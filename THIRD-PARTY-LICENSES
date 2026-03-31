@@ -1,0 +1,5 @@
+This project does not include any third-party code or assets that require attribution
+beyond the dependencies listed in pyproject.toml / package.json.
+
+All third-party dependencies are installed at build time and are subject to their
+respective licenses.

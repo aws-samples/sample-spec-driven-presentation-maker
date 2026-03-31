@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Cute / Playful — 楽しさは伝染する。スライドが楽しければ、場も楽しくなる。（ジョーク用）</title>
+<style>
+  :root {
+    /* === Colors === */
+    --color-primary: #FF6B9D;
+    --color-secondary: #C084FC;
+    --color-accent: #FCD34D;
+    --color-accent-2: #67E8F9;
+    --color-accent-3: #86EFAC;
+    --color-bg-dark: #2D1B4E;
+    --color-bg-light: #FFF5F7;
+    --color-bg-alt: #FEFCE8;
+    --color-bg-card: #FFFFFF;
+    --color-text-primary: #4A1D6A;
+    --color-text-secondary: #7C5B99;
+    --color-text-muted: #B89ED1;
+    --color-text-on-dark: #FFF5F7;
+    --color-border: #F3D5E0;
+    --color-fun-red: #EF4444;
+
+    /* === Tints (12%) === */
+    --color-primary-tint: #FFE1EA;
+    --color-secondary-tint: #F0DFFE;
+    --color-accent-tint: #FEF5D0;
+    --color-accent-2-tint: #DFF9FE;
+    --color-accent-3-tint: #E3FBE9;
+
+    /* === Template === */
+    /* 推奨テンプレート: Blank Light */
+
+    /* === Typography === */
+    --font-heading: "Trebuchet MS", "メイリオ", sans-serif;
+    --font-body: "Calibri", "メイリオ", sans-serif;
+    --fs-cover-title: 48pt;
+    --fs-cover-sub: 22pt;
+    --fs-slide-title: 38pt;
+    --fs-heading: 26pt;
+    --fs-body: 16pt;
+    --fs-caption: 12pt;
+    --fs-fun-stat: 72pt;
+
+    /* === Shape === */
+    --radius: 20px;
+    --radius-sm: 12px;
+    --radius-pill: 999px;
+    --radius-circle: 50%;
+    --shadow-card: 0 3px 12px rgba(255,107,157,0.12);
+    --shadow-sticker: 2px 4px 10px rgba(192,132,252,0.18);
+    --border-w: 2pt;
+
+    /* === Decoration === */
+    --deco-opacity: 0.25;
+    --deco-opacity-soft: 0.08;
+    --deco-confetti-opacity: 0.4;
+    --deco-confetti-radius: 3px;
+    --deco-dot-size-sm: 10px;
+    --deco-dot-size-md: 16px;
+    --deco-dot-size-lg: 22px;
+    --deco-star-size: 32pt;
+    --deco-heart-size: 28pt;
+    --deco-blob-size: 300px;
+  }
+
+  body {
+    margin: 0; padding: 40px;
+    background: #E5E5E5;
+    zoom: 0.7;
+  }
+  .slide {
+    position: relative;
+    width: 1920px; height: 1080px;
+    margin: 0 auto 40px;
+    background: var(--color-bg-light);
+    overflow: hidden;
+  }
+  .slide-dark { background: var(--color-bg-dark); }
+  .slide-alt { background: var(--color-bg-alt); }
+  .el { position: absolute; }
+
+  /* === Text styles === */
+  .t-cover-title {
+    font-family: var(--font-heading);
+    font-size: var(--fs-cover-title);
+    font-weight: bold;
+    color: var(--color-text-on-dark);
+    line-height: 1.3;
+  }
+  .t-cover-sub {
+    font-family: var(--font-body);
+    font-size: var(--fs-cover-sub);
+    color: var(--color-text-on-dark);
+    line-height: 1.5;
+    opacity: 0.85;
+  }
+  .t-slide-title {
+    font-family: var(--font-heading);
+    font-size: var(--fs-slide-title);
+    font-weight: bold;
+    color: var(--color-text-primary);
+    line-height: 1.3;
+  }
+  .t-heading {
+    font-family: var(--font-heading);
+    font-size: var(--fs-heading);
+    font-weight: bold;
+    color: var(--color-text-primary);
+    line-height: 1.4;
+  }
+  .t-body {
+    font-family: var(--font-body);
+    font-size: var(--fs-body);
+    color: var(--color-text-primary);
+    line-height: 1.6;
+  }
+  .t-caption {
+    font-family: var(--font-body);
+    font-size: var(--fs-caption);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+  .t-fun-stat {
+    font-family: var(--font-heading);
+    font-size: var(--fs-fun-stat);
+    font-weight: bold;
+    color: var(--color-primary);
+    line-height: 1.0;
+  }
+  .t-on-dark { color: var(--color-text-on-dark); }
+  .t-primary { color: var(--color-primary); }
+  .t-secondary { color: var(--color-secondary); }
+  .t-accent { color: var(--color-accent); }
+  .t-accent-2 { color: var(--color-accent-2); }
+  .t-accent-3 { color: var(--color-accent-3); }
+  .t-muted { color: var(--color-text-muted); }
+  .t-center { text-align: center; }
+
+  /* === Components === */
+  .card {
+    background: var(--color-bg-card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+    border: var(--border-w) solid var(--color-border);
+  }
+  .card-pink { border-color: var(--color-primary); }
+  .card-purple { border-color: var(--color-secondary); }
+  .card-yellow { border-color: var(--color-accent); }
+  .card-blue { border-color: var(--color-accent-2); }
+  .card-green { border-color: var(--color-accent-3); }
+
+  .badge {
+    display: inline-block;
+    padding: 6px 18px;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-heading);
+    font-size: var(--fs-caption);
+    font-weight: bold;
+    color: var(--color-bg-card);
+  }
+  .badge-pink { background: var(--color-primary); }
+  .badge-purple { background: var(--color-secondary); }
+  .badge-yellow { background: var(--color-accent); color: var(--color-text-primary); }
+  .badge-blue { background: var(--color-accent-2); color: var(--color-text-primary); }
+  .badge-green { background: var(--color-accent-3); color: var(--color-text-primary); }
+
+  .sticker {
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sticker);
+    padding: 12px 24px;
+    font-family: var(--font-heading);
+    font-size: var(--fs-body);
+    font-weight: bold;
+    display: inline-block;
+  }
+  .sticker-pink { background: var(--color-primary); color: var(--color-bg-card); }
+  .sticker-yellow { background: var(--color-accent); color: var(--color-text-primary); }
+  .sticker-blue { background: var(--color-accent-2); color: var(--color-text-primary); }
+
+  .icon-circle {
+    border-radius: var(--radius-circle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--fs-heading);
+  }
+  .icon-circle-pink { background: var(--color-primary-tint); }
+  .icon-circle-purple { background: var(--color-secondary-tint); }
+  .icon-circle-yellow { background: var(--color-accent-tint); }
+  .icon-circle-blue { background: var(--color-accent-2-tint); }
+  .icon-circle-green { background: var(--color-accent-3-tint); }
+
+  .color-swatch {
+    border-radius: var(--radius);
+    border: var(--border-w) solid var(--color-border);
+  }
+
+  /* === Decorations === */
+  .deco { position: absolute; pointer-events: none; }
+  .deco-dot { border-radius: var(--radius-circle); opacity: 0.5; }
+  .deco-dot-pink { background: var(--color-primary); }
+  .deco-dot-purple { background: var(--color-secondary); }
+  .deco-dot-yellow { background: var(--color-accent); }
+  .deco-dot-blue { background: var(--color-accent-2); }
+  .deco-dot-green { background: var(--color-accent-3); }
+
+  .deco-heart { font-size: var(--deco-heart-size); opacity: var(--deco-opacity); }
+  .deco-heart-pink { color: var(--color-primary); }
+  .deco-heart-yellow { color: var(--color-accent); }
+  .deco-heart-purple { color: var(--color-secondary); }
+  .deco-heart-blue { color: var(--color-accent-2); }
+
+  .deco-star { font-size: var(--deco-star-size); opacity: var(--deco-opacity); }
+  .deco-star-yellow { color: var(--color-accent); }
+  .deco-star-pink { color: var(--color-primary); }
+  .deco-star-green { color: var(--color-accent-3); }
+
+  .deco-confetti {
+    border-radius: var(--deco-confetti-radius);
+    opacity: var(--deco-confetti-opacity);
+  }
+  .deco-confetti-pink { background: var(--color-primary); }
+  .deco-confetti-purple { background: var(--color-secondary); }
+  .deco-confetti-yellow { background: var(--color-accent); }
+  .deco-confetti-blue { background: var(--color-accent-2); }
+  .deco-confetti-green { background: var(--color-accent-3); }
+
+  .deco-blob {
+    border-radius: var(--radius-circle);
+    opacity: var(--deco-opacity-soft);
+  }
+  .deco-blob-pink { background: var(--color-primary); }
+  .deco-blob-purple { background: var(--color-secondary); }
+  .deco-blob-yellow { background: var(--color-accent); }
+  .deco-blob-blue { background: var(--color-accent-2); }
+
+  .deco-wave {
+    border-radius: 50% 50% 0 0;
+    opacity: 0.06;
+    background: var(--color-primary);
+  }
+
+  .deco-footer {
+    font-family: var(--font-body);
+    font-size: var(--fs-caption);
+    color: var(--color-text-on-dark);
+    opacity: 0.5;
+  }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: COVER -->
+<div class="slide slide-dark">
+  <!-- 装飾: blob -->
+  <div class="deco deco-blob deco-blob-pink" style="left:-80px; top:-80px; width:300px; height:300px;"></div>
+  <div class="deco deco-blob deco-blob-yellow" style="left:1700px; top:-60px; width:250px; height:250px;"></div>
+  <div class="deco deco-blob deco-blob-purple" style="left:1600px; top:850px; width:350px; height:350px;"></div>
+  <div class="deco deco-blob deco-blob-blue" style="left:-50px; top:800px; width:280px; height:280px;"></div>
+  <!-- 装飾: dot -->
+  <div class="deco deco-dot deco-dot-pink" style="left:120px; top:80px; width:18px; height:18px;"></div>
+  <div class="deco deco-dot deco-dot-yellow" style="left:300px; top:160px; width:12px; height:12px;"></div>
+  <div class="deco deco-dot deco-dot-purple" style="left:1700px; top:120px; width:22px; height:22px;"></div>
+  <div class="deco deco-dot deco-dot-green" style="left:1500px; top:60px; width:10px; height:10px;"></div>
+  <div class="deco deco-dot deco-dot-blue" style="left:1820px; top:300px; width:14px; height:14px;"></div>
+  <div class="deco deco-dot deco-dot-yellow" style="left:80px; top:900px; width:16px; height:16px;"></div>
+  <div class="deco deco-dot deco-dot-pink" style="left:400px; top:950px; width:20px; height:20px;"></div>
+  <!-- 装飾: heart -->
+  <div class="deco deco-heart deco-heart-pink" style="left:200px; top:250px;">♥</div>
+  <div class="deco deco-heart deco-heart-yellow" style="left:1650px; top:200px;">♥</div>
+  <div class="deco deco-heart deco-heart-purple" style="left:1750px; top:750px;">♥</div>
+  <div class="deco deco-heart deco-heart-blue" style="left:100px; top:700px;">♥</div>
+  <!-- 装飾: star -->
+  <div class="deco deco-star deco-star-yellow" style="left:500px; top:100px;">★</div>
+  <div class="deco deco-star deco-star-yellow" style="left:1400px; top:900px;">★</div>
+  <div class="deco deco-star deco-star-green" style="left:1800px; top:500px;">★</div>
+  <div class="deco deco-star deco-star-pink" style="left:60px; top:500px;">★</div>
+  <!-- 装飾: confetti -->
+  <div class="deco deco-confetti deco-confetti-pink" style="left:700px; top:80px; width:8px; height:24px; transform:rotate(25deg);"></div>
+  <div class="deco deco-confetti deco-confetti-blue" style="left:850px; top:130px; width:6px; height:20px; transform:rotate(-15deg);"></div>
+  <div class="deco deco-confetti deco-confetti-yellow" style="left:1100px; top:60px; width:8px; height:22px; transform:rotate(40deg);"></div>
+  <div class="deco deco-confetti deco-confetti-green" style="left:1300px; top:110px; width:6px; height:18px; transform:rotate(-30deg);"></div>
+  <div class="deco deco-confetti deco-confetti-purple" style="left:600px; top:950px; width:8px; height:24px; transform:rotate(15deg);"></div>
+  <div class="deco deco-confetti deco-confetti-yellow" style="left:900px; top:980px; width:6px; height:20px; transform:rotate(-45deg);"></div>
+  <div class="deco deco-confetti deco-confetti-pink" style="left:1200px; top:940px; width:8px; height:22px; transform:rotate(35deg);"></div>
+  <!-- 波形 -->
+  <div class="deco deco-wave" style="left:0; top:980px; width:1920px; height:100px;"></div>
+  <!-- コンテンツ -->
+  <div class="el t-cover-title t-center" style="left:96px; top:340px; width:1728px;">✨ Cute / Playful ✨</div>
+  <div class="el t-cover-sub t-center" style="left:96px; top:460px; width:1728px;">楽しさは伝染する。スライドが楽しければ、場も楽しくなる。</div>
+  <!-- ステッカー -->
+  <div class="el sticker sticker-pink" style="left:660px; top:580px; transform:rotate(-3deg);">🎉 Have Fun!</div>
+  <div class="el sticker sticker-yellow" style="left:920px; top:570px; transform:rotate(2deg);">💖 Kawaii</div>
+  <div class="el sticker sticker-blue" style="left:1150px; top:585px; transform:rotate(-1deg);">⭐ Pop!</div>
+  <!-- フッター -->
+  <div class="el deco-footer t-center" style="left:96px; top:1000px; width:1728px;">Style Guide — イベント用プレゼンテーション</div>
+</div>
+
+<!-- SLIDE 2: カラーパレット -->
+<div class="slide">
+  <!-- 装飾 -->
+  <div class="deco deco-dot deco-dot-purple" style="left:1800px; top:60px; width:18px; height:18px;"></div>
+  <div class="deco deco-dot deco-dot-yellow" style="left:100px; top:950px; width:14px; height:14px;"></div>
+  <div class="deco deco-star deco-star-yellow" style="left:1780px; top:950px;">★</div>
+  <div class="deco deco-heart deco-heart-pink" style="left:1750px; top:150px;">♥</div>
+  <div class="deco deco-confetti deco-confetti-green" style="left:180px; top:100px; width:6px; height:20px; transform:rotate(20deg);"></div>
+  <div class="deco deco-confetti deco-confetti-purple" style="left:1650px; top:80px; width:8px; height:22px; transform:rotate(-25deg);"></div>
+  <!-- タイトル -->
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1728px;">🎨 カラーパレット</div>
+  <div class="el t-body" style="left:96px; top:120px; width:1728px;">5色をバランスよく使い分ける。単色は退屈 — 多色でポップに。</div>
+  <!-- メインカラー行 -->
+  <div class="el color-swatch" style="left:96px; top:200px; width:320px; height:140px; background:var(--color-primary);"></div>
+  <div class="el t-heading t-primary" style="left:96px; top:350px; width:320px;">Primary</div>
+  <div class="el t-caption" style="left:96px; top:395px; width:320px;">#FF6B9D コーラルピンク</div>
+
+  <div class="el color-swatch" style="left:456px; top:200px; width:320px; height:140px; background:var(--color-secondary);"></div>
+  <div class="el t-heading t-secondary" style="left:456px; top:350px; width:320px;">Secondary</div>
+  <div class="el t-caption" style="left:456px; top:395px; width:320px;">#C084FC ラベンダー</div>
+
+  <div class="el color-swatch" style="left:816px; top:200px; width:320px; height:140px; background:var(--color-accent);"></div>
+  <div class="el t-heading t-accent" style="left:816px; top:350px; width:320px;">Accent</div>
+  <div class="el t-caption" style="left:816px; top:395px; width:320px;">#FCD34D サンシャインイエロー</div>
+
+  <div class="el color-swatch" style="left:1176px; top:200px; width:320px; height:140px; background:var(--color-accent-2);"></div>
+  <div class="el t-heading t-accent-2" style="left:1176px; top:350px; width:320px;">Accent 2</div>
+  <div class="el t-caption" style="left:1176px; top:395px; width:320px;">#67E8F9 スカイブルー</div>
+
+  <div class="el color-swatch" style="left:1536px; top:200px; width:320px; height:140px; background:var(--color-accent-3);"></div>
+  <div class="el t-heading t-accent-3" style="left:1536px; top:350px; width:320px;">Accent 3</div>
+  <div class="el t-caption" style="left:1536px; top:395px; width:320px;">#86EFAC ミントグリーン</div>
+
+  <!-- 背景色行 -->
+  <div class="el t-heading" style="left:96px; top:460px; width:1728px;">背景カラー</div>
+
+  <div class="el color-swatch" style="left:96px; top:510px; width:240px; height:100px; background:var(--color-bg-dark);"></div>
+  <div class="el t-caption" style="left:96px; top:620px; width:240px;">bg-dark #2D1B4E<br>カバー・クロージング用</div>
+
+  <div class="el color-swatch" style="left:376px; top:510px; width:240px; height:100px; background:var(--color-bg-light);"></div>
+  <div class="el t-caption" style="left:376px; top:620px; width:240px;">bg-light #FFF5F7<br>ベビーピンク（基本背景）</div>
+
+  <div class="el color-swatch" style="left:656px; top:510px; width:240px; height:100px; background:var(--color-bg-alt);"></div>
+  <div class="el t-caption" style="left:656px; top:620px; width:240px;">bg-alt #FEFCE8<br>クリームイエロー（代替）</div>
+
+  <div class="el color-swatch" style="left:936px; top:510px; width:240px; height:100px; background:var(--color-bg-card);"></div>
+  <div class="el t-caption" style="left:936px; top:620px; width:240px;">bg-card #FFFFFF<br>カード背景</div>
+
+  <!-- テキストカラー -->
+  <div class="el t-heading" style="left:96px; top:700px; width:1728px;">テキストカラー</div>
+  <div class="el t-body" style="left:96px; top:750px; width:500px;">text-primary #4A1D6A — 本文</div>
+  <div class="el t-body t-muted" style="left:96px; top:785px; width:500px;">text-secondary #7C5B99 — サブ</div>
+  <div class="el t-body" style="left:96px; top:820px; width:500px;"><span style="color:var(--color-text-muted);">text-muted #B89ED1 — ミュート</span></div>
+  <div class="el card t-body t-on-dark" style="left:650px; top:750px; width:350px; height:90px; background:var(--color-bg-dark); padding:16px; border:none;">text-on-dark #FFF5F7<br>ダーク背景上のテキスト</div>
+
+  <!-- ルール -->
+  <div class="el card card-pink" style="left:96px; top:900px; width:1728px; height:130px; padding:20px;">
+    <span class="t-heading t-primary">ルール</span><br>
+    <span class="t-body">・モノトーン禁止 — 常に2色以上使う　・ダーク背景はカバーとクロージングのみ　・ボーダーはprimaryまたはsecondary</span>
+  </div>
+</div>
+
+<!-- SLIDE 3: タイポグラフィ -->
+<div class="slide slide-alt">
+  <!-- 装飾 -->
+  <div class="deco deco-dot deco-dot-pink" style="left:1780px; top:80px; width:16px; height:16px;"></div>
+  <div class="deco deco-dot deco-dot-blue" style="left:120px; top:980px; width:12px; height:12px;"></div>
+  <div class="deco deco-heart deco-heart-purple" style="left:1800px; top:500px;">♥</div>
+  <div class="deco deco-star deco-star-yellow" style="left:80px; top:200px;">★</div>
+  <div class="deco deco-confetti deco-confetti-pink" style="left:1700px; top:900px; width:8px; height:24px; transform:rotate(30deg);"></div>
+  <div class="deco deco-confetti deco-confetti-blue" style="left:1750px; top:870px; width:6px; height:18px; transform:rotate(-20deg);"></div>
+  <div class="deco deco-confetti deco-confetti-yellow" style="left:200px; top:950px; width:7px; height:22px; transform:rotate(45deg);"></div>
+  <!-- タイトル -->
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1728px;">✏️ タイポグラフィ</div>
+  <div class="el t-body" style="left:96px; top:120px; width:1728px;">Trebuchet MS + メイリオ。丸みのあるサンセリフで柔らかさを出す。</div>
+  <!-- サイズ階層デモ -->
+  <div class="el t-cover-title t-primary" style="left:96px; top:200px; width:1200px;">カバータイトル 48pt</div>
+  <div class="el t-slide-title" style="left:96px; top:290px; width:1200px;">スライドタイトル 38pt</div>
+  <div class="el t-heading" style="left:96px; top:365px; width:1200px;">セクション見出し 26pt</div>
+  <div class="el t-body" style="left:96px; top:420px; width:1200px;">本文テキスト 16pt — 読みやすさを最優先。行間1.6で余裕を持たせる。</div>
+  <div class="el t-caption" style="left:96px; top:460px; width:1200px;">キャプション 12pt — 補足情報やクレジットに使用</div>
+  <!-- Fun Stat デモ -->
+  <div class="el card card-yellow" style="left:96px; top:530px; width:500px; height:240px; padding:24px;">
+    <span class="t-caption">楽しい大数値 — fun-stat 72pt</span><br><br>
+    <span class="t-fun-stat">🎉 42%</span><br>
+    <span class="t-body">インパクトのある数値を大きく見せる。</span>
+  </div>
+  <!-- フォント指定カード -->
+  <div class="el card card-purple" style="left:660px; top:530px; width:500px; height:240px; padding:24px;">
+    <span class="t-heading t-secondary">フォント指定</span><br><br>
+    <span class="t-body">見出し: Trebuchet MS, メイリオ<br>本文: Calibri, メイリオ<br><br>絵文字はタイトル・見出しに控えめに使用OK。</span>
+  </div>
+  <!-- ルールカード -->
+  <div class="el card card-pink" style="left:1224px; top:530px; width:600px; height:240px; padding:24px;">
+    <span class="t-heading t-primary">タイポルール</span><br><br>
+    <span class="t-body">・隣接レベルは4pt以上の差をつける<br>・本文14pt以上、見出し20pt以上<br>・太字は見出しのみ。本文はregular<br>・モノスペース多用禁止</span>
+  </div>
+  <!-- 装飾: 大きな丸 -->
+  <div class="deco deco-blob deco-blob-pink" style="left:1750px; top:-40px; width:200px; height:200px;"></div>
+</div>
+
+<!-- SLIDE 4: カード＆コンポーネント -->
+<div class="slide">
+  <!-- 装飾 -->
+  <div class="deco deco-dot deco-dot-yellow" style="left:1800px; top:50px; width:14px; height:14px;"></div>
+  <div class="deco deco-dot deco-dot-green" style="left:80px; top:980px; width:18px; height:18px;"></div>
+  <div class="deco deco-heart deco-heart-pink" style="left:1820px; top:600px;">♥</div>
+  <div class="deco deco-star deco-star-yellow" style="left:60px; top:300px;">★</div>
+  <div class="deco deco-confetti deco-confetti-purple" style="left:1750px; top:950px; width:7px; height:22px; transform:rotate(-35deg);"></div>
+  <div class="deco deco-confetti deco-confetti-pink" style="left:300px; top:980px; width:6px; height:18px; transform:rotate(20deg);"></div>
+  <!-- タイトル -->
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1728px;">🧩 カード＆コンポーネント</div>
+  <div class="el t-body" style="left:96px; top:120px; width:1728px;">大角丸 + カラフルボーダー + 軽い影。柔らかくて楽しいコンテナ。</div>
+  <!-- カード5色 -->
+  <div class="el card card-pink" style="left:96px; top:200px; width:330px; height:180px; padding:20px;">
+    <span class="icon-circle icon-circle-pink" style="width:48px; height:48px; display:inline-flex;">🎀</span>
+    <span class="t-heading t-primary"> ピンク</span><br>
+    <span class="t-caption">border: primary</span>
+  </div>
+  <div class="el card card-purple" style="left:466px; top:200px; width:330px; height:180px; padding:20px;">
+    <span class="icon-circle icon-circle-purple" style="width:48px; height:48px; display:inline-flex;">🔮</span>
+    <span class="t-heading t-secondary"> パープル</span><br>
+    <span class="t-caption">border: secondary</span>
+  </div>
+  <div class="el card card-yellow" style="left:836px; top:200px; width:330px; height:180px; padding:20px;">
+    <span class="icon-circle icon-circle-yellow" style="width:48px; height:48px; display:inline-flex;">⭐</span>
+    <span class="t-heading t-accent"> イエロー</span><br>
+    <span class="t-caption">border: accent</span>
+  </div>
+  <div class="el card card-blue" style="left:1206px; top:200px; width:330px; height:180px; padding:20px;">
+    <span class="icon-circle icon-circle-blue" style="width:48px; height:48px; display:inline-flex;">💎</span>
+    <span class="t-heading t-accent-2"> ブルー</span><br>
+    <span class="t-caption">border: accent-2</span>
+  </div>
+  <div class="el card card-green" style="left:1576px; top:200px; width:260px; height:180px; padding:20px;">
+    <span class="icon-circle icon-circle-green" style="width:48px; height:48px; display:inline-flex;">🌿</span>
+    <span class="t-heading t-accent-3"> グリーン</span><br>
+    <span class="t-caption">border: accent-3</span>
+  </div>
+  <!-- バッジ -->
+  <div class="el t-heading" style="left:96px; top:430px; width:800px;">バッジ</div>
+  <div class="el" style="left:96px; top:480px;">
+    <span class="badge badge-pink">ピンク</span>
+    <span class="badge badge-purple">パープル</span>
+    <span class="badge badge-yellow">イエロー</span>
+    <span class="badge badge-blue">ブルー</span>
+    <span class="badge badge-green">グリーン</span>
+  </div>
+  <div class="el t-caption" style="left:96px; top:520px; width:800px;">pill型（radius: 999px）。ラベルやタグに使用。</div>
+  <!-- ステッカー -->
+  <div class="el t-heading" style="left:96px; top:580px; width:800px;">ステッカー</div>
+  <div class="el" style="left:96px; top:630px;">
+    <span class="sticker sticker-pink" style="transform:rotate(-3deg);">🎉 パーティー</span>
+    <span class="sticker sticker-yellow" style="transform:rotate(2deg);">💖 かわいい</span>
+    <span class="sticker sticker-blue" style="transform:rotate(-1deg);">✨ キラキラ</span>
+  </div>
+  <div class="el t-caption" style="left:96px; top:700px; width:800px;">角丸 + 回転 + パステル塗り = ステッカー風。</div>
+  <!-- アイコンサークル -->
+  <div class="el t-heading" style="left:96px; top:760px; width:800px;">アイコンサークル</div>
+  <div class="el" style="left:96px; top:810px;">
+    <span class="icon-circle icon-circle-pink" style="width:56px; height:56px; display:inline-flex;">🎀</span>
+    <span class="icon-circle icon-circle-purple" style="width:56px; height:56px; display:inline-flex;">🔮</span>
+    <span class="icon-circle icon-circle-yellow" style="width:56px; height:56px; display:inline-flex;">⭐</span>
+    <span class="icon-circle icon-circle-blue" style="width:56px; height:56px; display:inline-flex;">💎</span>
+    <span class="icon-circle icon-circle-green" style="width:56px; height:56px; display:inline-flex;">🌿</span>
+  </div>
+  <div class="el t-caption" style="left:96px; top:880px; width:800px;">tint色の丸背景 + 絵文字。各カードのアイコンに使用。</div>
+  <!-- ルール -->
+  <div class="el card card-purple" style="left:1000px; top:430px; width:820px; height:480px; padding:24px;">
+    <span class="t-heading t-secondary">コンポーネントルール</span><br><br>
+    <span class="t-body">
+      ・角丸は常に大きめ（radius: 20px）— シャープ角禁止<br>
+      ・カードは白背景 + カラーボーダー + ピンク系シャドウ<br>
+      ・ボーダーはやや太め（2pt）で存在感を出す<br>
+      ・各カードに色違いのアイコンサークルを配置<br>
+      ・ステッカーは軽い回転で手作り感を演出<br>
+      ・バッジはpill型で丸く<br>
+      ・色は5色をローテーション — 同色の連続を避ける
+    </span>
+  </div>
+</div>
+
+</body>
+</html>

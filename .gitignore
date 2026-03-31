@@ -1,0 +1,59 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Linter / Test / Coverage cache
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# Environment variables
+.env
+
+# Internal docs (not for public repo)
+docs/internal/
+
+# CDK
+infra/cdk.out/
+infra/node_modules/
+infra/cdk-outputs.json
+infra/cdk.context.json
+
+# Frontend
+admin-ui/node_modules/
+admin-ui/dist/
+web-ui/node_modules/
+web-ui/.next/
+web-ui/public/aws-exports.json
+
+# Kiro / Q-SPEC (local steering, specs, settings)
+.kiro/
+
+# Config (contains secrets)
+infra/config.yaml
+
+# Assets (downloaded via scripts)
+skill/assets/aws/
+skill/assets/material/
+*.tsbuildinfo
+.ash/
+?/

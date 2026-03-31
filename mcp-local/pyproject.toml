@@ -1,0 +1,21 @@
+[project]
+name = "sdpm-mcp-local"
+version = "1.0.0"
+description = "spec-driven-presentation-maker Local MCP Server — stdio transport for Kiro CLI, Claude Desktop, etc. (Layer 2)"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]",
+    "sdpm-skill",
+]
+
+[tool.uv.sources]
+sdpm-skill = { path = "../skill" }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 120

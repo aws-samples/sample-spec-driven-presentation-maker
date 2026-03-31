@@ -1,0 +1,830 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: MIT-0
+/**
+ * ChatPanel — Chat interface with streaming via AgentCore SSE.
+ *
+ * Key behaviors:
+ * - Send: ⌘+Enter (Mac) / Ctrl+Enter (Win). Enter = newline.
+ * - IME-safe: compositionstart/end tracking for Japanese/CJK input.
+ * - Textarea stays focused and editable during agent response.
+ * - Only the send button shows loading state.
+ * - Tool executions shown as structured indicators, not inline text.
+ * - File upload via + menu, drag-and-drop, ⌘V paste.
+ * - @mentions for slide and deck references.
+ */
+
+"use client"
+
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef, FormEvent, KeyboardEvent, useCallback } from "react"
+import { useAuth } from "react-oidc-context"
+import { invokeAgentCore, generateSessionId, setAgentConfig } from "@/services/agentCoreService"
+import { getChatHistory, listDecks, patchDeck, DeckSummary } from "@/services/deckService"
+import { uploadFile, validateFile, canAddMoreFiles, UploadedFile } from "@/services/uploadService"
+import { useCompositionSafe } from "@/hooks/useCompositionSafe"
+import { ChatMessage, ToolUse } from "./ChatMessage"
+import { MentionOverlay } from "./MentionOverlay"
+import { MentionPopup, MentionItem } from "./MentionPopup"
+import { PlusMenu } from "./PlusMenu"
+import { AttachmentPreview, Attachment, SnippetAttachment } from "./AttachmentPreview"
+import { FileDropZone } from "./FileDropZone"
+import { SnippetInput } from "./SnippetInput"
+import { useIsMobile } from "@/hooks/UseMobile"
+import { Send, Square, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+
+interface Message {
+  role: "user" | "assistant"
+  content: string
+  toolUses: ToolUse[]
+  /** Ordered sequence of text and tool blocks for inline display. */
+  blocks?: { type: "text"; text: string }[] | { type: "tool"; tool: ToolUse }[]
+  snippets?: { label: string; text: string }[]
+}
+
+interface ChatPanelProps {
+  deckId: string
+  deckName?: string
+  chatSessionId?: string
+  slidePreviewUrls?: (string | null)[]
+  onDeckCreated?: (deckId: string) => void
+  onPptxRequested?: () => void
+  onWorkflowPhase?: (phase: string) => void
+  onStyleGalleryRequest?: () => void
+}
+
+/** Handle exposed to parent for inserting text at cursor position. */
+export interface ChatPanelHandle {
+  insertAtCursor: (text: string) => void
+}
+
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPptxRequested, onWorkflowPhase, onStyleGalleryRequest }, ref) {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [mentionVisible, setMentionVisible] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState("")
+  const [mentionItems, setMentionItems] = useState<MentionItem[]>([])
+  const [allDecks, setAllDecks] = useState<DeckSummary[]>([])
+  const [snippetOpen, setSnippetOpen] = useState(false)
+  const [snippets, setSnippets] = useState<SnippetAttachment[]>([])
+  const [editingSnippetId, setEditingSnippetId] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState(() => {
+    if (chatSessionId) return chatSessionId
+    if (deckId === "new") return generateSessionId()
+    return deckId.padEnd(36, "0")
+  })
+
+  useEffect(() => {
+    if (chatSessionId && chatSessionId !== sessionId) {
+      setSessionId(chatSessionId)
+    }
+  }, [chatSessionId])
+
+  const [configLoaded, setConfigLoaded] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const shouldAutoScroll = useRef(true)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const mentionPopupRef = useRef<any>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const auth = useAuth()
+  const { onCompositionStart, onCompositionEnd, getIsComposing } = useCompositionSafe()
+  const isMobile = useIsMobile()
+
+  /**
+   * Insert text at the current cursor position in the textarea.
+   * Exposed to parent via ref.
+   */
+  useImperativeHandle(ref, () => ({
+    insertAtCursor(text: string) {
+      const ta = textareaRef.current
+      if (!ta) return
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      const before = input.slice(0, start)
+      const after = input.slice(end)
+      const newValue = before + text + after
+      setInput(newValue)
+      requestAnimationFrame(() => {
+        ta.focus()
+        const pos = start + text.length
+        ta.setSelectionRange(pos, pos)
+      })
+    },
+  }), [input])
+
+  // Load agent config
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const response = await fetch("/aws-exports.json")
+        const config = await response.json()
+        await setAgentConfig(config.agentRuntimeArn, config.awsRegion || "us-east-1", config.agentPattern)
+        setConfigLoaded(true)
+      } catch (err) {
+        console.error("Failed to load agent config:", err)
+      }
+    }
+    loadConfig()
+  }, [])
+
+  // Load chat history
+  useEffect(() => {
+    async function loadHistory() {
+      const idToken = auth.user?.id_token
+      if (!idToken || !sessionId) return
+      setHistoryLoading(true)
+      try {
+      const history = await getChatHistory(sessionId, idToken)
+      if (history.length > 0) {
+        const parsed: typeof messages = []
+        for (const m of history) {
+          let text = ""
+          const toolUses: ToolUse[] = []
+          const snippets: { label: string; text: string }[] = []
+
+          if (typeof m.content === "string") {
+            text = m.content
+          } else if (Array.isArray(m.content)) {
+            // toolResult messages: attach result to matching toolUse in previous assistant
+            if (m.role === "user" && m.content.some((b: Record<string, unknown>) => b.toolResult)) {
+              for (const block of m.content) {
+                const b = block as Record<string, unknown>
+                if (b.toolResult) {
+                  const tr = b.toolResult as Record<string, unknown>
+                  const tuId = tr.toolUseId as string
+                  const status = (tr.status as string) || "success"
+                  let resultText = ""
+                  for (const c of (tr.content as Record<string, unknown>[]) || []) {
+                    if (c.text) resultText += c.text as string
+                  }
+                  // Find matching toolUse in previous assistant and set result
+                  if (parsed.length > 0) {
+                    const prev = parsed[parsed.length - 1]
+                    if (prev.role === "assistant") {
+                      const matchedTool = prev.toolUses.find((t) => t.toolUseId === tuId)
+                      if (matchedTool) {
+                        matchedTool.status = status
+                        try { matchedTool.result = JSON.parse(resultText) } catch { matchedTool.result = resultText }
+                      }
+                      // Update blocks too
+                      if (prev.blocks) {
+                        for (const bl of prev.blocks) {
+                          if (bl.type === "tool" && bl.tool.toolUseId === tuId) {
+                            bl.tool.status = status
+                            try { bl.tool.result = JSON.parse(resultText) } catch { bl.tool.result = resultText }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              continue
+            }
+
+            for (const block of m.content) {
+              const b = block as Record<string, unknown>
+              if (b.toolUse) {
+                const tu = b.toolUse as Record<string, unknown>
+                toolUses.push({
+                  toolUseId: (tu.toolUseId as string) || "",
+                  name: (tu.name as string) || "",
+                  input: (tu.input as Record<string, unknown>) || {},
+                })
+              } else if (b.text && toolUses.length === 0) {
+                text += (text ? "\n" : "") + (b.text as string)
+              }
+            }
+          }
+          if (!text.trim() && toolUses.length === 0) continue
+          // Build blocks for inline tool display (same as streaming)
+          const blocks: ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[] = []
+          if (m.role === "assistant" && Array.isArray(m.content)) {
+            for (const block of m.content) {
+              const b = block as Record<string, unknown>
+              if (b.text) {
+                blocks.push({ type: "text", text: b.text as string })
+              } else if (b.toolUse) {
+                const tu = b.toolUse as Record<string, unknown>
+                blocks.push({ type: "tool", tool: {
+                  toolUseId: (tu.toolUseId as string) || "",
+                  name: (tu.name as string) || "",
+                  input: (tu.input as Record<string, unknown>) || {},
+                  status: "success",
+                }})
+              }
+            }
+          }
+          parsed.push({
+            role: m.role as "user" | "assistant",
+            content: text,
+            toolUses,
+            blocks: blocks.length > 0 ? blocks : undefined,
+            snippets: snippets.length > 0 ? snippets : undefined,
+          })
+        }
+        if (parsed.length > 0) setMessages(parsed)
+      }
+      } finally {
+        setHistoryLoading(false)
+      }
+    }
+    if (auth.isAuthenticated) loadHistory()
+  }, [sessionId, auth.isAuthenticated])
+
+  // Load deck list for @mentions
+  useEffect(() => {
+    async function loadDecks() {
+      const idToken = auth.user?.id_token
+      if (!idToken) return
+      const data = await listDecks(idToken)
+      setAllDecks(data.decks)
+    }
+    if (auth.isAuthenticated) loadDecks()
+  }, [auth.isAuthenticated])
+
+  useEffect(() => {
+    if (shouldAutoScroll.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [messages])
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const ta = textareaRef.current
+    if (ta) {
+      ta.style.height = "0px"
+      ta.style.height = ta.scrollHeight + "px"
+    }
+  }, [input])
+
+  // Build mention items from current deck slides + other decks
+  useEffect(() => {
+    const items: MentionItem[] = []
+
+    // Current deck slides with preview URLs
+    if (slidePreviewUrls) {
+      const did = deckId !== "new" ? deckId : null
+      const displayName = deckName || "Deck"
+      slidePreviewUrls.forEach((url, i) => {
+        items.push({
+          label: `Page ${i + 1}`,
+          insertText: did
+            ? `@${displayName}(#${did}):Page ${i + 1}`
+            : `@Page ${i + 1}`,
+          type: "slide",
+          page: i + 1,
+          previewUrl: url,
+        })
+      })
+    }
+
+    // Other decks with thumbnails
+    allDecks
+      .filter((d) => d.deckId !== deckId)
+      .forEach((d) => {
+        items.push({
+          label: d.name,
+          insertText: `@${d.name}(#${d.deckId})`,
+          type: "deck",
+          deckId: d.deckId,
+          previewUrl: d.thumbnailUrl,
+        })
+      })
+
+    setMentionItems(items)
+  }, [slidePreviewUrls, allDecks, deckId])
+
+  /**
+   * Handle file selection from + menu or drag-and-drop.
+   *
+   * @param files - FileList from input or drop event
+   */
+  const handleFiles = useCallback((files: FileList) => {
+    const currentCount = attachments.length
+    const newFiles = Array.from(files)
+
+    for (const file of newFiles) {
+      if (!canAddMoreFiles(currentCount + attachments.length)) {
+        toast.error("Maximum 5 files can be attached at once.")
+        break
+      }
+
+      const error = validateFile(file)
+      if (error) {
+        toast.error(error)
+        continue
+      }
+
+      const id = crypto.randomUUID()
+      setAttachments((prev) => [...prev, { id, file, status: "pending" }])
+    }
+  }, [attachments.length])
+
+  /**
+   * Remove an attachment by ID.
+   *
+   * @param id - Attachment identifier
+   */
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id))
+  }, [])
+
+  /**
+   * Detect @ input for mention popup.
+   *
+   * @param value - Current textarea value
+   */
+  const handleInputChange = (value: string) => {
+    setInput(value)
+
+    const ta = textareaRef.current
+    if (!ta) return
+
+    const cursorPos = ta.selectionStart
+    const textBeforeCursor = value.slice(0, cursorPos)
+
+    // Check if we're in a mention context (@ followed by non-space chars)
+    const mentionMatch = textBeforeCursor.match(/@(\w*)$/)
+    if (mentionMatch) {
+      setMentionVisible(true)
+      setMentionQuery(mentionMatch[1])
+    } else {
+      setMentionVisible(false)
+      setMentionQuery("")
+    }
+  }
+
+  /**
+   * Handle mention selection from popup.
+   *
+   * @param item - Selected mention item
+   */
+  const handleMentionSelect = (item: MentionItem) => {
+    const ta = textareaRef.current
+    if (!ta) return
+
+    const cursorPos = ta.selectionStart
+    const textBeforeCursor = input.slice(0, cursorPos)
+    const mentionStart = textBeforeCursor.lastIndexOf("@")
+
+    if (mentionStart >= 0) {
+      const before = input.slice(0, mentionStart)
+      const after = input.slice(cursorPos)
+      const newValue = before + item.insertText + " " + after
+      setInput(newValue)
+
+      requestAnimationFrame(() => {
+        ta.focus()
+        const pos = mentionStart + item.insertText.length + 1
+        ta.setSelectionRange(pos, pos)
+      })
+    }
+
+    setMentionVisible(false)
+  }
+
+  /**
+   * Upload all pending attachments and send the message.
+   *
+   * @param userMessage - The text to send
+   */
+  const handleSend = async (userMessage: string) => {
+    if ((!userMessage.trim() && attachments.length === 0 && snippets.length === 0) || !configLoaded || isLoading) return
+
+    const idToken = auth.user?.id_token
+    const accessToken = auth.user?.access_token
+    const userId = auth.user?.profile?.sub
+    if (!accessToken || !userId || !idToken) return
+
+    // Upload pending attachments
+    const uploadedFiles: UploadedFile[] = []
+    for (const att of attachments) {
+      if (att.status === "pending") {
+        try {
+          setAttachments((prev) =>
+            prev.map((a) => (a.id === att.id ? { ...a, status: "uploading" as const } : a)),
+          )
+          const result = await uploadFile(att.file, idToken, sessionId, deckId !== "new" ? deckId : undefined)
+          uploadedFiles.push(result)
+          setAttachments((prev) =>
+            prev.map((a) => (a.id === att.id ? { ...a, status: "completed" as const, uploadId: result.uploadId } : a)),
+          )
+        } catch {
+          setAttachments((prev) =>
+            prev.map((a) => (a.id === att.id ? { ...a, status: "failed" as const, error: "Upload failed" } : a)),
+          )
+        }
+      }
+    }
+
+    // Build message with attachment and snippet info
+    // Resolve @mentions to agent-readable instructions
+    let fullMessage = userMessage
+      // @DeckName(#id):Page N — slide with deckId
+      .replace(/@([^@(]+)\(#([^)]+)\):Page\s(\d+)/g, (_, name, did, page) =>
+        `[Reference: Slide Page ${page} of deck "${name}" (deckId: ${did}). Use get_deck("${did}") to read slide content.]`)
+      // @DeckName(#id) — deck reference
+      .replace(/@([^@(]+)\(#([^)]+)\)/g, (_, name, did) =>
+        `[Reference: Deck "${name}" (deckId: ${did}). Use get_deck("${did}") to read its content.]`)
+      // Legacy: @Page N (no deckId)
+      .replace(/@Page\s(\d+)/g, (_, page) => {
+        const did = deckId !== "new" ? deckId : null
+        return did
+          ? `[Reference: Slide Page ${page} of current deck (deckId: ${did}). Use get_deck("${did}") to read slide content.]`
+          : `[Reference: Slide Page ${page} of current deck]`
+      })
+    if (uploadedFiles.length > 0) {
+      const fileInfo = uploadedFiles
+        .map((f) => `[Attached: ${f.fileName} (uploadId: ${f.uploadId})]`)
+        .join("\n")
+      fullMessage = `${fileInfo}\n\n${fullMessage}`
+    }
+    if (snippets.length > 0) {
+      const snippetInfo = snippets
+        .map((s) => `---snippet---\n${s.text}\n---/snippet---`)
+        .join("\n\n")
+      fullMessage = `${fullMessage}\n\n${snippetInfo}`
+    }
+
+    const sentSnippets = snippets.map((s) => ({ label: s.label || "Text snippet", text: s.text }))
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: userMessage, toolUses: [], snippets: sentSnippets.length > 0 ? sentSnippets : undefined },
+      { role: "assistant", content: "", toolUses: [] },
+    ])
+    setInput("")
+    setAttachments([])
+    setSnippets([])
+    setIsLoading(true)
+
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    requestAnimationFrame(() => textareaRef.current?.focus())
+
+    try {
+      let lastTextSnapshot = ""
+      /** Map toolUseId → character position in cumulative text where tool was first seen. */
+      const toolPositions = new Map<string, number>()
+      /** Ordered list of toolUseIds in insertion order. */
+      const toolOrder: string[] = []
+
+      /**
+       * Rebuild blocks array from cumulative text + tool positions.
+       *
+       * @param text - Cumulative streamed text
+       * @param toolMap - Map of toolUseId → ToolUse data
+       * @returns Ordered blocks array
+       */
+      function rebuildBlocks(text: string, toolMap: Map<string, ToolUse>): ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[] {
+        const result: ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[] = []
+        let textStart = 0
+        for (const id of toolOrder) {
+          const pos = toolPositions.get(id) ?? textStart
+          const tool = toolMap.get(id)
+          if (!tool) continue
+          const textSlice = text.slice(textStart, pos)
+          if (textSlice) result.push({ type: "text", text: textSlice })
+          result.push({ type: "tool", tool })
+          textStart = pos
+        }
+        const trailing = text.slice(textStart)
+        if (trailing) result.push({ type: "text", text: trailing })
+        return result
+      }
+
+      await invokeAgentCore(
+        fullMessage,
+        sessionId,
+        (streamed: string) => {
+          lastTextSnapshot = streamed
+          setMessages((prev) => {
+            const updated = [...prev]
+            const last = updated[updated.length - 1]
+            const toolMap = new Map(last.toolUses.map((t) => [t.toolUseId, t]))
+            const blocks = rebuildBlocks(streamed, toolMap)
+            updated[updated.length - 1] = { ...last, content: streamed, blocks }
+            return updated
+          })
+        },
+        accessToken,
+        userId,
+        (toolName: string, toolUseData: any) => {
+          // Tool result (completed) — detect deckId from any tool's result
+          if (toolUseData?.completed && toolUseData?.result?.deckId && onDeckCreated) {
+            // Link chat session to deck for history restore
+            if (idToken) {
+              patchDeck(toolUseData.result.deckId, { chatSessionId: sessionId }, idToken).catch(() => {})
+            }
+            onDeckCreated(toolUseData.result.deckId)
+          }
+          if (toolUseData?.completed && toolName === "generate_pptx" && onPptxRequested) {
+            onPptxRequested()
+          }
+          if (toolUseData?.completed && (toolName === "list_styles" || toolName.endsWith("_list_styles")) && onStyleGalleryRequest) {
+            onStyleGalleryRequest()
+          }
+
+          // Tool result: update existing ToolUse with result/status
+          if (toolUseData?.completed) {
+            setMessages((prev) => {
+              const updated = [...prev]
+              const last = updated[updated.length - 1]
+              const idx = last.toolUses.findIndex((t) => t.toolUseId === toolUseData.toolUseId)
+              if (idx >= 0) {
+                const newToolUses = [...last.toolUses]
+                newToolUses[idx] = { ...newToolUses[idx], status: toolUseData.status, result: toolUseData.result }
+                const toolMap = new Map(newToolUses.map((t) => [t.toolUseId, t]))
+                const blocks = rebuildBlocks(lastTextSnapshot, toolMap)
+                updated[updated.length - 1] = { ...last, toolUses: newToolUses, blocks }
+              }
+              return updated
+            })
+            return
+          }
+
+          const toolUse: ToolUse = {
+            toolUseId: toolUseData?.toolUseId || crypto.randomUUID(),
+            name: toolName,
+            input: toolUseData?.input || {},
+          }
+
+          // Detect workflow phase from tool calls
+          if (onWorkflowPhase && (toolName === "read_workflows" || toolName.endsWith("_read_workflows"))) {
+            const names: string[] = toolUseData?.input?.names || []
+            const first = names[0] || ""
+            if (first.includes("briefing")) onWorkflowPhase("brief")
+            else if (first.includes("outline")) onWorkflowPhase("outline")
+            else if (first.includes("art-direction")) onWorkflowPhase("artDirection")
+            else if (first.includes("compose")) onWorkflowPhase("slides")
+          }
+
+          // Record position only on first encounter
+          if (!toolPositions.has(toolUse.toolUseId)) {
+            toolPositions.set(toolUse.toolUseId, lastTextSnapshot.length)
+            toolOrder.push(toolUse.toolUseId)
+          }
+
+          setMessages((prev) => {
+            const updated = [...prev]
+            const last = updated[updated.length - 1]
+
+            const existingIdx = last.toolUses.findIndex((t) => t.toolUseId === toolUse.toolUseId)
+            const newToolUses = existingIdx >= 0
+              ? last.toolUses.map((t, i) => i === existingIdx ? { ...t, ...toolUse, status: t.status, result: t.result } : t)
+              : [...last.toolUses, toolUse]
+
+            const toolMap = new Map(newToolUses.map((t) => [t.toolUseId, t]))
+            const blocks = rebuildBlocks(lastTextSnapshot, toolMap)
+
+            updated[updated.length - 1] = { ...last, content: lastTextSnapshot, blocks, toolUses: newToolUses }
+            return updated
+          })
+        },
+        controller.signal,
+      )
+    } catch (err) {
+      // AbortError is expected when user clicks stop — don't show error
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // Keep partial response as-is
+      } else {
+        setMessages((prev) => {
+          const updated = [...prev]
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            content: "Sorry, something went wrong. Please try again.",
+          }
+          return updated
+        })
+      }
+    } finally {
+      abortControllerRef.current = null
+      setIsLoading(false)
+    }
+  }
+
+  /**
+   * Stop the current streaming response.
+   * Aborts the fetch connection; the server will stop at the next safe point
+   * when a new request arrives for the same session.
+   */
+  const handleStop = () => {
+    abortControllerRef.current?.abort()
+  }
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    handleSend(input)
+  }
+
+  /**
+   * Send behavior respects user preference.
+   * sendWithEnter=true: Enter sends, Shift+Enter = newline.
+   * sendWithEnter=false: ⌘/Ctrl+Enter sends, Enter = newline.
+   * IME composition Enter is ignored.
+   * Arrow keys and Enter are intercepted when mention popup is visible.
+   */
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (getIsComposing(e)) return
+
+    // Let mention popup handle navigation keys
+    if (mentionVisible && (MentionPopup as any)._handleKeyDown?.(e)) {
+      return
+    }
+
+    const canSend = input.trim() || attachments.length > 0 || snippets.length > 0
+    const sendWithEnter = (() => { try { return JSON.parse(localStorage.getItem("sdpm-prefs") || "{}").sendWithEnter ?? false } catch { return false } })()
+
+    if (sendWithEnter) {
+      if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey && canSend) {
+        e.preventDefault()
+        handleSend(input)
+      }
+    } else {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canSend) {
+        e.preventDefault()
+        handleSend(input)
+      }
+    }
+  }
+
+  const handleSnippetRequest = () => {
+    setSnippetOpen(true)
+  }
+
+  /**
+   * Handle confirmed snippet text — add new or update existing.
+   *
+   * @param text - The snippet text
+   */
+  const handleSnippetConfirm = (text: string) => {
+    if (editingSnippetId) {
+      setSnippets((prev) => prev.map((s) => s.id === editingSnippetId ? { ...s, text } : s))
+      setEditingSnippetId(null)
+    } else {
+      setSnippets((prev) => [...prev, { id: crypto.randomUUID(), text }])
+    }
+  }
+
+  /**
+   * Open snippet dialog for editing.
+   *
+   * @param id - Snippet identifier
+   */
+  const editSnippet = useCallback((id: string) => {
+    setEditingSnippetId(id)
+    setSnippetOpen(true)
+  }, [])
+
+  /**
+   * Remove a snippet by ID.
+   *
+   * @param id - Snippet identifier
+   */
+  const removeSnippet = useCallback((id: string) => {
+    setSnippets((prev) => prev.filter((s) => s.id !== id))
+  }, [])
+
+  const isInitial = messages.length === 0 && !historyLoading
+
+  return (
+    <FileDropZone onFiles={handleFiles} onLongTextPaste={handleSnippetConfirm} pasteDisabled={snippetOpen} disabled={isLoading}>
+      <div className="flex flex-col h-full">
+        <SnippetInput
+          open={snippetOpen}
+          onClose={() => { setSnippetOpen(false); setEditingSnippetId(null) }}
+          onConfirm={handleSnippetConfirm}
+          initialText={editingSnippetId ? snippets.find((s) => s.id === editingSnippetId)?.text : undefined}
+        />
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4" role="log" aria-label="Chat messages"
+          onScroll={() => {
+            const el = scrollContainerRef.current
+            if (!el) return
+            // Near bottom (within 80px) → re-enable auto-scroll
+            shouldAutoScroll.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+          }}
+        >
+          {historyLoading ? (
+            <div className="space-y-4 animate-pulse">
+              {[0.6, 1, 0.75].map((w, i) => (
+                <div key={i} className={i % 2 === 0 ? "flex justify-end" : "flex gap-2.5"}>
+                  {i % 2 !== 0 && <div className="w-6 h-6 rounded-full bg-white/[0.06] flex-none" />}
+                  <div className="rounded-2xl bg-white/[0.04] h-10" style={{ width: `${w * 70}%` }} />
+                </div>
+              ))}
+            </div>
+          ) : isInitial ? (
+            <div className="h-full flex flex-col items-center justify-center text-center">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-brand-teal-soft mb-4">
+                <Send className="h-4 w-4 text-brand-teal" />
+              </div>
+              <h2 className="text-[14px] font-semibold tracking-[-0.01em] mb-1">{deckName || "New Deck"}</h2>
+              <p className="text-[12px] text-foreground-muted leading-relaxed">
+                Describe the presentation you want to create.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {messages.map((msg, i) => (
+                <ChatMessage
+                  key={i}
+                  role={msg.role}
+                  content={msg.content}
+                  toolUses={msg.toolUses}
+                  blocks={msg.blocks}
+                  snippets={msg.snippets}
+                  isStreaming={isLoading && i === messages.length - 1}
+                  idToken={auth.user?.id_token}
+                />
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+
+        <div className="flex-none px-3 pb-6 pt-2 safe-bottom">
+          <form
+            onSubmit={handleSubmit}
+            className="rounded-xl border border-white/[0.08] bg-background-raised search-glow"
+          >
+            <AttachmentPreview
+              attachments={attachments}
+              snippets={snippets}
+              onRemove={removeAttachment}
+              onRemoveSnippet={removeSnippet}
+              onEditSnippet={editSnippet}
+            />
+
+            <div className="flex items-end gap-2 px-2 py-2">
+              <PlusMenu
+                onFilesSelected={handleFiles}
+                onSnippetRequest={handleSnippetRequest}
+                disabled={isLoading}
+              />
+
+              <div className="flex-1 relative">
+                <MentionPopup
+                  ref={mentionPopupRef}
+                  visible={mentionVisible}
+                  query={mentionQuery}
+                  items={mentionItems}
+                  onSelect={handleMentionSelect}
+                  onClose={() => setMentionVisible(false)}
+                  position={{ top: 40, left: 0 }}
+                  textareaRef={textareaRef}
+                />
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onCompositionStart={onCompositionStart}
+                  onCompositionEnd={onCompositionEnd}
+                  placeholder={isMobile ? "Ask anything…" : "Ask anything…  ⌘↵ send"}
+                  aria-label="Chat message input"
+                  className="w-full bg-transparent resize-none text-[13px] min-h-[24px] max-h-[120px] py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground text-transparent selection:bg-brand-teal/30 leading-relaxed relative font-[inherit] tracking-[inherit]"
+                  rows={1}
+                  autoFocus
+                />
+                <MentionOverlay
+                  text={input}
+                  textareaRef={textareaRef}
+                  slidePreviewUrls={slidePreviewUrls}
+                />
+              </div>
+
+              {isLoading ? (
+                <button
+                  type="button"
+                  onClick={handleStop}
+                  className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-white/10 hover:bg-white/20"
+                  aria-label="Stop generation"
+                >
+                  <Square className="h-3 w-3 fill-current" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!input.trim() && attachments.length === 0 && snippets.length === 0}
+                  className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target"
+                  style={{
+                    background: (!input.trim() && attachments.length === 0 && snippets.length === 0) ? "transparent" : "var(--color-brand-teal)",
+                    color: (!input.trim() && attachments.length === 0 && snippets.length === 0) ? "var(--foreground-muted)" : "var(--background)",
+                  }}
+                  aria-label="Send message"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+      </div>
+    </FileDropZone>
+  )
+})

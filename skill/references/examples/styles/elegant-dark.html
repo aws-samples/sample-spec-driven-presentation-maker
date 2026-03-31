@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Elegant Dark — 余白と静寂が高級感を語る。装飾ではなく、引き算の美学。</title>
+<style>
+  :root {
+    /* Colors */
+    --color-primary: #1A1A2E;
+    --color-secondary: #B8860B;
+    --color-accent: #D4AF37;
+    --color-accent-light: #F5E6B8;
+    --color-bg-dark: #0C0C1D;
+    --color-bg-light: #FAF8F5;
+    --color-bg-card: #16162A;
+    --color-text: #F5E6B8;
+    --color-text-sub: #9A9AAA;
+    --color-text-muted: #6A6A7A;
+    --color-text-on-light: #1A1A2E;
+    --color-text-sub-on-light: #4A4A5A;
+    --color-border: #2A2A3E;
+    --color-border-light: #E8E0D5;
+    --color-burgundy: #6D2E46;
+
+    /* Template */
+    --template-theme: dark;
+    /* 推奨テンプレート: Blank Dark
+       ダークテンプレート使用。ライトスライドは background + defaultTextColor で切り替える。 */
+
+    /* Typography - Fonts */
+    --font-heading: "Palatino", "Georgia", serif;
+    --font-body: "Garamond", "Georgia", serif;
+
+    /* Typography - Sizes */
+    --size-cover-title: 48pt;
+    --size-slide-title: 38pt;
+    --size-section-header: 28pt;
+    --size-body: 16pt;
+    --size-caption: 11pt;
+
+    /* Spacing */
+    --title-letter-spacing: 6px;
+
+    /* Components - Card */
+    --card-radius: 0px;
+    --card-border: 0.5pt solid var(--color-border);
+    --card-shadow: 0 1px 5px rgba(0,0,0,0.06);
+
+    /* Components - Gold frame */
+    --frame-inset: 58px;
+    --frame-border: 0.5pt solid var(--color-accent);
+
+    /* Components - Corner accent */
+    --corner-size: 58px;
+    --corner-weight: 0.5pt;
+    --corner-color: var(--color-accent);
+
+    /* Components - Divider */
+    --divider: 0.5pt solid var(--color-accent);
+    --divider-muted: 0.5pt solid var(--color-border);
+  }
+
+  body {
+    margin: 0; padding: 40px;
+    background: #E5E5E5;
+    zoom: 0.7;
+  }
+  .slide {
+    position: relative;
+    width: 1920px; height: 1080px;
+    margin: 0 auto 40px;
+    background: var(--color-bg-dark);
+    overflow: hidden;
+  }
+  .slide--light {
+    background: var(--color-bg-light);
+  }
+  .el { position: absolute; }
+
+  /* Text styles */
+  .t-cover-title {
+    font-family: var(--font-heading);
+    font-size: var(--size-cover-title);
+    font-weight: normal;
+    color: var(--color-accent-light);
+    line-height: 1.2;
+    letter-spacing: var(--title-letter-spacing);
+    text-transform: uppercase;
+  }
+  .t-slide-title {
+    font-family: var(--font-heading);
+    font-size: var(--size-slide-title);
+    font-weight: normal;
+    color: var(--color-text);
+    line-height: 1.3;
+  }
+  .t-slide-title-on-light {
+    font-family: var(--font-heading);
+    font-size: var(--size-slide-title);
+    font-weight: normal;
+    color: var(--color-text-on-light);
+    line-height: 1.3;
+  }
+  .t-section-header {
+    font-family: var(--font-heading);
+    font-size: var(--size-section-header);
+    font-weight: normal;
+    color: var(--color-accent-light);
+    line-height: 1.3;
+  }
+  .t-body {
+    font-family: var(--font-body);
+    font-size: var(--size-body);
+    font-weight: 300;
+    color: var(--color-text-sub);
+    line-height: 1.7;
+  }
+  .t-body-on-light {
+    font-family: var(--font-body);
+    font-size: var(--size-body);
+    font-weight: 300;
+    color: var(--color-text-sub-on-light);
+    line-height: 1.7;
+  }
+  .t-caption {
+    font-family: var(--font-body);
+    font-size: var(--size-caption);
+    font-weight: normal;
+    font-style: italic;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+  .t-accent {
+    font-family: var(--font-body);
+    font-size: var(--size-body);
+    font-style: italic;
+    color: var(--color-accent-light);
+    line-height: 1.7;
+  }
+
+  /* Components */
+  .card {
+    background: var(--color-bg-card);
+    border: var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+  }
+  .gold-frame {
+    border: var(--frame-border);
+    position: absolute;
+    top: var(--frame-inset);
+    left: var(--frame-inset);
+    right: var(--frame-inset);
+    bottom: var(--frame-inset);
+    pointer-events: none;
+  }
+  .diamond {
+    width: 10px; height: 10px;
+    background: var(--color-accent);
+    transform: rotate(45deg);
+  }
+  .gold-line-h {
+    height: 0;
+    border-top: var(--divider);
+  }
+</style>
+</head>
+<body>
+
+<!-- Slide 1: Cover -->
+<div class="slide">
+  <div class="gold-frame"></div>
+  <div class="el t-cover-title" style="left:200px; top:380px; width:1520px; text-align:center;">Elegant Dark</div>
+  <div class="el" style="left:910px; top:480px; width:100px; text-align:center;"><div class="diamond" style="margin:0 auto;"></div></div>
+  <div class="el t-section-header" style="left:200px; top:510px; width:1520px; text-align:center; font-style:italic;">余白と静寂が高級感を語る</div>
+  <div class="el t-caption" style="left:200px; top:600px; width:1520px; text-align:center;">装飾ではなく、引き算の美学。</div>
+</div>
+
+<!-- Slide 2: Color Palette -->
+<div class="slide">
+  <div class="gold-frame"></div>
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1728px; letter-spacing:var(--title-letter-spacing);">Color Palette</div>
+  <div class="el gold-line-h" style="left:96px; top:120px; width:300px;"></div>
+  <div class="el t-body" style="left:96px; top:140px; width:800px;">ダーク背景にゴールドアクセント。色数は3色以内に抑え、余白で高級感を演出する。</div>
+
+  <!-- Primary colors row -->
+  <div class="el t-caption" style="left:96px; top:240px;">PRIMARY COLORS</div>
+  <div class="el" style="left:96px; top:270px; width:180px; height:120px; background:var(--color-primary);"></div>
+  <div class="el t-caption" style="left:96px; top:395px; color:var(--color-text-sub);">Primary<br>#1A1A2E</div>
+  <div class="el" style="left:296px; top:270px; width:180px; height:120px; background:var(--color-secondary);"></div>
+  <div class="el t-caption" style="left:296px; top:395px; color:var(--color-text-sub);">Secondary<br>#B8860B</div>
+  <div class="el" style="left:496px; top:270px; width:180px; height:120px; background:var(--color-accent);"></div>
+  <div class="el t-caption" style="left:496px; top:395px; color:var(--color-text-sub);">Accent<br>#D4AF37</div>
+  <div class="el" style="left:696px; top:270px; width:180px; height:120px; background:var(--color-accent-light);"></div>
+  <div class="el t-caption" style="left:696px; top:395px; color:var(--color-text-sub);">Accent Light<br>#F5E6B8</div>
+  <div class="el" style="left:896px; top:270px; width:180px; height:120px; background:var(--color-burgundy);"></div>
+  <div class="el t-caption" style="left:896px; top:395px; color:var(--color-text-sub);">Burgundy<br>#6D2E46</div>
+
+  <!-- Background colors row -->
+  <div class="el t-caption" style="left:96px; top:470px;">BACKGROUNDS</div>
+  <div class="el" style="left:96px; top:500px; width:180px; height:120px; background:var(--color-bg-dark); border:0.5pt solid var(--color-border);"></div>
+  <div class="el t-caption" style="left:96px; top:625px; color:var(--color-text-sub);">BG Dark<br>#0C0C1D</div>
+  <div class="el" style="left:296px; top:500px; width:180px; height:120px; background:var(--color-bg-light); border:0.5pt solid var(--color-border);"></div>
+  <div class="el t-caption" style="left:296px; top:625px; color:var(--color-text-sub);">BG Light<br>#FAF8F5</div>
+  <div class="el" style="left:496px; top:500px; width:180px; height:120px; background:var(--color-bg-card); border:0.5pt solid var(--color-border);"></div>
+  <div class="el t-caption" style="left:496px; top:625px; color:var(--color-text-sub);">Card Dark<br>#16162A</div>
+
+  <!-- Text colors row -->
+  <div class="el t-caption" style="left:96px; top:700px;">TEXT COLORS</div>
+  <div class="el" style="left:96px; top:730px; width:180px; height:60px; background:var(--color-bg-card); display:flex; align-items:center; justify-content:center;"><span style="color:var(--color-accent-light); font-family:var(--font-body); font-size:var(--size-body);">On Dark</span></div>
+  <div class="el" style="left:296px; top:730px; width:180px; height:60px; background:var(--color-bg-card); display:flex; align-items:center; justify-content:center;"><span style="color:var(--color-text-sub); font-family:var(--font-body); font-size:var(--size-body);">Sub</span></div>
+  <div class="el" style="left:496px; top:730px; width:180px; height:60px; background:var(--color-bg-light); display:flex; align-items:center; justify-content:center;"><span style="color:var(--color-text-on-light); font-family:var(--font-body); font-size:var(--size-body);">On Light</span></div>
+</div>
+
+<!-- Slide 3: Typography -->
+<div class="slide">
+  <div class="gold-frame"></div>
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1728px; letter-spacing:var(--title-letter-spacing);">Typography</div>
+  <div class="el gold-line-h" style="left:96px; top:120px; width:300px;"></div>
+  <div class="el t-body" style="left:96px; top:140px; width:900px;">セリフフォント主体。見出しはPalatino regular、本文はGaramond light。boldよりregularで上品さを保つ。</div>
+
+  <div class="el t-cover-title" style="left:96px; top:260px; width:1200px;">Cover Title — 48pt</div>
+  <div class="el t-slide-title" style="left:96px; top:360px; width:1200px;">Slide Title — 38pt Palatino</div>
+  <div class="el t-section-header" style="left:96px; top:440px; width:1200px;">Section Header — 28pt Palatino</div>
+  <div class="el t-body" style="left:96px; top:520px; width:1200px;">Body text — 16pt Garamond light。本文は軽いウェイトで繊細さを表現する。行間は1.7で呼吸空間を確保。</div>
+  <div class="el t-accent" style="left:96px; top:600px; width:1200px;">Accent italic — 引用やキーフレーズにイタリック体を使用する。</div>
+  <div class="el t-caption" style="left:96px; top:660px; width:1200px;">Caption — 11pt Garamond italic。補足情報や出典表記に使用。</div>
+
+  <div class="el t-caption" style="left:96px; top:780px;">LETTER SPACING</div>
+  <div class="el t-slide-title" style="left:96px; top:810px; width:1200px; letter-spacing:0;">letter-spacing: 0（通常）</div>
+  <div class="el t-slide-title" style="left:96px; top:880px; width:1200px; letter-spacing:var(--title-letter-spacing);">letter-spacing: 6px（タイトル用）</div>
+</div>
+
+<!-- Slide 4: Components & Decoration -->
+<div class="slide">
+  <div class="gold-frame"></div>
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1728px; letter-spacing:var(--title-letter-spacing);">Components</div>
+  <div class="el gold-line-h" style="left:96px; top:120px; width:300px;"></div>
+  <div class="el t-body" style="left:96px; top:140px; width:900px;">直角カード、極細ボーダー、控えめな影。装飾は最小限に。</div>
+
+  <!-- Card examples -->
+  <div class="el card" style="left:96px; top:240px; width:500px; height:180px; padding:24px; box-sizing:border-box;">
+    <div class="t-section-header" style="margin-bottom:8px;">ミニマルカード</div>
+    <div class="t-body">極細ボーダー 0.5pt + 角丸なし。影は存在を主張しない。</div>
+  </div>
+
+  <div class="el card" style="left:650px; top:240px; width:500px; height:180px; padding:24px; box-sizing:border-box; border-color:var(--color-accent);">
+    <div class="t-section-header" style="margin-bottom:8px;">ゴールドフレームカード</div>
+    <div class="t-body">アクセントとしてゴールドボーダーを使用。</div>
+  </div>
+
+  <!-- Double border frame -->
+  <div class="el" style="left:1220px; top:240px; width:500px; height:180px; border:0.5pt solid var(--color-accent); padding:6px; box-sizing:border-box;">
+    <div style="border:0.5pt solid var(--color-accent); width:100%; height:100%; padding:24px; box-sizing:border-box;">
+      <div class="t-section-header" style="margin-bottom:8px;">二重線フレーム</div>
+      <div class="t-body">額縁風の二重線ボーダー。</div>
+    </div>
+  </div>
+
+  <!-- Decorative elements -->
+  <div class="el t-caption" style="left:96px; top:480px;">DECORATIVE ELEMENTS</div>
+
+  <!-- Gold horizontal line -->
+  <div class="el t-body" style="left:96px; top:520px; width:300px;">ゴールド区切り線</div>
+  <div class="el gold-line-h" style="left:96px; top:560px; width:400px;"></div>
+
+  <!-- Diamond separator -->
+  <div class="el t-body" style="left:96px; top:600px; width:300px;">ダイヤモンド区切り</div>
+  <div class="el" style="left:96px; top:650px; width:400px; display:flex; align-items:center; gap:16px;">
+    <div style="flex:1; border-top:var(--divider);"></div>
+    <div class="diamond"></div>
+    <div style="flex:1; border-top:var(--divider);"></div>
+  </div>
+
+  <!-- L-corner accents demo -->
+  <div class="el t-body" style="left:96px; top:720px; width:300px;">L字コーナーアクセント</div>
+  <div class="el" style="left:96px; top:770px; width:200px; height:200px;">
+    <!-- Top-left -->
+    <div style="position:absolute; top:0; left:0; width:var(--corner-size); border-top:var(--corner-weight) solid var(--corner-color);"></div>
+    <div style="position:absolute; top:0; left:0; height:var(--corner-size); border-left:var(--corner-weight) solid var(--corner-color);"></div>
+    <!-- Top-right -->
+    <div style="position:absolute; top:0; right:0; width:var(--corner-size); border-top:var(--corner-weight) solid var(--corner-color);"></div>
+    <div style="position:absolute; top:0; right:0; height:var(--corner-size); border-right:var(--corner-weight) solid var(--corner-color);"></div>
+    <!-- Bottom-left -->
+    <div style="position:absolute; bottom:0; left:0; width:var(--corner-size); border-bottom:var(--corner-weight) solid var(--corner-color);"></div>
+    <div style="position:absolute; bottom:0; left:0; height:var(--corner-size); border-left:var(--corner-weight) solid var(--corner-color);"></div>
+    <!-- Bottom-right -->
+    <div style="position:absolute; bottom:0; right:0; width:var(--corner-size); border-bottom:var(--corner-weight) solid var(--corner-color);"></div>
+    <div style="position:absolute; bottom:0; right:0; height:var(--corner-size); border-right:var(--corner-weight) solid var(--corner-color);"></div>
+    <div class="t-caption" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);">四隅 L字 0.5pt</div>
+  </div>
+
+  <!-- Rules -->
+  <div class="el card" style="left:650px; top:520px; width:1070px; height:450px; padding:24px; box-sizing:border-box;">
+    <div class="t-section-header" style="margin-bottom:16px;">装飾ルール</div>
+    <div class="t-body" style="margin-bottom:8px;">✓ ゴールド細線は区切りとして使用可</div>
+    <div class="t-body" style="margin-bottom:8px;">✓ 四隅L字コーナー（0.3", 0.5pt）</div>
+    <div class="t-body" style="margin-bottom:8px;">✓ ダイヤモンド形でセクション区切り</div>
+    <div class="t-body" style="margin-bottom:8px;">✓ スライド全体を囲む極細ゴールドフレーム</div>
+    <div class="t-body" style="margin-bottom:16px;">✓ 影は極めて控えめ（blur:5, opacity:6%）</div>
+    <div class="t-body" style="color:var(--color-burgundy);">✗ タイトル下のアクセントライン禁止</div>
+    <div class="t-body" style="color:var(--color-burgundy);">✗ 太いボーダー禁止（2pt以上）</div>
+    <div class="t-body" style="color:var(--color-burgundy);">✗ 大きな角丸禁止</div>
+    <div class="t-body" style="color:var(--color-burgundy);">✗ 3D効果・ネオン・パターン過多禁止</div>
+  </div>
+</div>
+
+<!-- Slide 5: Light Content on Dark Template -->
+<div class="slide">
+  <!-- Light background via slide-level override -->
+  <div class="el" style="left:0; top:0; width:1920px; height:1080px; background:var(--color-bg-light);"></div>
+  <div class="el t-slide-title-on-light" style="left:96px; top:48px; width:1728px;">ライトコンテンツスライド</div>
+  <div class="el gold-line-h" style="left:96px; top:120px; width:300px;"></div>
+  <div class="el t-body-on-light" style="left:96px; top:140px; width:900px;">ダークテンプレート上でライトスライドを実現するには、スライドに "background": "#FAF8F5" と "defaultTextColor": "#1A1A2E" を指定する。</div>
+
+  <div class="el" style="left:96px; top:280px; width:820px; height:300px; background:#FFFFFF; border:0.5pt solid var(--color-border-light); padding:32px; box-sizing:border-box;">
+    <div style="font-family:var(--font-heading); font-size:var(--size-section-header); color:var(--color-text-on-light); margin-bottom:16px;">ライトモードのカード</div>
+    <div style="font-family:var(--font-body); font-size:var(--size-body); color:var(--color-text-sub-on-light); line-height:1.7;">コンテンツスライドはライト背景で読みやすさを確保。カード背景は#FFFFFF、ボーダーは暖色系#E8E0D5を使用。</div>
+  </div>
+
+  <div class="el" style="left:960px; top:280px; width:860px; height:300px; padding:32px; box-sizing:border-box; border:0.5pt solid var(--color-border-light);">
+    <div style="font-family:var(--font-heading); font-size:var(--size-section-header); color:var(--color-text-on-light); margin-bottom:16px;">テキストカラー</div>
+    <div style="font-family:var(--font-body); font-size:var(--size-body); color:var(--color-text-on-light); margin-bottom:8px;">Primary — #1A1A2E</div>
+    <div style="font-family:var(--font-body); font-size:var(--size-body); color:var(--color-text-sub-on-light); margin-bottom:8px;">Secondary — #4A4A5A</div>
+    <div style="font-family:var(--font-body); font-size:var(--size-body); color:#9A9AAA;">Muted — #9A9AAA</div>
+  </div>
+
+  <div class="el t-caption" style="left:96px; top:640px; color:var(--color-text-sub-on-light); font-style:normal;">実装メモ: slides.jsonでは z-order:0 の全面矩形で背景を覆い、コンテンツ要素はその上に配置する。</div>
+</div>
+
+<!-- Slide 6: Do's & Don'ts -->
+<div class="slide">
+  <div class="gold-frame"></div>
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1728px; letter-spacing:var(--title-letter-spacing);">Do's &amp; Don'ts</div>
+  <div class="el gold-line-h" style="left:96px; top:120px; width:300px;"></div>
+
+  <!-- Do's -->
+  <div class="el t-section-header" style="left:96px; top:180px; width:800px; color:var(--color-accent);">Do's</div>
+  <div class="el t-body" style="left:96px; top:230px; width:800px;">余白を最大限活用（内容の「呼吸空間」確保）</div>
+  <div class="el t-body" style="left:96px; top:280px; width:800px;">ゴールド要素は控えめに（アクセントのみ）</div>
+  <div class="el t-body" style="left:96px; top:330px; width:800px;">セリフフォントを主体に使用</div>
+  <div class="el t-body" style="left:96px; top:380px; width:800px;">イタリック体で引用・キーフレーズを強調</div>
+  <div class="el t-body" style="left:96px; top:430px; width:800px;">色数を3色以内に抑制</div>
+  <div class="el t-body" style="left:96px; top:480px; width:800px;">カバー・セクション区切り・クロージングはダーク背景</div>
+  <div class="el t-body" style="left:96px; top:530px; width:800px;">セクション番号はローマ数字（I, II, III...）</div>
+
+  <!-- Don'ts -->
+  <div class="el t-section-header" style="left:1020px; top:180px; width:800px; color:var(--color-burgundy);">Don'ts</div>
+  <div class="el t-body" style="left:1020px; top:230px; width:800px; color:var(--color-burgundy);">派手な色使い（ネオン・パステル・ポップ色）</div>
+  <div class="el t-body" style="left:1020px; top:280px; width:800px; color:var(--color-burgundy);">太いボーダー（2pt以上）</div>
+  <div class="el t-body" style="left:1020px; top:330px; width:800px; color:var(--color-burgundy);">大きな角丸（rectRadius &gt; 0.08）</div>
+  <div class="el t-body" style="left:1020px; top:380px; width:800px; color:var(--color-burgundy);">装飾の詰め込み（スペースが高級感を生む）</div>
+  <div class="el t-body" style="left:1020px; top:430px; width:800px; color:var(--color-burgundy);">影の多用・3D効果</div>
+  <div class="el t-body" style="left:1020px; top:480px; width:800px; color:var(--color-burgundy);">タイトル下のアクセントライン</div>
+  <div class="el t-body" style="left:1020px; top:530px; width:800px; color:var(--color-burgundy);">カラフルな要素・パターン過多</div>
+
+  <div class="el" style="left:96px; top:620px; width:1728px; display:flex; align-items:center; gap:16px;">
+    <div style="flex:1; border-top:var(--divider);"></div>
+    <div class="diamond"></div>
+    <div style="flex:1; border-top:var(--divider);"></div>
+  </div>
+
+  <div class="el t-accent" style="left:96px; top:680px; width:1728px; text-align:center;">「Less is more — 余白こそが最高の装飾である」</div>
+</div>
+
+</body>
+</html>

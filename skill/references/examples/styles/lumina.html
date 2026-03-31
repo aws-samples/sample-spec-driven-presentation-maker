@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Lumina — 暗闇の中の一筋の光</title>
+<style>
+  :root {
+    /* Background */
+    --color-bg: #0A0A0F;
+    --color-surface: #12121A;
+    --color-elevated: #1A1A26;
+
+    /* Text */
+    --color-text: #F0F0F5;
+    --color-text-sub: #8888A0;
+    --color-text-muted: #555570;
+
+    /* Accent */
+    --color-cyan: #00E5FF;
+    --color-purple: #A855F7;
+    --color-magenta: #FF006E;
+    --color-line: #2A2A3A;
+
+    /* Gradients */
+    --gradient-accent: linear-gradient(135deg, #00E5FF, #A855F7, #FF006E);
+    --gradient-accent-h: linear-gradient(90deg, #00E5FF, #A855F7, #FF006E);
+
+    /* Glow */
+    --glow-cyan: 0 0 40px rgba(0,229,255,0.3);
+    --glow-magenta: 0 0 40px rgba(255,0,110,0.3);
+    --glow-purple: 0 0 40px rgba(168,85,247,0.3);
+    --glow-accent: 0 0 60px rgba(0,229,255,0.2), 0 0 60px rgba(168,85,247,0.15), 0 0 60px rgba(255,0,110,0.2);
+
+    /* Typography — size only, no font-family */
+    --fs-cover: 64pt;
+    --fs-title: 48pt;
+    --fs-heading: 34pt;
+    --fs-body: 24pt;
+    --fs-caption: 16pt;
+
+    --fw-bold: 700;
+    --fw-semi: 600;
+    --fw-normal: 400;
+
+    /* Components */
+    --radius-card: 16px;
+    --radius-badge: 20px;
+    --border-card: 1px solid var(--color-line);
+  }
+
+  body {
+    margin: 0; padding: 40px;
+    background: #E5E5E5;
+    zoom: 0.7;
+  }
+
+  .slide {
+    position: relative;
+    width: 1920px; height: 1080px;
+    margin: 0 auto 40px;
+    background: var(--color-bg);
+    overflow: hidden;
+  }
+
+  .el { position: absolute; }
+
+  /* Text styles */
+  .t-cover {
+    font-size: var(--fs-cover);
+    font-weight: var(--fw-bold);
+    color: var(--color-text);
+    line-height: 1.15;
+  }
+  .t-title {
+    font-size: var(--fs-title);
+    font-weight: var(--fw-bold);
+    color: var(--color-text);
+    line-height: 1.2;
+  }
+  .t-heading {
+    font-size: var(--fs-heading);
+    font-weight: var(--fw-semi);
+    color: var(--color-text);
+    line-height: 1.3;
+  }
+  .t-body {
+    font-size: var(--fs-body);
+    font-weight: var(--fw-normal);
+    color: var(--color-text-sub);
+    line-height: 1.6;
+  }
+  .t-caption {
+    font-size: var(--fs-caption);
+    font-weight: var(--fw-normal);
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+
+  /* Gradient text */
+  .t-gradient {
+    background: var(--gradient-accent);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Components */
+  .card {
+    background: var(--color-surface);
+    border: var(--border-card);
+    border-radius: var(--radius-card);
+  }
+  .card-glow {
+    background: var(--color-surface);
+    border: 1px solid transparent;
+    border-radius: var(--radius-card);
+    background-clip: padding-box;
+    box-shadow: var(--glow-accent);
+    outline: 1px solid var(--color-line);
+  }
+  .badge {
+    background: var(--gradient-accent);
+    border-radius: var(--radius-badge);
+    color: var(--color-text);
+    font-size: var(--fs-caption);
+    font-weight: var(--fw-semi);
+    padding: 6px 20px;
+    display: inline-block;
+  }
+  .separator {
+    height: 2px;
+    background: var(--gradient-accent-h);
+    border: none;
+  }
+  .geo-line {
+    background: var(--color-line);
+  }
+</style>
+</head>
+<body>
+
+<!-- Slide 1: Cover -->
+<div class="slide">
+  <!-- Geometric decoration: diagonal lines -->
+  <div class="el geo-line" style="left:0; top:0; width:2px; height:1080px;"></div>
+  <div class="el geo-line" style="left:1918px; top:0; width:2px; height:1080px;"></div>
+  <div class="el geo-line" style="left:0; top:200px; width:600px; height:1px; transform:rotate(-15deg); transform-origin:left center;"></div>
+  <div class="el geo-line" style="left:1400px; top:800px; width:600px; height:1px; transform:rotate(-15deg); transform-origin:left center;"></div>
+  <!-- Dot grid (top-right) -->
+  <div class="el" style="left:1500px; top:80px; width:300px; height:200px; opacity:0.3;">
+    <svg width="300" height="200">
+      <pattern id="dots" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+        <circle cx="3" cy="3" r="2" fill="var(--color-line)"/>
+      </pattern>
+      <rect width="300" height="200" fill="url(#dots)"/>
+    </svg>
+  </div>
+  <!-- Glow orb (background atmosphere) -->
+  <div class="el" style="left:700px; top:300px; width:500px; height:500px; border-radius:50%; background:radial-gradient(circle, rgba(0,229,255,0.08) 0%, transparent 70%);"></div>
+  <div class="el" style="left:800px; top:280px; width:500px; height:500px; border-radius:50%; background:radial-gradient(circle, rgba(168,85,247,0.07) 0%, transparent 70%);"></div>
+  <div class="el" style="left:900px; top:350px; width:500px; height:500px; border-radius:50%; background:radial-gradient(circle, rgba(255,0,110,0.06) 0%, transparent 70%);"></div>
+  <!-- Title -->
+  <div class="el t-cover t-gradient" style="left:96px; top:420px; width:1200px;">Lumina</div>
+  <!-- Subtitle -->
+  <div class="el t-body" style="left:96px; top:520px; width:1000px;">暗闇の中の一筋の光。スライドはステージの照明である。</div>
+  <!-- Gradient separator -->
+  <div class="el separator" style="left:96px; top:500px; width:300px;"></div>
+  <!-- Caption -->
+  <div class="el t-caption" style="left:96px; top:980px; width:600px;">Presentation Style Guide — Premium Tech Keynote</div>
+</div>
+
+<!-- Slide 2: Color & Gradient -->
+<div class="slide">
+  <!-- Geometric: vertical line left -->
+  <div class="el geo-line" style="left:64px; top:0; width:1px; height:1080px;"></div>
+  <!-- Title -->
+  <div class="el t-title" style="left:96px; top:48px; width:800px;">Color & Gradient</div>
+  <div class="el t-body" style="left:96px; top:120px; width:900px;">3色のグラデーションが光の軌跡を描く。暗闇に浮かぶ色だけが情報を持つ。</div>
+  <!-- Color swatches -->
+  <div class="el" style="left:96px; top:240px; width:160px; height:160px; border-radius:var(--radius-card); background:var(--color-cyan); box-shadow:var(--glow-cyan);"></div>
+  <div class="el t-caption" style="left:96px; top:410px; width:160px; text-align:center;">Cyan<br>#00E5FF</div>
+  <div class="el" style="left:296px; top:240px; width:160px; height:160px; border-radius:var(--radius-card); background:var(--color-purple); box-shadow:var(--glow-purple);"></div>
+  <div class="el t-caption" style="left:296px; top:410px; width:160px; text-align:center;">Purple<br>#A855F7</div>
+  <div class="el" style="left:496px; top:240px; width:160px; height:160px; border-radius:var(--radius-card); background:var(--color-magenta); box-shadow:var(--glow-magenta);"></div>
+  <div class="el t-caption" style="left:496px; top:410px; width:160px; text-align:center;">Magenta<br>#FF006E</div>
+  <!-- Background colors -->
+  <div class="el" style="left:796px; top:240px; width:120px; height:120px; border-radius:var(--radius-card); background:var(--color-bg); border:var(--border-card);"></div>
+  <div class="el t-caption" style="left:796px; top:370px; width:120px; text-align:center;">BG<br>#0A0A0F</div>
+  <div class="el" style="left:946px; top:240px; width:120px; height:120px; border-radius:var(--radius-card); background:var(--color-surface); border:var(--border-card);"></div>
+  <div class="el t-caption" style="left:946px; top:370px; width:120px; text-align:center;">Surface<br>#12121A</div>
+  <div class="el" style="left:1096px; top:240px; width:120px; height:120px; border-radius:var(--radius-card); background:var(--color-elevated); border:var(--border-card);"></div>
+  <div class="el t-caption" style="left:1096px; top:370px; width:120px; text-align:center;">Elevated<br>#1A1A26</div>
+  <!-- Text colors -->
+  <div class="el t-body" style="left:1350px; top:240px; width:500px; color:var(--color-text);">Primary Text #F0F0F5</div>
+  <div class="el t-body" style="left:1350px; top:290px; width:500px; color:var(--color-text-sub);">Sub Text #8888A0</div>
+  <div class="el t-body" style="left:1350px; top:340px; width:500px; color:var(--color-text-muted);">Muted Text #555570</div>
+  <!-- Gradient bar -->
+  <div class="el separator" style="left:96px; top:520px; width:1728px;"></div>
+  <div class="el t-caption" style="left:96px; top:540px; width:400px;">Gradient Accent — 全アクセント要素に使用</div>
+  <!-- Gradient cards demo -->
+  <div class="el card" style="left:96px; top:620px; width:520px; height:340px; padding:40px; box-sizing:border-box;">
+    <div class="t-heading" style="color:var(--color-text);">Standard Card</div>
+    <div class="t-body" style="margin-top:16px;">Surface背景＋Lineボーダー。<br>情報を静かに囲む。主張しない。</div>
+  </div>
+  <div class="el card-glow" style="left:696px; top:620px; width:520px; height:340px; padding:40px; box-sizing:border-box;">
+    <div class="t-heading" style="color:var(--color-text);">Glow Card</div>
+    <div class="t-body" style="margin-top:16px;">グローエフェクト付き。<br>注目させたい要素に使う。光が意味を持つ。</div>
+  </div>
+  <div class="el" style="left:1296px; top:620px; width:520px; height:340px; border-radius:var(--radius-card); background:var(--gradient-accent); padding:40px; box-sizing:border-box;">
+    <div class="t-heading" style="color:var(--color-text);">Gradient Fill</div>
+    <div class="t-body" style="margin-top:16px; color:var(--color-text);">最も強いアクセント。<br>1スライドに1つまで。光の焦点。</div>
+  </div>
+</div>
+
+<!-- Slide 3: Typography -->
+<div class="slide">
+  <!-- Geometric: horizontal lines -->
+  <div class="el geo-line" style="left:0; top:180px; width:1920px; height:1px;"></div>
+  <div class="el geo-line" style="left:0; top:1000px; width:1920px; height:1px;"></div>
+  <!-- Title -->
+  <div class="el t-title" style="left:96px; top:48px; width:800px;">Typography</div>
+  <div class="el t-body" style="left:96px; top:120px; width:900px;">サイズの差が視線を導く。大きさ＝重要度。</div>
+  <!-- Hierarchy demo -->
+  <div class="el t-cover" style="left:96px; top:240px; width:1200px;">Cover Title — 64pt Bold</div>
+  <div class="el t-caption" style="left:1400px; top:270px; width:400px;">カバースライド専用。<br>一番大きく、一番少ない言葉で。</div>
+  <div class="el t-title" style="left:96px; top:380px; width:1200px;">Slide Title — 48pt Bold</div>
+  <div class="el t-caption" style="left:1400px; top:390px; width:400px;">各スライドの見出し。<br>一目で内容がわかる。</div>
+  <div class="el t-heading" style="left:96px; top:500px; width:1200px;">Heading — 34pt Semibold</div>
+  <div class="el t-caption" style="left:1400px; top:515px; width:400px;">セクション内の区切り。<br>カードのタイトルにも。</div>
+  <div class="el t-body" style="left:96px; top:590px; width:1200px;">Body — 24pt Regular — 説明文、本文テキスト。読みやすさが最優先。</div>
+  <div class="el t-caption" style="left:1400px; top:605px; width:400px;">メインの説明テキスト。<br>行間1.6で呼吸させる。</div>
+  <div class="el t-caption" style="left:96px; top:680px; width:1200px;">Caption — 16pt Regular — 補足情報、出典、ラベル。控えめに添える。</div>
+  <!-- Gradient text demo -->
+  <div class="el t-cover t-gradient" style="left:96px; top:790px; width:1400px;">Gradient Text</div>
+  <div class="el t-body" style="left:96px; top:910px; width:1000px;">グラデーションテキストは最大のアクセント。カバーやキーメッセージに限定して使う。多用すると光が散る。</div>
+</div>
+
+<!-- Slide 4: One Message -->
+<div class="slide">
+  <!-- Glow orb -->
+  <div class="el" style="left:600px; top:200px; width:700px; height:700px; border-radius:50%; background:radial-gradient(circle, rgba(168,85,247,0.1) 0%, transparent 70%);"></div>
+  <!-- The number -->
+  <div class="el t-gradient" style="left:96px; top:260px; width:1728px; text-align:center; font-size:180pt; font-weight:var(--fw-bold); line-height:1;">10x</div>
+  <!-- Message -->
+  <div class="el t-body" style="left:96px; top:640px; width:1728px; text-align:center;">1スライドに1つのメッセージ。余白が意味を持つ。<br>聴衆の視線は自然にここに集まる。</div>
+  <!-- Rule note -->
+  <div class="el t-caption" style="left:96px; top:780px; width:1728px; text-align:center;">レイアウトは多様に。同じ構図の繰り返しは避け、緩急をつけて飽きさせない。</div>
+</div>
+
+<!-- Slide 5: Closing -->
+<div class="slide">
+  <!-- Geometric lines -->
+  <div class="el geo-line" style="left:860px; top:0; width:1px; height:400px;"></div>
+  <div class="el geo-line" style="left:1060px; top:680px; width:1px; height:400px;"></div>
+  <!-- Subtle glow -->
+  <div class="el" style="left:660px; top:300px; width:600px; height:600px; border-radius:50%; background:radial-gradient(circle, rgba(0,229,255,0.06) 0%, transparent 70%);"></div>
+  <!-- Gradient separator -->
+  <div class="el separator" style="left:810px; top:480px; width:300px;"></div>
+  <!-- Thank you -->
+  <div class="el t-title t-gradient" style="left:96px; top:500px; width:1728px; text-align:center;">Thank You</div>
+  <!-- Subtitle -->
+  <div class="el t-caption" style="left:96px; top:590px; width:1728px; text-align:center;">余韻を残す。最後のスライドは静かに閉じる。</div>
+</div>
+
+</body>
+</html>

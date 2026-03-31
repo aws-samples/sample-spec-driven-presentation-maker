@@ -1,0 +1,23 @@
+[project]
+name = "sdpm-mcp-server"
+version = "1.0.0"
+description = "spec-driven-presentation-maker MCP Server — Streamable HTTP for AgentCore Runtime (Layer 3)"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]",
+    "boto3",
+    "sdpm-skill",
+    "aws-opentelemetry-distro>=0.10.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["tools*", "storage*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 120

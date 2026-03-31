@@ -1,0 +1,31 @@
+[project]
+name = "sdpm-skill"
+version = "1.0.0"
+description = "PowerPoint generation engine — JSON to PPTX with template analysis and design patterns"
+requires-python = ">=3.10"
+dependencies = [
+    "python-pptx",
+    "lxml",
+    "Pillow",
+    "qrcode",
+    "pygments>=2.19.2",
+    "defusedxml",
+]
+
+[tool.setuptools.packages.find]
+include = ["sdpm*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint.per-file-ignores]
+"sdpm/converter/color.py" = ["E402"]
+"sdpm/converter/constants.py" = ["E402"]
+"sdpm/converter/slide.py" = ["E402"]
+"sdpm/converter/xml_helpers.py" = ["E402"]

@@ -1,0 +1,26 @@
+[project]
+name = "spec-driven-presentation-maker"
+version = "1.0.0"
+description = "AI-powered PowerPoint generation toolkit — from local CLI to full-stack web app"
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff",
+    "python-pptx",
+    "lxml",
+    "Pillow",
+    "qrcode",
+    "pygments>=2.19.2",
+    "mcp[cli]",
+    "boto3",
+]
+
+[tool.ruff]
+line-length = 120
+src = ["skill", "mcp-local", "mcp-server"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,32 @@
+.git
+.gitignore
+.dockerignore
+.DS_Store
+.ruff_cache
+.pytest_cache
+.venv
+__pycache__
+*.pyc
+*.egg-info
+
+# CDK
+infra/cdk.out
+infra/node_modules
+
+# Layers not needed in mcp-server image
+mcp-local/
+agent/
+web-ui/
+png-worker/
+docs/
+tests/
+scripts/
+.kiro/
+
+# Assets (large, not needed at runtime — served from S3)
+skill/assets/
+skill/templates/
+skill/references/
+skill/.venv
+skill/.ruff_cache
+skill/scripts/

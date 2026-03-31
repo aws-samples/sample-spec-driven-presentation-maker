@@ -1,0 +1,46 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - npm install -g aws-cdk
+      - cd infra && npm ci && cd ..
+  pre_build:
+    commands:
+      # Generate config.yaml from environment variables
+      - |
+        cat > infra/config.yaml <<EOF
+        stacks:
+          data: true
+          runtime: true
+          pngWorker: ${STACK_PNG_WORKER:-true}
+          agent: ${STACK_AGENT:-false}
+          webUi: ${STACK_WEB_UI:-false}
+        features:
+          searchSlides: ${FEATURE_SEARCH_SLIDES:-false}
+          observability: ${FEATURE_OBSERVABILITY:-false}
+        EOF
+      - |
+        if [ -n "${AUTH_OIDC_URL}" ] && [ -n "${AUTH_ALLOWED_CLIENTS}" ]; then
+          cat >> infra/config.yaml <<EOF
+        auth:
+          oidcDiscoveryUrl: "${AUTH_OIDC_URL}"
+          allowedClients:
+        EOF
+          IFS=',' read -ra CLIENTS <<< "${AUTH_ALLOWED_CLIENTS}"
+          for c in "${CLIENTS[@]}"; do
+            echo "    - \"${c}\"" >> infra/config.yaml
+          done
+        fi
+      - cat infra/config.yaml
+  build:
+    commands:
+      # Build web-ui if Layer 4 (webUi) is enabled
+      - |
+        if grep -q "webUi: true" infra/config.yaml 2>/dev/null; then
+          echo "Building web-ui..."
+          cd web-ui && npm ci && npm run build && cd ..
+        fi
+      - cd infra && cdk ${CDK_COMMAND:-deploy} --all --require-approval never

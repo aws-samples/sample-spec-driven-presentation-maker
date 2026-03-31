@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>flat-shadow — フラットデザイン + 影で構造を作る</title>
+<style>
+  :root {
+    /* ── Colors ── */
+    --color-text: #161D26;
+    --color-sub: #6B7280;
+    --color-bg: #FFFFFF;
+    --color-surface: #F4F6F8;
+    --color-dark: #161D26;
+    --color-blue: #2563EB;
+    --color-teal: #0D9488;
+    --color-purple: #7C3AED;
+    --color-orange: #EA580C;
+    --color-green: #16A34A;
+    --color-amber: #D97706;
+    --color-red: #DC2626;
+    --tint-blue: #E4ECFC;
+    --tint-teal: #E1F2F0;
+    --tint-purple: #EFE7FC;
+    --tint-orange: #FCEAE1;
+    --tint-green: #E3F3E9;
+    --tint-amber: #FAEEE1;
+    --tint-red: #FAE4E4;
+
+    /* ── Typography ── */
+    --font-cover-title: 60pt;
+    --font-cover-subtitle: 32pt;
+    --font-slide-title: 48pt;
+    --font-section-title: 48pt;
+    --font-heading: 36pt;
+    --font-body: 24pt;
+    --font-caption: 18pt;
+
+    /* ── Card ── */
+    --card-radius: 12px;
+    --card-shadow: 0 3px 10px rgba(0,0,0,0.10);
+    --card-padding: 28px 32px;
+    --accent-bar-height: 14px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Amazon Ember", -apple-system, "Segoe UI", sans-serif;
+    background: #D1D5DB;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    zoom: 0.7;
+  }
+
+  /* ── Slide: 1920×1080 ── */
+  .slide {
+    width: 1920px;
+    height: 1080px;
+    position: relative;
+    overflow: hidden;
+    background: var(--color-bg);
+    border-radius: 6px;
+    box-shadow: 0 6px 36px rgba(0,0,0,0.18);
+  }
+  .el { position: absolute; }
+
+  /* ── Card ── */
+  .card {
+    background: var(--color-surface);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    padding: var(--card-padding);
+  }
+  .card-accent {
+    background: var(--color-surface);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    padding: var(--card-padding);
+  }
+  .accent-top {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: var(--accent-bar-height);
+    border-radius: 0;
+  }
+
+  /* ── Swatch ── */
+  .swatch {
+    border-radius: var(--card-radius);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 14px 16px;
+    font-size: var(--font-caption);
+    font-weight: 600;
+    box-shadow: var(--card-shadow);
+  }
+  .swatch .hex { opacity: 0.6; font-size: var(--font-caption); margin-top: 2px; }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: var(--font-caption);
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  /* ── Status ── */
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: var(--font-caption);
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 16px;
+  }
+  .dot { width: 16px; height: 16px; border-radius: 50%; }
+
+  /* ── Section label ── */
+  .section-label {
+    font-size: var(--font-caption);
+    font-weight: 700;
+    color: var(--color-sub);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* ── Reusable text styles ── */
+  .t-title    { font-size: var(--font-slide-title); font-weight: 700; color: var(--color-text); }
+  .t-heading  { font-size: var(--font-heading); font-weight: 700; color: var(--color-text); }
+  .t-body     { font-size: var(--font-body); color: var(--color-sub); line-height: 1.6; }
+  .t-caption  { font-size: var(--font-caption); color: var(--color-sub); }
+</style>
+</head>
+<body>
+
+<!-- ═══════ Slide 1 — Title Side 1A ═══════ -->
+<div class="slide">
+  <div class="el" style="left:75px; top:430px; width:1686px;">
+    <div style="width:56px; height:5px; background:var(--color-blue); border-radius:3px; margin-bottom:28px;"></div>
+    <div style="font-size:var(--font-cover-title); font-weight:700; color:var(--color-text); line-height:1.1;">flat-shadow</div>
+  </div>
+  <div class="el" style="left:95px; top:700px; width:1665px;">
+    <div style="font-size:var(--font-cover-subtitle); color:var(--color-sub); line-height:1.4;">フラットデザイン + 影で構造を作る。軽く、明快で、情報が主役。</div>
+  </div>
+</div>
+
+<!-- ═══════ Slide 2 — Color Palette ═══════ -->
+<!-- ═══════ Slide 2 — Design Principles ═══════ -->
+<div class="slide">
+  <div class="el" style="left:64px; top:46px; width:1803px; height:97px;">
+    <div class="t-title">Design Principles</div>
+  </div>
+
+  <div class="el card" style="left:64px; top:200px; width:880px; height:340px;">
+    <div class="t-heading" style="margin-bottom:20px;">使うもの</div>
+    <div class="t-body" style="color:var(--color-text);">
+      影 — カードを浮かせて境界を作る<br>
+      アクセントライン — カテゴリの意味を色で伝える<br>
+      角丸 — 視線が引っかからず滑るように読める<br>
+      フラットな塗り — 確定値だけ、曖昧さがない
+    </div>
+  </div>
+
+  <div class="el card" style="left:976px; top:200px; width:880px; height:340px;">
+    <div class="t-heading" style="margin-bottom:20px;">使わないもの</div>
+    <div class="t-body" style="color:var(--color-text);">
+      ボーダー — 重い。影が境界を担う<br>
+      グラデーション（塗り） — フラットの明快さを壊す<br>
+      不透明度 — 重なり順で色が変わる。実色で指定する<br>
+      グロー / ドロップシャドウ過多 — ノイズになる
+    </div>
+  </div>
+
+  <div class="el" style="left:64px; top:620px; width:1792px;">
+    <div class="t-body" style="color:var(--color-text); line-height:1.8;">
+      軽さが信頼を作る。重い装飾は情報を邪魔する。<br>
+      影だけで構造を見せ、色だけで意味を伝える。
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ Slide 3 — Base Colors ═══════ -->
+<div class="slide">
+  <div class="el" style="left:64px; top:46px; width:1803px; height:97px;">
+    <div class="t-title">Base Colors</div>
+  </div>
+
+  <div class="el" style="left:64px; top:200px; display:flex; gap:24px;">
+    <div class="swatch" style="width:360px; height:240px; background:var(--color-bg); border:1px solid #E5E7EB; color:var(--color-text);">
+      <span>White</span><span class="hex">#FFFFFF — 背景</span>
+    </div>
+    <div class="swatch" style="width:360px; height:240px; background:var(--color-surface); color:var(--color-text);">
+      <span>Surface</span><span class="hex">#F4F6F8 — カード・コンテナ</span>
+    </div>
+    <div class="swatch" style="width:360px; height:240px; background:var(--color-dark); color:#FFFFFF;">
+      <span>Dark Navy</span><span class="hex">#161D26 — テキスト・ダーク背景</span>
+    </div>
+  </div>
+
+  <div class="el" style="left:64px; top:540px; width:1792px;">
+    <div class="section-label" style="margin-bottom:20px;">テキスト色ルール</div>
+    <div class="t-body" style="color:var(--color-text); line-height:2.0;">
+      背景色でテキスト色が決まる。迷う余地をなくす。
+    </div>
+  </div>
+
+  <div class="el card" style="left:64px; top:680px; width:560px; height:160px;">
+    <div class="t-body" style="color:var(--color-text);">
+      White / Surface 背景<br>→ <span style="font-weight:700;">Dark Navy</span> テキスト
+    </div>
+  </div>
+  <div class="el card" style="left:648px; top:680px; width:560px; height:160px; background:var(--color-dark);">
+    <div class="t-body" style="color:#FFFFFF;">
+      Dark Navy 背景<br>→ <span style="font-weight:700;">White</span> テキスト
+    </div>
+  </div>
+  <div class="el card" style="left:1232px; top:680px; width:624px; height:160px;">
+    <div class="t-body" style="color:var(--color-sub);">
+      サブテキスト（補足・キャプション）<br>→ <span style="font-weight:700;">#6B7280</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ Slide 4 — Accent Colors ═══════ -->
+<div class="slide">
+  <div class="el" style="left:64px; top:46px; width:1803px; height:97px;">
+    <div class="t-title">Accent & Status Colors</div>
+  </div>
+
+  <div class="el" style="left:64px; top:200px; display:flex; gap:20px;">
+    <div class="swatch" style="width:280px; height:180px; background:var(--color-blue); color:#FFFFFF;">
+      <span>Blue</span><span class="hex">#2563EB — 信頼・基盤</span>
+    </div>
+    <div class="swatch" style="width:280px; height:180px; background:var(--color-teal); color:#FFFFFF;">
+      <span>Teal</span><span class="hex">#0D9488 — 成長・展開</span>
+    </div>
+    <div class="swatch" style="width:280px; height:180px; background:var(--color-purple); color:#FFFFFF;">
+      <span>Purple</span><span class="hex">#7C3AED — 先進・変革</span>
+    </div>
+    <div class="swatch" style="width:280px; height:180px; background:var(--color-orange); color:#FFFFFF;">
+      <span>Orange</span><span class="hex">#EA580C — 注意喚起</span>
+    </div>
+  </div>
+
+  <div class="el t-body" style="left:64px; top:430px; width:1200px; color:var(--color-text); line-height:1.8;">
+    色相が均等に散らばり、並べたとき明確に区別できる4色。<br>
+    3カードなら Blue → Teal → Purple。4つ目が要るときだけ Orange。<br>
+    アクセント色の上はすべて白テキスト。
+  </div>
+
+  <div class="el" style="left:64px; top:620px; display:flex; gap:40px;">
+    <div>
+      <div class="section-label" style="margin-bottom:16px;">Status</div>
+      <div class="status-item"><div class="dot" style="background:var(--color-green);"></div>Green — 完了・正常</div>
+      <div class="status-item"><div class="dot" style="background:var(--color-amber);"></div>Amber — 注意・進行中</div>
+      <div class="status-item"><div class="dot" style="background:var(--color-red);"></div>Red — 未着手・課題</div>
+    </div>
+    <div>
+      <div class="section-label" style="margin-bottom:16px;">Tint（バッジ・ラベル背景）</div>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; width:800px;">
+        <span class="badge" style="background:var(--tint-blue);">Blue</span>
+        <span class="badge" style="background:var(--tint-teal);">Teal</span>
+        <span class="badge" style="background:var(--tint-purple);">Purple</span>
+        <span class="badge" style="background:var(--tint-orange);">Orange</span>
+        <span class="badge" style="background:var(--tint-green);">Green</span>
+        <span class="badge" style="background:var(--tint-amber);">Amber</span>
+        <span class="badge" style="background:var(--tint-red);">Red</span>
+      </div>
+      <div class="t-body" style="margin-top:16px; color:var(--color-text);">各色の12%濃度。不透明度ではなく確定Hex値。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ Slide 5 — Containers ═══════ -->
+<div class="slide">
+  <div class="el" style="left:64px; top:46px; width:1803px; height:97px;">
+    <div class="t-title">Containers</div>
+  </div>
+
+  <div class="el" style="left:64px; top:180px;"><div class="section-label">カテゴリなし — カード + 影のみ</div></div>
+  <div class="el card" style="left:64px; top:230px; width:580px; height:240px;">
+    <div class="t-heading" style="margin-bottom:14px;">Card Title</div>
+    <div class="t-body">分類情報がない場合。<br>角丸カード + 影のみ。</div>
+  </div>
+  <div class="el t-body" style="left:680px; top:250px; width:500px; color:var(--color-text); line-height:1.8;">
+    影で浮かせて境界を作る。<br>枠線は重い。影は軽い。<br>同じ「区切り」でも印象が違う。
+  </div>
+
+  <div class="el" style="left:64px; top:530px;"><div class="section-label">カテゴリ付き — アクセントライン + カード + 影</div></div>
+  <div class="el card-accent" style="left:64px; top:580px; width:430px; height:380px;">
+    <div class="accent-top" style="background:var(--color-blue);"></div>
+    <div class="t-heading" style="margin-bottom:10px;">Step 1</div>
+    <div class="t-body">アクセントラインが<br>カテゴリの意味を伝える</div>
+  </div>
+  <div class="el card-accent" style="left:518px; top:580px; width:430px; height:380px;">
+    <div class="accent-top" style="background:var(--color-teal);"></div>
+    <div class="t-heading" style="margin-bottom:10px;">Step 2</div>
+    <div class="t-body">ラインがカードの角丸を<br>覆い隠す太さ</div>
+  </div>
+  <div class="el card-accent" style="left:972px; top:580px; width:430px; height:380px;">
+    <div class="accent-top" style="background:var(--color-purple);"></div>
+    <div class="t-heading" style="margin-bottom:10px;">Step 3</div>
+    <div class="t-body">ラインの位置は用途に応じて自由<br>— 上辺、左辺など</div>
+  </div>
+  <div class="el card-accent" style="left:1426px; top:580px; width:430px; height:380px;">
+    <div class="accent-top" style="background:var(--color-orange);"></div>
+    <div class="t-heading" style="margin-bottom:10px;">Step 4</div>
+    <div class="t-body">色がステップの順序を<br>視覚的に伝える</div>
+  </div>
+</div>
+
+<!-- ═══════ Slide 6 — Typography ═══════ -->
+<div class="slide">
+  <div class="el" style="left:64px; top:46px; width:1803px; height:97px;">
+    <div class="t-title">Typography</div>
+  </div>
+
+  <div class="el" style="left:64px; top:200px; width:1100px;">
+    <div style="font-size:var(--font-cover-title); font-weight:700; color:var(--color-text); margin-bottom:48px;">Cover Title — 60pt</div>
+    <div style="font-size:var(--font-slide-title); font-weight:700; color:var(--color-text); margin-bottom:48px;">Slide Title — 48pt</div>
+    <div style="font-size:var(--font-heading); font-weight:700; color:var(--color-text); margin-bottom:48px;">Heading — 36pt</div>
+    <div class="t-body" style="color:var(--color-text); margin-bottom:48px;">Body — 24pt — 本文テキスト。情報の中心を担う。</div>
+    <div class="t-caption">Caption — 18pt — 補足説明、キャプション、ラベル</div>
+  </div>
+
+  <div class="el t-body" style="left:1300px; top:220px; width:560px; color:var(--color-text); line-height:2.0;">
+    サイズの差が情報の階層を作る。<br>
+    差が小さいと構造が読めない。<br>
+    差が大きすぎると本文が小さくなる。<br><br>
+    最小 18pt。これ以下はプロジェクタで読めない。
+  </div>
+</div>
+
+<!-- ═══════ Slide 7 — Section Divider ═══════ -->
+<div class="slide">
+  <div class="el" style="left:0; top:0; width:1920px; height:1080px; background:var(--color-dark); opacity:0.88;"></div>
+  <div class="el" style="left:95px; top:300px; width:1547px; z-index:1;">
+    <div class="t-caption" style="color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:1.5px; font-weight:700; margin-bottom:24px;">Section Divider</div>
+    <div style="font-size:var(--font-section-title); font-weight:700; color:#FFFFFF; line-height:1.1; margin-bottom:24px;">ここで話が変わる</div>
+    <div class="t-body" style="font-size:20pt; color:rgba(255,255,255,0.55); line-height:1.8;">
+      コンテンツスライドは白背景。セクション区切りだけダークにする。<br>
+      Dark Navy の矩形をスライド全面に敷いて背景を擬似的に作る。<br>
+      この切り替えが「ここで話が変わる」を視覚的に伝える。
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

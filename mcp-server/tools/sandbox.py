@@ -1,0 +1,267 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+"""Sandbox code execution via Amazon Bedrock AgentCore Code Interpreter.
+
+Security: AWS manages infrastructure security. You manage access control,
+data classification, and IAM policies. See SECURITY.md for details.
+
+Wraps the Code Interpreter API to execute Python code in an isolated sandbox.
+Used by run_python MCP tool for deck workspace editing and general computation.
+
+Deck workspace layout (when deck_id is provided):
+    presentation.json   — slide data
+    specs/              — brief.md, art-direction.html, outline.md
+    includes/           — code block JSON files
+"""
+
+import json
+import logging
+from pathlib import PurePosixPath
+from typing import Any
+
+import boto3
+
+from storage import Storage
+
+logger = logging.getLogger(__name__)
+
+# Files managed by the deck workspace — only these are synced back to S3.
+_WORKSPACE_PREFIXES = ("presentation.json", "specs/", "includes/")
+
+
+def execute_in_sandbox(
+    code: str,
+    storage: Storage,
+    region: str,
+    deck_id: str | None = None,
+    save: bool = False,
+    files: list[str] | None = None,
+) -> str:
+    """Execute Python code in Amazon Bedrock AgentCore Code Interpreter sandbox.
+
+    When deck_id is provided, the entire deck workspace is loaded into the
+    sandbox filesystem. The user code can read/write any file via normal
+    file I/O (open, json.load, etc.). If save=True, modified and new files
+    are written back to S3.
+
+    Args:
+        code: Python code to execute.
+        storage: Storage backend for S3 operations.
+        region: AWS region for Code Interpreter API.
+        deck_id: If provided, loads deck workspace into sandbox.
+        save: If True, writes changed files back to S3. Requires deck_id.
+        files: Additional S3 keys to download into sandbox by basename.
+
+    Returns:
+        Code execution output (stdout/stderr).
+
+    Raises:
+        ValueError: If save=True without deck_id, or duplicate filenames in files.
+    """
+    if save and not deck_id:
+        raise ValueError("save=True requires deck_id")
+
+    if files:
+        basenames = [key.rsplit("/", 1)[-1] for key in files]
+        seen: set[str] = set()
+        for name in basenames:
+            if name in seen:
+                raise ValueError(f"Duplicate filename: {name}")
+            seen.add(name)
+
+    client = boto3.client("bedrock-agentcore", region_name=region)
+
+    session = client.start_code_interpreter_session(
+        codeInterpreterIdentifier="aws.codeinterpreter.v1",
+        name=f"pptx-{deck_id or 'calc'}",
+        sessionTimeoutSeconds=300,
+    )
+    session_id = session["sessionId"]
+    logger.info("Code Interpreter session started: %s", session_id)
+
+    try:
+        # Load deck workspace into sandbox
+        workspace_paths: list[str] = []
+        if deck_id:
+            workspace_paths = _upload_deck_workspace(
+                client, session_id, storage, deck_id,
+            )
+
+        # Upload additional files by basename
+        if files:
+            file_contents = []
+            for key in files:
+                data = storage.download_file_from_pptx_bucket(key)
+                basename = key.rsplit("/", 1)[-1]
+                file_contents.append({"path": basename, "text": data.decode("utf-8")})
+            _write_files(client, session_id, file_contents)
+
+        # Execute user code
+        response = client.invoke_code_interpreter(
+            codeInterpreterIdentifier="aws.codeinterpreter.v1",
+            sessionId=session_id,
+            name="executeCode",
+            arguments={"language": "python", "code": code},
+        )
+        output = _collect_stream(response)
+
+        # Save modified workspace files back to S3
+        if save and deck_id:
+            _save_deck_workspace(
+                client, session_id, storage, deck_id, workspace_paths,
+            )
+            logger.info("Deck workspace saved for deck %s", deck_id)
+
+        return output
+
+    finally:
+        client.stop_code_interpreter_session(
+            codeInterpreterIdentifier="aws.codeinterpreter.v1",
+            sessionId=session_id,
+        )
+        logger.info("Code Interpreter session stopped: %s", session_id)
+
+
+def _upload_deck_workspace(
+    client: Any,
+    session_id: str,
+    storage: Storage,
+    deck_id: str,
+) -> list[str]:
+    """Download all deck files from S3 and write them into the sandbox.
+
+    Args:
+        client: Bedrock AgentCore client.
+        session_id: Code Interpreter session ID.
+        storage: Storage backend.
+        deck_id: Deck identifier.
+
+    Returns:
+        List of relative paths written to the sandbox.
+    """
+    prefix = f"decks/{deck_id}/"
+    keys = storage.list_files(prefix=prefix, bucket=storage.pptx_bucket)
+
+    file_contents: list[dict[str, str]] = []
+    for key in keys:
+        rel_path = key.removeprefix(prefix)
+        if not any(rel_path.startswith(p) for p in _WORKSPACE_PREFIXES):
+            continue
+        try:
+            data = storage.download_file_from_pptx_bucket(key)
+            file_contents.append({"path": rel_path, "text": data.decode("utf-8")})
+        except Exception:
+            logger.warning("Skipping non-text file: %s", key)
+
+    if file_contents:
+        _write_files(client, session_id, file_contents)
+        logger.info("Uploaded %d files to sandbox for deck %s", len(file_contents), deck_id)
+
+    return [f["path"] for f in file_contents]
+
+
+def _save_deck_workspace(
+    client: Any,
+    session_id: str,
+    storage: Storage,
+    deck_id: str,
+    paths: list[str],
+) -> None:
+    """Read workspace files from sandbox and write back to S3.
+
+    Uses executeCode to read files via Python — avoids reliance on
+    readFiles API response format which is not well documented.
+
+    Args:
+        client: Bedrock AgentCore client.
+        session_id: Code Interpreter session ID.
+        storage: Storage backend.
+        deck_id: Deck identifier.
+        paths: Relative file paths to read back (from _upload_deck_workspace).
+    """
+    if not paths:
+        return
+
+    # Read all workspace files via executeCode + JSON dump
+    paths_repr = repr(paths)
+    code = (
+        "import json, os\n"
+        f"_paths = {paths_repr}\n"
+        "_result = {}\n"
+        "for _p in _paths:\n"
+        "    if os.path.isfile(_p):\n"
+        "        with open(_p, 'r') as _f:\n"
+        "            _result[_p] = _f.read()\n"
+        "print(json.dumps(_result))\n"
+    )
+    response = client.invoke_code_interpreter(
+        codeInterpreterIdentifier="aws.codeinterpreter.v1",
+        sessionId=session_id,
+        name="executeCode",
+        arguments={"language": "python", "code": code},
+    )
+    raw = _collect_stream(response)
+
+    file_map: dict[str, str] = json.loads(raw)
+
+    # Write back to S3
+    prefix = f"decks/{deck_id}/"
+    for rel_path, text in file_map.items():
+        s3_key = prefix + rel_path
+        storage.upload_file(
+            key=s3_key,
+            data=text.encode("utf-8"),
+            content_type=_content_type(rel_path),
+        )
+
+
+def _write_files(client: Any, session_id: str, content: list[dict[str, str]]) -> None:
+    """Write files into the sandbox.
+
+    Args:
+        client: Bedrock AgentCore client.
+        session_id: Code Interpreter session ID.
+        content: List of dicts with 'path' and 'text' keys.
+    """
+    client.invoke_code_interpreter(
+        codeInterpreterIdentifier="aws.codeinterpreter.v1",
+        sessionId=session_id,
+        name="writeFiles",
+        arguments={"content": content},
+    )
+
+
+def _collect_stream(response: dict[str, Any]) -> str:
+    """Collect text output from Code Interpreter streaming response.
+
+    Args:
+        response: invoke_code_interpreter response with 'stream' key.
+
+    Returns:
+        Concatenated text output.
+    """
+    texts: list[str] = []
+    for event in response["stream"]:
+        if "result" in event:
+            result = event["result"]
+            if "content" in result:
+                for item in result["content"]:
+                    if item.get("type") == "text":
+                        texts.append(item["text"])
+    return "\n".join(texts)
+
+
+def _content_type(path: str) -> str:
+    """Determine content type from file extension.
+
+    Args:
+        path: File path.
+
+    Returns:
+        MIME content type string.
+    """
+    suffix = PurePosixPath(path).suffix.lower()
+    return {
+        ".json": "application/json",
+        ".md": "text/markdown",
+    }.get(suffix, "text/plain")

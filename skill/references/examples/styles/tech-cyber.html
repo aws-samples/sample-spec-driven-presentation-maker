@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>tech-cyber — ネオングリーン×ダークのサイバースタイル（ジョーク用）</title>
+<style>
+  :root {
+    /* Colors */
+    --color-primary: #00FF88;
+    --color-secondary: #0D9488;
+    --color-accent: #58A6FF;
+    --color-bg: #0A0E17;
+    --color-bg-alt: #0D1117;
+    --color-bg-card: #161B22;
+    --color-bg-code: #1C2128;
+    --color-text: #E6EDF3;
+    --color-text-sub: #ABABAB;
+    --color-text-muted: #7D8590;
+    --color-border: #30363D;
+    --color-glow-green: #00FF88;
+    --color-glow-blue: #0066FF;
+
+    /* Typography */
+    --font-heading: Consolas, monospace;
+    --font-body: Calibri, sans-serif;
+    --font-mono: Consolas, monospace;
+    --fs-cover-title: 48pt;
+    --fs-slide-title: 36pt;
+    --fs-heading: 26pt;
+    --fs-body: 18pt;
+    --fs-caption: 14pt;
+    --fs-code: 12pt;
+    --ls-title: 4pt;
+
+    /* Template */
+    /* 推奨テンプレート: Blank Dark */
+
+    /* Components */
+    --card-radius: 3px;
+    --card-border: 1pt solid var(--color-primary);
+    --card-shadow: 0 0 12px rgba(0,255,136,0.3);
+    --card-shadow-strong: 0 0 24px rgba(0,255,136,0.5);
+    --glow-text: 0 0 20px rgba(0,255,136,0.6);
+    --bracket-size: 40px;
+    --bracket-width: 1pt;
+  }
+
+  body {
+    margin: 0; padding: 40px;
+    background: #E5E5E5;
+    zoom: 0.7;
+  }
+  .slide {
+    position: relative;
+    width: 1920px; height: 1080px;
+    margin: 0 auto 40px;
+    background: var(--color-bg);
+    overflow: hidden;
+  }
+  .el { position: absolute; }
+
+  /* Text styles */
+  .t-cover-title {
+    font: bold var(--fs-cover-title) var(--font-heading);
+    color: var(--color-primary);
+    letter-spacing: var(--ls-title);
+    text-shadow: var(--glow-text);
+  }
+  .t-slide-title {
+    font: bold var(--fs-slide-title) var(--font-heading);
+    color: var(--color-text);
+    letter-spacing: var(--ls-title);
+  }
+  .t-heading {
+    font: bold var(--fs-heading) var(--font-heading);
+    color: var(--color-primary);
+  }
+  .t-body {
+    font: normal var(--fs-body) var(--font-body);
+    color: var(--color-text);
+    line-height: 1.6;
+  }
+  .t-sub {
+    font: normal var(--fs-body) var(--font-body);
+    color: var(--color-text-sub);
+    line-height: 1.6;
+  }
+  .t-caption {
+    font: normal var(--fs-caption) var(--font-body);
+    color: var(--color-text-muted);
+  }
+  .t-code {
+    font: normal var(--fs-code) var(--font-mono);
+    color: var(--color-primary);
+    line-height: 1.7;
+  }
+  .t-terminal {
+    font: normal var(--fs-code) var(--font-mono);
+    color: var(--color-primary);
+  }
+  .t-prompt {
+    font: bold var(--fs-caption) var(--font-mono);
+    color: var(--color-text-muted);
+  }
+
+  /* Card */
+  .card {
+    background: var(--color-bg-card);
+    border: var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+  }
+  .card-strong {
+    background: var(--color-bg-card);
+    border: var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow-strong);
+  }
+
+  /* Code block */
+  .code-block {
+    background: var(--color-bg-code);
+    border: 1pt solid var(--color-border);
+    border-radius: var(--card-radius);
+    padding: 20px;
+  }
+
+  /* Corner brackets */
+  .bracket-tl, .bracket-tr, .bracket-bl, .bracket-br {
+    position: absolute;
+    width: var(--bracket-size);
+    height: var(--bracket-size);
+    border-color: var(--color-primary);
+    border-style: solid;
+    border-width: 0;
+  }
+  .bracket-tl { top: 40px; left: 40px; border-top-width: var(--bracket-width); border-left-width: var(--bracket-width); }
+  .bracket-tr { top: 40px; right: 40px; border-top-width: var(--bracket-width); border-right-width: var(--bracket-width); }
+  .bracket-bl { bottom: 40px; left: 40px; border-bottom-width: var(--bracket-width); border-left-width: var(--bracket-width); }
+  .bracket-br { bottom: 40px; right: 40px; border-bottom-width: var(--bracket-width); border-right-width: var(--bracket-width); }
+
+  /* Grid overlay */
+  .grid-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.05) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+  }
+
+  /* Scanline overlay */
+  .scanline-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(0,255,136,0.02) 3px,
+      rgba(0,255,136,0.02) 4px
+    );
+    pointer-events: none;
+  }
+
+  /* Left accent bar */
+  .accent-bar-left {
+    position: absolute;
+    width: 3px;
+    background: var(--color-primary);
+    box-shadow: var(--card-shadow);
+  }
+</style>
+</head>
+<body>
+
+<!-- Slide 1: Cover -->
+<div class="slide">
+  <div class="grid-overlay"></div>
+  <div class="scanline-overlay"></div>
+  <div class="bracket-tl"></div>
+  <div class="bracket-tr"></div>
+  <div class="bracket-bl"></div>
+  <div class="bracket-br"></div>
+  <div class="el t-prompt" style="left:96px; top:340px; width:600px;">&gt; STYLE_INITIALIZED</div>
+  <div class="el t-cover-title" style="left:96px; top:380px; width:1728px;">TECH / CYBER</div>
+  <div class="el t-sub" style="left:96px; top:480px; width:1200px;">ネオングリーンが暗闇に走る。コードが語り、光が導く。</div>
+  <div class="el t-caption" style="left:96px; top:960px; width:800px;">premise: 「光は暗闇の中でこそ意味を持つ。最小限の光で最大の情報を伝える。」</div>
+</div>
+
+<!-- Slide 2: Color Palette -->
+<div class="slide">
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1728px;">01// カラーパレット</div>
+  <div class="accent-bar-left" style="left:80px; top:48px; height:44px;"></div>
+
+  <!-- Primary -->
+  <div class="el card-strong" style="left:96px; top:160px; width:540px; height:200px; padding:24px;">
+    <div class="t-heading">PRIMARY</div>
+    <div style="margin-top:12px; width:100%; height:60px; background:var(--color-primary); border-radius:var(--card-radius);"></div>
+    <div class="t-code" style="margin-top:8px;">#00FF88 — ネオングリーン</div>
+    <div class="t-caption">メインアクセント。グロー効果の光源。</div>
+  </div>
+
+  <!-- Secondary -->
+  <div class="el card" style="left:690px; top:160px; width:540px; height:200px; padding:24px;">
+    <div class="t-heading" style="color:var(--color-secondary);">SECONDARY</div>
+    <div style="margin-top:12px; width:100%; height:60px; background:var(--color-secondary); border-radius:var(--card-radius);"></div>
+    <div class="t-code" style="margin-top:8px; color:var(--color-secondary);">#0D9488 — ティール</div>
+    <div class="t-caption">セカンダリアクセント。落ち着いた補助色。</div>
+  </div>
+
+  <!-- Accent -->
+  <div class="el card" style="left:1284px; top:160px; width:540px; height:200px; padding:24px;">
+    <div class="t-heading" style="color:var(--color-accent);">ACCENT</div>
+    <div style="margin-top:12px; width:100%; height:60px; background:var(--color-accent); border-radius:var(--card-radius);"></div>
+    <div class="t-code" style="margin-top:8px; color:var(--color-accent);">#58A6FF — エレクトリックブルー</div>
+    <div class="t-caption">リンク・CTA・インタラクティブ要素。</div>
+  </div>
+
+  <!-- Background swatches -->
+  <div class="el t-heading" style="left:96px; top:460px; width:600px;">背景レイヤー</div>
+  <div class="el" style="left:96px; top:520px; width:160px; height:80px; background:var(--color-bg); border:1pt solid var(--color-border); border-radius:var(--card-radius);"></div>
+  <div class="el t-code" style="left:96px; top:608px; width:160px; text-align:center;">#0A0E17</div>
+  <div class="el t-caption" style="left:96px; top:636px; width:160px; text-align:center;">メイン背景</div>
+
+  <div class="el" style="left:296px; top:520px; width:160px; height:80px; background:var(--color-bg-alt); border:1pt solid var(--color-border); border-radius:var(--card-radius);"></div>
+  <div class="el t-code" style="left:296px; top:608px; width:160px; text-align:center;">#0D1117</div>
+  <div class="el t-caption" style="left:296px; top:636px; width:160px; text-align:center;">代替背景</div>
+
+  <div class="el" style="left:496px; top:520px; width:160px; height:80px; background:var(--color-bg-card); border:1pt solid var(--color-border); border-radius:var(--card-radius);"></div>
+  <div class="el t-code" style="left:496px; top:608px; width:160px; text-align:center;">#161B22</div>
+  <div class="el t-caption" style="left:496px; top:636px; width:160px; text-align:center;">カード背景</div>
+
+  <div class="el" style="left:696px; top:520px; width:160px; height:80px; background:var(--color-bg-code); border:1pt solid var(--color-border); border-radius:var(--card-radius);"></div>
+  <div class="el t-code" style="left:696px; top:608px; width:160px; text-align:center;">#1C2128</div>
+  <div class="el t-caption" style="left:696px; top:636px; width:160px; text-align:center;">コード背景</div>
+
+  <!-- Text colors -->
+  <div class="el t-heading" style="left:96px; top:720px; width:600px;">テキストカラー</div>
+  <div class="el t-body" style="left:96px; top:780px; width:500px;">メインテキスト #E6EDF3 — 高コントラスト、長文可読</div>
+  <div class="el t-sub" style="left:96px; top:820px; width:500px;">サブテキスト #ABABAB — 補足情報、説明文</div>
+  <div class="el t-caption" style="left:96px; top:860px; width:500px;">ミュートテキスト #7D8590 — キャプション、注釈</div>
+
+  <!-- Rule -->
+  <div class="el t-sub" style="left:960px; top:520px; width:800px; line-height:1.8;">
+    ルール：暖色禁止。赤・オレンジ・ピンクをメインに使わない。<br>
+    グリーンとブルーの冷色系でサイバー感を維持する。<br>
+    背景は常にダーク。ライトモードは存在しない。
+  </div>
+</div>
+
+<!-- Slide 3: Typography -->
+<div class="slide">
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1728px;">02// タイポグラフィ</div>
+  <div class="accent-bar-left" style="left:80px; top:48px; height:44px;"></div>
+
+  <!-- Heading font demo -->
+  <div class="el t-heading" style="left:96px; top:160px; width:800px;">見出し — Consolas, monospace</div>
+  <div class="el t-cover-title" style="left:96px; top:220px; width:800px;">48pt COVER</div>
+  <div class="el t-slide-title" style="left:96px; top:300px; width:800px;">36pt SLIDE TITLE</div>
+  <div class="el t-heading" style="left:96px; top:370px; width:800px;">26pt HEADING</div>
+
+  <!-- Body font demo -->
+  <div class="el t-heading" style="left:96px; top:470px; width:800px;">本文 — Calibri, sans-serif</div>
+  <div class="el t-body" style="left:96px; top:530px; width:800px;">18pt 本文テキスト。可読性を最優先に。</div>
+  <div class="el t-sub" style="left:96px; top:570px; width:800px;">18pt サブテキスト。補足情報に使用。</div>
+  <div class="el t-caption" style="left:96px; top:610px; width:800px;">14pt キャプション。注釈やメタ情報。</div>
+
+  <!-- Code font demo -->
+  <div class="el t-heading" style="left:96px; top:700px; width:800px;">コード — Consolas, 12pt</div>
+  <div class="el code-block" style="left:96px; top:760px; width:760px; height:120px;">
+    <span class="t-code">$ ssh root@10.0.0.1<br>&gt; scanning ports...<br>&gt; connection established<br>const style = "tech-cyber";</span>
+  </div>
+
+  <!-- Rules on right side -->
+  <div class="el card" style="left:1000px; top:160px; width:824px; height:720px; padding:32px;">
+    <div class="t-heading">タイポグラフィ規則</div>
+    <div class="t-body" style="margin-top:20px; line-height:2.0;">
+      ● モノスペース（Consolas）= テック感の核<br>
+      ● タイトルには letter-spacing: 4pt で広めの字間<br>
+      ● セリフフォント使用禁止<br>
+      ● コード/ターミナルは12pt — 小さくてよい<br>
+      ● 本文は18pt — 可読性確保<br>
+      ● サイズの階段: 48 → 36 → 26 → 18 → 14 → 12<br>
+      ● 各段差は明確に区別できること
+    </div>
+    <div class="t-caption" style="margin-top:24px;">
+      見出しのモノスペースが「機械が語っている」印象を作る。<br>
+      本文のCalibriが人間の可読性を担保する。この対比がスタイルの骨格。
+    </div>
+  </div>
+</div>
+
+<!-- Slide 4: Components & Decoration -->
+<div class="slide">
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1728px;">03// コンポーネント＆装飾</div>
+  <div class="accent-bar-left" style="left:80px; top:48px; height:44px;"></div>
+
+  <!-- Standard card -->
+  <div class="el card" style="left:96px; top:160px; width:540px; height:180px; padding:24px;">
+    <div class="t-heading">標準カード</div>
+    <div class="t-body" style="margin-top:8px;">bg_card + primary border 1pt<br>控えめなグリーングロー影</div>
+    <div class="t-caption" style="margin-top:8px;">通常コンテンツに使用</div>
+  </div>
+
+  <!-- Strong card -->
+  <div class="el card-strong" style="left:690px; top:160px; width:540px; height:180px; padding:24px;">
+    <div class="t-heading">強調カード</div>
+    <div class="t-body" style="margin-top:8px;">同じ構造、グロー強め<br>重要な情報・CTAに使用</div>
+    <div class="t-caption" style="margin-top:8px;">box-shadow blur: 24px, opacity: 0.5</div>
+  </div>
+
+  <!-- Code block -->
+  <div class="el code-block" style="left:1284px; top:160px; width:540px; height:180px;">
+    <div class="t-code">&gt; system.status()<br>{ uptime: "99.97%",<br>&nbsp;&nbsp;nodes: 12,<br>&nbsp;&nbsp;threat_level: "LOW" }</div>
+  </div>
+  <div class="el t-caption" style="left:1284px; top:368px; width:540px;">コードブロック: bg_code + border色ボーダー</div>
+
+  <!-- Corner brackets demo -->
+  <div class="el" style="left:96px; top:440px; width:540px; height:280px;">
+    <div style="position:relative; width:100%; height:100%;">
+      <div class="bracket-tl" style="top:0; left:0;"></div>
+      <div class="bracket-tr" style="top:0; right:0;"></div>
+      <div class="bracket-bl" style="bottom:0; left:0;"></div>
+      <div class="bracket-br" style="bottom:0; right:0;"></div>
+      <div class="t-body" style="position:absolute; top:60px; left:60px; width:400px;">
+        コーナーブラケット [ ] 装飾<br>
+        カバーとクロージングで使用。<br>
+        サイバー空間の「枠」を暗示する。
+      </div>
+    </div>
+  </div>
+
+  <!-- Accent bar demo -->
+  <div class="el" style="left:690px; top:440px; width:540px; height:120px;">
+    <div style="position:absolute; left:0; top:0; width:3px; height:100%; background:var(--color-primary); box-shadow:var(--card-shadow);"></div>
+    <div class="t-body" style="position:absolute; left:20px; top:0; width:500px;">
+      左辺アクセントバー<br>
+      タイトル横に配置。primary色 3pt。<br>
+      タイトル下線は禁止 — 左辺バーのみ。
+    </div>
+  </div>
+
+  <!-- Terminal prompt -->
+  <div class="el card" style="left:690px; top:600px; width:540px; height:120px; padding:20px;">
+    <div class="t-terminal">&gt; ターミナルプロンプト表現</div>
+    <div class="t-terminal" style="margin-top:4px; color:var(--color-text-sub);">&gt; タグラインやCTAで使用可</div>
+    <div class="t-terminal" style="margin-top:4px;">&gt; READY_</div>
+  </div>
+
+  <!-- Decoration rules -->
+  <div class="el card" style="left:1284px; top:440px; width:540px; height:280px; padding:24px;">
+    <div class="t-heading">装飾ルール</div>
+    <div class="t-body" style="margin-top:12px; line-height:1.8;">
+      ● 角丸: 3px（シャープ寄り）<br>
+      ● グロー: 要所で強く、通常は控えめ<br>
+      ● グリッド/スキャンライン: カバー等のみ<br>
+      ● 装飾密度: 中〜高（テック感優先）
+    </div>
+  </div>
+
+  <!-- Do's and Don'ts -->
+  <div class="el t-heading" style="left:96px; top:800px; width:400px; color:var(--color-primary);">DO's</div>
+  <div class="el t-sub" style="left:96px; top:850px; width:800px; line-height:1.8;">
+    ダーク背景統一 / モノスペース積極使用 / ネオンアクセント / ターミナル風表現 / ブラケット装飾
+  </div>
+  <div class="el t-heading" style="left:1000px; top:800px; width:400px; color:#FF4444;">DON'Ts</div>
+  <div class="el t-sub" style="left:1000px; top:850px; width:800px; line-height:1.8;">
+    ライト背景 / セリフフォント / 暖色メイン使用 / タイトル下線 / 過度な丸角
+  </div>
+</div>
+
+<!-- Slide 5: Slide Types -->
+<div class="slide">
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1728px;">04// スライドタイプ別規則</div>
+  <div class="accent-bar-left" style="left:80px; top:48px; height:44px;"></div>
+
+  <!-- Cover -->
+  <div class="el card-strong" style="left:96px; top:160px; width:540px; height:340px; padding:24px;">
+    <div class="t-heading">COVER</div>
+    <div class="t-body" style="margin-top:12px; line-height:1.8;">
+      背景: "background": "#0A0E17" 固定<br>
+      タイトル: 48pt Consolas bold, primary色<br>
+      テキストグロー: ON（強）<br>
+      装飾: 四隅ブラケット + グリッド + スキャンライン<br>
+      タグライン: "&gt; INITIALIZING..." 風
+    </div>
+  </div>
+
+  <!-- Section Divider -->
+  <div class="el card" style="left:690px; top:160px; width:540px; height:340px; padding:24px;">
+    <div class="t-heading">SECTION DIVIDER</div>
+    <div class="t-body" style="margin-top:12px; line-height:1.8;">
+      背景: "background": "#0A0E17"<br>
+      タイトル: 36pt Consolas bold, primary色<br>
+      番号: "01//" 形式<br>
+      装飾: 左辺 primary バー + ブラケット<br>
+      グリッドオーバーレイ: ON
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="el card" style="left:1284px; top:160px; width:540px; height:340px; padding:24px;">
+    <div class="t-heading">CONTENT</div>
+    <div class="t-body" style="margin-top:12px; line-height:1.8;">
+      背景: "background": "#0A0E17" または "#0D1117"<br>
+      タイトル: 26pt Consolas bold, text色<br>
+      カード: bg_card + primary border + グロー<br>
+      データ: モノスペース推奨<br>
+      装飾: 控えめ（カード影のみ）
+    </div>
+  </div>
+
+  <!-- Closing -->
+  <div class="el card-strong" style="left:96px; top:560px; width:540px; height:340px; padding:24px;">
+    <div class="t-heading">CLOSING</div>
+    <div class="t-body" style="margin-top:12px; line-height:1.8;">
+      背景: "background": "#0A0E17"<br>
+      CTA: primary色大文字<br>
+      表現: "&gt; EXECUTE" 風<br>
+      装飾: 四隅ブラケット + スキャンライン<br>
+      グロー: ON（強）
+    </div>
+  </div>
+
+  <!-- Glow usage guide -->
+  <div class="el card" style="left:690px; top:560px; width:1134px; height:340px; padding:24px;">
+    <div class="t-heading">グロー効果の使い分け</div>
+    <div class="t-body" style="margin-top:16px; line-height:2.0;">
+      <span style="text-shadow:var(--glow-text); color:var(--color-primary);">■ 強グロー</span> — カバータイトル、CTA、セクションディバイダー、強調カード<br>
+      <span style="color:var(--color-primary);">■ 控えめグロー</span> — 通常カード、アクセントバー<br>
+      <span style="color:var(--color-text-muted);">■ グローなし</span> — 本文テキスト、キャプション、コードブロック
+    </div>
+    <div class="t-caption" style="margin-top:16px;">
+      メリハリの原則：光は暗闇の中で意味を持つ。全部光らせると何も目立たない。<br>
+      要所で強く使い、それ以外は抑える。この緩急がサイバー感を生む。
+    </div>
+  </div>
+</div>
+
+<!-- Slide 6: Closing -->
+<div class="slide">
+  <div class="grid-overlay"></div>
+  <div class="scanline-overlay"></div>
+  <div class="bracket-tl"></div>
+  <div class="bracket-tr"></div>
+  <div class="bracket-bl"></div>
+  <div class="bracket-br"></div>
+  <div class="el t-prompt" style="left:96px; top:400px; width:600px;">&gt; STYLE_LOADED</div>
+  <div class="el t-cover-title" style="left:96px; top:440px; width:1728px;">TECH / CYBER</div>
+  <div class="el t-sub" style="left:96px; top:540px; width:1200px;">光は暗闇の中でこそ意味を持つ。最小限の光で最大の情報を伝える。</div>
+  <div class="el t-terminal" style="left:96px; top:640px; width:600px;">&gt; READY TO EXECUTE_</div>
+</div>
+
+</body>
+</html>

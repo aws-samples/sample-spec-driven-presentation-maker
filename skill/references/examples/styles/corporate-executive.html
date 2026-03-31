@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Corporate Executive — 静かな権威。装飾ではなく構造と余白で信頼を語る。</title>
+<style>
+  :root {
+    /* Colors */
+    --color-primary: #1E2761;
+    --color-accent: #4472C4;
+    --color-bg-dark: #1A1F36;
+    --color-bg-light: #F8F9FC;
+    --color-bg-card: #FFFFFF;
+    --color-text: #1E293B;
+    --color-text-sub: #475569;
+    --color-text-muted: #94A3B8;
+    --color-text-on-dark: #FFFFFF;
+    --color-border: #E2E8F0;
+    --color-success: #059669;
+    --color-danger: #DC2626;
+
+    /* Typography - Fonts */
+    --font-heading: "Georgia", serif;
+    --font-body: "Calibri", "Segoe UI", sans-serif;
+    --font-mono: "Consolas", monospace;
+
+    /* Typography - Sizes */
+    --size-cover-title: 54pt;
+    --size-slide-title: 32pt;
+    --size-section-header: 40pt;
+    --size-heading: 28pt;
+    --size-body: 20pt;
+    --size-caption: 14pt;
+    --size-kpi: 72pt;
+
+    /* Template */
+    --template-theme: light;
+    /* 推奨テンプレート: Blank Light
+       ライトテンプレートのみ使用。ダークスライドは background + defaultTextColor で切り替える。
+       テンプレートの切り替えは行わない。 */
+
+    /* Components - Card */
+    --card-radius: 8px;
+    --card-border: 0.75pt solid var(--color-border);
+    --card-shadow: 0 2px 6px rgba(0,0,0,0.10);
+
+    /* Components - Accent bar */
+    --accent-bar-width: 3pt;
+    --accent-bar-color: var(--color-primary);
+
+    /* Components - Divider */
+    --divider: 0.5pt solid var(--color-border);
+
+    /* Components - Icon circle */
+    --icon-circle-bg: var(--color-accent);
+    --icon-circle-size: 48px;
+  }
+
+  body {
+    margin: 0; padding: 40px;
+    background: #E5E5E5;
+    zoom: 0.7;
+  }
+  .slide {
+    position: relative;
+    width: 1920px; height: 1080px;
+    margin: 0 auto 40px;
+    background: var(--color-bg-light);
+    overflow: hidden;
+  }
+  .slide--dark {
+    background: var(--color-bg-dark);
+  }
+  .el { position: absolute; }
+
+  /* Text styles */
+  .t-cover-title {
+    font-family: var(--font-heading);
+    font-size: var(--size-cover-title);
+    font-weight: bold;
+    color: var(--color-text-on-dark);
+    line-height: 1.2;
+  }
+  .t-slide-title {
+    font-family: var(--font-heading);
+    font-size: var(--size-slide-title);
+    font-weight: bold;
+    color: var(--color-text);
+    line-height: 1.3;
+  }
+  .t-section-header {
+    font-family: var(--font-heading);
+    font-size: var(--size-section-header);
+    font-weight: bold;
+    color: var(--color-text-on-dark);
+    line-height: 1.2;
+  }
+  .t-heading {
+    font-family: var(--font-heading);
+    font-size: var(--size-heading);
+    font-weight: bold;
+    color: var(--color-text);
+    line-height: 1.3;
+  }
+  .t-body {
+    font-family: var(--font-body);
+    font-size: var(--size-body);
+    font-weight: normal;
+    color: var(--color-text-sub);
+    line-height: 1.6;
+  }
+  .t-caption {
+    font-family: var(--font-body);
+    font-size: var(--size-caption);
+    font-weight: normal;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+  .t-kpi {
+    font-family: var(--font-body);
+    font-size: var(--size-kpi);
+    font-weight: bold;
+    color: var(--color-text);
+    line-height: 1.0;
+  }
+  .t-body-on-dark {
+    font-family: var(--font-body);
+    font-size: var(--size-body);
+    font-weight: normal;
+    color: rgba(255,255,255,0.7);
+    line-height: 1.6;
+  }
+
+  /* Component styles */
+  .card {
+    background: var(--color-bg-card);
+    border: var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+  }
+  .card--accent {
+    border-left: var(--accent-bar-width) solid var(--accent-bar-color);
+  }
+  .icon-circle {
+    width: var(--icon-circle-size);
+    height: var(--icon-circle-size);
+    border-radius: 50%;
+    background: var(--icon-circle-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-on-dark);
+    font-family: var(--font-body);
+    font-size: var(--size-body);
+    font-weight: bold;
+  }
+  /* Card-internal text (smaller than slide-level) */
+  .t-card-title {
+    font-family: var(--font-heading);
+    font-size: var(--size-body);
+    font-weight: bold;
+    color: var(--color-text);
+    line-height: 1.3;
+  }
+  .t-card-body {
+    font-family: var(--font-body);
+    font-size: var(--size-caption);
+    font-weight: normal;
+    color: var(--color-text-sub);
+    line-height: 1.6;
+  }
+  .t-card-body-on-dark {
+    font-family: var(--font-body);
+    font-size: var(--size-caption);
+    font-weight: normal;
+    color: rgba(255,255,255,0.7);
+    line-height: 1.6;
+  }
+  .t-label {
+    font-family: var(--font-body);
+    font-size: var(--size-caption);
+    font-weight: bold;
+    color: var(--color-accent);
+    line-height: 1.5;
+  }
+  .t-mono {
+    font-family: var(--font-mono);
+    font-size: var(--size-caption);
+    color: var(--color-text-sub);
+    line-height: 1.5;
+  }
+  .t-mini {
+    font-family: var(--font-body);
+    font-size: var(--size-caption);
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+  .divider {
+    border: none;
+    border-top: var(--divider);
+  }
+</style>
+</head>
+<body>
+
+<!-- Slide 1: Cover (Dark) -->
+<div class="slide slide--dark">
+  <div class="el t-cover-title" style="left:96px; top:340px; width:1200px;">
+    Corporate Executive
+  </div>
+  <div class="el t-body-on-dark" style="left:96px; top:430px; width:900px;">
+    静かな権威。装飾ではなく構造と余白で信頼を語る。
+  </div>
+  <!-- Corner accent: L-shape -->
+  <div class="el" style="left:0; bottom:0; width:4px; height:120px; background:var(--color-accent);"></div>
+  <div class="el" style="left:0; bottom:0; width:120px; height:4px; background:var(--color-accent);"></div>
+</div>
+
+<!-- Slide 2: Color Palette (Light) -->
+<div class="slide">
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1200px;">
+    カラーパレット
+  </div>
+  <div class="el t-body" style="left:96px; top:100px; width:1400px;">
+    ネイビー濃淡だけで場面を切り替える。色数を絞ることで「信頼」を視覚化する。
+  </div>
+
+  <!-- Primary -->
+  <div class="el card" style="left:96px; top:200px; width:260px; height:280px; padding:24px; box-sizing:border-box;">
+    <div style="width:212px; height:120px; background:var(--color-primary); border-radius:4px; margin-bottom:16px;"></div>
+    <div class="t-card-title" style="margin-bottom:4px;">Primary</div>
+    <div class="t-caption">#1E2761</div>
+    <div class="t-caption" style="margin-top:4px;">メインブランドカラー。見出し強調、アクセントバー。</div>
+  </div>
+
+  <!-- Accent -->
+  <div class="el card" style="left:386px; top:200px; width:260px; height:280px; padding:24px; box-sizing:border-box;">
+    <div style="width:212px; height:120px; background:var(--color-accent); border-radius:4px; margin-bottom:16px;"></div>
+    <div class="t-card-title" style="margin-bottom:4px;">Accent</div>
+    <div class="t-caption">#4472C4</div>
+    <div class="t-caption" style="margin-top:4px;">CTA、アイコン背景、リンク。</div>
+  </div>
+
+  <!-- BG Dark -->
+  <div class="el card" style="left:676px; top:200px; width:260px; height:280px; padding:24px; box-sizing:border-box;">
+    <div style="width:212px; height:120px; background:var(--color-bg-dark); border-radius:4px; margin-bottom:16px;"></div>
+    <div class="t-card-title" style="margin-bottom:4px;">BG Dark</div>
+    <div class="t-caption">#1A1F36</div>
+    <div class="t-caption" style="margin-top:4px;">カバー、セクション区切り、クロージング。</div>
+  </div>
+
+  <!-- BG Light -->
+  <div class="el card" style="left:966px; top:200px; width:260px; height:280px; padding:24px; box-sizing:border-box;">
+    <div style="width:212px; height:120px; background:var(--color-bg-light); border-radius:4px; border:1px solid var(--color-border); margin-bottom:16px;"></div>
+    <div class="t-card-title" style="margin-bottom:4px;">BG Light</div>
+    <div class="t-caption">#F8F9FC</div>
+    <div class="t-caption" style="margin-top:4px;">コンテンツスライド背景。</div>
+  </div>
+
+  <!-- BG Card -->
+  <div class="el card" style="left:1256px; top:200px; width:260px; height:280px; padding:24px; box-sizing:border-box;">
+    <div style="width:212px; height:120px; background:var(--color-bg-card); border-radius:4px; border:1px solid var(--color-border); margin-bottom:16px;"></div>
+    <div class="t-card-title" style="margin-bottom:4px;">BG Card</div>
+    <div class="t-caption">#FFFFFF</div>
+    <div class="t-caption" style="margin-top:4px;">カード、パネル背景。</div>
+  </div>
+
+  <!-- Text colors row -->
+  <div class="el t-card-title" style="left:96px; top:520px;">テキストカラー</div>
+
+  <div class="el card" style="left:96px; top:570px; width:360px; height:80px; padding:20px 24px; box-sizing:border-box; display:flex; align-items:center; gap:16px;">
+    <div style="width:40px; height:40px; background:var(--color-text); border-radius:4px; flex-shrink:0;"></div>
+    <div>
+      <div class="t-caption" style="color:var(--color-text);">Text Primary #1E293B</div>
+      <div class="t-caption">本文テキスト</div>
+    </div>
+  </div>
+
+  <div class="el card" style="left:486px; top:570px; width:360px; height:80px; padding:20px 24px; box-sizing:border-box; display:flex; align-items:center; gap:16px;">
+    <div style="width:40px; height:40px; background:var(--color-text-sub); border-radius:4px; flex-shrink:0;"></div>
+    <div>
+      <div class="t-caption" style="color:var(--color-text-sub);">Text Sub #475569</div>
+      <div class="t-caption">サブテキスト</div>
+    </div>
+  </div>
+
+  <div class="el card" style="left:876px; top:570px; width:360px; height:80px; padding:20px 24px; box-sizing:border-box; display:flex; align-items:center; gap:16px;">
+    <div style="width:40px; height:40px; background:var(--color-text-muted); border-radius:4px; flex-shrink:0;"></div>
+    <div>
+      <div class="t-caption" style="color:var(--color-text-muted);">Text Muted #94A3B8</div>
+      <div class="t-caption">キャプション・注釈</div>
+    </div>
+  </div>
+
+  <!-- Semantic colors -->
+  <div class="el t-card-title" style="left:96px; top:690px;">セマンティックカラー</div>
+
+  <div class="el card" style="left:96px; top:740px; width:260px; height:80px; padding:20px 24px; box-sizing:border-box; display:flex; align-items:center; gap:16px;">
+    <div style="width:40px; height:40px; background:var(--color-success); border-radius:4px; flex-shrink:0;"></div>
+    <div>
+      <div class="t-caption" style="color:var(--color-success);">Success #059669</div>
+      <div class="t-caption">正値・成功</div>
+    </div>
+  </div>
+
+  <div class="el card" style="left:386px; top:740px; width:260px; height:80px; padding:20px 24px; box-sizing:border-box; display:flex; align-items:center; gap:16px;">
+    <div style="width:40px; height:40px; background:var(--color-danger); border-radius:4px; flex-shrink:0;"></div>
+    <div>
+      <div class="t-caption" style="color:var(--color-danger);">Danger #DC2626</div>
+      <div class="t-caption">負値・警告</div>
+    </div>
+  </div>
+
+  <div class="el card" style="left:676px; top:740px; width:540px; height:80px; padding:20px 24px; box-sizing:border-box;">
+    <div class="t-caption">ダーク背景上のテキストは常に #FFFFFF。中間色は rgba(255,255,255,0.7) で表現。</div>
+  </div>
+
+  <div class="el t-caption" style="left:96px; top:1000px; width:1700px;">
+    色数を12色に制限。ネイビー系の濃淡でダーク/ライトを切り替え、アクセントのロイヤルブルーは控えめに使う。
+  </div>
+</div>
+
+<!-- Slide 3: Typography (Light) -->
+<div class="slide">
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1200px;">
+    タイポグラフィ
+  </div>
+  <div class="el t-body" style="left:96px; top:100px; width:1400px;">
+    Georgia（セリフ）で権威を、Calibri（サンセリフ）で可読性を。この二刀流がスタイルの核。
+  </div>
+
+  <!-- Heading font showcase -->
+  <div class="el card" style="left:96px; top:190px; width:840px; height:520px; padding:40px; box-sizing:border-box;">
+    <div class="t-caption" style="margin-bottom:24px; color:var(--color-accent); font-weight:bold;">見出しフォント — Georgia</div>
+    <div style="font-family:var(--font-heading); font-size:var(--size-cover-title); font-weight:bold; color:var(--color-text); margin-bottom:20px;">
+      カバータイトル 54pt
+    </div>
+    <div style="font-family:var(--font-heading); font-size:var(--size-section-header); font-weight:bold; color:var(--color-text); margin-bottom:20px;">
+      セクションヘッダー 40pt
+    </div>
+    <div style="font-family:var(--font-heading); font-size:var(--size-slide-title); font-weight:bold; color:var(--color-text); margin-bottom:20px;">
+      スライドタイトル 32pt
+    </div>
+    <div style="font-family:var(--font-heading); font-size:var(--size-heading); font-weight:bold; color:var(--color-text);">
+      見出し 28pt
+    </div>
+  </div>
+
+  <!-- Body font showcase -->
+  <div class="el card" style="left:976px; top:190px; width:840px; height:520px; padding:40px; box-sizing:border-box;">
+    <div class="t-caption" style="margin-bottom:24px; color:var(--color-accent); font-weight:bold;">本文フォント — Calibri</div>
+    <div style="font-family:var(--font-body); font-size:var(--size-kpi); font-weight:bold; color:var(--color-text); margin-bottom:20px;">
+      KPI 72pt
+    </div>
+    <div style="font-family:var(--font-body); font-size:var(--size-body); color:var(--color-text-sub); margin-bottom:20px; line-height:1.6;">
+      本文 20pt — プレゼンテーションの大半を占めるテキスト。<br>
+      Calibriの高い可読性が長文でも疲れさせない。<br>
+      行間 1.6 で十分な呼吸を確保する。
+    </div>
+    <div style="font-family:var(--font-body); font-size:var(--size-caption); color:var(--color-text-muted); margin-bottom:20px;">
+      キャプション 14pt — 注釈、出典、補足情報に使用。老眼でも読める最小サイズ。
+    </div>
+    <div class="t-mono" style="background:#F1F5F9; padding:12px 16px; border-radius:4px;">
+      Consolas — データ表示・コード用
+    </div>
+  </div>
+
+  <!-- Rules -->
+  <div class="el card card--accent" style="left:96px; top:750px; width:1720px; height:120px; padding:28px 32px; box-sizing:border-box;">
+    <div class="t-card-title" style="margin-bottom:8px;">タイポグラフィ規則</div>
+    <div class="t-card-body">
+      隣接レベルは最低4ptの差を確保 ／ タイトルには letter-spacing 2-4 推奨 ／ 本文の最小サイズは20pt ／ 見出しの最小サイズは28pt
+    </div>
+  </div>
+
+  <div class="el t-caption" style="left:96px; top:1000px; width:1700px;">
+    セリフ体の見出しが「この情報は重要だ」と無言で伝える。サンセリフの本文が「読みやすいから安心して読め」と伝える。
+  </div>
+</div>
+
+<!-- Slide 4: Cards & Components (Light) -->
+<div class="slide">
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1200px;">
+    カード＆コンポーネント
+  </div>
+  <div class="el t-body" style="left:96px; top:100px; width:1400px;">
+    許可された装飾は4つだけ。カード、アクセントバー、アイコン丸、区切り線。
+  </div>
+
+  <!-- Standard card -->
+  <div class="el card" style="left:96px; top:200px; width:540px; height:240px; padding:32px; box-sizing:border-box;">
+    <div class="t-card-title" style="margin-bottom:8px;">標準カード</div>
+    <div class="t-card-body">
+      白背景 + 細ボーダー（0.75pt #E2E8F0）+ 控えめな影（blur 6, opacity 10%）。角丸8px。情報をグループ化する基本単位。
+    </div>
+  </div>
+
+  <!-- Accent card -->
+  <div class="el card card--accent" style="left:686px; top:200px; width:540px; height:240px; padding:32px; box-sizing:border-box;">
+    <div class="t-card-title" style="margin-bottom:8px;">アクセントカード</div>
+    <div class="t-card-body">
+      左辺に3ptのネイビーバー。「このカードは特に重要」を示す。ボーダーの代わりにバーが視線を誘導する。
+    </div>
+  </div>
+
+  <!-- Dark card example -->
+  <div class="el" style="left:1276px; top:200px; width:540px; height:240px; padding:32px; box-sizing:border-box; background:#1C2536; border-radius:var(--card-radius); border:0.75pt solid #2D3748;">
+    <div class="t-card-title" style="margin-bottom:8px; color:var(--color-text-on-dark);">ダークカード</div>
+    <div class="t-card-body-on-dark">
+      ダークスライド上のカード。背景 #1C2536、ボーダー #2D3748。ライトカードの反転版。
+    </div>
+  </div>
+
+  <!-- Icon circles -->
+  <div class="el card" style="left:96px; top:490px; width:840px; height:200px; padding:32px; box-sizing:border-box;">
+    <div class="t-card-title" style="margin-bottom:16px;">アイコン丸</div>
+    <div style="display:flex; gap:24px; align-items:center;">
+      <div class="icon-circle">A</div>
+      <div class="icon-circle">B</div>
+      <div class="icon-circle">C</div>
+      <div class="t-card-body" style="margin-left:16px;">
+        accent色（#4472C4）の塗りつぶし円 + 白テキスト/アイコン。<br>
+        48px。ステップ番号やカテゴリ表示に使用。
+      </div>
+    </div>
+  </div>
+
+  <!-- Divider -->
+  <div class="el card" style="left:976px; top:490px; width:840px; height:200px; padding:32px; box-sizing:border-box;">
+    <div class="t-card-title" style="margin-bottom:16px;">区切り線</div>
+    <div class="t-card-body" style="margin-bottom:16px;">
+      #E2E8F0、0.5pt。セクション間の区切りに使用。
+    </div>
+    <hr class="divider" style="width:100%;">
+    <div class="t-caption" style="margin-top:12px;">控えめだが確実に領域を分ける。太い線や装飾的な区切りは禁止。</div>
+  </div>
+
+  <!-- KPI panel example -->
+  <div class="el card card--accent" style="left:96px; top:740px; width:540px; height:200px; padding:32px; box-sizing:border-box;">
+    <div class="t-caption" style="margin-bottom:4px; color:var(--color-accent); font-weight:bold;">KPIパネル</div>
+    <div class="t-kpi" style="margin-bottom:4px;">¥12.4M</div>
+    <div class="t-card-body">
+      数値を大きく（64pt bold）、ラベルを小さく。データの重要度を視覚的に表現。
+    </div>
+  </div>
+
+  <!-- Shadow spec -->
+  <div class="el card" style="left:686px; top:740px; width:540px; height:200px; padding:32px; box-sizing:border-box;">
+    <div class="t-card-title" style="margin-bottom:8px;">影の仕様</div>
+    <div class="t-card-body">
+      outer / blur: 6px / offset: 2px / opacity: 10%<br>
+      影は「浮いている」ではなく「紙が置いてある」程度。影の多用は禁止。
+    </div>
+  </div>
+
+  <div class="el t-caption" style="left:96px; top:1000px; width:1700px;">
+    装飾は各スライド最大2-3要素。「足りない」くらいがちょうどいい。
+  </div>
+</div>
+
+<!-- Slide 5: Dark/Light Structure (Dark) -->
+<div class="slide slide--dark">
+  <div class="el" style="left:0; top:0; width:1920px; height:1080px;">
+    <!-- Section divider demo -->
+    <div class="el t-section-header" style="left:96px; top:48px; width:1200px;">
+      ダーク / ライト構造
+    </div>
+    <div class="el t-body-on-dark" style="left:96px; top:110px; width:1400px;">
+      1つのライトテンプレートで全スライドをカバー。ダークスライドは background + defaultTextColor で背景を切り替える。
+    </div>
+
+    <!-- Sandwich diagram -->
+    <!-- Dark slide mini -->
+    <div class="el" style="left:96px; top:220px; width:320px; height:180px; background:var(--color-bg-dark); border:1px solid #2D3748; border-radius:4px; padding:16px; box-sizing:border-box;">
+      <div class="t-mini" style="color:var(--color-accent); margin-bottom:8px;">🌑 COVER</div>
+      <div class="t-card-title" style="color:var(--color-text-on-dark);">タイトル</div>
+    </div>
+
+    <!-- Light slides mini -->
+    <div class="el" style="left:446px; top:220px; width:220px; height:180px; background:var(--color-bg-light); border-radius:4px; padding:16px; box-sizing:border-box;">
+      <div class="t-mini" style="color:var(--color-accent); margin-bottom:8px;">☀️ CONTENT</div>
+      <div style="width:180px; height:60px; background:white; border:1px solid var(--color-border); border-radius:4px; margin-bottom:8px;"></div>
+      <div style="width:180px; height:40px; background:white; border:1px solid var(--color-border); border-radius:4px;"></div>
+    </div>
+    <div class="el" style="left:696px; top:220px; width:220px; height:180px; background:var(--color-bg-light); border-radius:4px; padding:16px; box-sizing:border-box;">
+      <div class="t-mini" style="color:var(--color-accent); margin-bottom:8px;">☀️ CONTENT</div>
+      <div style="width:180px; height:60px; background:white; border:1px solid var(--color-border); border-radius:4px; margin-bottom:8px;"></div>
+      <div style="width:180px; height:40px; background:white; border:1px solid var(--color-border); border-radius:4px;"></div>
+    </div>
+
+    <!-- Dark divider mini -->
+    <div class="el" style="left:946px; top:220px; width:320px; height:180px; background:var(--color-bg-dark); border:1px solid #2D3748; border-radius:4px; padding:16px; box-sizing:border-box;">
+      <div class="t-mini" style="color:var(--color-accent); margin-bottom:8px;">🌑 SECTION</div>
+      <div class="t-card-title" style="color:var(--color-text-on-dark);">02</div>
+    </div>
+
+    <!-- More light slides -->
+    <div class="el" style="left:1296px; top:220px; width:220px; height:180px; background:var(--color-bg-light); border-radius:4px; padding:16px; box-sizing:border-box;">
+      <div class="t-mini" style="color:var(--color-accent); margin-bottom:8px;">☀️ CONTENT</div>
+      <div style="width:180px; height:60px; background:white; border:1px solid var(--color-border); border-radius:4px; margin-bottom:8px;"></div>
+      <div style="width:180px; height:40px; background:white; border:1px solid var(--color-border); border-radius:4px;"></div>
+    </div>
+
+    <div class="el" style="left:1546px; top:220px; width:280px; height:180px; background:var(--color-bg-dark); border:1px solid #2D3748; border-radius:4px; padding:16px; box-sizing:border-box;">
+      <div class="t-mini" style="color:var(--color-accent); margin-bottom:8px;">🌑 CLOSING</div>
+      <div class="t-card-title" style="color:var(--color-text-on-dark);">Thank you</div>
+    </div>
+
+    <!-- Explanation cards -->
+    <div class="el" style="left:96px; top:460px; width:840px; height:240px; background:#1C2536; border:0.75pt solid #2D3748; border-radius:var(--card-radius); padding:32px; box-sizing:border-box;">
+      <div class="t-card-title" style="color:var(--color-text-on-dark); margin-bottom:12px;">ダークスライドの作り方</div>
+      <div class="t-card-body-on-dark">
+        スライドに "background": "#1A1F36" と "defaultTextColor": "#FFFFFF" を指定する。<br>
+        テンプレートの切り替えは不要。background で背景色を制御する。
+      </div>
+    </div>
+
+    <div class="el" style="left:976px; top:460px; width:840px; height:240px; background:#1C2536; border:0.75pt solid #2D3748; border-radius:var(--card-radius); padding:32px; box-sizing:border-box;">
+      <div class="t-card-title" style="color:var(--color-text-on-dark); margin-bottom:12px;">セクション区切りの役割</div>
+      <div class="t-card-body-on-dark">
+        ダークスライドは「ここが区切り」を伝えるリズム装置。<br>
+        セクション番号を60pt+で薄く表示し、タイトルを36ptで配置。<br>
+        ライトスライドが続いた後のダークは、視覚的なリセットになる。
+      </div>
+    </div>
+
+    <!-- Corner accent -->
+    <div class="el" style="left:96px; top:760px; width:1720px;">
+      <div class="t-card-body-on-dark">
+        カバースライドのみ、控えめなL字コーナー装飾（accent色、4pt）を許可。他のダークスライドでは使わない。
+      </div>
+    </div>
+
+    <!-- L-shape demo -->
+    <div class="el" style="left:96px; top:830px; width:300px; height:180px; background:var(--color-bg-dark); border:1px solid #2D3748; border-radius:4px; position:relative;">
+      <div style="position:absolute; left:0; bottom:0; width:4px; height:60px; background:var(--color-accent);"></div>
+      <div style="position:absolute; left:0; bottom:0; width:60px; height:4px; background:var(--color-accent);"></div>
+      <div class="t-mini" style="position:absolute; left:16px; top:16px;">L字コーナー装飾（カバーのみ）</div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 6: Do's / Don'ts (Light) -->
+<div class="slide">
+  <div class="el t-slide-title" style="left:96px; top:48px; width:1200px;">
+    Do's / Don'ts
+  </div>
+  <div class="el t-body" style="left:96px; top:100px; width:1400px;">
+    このスタイルの判断基準。迷ったら「引き算」を選ぶ。
+  </div>
+
+  <!-- Do's -->
+  <div class="el card card--accent" style="left:96px; top:200px; width:840px; height:700px; padding:40px; box-sizing:border-box;">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:24px;">
+      <div class="icon-circle" style="width:36px; height:36px; background:var(--color-success);">✓</div>
+      <div class="t-card-title" style="color:var(--color-success);">Do's</div>
+    </div>
+    <div class="t-card-body" style="line-height:2.2;">
+      余白を十分に確保する（最低 0.5" マージン）<br>
+      コントラスト比 4.5:1 以上を維持する<br>
+      データはチャート / KPIパネルで視覚化する<br>
+      ダーク / ライトの「サンドイッチ構造」を使う<br>
+      見出しはGeorgia、本文はCalibriを徹底する<br>
+      カード左辺のアクセントバーで重要度を示す<br>
+      装飾は各スライド最大 2-3 要素に抑える<br>
+      アイコンは塗りつぶし丸（accent色 + 白）を使う<br>
+      区切り線は細く控えめに（0.5pt #E2E8F0）
+    </div>
+  </div>
+
+  <!-- Don'ts -->
+  <div class="el card" style="left:976px; top:200px; width:840px; height:700px; padding:40px; box-sizing:border-box; border-left:var(--accent-bar-width) solid var(--color-danger);">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:24px;">
+      <div class="icon-circle" style="width:36px; height:36px; background:var(--color-danger);">✗</div>
+      <div class="t-card-title" style="color:var(--color-danger);">Don'ts</div>
+    </div>
+    <div class="t-card-body" style="line-height:2.2;">
+      タイトル下のアクセントラインを使わない（AI生成感）<br>
+      グラデーションを使わない（pptxgenjs非対応）<br>
+      派手なパターンや幾何学模様を入れない<br>
+      3D効果を使わない<br>
+      影を多用しない（1カードにつき1影まで）<br>
+      過度な角丸を使わない（0.12" 以下に抑える）<br>
+      太いボーダーを使わない（1pt 以下）<br>
+      装飾的な区切り線を使わない<br>
+      色数を増やさない（パレット外の色は禁止）
+    </div>
+  </div>
+
+  <div class="el t-caption" style="left:96px; top:1000px; width:1700px;">
+    「静かな権威」— 足すのではなく、引くことで信頼を作る。装飾が少ないほど、情報が際立つ。
+  </div>
+</div>
+
+</body>
+</html>

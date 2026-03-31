@@ -1,0 +1,33 @@
+# Deployment configuration for spec-driven-presentation-maker CDK stacks.
+# Copy this file to config.yaml and customize.
+#
+# Layer 3 (MCP Server only):
+#   stacks.data + stacks.runtime = true, everything else false
+#
+# Layer 3 + PNG previews:
+#   + stacks.pngWorker = true
+#
+# Layer 4 (Full stack):
+#   + stacks.agent + stacks.webUi = true
+
+stacks:
+  data: true           # Required — DynamoDB + S3
+  runtime: true        # Required — AgentCore Runtime MCP Server
+  pngWorker: true      # Optional — PPTX→PNG conversion (Fargate + SQS)
+  agent: false         # Layer 4 — Strands Agent on AgentCore Runtime
+  webUi: false         # Layer 4 — React Web UI (Amplify Hosting)
+
+features:
+  searchSlides: false   # Semantic slide search (requires Bedrock Knowledge Base)
+  observability: false  # Bedrock Model Invocation Logging (account-level, overwrites existing config)
+
+# Model configuration for the Agent (Layer 4).
+# Use inference profile IDs for cross-region routing.
+# Examples:
+#   global.anthropic.claude-sonnet-4-6              (all regions, recommended)
+#   us.anthropic.claude-sonnet-4-6                  (US regions only)
+#   global.anthropic.claude-opus-4-6-v1             (all regions, higher cost)
+#   us.anthropic.claude-sonnet-4-5-20250929-v1:0    (US regions only)
+model:
+  modelId: "global.anthropic.claude-sonnet-4-6"
+  # modelId: "global.anthropic.claude-opus-4-6-v1"

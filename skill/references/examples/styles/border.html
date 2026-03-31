@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>border — 額縁が空間をつくる。線と余白だけで、静かに語る。</title>
+<style>
+  :root {
+    /* --- Colors --- */
+    --color-border: #303030;
+    --color-bg-start: #F7F7F7;
+    --color-bg-end: #D3D3D3;
+    --color-outline: #FFFFFF;
+    --color-text: #0A0A0A;
+    --color-text-light: #666666;
+    --color-mark: #FFEF92;
+    --color-card-bg: #FFFFFF;
+    --color-blockquote-bg: #DADADA;
+
+    /* --- Typography (pt) --- */
+    --font-cover: 54pt;
+    --font-title: 40pt;
+    --font-heading: 28pt;
+    --font-body: 20pt;
+    --font-caption: 15pt;
+
+    /* --- Font family (recommended) --- */
+    --font-family: Inter, "SF Pro Display", "Segoe UI", "Helvetica Neue", Arial,
+                   "ヒラギノ角ゴシック", "Hiragino Sans", "メイリオ", Meiryo, sans-serif;
+
+    /* --- Frame --- */
+    --frame-border: 56px;
+    --frame-outline: 40px;
+
+    /* --- Spacing --- */
+    --spacing-lg: 60px;
+    --spacing-md: 40px;
+    --spacing-sm: 20px;
+
+    /* --- Components --- */
+    --card-border-width: 1.5px;
+    --accent-line-width: 4px;
+    --divider-width: 1.5px;
+    --mark-radius: 4px;
+  }
+
+  body {
+    margin: 0; padding: 40px;
+    background: #E5E5E5;
+    zoom: 0.7;
+    font-family: var(--font-family);
+  }
+
+  .slide {
+    position: relative;
+    width: 1920px; height: 1080px;
+    margin: 0 auto 40px;
+    background: linear-gradient(to bottom right, var(--color-bg-start), var(--color-bg-end));
+    overflow: hidden;
+    border: var(--frame-border) solid var(--color-border);
+    outline: var(--frame-outline) solid var(--color-outline);
+    outline-offset: calc(var(--frame-outline) * -0.5);
+  }
+
+  .el { position: absolute; }
+
+  /* --- Text styles --- */
+  .t-cover {
+    font-size: var(--font-cover);
+    font-weight: 700;
+    color: var(--color-text);
+    line-height: 1.2;
+  }
+  .t-title {
+    font-size: var(--font-title);
+    font-weight: 700;
+    color: var(--color-text);
+    line-height: 1.2;
+  }
+  .t-heading {
+    font-size: var(--font-heading);
+    font-weight: 700;
+    color: var(--color-text);
+    line-height: 1.3;
+  }
+  .t-body {
+    font-size: var(--font-body);
+    font-weight: 400;
+    color: var(--color-text);
+    line-height: 1.6;
+  }
+  .t-caption {
+    font-size: var(--font-caption);
+    font-weight: 400;
+    color: var(--color-text-light);
+    line-height: 1.5;
+  }
+
+  /* --- Components --- */
+  .card {
+    background: var(--color-card-bg);
+    border: var(--card-border-width) solid var(--color-border);
+  }
+  .accent-left {
+    border-left: var(--accent-line-width) solid var(--color-border);
+    padding-left: var(--spacing-sm);
+  }
+  .blockquote {
+    background: var(--color-blockquote-bg);
+    border-left: var(--accent-line-width) solid var(--color-border);
+    padding: var(--spacing-sm);
+  }
+  .mark {
+    background: var(--color-mark);
+    border-radius: var(--mark-radius);
+    padding: 0 4px 2px;
+  }
+  .divider {
+    border: none;
+    border-top: var(--divider-width) solid var(--color-border);
+  }
+</style>
+</head>
+<body>
+
+  <!-- Slide 1: Cover -->
+  <div class="slide">
+    <div class="el t-cover" style="left:120px; top:380px; width:1680px;">
+      border
+    </div>
+    <div class="el" style="left:120px; top:500px; width:600px;">
+      <hr class="divider">
+    </div>
+    <div class="el t-body" style="left:120px; top:540px; width:1680px; color:var(--color-text-light);">
+      額縁が空間をつくる。線と余白だけで、静かに語る。
+    </div>
+  </div>
+
+  <!-- Slide 2: Colors & Typography -->
+  <div class="slide">
+    <div class="el t-title" style="left:120px; top:60px; width:1680px;">
+      Colors &amp; Typography
+    </div>
+    <div class="el" style="left:120px; top:140px; width:1680px;"><hr class="divider"></div>
+
+    <!-- Color swatches -->
+    <div class="el t-heading" style="left:120px; top:190px;">Palette</div>
+
+    <div class="el card" style="left:120px; top:260px; width:180px; height:180px; background:var(--color-border);"></div>
+    <div class="el t-caption" style="left:120px; top:450px; width:180px; text-align:center;">#303030<br>Border</div>
+
+    <div class="el card" style="left:340px; top:260px; width:180px; height:180px; background:var(--color-text);"></div>
+    <div class="el t-caption" style="left:340px; top:450px; width:180px; text-align:center;">#0A0A0A<br>Text</div>
+
+    <div class="el card" style="left:560px; top:260px; width:180px; height:180px; background:var(--color-text-light);"></div>
+    <div class="el t-caption" style="left:560px; top:450px; width:180px; text-align:center;">#666666<br>Caption</div>
+
+    <div class="el card" style="left:780px; top:260px; width:180px; height:180px; background:var(--color-blockquote-bg);"></div>
+    <div class="el t-caption" style="left:780px; top:450px; width:180px; text-align:center;">#DADADA<br>Quote BG</div>
+
+    <div class="el card" style="left:1000px; top:260px; width:180px; height:180px; background:var(--color-card-bg);"></div>
+    <div class="el t-caption" style="left:1000px; top:450px; width:180px; text-align:center;">#FFFFFF<br>Card BG</div>
+
+    <div class="el card" style="left:1220px; top:260px; width:180px; height:180px; background:var(--color-mark);"></div>
+    <div class="el t-caption" style="left:1220px; top:450px; width:180px; text-align:center;">#FFEF92<br>Highlight</div>
+
+    <!-- Typography scale -->
+    <div class="el" style="left:120px; top:540px; width:1680px;"><hr class="divider"></div>
+    <div class="el t-heading" style="left:120px; top:580px;">Type Scale</div>
+
+    <div class="el t-cover" style="left:120px; top:650px; width:800px;">Cover 54pt</div>
+    <div class="el t-title" style="left:120px; top:730px; width:800px;">Title 40pt</div>
+    <div class="el t-heading" style="left:120px; top:790px; width:800px;">Heading 28pt</div>
+    <div class="el t-body" style="left:120px; top:840px; width:800px;">Body 20pt — 本文テキスト</div>
+    <div class="el t-caption" style="left:120px; top:890px; width:800px;">Caption 15pt — 補足・注釈</div>
+
+    <div class="el t-caption accent-left" style="left:1000px; top:660px; width:700px;">
+      推奨フォント:<br>
+      Inter / SF Pro Display / Segoe UI / Helvetica Neue<br>
+      ヒラギノ角ゴシック / メイリオ<br><br>
+      見出し: Bold 700<br>
+      本文: Regular 400
+    </div>
+  </div>
+
+  <!-- Slide 3: Components -->
+  <div class="slide">
+    <div class="el t-title" style="left:120px; top:60px; width:1680px;">
+      Components
+    </div>
+    <div class="el" style="left:120px; top:140px; width:1680px;"><hr class="divider"></div>
+
+    <!-- Card -->
+    <div class="el t-heading" style="left:120px; top:190px;">Card</div>
+    <div class="el card" style="left:120px; top:250px; width:700px; height:200px; padding:var(--spacing-sm);">
+      <div class="t-body" style="margin-bottom:12px;">白背景＋細いボーダー。シャドウなし、角丸なし。</div>
+      <div class="t-caption">情報をグループ化するときに使う。装飾ではなく境界。</div>
+    </div>
+
+    <!-- Accent left -->
+    <div class="el t-heading" style="left:120px; top:510px;">左線アクセント</div>
+    <div class="el accent-left" style="left:120px; top:570px; width:700px;">
+      <div class="t-body">太い左線で注目を引く。引用やポイントの強調に。</div>
+      <div class="t-caption" style="margin-top:8px;">blockquoteの代わりにも使える。</div>
+    </div>
+
+    <!-- Blockquote -->
+    <div class="el t-heading" style="left:1000px; top:190px;">引用</div>
+    <div class="el blockquote" style="left:1000px; top:250px; width:700px;">
+      <div class="t-body">グレー背景＋左線。引用文やコメントに。</div>
+    </div>
+
+    <!-- Highlight -->
+    <div class="el t-heading" style="left:1000px; top:420px;">ハイライト</div>
+    <div class="el t-body" style="left:1000px; top:480px; width:700px;">
+      唯一の色味は<span class="mark">黄色のハイライト</span>。ここぞという単語だけに使う。
+    </div>
+
+    <!-- Divider -->
+    <div class="el t-heading" style="left:1000px; top:580px;">区切り線</div>
+    <div class="el" style="left:1000px; top:640px; width:700px;"><hr class="divider"></div>
+    <div class="el t-caption" style="left:1000px; top:670px; width:700px;">
+      セクションの区切りに。細い線で静かに分ける。
+    </div>
+  </div>
+
+  <!-- Slide 4: Layout & Whitespace -->
+  <div class="slide">
+    <div class="el t-title" style="left:120px; top:60px; width:1680px;">
+      Layout &amp; Whitespace
+    </div>
+    <div class="el" style="left:120px; top:140px; width:1680px;"><hr class="divider"></div>
+
+    <div class="el accent-left" style="left:120px; top:200px; width:760px;">
+      <div class="t-body">余白は装飾。要素を減らすほど、残ったものが強くなる。</div>
+    </div>
+
+    <div class="el card" style="left:120px; top:320px; width:760px; padding:var(--spacing-sm);">
+      <div class="t-heading" style="margin-bottom:16px;">間隔のルール</div>
+      <div class="t-body">
+        要素間: 最低 40px<br>
+        セクション間: 60px<br>
+        額縁からコンテンツ: 120px<br>
+        行間: 1.6（本文）
+      </div>
+    </div>
+
+    <div class="el card" style="left:120px; top:640px; width:760px; padding:var(--spacing-sm);">
+      <div class="t-heading" style="margin-bottom:16px;">レイアウトの考え方</div>
+      <div class="t-body">
+        2カラムが基本。左右 960px ずつ。<br>
+        1カラムで大きく見せるのも良い。<br>
+        3カラム以上は避ける — 余白が死ぬ。
+      </div>
+    </div>
+
+    <!-- Right side: visual demo of whitespace -->
+    <div class="el t-caption" style="left:1040px; top:200px; width:700px; color:var(--color-text-light);">
+      ← この右半分が空いていること自体がデモ。
+    </div>
+    <div class="el t-body" style="left:1040px; top:500px; width:700px;">
+      スライドの半分が空白でも<br>それは失敗ではなく<span class="mark">設計</span>。
+    </div>
+  </div>
+
+  <!-- Slide 5: Do / Don't -->
+  <div class="slide">
+    <div class="el t-title" style="left:120px; top:60px; width:1680px;">
+      Do / Don't
+    </div>
+    <div class="el" style="left:120px; top:140px; width:1680px;"><hr class="divider"></div>
+
+    <!-- Do -->
+    <div class="el t-heading" style="left:120px; top:200px; width:760px;">
+      <span class="mark">Do</span>
+    </div>
+    <div class="el accent-left" style="left:120px; top:270px; width:760px;">
+      <div class="t-body">線と余白で構造をつくる</div>
+    </div>
+    <div class="el accent-left" style="left:120px; top:340px; width:760px;">
+      <div class="t-body">モノクロで統一する</div>
+    </div>
+    <div class="el accent-left" style="left:120px; top:410px; width:760px;">
+      <div class="t-body">ハイライトは1スライド1〜2箇所まで</div>
+    </div>
+    <div class="el accent-left" style="left:120px; top:480px; width:760px;">
+      <div class="t-body">要素を減らして余白を残す</div>
+    </div>
+    <div class="el accent-left" style="left:120px; top:550px; width:760px;">
+      <div class="t-body">カードはボーダーのみ、塗りは白</div>
+    </div>
+
+    <!-- Don't -->
+    <div class="el t-heading" style="left:1040px; top:200px; width:700px;">
+      Don't
+    </div>
+    <div class="el accent-left" style="left:1040px; top:270px; width:700px;">
+      <div class="t-body" style="color:var(--color-text-light);">色を追加する（黄色以外）</div>
+    </div>
+    <div class="el accent-left" style="left:1040px; top:340px; width:700px;">
+      <div class="t-body" style="color:var(--color-text-light);">シャドウを使う</div>
+    </div>
+    <div class="el accent-left" style="left:1040px; top:410px; width:700px;">
+      <div class="t-body" style="color:var(--color-text-light);">角丸にする</div>
+    </div>
+    <div class="el accent-left" style="left:1040px; top:480px; width:700px;">
+      <div class="t-body" style="color:var(--color-text-light);">グラデーション（背景以外）</div>
+    </div>
+    <div class="el accent-left" style="left:1040px; top:550px; width:700px;">
+      <div class="t-body" style="color:var(--color-text-light);">余白を埋めようとする</div>
+    </div>
+  </div>
+
+</body>
+</html>
