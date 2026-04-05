@@ -71,7 +71,7 @@ from sdpm.utils.text import normalize_spacing, parse_styled_text  # noqa: F401
 
 
 def _resolve_template(data, input_path):
-    """Resolve template path: presentation.json "template" → templates/default-dark.pptx → repo fallback."""
+    """Resolve template path: presentation.json "template" → templates/ lookup → error."""
     templates_dir = Path(__file__).parent.parent / "templates"
 
     if data.get("template"):
@@ -85,11 +85,7 @@ def _resolve_template(data, input_path):
         if named.exists():
             return named, True
 
-    default = templates_dir / "default-dark.pptx"
-    if default.exists():
-        return default, False
-
-    print(f"Error: No template found. Place a template in {templates_dir}/ or set \"template\" in presentation JSON", file=sys.stderr)
+    print("Error: No template specified. Set \"template\" in presentation JSON.", file=sys.stderr)
     sys.exit(1)
 
 
