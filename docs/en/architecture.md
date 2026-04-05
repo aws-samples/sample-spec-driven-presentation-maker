@@ -12,34 +12,13 @@ data model, CDK stack structure, and deployment patterns.
 spec-driven-presentation-maker consists of 4 layers.
 Each layer is a thin wrapper around the previous one — use only the layers you need.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Layer 4: Agent + Web UI                                    │
-│  Strands Agent, React UI, REST API                          │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │  Layer 3: Remote MCP Server                             ││
-│  │  AgentCore Runtime, DDB + S3, JWT auth                  ││
-│  │  ┌─────────────────────────────────────────────────────┐││
-│  │  │  Layer 2: Local MCP Server                          │││
-│  │  │  stdio MCP tools                                    │││
-│  │  │  ┌─────────────────────────────────────────────────┐│││
-│  │  │  │  Layer 1: Skill (Engine)                        ││││
-│  │  │  │  python-pptx, references, templates             ││││
-│  │  │  └─────────────────────────────────────────────────┘│││
-│  │  └─────────────────────────────────────────────────────┘││
-│  └─────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────┘
-```
+![4layer-architecture](../assets/4layer-architecture-en.png)
 
 ### Dependency Direction
 
 Dependencies always flow top-down.
 
-```
-web-ui ──→ api ──→ agent ──→ mcp-server ──→ engine (skill/sdpm)
-                              mcp-local  ──→ engine
-                              png-worker     (independent, SQS-driven)
-```
+![dependency-direction](../assets/dependency-direction-en.png)
 
 ---
 
@@ -97,7 +76,7 @@ DynamoDB:
 
 S3 (pptx bucket):
   decks/{deckId}/presentation.json  — slide data
-  decks/{deckId}/specs/             — brief.md, outline.md, art-direction.html
+  decks/{deckId}/specs/             — narrative.md, outline.md, design.md
   decks/{deckId}/includes/          — code block JSON
   previews/{deckId}/{slideId}.png   — slide previews
 
@@ -114,9 +93,9 @@ The agent can read and write files using standard Python file I/O (`open`, `json
 
 ```
 presentation.json   — {"slides": [...], "fonts": {...}}
-specs/brief.md          — briefing (audience, purpose, key messages)
-specs/outline.md        — one line per slide, each line = one message
-specs/art-direction.html — visual design direction (HTML style guide)
+specs/narrative.md  — story design
+specs/outline.md    — one line per slide, each line = one message
+specs/design.md     — design tone
 includes/           — code block JSON files
 ```
 
@@ -160,40 +139,15 @@ The agent's system prompt is minimal — workflow knowledge is dynamically retri
 
 ### Layer 4 (Full Stack) Data Flow
 
-```
-User (Browser)
-  │
-  │  HTTPS (JWT Bearer)
-  ▼
-CloudFront + S3 (React SPA)
-  │
-  │  REST API / SSE
-  ▼
-API Gateway + Lambda ─────────────────────┐
-  │                                       │
-  │  AgentCore Runtime                    │  DynamoDB (deck list,
-  ▼                                       │  templates, authorization)
-Strands Agent                             │
-  │                                       │  S3 (thumbnail retrieval,
-  │  MCP Protocol                         │  PPTX download)
-  ▼                                       │
-MCP Server (AgentCore Runtime)            │
-  │                                       │
-  ├──→ DynamoDB (deck CRUD)               │
-  ├──→ S3 (workspace read/write)          │
-  ├──→ S3 (PPTX generation/storage)       │
-  └──→ SQS ──→ PNG Worker (Fargate)       │
-                  │                       │
-                  ├──→ S3 (PNG storage)    │
-                  └──→ S3 (autofit bake)   │
-```
+
+![data-flow](../assets/data-flow-en.png)
 
 ### Slide Generation Steps
 
 1. User describes the presentation content via chat
 2. Agent calls MCP Server tools to create a deck (`init_presentation`)
 3. Analyzes the template and retrieves available layouts (`analyze_template`)
-4. Following workflow files, designs briefing → outline → art direction (persisted to `specs/`)
+4. Following workflow files, designs narrative → outline → design tone (persisted to `specs/`)
 5. Builds slides (`run_python` to edit files in the workspace)
 6. Generates PPTX (`generate_pptx`) → saved to S3
 7. PNG Worker triggered via SQS → generates PNG previews
@@ -207,16 +161,7 @@ MCP Server (AgentCore Runtime)            │
 
 spec-driven-presentation-maker integrates with any OIDC-compliant IdP (Identity Provider).
 
-```
-┌──────────────┐     JWT Bearer Token     ┌──────────────────┐
-│   IdP        │ ◀──────────────────────▶ │  AgentCore       │
-│              │                          │  Runtime         │
-│  · Cognito   │   OIDC Discovery URL     │                  │
-│  · Entra ID  │ ─────────────────────── ▶│  JWT validation  │
-│  · Auth0     │                          │  → user_id       │
-│  · Okta      │                          │  → forwarded     │
-└──────────────┘                          └──────────────────┘
-```
+![jwt-auth-flow](../assets/jwt-auth-flow-en.png)
 
 - Amazon Bedrock AgentCore Runtime's `customJwtAuthorizer` validates the JWT
 - The JWT `sub` claim is propagated as `user_id` to the application
@@ -262,17 +207,19 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Workflow | `init_presentation`, `analyze_template` | Initialize deck, analyze template |
 | Generation | `generate_pptx`, `get_preview` | Generate PPTX, get PNG preview |
 | Assets | `search_assets`, `list_asset_sources`, `list_templates` | Search icons, list sources, list templates |
-| References | `list_styles`, `read_examples` | Slide style examples |
+| References | `list_examples`, `read_examples` | Slide pattern examples |
 | References | `list_workflows`, `read_workflows` | Phase workflow instructions |
 | References | `list_guides`, `read_guides` | Design rules and guides |
+| Search | `example_search` | Keyword search across pptx sample slides |
 | Layout | `grid` | CSS Grid coordinate calculation |
-| Utility | `code_to_slide`, `pptx_to_json` | Code highlighting, PPTX reverse conversion |
+| Utility | `code_block`, `pptx_to_json` | Code highlighting, PPTX reverse conversion |
 
 ### Layer 3 Additional Tools
 
 | Tool | Description |
 |------|-------------|
 | `run_python` | Execute Python in Code Interpreter sandbox |
+| `code_to_slide` | Syntax-highlighted code block saved as include file |
 | `search_slides` | Semantic slide search (optional, requires Amazon Bedrock KB) |
 
 ---
@@ -281,29 +228,7 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 
 ### Stack Dependencies
 
-```
-                    ┌──────────────┐
-                    │  AuthStack   │
-                    │  (Cognito)   │
-                    └──────┬───────┘
-                           │
-┌──────────────┐           │         ┌─────────────────┐
-│  DataStack   │───────────┼────────▶│  RuntimeStack   │
-│  (DDB + S3)  │──┐        │         │  (MCP Server)   │
-└──────────────┘  │        │         └────────┬────────┘
-                  │        │                  │
-┌────────────────┐│        │                  ▼
-│ PngWorkerStack ├┘        │         ┌─────────────────┐
-│ (Fargate + SQS)│         │         │  AgentStack     │
-└────────────────┘         │         │  (Strands Agent)│
-                           │         └────────┬────────┘
-                           │                  │
-                           │                  ▼
-                           │         ┌─────────────────┐
-                           └────────▶│  WebUiStack     │
-                                     │  (React SPA)    │
-                                     └─────────────────┘
-```
+![cdk-dependencies](../assets/cdk-dependencies.png)
 
 ### Stack Roles
 

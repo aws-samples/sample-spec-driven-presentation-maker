@@ -28,17 +28,8 @@ Spec-driven presentation applies the concept of Spec-Driven Development from sof
 
 ### Workflow
 
-```
-Phase 1                    Phase 2                    Phase 3
-Spec                       Build Slides               Generate + Review
 
-┌──────────────────┐    ┌────────────────┐      ┌────────────────┐
-│ Briefing         │    │                │      │ Generate PPTX  │
-│ Outline          │───▶│ Build slides   │─────▶│ Visual review  │
-│ Art direction    │    │                │      │ Polish         │
-└──────────────────┘    └────────────────┘      └────────────────┘
-  User dialogue            specs/ → JSON            PPTX + Preview
-```
+![workflow](./docs/assets/workflow-en.png)
 
 ---
 
@@ -101,6 +92,7 @@ See [Architecture](docs/en/architecture.md) for details.
 - **Authorization**: Resource-level RBAC enforced at API and storage layers
 - **Encryption**: S3 server-side encryption (SSE-S3), DynamoDB encryption at rest
 - **Network**: CloudFront with OAI for static assets, API Gateway with Cognito authorizer
+- **AI Safety**: LLM outputs are clearly labeled; see `docs/internal/DATASET_COMPLIANCE.md`
 
 ---
 

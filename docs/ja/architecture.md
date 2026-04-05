@@ -12,34 +12,13 @@
 spec-driven-presentation-maker は 4 つのレイヤーで構成されます。
 各レイヤーは前のレイヤーの薄いラッパーであり、必要なレイヤーだけを選んで利用できます。
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Layer 4: Agent + Web UI                                    │
-│  Strands Agent, React UI, REST API                          │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │  Layer 3: Remote MCP Server                             ││
-│  │  AgentCore Runtime, DDB + S3, JWT auth                  ││
-│  │  ┌─────────────────────────────────────────────────────┐││
-│  │  │  Layer 2: Local MCP Server                          │││
-│  │  │  stdio MCP tools                                    │││
-│  │  │  ┌─────────────────────────────────────────────────┐│││
-│  │  │  │  Layer 1: Skill (Engine)                        ││││
-│  │  │  │  python-pptx, references, templates             ││││
-│  │  │  └─────────────────────────────────────────────────┘│││
-│  │  └─────────────────────────────────────────────────────┘││
-│  └─────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────┘
-```
+![4layer-architecture](../assets/4layer-architecture-ja.png)
 
 ### レイヤー間の依存方向
 
 依存は常に上から下への一方向です。
 
-```
-web-ui ──→ api ──→ agent ──→ mcp-server ──→ engine (skill/sdpm)
-                              mcp-local  ──→ engine
-                              png-worker     （独立、SQS 駆動）
-```
+![dependency-direction](../assets/dependency-direction-ja.png)
 
 ---
 
@@ -97,7 +76,7 @@ DynamoDB:
 
 S3（pptx バケット）:
   decks/{deckId}/presentation.json  — スライドデータ
-  decks/{deckId}/specs/             — brief.md, outline.md, art-direction.html
+  decks/{deckId}/specs/             — narrative.md, outline.md, design.md
   decks/{deckId}/includes/          — コードブロック JSON
   previews/{deckId}/{slideId}.png   — スライドプレビュー
 
@@ -114,9 +93,9 @@ S3（リソースバケット）:
 
 ```
 presentation.json   — {"slides": [...], "fonts": {...}}
-specs/brief.md          — ブリーフィング（対象者、目的、キーメッセージ）
-specs/outline.md        — 1 行 1 スライド、各行 = 1 メッセージ
-specs/art-direction.html — ビジュアルデザイン方針（HTML スタイルガイド）
+specs/narrative.md  — ストーリー設計
+specs/outline.md    — 1 行 1 スライド、各行 = 1 メッセージ
+specs/design.md     — デザイントーン
 includes/           — コードブロック JSON ファイル
 ```
 
@@ -160,40 +139,14 @@ Agent の system prompt は最小限です — ワークフロー知識は MCP S
 
 ### Layer 4（フルスタック）のデータフロー
 
-```
-ユーザー（ブラウザ）
-  │
-  │  HTTPS (JWT Bearer)
-  ▼
-CloudFront + S3（React SPA）
-  │
-  │  REST API / SSE
-  ▼
-API Gateway + Lambda ─────────────────────┐
-  │                                       │
-  │  AgentCore Runtime                    │  DynamoDB（デッキ一覧、
-  ▼                                       │  テンプレート、認可）
-Strands Agent                             │
-  │                                       │  S3（サムネイル取得、
-  │  MCP Protocol                         │  PPTX ダウンロード）
-  ▼                                       │
-MCP Server（AgentCore Runtime）           │
-  │                                       │
-  ├──→ DynamoDB（デッキ CRUD）            │
-  ├──→ S3（ワークスペース読み書き）       │
-  ├──→ S3（PPTX 生成・保存）             │
-  └──→ SQS ──→ PNG Worker（Fargate）     │
-                  │                       │
-                  ├──→ S3（PNG 保存）     │
-                  └──→ S3（autofit 焼込） │
-```
+![data-flow](../assets/data-flow-ja.png)
 
 ### スライド生成の処理ステップ
 
 1. ユーザーがチャットでプレゼンテーションの内容を指示
 2. Agent が MCP Server のツールを呼び出し、デッキを作成（`init_presentation`）
 3. テンプレートを分析し、利用可能なレイアウトを取得（`analyze_template`）
-4. ワークフローファイルに従い、ブリーフィング → アウトライン → アートディレクションを設計（`specs/` に永続化）
+4. ワークフローファイルに従い、ナラティブ → アウトライン → デザイントーンを設計（`specs/` に永続化）
 5. スライドを構築（`run_python` でワークスペース内のファイルを編集）
 6. PPTX を生成（`generate_pptx`）→ S3 に保存
 7. SQS 経由で PNG Worker が起動 → PNG プレビューを生成
@@ -207,16 +160,7 @@ MCP Server（AgentCore Runtime）           │
 
 spec-driven-presentation-maker は OIDC 準拠の任意の IdP（Identity Provider）と連携できます。
 
-```
-┌──────────────┐     JWT Bearer Token     ┌──────────────────┐
-│   IdP        │ ◀──────────────────────▶ │  AgentCore       │
-│              │                          │  Runtime         │
-│  ・Cognito   │   OIDC Discovery URL     │                  │
-│  ・Entra ID  │ ─────────────────────── ▶│  JWT 検証        │
-│  ・Auth0     │                          │  → user_id 抽出  │
-│  ・Okta      │                          │  → コンテナ転送  │
-└──────────────┘                          └──────────────────┘
-```
+![jwt-auth-flow](../assets/jwt-auth-flow-ja.png)
 
 - Amazon Bedrock AgentCore Runtime の `customJwtAuthorizer` が JWT を検証
 - JWT の `sub` クレームが `user_id` としてアプリケーションに伝播
@@ -262,17 +206,19 @@ spec-driven-presentation-maker は OIDC 準拠の任意の IdP（Identity Provid
 | ワークフロー | `init_presentation`, `analyze_template` | デッキ初期化、テンプレート解析 |
 | 生成 | `generate_pptx`, `get_preview` | PPTX 生成、PNG プレビュー取得 |
 | アセット | `search_assets`, `list_asset_sources`, `list_templates` | アイコン検索、ソース一覧、テンプレート一覧 |
-| リファレンス | `list_styles`, `read_examples` | スライドスタイル例 |
+| リファレンス | `list_examples`, `read_examples` | スライドパターン例 |
 | リファレンス | `list_workflows`, `read_workflows` | フェーズ別ワークフロー手順 |
 | リファレンス | `list_guides`, `read_guides` | デザインルール・ガイド |
+| 検索 | `example_search` | pptx サンプルスライドのキーワード検索 |
 | レイアウト | `grid` | CSS Grid 座標計算 |
-| ユーティリティ | `code_to_slide`, `pptx_to_json` | コードハイライト、PPTX 逆変換 |
+| ユーティリティ | `code_block`, `pptx_to_json` | コードハイライト、PPTX 逆変換 |
 
 ### Layer 3 追加ツール
 
 | ツール | 説明 |
 |--------|------|
 | `run_python` | Code Interpreter サンドボックスで Python 実行 |
+| `code_to_slide` | シンタックスハイライト付きコードブロックを include ファイルとして保存 |
 | `search_slides` | セマンティックスライド検索（任意、Amazon Bedrock KB 必要） |
 
 ---
@@ -281,29 +227,7 @@ spec-driven-presentation-maker は OIDC 準拠の任意の IdP（Identity Provid
 
 ### スタック依存関係
 
-```
-                    ┌──────────────┐
-                    │  AuthStack   │
-                    │  (Cognito)   │
-                    └──────┬───────┘
-                           │
-┌──────────────┐           │         ┌─────────────────┐
-│  DataStack   │───────────┼────────▶│  RuntimeStack   │
-│  (DDB + S3)  │──┐        │         │  (MCP Server)   │
-└──────────────┘  │        │         └────────┬────────┘
-                  │        │                  │
-┌────────────────┐│        │                  ▼
-│ PngWorkerStack ├┘        │         ┌─────────────────┐
-│ (Fargate + SQS)│         │         │  AgentStack     │
-└────────────────┘         │         │  (Strands Agent)│
-                           │         └────────┬────────┘
-                           │                  │
-                           │                  ▼
-                           │         ┌─────────────────┐
-                           └────────▶│  WebUiStack     │
-                                     │  (React SPA)    │
-                                     └─────────────────┘
-```
+![cdk-dependencies](../assets/cdk-dependencies.png)
 
 ### 各スタックの役割
 
