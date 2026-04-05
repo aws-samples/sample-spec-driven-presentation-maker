@@ -28,17 +28,8 @@ Spec-driven presentation applies the concept of Spec-Driven Development from sof
 
 ### Workflow
 
-```
-Phase 1                    Phase 2                    Phase 3
-Spec                       Build Slides               Generate + Review
 
-┌──────────────────┐    ┌────────────────┐      ┌────────────────┐
-│ Briefing         │    │                │      │ Generate PPTX  │
-│ Outline          │───▶│ Build slides   │─────▶│ Visual review  │
-│ Art direction    │    │                │      │ Polish         │
-└──────────────────┘    └────────────────┘      └────────────────┘
-  User dialogue            specs/ → JSON            PPTX + Preview
-```
+![workflow](./docs/assets/workflow-en.png)
 
 ---
 

@@ -12,34 +12,13 @@ data model, CDK stack structure, and deployment patterns.
 spec-driven-presentation-maker consists of 4 layers.
 Each layer is a thin wrapper around the previous one — use only the layers you need.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Layer 4: Agent + Web UI                                    │
-│  Strands Agent, React UI, REST API                          │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │  Layer 3: Remote MCP Server                             ││
-│  │  AgentCore Runtime, DDB + S3, JWT auth                  ││
-│  │  ┌─────────────────────────────────────────────────────┐││
-│  │  │  Layer 2: Local MCP Server                          │││
-│  │  │  stdio MCP tools                                    │││
-│  │  │  ┌─────────────────────────────────────────────────┐│││
-│  │  │  │  Layer 1: Skill (Engine)                        ││││
-│  │  │  │  python-pptx, references, templates             ││││
-│  │  │  └─────────────────────────────────────────────────┘│││
-│  │  └─────────────────────────────────────────────────────┘││
-│  └─────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────┘
-```
+![4layer-architecture](../assets/4layer-architecture-en.png)
 
 ### Dependency Direction
 
 Dependencies always flow top-down.
 
-```
-web-ui ──→ api ──→ agent ──→ mcp-server ──→ engine (skill/sdpm)
-                              mcp-local  ──→ engine
-                              png-worker     (independent, SQS-driven)
-```
+![dependency-direction](../assets/dependency-direction-en.png)
 
 ---
 
@@ -85,7 +64,6 @@ MCP Client → AgentCore Runtime → MCP Server Container
 
 Additional tools over Layer 2:
 - `run_python` — Execute Python in Amazon Bedrock AgentCore Code Interpreter sandbox (edit deck workspace, analyze data)
-- `code_to_slide` — Syntax-highlighted code block saved as S3 include file
 - `search_slides` — Semantic slide search via Amazon Bedrock Knowledge Base (optional)
 
 ### Storage
@@ -160,33 +138,8 @@ The agent's system prompt is minimal — workflow knowledge is dynamically retri
 
 ### Layer 4 (Full Stack) Data Flow
 
-```
-User (Browser)
-  │
-  │  HTTPS (JWT Bearer)
-  ▼
-CloudFront + S3 (React SPA)
-  │
-  │  REST API / SSE
-  ▼
-API Gateway + Lambda ─────────────────────┐
-  │                                       │
-  │  AgentCore Runtime                    │  DynamoDB (deck list,
-  ▼                                       │  templates, authorization)
-Strands Agent                             │
-  │                                       │  S3 (thumbnail retrieval,
-  │  MCP Protocol                         │  PPTX download)
-  ▼                                       │
-MCP Server (AgentCore Runtime)            │
-  │                                       │
-  ├──→ DynamoDB (deck CRUD)               │
-  ├──→ S3 (workspace read/write)          │
-  ├──→ S3 (PPTX generation/storage)       │
-  └──→ SQS ──→ PNG Worker (Fargate)       │
-                  │                       │
-                  ├──→ S3 (PNG storage)    │
-                  └──→ S3 (autofit bake)   │
-```
+
+![data-flow](../assets/data-flow-en.png)
 
 ### Slide Generation Steps
 
@@ -207,16 +160,7 @@ MCP Server (AgentCore Runtime)            │
 
 spec-driven-presentation-maker integrates with any OIDC-compliant IdP (Identity Provider).
 
-```
-┌──────────────┐     JWT Bearer Token     ┌──────────────────┐
-│   IdP        │ ◀──────────────────────▶ │  AgentCore       │
-│              │                          │  Runtime         │
-│  · Cognito   │   OIDC Discovery URL     │                  │
-│  · Entra ID  │ ─────────────────────── ▶│  JWT validation  │
-│  · Auth0     │                          │  → user_id       │
-│  · Okta      │                          │  → forwarded     │
-└──────────────┘                          └──────────────────┘
-```
+![jwt-auth-flow](../assets/jwt-auth-flow-en.png)
 
 - Amazon Bedrock AgentCore Runtime's `customJwtAuthorizer` validates the JWT
 - The JWT `sub` claim is propagated as `user_id` to the application
@@ -281,29 +225,7 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 
 ### Stack Dependencies
 
-```
-                    ┌──────────────┐
-                    │  AuthStack   │
-                    │  (Cognito)   │
-                    └──────┬───────┘
-                           │
-┌──────────────┐           │         ┌─────────────────┐
-│  DataStack   │───────────┼────────▶│  RuntimeStack   │
-│  (DDB + S3)  │──┐        │         │  (MCP Server)   │
-└──────────────┘  │        │         └────────┬────────┘
-                  │        │                  │
-┌────────────────┐│        │                  ▼
-│ PngWorkerStack ├┘        │         ┌─────────────────┐
-│ (Fargate + SQS)│         │         │  AgentStack     │
-└────────────────┘         │         │  (Strands Agent)│
-                           │         └────────┬────────┘
-                           │                  │
-                           │                  ▼
-                           │         ┌─────────────────┐
-                           └────────▶│  WebUiStack     │
-                                     │  (React SPA)    │
-                                     └─────────────────┘
-```
+![cdk-dependencies](../assets/cdk-dependencies.png)
 
 ### Stack Roles
 

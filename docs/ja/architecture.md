@@ -12,34 +12,13 @@
 spec-driven-presentation-maker は 4 つのレイヤーで構成されます。
 各レイヤーは前のレイヤーの薄いラッパーであり、必要なレイヤーだけを選んで利用できます。
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Layer 4: Agent + Web UI                                    │
-│  Strands Agent, React UI, REST API                          │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │  Layer 3: Remote MCP Server                             ││
-│  │  AgentCore Runtime, DDB + S3, JWT auth                  ││
-│  │  ┌─────────────────────────────────────────────────────┐││
-│  │  │  Layer 2: Local MCP Server                          │││
-│  │  │  stdio MCP tools                                    │││
-│  │  │  ┌─────────────────────────────────────────────────┐│││
-│  │  │  │  Layer 1: Skill (Engine)                        ││││
-│  │  │  │  python-pptx, references, templates             ││││
-│  │  │  └─────────────────────────────────────────────────┘│││
-│  │  └─────────────────────────────────────────────────────┘││
-│  └─────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────┘
-```
+![4layer-architecture](../assets/4layer-architecture-ja.png)
 
 ### レイヤー間の依存方向
 
 依存は常に上から下への一方向です。
 
-```
-web-ui ──→ api ──→ agent ──→ mcp-server ──→ engine (skill/sdpm)
-                              mcp-local  ──→ engine
-                              png-worker     （独立、SQS 駆動）
-```
+![dependency-direction](../assets/dependency-direction-ja.png)
 
 ---
 
@@ -85,7 +64,6 @@ MCP Client → AgentCore Runtime → MCP Server コンテナ
 
 Layer 2 に対する追加ツール:
 - `run_python` — Amazon Bedrock AgentCore Code Interpreter サンドボックスで Python を実行（デッキワークスペースの編集、データ分析）
-- `code_to_slide` — シンタックスハイライト付きコードブロックを S3 include ファイルとして保存
 - `search_slides` — Amazon Bedrock Knowledge Base によるセマンティックスライド検索（任意）
 
 ### ストレージ
@@ -160,33 +138,7 @@ Agent の system prompt は最小限です — ワークフロー知識は MCP S
 
 ### Layer 4（フルスタック）のデータフロー
 
-```
-ユーザー（ブラウザ）
-  │
-  │  HTTPS (JWT Bearer)
-  ▼
-CloudFront + S3（React SPA）
-  │
-  │  REST API / SSE
-  ▼
-API Gateway + Lambda ─────────────────────┐
-  │                                       │
-  │  AgentCore Runtime                    │  DynamoDB（デッキ一覧、
-  ▼                                       │  テンプレート、認可）
-Strands Agent                             │
-  │                                       │  S3（サムネイル取得、
-  │  MCP Protocol                         │  PPTX ダウンロード）
-  ▼                                       │
-MCP Server（AgentCore Runtime）           │
-  │                                       │
-  ├──→ DynamoDB（デッキ CRUD）            │
-  ├──→ S3（ワークスペース読み書き）       │
-  ├──→ S3（PPTX 生成・保存）             │
-  └──→ SQS ──→ PNG Worker（Fargate）     │
-                  │                       │
-                  ├──→ S3（PNG 保存）     │
-                  └──→ S3（autofit 焼込） │
-```
+![data-flow](../assets/data-flow-ja.png)
 
 ### スライド生成の処理ステップ
 
@@ -207,16 +159,7 @@ MCP Server（AgentCore Runtime）           │
 
 spec-driven-presentation-maker は OIDC 準拠の任意の IdP（Identity Provider）と連携できます。
 
-```
-┌──────────────┐     JWT Bearer Token     ┌──────────────────┐
-│   IdP        │ ◀──────────────────────▶ │  AgentCore       │
-│              │                          │  Runtime         │
-│  ・Cognito   │   OIDC Discovery URL     │                  │
-│  ・Entra ID  │ ─────────────────────── ▶│  JWT 検証        │
-│  ・Auth0     │                          │  → user_id 抽出  │
-│  ・Okta      │                          │  → コンテナ転送  │
-└──────────────┘                          └──────────────────┘
-```
+![jwt-auth-flow](../assets/jwt-auth-flow-ja.png)
 
 - Amazon Bedrock AgentCore Runtime の `customJwtAuthorizer` が JWT を検証
 - JWT の `sub` クレームが `user_id` としてアプリケーションに伝播
@@ -281,29 +224,7 @@ spec-driven-presentation-maker は OIDC 準拠の任意の IdP（Identity Provid
 
 ### スタック依存関係
 
-```
-                    ┌──────────────┐
-                    │  AuthStack   │
-                    │  (Cognito)   │
-                    └──────┬───────┘
-                           │
-┌──────────────┐           │         ┌─────────────────┐
-│  DataStack   │───────────┼────────▶│  RuntimeStack   │
-│  (DDB + S3)  │──┐        │         │  (MCP Server)   │
-└──────────────┘  │        │         └────────┬────────┘
-                  │        │                  │
-┌────────────────┐│        │                  ▼
-│ PngWorkerStack ├┘        │         ┌─────────────────┐
-│ (Fargate + SQS)│         │         │  AgentStack     │
-└────────────────┘         │         │  (Strands Agent)│
-                           │         └────────┬────────┘
-                           │                  │
-                           │                  ▼
-                           │         ┌─────────────────┐
-                           └────────▶│  WebUiStack     │
-                                     │  (React SPA)    │
-                                     └─────────────────┘
-```
+![cdk-dependencies](../assets/cdk-dependencies.png)
 
 ### 各スタックの役割
 
