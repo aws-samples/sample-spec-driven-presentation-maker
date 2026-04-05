@@ -9,6 +9,7 @@ from sdpm.utils.image import resolve_image_path, apply_image_effects
 from sdpm.utils.effects import apply_effects
 from sdpm.utils.svg import _recolor_svg, get_svg_dimensions, generate_qr_svg, add_svg_to_slide
 from sdpm.utils.text import _expand_styled_newlines
+from sdpm.assets import is_recolor_protected
 
 _DEFAULTS = ELEMENT_DEFAULTS["image"]
 
@@ -91,10 +92,14 @@ class ImageMixin:
         svg_bytes = None
         if is_svg:
             svg_bytes = img_path.read_bytes()
-            effective_icon_color = icon_color or self.theme_colors["text"]
-            recolored = _recolor_svg(svg_bytes, effective_icon_color)
-            if recolored:
-                svg_bytes = recolored
+            if src and is_recolor_protected(src):
+                if icon_color:
+                    print(f"Warning: iconColor ignored (recolor-protected asset): {src}", file=sys.stderr)
+            else:
+                effective_icon_color = icon_color or self.theme_colors["text"]
+                recolored = _recolor_svg(svg_bytes, effective_icon_color)
+                if recolored:
+                    svg_bytes = recolored
         elif icon_color:
             print(f"Warning: iconColor ignored (not SVG): {img_path.name}", file=sys.stderr)
         

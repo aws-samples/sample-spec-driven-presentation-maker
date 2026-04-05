@@ -172,7 +172,7 @@ def load_slides_json_or_pptx(path):
             for slide_def in data.get("slides", []):
                 builder.add_slide(resolve_override(slide_def, id_map))
             builder.save(tmp_pptx)
-            # Apply autofit via PowerPoint (same as generate flow)
+            # Apply autofit via detected presentation backend
             from sdpm.preview import refresh_autofit, unlock_height_constraints
             refresh_autofit(tmp_pptx)
             unlock_height_constraints(tmp_pptx)

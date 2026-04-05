@@ -12,97 +12,10 @@ from .slide import extract_slide
 from sdpm.utils.io import write_json
 from sdpm.schema.defaults import sort_element_keys
 
-def _is_wsl():
-    try:
-        return 'microsoft' in open('/proc/version').read().lower()
-    except Exception:
-        return False
-
 def _refresh_autofit_pptx(pptx_path):
-    """Open PPTX in PowerPoint, apply 'resize shape to fit text' on spAutoFit textboxes, return temp path."""
-    import shutil
-    import subprocess
-    import tempfile
-    from pptx import Presentation as _Prs
-    from pptx.oxml.ns import qn as _qn
-    
-    # Find textboxes (txBox="1") to apply resize
-    prs = _Prs(str(pptx_path))
-    targets = []  # list of (slide_idx_1based, shape_idx_1based)
-    for si, slide in enumerate(prs.slides, 1):
-        for shi, shape in enumerate(slide.shapes, 1):
-            sp = shape._element
-            nvSpPr = sp.find(_qn('p:nvSpPr'))
-            if nvSpPr is None:
-                continue
-            cNvSpPr = nvSpPr.find(_qn('p:cNvSpPr'))
-            if cNvSpPr is None or cNvSpPr.get('txBox') != '1':
-                continue
-            targets.append((si, shi))
-    
-    if not targets:
-        return None  # nothing to refresh
-    
-    tmp_dir = tempfile.mkdtemp()
-    tmp_pptx = Path(tmp_dir) / pptx_path.name
-    shutil.copy2(pptx_path, tmp_pptx)
-    
-    if sys.platform == "darwin":
-        from sdpm.preview import _mac_open_pptx_background, _mac_restore_pptx_focus_async
-        # Build AppleScript lines for each target shape
-        resize_lines = "\n".join(
-            f'                try\n'
-            f'                    tell text frame of shape {shi} of slide {si} of pres\n'
-            f'                        set auto size to shape to fit text\n'
-            f'                    end tell\n'
-            f'                end try'
-            for si, shi in targets
-        )
-        pptx_name = tmp_pptx.name
-        restore_info = _mac_open_pptx_background(tmp_pptx)
-        _mac_restore_pptx_focus_async(restore_info)
-        import time
-        time.sleep(2)
-        script = f'''
-    tell application "Microsoft PowerPoint"
-        set pres to presentation "{pptx_name}"
-{resize_lines}
-        delay 1
-        save pres
-        close pres
-    end tell
-'''
-        cmd = ["osascript", "-e", script]
-    elif sys.platform == "win32" or _is_wsl():
-        # PowerShell COM: TextFrame.AutoSize = 1 (ppAutoSizeShapeToFitText)
-        # targets is list of (slide_1based, shape_1based)
-        resize_lines = "; ".join(
-            f"$prs.Slides[{si}].Shapes[{shi}].TextFrame.AutoSize = 1"
-            for si, shi in targets
-        )
-        ps_cmd = (
-            f"$app = New-Object -ComObject PowerPoint.Application; "
-            f"$prs = $app.Presentations.Open('{tmp_pptx}'); "
-            f"{resize_lines}; "
-            f"$prs.Save(); $prs.Close(); $app.Quit()"
-        )
-        if _is_wsl():
-            win_path = subprocess.run(["wslpath", "-w", str(tmp_pptx)], capture_output=True, text=True).stdout.strip()  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-            ps_cmd = ps_cmd.replace(str(tmp_pptx), win_path)
-            cmd = ["/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe", "-Command", ps_cmd]
-        else:
-            cmd = ["powershell.exe", "-Command", ps_cmd]
-    else:
-        shutil.rmtree(tmp_dir)
-        return None
-    try:
-        result = subprocess.run(cmd, capture_output=True, timeout=60)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-        if result.returncode == 0:
-            return tmp_pptx
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
-    shutil.rmtree(tmp_dir)
-    return None
+    """Re-save PPTX with autofit applied via detected presentation backend."""
+    from sdpm.preview import refresh_autofit_for_convert
+    return refresh_autofit_for_convert(pptx_path)
 
 def pptx_to_json(pptx_path: Path, output_dir: Path = None, no_autofit: bool = False, use_layout_names: bool = True, minimal: bool = False):
     """Convert PPTX to JSON. Output is a project folder with slides.json + images/."""
@@ -111,7 +24,7 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, no_autofit: bool = Fa
     if not no_autofit:
         tmp_pptx = _refresh_autofit_pptx(pptx_path)
         if tmp_pptx:
-            print("Autofit refreshed via PowerPoint")
+            print("Autofit refreshed via presentation backend")
     
     actual_path = tmp_pptx or pptx_path
     prs = Presentation(str(actual_path))

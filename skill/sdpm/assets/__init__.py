@@ -63,11 +63,24 @@ ICON_LOCAL_DIR = ASSETS_DIR
 _manifest_cache: Optional[list[dict]] = None
 
 
+def _check_recolor_protected(cfg, item: dict) -> bool:
+    """Check if an icon entry is recolor-protected based on config."""
+    if cfg is True:
+        return True
+    if isinstance(cfg, dict):
+        when = cfg.get("when", {})
+        types = when.get("type", [])
+        if types and item.get("type") in types:
+            return True
+    return False
+
+
 def _load_manifest_file(
     manifest_path: Path,
     source_override: Optional[str],
     all_assets: list[dict],
     files_dir: Optional[Path] = None,
+    recolor_protected=None,
 ) -> None:
     """Load a single manifest.json and append entries to all_assets.
 
@@ -83,9 +96,11 @@ def _load_manifest_file(
         data = json.load(f)
     source = source_override or data.get("source", manifest_path.parent.name)
     resolved_dir = files_dir or manifest_path.parent
+    recolor_cfg = recolor_protected or data.get("recolorProtected", False)
     for item in data.get("icons", []):
         item["_source"] = source
         item["_dir"] = resolved_dir
+        item["_recolor_protected"] = _check_recolor_protected(recolor_cfg, item)
         all_assets.append(item)
 
 
@@ -113,7 +128,10 @@ def _load_manifests() -> list[dict]:
         manifest_path = Path(entry["manifest"]).expanduser()
         source_name = entry.get("source")
         files_dir = Path(entry["files_dir"]).expanduser() if "files_dir" in entry else None
-        _load_manifest_file(manifest_path, source_override=source_name, all_assets=all_assets, files_dir=files_dir)
+        _load_manifest_file(
+            manifest_path, source_override=source_name, all_assets=all_assets,
+            files_dir=files_dir, recolor_protected=entry.get("recolorProtected"),
+        )
 
     # Auto-detect legacy icons/ directory (sibling of assets/)
     legacy_icons = ASSETS_DIR.parent / "icons"
@@ -201,6 +219,28 @@ def check_asset_exists(ref: str, theme: str = "light") -> bool:
 
 # Backward-compatible aliases
 check_icon_exists = check_asset_exists
+
+
+def is_recolor_protected(ref: str) -> bool:
+    """Check if an asset is recolor-protected (e.g. brand icons).
+
+    Args:
+        ref: Asset reference — `assets:source/name` or `icons:name`.
+
+    Returns:
+        True if the asset should not be recolored.
+    """
+    if ref.startswith("assets:"):
+        name = _strip_ext(ref.split(":", 1)[1].split("/", 1)[-1])
+    elif ref.startswith("icons:"):
+        name = _strip_ext(ref.split(":", 1)[1])
+    else:
+        return False
+    for item in _load_manifests():
+        file_stem = item["file"].rsplit(".", 1)[0]
+        if file_stem == name:
+            return item.get("_recolor_protected", False)
+    return False
 
 
 def resolve_asset_path(ref: str, theme: str = "light") -> Path:

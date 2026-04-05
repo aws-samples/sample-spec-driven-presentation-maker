@@ -57,3 +57,4 @@ skill/assets/material/
 *.tsbuildinfo
 .ash/
 ?/
+skill/sdpm/.cache/

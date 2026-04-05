@@ -24,6 +24,10 @@ def _recolor_svg(svg_bytes: bytes, color: str) -> bytes | None:
 
     original = unique.pop()
 
+    # No change needed — target color matches original
+    if original.lower() == color.lower():
+        return None
+
     has_fill = bool(re.search(r'fill\s*[=:]\s*["\']?\s*' + re.escape(original), text, re.IGNORECASE))
     has_stroke = bool(re.search(r'stroke\s*[=:]\s*["\']?\s*' + re.escape(original), text, re.IGNORECASE))
 

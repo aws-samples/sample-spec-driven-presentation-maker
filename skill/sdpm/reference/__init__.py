@@ -3,6 +3,7 @@
 """Reference: unified access to design patterns and example datasets.
 
 Reference data is used to guide AI-generated slide content.
+See docs/internal/DATASET_COMPLIANCE.md for dataset provenance.
 
 Reference: unified access to design patterns, components, schemas, rules, and reviews."""
 from pathlib import Path
