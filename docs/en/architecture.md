@@ -64,7 +64,6 @@ MCP Client → AgentCore Runtime → MCP Server Container
 
 Additional tools over Layer 2:
 - `run_python` — Execute Python in Amazon Bedrock AgentCore Code Interpreter sandbox (edit deck workspace, analyze data)
-- `code_to_slide` — Syntax-highlighted code block saved as S3 include file
 - `search_slides` — Semantic slide search via Amazon Bedrock Knowledge Base (optional)
 
 ### Storage
@@ -76,7 +75,7 @@ DynamoDB:
 
 S3 (pptx bucket):
   decks/{deckId}/presentation.json  — slide data
-  decks/{deckId}/specs/             — narrative.md, outline.md, design.md
+  decks/{deckId}/specs/             — brief.md, outline.md, art-direction.html
   decks/{deckId}/includes/          — code block JSON
   previews/{deckId}/{slideId}.png   — slide previews
 
@@ -93,9 +92,9 @@ The agent can read and write files using standard Python file I/O (`open`, `json
 
 ```
 presentation.json   — {"slides": [...], "fonts": {...}}
-specs/narrative.md  — story design
-specs/outline.md    — one line per slide, each line = one message
-specs/design.md     — design tone
+specs/brief.md          — briefing (audience, purpose, key messages)
+specs/outline.md        — one line per slide, each line = one message
+specs/art-direction.html — visual design direction (HTML style guide)
 includes/           — code block JSON files
 ```
 
@@ -147,7 +146,7 @@ The agent's system prompt is minimal — workflow knowledge is dynamically retri
 1. User describes the presentation content via chat
 2. Agent calls MCP Server tools to create a deck (`init_presentation`)
 3. Analyzes the template and retrieves available layouts (`analyze_template`)
-4. Following workflow files, designs narrative → outline → design tone (persisted to `specs/`)
+4. Following workflow files, designs briefing → outline → art direction (persisted to `specs/`)
 5. Builds slides (`run_python` to edit files in the workspace)
 6. Generates PPTX (`generate_pptx`) → saved to S3
 7. PNG Worker triggered via SQS → generates PNG previews
@@ -207,19 +206,17 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Workflow | `init_presentation`, `analyze_template` | Initialize deck, analyze template |
 | Generation | `generate_pptx`, `get_preview` | Generate PPTX, get PNG preview |
 | Assets | `search_assets`, `list_asset_sources`, `list_templates` | Search icons, list sources, list templates |
-| References | `list_examples`, `read_examples` | Slide pattern examples |
+| References | `list_styles`, `read_examples` | Slide style examples |
 | References | `list_workflows`, `read_workflows` | Phase workflow instructions |
 | References | `list_guides`, `read_guides` | Design rules and guides |
-| Search | `example_search` | Keyword search across pptx sample slides |
 | Layout | `grid` | CSS Grid coordinate calculation |
-| Utility | `code_block`, `pptx_to_json` | Code highlighting, PPTX reverse conversion |
+| Utility | `code_to_slide`, `pptx_to_json` | Code highlighting, PPTX reverse conversion |
 
 ### Layer 3 Additional Tools
 
 | Tool | Description |
 |------|-------------|
 | `run_python` | Execute Python in Code Interpreter sandbox |
-| `code_to_slide` | Syntax-highlighted code block saved as include file |
 | `search_slides` | Semantic slide search (optional, requires Amazon Bedrock KB) |
 
 ---

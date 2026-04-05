@@ -64,7 +64,6 @@ MCP Client → AgentCore Runtime → MCP Server コンテナ
 
 Layer 2 に対する追加ツール:
 - `run_python` — Amazon Bedrock AgentCore Code Interpreter サンドボックスで Python を実行（デッキワークスペースの編集、データ分析）
-- `code_to_slide` — シンタックスハイライト付きコードブロックを S3 include ファイルとして保存
 - `search_slides` — Amazon Bedrock Knowledge Base によるセマンティックスライド検索（任意）
 
 ### ストレージ
@@ -76,7 +75,7 @@ DynamoDB:
 
 S3（pptx バケット）:
   decks/{deckId}/presentation.json  — スライドデータ
-  decks/{deckId}/specs/             — narrative.md, outline.md, design.md
+  decks/{deckId}/specs/             — brief.md, outline.md, art-direction.html
   decks/{deckId}/includes/          — コードブロック JSON
   previews/{deckId}/{slideId}.png   — スライドプレビュー
 
@@ -93,9 +92,9 @@ S3（リソースバケット）:
 
 ```
 presentation.json   — {"slides": [...], "fonts": {...}}
-specs/narrative.md  — ストーリー設計
-specs/outline.md    — 1 行 1 スライド、各行 = 1 メッセージ
-specs/design.md     — デザイントーン
+specs/brief.md          — ブリーフィング（対象者、目的、キーメッセージ）
+specs/outline.md        — 1 行 1 スライド、各行 = 1 メッセージ
+specs/art-direction.html — ビジュアルデザイン方針（HTML スタイルガイド）
 includes/           — コードブロック JSON ファイル
 ```
 
@@ -146,7 +145,7 @@ Agent の system prompt は最小限です — ワークフロー知識は MCP S
 1. ユーザーがチャットでプレゼンテーションの内容を指示
 2. Agent が MCP Server のツールを呼び出し、デッキを作成（`init_presentation`）
 3. テンプレートを分析し、利用可能なレイアウトを取得（`analyze_template`）
-4. ワークフローファイルに従い、ナラティブ → アウトライン → デザイントーンを設計（`specs/` に永続化）
+4. ワークフローファイルに従い、ブリーフィング → アウトライン → アートディレクションを設計（`specs/` に永続化）
 5. スライドを構築（`run_python` でワークスペース内のファイルを編集）
 6. PPTX を生成（`generate_pptx`）→ S3 に保存
 7. SQS 経由で PNG Worker が起動 → PNG プレビューを生成
@@ -206,19 +205,17 @@ spec-driven-presentation-maker は OIDC 準拠の任意の IdP（Identity Provid
 | ワークフロー | `init_presentation`, `analyze_template` | デッキ初期化、テンプレート解析 |
 | 生成 | `generate_pptx`, `get_preview` | PPTX 生成、PNG プレビュー取得 |
 | アセット | `search_assets`, `list_asset_sources`, `list_templates` | アイコン検索、ソース一覧、テンプレート一覧 |
-| リファレンス | `list_examples`, `read_examples` | スライドパターン例 |
+| リファレンス | `list_styles`, `read_examples` | スライドスタイル例 |
 | リファレンス | `list_workflows`, `read_workflows` | フェーズ別ワークフロー手順 |
 | リファレンス | `list_guides`, `read_guides` | デザインルール・ガイド |
-| 検索 | `example_search` | pptx サンプルスライドのキーワード検索 |
 | レイアウト | `grid` | CSS Grid 座標計算 |
-| ユーティリティ | `code_block`, `pptx_to_json` | コードハイライト、PPTX 逆変換 |
+| ユーティリティ | `code_to_slide`, `pptx_to_json` | コードハイライト、PPTX 逆変換 |
 
 ### Layer 3 追加ツール
 
 | ツール | 説明 |
 |--------|------|
 | `run_python` | Code Interpreter サンドボックスで Python 実行 |
-| `code_to_slide` | シンタックスハイライト付きコードブロックを include ファイルとして保存 |
 | `search_slides` | セマンティックスライド検索（任意、Amazon Bedrock KB 必要） |
 
 ---
