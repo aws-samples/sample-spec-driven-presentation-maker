@@ -92,7 +92,6 @@ npm install && npx cdk deploy --all
 - **認可**: API・ストレージ層でのリソースレベル RBAC
 - **暗号化**: S3 サーバーサイド暗号化（SSE-S3）、DynamoDB 保存時暗号化
 - **ネットワーク**: CloudFront + OAI による静的アセット配信、API Gateway + Cognito 認可
-- **AI 安全性**: LLM 出力は明示的にラベル付け。`docs/internal/DATASET_COMPLIANCE.md` 参照
 
 ---
 

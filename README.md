@@ -92,7 +92,6 @@ See [Architecture](docs/en/architecture.md) for details.
 - **Authorization**: Resource-level RBAC enforced at API and storage layers
 - **Encryption**: S3 server-side encryption (SSE-S3), DynamoDB encryption at rest
 - **Network**: CloudFront with OAI for static assets, API Gateway with Cognito authorizer
-- **AI Safety**: LLM outputs are clearly labeled; see `docs/internal/DATASET_COMPLIANCE.md`
 
 ---
 
