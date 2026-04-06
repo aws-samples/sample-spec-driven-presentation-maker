@@ -145,7 +145,8 @@ Icons are stored in `skill/assets/` with a `manifest.json` per source:
 
 ```
 skill/assets/
-├── config.json          # Optional: extra source configuration
+├── config.json          # Optional: user settings (gitignored, see config.example.json)
+├── config.example.json  # Example config (git-managed)
 ├── aws/
 │   ├── manifest.json    # {"icons": [{"name": "Lambda", "file": "Lambda.svg", "tags": [...]}]}
 │   └── *.svg
@@ -181,17 +182,21 @@ Create a directory with your icons and a `manifest.json`:
 }
 ```
 
-Register in `skill/assets/config.json`:
+Register in `skill/assets/config.json` (copy from `config.example.json`):
 
 ```json
 {
+  "output_dir": "~/Documents/SDPM-Presentations",
   "extra_sources": [
     {
       "name": "mybrand",
       "manifest": "/path/to/my-icons/manifest.json",
       "files_dir": "/path/to/my-icons/"
     }
-  ]
+  ],
+  "preview": {
+    "backend": ""
+  }
 }
 ```
 

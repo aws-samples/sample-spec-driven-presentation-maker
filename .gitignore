@@ -51,9 +51,10 @@ web-ui/public/aws-exports.json
 # Config (contains secrets)
 infra/config.yaml
 
-# Assets (downloaded via scripts)
+# Assets (downloaded via scripts) and user config
 skill/assets/aws/
 skill/assets/material/
+skill/assets/config.json
 *.tsbuildinfo
 .ash/
 ?/

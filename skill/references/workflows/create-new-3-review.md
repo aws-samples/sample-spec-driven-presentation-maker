@@ -17,7 +17,7 @@ Generate the PPTX, review the preview, and polish.
 The generate command automatically runs autofit and outputs preview PNGs after building the PPTX.
 
 ```bash
-uv run python3 scripts/pptx_builder.py generate {output_json}
+uv run python3 scripts/pptx_builder.py generate {output_json} -o {project_dir}/output.pptx
 ```
 
 If warnings appear during generation, address them in Step 3 (Polish):
@@ -36,7 +36,7 @@ Review preview PNGs for design quality.
 
 Read preview images with fs_read Image mode.
 
-If grid-overlaid PNGs are needed for position checking, generate them with `uv run python3 scripts/pptx_builder.py preview output.pptx`.
+If grid-overlaid PNGs are needed for position checking, generate them with `uv run python3 scripts/pptx_builder.py preview {project_dir}/output.pptx`.
 
 **Constraints:**
 - You MUST read ALL preview images before reporting because partial review misses cross-slide inconsistencies

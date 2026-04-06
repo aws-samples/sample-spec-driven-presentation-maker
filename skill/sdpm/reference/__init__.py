@@ -152,7 +152,7 @@ window.addEventListener('load',fit);
 new ResizeObserver(fit).observe(document.getElementById('main'));
 </script></body></html>"""
 
-    out = Path(tempfile.gettempdir()) / "pptx-maker-styles-index.html"
+    out = Path(tempfile.gettempdir()) / "sdpm-styles-index.html"
     out.write_text(index_html, encoding="utf-8")
     return out
 

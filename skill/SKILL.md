@@ -1,5 +1,5 @@
 ---
-name: pptx-maker
+name: spec-driven-presentation-maker
 description: "Generate PowerPoint presentations from JSON. Use when user wants to create slides, proposals, or presentation materials."
 ---
 

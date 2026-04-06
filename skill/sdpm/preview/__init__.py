@@ -133,9 +133,9 @@ def unlock_height_constraints(pptx_path):
 
 
 def get_tmp_project_dir(input_json_path):
-    """Derive temp pptx-maker/{project_name}/ from input JSON path."""
+    """Derive temp sdpm/{project_name}/ from input JSON path."""
     p = Path(input_json_path).resolve().parent
     project_name = p.name
-    tmp_dir = Path(tempfile.gettempdir()) / "pptx-maker" / project_name
+    tmp_dir = Path(tempfile.gettempdir()) / "sdpm" / project_name
     tmp_dir.mkdir(parents=True, exist_ok=True)
     return tmp_dir

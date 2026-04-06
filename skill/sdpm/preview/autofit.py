@@ -7,7 +7,7 @@ lnSpcReduction values. This module reads those values from the LibreOffice
 re-saved copy for reporting, then replaces normAutofit with noAutofit in the
 original PPTX without modifying font sizes or spacing.
 
-Ported from hobby pptx-maker png-worker/handlers/autofit.py.
+Ported from hobby sdpm png-worker/handlers/autofit.py.
 """
 
 import logging

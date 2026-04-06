@@ -342,14 +342,9 @@ def detect_backend() -> PresentationBackend | None:
 
     Priority: config file > PowerPoint > LibreOffice > None.
     """
-    cfg = {}
-    config_path = Path(__file__).resolve().parent.parent.parent / "assets" / "config.json"
-    if config_path.exists():
-        import json
+    from sdpm.config import get_preview_config
 
-        with open(config_path) as f:
-            cfg = json.load(f)
-    forced = cfg.get("preview", {}).get("backend", "").lower()
+    forced = get_preview_config().get("backend", "").lower()
     if forced == "powerpoint":
         return PowerPointBackend()
     if forced == "libreoffice":
