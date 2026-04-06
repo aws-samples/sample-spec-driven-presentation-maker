@@ -358,7 +358,7 @@ def apply_style(deck_id: str, style: str) -> str:
     Returns:
         JSON confirmation.
     """
-    _check_deck_access(deck_id, "write")
+    _check_deck_access(deck_id, "edit_slide")
     html_key = f"references/examples/styles/{style}.html"
     html_bytes = _storage.download_file(key=html_key)
     dest_key = f"decks/{deck_id}/specs/art-direction.html"
