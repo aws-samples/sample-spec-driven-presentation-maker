@@ -10,6 +10,7 @@ Backward compatible: `icons:{name}` searches all sources (fallback).
 New format: `assets:{source}/{name}` searches a specific source.
 """
 
+import json
 import sys
 from pathlib import Path
 from typing import Optional
