@@ -54,8 +54,7 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
    * @returns true if the spec file exists and has content
    */
   function hasContent(key: SpecTab): boolean {
-    if (key === "slides") return true
-    return specs?.[key] != null
+    return true
   }
 
   return (
@@ -208,7 +207,6 @@ const specComponents = {
  */
 export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, idToken }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; idToken?: string }) {
   // Hooks must be called unconditionally — before any early returns.
-  const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
 
   // Art Direction inline gallery state
@@ -222,10 +220,11 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
   const galleryScrollRef = useRef(0)
   const galleryContainerRef = useRef<HTMLDivElement>(null)
 
-  // Sync mode when content changes externally (e.g. polling updates art-direction)
+  // Sync mode when content appears externally (e.g. polling updates art-direction)
+  const userRequestedGallery = useRef(false)
   useEffect(() => {
     if (specKey !== "artDirection") return
-    if (content && adMode === "gallery" && !preview) setAdMode("result")
+    if (content && adMode === "gallery" && !preview && !userRequestedGallery.current) setAdMode("result")
     if (!content && adMode === "result") setAdMode("gallery")
   }, [content, specKey, adMode, preview])
 
@@ -261,14 +260,21 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [handleKeyDown])
 
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => {
-      setContainerWidth(entry.contentRect.width)
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
+  // Art Direction result iframe: callback ref for ResizeObserver (handles mount/unmount across states)
+  const resultRoRef = useRef<ResizeObserver | null>(null)
+  const resultMeasuredRef = useCallback((node: HTMLDivElement | null) => {
+    if (resultRoRef.current) {
+      resultRoRef.current.disconnect()
+      resultRoRef.current = null
+    }
+    if (node) {
+      const w = node.getBoundingClientRect().width
+      if (w > 0) setContainerWidth(w)
+      resultRoRef.current = new ResizeObserver(([entry]) => {
+        setContainerWidth(entry.contentRect.width)
+      })
+      resultRoRef.current.observe(node)
+    }
   }, [])
 
   // Outline tab uses the dedicated timeline renderer.
@@ -278,8 +284,8 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
 
   // Art Direction: 3-state inline view
   if (specKey === "artDirection") {
-    // Waiting state (no content, no styles yet / not in gallery)
-    if (!content && adMode !== "gallery") {
+    // Waiting state (no content, not browsing styles)
+    if (!content && adMode === "result") {
       return (
         <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
           <ArtDirectionWaiting />
@@ -290,8 +296,8 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     // GALLERY state
     if (adMode === "gallery") {
       const handleCardClick = async (name: string) => {
-        // Save scroll position
         if (galleryContainerRef.current) galleryScrollRef.current = galleryContainerRef.current.scrollTop
+        userRequestedGallery.current = false
         setPreviewLoading(true)
         setPreview({ name, html: "" })
         setAdMode("preview")
@@ -312,7 +318,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
             </div>
             {content && (
               <button
-                onClick={() => setAdMode("result")}
+                onClick={() => { userRequestedGallery.current = false; setAdMode("result") }}
                 className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.06] transition-colors"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
@@ -384,11 +390,11 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     // RESULT state (default when content exists)
     const ratio = containerWidth > 0 ? containerWidth / 1920 : 1
     return (
-      <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div ref={resultMeasuredRef} className="flex-1 overflow-y-auto overflow-x-hidden">
         {onStyleSelect && (
           <div className="flex justify-end px-4 py-2">
             <button
-              onClick={() => setAdMode("gallery")}
+              onClick={() => { userRequestedGallery.current = true; setAdMode("gallery") }}
               className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.06] transition-colors"
             >
               <Palette className="h-3.5 w-3.5" />
