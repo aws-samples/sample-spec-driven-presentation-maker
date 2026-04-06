@@ -245,6 +245,8 @@ def get_style(name: str) -> Dict[str, Any]:
     """
     if not RESOURCE_BUCKET:
         return {"error": f"Style not found: {name}"}, 404
+    if not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
+        return {"error": "Invalid style name"}, 400
     key = f"references/examples/styles/{name}.html"
     try:
         body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=key)["Body"].read().decode("utf-8")

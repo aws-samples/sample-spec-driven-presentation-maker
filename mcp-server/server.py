@@ -15,6 +15,7 @@ To use a custom backend, replace AwsStorage with your Storage ABC implementation
 import json
 import logging
 import os
+import re
 import sys
 from contextvars import ContextVar
 from pathlib import Path
@@ -359,6 +360,8 @@ def apply_style(deck_id: str, style: str) -> str:
         JSON confirmation.
     """
     _check_deck_access(deck_id)
+    if not re.fullmatch(r"[a-zA-Z0-9_-]+", style):
+        raise ValueError("Invalid style name")
     html_key = f"references/examples/styles/{style}.html"
     html_bytes = _storage.download_file(key=html_key)
     dest_key = f"decks/{deck_id}/specs/art-direction.html"
