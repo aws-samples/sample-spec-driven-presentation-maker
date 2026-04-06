@@ -10,15 +10,12 @@ Backward compatible: `icons:{name}` searches all sources (fallback).
 New format: `assets:{source}/{name}` searches a specific source.
 """
 
-import json
 import sys
 from pathlib import Path
 from typing import Optional
 
+from sdpm.config import ASSETS_DIR, get_extra_sources
 from sdpm.utils.svg import _recolor_svg  # noqa: F401 - re-exported for builder
-
-# Asset directories
-ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets"
 _KNOWN_EXTS = (".svg", ".png", ".gif", ".jpg", ".jpeg")
 
 
@@ -31,26 +28,12 @@ def _strip_ext(name: str) -> str:
 
 
 def _load_extra_sources() -> list[dict]:
-    """Load extra asset sources from assets/config.json.
-
-    Config format:
-        {"extra_sources": [
-            {"source": "my-icons", "manifest": "~/path/to/manifest.json"},
-            {"source": "other", "manifest": "~/m.json", "files_dir": "~/icons/"}
-        ]}
-
-    Each entry specifies a manifest path and a source name.
-    Files are resolved relative to files_dir (if set) or the manifest's parent directory.
+    """Load extra asset sources from config.
 
     Returns:
         List of extra source dicts with 'source', 'manifest', and optional 'files_dir' keys.
     """
-    config_path = ASSETS_DIR / "config.json"
-    if not config_path.exists():
-        return []
-    with open(config_path) as f:
-        data = json.load(f)
-    return data.get("extra_sources", [])
+    return get_extra_sources()
 
 
 _EXTRA_SOURCES: list[dict] = _load_extra_sources()

@@ -18,6 +18,15 @@ from typing import Any
 import json
 
 
+def _get_output_base_dir() -> Path:
+    """Return output base directory from config, with tilde expansion."""
+    try:
+        from sdpm.config import get_output_dir
+        return get_output_dir()
+    except Exception:
+        return Path.home() / "Documents" / "SDPM-Presentations"
+
+
 def init_presentation(
     name: str,
     template: str,
@@ -45,7 +54,7 @@ def init_presentation(
 
     ts = _dt.now().strftime("%Y%m%d-%H%M")
     dir_name = f"{ts}-{name}" if name else ts
-    out_dir = Path.home() / "Documents" / "sdpm" / dir_name
+    out_dir = _get_output_base_dir() / dir_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
     pres_data: dict[str, Any] = {"fonts": {"fullwidth": None, "halfwidth": None}, "slides": []}

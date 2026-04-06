@@ -145,7 +145,8 @@ uv run python3 scripts/download_material_icons.py
 
 ```
 skill/assets/
-├── config.json          # 任意: 追加ソース設定
+├── config.json          # 任意: ユーザー設定（git管理外、config.example.json を参照）
+├── config.example.json  # 設定例（git管理）
 ├── aws/
 │   ├── manifest.json    # {"icons": [{"name": "Lambda", "file": "Lambda.svg", "tags": [...]}]}
 │   └── *.svg
@@ -181,17 +182,21 @@ skill/assets/
 }
 ```
 
-`skill/assets/config.json` に登録:
+`skill/assets/config.json` に登録（`config.example.json` をコピーして作成）:
 
 ```json
 {
+  "output_dir": "~/Documents/SDPM-Presentations",
   "extra_sources": [
     {
       "name": "mybrand",
       "manifest": "/path/to/my-icons/manifest.json",
       "files_dir": "/path/to/my-icons/"
     }
-  ]
+  ],
+  "preview": {
+    "backend": ""
+  }
 }
 ```
 
