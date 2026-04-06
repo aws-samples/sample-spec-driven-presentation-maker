@@ -41,37 +41,36 @@ def code_block_to_include(
     from sdpm.builder.constants import CODE_COLORS
 
     colors = CODE_COLORS.get(theme, CODE_COLORS["dark"])
+    bg = colors["background"]
+    inverse_theme = "light" if theme == "dark" else "dark"
+    inverse_bg = CODE_COLORS[inverse_theme]["background"]
+    label_fg = "000000" if theme == "dark" else "FFFFFF"
     label_height = 22
+
+    label_map = {"typescript": "TypeScript", "javascript": "JavaScript", "csharp": "C#", "cpp": "C++"}
+    label_text = label_map.get(language, language.capitalize())
 
     elements: list[dict[str, Any]] = [
         {
-            "type": "shape",
-            "shape_type": "rectangle",
-            "x": x, "y": y, "width": width, "height": height,
-            "fill": colors["bg"],
-            "corner_radius": 8,
-        },
-        {
-            "type": "shape",
-            "shape_type": "rectangle",
-            "x": x, "y": y, "width": width, "height": label_height,
-            "fill": colors["label_bg"],
-            "corner_radius": 8,
-        },
-        {
             "type": "textbox",
-            "x": x + 8, "y": y + 2,
-            "width": width - 16, "height": label_height - 4,
-            "text": [{"text": language, "font_size": 9, "color": colors["label_fg"]}],
+            "x": x, "y": y, "width": width, "height": label_height,
+            "fontSize": 8, "align": "left",
+            "fill": inverse_bg,
+            "text": f"{{{{#{label_fg}:{label_text}}}}}",
+            "marginLeft": 50000, "marginTop": 0, "marginRight": 0, "marginBottom": 0,
+            "autoWidth": True,
         },
     ]
 
     spans = highlight_code(code, language, theme)
     elements.append({
         "type": "textbox",
-        "x": x + 12, "y": y + label_height + 4,
-        "width": width - 24, "height": height - label_height - 8,
+        "x": x, "y": y + label_height,
+        "width": width, "height": height - label_height,
+        "fill": bg,
         "text": spans,
+        "fontSize": 11, "fontFamily": "Courier New",
+        "marginLeft": 50000, "marginTop": 30000, "marginRight": 50000, "marginBottom": 30000,
     })
 
     # Save to S3 includes/
