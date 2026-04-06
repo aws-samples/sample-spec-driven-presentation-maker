@@ -19,14 +19,13 @@
 
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useCallback } from "react"
 import { useAuth } from "react-oidc-context"
 import { AppShell } from "@/components/AppShell"
 import { DeckListView } from "@/components/deck/DeckListView"
 import { SlideCarousel } from "@/components/deck/SlideCarousel"
 import { DeckActions } from "@/components/deck/DeckActions"
 import { DeleteDeckModal } from "@/components/deck/DeleteDeckModal"
-import { StyleGalleryModal } from "@/components/deck/StyleGalleryModal"
 import { ChatPanelShell } from "@/components/chat/ChatPanelShell"
 import { ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { updateVisibility, shareDeck } from "@/services/deckService"
@@ -51,12 +50,20 @@ export default function DecksPage() {
   const [fabOpen, setFabOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"chat" | "preview">("chat")
   const [workflowPhase, setWorkflowPhase] = useState<string | null>(null)
-  const [styleGalleryOpen, setStyleGalleryOpen] = useState(false)
   const chatRef = useRef<ChatPanelHandle>(null)
   const swipeRef = useSwipe(
     () => setActiveTab("preview"),
     () => setActiveTab("chat"),
   )
+
+  /** Handle inline style selection — insert message into chat input. */
+  const handleStyleSelect = useCallback((name: string) => {
+    const hasArtDirection = ws.deck?.specs?.artDirection != null
+    const msg = hasArtDirection
+      ? `I want to change the style to "${name}". `
+      : `I'll use the "${name}" style. `
+    chatRef.current?.insertAtCursor(msg)
+  }, [ws.deck?.specs?.artDirection])
 
   /* ── Render ── */
   return (
@@ -111,7 +118,6 @@ export default function DecksPage() {
                     slidePreviewUrls={ws.deck?.slides.map(s => s.previewUrl) || []}
                     onDeckCreated={ws.handleDeckCreated} onPptxRequested={() => ws.setPptxRequested(true)}
                     onWorkflowPhase={setWorkflowPhase}
-                    onStyleGalleryRequest={() => setStyleGalleryOpen(true)}
                     inline
                   />
                 ) : (
@@ -125,7 +131,8 @@ export default function DecksPage() {
                     onScrollComplete={() => ws.setScrollToSlide("")}
                     specs={ws.deck?.specs}
                     workflowPhase={workflowPhase}
-                    onStyleGalleryRequest={() => setStyleGalleryOpen(true)}
+                    onStyleSelect={handleStyleSelect}
+                    idToken={idToken}
                     onSlideClick={(page) => {
                       const dName = ws.deck?.name || "Deck"
                       const mention = ws.activeDeckId
@@ -225,7 +232,6 @@ export default function DecksPage() {
             slidePreviewUrls={ws.deck?.slides.map(s => s.previewUrl) || []}
             onDeckCreated={ws.handleDeckCreated} onPptxRequested={() => ws.setPptxRequested(true)}
             onWorkflowPhase={setWorkflowPhase}
-            onStyleGalleryRequest={() => setStyleGalleryOpen(true)}
           />
         </div>
       </div>
@@ -235,22 +241,6 @@ export default function DecksPage() {
           deckName={list.deleteTarget.name}
           onConfirm={list.confirmDelete}
           onCancel={() => list.setDeleteTarget(null)}
-        />
-      )}
-
-      {styleGalleryOpen && idToken && (
-        <StyleGalleryModal
-          open={styleGalleryOpen}
-          onClose={() => setStyleGalleryOpen(false)}
-          onSelect={(name) => {
-            setStyleGalleryOpen(false)
-            const hasArtDirection = ws.deck?.specs?.artDirection != null
-            const msg = hasArtDirection
-              ? `I want to change the style to "${name}". `
-              : `I'll use the "${name}" style. `
-            chatRef.current?.insertAtCursor(msg)
-          }}
-          idToken={idToken}
         />
       )}
 

@@ -15,11 +15,11 @@
 
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { Layers, FileText, Palette } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Layers, FileText, Palette, ArrowLeft, Check } from "lucide-react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import type { SpecFiles } from "@/services/deckService"
+import { fetchStyles, fetchStyleHtml, type StyleEntry, type SpecFiles } from "@/services/deckService"
 import { OutlineView } from "./OutlineView"
 
 /** Tab key union type for spec viewer navigation. */
@@ -206,10 +206,60 @@ const specComponents = {
  * @param props.specName - Name of the spec (for empty state)
  * @param props.specKey - Which spec tab ("brief" | "outline" | "artDirection")
  */
-export function SpecMarkdownPreview({ content, specName, specKey, onStyleChange }: { content: string | null; specName: string; specKey?: string; onStyleChange?: () => void }) {
+export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, idToken }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; idToken?: string }) {
   // Hooks must be called unconditionally — before any early returns.
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
+
+  // Art Direction inline gallery state
+  type ArtDirectionMode = "gallery" | "preview" | "result"
+  const [adMode, setAdMode] = useState<ArtDirectionMode>(content ? "result" : "gallery")
+  const [styles, setStyles] = useState<StyleEntry[]>([])
+  const [stylesLoading, setStylesLoading] = useState(false)
+  const stylesLoadedRef = useRef(false)
+  const [preview, setPreview] = useState<{ name: string; html: string } | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const galleryScrollRef = useRef(0)
+  const galleryContainerRef = useRef<HTMLDivElement>(null)
+
+  // Sync mode when content changes externally (e.g. polling updates art-direction)
+  useEffect(() => {
+    if (specKey !== "artDirection") return
+    if (content && adMode === "gallery" && !preview) setAdMode("result")
+    if (!content && adMode === "result") setAdMode("gallery")
+  }, [content, specKey, adMode, preview])
+
+  // Fetch styles when gallery is shown
+  useEffect(() => {
+    if (specKey !== "artDirection" || adMode !== "gallery" || stylesLoadedRef.current || !idToken) return
+    let cancelled = false
+    setStylesLoading(true)
+    fetchStyles(idToken).then((s) => {
+      if (cancelled) return
+      stylesLoadedRef.current = true
+      setStyles(s)
+      setStylesLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [specKey, adMode, idToken])
+
+  // Esc key handling for art direction states
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (specKey !== "artDirection") return
+    if (e.key === "Escape") {
+      if (adMode === "preview") {
+        setPreview(null)
+        setAdMode("gallery")
+      } else if (adMode === "gallery" && content) {
+        setAdMode("result")
+      }
+    }
+  }, [specKey, adMode, content])
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [handleKeyDown])
 
   useEffect(() => {
     const el = containerRef.current
@@ -226,32 +276,119 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleChange 
     return <OutlineView content={content} />
   }
 
-  if (!content) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
-        {specKey === "brief" && <BriefWaiting />}
-        {specKey === "outline" && <OutlineWaiting />}
-        {specKey === "artDirection" && <ArtDirectionWaiting />}
-        {(!specKey || !["brief", "outline", "artDirection"].includes(specKey)) && (
-          <>
-            <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center mb-4 text-foreground-muted/40">
-              <FileText className="h-5 w-5" />
-            </div>
-            <p className="text-[13px] text-foreground-muted">{specName} will appear here.</p>
-          </>
-        )}
-      </div>
-    )
-  }
-
+  // Art Direction: 3-state inline view
   if (specKey === "artDirection") {
+    // Waiting state (no content, no styles yet / not in gallery)
+    if (!content && adMode !== "gallery") {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
+          <ArtDirectionWaiting />
+        </div>
+      )
+    }
+
+    // GALLERY state
+    if (adMode === "gallery") {
+      const handleCardClick = async (name: string) => {
+        // Save scroll position
+        if (galleryContainerRef.current) galleryScrollRef.current = galleryContainerRef.current.scrollTop
+        setPreviewLoading(true)
+        setPreview({ name, html: "" })
+        setAdMode("preview")
+        if (idToken) {
+          const html = await fetchStyleHtml(name, idToken)
+          setPreview({ name, html })
+        }
+        setPreviewLoading(false)
+      }
+
+      return (
+        <div ref={galleryContainerRef} className="flex-1 overflow-y-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
+            <div>
+              <h2 className="text-sm font-semibold">Choose a Style</h2>
+              <p className="text-xs text-foreground-muted mt-0.5">Click a style to preview</p>
+            </div>
+            {content && (
+              <button
+                onClick={() => setAdMode("result")}
+                className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.06] transition-colors"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back to Art Direction
+              </button>
+            )}
+          </div>
+          {/* Grid */}
+          <div className="p-6">
+            {stylesLoading ? (
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="aspect-[16/10] rounded-xl bg-white/[0.03] animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                {styles.map((style, i) => (
+                  <StyleCard key={style.name} style={style} index={i} onClick={handleCardClick} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    // PREVIEW state
+    if (adMode === "preview" && preview) {
+      const handleSelect = () => {
+        if (onStyleSelect) onStyleSelect(preview.name)
+        if (content) setAdMode("result")
+        else { setPreview(null); setAdMode("gallery") }
+      }
+
+      return (
+        <div className="flex-1 overflow-y-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setPreview(null); setAdMode("gallery"); }}
+                className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                aria-label="Back to styles"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <div>
+                <h2 className="text-sm font-semibold">{preview.name}</h2>
+                <p className="text-xs text-foreground-muted mt-0.5">Preview all slides — select to apply</p>
+              </div>
+            </div>
+            <button
+              onClick={handleSelect}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-teal text-primary-foreground hover:bg-brand-teal/90 transition-colors"
+            >
+              <Check className="h-3.5 w-3.5" />
+              Select
+            </button>
+          </div>
+          {/* Preview content */}
+          <div className="p-6">
+            <StylePreviewInline html={preview.html} loading={previewLoading} />
+          </div>
+        </div>
+      )
+    }
+
+    // RESULT state (default when content exists)
     const ratio = containerWidth > 0 ? containerWidth / 1920 : 1
     return (
       <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden">
-        {onStyleChange && (
+        {onStyleSelect && (
           <div className="flex justify-end px-4 py-2">
             <button
-              onClick={onStyleChange}
+              onClick={() => setAdMode("gallery")}
               className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.06] transition-colors"
             >
               <Palette className="h-3.5 w-3.5" />
@@ -261,7 +398,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleChange 
         )}
         <div style={{ width: containerWidth, height: 1080 * ratio * 10, overflow: "hidden" }}>
           <iframe
-            srcDoc={content}
+            srcDoc={content!}
             sandbox="allow-same-origin"
             title="Art Direction"
             style={{
@@ -277,6 +414,23 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleChange 
     )
   }
 
+  if (!content) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
+        {specKey === "brief" && <BriefWaiting />}
+        {specKey === "outline" && <OutlineWaiting />}
+        {(!specKey || !["brief", "outline", "artDirection"].includes(specKey)) && (
+          <>
+            <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center mb-4 text-foreground-muted/40">
+              <FileText className="h-5 w-5" />
+            </div>
+            <p className="text-[13px] text-foreground-muted">{specName} will appear here.</p>
+          </>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="flex-1 overflow-y-auto px-6 sm:px-8 py-6">
       <article className="prose prose-invert prose-sm max-w-3xl mx-auto spec-prose">
@@ -287,6 +441,124 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleChange 
           {content}
         </Markdown>
       </article>
+    </div>
+  )
+}
+
+/* ── Inline style components ── */
+
+/** Individual style card with iframe cover preview. */
+function StyleCard({ style, index, onClick }: { style: StyleEntry; index: number; onClick: (name: string) => void }) {
+  const iframeWidth = 1920
+  const iframeHeight = 1080
+  const cardRef = useRef<HTMLButtonElement>(null)
+  const [scale, setScale] = useState(0.2)
+
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      setScale(entry.contentRect.width / iframeWidth)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  return (
+    <button
+      ref={cardRef}
+      onClick={() => onClick(style.name)}
+      className="group text-left rounded-xl border border-white/[0.06] overflow-hidden transition-all duration-300 hover:border-brand-teal/30 hover:shadow-[0_0_24px_oklch(0.75_0.14_185/10%)] focus:outline-none focus:ring-2 focus:ring-brand-teal/40 animate-[card-in_0.5s_ease_both]"
+      style={{ animationDelay: `${index * 60}ms` }}
+      aria-label={`Preview ${style.name} style`}
+    >
+      <div className="relative overflow-hidden bg-black/20" style={{ height: iframeHeight * scale }}>
+        {style.coverHtml ? (
+          <iframe
+            srcDoc={style.coverHtml}
+            sandbox=""
+            title={style.name}
+            style={{
+              width: iframeWidth,
+              height: iframeHeight,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+              border: "none",
+              pointerEvents: "none",
+            }}
+            tabIndex={-1}
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-foreground-muted text-xs">
+            No preview
+          </div>
+        )}
+        <div className="absolute inset-0 bg-brand-teal/0 group-hover:bg-brand-teal/5 transition-colors duration-300" />
+      </div>
+      <div className="px-3 py-2.5 border-t border-white/[0.04]">
+        <p className="text-[13px] font-medium text-foreground group-hover:text-brand-teal transition-colors">{style.name}</p>
+        {style.description && (
+          <p className="text-[11px] text-foreground-muted mt-0.5 line-clamp-1">{style.description}</p>
+        )}
+      </div>
+    </button>
+  )
+}
+
+/** Full style preview rendered via scaled iframe. */
+function StylePreviewInline({ html, loading }: { html: string; loading: boolean }) {
+  const [containerWidth, setContainerWidth] = useState(0)
+
+  // Callback ref to handle DOM element changes (e.g. after loading→content transition)
+  const roRef = useRef<ResizeObserver | null>(null)
+  const measuredRef = useCallback((node: HTMLDivElement | null) => {
+    if (roRef.current) {
+      roRef.current.disconnect()
+      roRef.current = null
+    }
+    if (node) {
+      const w = node.getBoundingClientRect().width
+      if (w > 0) setContainerWidth(w)
+      roRef.current = new ResizeObserver(([entry]) => {
+        setContainerWidth(entry.contentRect.width)
+      })
+      roRef.current.observe(node)
+    }
+  }, [])
+
+  if (loading || !html) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-6 h-6 border-2 border-brand-teal/30 border-t-brand-teal rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  const ratio = containerWidth > 0 ? containerWidth / 1920 : 0
+  const slideCount = (html.match(/class="slide"/g) || []).length || 5
+
+  return (
+    <div ref={measuredRef} className="w-full overflow-x-hidden">
+      <div style={{ width: "100%", height: ratio > 0 ? 1080 * ratio * slideCount : 400, overflow: "hidden" }}>
+        {ratio > 0 ? (
+          <iframe
+            srcDoc={html}
+            sandbox="allow-same-origin"
+            title="Style Preview"
+            style={{
+              width: 1920,
+              height: 1080 * slideCount,
+              border: "none",
+              transformOrigin: "top left",
+              transform: `scale(${ratio})`,
+            }}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <div className="w-6 h-6 border-2 border-brand-teal/30 border-t-brand-teal rounded-full animate-spin" />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

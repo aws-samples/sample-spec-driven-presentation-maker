@@ -41,14 +41,13 @@ interface ChatPanelShellProps {
   onDeckCreated?: (deckId: string) => void
   onPptxRequested?: () => void
   onWorkflowPhase?: (phase: string) => void
-  onStyleGalleryRequest?: () => void
   chatRef?: React.RefObject<ChatPanelHandle | null>
   inline?: boolean
 }
 
 export function ChatPanelShell({
   open, onClose, chatTab, onChatTabChange,
-  deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPptxRequested, onWorkflowPhase, onStyleGalleryRequest, chatRef: externalChatRef,
+  deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPptxRequested, onWorkflowPhase, chatRef: externalChatRef,
   inline = false,
 }: ChatPanelShellProps) {
   const internalChatRef = useRef<ChatPanelHandle>(null)
@@ -149,7 +148,6 @@ export function ChatPanelShell({
           onDeckCreated={handlePanelADeckCreated}
           onPptxRequested={onPptxRequested}
           onWorkflowPhase={onWorkflowPhase}
-          onStyleGalleryRequest={onStyleGalleryRequest}
         />
       </div>
 
@@ -166,7 +164,6 @@ export function ChatPanelShell({
             onDeckCreated={handlePanelBDeckCreated}
             onPptxRequested={onPptxRequested}
             onWorkflowPhase={onWorkflowPhase}
-            onStyleGalleryRequest={onStyleGalleryRequest}
           />
         </div>
       )}
