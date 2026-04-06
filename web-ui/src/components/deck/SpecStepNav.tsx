@@ -15,7 +15,7 @@
 
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Layers, FileText } from "lucide-react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -207,6 +207,20 @@ const specComponents = {
  * @param props.specKey - Which spec tab ("brief" | "outline" | "artDirection")
  */
 export function SpecMarkdownPreview({ content, specName, specKey }: { content: string | null; specName: string; specKey?: string }) {
+  // Hooks must be called unconditionally — before any early returns.
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      setContainerWidth(entry.contentRect.width)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   // Outline tab uses the dedicated timeline renderer.
   if (specKey === "outline") {
     return <OutlineView content={content} />
@@ -229,22 +243,6 @@ export function SpecMarkdownPreview({ content, specName, specKey }: { content: s
       </div>
     )
   }
-
-  // Art Direction tab renders HTML via sandboxed iframe.
-  // Style HTMLs use fixed 1920px-wide body. We render the iframe at 1920px
-  // and use CSS transform to scale it down to fit the container.
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [containerWidth, setContainerWidth] = useState(0)
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => {
-      setContainerWidth(entry.contentRect.width)
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
 
   if (specKey === "artDirection") {
     const ratio = containerWidth > 0 ? containerWidth / 1920 : 1

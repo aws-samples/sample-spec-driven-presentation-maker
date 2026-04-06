@@ -25,9 +25,10 @@ interface SnippetInputProps {
  * @param props - SnippetInputProps
  */
 export function SnippetInput({ open, onClose, onConfirm, initialText }: SnippetInputProps) {
-  const [text, setText] = useState("")
+  const [text, setText] = useState(initialText || "")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Reset text and focus when dialog opens
   useEffect(() => {
     if (open) {
       setText(initialText || "")

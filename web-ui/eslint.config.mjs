@@ -1,30 +1,33 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { dirname } from "path"
-import { fileURLToPath } from "url"
-import { FlatCompat } from "@eslint/eslintrc"
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-})
+import nextConfig from "eslint-config-next"
 
 const eslintConfig = [
-  // Ignore patterns (replacing .eslintignore)
   {
     ignores: ["node_modules/**", "build/**", "delete/**", "tmp/**", ".next/**"],
   },
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  // Base Next.js config (react, hooks, import, jsx-a11y, @next/next)
+  nextConfig[0],
+  // Downgrade set-state-in-effect to warning (valid patterns: fetch loading, dialog reset)
+  // Disable no-img-element (project uses dynamic URLs from API / S3 signed URLs)
   {
     rules: {
-      // Treat these as warnings instead of errors to prevent build failures
+      "react-hooks/set-state-in-effect": "warn",
+      "@next/next/no-img-element": "off",
+    },
+  },
+  // TypeScript config with rule overrides
+  {
+    ...nextConfig[1],
+    rules: {
+      ...nextConfig[1].rules,
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
     },
   },
+  // Next.js default ignores
+  ...(nextConfig.length > 2 ? nextConfig.slice(2) : []),
 ]
 
 export default eslintConfig

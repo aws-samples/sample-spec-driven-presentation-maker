@@ -104,11 +104,11 @@ export function ChatPanelShell({
   // bump Panel B key so it remounts with new chat history.
   // But if Panel A or Panel B created this deck, don't bump.
   const prevDeckIdRef = useRef(deckId)
+
   useEffect(() => {
     if (deckId !== prevDeckIdRef.current) {
       if (deckId !== panelADeckId) {
         setPanelADeckId(null)
-        // Only bump Panel B on external navigation, not on create_deck from Panel B
         if (panelBCreatedRef.current) {
           panelBCreatedRef.current = false
         } else {

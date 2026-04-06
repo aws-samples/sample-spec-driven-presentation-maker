@@ -8,7 +8,7 @@
 
 "use client"
 
-import { X, FileText, Image, File, AlignLeft } from "lucide-react"
+import { X, FileText, Image as ImageIcon, File, AlignLeft } from "lucide-react"
 
 export interface Attachment {
   id: string
@@ -57,7 +57,7 @@ function formatSize(bytes: number): string {
  * @returns Lucide icon component
  */
 function FileIcon({ type }: { type: string }) {
-  if (type.startsWith("image/")) return <Image className="h-4 w-4 text-blue-400" />
+  if (type.startsWith("image/")) return <ImageIcon className="h-4 w-4 text-blue-400" />
   if (type.includes("pdf") || type.includes("word") || type.includes("sheet") || type.includes("presentation")) {
     return <FileText className="h-4 w-4 text-orange-400" />
   }

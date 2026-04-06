@@ -8,7 +8,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Globe, Lock, Share2, X, UserPlus, Trash2, Building2 } from "lucide-react"
+import { Lock, Share2, X, Trash2, Building2 } from "lucide-react"
 import { searchUsers, UserSearchResult } from "@/services/deckService"
 
 interface DeckActionsProps {

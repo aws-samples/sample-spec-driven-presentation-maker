@@ -29,7 +29,7 @@ import { AttachmentPreview, Attachment, SnippetAttachment } from "./AttachmentPr
 import { FileDropZone } from "./FileDropZone"
 import { SnippetInput } from "./SnippetInput"
 import { useIsMobile } from "@/hooks/UseMobile"
-import { Send, Square, Loader2 } from "lucide-react"
+import { Send, Square } from "lucide-react"
 import { toast } from "sonner"
 
 interface Message {
@@ -39,6 +39,15 @@ interface Message {
   /** Ordered sequence of text and tool blocks for inline display. */
   blocks?: { type: "text"; text: string }[] | { type: "tool"; tool: ToolUse }[]
   snippets?: { label: string; text: string }[]
+}
+
+/** Shape of tool-use callback data from the agent streaming API. */
+interface ToolUseCallbackData {
+  toolUseId?: string
+  completed?: boolean
+  status?: "success" | "error"
+  result?: Record<string, unknown>
+  input?: Record<string, unknown>
 }
 
 interface ChatPanelProps {
@@ -87,7 +96,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const shouldAutoScroll = useRef(true)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const mentionPopupRef = useRef<any>(null)
+  const mentionPopupRef = useRef<{ _handleKeyDown?: (e: KeyboardEvent) => boolean } | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const auth = useAuth()
   const { onCompositionStart, onCompositionEnd, getIsComposing } = useCompositionSafe()
@@ -514,14 +523,15 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         },
         accessToken,
         userId,
-        (toolName: string, toolUseData: any) => {
+        (toolName: string, toolUseData: ToolUseCallbackData | undefined) => {
           // Tool result (completed) — detect deckId from any tool's result
           if (toolUseData?.completed && toolUseData?.result?.deckId && onDeckCreated) {
             // Link chat session to deck for history restore
+            const resultDeckId = String(toolUseData.result.deckId)
             if (idToken) {
-              patchDeck(toolUseData.result.deckId, { chatSessionId: sessionId }, idToken).catch(() => {})
+              patchDeck(resultDeckId, { chatSessionId: sessionId }, idToken).catch(() => {})
             }
-            onDeckCreated(toolUseData.result.deckId)
+            onDeckCreated(resultDeckId)
           }
           if (toolUseData?.completed && toolName === "generate_pptx" && onPptxRequested) {
             onPptxRequested()
@@ -556,7 +566,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
           // Detect workflow phase from tool calls
           if (onWorkflowPhase && (toolName === "read_workflows" || toolName.endsWith("_read_workflows"))) {
-            const names: string[] = toolUseData?.input?.names || []
+            const names = (toolUseData?.input?.names || []) as string[]
             const first = names[0] || ""
             if (first.includes("briefing")) onWorkflowPhase("brief")
             else if (first.includes("outline")) onWorkflowPhase("outline")
@@ -633,7 +643,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (getIsComposing(e)) return
 
     // Let mention popup handle navigation keys
-    if (mentionVisible && (MentionPopup as any)._handleKeyDown?.(e)) {
+    if (mentionVisible && (MentionPopup as unknown as { _handleKeyDown?: (e: KeyboardEvent) => boolean })._handleKeyDown?.(e)) {
       return
     }
 

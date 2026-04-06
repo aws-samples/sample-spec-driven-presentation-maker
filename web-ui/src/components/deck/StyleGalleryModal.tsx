@@ -29,15 +29,20 @@ interface StyleGalleryModalProps {
 export function StyleGalleryModal({ open, onClose, onSelect, idToken }: StyleGalleryModalProps) {
   const [styles, setStyles] = useState<StyleEntry[]>([])
   const [loading, setLoading] = useState(false)
+  const loadedRef = useRef(false)
 
   useEffect(() => {
-    if (!open || styles.length > 0) return
+    if (!open || loadedRef.current) return
+    let cancelled = false
     setLoading(true)
     fetchStyles(idToken).then((s) => {
+      if (cancelled) return
+      loadedRef.current = true
       setStyles(s)
       setLoading(false)
     })
-  }, [open, idToken, styles.length])
+    return () => { cancelled = true }
+  }, [open, idToken])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") onClose()
