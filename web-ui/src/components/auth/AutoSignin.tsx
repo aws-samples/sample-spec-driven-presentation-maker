@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 "use client"
 
-import { ReactNode, useEffect, useState } from "react"
+import { ReactNode, useSyncExternalStore } from "react"
 import { useAutoSignin } from "react-oidc-context"
 
 /**
@@ -33,15 +33,15 @@ function AutoSigninContent({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+const subscribe = () => () => {}
+const getSnapshot = () => true
+const getServerSnapshot = () => false
+
 /**
  * AutoSignin — delays rendering until client-side mount to avoid SSR hydration mismatch.
  */
 export function AutoSignin({ children }: { children: ReactNode }) {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   if (!mounted) {
     return null
