@@ -13,7 +13,7 @@ Run the following for each PPTX (`{name}` is the filename without extension):
 
 1. Convert the existing PPTX to JSON to get structural data
    ```bash
-   uv run python3 scripts/pptx_to_json.py {input_pptx} -o /tmp/pptx-maker/{name}/{name}.json
+   uv run python3 scripts/pptx_to_json.py {input_pptx} -o /tmp/sdpm/{name}/{name}.json
    ```
 2. Generate previews to see all slides visually
    ```bash
@@ -31,7 +31,7 @@ Review preview images and JSON, then inventory the following:
 Present the inventory to the user and agree on what to reuse.
 
 ## Rules
-- Output to `/tmp/pptx-maker/{name}/` — use distinct names to avoid collisions across multiple PPTXs
+- Output to `/tmp/sdpm/{name}/` — use distinct names to avoid collisions across multiple PPTXs
 - Complete both JSON conversion AND preview before proceeding to reuse assessment
 - Do NOT reuse colors (fill, fontColor, line, etc.) or styles — re-apply according to the new theme and design-rules.md
 - Only content (text, data, diagram structure) may be reused

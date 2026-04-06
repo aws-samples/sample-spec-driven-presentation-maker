@@ -35,8 +35,8 @@ The diff command accepts a PPTX file directly (it runs pptx_to_json internally).
 Read the diff output and apply the hand-edit changes to output_json.
 
 - **Modified elements**: Read property diffs and edit output_json directly
-- **Added slides/elements**: Copy the relevant parts from `/tmp/pptx-maker/{project}/edited/slides.json` into output_json (diff output is a summary only — refer to the roundtrip JSON for actual data)
-- **Added images**: Reference them via src path from `/tmp/pptx-maker/{project}/edited/images/`
+- **Added slides/elements**: Copy the relevant parts from `/tmp/sdpm/{project}/edited/slides.json` into output_json (diff output is a summary only — refer to the roundtrip JSON for actual data)
+- **Added images**: Reference them via src path from `/tmp/sdpm/{project}/edited/images/`
 - **Reordered slides**: Change the slide array order in output_json
 
 **Constraints:**

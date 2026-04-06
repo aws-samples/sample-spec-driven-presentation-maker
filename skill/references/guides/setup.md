@@ -4,7 +4,7 @@ description: "Initial environment setup — read once on first use"
 
 # Setup Guide
 
-Setup steps for using the pptx-maker Skill in a new environment.
+Setup steps for using the spec-driven-presentation-maker Skill in a new environment.
 
 ## Prerequisites
 

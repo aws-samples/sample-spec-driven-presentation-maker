@@ -17,7 +17,7 @@ Agent は以下の 2 種類のツールを組み合わせて動作する。
 
 ```
 User → AgentCore Runtime → Agent
-                             ├── MCP: pptx-maker (AgentCore Runtime + JWT)
+                             ├── MCP: spec-driven-presentation-maker (AgentCore Runtime + JWT)
                              ├── MCP: AWS Knowledge (Public, no auth)
                              ├── MCP: AWS Pricing (Local stdio)
                              ├── Built-in: upload_tools
@@ -130,13 +130,13 @@ agent/
 ### ビルド
 
 ```bash
-docker build -t pptx-maker-agent .
+docker build -t sdpm-agent .
 ```
 
 ### 実行
 
 ```bash
-docker run -p 8080:8080 pptx-maker-agent
+docker run -p 8080:8080 sdpm-agent
 ```
 
 - ポート: `8080`

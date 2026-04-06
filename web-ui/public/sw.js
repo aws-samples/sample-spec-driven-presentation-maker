@@ -5,7 +5,7 @@
  * Caches static assets only; API calls pass through to network.
  */
 
-const CACHE_NAME = "pptx-maker-v3"
+const CACHE_NAME = "sdpm-v3"
 
 self.addEventListener("install", () => {
   self.skipWaiting()

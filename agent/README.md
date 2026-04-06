@@ -26,7 +26,7 @@ Layer 4 agent built with [Strands Agents](https://github.com/strands-agents/sdk-
    ┌─────────┘   └──────────┐
    ▼                        ▼
 AgentCore Runtime     Public / Local
-(pptx-maker MCP)      MCP Servers
+(spec-driven-presentation-maker MCP)      MCP Servers
 ```
 
 The agent is created via `create_agent()`, which:

@@ -583,7 +583,12 @@ def cmd_guides(args):
 
 
 def _get_documents_dir():
-    """Get Documents directory."""
+    """Get output base directory from config, with WSL fallback."""
+    try:
+        from sdpm.config import get_output_dir
+        return get_output_dir()
+    except Exception:
+        pass
     import subprocess
     if _is_wsl():
         try:
@@ -595,10 +600,10 @@ def _get_documents_dir():
             if win_path:
                 wsl = subprocess.run(["wslpath", win_path], capture_output=True, text=True)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
                 if wsl.returncode == 0:
-                    return Path(wsl.stdout.strip())
+                    return Path(wsl.stdout.strip()) / "SDPM-Presentations"
         except Exception:
             pass
-    return Path.home() / "Documents"
+    return Path.home() / "Documents" / "SDPM-Presentations"
 
 
 def cmd_init(args):
@@ -607,7 +612,7 @@ def cmd_init(args):
     else:
         ts = datetime.now().strftime("%Y%m%d-%H%M")
         name = f"{ts}-{args.name}" if args.name else ts
-        out_dir = _get_documents_dir() / "pptx-maker" / name
+        out_dir = _get_documents_dir() / name
     out_dir.mkdir(parents=True, exist_ok=True)
     pres_data = {"fonts": {"fullwidth": None, "halfwidth": None}, "slides": []}
     json_path = out_dir / "presentation.json"
@@ -773,7 +778,7 @@ def cmd_layout(args):
     if connections:
         edges_out = _layout_route_connections(connections, nodes_out, groups_out)
 
-    # Build pptx-maker elements array
+    # Build sdpm elements array
     elements = []
 
     # Groups (largest first for correct z-order)
