@@ -37,9 +37,11 @@ interface SlideCarouselProps {
   specs?: SpecFiles | null
   /** Workflow phase detected from tool calls — drives spec tab auto-switch. */
   workflowPhase?: string | null
+  /** Callback to open the style gallery for re-selection. */
+  onStyleGalleryRequest?: () => void
 }
 
-export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase }: SlideCarouselProps) {
+export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleGalleryRequest }: SlideCarouselProps) {
   const slidesWithPreview = slides.filter((s) => s.previewUrl)
   const auth = useAuth()
   const [jsonLoading, setJsonLoading] = useState(false)
@@ -333,6 +335,7 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
           content={specs?.[specTab] ?? null}
           specName={specTab.charAt(0).toUpperCase() + specTab.slice(1)}
           specKey={specTab}
+          onStyleChange={specTab === "artDirection" ? onStyleGalleryRequest : undefined}
         />
       )}
     </div>

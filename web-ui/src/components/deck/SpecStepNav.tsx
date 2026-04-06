@@ -16,7 +16,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Layers, FileText } from "lucide-react"
+import { Layers, FileText, Palette } from "lucide-react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { SpecFiles } from "@/services/deckService"
@@ -206,7 +206,7 @@ const specComponents = {
  * @param props.specName - Name of the spec (for empty state)
  * @param props.specKey - Which spec tab ("brief" | "outline" | "artDirection")
  */
-export function SpecMarkdownPreview({ content, specName, specKey }: { content: string | null; specName: string; specKey?: string }) {
+export function SpecMarkdownPreview({ content, specName, specKey, onStyleChange }: { content: string | null; specName: string; specKey?: string; onStyleChange?: () => void }) {
   // Hooks must be called unconditionally — before any early returns.
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
@@ -248,6 +248,17 @@ export function SpecMarkdownPreview({ content, specName, specKey }: { content: s
     const ratio = containerWidth > 0 ? containerWidth / 1920 : 1
     return (
       <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+        {onStyleChange && (
+          <div className="flex justify-end px-4 py-2">
+            <button
+              onClick={onStyleChange}
+              className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.06] transition-colors"
+            >
+              <Palette className="h-3.5 w-3.5" />
+              Change Style
+            </button>
+          </div>
+        )}
         <div style={{ width: containerWidth, height: 1080 * ratio * 10, overflow: "hidden" }}>
           <iframe
             srcDoc={content}

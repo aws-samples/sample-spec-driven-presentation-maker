@@ -12,7 +12,7 @@
 import {
   BookOpen, List, Search, FolderPlus, Pencil, Image,
   Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench, Loader2,
-  FileText, Download, Play, Code, LayoutTemplate, Package,
+  FileText, Download, Play, Code, Palette, LayoutTemplate, Package,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -41,6 +41,7 @@ const TOOL_META: Record<string, { Icon: LucideIcon; label: string }> = {
   start_presentation: { Icon: Play,            label: "Starting workflow" },
   list_templates:     { Icon: LayoutTemplate,  label: "Listing templates" },
   list_styles:        { Icon: List,            label: "Listing styles" },
+  apply_style:        { Icon: Palette,         label: "Applying style" },
   read_examples:      { Icon: BookOpen,        label: "Reading example" },
   list_workflows:     { Icon: List,            label: "Listing workflows" },
   read_workflows:     { Icon: BookOpen,        label: "Reading workflow" },

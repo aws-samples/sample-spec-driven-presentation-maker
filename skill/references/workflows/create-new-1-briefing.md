@@ -34,8 +34,6 @@ You MUST NOT read the next workflow file until the user explicitly approves `spe
 - You MUST extract the main message from conversation or source material — do NOT invent
 - You MUST define expected outcome as a concrete action
 
-**Available styles:** Run `uv run python3 scripts/pptx_builder.py examples styles` to list available styles. When the user doesn't specify a style, show the list and ask. When the user has already specified a style, use `--no-browse` to verify the name exists in the list without opening the browser. The selected style is passed to `init --style` in Step 2.
-
 ## Steps
 
 ### 1. Hearing
@@ -100,12 +98,10 @@ Before running `init`, determine your output path:
 - Can I only write inside this workspace? → use `-o` with a writable path
 
 ```bash
-uv run python3 scripts/pptx_builder.py init {name} --style {style}
+uv run python3 scripts/pptx_builder.py init {name}
 ```
 
-This generates `brief.md`, `art-direction.html` (when `--style` is specified) or `art-direction.md`, and `outline.md` under `specs/`.
-
-When `--style` is specified, read `specs/art-direction.html` after init. Understanding the design direction informs brief and outline writing.
+This generates `brief.md` and `outline.md` under `specs/`.
 
 ### 3. Write brief
 

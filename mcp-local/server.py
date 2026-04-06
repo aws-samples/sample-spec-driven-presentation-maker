@@ -82,21 +82,20 @@ mcp = FastMCP(
 
 
 @mcp.tool()
-def init_presentation(name: str, style: str = "") -> str:
+def init_presentation(name: str) -> str:
     """Initialize a presentation workspace. Call after Phase 1 hearing, before building slides.
     Creates output directory with empty presentation.json and specs/.
 
-    Workflow equivalent: ``init {name} --style {style}``
+    Workflow equivalent: ``init {name}``
 
     Args:
         name: Presentation name (e.g. "lambda-overview").
-        style: Style name from list_styles (e.g. "elegant-dark"). Empty = no style.
 
     Returns:
         JSON with output_dir, json_path, and workspace file list.
     """
     return json.dumps(
-        _init_presentation(name=name, template="", skill_dir=_SKILL_DIR, style=style.strip()),
+        _init_presentation(name=name, template="", skill_dir=_SKILL_DIR),
         ensure_ascii=False,
     )
 

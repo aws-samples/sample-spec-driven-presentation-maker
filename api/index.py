@@ -236,6 +236,23 @@ def list_styles() -> Dict[str, Any]:
     return {"styles": styles}
 
 
+@app.get("/styles/<name>")
+def get_style(name: str) -> Dict[str, Any]:
+    """Get full HTML for a single style.
+
+    Returns:
+        Dict with name and fullHtml.
+    """
+    if not RESOURCE_BUCKET:
+        return {"error": f"Style not found: {name}"}, 404
+    key = f"references/examples/styles/{name}.html"
+    try:
+        body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=key)["Body"].read().decode("utf-8")
+    except Exception:
+        return {"error": f"Style not found: {name}"}, 404
+    return {"name": name, "fullHtml": body}
+
+
 # ---------------------------------------------------------------------------
 # Deck endpoints
 # ---------------------------------------------------------------------------

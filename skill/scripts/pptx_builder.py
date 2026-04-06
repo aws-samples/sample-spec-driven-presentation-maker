@@ -532,7 +532,7 @@ def cmd_examples(args):
                     if index_path.exists():
                         webbrowser.open(index_path.as_uri())
             else:
-                print("# Use 'init --style {name}' to copy a style, then read specs/art-direction.html", file=sys.stderr)
+                print("# Copy a style to your project: cp references/examples/styles/{name}.html specs/art-direction.html", file=sys.stderr)
             continue
 
         # pptx files (components, patterns) — directory-like behavior
@@ -620,19 +620,6 @@ def cmd_init(args):
     specs_dir = out_dir / "specs"
     specs_dir.mkdir(exist_ok=True)
     spec_files = ["brief.md", "outline.md"]
-    if args.style:
-        # Copy style HTML as art-direction.html
-        styles_dir = Path(__file__).parent.parent / "references" / "examples" / "styles"
-        style_name = args.style if args.style.endswith(".html") else args.style + ".html"
-        style_src = styles_dir / style_name
-        if not style_src.exists():
-            print(f"Error: Style not found: {style_src}", file=sys.stderr)
-            sys.exit(1)
-        import shutil
-        shutil.copy2(style_src, specs_dir / "art-direction.html")
-        print(f"style:       {style_src.name} → specs/art-direction.html")
-    else:
-        spec_files.append("art-direction.md")
     for name in spec_files:
         (specs_dir / name).touch()
     print(f"output_json: {json_path}")
@@ -1319,7 +1306,6 @@ def main():
     p_init = subparsers.add_parser("init", help="Initialize output directory with empty presentation JSON")
     p_init.add_argument("name", nargs="?", help="Presentation name (e.g. 'my-proposal')")
     p_init.add_argument("-o", "--output", help="Output directory (overrides default)")
-    p_init.add_argument("--style", help="Style name (copies style HTML as art-direction.html)")
 
     p_layout = subparsers.add_parser("layout", help="Compute layout coordinates from logical structure JSON")
 
