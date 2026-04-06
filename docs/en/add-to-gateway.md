@@ -41,7 +41,7 @@ For multi-user deployments, connect through Amazon Bedrock AgentCore Gateway. Th
 
 ### Prerequisites
 
-- Layer 3 deployed via CDK (see [Deployment Guide](deploy.md))
+- Layer 3 deployed via CDK (see [Getting Started — Layer 3](getting-started.md#layer-3-remote-mcp-server-aws))
 - Amazon Bedrock AgentCore Gateway configured in your AWS account
 
 ### Register as a Gateway Target
