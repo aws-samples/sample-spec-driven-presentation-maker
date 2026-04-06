@@ -95,6 +95,10 @@ Example:
 
 Once the hearing gives enough understanding of the presentation content, initialize the working directory.
 
+Before running `init`, determine your output path:
+- Can I write files outside this workspace? → use default (no `-o`)
+- Can I only write inside this workspace? → use `-o` with a writable path
+
 ```bash
 uv run python3 scripts/pptx_builder.py init {name} --style {style}
 ```
