@@ -14,9 +14,9 @@ Never compromise on design quality, even for simple decks — maintain a quality
 
 ## Deliverable
 
-`specs/art-direction.html` — approved by the user.
+`specs/art-direction.html` (when using a style) or `specs/art-direction.md` (when not) — approved by the user.
 
-You MUST NOT read the next workflow file until the user explicitly approves `specs/art-direction.html`.
+You MUST NOT read the next workflow file until the user explicitly approves the art direction.
 
 ## Constraints
 
@@ -24,7 +24,24 @@ You MUST NOT read the next workflow file until the user explicitly approves `spe
 
 ---
 
-### 0. Select and analyze template
+### 0. Select style
+
+Show available styles and ask the user to choose one — or proceed without a style.
+
+```bash
+uv run python3 scripts/pptx_builder.py examples styles
+```
+
+This opens the Style Gallery in the browser. The user picks a style or says "no style."
+
+When a style is selected, copy it as the art direction base:
+```bash
+cp references/examples/styles/{name}.html specs/art-direction.html
+```
+
+Read `specs/art-direction.html` after copying — understand the design tokens before proceeding.
+
+### 1. Select and analyze template
 
 List available templates and ask the user to select one.
 
@@ -40,7 +57,7 @@ uv run python3 scripts/pptx_builder.py analyze-template templates/{selected_temp
 
 Update `presentation.json` with the template name and fonts from the analyze output.
 When `specs/art-direction.html` exists, read `:root` CSS variables and use `--color-text` as `defaultTextColor`.
-If the style HTML specifies font-family, ask the user which to use — the style's fonts or the template's fonts:
+If the style HTML specifies font-family, ask the user which to use — the style's fonts or the template's fonts.
 ```json
 {
   "template": "{selected_template}.pptx",
@@ -52,7 +69,7 @@ If the style HTML specifies font-family, ask the user which to use — the style
 
 Review the summary output only (layout names and placeholder types). Detailed layout info (positions, sizes, samples) is retrieved per-layout in Phase 2 via `--layout`.
 
-### 1. Read reference materials
+### 2. Read reference materials
 
 Run `guides` to review available guides. Read any that are relevant to this phase's work.
 
@@ -61,15 +78,13 @@ You MUST read the following before proposing art direction:
 python scripts/pptx_builder.py guides design-rules design-vocabulary
 ```
 
-**When a style is specified:** `specs/art-direction.html` was already read during briefing (Step 2).
-
-### 2. Propose art direction
+### 3. Propose art direction
 
 Art direction is a design agreement. The user sees the actual visual direction in the browser
 and says "yes, this is what I want" or "change this." That's it.
 
-**When art-direction.html already exists** (init with `--style`):
-The user has already seen this style in the Style Gallery (`examples styles`).
+**When art-direction.html already exists** (style selected in Step 0):
+The user has already seen this style in the Style Gallery.
 Present the style name and key design tokens (colors, fonts, decoration level) as text.
 Ask: "This is the design direction. Does this work as-is, or do you want to adjust anything?"
 
@@ -77,9 +92,9 @@ If the user is happy, it's done — no need to open the browser.
 If they want changes, modify the HTML, then open `specs/art-direction.html` in the browser
 so they can verify the edits visually.
 
-**When art-direction.md exists** (init without `--style`):
-Write `specs/art-direction.html` from scratch following the structure in `create-style.md` Step 3.
-Remove the empty `art-direction.md`.
+**When no style was selected** (art-direction.html does not exist):
+Write `specs/art-direction.md` — design direction in prose. Cover color, decoration,
+density, and impression. This is a human-readable agreement, not a machine-readable spec.
 
 Also confirm:
 - **Design level** — Simple / Standard / Premium. Propose one based on context.
@@ -101,9 +116,19 @@ Also confirm:
 When art-direction.html was edited, have the user review it in a browser and confirm agreement.
 When it was copied from a style without changes, text confirmation is sufficient.
 
+### 4. Review outline fit
+
+After art direction is confirmed, check whether the outline still fits the design direction.
+Design level and information density may require splitting dense slides or merging thin ones.
+
+Do NOT ask "shall we review the outline?" every time — that becomes ritual.
+Instead, read the outline against the confirmed design level and propose specific changes
+if needed (e.g., "Slide 4 has too much for Premium — split into overview + detail").
+If the outline fits, say so briefly and move on.
+
 ---
 
 ## Next Step
 
-Once the user explicitly approves `specs/art-direction.html`, proceed to Phase 2 (`create-new-2-compose`).
-Do not proceed without approval of the file.
+Once the user explicitly approves the art direction, proceed to Phase 2 (`create-new-2-compose`).
+Do not proceed without approval.
