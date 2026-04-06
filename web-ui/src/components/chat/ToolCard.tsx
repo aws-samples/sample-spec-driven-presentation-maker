@@ -27,7 +27,7 @@
 import {
   BookOpen, List, Search, FolderPlus, Pencil, Image,
   Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench,
-  Check, FileText, Download, Play, Code,
+  Check, FileText, Download, Play, Code, Palette,
   LayoutTemplate, Package, AlertCircle,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
