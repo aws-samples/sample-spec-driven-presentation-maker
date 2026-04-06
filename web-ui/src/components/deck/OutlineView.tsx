@@ -114,7 +114,7 @@ function DetailPanel({ subItems, state }: { subItems: OutlineSubItem[]; state: S
                   strokeWidth={1.5}
                 />
                 <div className="min-w-0 flex-1">
-                  <span className="text-[10px] uppercase tracking-[0.08em] text-foreground-muted/60 font-medium">
+                  <span className="text-[10px] uppercase tracking-[0.08em] text-foreground-secondary/70 font-medium">
                     {label}
                   </span>
                   <p className="text-[12.5px] text-foreground/80 leading-relaxed mt-0.5">
