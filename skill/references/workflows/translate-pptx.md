@@ -20,7 +20,8 @@ Run `guides` to review available guides. Read any that are relevant to the trans
 
 ```bash
 uv run python3 scripts/pptx_builder.py init {name}
-uv run python3 scripts/pptx_to_json.py {input_pptx} -o ~/Documents/SDPM-Presentations/{name}
+# {project_dir} = the directory created by init (printed in output)
+uv run python3 scripts/pptx_to_json.py {input_pptx} -o {project_dir}
 ```
 
 - Do NOT use `--minimal` — translation requires a full roundtrip
@@ -32,13 +33,13 @@ uv run python3 scripts/pptx_to_json.py {input_pptx} -o ~/Documents/SDPM-Presenta
 
 ```bash
 # Extract as TSV for review
-uv run python3 scripts/translate_extract.py ~/Documents/SDPM-Presentations/{name}/slides.json -o ~/Documents/SDPM-Presentations/{name}/texts.tsv
+uv run python3 scripts/translate_extract.py {project_dir}/slides.json -o {project_dir}/texts.tsv
 
 # Generate empty dictionary template (recommended — keys with \x0b and other control characters are generated accurately)
-uv run python3 scripts/translate_extract.py ~/Documents/SDPM-Presentations/{name}/slides.json --generate-map -o ~/Documents/SDPM-Presentations/{name}/translation_map.json
+uv run python3 scripts/translate_extract.py {project_dir}/slides.json --generate-map -o {project_dir}/translation_map.json
 
 # Exclude short text (technical abbreviations, numbers, etc.)
-uv run python3 scripts/translate_extract.py ~/Documents/SDPM-Presentations/{name}/slides.json --generate-map --skip-short 3 -o ~/Documents/SDPM-Presentations/{name}/translation_map.json
+uv run python3 scripts/translate_extract.py {project_dir}/slides.json --generate-map --skip-short 3 -o {project_dir}/translation_map.json
 ```
 
 - `--generate-map` generates an empty dictionary template. Keys match the original text in slides.json exactly, preventing `\x0b` mismatches from manual copy-paste
@@ -59,10 +60,10 @@ Create a translation mapping dictionary in `translation_map.json` based on the e
 
 ```bash
 # Dry run to verify key matching (no file changes)
-uv run python3 scripts/translate_apply.py ~/Documents/SDPM-Presentations/{name}/slides.json ~/Documents/SDPM-Presentations/{name}/translation_map.json --dry-run
+uv run python3 scripts/translate_apply.py {project_dir}/slides.json {project_dir}/translation_map.json --dry-run
 
 # Apply
-uv run python3 scripts/translate_apply.py ~/Documents/SDPM-Presentations/{name}/slides.json ~/Documents/SDPM-Presentations/{name}/translation_map.json
+uv run python3 scripts/translate_apply.py {project_dir}/slides.json {project_dir}/translation_map.json
 ```
 
 **Translating styled text:**
@@ -104,7 +105,7 @@ uv run python3 scripts/translate_apply.py ~/Documents/SDPM-Presentations/{name}/
 Run extract again on the translated slides.json to find remaining text.
 
 ```bash
-uv run python3 scripts/translate_extract.py ~/Documents/SDPM-Presentations/{name}/slides.json
+uv run python3 scripts/translate_extract.py {project_dir}/slides.json
 ```
 
 Person names, company names, technical abbreviations, and numbers remaining is expected. If other source-language text remains, add it to the dictionary and re-apply.
@@ -114,10 +115,10 @@ Person names, company names, technical abbreviations, and numbers remaining is e
 ### 5. Generate + preview
 
 ```bash
-uv run python3 scripts/pptx_builder.py generate ~/Documents/SDPM-Presentations/{name}/slides.json -o ~/Documents/SDPM-Presentations/{name}/output.pptx
-uv run python3 scripts/pptx_builder.py preview ~/Documents/SDPM-Presentations/{name}/output.pptx
+uv run python3 scripts/pptx_builder.py generate {project_dir}/slides.json -o {project_dir}/output.pptx
+uv run python3 scripts/pptx_builder.py preview {project_dir}/output.pptx
 # Prioritize slides with Autofit shrink warnings
-uv run python3 scripts/pptx_builder.py preview ~/Documents/SDPM-Presentations/{name}/output.pptx -p 1,3,5
+uv run python3 scripts/pptx_builder.py preview {project_dir}/output.pptx -p 1,3,5
 ```
 
 **Layout breakage checks:**

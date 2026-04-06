@@ -19,10 +19,10 @@ Run `guides` to review available guides. Read any that are relevant to the edit.
 ### 1. PPTX → JSON conversion
 
 ```bash
-# Output under ~/Documents/SDPM-Presentations/ to avoid preview permission prompts
-uv run python3 scripts/pptx_to_json.py {input_pptx} -o ~/Documents/SDPM-Presentations/{name}
-# → Generates {output_dir}/slides.json + images/
-# → From here on, output_json = ~/Documents/SDPM-Presentations/{name}/slides.json
+# Use the project directory from `init` for all output
+uv run python3 scripts/pptx_to_json.py {input_pptx} -o {project_dir}
+# → Generates {project_dir}/slides.json + images/
+# → From here on, output_json = {project_dir}/slides.json
 ```
 - PowerPoint recalculates autofit, so the output reflects accurate heights
 

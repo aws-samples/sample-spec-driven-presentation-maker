@@ -34,7 +34,7 @@ For PPTX files, analyze from three angles:
 ```bash
 uv run python3 scripts/pptx_builder.py analyze-template {input.pptx}
 uv run python3 scripts/pptx_builder.py preview {input.pptx}
-uv run python3 scripts/pptx_builder.py convert {input.pptx} -o ~/Documents/SDPM-Presentations/{name}
+uv run python3 scripts/pptx_builder.py convert {input.pptx} -o {project_dir}/{name}
 ```
 analyze-template extracts theme colors, color usage ratios, and fonts.
 Preview images show the overall visual impression — read a few representative slides,
