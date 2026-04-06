@@ -411,3 +411,20 @@ export async function fetchStyles(idToken: string): Promise<StyleEntry[]> {
   const data = await res.json()
   return data.styles || []
 }
+
+/**
+ * Fetch full HTML for a single style.
+ *
+ * @param name - Style name
+ * @param idToken - Cognito ID token for API Gateway authorization
+ * @returns Full HTML string, or empty string on error
+ */
+export async function fetchStyleHtml(name: string, idToken: string): Promise<string> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}/styles/${encodeURIComponent(name)}`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  if (!res.ok) return ""
+  const data = await res.json()
+  return data.fullHtml || ""
+}
