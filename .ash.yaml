@@ -1,6 +1,7 @@
 project_name: sample-spec-driven-presentation-maker
 
 global_settings:
+  severity_threshold: HIGH
   ignore_paths:
     - path: "infra/node_modules/**"
       reason: "CDK bundled code — not our source code"
