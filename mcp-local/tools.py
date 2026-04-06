@@ -31,24 +31,16 @@ def init_presentation(
     name: str,
     template: str,
     skill_dir: Path,
-    style: str = "",
 ) -> dict[str, Any]:
     """Create a presentation workspace with empty JSON, specs/, and optional template.
-
-    When style is provided, copies the style HTML as specs/art-direction.html.
-    When style is empty, creates an empty specs/art-direction.md placeholder.
 
     Args:
         name: Presentation name (used in directory name).
         skill_dir: Path to the skill/ directory.
         template: Template name (from list-templates) or full path. Required.
-        style: Style name (e.g. "elegant-dark"). Empty string means no style.
 
     Returns:
         Dict with output_dir, json_path, template info, and workspace file list.
-
-    Raises:
-        FileNotFoundError: If the specified style does not exist.
     """
     from datetime import datetime as _dt
 
@@ -80,23 +72,10 @@ def init_presentation(
     specs_dir = out_dir / "specs"
     specs_dir.mkdir(exist_ok=True)
     spec_files = ("brief.md", "outline.md")
-    if style:
-        # Copy style HTML as art-direction.html
-        styles_dir = skill_dir / "references" / "examples" / "styles"
-        style_name = style if style.endswith(".html") else style + ".html"
-        style_src = styles_dir / style_name
-        if not style_src.exists():
-            raise FileNotFoundError(f"Style not found: {style_src}")
-        import shutil
-        shutil.copy2(style_src, specs_dir / "art-direction.html")
-        art_file = "specs/art-direction.html"
-    else:
-        (specs_dir / "art-direction.md").touch()
-        art_file = "specs/art-direction.md"
     for spec_name in spec_files:
         (specs_dir / spec_name).touch()
 
-    workspace = ["presentation.json"] + [f"specs/{s}" for s in spec_files] + [art_file]
+    workspace = ["presentation.json"] + [f"specs/{s}" for s in spec_files]
 
     return {
         "output_dir": str(out_dir),

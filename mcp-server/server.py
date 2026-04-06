@@ -195,15 +195,14 @@ def _check_deck_access(deck_id: str, action: str = "read") -> None:
 
 
 @mcp.tool()
-def init_presentation(name: str, style: str = "") -> str:
+def init_presentation(name: str) -> str:
     """Initialize a presentation. Creates a deck and empty workspace in S3.
     Call after Phase 1 hearing, before building slides.
 
-    Workflow equivalent: ``init {name} --style {style}``
+    Workflow equivalent: ``init {name}``
 
     Args:
         name: Presentation name (e.g. "lambda-overview").
-        style: Style name from list_styles (e.g. "elegant-dark"). Empty = no style.
 
     Returns:
         JSON with deckId and workspace file list.
@@ -211,7 +210,7 @@ def init_presentation(name: str, style: str = "") -> str:
     return json.dumps(
         init_mod.init_presentation(
             name=name.strip(), user_id=_get_user_id(),
-            storage=_storage, style=style.strip(),
+            storage=_storage,
         ),
         ensure_ascii=False,
     )
@@ -344,6 +343,27 @@ def list_styles() -> str:
         JSON with list of styles (name + description).
     """
     return json.dumps(reference.list_styles(storage=_storage), ensure_ascii=False)
+
+
+@mcp.tool()
+def apply_style(deck_id: str, style: str) -> str:
+    """Copy a style as the deck's art direction. Call during Art Direction phase.
+
+    Copies references/examples/styles/{style}.html → specs/art-direction.html.
+
+    Args:
+        deck_id: Deck ID.
+        style: Style name from list_styles (e.g. "elegant-dark").
+
+    Returns:
+        JSON confirmation.
+    """
+    _check_deck_access(deck_id, "write")
+    html_key = f"references/examples/styles/{style}.html"
+    html_bytes = _storage.download_file(key=html_key)
+    dest_key = f"decks/{deck_id}/specs/art-direction.html"
+    _storage.upload_file(key=dest_key, data=html_bytes, content_type="text/html")
+    return json.dumps({"applied": style, "path": "specs/art-direction.html"})
 
 
 @mcp.tool()

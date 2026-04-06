@@ -125,6 +125,7 @@ export default function DecksPage() {
                     onScrollComplete={() => ws.setScrollToSlide("")}
                     specs={ws.deck?.specs}
                     workflowPhase={workflowPhase}
+                    onStyleGalleryRequest={() => setStyleGalleryOpen(true)}
                     onSlideClick={(page) => {
                       const dName = ws.deck?.name || "Deck"
                       const mention = ws.activeDeckId
@@ -243,7 +244,11 @@ export default function DecksPage() {
           onClose={() => setStyleGalleryOpen(false)}
           onSelect={(name) => {
             setStyleGalleryOpen(false)
-            chatRef.current?.insertAtCursor(`I'll use the "${name}" style. `)
+            const hasArtDirection = ws.deck?.specs?.artDirection != null
+            const msg = hasArtDirection
+              ? `I want to change the style to "${name}". `
+              : `I'll use the "${name}" style. `
+            chatRef.current?.insertAtCursor(msg)
           }}
           idToken={idToken}
         />
