@@ -70,7 +70,10 @@ export function useWorkspace(
 
   // Clear URL cache when generate_pptx is triggered so new PNGs are picked up
   useEffect(() => {
-    if (pptxRequested) stablePreviewUrls.current.clear()
+    if (pptxRequested) {
+      stablePreviewUrls.current.clear()
+      prevSlideKeyRef.current = ""
+    }
   }, [pptxRequested])
 
   useEffect(() => {
@@ -174,13 +177,14 @@ export function useWorkspace(
   const waitingForPng = pptxRequested
 
   // Reset flag once PNGs change after generate_pptx
-  const prevSlideCountRef = useRef(0)
+  const prevPngKeyRef = useRef<string>("")
   useEffect(() => {
-    const count = deck?.slides.filter((s) => s.previewUrl).length ?? 0
-    if (pptxRequested && count > 0 && count !== prevSlideCountRef.current) {
+    if (!pptxRequested || !deck?.slides) return
+    const pngKey = deck.slides.map((s) => `${s.slideId}:${s.previewUrl || ""}`).join("|")
+    if (prevPngKeyRef.current && pngKey !== prevPngKeyRef.current) {
       setPptxRequested(false)
     }
-    prevSlideCountRef.current = count
+    prevPngKeyRef.current = pngKey
   }, [pptxRequested, deck?.slides])
 
   return {
