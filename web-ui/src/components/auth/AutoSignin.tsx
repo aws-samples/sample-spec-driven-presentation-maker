@@ -10,6 +10,11 @@ import { useAutoSignin } from "react-oidc-context"
  * Handles hasAuthParams check, redirect loop prevention, and error states internally.
  */
 function AutoSigninContent({ children }: { children: ReactNode }) {
+  // Save current URL (with hash) before potential OIDC redirect
+  if (typeof window !== "undefined" && !window.location.search.includes("code=")) {
+    sessionStorage.setItem("post_signin_return_url", window.location.pathname + window.location.hash)
+  }
+
   const { isLoading, isAuthenticated, error } = useAutoSignin({
     signinMethod: "signinRedirect",
   })

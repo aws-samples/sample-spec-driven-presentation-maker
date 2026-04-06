@@ -58,7 +58,6 @@ interface ChatPanelProps {
   onDeckCreated?: (deckId: string) => void
   onPptxRequested?: () => void
   onWorkflowPhase?: (phase: string) => void
-  onStyleGalleryRequest?: () => void
 }
 
 /** Handle exposed to parent for inserting text at cursor position. */
@@ -66,7 +65,7 @@ export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPptxRequested, onWorkflowPhase, onStyleGalleryRequest }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPptxRequested, onWorkflowPhase }, ref) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -535,9 +534,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           }
           if (toolUseData?.completed && toolName === "generate_pptx" && onPptxRequested) {
             onPptxRequested()
-          }
-          if (toolUseData?.completed && (toolName === "list_styles" || toolName.endsWith("_list_styles")) && onStyleGalleryRequest) {
-            onStyleGalleryRequest()
           }
 
           // Tool result: update existing ToolUse with result/status
