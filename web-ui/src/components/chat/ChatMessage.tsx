@@ -54,7 +54,7 @@ function renderInlinePreviews(text: string, urls: Record<string, string>): strin
  * @param text - Raw text that may contain mentions or color codes
  * @returns Array of string and JSX elements with mentions/colors highlighted
  */
-function highlightMentions(text: string): (string | JSX.Element)[] {
+function highlightMentions(text: string): (string | React.JSX.Element)[] {
   // Combined regex: mentions OR hex color codes
   const COMBINED_RE = /(@Page\s\d+|@\[[^\]]+\]|#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b)/g
   const parts = text.split(COMBINED_RE)

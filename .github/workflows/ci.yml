@@ -38,6 +38,17 @@ jobs:
       - name: Lint
         run: npm run lint
         working-directory: web-ui
+      - name: Check for undefined references
+        run: |
+          # Catch "Cannot find name" errors that cause runtime crashes
+          # Full tsc --noEmit is not yet clean; this targets the most critical class
+          ERRORS=$(npx tsc --noEmit 2>&1 | grep "Cannot find name" || true)
+          if [ -n "$ERRORS" ]; then
+            echo "$ERRORS"
+            echo "::error::Undefined references found — these will crash at runtime"
+            exit 1
+          fi
+        working-directory: web-ui
       - name: Build
         run: npm run build
         working-directory: web-ui
