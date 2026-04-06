@@ -14,8 +14,6 @@
 "use client"
 
 import { DeckDetail } from "@/services/deckService"
-import { SlideCarousel } from "@/components/deck/SlideCarousel"
-import { DeckActions } from "@/components/deck/DeckActions"
 import { Share2, Download, Layers } from "lucide-react"
 
 interface WorkspaceViewProps {

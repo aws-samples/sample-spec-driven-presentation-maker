@@ -10,7 +10,7 @@
  */
 
 import {
-  BookOpen, List, Search, FolderPlus, Pencil, Cog, Image,
+  BookOpen, List, Search, FolderPlus, Pencil, Image,
   Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench, Loader2,
   FileText, Download, Play, Code, LayoutTemplate, Package,
 } from "lucide-react"

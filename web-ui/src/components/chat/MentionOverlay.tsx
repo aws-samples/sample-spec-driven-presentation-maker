@@ -13,8 +13,6 @@
 import { RefObject, useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 
-/** Regex to match @Page N mentions (legacy). */
-const PAGE_MENTION_RE = /@Page\s(\d+)/g
 /** Regex to match @DeckName(#id):Page N or @DeckName(#id) or @[DeckName] or @Page N */
 const ALL_MENTIONS_RE = /@([^@(]+)\(#([^)]+)\):Page\s(\d+)|@([^@(]+)\(#([^)]+)\)|@\[([^\]]+)\]|@Page\s(\d+)/g
 

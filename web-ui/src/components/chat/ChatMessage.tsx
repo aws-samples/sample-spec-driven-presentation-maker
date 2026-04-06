@@ -21,7 +21,7 @@
 import { useState, useEffect } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Loader2, ChevronRight, Sparkles } from "lucide-react"
+import { ChevronRight, Sparkles } from "lucide-react"
 import { ToolCard, ToolCardCompact } from "./ToolCard"
 import { SnippetBlock } from "./SnippetBlock"
 import { batchGetSlidePreviewUrls } from "@/services/deckService"
@@ -189,7 +189,6 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
   const renderTextBlock = (text: string, isLast: boolean) => {
     if (!text.trim()) return null
     // Apply snippet extraction to each text block
-    const blockSnippetRegex = /---snippet---\n([\s\S]*?)---\/snippet---/g
     const cleaned = text.replace(/\n*---snippet---\n[\s\S]*?---\/snippet---/g, "").trim()
     if (!cleaned) return null
     return (

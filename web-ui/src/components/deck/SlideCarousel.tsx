@@ -123,9 +123,6 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
     }
   }
 
-  /** Whether any spec file has content. */
-  const hasSpecs = specs != null && (specs.brief != null || specs.outline != null || specs.artDirection != null)
-
   /**
    * Render the empty-slides placeholder (loading animation or static message).
    *

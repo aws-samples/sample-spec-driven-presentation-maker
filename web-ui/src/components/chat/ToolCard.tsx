@@ -25,9 +25,9 @@
 "use client"
 
 import {
-  BookOpen, List, Search, FolderPlus, Pencil, Cog, Image,
+  BookOpen, List, Search, FolderPlus, Pencil, Image,
   Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench,
-  Check, FileText, Download, Play, Code, Palette,
+  Check, FileText, Download, Play, Code,
   LayoutTemplate, Package, AlertCircle,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"

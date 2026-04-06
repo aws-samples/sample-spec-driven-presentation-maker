@@ -91,7 +91,7 @@ export function MentionPopup({ visible, query, items, onSelect, onClose, positio
     [visible, filtered, selectedIndex, onSelect, onClose],
   )
 
-  ;(MentionPopup as any)._handleKeyDown = handleKeyDown
+  ;(MentionPopup as unknown as { _handleKeyDown: typeof handleKeyDown })._handleKeyDown = handleKeyDown
 
   if (!visible || filtered.length === 0) return null
 

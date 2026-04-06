@@ -10,9 +10,11 @@ const eslintConfig = [
   // Base Next.js config (react, hooks, import, jsx-a11y, @next/next)
   nextConfig[0],
   // Downgrade set-state-in-effect to warning (valid patterns: fetch loading, dialog reset)
+  // Disable no-img-element (project uses dynamic URLs from API / S3 signed URLs)
   {
     rules: {
       "react-hooks/set-state-in-effect": "warn",
+      "@next/next/no-img-element": "off",
     },
   },
   // TypeScript config with rule overrides

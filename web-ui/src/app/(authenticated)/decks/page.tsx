@@ -34,7 +34,7 @@ import { useIsMobile } from "@/hooks/UseMobile"
 import { useSwipe } from "@/hooks/useSwipe"
 import { useDeckList } from "@/hooks/useDeckList"
 import { useWorkspace } from "@/hooks/useWorkspace"
-import { Plus, MessageSquare, Image, Star } from "lucide-react"
+import { Plus, MessageSquare, Image as ImageIcon, Star } from "lucide-react"
 
 export default function DecksPage() {
   const auth = useAuth()
@@ -88,7 +88,7 @@ export default function DecksPage() {
                       activeTab === "preview" ? "text-foreground border-b-2 border-foreground" : "text-foreground-muted"
                     }`}
                   >
-                    <Image className="h-4 w-4" />
+                    <ImageIcon className="h-4 w-4" />
                     Preview
                     {ws.hasSlides && <span className="w-1.5 h-1.5 rounded-full bg-green-500" />}
                   </button>
