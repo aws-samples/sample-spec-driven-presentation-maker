@@ -187,7 +187,9 @@ export class WebUiStack extends cdk.Stack {
     api.root.addResource("chat").addResource("{session_id}").addMethod("GET", integration, auth);
     const slides = api.root.addResource("slides");
     slides.addResource("search").addMethod("GET", integration, auth);
-    api.root.addResource("styles").addMethod("GET", integration, auth);
+    const styles = api.root.addResource("styles");
+    styles.addMethod("GET", integration, auth);
+    styles.addResource("{name}").addMethod("GET", integration, auth);
 
     // --- Deploy web-ui static files to S3 ---
     const deployment = new s3deploy.BucketDeployment(this, "DeploySite", {

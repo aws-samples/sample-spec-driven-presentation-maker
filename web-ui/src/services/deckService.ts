@@ -404,7 +404,7 @@ export interface StyleEntry {
  */
 export async function fetchStyles(idToken: string): Promise<StyleEntry[]> {
   const base = await getApiBaseUrl()
-  const res = await fetch(`${base}/styles`, {
+  const res = await fetch(`${base}styles`, {
     headers: { Authorization: `Bearer ${idToken}` },
   })
   if (!res.ok) return []
@@ -421,7 +421,7 @@ export async function fetchStyles(idToken: string): Promise<StyleEntry[]> {
  */
 export async function fetchStyleHtml(name: string, idToken: string): Promise<string> {
   const base = await getApiBaseUrl()
-  const res = await fetch(`${base}/styles/${encodeURIComponent(name)}`, {
+  const res = await fetch(`${base}styles/${encodeURIComponent(name)}`, {
     headers: { Authorization: `Bearer ${idToken}` },
   })
   if (!res.ok) return ""

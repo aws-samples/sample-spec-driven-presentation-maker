@@ -146,14 +146,23 @@ function StylePreview({ html, loading }: { html: string; loading: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
 
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => {
-      setContainerWidth(entry.contentRect.width)
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
+  // Use callback ref to handle DOM element changes (e.g. after loading→content transition)
+  const roRef = useRef<ResizeObserver | null>(null)
+  const measuredRef = useCallback((node: HTMLDivElement | null) => {
+    if (roRef.current) {
+      roRef.current.disconnect()
+      roRef.current = null
+    }
+    if (node) {
+      // Immediately measure
+      const w = node.getBoundingClientRect().width
+      if (w > 0) setContainerWidth(w)
+      // Observe future resizes
+      roRef.current = new ResizeObserver(([entry]) => {
+        setContainerWidth(entry.contentRect.width)
+      })
+      roRef.current.observe(node)
+    }
   }, [])
 
   if (loading || !html) {
@@ -164,23 +173,30 @@ function StylePreview({ html, loading }: { html: string; loading: boolean }) {
     )
   }
 
-  const ratio = containerWidth > 0 ? containerWidth / 1920 : 1
+  const ratio = containerWidth > 0 ? containerWidth / 1920 : 0
+  const slideCount = (html.match(/class="slide"/g) || []).length || 5
 
   return (
-    <div ref={containerRef} className="overflow-x-hidden">
-      <div style={{ width: containerWidth, height: 1080 * ratio * 10, overflow: "hidden" }}>
-        <iframe
-          srcDoc={html}
-          sandbox="allow-same-origin"
-          title="Style Preview"
-          style={{
-            width: 1920,
-            height: 10800,
-            border: "none",
-            transformOrigin: "top left",
-            transform: `scale(${ratio})`,
-          }}
-        />
+    <div ref={measuredRef} className="w-full overflow-x-hidden">
+      <div style={{ width: "100%", height: ratio > 0 ? 1080 * ratio * slideCount : 400, overflow: "hidden" }}>
+        {ratio > 0 ? (
+          <iframe
+            srcDoc={html}
+            sandbox="allow-same-origin"
+            title="Style Preview"
+            style={{
+              width: 1920,
+              height: 1080 * slideCount,
+              border: "none",
+              transformOrigin: "top left",
+              transform: `scale(${ratio})`,
+            }}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <div className="w-6 h-6 border-2 border-brand-teal/30 border-t-brand-teal rounded-full animate-spin" />
+          </div>
+        )}
       </div>
     </div>
   )
