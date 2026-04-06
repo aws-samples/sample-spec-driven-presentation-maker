@@ -22,7 +22,7 @@ jobs:
       - name: Run ASH scan
         run: ash --mode local --fail-on-findings
       - name: Upload scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: ash-results
