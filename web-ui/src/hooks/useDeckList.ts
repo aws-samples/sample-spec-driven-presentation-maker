@@ -13,7 +13,7 @@
 
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import {
   listDecks, DeckSummary,
   listPublicDecks, listSharedDecks, listFavorites,
@@ -41,6 +41,7 @@ export function useDeckList(
   const [searching, setSearching] = useState(false)
 
   /** Fetch all deck lists when on list view. */
+  const initialLoadDone = useRef(false)
   useEffect(() => {
     if (activeDeckId !== null) return
     if (!isAuthenticated || !idToken) return
@@ -53,14 +54,27 @@ export function useDeckList(
           listSharedDecks(idToken!),
           listFavorites(idToken!),
         ])
-        setDecks(myData.decks)
+        // Merge: preserve existing thumbnailUrl if deckId matches to avoid image flicker
+        setDecks((prev) => {
+          const prevMap = new Map(prev.map((d) => [d.deckId, d]))
+          return myData.decks.map((d) => {
+            const existing = prevMap.get(d.deckId)
+            if (existing && existing.thumbnailUrl && d.thumbnailUrl) {
+              return { ...d, thumbnailUrl: existing.thumbnailUrl }
+            }
+            return d
+          })
+        })
         setFavoriteIds(new Set(myData.favoriteIds))
         setPublicDecks(pubDecks)
         setSharedDecks(shDecks)
         setFavoriteDecks(favDecks)
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load decks")
+        if (!initialLoadDone.current) {
+          setError(err instanceof Error ? err.message : "Failed to load decks")
+        }
       } finally {
+        initialLoadDone.current = true
         setLoading(false)
       }
     }
