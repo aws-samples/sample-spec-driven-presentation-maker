@@ -13,10 +13,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
 import json
-import re
-from datetime import datetime
-
-from pptx import Presentation
 
 from sdpm.assets import (  # noqa: F401
     ICON_DIR,
@@ -27,11 +23,6 @@ from sdpm.assets import (  # noqa: F401
     resolve_asset_path,
     resolve_icon_path,
     search_assets,
-)
-from sdpm.builder import (
-    PPTXBuilder,
-    resolve_override,
-    validate_icons_in_json,
 )
 from sdpm.diff import (
     _diff_value,
@@ -47,14 +38,7 @@ from sdpm.layout import (
     _layout_translate,
     box_to_elements,
 )
-from sdpm.preview import (
-    _is_wsl,
-    check_layout_imbalance,
-    export_pdf,
-    get_tmp_project_dir,
-    refresh_autofit,
-    unlock_height_constraints,
-)
+from sdpm.preview import _is_wsl
 from sdpm.utils.effects import apply_effects  # noqa: F401
 from sdpm.utils.image import apply_image_effects, resolve_image_path  # noqa: F401
 from sdpm.utils.io import read_json, write_json
@@ -91,7 +75,7 @@ def _resolve_template(data, input_path):
 def cmd_generate(args):
     """Generate PPTX from JSON."""
     from sdpm.api import generate
-    from sdpm.preview import check_layout_imbalance, get_tmp_project_dir
+    from sdpm.preview import get_tmp_project_dir
 
     try:
         result = generate(
@@ -858,7 +842,6 @@ def cmd_image_size(args):
 def cmd_grid(args):
     """Compute CSS Grid layout coordinates."""
     from sdpm.layout.grid import compute_grid
-    from sdpm.utils.io import read_json, write_json
 
     if args.input == "-":
         spec = json.loads(sys.stdin.read())

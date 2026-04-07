@@ -6,7 +6,6 @@ These functions encapsulate the full workflow that the CLI (pptx_builder.py) per
 mcp-local and other consumers should call these instead of assembling low-level APIs.
 """
 
-import json
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -319,7 +318,6 @@ def preview(
 def _preview_win32(pptx_path: Path, output_dir: Path, pages_set: set[int] | None) -> list[str]:
     """Windows native PNG export via PowerShell COM."""
     import glob
-    import re
     import shutil
     import subprocess
 
