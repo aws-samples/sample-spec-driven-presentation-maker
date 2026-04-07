@@ -259,43 +259,55 @@ def get_pptx_notes(pptx_path, pages=None):
 # High-level reference helpers (local filesystem)
 # ---------------------------------------------------------------------------
 
-def list_category(category_dir: Path) -> list[dict[str, str]]:
-    """List all .md, .pptx, and .html files in a category directory with descriptions.
+def _collect_files(directory: Path) -> dict[str, Path]:
+    """Collect md/pptx files in directory. md takes priority over pptx for same stem."""
+    files: dict[str, Path] = {}
+    for f in sorted(directory.glob("*.pptx")):
+        files[f.stem] = f
+    for f in sorted(directory.glob("*.md")):
+        files[f.stem] = f  # md overwrites pptx
+    return files
 
-    Recurses into subdirectories. Returns list of dicts with name, description, path.
+
+def _strip_frontmatter(text: str) -> str:
+    """Strip YAML frontmatter from markdown text."""
+    lines = text.splitlines(True)
+    if lines and lines[0].strip() == "---":
+        for i, line in enumerate(lines[1:], 1):
+            if line.strip() == "---":
+                return "".join(lines[i + 1:]).lstrip("\n")
+    return text
+
+
+def list_category(category_dir: Path) -> list[dict[str, str]]:
+    """List documents in a category directory with descriptions.
+
+    Supports flat and subdirectory layouts (matching CLI _list_or_show).
+    md takes priority over pptx for same stem.
     """
     if not category_dir.exists():
         return []
+    subdirs = sorted(d for d in category_dir.iterdir() if d.is_dir())
+    flat = not subdirs
     items: list[dict[str, str]] = []
-    seen: set[str] = set()
-    for f in sorted(category_dir.rglob("*")):
-        if f.suffix not in (".md", ".pptx", ".html"):
-            continue
-        rel = f.relative_to(category_dir)
-        stem_key = str(rel.with_suffix(""))
-        if stem_key in seen:
-            continue
-        seen.add(stem_key)
-        desc = _get_description(f)
-        items.append({
-            "name": stem_key,
-            "description": desc,
-            "path": f"{category_dir.name}/{rel}",
-        })
+    if flat:
+        for stem, f in sorted(_collect_files(category_dir).items()):
+            items.append({"name": stem, "description": _get_description(f)})
+    else:
+        for sd in subdirs:
+            for stem, f in sorted(_collect_files(sd).items()):
+                items.append({"name": f"{sd.name}/{stem}", "description": _get_description(f)})
     return items
 
 
 def read_docs(category_dir: Path, names: list[str]) -> list[dict]:
-    """Read one or more documents from a category directory.
+    """Read documents by name from a category directory.
 
-    Supports .md (text), .pptx (notes via get_pptx_notes), .html (text).
-    Names can include page specifiers: "name/3" or "name/all".
-
-    Returns list of dicts with name, path, content.
+    Supports .md (with frontmatter strip), .pptx (notes via get_pptx_notes).
+    Names can include page specifiers for pptx: "name/3" or "name/all".
     """
     results = []
     for name in names:
-        # Parse page specifier
         pages = None
         has_page_specifier = False
         parts = name.rsplit("/", 1)
@@ -307,43 +319,21 @@ def read_docs(category_dir: Path, names: list[str]) -> list[dict]:
 
         md_path = category_dir / f"{file_name}.md"
         pptx_path = category_dir / f"{file_name}.pptx"
-        html_path = category_dir / f"{file_name}.html"
 
         if md_path.exists():
-            results.append({
-                "name": file_name,
-                "path": f"{category_dir.name}/{file_name}.md",
-                "content": md_path.read_text(encoding="utf-8"),
-            })
+            text = _strip_frontmatter(md_path.read_text(encoding="utf-8"))
+            results.append({"name": file_name, "content": text})
         elif pptx_path.exists():
             if not has_page_specifier:
                 descriptions = list_pptx_descriptions(str(pptx_path))
                 content = "\n".join(f"  {page:>3}  {desc}" for page, desc in descriptions)
-                results.append({
-                    "name": name,
-                    "path": f"{category_dir.name}/{file_name}.pptx",
-                    "content": content,
-                })
             else:
                 notes = get_pptx_notes(pptx_path, pages=pages)
-                content_lines = [f"## Page {pn}\n\n{text}\n" for pn, text in notes]
-                results.append({
-                    "name": name,
-                    "path": f"{category_dir.name}/{file_name}.pptx",
-                    "content": "\n".join(content_lines),
-                })
-        elif html_path.exists():
-            results.append({
-                "name": file_name,
-                "path": f"{category_dir.name}/{file_name}.html",
-                "content": html_path.read_text(encoding="utf-8"),
-            })
+                content = "\n".join(f"## Page {pn}\n\n{text}\n" for pn, text in notes)
+            results.append({"name": name, "content": content})
         else:
-            available = sorted({
-                str(f.relative_to(category_dir).with_suffix(""))
-                for f in category_dir.rglob("*")
-                if f.suffix in (".md", ".pptx", ".html")
-            })
+            # Collect available names for error message
+            available = sorted(_collect_files(category_dir).keys())
             raise FileNotFoundError(
                 f"'{file_name}' not found in {category_dir.name}/. Available: {', '.join(available)}"
             )
