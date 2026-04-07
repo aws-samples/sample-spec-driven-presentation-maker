@@ -213,7 +213,6 @@ def cmd_search_assets(args):
 
 
 # Backward-compatible alias
-cmd_icon_search = cmd_search_assets
 
 
 def cmd_list_asset_sources(args):
@@ -1087,13 +1086,7 @@ def main():
     p_search.add_argument("-t", "--type", help="Filter by type (e.g. service, resource)")
     p_search.add_argument("--theme", choices=["light", "dark"], help="Filter by theme (light/dark)")
 
-    # Backward-compatible alias
-    p_icon = subparsers.add_parser("icon-search", help="Search assets (alias for search-assets)")
-    p_icon.add_argument("query", help="Search keywords (space-separated)")
-    p_icon.add_argument("-n", "--limit", type=int, default=20, help="Max results (default: 20)")
-    p_icon.add_argument("-s", "--source", help="Filter by source (e.g. aws, material)")
-    p_icon.add_argument("-t", "--type", help="Filter by type (e.g. service, resource)")
-    p_icon.add_argument("--theme", choices=["light", "dark"], help="Filter by theme (light/dark)")
+    # Backward-compatible alias removed (icon-search was alias for search-assets)
 
     subparsers.add_parser("list-asset-sources", help="List available asset sources")
     subparsers.add_parser("list-templates", help="List available PPTX templates")
@@ -1164,8 +1157,6 @@ def main():
         cmd_preview(args)
     elif args.command == "search-assets":
         cmd_search_assets(args)
-    elif args.command == "icon-search":
-        cmd_icon_search(args)
     elif args.command == "list-asset-sources":
         cmd_list_asset_sources(args)
     elif args.command == "list-templates":
