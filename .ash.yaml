@@ -79,6 +79,14 @@ global_settings:
       expiration: "2027-03-29"
 
     - rule_id: "B108"
+      path: "skill/sdpm/api.py"
+      reason: >
+        High-level API uses /tmp for transient PPTX preview files.
+        Extracted from pptx_builder.py (Layer 1). Runs on developer's machine,
+        not in a shared server environment.
+      expiration: "2027-03-29"
+
+    - rule_id: "B108"
       path: "skill/sdpm/analyzer/__init__.py"
       reason: >
         Template analyzer reads preview PNGs from /tmp. Local CLI tool (Layer 1),
