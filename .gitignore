@@ -46,7 +46,10 @@ web-ui/.next/
 web-ui/public/aws-exports.json
 
 # Kiro / Q-SPEC (local steering, specs, settings)
-.kiro/
+.kiro/*
+!.kiro/steering/
+.kiro/steering/*
+!.kiro/steering/principles.md
 
 # Config (contains secrets)
 infra/config.yaml
