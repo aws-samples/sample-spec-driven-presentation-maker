@@ -105,12 +105,12 @@ def cmd_generate(args):
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     except ValueError as e:
-        # Missing assets
         print(f"Error: {e}", file=sys.stderr)
-        print("", file=sys.stderr)
-        print("Run the following command to download assets:", file=sys.stderr)
-        print("  python3 scripts/download_aws_icons.py", file=sys.stderr)
-        print("  python3 scripts/download_material_icons.py", file=sys.stderr)
+        if "Missing assets" in str(e):
+            print("", file=sys.stderr)
+            print("Run the following command to download assets:", file=sys.stderr)
+            print("  python3 scripts/download_aws_icons.py", file=sys.stderr)
+            print("  python3 scripts/download_material_icons.py", file=sys.stderr)
         sys.exit(1)
 
     print(f"Generated: {Path(result['output_path']).resolve()}")

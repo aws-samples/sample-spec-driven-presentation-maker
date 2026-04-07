@@ -86,7 +86,7 @@ def init(
     pres_data: dict[str, Any] = {"fonts": {"fullwidth": None, "halfwidth": None}, "slides": []}
 
     if template:
-        templates_dir = Path(__file__).parent / "templates"  # skill/templates/
+        templates_dir = Path(__file__).parent.parent / "templates"  # skill/templates/
         template_src = Path(template).expanduser()
         if not template_src.exists():
             candidate = templates_dir / (str(template) if str(template).endswith(".pptx") else f"{template}.pptx")
@@ -151,7 +151,7 @@ def generate(
         raise FileNotFoundError(f"Slides JSON not found: {json_path}")
 
     data = read_json(input_path)
-    templates_dir = Path(__file__).parent / "templates"
+    templates_dir = Path(__file__).parent.parent / "templates"  # skill/templates/
     warnings: list[str] = []
 
     # Resolve template
