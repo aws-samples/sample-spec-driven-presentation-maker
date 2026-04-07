@@ -280,7 +280,7 @@ def _preview_macos(pptx_path: Path, pages: str) -> dict[str, Any]:
     import glob
 
     from pptx import Presentation
-    from sdpm.preview import _mac_open_pptx_background, _mac_restore_pptx_focus_async
+    from sdpm.preview.backend import _mac_open_pptx_background, _mac_restore_pptx_focus_async
 
     output_dir = Path("/tmp/pptx-preview")
     output_dir.mkdir(parents=True, exist_ok=True)
