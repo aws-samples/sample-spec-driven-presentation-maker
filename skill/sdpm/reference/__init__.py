@@ -253,3 +253,114 @@ def get_pptx_notes(pptx_path, pages=None):
         if notes:
             results.append((page_num, notes))
     return results
+
+
+# ---------------------------------------------------------------------------
+# High-level reference helpers (local filesystem)
+# ---------------------------------------------------------------------------
+
+def list_category(category_dir: Path) -> list[dict[str, str]]:
+    """List all .md, .pptx, and .html files in a category directory with descriptions.
+
+    Recurses into subdirectories. Returns list of dicts with name, description, path.
+    """
+    if not category_dir.exists():
+        return []
+    items: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for f in sorted(category_dir.rglob("*")):
+        if f.suffix not in (".md", ".pptx", ".html"):
+            continue
+        rel = f.relative_to(category_dir)
+        stem_key = str(rel.with_suffix(""))
+        if stem_key in seen:
+            continue
+        seen.add(stem_key)
+        desc = _get_description(f)
+        items.append({
+            "name": stem_key,
+            "description": desc,
+            "path": f"{category_dir.name}/{rel}",
+        })
+    return items
+
+
+def read_docs(category_dir: Path, names: list[str]) -> list[dict]:
+    """Read one or more documents from a category directory.
+
+    Supports .md (text), .pptx (notes via get_pptx_notes), .html (text).
+    Names can include page specifiers: "name/3" or "name/all".
+
+    Returns list of dicts with name, path, content.
+    """
+    results = []
+    for name in names:
+        # Parse page specifier
+        pages = None
+        has_page_specifier = False
+        parts = name.rsplit("/", 1)
+        file_name = name
+        if len(parts) == 2 and (parts[1].isdigit() or parts[1] == "all"):
+            file_name = parts[0]
+            has_page_specifier = True
+            pages = None if parts[1] == "all" else [int(parts[1])]
+
+        md_path = category_dir / f"{file_name}.md"
+        pptx_path = category_dir / f"{file_name}.pptx"
+        html_path = category_dir / f"{file_name}.html"
+
+        if md_path.exists():
+            results.append({
+                "name": file_name,
+                "path": f"{category_dir.name}/{file_name}.md",
+                "content": md_path.read_text(encoding="utf-8"),
+            })
+        elif pptx_path.exists():
+            if not has_page_specifier:
+                descriptions = list_pptx_descriptions(str(pptx_path))
+                content = "\n".join(f"  {page:>3}  {desc}" for page, desc in descriptions)
+                results.append({
+                    "name": name,
+                    "path": f"{category_dir.name}/{file_name}.pptx",
+                    "content": content,
+                })
+            else:
+                notes = get_pptx_notes(pptx_path, pages=pages)
+                content_lines = [f"## Page {pn}\n\n{text}\n" for pn, text in notes]
+                results.append({
+                    "name": name,
+                    "path": f"{category_dir.name}/{file_name}.pptx",
+                    "content": "\n".join(content_lines),
+                })
+        elif html_path.exists():
+            results.append({
+                "name": file_name,
+                "path": f"{category_dir.name}/{file_name}.html",
+                "content": html_path.read_text(encoding="utf-8"),
+            })
+        else:
+            available = sorted({
+                str(f.relative_to(category_dir).with_suffix(""))
+                for f in category_dir.rglob("*")
+                if f.suffix in (".md", ".pptx", ".html")
+            })
+            raise FileNotFoundError(
+                f"'{file_name}' not found in {category_dir.name}/. Available: {', '.join(available)}"
+            )
+    return results
+
+
+def list_styles(styles_dir: Path) -> list[dict[str, str]]:
+    """List available styles from HTML files in a styles directory.
+
+    Returns list of dicts with name and description.
+    """
+    if not styles_dir.exists():
+        return []
+    styles: list[dict[str, str]] = []
+    for f in sorted(styles_dir.iterdir()):
+        if f.suffix != ".html" or f.name.startswith("."):
+            continue
+        desc = _get_description(f)
+        styles.append({"name": f.stem, "description": desc})
+    return styles

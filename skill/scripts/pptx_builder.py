@@ -91,86 +91,49 @@ def _resolve_template(data, input_path):
 
 def cmd_generate(args):
     """Generate PPTX from JSON."""
-    # Read input data first
-    if args.input and args.input != "-":
-        data = read_json(Path(args.input))
-    else:
-        data = json.load(sys.stdin)
+    from sdpm.api import generate
+    from sdpm.preview import check_layout_imbalance, get_tmp_project_dir
 
-    template, custom_template = _resolve_template(
-        data,
-        args.input if hasattr(args, 'input') else None
-    )
-
-    if not template.exists():
-        print(f"Error: Template not found: {template}", file=sys.stderr)
+    try:
+        result = generate(
+            json_path=args.input if args.input and args.input != "-" else None,
+            output_path=args.output,
+            no_autofit=args.no_autofit,
+            no_preview=args.no_preview,
+        )
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
-
-    missing_icons = validate_icons_in_json(data)
-    if missing_icons:
-        print(f"Error: Missing assets ({len(missing_icons)}):", file=sys.stderr)
-        for icon in sorted(missing_icons):
-            print(f"  - {icon}", file=sys.stderr)
+    except ValueError as e:
+        # Missing assets
+        print(f"Error: {e}", file=sys.stderr)
         print("", file=sys.stderr)
         print("Run the following command to download assets:", file=sys.stderr)
         print("  python3 scripts/download_aws_icons.py", file=sys.stderr)
         print("  python3 scripts/download_material_icons.py", file=sys.stderr)
         sys.exit(1)
 
-    base_dir = Path(args.input).parent if args.input and args.input != "-" else Path(".")
-    builder = PPTXBuilder(template, custom_template=custom_template,
-                          fonts=data.get("fonts"), base_dir=base_dir,
-                          keep_empty_placeholders=getattr(args, 'keep_empty_placeholders', False),
-                          default_text_color=data.get("defaultTextColor"))
-    slides = data.get("slides", [])
+    print(f"Generated: {Path(result['output_path']).resolve()}")
+    for line in result["slides"]:
+        print(line)
 
-    id_map = {}
-    for slide_def in slides:
-        if "id" in slide_def:
-            sid = slide_def["id"]
-            if sid in id_map:
-                print(f"Error: Duplicate slide id: {sid}", file=sys.stderr)
-                sys.exit(1)
-            id_map[sid] = slide_def
-
-    for slide_def in slides:
-        resolved = resolve_override(slide_def, id_map)
-        builder.add_slide(resolved)
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    p = Path(args.output)
-    output_path = p.with_stem(f"{p.stem}_{ts}")
-    builder.save(output_path)
-
-    print(f"Generated: {output_path.resolve()}")
-    for i, slide_def in enumerate(slides, 1):
-        title = (slide_def.get("placeholders") or {}).get("0", "(no title)")
-        if isinstance(title, dict):
-            title = title.get("text", "(no title)")
-        print(f"page{i:02d} - {title}")
-
-    pdf_path = None
-    if not args.no_autofit:
-        pptx_path = output_path.resolve()
-        if not args.no_preview:
-            preview_dir = Path("/tmp/pptx-preview")
-            preview_dir.mkdir(parents=True, exist_ok=True)
-            pdf_path = preview_dir / "slides.pdf"
-        refresh_autofit(pptx_path, pdf_path=pdf_path)
-        unlock_height_constraints(pptx_path)
-    check_layout_imbalance(output_path, slides)
-
-    tmp_project = None
-    if args.input and args.input != "-":
-        tmp_project = get_tmp_project_dir(args.input)
+    if result["warnings"]:
+        print(f"⚠️  Layout bias detected ({len(result['warnings'])} slides):")
+        for w in result["warnings"]:
+            print(f"  {w}")
+        print("  → MUST FIX unless the layout type is intentionally asymmetric.")
 
     if not args.no_preview:
+        tmp_project = None
+        if args.input and args.input != "-":
+            tmp_project = get_tmp_project_dir(args.input)
         preview_dir = tmp_project / 'preview' if tmp_project else Path("/tmp/pptx-preview")
         preview_dir.mkdir(parents=True, exist_ok=True)
         preview_args = argparse.Namespace(
-            input=str(output_path),
+            input=str(result["output_path"]),
             pages=None,
             no_grid=True,
-            _pdf_path=str(pdf_path) if pdf_path and pdf_path.exists() else None,
+            _pdf_path=result.get("pdf_path"),
             _output_dir=str(preview_dir),
         )
         cmd_preview(preview_args)
@@ -198,146 +161,40 @@ def _export_png_win32(pptx_path, output_dir):
     return png_dir
 def cmd_preview(args):
     """Export PPTX slides as PNG images."""
-    import glob
-    import subprocess
-    
+    from sdpm.api import preview as api_preview
+
     pptx_path = Path(args.input).resolve()
-    
-    if _is_wsl() or sys.platform == "win32":
-        output_dir = pptx_path.parent / "preview"
-    elif hasattr(args, '_output_dir') and args._output_dir:
-        output_dir = Path(args._output_dir)
-    else:
-        output_dir = Path("/tmp/pptx-preview")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
     if not pptx_path.exists():
         print(f"Error: File not found: {pptx_path}", file=sys.stderr)
         sys.exit(1)
-    
-    if sys.platform == "win32":
-        # Windows native: direct PNG export via COM
-        png_dir = _export_png_win32(pptx_path, output_dir)
-        
-        # Parse pages to export
-        pages_to_export = None
-        if args.pages:
-            pages_to_export = set(int(p.strip()) for p in args.pages.split(","))
-        
-        # Collect PNGs from PowerPoint output
-        png_files = sorted(glob.glob(str(png_dir / "**" / "*.png"), recursive=True))
-        if not png_files:
-            png_files = sorted(glob.glob(str(png_dir / "**" / "*.PNG"), recursive=True))
-        
-        # Rename with slide titles
-        prs = Presentation(str(pptx_path))
-        titles = {}
-        for i, slide in enumerate(prs.slides, 1):
-            title = ""
-            if slide.shapes.title:
-                title = slide.shapes.title.text.strip().replace("\n", " ")[:30]
-            title = re.sub(r'[\\/:*?"<>|]', '', title)
-            titles[i] = title or "notitle"
-        
-        generated = []
-        for idx, png in enumerate(png_files, 1):
-            if pages_to_export and idx not in pages_to_export:
-                Path(png).unlink()
-                continue
-            new_name = f"page{idx:02d}-{titles.get(idx, 'notitle')}.png"
-            new_path = output_dir / new_name
-            Path(png).rename(new_path)
-            generated.append(new_path)
-        
-        # Cleanup temp PNG dir
-        import shutil
-        shutil.rmtree(png_dir, ignore_errors=True)
-    else:
-        # PDF + pdftoppm pipeline (macOS / WSL / Linux)
-        pdf_path = output_dir / "slides.pdf"
-        pre_generated_pdf = getattr(args, '_pdf_path', None)
-        
-        if pre_generated_pdf and Path(pre_generated_pdf).exists():
-            import shutil
-            if str(Path(pre_generated_pdf).resolve()) != str(pdf_path.resolve()):
-                shutil.copy2(pre_generated_pdf, pdf_path)
-        else:
-            if not export_pdf(pptx_path, pdf_path):
-                print("Error: PDF export failed", file=sys.stderr)
-                sys.exit(1)
-        
-        # Parse pages to export
-        pages_to_export = None
-        if args.pages:
-            pages_to_export = set(int(p.strip()) for p in args.pages.split(","))
-        
-        # PDF -> PNG via pdftoppm (max 1280px wide for compact preview)
-        cmd = ["pdftoppm", "-png", "-scale-to", "1280", str(pdf_path), str(output_dir / "page")]
-        result = subprocess.run(cmd, capture_output=True, text=True)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-        if result.returncode != 0:
-            print(f"Error: PNG conversion failed: {result.stderr}", file=sys.stderr)
-            sys.exit(1)
-        
-        # Rename with slide titles
-        prs = Presentation(str(pptx_path))
-        titles = {}
-        for i, slide in enumerate(prs.slides, 1):
-            title = ""
-            if slide.shapes.title:
-                title = slide.shapes.title.text.strip().replace("\n", " ")[:30]
-            title = re.sub(r'[\\/:*?"<>|]', '', title)
-            titles[i] = title or "notitle"
-        
-        generated = []
-        for png in sorted(glob.glob(str(output_dir / "page-*.png"))):
-            basename = Path(png).name
-            match = re.match(r'page-(\d+)\.png', basename)
-            if match:
-                num = int(match.group(1))
-                if pages_to_export and num not in pages_to_export:
-                    Path(png).unlink()
-                    continue
-                new_name = f"page{num:02d}-{titles.get(num, 'notitle')}.png"
-                new_path = output_dir / new_name
-                Path(png).rename(new_path)
-                generated.append(new_path)
-        
-        # Cleanup PDF
-        pdf_path.unlink()
-    
-    # Add grid overlay unless disabled
-    if not args.no_grid:
-        from PIL import Image, ImageDraw, ImageFont
-        color = (255, 0, 0, 128)
-        try:
-            font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 24)
-        except Exception:
-            try:
-                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
-            except Exception:
-                font = ImageFont.load_default()
-        
-        for png_path in generated:
-            img = Image.open(png_path).convert("RGBA")
-            w, h = img.size
-            overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(overlay)
-            for pct in range(5, 100, 5):
-                x, y = int(w * pct / 100), int(h * pct / 100)
-                px_x, px_y = int(1920 * pct / 100), int(1080 * pct / 100)
-                draw.line([(x, 0), (x, h)], fill=color, width=1)
-                draw.line([(0, y), (w, y)], fill=color, width=1)
-                if pct % 10 == 0:
-                    draw.text((x + 4, 4), f"{px_x}px ({pct}%)", fill=color, font=font)
-                    draw.text((4, y + 4), f"{px_y}px ({pct}%)", fill=color, font=font)
-            Image.alpha_composite(img, overlay).convert("RGB").save(png_path)
-    
-    for path in generated:
+
+    pages_list = None
+    if args.pages:
+        pages_list = [int(p.strip()) for p in args.pages.split(",")]
+
+    # Determine output dir
+    output_dir = None
+    if hasattr(args, '_output_dir') and args._output_dir:
+        output_dir = args._output_dir
+
+    pre_pdf = getattr(args, '_pdf_path', None)
+
+    try:
+        result = api_preview(
+            pptx_path=pptx_path,
+            pages=pages_list,
+            output_dir=output_dir,
+            grid=not args.no_grid,
+            pdf_path=pre_pdf,
+        )
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    for path in result["files"]:
         print(f"Generated: {path}")
-    if generated:
-        print(f"Preview: {generated[0].parent}")
-    if generated:
-        print(f"Preview: {generated[0].parent}")
+    if result["files"]:
+        print(f"Preview: {result['preview_dir']}")
 
 
 
@@ -607,28 +464,18 @@ def _get_documents_dir():
 
 
 def cmd_init(args):
-    if args.output:
-        out_dir = Path(args.output).expanduser()
-    else:
-        ts = datetime.now().strftime("%Y%m%d-%H%M")
-        name = f"{ts}-{args.name}" if args.name else ts
-        out_dir = _get_documents_dir() / name
-    out_dir.mkdir(parents=True, exist_ok=True)
-    pres_data = {"fonts": {"fullwidth": None, "halfwidth": None}, "slides": []}
-    json_path = out_dir / "presentation.json"
-    write_json(json_path, pres_data, suffix="\n")
-    specs_dir = out_dir / "specs"
-    specs_dir.mkdir(exist_ok=True)
-    spec_files = ["brief.md", "outline.md"]
-    for name in spec_files:
-        (specs_dir / name).touch()
-    print(f"output_json: {json_path}")
-    for name in spec_files:
-        print(f"specs:       {specs_dir / name}")
+    from sdpm.api import init
+    result = init(
+        name=args.name or "",
+        output_dir=args.output if hasattr(args, 'output') and args.output else None,
+    )
+    print(f"output_json: {result['json_path']}")
+    for f in result["workspace"]:
+        if f.startswith("specs/"):
+            print(f"specs:       {Path(result['output_dir']) / f}")
 def cmd_code_block(args):
     """Generate elements JSON for a syntax-highlighted code block."""
-    from sdpm.builder.constants import CODE_COLORS
-    from sdpm.utils.text import highlight_code
+    from sdpm.api import code_block
 
     if args.input == "-":
         import sys as _sys
@@ -636,53 +483,15 @@ def cmd_code_block(args):
     else:
         code = Path(args.input).read_text(encoding="utf-8")
 
-    language = args.language or "text"
-    theme = args.theme or "dark"
-    x = args.x or 0
-    y = args.y or 0
-    width = args.width or 800
-    height = args.height or 300
-    label_height = 22
-    show_label = not args.no_label
-
-    colors = CODE_COLORS.get(theme, CODE_COLORS["dark"])
-    bg = colors["background"]
-    inverse_theme = "light" if theme == "dark" else "dark"
-    inverse_bg = f"#{CODE_COLORS[inverse_theme]['background'].lstrip('#')}" if isinstance(CODE_COLORS[inverse_theme]['background'], str) else CODE_COLORS[inverse_theme]['background']
-    # Resolve string hex colors
-    if isinstance(bg, str):
-        bg_hex = bg
-    else:
-        bg_hex = f"#{bg:06x}" if isinstance(bg, int) else bg
-
-    highlighted = highlight_code(code, language, theme)
-    label_map = {"typescript": "TypeScript", "javascript": "JavaScript", "csharp": "C#", "cpp": "C++"}
-    label_text = label_map.get(language, language.capitalize())
-
-    elements = []
-    if show_label:
-        elements.append({
-            "type": "textbox",
-            "x": x, "y": y, "width": width, "height": label_height,
-            "fontSize": 8, "align": "left",
-            "fill": inverse_bg,
-            "text": f"{{{{#{'000000' if theme == 'dark' else 'FFFFFF'}:{label_text}}}}}",
-            "marginLeft": 50000, "marginTop": 0, "marginRight": 0, "marginBottom": 0,
-            "autoWidth": True,
-        })
-        code_y = y + label_height
-        code_height = height - label_height
-    else:
-        code_y = y
-        code_height = height
-
-    elements.append({
-        "type": "textbox",
-        "x": x, "y": code_y, "width": width, "height": code_height,
-        "fontSize": args.font_size or 12, "align": "left",
-        "fill": bg_hex,
-        "text": highlighted,
-    })
+    elements = code_block(
+        code=code,
+        language=args.language or "text",
+        theme=args.theme or "dark",
+        x=args.x or 0, y=args.y or 0,
+        width=args.width or 800, height=args.height or 300,
+        font_size=args.font_size or 12,
+        show_label=not args.no_label,
+    )
 
     output = {"elements": elements}
     out_str = json.dumps(output, ensure_ascii=False, indent=2)
