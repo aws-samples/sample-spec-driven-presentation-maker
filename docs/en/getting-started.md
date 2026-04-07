@@ -241,6 +241,16 @@ To use your own IdP (Entra ID, Auth0, Okta, etc.):
 2. Set `oidcDiscoveryUrl` and `allowedClients` in `config.yaml`
 3. The Runtime's `customJwtAuthorizer` validates JWTs from any OIDC-compliant issuer
 
+### Checking Endpoints After Deployment
+
+If the deploy script's log monitoring was interrupted, or you need to check the endpoints later, run:
+
+```bash
+bash scripts/show_endpoints.sh
+```
+
+This displays the CloudFront URL and Cognito sign-up URL from the deployed CloudFormation stacks.
+
 ### Updating the Web UI
 
 To update the Web UI without a full CDK deployment:

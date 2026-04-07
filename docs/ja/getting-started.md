@@ -241,6 +241,16 @@ npx cdk deploy --all
 2. `config.yaml` に `oidcDiscoveryUrl` と `allowedClients` を設定
 3. Runtime の `customJwtAuthorizer` が OIDC 準拠の任意の発行者からの JWT を検証
 
+### デプロイ後のエンドポイント確認
+
+デプロイスクリプトのログ監視が途中で中断した場合や、後からエンドポイントを確認したい場合は以下を実行してください。
+
+```bash
+bash scripts/show_endpoints.sh
+```
+
+デプロイ済みの CloudFormation スタックから CloudFront URL と Cognito サインアップ URL を表示します。
+
 ### Web UI の更新
 
 Web UI のコードを変更した場合、フル CDK デプロイなしで更新できます。
