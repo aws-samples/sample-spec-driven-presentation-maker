@@ -337,7 +337,34 @@ print(data.get('nextForwardToken', ''))
 
     if [ "${BUILD_STATUS}" = "SUCCEEDED" ]; then
       echo ""
-      echo "Deployment complete. Check CloudFormation outputs above for endpoints."
+      echo "Deployment complete!"
+      echo ""
+
+      # Fetch and display key endpoints from CloudFormation outputs
+      SITE_URL=$(aws cloudformation describe-stacks \
+        --stack-name SdpmWebUi ${AWS_OPTS} \
+        --query 'Stacks[0].Outputs[?OutputKey==`SiteUrl`].OutputValue' \
+        --output text 2>/dev/null || echo "")
+
+      USER_POOL_ID=$(aws cloudformation describe-stacks \
+        --stack-name SdpmAuth ${AWS_OPTS} \
+        --query 'Stacks[0].Outputs[?OutputKey==`UserPoolId`].OutputValue' \
+        --output text 2>/dev/null || echo "")
+
+      if [ -n "${SITE_URL}" ]; then
+        COGNITO_CONSOLE_URL="https://${REGION}.console.aws.amazon.com/cognito/v2/idp/user-pools/${USER_POOL_ID}/users?region=${REGION}"
+
+        echo "========================================="
+        echo "  CloudFront URL      : ${SITE_URL}"
+        echo "  Cognito User Pool   : ${COGNITO_CONSOLE_URL}"
+        echo "========================================="
+        echo ""
+        echo "1. Open the Cognito User Pool console to create a user"
+        echo "2. Open the CloudFront URL to access the Web UI"
+      else
+        echo "Check CloudFormation outputs for endpoints."
+      fi
+
       exit 0
     else
       echo ""
