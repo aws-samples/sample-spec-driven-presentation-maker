@@ -259,6 +259,18 @@ def get_pptx_notes(pptx_path, pages=None):
 # High-level reference helpers (local filesystem)
 # ---------------------------------------------------------------------------
 
+
+def open_styles_gallery(styles_dir: Path) -> Path | None:
+    """Generate styles gallery HTML and open in browser. Returns index path or None."""
+    import webbrowser
+
+    index_path = generate_styles_index(styles_dir)
+    if index_path and index_path.exists():
+        webbrowser.open(index_path.as_uri())
+        return index_path
+    return None
+
+
 def _collect_files(directory: Path) -> dict[str, Path]:
     """Collect md/pptx files in directory. md takes priority over pptx for same stem."""
     files: dict[str, Path] = {}

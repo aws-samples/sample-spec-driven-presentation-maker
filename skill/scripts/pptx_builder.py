@@ -55,7 +55,6 @@ from sdpm.preview import (
     refresh_autofit,
     unlock_height_constraints,
 )
-from sdpm.reference import _get_description
 from sdpm.utils.effects import apply_effects  # noqa: F401
 from sdpm.utils.image import apply_image_effects, resolve_image_path  # noqa: F401
 from sdpm.utils.io import read_json, write_json
@@ -241,101 +240,6 @@ def cmd_list_templates(args):
         print(f"  {t.stem}")
 
 
-def _list_or_show(category_dir, names, category_label):
-    """List or show documents in a category directory.
-
-    Supports two layouts:
-    - Categorized: subdirectories as categories, names use 'category/name' format
-    - Flat: files directly in category_dir, names use plain 'name' format
-
-    Args:
-        category_dir: Path to the category directory.
-        names: List of names to show. Empty list shows the listing.
-        category_label: Display label (e.g. "Examples").
-    """
-    if not category_dir.exists():
-        print(f"Directory not found: {category_dir}", file=sys.stderr)
-        return
-
-    # Discover subdirectories as categories
-    subdirs = sorted(d for d in category_dir.iterdir() if d.is_dir())
-    flat = not subdirs
-    root_files = _collect_files(category_dir) if flat else {}
-
-    if names:
-        for name in names:
-            if flat or '/' not in name:
-                # Flat mode: look up directly in category_dir
-                files = root_files if flat else {}
-                if not flat:
-                    # Categorized mode but no slash — try to find in subdirs
-                    for sd in subdirs:
-                        files = _collect_files(sd)
-                        if name in files:
-                            print(f"# Format: category/name (e.g. {sd.name}/{name})", file=sys.stderr)
-                            break
-                    else:
-                        print(f"# Format: category/name (e.g. pattern/{name})", file=sys.stderr)
-                    continue
-                doc = files.get(name)
-                if not doc:
-                    print(f"# Not found: {name}", file=sys.stderr)
-                    print(f"# Available: {', '.join(sorted(files.keys()))}", file=sys.stderr)
-                    continue
-            else:
-                cat, stem = name.split('/', 1)
-                sub = category_dir / cat
-                if not sub.is_dir():
-                    cats = [d.name for d in subdirs]
-                    print(f"# Category not found: {cat}", file=sys.stderr)
-                    print(f"# Available: {', '.join(cats)}", file=sys.stderr)
-                    continue
-                files = _collect_files(sub)
-                doc = files.get(stem)
-                if not doc:
-                    print(f"# Not found: {name}", file=sys.stderr)
-                    print(f"# Available in {cat}/: {', '.join(sorted(files.keys()))}", file=sys.stderr)
-                    continue
-            if doc.suffix == '.md':
-                text = doc.read_text(encoding="utf-8")
-                # Strip YAML frontmatter
-                lines = text.splitlines(True)
-                if lines and lines[0].strip() == '---':
-                    for i, line in enumerate(lines[1:], 1):
-                        if line.strip() == '---':
-                            text = ''.join(lines[i + 1:]).lstrip('\n')
-                            break
-                print(text)
-            print()
-    else:
-        print(f"# {category_label}")
-        if flat:
-            for stem in sorted(root_files.keys()):
-                f = root_files[stem]
-                desc = _get_description(f) or stem
-                print(f"  {stem:<36} {desc}")
-        else:
-            for sd in subdirs:
-                files = _collect_files(sd)
-                if not files:
-                    continue
-                print(f"\n## {sd.name.title()}")
-                for stem in sorted(files.keys()):
-                    f = files[stem]
-                    desc = _get_description(f) or stem
-                    print(f"  {sd.name}/{stem:<28} {desc}")
-
-
-def _collect_files(directory):
-    """Collect md/pptx files in directory. md takes priority over pptx for same stem."""
-    files = {}
-    for f in sorted(directory.glob("*.pptx")):
-        files[f.stem] = f
-    for f in sorted(directory.glob("*.md")):
-        files[f.stem] = f
-    return files
-
-
 def cmd_search_patterns(args):
     """Search patterns by keywords."""
     from sdpm.reference import search_patterns
@@ -350,7 +254,7 @@ def cmd_search_patterns(args):
 
 def cmd_examples(args):
     """List or show design examples (components/patterns/styles)."""
-    from sdpm.reference import get_pptx_notes, list_pptx_descriptions
+    from sdpm.reference import list_styles, open_styles_gallery, read_docs
 
     examples_dir = Path(__file__).parent.parent / "references" / "examples"
     if not examples_dir.exists():
@@ -367,33 +271,29 @@ def cmd_examples(args):
         base = parts[0]
         sub = parts[1] if len(parts) > 1 else None
 
-        # styles/ directory — always show full content
+        # styles/ directory
         if base == "styles":
             styles_dir = examples_dir / "styles"
             if not styles_dir.exists():
                 print("# Not found: styles/", file=sys.stderr)
                 continue
             if sub is None:
-                # List styles
-                for f in sorted(styles_dir.iterdir()):
-                    if f.suffix == '.html' and not f.name.startswith('.'):
-                        from sdpm.reference import _get_description
-                        desc = _get_description(f)
-                        print(f"  styles/{f.stem}  {desc}")
-                # Open index in browser unless --no-browse
+                for s in list_styles(styles_dir):
+                    print(f"  styles/{s['name']}  {s['description']}")
                 if not args.no_browse:
-                    import webbrowser
-                    from sdpm.reference import generate_styles_index
-                    index_path = generate_styles_index(styles_dir)
-                    if index_path.exists():
-                        webbrowser.open(index_path.as_uri())
+                    open_styles_gallery(styles_dir)
             else:
                 print("# Copy a style to your project: cp references/examples/styles/{name}.html specs/art-direction.html", file=sys.stderr)
             continue
 
-        # pptx files (components, patterns) — directory-like behavior
-        pptx_path = examples_dir / f"{base}.pptx"
-        if not pptx_path.is_file():
+        # pptx files (components, patterns)
+        query = f"{base}/{sub}" if sub else base
+        try:
+            docs = read_docs(examples_dir, [query])
+            for doc in docs:
+                print(doc["content"])
+                print()
+        except FileNotFoundError:
             print(f"# Not found: {base}", file=sys.stderr)
             cats = []
             for f in sorted(examples_dir.iterdir()):
@@ -402,40 +302,40 @@ def cmd_examples(args):
                 elif f.is_dir() and not f.name.startswith('.'):
                     cats.append(f"{f.name}/")
             print(f"# Available: {', '.join(cats)}", file=sys.stderr)
-            continue
-
-        if sub is None:
-            # List slides
-            for page, desc in list_pptx_descriptions(str(pptx_path)):
-                print(f"  {page:>3}  {desc}")
-        elif sub == "all":
-            # All notes
-            for _, notes in get_pptx_notes(str(pptx_path)):
-                print(notes)
-                print()
-        else:
-            # Specific pages
-            try:
-                pages = [int(p.strip()) for p in sub.split(",")]
-            except ValueError:
-                print(f"# Invalid page: {sub}", file=sys.stderr)
-                continue
-            results = get_pptx_notes(str(pptx_path), pages=pages)
-            if not results:
-                print(f"# No notes found for page(s): {sub}", file=sys.stderr)
-            for _, notes in results:
-                print(notes)
-                print()
 
 
 def cmd_workflows(args):
     """List or show workflow documents."""
-    _list_or_show(Path(__file__).parent.parent / "references" / "workflows", args.names, "Workflows")
+    from sdpm.reference import list_category, read_docs
+    d = Path(__file__).parent.parent / "references" / "workflows"
+    if not args.names:
+        print("# Workflows")
+        for item in list_category(d):
+            print(f"  {item['name']:<36} {item['description']}")
+    else:
+        try:
+            for doc in read_docs(d, args.names):
+                print(doc["content"])
+                print()
+        except FileNotFoundError as e:
+            print(f"# {e}", file=sys.stderr)
 
 
 def cmd_guides(args):
     """List or show guide documents."""
-    _list_or_show(Path(__file__).parent.parent / "references" / "guides", args.names, "Guides")
+    from sdpm.reference import list_category, read_docs
+    d = Path(__file__).parent.parent / "references" / "guides"
+    if not args.names:
+        print("# Guides")
+        for item in list_category(d):
+            print(f"  {item['name']:<36} {item['description']}")
+    else:
+        try:
+            for doc in read_docs(d, args.names):
+                print(doc["content"])
+                print()
+        except FileNotFoundError as e:
+            print(f"# {e}", file=sys.stderr)
 
 
 def _get_documents_dir():
