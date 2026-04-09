@@ -804,15 +804,13 @@ def cmd_analyze_template(args):
         print()
 
     ts = result.get("table_styles", {})
-    print("tableStyles:")
     if ts.get("styles"):
+        print("tableStyles:")
         for s in ts["styles"]:
             default_mark = " ★default" if s["name"] == ts.get("default") else ""
             print(f'  "{s["name"]}"{default_mark}')
             print(f'    {s["description"]}')
-    else:
-        print("  (none — theme-based fallback will be used)")
-    print()
+        print()
 
 
 def cmd_image_size(args):

@@ -42,7 +42,6 @@ def analyze_template(template_path: Path):
     theme_colors = extract_theme_colors(template_path)
     fonts = extract_fonts(template_path)
     color_usage = _load_color_usage_cache(template_path)
-    table_styles = extract_table_styles(template_path, theme_colors)
     slide_size = {
         "width": int(prs.slide_width / emu),
         "height": int(prs.slide_height / emu),
@@ -53,7 +52,6 @@ def analyze_template(template_path: Path):
         "layouts": layouts,
         "theme_colors": theme_colors,
         "color_usage": color_usage,
-        "table_styles": table_styles,
         "fonts": fonts,
     }
 
@@ -145,101 +143,6 @@ def extract_theme_colors(template_path: Path):
         if colors.get(key):
             result[key] = colors[key]
     return result
-
-
-def extract_table_styles(template_path: Path, theme_colors: dict):
-    """Extract table styles from template's tableStyles.xml.
-
-    Returns dict with 'default' (styleName or None) and 'styles' list.
-    Each style has 'name', 'styleId', and 'description'.
-    """
-    import zipfile
-    from lxml import etree
-
-    ns = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
-
-    # Build scheme color lookup
-    scheme_map = {
-        'dk1': theme_colors.get('text', ''),
-        'lt1': theme_colors.get('background', ''),
-        'dk2': theme_colors.get('text2', ''),
-        'lt2': theme_colors.get('background2', ''),
-        'tx1': theme_colors.get('text', ''),
-        'bg1': theme_colors.get('background', ''),
-        'tx2': theme_colors.get('text2', ''),
-        'bg2': theme_colors.get('background2', ''),
-    }
-    for i in range(1, 7):
-        scheme_map[f'accent{i}'] = theme_colors.get(f'accent{i}', '')
-
-    def _resolve_color(parent):
-        """Resolve scheme/srgb color from an XML element."""
-        if parent is None:
-            return None
-        scheme = parent.find('.//a:schemeClr', ns)
-        if scheme is not None:
-            return scheme_map.get(scheme.get('val'))
-        srgb = parent.find('.//a:srgbClr', ns)
-        if srgb is not None:
-            return '#' + srgb.get('val')
-        return None
-
-    def _describe(s):
-        """Generate human-readable description for style selection."""
-        parts = []
-
-        # Header color
-        fr = s.find('a:firstRow', ns)
-        if fr is not None:
-            fill_el = fr.find('a:tcStyle/a:fill/a:solidFill', ns)
-            fill_ref = fr.find('a:tcStyle/a:fillRef', ns)
-            fc = _resolve_color(fill_el) if fill_el is not None else _resolve_color(fill_ref)
-            if fc:
-                parts.append(f'{fc} header')
-
-        # Body: table background, fill, or transparent
-        has_tbl_bg = s.find('a:tblBg', ns) is not None
-        whole_fill = s.find('a:wholeTbl/a:tcStyle/a:fill', ns)
-        if has_tbl_bg:
-            c = _resolve_color(s.find('a:tblBg', ns))
-            parts.append(f'{c} tinted background' if c else 'tinted background')
-        elif whole_fill is not None and whole_fill.find('a:noFill', ns) is not None:
-            parts.append('transparent body')
-        elif whole_fill is not None and whole_fill.find('a:solidFill', ns) is not None:
-            c = _resolve_color(whole_fill.find('a:solidFill', ns))
-            parts.append(f'{c} body' if c else 'filled body')
-
-        # Style character
-        if s.find('a:band1H/a:tcStyle/a:fill/a:solidFill', ns) is not None:
-            parts.append('banded rows')
-        if whole_fill is not None and whole_fill.find('a:noFill', ns) is not None:
-            parts.append('line-based')
-
-        return ', '.join(parts) if parts else '(minimal)'
-
-    try:
-        with zipfile.ZipFile(str(template_path)) as z:
-            xml = z.read('ppt/tableStyles.xml')
-    except (KeyError, Exception):
-        return {"default": None, "styles": []}
-
-    root = etree.fromstring(xml)
-    default_id = root.get('def')
-    default_name = None
-
-    styles = []
-    for s in root.findall('a:tblStyle', ns):
-        sid = s.get('styleId')
-        name = s.get('styleName', '')
-        if sid == default_id:
-            default_name = name
-        styles.append({
-            "name": name,
-            "styleId": sid,
-            "description": _describe(s),
-        })
-
-    return {"default": default_name, "styles": styles}
 
 
 def _color_usage_cache_path(template_path: Path) -> Path:

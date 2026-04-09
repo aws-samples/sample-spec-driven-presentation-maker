@@ -205,7 +205,7 @@ Expands an external JSON file's elements array. Draw order is controlled by posi
 }
 ```
 
-- `height`: **Required**. Text is auto-shrunk to fit the box
+- `height`: **Required**. Text that overflows the box is detected and warned — adjust layout or content to fit
   - Height guide: 1 line = `fontSize × 3.5`, multiple lines = `lines × fontSize × 2.7` (varies with afterSpace etc.)
 - `fontFamily`: font name (omit to use theme default)
 
@@ -280,65 +280,9 @@ Height includes the language label (22px). Code body height is `height - 22`.
 ```
 
 ### table
-```json
-{
-  "type": "table",
-  "x": 58, "y": 270, "width": 1804, "height": 250,
-  "colWidths": [400, 500, 300, 604],
-  "rowHeights": [50, 50, 50],
-  "firstRow": true, "bandRow": true,
-  "tableStyle": "Medium Style 2 - Accent 1",
-  "headers": [
-    {"text": "Service", "align": "center", "bold": true, "fontSize": 14, "fontColor": "#FFFFFF", "fill": "#232F3E"},
-    "Column 2"
-  ],
-  "rows": [
-    [
-      {"text": "Lambda", "bold": true, "fontColor": "#FF9900"},
-      {"text": "$120", "align": "right"}
-    ],
-    [
-      {"text": "S3 + CF", "gridSpan": 2},
-      {"merged": true, "text": ""}
-    ]
-  ]
-}
-```
 
-- `height`: auto-calculated from row count when omitted
-- `colWidths`: width of each column (px array). Equal split when omitted
-- `rowHeights`: height of each row (px array). Default when omitted
-- `firstRow`/`lastRow`/`firstCol`/`lastCol`/`bandRow`/`bandCol`: table style flags
-- `tableStyle`: table style by name (from `analyze-template`). Omit to use template default
-- `headers`/`rows` cell values: string (text only) or object (with properties)
-
-**Cell object**:
-```json
-{
-  "text": "Content",
-  "fill": "#232F3E",
-  "fontColor": "#FFFFFF",
-  "fontSize": 14,
-  "bold": true,
-  "italic": true,
-  "align": "center|left|right",
-  "verticalAlign": "top|middle|bottom",
-  "gridSpan": 2,
-  "rowSpan": 2,
-  "merged": true,
-  "margins": {"left": 10, "right": 10, "top": 5, "bottom": 5},
-  "borders": {
-    "left":   {"color": "#FFFFFF", "width": 1.0},
-    "right":  {"color": "#FFFFFF", "width": 1.0},
-    "top":    {"color": "#FFFFFF", "width": 1.0, "fill": "none"},
-    "bottom": {"color": "#FFFFFF", "width": 1.0}
-  }
-}
-```
-
-- `merged: true`: cell consumed by gridSpan/rowSpan (place with empty text)
-- `verticalAlign`: vertical alignment (`top`, `middle`, `bottom`). Default: `middle`
-- Cells without properties can remain as plain strings
+`"type": "table"` — CSS-style cascade styling with `style`, `columnStyles`, `cellOverrides`.
+- Read `guides table` for structure, cascade, CSS properties, and styled samples.
 
 ### image
 ```json
@@ -414,16 +358,21 @@ Height includes the language label (22px). Code body height is `height - 22`.
   "line": "#232F3E",
   "lineWidth": 2,
   "lineGradient": {"angle": 90, "stops": [...]},
+  "lineOpacity": 0.5,
   "dashStyle": "solid|dash|dot|dash_dot|long_dash|square_dot",
   "adjustments": [0.06],
   "rotation": 0,
   "flipH": false,
   "flipV": false,
   "text": "Label",
+  "paragraphs": [{"text": "Title", "fontSize": 24, "align": "center"}, {"text": "Body", "bullet": true}],
   "fontSize": 14,
   "align": "left|center|right",
   "verticalAlign": "top|middle|bottom",
+  "textDirection": "vert270",
   "items": ["Bullet 1", "Bullet 2"],
+  "arrowStart": "arrow|triangle|stealth|oval|diamond|none",
+  "arrowEnd": "arrow|triangle|stealth|oval|diamond|none",
   "link": "https://..."
 }
 ```
@@ -527,9 +476,26 @@ Effects applicable to shape, textbox, and image.
   "dashStyle": "solid|dash|dot|dash_dot|long_dash|square_dot",
   "connectorType": "straight|elbow|curved",
   "elbowStart": "horizontal|vertical",
+  "preset": "bentConnector3",
+  "adjustments": [0.5],
   "arrowStart": "arrow|triangle|stealth|oval|diamond|none",
   "arrowEnd": "arrow|triangle|stealth|oval|diamond|none",
   "lineGradient": {"angle": 0, "stops": [...]}
+}
+```
+
+- `preset`: connector preset name (e.g. `bentConnector3`, `bentConnector4`, `bentConnector5`)
+- `adjustments`: elbow/curved connector waypoints (0–1 ratio array). Auto-selects bentConnector3/4/5 by count
+- `elbowStart`: first segment direction for elbow connectors. `"horizontal"` (default, H-V-H) or `"vertical"` (V-H-V)
+
+**Polyline** (3+ point path):
+```json
+{
+  "type": "line",
+  "points": [[100, 200], [300, 200], [300, 400], [500, 400]],
+  "color": "#FF9900",
+  "lineWidth": 2,
+  "arrowEnd": "triangle"
 }
 ```
 
@@ -557,6 +523,8 @@ Effects applicable to shape, textbox, and image.
 - `paths`: multi-path alternative (array of path arrays or objects with `commands` and `fill`)
 - `customGeometry`: raw XML string also accepted (`path`/`paths` take priority)
 - Supports `fill`, `line`, `lineWidth`, `lineGradient`, `lineOpacity`, `dashStyle`, `opacity`, effects
+- `headEnd`/`tailEnd`: arrow heads on open paths (`"triangle"`, `"arrow"`, `"stealth"`, etc.)
+- `text`, `items`, `fontSize`, `align`, `verticalAlign`, `marginLeft/Top/Right/Bottom`: text inside freeform
 - For command details, control points, multi-path, fill mode, and coordinate system, see `guides freeform`
 
 ### group
@@ -575,16 +543,43 @@ Native PPTX chart (editable in PowerPoint).
 ```json
 {
   "type": "chart",
-  "chartType": "bar|line|pie",
+  "chartType": "bar|line|pie|donut",
   "x": 192, "y": 216, "width": 1536, "height": 700,
   "categories": ["A", "B", "C"],
-  "series": [{"name": "Series 1", "values": [10, 20, 30]}]
+  "series": [{"name": "Series 1", "values": [10, 20, 30], "color": "#FF9900"}],
+  "stacked": false,
+  "horizontal": false,
+  "smooth": false,
+  "markers": true,
+  "legend": true,
+  "dataLabels": false,
+  "numberFormat": "#,##0",
+  "title": "Chart Title",
+  "holeSize": 50
 }
 ```
 
 - `chartType`: `bar`, `line`, `pie`, `donut`
 - Colors, gridlines, and fonts are auto-adjusted from the theme
-- For details, variations, and style overrides, see `guides chart-bar`, `guides chart-line`, `guides chart-pie`
+- `stacked`/`horizontal`: bar variations. `smooth`/`markers`: line variations. `holeSize`: donut only
+- For details, variations, axis control, and style overrides, read the relevant guide:
+  - `guides chart-bar` — bar/column charts
+  - `guides chart-line` — line/trend charts
+  - `guides chart-pie` — pie/donut charts
+
+### video
+
+```json
+{
+  "type": "video",
+  "src": "demo.mp4",
+  "poster": "demo-poster.png",
+  "x": 100, "y": 200, "width": 800, "height": 450
+}
+```
+
+- `src`: video file path (mp4, avi, wmv, mov)
+- `poster`: poster frame image (optional)
 
 ## Styled Text
 
@@ -607,3 +602,7 @@ Native PPTX chart (editable in PowerPoint).
   "text": "{{#888888:<Insert screenshot here>}}"
 }
 ```
+
+## Complete Reference
+
+For the full list of all supported properties (including video, polyline, arch-group, radial gradients, axis control, and more), see `guides json-full-reference`.
