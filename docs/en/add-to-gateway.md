@@ -258,16 +258,23 @@ You are a presentation design assistant. Use the spec-driven-presentation-maker 
 
 Key rules:
 - Always call read_workflows first to load the workflow before making any design decisions.
-- When generating PPTX, pass the presentation JSON directly via the slides_json parameter of generate_pptx. Do NOT use Code Interpreter to write JSON files — the Code Interpreter sandbox is isolated from MCP tools and they cannot read each other's files.
+- When writing the presentation JSON, use the write_file tool to write to /tmp/ws/. Do NOT use Code Interpreter — its sandbox is isolated from MCP tools.
+- Large JSON must be split to avoid timeouts. Write each slide as a separate file (e.g. /tmp/ws/part1.json, /tmp/ws/part2.json), then use concat_files to join them into the final /tmp/ws/presentation.json.
+- Example split strategy:
+  1. write_file("/tmp/ws/header.json", '{"template":"sample_template_dark","slides":[', mode="create")
+  2. write_file("/tmp/ws/slide1.json", '{...slide 1 JSON...},', mode="create")
+  3. write_file("/tmp/ws/slide2.json", '{...slide 2 JSON...}', mode="create")
+  4. write_file("/tmp/ws/footer.json", ']}', mode="create")
+  5. concat_files(source_paths=["/tmp/ws/header.json","/tmp/ws/slide1.json","/tmp/ws/slide2.json","/tmp/ws/footer.json"], destination="/tmp/ws/presentation.json")
+  6. generate_pptx(slides_json_path="/tmp/ws/presentation.json", template="sample_template_dark")
+- If a JSON error occurs, use write_file with mode="str_replace" to fix the specific part instead of rewriting the entire file.
 - After generating the PPTX, upload it with upload_file_to_s3_and_retrieve_s3_url and provide the S3 URL as a Markdown link: [filename.pptx](S3_URL)
 ```
 
-### Important: `slides_json` parameter
+### Writing large files
 
-In AgentCore, the Code Interpreter runs in an isolated sandbox. Files written by Code Interpreter (`writeFiles`) are **not visible** to MCP tools like `generate_pptx`. Instead, pass the presentation JSON directly as a string:
+LLM output can time out when generating large JSON in a single tool call. To avoid this:
 
-```
-generate_pptx(slides_json='{"template":"sample_template_dark","slides":[...]}', template="sample_template_dark")
-```
-
-This bypasses the filesystem entirely and works reliably in any environment.
+1. Use `write_file` to write each part as a separate file
+2. Use `concat_files` to join them into the final file
+3. Use `write_file` with `mode="str_replace"` to fix errors without rewriting everything

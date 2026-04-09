@@ -248,16 +248,23 @@ AgentBuilder でエージェントを作成する際、MCP サーバーリスト
 
 重要なルール:
 - デザインの決定を行う前に、必ず read_workflows を呼び出してワークフローを読み込んでください。
-- PPTX を生成する際は、generate_pptx の slides_json パラメータに JSON 文字列を直接渡してください。Code Interpreter でファイルを書き出さないでください — Code Interpreter のサンドボックスと MCP ツールのファイルシステムは分離されており、互いのファイルを読めません。
+- プレゼンテーション JSON の書き込みには write_file ツールを使い、/tmp/ws/ に出力してください。Code Interpreter は使わないでください — サンドボックスが MCP ツールと分離されています。
+- 大きな JSON はタイムアウトを避けるため分割して書いてください。各スライドを別ファイルとして書き出し（例: /tmp/ws/part1.json, /tmp/ws/part2.json）、最後に concat_files で /tmp/ws/presentation.json に結合してください。
+- 分割の例:
+  1. write_file("/tmp/ws/header.json", '{"template":"sample_template_dark","slides":[', mode="create")
+  2. write_file("/tmp/ws/slide1.json", '{...スライド1のJSON...},', mode="create")
+  3. write_file("/tmp/ws/slide2.json", '{...スライド2のJSON...}', mode="create")
+  4. write_file("/tmp/ws/footer.json", ']}', mode="create")
+  5. concat_files(source_paths=["/tmp/ws/header.json","/tmp/ws/slide1.json","/tmp/ws/slide2.json","/tmp/ws/footer.json"], destination="/tmp/ws/presentation.json")
+  6. generate_pptx(slides_json_path="/tmp/ws/presentation.json", template="sample_template_dark")
+- JSON にエラーがある場合は、write_file の mode="str_replace" で該当箇所だけ修正してください。ファイル全体を書き直す必要はありません。
 - PPTX 生成後、upload_file_to_s3_and_retrieve_s3_url でアップロードし、S3 URL を Markdown リンク形式で提示してください: [ファイル名.pptx](S3_URL)
 ```
 
-### 重要: `slides_json` パラメータ
+### 大きなファイルの書き込み
 
-AgentCore では、Code Interpreter は隔離されたサンドボックスで動作します。Code Interpreter の `writeFiles` で書いたファイルは `generate_pptx` などの MCP ツールからは**見えません**。代わりに、JSON 文字列を直接渡してください：
+LLM の出力は1回のツール呼び出しで大きな JSON を生成するとタイムアウトする場合があります。これを回避するには：
 
-```
-generate_pptx(slides_json='{"template":"sample_template_dark","slides":[...]}', template="sample_template_dark")
-```
-
-ファイルシステムを経由しないため、どの環境でも確実に動作します。
+1. `write_file` で各パーツを別ファイルとして書き出す
+2. `concat_files` で最終ファイルに結合する
+3. エラー修正には `write_file` の `mode="str_replace"` を使い、全体の書き直しを避ける
