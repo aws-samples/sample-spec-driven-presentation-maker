@@ -13,10 +13,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
 import json
-import re
-from datetime import datetime
-
-from pptx import Presentation
 
 from sdpm.assets import (  # noqa: F401
     ICON_DIR,
@@ -27,11 +23,6 @@ from sdpm.assets import (  # noqa: F401
     resolve_asset_path,
     resolve_icon_path,
     search_assets,
-)
-from sdpm.builder import (
-    PPTXBuilder,
-    resolve_override,
-    validate_icons_in_json,
 )
 from sdpm.diff import (
     _diff_value,
@@ -47,15 +38,7 @@ from sdpm.layout import (
     _layout_translate,
     box_to_elements,
 )
-from sdpm.preview import (
-    _is_wsl,
-    check_layout_imbalance,
-    export_pdf,
-    get_tmp_project_dir,
-    refresh_autofit,
-    unlock_height_constraints,
-)
-from sdpm.reference import _get_description
+from sdpm.preview import _is_wsl
 from sdpm.utils.effects import apply_effects  # noqa: F401
 from sdpm.utils.image import apply_image_effects, resolve_image_path  # noqa: F401
 from sdpm.utils.io import read_json, write_json
@@ -91,86 +74,49 @@ def _resolve_template(data, input_path):
 
 def cmd_generate(args):
     """Generate PPTX from JSON."""
-    # Read input data first
-    if args.input and args.input != "-":
-        data = read_json(Path(args.input))
-    else:
-        data = json.load(sys.stdin)
+    from sdpm.api import generate
+    from sdpm.preview import get_tmp_project_dir
 
-    template, custom_template = _resolve_template(
-        data,
-        args.input if hasattr(args, 'input') else None
-    )
-
-    if not template.exists():
-        print(f"Error: Template not found: {template}", file=sys.stderr)
+    try:
+        result = generate(
+            json_path=args.input if args.input and args.input != "-" else None,
+            output_path=args.output,
+            no_autofit=args.no_autofit,
+            no_preview=args.no_preview,
+        )
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        if "Missing assets" in str(e):
+            print("", file=sys.stderr)
+            print("Run the following command to download assets:", file=sys.stderr)
+            print("  python3 scripts/download_aws_icons.py", file=sys.stderr)
+            print("  python3 scripts/download_material_icons.py", file=sys.stderr)
         sys.exit(1)
 
-    missing_icons = validate_icons_in_json(data)
-    if missing_icons:
-        print(f"Error: Missing assets ({len(missing_icons)}):", file=sys.stderr)
-        for icon in sorted(missing_icons):
-            print(f"  - {icon}", file=sys.stderr)
-        print("", file=sys.stderr)
-        print("Run the following command to download assets:", file=sys.stderr)
-        print("  python3 scripts/download_aws_icons.py", file=sys.stderr)
-        print("  python3 scripts/download_material_icons.py", file=sys.stderr)
-        sys.exit(1)
+    print(f"Generated: {Path(result['output_path']).resolve()}")
+    for line in result["slides"]:
+        print(line)
 
-    base_dir = Path(args.input).parent if args.input and args.input != "-" else Path(".")
-    builder = PPTXBuilder(template, custom_template=custom_template,
-                          fonts=data.get("fonts"), base_dir=base_dir,
-                          keep_empty_placeholders=getattr(args, 'keep_empty_placeholders', False),
-                          default_text_color=data.get("defaultTextColor"))
-    slides = data.get("slides", [])
-
-    id_map = {}
-    for slide_def in slides:
-        if "id" in slide_def:
-            sid = slide_def["id"]
-            if sid in id_map:
-                print(f"Error: Duplicate slide id: {sid}", file=sys.stderr)
-                sys.exit(1)
-            id_map[sid] = slide_def
-
-    for slide_def in slides:
-        resolved = resolve_override(slide_def, id_map)
-        builder.add_slide(resolved)
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    p = Path(args.output)
-    output_path = p.with_stem(f"{p.stem}_{ts}")
-    builder.save(output_path)
-
-    print(f"Generated: {output_path.resolve()}")
-    for i, slide_def in enumerate(slides, 1):
-        title = (slide_def.get("placeholders") or {}).get("0", "(no title)")
-        if isinstance(title, dict):
-            title = title.get("text", "(no title)")
-        print(f"page{i:02d} - {title}")
-
-    pdf_path = None
-    if not args.no_autofit:
-        pptx_path = output_path.resolve()
-        if not args.no_preview:
-            preview_dir = Path("/tmp/pptx-preview")
-            preview_dir.mkdir(parents=True, exist_ok=True)
-            pdf_path = preview_dir / "slides.pdf"
-        refresh_autofit(pptx_path, pdf_path=pdf_path)
-        unlock_height_constraints(pptx_path)
-    check_layout_imbalance(output_path, slides)
-
-    tmp_project = None
-    if args.input and args.input != "-":
-        tmp_project = get_tmp_project_dir(args.input)
+    if result["warnings"]:
+        print(f"⚠️  Layout bias detected ({len(result['warnings'])} slides):")
+        for w in result["warnings"]:
+            print(f"  {w}")
+        print("  → MUST FIX unless the layout type is intentionally asymmetric.")
 
     if not args.no_preview:
+        tmp_project = None
+        if args.input and args.input != "-":
+            tmp_project = get_tmp_project_dir(args.input)
         preview_dir = tmp_project / 'preview' if tmp_project else Path("/tmp/pptx-preview")
         preview_dir.mkdir(parents=True, exist_ok=True)
         preview_args = argparse.Namespace(
-            input=str(output_path),
+            input=str(result["output_path"]),
             pages=None,
             no_grid=True,
-            _pdf_path=str(pdf_path) if pdf_path and pdf_path.exists() else None,
+            _pdf_path=result.get("pdf_path"),
             _output_dir=str(preview_dir),
         )
         cmd_preview(preview_args)
@@ -198,146 +144,40 @@ def _export_png_win32(pptx_path, output_dir):
     return png_dir
 def cmd_preview(args):
     """Export PPTX slides as PNG images."""
-    import glob
-    import subprocess
-    
+    from sdpm.api import preview as api_preview
+
     pptx_path = Path(args.input).resolve()
-    
-    if _is_wsl() or sys.platform == "win32":
-        output_dir = pptx_path.parent / "preview"
-    elif hasattr(args, '_output_dir') and args._output_dir:
-        output_dir = Path(args._output_dir)
-    else:
-        output_dir = Path("/tmp/pptx-preview")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
     if not pptx_path.exists():
         print(f"Error: File not found: {pptx_path}", file=sys.stderr)
         sys.exit(1)
-    
-    if sys.platform == "win32":
-        # Windows native: direct PNG export via COM
-        png_dir = _export_png_win32(pptx_path, output_dir)
-        
-        # Parse pages to export
-        pages_to_export = None
-        if args.pages:
-            pages_to_export = set(int(p.strip()) for p in args.pages.split(","))
-        
-        # Collect PNGs from PowerPoint output
-        png_files = sorted(glob.glob(str(png_dir / "**" / "*.png"), recursive=True))
-        if not png_files:
-            png_files = sorted(glob.glob(str(png_dir / "**" / "*.PNG"), recursive=True))
-        
-        # Rename with slide titles
-        prs = Presentation(str(pptx_path))
-        titles = {}
-        for i, slide in enumerate(prs.slides, 1):
-            title = ""
-            if slide.shapes.title:
-                title = slide.shapes.title.text.strip().replace("\n", " ")[:30]
-            title = re.sub(r'[\\/:*?"<>|]', '', title)
-            titles[i] = title or "notitle"
-        
-        generated = []
-        for idx, png in enumerate(png_files, 1):
-            if pages_to_export and idx not in pages_to_export:
-                Path(png).unlink()
-                continue
-            new_name = f"page{idx:02d}-{titles.get(idx, 'notitle')}.png"
-            new_path = output_dir / new_name
-            Path(png).rename(new_path)
-            generated.append(new_path)
-        
-        # Cleanup temp PNG dir
-        import shutil
-        shutil.rmtree(png_dir, ignore_errors=True)
-    else:
-        # PDF + pdftoppm pipeline (macOS / WSL / Linux)
-        pdf_path = output_dir / "slides.pdf"
-        pre_generated_pdf = getattr(args, '_pdf_path', None)
-        
-        if pre_generated_pdf and Path(pre_generated_pdf).exists():
-            import shutil
-            if str(Path(pre_generated_pdf).resolve()) != str(pdf_path.resolve()):
-                shutil.copy2(pre_generated_pdf, pdf_path)
-        else:
-            if not export_pdf(pptx_path, pdf_path):
-                print("Error: PDF export failed", file=sys.stderr)
-                sys.exit(1)
-        
-        # Parse pages to export
-        pages_to_export = None
-        if args.pages:
-            pages_to_export = set(int(p.strip()) for p in args.pages.split(","))
-        
-        # PDF -> PNG via pdftoppm (max 1280px wide for compact preview)
-        cmd = ["pdftoppm", "-png", "-scale-to", "1280", str(pdf_path), str(output_dir / "page")]
-        result = subprocess.run(cmd, capture_output=True, text=True)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-        if result.returncode != 0:
-            print(f"Error: PNG conversion failed: {result.stderr}", file=sys.stderr)
-            sys.exit(1)
-        
-        # Rename with slide titles
-        prs = Presentation(str(pptx_path))
-        titles = {}
-        for i, slide in enumerate(prs.slides, 1):
-            title = ""
-            if slide.shapes.title:
-                title = slide.shapes.title.text.strip().replace("\n", " ")[:30]
-            title = re.sub(r'[\\/:*?"<>|]', '', title)
-            titles[i] = title or "notitle"
-        
-        generated = []
-        for png in sorted(glob.glob(str(output_dir / "page-*.png"))):
-            basename = Path(png).name
-            match = re.match(r'page-(\d+)\.png', basename)
-            if match:
-                num = int(match.group(1))
-                if pages_to_export and num not in pages_to_export:
-                    Path(png).unlink()
-                    continue
-                new_name = f"page{num:02d}-{titles.get(num, 'notitle')}.png"
-                new_path = output_dir / new_name
-                Path(png).rename(new_path)
-                generated.append(new_path)
-        
-        # Cleanup PDF
-        pdf_path.unlink()
-    
-    # Add grid overlay unless disabled
-    if not args.no_grid:
-        from PIL import Image, ImageDraw, ImageFont
-        color = (255, 0, 0, 128)
-        try:
-            font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 24)
-        except Exception:
-            try:
-                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
-            except Exception:
-                font = ImageFont.load_default()
-        
-        for png_path in generated:
-            img = Image.open(png_path).convert("RGBA")
-            w, h = img.size
-            overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(overlay)
-            for pct in range(5, 100, 5):
-                x, y = int(w * pct / 100), int(h * pct / 100)
-                px_x, px_y = int(1920 * pct / 100), int(1080 * pct / 100)
-                draw.line([(x, 0), (x, h)], fill=color, width=1)
-                draw.line([(0, y), (w, y)], fill=color, width=1)
-                if pct % 10 == 0:
-                    draw.text((x + 4, 4), f"{px_x}px ({pct}%)", fill=color, font=font)
-                    draw.text((4, y + 4), f"{px_y}px ({pct}%)", fill=color, font=font)
-            Image.alpha_composite(img, overlay).convert("RGB").save(png_path)
-    
-    for path in generated:
+
+    pages_list = None
+    if args.pages:
+        pages_list = [int(p.strip()) for p in args.pages.split(",")]
+
+    # Determine output dir
+    output_dir = None
+    if hasattr(args, '_output_dir') and args._output_dir:
+        output_dir = args._output_dir
+
+    pre_pdf = getattr(args, '_pdf_path', None)
+
+    try:
+        result = api_preview(
+            pptx_path=pptx_path,
+            pages=pages_list,
+            output_dir=output_dir,
+            grid=not args.no_grid,
+            pdf_path=pre_pdf,
+        )
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    for path in result["files"]:
         print(f"Generated: {path}")
-    if generated:
-        print(f"Preview: {generated[0].parent}")
-    if generated:
-        print(f"Preview: {generated[0].parent}")
+    if result["files"]:
+        print(f"Preview: {result['preview_dir']}")
 
 
 
@@ -356,7 +196,6 @@ def cmd_search_assets(args):
 
 
 # Backward-compatible alias
-cmd_icon_search = cmd_search_assets
 
 
 def cmd_list_asset_sources(args):
@@ -385,101 +224,6 @@ def cmd_list_templates(args):
         print(f"  {t.stem}")
 
 
-def _list_or_show(category_dir, names, category_label):
-    """List or show documents in a category directory.
-
-    Supports two layouts:
-    - Categorized: subdirectories as categories, names use 'category/name' format
-    - Flat: files directly in category_dir, names use plain 'name' format
-
-    Args:
-        category_dir: Path to the category directory.
-        names: List of names to show. Empty list shows the listing.
-        category_label: Display label (e.g. "Examples").
-    """
-    if not category_dir.exists():
-        print(f"Directory not found: {category_dir}", file=sys.stderr)
-        return
-
-    # Discover subdirectories as categories
-    subdirs = sorted(d for d in category_dir.iterdir() if d.is_dir())
-    flat = not subdirs
-    root_files = _collect_files(category_dir) if flat else {}
-
-    if names:
-        for name in names:
-            if flat or '/' not in name:
-                # Flat mode: look up directly in category_dir
-                files = root_files if flat else {}
-                if not flat:
-                    # Categorized mode but no slash — try to find in subdirs
-                    for sd in subdirs:
-                        files = _collect_files(sd)
-                        if name in files:
-                            print(f"# Format: category/name (e.g. {sd.name}/{name})", file=sys.stderr)
-                            break
-                    else:
-                        print(f"# Format: category/name (e.g. pattern/{name})", file=sys.stderr)
-                    continue
-                doc = files.get(name)
-                if not doc:
-                    print(f"# Not found: {name}", file=sys.stderr)
-                    print(f"# Available: {', '.join(sorted(files.keys()))}", file=sys.stderr)
-                    continue
-            else:
-                cat, stem = name.split('/', 1)
-                sub = category_dir / cat
-                if not sub.is_dir():
-                    cats = [d.name for d in subdirs]
-                    print(f"# Category not found: {cat}", file=sys.stderr)
-                    print(f"# Available: {', '.join(cats)}", file=sys.stderr)
-                    continue
-                files = _collect_files(sub)
-                doc = files.get(stem)
-                if not doc:
-                    print(f"# Not found: {name}", file=sys.stderr)
-                    print(f"# Available in {cat}/: {', '.join(sorted(files.keys()))}", file=sys.stderr)
-                    continue
-            if doc.suffix == '.md':
-                text = doc.read_text(encoding="utf-8")
-                # Strip YAML frontmatter
-                lines = text.splitlines(True)
-                if lines and lines[0].strip() == '---':
-                    for i, line in enumerate(lines[1:], 1):
-                        if line.strip() == '---':
-                            text = ''.join(lines[i + 1:]).lstrip('\n')
-                            break
-                print(text)
-            print()
-    else:
-        print(f"# {category_label}")
-        if flat:
-            for stem in sorted(root_files.keys()):
-                f = root_files[stem]
-                desc = _get_description(f) or stem
-                print(f"  {stem:<36} {desc}")
-        else:
-            for sd in subdirs:
-                files = _collect_files(sd)
-                if not files:
-                    continue
-                print(f"\n## {sd.name.title()}")
-                for stem in sorted(files.keys()):
-                    f = files[stem]
-                    desc = _get_description(f) or stem
-                    print(f"  {sd.name}/{stem:<28} {desc}")
-
-
-def _collect_files(directory):
-    """Collect md/pptx files in directory. md takes priority over pptx for same stem."""
-    files = {}
-    for f in sorted(directory.glob("*.pptx")):
-        files[f.stem] = f
-    for f in sorted(directory.glob("*.md")):
-        files[f.stem] = f
-    return files
-
-
 def cmd_search_patterns(args):
     """Search patterns by keywords."""
     from sdpm.reference import search_patterns
@@ -494,7 +238,7 @@ def cmd_search_patterns(args):
 
 def cmd_examples(args):
     """List or show design examples (components/patterns/styles)."""
-    from sdpm.reference import get_pptx_notes, list_pptx_descriptions
+    from sdpm.reference import list_styles, open_styles_gallery, read_docs
 
     examples_dir = Path(__file__).parent.parent / "references" / "examples"
     if not examples_dir.exists():
@@ -511,33 +255,29 @@ def cmd_examples(args):
         base = parts[0]
         sub = parts[1] if len(parts) > 1 else None
 
-        # styles/ directory — always show full content
+        # styles/ directory
         if base == "styles":
             styles_dir = examples_dir / "styles"
             if not styles_dir.exists():
                 print("# Not found: styles/", file=sys.stderr)
                 continue
             if sub is None:
-                # List styles
-                for f in sorted(styles_dir.iterdir()):
-                    if f.suffix == '.html' and not f.name.startswith('.'):
-                        from sdpm.reference import _get_description
-                        desc = _get_description(f)
-                        print(f"  styles/{f.stem}  {desc}")
-                # Open index in browser unless --no-browse
+                for s in list_styles(styles_dir):
+                    print(f"  styles/{s['name']}  {s['description']}")
                 if not args.no_browse:
-                    import webbrowser
-                    from sdpm.reference import generate_styles_index
-                    index_path = generate_styles_index(styles_dir)
-                    if index_path.exists():
-                        webbrowser.open(index_path.as_uri())
+                    open_styles_gallery(styles_dir)
             else:
                 print("# Copy a style to your project: cp references/examples/styles/{name}.html specs/art-direction.html", file=sys.stderr)
             continue
 
-        # pptx files (components, patterns) — directory-like behavior
-        pptx_path = examples_dir / f"{base}.pptx"
-        if not pptx_path.is_file():
+        # pptx files (components, patterns)
+        query = f"{base}/{sub}" if sub else base
+        try:
+            docs = read_docs(examples_dir, [query])
+            for doc in docs:
+                print(doc["content"])
+                print()
+        except FileNotFoundError:
             print(f"# Not found: {base}", file=sys.stderr)
             cats = []
             for f in sorted(examples_dir.iterdir()):
@@ -546,40 +286,40 @@ def cmd_examples(args):
                 elif f.is_dir() and not f.name.startswith('.'):
                     cats.append(f"{f.name}/")
             print(f"# Available: {', '.join(cats)}", file=sys.stderr)
-            continue
-
-        if sub is None:
-            # List slides
-            for page, desc in list_pptx_descriptions(str(pptx_path)):
-                print(f"  {page:>3}  {desc}")
-        elif sub == "all":
-            # All notes
-            for _, notes in get_pptx_notes(str(pptx_path)):
-                print(notes)
-                print()
-        else:
-            # Specific pages
-            try:
-                pages = [int(p.strip()) for p in sub.split(",")]
-            except ValueError:
-                print(f"# Invalid page: {sub}", file=sys.stderr)
-                continue
-            results = get_pptx_notes(str(pptx_path), pages=pages)
-            if not results:
-                print(f"# No notes found for page(s): {sub}", file=sys.stderr)
-            for _, notes in results:
-                print(notes)
-                print()
 
 
 def cmd_workflows(args):
     """List or show workflow documents."""
-    _list_or_show(Path(__file__).parent.parent / "references" / "workflows", args.names, "Workflows")
+    from sdpm.reference import list_category, read_docs
+    d = Path(__file__).parent.parent / "references" / "workflows"
+    if not args.names:
+        print("# Workflows")
+        for item in list_category(d):
+            print(f"  {item['name']:<36} {item['description']}")
+    else:
+        try:
+            for doc in read_docs(d, args.names):
+                print(doc["content"])
+                print()
+        except FileNotFoundError as e:
+            print(f"# {e}", file=sys.stderr)
 
 
 def cmd_guides(args):
     """List or show guide documents."""
-    _list_or_show(Path(__file__).parent.parent / "references" / "guides", args.names, "Guides")
+    from sdpm.reference import list_category, read_docs
+    d = Path(__file__).parent.parent / "references" / "guides"
+    if not args.names:
+        print("# Guides")
+        for item in list_category(d):
+            print(f"  {item['name']:<36} {item['description']}")
+    else:
+        try:
+            for doc in read_docs(d, args.names):
+                print(doc["content"])
+                print()
+        except FileNotFoundError as e:
+            print(f"# {e}", file=sys.stderr)
 
 
 def _get_documents_dir():
@@ -607,28 +347,18 @@ def _get_documents_dir():
 
 
 def cmd_init(args):
-    if args.output:
-        out_dir = Path(args.output).expanduser()
-    else:
-        ts = datetime.now().strftime("%Y%m%d-%H%M")
-        name = f"{ts}-{args.name}" if args.name else ts
-        out_dir = _get_documents_dir() / name
-    out_dir.mkdir(parents=True, exist_ok=True)
-    pres_data = {"fonts": {"fullwidth": None, "halfwidth": None}, "slides": []}
-    json_path = out_dir / "presentation.json"
-    write_json(json_path, pres_data, suffix="\n")
-    specs_dir = out_dir / "specs"
-    specs_dir.mkdir(exist_ok=True)
-    spec_files = ["brief.md", "outline.md"]
-    for name in spec_files:
-        (specs_dir / name).touch()
-    print(f"output_json: {json_path}")
-    for name in spec_files:
-        print(f"specs:       {specs_dir / name}")
+    from sdpm.api import init
+    result = init(
+        name=args.name or "",
+        output_dir=args.output if hasattr(args, 'output') and args.output else None,
+    )
+    print(f"output_json: {result['json_path']}")
+    for f in result["workspace"]:
+        if f.startswith("specs/"):
+            print(f"specs:       {Path(result['output_dir']) / f}")
 def cmd_code_block(args):
     """Generate elements JSON for a syntax-highlighted code block."""
-    from sdpm.builder.constants import CODE_COLORS
-    from sdpm.utils.text import highlight_code
+    from sdpm.api import code_block
 
     if args.input == "-":
         import sys as _sys
@@ -636,53 +366,15 @@ def cmd_code_block(args):
     else:
         code = Path(args.input).read_text(encoding="utf-8")
 
-    language = args.language or "text"
-    theme = args.theme or "dark"
-    x = args.x or 0
-    y = args.y or 0
-    width = args.width or 800
-    height = args.height or 300
-    label_height = 22
-    show_label = not args.no_label
-
-    colors = CODE_COLORS.get(theme, CODE_COLORS["dark"])
-    bg = colors["background"]
-    inverse_theme = "light" if theme == "dark" else "dark"
-    inverse_bg = f"#{CODE_COLORS[inverse_theme]['background'].lstrip('#')}" if isinstance(CODE_COLORS[inverse_theme]['background'], str) else CODE_COLORS[inverse_theme]['background']
-    # Resolve string hex colors
-    if isinstance(bg, str):
-        bg_hex = bg
-    else:
-        bg_hex = f"#{bg:06x}" if isinstance(bg, int) else bg
-
-    highlighted = highlight_code(code, language, theme)
-    label_map = {"typescript": "TypeScript", "javascript": "JavaScript", "csharp": "C#", "cpp": "C++"}
-    label_text = label_map.get(language, language.capitalize())
-
-    elements = []
-    if show_label:
-        elements.append({
-            "type": "textbox",
-            "x": x, "y": y, "width": width, "height": label_height,
-            "fontSize": 8, "align": "left",
-            "fill": inverse_bg,
-            "text": f"{{{{#{'000000' if theme == 'dark' else 'FFFFFF'}:{label_text}}}}}",
-            "marginLeft": 50000, "marginTop": 0, "marginRight": 0, "marginBottom": 0,
-            "autoWidth": True,
-        })
-        code_y = y + label_height
-        code_height = height - label_height
-    else:
-        code_y = y
-        code_height = height
-
-    elements.append({
-        "type": "textbox",
-        "x": x, "y": code_y, "width": width, "height": code_height,
-        "fontSize": args.font_size or 12, "align": "left",
-        "fill": bg_hex,
-        "text": highlighted,
-    })
+    elements = code_block(
+        code=code,
+        language=args.language or "text",
+        theme=args.theme or "dark",
+        x=args.x or 0, y=args.y or 0,
+        width=args.width or 800, height=args.height or 300,
+        font_size=args.font_size or 12,
+        show_label=not args.no_label,
+    )
 
     output = {"elements": elements}
     out_str = json.dumps(output, ensure_ascii=False, indent=2)
@@ -1150,7 +842,6 @@ def cmd_image_size(args):
 def cmd_grid(args):
     """Compute CSS Grid layout coordinates."""
     from sdpm.layout.grid import compute_grid
-    from sdpm.utils.io import read_json, write_json
 
     if args.input == "-":
         spec = json.loads(sys.stdin.read())
@@ -1278,13 +969,7 @@ def main():
     p_search.add_argument("-t", "--type", help="Filter by type (e.g. service, resource)")
     p_search.add_argument("--theme", choices=["light", "dark"], help="Filter by theme (light/dark)")
 
-    # Backward-compatible alias
-    p_icon = subparsers.add_parser("icon-search", help="Search assets (alias for search-assets)")
-    p_icon.add_argument("query", help="Search keywords (space-separated)")
-    p_icon.add_argument("-n", "--limit", type=int, default=20, help="Max results (default: 20)")
-    p_icon.add_argument("-s", "--source", help="Filter by source (e.g. aws, material)")
-    p_icon.add_argument("-t", "--type", help="Filter by type (e.g. service, resource)")
-    p_icon.add_argument("--theme", choices=["light", "dark"], help="Filter by theme (light/dark)")
+    # Backward-compatible alias removed (icon-search was alias for search-assets)
 
     subparsers.add_parser("list-asset-sources", help="List available asset sources")
     subparsers.add_parser("list-templates", help="List available PPTX templates")
@@ -1355,8 +1040,6 @@ def main():
         cmd_preview(args)
     elif args.command == "search-assets":
         cmd_search_assets(args)
-    elif args.command == "icon-search":
-        cmd_icon_search(args)
     elif args.command == "list-asset-sources":
         cmd_list_asset_sources(args)
     elif args.command == "list-templates":
