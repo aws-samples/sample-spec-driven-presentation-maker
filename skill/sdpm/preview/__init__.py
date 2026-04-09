@@ -13,13 +13,13 @@ from pptx import Presentation
 from .backend import _is_wsl as _is_wsl, detect_backend
 
 
-def refresh_autofit(pptx_path, pdf_path=None):
+def refresh_autofit(pptx_path, pdf_path=None, pre_autofit_pdf=None):
     """Refresh autofit via detected presentation backend."""
     backend = detect_backend()
     if backend is None:
         print("Warning: Autofit refresh skipped (no presentation app available)", file=sys.stderr)
         return False
-    result = backend.refresh_autofit(Path(pptx_path), Path(pdf_path) if pdf_path else None)
+    result = backend.refresh_autofit(Path(pptx_path), Path(pdf_path) if pdf_path else None, pre_autofit_pdf=Path(pre_autofit_pdf) if pre_autofit_pdf else None)
     if not result:
         print(f"Warning: Autofit refresh failed ({backend.name})", file=sys.stderr)
     return result

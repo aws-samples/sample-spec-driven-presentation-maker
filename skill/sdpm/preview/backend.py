@@ -21,7 +21,7 @@ class PresentationBackend:
         """Export PPTX to PDF. Returns True on success."""
         raise NotImplementedError
 
-    def refresh_autofit(self, pptx_path: Path, pdf_path: Path | None = None) -> bool:
+    def refresh_autofit(self, pptx_path: Path, pdf_path: Path | None = None, pre_autofit_pdf: Path | None = None) -> bool:
         """Refresh autofit and optionally export PDF. Returns True on success."""
         raise NotImplementedError
 
@@ -54,9 +54,9 @@ class PowerPointBackend(PresentationBackend):
             return self._win_export_pdf(pptx_path, pdf_path)
         return False
 
-    def refresh_autofit(self, pptx_path: Path, pdf_path: Path | None = None) -> bool:
+    def refresh_autofit(self, pptx_path: Path, pdf_path: Path | None = None, pre_autofit_pdf: Path | None = None) -> bool:
         if sys.platform == "darwin":
-            return self._mac_refresh_autofit(pptx_path, pdf_path)
+            return self._mac_refresh_autofit(pptx_path, pdf_path, pre_autofit_pdf=pre_autofit_pdf)
         elif sys.platform == "win32":
             return self._win_refresh_autofit(pptx_path, pdf_path)
         elif _is_wsl():
@@ -106,7 +106,13 @@ class PowerPointBackend(PresentationBackend):
 
     # --- macOS AppleScript helpers ---
 
-    def _mac_refresh_autofit(self, pptx_path: Path, pdf_path: Path | None) -> bool:
+    def _mac_refresh_autofit(self, pptx_path: Path, pdf_path: Path | None, pre_autofit_pdf: Path | None = None) -> bool:
+        pre_pdf_lines = ""
+        if pre_autofit_pdf:
+            pre_pdf_lines = f'''
+                set preOutPath to (POSIX file "{pre_autofit_pdf}") as text
+                save pres in preOutPath as save as PDF
+            '''
         pdf_lines = ""
         if pdf_path:
             pdf_lines = f'''
@@ -122,6 +128,7 @@ class PowerPointBackend(PresentationBackend):
             tell application "Microsoft PowerPoint"
                 set pres to presentation "{pptx_name}"
                 set slideCount to count of slides of pres
+                {pre_pdf_lines}
                 if (count of shapes of slide 1 of pres) > 0 then
                     set sh to shape 1 of slide 1 of pres
                     set w to width of sh
@@ -274,7 +281,7 @@ class LibreOfficeBackend(PresentationBackend):
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    def refresh_autofit(self, pptx_path: Path, pdf_path: Path | None = None) -> bool:
+    def refresh_autofit(self, pptx_path: Path, pdf_path: Path | None = None, pre_autofit_pdf: Path | None = None) -> bool:
         from .autofit import extract_scaling, unlock_autofit
         tmp_dir = tempfile.mkdtemp()
         try:
