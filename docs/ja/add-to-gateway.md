@@ -226,3 +226,34 @@ npx -w packages/cdk cdk deploy --all
 ```
 
 エージェントは sdpm の `server_instructions` に従ってプレゼンテーションワークフロー（ヒアリング → アウトライン → コンポーズ → レビュー → 生成）を実行し、生成された PPTX を S3 にアップロードしてダウンロード URL を返します。
+
+### 使い方: AgentCore チャット
+
+AgentCore チャットはそのまま動作します。エージェントは `mcp.json` 経由で sdpm ツールを自動検出し、`server_instructions` を受け取ります。リクエストを入力するだけです：
+
+```
+AWS Lambdaについて1枚のエグゼクティブ向けスライドを作って
+```
+
+### 使い方: AgentBuilder
+
+AgentBuilder でエージェントを作成する際、MCP サーバーリストから `spec-driven-presentation-maker` を選択し、以下のシステムプロンプトを設定してください：
+
+```
+あなたはプレゼンテーション設計アシスタントです。spec-driven-presentation-maker の MCP ツールを使って PowerPoint スライドを作成してください。
+
+重要なルール:
+- デザインの決定を行う前に、必ず read_workflows を呼び出してワークフローを読み込んでください。
+- PPTX を生成する際は、generate_pptx の slides_json パラメータに JSON 文字列を直接渡してください。Code Interpreter でファイルを書き出さないでください — Code Interpreter のサンドボックスと MCP ツールのファイルシステムは分離されており、互いのファイルを読めません。
+- PPTX 生成後、upload_file_to_s3_and_retrieve_s3_url でアップロードし、S3 URL を Markdown リンク形式で提示してください: [ファイル名.pptx](S3_URL)
+```
+
+### 重要: `slides_json` パラメータ
+
+AgentCore のようなサンドボックス環境では、Code Interpreter は隔離されたサンドボックスで動作します。Code Interpreter の `writeFiles` で書いたファイルは `generate_pptx` などの MCP ツールからは**見えません**。代わりに、JSON 文字列を直接渡してください：
+
+```
+generate_pptx(slides_json='{"template":"sample_template_dark","slides":[...]}', template="sample_template_dark")
+```
+
+ファイルシステムを経由しないため、どの環境でも確実に動作します。

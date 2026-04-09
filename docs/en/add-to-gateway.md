@@ -233,3 +233,34 @@ User → GenU Web UI → Strands Agent (AgentCore Runtime)
 ```
 
 The agent follows sdpm's `server_instructions` to execute the presentation workflow (briefing → outline → compose → review → generate), then uploads the resulting PPTX to S3 and returns the download URL.
+
+### Usage: AgentCore Chat
+
+AgentCore Chat works out of the box — the agent automatically discovers sdpm tools via `mcp.json` and receives `server_instructions`. Simply type your request:
+
+```
+AWS Lambdaについて1枚のエグゼクティブ向けスライドを作って
+```
+
+### Usage: AgentBuilder
+
+When creating an agent in AgentBuilder, select `spec-driven-presentation-maker` from the MCP server list and add the following system prompt:
+
+```
+You are a presentation design assistant. Use the spec-driven-presentation-maker MCP tools to create PowerPoint slides.
+
+Key rules:
+- Always call read_workflows first to load the workflow before making any design decisions.
+- When generating PPTX, pass the presentation JSON directly via the slides_json parameter of generate_pptx. Do NOT use Code Interpreter to write JSON files — the Code Interpreter sandbox is isolated from MCP tools and they cannot read each other's files.
+- After generating the PPTX, upload it with upload_file_to_s3_and_retrieve_s3_url and provide the S3 URL as a Markdown link: [filename.pptx](S3_URL)
+```
+
+### Important: `slides_json` parameter
+
+In sandboxed environments like AgentCore, the Code Interpreter runs in an isolated sandbox. Files written by Code Interpreter (`writeFiles`) are **not visible** to MCP tools like `generate_pptx`. Instead, pass the presentation JSON directly as a string:
+
+```
+generate_pptx(slides_json='{"template":"sample_template_dark","slides":[...]}', template="sample_template_dark")
+```
+
+This bypasses the filesystem entirely and works reliably in any environment.
