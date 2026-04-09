@@ -20,7 +20,7 @@ You MUST NOT read the next workflow file until the user explicitly approves the 
 
 ## Constraints
 
-- Design level, tone, and color decisions apply to ALL slides — Phase 2's design MUST be consistent with them
+- Tone and color decisions apply to ALL slides — Phase 2's design MUST be consistent with them
 
 ---
 
@@ -39,7 +39,10 @@ When a style is selected, copy it as the art direction base:
 cp references/examples/styles/{name}.html specs/art-direction.html
 ```
 
-Read `specs/art-direction.html` after copying — understand the design tokens before proceeding.
+Read `specs/art-direction.html` after copying — read the ENTIRE file including all `<body>` content.
+Do NOT truncate at `<head>` or `:root`. The body contains slide composition examples that define
+container styles, card layouts, spacing patterns, and decoration details.
+Internalize the design tokens and visual language now — Phase 2 will not re-read this file.
 
 ### 1. Select and analyze template
 
@@ -97,19 +100,10 @@ Write `specs/art-direction.md` — design direction in prose. Cover color, decor
 density, and impression. This is a human-readable agreement, not a machine-readable spec.
 
 Also confirm:
-- **Design level** — Simple / Standard / Premium. Propose one based on context.
-
-| Level | Name | Use cases | Color | Decoration | Layout tendency |
-|-------|------|-----------|-------|------------|-----------------|
-| 1 | Simple | Internal sharing, tech discussions, weekly reports | White text + 2 accent colors | Minimal | Text & data focused |
-| 2 | Standard | Customer proposals, internal presentations, workshops | 2-3 accent colors, gradient borders | Moderate | Structured, visual grouping |
-| 3 | Premium | Executive presentations, conference talks, new service launches | Multi-color, gradient fills, textGradient | Rich | Visual impact focused |
-
 - **Source materials** — When image assets are provided, read each one with fs_read Image mode to understand the content and determine placement across slides.
 
 #### Constraints
 - You MUST propose an art direction based on Phase 1 context, not ask the user to choose from abstract options
-- You MUST confirm design level — propose one if user doesn't specify
 - You MUST use analyze-template color output to determine color scheme for the chosen template
 - Text color, table color, chart color, etc. are auto-resolved from the template's theme colors
 
@@ -119,12 +113,19 @@ When it was copied from a style without changes, text confirmation is sufficient
 ### 4. Review outline fit
 
 After art direction is confirmed, check whether the outline still fits the design direction.
-Design level and information density may require splitting dense slides or merging thin ones.
+Information density may require splitting dense slides or merging thin ones.
 
 Do NOT ask "shall we review the outline?" every time — that becomes ritual.
-Instead, read the outline against the confirmed design level and propose specific changes
-if needed (e.g., "Slide 4 has too much for Premium — split into overview + detail").
+Instead, read the outline against the confirmed direction and propose specific changes
+if needed (e.g., "Slide 4 has too much content — split into overview + detail").
 If the outline fits, say so briefly and move on.
+
+### Scope of art direction
+
+Art direction defines the visual style layer only — colors, typography, spacing, decoration.
+It does NOT define slide composition. How elements are arranged (patterns) and how each element
+is built (components) are decided per-slide in Phase 2. Art direction constrains the palette;
+it does not constrain the structure.
 
 ---
 

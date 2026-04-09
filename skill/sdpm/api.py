@@ -200,12 +200,14 @@ def generate(
     pdf_path = None
     if not no_autofit:
         pptx_resolved = out.resolve()
+        pre_autofit_pdf = None
         if not no_preview:
             tmp_project = get_tmp_project_dir(str(input_path))
             preview_dir = tmp_project / "preview"
             preview_dir.mkdir(parents=True, exist_ok=True)
-            pdf_path = preview_dir / "slides.pdf"
-        refresh_autofit(pptx_resolved, pdf_path=pdf_path)
+            pre_autofit_pdf = preview_dir / "slides.pdf"
+        refresh_autofit(pptx_resolved, pdf_path=None, pre_autofit_pdf=pre_autofit_pdf)
+        pdf_path = pre_autofit_pdf
         unlock_height_constraints(pptx_resolved)
 
     imbalance = check_layout_imbalance_data(out, slides)
