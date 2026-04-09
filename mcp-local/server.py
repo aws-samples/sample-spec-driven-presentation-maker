@@ -139,17 +139,19 @@ def generate_pptx(
         JSON with output file path and slide summary.
     """
     if slides_json and not slides_json_path:
-        import tempfile, os
+        import tempfile
+        import os
+
         base = os.environ.get("SDPM_OUTPUT_DIR", "/tmp")
         os.makedirs(base, exist_ok=True)
-        tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", dir=base, delete=False
-        )
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", dir=base, delete=False)
         tmp.write(slides_json)
         tmp.close()
         slides_json_path = tmp.name
     return json.dumps(
-        _generate_pptx(slides_json_path=slides_json_path, template=template, output_path=output_path, skill_dir=_SKILL_DIR),
+        _generate_pptx(
+            slides_json_path=slides_json_path, template=template, output_path=output_path, skill_dir=_SKILL_DIR
+        ),
         ensure_ascii=False,
     )
 
@@ -173,7 +175,9 @@ def get_preview(pptx_path: str, pages: str = "") -> str:
 
 
 @mcp.tool()
-def search_assets(query: str, limit: int = 20, source_filter: str = "", type_filter: str = "", theme_filter: str = "") -> str:
+def search_assets(
+    query: str, limit: int = 20, source_filter: str = "", type_filter: str = "", theme_filter: str = ""
+) -> str:
     """Search icons and assets by keyword. Use list_asset_sources to see available sources.
     Multiple keywords can be space-separated (e.g. "lambda s3 dynamodb") — each is searched independently.
 
@@ -188,7 +192,14 @@ def search_assets(query: str, limit: int = 20, source_filter: str = "", type_fil
         JSON with matching icons/assets and their paths.
     """
     return json.dumps(
-        _search_assets(query=query, limit=limit, source_filter=source_filter, type_filter=type_filter, theme_filter=theme_filter, skill_dir=_SKILL_DIR),
+        _search_assets(
+            query=query,
+            limit=limit,
+            source_filter=source_filter,
+            type_filter=type_filter,
+            theme_filter=theme_filter,
+            skill_dir=_SKILL_DIR,
+        ),
         ensure_ascii=False,
     )
 
@@ -298,8 +309,15 @@ def read_guides(names: list[str]) -> str:
 
 
 @mcp.tool()
-def code_to_slide(code: str, language: str = "python", theme: str = "dark",
-                    x: int = 0, y: int = 0, width: int = 800, height: int = 300) -> str:
+def code_to_slide(
+    code: str,
+    language: str = "python",
+    theme: str = "dark",
+    x: int = 0,
+    y: int = 0,
+    width: int = 800,
+    height: int = 300,
+) -> str:
     """Generate slide elements JSON for a syntax-highlighted code block.
 
     Args:

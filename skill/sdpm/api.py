@@ -27,7 +27,7 @@ def _resolve_template(data: dict, input_path: str | Path | None, templates_dir: 
         named = templates_dir / (name if name.endswith(".pptx") else name + ".pptx")
         if named.exists():
             return named, True
-    raise FileNotFoundError("No template specified. Set \"template\" in presentation JSON.")
+    raise FileNotFoundError('No template specified. Set "template" in presentation JSON.')
 
 
 def _get_output_base_dir() -> Path:
@@ -37,17 +37,25 @@ def _get_output_base_dir() -> Path:
         return Path(env_dir)
     try:
         from sdpm.config import get_output_dir
+
         return get_output_dir()
     except Exception:
         pass
     from sdpm.preview import _is_wsl
+
     if _is_wsl():
         import subprocess
+
         try:
             result = subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                ["/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe", "-Command",
-                 "[Environment]::GetFolderPath('MyDocuments')"],
-                capture_output=True, timeout=10)
+                [
+                    "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+                    "-Command",
+                    "[Environment]::GetFolderPath('MyDocuments')",
+                ],
+                capture_output=True,
+                timeout=10,
+            )
             win_path = result.stdout.decode("cp932", errors="replace").strip()
             if win_path:
                 wsl = subprocess.run(["wslpath", win_path], capture_output=True, text=True)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
@@ -192,8 +200,10 @@ def generate(
 
     # Build
     builder = PPTXBuilder(
-        template_file, custom_template=custom,
-        fonts=fonts, base_dir=input_path.parent,
+        template_file,
+        custom_template=custom,
+        fonts=fonts,
+        base_dir=input_path.parent,
         default_text_color=dtc,
     )
     slides = data.get("slides", [])
@@ -314,7 +324,7 @@ def preview(
 
         generated = []
         for png in sorted(glob.glob(str(out_dir / "page-*.png"))):
-            match = re.match(r'page-(\d+)\.png', Path(png).name)
+            match = re.match(r"page-(\d+)\.png", Path(png).name)
             if match:
                 num = int(match.group(1))
                 if pages_set and num not in pages_set:
@@ -383,12 +393,13 @@ def _preview_win32(pptx_path: Path, output_dir: Path, pages_set: set[int] | None
 def _extract_slide_titles(prs) -> dict[int, str]:
     """Extract sanitized slide titles from a Presentation object."""
     import re
+
     titles = {}
     for i, slide in enumerate(prs.slides, 1):
         title = ""
         if slide.shapes.title:
             title = slide.shapes.title.text.strip().replace("\n", " ")[:30]
-        title = re.sub(r'[\\/:*?"<>|]', '', title)
+        title = re.sub(r'[\\/:*?"<>|]', "", title)
         titles[i] = title or "notitle"
     return titles
 
@@ -461,15 +472,24 @@ def code_block(
 
     elements: list[dict[str, Any]] = []
     if show_label:
-        elements.append({
-            "type": "textbox",
-            "x": x, "y": y, "width": width, "height": label_height,
-            "fontSize": 8, "align": "left",
-            "fill": inverse_bg,
-            "text": f"{{{{#{label_fg}:{label_text}}}}}",
-            "marginLeft": 50000, "marginTop": 0, "marginRight": 0, "marginBottom": 0,
-            "autoWidth": True,
-        })
+        elements.append(
+            {
+                "type": "textbox",
+                "x": x,
+                "y": y,
+                "width": width,
+                "height": label_height,
+                "fontSize": 8,
+                "align": "left",
+                "fill": inverse_bg,
+                "text": f"{{{{#{label_fg}:{label_text}}}}}",
+                "marginLeft": 50000,
+                "marginTop": 0,
+                "marginRight": 0,
+                "marginBottom": 0,
+                "autoWidth": True,
+            }
+        )
         code_y = y + label_height
         code_height = height - label_height
     else:
@@ -477,12 +497,18 @@ def code_block(
         code_height = height
 
     spans = highlight_code(code, language, theme)
-    elements.append({
-        "type": "textbox",
-        "x": x, "y": code_y, "width": width, "height": code_height,
-        "fontSize": font_size, "align": "left",
-        "fill": bg,
-        "text": spans,
-    })
+    elements.append(
+        {
+            "type": "textbox",
+            "x": x,
+            "y": code_y,
+            "width": width,
+            "height": code_height,
+            "fontSize": font_size,
+            "align": "left",
+            "fill": bg,
+            "text": spans,
+        }
+    )
 
     return elements
