@@ -148,26 +148,14 @@ requestHeaderConfiguration: {
 
 > **注意:** [Generative AI Use Cases on AWS (GenU)](https://github.com/aws-samples/generative-ai-use-cases-jp) は活発に開発が行われている別のオープンソースプロジェクトです。以下の手順は 2026 年 4 月時点の GenU v5.x に基づいており、今後のリリースで変更される可能性があります。
 
-[GenU](https://github.com/aws-samples/generative-ai-use-cases-jp) は、チャット・RAG・画像生成など多様な生成 AI ユースケースを AWS 上で提供するオープンソース Web アプリケーションです。GenU は AgentCore を利用する 2 つの方法を提供しています：
-
-| | AgentCore チャット | AgentBuilder |
-|---|---|---|
-| UI | 組み込みチャットページ | カスタムエージェント作成ページ |
-| MCP 設定 | `mcp-configs/generic/mcp.json` | `mcp-configs/agent-builder/mcp.json` |
-| システムプロンプト | 固定（`config.py` から） | エージェントごとにカスタマイズ可能 |
-| CDK オプション | `createGenericAgentCoreRuntime: true` | `agentBuilderEnabled: true` |
-
-両者は同じ Docker イメージと Runtime バックエンドを共有しています。違いは読み込まれる `mcp.json` と、ユーザーがカスタムシステムプロンプトを設定できるかどうかです。
+[GenU](https://github.com/aws-samples/generative-ai-use-cases-jp) は、多様な生成 AI ユースケースを AWS 上で提供するオープンソース Web アプリケーションです。GenU の **AgentBuilder** を使うと、選択した MCP ツールとカスタムシステムプロンプトでエージェントを作成できます。AgentCore Runtime コンテナに spec-driven-presentation-maker をバンドルすることで、GenU の Web インターフェースからプレゼンテーションを生成できます。
 
 ### 前提条件
 
 - GenU リポジトリがクローン済みでデプロイ可能な状態（[GenU README](https://github.com/aws-samples/generative-ai-use-cases-jp) 参照）
 - ビルドマシンで Docker が利用可能（AgentCore コンテナイメージのビルドに必要）
 - x86_64 ホスト（Intel/AMD）では、デプロイ前に `docker run --privileged --rm tonistiigi/binfmt --install arm64` を実行（AgentCore は ARM64 コンテナイメージを要求）
-- `packages/cdk/cdk.json` または `parameter.ts` で使用するユースケースを有効化：
-  - **AgentCore チャット:** `createGenericAgentCoreRuntime: true`
-  - **AgentBuilder:** `agentBuilderEnabled: true`
-  - 両方を同時に有効化可能
+- `packages/cdk/cdk.json` または `parameter.ts` で **AgentBuilder を有効化**: `agentBuilderEnabled: true`
 
 ### Step 1: sdpm ファイルを GenU AgentCore Runtime ディレクトリにコピー
 
@@ -194,10 +182,7 @@ RUN ln -s /var/task/sdpm-skill /var/task/skill
 
 ### Step 3: MCP サーバーの登録
 
-有効化したユースケースに対応する設定ファイルに sdpm エントリを追加します。`mcpServers` 配下に追加してください：
-
-- **AgentCore チャット** → `$GENU_RUNTIME_DIR/mcp-configs/generic/mcp.json`
-- **AgentBuilder** → `$GENU_RUNTIME_DIR/mcp-configs/agent-builder/mcp.json`
+`$GENU_RUNTIME_DIR/mcp-configs/agent-builder/mcp.json` の `mcpServers` に以下を追加します：
 
 ```json
 "spec-driven-presentation-maker": {
@@ -219,29 +204,12 @@ cd <path-to-genu>
 npx -w packages/cdk cdk deploy --all
 ```
 
-### 動作の仕組み
+### Step 5: AgentBuilder でエージェントを作成
 
-```
-ユーザー → GenU Web UI → Strands Agent (AgentCore Runtime)
-                           ├── sdpm MCP ツール (stdio)
-                           │   ├── init_presentation
-                           │   ├── generate_pptx → /tmp/ws/*.pptx
-                           │   └── search_assets, analyze_template, ...
-                           └── upload_file_to_s3_and_retrieve_s3_url
-                               └── S3 URL → ユーザー
-```
+GenU の AgentBuilder UI で：
 
-### 使い方: AgentCore チャット
-
-そのまま動作します。エージェントは `generic/mcp.json` 経由で sdpm ツールを自動検出し、`server_instructions` を受け取ります。リクエストを入力するだけです：
-
-```
-AWS Lambdaについて1枚のエグゼクティブ向けスライドを作って
-```
-
-### 使い方: AgentBuilder
-
-AgentBuilder でエージェントを作成する際、MCP サーバーリストから `spec-driven-presentation-maker` を選択し、以下のシステムプロンプトを設定してください：
+1. MCP サーバーリストから `spec-driven-presentation-maker` を選択
+2. 以下のシステムプロンプトを設定：
 
 ```
 あなたはプレゼンテーション設計アシスタントです。spec-driven-presentation-maker の MCP ツールを使って PowerPoint スライドを作成してください。
@@ -259,6 +227,18 @@ AgentBuilder でエージェントを作成する際、MCP サーバーリスト
   6. generate_pptx(slides_json_path="/tmp/ws/presentation.json", template="sample_template_dark")
 - JSON にエラーがある場合は、write_file の mode="str_replace" で該当箇所だけ修正してください。ファイル全体を書き直す必要はありません。
 - PPTX 生成後、upload_file_to_s3_and_retrieve_s3_url でアップロードし、S3 URL を Markdown リンク形式で提示してください: [ファイル名.pptx](S3_URL)
+```
+
+### 動作の仕組み
+
+```
+ユーザー → GenU AgentBuilder UI → Strands Agent (AgentCore Runtime)
+                                     ├── sdpm MCP ツール (stdio)
+                                     │   ├── generate_pptx → /tmp/ws/*.pptx
+                                     │   └── search_assets, analyze_template, ...
+                                     ├── write_file, concat_files (組み込み)
+                                     └── upload_file_to_s3_and_retrieve_s3_url
+                                         └── S3 URL → ユーザー
 ```
 
 ### 大きなファイルの書き込み

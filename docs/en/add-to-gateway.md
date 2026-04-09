@@ -155,26 +155,14 @@ No additional user registration is needed — any valid JWT with a `sub` claim w
 
 > **Note:** [Generative AI Use Cases on AWS (GenU)](https://github.com/aws-samples/generative-ai-use-cases-jp) is a separate open-source project under active development. The steps below are based on GenU v5.x as of April 2026 and may change in future releases.
 
-[GenU](https://github.com/aws-samples/generative-ai-use-cases-jp) is an open-source web application that provides various generative AI use cases (chat, RAG, image generation, etc.) on AWS. GenU provides two ways to use AgentCore:
-
-| | AgentCore Chat | AgentBuilder |
-|---|---|---|
-| UI | Built-in chat page | Custom agent creation page |
-| MCP config | `mcp-configs/generic/mcp.json` | `mcp-configs/agent-builder/mcp.json` |
-| System prompt | Fixed (from `config.py`) | Customizable per agent |
-| CDK option | `createGenericAgentCoreRuntime: true` | `agentBuilderEnabled: true` |
-
-Both share the same Docker image and Runtime backend. The difference is which `mcp.json` is loaded and whether the user can set a custom system prompt.
+[GenU](https://github.com/aws-samples/generative-ai-use-cases-jp) is an open-source web application that provides various generative AI use cases on AWS. GenU's **AgentBuilder** lets users create custom agents with selected MCP tools and a tailored system prompt. By bundling spec-driven-presentation-maker into the AgentCore Runtime container, users can generate presentations from GenU's web interface.
 
 ### Prerequisites
 
 - GenU repository cloned and deployable (see [GenU README](https://github.com/aws-samples/generative-ai-use-cases-jp))
 - Docker available on the build machine (required for AgentCore container image build)
 - On x86_64 hosts (Intel/AMD), run `docker run --privileged --rm tonistiigi/binfmt --install arm64` before deploying (AgentCore requires ARM64 container images)
-- Enable the use case(s) you want in `packages/cdk/cdk.json` or `parameter.ts`:
-  - **AgentCore Chat:** `createGenericAgentCoreRuntime: true`
-  - **AgentBuilder:** `agentBuilderEnabled: true`
-  - You can enable both simultaneously
+- **AgentBuilder enabled** in `packages/cdk/cdk.json` or `parameter.ts`: `agentBuilderEnabled: true`
 
 ### Step 1: Copy sdpm files into the GenU AgentCore Runtime directory
 
@@ -201,13 +189,7 @@ RUN ln -s /var/task/sdpm-skill /var/task/skill
 
 ### Step 3: Register the MCP server
 
-The sdpm entry is the same for both configs. Add it to the config(s) matching the use case(s) you enabled:
-
-**AgentCore Chat** — `$GENU_RUNTIME_DIR/mcp-configs/generic/mcp.json`:
-
-**AgentBuilder** — `$GENU_RUNTIME_DIR/mcp-configs/agent-builder/mcp.json`:
-
-Add under `mcpServers`:
+Add the following entry to `$GENU_RUNTIME_DIR/mcp-configs/agent-builder/mcp.json` under `mcpServers`:
 
 ```json
 "spec-driven-presentation-maker": {
@@ -229,29 +211,12 @@ cd <path-to-genu>
 npx -w packages/cdk cdk deploy --all
 ```
 
-### How it works
+### Step 5: Create an agent in AgentBuilder
 
-```
-User → GenU Web UI → Strands Agent (AgentCore Runtime)
-                       ├── sdpm MCP tools (stdio)
-                       │   ├── init_presentation
-                       │   ├── generate_pptx → /tmp/ws/*.pptx
-                       │   └── search_assets, analyze_template, ...
-                       └── upload_file_to_s3_and_retrieve_s3_url
-                           └── S3 URL → User
-```
+In GenU's AgentBuilder UI:
 
-### Usage: AgentCore Chat
-
-Works out of the box. The agent automatically discovers sdpm tools and receives `server_instructions`. Simply type your request:
-
-```
-Create a 1-slide executive presentation about AWS Lambda
-```
-
-### Usage: AgentBuilder
-
-When creating an agent in AgentBuilder, select `spec-driven-presentation-maker` from the MCP server list and set the following system prompt:
+1. Select `spec-driven-presentation-maker` from the MCP server list
+2. Set the following system prompt:
 
 ```
 You are a presentation design assistant. Use the spec-driven-presentation-maker MCP tools to create PowerPoint slides.
@@ -269,6 +234,18 @@ Key rules:
   6. generate_pptx(slides_json_path="/tmp/ws/presentation.json", template="sample_template_dark")
 - If a JSON error occurs, use write_file with mode="str_replace" to fix the specific part instead of rewriting the entire file.
 - After generating the PPTX, upload it with upload_file_to_s3_and_retrieve_s3_url and provide the S3 URL as a Markdown link: [filename.pptx](S3_URL)
+```
+
+### How it works
+
+```
+User → GenU AgentBuilder UI → Strands Agent (AgentCore Runtime)
+                                 ├── sdpm MCP tools (stdio)
+                                 │   ├── generate_pptx → /tmp/ws/*.pptx
+                                 │   └── search_assets, analyze_template, ...
+                                 ├── write_file, concat_files (built-in)
+                                 └── upload_file_to_s3_and_retrieve_s3_url
+                                     └── S3 URL → User
 ```
 
 ### Writing large files
