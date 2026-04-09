@@ -6,6 +6,7 @@ These functions encapsulate the full workflow that the CLI (pptx_builder.py) per
 mcp-local and other consumers should call these instead of assembling low-level APIs.
 """
 
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -31,6 +32,9 @@ def _resolve_template(data: dict, input_path: str | Path | None, templates_dir: 
 
 def _get_output_base_dir() -> Path:
     """Get output base directory from config, with WSL fallback."""
+    env_dir = os.environ.get("SDPM_OUTPUT_DIR")
+    if env_dir:
+        return Path(env_dir)
     try:
         from sdpm.config import get_output_dir
         return get_output_dir()
