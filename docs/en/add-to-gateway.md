@@ -148,3 +148,110 @@ The JWT `sub` claim is used as the user identity throughout the stack:
 - Audit trail
 
 No additional user registration is needed — any valid JWT with a `sub` claim works.
+
+---
+
+## Option 4: Generative AI Use Cases on AWS (GenU) Integration
+
+> **Note:** [Generative AI Use Cases on AWS (GenU)](https://github.com/aws-samples/generative-ai-use-cases-jp) is a separate open-source project under active development. The steps below are based on GenU v5.x as of April 2026 and may change in future releases.
+
+[GenU](https://github.com/aws-samples/generative-ai-use-cases-jp) is an open-source web application that provides various generative AI use cases on AWS. GenU's **AgentBuilder** lets users create custom agents with selected MCP tools and a tailored system prompt. By bundling spec-driven-presentation-maker into the AgentCore Runtime container, users can generate presentations from GenU's web interface.
+
+### Prerequisites
+
+- GenU repository cloned and deployable (see [GenU README](https://github.com/aws-samples/generative-ai-use-cases-jp))
+- Docker available on the build machine (required for AgentCore container image build)
+- On x86_64 hosts (Intel/AMD), run `docker run --privileged --rm tonistiigi/binfmt --install arm64` before deploying (AgentCore requires ARM64 container images)
+- **AgentBuilder enabled** in `packages/cdk/cdk.json` or `parameter.ts`: `agentBuilderEnabled: true`
+
+### Step 1: Copy sdpm files into the GenU AgentCore Runtime directory
+
+```bash
+GENU_RUNTIME_DIR=<path-to-genu>/packages/cdk/lambda-python/generic-agent-core-runtime
+
+cp -r <path-to-sdpm>/skill $GENU_RUNTIME_DIR/sdpm-skill
+cp -r <path-to-sdpm>/mcp-local $GENU_RUNTIME_DIR/sdpm-mcp-local
+```
+
+### Step 2: Patch the Dockerfile
+
+Add the following lines to `$GENU_RUNTIME_DIR/Dockerfile`, **before** the `EXPOSE` line:
+
+```dockerfile
+# --- SDPM: spec-driven-presentation-maker ---
+COPY sdpm-skill/ ./sdpm-skill/
+COPY sdpm-mcp-local/ ./sdpm-mcp-local/
+RUN uv pip install --python /tmp/.venv/bin/python ./sdpm-skill
+RUN /tmp/.venv/bin/python sdpm-skill/scripts/download_aws_icons.py \
+ && /tmp/.venv/bin/python sdpm-skill/scripts/download_material_icons.py
+RUN ln -s /var/task/sdpm-skill /var/task/skill
+```
+
+### Step 3: Register the MCP server
+
+Add the following entry to `$GENU_RUNTIME_DIR/mcp-configs/agent-builder/mcp.json` under `mcpServers`:
+
+```json
+"spec-driven-presentation-maker": {
+    "command": "python",
+    "args": ["sdpm-mcp-local/server.py"],
+    "env": {
+        "PYTHONPATH": "/var/task/sdpm-skill",
+        "SDPM_OUTPUT_DIR": "/tmp/ws"
+    }
+}
+```
+
+`SDPM_OUTPUT_DIR` tells the skill where to write generated files. GenU requires output files under `/tmp/ws` so that `upload_file_to_s3_and_retrieve_s3_url` can upload them to S3.
+
+### Step 4: Deploy
+
+```bash
+cd <path-to-genu>
+npx -w packages/cdk cdk deploy --all
+```
+
+### Step 5: Create an agent in AgentBuilder
+
+In GenU's AgentBuilder UI:
+
+1. Select `spec-driven-presentation-maker` from the MCP server list
+2. Set the following system prompt:
+
+```
+You are a presentation design assistant. Use the spec-driven-presentation-maker MCP tools to create PowerPoint slides.
+
+Key rules:
+- Always call read_workflows first to load the workflow before making any design decisions.
+- When writing the presentation JSON, use the write_file tool to write to /tmp/ws/. Do NOT use Code Interpreter — its sandbox is isolated from MCP tools.
+- Large JSON must be split to avoid timeouts. Write each slide as a separate file (e.g. /tmp/ws/part1.json, /tmp/ws/part2.json), then use concat_files to join them into the final /tmp/ws/presentation.json.
+- Example split strategy:
+  1. write_file("/tmp/ws/header.json", '{"template":"sample_template_dark","slides":[', mode="create")
+  2. write_file("/tmp/ws/slide1.json", '{...slide 1 JSON...},', mode="create")
+  3. write_file("/tmp/ws/slide2.json", '{...slide 2 JSON...}', mode="create")
+  4. write_file("/tmp/ws/footer.json", ']}', mode="create")
+  5. concat_files(source_paths=["/tmp/ws/header.json","/tmp/ws/slide1.json","/tmp/ws/slide2.json","/tmp/ws/footer.json"], destination="/tmp/ws/presentation.json")
+  6. generate_pptx(slides_json_path="/tmp/ws/presentation.json", template="sample_template_dark")
+- If a JSON error occurs, use write_file with mode="str_replace" to fix the specific part instead of rewriting the entire file.
+- After generating the PPTX, upload it with upload_file_to_s3_and_retrieve_s3_url and provide the S3 URL as a Markdown link: [filename.pptx](S3_URL)
+```
+
+### How it works
+
+```
+User → GenU AgentBuilder UI → Strands Agent (AgentCore Runtime)
+                                 ├── sdpm MCP tools (stdio)
+                                 │   ├── generate_pptx → /tmp/ws/*.pptx
+                                 │   └── search_assets, analyze_template, ...
+                                 ├── write_file, concat_files (built-in)
+                                 └── upload_file_to_s3_and_retrieve_s3_url
+                                     └── S3 URL → User
+```
+
+### Writing large files
+
+LLM output can time out when generating large JSON in a single tool call. To avoid this:
+
+1. Use `write_file` to write each part as a separate file
+2. Use `concat_files` to join them into the final file
+3. Use `write_file` with `mode="str_replace"` to fix errors without rewriting everything
