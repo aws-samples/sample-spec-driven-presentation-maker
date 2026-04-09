@@ -171,6 +171,20 @@ def generate(
     else:
         template_file, custom = _resolve_template(data, str(input_path), templates_dir)
 
+    # Auto-fill fonts / defaultTextColor from template when missing
+    from sdpm.analyzer import extract_fonts as _extract_fonts
+
+    fonts = data.get("fonts")
+    if not fonts or not fonts.get("fullwidth"):
+        fonts = _extract_fonts(template_file)
+        warnings.append("fonts auto-detected from template")
+
+    dtc = data.get("defaultTextColor")
+    if not dtc:
+        _, is_dark = PPTXBuilder._extract_theme_colors(template_file)
+        dtc = "#FFFFFF" if is_dark else "#333333"
+        warnings.append(f"defaultTextColor auto-set to {dtc}")
+
     # Validate icons
     missing = validate_icons_in_json(data)
     if missing:
@@ -179,8 +193,8 @@ def generate(
     # Build
     builder = PPTXBuilder(
         template_file, custom_template=custom,
-        fonts=data.get("fonts"), base_dir=input_path.parent,
-        default_text_color=data.get("defaultTextColor"),
+        fonts=fonts, base_dir=input_path.parent,
+        default_text_color=dtc,
     )
     slides = data.get("slides", [])
     id_map = {}
