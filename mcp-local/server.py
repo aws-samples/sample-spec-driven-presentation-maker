@@ -142,7 +142,7 @@ def generate_pptx(
         import tempfile
         import os
 
-        base = os.environ.get("SDPM_OUTPUT_DIR", "/tmp")
+        base = os.environ.get("SDPM_OUTPUT_DIR", "/tmp")  # nosec B108
         os.makedirs(base, exist_ok=True)
         tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", dir=base, delete=False)
         tmp.write(slides_json)
