@@ -246,7 +246,7 @@ User → GenU Web UI → Strands Agent (AgentCore Runtime)
 Works out of the box. The agent automatically discovers sdpm tools and receives `server_instructions`. Simply type your request:
 
 ```
-AWS Lambdaについて1枚のエグゼクティブ向けスライドを作って
+Create a 1-slide executive presentation about AWS Lambda
 ```
 
 ### Usage: AgentBuilder
