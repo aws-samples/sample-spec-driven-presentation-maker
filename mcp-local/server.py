@@ -47,16 +47,6 @@ _INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generat
 
 **Critical constraint:** Do NOT make any decisions about slide structure, content, design, or layout before loading the workflow. The workflow files contain the full process including briefing, outline, and art direction. Wait until the workflow is loaded and follow it step by step.
 
-## Generating PPTX in sandboxed environments (e.g. Amazon Bedrock AgentCore)
-
-When running in an environment where you cannot write files to the host filesystem (e.g. Code Interpreter sandbox is isolated from MCP tools), use the `slides_json` parameter of `generate_pptx` to pass the presentation JSON directly as a string instead of writing a file and passing a path. Example:
-
-```
-generate_pptx(slides_json='{"template":"sample_template_dark","slides":[...]}', template="sample_template_dark")
-```
-
-Do NOT use Code Interpreter to write presentation.json to disk — the MCP server cannot read files from the Code Interpreter sandbox.
-
 **Present the options and ask which to do:**
 
 A. New presentation — create slides from scratch
