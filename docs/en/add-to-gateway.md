@@ -148,3 +148,88 @@ The JWT `sub` claim is used as the user identity throughout the stack:
 - Audit trail
 
 No additional user registration is needed — any valid JWT with a `sub` claim works.
+
+---
+
+## Option 4: Generative AI Use Cases on AWS (GenU) Integration
+
+> **Note:** [Generative AI Use Cases on AWS (GenU)](https://github.com/aws-samples/generative-ai-use-cases-jp) is a separate open-source project under active development. The steps below are based on GenU v5.x as of April 2026 and may change in future releases.
+
+[GenU](https://github.com/aws-samples/generative-ai-use-cases-jp) is an open-source web application that provides various generative AI use cases (chat, RAG, image generation, etc.) on AWS. GenU's **AgentCore use case** runs a [Strands Agent](https://strandsagents.com/) inside an Amazon Bedrock AgentCore Runtime container, where the agent can call MCP tools defined in a configuration file. By bundling spec-driven-presentation-maker into this container, users can generate presentations directly from GenU's chat interface.
+
+### Prerequisites
+
+- GenU repository cloned and deployable (see [GenU README](https://github.com/aws-samples/generative-ai-use-cases-jp))
+- Docker available on the build machine (required for AgentCore container image build)
+- **AgentCore use case enabled** in GenU — set `createGenericAgentCoreRuntime: true` in `packages/cdk/cdk.json` or `parameter.ts` (see [GenU Deploy Options](https://github.com/aws-samples/generative-ai-use-cases-jp/blob/main/docs/ja/DEPLOY_OPTION.md))
+- On x86_64 hosts (Intel/AMD), run `docker run --privileged --rm tonistiigi/binfmt --install arm64` before deploying (AgentCore requires ARM64 container images)
+
+### Step 1: Copy sdpm files into the GenU AgentCore Runtime directory
+
+Copy the skill package and local MCP server into GenU's AgentCore Runtime Docker context:
+
+```bash
+GENU_RUNTIME_DIR=<path-to-genu>/packages/cdk/lambda-python/generic-agent-core-runtime
+
+# Copy skill package (engine, templates, references, scripts)
+cp -r <path-to-sdpm>/skill $GENU_RUNTIME_DIR/sdpm-skill
+
+# Copy local MCP server
+cp -r <path-to-sdpm>/mcp-local $GENU_RUNTIME_DIR/sdpm-mcp-local
+```
+
+### Step 2: Patch the Dockerfile
+
+Add the following lines to `$GENU_RUNTIME_DIR/Dockerfile`, **before** the `EXPOSE` line:
+
+```dockerfile
+# --- SDPM: spec-driven-presentation-maker ---
+COPY sdpm-skill/ ./sdpm-skill/
+COPY sdpm-mcp-local/ ./sdpm-mcp-local/
+RUN uv pip install --python /tmp/.venv/bin/python ./sdpm-skill
+# Download icon assets (AWS Architecture Icons + Material Icons)
+RUN /tmp/.venv/bin/python sdpm-skill/scripts/download_aws_icons.py \
+ && /tmp/.venv/bin/python sdpm-skill/scripts/download_material_icons.py
+# Symlink so server.py can resolve the skill package
+RUN ln -s /var/task/sdpm-skill /var/task/skill
+```
+
+### Step 3: Register the MCP server
+
+Add the following entry to `$GENU_RUNTIME_DIR/mcp-configs/generic/mcp.json` under `mcpServers`:
+
+```json
+"spec-driven-presentation-maker": {
+    "command": "python",
+    "args": ["sdpm-mcp-local/server.py"],
+    "env": {
+        "PYTHONPATH": "/var/task/sdpm-skill",
+        "SDPM_OUTPUT_DIR": "/tmp/ws"
+    }
+}
+```
+
+`SDPM_OUTPUT_DIR` tells the skill where to write generated files. GenU's AgentCore Runtime requires output files to be under `/tmp/ws` so that the built-in `upload_file_to_s3_and_retrieve_s3_url` tool can upload them to S3 and return a download URL to the user.
+
+### Step 4: Deploy
+
+Deploy GenU with CDK as usual. The AgentCore container image will be rebuilt with sdpm bundled in:
+
+```bash
+cd <path-to-genu>
+npx -w packages/cdk cdk deploy --all
+```
+
+### How it works
+
+```
+User → GenU Web UI → Strands Agent (AgentCore Runtime)
+                       ├── sdpm MCP tools (stdio)
+                       │   ├── init_presentation
+                       │   ├── generate_pptx → /tmp/ws/*.pptx
+                       │   └── search_assets, analyze_template, ...
+                       └── upload_file_to_s3_and_retrieve_s3_url
+                           └── S3 URL → User
+```
+
+The agent follows sdpm's `server_instructions` to execute the presentation workflow (briefing → outline → compose → review → generate), then uploads the resulting PPTX to S3 and returns the download URL.

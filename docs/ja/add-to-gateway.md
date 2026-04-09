@@ -141,3 +141,88 @@ requestHeaderConfiguration: {
 
 - [はじめに](getting-started.md) — セットアップとデプロイ手順
 - [アーキテクチャ](architecture.md) — 認証・認可モデルの詳細
+
+---
+
+## オプション 4: Generative AI Use Cases on AWS (GenU) 連携
+
+> **注意:** [Generative AI Use Cases on AWS (GenU)](https://github.com/aws-samples/generative-ai-use-cases-jp) は活発に開発が行われている別のオープンソースプロジェクトです。以下の手順は 2026 年 4 月時点の GenU v5.x に基づいており、今後のリリースで変更される可能性があります。
+
+[GenU](https://github.com/aws-samples/generative-ai-use-cases-jp) は、チャット・RAG・画像生成など多様な生成 AI ユースケースを AWS 上で提供するオープンソース Web アプリケーションです。GenU の **AgentCore ユースケース**は、Amazon Bedrock AgentCore Runtime コンテナ内で [Strands Agent](https://strandsagents.com/) を実行し、設定ファイルで定義された MCP ツールを呼び出します。このコンテナに spec-driven-presentation-maker をバンドルすることで、GenU のチャット画面から直接プレゼンテーションを生成できます。
+
+### 前提条件
+
+- GenU リポジトリがクローン済みでデプロイ可能な状態（[GenU README](https://github.com/aws-samples/generative-ai-use-cases-jp) 参照）
+- ビルドマシンで Docker が利用可能（AgentCore コンテナイメージのビルドに必要）
+- GenU で **AgentCore ユースケースが有効化済み** — `packages/cdk/cdk.json` または `parameter.ts` で `createGenericAgentCoreRuntime: true` を設定（[GenU デプロイオプション](https://github.com/aws-samples/generative-ai-use-cases-jp/blob/main/docs/ja/DEPLOY_OPTION.md)参照）
+- x86_64 ホスト（Intel/AMD）では、デプロイ前に `docker run --privileged --rm tonistiigi/binfmt --install arm64` を実行（AgentCore は ARM64 コンテナイメージを要求）
+
+### Step 1: sdpm ファイルを GenU AgentCore Runtime ディレクトリにコピー
+
+スキルパッケージとローカル MCP サーバーを GenU の AgentCore Runtime Docker コンテキストにコピーします：
+
+```bash
+GENU_RUNTIME_DIR=<path-to-genu>/packages/cdk/lambda-python/generic-agent-core-runtime
+
+# スキルパッケージ（エンジン、テンプレート、リファレンス、スクリプト）をコピー
+cp -r <path-to-sdpm>/skill $GENU_RUNTIME_DIR/sdpm-skill
+
+# ローカル MCP サーバーをコピー
+cp -r <path-to-sdpm>/mcp-local $GENU_RUNTIME_DIR/sdpm-mcp-local
+```
+
+### Step 2: Dockerfile のパッチ
+
+`$GENU_RUNTIME_DIR/Dockerfile` の `EXPOSE` 行の**前**に以下を追加します：
+
+```dockerfile
+# --- SDPM: spec-driven-presentation-maker ---
+COPY sdpm-skill/ ./sdpm-skill/
+COPY sdpm-mcp-local/ ./sdpm-mcp-local/
+RUN uv pip install --python /tmp/.venv/bin/python ./sdpm-skill
+# アイコンアセットのダウンロード（AWS Architecture Icons + Material Icons）
+RUN /tmp/.venv/bin/python sdpm-skill/scripts/download_aws_icons.py \
+ && /tmp/.venv/bin/python sdpm-skill/scripts/download_material_icons.py
+# server.py がスキルパッケージを解決できるようシンボリックリンクを作成
+RUN ln -s /var/task/sdpm-skill /var/task/skill
+```
+
+### Step 3: MCP サーバーの登録
+
+`$GENU_RUNTIME_DIR/mcp-configs/generic/mcp.json` の `mcpServers` に以下のエントリを追加します：
+
+```json
+"spec-driven-presentation-maker": {
+    "command": "python",
+    "args": ["sdpm-mcp-local/server.py"],
+    "env": {
+        "PYTHONPATH": "/var/task/sdpm-skill",
+        "SDPM_OUTPUT_DIR": "/tmp/ws"
+    }
+}
+```
+
+`SDPM_OUTPUT_DIR` は生成ファイルの出力先を指定します。GenU の AgentCore Runtime は `/tmp/ws` 配下のファイルのみ S3 にアップロードできるため、この設定が必要です。組み込みの `upload_file_to_s3_and_retrieve_s3_url` ツールがファイルを S3 にアップロードし、ダウンロード URL をユーザーに返します。
+
+### Step 4: デプロイ
+
+通常通り CDK で GenU をデプロイします。sdpm がバンドルされた AgentCore コンテナイメージが再ビルドされます：
+
+```bash
+cd <path-to-genu>
+npx -w packages/cdk cdk deploy --all
+```
+
+### 動作の仕組み
+
+```
+ユーザー → GenU Web UI → Strands Agent (AgentCore Runtime)
+                           ├── sdpm MCP ツール (stdio)
+                           │   ├── init_presentation
+                           │   ├── generate_pptx → /tmp/ws/*.pptx
+                           │   └── search_assets, analyze_template, ...
+                           └── upload_file_to_s3_and_retrieve_s3_url
+                               └── S3 URL → ユーザー
+```
+
+エージェントは sdpm の `server_instructions` に従ってプレゼンテーションワークフロー（ヒアリング → アウトライン → コンポーズ → レビュー → 生成）を実行し、生成された PPTX を S3 にアップロードしてダウンロード URL を返します。
