@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 "use client"
 
-import { ReactNode, useSyncExternalStore } from "react"
+import { ReactNode, useEffect, useSyncExternalStore } from "react"
 import { useAutoSignin } from "react-oidc-context"
 
 /**
@@ -10,10 +10,13 @@ import { useAutoSignin } from "react-oidc-context"
  * Handles hasAuthParams check, redirect loop prevention, and error states internally.
  */
 function AutoSigninContent({ children }: { children: ReactNode }) {
-  // Save current URL (with hash) before potential OIDC redirect
-  if (typeof window !== "undefined" && !window.location.search.includes("code=")) {
-    sessionStorage.setItem("post_signin_return_url", window.location.pathname + window.location.hash)
-  }
+  // Save current URL once on mount (before potential OIDC redirect).
+  // Using useEffect to avoid re-saving on re-renders after the OIDC callback.
+  useEffect(() => {
+    if (!window.location.search.includes("code=")) {
+      sessionStorage.setItem("post_signin_return_url", window.location.pathname + window.location.hash)
+    }
+  }, [])
 
   const { isLoading, isAuthenticated, error } = useAutoSignin({
     signinMethod: "signinRedirect",

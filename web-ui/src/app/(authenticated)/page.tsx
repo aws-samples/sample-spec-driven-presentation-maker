@@ -7,21 +7,15 @@
 "use client"
 
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
 
 export default function RootPage() {
-  const router = useRouter()
-
   useEffect(() => {
     const returnUrl = sessionStorage.getItem("post_signin_return_url")
-    console.log("[RootPage] returnUrl from sessionStorage:", returnUrl)
-    if (returnUrl && returnUrl !== "/") {
-      sessionStorage.removeItem("post_signin_return_url")
-      router.replace(returnUrl)
-    } else {
-      router.replace("/decks")
-    }
-  }, [router])
+    sessionStorage.removeItem("post_signin_return_url")
+    // Avoid redirecting to "/" (this page) which would cause an infinite loop
+    const target = returnUrl && returnUrl !== "/" ? returnUrl : "/decks/"
+    window.location.replace(target)
+  }, [])
 
   return null
 }

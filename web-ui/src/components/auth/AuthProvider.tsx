@@ -64,10 +64,7 @@ const AuthProvider = ({ children }: PropsWithChildren) => {
       {...authConfig}
       // This callback removes the `?code=` from the URL, which will break page refreshes
       onSigninCallback={() => {
-        // Restore the URL the user was on before OIDC redirect (saved by AutoSignin)
-        const returnUrl = sessionStorage.getItem("post_signin_return_url") || ""
-        sessionStorage.removeItem("post_signin_return_url")
-        window.history.replaceState({}, document.title, returnUrl || window.location.pathname)
+        window.history.replaceState({}, document.title, window.location.pathname)
       }}
     >
       <AutoSignin>{children}</AutoSignin>
