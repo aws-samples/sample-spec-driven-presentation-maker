@@ -15,7 +15,7 @@ export default function RootPage() {
   useEffect(() => {
     const returnUrl = sessionStorage.getItem("post_signin_return_url")
     console.log("[RootPage] returnUrl from sessionStorage:", returnUrl)
-    if (returnUrl) {
+    if (returnUrl && returnUrl !== "/") {
       sessionStorage.removeItem("post_signin_return_url")
       router.replace(returnUrl)
     } else {
