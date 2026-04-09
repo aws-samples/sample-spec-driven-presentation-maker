@@ -148,26 +148,33 @@ requestHeaderConfiguration: {
 
 > **注意:** [Generative AI Use Cases on AWS (GenU)](https://github.com/aws-samples/generative-ai-use-cases-jp) は活発に開発が行われている別のオープンソースプロジェクトです。以下の手順は 2026 年 4 月時点の GenU v5.x に基づいており、今後のリリースで変更される可能性があります。
 
-[GenU](https://github.com/aws-samples/generative-ai-use-cases-jp) は、チャット・RAG・画像生成など多様な生成 AI ユースケースを AWS 上で提供するオープンソース Web アプリケーションです。GenU の **AgentCore ユースケース**は、Amazon Bedrock AgentCore Runtime コンテナ内で [Strands Agent](https://strandsagents.com/) を実行し、設定ファイルで定義された MCP ツールを呼び出します。このコンテナに spec-driven-presentation-maker をバンドルすることで、GenU のチャット画面から直接プレゼンテーションを生成できます。
+[GenU](https://github.com/aws-samples/generative-ai-use-cases-jp) は、チャット・RAG・画像生成など多様な生成 AI ユースケースを AWS 上で提供するオープンソース Web アプリケーションです。GenU は AgentCore を利用する 2 つの方法を提供しています：
+
+| | AgentCore チャット | AgentBuilder |
+|---|---|---|
+| UI | 組み込みチャットページ | カスタムエージェント作成ページ |
+| MCP 設定 | `mcp-configs/generic/mcp.json` | `mcp-configs/agent-builder/mcp.json` |
+| システムプロンプト | 固定（`config.py` から） | エージェントごとにカスタマイズ可能 |
+| CDK オプション | `createGenericAgentCoreRuntime: true` | `agentBuilderEnabled: true` |
+
+両者は同じ Docker イメージと Runtime バックエンドを共有しています。違いは読み込まれる `mcp.json` と、ユーザーがカスタムシステムプロンプトを設定できるかどうかです。
 
 ### 前提条件
 
 - GenU リポジトリがクローン済みでデプロイ可能な状態（[GenU README](https://github.com/aws-samples/generative-ai-use-cases-jp) 参照）
 - ビルドマシンで Docker が利用可能（AgentCore コンテナイメージのビルドに必要）
-- GenU で **AgentCore ユースケースが有効化済み** — `packages/cdk/cdk.json` または `parameter.ts` で `createGenericAgentCoreRuntime: true` を設定（[GenU デプロイオプション](https://github.com/aws-samples/generative-ai-use-cases-jp/blob/main/docs/ja/DEPLOY_OPTION.md)参照）
 - x86_64 ホスト（Intel/AMD）では、デプロイ前に `docker run --privileged --rm tonistiigi/binfmt --install arm64` を実行（AgentCore は ARM64 コンテナイメージを要求）
+- `packages/cdk/cdk.json` または `parameter.ts` で使用するユースケースを有効化：
+  - **AgentCore チャット:** `createGenericAgentCoreRuntime: true`
+  - **AgentBuilder:** `agentBuilderEnabled: true`
+  - 両方を同時に有効化可能
 
 ### Step 1: sdpm ファイルを GenU AgentCore Runtime ディレクトリにコピー
-
-スキルパッケージとローカル MCP サーバーを GenU の AgentCore Runtime Docker コンテキストにコピーします：
 
 ```bash
 GENU_RUNTIME_DIR=<path-to-genu>/packages/cdk/lambda-python/generic-agent-core-runtime
 
-# スキルパッケージ（エンジン、テンプレート、リファレンス、スクリプト）をコピー
 cp -r <path-to-sdpm>/skill $GENU_RUNTIME_DIR/sdpm-skill
-
-# ローカル MCP サーバーをコピー
 cp -r <path-to-sdpm>/mcp-local $GENU_RUNTIME_DIR/sdpm-mcp-local
 ```
 
@@ -180,16 +187,17 @@ cp -r <path-to-sdpm>/mcp-local $GENU_RUNTIME_DIR/sdpm-mcp-local
 COPY sdpm-skill/ ./sdpm-skill/
 COPY sdpm-mcp-local/ ./sdpm-mcp-local/
 RUN uv pip install --python /tmp/.venv/bin/python ./sdpm-skill
-# アイコンアセットのダウンロード（AWS Architecture Icons + Material Icons）
 RUN /tmp/.venv/bin/python sdpm-skill/scripts/download_aws_icons.py \
  && /tmp/.venv/bin/python sdpm-skill/scripts/download_material_icons.py
-# server.py がスキルパッケージを解決できるようシンボリックリンクを作成
 RUN ln -s /var/task/sdpm-skill /var/task/skill
 ```
 
 ### Step 3: MCP サーバーの登録
 
-`$GENU_RUNTIME_DIR/mcp-configs/generic/mcp.json` の `mcpServers` に以下のエントリを追加します：
+有効化したユースケースに対応する設定ファイルに sdpm エントリを追加します。`mcpServers` 配下に追加してください：
+
+- **AgentCore チャット** → `$GENU_RUNTIME_DIR/mcp-configs/generic/mcp.json`
+- **AgentBuilder** → `$GENU_RUNTIME_DIR/mcp-configs/agent-builder/mcp.json`
 
 ```json
 "spec-driven-presentation-maker": {
@@ -202,11 +210,9 @@ RUN ln -s /var/task/sdpm-skill /var/task/skill
 }
 ```
 
-`SDPM_OUTPUT_DIR` は生成ファイルの出力先を指定します。GenU の AgentCore Runtime は `/tmp/ws` 配下のファイルのみ S3 にアップロードできるため、この設定が必要です。組み込みの `upload_file_to_s3_and_retrieve_s3_url` ツールがファイルを S3 にアップロードし、ダウンロード URL をユーザーに返します。
+`SDPM_OUTPUT_DIR` は生成ファイルの出力先を指定します。GenU は `/tmp/ws` 配下のファイルのみ S3 にアップロードできるため、この設定が必要です。
 
 ### Step 4: デプロイ
-
-通常通り CDK で GenU をデプロイします。sdpm がバンドルされた AgentCore コンテナイメージが再ビルドされます：
 
 ```bash
 cd <path-to-genu>
@@ -225,11 +231,9 @@ npx -w packages/cdk cdk deploy --all
                                └── S3 URL → ユーザー
 ```
 
-エージェントは sdpm の `server_instructions` に従ってプレゼンテーションワークフロー（ヒアリング → アウトライン → コンポーズ → レビュー → 生成）を実行し、生成された PPTX を S3 にアップロードしてダウンロード URL を返します。
-
 ### 使い方: AgentCore チャット
 
-AgentCore チャットはそのまま動作します。エージェントは `mcp.json` 経由で sdpm ツールを自動検出し、`server_instructions` を受け取ります。リクエストを入力するだけです：
+そのまま動作します。エージェントは `generic/mcp.json` 経由で sdpm ツールを自動検出し、`server_instructions` を受け取ります。リクエストを入力するだけです：
 
 ```
 AWS Lambdaについて1枚のエグゼクティブ向けスライドを作って
@@ -250,7 +254,7 @@ AgentBuilder でエージェントを作成する際、MCP サーバーリスト
 
 ### 重要: `slides_json` パラメータ
 
-AgentCore のようなサンドボックス環境では、Code Interpreter は隔離されたサンドボックスで動作します。Code Interpreter の `writeFiles` で書いたファイルは `generate_pptx` などの MCP ツールからは**見えません**。代わりに、JSON 文字列を直接渡してください：
+AgentCore では、Code Interpreter は隔離されたサンドボックスで動作します。Code Interpreter の `writeFiles` で書いたファイルは `generate_pptx` などの MCP ツールからは**見えません**。代わりに、JSON 文字列を直接渡してください：
 
 ```
 generate_pptx(slides_json='{"template":"sample_template_dark","slides":[...]}', template="sample_template_dark")

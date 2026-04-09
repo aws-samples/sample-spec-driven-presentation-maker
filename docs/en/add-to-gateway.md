@@ -155,26 +155,33 @@ No additional user registration is needed — any valid JWT with a `sub` claim w
 
 > **Note:** [Generative AI Use Cases on AWS (GenU)](https://github.com/aws-samples/generative-ai-use-cases-jp) is a separate open-source project under active development. The steps below are based on GenU v5.x as of April 2026 and may change in future releases.
 
-[GenU](https://github.com/aws-samples/generative-ai-use-cases-jp) is an open-source web application that provides various generative AI use cases (chat, RAG, image generation, etc.) on AWS. GenU's **AgentCore use case** runs a [Strands Agent](https://strandsagents.com/) inside an Amazon Bedrock AgentCore Runtime container, where the agent can call MCP tools defined in a configuration file. By bundling spec-driven-presentation-maker into this container, users can generate presentations directly from GenU's chat interface.
+[GenU](https://github.com/aws-samples/generative-ai-use-cases-jp) is an open-source web application that provides various generative AI use cases (chat, RAG, image generation, etc.) on AWS. GenU provides two ways to use AgentCore:
+
+| | AgentCore Chat | AgentBuilder |
+|---|---|---|
+| UI | Built-in chat page | Custom agent creation page |
+| MCP config | `mcp-configs/generic/mcp.json` | `mcp-configs/agent-builder/mcp.json` |
+| System prompt | Fixed (from `config.py`) | Customizable per agent |
+| CDK option | `createGenericAgentCoreRuntime: true` | `agentBuilderEnabled: true` |
+
+Both share the same Docker image and Runtime backend. The difference is which `mcp.json` is loaded and whether the user can set a custom system prompt.
 
 ### Prerequisites
 
 - GenU repository cloned and deployable (see [GenU README](https://github.com/aws-samples/generative-ai-use-cases-jp))
 - Docker available on the build machine (required for AgentCore container image build)
-- **AgentCore use case enabled** in GenU — set `createGenericAgentCoreRuntime: true` in `packages/cdk/cdk.json` or `parameter.ts` (see [GenU Deploy Options](https://github.com/aws-samples/generative-ai-use-cases-jp/blob/main/docs/ja/DEPLOY_OPTION.md))
 - On x86_64 hosts (Intel/AMD), run `docker run --privileged --rm tonistiigi/binfmt --install arm64` before deploying (AgentCore requires ARM64 container images)
+- Enable the use case(s) you want in `packages/cdk/cdk.json` or `parameter.ts`:
+  - **AgentCore Chat:** `createGenericAgentCoreRuntime: true`
+  - **AgentBuilder:** `agentBuilderEnabled: true`
+  - You can enable both simultaneously
 
 ### Step 1: Copy sdpm files into the GenU AgentCore Runtime directory
-
-Copy the skill package and local MCP server into GenU's AgentCore Runtime Docker context:
 
 ```bash
 GENU_RUNTIME_DIR=<path-to-genu>/packages/cdk/lambda-python/generic-agent-core-runtime
 
-# Copy skill package (engine, templates, references, scripts)
 cp -r <path-to-sdpm>/skill $GENU_RUNTIME_DIR/sdpm-skill
-
-# Copy local MCP server
 cp -r <path-to-sdpm>/mcp-local $GENU_RUNTIME_DIR/sdpm-mcp-local
 ```
 
@@ -187,16 +194,20 @@ Add the following lines to `$GENU_RUNTIME_DIR/Dockerfile`, **before** the `EXPOS
 COPY sdpm-skill/ ./sdpm-skill/
 COPY sdpm-mcp-local/ ./sdpm-mcp-local/
 RUN uv pip install --python /tmp/.venv/bin/python ./sdpm-skill
-# Download icon assets (AWS Architecture Icons + Material Icons)
 RUN /tmp/.venv/bin/python sdpm-skill/scripts/download_aws_icons.py \
  && /tmp/.venv/bin/python sdpm-skill/scripts/download_material_icons.py
-# Symlink so server.py can resolve the skill package
 RUN ln -s /var/task/sdpm-skill /var/task/skill
 ```
 
 ### Step 3: Register the MCP server
 
-Add the following entry to `$GENU_RUNTIME_DIR/mcp-configs/generic/mcp.json` under `mcpServers`:
+The sdpm entry is the same for both configs. Add it to the config(s) matching the use case(s) you enabled:
+
+**AgentCore Chat** — `$GENU_RUNTIME_DIR/mcp-configs/generic/mcp.json`:
+
+**AgentBuilder** — `$GENU_RUNTIME_DIR/mcp-configs/agent-builder/mcp.json`:
+
+Add under `mcpServers`:
 
 ```json
 "spec-driven-presentation-maker": {
@@ -209,11 +220,9 @@ Add the following entry to `$GENU_RUNTIME_DIR/mcp-configs/generic/mcp.json` unde
 }
 ```
 
-`SDPM_OUTPUT_DIR` tells the skill where to write generated files. GenU's AgentCore Runtime requires output files to be under `/tmp/ws` so that the built-in `upload_file_to_s3_and_retrieve_s3_url` tool can upload them to S3 and return a download URL to the user.
+`SDPM_OUTPUT_DIR` tells the skill where to write generated files. GenU requires output files under `/tmp/ws` so that `upload_file_to_s3_and_retrieve_s3_url` can upload them to S3.
 
 ### Step 4: Deploy
-
-Deploy GenU with CDK as usual. The AgentCore container image will be rebuilt with sdpm bundled in:
 
 ```bash
 cd <path-to-genu>
@@ -232,11 +241,9 @@ User → GenU Web UI → Strands Agent (AgentCore Runtime)
                            └── S3 URL → User
 ```
 
-The agent follows sdpm's `server_instructions` to execute the presentation workflow (briefing → outline → compose → review → generate), then uploads the resulting PPTX to S3 and returns the download URL.
-
 ### Usage: AgentCore Chat
 
-AgentCore Chat works out of the box — the agent automatically discovers sdpm tools via `mcp.json` and receives `server_instructions`. Simply type your request:
+Works out of the box. The agent automatically discovers sdpm tools and receives `server_instructions`. Simply type your request:
 
 ```
 AWS Lambdaについて1枚のエグゼクティブ向けスライドを作って
@@ -244,7 +251,7 @@ AWS Lambdaについて1枚のエグゼクティブ向けスライドを作って
 
 ### Usage: AgentBuilder
 
-When creating an agent in AgentBuilder, select `spec-driven-presentation-maker` from the MCP server list and add the following system prompt:
+When creating an agent in AgentBuilder, select `spec-driven-presentation-maker` from the MCP server list and set the following system prompt:
 
 ```
 You are a presentation design assistant. Use the spec-driven-presentation-maker MCP tools to create PowerPoint slides.
@@ -257,7 +264,7 @@ Key rules:
 
 ### Important: `slides_json` parameter
 
-In sandboxed environments like AgentCore, the Code Interpreter runs in an isolated sandbox. Files written by Code Interpreter (`writeFiles`) are **not visible** to MCP tools like `generate_pptx`. Instead, pass the presentation JSON directly as a string:
+In AgentCore, the Code Interpreter runs in an isolated sandbox. Files written by Code Interpreter (`writeFiles`) are **not visible** to MCP tools like `generate_pptx`. Instead, pass the presentation JSON directly as a string:
 
 ```
 generate_pptx(slides_json='{"template":"sample_template_dark","slides":[...]}', template="sample_template_dark")
