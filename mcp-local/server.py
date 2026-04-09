@@ -122,32 +122,21 @@ def analyze_template(template_path: str, layout: str = "") -> str:
 
 @mcp.tool()
 def generate_pptx(
-    slides_json_path: str = "",
-    slides_json: str = "",
+    slides_json_path: str,
     template: str = "",
     output_path: str = "",
 ) -> str:
-    """Generate PPTX from slides JSON. Provide EITHER slides_json_path OR slides_json.
+    """Generate PPTX from a JSON file. Call after building all slides.
+    Template is auto-detected from presentation.json if init_presentation was used — no need to specify again.
 
     Args:
-        slides_json_path: Path to a JSON file on disk.
-        slides_json: JSON string with the presentation data (use this when you cannot write files to disk).
-        template: Optional template override (e.g. "sample_template_dark").
-        output_path: Optional output .pptx path. Auto-generated if empty.
+        slides_json_path: Path to the slides JSON file.
+        template: Optional template override. Usually not needed if init_presentation was used.
+        output_path: Optional output path. Auto-generated if empty.
 
     Returns:
         JSON with output file path and slide summary.
     """
-    if slides_json and not slides_json_path:
-        import tempfile
-        import os
-
-        base = os.environ.get("SDPM_OUTPUT_DIR") or tempfile.gettempdir()
-        os.makedirs(base, exist_ok=True)
-        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", dir=base, delete=False)
-        tmp.write(slides_json)
-        tmp.close()
-        slides_json_path = tmp.name
     return json.dumps(
         _generate_pptx(
             slides_json_path=slides_json_path, template=template, output_path=output_path, skill_dir=_SKILL_DIR
