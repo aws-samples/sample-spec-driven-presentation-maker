@@ -70,10 +70,32 @@ export class WebUiStack extends cdk.Stack {
     const oai = new cloudfront.OriginAccessIdentity(this, "OAI");
     siteBucket.grantRead(oai);
 
+    // CloudFront Function to rewrite directory requests to index.html
+    // (S3 REST API does not support index documents for subdirectories)
+    const urlRewrite = new cloudfront.Function(this, "UrlRewrite", {
+      code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+  if (uri.endsWith('/')) {
+    request.uri += 'index.html';
+  } else if (!uri.includes('.')) {
+    request.uri += '/index.html';
+  }
+  return request;
+}
+`),
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+    });
+
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
         origin: new origins.S3Origin(siteBucket, { originAccessIdentity: oai }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        functionAssociations: [{
+          function: urlRewrite,
+          eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+        }],
       },
       defaultRootObject: "index.html",
       errorResponses: [
