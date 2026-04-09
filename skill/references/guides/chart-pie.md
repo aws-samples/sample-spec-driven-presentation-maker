@@ -21,6 +21,18 @@ Pie/donut charts for proportions and breakdowns.
 - `fontColor`, `fontSize`: text
 - `legendPosition`: legend position (bottom/right/left/top)
 
+These can be set as a `style` object:
+```json
+"style": {"fontColor": "#333", "fontSize": 10, "legendPosition": "bottom"}
+```
+
+## Additional properties
+
+- `title`: chart title text
+- `titleFontSize`: title font size (default: 14)
+- `titleFontColor`: title color
+- `holeSize`: donut hole size in % (donut only)
+
 ## JSON: Cost breakdown
 
 ```json

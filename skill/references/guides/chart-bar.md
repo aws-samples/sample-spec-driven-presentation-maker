@@ -23,10 +23,38 @@ Bar charts (vertical, horizontal, stacked) for comparison data.
 
 ## Style-adjustable properties
 - `gapWidth`: gap between bars (default: clustered=80, stacked=60)
+- `overlap`: overlap between clustered bars (default: -10, negative=gap, positive=overlap)
 - `gridlineColor`, `gridlineWidth`, `gridlineDash`: gridlines
 - `axisColor`, `axisWidth`: axis lines
 - `fontColor`, `fontSize`: text
 - `legendPosition`: legend position (bottom/right/left/top)
+
+These can be set either as top-level `style` object or individually:
+```json
+"style": {
+  "gapWidth": 80, "gridlineColor": "#E0E0E0", "gridlineWidth": 0.25,
+  "gridlineDash": "dash", "axisColor": "#CCC", "axisWidth": 0.5,
+  "fontColor": "#333", "fontSize": 10, "legendPosition": "bottom"
+}
+```
+
+## Axis control
+
+```json
+"valueAxis": {"min": 0, "max": 100, "majorUnit": 20, "gridlines": true, "line": "none", "tickMark": "none"},
+"categoryAxis": {"tickMark": "none"}
+```
+
+- `gridlines: false` removes gridlines entirely
+- `line: "none"` hides the axis line
+- `tickMark: "none"` hides tick marks
+
+## Additional properties
+
+- `title`: chart title text
+- `titleFontSize`: title font size (default: 14)
+- `titleFontColor`: title color
+- `pointColors`: per-bar colors `{"0": "#FF0000", "2": "#00FF00"}` (index → color)
 
 ## JSON: Vertical bar (comparison)
 

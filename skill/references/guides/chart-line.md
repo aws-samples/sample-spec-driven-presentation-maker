@@ -21,6 +21,29 @@ Line charts for time-series and trend data.
 - `markerSize`: marker size (default: 8)
 - `gridlineColor`, `gridlineWidth`, `gridlineDash`: gridlines
 - `fontColor`, `fontSize`: text
+- `legendPosition`: legend position (bottom/right/left/top)
+
+These can be set as a `style` object:
+```json
+"style": {
+  "lineWidth": 2.5, "markerSize": 8, "gridlineColor": "#E0E0E0",
+  "gridlineWidth": 0.25, "gridlineDash": "dash",
+  "fontColor": "#333", "fontSize": 10, "legendPosition": "bottom"
+}
+```
+
+## Axis control
+
+```json
+"valueAxis": {"min": 0, "max": 1000, "majorUnit": 200, "gridlines": true, "line": "none", "tickMark": "none"},
+"categoryAxis": {"tickMark": "none"}
+```
+
+## Additional properties
+
+- `title`: chart title text
+- `titleFontSize`: title font size (default: 14)
+- `titleFontColor`: title color
 
 ## JSON: Load test trend
 

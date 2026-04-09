@@ -109,7 +109,6 @@ class PPTXBuilder(
         self.keep_empty_placeholders = keep_empty_placeholders
         self.layouts = self._build_layout_map()
         self._base_dir = base_dir if base_dir is not None else Path(".")
-        self._table_style_map, self._default_table_style_id = self._build_table_style_map(template_path)
         self._clear_slides()
 
     @staticmethod
@@ -193,28 +192,6 @@ class PPTXBuilder(
             name = layout.name if layout.name else f"layout-{i+1:02d}"
             layouts[name] = i
         return layouts
-
-    @staticmethod
-    def _build_table_style_map(template_path):
-        """Build styleName → styleId mapping and default style ID from tableStyles.xml."""
-        import zipfile
-        from lxml import etree
-
-        ns = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
-        try:
-            with zipfile.ZipFile(str(template_path)) as z:
-                xml = z.read('ppt/tableStyles.xml')
-        except (KeyError, Exception):
-            return {}, None
-        root = etree.fromstring(xml)
-        default_id = root.get('def')
-        result = {}
-        for s in root.findall('a:tblStyle', ns):
-            name = s.get('styleName', '')
-            sid = s.get('styleId', '')
-            if name and sid:
-                result[name] = sid
-        return result, default_id
 
     def _clear_slides(self):
         while len(self.prs.slides) > 0:
