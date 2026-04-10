@@ -5,8 +5,12 @@ description = "AI-powered PowerPoint generation toolkit — from local CLI to fu
 requires-python = ">=3.10"
 dependencies = []
 
+[tool.uv.sources]
+sdpm-skill = { path = "skill", editable = true }
+
 [dependency-groups]
 dev = [
+    "sdpm-skill",
     "pytest>=9.0.2",
     "ruff",
     "python-pptx",
