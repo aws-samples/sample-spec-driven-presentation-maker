@@ -53,6 +53,7 @@ const TOOL_META: Record<string, { Icon: LucideIcon; label: string }> = {
   run_python:         { Icon: Code,            label: "Running code" },
   code_to_slide:      { Icon: Code,            label: "Code to slide" },
   pptx_to_json:       { Icon: FileText,        label: "Converting PPTX" },
+  grid:               { Icon: LayoutTemplate,  label: "Computing layout" },
 }
 
 /**

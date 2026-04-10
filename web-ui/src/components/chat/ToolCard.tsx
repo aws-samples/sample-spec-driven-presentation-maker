@@ -88,6 +88,7 @@ const TOOL_META: Record<string, ToolMeta> = {
   run_python:         { Icon: Code,            label: "Running code",           category: "compute" },
   code_to_slide:      { Icon: Code,            label: "Code to slide",          category: "build" },
   pptx_to_json:       { Icon: FileText,        label: "Converting PPTX",        category: "explore" },
+  grid:               { Icon: LayoutTemplate,  label: "Computing layout",       category: "compute" },
   // MCP prefixed tools (Strands adds prefix from MCPClient)
   spec_driven_presentation_maker_init_presentation:  { Icon: FolderPlus,     label: "Initializing deck",     category: "build" },
   spec_driven_presentation_maker_analyze_template:   { Icon: LayoutTemplate, label: "Analyzing template",    category: "explore" },
@@ -107,6 +108,7 @@ const TOOL_META: Record<string, ToolMeta> = {
   spec_driven_presentation_maker_run_python:         { Icon: Code,           label: "Running code",          category: "compute" },
   spec_driven_presentation_maker_code_to_slide:      { Icon: Code,           label: "Code to slide",         category: "build" },
   spec_driven_presentation_maker_pptx_to_json:       { Icon: FileText,       label: "Converting PPTX",       category: "explore" },
+  spec_driven_presentation_maker_grid:               { Icon: LayoutTemplate, label: "Computing layout",      category: "compute" },
 }
 
 /**
