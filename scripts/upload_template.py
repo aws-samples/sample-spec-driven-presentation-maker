@@ -12,7 +12,7 @@ Upload a PowerPoint template to S3 and register in DynamoDB.
 Runs analyze-template automatically and stores results in DDB.
 
 Usage:
-    python scripts/upload_template.py \
+    uv run python scripts/upload_template.py \
         --file template.pptx \
         --name "Corporate 2026" \
         --bucket my-sdpm-bucket \

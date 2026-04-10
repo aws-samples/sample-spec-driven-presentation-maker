@@ -107,7 +107,7 @@ skill/templates/
 テンプレートを S3 にアップロードし、Amazon DynamoDB に登録します。
 
 ```bash
-python scripts/upload_template.py \
+uv run python scripts/upload_template.py \
   --file my-template.pptx \
   --name "Corporate 2026" \
   --bucket <ResourceBucketName> \
@@ -205,7 +205,7 @@ skill/assets/
 ### S3 へのアセットアップロード（Layer 3）
 
 ```bash
-python scripts/upload_assets.py \
+uv run python scripts/upload_assets.py \
   --dir ./my-icons/ \
   --bucket <ResourceBucketName> \
   --category icons

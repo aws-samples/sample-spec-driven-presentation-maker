@@ -107,7 +107,7 @@ skill/templates/
 Upload the template to S3 and register it in DynamoDB:
 
 ```bash
-python scripts/upload_template.py \
+uv run python scripts/upload_template.py \
   --file my-template.pptx \
   --name "Corporate 2026" \
   --bucket <ResourceBucketName> \
@@ -205,7 +205,7 @@ Now reference as `assets:mybrand/my-logo`.
 ### Uploading Assets to S3 (Layer 3)
 
 ```bash
-python scripts/upload_assets.py \
+uv run python scripts/upload_assets.py \
   --dir ./my-icons/ \
   --bucket <ResourceBucketName> \
   --category icons
