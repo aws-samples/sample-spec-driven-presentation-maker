@@ -42,6 +42,23 @@ Spec-driven presentation applies the concept of Spec-Driven Development from sof
 
 Copy `skill/` to your Kiro CLI skills directory. The engine, references, and sample templates are all included.
 
+You can also install the engine as a Python package:
+
+```bash
+# Latest
+pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git#subdirectory=skill
+
+# Specific version
+pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git@v0.1.0#subdirectory=skill
+```
+
+Check the installed version:
+
+```python
+import sdpm
+print(sdpm.__version__)
+```
+
 ### Layer 2: Local MCP Server
 
 ```bash
