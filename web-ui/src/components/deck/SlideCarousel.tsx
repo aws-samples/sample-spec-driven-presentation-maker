@@ -132,28 +132,38 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
    *
    * @returns JSX element for the empty slides state
    */
+  const WAIT_COLORS = [
+    "oklch(0.75 0.14 185)", "oklch(0.82 0.16 75)",
+    "oklch(0.70 0.18 330)", "oklch(0.78 0.15 145)",
+  ]
+
   function renderSlidesEmpty(): React.ReactNode {
     if (isLoading) {
       return (
         <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-          <div className="flex flex-col items-center gap-5">
-            <div className="relative w-28 h-20">
-              {/* Slides developing like photos — rising and fading in */}
+          <div className="build-waiting flex flex-col items-center gap-6">
+            <div className="relative" style={{ width: 200, height: 80 }}>
               {[0, 1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="absolute rounded-md border border-brand-teal/20 overflow-hidden"
+                  className="build-card absolute rounded-lg overflow-hidden"
                   style={{
-                    width: 48,
-                    height: 32,
-                    left: i * 20,
+                    width: 72,
+                    height: 48,
+                    left: i * 34,
                     bottom: 0,
-                    animation: `build-develop 2.8s ease-in-out ${i * 0.35}s infinite`,
-                  }}
+                    border: `1.5px solid ${WAIT_COLORS[i]}`,
+                    "--card-color": WAIT_COLORS[i],
+                    animation: `build-develop 2.8s ease-in-out ${i * 0.3}s infinite, build-glow-pulse 2.8s ease-in-out ${i * 0.3}s infinite`,
+                  } as React.CSSProperties}
                 >
-                  {/* Shimmer sweep across each card */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-brand-teal/15 to-transparent"
-                    style={{ animation: `build-shimmer 2.8s ease-in-out ${i * 0.35}s infinite` }}
+                  <div
+                    className="build-shimmer-el absolute inset-0"
+                    style={{
+                      background: `linear-gradient(90deg, transparent, ${WAIT_COLORS[i]}40, transparent)`,
+                      opacity: 0.35,
+                      animation: `build-shimmer 2.8s ease-in-out ${i * 0.3}s infinite`,
+                    }}
                   />
                 </div>
               ))}
@@ -162,10 +172,13 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
               <p className="text-sm font-medium text-foreground">Building your slides</p>
               <p className="text-xs text-foreground-secondary mt-1">This usually takes a few seconds…</p>
             </div>
-            <div className="w-40 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+            <div className="w-48 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
               <div
-                className="h-full rounded-full bg-brand-teal/60"
-                style={{ animation: "progress-sweep 2.5s ease-in-out infinite" }}
+                className="h-full rounded-full"
+                style={{
+                  background: `linear-gradient(90deg, ${WAIT_COLORS[0]}, ${WAIT_COLORS[1]})`,
+                  animation: "progress-sweep 2.5s ease-in-out infinite",
+                }}
               />
             </div>
           </div>
@@ -175,22 +188,43 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
         {workflowPhase === "slides" ? (
-          <div className="flex flex-col items-center gap-5">
-            <div className="relative w-24 h-16">
-              {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="absolute left-1/2 rounded-md border border-brand-teal/15"
-                  style={{
-                    width: 56,
-                    height: 36,
-                    bottom: i * 4,
-                    "--fan-r": `${(i - 1.5) * 4}deg`,
-                    background: `oklch(0.16 0.02 185 / ${0.7 - i * 0.12})`,
-                    animation: `compose-fan 2.4s ease-in-out ${i * 0.15}s infinite`,
-                  } as React.CSSProperties}
-                />
-              ))}
+          <div className="compose-waiting flex flex-col items-center gap-6">
+            <div className="relative" style={{ width: 160, height: 100 }}>
+              {[0, 1, 2, 3].map((i) => {
+                const color = WAIT_COLORS[i]
+                return (
+                  <div
+                    key={i}
+                    className="compose-card absolute left-1/2 rounded-lg overflow-hidden"
+                    style={{
+                      width: 80,
+                      height: 50,
+                      bottom: i * 5,
+                      "--fan-r": `${(i - 1.5) * 8}deg`,
+                      border: `1.5px solid ${color}`,
+                      background: `oklch(0.14 0.01 260 / ${0.8 - i * 0.1})`,
+                      boxShadow: `0 0 12px ${color}30`,
+                      animation: `compose-fan 2.4s ease-in-out ${i * 0.15}s infinite`,
+                    } as React.CSSProperties}
+                  >
+                    {/* Inner content lines */}
+                    <div className="p-1.5 flex flex-col gap-1">
+                      {[0, 1, 2].map((j) => (
+                        <div
+                          key={j}
+                          className="h-[2.5px] rounded-full"
+                          style={{
+                            width: `${70 - j * 15}%`,
+                            background: color,
+                            opacity: 0.3,
+                            animation: `compose-inner-line 2.4s ease-in-out ${i * 0.15 + j * 0.2}s infinite`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
             <p className="text-sm text-muted-foreground">Composing slides…</p>
           </div>
