@@ -135,13 +135,15 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
         if key:
             thumb_url = presigned_url(s3_client, BUCKET_NAME, key)
         else:
-            # Fallback: first slide PNG uses sequential naming (slide_01.png)
-            s3_key = f"previews/{deck_id}/slide_01.png"
-            try:
-                s3_client.head_object(Bucket=BUCKET_NAME, Key=s3_key)
-                thumb_url = presigned_url(s3_client, BUCKET_NAME, s3_key)
-            except Exception:
-                pass
+            # Fallback: first slide preview (webp preferred, png fallback)
+            for ext in ("webp", "png"):
+                s3_key = f"previews/{deck_id}/slide_01.{ext}"
+                try:
+                    s3_client.head_object(Bucket=BUCKET_NAME, Key=s3_key)
+                    thumb_url = presigned_url(s3_client, BUCKET_NAME, s3_key)
+                    break
+                except Exception:
+                    pass
 
         extras[deck_id] = {"thumbnailUrl": thumb_url}
     return extras
@@ -368,13 +370,15 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         presentation = json.loads(resp["Body"].read())
         for i, s in enumerate(presentation.get("slides", [])):
             sid = f"slide_{i + 1:02d}"
-            preview_key = f"previews/{deck_id}/{sid}.png"
             preview_url = None
-            try:
-                s3_client.head_object(Bucket=BUCKET_NAME, Key=preview_key)
-                preview_url = presigned_url(s3_client, BUCKET_NAME, preview_key)
-            except Exception:
-                pass
+            for ext in ("webp", "png"):
+                preview_key = f"previews/{deck_id}/{sid}.{ext}"
+                try:
+                    s3_client.head_object(Bucket=BUCKET_NAME, Key=preview_key)
+                    preview_url = presigned_url(s3_client, BUCKET_NAME, preview_key)
+                    break
+                except Exception:
+                    pass
             slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": preview_url}
             if include_json:
                 slide_entry["slideJson"] = json.dumps(s)
@@ -596,15 +600,17 @@ def search_slides_api() -> Dict[str, Any]:
             continue
         seen.add(dedup_key)
 
-        # Generate preview URL — slideId matches PNG filename (e.g. slide_01.png)
+        # Generate preview URL — slideId matches preview filename (webp preferred)
         preview_url = ""
         if deck_id and slide_id:
-            s3_key = f"previews/{deck_id}/{slide_id}.png"
-            try:
-                s3_client.head_object(Bucket=BUCKET_NAME, Key=s3_key)
-                preview_url = presigned_url(s3_client, BUCKET_NAME, s3_key)
-            except Exception:
-                pass
+            for ext in ("webp", "png"):
+                s3_key = f"previews/{deck_id}/{slide_id}.{ext}"
+                try:
+                    s3_client.head_object(Bucket=BUCKET_NAME, Key=s3_key)
+                    preview_url = presigned_url(s3_client, BUCKET_NAME, s3_key)
+                    break
+                except Exception:
+                    pass
 
         results.append({
             "deckId": deck_id,

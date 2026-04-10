@@ -108,11 +108,15 @@ def handle_png(payload: dict) -> None:
     if not png_files:
         raise FileNotFoundError(f"No PNGs generated in {work_dir}")
 
-    # Upload PNGs with sequential naming (slide_01, slide_02, ...)
+    # Upload as WebP (smaller than PNG) with sequential naming (slide_01, slide_02, ...)
+    from PIL import Image
+
     for i, png_path in enumerate(png_files):
-        s3_key = f"previews/{deck_id}/slide_{i + 1:02d}.png"
+        webp_path = png_path.with_suffix(".webp")
+        Image.open(png_path).save(webp_path, "WEBP", quality=85)
 
-        s3_client.upload_file(str(png_path), bucket, s3_key, ExtraArgs={"ContentType": "image/png"})
-        logger.info("PNG uploaded: s3://%s/%s", bucket, s3_key)
+        s3_key = f"previews/{deck_id}/slide_{i + 1:02d}.webp"
+        s3_client.upload_file(str(webp_path), bucket, s3_key, ExtraArgs={"ContentType": "image/webp"})
+        logger.info("WebP uploaded: s3://%s/%s", bucket, s3_key)
 
-    logger.info("PNG generation complete: %d pages for deck %s", len(png_files), deck_id)
+    logger.info("Preview generation complete: %d pages for deck %s", len(png_files), deck_id)
