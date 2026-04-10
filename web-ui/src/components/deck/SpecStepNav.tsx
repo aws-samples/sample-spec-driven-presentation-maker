@@ -277,7 +277,14 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     }
   }, [])
 
-  // Outline tab uses the dedicated timeline renderer.
+  // Outline tab: show waiting animation when no content, timeline when content exists.
+  if (specKey === "outline" && !content) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
+        <OutlineWaiting />
+      </div>
+    )
+  }
   if (specKey === "outline") {
     return <OutlineView content={content} />
   }
