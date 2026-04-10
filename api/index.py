@@ -785,6 +785,23 @@ def presign_upload() -> Dict[str, Any]:
 _TEXT_EXTRACTABLE = {"text/plain", "text/markdown", "application/json"}
 
 
+def _extract_pptx_text(s3_key: str) -> str:
+    """Extract slide text from PPTX using zipfile + XML (no python-pptx needed)."""
+    import io, zipfile, re
+    obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=s3_key)
+    data = obj["Body"].read()
+    slides_text = []
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        slide_names = sorted(n for n in zf.namelist() if re.match(r"ppt/slides/slide\d+\.xml$", n))
+        for name in slide_names:
+            xml = zf.read(name).decode("utf-8")
+            texts = re.findall(r"<a:t>([^<]+)</a:t>", xml)
+            if texts:
+                slide_num = re.search(r"slide(\d+)", name).group(1)
+                slides_text.append(f"--- Slide {slide_num} ---\n" + "\n".join(texts))
+    return "\n\n".join(slides_text)
+
+
 @app.post("/uploads/<upload_id>/process")
 def process_upload(upload_id: str) -> Dict[str, Any]:
     """Process an uploaded file — extract text for text-based files."""
@@ -804,12 +821,22 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
     expr_names = {"#st": "status"}
 
     extracted_text = None
+    _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     if file_type in _TEXT_EXTRACTABLE and s3_key:
         try:
             obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=s3_key)
             extracted_text = obj["Body"].read().decode("utf-8")
             update_expr_parts.append("extractedText = :et")
-            expr_values[":et"] = extracted_text[:50000]  # cap at 50k chars
+            expr_values[":et"] = extracted_text[:50000]
+            expr_values[":st"] = "completed"
+        except Exception:
+            expr_values[":st"] = "completed"
+    elif file_type == _PPTX_MIME and s3_key:
+        try:
+            extracted_text = _extract_pptx_text(s3_key)
+            if extracted_text:
+                update_expr_parts.append("extractedText = :et")
+                expr_values[":et"] = extracted_text[:50000]
             expr_values[":st"] = "completed"
         except Exception:
             expr_values[":st"] = "completed"

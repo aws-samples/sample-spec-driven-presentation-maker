@@ -79,6 +79,13 @@ def read_uploaded_file(upload_id: str) -> str:
     extracted_text = item.get("extractedText")
     if extracted_text:
         file_name = item.get("fileName", "unknown")
+        file_type = item.get("fileType", "")
+        _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        if file_type == _PPTX_MIME:
+            return (
+                f"## Content of {file_name}\n\n{extracted_text}\n\n"
+                f"---\nTo edit this PPTX, use pptx_to_json(deck_id=..., upload_id=\"{upload_id}\") to convert to editable JSON."
+            )
         return f"## Content of {file_name}\n\n{extracted_text}"
 
     # For binary files, return guidance based on type
