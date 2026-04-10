@@ -81,6 +81,14 @@ export class AgentStack extends cdk.Stack {
       })
     );
 
+    // AWS MCP service (IAM-authenticated Knowledge MCP endpoint)
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["aws-mcp:*"],
+        resources: ["*"],
+      })
+    );
+
     // ECR pull
     role.addToPolicy(
       new iam.PolicyStatement({
@@ -140,6 +148,7 @@ export class AgentStack extends cdk.Stack {
         DECKS_TABLE: props.table.tableName,
         PPTX_BUCKET: props.pptxBucket.bucketName,
         AWS_DEFAULT_REGION: this.region,
+        DEPLOY_TIMESTAMP: new Date().toISOString(),
       },
       description: "spec-driven-presentation-maker Strands Agent — connects to MCP Server for slide generation",
     });

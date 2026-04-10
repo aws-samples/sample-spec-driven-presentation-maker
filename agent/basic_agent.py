@@ -42,9 +42,10 @@ app = BedrockAgentCoreApp()
 #     - For MCP servers deployed on Amazon Bedrock AgentCore Runtime with JWT authentication
 #     - Requires: Runtime ARN, caller's JWT token
 #
-#   Pattern 2: Public Remote MCP (no auth)
-#     - For publicly accessible MCP servers (e.g. AWS Knowledge MCP)
-#     - Requires: URL only
+#   Pattern 2: IAM-authenticated Remote MCP (with public fallback)
+#     - For AWS-managed MCP servers (e.g. AWS Knowledge MCP)
+#     - Primary: IAM-authenticated endpoint via mcp-proxy-for-aws
+#     - Fallback: Public unauthenticated endpoint
 #
 #   Pattern 3: Local stdio MCP
 #     - For MCP servers that run as local processes
@@ -83,17 +84,31 @@ def _mcp_agentcore_runtime(jwt_token: str) -> MCPClient:
 
 
 def _mcp_aws_knowledge() -> MCPClient:
-    """Pattern 2: Public Remote MCP Server (no authentication).
+    """Pattern 2: IAM-authenticated AWS Knowledge MCP with public fallback.
 
     AWS Knowledge MCP provides access to AWS documentation, API references,
     What's New, Well-Architected guidance, and blog posts.
 
+    Primary: IAM-authenticated endpoint (higher rate limits).
+    Fallback: Public unauthenticated endpoint.
+
     Returns:
         MCPClient for AWS Knowledge MCP.
     """
-    return MCPClient(
-        lambda: streamablehttp_client(url="https://knowledge-mcp.global.api.aws"),
-    )
+    region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
+    try:
+        from mcp_proxy_for_aws.client import aws_iam_streamablehttp_client
+        return MCPClient(
+            lambda: aws_iam_streamablehttp_client(
+                endpoint=f"https://aws-mcp.{region}.api.aws/mcp",
+                aws_service="aws-mcp",
+            ),
+        )
+    except Exception:
+        logger.warning("IAM auth unavailable for AWS Knowledge MCP, using public endpoint")
+        return MCPClient(
+            lambda: streamablehttp_client(url="https://knowledge-mcp.global.api.aws"),
+        )
 
 
 def _mcp_aws_pricing() -> MCPClient:
@@ -155,6 +170,13 @@ def _build_system_prompt(mcp_instructions: str) -> str:
 # Agent Factory
 # ---------------------------------------------------------------------------
 
+# MCP server definitions: (factory, display_name, required)
+_MCP_DEFS: list[tuple[str, bool]] = [
+    ("Presentation Maker", True),
+    ("AWS Knowledge", False),
+    ("AWS Pricing", False),
+]
+
 
 def _collect_mcp_instructions(mcp_servers: list[MCPClient]) -> str:
     """Collect server_instructions from all MCP servers.
@@ -177,11 +199,12 @@ def _collect_mcp_instructions(mcp_servers: list[MCPClient]) -> str:
     return "\n\n".join(sections)
 
 
-def create_agent(user_id: str, session_id: str, jwt_token: str) -> Agent:
+def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, list[dict]]:
     """Create a Strands Agent with MCP tools and memory.
 
     MCP servers are initialized first so that server_instructions can be
     collected and injected into the system prompt (MCP spec compliance).
+    Optional MCP servers that fail to initialize are skipped.
 
     Args:
         user_id: User identifier (JWT sub claim).
@@ -189,7 +212,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> Agent:
         jwt_token: JWT access token for MCP Server authentication.
 
     Returns:
-        Configured Strands Agent instance.
+        Tuple of (Configured Strands Agent instance, MCP status list).
     """
     memory_id = os.environ.get("MEMORY_ID", "")
     region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
@@ -211,31 +234,70 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> Agent:
         temperature=0.1,
     )
 
-    # --- Register MCP Servers ---
-    mcp_servers = [
-        _mcp_agentcore_runtime(jwt_token=jwt_token),  # Pattern 1: sdpm (AgentCore + JWT)
-        _mcp_aws_knowledge(),       # Pattern 2: AWS docs (public, no auth)
-        _mcp_aws_pricing(),         # Pattern 3: AWS pricing (local stdio)
+    # --- Build MCP server list with resilience ---
+    factories = [
+        lambda: _mcp_agentcore_runtime(jwt_token=jwt_token),
+        _mcp_aws_knowledge,
+        _mcp_aws_pricing,
     ]
 
-    # Collect server_instructions from MCP servers for system prompt injection.
-    # Agent.__init__ triggers tool loading which initializes all MCP clients,
-    # so server_instructions is available after Agent creation.
-    agent = Agent(
-        name="SdpmAgent",
-        system_prompt="",  # placeholder — replaced below after MCP init
-        tools=[*mcp_servers, read_uploaded_file, list_uploads, web_fetch],
-        model=model,
-        session_manager=session_manager,
-        trace_attributes={"user.id": user_id, "session.id": session_id},
-    )
+    mcp_servers: list[MCPClient] = []
+    mcp_status: list[dict] = []
+
+    for (name, required), factory in zip(_MCP_DEFS, factories):
+        try:
+            mcp_servers.append(factory())
+            mcp_status.append({"name": name, "status": "ok"})
+        except Exception as e:
+            mcp_status.append({"name": name, "status": "error", "error": str(e)})
+            if required:
+                raise
+
+    # Agent.__init__ triggers MCP client connections.
+    # If optional MCP servers fail during init, retry with required-only.
+    tools = [*mcp_servers, read_uploaded_file, list_uploads, web_fetch]
+    try:
+        agent = Agent(
+            name="SdpmAgent",
+            system_prompt="",
+            tools=tools,
+            model=model,
+            session_manager=session_manager,
+            trace_attributes={"user.id": user_id, "session.id": session_id},
+        )
+    except Exception as init_err:
+        init_reason = str(init_err)
+        logger.warning("Agent init failed with all MCP servers, retrying with required-only: %s", init_reason)
+        # Keep only required MCP servers
+        required_servers = []
+        new_status = []
+        for (name, required), st in zip(_MCP_DEFS, mcp_status):
+            if required and st["status"] == "ok":
+                required_servers.append(mcp_servers[len(new_status)])
+                new_status.append(st)
+            else:
+                if st["status"] == "ok":
+                    new_status.append({"name": name, "status": "error", "error": "Service unavailable"})
+                else:
+                    new_status.append(st)
+
+        mcp_servers = required_servers
+        mcp_status = new_status
+        agent = Agent(
+            name="SdpmAgent",
+            system_prompt="",
+            tools=[*mcp_servers, read_uploaded_file, list_uploads, web_fetch],
+            model=model,
+            session_manager=session_manager,
+            trace_attributes={"user.id": user_id, "session.id": session_id},
+        )
 
     # Now that MCP clients are initialized, inject their instructions.
     agent.system_prompt = _build_system_prompt(
         mcp_instructions=_collect_mcp_instructions(mcp_servers),
     )
 
-    return agent
+    return agent, mcp_status
 
 
 # ---------------------------------------------------------------------------
@@ -370,7 +432,11 @@ async def agent_stream(payload, context):
 
     try:
         os.environ["_CURRENT_SESSION_ID"] = session_id
-        agent = create_agent(user_id=user_id, session_id=session_id, jwt_token=jwt_token)
+        agent, mcp_status = create_agent(user_id=user_id, session_id=session_id, jwt_token=jwt_token)
+
+        # Emit MCP status as the first SSE event
+        yield {"mcp_status": mcp_status}
+
         _fix_excess_tool_results(agent.messages)
 
         async def _next(aiter):
