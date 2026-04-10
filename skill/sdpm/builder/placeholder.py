@@ -97,32 +97,40 @@ class PlaceholderMixin:
         self._fill_placeholders(slide, d)
     
     def _set_bullet(self, paragraph, char=None):
-        """Set bullet point formatting on paragraph."""
+        """Set bullet point formatting from master's bodyStyle definition."""
         from pptx.oxml.ns import qn
         from lxml import etree
         
+        level = paragraph.level or 0
+        style = self._list_styles.get(level, {})
+        
         pPr = paragraph._element.get_or_add_pPr()
-        pPr.set('marL', '285750')
-        pPr.set('indent', '-285750')
+        if style.get('marL'):
+            pPr.set('marL', style['marL'])
+        if style.get('indent'):
+            pPr.set('indent', style['indent'])
         
-        # Add bullet font
-        buFont = etree.SubElement(pPr, qn('a:buFont'))
-        buFont.set('typeface', 'Arial')
-        
-        # Add bullet character
-        buChar = etree.SubElement(pPr, qn('a:buChar'))
-        buChar.set('char', char or '•')
+        bu_font = style.get('buFont', 'Arial')
+        bu_char = char or style.get('buChar', '•')
+        font_elem = etree.SubElement(pPr, qn('a:buFont'))
+        font_elem.set('typeface', bu_font)
+        char_elem = etree.SubElement(pPr, qn('a:buChar'))
+        char_elem.set('char', bu_char)
     
     def _set_numbering(self, paragraph, numbering_type='arabicPeriod'):
-        """Set numbering formatting on paragraph."""
+        """Set numbering formatting, using master's marL/indent for indentation."""
         from pptx.oxml.ns import qn
         from lxml import etree
         
-        pPr = paragraph._element.get_or_add_pPr()
-        pPr.set('marL', '285750')
-        pPr.set('indent', '-285750')
+        level = paragraph.level or 0
+        style = self._list_styles.get(level, {})
         
-        # Add auto numbering
+        pPr = paragraph._element.get_or_add_pPr()
+        if style.get('marL'):
+            pPr.set('marL', style['marL'])
+        if style.get('indent'):
+            pPr.set('indent', style['indent'])
+        
         buAutoNum = etree.SubElement(pPr, qn('a:buAutoNum'))
         buAutoNum.set('type', numbering_type)
     

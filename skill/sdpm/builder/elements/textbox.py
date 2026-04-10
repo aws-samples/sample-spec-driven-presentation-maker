@@ -40,7 +40,7 @@ class TextboxMixin:
             ns = 'http://schemas.openxmlformats.org/drawingml/2006/main'
             # If paragraphs have bullets, remove buNone from lstStyle
             has_bullets = any(
-                (p.get('bullet') if isinstance(p, dict) else False)
+                (p.get('list') if isinstance(p, dict) else False)
                 for p in (elem.get('paragraphs') or [])
             )
             if has_bullets:
@@ -151,24 +151,24 @@ class TextboxMixin:
                 # Check if it's a dict with bullet/numbering info or just a string
                 if isinstance(para_item, dict):
                     para_text = para_item.get("text", "")
-                    has_bullet = para_item.get("bullet", False)
-                    numbering = para_item.get("numbering")
+                    list_def = para_item.get("list")
                 else:
                     para_text = para_item
-                    has_bullet = False
-                    numbering = None
+                    list_def = None
                 
-                # Apply bullet or numbering
-                if numbering:
-                    p.level = 0
-                    self._set_numbering(p, numbering)
-                elif has_bullet:
-                    p.level = 0
-                    self._set_bullet(p)
+                # Apply list (bullet or numbering)
+                if list_def and isinstance(list_def, dict):
+                    list_type = list_def.get("type", "disc")
+                    p.level = list_def.get("level", 0)
+                    if list_type == "disc":
+                        self._set_bullet(p)
+                    else:
+                        self._set_numbering(p, list_type)
                 
                 # Apply text
                 if para_text:
-                    self._apply_styled_text(p, para_text, default_color=default_color, default_font_size=default_font_size, font_family=font_family, no_default_font=has_lst_style)
+                    para_font_size = para_item.get("fontSize", default_font_size) if isinstance(para_item, dict) else default_font_size
+                    self._apply_styled_text(p, para_text, default_color=default_color, default_font_size=para_font_size, font_family=font_family, no_default_font=has_lst_style)
                 
                 # Apply line spacing percentage (must be before spcBef/spcAft in XML)
                 if isinstance(para_item, dict) and para_item.get("lineSpacingPct"):
@@ -205,7 +205,7 @@ class TextboxMixin:
                     p.alignment = align_map.get(effective_align, PP_ALIGN.LEFT)
                 
                 # Add buNone if lstStyle has bullet defs but paragraph has no bullet
-                if has_lst_style and not (isinstance(para_item, dict) and para_item.get("bullet")):
+                if has_lst_style and not (isinstance(para_item, dict) and para_item.get("list")):
                     from lxml import etree as _et
                     from pptx.oxml.ns import qn as _qn
                     pPr = p._element.get_or_add_pPr()

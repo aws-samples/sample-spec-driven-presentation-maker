@@ -109,6 +109,7 @@ class PPTXBuilder(
         self.keep_empty_placeholders = keep_empty_placeholders
         self.layouts = self._build_layout_map()
         self._base_dir = base_dir if base_dir is not None else Path(".")
+        self._list_styles = self._load_list_styles()
         self._clear_slides()
 
     @staticmethod
@@ -192,6 +193,34 @@ class PPTXBuilder(
             name = layout.name if layout.name else f"layout-{i+1:02d}"
             layouts[name] = i
         return layouts
+
+    def _load_list_styles(self):
+        """Load bullet/numbering definitions from slide master's bodyStyle."""
+        from pptx.oxml.ns import qn
+        master = self.prs.slide_masters[self.master_idx]
+        tx_styles = master._element.find(qn('p:txStyles'))
+        if tx_styles is None:
+            return {}
+        body_style = tx_styles.find(qn('p:bodyStyle'))
+        if body_style is None:
+            return {}
+        styles = {}
+        for i, lvl in enumerate(body_style):
+            bu_char = lvl.find(qn('a:buChar'))
+            bu_font = lvl.find(qn('a:buFont'))
+            bu_auto_num = lvl.find(qn('a:buAutoNum'))
+            entry = {
+                'marL': lvl.get('marL'),
+                'indent': lvl.get('indent'),
+            }
+            if bu_char is not None:
+                entry['buChar'] = bu_char.get('char')
+            if bu_font is not None:
+                entry['buFont'] = bu_font.get('typeface')
+            if bu_auto_num is not None:
+                entry['buAutoNum'] = bu_auto_num.get('type')
+            styles[i] = entry
+        return styles
 
     def _clear_slides(self):
         while len(self.prs.slides) > 0:
@@ -356,6 +385,9 @@ class PPTXBuilder(
         self.theme_colors["text"] = saved_text
         self.theme_colors["background"] = saved_bg
         self.is_dark = saved_is_dark
+
+        if slide_def.get("hidden"):
+            slide._element.set("show", "0")
 
         return slide
 
