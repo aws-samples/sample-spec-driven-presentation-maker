@@ -769,10 +769,89 @@ def presign_upload() -> Dict[str, Any]:
 
     table.put_item(Item={
         "PK": deck_pk(user_id), "SK": upload_sk(upload_id),
-        "fileName": file_name, "contentType": content_type, "fileSize": file_size,
-        "s3Key": s3_key, "status": "uploaded", "createdAt": now_iso(),
+        "fileName": file_name, "fileType": content_type, "fileSize": file_size,
+        "s3KeyRaw": s3_key, "status": "uploading", "createdAt": now_iso(),
     })
     return {"uploadId": upload_id, "presignedUrl": url, "s3Key": s3_key}
+
+
+# Text-extractable MIME types (can be read directly from S3 in Lambda)
+_TEXT_EXTRACTABLE = {"text/plain", "text/markdown", "application/json"}
+
+
+@app.post("/uploads/<upload_id>/process")
+def process_upload(upload_id: str) -> Dict[str, Any]:
+    """Process an uploaded file — extract text for text-based files."""
+    user_id = get_user_id(app.current_event)
+    body = app.current_event.json_body or {}
+    session_id: str = body.get("sessionId", "")
+
+    resp = table.get_item(Key={"PK": deck_pk(user_id), "SK": upload_sk(upload_id)})
+    item = resp.get("Item")
+    if not item:
+        raise app.not_found()
+
+    file_type = item.get("fileType", "")
+    s3_key = item.get("s3KeyRaw", "")
+    update_expr_parts = ["#st = :st", "sessionId = :sid"]
+    expr_values: Dict[str, Any] = {":sid": session_id}
+    expr_names = {"#st": "status"}
+
+    extracted_text = None
+    if file_type in _TEXT_EXTRACTABLE and s3_key:
+        try:
+            obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=s3_key)
+            extracted_text = obj["Body"].read().decode("utf-8")
+            update_expr_parts.append("extractedText = :et")
+            expr_values[":et"] = extracted_text[:50000]  # cap at 50k chars
+            expr_values[":st"] = "completed"
+        except Exception:
+            expr_values[":st"] = "completed"
+    else:
+        # Binary files (PDF, DOCX, PPTX, images): mark completed,
+        # agent reads directly from S3 via presigned URL or further processing
+        expr_values[":st"] = "completed"
+
+    table.update_item(
+        Key={"PK": deck_pk(user_id), "SK": upload_sk(upload_id)},
+        UpdateExpression="SET " + ", ".join(update_expr_parts),
+        ExpressionAttributeValues=expr_values,
+        ExpressionAttributeNames=expr_names,
+    )
+
+    image_url = None
+    if file_type.startswith("image/") and s3_key:
+        image_url = presigned_url(s3_client, BUCKET_NAME, s3_key)
+
+    return {
+        "uploadId": upload_id,
+        "status": expr_values[":st"],
+        "extractedText": extracted_text,
+        "imageUrl": image_url,
+    }
+
+
+@app.get("/uploads/<upload_id>/status")
+def get_upload_status(upload_id: str) -> Dict[str, Any]:
+    """Return current processing status of an upload."""
+    user_id = get_user_id(app.current_event)
+    resp = table.get_item(Key={"PK": deck_pk(user_id), "SK": upload_sk(upload_id)})
+    item = resp.get("Item")
+    if not item:
+        raise app.not_found()
+
+    image_url = None
+    if item.get("fileType", "").startswith("image/") and item.get("s3KeyRaw"):
+        image_url = presigned_url(s3_client, BUCKET_NAME, item["s3KeyRaw"])
+
+    return {
+        "uploadId": upload_id,
+        "fileName": item.get("fileName", ""),
+        "fileType": item.get("fileType", ""),
+        "status": item.get("status", "unknown"),
+        "extractedText": item.get("extractedText"),
+        "imageUrl": image_url,
+    }
 
 
 # ---------------------------------------------------------------------------
