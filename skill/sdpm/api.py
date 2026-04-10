@@ -193,6 +193,10 @@ def generate(
         dtc = "#FFFFFF" if is_dark else "#333333"
         warnings.append(f"defaultTextColor auto-set to {dtc}")
 
+    # Lint slide JSON
+    from sdpm.schema.lint import lint as lint_slides
+    lint_diagnostics = lint_slides(data)
+
     # Validate icons
     missing = validate_icons_in_json(data)
     if missing:
@@ -251,13 +255,16 @@ def generate(
             title = title.get("text", "(no title)")
         summary.append(f"page{i:02d} - {title}")
 
-    return {
+    result = {
         "output_path": str(out),
         "slide_count": len(slides),
         "slides": summary,
         "warnings": warnings,
         "pdf_path": str(pdf_path) if pdf_path and pdf_path.exists() else None,
     }
+    if lint_diagnostics:
+        result["errors"] = {"lintDiagnostics": lint_diagnostics}
+    return result
 
 
 def preview(

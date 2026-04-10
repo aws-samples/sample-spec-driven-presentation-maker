@@ -145,6 +145,10 @@ def generate_pptx(
         default_text_color=presentation.get("defaultTextColor"),
     )
 
+    # Lint slide JSON
+    from sdpm.schema.lint import lint as lint_slides
+    lint_diagnostics = lint_slides(presentation)
+
     # Build id_map for resolve_override
     id_map: dict[str, dict] = {}
     for s in slides:
@@ -260,4 +264,6 @@ def generate_pptx(
     }
     if warnings:
         result["warnings"] = warnings
+    if lint_diagnostics:
+        result["errors"] = {"lintDiagnostics": lint_diagnostics}
     return result
