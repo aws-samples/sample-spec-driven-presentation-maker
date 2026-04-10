@@ -12,7 +12,7 @@ Upload a PowerPoint template to S3 and register in DynamoDB.
 Runs analyze-template automatically and stores results in DDB.
 
 Usage:
-    python scripts/upload_template.py \
+    uv run python scripts/upload_template.py \
         --file template.pptx \
         --name "Corporate 2026" \
         --bucket my-sdpm-bucket \
@@ -58,7 +58,7 @@ def main() -> None:
     try:
         from pathlib import Path as P
         from sdpm.analyzer import analyze_template, extract_fonts
-        analysis = analyze_template(args.file)
+        analysis = analyze_template(P(args.file))
         analysis_json = json.dumps(analysis, ensure_ascii=False)
         fonts = extract_fonts(P(args.file))
         print(f"Template analysis complete: {len(analysis.get('layouts', []))} layouts, fonts={fonts}")

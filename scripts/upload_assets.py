@@ -16,7 +16,7 @@ Manifest schema (Layer 1 compatible):
     [{"name": "Amazon S3", "file": "s3.svg", "tags": ["storage"]}]
 
 Usage:
-    python scripts/upload_assets.py \
+    uv run python scripts/upload_assets.py \
         --dir ./my-icons/ \
         --bucket my-resource-bucket \
         --source my-brand \
