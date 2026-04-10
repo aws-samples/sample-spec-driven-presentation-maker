@@ -20,4 +20,3 @@
 - Breaking changes must always bump MAJOR
 - No release needed for internal-only refactoring
 - Git tag format: `v{MAJOR}.{MINOR}.{PATCH}` (e.g., `v0.1.0`)
-- After tag push, create GitHub Releases with key changes noted
