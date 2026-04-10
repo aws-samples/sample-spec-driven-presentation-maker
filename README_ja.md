@@ -42,6 +42,23 @@
 
 `skill/` を Kiro CLI のスキルディレクトリにコピーするだけで使えます。
 
+エンジンを Python パッケージとしてインストールすることもできます:
+
+```bash
+# 最新版
+pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git#subdirectory=skill
+
+# バージョン指定
+pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git@v0.1.0#subdirectory=skill
+```
+
+インストール済みバージョンの確認:
+
+```python
+import sdpm
+print(sdpm.__version__)
+```
+
 ### Layer 2: ローカル MCP サーバー
 
 ```bash

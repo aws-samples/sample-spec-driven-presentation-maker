@@ -50,6 +50,8 @@ web-ui/public/aws-exports.json
 !.kiro/steering/
 .kiro/steering/*
 !.kiro/steering/principles.md
+!.kiro/steering/versioning.md
+!.kiro/steering/steering-policy.md
 
 # Config (contains secrets)
 infra/config.yaml
