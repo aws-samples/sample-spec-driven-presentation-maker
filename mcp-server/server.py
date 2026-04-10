@@ -269,7 +269,7 @@ def pptx_to_json(deck_id: str, upload_id: str) -> str:
 
     # Download PPTX to temp file and convert
     with tempfile.NamedTemporaryFile(suffix=".pptx", delete=True) as tmp:
-        data = _storage.download_file(s3_key)
+        data = _storage.download_file_from_pptx_bucket(s3_key)
         tmp.write(data)
         tmp.flush()
         result = _convert(tmp.name)

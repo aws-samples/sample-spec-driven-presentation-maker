@@ -13,6 +13,9 @@ import os
 import boto3
 from strands import tool
 
+# Module-level state — set by basic_agent.py before tool invocation
+_current_user_id: str = ""
+
 
 def _get_table():
     """Get the DynamoDB Table resource for decks.
@@ -43,9 +46,6 @@ def read_uploaded_file(upload_id: str) -> str:
     Returns:
         Extracted text content, or an error/status message.
     """
-    # Get user_id from module-level state (set by basic_agent.py)
-    from tools.deck_tools import _current_user_id
-
     table = _get_table()
     resp = table.get_item(Key={"PK": f"USER#{_current_user_id}", "SK": f"UPLOAD#{upload_id}"})
     item = resp.get("Item")
@@ -138,8 +138,6 @@ def list_uploads(session_id: str) -> str:
     Returns:
         JSON list of uploads with their status and file names.
     """
-    from tools.deck_tools import _current_user_id
-
     table = _get_table()
 
     # Query all uploads for this user and filter by sessionId
