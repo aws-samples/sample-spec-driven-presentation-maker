@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT-0
 "use client"
 
-import { ReactNode, useEffect, useSyncExternalStore } from "react"
-import { useAutoSignin } from "react-oidc-context"
+import { ReactNode, useEffect, useRef, useSyncExternalStore } from "react"
+import { useAuth, useAutoSignin } from "react-oidc-context"
 
 /**
  * AutoSigninContent — uses the official useAutoSignin hook from react-oidc-context.
@@ -22,16 +22,22 @@ function AutoSigninContent({ children }: { children: ReactNode }) {
     signinMethod: "signinRedirect",
   })
 
+  // On auth error, clear stale OIDC state and retry sign-in once
+  const auth = useAuth()
+  const retried = useRef(false)
+  useEffect(() => {
+    if (error && !retried.current) {
+      retried.current = true
+      auth.removeUser().then(() => auth.signinRedirect())
+    }
+  }, [error, auth])
+
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen text-xl">Signing in...</div>
   }
 
   if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen text-xl text-red-400">
-        Authentication error: {error.message}
-      </div>
-    )
+    return <div className="flex items-center justify-center min-h-screen text-xl">Signing in...</div>
   }
 
   if (!isAuthenticated) {
