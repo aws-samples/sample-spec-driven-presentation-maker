@@ -236,6 +236,53 @@ def analyze_template(template: str) -> str:
     )
 
 
+# --- Conversion Tools ---
+
+
+@mcp.tool()
+def pptx_to_json(deck_id: str, upload_id: str) -> str:
+    """Convert an uploaded PPTX file to JSON representation for editing.
+    Downloads the PPTX from S3, converts via Engine, and saves presentation.json to the deck workspace.
+
+    Args:
+        deck_id: The deck ID to save the converted JSON into.
+        upload_id: The upload ID of the PPTX file.
+
+    Returns:
+        JSON with slide count and conversion status.
+    """
+    import tempfile
+    from sdpm.converter import pptx_to_json as _convert
+
+    _check_deck_access(deck_id, action="write")
+    user_id = _get_user_id()
+
+    # Look up upload record from DynamoDB
+    resp = _storage.table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"UPLOAD#{upload_id}"})
+    item = resp.get("Item")
+    if not item:
+        return json.dumps({"error": f"Upload {upload_id} not found"})
+
+    s3_key = item.get("s3KeyRaw", "")
+    if not s3_key:
+        return json.dumps({"error": "No S3 key for upload"})
+
+    # Download PPTX to temp file and convert
+    with tempfile.NamedTemporaryFile(suffix=".pptx", delete=True) as tmp:
+        data = _storage.download_file(s3_key)
+        tmp.write(data)
+        tmp.flush()
+        result = _convert(tmp.name)
+
+    # Save as presentation.json in deck workspace
+    pres_json = json.dumps(result, ensure_ascii=False)
+    pres_key = f"decks/{deck_id}/presentation.json"
+    _storage.upload_file(key=pres_key, data=pres_json.encode("utf-8"), content_type="application/json")
+
+    slide_count = len(result.get("slides", []))
+    return json.dumps({"status": "ok", "slideCount": slide_count, "deckId": deck_id})
+
+
 # --- Generation Tools ---
 
 

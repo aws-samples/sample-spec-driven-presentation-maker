@@ -81,12 +81,18 @@ def read_uploaded_file(upload_id: str) -> str:
         file_name = item.get("fileName", "unknown")
         return f"## Content of {file_name}\n\n{extracted_text}"
 
-    # For images, return presigned URL
+    # For binary files, return guidance based on type
     file_type = item.get("fileType", "")
-    if file_type.startswith("image/") or file_type in (
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "application/pdf",
-    ):
+    file_name = item.get("fileName", "unknown")
+
+    _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    if file_type == _PPTX_MIME:
+        return (
+            f"PPTX file: {file_name} (uploadId: {upload_id}). "
+            f"Use pptx_to_json(deck_id=..., upload_id=\"{upload_id}\") to convert to editable JSON."
+        )
+
+    if file_type.startswith("image/"):
         s3_key = item.get("s3KeyRaw")
         if s3_key:
             bucket = os.environ.get("PPTX_BUCKET")
@@ -97,10 +103,7 @@ def read_uploaded_file(upload_id: str) -> str:
                 Params={"Bucket": bucket, "Key": s3_key},
                 ExpiresIn=900,
             )
-            file_name = item.get("fileName", "unknown")
-            if file_type.startswith("image/"):
-                return f"Image file: {file_name}. Presigned URL: {url}"
-            return f"Binary file: {file_name} ({file_type}). Use init_deck with this presigned URL to convert: {url}"
+            return f"Image file: {file_name}. Presigned URL: {url}"
 
     # Try reading from S3 extracted key
     s3_key_extracted = item.get("s3KeyExtracted")
