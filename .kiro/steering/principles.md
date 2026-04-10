@@ -1,3 +1,5 @@
+<!-- PUBLIC: This file is git-tracked and visible in the public repository. -->
+
 # Principles
 
 ## Architecture: 3-Layer Structure
