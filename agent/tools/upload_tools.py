@@ -82,7 +82,11 @@ def read_uploaded_file(upload_id: str) -> str:
         return f"## Content of {file_name}\n\n{extracted_text}"
 
     # For images, return presigned URL
-    if item.get("fileType", "").startswith("image/"):
+    file_type = item.get("fileType", "")
+    if file_type.startswith("image/") or file_type in (
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/pdf",
+    ):
         s3_key = item.get("s3KeyRaw")
         if s3_key:
             bucket = os.environ.get("PPTX_BUCKET")
@@ -93,7 +97,10 @@ def read_uploaded_file(upload_id: str) -> str:
                 Params={"Bucket": bucket, "Key": s3_key},
                 ExpiresIn=900,
             )
-            return f"Image file. Presigned URL: {url}"
+            file_name = item.get("fileName", "unknown")
+            if file_type.startswith("image/"):
+                return f"Image file: {file_name}. Presigned URL: {url}"
+            return f"Binary file: {file_name} ({file_type}). Use init_deck with this presigned URL to convert: {url}"
 
     # Try reading from S3 extracted key
     s3_key_extracted = item.get("s3KeyExtracted")
