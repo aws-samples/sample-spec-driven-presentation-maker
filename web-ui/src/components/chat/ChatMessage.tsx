@@ -21,7 +21,7 @@
 import { useState, useEffect } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { ChevronRight, Sparkles } from "lucide-react"
+import { ChevronRight, Sparkles, FileText as FileTextIcon, Image as ImageIcon } from "lucide-react"
 import { ToolCard, ToolCardCompact } from "./ToolCard"
 import { SnippetBlock } from "./SnippetBlock"
 import { batchGetSlidePreviewUrls } from "@/services/deckService"
@@ -138,12 +138,13 @@ interface ChatMessageProps {
   /** Ordered text/tool blocks for inline display. Falls back to content+toolUses if absent. */
   blocks?: MessageBlock[]
   snippets?: { label: string; text: string }[]
+  attachments?: { fileName: string; fileType: string }[]
   isStreaming?: boolean
   /** Cognito ID token for fetching slide previews. */
   idToken?: string
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], isStreaming = false, idToken }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken }: ChatMessageProps) {
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
@@ -159,6 +160,8 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
   if (inlineSnippets.length > 0) {
     cleanContent = content.replace(/\n*---snippet---\n[\s\S]*?---\/snippet---/g, "").trim()
   }
+  // Strip [Attached: ...] markers from display text
+  cleanContent = cleanContent.replace(/\[Attached:\s*[^\]]+\]\n*/g, "").trim()
   const allSnippets = [...inlineSnippets, ...snippets]
 
   // Fetch preview URLs for [slide-preview:deckId:slideId] markers
@@ -216,8 +219,20 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
       <div className={isUser ? "max-w-[85%]" : "flex-1 min-w-0"}>
         {isUser ? (
           /* User bubble */
-          <div className="text-[13px] leading-relaxed break-words px-3.5 py-2.5 rounded-2xl rounded-br-md bg-brand-teal-soft border border-brand-teal/15 whitespace-pre-wrap">
-            {MENTION_RE.test(cleanContent) ? highlightMentions(cleanContent) : cleanContent}
+          <div className="text-[13px] leading-relaxed break-words px-3.5 py-2.5 rounded-2xl rounded-br-md bg-brand-teal-soft border border-brand-teal/15">
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {attachments.map((att, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] border border-border/40 bg-background/30">
+                    {att.fileType.startsWith("image/")
+                      ? <ImageIcon className="h-3 w-3 text-blue-400" />
+                      : <FileTextIcon className="h-3 w-3 text-orange-400" />}
+                    <span className="max-w-[140px] truncate">{att.fileName}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+            <span className="whitespace-pre-wrap">{MENTION_RE.test(cleanContent) ? highlightMentions(cleanContent) : cleanContent}</span>
           </div>
         ) : hasBlocks ? (
           /* Assistant: inline blocks layout */
