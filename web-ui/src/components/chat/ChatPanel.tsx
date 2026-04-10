@@ -22,6 +22,7 @@ import { getChatHistory, listDecks, patchDeck, DeckSummary } from "@/services/de
 import { uploadFile, validateFile, canAddMoreFiles, UploadedFile } from "@/services/uploadService"
 import { useCompositionSafe } from "@/hooks/useCompositionSafe"
 import { ChatMessage, ToolUse } from "./ChatMessage"
+import { McpStatusBar, McpServerStatus } from "./McpStatusBar"
 import { MentionOverlay } from "./MentionOverlay"
 import { MentionPopup, MentionItem } from "./MentionPopup"
 import { PlusMenu } from "./PlusMenu"
@@ -39,6 +40,7 @@ interface Message {
   /** Ordered sequence of text and tool blocks for inline display. */
   blocks?: { type: "text"; text: string }[] | { type: "tool"; tool: ToolUse }[]
   snippets?: { label: string; text: string }[]
+  mcpStatus?: McpServerStatus[]
 }
 
 /** Shape of tool-use callback data from the agent streaming API. */
@@ -523,6 +525,22 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         accessToken,
         userId,
         (toolName: string, toolUseData: ToolUseCallbackData | undefined) => {
+          // MCP status event — show on first message, or when status changes
+          if (toolName === '__mcp_status__' && toolUseData && 'mcpStatus' in toolUseData) {
+            const incoming = (toolUseData as unknown as { mcpStatus: McpServerStatus[] }).mcpStatus
+            setMessages((prev) => {
+              // Find the last mcpStatus in history
+              const lastStatus = [...prev].reverse().find((m) => m.mcpStatus)?.mcpStatus
+              // Skip if identical to previous
+              if (lastStatus && JSON.stringify(lastStatus) === JSON.stringify(incoming)) return prev
+              const updated = [...prev]
+              const last = updated[updated.length - 1]
+              updated[updated.length - 1] = { ...last, mcpStatus: incoming }
+              return updated
+            })
+            return
+          }
+
           // Tool result (completed) — detect deckId from any tool's result
           if (toolUseData?.completed && toolUseData?.result?.deckId && onDeckCreated) {
             // Link chat session to deck for history restore
@@ -737,16 +755,22 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           ) : (
             <div className="space-y-4">
               {messages.map((msg, i) => (
-                <ChatMessage
-                  key={i}
-                  role={msg.role}
-                  content={msg.content}
-                  toolUses={msg.toolUses}
-                  blocks={msg.blocks}
-                  snippets={msg.snippets}
-                  isStreaming={isLoading && i === messages.length - 1}
-                  idToken={auth.user?.id_token}
-                />
+                <div key={i}>
+                  {msg.mcpStatus && (
+                    <div className="mb-2 ml-10">
+                      <McpStatusBar servers={msg.mcpStatus} />
+                    </div>
+                  )}
+                  <ChatMessage
+                    role={msg.role}
+                    content={msg.content}
+                    toolUses={msg.toolUses}
+                    blocks={msg.blocks}
+                    snippets={msg.snippets}
+                    isStreaming={isLoading && i === messages.length - 1}
+                    idToken={auth.user?.id_token}
+                  />
+                </div>
               ))}
               <div ref={messagesEndRef} />
             </div>

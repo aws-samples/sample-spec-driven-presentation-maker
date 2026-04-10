@@ -50,6 +50,12 @@ export const parseStreamingChunk = (line, currentCompletion, updateCallback, too
     // Keep-alive
     if (json.keepalive) return currentCompletion;
 
+    // MCP status event — pass to toolCallback with special type
+    if (json.mcp_status) {
+      if (toolCallback) toolCallback('__mcp_status__', { mcpStatus: json.mcp_status });
+      return currentCompletion;
+    }
+
     // Tool start events — tool is now executing (no input yet)
     if (json.toolStart) {
       const toolUseId = json.toolStart.toolUseId;
