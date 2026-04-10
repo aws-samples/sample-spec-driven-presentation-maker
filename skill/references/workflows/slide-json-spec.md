@@ -261,18 +261,18 @@ Height includes the language label (22px). Code body height is `height - 22`.
 **Bullets / numbered lists**:
 ```json
 {"type": "textbox", "paragraphs": [
-  {"text": "Item 1", "bullet": true},
-  {"text": "Step 1", "numbering": "arabicPeriod"}
+  {"text": "Item 1", "list": {"type": "disc"}},
+  {"text": "Step 1", "list": {"type": "arabicPeriod"}}
 ]}
 ```
 
 - `spaceAfter`: space after paragraph (hundredths of a point. 800 = 8pt). Works in textbox `paragraphs` and shape `items`
 ```json
-{"text": "Item 1", "bullet": true, "spaceAfter": 800}
+{"text": "Item 1", "list": {"type": "disc"}, "spaceAfter": 800}
 ```
-- `level`: paragraph level (0=top, 1=sub, 2=sub-sub). For nested bullets
+- `list.level`: paragraph level (0=top, 1=sub, 2=sub-sub). For nested lists
 ```json
-{"text": "Sub-item", "bullet": true, "level": 1}
+{"text": "Sub-item", "list": {"type": "disc", "level": 1}}
 ```
 - `lineSpacingPct`: line spacing (percent × 1000. 120000 = 120%)
 ```json
@@ -365,7 +365,7 @@ Height includes the language label (22px). Code body height is `height - 22`.
   "flipH": false,
   "flipV": false,
   "text": "Label",
-  "paragraphs": [{"text": "Title", "fontSize": 24, "align": "center"}, {"text": "Body", "bullet": true}],
+  "paragraphs": [{"text": "Title", "fontSize": 24, "align": "center"}, {"text": "Body", "list": {"type": "disc"}}],
   "fontSize": 14,
   "align": "left|center|right",
   "verticalAlign": "top|middle|bottom",

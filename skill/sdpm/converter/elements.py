@@ -614,7 +614,7 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
             
             # Empty paragraph
             if not paragraph.text.strip():
-                paragraphs.append({"text": "", "bullet": False})
+                paragraphs.append({"text": ""})
                 continue
             
             # Check for bullet or numbering
@@ -660,10 +660,16 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
             
             item_text = _extract_styled_text(paragraph.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, is_placeholder=is_placeholder, paragraph=paragraph)
             para_info = {"text": item_text}
-            if has_bullet:
-                para_info["bullet"] = True
-            elif numbering_type:
-                para_info["numbering"] = numbering_type
+            if has_bullet or numbering_type:
+                list_def = {}
+                if numbering_type:
+                    list_def["type"] = numbering_type
+                else:
+                    list_def["type"] = "disc"
+                level = paragraph.level if paragraph.level else 0
+                if level > 0:
+                    list_def["level"] = level
+                para_info["list"] = list_def
             if bu_font:
                 para_info["buFont"] = bu_font
             if mar_l is not None:
