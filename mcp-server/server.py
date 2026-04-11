@@ -274,7 +274,7 @@ def pptx_to_json(deck_id: str, upload_id: str) -> str:
             data = _storage.download_file_from_pptx_bucket(s3_key)
             tmp.write(data)
             tmp.flush()
-            result = _convert(tmp.name)
+            result = _convert(Path(tmp.name))
 
         # Save as presentation.json in deck workspace
         pres_json = json.dumps(result, ensure_ascii=False)
@@ -283,7 +283,13 @@ def pptx_to_json(deck_id: str, upload_id: str) -> str:
 
         slide_count = len(result.get("slides", []))
         logger.info("pptx_to_json completed: deck=%s slides=%s", deck_id, slide_count)
-        return json.dumps({"status": "ok", "slideCount": slide_count, "deckId": deck_id})
+        return json.dumps({
+            "status": "ok",
+            "slideCount": slide_count,
+            "deckId": deck_id,
+            "jsonPath": "presentation.json",
+            "hint": f'Use run_python(deck_id="{deck_id}") with open("presentation.json") to read/edit the converted JSON.',
+        })
     except Exception as e:
         logger.exception("pptx_to_json failed: deck=%s upload=%s", deck_id, upload_id)
         return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
@@ -340,9 +346,16 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
         return [{"type": "text", "text": "Error: slide_numbers must not be empty"}]
     if quality not in ("low", "high"):
         quality = "high"
-    return preview.get_preview(
-        deck_id=deck_id, slide_numbers=slide_numbers, storage=_storage, quality=quality,
-    )
+    try:
+        return preview.get_preview(
+            deck_id=deck_id, slide_numbers=slide_numbers, storage=_storage, quality=quality,
+        )
+    except _storage._s3.exceptions.NoSuchKey:
+        return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first, then wait for PNG worker to finish."}]
+    except Exception as e:
+        if "NoSuchKey" in str(e):
+            return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first, then wait for PNG worker to finish."}]
+        raise
 
 
 # --- Asset Tools ---
