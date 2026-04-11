@@ -787,7 +787,9 @@ _TEXT_EXTRACTABLE = {"text/plain", "text/markdown", "application/json"}
 
 def _extract_pptx_text(s3_key: str) -> str:
     """Extract slide text from PPTX using zipfile + XML (no python-pptx needed)."""
-    import io, zipfile, re
+    import io
+    import re
+    import zipfile
     obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=s3_key)
     data = obj["Body"].read()
     slides_text = []
