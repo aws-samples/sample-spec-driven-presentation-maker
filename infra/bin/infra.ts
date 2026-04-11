@@ -23,7 +23,6 @@ import * as path from "path";
 import { DataStack } from "../lib/data-stack";
 import { AuthStack } from "../lib/auth-stack";
 import { RuntimeStack } from "../lib/runtime-stack";
-import { PngWorkerStack } from "../lib/png-worker-stack";
 import { AgentStack } from "../lib/agent-stack";
 import { WebUiStack } from "../lib/web-ui-stack";
 
@@ -65,16 +64,6 @@ const searchSlides = config.features?.searchSlides === true;
 const observability = config.features?.observability === true;
 const data = new DataStack(app, "SdpmData", { env, searchSlides, observability });
 
-// --- Optional: PNG Worker (must be created before Runtime for queue URL) ---
-let pngWorker: PngWorkerStack | undefined;
-if (config.stacks?.pngWorker) {
-  pngWorker = new PngWorkerStack(app, "SdpmPngWorker", {
-    env,
-    table: data.table,
-    pptxBucket: data.pptxBucket,
-  });
-}
-
 const runtime = new RuntimeStack(app, "SdpmRuntime", {
   env,
   table: data.table,
@@ -82,8 +71,6 @@ const runtime = new RuntimeStack(app, "SdpmRuntime", {
   resourceBucket: data.resourceBucket,
   oidcDiscoveryUrl,
   allowedClients,
-  pngQueueUrl: pngWorker?.queueUrl,
-  pngQueue: pngWorker?.queue,
   kbSsmParamName: data.kbSsmParamName || undefined,
   vectorBucketName: data.vectorBucketName || undefined,
   vectorIndexName: data.vectorIndexName || undefined,

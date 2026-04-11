@@ -9,7 +9,6 @@
 #   ./scripts/deploy.sh                    # Layer 4 full stack (default)
 #   ./scripts/deploy.sh --layer3           # Layer 3 only (MCP Server)
 #   ./scripts/deploy.sh --layer4           # Layer 4 explicit
-#   ./scripts/deploy.sh --layer3 --no-png  # Layer 3 without PNG Worker
 #   ./scripts/deploy.sh --destroy          # Tear down all stacks
 #
 # Prerequisites:
@@ -23,7 +22,6 @@ set -euo pipefail
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 PROFILE=""
 LAYER="4"
-PNG_WORKER="true"
 SEARCH_SLIDES="false"
 OBSERVABILITY="false"
 OIDC_URL=""
@@ -44,7 +42,6 @@ Options:
 
   --layer3                 Layer 3 only — MCP Server (no Agent, no Web UI)
   --layer4                 Layer 4 full stack — Agent + Web UI (default)
-  --no-png                 Disable PNG Worker
   --search                 Enable semantic slide search (Bedrock KB)
   --observability          Enable Bedrock Model Invocation Logging
 
@@ -64,7 +61,6 @@ while [[ $# -gt 0 ]]; do
     --profile)        PROFILE="$2"; shift 2 ;;
     --layer3)         LAYER="3"; shift ;;
     --layer4)         LAYER="4"; shift ;;
-    --no-png)         PNG_WORKER="false"; shift ;;
     --search)         SEARCH_SLIDES="true"; shift ;;
     --observability)  OBSERVABILITY="true"; shift ;;
     --oidc-url)       OIDC_URL="$2"; shift 2 ;;
@@ -95,7 +91,6 @@ ACCOUNT_ID=$(aws sts get-caller-identity ${AWS_OPTS} --query Account --output te
 echo "Account: ${ACCOUNT_ID}"
 echo "Region:  ${REGION}"
 echo "Layer:   ${LAYER}"
-echo "PNG:     ${PNG_WORKER}"
 echo "Search:  ${SEARCH_SLIDES}"
 echo "Observ:  ${OBSERVABILITY}"
 echo "Command: ${CDK_COMMAND}"
@@ -205,7 +200,6 @@ ENV_VARS_JSON=$(cat <<EOF
 [
   {"name":"STACK_AGENT",           "value":"${STACK_AGENT}",       "type":"PLAINTEXT"},
   {"name":"STACK_WEB_UI",          "value":"${STACK_WEB_UI}",      "type":"PLAINTEXT"},
-  {"name":"STACK_PNG_WORKER",      "value":"${PNG_WORKER}",        "type":"PLAINTEXT"},
   {"name":"FEATURE_SEARCH_SLIDES", "value":"${SEARCH_SLIDES}",     "type":"PLAINTEXT"},
   {"name":"FEATURE_OBSERVABILITY", "value":"${OBSERVABILITY}",     "type":"PLAINTEXT"},
   {"name":"AUTH_OIDC_URL",         "value":"${OIDC_URL}",          "type":"PLAINTEXT"},
