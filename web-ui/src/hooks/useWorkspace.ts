@@ -75,6 +75,7 @@ export function useWorkspace(
     if (pptxRequested) {
       stablePreviewUrls.current.clear()
       prevSlideKeyRef.current = ""
+      prevPngKeyRef.current = ""
     }
   }, [pptxRequested])
 
