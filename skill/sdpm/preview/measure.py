@@ -154,7 +154,7 @@ def split_svg_per_slide(svg_text: str) -> list[str]:
             new_root.append(deepcopy(d))
         # Append slide group
         new_root.append(deepcopy(slide_g))
-        result.append(etree.tostring(new_root, xml_declaration=True, encoding="unicode"))
+        result.append(etree.tostring(new_root, encoding="unicode"))
     return result
 
 
