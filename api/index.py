@@ -151,11 +151,12 @@ def _list_preview_keys(deck_id: str) -> dict:
     }
 
 
-def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: dict) -> Optional[str]:
+def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: dict) -> tuple[Optional[str], Optional[int]]:
     """Resolve the best preview URL for a slide from cached keys.
 
     Fallback order: webp > png.
-    Appends &_t=<epoch> cache-buster so clients detect S3 overwrites.
+    For S3 presigned URL fallback, appends &_t=<epoch> cache-buster.
+    CloudFront signed URLs are returned as-is (extra params break signature).
 
     Args:
         deck_id: Deck identifier.
@@ -163,16 +164,19 @@ def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: dict) -> Opt
         preview_keys: Dict mapping S3 key to LastModified epoch from _list_preview_keys.
 
     Returns:
-        Presigned URL or None.
+        Tuple of (presigned URL or None, LastModified epoch or None).
     """
     prefix = f"previews/{deck_id}/"
     for candidate in (f"{prefix}{slide_id}.webp", f"{prefix}{slide_id}.png"):
         if candidate in preview_keys:
             url = preview_url(candidate)
             if url:
-                sep = "&" if "?" in url else "?"
-                return f"{url}{sep}_t={preview_keys[candidate]}"
-    return None
+                mtime = preview_keys[candidate]
+                if "Key-Pair-Id=" not in url:
+                    sep = "&" if "?" in url else "?"
+                    url = f"{url}{sep}_t={mtime}"
+                return url, mtime
+    return None, None
 
 
 def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
@@ -198,7 +202,7 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
         else:
             # Fallback: first slide preview
             preview_keys = _list_preview_keys(deck_id)
-            thumb_url = _resolve_preview_url(deck_id, "slide_01", preview_keys)
+            thumb_url, _ = _resolve_preview_url(deck_id, "slide_01", preview_keys)
 
         extras[deck_id] = {"thumbnailUrl": thumb_url}
     return extras
@@ -426,8 +430,10 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         preview_keys = _list_preview_keys(deck_id)
         for i, s in enumerate(presentation.get("slides", [])):
             sid = f"slide_{i + 1:02d}"
-            slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
+            slide_preview, slide_mtime = _resolve_preview_url(deck_id, sid, preview_keys)
             slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
+            if slide_mtime is not None:
+                slide_entry["previewUpdatedAt"] = slide_mtime
             if include_json:
                 slide_entry["slideJson"] = json.dumps(s)
             slides.append(slide_entry)
@@ -655,7 +661,8 @@ def search_slides_api() -> Dict[str, Any]:
             # Lazy-load preview keys per deck
             if deck_id not in seen_decks:
                 seen_decks[deck_id] = _list_preview_keys(deck_id)
-            slide_preview_url = _resolve_preview_url(deck_id, slide_id, seen_decks[deck_id]) or ""
+            slide_preview_url, _ = _resolve_preview_url(deck_id, slide_id, seen_decks[deck_id])
+            slide_preview_url = slide_preview_url or ""
 
         results.append({
             "deckId": deck_id,
