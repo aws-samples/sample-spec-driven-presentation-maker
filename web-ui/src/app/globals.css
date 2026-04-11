@@ -45,6 +45,14 @@
 /* Dark Editorial × Minimal Luxury palette */
 :root {
   --radius: 0.75rem;
+  --wait-teal: oklch(0.75 0.14 185);
+  --wait-teal-dim: oklch(0.75 0.14 185 / 30%);
+  --wait-amber: oklch(0.82 0.16 75);
+  --wait-amber-dim: oklch(0.82 0.16 75 / 30%);
+  --wait-magenta: oklch(0.70 0.18 330);
+  --wait-magenta-dim: oklch(0.70 0.18 330 / 30%);
+  --wait-green: oklch(0.78 0.15 145);
+  --wait-green-dim: oklch(0.78 0.15 145 / 30%);
   --background: oklch(0.11 0.005 260);
   --background-raised: oklch(0.14 0.005 260);
   --background-hover: oklch(0.16 0.005 260);
@@ -107,54 +115,105 @@ body {
 
 /* ── Spec waiting states ── */
 
-/* Brief: writing cursor with expanding lines */
+/* Brief: page being written — lines expand with colorful glow cursor */
 @keyframes brief-line {
   0% { width: 0; opacity: 0; }
-  20% { opacity: 1; }
-  80% { opacity: 1; }
-  100% { width: 100%; opacity: 0.3; }
+  15% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { width: 100%; opacity: 0.5; }
 }
 @keyframes brief-cursor {
-  0%, 100% { opacity: 0; }
+  0%, 100% { opacity: 0.3; }
   50% { opacity: 1; }
 }
-
-/* Outline: blocks stacking up */
-@keyframes outline-block {
-  0% { transform: translateY(8px) scaleX(0.3); opacity: 0; }
-  40% { transform: translateY(0) scaleX(1); opacity: 1; }
-  80% { opacity: 1; }
-  100% { opacity: 0.25; }
+@keyframes brief-page-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
 }
+.brief-waiting { animation: brief-page-in 0.6s ease-out both; }
+.brief-waiting:hover .brief-cursor-glow {
+  box-shadow: 0 0 20px var(--wait-teal), 0 0 40px var(--wait-teal-dim);
+}
+.brief-waiting:hover .brief-line-el { animation-duration: 2s; }
 
-/* Art Direction: orbiting color dots */
+/* Outline: tree growing — trunk extends, nodes branch out */
+@keyframes outline-trunk-grow {
+  from { height: 0; }
+  to   { height: 100%; }
+}
+@keyframes outline-wait-node {
+  0% { opacity: 0; transform: translateX(-12px) scale(0.5); }
+  50% { opacity: 1; transform: translateX(0) scale(1.15); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes outline-wait-glow {
+  0%, 100% { box-shadow: 0 0 6px var(--node-color); }
+  50%      { box-shadow: 0 0 16px var(--node-color); }
+}
+@keyframes outline-wait-branch {
+  from { width: 0; opacity: 0; }
+  to   { width: 16px; opacity: 0.5; }
+}
+.outline-waiting:hover .outline-wait-node-el { animation-duration: 0.4s; }
+.outline-waiting:hover .outline-wait-glow-el { animation-duration: 1.5s; }
+
+/* Art Direction: orbiting color dots with glow trails */
 @keyframes art-orbit {
-  0% { transform: rotate(0deg) translateX(20px) rotate(0deg) scale(1); }
-  50% { transform: rotate(180deg) translateX(20px) rotate(-180deg) scale(1.3); }
-  100% { transform: rotate(360deg) translateX(20px) rotate(-360deg) scale(1); }
+  0% { transform: rotate(0deg) translateX(var(--orbit-r, 30px)) rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) translateX(var(--orbit-r, 30px)) rotate(-180deg) scale(1.3); }
+  100% { transform: rotate(360deg) translateX(var(--orbit-r, 30px)) rotate(-360deg) scale(1); }
 }
 @keyframes art-hue {
   0% { filter: hue-rotate(0deg); }
   100% { filter: hue-rotate(360deg); }
 }
+@keyframes art-center-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50%      { transform: scale(1.5); opacity: 0.8; }
+}
+.art-waiting:hover { --orbit-r: 22px; }
+.art-waiting:hover .art-dot { animation-duration: 2s; }
 
-/* Slides: cards fanning out */
+/* Slides: cards fanning out with colorful borders */
 @keyframes compose-fan {
   0%, 100% { transform: translateX(-50%) rotate(var(--fan-r)) translateY(0); opacity: 0.5; }
-  50% { transform: translateX(-50%) rotate(var(--fan-r)) translateY(-6px); opacity: 1; }
+  50% { transform: translateX(-50%) rotate(var(--fan-r)) translateY(-14px); opacity: 1; }
 }
+@keyframes compose-inner-line {
+  0% { width: 0; opacity: 0; }
+  50% { width: 100%; opacity: 0.6; }
+  100% { width: 100%; opacity: 0.2; }
+}
+.compose-waiting:hover .compose-card { animation-duration: 1.6s; }
 
-/* Build: slides developing like photos */
+/* Build: slides developing like photos with strong shimmer */
 @keyframes build-develop {
-  0% { opacity: 0; transform: translateY(8px) scale(0.92); background: oklch(0.14 0.02 185 / 0.3); }
-  30% { opacity: 1; transform: translateY(0) scale(1); background: oklch(0.18 0.03 185 / 0.6); }
-  70% { opacity: 1; background: oklch(0.18 0.03 185 / 0.6); }
-  100% { opacity: 0.3; transform: translateY(-2px) scale(0.98); background: oklch(0.14 0.02 185 / 0.3); }
+  0% { opacity: 0; transform: translateY(10px) scale(0.9); }
+  30% { opacity: 1; transform: translateY(0) scale(1); }
+  70% { opacity: 1; }
+  100% { opacity: 0.2; transform: translateY(-3px) scale(0.97); }
 }
 @keyframes build-shimmer {
-  0%, 30% { transform: translateX(-100%); }
+  0%, 20% { transform: translateX(-100%); }
   60%, 100% { transform: translateX(100%); }
 }
+@keyframes build-glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--card-color); }
+  40% { box-shadow: 0 0 12px 2px var(--card-color); }
+}
+.build-waiting:hover .build-card { animation-duration: 2s; }
+.build-waiting:hover .build-shimmer-el { opacity: 0.5; }
+
+/* ── Waiting → Content transition ── */
+@keyframes wait-fade-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.95); }
+}
+@keyframes content-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.content-enter { animation: content-fade-in 0.4s ease-out 0.15s both; }
 
 /* ── Card entrance ── */
 @keyframes card-in {
@@ -324,11 +383,17 @@ body {
   @keyframes tool-spinner { to { transform: rotate(360deg); } }
   @keyframes tool-active-shimmer { 0%, 100% { opacity: 0.8; } }
   @keyframes tool-pulse { 0%, 100% { opacity: 0.6; } }
-  @keyframes brief-line { 0%, 100% { opacity: 0.3; width: var(--w, 80%); } }
-  @keyframes brief-cursor { 0%, 100% { opacity: 0.5; } }
-  @keyframes outline-block { 0%, 100% { opacity: 0.4; transform: none; } }
-  @keyframes art-orbit { 0%, 100% { transform: none; } }
-  @keyframes art-hue { 0%, 100% { filter: none; } }
+  /* Waiting animations */
+  .brief-waiting,
+  .outline-waiting,
+  .art-waiting,
+  .compose-waiting,
+  .build-waiting { animation: none; }
+  .brief-waiting *,
+  .outline-waiting *,
+  .art-waiting *,
+  .compose-waiting *,
+  .build-waiting * { animation: none !important; }
   @keyframes compose-fan { 0%, 100% { transform: translateX(-50%); opacity: 0.5; } }
   @keyframes build-develop { 0%, 100% { opacity: 0.4; transform: none; } }
   @keyframes build-shimmer { 0%, 100% { transform: none; } }
