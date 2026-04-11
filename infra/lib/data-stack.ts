@@ -93,6 +93,23 @@ export class DataStack extends cdk.Stack {
       ],
     });
 
+    // Allow CloudFront OAC to read preview images (policy added here to avoid
+    // cross-stack dependency cycle between DataStack and WebUiStack).
+    this.pptxBucket.addToResourcePolicy(new iam.PolicyStatement({
+      sid: "AllowCloudFrontOACPreview",
+      effect: iam.Effect.ALLOW,
+      principals: [new iam.ServicePrincipal("cloudfront.amazonaws.com")],
+      actions: ["s3:GetObject"],
+      resources: [
+        `${this.pptxBucket.bucketArn}/previews/*`,
+        `${this.pptxBucket.bucketArn}/decks/*`,
+        `${this.pptxBucket.bucketArn}/pptx/*`,
+      ],
+      conditions: {
+        StringEquals: { "aws:SourceAccount": this.account },
+      },
+    }));
+
     this.resourceBucket = new s3.Bucket(this, "ResourceBucket", {
       encryption: s3.BucketEncryption.S3_MANAGED,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,

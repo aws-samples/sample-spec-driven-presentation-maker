@@ -16,6 +16,7 @@ import { Download, FileJson, Layers, Loader2, LayoutGrid, Rows3 } from "lucide-r
 import { useAuth } from "react-oidc-context"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
+import { PreviewImage } from "@/components/ui/PreviewImage"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 
@@ -285,6 +286,7 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
                 updated={updatedIds.has(slide.slideId)}
                 className="border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 cursor-pointer group"
               >
+
                 <span className="absolute bottom-1.5 right-2 text-[10px] font-medium text-white/30 group-hover:text-white/50 transition-colors">
                   {i + 1}
                 </span>
