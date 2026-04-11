@@ -15,6 +15,8 @@
 
 import { DeckDetail } from "@/services/deckService"
 import { Share2, Download, Layers } from "lucide-react"
+import { PreviewImage } from "@/components/ui/PreviewImage"
+import { useAuth } from "react-oidc-context"
 
 interface WorkspaceViewProps {
   deck: DeckDetail
@@ -41,6 +43,7 @@ function formatDate(iso: string): string {
 
 export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps) {
   const slideCount = deck.slides?.length || 0
+  const auth = useAuth()
 
   return (
     <div className="h-full flex flex-col animate-card-in">
@@ -90,8 +93,11 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
               >
                 <div className="aspect-[16/9] relative bg-muted/30">
                   {slide.previewUrl ? (
-                    <img
+                    <PreviewImage
                       src={slide.previewUrl}
+                      deckId={deck.deckId}
+                      slideId={slide.slideId}
+                      idToken={auth.user?.id_token}
                       alt={`Slide ${i + 1}`}
                       className="w-full h-full object-cover"
                     />

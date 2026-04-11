@@ -25,7 +25,7 @@ from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
-from tools.upload_tools import list_uploads, read_uploaded_file
+from tools.upload_tools import list_uploads
 from tools.web_tools import web_fetch
 
 logger = logging.getLogger("sdpm.agent")
@@ -142,7 +142,7 @@ Follow the instructions provided by each MCP server to use their tools effective
 Respond in the same language as the user.
 {mcp_instructions}
 ## File Uploads
-- When a user message contains [Attached: filename (uploadId: xxx)], use read_uploaded_file(upload_id) to read content
+- When a user message contains [Attached: filename (uploadId: xxx)], use read_uploaded_file(upload_id, deck_id) to read content. If no deck exists yet, call init_presentation() first.
 - Use list_uploads(session_id) to see all files in the current session
 
 ## Web Fetch
@@ -259,7 +259,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
 
     # Agent.__init__ triggers MCP client connections.
     # If optional MCP servers fail during init, retry with required-only.
-    tools = [*mcp_servers, read_uploaded_file, list_uploads, web_fetch]
+    tools = [*mcp_servers, list_uploads, web_fetch]
     try:
         agent = Agent(
             name="SdpmAgent",
@@ -290,7 +290,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
         agent = Agent(
             name="SdpmAgent",
             system_prompt="",
-            tools=[*mcp_servers, read_uploaded_file, list_uploads, web_fetch],
+            tools=[*mcp_servers, list_uploads, web_fetch],
             model=model,
             session_manager=session_manager,
             trace_attributes={"user.id": user_id, "session.id": session_id},

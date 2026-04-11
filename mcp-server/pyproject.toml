@@ -8,6 +8,7 @@ dependencies = [
     "boto3",
     "sdpm-skill",
     "aws-opentelemetry-distro>=0.10.0",
+    "pypdf",
 ]
 
 [tool.setuptools.packages.find]
