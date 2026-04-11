@@ -292,6 +292,30 @@ body {
   50% { opacity: 1; transform: scale(1.4); }
 }
 
+/* ── Slide crossfade (preview image transitions) ── */
+.slide-crossfade {
+  animation: slide-fade-in 300ms ease-out;
+}
+@keyframes slide-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Measure shimmer overlay ── */
+@keyframes measure-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.slide-measuring { position: relative; overflow: hidden; }
+.slide-measuring::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, oklch(0.75 0.14 185 / 8%), transparent);
+  animation: measure-shimmer 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .tool-card-enter,
@@ -308,6 +332,8 @@ body {
   @keyframes compose-fan { 0%, 100% { transform: translateX(-50%); opacity: 0.5; } }
   @keyframes build-develop { 0%, 100% { opacity: 0.4; transform: none; } }
   @keyframes build-shimmer { 0%, 100% { transform: none; } }
+  @keyframes measure-shimmer { 0%, 100% { opacity: 0; } }
+  .slide-crossfade { animation: none; }
 }
 
 /* ── Chat prose overrides (dark editorial) ── */

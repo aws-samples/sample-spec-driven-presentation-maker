@@ -41,10 +41,19 @@ interface SlideCarouselProps {
   onStyleSelect?: (name: string) => void
   /** Cognito ID token for style API calls. */
   idToken?: string
+  /** Whether measure_slides is currently running. */
+  isMeasuring?: boolean
 }
 
-export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, idToken }: SlideCarouselProps) {
+/** Check if a slide's preview URL is a draft SVG. */
+function isDraftPreview(url: string | null | undefined): boolean {
+  if (!url) return false
+  return url.includes("draft_slide_")
+}
+
+export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, idToken, isMeasuring }: SlideCarouselProps) {
   const slidesWithPreview = slides.filter((s) => s.previewUrl)
+  const hasDraft = slidesWithPreview.some((s) => isDraftPreview(s.previewUrl))
   const auth = useAuth()
   const [jsonLoading, setJsonLoading] = useState(false)
   const { viewMode, setViewMode } = usePreferences()
@@ -224,14 +233,20 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
                 data-slide-id={slide.slideId}
                 type="button"
                 onClick={() => onSlideClick?.(i + 1)}
-                className="rounded-lg overflow-hidden border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 relative group"
+                className={`rounded-lg overflow-hidden border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 relative group${isMeasuring ? " slide-measuring" : ""}`}
                 aria-label={`Slide ${i + 1}`}
               >
                 <img
+                  key={slide.previewUrl}
                   src={slide.previewUrl!}
                   alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
-                  className="w-full pointer-events-none"
+                  className="w-full pointer-events-none slide-crossfade"
                 />
+                {isDraftPreview(slide.previewUrl) && (
+                  <span className="absolute top-1.5 right-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-white/10 text-white/50 backdrop-blur-sm slide-crossfade">
+                    Draft
+                  </span>
+                )}
                 <span className="absolute bottom-1.5 right-2 text-[10px] font-medium text-white/30 group-hover:text-white/50 transition-colors">
                   {i + 1}
                 </span>
@@ -245,14 +260,20 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
               data-slide-id={slide.slideId}
               type="button"
               onClick={() => onSlideClick?.(i + 1)}
-              className="slide-shadow rounded-lg overflow-hidden w-full text-left cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
+              className={`slide-shadow rounded-lg overflow-hidden w-full text-left cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow relative${isMeasuring ? " slide-measuring" : ""}`}
               aria-label={`Insert reference to slide ${i + 1}`}
             >
               <img
+                key={slide.previewUrl}
                 src={slide.previewUrl!}
                 alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
-                className="w-full pointer-events-none"
+                className="w-full pointer-events-none slide-crossfade"
               />
+              {isDraftPreview(slide.previewUrl) && (
+                <span className="absolute top-2 right-2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-white/10 text-white/50 backdrop-blur-sm slide-crossfade">
+                  Draft
+                </span>
+              )}
             </button>
           ))
         )}
@@ -280,6 +301,7 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
               </h2>
               <p className="text-xs text-muted-foreground">
                 {slidesWithPreview.length} {slidesWithPreview.length === 1 ? "slide" : "slides"}
+                {hasDraft && <span className="text-muted-foreground/50"> · Draft</span>}
                 {ownerAlias && <span> · by {ownerAlias}</span>}
               </p>
             </div>

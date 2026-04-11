@@ -59,8 +59,9 @@ interface ChatPanelProps {
   chatSessionId?: string
   slidePreviewUrls?: (string | null)[]
   onDeckCreated?: (deckId: string) => void
-  onPptxRequested?: () => void
+  onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
+  onMeasuringChange?: (measuring: boolean) => void
 }
 
 /** Handle exposed to parent for inserting text at cursor position. */
@@ -68,7 +69,7 @@ export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPptxRequested, onWorkflowPhase }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onMeasuringChange }, ref) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -564,8 +565,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             }
             onDeckCreated(resultDeckId)
           }
-          if (toolUseData?.completed && toolName === "generate_pptx" && onPptxRequested) {
-            onPptxRequested()
+          if (toolUseData?.completed && (toolName === "generate_pptx" || toolName.endsWith("_generate_pptx")) && onPreviewInvalidated) {
+            onPreviewInvalidated()
+          }
+          if (toolUseData?.completed && (toolName === "measure_slides" || toolName.endsWith("_measure_slides")) && onPreviewInvalidated) {
+            onPreviewInvalidated()
+          }
+          if (toolUseData?.completed && (toolName === "measure_slides" || toolName.endsWith("_measure_slides")) && onMeasuringChange) {
+            onMeasuringChange(false)
           }
 
           // Tool result: update existing ToolUse with result/status
@@ -590,6 +597,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             toolUseId: toolUseData?.toolUseId || crypto.randomUUID(),
             name: toolName,
             input: toolUseData?.input || {},
+          }
+
+          // Signal measure_slides start
+          if (onMeasuringChange && (toolName === "measure_slides" || toolName.endsWith("_measure_slides"))) {
+            onMeasuringChange(true)
           }
 
           // Detect workflow phase from tool calls

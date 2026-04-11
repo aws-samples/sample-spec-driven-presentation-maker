@@ -50,6 +50,7 @@ export default function DecksPage() {
   const [fabOpen, setFabOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"chat" | "preview">("chat")
   const [workflowPhase, setWorkflowPhase] = useState<string | null>(null)
+  const [isMeasuring, setIsMeasuring] = useState(false)
   const chatRef = useRef<ChatPanelHandle>(null)
   const swipeRef = useSwipe(
     () => setActiveTab("preview"),
@@ -116,8 +117,9 @@ export default function DecksPage() {
                     deckName={ws.deck?.name || null}
                     chatSessionId={ws.deck?.chatSessionId}
                     slidePreviewUrls={ws.deck?.slides.map(s => s.previewUrl) || []}
-                    onDeckCreated={ws.handleDeckCreated} onPptxRequested={() => ws.setPptxRequested(true)}
+                    onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
                     onWorkflowPhase={setWorkflowPhase}
+                    onMeasuringChange={setIsMeasuring}
                     inline
                   />
                 ) : (
@@ -133,6 +135,7 @@ export default function DecksPage() {
                     workflowPhase={workflowPhase}
                     onStyleSelect={handleStyleSelect}
                     idToken={idToken}
+                    isMeasuring={isMeasuring}
                     onSlideClick={(page) => {
                       const dName = ws.deck?.name || "Deck"
                       const mention = ws.activeDeckId
@@ -230,8 +233,9 @@ export default function DecksPage() {
             deckName={ws.deck?.name || null}
             chatSessionId={ws.deck?.chatSessionId}
             slidePreviewUrls={ws.deck?.slides.map(s => s.previewUrl) || []}
-            onDeckCreated={ws.handleDeckCreated} onPptxRequested={() => ws.setPptxRequested(true)}
+            onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
             onWorkflowPhase={setWorkflowPhase}
+            onMeasuringChange={setIsMeasuring}
           />
         </div>
       </div>
