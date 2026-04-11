@@ -114,6 +114,37 @@ def _delete_kb_vectors(deck_id: str, user_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _list_preview_keys(deck_id: str) -> set:
+    """List all preview keys for a deck in one S3 call.
+
+    Returns:
+        Set of S3 keys under previews/{deck_id}/.
+    """
+    prefix = f"previews/{deck_id}/"
+    resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
+    return {obj["Key"] for obj in resp.get("Contents", [])}
+
+
+def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: set) -> Optional[str]:
+    """Resolve the best preview URL for a slide from cached keys.
+
+    Fallback order: webp > png > draft SVG.
+
+    Args:
+        deck_id: Deck identifier.
+        slide_id: Slide identifier (e.g. slide_01).
+        preview_keys: Set of existing S3 keys from _list_preview_keys.
+
+    Returns:
+        Presigned URL or None.
+    """
+    prefix = f"previews/{deck_id}/"
+    for candidate in (f"{prefix}{slide_id}.webp", f"{prefix}{slide_id}.png", f"{prefix}draft_{slide_id}.svg"):
+        if candidate in preview_keys:
+            return presigned_url(s3_client, BUCKET_NAME, candidate)
+    return None
+
+
 def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
     """Get thumbnail URLs for deck items.
 
@@ -135,15 +166,9 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
         if key:
             thumb_url = presigned_url(s3_client, BUCKET_NAME, key)
         else:
-            # Fallback: first slide preview (webp preferred, png fallback)
-            for ext in ("webp", "png"):
-                s3_key = f"previews/{deck_id}/slide_01.{ext}"
-                try:
-                    s3_client.head_object(Bucket=BUCKET_NAME, Key=s3_key)
-                    thumb_url = presigned_url(s3_client, BUCKET_NAME, s3_key)
-                    break
-                except Exception:
-                    pass
+            # Fallback: first slide preview
+            preview_keys = _list_preview_keys(deck_id)
+            thumb_url = _resolve_preview_url(deck_id, "slide_01", preview_keys)
 
         extras[deck_id] = {"thumbnailUrl": thumb_url}
     return extras
@@ -368,17 +393,10 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         pres_key = f"decks/{deck_id}/presentation.json"
         resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=pres_key)
         presentation = json.loads(resp["Body"].read())
+        preview_keys = _list_preview_keys(deck_id)
         for i, s in enumerate(presentation.get("slides", [])):
             sid = f"slide_{i + 1:02d}"
-            preview_url = None
-            for ext in ("webp", "png"):
-                preview_key = f"previews/{deck_id}/{sid}.{ext}"
-                try:
-                    s3_client.head_object(Bucket=BUCKET_NAME, Key=preview_key)
-                    preview_url = presigned_url(s3_client, BUCKET_NAME, preview_key)
-                    break
-                except Exception:
-                    pass
+            preview_url = _resolve_preview_url(deck_id, sid, preview_keys)
             slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": preview_url}
             if include_json:
                 slide_entry["slideJson"] = json.dumps(s)
@@ -591,6 +609,7 @@ def search_slides_api() -> Dict[str, Any]:
 
     results: List[Dict] = []
     seen: set = set()
+    seen_decks: Dict[str, set] = {}
     for r in response.get("retrievalResults", []):
         meta = r.get("metadata", {})
         deck_id = meta.get("deckId", "")
@@ -600,17 +619,15 @@ def search_slides_api() -> Dict[str, Any]:
             continue
         seen.add(dedup_key)
 
-        # Generate preview URL — slideId matches preview filename (webp preferred)
+        # Generate preview URL — slideId matches preview filename
         preview_url = ""
         if deck_id and slide_id:
-            for ext in ("webp", "png"):
-                s3_key = f"previews/{deck_id}/{slide_id}.{ext}"
-                try:
-                    s3_client.head_object(Bucket=BUCKET_NAME, Key=s3_key)
-                    preview_url = presigned_url(s3_client, BUCKET_NAME, s3_key)
-                    break
-                except Exception:
-                    pass
+            # Lazy-load preview keys per deck
+            if deck_id not in seen_decks:
+                seen_decks[deck_id] = _list_preview_keys(deck_id)
+            url = _resolve_preview_url(deck_id, slide_id, seen_decks[deck_id])
+            if url:
+                preview_url = url
 
         results.append({
             "deckId": deck_id,
