@@ -269,12 +269,27 @@ def pptx_to_json(deck_id: str, upload_id: str) -> str:
         if not s3_key:
             return json.dumps({"error": "No S3 key for upload"})
 
-        # Download PPTX to temp file and convert
-        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=True) as tmp:
-            data = _storage.download_file_from_pptx_bucket(s3_key)
-            tmp.write(data)
-            tmp.flush()
-            result = _convert(Path(tmp.name))
+        # Download PPTX to temp dir and convert
+        work_dir = Path(tempfile.mkdtemp())
+        pptx_path = work_dir / "input.pptx"
+        pptx_path.write_bytes(_storage.download_file_from_pptx_bucket(s3_key))
+        result = _convert(pptx_path)
+
+        # Upload extracted images to S3 deck workspace
+        images_dir = pptx_path.with_suffix('') / "images"
+        image_count = 0
+        if images_dir.is_dir():
+            import mimetypes
+            for img_file in images_dir.iterdir():
+                if img_file.is_file():
+                    s3_img_key = f"decks/{deck_id}/images/{img_file.name}"
+                    ct = mimetypes.guess_type(img_file.name)[0] or "application/octet-stream"
+                    _storage.upload_file(key=s3_img_key, data=img_file.read_bytes(), content_type=ct)
+                    image_count += 1
+
+        # Cleanup
+        import shutil
+        shutil.rmtree(work_dir, ignore_errors=True)
 
         # Save as presentation.json in deck workspace
         pres_json = json.dumps(result, ensure_ascii=False)

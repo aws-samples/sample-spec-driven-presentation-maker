@@ -81,6 +81,16 @@ def generate_pptx(
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(storage.download_file_from_pptx_bucket(key))
 
+    # Download images extracted by pptx_to_json
+    image_keys = storage.list_files(
+        prefix=f"decks/{deck_id}/images/", bucket=storage.pptx_bucket
+    )
+    for key in image_keys:
+        rel = key.replace(f"decks/{deck_id}/", "")
+        dest = tmpdir / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(storage.download_file_from_pptx_bucket(key))
+
     # Download asset manifests + referenced icons from S3
     assets_dir = tmpdir / "assets"
     asset_keys = storage.list_files(prefix="assets/")
