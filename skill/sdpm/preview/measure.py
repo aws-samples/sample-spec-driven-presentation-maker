@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT-0
 """Measure text bounding boxes from LibreOffice SVG export."""
 
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -116,6 +117,45 @@ def measure_from_svg(
             results[slide_num] = bboxes
 
     return results
+
+
+def split_svg_per_slide(svg_text: str) -> list[str]:
+    """Split a multi-slide LibreOffice SVG into per-slide SVG strings.
+
+    Args:
+        svg_text: Full SVG string from LibreOffice export.
+
+    Returns:
+        List of SVG strings, one per real slide (skipping dummy slide 0).
+    """
+    root = etree.fromstring(svg_text.encode("utf-8"))  # noqa: S320
+    viewBox = root.get("viewBox", "")
+    ns = root.nsmap.copy()
+
+    # Collect top-level <defs> (clipPath, fonts, BulletChars, metadata)
+    defs_elements = root.findall(f"{{{SVG_NS}}}defs")
+
+    # Find all Slide groups — index 0 is dummy
+    slides_g = root.findall(f".//{{{SVG_NS}}}g[@class='Slide']")
+
+    result: list[str] = []
+    for i, slide_g in enumerate(slides_g):
+        if i == 0:
+            continue
+        # Build standalone SVG document
+        new_root = etree.Element(f"{{{SVG_NS}}}svg", nsmap=ns)
+        new_root.set("viewBox", viewBox)
+        if root.get("width"):
+            new_root.set("width", root.get("width"))
+        if root.get("height"):
+            new_root.set("height", root.get("height"))
+        # Copy all top-level defs
+        for d in defs_elements:
+            new_root.append(deepcopy(d))
+        # Append slide group
+        new_root.append(deepcopy(slide_g))
+        result.append(etree.tostring(new_root, xml_declaration=True, encoding="unicode"))
+    return result
 
 
 def format_measure_report(results: dict[int, list[ElementBBox]]) -> str:

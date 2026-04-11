@@ -28,6 +28,7 @@ from tools import (  # noqa: E402
     analyze_template as _analyze_template,
     generate_pptx as _generate_pptx,
     preview as _preview,
+    measure as _measure,
     search_assets as _search_assets,
     list_asset_sources as _list_asset_sources,
     list_styles as _list_styles,
@@ -123,7 +124,6 @@ def analyze_template(template_path: str, layout: str = "") -> str:
 @mcp.tool()
 def generate_pptx(
     slides_json_path: str,
-    template: str = "",
     output_path: str = "",
 ) -> str:
     """Generate PPTX from a JSON file. Call after building all slides.
@@ -131,7 +131,6 @@ def generate_pptx(
 
     Args:
         slides_json_path: Path to the slides JSON file.
-        template: Optional template override. Usually not needed if init_presentation was used.
         output_path: Optional output path. Auto-generated if empty.
 
     Returns:
@@ -139,28 +138,45 @@ def generate_pptx(
     """
     return json.dumps(
         _generate_pptx(
-            slides_json_path=slides_json_path, template=template, output_path=output_path, skill_dir=_SKILL_DIR
+            slides_json_path=slides_json_path, output_path=output_path, skill_dir=_SKILL_DIR
         ),
         ensure_ascii=False,
     )
 
 
 @mcp.tool()
-def get_preview(pptx_path: str, pages: str = "") -> str:
-    """Generate PNG previews of a PPTX file.
-    Requires Microsoft PowerPoint on macOS, or PowerShell on Windows/WSL.
+def get_preview(slides_json_path: str, pages: str = "", output_path: str = "") -> str:
+    """Generate PNG previews from a slides JSON file.
+    Requires LibreOffice and poppler-utils installed locally.
 
     Args:
-        pptx_path: Path to the .pptx file to preview.
+        slides_json_path: Path to the slides JSON file.
         pages: Optional comma-separated page numbers (e.g. "1,3,5"). All pages if empty.
+        output_path: Optional output directory path.
 
     Returns:
         JSON with generated PNG file paths.
     """
     return json.dumps(
-        _preview(pptx_path=pptx_path, pages=pages),
+        _preview(slides_json_path=slides_json_path, pages=pages, output_path=output_path),
         ensure_ascii=False,
     )
+
+
+@mcp.tool()
+def measure_slides(slides_json_path: str, pages: str = "") -> str:
+    """Measure text bounding boxes for overflow detection.
+    Generates SVG via LibreOffice and extracts bbox data.
+    Requires LibreOffice installed locally.
+
+    Args:
+        slides_json_path: Path to the slides JSON file.
+        pages: Optional comma-separated page numbers (e.g. "1,3,5"). All pages if empty.
+
+    Returns:
+        Measure report as text.
+    """
+    return _measure(slides_json_path=slides_json_path, pages=pages)
 
 
 @mcp.tool()

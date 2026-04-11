@@ -123,7 +123,6 @@ _kb_id = os.environ.get("KB_ID", "")
 _kb_ssm_param = os.environ.get("KB_SSM_PARAM", "")
 _vector_bucket_name = os.environ.get("VECTOR_BUCKET_NAME", "")
 _vector_index_name = os.environ.get("VECTOR_INDEX_NAME", "")
-_png_queue_url = os.environ.get("PNG_QUEUE_URL", "")
 
 if not _table_name:
     raise ValueError("DECKS_TABLE environment variable is required")
@@ -137,7 +136,6 @@ _storage = AwsStorage(
     s3_client=boto3.client("s3", region_name=_region),
     pptx_bucket=_pptx_bucket,
     resource_bucket=_resource_bucket,
-    png_queue_url=_png_queue_url,
 )
 
 
@@ -343,7 +341,7 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
     """Get PNG preview images for visual review by the agent.
 
     Returns actual slide images that the model can see and analyze.
-    Available after generate_pptx + PNG worker processing.
+    Available after generate_pptx completes.
 
     - quality="low" (800px): Review all slides at once — check flow, structure, design consistency.
     - quality="high" (1280px): Precise review of specific slides — check text, layout details.
@@ -366,11 +364,86 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
             deck_id=deck_id, slide_numbers=slide_numbers, storage=_storage, quality=quality,
         )
     except _storage._s3.exceptions.NoSuchKey:
-        return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first, then wait for PNG worker to finish."}]
+        return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first."}]
     except Exception as e:
         if "NoSuchKey" in str(e):
-            return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first, then wait for PNG worker to finish."}]
+            return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first."}]
         raise
+
+
+@mcp.tool()
+def measure_slides(deck_id: str, slide_numbers: list[int] | None = None) -> str:
+    """Measure text bounding boxes for overflow detection.
+    Builds PPTX from presentation.json, generates SVG via LibreOffice, and extracts bbox data.
+    Does NOT require generate_pptx — works directly from workspace JSON.
+    Also uploads per-slide draft SVG previews to S3.
+
+    Args:
+        deck_id: The deck ID to measure.
+        slide_numbers: Optional list of 1-based slide numbers. All slides if None.
+
+    Returns:
+        Measure report as text.
+    """
+    _check_deck_access(deck_id, action="read")
+    import shutil
+    import subprocess
+    import traceback
+
+    try:
+        from sdpm.builder import PPTXBuilder, resolve_override
+        from sdpm.preview.measure import measure_from_svg, format_measure_report, split_svg_per_slide
+        from tools.generate import _prepare_workspace
+
+        user_id = _get_user_id()
+        tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
+        try:
+            # Build PPTX from JSON
+            builder = PPTXBuilder(**build_kwargs)
+            id_map: dict[str, dict] = {}
+            for s in slides:
+                if "id" in s:
+                    id_map[s["id"]] = s
+            for s in slides:
+                builder.add_slide(resolve_override(s, id_map))
+            pptx_path = tmpdir / "measure.pptx"
+            builder.save(pptx_path)
+
+            # PPTX → SVG via LibreOffice
+            env = os.environ.copy()
+            env["HOME"] = str(tmpdir)
+            subprocess.run(  # nosec B603
+                ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
+                env=env, capture_output=True, text=True, timeout=120, check=True,
+            )
+            svg_path = tmpdir / "measure.svg"
+            if not svg_path.exists():
+                return json.dumps({"error": "LibreOffice SVG export failed"})
+
+            # Measure bboxes
+            results = measure_from_svg(svg_path=svg_path, slide_indices=slide_numbers)
+            report = format_measure_report(results)
+
+            # Split SVG and upload draft previews
+            try:
+                svg_text = svg_path.read_text(encoding="utf-8")
+                per_slide_svgs = split_svg_per_slide(svg_text)
+                for i, svg_str in enumerate(per_slide_svgs):
+                    s3_key = f"previews/{deck_id}/draft_slide_{i + 1:02d}.svg"
+                    _storage.upload_file(
+                        key=s3_key, data=svg_str.encode("utf-8"),
+                        content_type="image/svg+xml",
+                    )
+                logger.info("Draft SVG previews uploaded: %d slides for deck %s", len(per_slide_svgs), deck_id)
+            except Exception as e:
+                logger.warning("Draft SVG upload failed for deck %s: %s", deck_id, e)
+
+            return report
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+    except Exception as e:
+        logger.exception("measure_slides failed: deck=%s", deck_id)
+        return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
 
 
 # --- Asset Tools ---
