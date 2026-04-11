@@ -3,10 +3,9 @@
 import json
 import subprocess  # nosec B404 — openssl invocation with fixed args only
 import logging
-import http.client
-from urllib.parse import urlparse
 
 import boto3
+import urllib3
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -14,6 +13,9 @@ logger.setLevel(logging.INFO)
 ssm = boto3.client("ssm")
 
 _OPENSSL = "/usr/bin/openssl"
+
+# urllib3 is bundled with botocore in Lambda — no extra dependency needed.
+_http = urllib3.PoolManager()
 
 
 def send(event, context, status, data=None, physical_id=None, reason=None):
@@ -29,10 +31,7 @@ def send(event, context, status, data=None, physical_id=None, reason=None):
     url = event["ResponseURL"]
     if not url.startswith("https://"):
         raise ValueError("ResponseURL must be HTTPS")
-    parsed = urlparse(url)
-    conn = http.client.HTTPSConnection(parsed.hostname)
-    conn.request("PUT", f"{parsed.path}?{parsed.query}", body=body, headers={"Content-Type": ""})
-    conn.getresponse()
+    _http.request("PUT", url, body=body, headers={"Content-Type": ""})
 
 
 def handler(event, context):
