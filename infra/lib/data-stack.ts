@@ -103,6 +103,7 @@ export class DataStack extends cdk.Stack {
       resources: [
         `${this.pptxBucket.bucketArn}/previews/*`,
         `${this.pptxBucket.bucketArn}/decks/*`,
+        `${this.pptxBucket.bucketArn}/pptx/*`,
       ],
       conditions: {
         StringEquals: { "aws:SourceAccount": this.account },
