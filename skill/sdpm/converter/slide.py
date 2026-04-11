@@ -335,6 +335,12 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
         try:
             elem, img_counter = _dispatch_shape(shape, theme_colors, color_mapping, theme_styles, output_dir, slide_idx, img_counter, builder_text_color=builder_text_color, pptx_path=pptx_path)
             if elem:
+                # Skip tiny invisible connector stubs (e.g. w=20, h=0 decorative connectors)
+                if elem.get("type") == "line":
+                    dx = abs(elem.get("x2", 0) - elem.get("x1", 0))
+                    dy = abs(elem.get("y2", 0) - elem.get("y1", 0))
+                    if dx <= 30 and dy <= 30:
+                        continue
                 elements.append(elem)
         except Exception as e:
             print(f"Warning: Failed to extract shape {shape.name}: {e}", file=sys.stderr)

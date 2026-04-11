@@ -104,10 +104,13 @@ class LineMixin:
         if points and len(points) >= 2:
             return self._add_polyline(slide, elem, points)
 
-        x1_emu = self._px_to_emu(elem.get("x1", 10))
-        y1_emu = self._px_to_emu(elem.get("y1", 10))
-        x2_emu = self._px_to_emu(elem.get("x2", 30))
-        y2_emu = self._px_to_emu(elem.get("y2", 10))
+        # Require x1/y1/x2/y2 format (x/y/width/height is not supported — use linter to catch)
+        if "x1" not in elem:
+            return  # No coordinates — skip silently
+        x1_emu = self._px_to_emu(elem["x1"])
+        y1_emu = self._px_to_emu(elem["y1"])
+        x2_emu = self._px_to_emu(elem["x2"])
+        y2_emu = self._px_to_emu(elem["y2"])
 
         # Determine connector type
         connector_type_str = elem.get("connectorType", _DEFAULTS["connectorType"])

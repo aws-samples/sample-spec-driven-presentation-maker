@@ -217,6 +217,10 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
     memory_id = os.environ.get("MEMORY_ID", "")
     region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
 
+    # Set user_id for upload tools
+    import tools.upload_tools as _ut
+    _ut._current_user_id = user_id
+
     session_manager = None
     if memory_id and memory_id != "PLACEHOLDER":
         from bedrock_agentcore.memory.integrations.strands.config import AgentCoreMemoryConfig

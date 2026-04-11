@@ -40,6 +40,7 @@ interface Message {
   /** Ordered sequence of text and tool blocks for inline display. */
   blocks?: { type: "text"; text: string }[] | { type: "tool"; tool: ToolUse }[]
   snippets?: { label: string; text: string }[]
+  attachments?: { fileName: string; fileType: string }[]
   mcpStatus?: McpServerStatus[]
 }
 
@@ -234,6 +235,18 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             toolUses,
             blocks: blocks.length > 0 ? blocks : undefined,
             snippets: snippets.length > 0 ? snippets : undefined,
+            ...((m.role === "user") && (() => {
+              const attRe = /\[Attached:\s*(.+?)\s*\(uploadId:\s*[^)]+\)\]/g
+              const atts: { fileName: string; fileType: string }[] = []
+              let am: RegExpExecArray | null
+              while ((am = attRe.exec(text)) !== null) {
+                const fn = am[1]
+                const ext = fn.split(".").pop()?.toLowerCase() || ""
+                const mimeMap: Record<string, string> = { pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", pdf: "application/pdf", png: "image/png", json: "application/json", md: "text/markdown", txt: "text/plain" }
+                atts.push({ fileName: fn, fileType: mimeMap[ext] || "application/octet-stream" })
+              }
+              return atts.length > 0 ? { attachments: atts } : {}
+            })()),
           })
         }
         if (parsed.length > 0) setMessages(parsed)
@@ -461,10 +474,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     }
 
     const sentSnippets = snippets.map((s) => ({ label: s.label || "Text snippet", text: s.text }))
+    const sentAttachments = uploadedFiles.map((f) => ({ fileName: f.fileName, fileType: f.fileType }))
 
     setMessages((prev) => [
       ...prev,
-      { role: "user", content: userMessage, toolUses: [], snippets: sentSnippets.length > 0 ? sentSnippets : undefined },
+      { role: "user", content: userMessage, toolUses: [], snippets: sentSnippets.length > 0 ? sentSnippets : undefined, attachments: sentAttachments.length > 0 ? sentAttachments : undefined },
       { role: "assistant", content: "", toolUses: [] },
     ])
     setInput("")
@@ -767,6 +781,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     toolUses={msg.toolUses}
                     blocks={msg.blocks}
                     snippets={msg.snippets}
+                    attachments={msg.attachments}
                     isStreaming={isLoading && i === messages.length - 1}
                     idToken={auth.user?.id_token}
                   />

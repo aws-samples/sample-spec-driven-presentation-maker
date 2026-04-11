@@ -65,8 +65,13 @@ def get_preview(
     """
     result: list = []
     for n in slide_numbers:
-        key = f"previews/{deck_id}/slide_{n:02d}.png"
-        data = storage.download_file_from_pptx_bucket(key=key)
+        # Try WebP first (newer), fall back to PNG (legacy)
+        key = f"previews/{deck_id}/slide_{n:02d}.webp"
+        try:
+            data = storage.download_file_from_pptx_bucket(key=key)
+        except Exception:
+            key = f"previews/{deck_id}/slide_{n:02d}.png"
+            data = storage.download_file_from_pptx_bucket(key=key)
         jpeg_data = _resize_to_jpeg(data=data, quality=quality)
         result.append(f"Slide {n}")
         result.append(Image(data=jpeg_data, format="jpeg"))

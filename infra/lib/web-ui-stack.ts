@@ -205,7 +205,11 @@ function handler(event) {
     deck.addMethod("DELETE", integration, auth);
     deck.addMethod("PATCH", integration, auth);
     deck.addResource("favorite").addMethod("POST", integration, auth);
-    api.root.addResource("uploads").addResource("presign").addMethod("POST", integration, auth);
+    const uploads = api.root.addResource("uploads");
+    uploads.addResource("presign").addMethod("POST", integration, auth);
+    const upload = uploads.addResource("{upload_id}");
+    upload.addResource("process").addMethod("POST", integration, auth);
+    upload.addResource("status").addMethod("GET", integration, auth);
     api.root.addResource("chat").addResource("{session_id}").addMethod("GET", integration, auth);
     const slides = api.root.addResource("slides");
     slides.addResource("search").addMethod("GET", integration, auth);

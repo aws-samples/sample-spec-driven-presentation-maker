@@ -13,6 +13,9 @@ import os
 import boto3
 from strands import tool
 
+# Module-level state — set by basic_agent.py before tool invocation
+_current_user_id: str = ""
+
 
 def _get_table():
     """Get the DynamoDB Table resource for decks.
@@ -43,9 +46,6 @@ def read_uploaded_file(upload_id: str) -> str:
     Returns:
         Extracted text content, or an error/status message.
     """
-    # Get user_id from module-level state (set by basic_agent.py)
-    from tools.deck_tools import _current_user_id
-
     table = _get_table()
     resp = table.get_item(Key={"PK": f"USER#{_current_user_id}", "SK": f"UPLOAD#{upload_id}"})
     item = resp.get("Item")
@@ -79,10 +79,27 @@ def read_uploaded_file(upload_id: str) -> str:
     extracted_text = item.get("extractedText")
     if extracted_text:
         file_name = item.get("fileName", "unknown")
+        file_type = item.get("fileType", "")
+        _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        if file_type == _PPTX_MIME:
+            return (
+                f"## Content of {file_name}\n\n{extracted_text}\n\n"
+                f"---\nTo edit this PPTX, use pptx_to_json(deck_id=..., upload_id=\"{upload_id}\") to convert to editable JSON."
+            )
         return f"## Content of {file_name}\n\n{extracted_text}"
 
-    # For images, return presigned URL
-    if item.get("fileType", "").startswith("image/"):
+    # For binary files, return guidance based on type
+    file_type = item.get("fileType", "")
+    file_name = item.get("fileName", "unknown")
+
+    _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    if file_type == _PPTX_MIME:
+        return (
+            f"PPTX file: {file_name} (uploadId: {upload_id}). "
+            f"Use pptx_to_json(deck_id=..., upload_id=\"{upload_id}\") to convert to editable JSON."
+        )
+
+    if file_type.startswith("image/"):
         s3_key = item.get("s3KeyRaw")
         if s3_key:
             bucket = os.environ.get("PPTX_BUCKET")
@@ -93,7 +110,7 @@ def read_uploaded_file(upload_id: str) -> str:
                 Params={"Bucket": bucket, "Key": s3_key},
                 ExpiresIn=900,
             )
-            return f"Image file. Presigned URL: {url}"
+            return f"Image file: {file_name}. Presigned URL: {url}"
 
     # Try reading from S3 extracted key
     s3_key_extracted = item.get("s3KeyExtracted")
@@ -121,8 +138,6 @@ def list_uploads(session_id: str) -> str:
     Returns:
         JSON list of uploads with their status and file names.
     """
-    from tools.deck_tools import _current_user_id
-
     table = _get_table()
 
     # Query all uploads for this user and filter by sessionId

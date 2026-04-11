@@ -236,6 +236,80 @@ def analyze_template(template: str) -> str:
     )
 
 
+# --- Conversion Tools ---
+
+
+@mcp.tool()
+def pptx_to_json(deck_id: str, upload_id: str) -> str:
+    """Convert an uploaded PPTX file to JSON representation for editing.
+    Downloads the PPTX from S3, converts via Engine, and saves presentation.json to the deck workspace.
+
+    Args:
+        deck_id: The deck ID to save the converted JSON into.
+        upload_id: The upload ID of the PPTX file.
+
+    Returns:
+        JSON with slide count and conversion status.
+    """
+    import tempfile
+    import traceback
+    from sdpm.converter import pptx_to_json as _convert
+
+    _check_deck_access(deck_id, action="edit_slide")
+    user_id = _get_user_id()
+
+    try:
+        # Look up upload record from DynamoDB
+        resp = _storage.table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"UPLOAD#{upload_id}"})
+        item = resp.get("Item")
+        if not item:
+            return json.dumps({"error": f"Upload {upload_id} not found"})
+
+        s3_key = item.get("s3KeyRaw", "")
+        if not s3_key:
+            return json.dumps({"error": "No S3 key for upload"})
+
+        # Download PPTX to temp dir and convert
+        work_dir = Path(tempfile.mkdtemp())
+        pptx_path = work_dir / "input.pptx"
+        pptx_path.write_bytes(_storage.download_file_from_pptx_bucket(s3_key))
+        result = _convert(pptx_path)
+
+        # Upload extracted images to S3 deck workspace
+        images_dir = pptx_path.with_suffix('') / "images"
+        image_count = 0
+        if images_dir.is_dir():
+            import mimetypes
+            for img_file in images_dir.iterdir():
+                if img_file.is_file():
+                    s3_img_key = f"decks/{deck_id}/images/{img_file.name}"
+                    ct = mimetypes.guess_type(img_file.name)[0] or "application/octet-stream"
+                    _storage.upload_file(key=s3_img_key, data=img_file.read_bytes(), content_type=ct)
+                    image_count += 1
+
+        # Cleanup
+        import shutil
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+        # Save as presentation.json in deck workspace
+        pres_json = json.dumps(result, ensure_ascii=False)
+        pres_key = f"decks/{deck_id}/presentation.json"
+        _storage.upload_file(key=pres_key, data=pres_json.encode("utf-8"), content_type="application/json")
+
+        slide_count = len(result.get("slides", []))
+        logger.info("pptx_to_json completed: deck=%s slides=%s", deck_id, slide_count)
+        return json.dumps({
+            "status": "ok",
+            "slideCount": slide_count,
+            "deckId": deck_id,
+            "jsonPath": "presentation.json",
+            "hint": f'Use run_python(deck_id="{deck_id}") with open("presentation.json") to read/edit the converted JSON.',
+        })
+    except Exception as e:
+        logger.exception("pptx_to_json failed: deck=%s upload=%s", deck_id, upload_id)
+        return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
+
+
 # --- Generation Tools ---
 
 
@@ -287,9 +361,16 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
         return [{"type": "text", "text": "Error: slide_numbers must not be empty"}]
     if quality not in ("low", "high"):
         quality = "high"
-    return preview.get_preview(
-        deck_id=deck_id, slide_numbers=slide_numbers, storage=_storage, quality=quality,
-    )
+    try:
+        return preview.get_preview(
+            deck_id=deck_id, slide_numbers=slide_numbers, storage=_storage, quality=quality,
+        )
+    except _storage._s3.exceptions.NoSuchKey:
+        return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first, then wait for PNG worker to finish."}]
+    except Exception as e:
+        if "NoSuchKey" in str(e):
+            return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first, then wait for PNG worker to finish."}]
+        raise
 
 
 # --- Asset Tools ---
