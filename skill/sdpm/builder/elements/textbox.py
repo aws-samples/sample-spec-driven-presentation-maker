@@ -67,25 +67,10 @@ class TextboxMixin:
                 tag = child.tag.split('}')[1]
                 if tag in ('spAutoFit', 'noAutofit', 'normAutofit'):
                     bodyPr.remove(child)
-        elif elem.get("_spAutoFit"):
-            tf.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
         else:
-            tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE if height_px else MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
+            tf.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
         if not elem.get("_noAutofit"):
             tf.word_wrap = not auto_width
-        
-        # Apply fontScale from original normAutofit
-        font_scale = elem.get("_fontScale")
-        if font_scale:
-            from lxml import etree
-            from pptx.oxml.ns import qn
-            bodyPr = tf._txBody.find(qn('a:bodyPr'))
-            for child in list(bodyPr):
-                tag = child.tag.split('}')[1]
-                if tag in ('spAutoFit', 'noAutofit', 'normAutofit'):
-                    bodyPr.remove(child)
-            norm = etree.SubElement(bodyPr, qn('a:normAutofit'))
-            norm.set('fontScale', str(font_scale))
         
         # Apply rotation
         rotation = elem.get("rotation", _DEFAULTS["rotation"])

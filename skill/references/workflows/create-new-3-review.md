@@ -12,18 +12,21 @@ Generate the PPTX, review the preview, and polish.
 
 ---
 
-### 1. Generate + check warnings
-
-The generate command automatically runs autofit and outputs preview PNGs after building the PPTX.
+### 1. Generate + measure
 
 ```bash
+# Generate PPTX
 uv run python3 scripts/pptx_builder.py generate {output_json} -o {project_dir}/output.pptx
+
+# Final text measurement across all slides
+uv run python3 scripts/pptx_builder.py measure {output_json}
 ```
 
 If warnings appear during generation, address them in Step 3 (Polish):
 
 - **Layout bias detected**: Vertical balance of elements is skewed. Adjust element heights, spacing, or placement to resolve — unless the bias is intentional by design
-- **Autofit shrink detected**: Text was auto-shrunk to fit. Consider increasing height or reducing text
+
+If measure shows text sizes that differ significantly from your declared heights, address them in Step 3 (Polish). The measure output includes guidance on what to adjust.
 
 **Constraints:**
 - You MUST fix Layout bias warnings unless the bias is intentional by design because unbalanced layouts look unprofessional
@@ -34,9 +37,16 @@ If warnings appear during generation, address them in Step 3 (Polish):
 
 Review preview PNGs for design quality.
 
+```bash
+uv run python3 scripts/pptx_builder.py preview {output_json}
+```
+
 Read preview images with fs_read Image mode.
 
-If grid-overlaid PNGs are needed for position checking, generate them with `uv run python3 scripts/pptx_builder.py preview {project_dir}/output.pptx`.
+If grid-overlaid PNGs are needed for position checking:
+```bash
+uv run python3 scripts/pptx_builder.py preview {output_json} --grid
+```
 
 **Constraints:**
 - You MUST read ALL preview images before reporting because partial review misses cross-slide inconsistencies
@@ -48,10 +58,10 @@ If grid-overlaid PNGs are needed for position checking, generate them with `uv r
 ### 3. Polish
 
 Edit output_json directly based on review findings and user feedback, then regenerate.
-Warnings from Step 1 (Layout bias, Autofit shrink) are also addressed here.
+Warnings from Step 1 (Layout bias) and measure discrepancies are also addressed here.
 
 **Constraints:**
-- You MUST re-run Step 1 (Generate) → Step 2 (Review) after making changes because edits may introduce new issues
+- You MUST re-run Step 1 (Generate + measure) → Step 2 (Review) after making changes because edits may introduce new issues
 
 ---
 

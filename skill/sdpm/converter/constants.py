@@ -40,21 +40,13 @@ def _serialize_lstStyle(source):
     return None
 
 def _extract_autofit_props(shape):
-    """Extract bodyPr autofit properties. Returns dict with _fontScale/_lnSpcReduction/_spAutoFit/_noAutofit."""
+    """Extract bodyPr autofit properties. Returns dict with _spAutoFit/_noAutofit."""
     result = {}
     try:
         bodyPr = shape.text_frame._txBody.find(f'{{{_NS["a"]}}}bodyPr')
         if bodyPr is not None:
-            norm = bodyPr.find(f'{{{_NS["a"]}}}normAutofit')
             spAuto = bodyPr.find(f'{{{_NS["a"]}}}spAutoFit')
-            if norm is not None:
-                fs = norm.get('fontScale')
-                lnRed = norm.get('lnSpcReduction')
-                if fs and fs != '100000':
-                    result["_fontScale"] = int(fs)
-                if lnRed and lnRed != '0':
-                    result["_lnSpcReduction"] = int(lnRed)
-            elif spAuto is not None:
+            if spAuto is not None:
                 result["_spAutoFit"] = True
             else:
                 noAuto = bodyPr.find(f'{{{_NS["a"]}}}noAutofit')

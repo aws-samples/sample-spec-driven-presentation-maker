@@ -231,17 +231,6 @@ class ShapeMixin:
             tf.auto_size = None if elem.get("_noAutofit") else (MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT if elem.get("_spAutoFit") else MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE)
             tf.clear()
             
-            # Apply fontScale from original normAutofit
-            font_scale = elem.get("_fontScale")
-            if font_scale:
-                from lxml import etree as _et
-                _bodyPr = tf._txBody.find('{http://schemas.openxmlformats.org/drawingml/2006/main}bodyPr')
-                for _ch in list(_bodyPr):
-                    if _ch.tag.split('}')[1] in ('spAutoFit', 'noAutofit', 'normAutofit'):
-                        _bodyPr.remove(_ch)
-                _norm = _et.SubElement(_bodyPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}normAutofit')
-                _norm.set('fontScale', str(font_scale))
-            
             # Apply margins (px input → EMU)
             if elem.get("marginLeft") is not None:
                 tf.margin_left = self._px_to_emu(elem["marginLeft"])

@@ -12,21 +12,9 @@ from .slide import extract_slide
 from sdpm.utils.io import write_json
 from sdpm.schema.defaults import sort_element_keys
 
-def _refresh_autofit_pptx(pptx_path):
-    """Re-save PPTX with autofit applied via detected presentation backend."""
-    from sdpm.preview import refresh_autofit_for_convert
-    return refresh_autofit_for_convert(pptx_path)
-
-def pptx_to_json(pptx_path: Path, output_dir: Path = None, no_autofit: bool = False, use_layout_names: bool = True, minimal: bool = False):
+def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: bool = True, minimal: bool = False):
     """Convert PPTX to JSON. Output is a project folder with slides.json + images/."""
-    # Refresh autofit via PowerPoint (temp copy → extract → cleanup)
-    tmp_pptx = None
-    if not no_autofit:
-        tmp_pptx = _refresh_autofit_pptx(pptx_path)
-        if tmp_pptx:
-            print("Autofit refreshed via presentation backend")
-    
-    actual_path = tmp_pptx or pptx_path
+    actual_path = pptx_path
     prs = Presentation(str(actual_path))
 
     # Set EMU_PER_PX based on actual slide size
@@ -78,10 +66,7 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, no_autofit: bool = Fa
     json_path = output_dir / "slides.json"
     write_json(json_path, result)
     
-    # Cleanup temp copy
-    if tmp_pptx:
-        import shutil
-        shutil.rmtree(tmp_pptx.parent)
+    # Cleanup
     print(f"Converted: {output_dir}/")
     print(f"  {json_path}")
     images_dir = output_dir / "images"
@@ -95,7 +80,6 @@ def main():
     parser = argparse.ArgumentParser(description="Convert PPTX to JSON")
     parser.add_argument("input", help="Input PPTX file")
     parser.add_argument("-o", "--output", help="Output directory (default: input filename without extension)")
-    parser.add_argument("--no-autofit", action="store_true", help="Skip PowerPoint autofit refresh")
     parser.add_argument("--minimal", action="store_true", help="Strip defaults, internal keys, and font tags for clean output")
     args = parser.parse_args()
     
@@ -105,7 +89,7 @@ def main():
         sys.exit(1)
     
     output_dir = Path(args.output) if args.output else None
-    pptx_to_json(input_path, output_dir, no_autofit=args.no_autofit, minimal=args.minimal)
+    pptx_to_json(input_path, output_dir, minimal=args.minimal)
 
 if __name__ == "__main__":
     main()

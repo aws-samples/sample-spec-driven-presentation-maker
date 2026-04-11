@@ -281,7 +281,7 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                                         if isinstance(p, dict) and p.get("lineSpacingPct") is None:
                                             p["lineSpacingPct"] = ls_val
                         except Exception:
-                            pass                    # Preserve fontScale from normAutofit
+                            pass
                     elem.update(_extract_autofit_props(shape))
                     # Resolve bodyPr margins from master placeholder
                     if not elem.get("marginLeft") and not elem.get("marginRight"):

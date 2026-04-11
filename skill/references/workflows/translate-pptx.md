@@ -112,19 +112,20 @@ Person names, company names, technical abbreviations, and numbers remaining is e
 
 ---
 
-### 5. Generate + preview
+### 5. Generate + measure + preview
 
 ```bash
 uv run python3 scripts/pptx_builder.py generate {project_dir}/slides.json -o {project_dir}/output.pptx
-uv run python3 scripts/pptx_builder.py preview {project_dir}/output.pptx
-# Prioritize slides with Autofit shrink warnings
-uv run python3 scripts/pptx_builder.py preview {project_dir}/output.pptx -p 1,3,5
+uv run python3 scripts/pptx_builder.py measure {project_dir}/slides.json
+uv run python3 scripts/pptx_builder.py preview {project_dir}/slides.json
+# Check specific slides
+uv run python3 scripts/pptx_builder.py preview {project_dir}/slides.json -p 1,3,5
 ```
 
 **Layout breakage checks:**
 - Japanese text is wider than English, so text may overflow or clip
-- Prioritize preview of slides with Autofit shrink warnings
-- Review preview PNGs and fix slides.json for any broken slides, then regenerate
+- Prioritize slides where measure shows significant size discrepancies
+- Review measure output and preview PNGs, fix slides.json for any broken slides, then regenerate
 - Common fixes:
   - Reduce `fontSize`
   - Shorten text or increase element `width`/`height`
@@ -132,13 +133,13 @@ uv run python3 scripts/pptx_builder.py preview {project_dir}/output.pptx -p 1,3,
 
 **Constraints:**
 - You MUST use the original PPTX as template because the default template causes layout name mismatch errors — ensure `"template"` in the JSON points to the original PPTX
-- Autofit shrink warnings are common when translating to Japanese due to increased character count — shrink above 90% is acceptable
+- Japanese text is typically wider than English — measure discrepancies are expected. Focus on slides where text significantly exceeds the declared height
 
 ---
 
 ### 6. Final checklist
 
-- [ ] All slides with Autofit shrink warnings reviewed
+- [ ] All slides with significant measure discrepancies reviewed
 - [ ] Cover and section slide titles checked for overflow
 - [ ] Table cell text checked for overflow
 - [ ] Speaker notes added for text inside images (cannot be translated)
