@@ -187,6 +187,13 @@ function handler(event) {
       CachePolicyId: previewCachePolicy.cachePolicyId,
       TrustedKeyGroups: [keyGroup.keyGroupId],
       Compress: true,
+    }, {
+      PathPattern: "pptx/*",
+      TargetOriginId: "previewS3Origin",
+      ViewerProtocolPolicy: "redirect-to-https",
+      CachePolicyId: previewCachePolicy.cachePolicyId,
+      TrustedKeyGroups: [keyGroup.keyGroupId],
+      Compress: true,
     }]);
 
     // --- REST API Lambda ---
