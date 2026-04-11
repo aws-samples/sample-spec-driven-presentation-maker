@@ -16,7 +16,6 @@ import { Download, FileJson, Layers, Loader2, LayoutGrid, Rows3 } from "lucide-r
 import { useAuth } from "react-oidc-context"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
-import { PreviewImage } from "@/components/ui/PreviewImage"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 
