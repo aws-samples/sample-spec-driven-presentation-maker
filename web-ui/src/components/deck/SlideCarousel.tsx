@@ -16,6 +16,7 @@ import { Download, FileJson, Layers, Loader2, LayoutGrid, Rows3 } from "lucide-r
 import { useAuth } from "react-oidc-context"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
+import { PreviewImage } from "@/components/ui/PreviewImage"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 
 interface SlideCarouselProps {
@@ -227,8 +228,11 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
                 className="rounded-lg overflow-hidden border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 relative group"
                 aria-label={`Slide ${i + 1}`}
               >
-                <img
+                <PreviewImage
                   src={slide.previewUrl!}
+                  deckId={deckId}
+                  slideId={slide.slideId}
+                  idToken={auth.user?.id_token}
                   alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
                   className="w-full pointer-events-none"
                 />
@@ -248,8 +252,11 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
               className="slide-shadow rounded-lg overflow-hidden w-full text-left cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
               aria-label={`Insert reference to slide ${i + 1}`}
             >
-              <img
+              <PreviewImage
                 src={slide.previewUrl!}
+                deckId={deckId}
+                slideId={slide.slideId}
+                idToken={auth.user?.id_token}
                 alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
                 className="w-full pointer-events-none"
               />

@@ -22,6 +22,7 @@ import * as cr from "aws-cdk-lib/custom-resources";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import { Construct } from "constructs";
@@ -88,6 +89,64 @@ function handler(event) {
       runtime: cloudfront.FunctionRuntime.JS_2_0,
     });
 
+    // --- CloudFront signing key for preview delivery ---
+    const cfKeyProvisioner = new lambda.Function(this, "CfKeyProvisioner", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "..", "lambdas", "cf-key-provisioner")),
+      timeout: cdk.Duration.minutes(2),
+      logGroup: new logs.LogGroup(this, "CfKeyProvisionerLogs", {
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+    cfKeyProvisioner.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["ssm:PutParameter", "ssm:GetParameter", "ssm:DeleteParameter"],
+      resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter/sdpm/cf-*`],
+    }));
+
+    const keyPair = new cdk.CustomResource(this, "CfSigningKey", {
+      serviceToken: cfKeyProvisioner.functionArn,
+      properties: {
+        PrivateKeyParam: "/sdpm/cf-private-key",
+        PublicKeyParam: "/sdpm/cf-public-key",
+      },
+    });
+
+    const cfPublicKey = new cloudfront.PublicKey(this, "CfPublicKey", {
+      encodedKey: keyPair.getAttString("PublicKeyPem"),
+    });
+    const keyGroup = new cloudfront.KeyGroup(this, "CfKeyGroup", {
+      items: [cfPublicKey],
+    });
+
+    // --- Preview cache policy (max-age=5, ETag revalidation) ---
+    const previewCachePolicy = new cloudfront.CachePolicy(this, "PreviewCachePolicy", {
+      cachePolicyName: "sdpm-preview-cache",
+      defaultTtl: cdk.Duration.seconds(5),
+      maxTtl: cdk.Duration.hours(1),
+      minTtl: cdk.Duration.seconds(0),
+      enableAcceptEncodingGzip: true,
+      enableAcceptEncodingBrotli: true,
+    });
+
+    // --- Preview origin ---
+    // Cross-stack OAC causes dependency cycles in CDK (aws/aws-cdk#31462).
+    // Workaround: define preview origin + OAC at L1 level via escape hatch.
+    const previewOac = new cloudfront.CfnOriginAccessControl(this, "PreviewOAC", {
+      originAccessControlConfig: {
+        name: `sdpm-preview-oac-${this.stackName}`,
+        originAccessControlOriginType: "s3",
+        signingBehavior: "always",
+        signingProtocol: "sigv4",
+      },
+    });
+
+    const s3RegionalDomain = cdk.Fn.sub(
+      "${Bucket}.s3.${AWS::Region}.amazonaws.com",
+      { Bucket: props.pptxBucket.bucketName },
+    );
+
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
         origin: new origins.S3Origin(siteBucket, { originAccessIdentity: oai }),
@@ -105,6 +164,30 @@ function handler(event) {
     });
 
     this.siteUrl = `https://${distribution.distributionDomainName}`;
+
+    // Add preview origin + behavior at L1 to avoid cross-stack dependency cycle
+    const cfnDist = distribution.node.defaultChild as cloudfront.CfnDistribution;
+    cfnDist.addPropertyOverride("DistributionConfig.Origins.1", {
+      Id: "previewS3Origin",
+      DomainName: s3RegionalDomain,
+      S3OriginConfig: { OriginAccessIdentity: "" },
+      OriginAccessControlId: previewOac.attrId,
+    });
+    cfnDist.addPropertyOverride("DistributionConfig.CacheBehaviors", [{
+      PathPattern: "previews/*",
+      TargetOriginId: "previewS3Origin",
+      ViewerProtocolPolicy: "redirect-to-https",
+      CachePolicyId: previewCachePolicy.cachePolicyId,
+      TrustedKeyGroups: [keyGroup.keyGroupId],
+      Compress: true,
+    }, {
+      PathPattern: "decks/*/*",
+      TargetOriginId: "previewS3Origin",
+      ViewerProtocolPolicy: "redirect-to-https",
+      CachePolicyId: previewCachePolicy.cachePolicyId,
+      TrustedKeyGroups: [keyGroup.keyGroupId],
+      Compress: true,
+    }]);
 
     // --- REST API Lambda ---
     const powertoolsLayer = lambda.LayerVersion.fromLayerVersionArn(
@@ -140,12 +223,20 @@ function handler(event) {
         CORS_ALLOWED_ORIGINS: "*",
         POWERTOOLS_SERVICE_NAME: "sdpm-api",
         POWERTOOLS_METRICS_NAMESPACE: "sdpm",
+        CF_DOMAIN: distribution.distributionDomainName,
+        CF_KEY_PAIR_ID: cfPublicKey.publicKeyId,
+        CF_PRIVATE_KEY_PARAM: "/sdpm/cf-private-key",
       },
     });
     // IAM: Least-privilege — API Lambda gets scoped DynamoDB and S3 access only.
     props.table.grantReadWriteData(apiLambda);
     props.pptxBucket.grantReadWrite(apiLambda);
     props.resourceBucket.grantRead(apiLambda);
+    // SSM read for CloudFront signing key
+    apiLambda.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["ssm:GetParameter"],
+      resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter/sdpm/cf-private-key`],
+    }));
 
     // Amazon Bedrock AgentCore Memory read access for chat history
     if (props.memoryId) {
