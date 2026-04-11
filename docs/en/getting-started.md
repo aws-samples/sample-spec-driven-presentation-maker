@@ -105,7 +105,6 @@ Edit `config.yaml` to select which stacks to deploy.
 stacks:
   data: true           # Required — DynamoDB + S3
   runtime: true        # Required — AgentCore Runtime MCP Server
-  pngWorker: true      # Optional — PPTX→PNG conversion (Fargate + SQS)
   agent: false
   webUi: false
 
@@ -149,7 +148,6 @@ npx cdk deploy --all --context modelId=global.anthropic.claude-opus-4-6-v1
 |-------|-----------|
 | SdpmData | Amazon DynamoDB table, S3 buckets (pptx + resources), reference files deployed to S3 |
 | SdpmRuntime | Amazon Bedrock AgentCore Runtime endpoint, ECR repository + Docker image, Amazon Cognito M2M auth |
-| SdpmPngWorker | AWS Fargate task definition, SQS queue, ECS cluster |
 
 ### Template Registration
 
@@ -205,7 +203,6 @@ Enable `agent` and `webUi` in `config.yaml` to add:
 stacks:
   data: true
   runtime: true
-  pngWorker: true
   agent: true          # Strands Agent on AgentCore Runtime
   webUi: true          # React Web UI (S3 + CloudFront)
 
@@ -283,7 +280,6 @@ For adding custom .pptx templates and icons, see [Custom Templates and Assets](c
 
 ### Cost
 
-- PngWorkerStack creates a VPC with NAT Gateway (hourly charges apply)
 - Amazon Bedrock AgentCore Runtime runs 2 containers (Agent + MCP Server)
 - Enabling `features.searchSlides` creates an additional Amazon Bedrock Knowledge Base
 - Delete resources with `npx cdk destroy --all` when done with development/testing

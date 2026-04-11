@@ -105,19 +105,26 @@ includes/           — コードブロック JSON ファイル
 - ユーザー識別: JWT `sub` クレームがスタック全体に伝播
 - 認可: デッキ単位のロールベース（owner / collaborator / viewer）
 
-### PNG Worker
+### プレビュー生成
 
-PPTX を PNG プレビューに変換する独立した AWS Fargate サービスです。
+MCP Server コンテナには LibreOffice と poppler-utils が内蔵されており、プレビューを同期的に生成します。
+`generate_pptx` 呼び出し時にインラインでプレビューが生成されます:
 
 ```
-generate_pptx → SQS メッセージ → Fargate タスク:
-  1. S3 から PPTX をダウンロード
-  2. LibreOffice で再保存（autofit スケーリング値を焼き込み）
-  3. PDF → PNG に変換（スライドごと）
-  4. PNG + autofit_report.json を S3 にアップロード
+generate_pptx:
+  1. presentation.json から PPTX をビルド
+  2. LibreOffice: PPTX → PDF
+  3. pdftoppm: PDF → スライドごとの PNG
+  4. Pillow: PNG → WebP (quality=85)
+  5. WebP プレビューを S3 にアップロード
 ```
 
-エージェントは `get_preview` で PNG 画像を直接取得し、スライドを視覚的にレビューします。
+エージェントは `get_preview` でプレビュー画像を取得し、スライドを視覚的にレビューします。
+
+### テキスト計測
+
+`measure_slides` ツールは LibreOffice の SVG エクスポートを使用してテキストのバウンディングボックスを計測し、
+Build ループ中に視覚レビューなしでオーバーフローを検出できます。
 
 ---
 
@@ -147,9 +154,8 @@ Agent の system prompt は最小限です — ワークフロー知識は MCP S
 3. テンプレートを分析し、利用可能なレイアウトを取得（`analyze_template`）
 4. ワークフローファイルに従い、ブリーフィング → アウトライン → アートディレクションを設計（`specs/` に永続化）
 5. スライドを構築（`run_python` でワークスペース内のファイルを編集）
-6. PPTX を生成（`generate_pptx`）→ S3 に保存
-7. SQS 経由で PNG Worker が起動 → PNG プレビューを生成
-8. プレビュー画像を取得してレビュー（`get_preview`）
+6. PPTX を生成（`generate_pptx`）→ S3 に保存、プレビューを同期生成
+7. プレビュー画像を取得してレビュー（`get_preview`）
 
 ---
 
@@ -203,7 +209,7 @@ spec-driven-presentation-maker は OIDC 準拠の任意の IdP（Identity Provid
 | カテゴリ | ツール | 説明 |
 |---------|--------|------|
 | ワークフロー | `init_presentation`, `analyze_template` | デッキ初期化、テンプレート解析 |
-| 生成 | `generate_pptx`, `get_preview` | PPTX 生成、PNG プレビュー取得 |
+| 生成 | `generate_pptx`, `get_preview`, `measure_slides` | PPTX 生成、プレビュー取得、テキスト計測 |
 | アセット | `search_assets`, `list_asset_sources`, `list_templates` | アイコン検索、ソース一覧、テンプレート一覧 |
 | リファレンス | `list_styles`, `read_examples` | スライドスタイル例 |
 | リファレンス | `list_workflows`, `read_workflows` | フェーズ別ワークフロー手順 |
@@ -232,7 +238,6 @@ spec-driven-presentation-maker は OIDC 準拠の任意の IdP（Identity Provid
 |---|---|---|
 | SdpmData | Amazon DynamoDB テーブル、S3 バケット ×2、リファレンスデプロイ | `stacks.data` |
 | SdpmRuntime | Amazon Bedrock AgentCore Runtime + ECR | `stacks.runtime` |
-| SdpmPngWorker | AWS Fargate + SQS | `stacks.pngWorker` |
 | SdpmAgent | Strands Agent（Amazon Bedrock AgentCore Runtime） | `stacks.agent` |
 | SdpmWebUi | S3 + Amazon CloudFront + Amazon API Gateway + Lambda | `stacks.webUi` |
 | SdpmAuth | Amazon Cognito User Pool（agent または webUi 有効時に自動作成） | （自動） |

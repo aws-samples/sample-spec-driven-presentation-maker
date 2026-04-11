@@ -57,6 +57,7 @@ Layer 2 with storage swapped to Amazon DynamoDB + S3, plus authentication and au
 ```
 MCP Client → AgentCore Runtime → MCP Server Container
                                    ├── 17+ MCP tools
+                                   ├── LibreOffice (PPTX → PDF/SVG)
                                    ├── DynamoDB (decks, templates)
                                    ├── S3 (PPTX, previews, references, assets)
                                    └── Code Interpreter (optional)
@@ -105,19 +106,26 @@ includes/           — code block JSON files
 - User identity: JWT `sub` claim propagated through the entire stack
 - Authorization: role-based per deck (owner / collaborator / viewer)
 
-### PNG Worker
+### Preview Generation
 
-A separate AWS Fargate service that converts PPTX to PNG previews.
+The MCP Server container includes LibreOffice and poppler-utils for synchronous preview generation.
+When `generate_pptx` is called, previews are generated inline:
 
 ```
-generate_pptx → SQS message → Fargate task:
-  1. Download PPTX from S3
-  2. LibreOffice re-save (bakes autofit scaling values)
-  3. Convert PDF → PNG per slide
-  4. Upload PNGs + autofit_report.json to S3
+generate_pptx:
+  1. Build PPTX from presentation.json
+  2. LibreOffice: PPTX → PDF
+  3. pdftoppm: PDF → per-page PNG
+  4. Pillow: PNG → WebP (quality=85)
+  5. Upload WebP previews to S3
 ```
 
-The agent uses `get_preview` to retrieve PNG images and visually review slides.
+The agent uses `get_preview` to retrieve preview images and visually review slides.
+
+### Text Measurement
+
+The `measure_slides` tool uses LibreOffice SVG export to measure text bounding boxes,
+enabling overflow detection during the Build loop without visual review.
 
 ---
 
@@ -148,9 +156,8 @@ The agent's system prompt is minimal — workflow knowledge is dynamically retri
 3. Analyzes the template and retrieves available layouts (`analyze_template`)
 4. Following workflow files, designs briefing → outline → art direction (persisted to `specs/`)
 5. Builds slides (`run_python` to edit files in the workspace)
-6. Generates PPTX (`generate_pptx`) → saved to S3
-7. PNG Worker triggered via SQS → generates PNG previews
-8. Retrieves preview images for review (`get_preview`)
+6. Generates PPTX (`generate_pptx`) → saved to S3, previews generated synchronously
+7. Retrieves preview images for review (`get_preview`)
 
 ---
 
@@ -204,7 +211,7 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Category | Tool | Description |
 |----------|------|-------------|
 | Workflow | `init_presentation`, `analyze_template` | Initialize deck, analyze template |
-| Generation | `generate_pptx`, `get_preview` | Generate PPTX, get PNG preview |
+| Generation | `generate_pptx`, `get_preview`, `measure_slides` | Generate PPTX, get preview, measure text bbox |
 | Assets | `search_assets`, `list_asset_sources`, `list_templates` | Search icons, list sources, list templates |
 | References | `list_styles`, `read_examples` | Slide style examples |
 | References | `list_workflows`, `read_workflows` | Phase workflow instructions |
@@ -233,7 +240,6 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 |---|---|---|
 | SdpmData | Amazon DynamoDB table, S3 buckets ×2, reference deployment | `stacks.data` |
 | SdpmRuntime | Amazon Bedrock AgentCore Runtime + ECR | `stacks.runtime` |
-| SdpmPngWorker | AWS Fargate + SQS | `stacks.pngWorker` |
 | SdpmAgent | Strands Agent (Amazon Bedrock AgentCore Runtime) | `stacks.agent` |
 | SdpmWebUi | S3 + Amazon CloudFront + Amazon API Gateway + Lambda | `stacks.webUi` |
 | SdpmAuth | Amazon Cognito User Pool (auto-created when agent or webUi enabled) | (auto) |

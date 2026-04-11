@@ -105,7 +105,6 @@ cp config.example.yaml config.yaml
 stacks:
   data: true           # 必須 — DynamoDB + S3
   runtime: true        # 必須 — AgentCore Runtime MCP Server
-  pngWorker: true      # 任意 — PPTX→PNG 変換（Fargate + SQS）
   agent: false
   webUi: false
 
@@ -149,7 +148,6 @@ npx cdk deploy --all --context modelId=global.anthropic.claude-opus-4-6-v1
 |---------|---------|
 | SdpmData | Amazon DynamoDB テーブル、S3 バケット（pptx + リソース）、リファレンスファイルを S3 にデプロイ |
 | SdpmRuntime | Amazon Bedrock AgentCore Runtime エンドポイント、ECR リポジトリ + Docker イメージ、Amazon Cognito M2M 認証 |
-| SdpmPngWorker | AWS Fargate タスク定義、SQS キュー、ECS クラスター |
 
 ### テンプレートの登録
 
@@ -205,7 +203,6 @@ curl -X POST \
 stacks:
   data: true
   runtime: true
-  pngWorker: true
   agent: true          # Strands Agent（AgentCore Runtime 上）
   webUi: true          # React Web UI（S3 + CloudFront）
 
@@ -283,7 +280,6 @@ bash scripts/deploy_webui.sh
 
 ### コスト
 
-- PngWorkerStack は NAT Gateway を含む VPC を作成します（時間課金が発生）
 - Amazon Bedrock AgentCore Runtime は 2 つのコンテナ（Agent + MCP Server）を実行します
 - `features.searchSlides` を有効にすると Amazon Bedrock Knowledge Base が追加で作成されます
 - 開発・検証が終わったら `npx cdk destroy --all` でリソースを削除してください
