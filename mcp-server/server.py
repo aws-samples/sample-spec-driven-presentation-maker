@@ -424,9 +424,9 @@ def measure_slides(deck_id: str, slide_numbers: list[int] | None = None) -> str:
                 try:
                     webp_files = generate_previews(pptx_path, preview_dir)
                     for i, webp_path in enumerate(webp_files):
-                        s3_key = f"previews/{deck_id}/draft_slide_{i + 1:02d}.webp"
+                        s3_key = f"previews/{deck_id}/slide_{i + 1:02d}.webp"
                         _storage.upload_file(key=s3_key, data=webp_path.read_bytes(), content_type="image/webp")
-                    logger.info("Draft WebP previews uploaded: %d slides for deck %s", len(webp_files), deck_id)
+                    logger.info("Measure WebP previews uploaded: %d slides for deck %s", len(webp_files), deck_id)
                 finally:
                     shutil.rmtree(preview_dir, ignore_errors=True)
             except Exception as e:

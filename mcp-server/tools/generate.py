@@ -269,13 +269,9 @@ def generate_pptx(
             for i, webp_path in enumerate(webp_files):
                 s3_key = f"previews/{deck_id}/slide_{i + 1:02d}.webp"
                 storage.upload_file(key=s3_key, data=webp_path.read_bytes(), content_type="image/webp")
-            # Cleanup orphan previews (reduced slide count or draft SVGs)
+            # Cleanup orphan previews (reduced slide count)
             existing = storage.list_files(prefix=f"previews/{deck_id}/", bucket=storage.pptx_bucket)
-            orphans = [
-                k for k in existing
-                if k.startswith(f"previews/{deck_id}/draft_slide_")
-                or _is_orphan_webp(k, deck_id, slide_count)
-            ]
+            orphans = [k for k in existing if _is_orphan_webp(k, deck_id, slide_count)]
             if orphans:
                 _delete_keys(storage, orphans)
             logger.info("Preview generation complete: %d pages for deck %s", len(webp_files), deck_id)

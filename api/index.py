@@ -128,7 +128,7 @@ def _list_preview_keys(deck_id: str) -> set:
 def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: set) -> Optional[str]:
     """Resolve the best preview URL for a slide from cached keys.
 
-    Fallback order: webp > png > draft webp > draft SVG.
+    Fallback order: webp > png.
 
     Args:
         deck_id: Deck identifier.
@@ -139,7 +139,7 @@ def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: set) -> Opti
         Presigned URL or None.
     """
     prefix = f"previews/{deck_id}/"
-    for candidate in (f"{prefix}{slide_id}.webp", f"{prefix}{slide_id}.png", f"{prefix}draft_{slide_id}.webp", f"{prefix}draft_{slide_id}.svg"):
+    for candidate in (f"{prefix}{slide_id}.webp", f"{prefix}{slide_id}.png"):
         if candidate in preview_keys:
             return presigned_url(s3_client, BUCKET_NAME, candidate)
     return None

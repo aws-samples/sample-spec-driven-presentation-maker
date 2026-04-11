@@ -360,21 +360,6 @@ body {
   to { opacity: 1; }
 }
 
-/* ── Measure shimmer overlay ── */
-@keyframes measure-shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-.slide-measuring { position: relative; overflow: hidden; }
-.slide-measuring::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, oklch(0.75 0.14 185 / 8%), transparent);
-  animation: measure-shimmer 1.5s ease-in-out infinite;
-  pointer-events: none;
-}
-
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .tool-card-enter,
@@ -383,7 +368,6 @@ body {
   @keyframes tool-spinner { to { transform: rotate(360deg); } }
   @keyframes tool-active-shimmer { 0%, 100% { opacity: 0.8; } }
   @keyframes tool-pulse { 0%, 100% { opacity: 0.6; } }
-  /* Waiting animations */
   .brief-waiting,
   .outline-waiting,
   .art-waiting,
@@ -397,7 +381,6 @@ body {
   @keyframes compose-fan { 0%, 100% { transform: translateX(-50%); opacity: 0.5; } }
   @keyframes build-develop { 0%, 100% { opacity: 0.4; transform: none; } }
   @keyframes build-shimmer { 0%, 100% { transform: none; } }
-  @keyframes measure-shimmer { 0%, 100% { opacity: 0; } }
   .slide-crossfade { animation: none; }
 }
 

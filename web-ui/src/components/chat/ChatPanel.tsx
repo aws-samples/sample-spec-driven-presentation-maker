@@ -61,7 +61,6 @@ interface ChatPanelProps {
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
-  onMeasuringChange?: (measuring: boolean) => void
 }
 
 /** Handle exposed to parent for inserting text at cursor position. */
@@ -69,7 +68,7 @@ export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onMeasuringChange }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -568,12 +567,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           if (toolUseData?.completed && (toolName === "generate_pptx" || toolName.endsWith("_generate_pptx")) && onPreviewInvalidated) {
             onPreviewInvalidated()
           }
-          if (toolUseData?.completed && (toolName === "measure_slides" || toolName.endsWith("_measure_slides")) && onPreviewInvalidated) {
-            onPreviewInvalidated()
-          }
-          if (toolUseData?.completed && (toolName === "measure_slides" || toolName.endsWith("_measure_slides")) && onMeasuringChange) {
-            onMeasuringChange(false)
-          }
 
           // Tool result: update existing ToolUse with result/status
           if (toolUseData?.completed) {
@@ -597,11 +590,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             toolUseId: toolUseData?.toolUseId || crypto.randomUUID(),
             name: toolName,
             input: toolUseData?.input || {},
-          }
-
-          // Signal measure_slides start
-          if (onMeasuringChange && (toolName === "measure_slides" || toolName.endsWith("_measure_slides"))) {
-            onMeasuringChange(true)
           }
 
           // Detect workflow phase from tool calls
