@@ -29,7 +29,7 @@ def send(event, context, status, data=None, physical_id=None, reason=None):
     if not url.startswith("https://"):  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected
         raise ValueError("ResponseURL must be HTTPS")
     req = urllib.request.Request(url, data=body, headers={"Content-Type": ""}, method="PUT")
-    urllib.request.urlopen(req)  # nosec B310 — URL validated above
+    urllib.request.urlopen(req)  # nosec B310 — URL validated above  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected
 
 
 def handler(event, context):
