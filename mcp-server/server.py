@@ -240,6 +240,32 @@ def analyze_template(template: str) -> str:
 
 
 @mcp.tool()
+def read_uploaded_file(upload_id: str, deck_id: str) -> list:
+    """Read an uploaded file's content. Returns text for documents, visual preview for images/PDFs.
+
+    For images: saves original to deck workspace for use in slides, returns visual preview.
+    For PDFs: extracts text and embedded images, saves images to deck workspace.
+    For PPTX: returns extracted text and guidance to use pptx_to_json.
+
+    Args:
+        deck_id: The deck ID. Must be initialized first via init_presentation().
+        upload_id: The upload identifier from the [Attached: ...] message.
+
+    Returns:
+        Text content and/or image previews for visual analysis.
+    """
+    from tools.upload import read_uploaded_file as _read
+
+    _check_deck_access(deck_id, action="edit_slide")
+    return _read(
+        upload_id=upload_id,
+        deck_id=deck_id,
+        user_id=_get_user_id(),
+        storage=_storage,
+    )
+
+
+@mcp.tool()
 def pptx_to_json(deck_id: str, upload_id: str) -> str:
     """Convert an uploaded PPTX file to JSON representation for editing.
     Downloads the PPTX from S3, converts via Engine, and saves presentation.json to the deck workspace.

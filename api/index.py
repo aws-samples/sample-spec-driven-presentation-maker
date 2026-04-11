@@ -805,7 +805,7 @@ ALLOWED_CONTENT_TYPES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "image/png",
+    "image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml",
 }
 
 
