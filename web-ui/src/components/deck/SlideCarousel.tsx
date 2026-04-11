@@ -17,6 +17,7 @@ import { useAuth } from "react-oidc-context"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
+import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 
 interface SlideCarouselProps {
   slides: SlidePreview[]
@@ -49,6 +50,27 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
   const [jsonLoading, setJsonLoading] = useState(false)
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
+
+  /* ── Slide update detection for glow highlight ── */
+  const prevUrlKeys = useRef<Map<string, string>>(new Map())
+  const [updatedIds, setUpdatedIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    const newUpdated = new Set<string>()
+    for (const slide of slides) {
+      const newKey = slide.previewUrl?.split("?")[0] || ""
+      const prevKey = prevUrlKeys.current.get(slide.slideId) || ""
+      if (prevKey && newKey && newKey !== prevKey) {
+        newUpdated.add(slide.slideId)
+      }
+      if (newKey) prevUrlKeys.current.set(slide.slideId, newKey)
+    }
+    if (newUpdated.size > 0) {
+      setUpdatedIds(newUpdated)
+      const timer = setTimeout(() => setUpdatedIds(new Set()), 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [slides])
 
   /* ── Spec tab state + auto-focus ── */
   const [specTab, setSpecTab] = useState<SpecTab>("brief")
@@ -253,43 +275,34 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
         {viewMode === "grid" ? (
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
             {slidesWithPreview.map((slide, i) => (
-              <button
+              <SlideThumbnail
                 key={slide.slideId}
-                data-slide-id={slide.slideId}
-                type="button"
+                src={slide.previewUrl}
+                alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
+                index={i}
+                slideId={slide.slideId}
                 onClick={() => onSlideClick?.(i + 1)}
-                className="rounded-lg overflow-hidden border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 relative group"
-                aria-label={`Slide ${i + 1}`}
+                updated={updatedIds.has(slide.slideId)}
+                className="border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 cursor-pointer group"
               >
-                <img
-                  key={slide.previewUrl}
-                  src={slide.previewUrl!}
-                  alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
-                  className="w-full pointer-events-none slide-crossfade"
-                />
                 <span className="absolute bottom-1.5 right-2 text-[10px] font-medium text-white/30 group-hover:text-white/50 transition-colors">
                   {i + 1}
                 </span>
-              </button>
+              </SlideThumbnail>
             ))}
           </div>
         ) : (
           slidesWithPreview.map((slide, i) => (
-            <button
+            <SlideThumbnail
               key={slide.slideId}
-              data-slide-id={slide.slideId}
-              type="button"
+              src={slide.previewUrl}
+              alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
+              index={i}
+              slideId={slide.slideId}
               onClick={() => onSlideClick?.(i + 1)}
-              className="slide-shadow rounded-lg overflow-hidden w-full text-left cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow relative"
-              aria-label={`Insert reference to slide ${i + 1}`}
-            >
-              <img
-                key={slide.previewUrl}
-                src={slide.previewUrl!}
-                alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
-                className="w-full pointer-events-none slide-crossfade"
-              />
-            </button>
+              updated={updatedIds.has(slide.slideId)}
+              className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
+            />
           ))
         )}
       </div>

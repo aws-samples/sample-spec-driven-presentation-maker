@@ -351,13 +351,43 @@ body {
   50% { opacity: 1; transform: scale(1.4); }
 }
 
-/* ── Slide crossfade (preview image transitions) ── */
-.slide-crossfade {
-  animation: slide-fade-in 300ms ease-out;
+/* ── Slide skeleton shimmer ── */
+@keyframes slide-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
-@keyframes slide-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.slide-skeleton {
+  background: oklch(0.16 0.005 260);
+}
+.slide-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, oklch(0.75 0.14 185 / 8%), transparent);
+  animation: slide-shimmer 1.8s ease-in-out infinite;
+}
+
+/* ── Slide reveal (skeleton → image) ── */
+.slide-reveal {
+  opacity: 0;
+  transform: scale(0.97);
+}
+.slide-reveal[data-loaded="true"] {
+  animation: slide-reveal-in 400ms ease-out both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+@keyframes slide-reveal-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Slide update glow highlight ── */
+@keyframes slide-update-glow {
+  0%   { box-shadow: 0 0 0 1px oklch(0.75 0.14 185 / 60%), 0 0 16px oklch(0.75 0.14 185 / 25%); }
+  100% { box-shadow: 0 0 0 1px transparent, 0 0 0 transparent; }
+}
+.slide-updated {
+  animation: slide-update-glow 1.5s ease-out both;
 }
 
 /* ── Reduced motion ── */
@@ -381,7 +411,9 @@ body {
   @keyframes compose-fan { 0%, 100% { transform: translateX(-50%); opacity: 0.5; } }
   @keyframes build-develop { 0%, 100% { opacity: 0.4; transform: none; } }
   @keyframes build-shimmer { 0%, 100% { transform: none; } }
-  .slide-crossfade { animation: none; }
+  .slide-skeleton::after { animation: none; }
+  .slide-reveal[data-loaded="true"] { animation: none; opacity: 1; transform: none; }
+  .slide-updated { animation: none; }
 }
 
 /* ── Chat prose overrides (dark editorial) ── */
