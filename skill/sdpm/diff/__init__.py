@@ -175,7 +175,7 @@ def load_slides_json_or_pptx(path):
                 if named.exists():
                     template = named
                 else:
-                    raise FileNotFoundError(f"Template not found: {tpl_name}")
+                    raise FileNotFoundError(f"Template not found: '{tpl_name}'. Use list_templates to see available templates.")
             builder = PPTXBuilder(template, fonts=data.get("fonts"), base_dir=Path(path).parent,
                                   default_text_color=data.get("defaultTextColor", "#FFFFFF"))
             id_map = {s["id"]: s for s in data.get("slides", []) if "id" in s}
