@@ -137,26 +137,30 @@ def _delete_kb_vectors(deck_id: str, user_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _list_preview_keys(deck_id: str) -> set:
+def _list_preview_keys(deck_id: str) -> dict:
     """List all preview keys for a deck in one S3 call.
 
     Returns:
-        Set of S3 keys under previews/{deck_id}/.
+        Dict mapping S3 key to LastModified epoch (int) under previews/{deck_id}/.
     """
     prefix = f"previews/{deck_id}/"
     resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
-    return {obj["Key"] for obj in resp.get("Contents", [])}
+    return {
+        obj["Key"]: int(obj["LastModified"].timestamp())
+        for obj in resp.get("Contents", [])
+    }
 
 
-def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: set) -> Optional[str]:
+def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: dict) -> Optional[str]:
     """Resolve the best preview URL for a slide from cached keys.
 
     Fallback order: webp > png.
+    Appends &_t=<epoch> cache-buster so clients detect S3 overwrites.
 
     Args:
         deck_id: Deck identifier.
         slide_id: Slide identifier (e.g. slide_01).
-        preview_keys: Set of existing S3 keys from _list_preview_keys.
+        preview_keys: Dict mapping S3 key to LastModified epoch from _list_preview_keys.
 
     Returns:
         Presigned URL or None.
@@ -164,7 +168,10 @@ def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: set) -> Opti
     prefix = f"previews/{deck_id}/"
     for candidate in (f"{prefix}{slide_id}.webp", f"{prefix}{slide_id}.png"):
         if candidate in preview_keys:
-            return preview_url(candidate)
+            url = preview_url(candidate)
+            if url:
+                sep = "&" if "?" in url else "?"
+                return f"{url}{sep}_t={preview_keys[candidate]}"
     return None
 
 

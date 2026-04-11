@@ -105,20 +105,27 @@ export function useWorkspace(
       try {
         const data = await getDeck(deckIdToLoad, idToken)
         // Detect slide changes (added/removed/preview updated)
-        const slideKey = data.slides.map((s) => `${s.slideId}:${s.previewUrl?.split("?")[0] || ""}`).join("|")
+        const slideKey = data.slides.map((s) => {
+          const base = s.previewUrl?.split("?")[0] || ""
+          const t = s.previewUrl ? new URL(s.previewUrl, "https://x").searchParams.get("_t") || "" : ""
+          return `${s.slideId}:${base}:${t}`
+        }).join("|")
         if (slideKey !== prevSlideKeyRef.current) {
           prevSlideKeyRef.current = slideKey
           step = 0 // reset to fast polling on change
         }
         // Stabilise presigned URLs to prevent unnecessary image re-downloads.
         // Update cache when the underlying S3 key changes (draft → final, or measure update).
+        // Include _t cache-buster param so overwrites to the same key are detected.
         for (const s of data.slides) {
           if (s.previewUrl) {
             const cached = stablePreviewUrls.current.get(s.slideId)
-            // Compare S3 key (path before '?') — ignore changing presigned query params
-            const newKey = s.previewUrl.split("?")[0]
-            const cachedKey = cached?.split("?")[0]
-            if (newKey !== cachedKey) {
+            const stableKey = (url: string) => {
+              const base = url.split("?")[0]
+              const t = new URL(url, "https://x").searchParams.get("_t") || ""
+              return `${base}:${t}`
+            }
+            if (stableKey(s.previewUrl) !== (cached ? stableKey(cached) : "")) {
               stablePreviewUrls.current.set(s.slideId, s.previewUrl)
             } else if (cached) {
               s.previewUrl = cached
