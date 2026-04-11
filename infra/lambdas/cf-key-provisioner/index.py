@@ -3,7 +3,8 @@
 import json
 import subprocess  # nosec B404 — openssl invocation with fixed args only
 import logging
-import urllib.request
+import http.client
+from urllib.parse import urlparse
 
 import boto3
 
@@ -26,10 +27,12 @@ def send(event, context, status, data=None, physical_id=None, reason=None):
         "Data": data or {},
     }).encode()
     url = event["ResponseURL"]
-    if not url.startswith("https://"):  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected
+    if not url.startswith("https://"):
         raise ValueError("ResponseURL must be HTTPS")
-    req = urllib.request.Request(url, data=body, headers={"Content-Type": ""}, method="PUT")
-    urllib.request.urlopen(req)  # nosec B310 — URL validated above  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected
+    parsed = urlparse(url)
+    conn = http.client.HTTPSConnection(parsed.hostname)
+    conn.request("PUT", f"{parsed.path}?{parsed.query}", body=body, headers={"Content-Type": ""})
+    conn.getresponse()
 
 
 def handler(event, context):
