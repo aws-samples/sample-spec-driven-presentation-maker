@@ -366,7 +366,7 @@ def measure_slides(deck_id: str, slide_numbers: list[int] | None = None) -> str:
     """Measure text bounding boxes for overflow detection.
     Builds PPTX from presentation.json, generates SVG via LibreOffice, and extracts bbox data.
     Does NOT require generate_pptx — works directly from workspace JSON.
-    Also uploads per-slide draft SVG previews to S3.
+    After returning the measure report, generates draft WebP previews in the background.
 
     Args:
         deck_id: The deck ID to measure.
@@ -376,61 +376,70 @@ def measure_slides(deck_id: str, slide_numbers: list[int] | None = None) -> str:
         Measure report as text.
     """
     _check_deck_access(deck_id, action="read")
+    import asyncio
     import shutil
     import subprocess
+    import tempfile
     import traceback
 
     try:
         from sdpm.builder import PPTXBuilder, resolve_override
-        from sdpm.preview.measure import measure_from_svg, format_measure_report, split_svg_per_slide
-        from tools.generate import _prepare_workspace
+        from sdpm.preview.measure import measure_from_svg, format_measure_report
+        from tools.generate import _prepare_workspace, generate_previews
 
         user_id = _get_user_id()
         tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
-        try:
-            # Build PPTX from JSON
-            builder = PPTXBuilder(**build_kwargs)
-            id_map: dict[str, dict] = {}
-            for s in slides:
-                if "id" in s:
-                    id_map[s["id"]] = s
-            for s in slides:
-                builder.add_slide(resolve_override(s, id_map))
-            pptx_path = tmpdir / "measure.pptx"
-            builder.save(pptx_path)
 
-            # PPTX → SVG via LibreOffice
-            env = os.environ.copy()
-            env["HOME"] = str(tmpdir)
-            subprocess.run(  # nosec B603
-                ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
-                env=env, capture_output=True, text=True, timeout=120, check=True,
-            )
-            svg_path = tmpdir / "measure.svg"
-            if not svg_path.exists():
-                return json.dumps({"error": "LibreOffice SVG export failed"})
+        # Build PPTX from JSON
+        builder = PPTXBuilder(**build_kwargs)
+        id_map: dict[str, dict] = {}
+        for s in slides:
+            if "id" in s:
+                id_map[s["id"]] = s
+        for s in slides:
+            builder.add_slide(resolve_override(s, id_map))
+        pptx_path = tmpdir / "measure.pptx"
+        builder.save(pptx_path)
 
-            # Measure bboxes
-            results = measure_from_svg(svg_path=svg_path, slide_indices=slide_numbers)
-            report = format_measure_report(results)
-
-            # Split SVG and upload draft previews
-            try:
-                svg_text = svg_path.read_text(encoding="utf-8")
-                per_slide_svgs = split_svg_per_slide(svg_text)
-                for i, svg_str in enumerate(per_slide_svgs):
-                    s3_key = f"previews/{deck_id}/draft_slide_{i + 1:02d}.svg"
-                    _storage.upload_file(
-                        key=s3_key, data=svg_str.encode("utf-8"),
-                        content_type="image/svg+xml",
-                    )
-                logger.info("Draft SVG previews uploaded: %d slides for deck %s", len(per_slide_svgs), deck_id)
-            except Exception as e:
-                logger.warning("Draft SVG upload failed for deck %s: %s", deck_id, e)
-
-            return report
-        finally:
+        # PPTX → SVG via LibreOffice (for bbox extraction)
+        env = os.environ.copy()
+        env["HOME"] = str(tmpdir)
+        subprocess.run(  # nosec B603
+            ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
+            env=env, capture_output=True, text=True, timeout=120, check=True,
+        )
+        svg_path = tmpdir / "measure.svg"
+        if not svg_path.exists():
             shutil.rmtree(tmpdir, ignore_errors=True)
+            return json.dumps({"error": "LibreOffice SVG export failed"})
+
+        # Measure bboxes
+        results = measure_from_svg(svg_path=svg_path, slide_indices=slide_numbers)
+        report = format_measure_report(results)
+
+        # Schedule background draft WebP generation (tmpdir cleanup in task)
+        async def _generate_draft_webp() -> None:
+            try:
+                preview_dir = Path(tempfile.mkdtemp())
+                try:
+                    webp_files = generate_previews(pptx_path, preview_dir)
+                    for i, webp_path in enumerate(webp_files):
+                        s3_key = f"previews/{deck_id}/draft_slide_{i + 1:02d}.webp"
+                        _storage.upload_file(key=s3_key, data=webp_path.read_bytes(), content_type="image/webp")
+                    logger.info("Draft WebP previews uploaded: %d slides for deck %s", len(webp_files), deck_id)
+                finally:
+                    shutil.rmtree(preview_dir, ignore_errors=True)
+            except Exception as e:
+                logger.warning("Draft WebP generation failed for deck %s: %s", deck_id, e)
+            finally:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+
+        try:
+            asyncio.get_event_loop().create_task(_generate_draft_webp())
+        except Exception:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+        return report
     except Exception as e:
         logger.exception("measure_slides failed: deck=%s", deck_id)
         return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
