@@ -42,6 +42,9 @@ KB_ID = os.environ.get("KB_ID", "")
 VECTOR_BUCKET_NAME = os.environ.get("VECTOR_BUCKET_NAME", "")
 VECTOR_INDEX_NAME = os.environ.get("VECTOR_INDEX_NAME", "")
 RESOURCE_BUCKET = os.environ.get("RESOURCE_BUCKET", "")
+CF_DOMAIN = os.environ.get("CF_DOMAIN", "")
+CF_KEY_PAIR_ID = os.environ.get("CF_KEY_PAIR_ID", "")
+CF_PRIVATE_KEY_PARAM = os.environ.get("CF_PRIVATE_KEY_PARAM", "")
 
 # Module-level cache for styles (references are static, deployed once).
 _styles_cache: Optional[List[Dict[str, str]]] = None
@@ -56,6 +59,37 @@ if KB_ID.startswith("/"):
 
 PRESIGNED_URL_EXPIRY = 900
 MAX_FILE_SIZE = 100 * 1024 * 1024
+
+# --- CloudFront preview URL helper ---
+_cf_private_key: Optional[str] = None
+
+
+def _get_cf_private_key() -> str:
+    """Load CloudFront signing private key from SSM (cached)."""
+    global _cf_private_key
+    if _cf_private_key is None:
+        ssm = boto3.client("ssm")
+        _cf_private_key = ssm.get_parameter(
+            Name=CF_PRIVATE_KEY_PARAM, WithDecryption=True,
+        )["Parameter"]["Value"]
+    return _cf_private_key
+
+
+def preview_url(s3_key: str) -> Optional[str]:
+    """Return CloudFront signed URL for a preview S3 key, or presigned S3 URL fallback."""
+    return _cf_signed_url(s3_key) or presigned_url(s3_client, BUCKET_NAME, s3_key)
+
+
+def _preview_url_for_slide(deck_id: str, slide_id: str) -> Optional[str]:
+    """Return preview URL for a slide, checking webp then png existence."""
+    for ext in ("webp", "png"):
+        s3_key = f"previews/{deck_id}/{slide_id}.{ext}"
+        try:
+            s3_client.head_object(Bucket=BUCKET_NAME, Key=s3_key)
+            return _cf_signed_url(s3_key) or presigned_url(s3_client, BUCKET_NAME, s3_key)
+        except Exception:
+            continue
+    return None
 
 cors_origins = [o.strip() for o in CORS_ALLOWED_ORIGINS.split(",") if o.strip()]
 cors_config = CORSConfig(
@@ -133,17 +167,9 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
 
         key = deck.get("thumbnailS3Key")
         if key:
-            thumb_url = presigned_url(s3_client, BUCKET_NAME, key)
+            thumb_url = preview_url(key) or presigned_url(s3_client, BUCKET_NAME, key)
         else:
-            # Fallback: first slide preview (webp preferred, png fallback)
-            for ext in ("webp", "png"):
-                s3_key = f"previews/{deck_id}/slide_01.{ext}"
-                try:
-                    s3_client.head_object(Bucket=BUCKET_NAME, Key=s3_key)
-                    thumb_url = presigned_url(s3_client, BUCKET_NAME, s3_key)
-                    break
-                except Exception:
-                    pass
+            thumb_url = _preview_url_for_slide(deck_id, "slide_01")
 
         extras[deck_id] = {"thumbnailUrl": thumb_url}
     return extras
@@ -370,16 +396,8 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         presentation = json.loads(resp["Body"].read())
         for i, s in enumerate(presentation.get("slides", [])):
             sid = f"slide_{i + 1:02d}"
-            preview_url = None
-            for ext in ("webp", "png"):
-                preview_key = f"previews/{deck_id}/{sid}.{ext}"
-                try:
-                    s3_client.head_object(Bucket=BUCKET_NAME, Key=preview_key)
-                    preview_url = presigned_url(s3_client, BUCKET_NAME, preview_key)
-                    break
-                except Exception:
-                    pass
-            slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": preview_url}
+            slide_preview = _preview_url_for_slide(deck_id, sid)
+            slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
             if include_json:
                 slide_entry["slideJson"] = json.dumps(s)
             slides.append(slide_entry)
@@ -419,7 +437,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         "slideCount": len(slides),
         "slides": slides,
         "specs": specs,
-        "pptxUrl": presigned_url(s3_client, BUCKET_NAME, pptx_key) if pptx_key else None,
+        "pptxUrl": (_cf_signed_url(pptx_key) or presigned_url(s3_client, BUCKET_NAME, pptx_key)) if pptx_key else None,
         "updatedAt": deck.get("updatedAt", ""),
         "chatSessionId": deck.get("chatSessionId"),
         "isOwner": decision.role == "owner",
@@ -600,17 +618,10 @@ def search_slides_api() -> Dict[str, Any]:
             continue
         seen.add(dedup_key)
 
-        # Generate preview URL — slideId matches preview filename (webp preferred)
-        preview_url = ""
+        # Generate preview URL (CloudFront or presigned fallback)
+        slide_preview_url = ""
         if deck_id and slide_id:
-            for ext in ("webp", "png"):
-                s3_key = f"previews/{deck_id}/{slide_id}.{ext}"
-                try:
-                    s3_client.head_object(Bucket=BUCKET_NAME, Key=s3_key)
-                    preview_url = presigned_url(s3_client, BUCKET_NAME, s3_key)
-                    break
-                except Exception:
-                    pass
+            slide_preview_url = _preview_url_for_slide(deck_id, slide_id) or ""
 
         results.append({
             "deckId": deck_id,
@@ -619,7 +630,7 @@ def search_slides_api() -> Dict[str, Any]:
             "pageNumber": int(meta.get("pageNumber", 0)),
             "score": r.get("score", 0),
             "excerpt": r.get("content", {}).get("text", "")[:200],
-            "previewUrl": preview_url,
+            "previewUrl": slide_preview_url,
         })
 
     return {"results": results}
@@ -732,6 +743,57 @@ def _parse_memory_payload(payload_item: Dict) -> Dict | None:
     except (json.JSONDecodeError, KeyError, TypeError, IndexError, UnicodeDecodeError):
         pass
     return None
+
+
+# ---------------------------------------------------------------------------
+# CloudFront signed URL helper
+# ---------------------------------------------------------------------------
+
+
+def _cf_signed_url(s3_key: str, expires_in: int = 900) -> Optional[str]:
+    """Generate a CloudFront signed URL for an S3 key.
+
+    Args:
+        s3_key: S3 object key (e.g. previews/deck_id/slide_01.webp).
+        expires_in: URL validity in seconds (default 15 min).
+
+    Returns:
+        Signed URL string, or None if CloudFront is not configured.
+    """
+    if not CF_DOMAIN or not CF_KEY_PAIR_ID or not CF_PRIVATE_KEY_PARAM:
+        return None
+
+    import datetime
+    import base64
+    import subprocess
+    import tempfile
+
+    private_key_pem = _get_cf_private_key()
+    expires = int((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expires_in)).timestamp())
+    url = f"https://{CF_DOMAIN}/{s3_key}"
+
+    policy = json.dumps({
+        "Statement": [{
+            "Resource": url,
+            "Condition": {"DateLessThan": {"AWS:EpochTime": expires}},
+        }],
+    }, separators=(",", ":"))
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as kf:
+        kf.write(private_key_pem)
+        key_path = kf.name
+    try:
+        sig_raw = subprocess.check_output(  # nosec B603 B607 — fixed args, key_path is tempfile
+            ["/usr/bin/openssl", "dgst", "-sha1", "-sign", key_path],
+            input=policy.encode(), stderr=subprocess.DEVNULL,
+        )
+    finally:
+        os.unlink(key_path)
+
+    def _b64(data: bytes) -> str:
+        return base64.b64encode(data).decode().replace("+", "-").replace("=", "_").replace("/", "~")
+
+    return f"{url}?Policy={_b64(policy.encode())}&Signature={_b64(sig_raw)}&Key-Pair-Id={CF_KEY_PAIR_ID}"
 
 
 # ---------------------------------------------------------------------------

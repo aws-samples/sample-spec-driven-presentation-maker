@@ -116,7 +116,7 @@ def handle_png(payload: dict) -> None:
         Image.open(png_path).save(webp_path, "WEBP", quality=85)
 
         s3_key = f"previews/{deck_id}/slide_{i + 1:02d}.webp"
-        s3_client.upload_file(str(webp_path), bucket, s3_key, ExtraArgs={"ContentType": "image/webp"})
+        s3_client.upload_file(str(webp_path), bucket, s3_key, ExtraArgs={"ContentType": "image/webp", "CacheControl": "public, max-age=5"})
         logger.info("WebP uploaded: s3://%s/%s", bucket, s3_key)
 
     logger.info("Preview generation complete: %d pages for deck %s", len(png_files), deck_id)
