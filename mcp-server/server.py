@@ -684,8 +684,9 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
 
     result: dict = {"output": output}
 
-    # Post-processing: check and/or WebP generation
-    if deck_id and (check or save):
+    # Post-processing: check triggers PPTX build → measure/lint/bias
+    # WebP preview generation runs when check is present and save=True
+    if deck_id and check:
         import shutil
         import traceback
 
@@ -696,32 +697,31 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
             tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
             pptx_path = _build_pptx(tmpdir, slides, build_kwargs)
 
-            if check:
-                # Measure
-                try:
-                    result["measure"] = _run_measure(tmpdir, pptx_path, check)
-                except Exception as e:
-                    result["measure"] = json.dumps({"error": str(e)})
+            # Measure
+            try:
+                result["measure"] = _run_measure(tmpdir, pptx_path, check)
+            except Exception as e:
+                result["measure"] = json.dumps({"error": str(e)})
 
-                # Lint (filter to checked slides; lint uses 0-based index)
-                try:
-                    from sdpm.schema.lint import lint as lint_slides
-                    presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
-                    check_set = set(check)
-                    lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in check_set]
-                    if lint_diag:
-                        result["errors"] = {"lintDiagnostics": lint_diag}
-                except Exception as e:
-                    logger.warning("Lint failed: %s", e)
+            # Lint (filter to checked slides; lint uses 0-based index)
+            try:
+                from sdpm.schema.lint import lint as lint_slides
+                presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
+                check_set = set(check)
+                lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in check_set]
+                if lint_diag:
+                    result["errors"] = {"lintDiagnostics": lint_diag}
+            except Exception as e:
+                logger.warning("Lint failed: %s", e)
 
-                # Layout bias (filter to checked slides; bias uses 1-based)
-                try:
-                    from sdpm.preview import check_layout_imbalance_data
-                    layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in check_set]
-                    if layout_bias:
-                        result["warnings"] = {"layoutBias": layout_bias}
-                except Exception as e:
-                    logger.warning("Layout bias check failed: %s", e)
+            # Layout bias (filter to checked slides; bias uses 1-based)
+            try:
+                from sdpm.preview import check_layout_imbalance_data
+                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in check_set]
+                if layout_bias:
+                    result["warnings"] = {"layoutBias": layout_bias}
+            except Exception as e:
+                logger.warning("Layout bias check failed: %s", e)
 
             if save:
                 from server_utils import schedule_webp_background
@@ -730,8 +730,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as e:
             logger.exception("run_python post-processing failed: deck=%s", deck_id)
-            if check:
-                result["measure"] = json.dumps({"error": str(e), "traceback": traceback.format_exc()})
+            result["measure"] = json.dumps({"error": str(e), "traceback": traceback.format_exc()})
 
     return json.dumps(result, ensure_ascii=False)
 
