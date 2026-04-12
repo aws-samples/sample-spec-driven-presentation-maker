@@ -621,7 +621,7 @@ def code_to_slide(deck_id: str, code: str, name: str,
 
 @mcp.tool()
 def run_python(code: str, deck_id: str | None = None, save: bool = False,
-               files: list[str] | None = None, check: list[int] | None = None,
+               files: list[str] | None = None, measure_slides: list[int] | None = None,
                purpose: str = "") -> str:
     """Execute Python code in a secure sandbox.
 
@@ -637,21 +637,21 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
     All files are accessible via normal file I/O (open, read, write).
     If save=True, all modified/new workspace files are written back to S3.
 
-    **Always specify check when editing slides.** check runs validation after
+    **Always specify measure_slides when editing slides.** Runs validation after
     code execution (requires deck_id):
         - Text bbox measurement (overflow detection via LibreOffice SVG)
         - Lint diagnostics (JSON schema validation)
         - Layout bias detection
-    Pass the 1-based slide numbers you edited, e.g. check=[3, 5].
+    Pass the 1-based slide numbers you edited, e.g. measure_slides=[3, 5].
 
     If files are provided (S3 keys), they are downloaded and available by filename.
     Supported: text files (CSV, JSON, TXT, Markdown, Python). Binary files are not supported.
     Example: files=["uploads/tmp/user/abc/data.csv"] → accessible as "data.csv" in code.
 
     Examples:
-        Edit slides:   run_python(code="...", deck_id="abc", save=True, check=[3, 5])
+        Edit slides:   run_python(code="...", deck_id="abc", save=True, measure_slides=[3, 5])
         Edit specs:    run_python(code="open('specs/brief.md','w').write('...')", deck_id="abc", save=True)
-        Check only:    run_python(code="print('ok')", deck_id="abc", check=[1, 2])
+        Measure only:  run_python(code="print('ok')", deck_id="abc", measure_slides=[1, 2])
         Compute:       run_python(code="print(2**100)")
         CSV:           run_python(code="import pandas as pd; print(pd.read_csv('data.csv'))",
                                   files=["uploads/tmp/user/x/data.csv"])
@@ -661,7 +661,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
         deck_id: Deck ID to load workspace from. Optional.
         save: If True, save modified workspace files back to S3. Requires deck_id.
         files: S3 keys of files to make available in the sandbox. Optional.
-        check: List of 1-based slide numbers to validate after execution. Requires deck_id.
+        measure_slides: List of 1-based slide numbers to measure after execution. Requires deck_id.
         purpose: Brief user-facing description of what this code does,
             written in the user's language (e.g. 'Analyzing slide structure',
             'Adding 3 comparison slides'). Shown in the UI.
@@ -669,8 +669,8 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
     Returns:
         JSON string: {"output", "measure"?, "errors"?, "warnings"?}
     """
-    if check and not deck_id:
-        return json.dumps({"error": "check requires deck_id"})
+    if measure_slides and not deck_id:
+        return json.dumps({"error": "measure_slides requires deck_id"})
     if deck_id:
         _check_deck_access(deck_id, action="edit_slide" if save else "read")
 
@@ -685,9 +685,9 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
 
     result: dict = {"output": output}
 
-    # Post-processing: check triggers PPTX build → measure/lint/bias
-    # WebP preview generation runs when check is present and save=True
-    if deck_id and check:
+    # Post-processing: measure_slides triggers PPTX build → measure/lint/bias
+    # WebP preview generation runs when measure_slides is present and save=True
+    if deck_id and measure_slides:
         import shutil
         import traceback
 
@@ -700,25 +700,25 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
 
             # Measure
             try:
-                result["measure"] = _run_measure(tmpdir, pptx_path, check)
+                result["measure"] = _run_measure(tmpdir, pptx_path, measure_slides)
             except Exception as e:
                 result["measure"] = json.dumps({"error": str(e)})
 
-            # Lint (filter to checked slides; lint uses 0-based index)
+            # Lint (filter to measured slides; lint uses 0-based index)
             try:
                 from sdpm.schema.lint import lint as lint_slides
                 presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
-                check_set = set(check)
-                lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in check_set]
+                slide_set = set(measure_slides)
+                lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in slide_set]
                 if lint_diag:
                     result["errors"] = {"lintDiagnostics": lint_diag}
             except Exception as e:
                 logger.warning("Lint failed: %s", e)
 
-            # Layout bias (filter to checked slides; bias uses 1-based)
+            # Layout bias (filter to measured slides; bias uses 1-based)
             try:
                 from sdpm.preview import check_layout_imbalance_data
-                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in check_set]
+                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in slide_set]
                 if layout_bias:
                     result["warnings"] = {"layoutBias": layout_bias}
             except Exception as e:
