@@ -703,20 +703,21 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 except Exception as e:
                     result["measure"] = json.dumps({"error": str(e)})
 
-                # Lint
+                # Lint (filter to checked slides; lint uses 0-based index)
                 try:
                     from sdpm.schema.lint import lint as lint_slides
                     presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
-                    lint_diag = lint_slides(presentation)
+                    check_set = set(check)
+                    lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in check_set]
                     if lint_diag:
                         result["errors"] = {"lintDiagnostics": lint_diag}
                 except Exception as e:
                     logger.warning("Lint failed: %s", e)
 
-                # Layout bias
+                # Layout bias (filter to checked slides; bias uses 1-based)
                 try:
                     from sdpm.preview import check_layout_imbalance_data
-                    layout_bias = check_layout_imbalance_data(pptx_path, slide_defs=slides)
+                    layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in check_set]
                     if layout_bias:
                         result["warnings"] = {"layoutBias": layout_bias}
                 except Exception as e:

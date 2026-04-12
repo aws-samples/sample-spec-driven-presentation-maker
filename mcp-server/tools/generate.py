@@ -204,11 +204,6 @@ def generate_pptx(
     try:
         builder = PPTXBuilder(**build_kwargs)
 
-        # Lint slide JSON
-        from sdpm.schema.lint import lint as lint_slides
-        presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
-        lint_diagnostics = lint_slides(presentation)
-
         # Build id_map for resolve_override
         id_map: dict[str, dict] = {}
         for s in slides:
@@ -221,10 +216,6 @@ def generate_pptx(
 
         out = tmpdir / "output.pptx"
         builder.save(out)
-
-        # Detect layout bias
-        from sdpm.preview import check_layout_imbalance_data
-        layout_bias = check_layout_imbalance_data(out, slide_defs=slides)
 
         # Upload PPTX to S3
         pptx_key = f"pptx/{deck_id}/{uuid.uuid4()}.pptx"
@@ -261,12 +252,6 @@ def generate_pptx(
         except Exception as e:
             kb_error = str(e)
 
-    warnings: dict = {}
-    if layout_bias:
-        warnings["layoutBias"] = layout_bias
-    if kb_error:
-        warnings["kbSyncFailed"] = kb_error
-
     result: dict = {
         "status": "completed",
         "slideCount": len(slides),
@@ -275,8 +260,6 @@ def generate_pptx(
             for i, s in enumerate(slides, 1)
         ],
     }
-    if warnings:
-        result["warnings"] = warnings
-    if lint_diagnostics:
-        result["errors"] = {"lintDiagnostics": lint_diagnostics}
+    if kb_error:
+        result["warnings"] = {"kbSyncFailed": kb_error}
     return result
