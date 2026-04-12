@@ -637,19 +637,20 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
     All files are accessible via normal file I/O (open, read, write).
     If save=True, all modified/new workspace files are written back to S3.
 
-    If check is provided (list of 1-based slide numbers), the following
-    validations run after code execution (requires deck_id):
+    **Always specify check when editing slides.** check runs validation after
+    code execution (requires deck_id):
         - Text bbox measurement (overflow detection via LibreOffice SVG)
         - Lint diagnostics (JSON schema validation)
         - Layout bias detection
+    Pass the 1-based slide numbers you edited, e.g. check=[3, 5].
 
     If files are provided (S3 keys), they are downloaded and available by filename.
     Supported: text files (CSV, JSON, TXT, Markdown, Python). Binary files are not supported.
     Example: files=["uploads/tmp/user/abc/data.csv"] → accessible as "data.csv" in code.
 
     Examples:
-        Edit + check:  run_python(code="...", deck_id="abc", save=True, check=[3, 5])
-        Edit only:     run_python(code="...", deck_id="abc", save=True)
+        Edit slides:   run_python(code="...", deck_id="abc", save=True, check=[3, 5])
+        Edit specs:    run_python(code="open('specs/brief.md','w').write('...')", deck_id="abc", save=True)
         Check only:    run_python(code="print('ok')", deck_id="abc", check=[1, 2])
         Compute:       run_python(code="print(2**100)")
         CSV:           run_python(code="import pandas as pd; print(pd.read_csv('data.csv'))",
