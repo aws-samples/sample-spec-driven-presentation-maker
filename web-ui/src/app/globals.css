@@ -254,13 +254,35 @@ body {
   pointer-events: auto;
 }
 
-/* ── Chat toggle pulse ── */
+/* ── Chat toggle pulse (first-visit only) ── */
 @keyframes chat-pulse {
   0%, 100% { box-shadow: 0 0 0 0 oklch(0.75 0.14 185 / 30%); }
   50% { box-shadow: 0 0 0 6px oklch(0.75 0.14 185 / 0%); }
 }
 .chat-toggle-pulse {
   animation: chat-pulse 3s ease-in-out infinite;
+}
+
+/* ── User menu enter ── */
+.user-menu-enter {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.95);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+.user-menu-enter.user-menu-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* ── Menu item stagger ── */
+.menu-item-stagger {
+  opacity: 0;
+  transform: translateY(4px);
+  animation: menu-item-in 150ms ease-out forwards;
+  animation-delay: calc(var(--stagger, 0ms) + 80ms);
+}
+@keyframes menu-item-in {
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Frosted glass header ── */
@@ -414,6 +436,9 @@ body {
   .slide-skeleton::after { animation: none; }
   .slide-reveal[data-loaded="true"] { animation: none; opacity: 1; transform: none; }
   .slide-updated { animation: none; }
+  .user-menu-enter { opacity: 1; transform: none; transition: none; }
+  .menu-item-stagger { opacity: 1; transform: none; animation: none; }
+  .chat-toggle-pulse { animation: none; }
 }
 
 /* ── Chat prose overrides (dark editorial) ── */
