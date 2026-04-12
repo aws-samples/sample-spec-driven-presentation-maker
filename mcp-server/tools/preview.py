@@ -48,11 +48,9 @@ def get_preview(
     storage: Storage,
     quality: str = "high",
 ) -> list:
-    """Fetch slide PNGs from S3, resize, convert to JPEG, and return as Image list.
+    """Fetch slide previews from S3, resize, convert to JPEG, and return as Image list.
 
-    The returned list alternates between text labels (slide numbers) and
-    FastMCP Image objects. FastMCP converts these into TextContent and
-    ImageContent blocks that the LLM can visually inspect.
+    Uses build_slide_key_map to resolve epoch-based S3 keys.
 
     Args:
         deck_id: The deck ID.
@@ -63,15 +61,17 @@ def get_preview(
     Returns:
         List of str and Image objects for MCP content serialization.
     """
+    from shared.preview import build_slide_key_map
+
+    all_keys = storage.list_files(prefix=f"previews/{deck_id}/", bucket=storage.pptx_bucket)
+    key_map = build_slide_key_map(all_keys)
+
     result: list = []
     for n in slide_numbers:
-        # Try WebP first (newer), fall back to PNG (legacy)
-        key = f"previews/{deck_id}/slide_{n:02d}.webp"
-        try:
-            data = storage.download_file_from_pptx_bucket(key=key)
-        except Exception:
-            key = f"previews/{deck_id}/slide_{n:02d}.png"
-            data = storage.download_file_from_pptx_bucket(key=key)
+        key = key_map.get(n)
+        if not key:
+            raise Exception(f"NoSuchKey: preview not found for slide {n}")
+        data = storage.download_file_from_pptx_bucket(key=key)
         jpeg_data = _resize_to_jpeg(data=data, quality=quality)
         result.append(f"Slide {n}")
         result.append(Image(data=jpeg_data, format="jpeg"))

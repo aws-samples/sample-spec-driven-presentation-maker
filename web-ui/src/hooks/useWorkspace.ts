@@ -67,7 +67,7 @@ export function useWorkspace(
   /* ── Data loading: workspace polling with exponential backoff ── */
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevSlideKeyRef = useRef<string>("")
-  const stablePreviewUrls = useRef<Map<string, { url: string; mtime?: number }>>(new Map())
+  const stablePreviewUrls = useRef<Map<string, { url: string }>>(new Map())
 
   // Clear URL cache when switching decks
   useEffect(() => {
@@ -107,24 +107,22 @@ export function useWorkspace(
         // Detect slide changes (added/removed/preview updated)
         const slideKey = data.slides.map((s) => {
           const base = s.previewUrl?.split("?")[0] || ""
-          return `${s.slideId}:${base}:${s.previewUpdatedAt || ""}`
+          return `${s.slideId}:${base}`
         }).join("|")
         if (slideKey !== prevSlideKeyRef.current) {
           prevSlideKeyRef.current = slideKey
           step = 0 // reset to fast polling on change
         }
         // Stabilise presigned URLs to prevent unnecessary image re-downloads.
-        // Update cache when the underlying S3 key or previewUpdatedAt changes.
+        // Update cache when the underlying S3 key changes (epoch in path).
         for (const s of data.slides) {
           if (s.previewUrl) {
             const cached = stablePreviewUrls.current.get(s.slideId)
             const stableKey = (slide: typeof s) => {
-              const base = slide.previewUrl?.split("?")[0] || ""
-              return `${base}:${slide.previewUpdatedAt || ""}`
+              return slide.previewUrl?.split("?")[0] || ""
             }
-            const cachedSlide = cached ? { previewUrl: cached.url, previewUpdatedAt: cached.mtime } : null
-            if (stableKey(s) !== (cachedSlide ? stableKey(cachedSlide as typeof s) : "")) {
-              stablePreviewUrls.current.set(s.slideId, { url: s.previewUrl, mtime: s.previewUpdatedAt })
+            if (stableKey(s) !== (cached ? stableKey({ previewUrl: cached.url } as typeof s) : "")) {
+              stablePreviewUrls.current.set(s.slideId, { url: s.previewUrl })
             } else if (cached) {
               s.previewUrl = cached.url
             }

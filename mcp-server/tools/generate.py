@@ -20,6 +20,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,27 +28,6 @@ from pathlib import Path
 from storage import Storage
 
 logger = logging.getLogger("sdpm.generate")
-
-
-def _is_orphan_webp(key: str, deck_id: str, slide_count: int) -> bool:
-    """Check if a WebP preview key is beyond the current slide count."""
-    prefix = f"previews/{deck_id}/slide_"
-    if not key.startswith(prefix) or not key.endswith(".webp"):
-        return False
-    try:
-        num = int(key[len(prefix):-len(".webp")])
-        return num > slide_count
-    except ValueError:
-        return False
-
-
-def _delete_keys(storage: Storage, keys: list[str]) -> None:
-    """Delete specific S3 keys from pptx bucket."""
-    for key in keys:
-        try:
-            storage._s3.delete_object(Bucket=storage.pptx_bucket, Key=key)
-        except Exception:
-            logger.warning("Failed to delete orphan key: %s", key)
 
 
 def generate_previews(pptx_path: Path, output_dir: Path) -> list[Path]:
@@ -261,19 +241,20 @@ def generate_pptx(
             "pptxS3Key": pptx_key, "updatedAt": now, "slideCount": len(slides),
         })
 
-        # Preview: overwrite WebP + cleanup orphans + delete draft SVGs
-        slide_count = len(slides)
+        # Preview: epoch-keyed WebP + delete all old keys
         try:
             preview_dir = Path(tempfile.mkdtemp())
+            old_keys = storage.list_files(prefix=f"previews/{deck_id}/", bucket=storage.pptx_bucket)
+            epoch = int(time.time())
             webp_files = generate_previews(out, preview_dir)
             for i, webp_path in enumerate(webp_files):
-                s3_key = f"previews/{deck_id}/slide_{i + 1:02d}.webp"
+                s3_key = f"previews/{deck_id}/slide_{i + 1:02d}_{epoch}.webp"
                 storage.upload_file(key=s3_key, data=webp_path.read_bytes(), content_type="image/webp")
-            # Cleanup orphan previews (reduced slide count)
-            existing = storage.list_files(prefix=f"previews/{deck_id}/", bucket=storage.pptx_bucket)
-            orphans = [k for k in existing if _is_orphan_webp(k, deck_id, slide_count)]
-            if orphans:
-                _delete_keys(storage, orphans)
+            for key in old_keys:
+                try:
+                    storage._s3.delete_object(Bucket=storage.pptx_bucket, Key=key)
+                except Exception:
+                    logger.warning("Failed to delete old preview key: %s", key)
             logger.info("Preview generation complete: %d pages for deck %s", len(webp_files), deck_id)
         except Exception as e:
             logger.warning("Preview generation failed for deck %s: %s", deck_id, e)

@@ -448,10 +448,17 @@ def measure_slides(deck_id: str, slide_numbers: list[int] | None = None) -> str:
             try:
                 preview_dir = Path(tempfile.mkdtemp())
                 try:
+                    old_keys = _storage.list_files(prefix=f"previews/{deck_id}/", bucket=_storage.pptx_bucket)
+                    epoch = int(__import__("time").time())
                     webp_files = generate_previews(pptx_path, preview_dir)
                     for i, webp_path in enumerate(webp_files):
-                        s3_key = f"previews/{deck_id}/slide_{i + 1:02d}.webp"
+                        s3_key = f"previews/{deck_id}/slide_{i + 1:02d}_{epoch}.webp"
                         _storage.upload_file(key=s3_key, data=webp_path.read_bytes(), content_type="image/webp")
+                    for key in old_keys:
+                        try:
+                            _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=key)
+                        except Exception:
+                            logger.warning("Failed to delete old preview key: %s", key)
                     logger.info("Measure WebP previews uploaded: %d slides for deck %s", len(webp_files), deck_id)
                 finally:
                     shutil.rmtree(preview_dir, ignore_errors=True)

@@ -19,7 +19,6 @@ export interface DeckSummary {
 export interface SlidePreview {
   slideId: string
   previewUrl: string | null
-  previewUpdatedAt?: number
   updatedAt: string
   slideJson?: string
 }

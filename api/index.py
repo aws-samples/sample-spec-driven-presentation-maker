@@ -137,46 +137,42 @@ def _delete_kb_vectors(deck_id: str, user_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _list_preview_keys(deck_id: str) -> dict:
+def _list_preview_keys(deck_id: str) -> set:
     """List all preview keys for a deck in one S3 call.
 
     Returns:
-        Dict mapping S3 key to LastModified epoch (int) under previews/{deck_id}/.
+        Set of S3 keys under previews/{deck_id}/.
     """
     prefix = f"previews/{deck_id}/"
     resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
-    return {
-        obj["Key"]: int(obj["LastModified"].timestamp())
-        for obj in resp.get("Contents", [])
-    }
+    return {obj["Key"] for obj in resp.get("Contents", [])}
 
 
-def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: dict) -> tuple[Optional[str], Optional[int]]:
+def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: set) -> Optional[str]:
     """Resolve the best preview URL for a slide from cached keys.
 
-    Fallback order: webp > png.
-    For S3 presigned URL fallback, appends &_t=<epoch> cache-buster.
-    CloudFront signed URLs are returned as-is (extra params break signature).
+    Uses build_slide_key_map to pick the latest epoch key.
 
     Args:
         deck_id: Deck identifier.
         slide_id: Slide identifier (e.g. slide_01).
-        preview_keys: Dict mapping S3 key to LastModified epoch from _list_preview_keys.
+        preview_keys: Set of S3 keys from _list_preview_keys.
 
     Returns:
-        Tuple of (presigned URL or None, LastModified epoch or None).
+        Presigned/signed URL or None.
     """
-    prefix = f"previews/{deck_id}/"
-    for candidate in (f"{prefix}{slide_id}.webp", f"{prefix}{slide_id}.png"):
-        if candidate in preview_keys:
-            url = preview_url(candidate)
-            if url:
-                mtime = preview_keys[candidate]
-                if "Key-Pair-Id=" not in url:
-                    sep = "&" if "?" in url else "?"
-                    url = f"{url}{sep}_t={mtime}"
-                return url, mtime
-    return None, None
+    from shared.preview import build_slide_key_map
+    import re as _re
+
+    m = _re.search(r"(\d+)$", slide_id)
+    if not m:
+        return None
+    num = int(m.group(1))
+    key_map = build_slide_key_map(preview_keys)
+    key = key_map.get(num)
+    if not key:
+        return None
+    return preview_url(key)
 
 
 def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
@@ -202,7 +198,7 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
         else:
             # Fallback: first slide preview
             preview_keys = _list_preview_keys(deck_id)
-            thumb_url, _ = _resolve_preview_url(deck_id, "slide_01", preview_keys)
+            thumb_url = _resolve_preview_url(deck_id, "slide_01", preview_keys)
 
         extras[deck_id] = {"thumbnailUrl": thumb_url}
     return extras
@@ -430,10 +426,8 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         preview_keys = _list_preview_keys(deck_id)
         for i, s in enumerate(presentation.get("slides", [])):
             sid = f"slide_{i + 1:02d}"
-            slide_preview, slide_mtime = _resolve_preview_url(deck_id, sid, preview_keys)
+            slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
             slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
-            if slide_mtime is not None:
-                slide_entry["previewUpdatedAt"] = slide_mtime
             if include_json:
                 slide_entry["slideJson"] = json.dumps(s)
             slides.append(slide_entry)
@@ -661,7 +655,7 @@ def search_slides_api() -> Dict[str, Any]:
             # Lazy-load preview keys per deck
             if deck_id not in seen_decks:
                 seen_decks[deck_id] = _list_preview_keys(deck_id)
-            slide_preview_url, _ = _resolve_preview_url(deck_id, slide_id, seen_decks[deck_id])
+            slide_preview_url = _resolve_preview_url(deck_id, slide_id, seen_decks[deck_id])
             slide_preview_url = slide_preview_url or ""
 
         results.append({
