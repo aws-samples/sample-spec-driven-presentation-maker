@@ -20,7 +20,6 @@ import re
 import shutil
 import subprocess
 import tempfile
-import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -241,27 +240,12 @@ def generate_pptx(
             "pptxS3Key": pptx_key, "updatedAt": now, "slideCount": len(slides),
         })
 
-        # Preview: epoch-keyed WebP + delete all old keys
-        try:
-            preview_dir = Path(tempfile.mkdtemp())
-            old_keys = storage.list_files(prefix=f"previews/{deck_id}/", bucket=storage.pptx_bucket)
-            epoch = int(time.time())
-            webp_files = generate_previews(out, preview_dir)
-            for i, webp_path in enumerate(webp_files):
-                s3_key = f"previews/{deck_id}/slide_{i + 1:02d}_{epoch}.webp"
-                storage.upload_file(key=s3_key, data=webp_path.read_bytes(), content_type="image/webp")
-            for key in old_keys:
-                try:
-                    storage._s3.delete_object(Bucket=storage.pptx_bucket, Key=key)
-                except Exception:
-                    logger.warning("Failed to delete old preview key: %s", key)
-            logger.info("Preview generation complete: %d pages for deck %s", len(webp_files), deck_id)
-        except Exception as e:
-            logger.warning("Preview generation failed for deck %s: %s", deck_id, e)
-        finally:
-            shutil.rmtree(preview_dir, ignore_errors=True)
-    finally:
+        # Preview: epoch-keyed WebP (background)
+        from server_utils import schedule_webp_background
+        schedule_webp_background(deck_id, out, tmpdir, storage)
+    except Exception:
         shutil.rmtree(tmpdir, ignore_errors=True)
+        raise
 
     # KB sync
     kb_error: str | None = None

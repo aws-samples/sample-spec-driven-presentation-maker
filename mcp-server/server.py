@@ -423,36 +423,6 @@ def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int]) -> str
     return format_measure_report(results)
 
 
-async def _generate_webp_background(deck_id: str, pptx_path: Path, tmpdir: Path) -> None:
-    """Background WebP preview generation → S3 upload → tmpdir cleanup."""
-    import shutil
-    import tempfile
-
-    from tools.generate import generate_previews
-
-    try:
-        preview_dir = Path(tempfile.mkdtemp())
-        try:
-            old_keys = _storage.list_files(prefix=f"previews/{deck_id}/", bucket=_storage.pptx_bucket)
-            epoch = int(__import__("time").time())
-            webp_files = generate_previews(pptx_path, preview_dir)
-            for i, webp_path in enumerate(webp_files):
-                s3_key = f"previews/{deck_id}/slide_{i + 1:02d}_{epoch}.webp"
-                _storage.upload_file(key=s3_key, data=webp_path.read_bytes(), content_type="image/webp")
-            for key in old_keys:
-                try:
-                    _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=key)
-                except Exception:
-                    logger.warning("Failed to delete old preview key: %s", key)
-            logger.info("WebP previews uploaded: %d slides for deck %s", len(webp_files), deck_id)
-        finally:
-            shutil.rmtree(preview_dir, ignore_errors=True)
-    except Exception as e:
-        logger.warning("WebP generation failed for deck %s: %s", deck_id, e)
-    finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
-
-
 # --- Asset Tools ---
 
 
@@ -651,7 +621,7 @@ def code_to_slide(deck_id: str, code: str, name: str,
 
 @mcp.tool()
 def run_python(code: str, deck_id: str | None = None, save: bool = False,
-               files: list[str] | None = None, measure: list[int] | None = None,
+               files: list[str] | None = None, check: list[int] | None = None,
                purpose: str = "") -> str:
     """Execute Python code in a secure sandbox.
 
@@ -667,38 +637,39 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
     All files are accessible via normal file I/O (open, read, write).
     If save=True, all modified/new workspace files are written back to S3.
 
-    If measure is provided (list of 1-based slide numbers), text bounding box
-    measurement is performed after code execution. Builds PPTX from the current
-    presentation.json, generates SVG via LibreOffice, and extracts bbox data.
-    Requires deck_id.
+    If check is provided (list of 1-based slide numbers), the following
+    validations run after code execution (requires deck_id):
+        - Text bbox measurement (overflow detection via LibreOffice SVG)
+        - Lint diagnostics (JSON schema validation)
+        - Layout bias detection
 
     If files are provided (S3 keys), they are downloaded and available by filename.
     Supported: text files (CSV, JSON, TXT, Markdown, Python). Binary files are not supported.
     Example: files=["uploads/tmp/user/abc/data.csv"] → accessible as "data.csv" in code.
 
     Examples:
-        Edit + measure:  run_python(code="...", deck_id="abc", save=True, measure=[3, 5])
-        Edit only:       run_python(code="...", deck_id="abc", save=True)
-        Measure only:    run_python(code="print('ok')", deck_id="abc", measure=[1, 2])
-        Compute:         run_python(code="print(2**100)")
-        CSV:             run_python(code="import pandas as pd; print(pd.read_csv('data.csv'))",
-                                    files=["uploads/tmp/user/x/data.csv"])
+        Edit + check:  run_python(code="...", deck_id="abc", save=True, check=[3, 5])
+        Edit only:     run_python(code="...", deck_id="abc", save=True)
+        Check only:    run_python(code="print('ok')", deck_id="abc", check=[1, 2])
+        Compute:       run_python(code="print(2**100)")
+        CSV:           run_python(code="import pandas as pd; print(pd.read_csv('data.csv'))",
+                                  files=["uploads/tmp/user/x/data.csv"])
 
     Args:
         code: Python code to execute.
         deck_id: Deck ID to load workspace from. Optional.
         save: If True, save modified workspace files back to S3. Requires deck_id.
         files: S3 keys of files to make available in the sandbox. Optional.
-        measure: List of 1-based slide numbers to measure after execution. Requires deck_id.
+        check: List of 1-based slide numbers to validate after execution. Requires deck_id.
         purpose: Brief user-facing description of what this code does,
             written in the user's language (e.g. 'Analyzing slide structure',
             'Adding 3 comparison slides'). Shown in the UI.
 
     Returns:
-        JSON string: {"output": "...", "measure": "...(if requested)"}
+        JSON string: {"output", "measure"?, "errors"?, "warnings"?}
     """
-    if measure and not deck_id:
-        return json.dumps({"error": "measure requires deck_id"})
+    if check and not deck_id:
+        return json.dumps({"error": "check requires deck_id"})
     if deck_id:
         _check_deck_access(deck_id, action="edit_slide" if save else "read")
 
@@ -711,11 +682,10 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
         files=files,
     )
 
-    result: dict[str, str] = {"output": output}
+    result: dict = {"output": output}
 
-    # Post-processing: measure and/or WebP generation
-    if deck_id and (measure or save):
-        import asyncio
+    # Post-processing: check and/or WebP generation
+    if deck_id and (check or save):
         import shutil
         import traceback
 
@@ -726,24 +696,40 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
             tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
             pptx_path = _build_pptx(tmpdir, slides, build_kwargs)
 
-            if measure:
+            if check:
+                # Measure
                 try:
-                    result["measure"] = _run_measure(tmpdir, pptx_path, measure)
+                    result["measure"] = _run_measure(tmpdir, pptx_path, check)
                 except Exception as e:
                     result["measure"] = json.dumps({"error": str(e)})
 
-            if save:
+                # Lint
                 try:
-                    asyncio.get_event_loop().create_task(
-                        _generate_webp_background(deck_id, pptx_path, tmpdir)
-                    )
-                except Exception:
-                    shutil.rmtree(tmpdir, ignore_errors=True)
+                    from sdpm.schema.lint import lint as lint_slides
+                    presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
+                    lint_diag = lint_slides(presentation)
+                    if lint_diag:
+                        result["errors"] = {"lintDiagnostics": lint_diag}
+                except Exception as e:
+                    logger.warning("Lint failed: %s", e)
+
+                # Layout bias
+                try:
+                    from sdpm.preview import check_layout_imbalance_data
+                    layout_bias = check_layout_imbalance_data(pptx_path, slide_defs=slides)
+                    if layout_bias:
+                        result["warnings"] = {"layoutBias": layout_bias}
+                except Exception as e:
+                    logger.warning("Layout bias check failed: %s", e)
+
+            if save:
+                from server_utils import schedule_webp_background
+                schedule_webp_background(deck_id, pptx_path, tmpdir, _storage)
             else:
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as e:
             logger.exception("run_python post-processing failed: deck=%s", deck_id)
-            if measure:
+            if check:
                 result["measure"] = json.dumps({"error": str(e), "traceback": traceback.format_exc()})
 
     return json.dumps(result, ensure_ascii=False)
