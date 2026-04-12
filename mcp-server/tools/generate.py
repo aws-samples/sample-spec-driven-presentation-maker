@@ -242,7 +242,6 @@ def generate_pptx(
         })
 
         # Preview: epoch-keyed WebP + delete all old keys
-        slide_count = len(slides)
         try:
             preview_dir = Path(tempfile.mkdtemp())
             old_keys = storage.list_files(prefix=f"previews/{deck_id}/", bucket=storage.pptx_bucket)
