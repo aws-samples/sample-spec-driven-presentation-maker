@@ -28,6 +28,7 @@ COPY mcp-server/pyproject.toml mcp-server/pyproject.toml
 COPY mcp-server/tools/ mcp-server/tools/
 COPY mcp-server/storage/ mcp-server/storage/
 COPY mcp-server/server.py mcp-server/server.py
+COPY mcp-server/server_utils.py mcp-server/server_utils.py
 RUN python3.13 -m pip install --no-cache-dir ./mcp-server
 
 ENV PYTHONPATH=/app

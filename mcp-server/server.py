@@ -387,95 +387,40 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
         raise
 
 
-@mcp.tool()
-def measure_slides(deck_id: str, slide_numbers: list[int] | None = None) -> str:
-    """Measure text bounding boxes for overflow detection.
-    Builds PPTX from presentation.json, generates SVG via LibreOffice, and extracts bbox data.
-    Does NOT require generate_pptx — works directly from workspace JSON.
-    After returning the measure report, generates draft WebP previews in the background.
+def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> Path:
+    """Build PPTX from slides JSON. Returns path to built file."""
+    from sdpm.builder import PPTXBuilder, resolve_override
 
-    Args:
-        deck_id: The deck ID to measure.
-        slide_numbers: Optional list of 1-based slide numbers. All slides if None.
+    builder = PPTXBuilder(**build_kwargs)
+    id_map: dict[str, dict] = {}
+    for s in slides:
+        if "id" in s:
+            id_map[s["id"]] = s
+    for s in slides:
+        builder.add_slide(resolve_override(s, id_map))
+    pptx_path = tmpdir / "measure.pptx"
+    builder.save(pptx_path)
+    return pptx_path
 
-    Returns:
-        Measure report as text.
-    """
-    _check_deck_access(deck_id, action="read")
-    import asyncio
-    import shutil
+
+def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int]) -> str:
+    """PPTX → SVG → bbox measurement → report string."""
     import subprocess
-    import tempfile
-    import traceback
 
-    try:
-        from sdpm.builder import PPTXBuilder, resolve_override
-        from sdpm.preview.measure import measure_from_svg, format_measure_report
-        from tools.generate import _prepare_workspace, generate_previews
+    from sdpm.preview.measure import measure_from_svg, format_measure_report
 
-        user_id = _get_user_id()
-        tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
+    env = os.environ.copy()
+    env["HOME"] = str(tmpdir)
+    subprocess.run(  # nosec B603
+        ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
+        env=env, capture_output=True, text=True, timeout=120, check=True,
+    )
+    svg_path = tmpdir / "measure.svg"
+    if not svg_path.exists():
+        return json.dumps({"error": "LibreOffice SVG export failed"})
 
-        # Build PPTX from JSON
-        builder = PPTXBuilder(**build_kwargs)
-        id_map: dict[str, dict] = {}
-        for s in slides:
-            if "id" in s:
-                id_map[s["id"]] = s
-        for s in slides:
-            builder.add_slide(resolve_override(s, id_map))
-        pptx_path = tmpdir / "measure.pptx"
-        builder.save(pptx_path)
-
-        # PPTX → SVG via LibreOffice (for bbox extraction)
-        env = os.environ.copy()
-        env["HOME"] = str(tmpdir)
-        subprocess.run(  # nosec B603
-            ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
-            env=env, capture_output=True, text=True, timeout=120, check=True,
-        )
-        svg_path = tmpdir / "measure.svg"
-        if not svg_path.exists():
-            shutil.rmtree(tmpdir, ignore_errors=True)
-            return json.dumps({"error": "LibreOffice SVG export failed"})
-
-        # Measure bboxes
-        results = measure_from_svg(svg_path=svg_path, slide_indices=slide_numbers)
-        report = format_measure_report(results)
-
-        # Schedule background draft WebP generation (tmpdir cleanup in task)
-        async def _generate_draft_webp() -> None:
-            try:
-                preview_dir = Path(tempfile.mkdtemp())
-                try:
-                    old_keys = _storage.list_files(prefix=f"previews/{deck_id}/", bucket=_storage.pptx_bucket)
-                    epoch = int(__import__("time").time())
-                    webp_files = generate_previews(pptx_path, preview_dir)
-                    for i, webp_path in enumerate(webp_files):
-                        s3_key = f"previews/{deck_id}/slide_{i + 1:02d}_{epoch}.webp"
-                        _storage.upload_file(key=s3_key, data=webp_path.read_bytes(), content_type="image/webp")
-                    for key in old_keys:
-                        try:
-                            _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=key)
-                        except Exception:
-                            logger.warning("Failed to delete old preview key: %s", key)
-                    logger.info("Measure WebP previews uploaded: %d slides for deck %s", len(webp_files), deck_id)
-                finally:
-                    shutil.rmtree(preview_dir, ignore_errors=True)
-            except Exception as e:
-                logger.warning("Draft WebP generation failed for deck %s: %s", deck_id, e)
-            finally:
-                shutil.rmtree(tmpdir, ignore_errors=True)
-
-        try:
-            asyncio.get_event_loop().create_task(_generate_draft_webp())
-        except Exception:
-            shutil.rmtree(tmpdir, ignore_errors=True)
-
-        return report
-    except Exception as e:
-        logger.exception("measure_slides failed: deck=%s", deck_id)
-        return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
+    results = measure_from_svg(svg_path=svg_path, slide_indices=slide_numbers)
+    return format_measure_report(results)
 
 
 # --- Asset Tools ---
@@ -676,7 +621,8 @@ def code_to_slide(deck_id: str, code: str, name: str,
 
 @mcp.tool()
 def run_python(code: str, deck_id: str | None = None, save: bool = False,
-               files: list[str] | None = None, purpose: str = "") -> str:
+               files: list[str] | None = None, measure_slides: list[int] | None = None,
+               purpose: str = "") -> str:
     """Execute Python code in a secure sandbox.
 
     Use this tool to edit the deck workspace or for general computation.
@@ -691,33 +637,44 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
     All files are accessible via normal file I/O (open, read, write).
     If save=True, all modified/new workspace files are written back to S3.
 
+    **Always specify measure_slides when editing slides.** Runs validation after
+    code execution (requires deck_id):
+        - Text bbox measurement (overflow detection via LibreOffice SVG)
+        - Lint diagnostics (JSON schema validation)
+        - Layout bias detection
+    Pass the 1-based slide numbers you edited, e.g. measure_slides=[3, 5].
+
     If files are provided (S3 keys), they are downloaded and available by filename.
     Supported: text files (CSV, JSON, TXT, Markdown, Python). Binary files are not supported.
     Example: files=["uploads/tmp/user/abc/data.csv"] → accessible as "data.csv" in code.
 
     Examples:
-        Read:      run_python(code="import json; p=json.load(open('presentation.json')); print(len(p['slides']))", deck_id="abc")
-        Edit:      run_python(code="import json; p=json.load(open('presentation.json')); p['slides'].append({...}); json.dump(p, open('presentation.json','w'), ensure_ascii=False)", deck_id="abc", save=True)
-        Specs:     run_python(code="open('specs/brief.md','w').write('# Brief\\n...')", deck_id="abc", save=True)
-        Compute:   run_python(code="print(2**100)")
-        CSV:       run_python(code="import pandas as pd; print(pd.read_csv('data.csv'))",
-                              files=["uploads/tmp/user/x/data.csv"])
+        Edit slides:   run_python(code="...", deck_id="abc", save=True, measure_slides=[3, 5])
+        Edit specs:    run_python(code="open('specs/brief.md','w').write('...')", deck_id="abc", save=True)
+        Measure only:  run_python(code="print('ok')", deck_id="abc", measure_slides=[1, 2])
+        Compute:       run_python(code="print(2**100)")
+        CSV:           run_python(code="import pandas as pd; print(pd.read_csv('data.csv'))",
+                                  files=["uploads/tmp/user/x/data.csv"])
 
     Args:
         code: Python code to execute.
         deck_id: Deck ID to load workspace from. Optional.
         save: If True, save modified workspace files back to S3. Requires deck_id.
         files: S3 keys of files to make available in the sandbox. Optional.
+        measure_slides: List of 1-based slide numbers to measure after execution. Requires deck_id.
         purpose: Brief user-facing description of what this code does,
             written in the user's language (e.g. 'Analyzing slide structure',
             'Adding 3 comparison slides'). Shown in the UI.
 
     Returns:
-        Code execution output (stdout).
+        JSON string: {"output", "measure"?, "errors"?, "warnings"?}
     """
+    if measure_slides and not deck_id:
+        return json.dumps({"error": "measure_slides requires deck_id"})
     if deck_id:
         _check_deck_access(deck_id, action="edit_slide" if save else "read")
-    return sandbox_mod.execute_in_sandbox(
+
+    output = sandbox_mod.execute_in_sandbox(
         code=code,
         storage=_storage,
         region=_region,
@@ -725,6 +682,58 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
         save=save,
         files=files,
     )
+
+    result: dict = {"output": output}
+
+    # Post-processing: measure_slides triggers PPTX build → measure/lint/bias
+    # WebP preview generation runs when measure_slides is present and save=True
+    if deck_id and measure_slides:
+        import shutil
+        import traceback
+
+        try:
+            from tools.generate import _prepare_workspace
+
+            user_id = _get_user_id()
+            tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
+            pptx_path = _build_pptx(tmpdir, slides, build_kwargs)
+
+            # Measure
+            try:
+                result["measure"] = _run_measure(tmpdir, pptx_path, measure_slides)
+            except Exception as e:
+                result["measure"] = json.dumps({"error": str(e)})
+
+            # Lint (filter to measured slides; lint uses 0-based index)
+            try:
+                from sdpm.schema.lint import lint as lint_slides
+                presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
+                slide_set = set(measure_slides)
+                lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in slide_set]
+                if lint_diag:
+                    result["errors"] = {"lintDiagnostics": lint_diag}
+            except Exception as e:
+                logger.warning("Lint failed: %s", e)
+
+            # Layout bias (filter to measured slides; bias uses 1-based)
+            try:
+                from sdpm.preview import check_layout_imbalance_data
+                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in slide_set]
+                if layout_bias:
+                    result["warnings"] = {"layoutBias": layout_bias}
+            except Exception as e:
+                logger.warning("Layout bias check failed: %s", e)
+
+            if save:
+                from server_utils import schedule_webp_background
+                schedule_webp_background(deck_id, pptx_path, tmpdir, _storage)
+            else:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+        except Exception as e:
+            logger.exception("run_python post-processing failed: deck=%s", deck_id)
+            result["measure"] = json.dumps({"error": str(e), "traceback": traceback.format_exc()})
+
+    return json.dumps(result, ensure_ascii=False)
 
 
 @mcp.tool()
