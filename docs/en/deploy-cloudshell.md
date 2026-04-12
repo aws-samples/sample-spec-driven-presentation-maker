@@ -177,7 +177,6 @@ echo "Open the URL above to sign in."
 | `--profile PROFILE` | AWS CLI profile | — |
 | `--layer3` | Layer 3 only (MCP Server) | — |
 | `--layer4` | Layer 4 full stack | Default |
-| `--no-png` | Disable PNG Worker | Enabled |
 | `--search` | Enable semantic slide search | Disabled |
 | `--observability` | Enable Bedrock Model Invocation Logging | Disabled |
 | `--oidc-url URL` | External IdP OIDC Discovery URL | — |
@@ -215,15 +214,13 @@ Estimates for Layer 4 full stack (us-east-1). Assumes a team of ~10 users genera
 
 | Resource | Configuration | Est. Monthly |
 |---|---|---|
-| NAT Gateway (PNG Worker VPC) | 1 × 24h × 30 days | ~$32 |
-| Fargate (PNG Worker) | 1 task, 1vCPU/2GB, SPOT 80% | ~$15 |
 | CloudFront | ~10GB transfer/month | ~$1 |
 | Cognito User Pool | Free up to 50,000 MAU | $0 |
 | API Gateway REST | A few thousand requests/month | ~$0.5 |
 | Lambda (API) | A few thousand requests/month | ~$0.5 |
 | S3 (3 buckets) | A few GB storage + requests | ~$1 |
 | DynamoDB On-Demand | Low read/write volume | ~$1 |
-| ECR (3 images) | A few GB storage | ~$1 |
+| ECR (2 images) | A few GB storage | ~$1 |
 | CloudWatch Logs | Log storage | ~$1 |
 
 ### Variable Costs (Usage-Dependent)
@@ -238,13 +235,12 @@ Estimates for Layer 4 full stack (us-east-1). Assumes a team of ~10 users genera
 
 ### Total
 
-**~$110–185/month** (varies with usage)
+**~$60–140/month** (varies with usage)
 
 ### Cost Reduction Tips
 
 | Method | Savings | Notes |
 |---|---|---|
-| Disable PNG Worker with `--no-png` | -$47/month | Eliminates NAT Gateway + Fargate |
 | Switch LLM to Sonnet 4.6 | LLM cost 1/5–1/10 | Default since v1.0. Use `config.yaml` to switch models |
 | Don't use `--search` (default) | No KB + S3 Vectors cost | Skip if semantic search isn't needed |
 | Don't use `--observability` (default) | No CloudWatch Logs cost | Skip if MIL logging isn't needed |

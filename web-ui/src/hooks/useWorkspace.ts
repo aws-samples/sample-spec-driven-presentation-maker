@@ -67,15 +67,11 @@ export function useWorkspace(
   /* ── Data loading: workspace polling with exponential backoff ── */
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevSlideKeyRef = useRef<string>("")
-  const stablePreviewUrls = useRef<Map<string, string>>(new Map())
+  const stablePreviewUrls = useRef<Map<string, { url: string; mtime?: number }>>(new Map())
 
-  // Clear URL cache when generate_pptx is triggered so new PNGs are picked up
+  // Clear URL cache when switching decks
   useEffect(() => {
     pptxRequestedRef.current = pptxRequested
-    if (pptxRequested) {
-      stablePreviewUrls.current.clear()
-      prevSlideKeyRef.current = ""
-    }
   }, [pptxRequested])
 
   useEffect(() => {
@@ -108,22 +104,32 @@ export function useWorkspace(
       }
       try {
         const data = await getDeck(deckIdToLoad, idToken)
-        // Detect slide changes (added/removed/PNG generated) — exclude presigned URL from comparison
-        const slideKey = data.slides.map((s) => `${s.slideId}:${!!s.previewUrl}`).join("|")
+        // Detect slide changes (added/removed/preview updated)
+        const slideKey = data.slides.map((s) => {
+          const base = s.previewUrl?.split("?")[0] || ""
+          return `${s.slideId}:${base}:${s.previewUpdatedAt || ""}`
+        }).join("|")
         if (slideKey !== prevSlideKeyRef.current) {
           prevSlideKeyRef.current = slideKey
           step = 0 // reset to fast polling on change
         }
         // Stabilise presigned URLs to prevent unnecessary image re-downloads.
-        // Skip cache while waiting for new PNGs after generate_pptx.
-        if (!pptxRequestedRef.current) {
-          for (const s of data.slides) {
-            if (s.previewUrl && !stablePreviewUrls.current.has(s.slideId)) {
-              stablePreviewUrls.current.set(s.slideId, s.previewUrl)
+        // Update cache when the underlying S3 key or previewUpdatedAt changes.
+        for (const s of data.slides) {
+          if (s.previewUrl) {
+            const cached = stablePreviewUrls.current.get(s.slideId)
+            const stableKey = (slide: typeof s) => {
+              const base = slide.previewUrl?.split("?")[0] || ""
+              return `${base}:${slide.previewUpdatedAt || ""}`
             }
-            if (stablePreviewUrls.current.has(s.slideId)) {
-              s.previewUrl = stablePreviewUrls.current.get(s.slideId)!
+            const cachedSlide = cached ? { previewUrl: cached.url, previewUpdatedAt: cached.mtime } : null
+            if (stableKey(s) !== (cachedSlide ? stableKey(cachedSlide as typeof s) : "")) {
+              stablePreviewUrls.current.set(s.slideId, { url: s.previewUrl, mtime: s.previewUpdatedAt })
+            } else if (cached) {
+              s.previewUrl = cached.url
             }
+          } else {
+            stablePreviewUrls.current.delete(s.slideId)
           }
         }
         setDeck(data)
@@ -181,11 +187,11 @@ export function useWorkspace(
   const hasSlides = deck && deck.slides.some((s) => s.previewUrl)
   const waitingForPng = pptxRequested
 
-  // Reset flag once PNGs change after generate_pptx
+  // Reset flag once previews change after generate_pptx
   const prevPngKeyRef = useRef<string>("")
   useEffect(() => {
     if (!pptxRequested || !deck?.slides) return
-    const pngKey = deck.slides.map((s) => `${s.slideId}:${s.previewUrl || ""}`).join("|")
+    const pngKey = deck.slides.map((s) => `${s.slideId}:${s.previewUrl?.split("?")[0] || ""}`).join("|")
     if (prevPngKeyRef.current && pngKey !== prevPngKeyRef.current) {
       setPptxRequested(false)
     }

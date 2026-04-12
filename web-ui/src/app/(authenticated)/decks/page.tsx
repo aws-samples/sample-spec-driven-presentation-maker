@@ -116,7 +116,7 @@ export default function DecksPage() {
                     deckName={ws.deck?.name || null}
                     chatSessionId={ws.deck?.chatSessionId}
                     slidePreviewUrls={ws.deck?.slides.map(s => s.previewUrl) || []}
-                    onDeckCreated={ws.handleDeckCreated} onPptxRequested={() => ws.setPptxRequested(true)}
+                    onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
                     onWorkflowPhase={setWorkflowPhase}
                     inline
                   />
@@ -230,7 +230,7 @@ export default function DecksPage() {
             deckName={ws.deck?.name || null}
             chatSessionId={ws.deck?.chatSessionId}
             slidePreviewUrls={ws.deck?.slides.map(s => s.previewUrl) || []}
-            onDeckCreated={ws.handleDeckCreated} onPptxRequested={() => ws.setPptxRequested(true)}
+            onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
             onWorkflowPhase={setWorkflowPhase}
           />
         </div>

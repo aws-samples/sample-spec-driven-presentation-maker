@@ -24,7 +24,6 @@ uv run python3 scripts/pptx_to_json.py {input_pptx} -o {project_dir}
 # → Generates {project_dir}/slides.json + images/
 # → From here on, output_json = {project_dir}/slides.json
 ```
-- PowerPoint recalculates autofit, so the output reflects accurate heights
 
 ---
 
@@ -54,9 +53,11 @@ Edit `slides.json` directly. Roundtrip JSON is valid input for pptx_builder as-i
 
 ```bash
 uv run python3 scripts/pptx_builder.py generate {output_json} -o {output_pptx}
+uv run python3 scripts/pptx_builder.py measure {output_json}
+uv run python3 scripts/pptx_builder.py preview {output_json}
 ```
 
-Review preview PNGs and fix/regenerate as needed.
+Review measure output and preview PNGs, fix and regenerate as needed.
 
 **Constraints:**
 - You MUST NOT run generate until all slides are edited/added to the JSON

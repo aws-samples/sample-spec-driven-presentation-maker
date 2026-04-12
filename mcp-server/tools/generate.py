@@ -14,95 +14,134 @@ and builds PPTX via sdpm.builder.
 """
 
 import json
+import logging
+import os
 import re
+import shutil
+import subprocess
 import tempfile
-import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 from storage import Storage
 
+logger = logging.getLogger("sdpm.generate")
 
-def generate_pptx(
+
+def _is_orphan_webp(key: str, deck_id: str, slide_count: int) -> bool:
+    """Check if a WebP preview key is beyond the current slide count."""
+    prefix = f"previews/{deck_id}/slide_"
+    if not key.startswith(prefix) or not key.endswith(".webp"):
+        return False
+    try:
+        num = int(key[len(prefix):-len(".webp")])
+        return num > slide_count
+    except ValueError:
+        return False
+
+
+def _delete_keys(storage: Storage, keys: list[str]) -> None:
+    """Delete specific S3 keys from pptx bucket."""
+    for key in keys:
+        try:
+            storage._s3.delete_object(Bucket=storage.pptx_bucket, Key=key)
+        except Exception:
+            logger.warning("Failed to delete orphan key: %s", key)
+
+
+def generate_previews(pptx_path: Path, output_dir: Path) -> list[Path]:
+    """Convert PPTX → PDF → per-page WebP via LibreOffice + pdftoppm + Pillow.
+
+    Args:
+        pptx_path: Path to the PPTX file.
+        output_dir: Directory for intermediate and output files.
+
+    Returns:
+        Sorted list of WebP file paths.
+    """
+    from PIL import Image
+
+    env = os.environ.copy()
+    env["HOME"] = str(output_dir)
+
+    # PPTX → PDF
+    subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+        ["soffice", "--headless", "--convert-to", "pdf", "--outdir", str(output_dir), str(pptx_path)],
+        env=env, capture_output=True, text=True, timeout=120, check=True,
+    )
+    pdf_path = output_dir / pptx_path.with_suffix(".pdf").name
+    if not pdf_path.exists():
+        raise FileNotFoundError("LibreOffice did not produce PDF")
+
+    # PDF → per-page PNGs
+    subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+        ["pdftoppm", "-png", "-r", "200", str(pdf_path), str(output_dir / "slide")],
+        capture_output=True, text=True, timeout=120, check=True,
+    )
+
+    # PNG → WebP
+    webp_files: list[Path] = []
+    for png_path in sorted(output_dir.glob("slide-*.png")):
+        webp_path = png_path.with_suffix(".webp")
+        Image.open(png_path).save(webp_path, "WEBP", quality=85)
+        webp_files.append(webp_path)
+    return webp_files
+
+
+def _prepare_workspace(
     deck_id: str,
     user_id: str,
     storage: Storage,
-    kb_sync: object | None = None,
-) -> dict:
-    """Generate a PowerPoint file from S3 presentation.json.
-
-    Downloads presentation.json and all includes/ files to a tmpdir,
-    then uses engine builder with base_dir set to tmpdir for include resolution.
-    Template is resolved from presentation.json's "template" field.
-
-    Args:
-        deck_id: Deck identifier.
-        user_id: Owner's user ID.
-        storage: Storage backend instance.
-        kb_sync: Optional KBSync instance for vector synchronization.
+) -> tuple[Path, list[dict], dict]:
+    """Download S3 workspace to tmpdir and prepare for PPTX build.
 
     Returns:
-        Dict with status, slideCount, slides summary, and optional warnings.
-
-    Raises:
-        ValueError: If deck not found or has no slides.
+        (tmpdir, slides, build_kwargs) where build_kwargs has keys:
+        template_path, custom_template, fonts, base_dir, default_text_color
     """
-    from sdpm.builder import PPTXBuilder, resolve_override
+    from sdpm.analyzer import extract_fonts
+    from sdpm.builder import PPTXBuilder  # noqa: F401 — validate import
 
-    # Get deck metadata from DDB
     deck = storage.get_deck(deck_id, user_id)
     if not deck:
         raise ValueError(f"Deck {deck_id} not found.")
 
-    # Read presentation.json from S3
     presentation = storage.get_presentation_json(deck_id)
     if not isinstance(presentation, dict):
-        raise ValueError(f"Deck {deck_id} has invalid presentation.json (expected object).")
+        raise ValueError(f"Deck {deck_id} has invalid presentation.json.")
     slides = presentation.get("slides", [])
-    if not isinstance(slides, list):
-        raise ValueError(f"Deck {deck_id} has invalid slides (expected array).")
-    if not slides:
+    if not isinstance(slides, list) or not slides:
         raise ValueError(f"Deck {deck_id} has no slides.")
 
-    # Set up tmpdir with presentation.json + includes
     tmpdir = Path(tempfile.mkdtemp())
     (tmpdir / "presentation.json").write_text(
         json.dumps(presentation, ensure_ascii=False), encoding="utf-8"
     )
 
     # Download includes
-    include_keys = storage.list_files(
-        prefix=f"decks/{deck_id}/includes/", bucket=storage.pptx_bucket
-    )
-    for key in include_keys:
+    for key in storage.list_files(prefix=f"decks/{deck_id}/includes/", bucket=storage.pptx_bucket):
         rel = key.replace(f"decks/{deck_id}/", "")
         dest = tmpdir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(storage.download_file_from_pptx_bucket(key))
 
-    # Download images extracted by pptx_to_json
-    image_keys = storage.list_files(
-        prefix=f"decks/{deck_id}/images/", bucket=storage.pptx_bucket
-    )
-    for key in image_keys:
+    # Download images
+    for key in storage.list_files(prefix=f"decks/{deck_id}/images/", bucket=storage.pptx_bucket):
         rel = key.replace(f"decks/{deck_id}/", "")
         dest = tmpdir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(storage.download_file_from_pptx_bucket(key))
 
-    # Download asset manifests + referenced icons from S3
+    # Download asset manifests + referenced icons
     assets_dir = tmpdir / "assets"
     asset_keys = storage.list_files(prefix="assets/")
-    # Always download manifests
     for key in [k for k in asset_keys if k.endswith("manifest.json")]:
         dest = tmpdir / key
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(storage.download_file(key=key))
-    # Collect referenced asset files from slides
     slide_text = json.dumps(slides)
     refs = set(re.findall(r'(?:assets:|icons:)([^"]+)', slide_text))
-    # Load manifests to map name → file
     for source_dir in assets_dir.iterdir() if assets_dir.exists() else []:
         manifest_path = source_dir / "manifest.json"
         if not manifest_path.exists():
@@ -126,9 +165,9 @@ def generate_pptx(
     _assets_mod.ASSETS_DIR = assets_dir
     _assets_mod.ICON_DIR = assets_dir
     _assets_mod.ICON_LOCAL_DIR = assets_dir
-    _assets_mod._manifest_cache = None  # Reset so engine reloads from new ASSETS_DIR
+    _assets_mod._manifest_cache = None
 
-    # Resolve template S3 key from presentation.json or deck metadata
+    # Resolve template
     template_key = ""
     tmpl_name = presentation.get("template", "")
     if tmpl_name:
@@ -138,129 +177,128 @@ def generate_pptx(
                 break
     if not template_key:
         template_key = deck.get("templateS3Key", "templates/default.pptx")
-    template_data = storage.download_file(key=template_key)
     template_path = tmpdir / "template.pptx"
-    template_path.write_bytes(template_data)
+    template_path.write_bytes(storage.download_file(key=template_key))
 
-    # Get fonts
+    # Fonts
     fonts = presentation.get("fonts") or deck.get("fonts")
     if not fonts or not fonts.get("fullwidth"):
-        from sdpm.analyzer import extract_fonts
         fonts = extract_fonts(template_path)
 
-    # Build PPTX
-    builder = PPTXBuilder(
-        template_path, custom_template=True,
-        fonts=fonts, base_dir=tmpdir,
-        default_text_color=presentation.get("defaultTextColor"),
-    )
+    return tmpdir, slides, {
+        "template_path": template_path,
+        "custom_template": True,
+        "fonts": fonts,
+        "base_dir": tmpdir,
+        "default_text_color": presentation.get("defaultTextColor"),
+    }
 
-    # Lint slide JSON
-    from sdpm.schema.lint import lint as lint_slides
-    lint_diagnostics = lint_slides(presentation)
 
-    # Build id_map for resolve_override
-    id_map: dict[str, dict] = {}
-    for s in slides:
-        if "id" in s:
-            id_map[s["id"]] = s
+def generate_pptx(
+    deck_id: str,
+    user_id: str,
+    storage: Storage,
+    kb_sync: object | None = None,
+) -> dict:
+    """Generate a PowerPoint file from S3 presentation.json.
 
-    for s in slides:
-        resolved = resolve_override(s, id_map)
-        builder.add_slide(resolved)
+    Downloads presentation.json and all includes/ files to a tmpdir,
+    then uses engine builder with base_dir set to tmpdir for include resolution.
+    Template is resolved from presentation.json's "template" field.
+    After PPTX build, generates WebP previews synchronously via LibreOffice.
 
-    out = tmpdir / "output.pptx"
-    builder.save(out)
+    Args:
+        deck_id: Deck identifier.
+        user_id: Owner's user ID.
+        storage: Storage backend instance.
+        kb_sync: Optional KBSync instance for vector synchronization.
 
-    # Detect layout bias (centroid offset from content area center)
-    from sdpm.preview import check_layout_imbalance_data
-    layout_bias = check_layout_imbalance_data(out, slide_defs=slides)
+    Returns:
+        Dict with status, slideCount, slides summary, and optional warnings.
 
-    # Upload result
-    key = f"pptx/{deck_id}/{uuid.uuid4()}.pptx"
-    storage.upload_file(
-        key=key, data=out.read_bytes(),
-        content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    )
+    Raises:
+        ValueError: If deck not found or has no slides.
+    """
+    from sdpm.builder import PPTXBuilder, resolve_override
 
-    # Update deck record
-    now = datetime.now(timezone.utc).isoformat()
-    storage.update_deck(deck_id=deck_id, user_id=user_id, updates={
-        "pptxS3Key": key, "updatedAt": now, "slideCount": len(slides),
-    })
+    tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, storage)
+    try:
+        builder = PPTXBuilder(**build_kwargs)
 
-    # Delete old previews before triggering new PNG generation
-    storage.delete_files(prefix=f"previews/{deck_id}/", bucket=storage.pptx_bucket)
+        # Lint slide JSON
+        from sdpm.schema.lint import lint as lint_slides
+        presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
+        lint_diagnostics = lint_slides(presentation)
 
-    # Trigger PNG generation via SQS (no-op if PNG Worker not deployed)
-    storage.send_png_job({
-        "deckId": deck_id,
-        "userId": user_id,
-        "bucket": storage.pptx_bucket,
-        "key": key,
-    })
+        # Build id_map for resolve_override
+        id_map: dict[str, dict] = {}
+        for s in slides:
+            if "id" in s:
+                id_map[s["id"]] = s
 
-    # --- Parallel: PNG polling + KB sync ---
-    import concurrent.futures
+        for s in slides:
+            resolved = resolve_override(s, id_map)
+            builder.add_slide(resolved)
 
-    def _run_kb_sync() -> str | None:
-        """Run KB sync in background thread. Returns error string or None."""
-        if not kb_sync:
-            return None
+        out = tmpdir / "output.pptx"
+        builder.save(out)
+
+        # Detect layout bias
+        from sdpm.preview import check_layout_imbalance_data
+        layout_bias = check_layout_imbalance_data(out, slide_defs=slides)
+
+        # Upload PPTX to S3
+        pptx_key = f"pptx/{deck_id}/{uuid.uuid4()}.pptx"
+        storage.upload_file(
+            key=pptx_key, data=out.read_bytes(),
+            content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
+
+        # Update deck record
+        deck = storage.get_deck(deck_id, user_id)
+        now = datetime.now(timezone.utc).isoformat()
+        storage.update_deck(deck_id=deck_id, user_id=user_id, updates={
+            "pptxS3Key": pptx_key, "updatedAt": now, "slideCount": len(slides),
+        })
+
+        # Preview: overwrite WebP + cleanup orphans + delete draft SVGs
+        slide_count = len(slides)
         try:
-            visibility = deck.get("visibility", "private")
-            deck_name = deck.get("name", "")
+            preview_dir = Path(tempfile.mkdtemp())
+            webp_files = generate_previews(out, preview_dir)
+            for i, webp_path in enumerate(webp_files):
+                s3_key = f"previews/{deck_id}/slide_{i + 1:02d}.webp"
+                storage.upload_file(key=s3_key, data=webp_path.read_bytes(), content_type="image/webp")
+            # Cleanup orphan previews (reduced slide count)
+            existing = storage.list_files(prefix=f"previews/{deck_id}/", bucket=storage.pptx_bucket)
+            orphans = [k for k in existing if _is_orphan_webp(k, deck_id, slide_count)]
+            if orphans:
+                _delete_keys(storage, orphans)
+            logger.info("Preview generation complete: %d pages for deck %s", len(webp_files), deck_id)
+        except Exception as e:
+            logger.warning("Preview generation failed for deck %s: %s", deck_id, e)
+        finally:
+            shutil.rmtree(preview_dir, ignore_errors=True)
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+    # KB sync
+    kb_error: str | None = None
+    if kb_sync:
+        try:
             kb_sync.sync_deck(
                 deck_id=deck_id,
                 user_id=user_id,
-                deck_name=deck_name,
-                visibility=visibility,
+                deck_name=(deck or {}).get("name", ""),
+                visibility=(deck or {}).get("visibility", "private"),
                 slides=slides,
             )
-            return None
         except Exception as e:
-            return str(e)
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        kb_future = executor.submit(_run_kb_sync)
-
-        # Poll for PNG completion (timeout if PNG Worker not deployed)
-        expected = len(slides)
-        for _ in range(30):  # 30 * 2s = 60s timeout
-            png_keys = [
-                k for k in storage.list_files(
-                    prefix=f"previews/{deck_id}/", bucket=storage.pptx_bucket
-                ) if k.endswith(".png")
-            ]
-            if len(png_keys) >= expected:
-                break
-            time.sleep(2)
-
-        # Collect KB sync result
-        kb_error = kb_future.result(timeout=60)
-
-    # Read autofit report if available (written by PNG Worker)
-    autofit_overflow: list[dict] = []
-    try:
-        report_data = storage.download_file_from_pptx_bucket(f"previews/{deck_id}/autofit_report.json")
-        autofit_overflow = json.loads(report_data)
-    except Exception:
-        pass  # No report = no overflow or PNG Worker not deployed
+            kb_error = str(e)
 
     warnings: dict = {}
     if layout_bias:
         warnings["layoutBias"] = layout_bias
-    if autofit_overflow:
-        warnings["autofitOverflow"] = autofit_overflow
-        warnings["autofitOverflowAdvice"] = (
-            "Text may not fit — would need fontSize reduction to fit within shape bounds. "
-            "fontSize reduction also changes text wrapping — exact cause of overflow varies. "
-            "Check preview for: text overflowing shape bounds, unintended wrapping, overlap with nearby elements. "
-            "If no visible problem, no action needed. "
-            "If text overflows, adjust layout (width/height) or content (text length). "
-            "fontSize has recommended minimums — prefer layout/content adjustments over reducing fontSize. "
-            "Review surrounding layout together — don't fix in isolation."
-        )
     if kb_error:
         warnings["kbSyncFailed"] = kb_error
 

@@ -15,7 +15,6 @@ phases:
         stacks:
           data: true
           runtime: true
-          pngWorker: ${STACK_PNG_WORKER:-true}
           agent: ${STACK_AGENT:-false}
           webUi: ${STACK_WEB_UI:-false}
         features:

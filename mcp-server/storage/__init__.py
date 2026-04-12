@@ -106,15 +106,6 @@ class Storage(ABC):
             Number of objects deleted.
         """
 
-    # --- PNG Job ---
-
-    def send_png_job(self, message: dict) -> None:
-        """Send PNG generation job to SQS. No-op if queue not configured.
-
-        Args:
-            message: Dict with deckId, userId, bucket, key.
-        """
-
     # --- Auth ---
 
     @property

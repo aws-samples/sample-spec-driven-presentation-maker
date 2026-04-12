@@ -98,7 +98,7 @@ Built on a 4-layer architecture. Each layer is a thin wrapper around the previou
 |---|---|:---:|
 | Personal use with Kiro CLI | Layer 1: `skill/` | Not required |
 | Local MCP (Claude Desktop, VS Code, Kiro) | Layer 2: `skill/` + `mcp-local/` | Not required |
-| Team deployment | Layer 3: + `mcp-server/` + `infra/` + `png-worker/` | Required |
+| Team deployment | Layer 3: + `mcp-server/` + `infra/` | Required |
 | Full stack | Layer 4: + `agent/` + `api/` + `web-ui/` | Required |
 
 See [Architecture](docs/en/architecture.md) for details.
@@ -131,9 +131,8 @@ See [Architecture](docs/en/architecture.md) for details.
 spec-driven-presentation-maker/
 ├── skill/            Layer 1 — Engine, references, templates
 ├── mcp-local/        Layer 2 — Local stdio MCP server
-├── mcp-server/       Layer 3 — Streamable HTTP MCP server
+├── mcp-server/       Layer 3 — Streamable HTTP MCP server (LibreOffice built-in)
 ├── infra/            Layer 3-4 — CDK stacks
-├── png-worker/       Layer 3 — PPTX→PNG conversion (Fargate + SQS)
 ├── agent/            Layer 4 — Strands Agent
 ├── api/              Layer 4 — Unified REST API Lambda
 ├── web-ui/           Layer 4 — React Web UI

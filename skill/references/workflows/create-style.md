@@ -33,13 +33,13 @@ what to change, and what to add.
 For PPTX files, analyze from three angles:
 ```bash
 uv run python3 scripts/pptx_builder.py analyze-template {input.pptx}
-uv run python3 scripts/pptx_builder.py preview {input.pptx}
 uv run python3 scripts/pptx_builder.py convert {input.pptx} -o {project_dir}/{name}
+uv run python3 scripts/pptx_builder.py preview {project_dir}/{name}/slides.json
 ```
 analyze-template extracts theme colors, color usage ratios, and fonts.
+Converted JSON reveals specific shapes, fills, borders, and spacing.
 Preview images show the overall visual impression — read a few representative slides,
 not all of them.
-Converted JSON reveals specific shapes, fills, borders, and spacing.
 
 For reference images (PNG, screenshots, design mockups), extract dominant colors with python:
 ```python

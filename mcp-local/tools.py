@@ -46,27 +46,29 @@ def analyze_template(template_path: str, skill_dir: Path, layout: str = "") -> d
 
 def generate_pptx(
     slides_json_path: str, skill_dir: Path,
-    template: str = "", output_path: str = "",
+    output_path: str = "",
 ) -> dict[str, Any]:
-    """Generate PPTX from a JSON file with full post-processing."""
+    """Generate PPTX from a JSON file."""
     from sdpm.api import generate
     return generate(
         json_path=slides_json_path,
-        template=template or None,
         output_path=output_path or None,
     )
 
 
-def preview(pptx_path: str, pages: str = "") -> dict[str, Any]:
-    """Generate PNG previews of a PPTX file."""
+def measure(slides_json_path: str, pages: str = "") -> str:
+    """Measure text bounding boxes in slides."""
+    from sdpm.api import measure as _measure
+    pages_list = [int(p.strip()) for p in pages.split(",") if p.strip()] if pages else None
+    return _measure(json_path=slides_json_path, slides=pages_list)
+
+
+def preview(slides_json_path: str, pages: str = "", output_path: str = "") -> dict[str, Any]:
+    """Generate PNG previews from a JSON file."""
     from sdpm.api import preview as _preview
 
-    path = Path(pptx_path).resolve()
-    if not path.exists():
-        raise FileNotFoundError(f"PPTX not found: {pptx_path}")
-
     pages_list = [int(p.strip()) for p in pages.split(",") if p.strip()] if pages else None
-    return _preview(pptx_path=path, pages=pages_list)
+    return _preview(json_path=slides_json_path, output_path=output_path or None, pages=pages_list)
 
 
 def search_assets(

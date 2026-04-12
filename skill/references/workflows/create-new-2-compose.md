@@ -1,12 +1,12 @@
 ---
 name: new-phase-2-compose
-description: "Phase 2: Compose slides — design then build, one slide at a time"
+description: "Phase 2: Compose slides — design then build with measure feedback"
 category: workflow
 ---
 
 # Phase 2: Compose
 
-Build each slide one at a time: design then build.
+Design then build each slide. Build is iterative — place components, measure, adjust.
 
 ## Design = Style × Components × Patterns
 
@@ -52,14 +52,22 @@ for slide in slides:
     think: message + visual structure together
     check: layout fits message? no repetition?
 
-    # Build
-    coords   = calculate(grid_command, inline_python)
-    assets   = run("search-assets", ...)
-    elements = build_elements(coords, assets)
-    write(slide)                        # notes + elements
+    # Build — iterative
+    while components remain or adjustments needed:
+        place(next components)
+        measure()                       # actual rendered size
+        adjust or continue              # result feeds next decision
 ```
 
-Complete one full Design → Build iteration before moving to the next slide.
+**Why iterative build?** The actual rendered size of text affects everything that follows.
+A title's real height determines where the content area starts. A card's text wrapping
+determines whether the card width works. You cannot know these until you measure.
+Building everything at once and checking later means large rework when something doesn't fit.
+Building incrementally lets each measurement inform the next placement decision.
+
+Early in the deck, measure frequently — font size and width interact in ways you can only
+learn by seeing the result. Once you have a feel for how text behaves at a given size and width,
+you can place more components before measuring, or even build a full slide in one pass.
 
 **You MUST write one slide at a time.** Do NOT batch-generate multiple slides at once.
 Writing all slides in a single operation risks output truncation and write failure — always write per slide.
@@ -79,7 +87,37 @@ For each slide, think through what to say and how to show it — together.
 
 ## Build
 
-For each slide, execute the design decisions.
+Build is not a single pass — it is a loop of place, measure, adjust.
+
+The actual rendered size of an element affects what comes next. A title that wraps to 3 lines
+instead of 2 pushes the content area down. A card whose text is wider than expected needs a
+different width — which changes the spacing for all cards in the row. You cannot know these
+until you measure — and you cannot measure until you write.
+
+Write partial elements, measure, then write more. For example: write the title and subtitle,
+measure to see their actual height, then use that height to decide where the content area starts.
+Write one card, measure to confirm the text fits, then write the remaining cards with the same
+dimensions. Do not write all elements at once and measure afterward — by then every decision
+is already made and measurement can only confirm or force rework.
+
+**measure:**
+
+```bash
+uv run python3 scripts/pptx_builder.py measure {output_json} -p {slide_number}
+```
+
+Reports each text element's actual position, size, line count, and text preview.
+Compare the actual size against your intended size (the `height` you declared in JSON).
+The measure output includes guidance on what to adjust when sizes don't match.
+
+Early in the deck, measure after each major component — this is how you learn the relationship
+between font size, width, and line count for this deck's content. Once you have a feel for how
+text behaves, you can write more components before measuring, or even build a full slide in one pass.
+
+If measure reveals that the layout structure itself doesn't work (not just a size tweak, but
+the design assumption was wrong — e.g., too much text for a 3-column layout), go back to
+Design and rethink the structure. Forcing text into a broken layout produces worse results
+than changing the layout.
 
 **coordinate calculation:**
 - Decide structure first, then calculate coordinates — computing coordinates before structure makes the layout rigid

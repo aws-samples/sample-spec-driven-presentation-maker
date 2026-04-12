@@ -4,16 +4,12 @@
 # Layer 3 (MCP Server only):
 #   stacks.data + stacks.runtime = true, everything else false
 #
-# Layer 3 + PNG previews:
-#   + stacks.pngWorker = true
-#
 # Layer 4 (Full stack):
 #   + stacks.agent + stacks.webUi = true
 
 stacks:
   data: true           # Required — DynamoDB + S3
   runtime: true        # Required — AgentCore Runtime MCP Server
-  pngWorker: true      # Optional — PPTX→PNG conversion (Fargate + SQS)
   agent: false         # Layer 4 — Strands Agent on AgentCore Runtime
   webUi: false         # Layer 4 — React Web UI (Amplify Hosting)
 

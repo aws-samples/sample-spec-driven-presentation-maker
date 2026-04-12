@@ -30,24 +30,26 @@ uv run python server.py
 
 | Tool | Description |
 |------|-------------|
-| `start_presentation` | Start creating a presentation — returns design rules + workflow |
 | `init_presentation` | Initialize workspace with template and fonts |
 | `analyze_template` | Analyze a PPTX template (layouts, colors, fonts) |
 | `generate_pptx` | Generate PPTX from JSON |
-| `preview` | Generate PNG previews (requires PowerPoint) |
+| `get_preview` | Generate PNG previews (requires LibreOffice + poppler) |
+| `measure_slides` | Measure text bounding boxes (requires LibreOffice) |
 | `search_assets` | Search icons by keyword |
 | `list_asset_sources` | List available asset sources |
-| `list_examples` | List design pattern and component examples |
-| `read_examples` | Read example documents |
+| `list_templates` | List available templates |
+| `list_styles` | List design styles |
+| `read_examples` | Read design pattern and component examples |
 | `list_workflows` | List workflow documents |
 | `read_workflows` | Read workflow instructions |
 | `list_guides` | List guide documents |
 | `read_guides` | Read guide documents |
-| `code_block` | Generate code block elements JSON |
+| `code_to_slide` | Generate code block elements JSON |
 | `pptx_to_json` | Convert PPTX to JSON |
+| `grid` | CSS Grid coordinate calculation |
 
 ## Requirements
 
 - Python 3.10+
-- Microsoft PowerPoint (for `preview` tool, macOS/Windows only)
-- poppler (`pdftoppm`) for PNG conversion on macOS
+- LibreOffice (for `get_preview` and `measure_slides` tools)
+- poppler-utils (`pdftoppm`) for PNG conversion

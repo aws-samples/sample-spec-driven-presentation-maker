@@ -1,13 +1,13 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""High-level API for sdpm — single entry points for generate, preview, init, code_block.
+"""High-level API for sdpm — single entry points for generate, measure, preview, init, code_block.
 
 These functions encapsulate the full workflow that the CLI (pptx_builder.py) performs.
 mcp-local and other consumers should call these instead of assembling low-level APIs.
 """
 
 import os
-import sys
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -41,7 +41,7 @@ def _get_output_base_dir() -> Path:
         return get_output_dir()
     except Exception:
         pass
-    from sdpm.preview import _is_wsl
+    from sdpm.preview.backend import _is_wsl
 
     if _is_wsl():
         import subprocess
@@ -126,35 +126,26 @@ def init(
     }
 
 
-def generate(
-    json_path: str | Path,
-    template: str | Path | None = None,
-    output_path: str | Path | None = None,
-    no_autofit: bool = False,
-    no_preview: bool = False,
-) -> dict[str, Any]:
-    """Generate PPTX from JSON with full post-processing.
+@dataclass
+class BuildConfig:
+    """Resolved configuration for PPTX build."""
 
-    Includes: template resolution, icon validation, build,
-    autofit refresh, unlock_height_constraints, check_layout_imbalance.
+    template_path: Path
+    custom_template: bool
+    fonts: dict
+    default_text_color: str
+    slides: list[dict] = field(default_factory=list)  # override解決済み
+    base_dir: Path = field(default_factory=lambda: Path("."))
+    warnings: list[str] = field(default_factory=list)
+    lint_diagnostics: list = field(default_factory=list)
 
-    Args:
-        json_path: Path to the slides JSON file.
-        template: Template override (name or path). Uses JSON's "template" if None.
-        output_path: Output .pptx path. Auto-generated if None.
-        no_autofit: Skip autofit refresh.
-        no_preview: Skip PDF generation during autofit.
 
-    Returns:
-        Dict with output_path, slide_count, slides summary, warnings.
+def _resolve_config(json_path: str | Path) -> BuildConfig:
+    """Resolve template, fonts, icons, overrides from JSON.
+
+    Raises FileNotFoundError, ValueError on missing template/icons.
     """
     from sdpm.builder import PPTXBuilder, resolve_override, validate_icons_in_json
-    from sdpm.preview import (
-        check_layout_imbalance_data,
-        get_tmp_project_dir,
-        refresh_autofit,
-        unlock_height_constraints,
-    )
     from sdpm.utils.io import read_json
 
     input_path = Path(json_path)
@@ -162,24 +153,12 @@ def generate(
         raise FileNotFoundError(f"Slides JSON not found: {json_path}")
 
     data = read_json(input_path)
-    templates_dir = Path(__file__).parent.parent / "templates"  # skill/templates/
+    templates_dir = Path(__file__).parent.parent / "templates"
     warnings: list[str] = []
 
-    # Resolve template
-    if template:
-        p = Path(template)
-        if p.exists():
-            template_file, custom = p, True
-        else:
-            named = templates_dir / (str(template) if str(template).endswith(".pptx") else f"{template}.pptx")
-            if named.exists():
-                template_file, custom = named, True
-            else:
-                raise FileNotFoundError(f"Template not found: {template}")
-    else:
-        template_file, custom = _resolve_template(data, str(input_path), templates_dir)
+    template_file, custom = _resolve_template(data, str(input_path), templates_dir)
 
-    # Auto-fill fonts / defaultTextColor from template when missing
+    # Auto-fill fonts
     from sdpm.analyzer import extract_fonts as _extract_fonts
 
     fonts = data.get("fonts")
@@ -187,14 +166,16 @@ def generate(
         fonts = _extract_fonts(template_file)
         warnings.append("fonts auto-detected from template")
 
+    # Auto-fill defaultTextColor
     dtc = data.get("defaultTextColor")
     if not dtc:
         _, is_dark = PPTXBuilder._extract_theme_colors(template_file)
         dtc = "#FFFFFF" if is_dark else "#333333"
         warnings.append(f"defaultTextColor auto-set to {dtc}")
 
-    # Lint slide JSON
+    # Lint
     from sdpm.schema.lint import lint as lint_slides
+
     lint_diagnostics = lint_slides(data)
 
     # Validate icons
@@ -202,23 +183,64 @@ def generate(
     if missing:
         raise ValueError(f"Missing assets ({len(missing)}): {', '.join(sorted(missing)[:10])}")
 
-    # Build
-    builder = PPTXBuilder(
-        template_file,
-        custom_template=custom,
-        fonts=fonts,
-        base_dir=input_path.parent,
-        default_text_color=dtc,
-    )
+    # Resolve overrides
     slides = data.get("slides", [])
     id_map = {}
     for s in slides:
         if "id" in s:
             id_map[s["id"]] = s
-    for s in slides:
-        builder.add_slide(resolve_override(s, id_map))
+    resolved_slides = [resolve_override(s, id_map) for s in slides]
+
+    return BuildConfig(
+        template_path=template_file,
+        custom_template=custom,
+        fonts=fonts,
+        default_text_color=dtc,
+        slides=resolved_slides,
+        base_dir=input_path.parent,
+        warnings=warnings,
+        lint_diagnostics=lint_diagnostics,
+    )
+
+
+def _build(config: BuildConfig, output_path: Path) -> Path:
+    """Build PPTX from resolved config. Returns output path."""
+    from sdpm.builder import PPTXBuilder
+
+    builder = PPTXBuilder(
+        config.template_path,
+        custom_template=config.custom_template,
+        fonts=config.fonts,
+        base_dir=config.base_dir,
+        default_text_color=config.default_text_color,
+    )
+    for s in config.slides:
+        builder.add_slide(s)
+    builder.save(output_path)
+    return output_path
+
+
+def generate(
+    json_path: str | Path,
+    output_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """Generate PPTX from JSON.
+
+    Includes: template resolution, icon validation, build, check_layout_imbalance.
+
+    Args:
+        json_path: Path to the slides JSON file.
+        output_path: Output .pptx path. Auto-generated if None.
+
+    Returns:
+        Dict with output_path, slide_count, slides summary, warnings.
+    """
+    from sdpm.preview import check_layout_imbalance_data
+
+    config = _resolve_config(json_path)
 
     # Output path
+    input_path = Path(json_path)
     if not output_path:
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         p = input_path.with_suffix(".pptx")
@@ -226,68 +248,86 @@ def generate(
     else:
         out = Path(output_path)
 
-    builder.save(out)
+    _build(config, out)
 
-    # Post-processing
-    pdf_path = None
-    if not no_autofit:
-        pptx_resolved = out.resolve()
-        pre_autofit_pdf = None
-        if not no_preview:
-            tmp_project = get_tmp_project_dir(str(input_path))
-            preview_dir = tmp_project / "preview"
-            preview_dir.mkdir(parents=True, exist_ok=True)
-            pre_autofit_pdf = preview_dir / "slides.pdf"
-        refresh_autofit(pptx_resolved, pdf_path=None, pre_autofit_pdf=pre_autofit_pdf)
-        pdf_path = pre_autofit_pdf
-        unlock_height_constraints(pptx_resolved)
-
-    imbalance = check_layout_imbalance_data(out, slides)
+    imbalance = check_layout_imbalance_data(out, config.slides)
     if imbalance:
         for a in imbalance:
-            warnings.append(f"page{a['slide']:02d} ({a['layout']}) offset: {a['offset']} ({a['direction']})")
+            config.warnings.append(f"page{a['slide']:02d} ({a['layout']}) offset: {a['offset']} ({a['direction']})")
 
     # Summary
     summary = []
-    for i, s in enumerate(slides, 1):
+    for i, s in enumerate(config.slides, 1):
         title = s.get("title", "(no title)")
         if isinstance(title, dict):
             title = title.get("text", "(no title)")
         summary.append(f"page{i:02d} - {title}")
 
-    result = {
+    result: dict[str, Any] = {
         "output_path": str(out),
-        "slide_count": len(slides),
+        "slide_count": len(config.slides),
         "slides": summary,
-        "warnings": warnings,
-        "pdf_path": str(pdf_path) if pdf_path and pdf_path.exists() else None,
+        "warnings": config.warnings,
     }
-    if lint_diagnostics:
-        result["errors"] = {"lintDiagnostics": lint_diagnostics}
+    if config.lint_diagnostics:
+        result["errors"] = {"lintDiagnostics": config.lint_diagnostics}
     return result
 
 
-def preview(
-    pptx_path: str | Path,
-    pages: list[int] | None = None,
-    output_dir: str | Path | None = None,
-    grid: bool = False,
-    pdf_path: str | Path | None = None,
-) -> dict[str, Any]:
-    """Export PPTX slides as PNG images.
-
-    Uses export_pdf → pdftoppm pipeline on macOS/Linux/WSL.
-    Uses COM → PNG direct export on Windows native.
+def measure(
+    json_path: str | Path,
+    slides: list[int] | None = None,
+) -> str:
+    """Build PPTX from JSON, convert to SVG, extract text bboxes.
 
     Args:
-        pptx_path: Path to .pptx file.
-        pages: Page numbers to export. None for all.
-        output_dir: Output directory. Auto-generated if None.
-        grid: Add grid overlay to PNGs.
-        pdf_path: Pre-generated PDF to skip export step.
+        json_path: Path to the slides JSON file.
+        slides: Slide numbers to measure (1-based). None for all.
 
     Returns:
-        Dict with preview_dir and files list.
+        Text report of bbox measurements.
+    """
+    import tempfile
+
+    from sdpm.preview.backend import LibreOfficeBackend
+    from sdpm.preview.measure import format_measure_report, measure_from_svg
+
+    config = _resolve_config(json_path)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_pptx = Path(tmp_dir) / "measure.pptx"
+        _build(config, tmp_pptx)
+
+        backend = LibreOfficeBackend()
+        svg_path = backend.export_svg(tmp_pptx)
+        if svg_path is None:
+            raise RuntimeError("SVG export failed. Is LibreOffice (soffice) installed?")
+
+        try:
+            results = measure_from_svg(svg_path, slides)
+            return format_measure_report(results)
+        finally:
+            import shutil
+            if svg_path:
+                shutil.rmtree(svg_path.parent, ignore_errors=True)
+
+
+def preview(
+    json_path: str | Path,
+    output_path: str | Path | None = None,
+    pages: list[int] | None = None,
+    grid: bool = False,
+) -> dict[str, Any]:
+    """Build PPTX from JSON and export slides as PNG images.
+
+    Args:
+        json_path: Path to the slides JSON file.
+        output_path: Output .pptx path. Auto-generated if None.
+        pages: Page numbers to export. None for all.
+        grid: Add grid overlay to PNGs.
+
+    Returns:
+        Dict with preview_dir, files list, and output_path.
     """
     import glob
     import re
@@ -295,106 +335,60 @@ def preview(
 
     from pptx import Presentation
 
-    from sdpm.preview import _is_wsl, export_pdf
+    from sdpm.preview import export_pdf
 
-    path = Path(pptx_path).resolve()
-    if not path.exists():
-        raise FileNotFoundError(f"PPTX not found: {pptx_path}")
+    config = _resolve_config(json_path)
 
-    if output_dir:
-        out_dir = Path(output_dir)
-    elif _is_wsl() or sys.platform == "win32":
-        out_dir = path.parent / "preview"
+    # Output path
+    input_path = Path(json_path)
+    if not output_path:
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        p = input_path.with_suffix(".pptx")
+        out = p.with_stem(f"{p.stem}_{ts}")
     else:
-        out_dir = Path("/tmp/pptx-preview")
+        out = Path(output_path)
+
+    _build(config, out)
+
+    # Preview dir
+    out_dir = Path("/tmp/pptx-preview")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     pages_set = set(pages) if pages else None
 
-    if sys.platform == "win32":
-        generated = _preview_win32(path, out_dir, pages_set)
-    else:
-        # PDF + pdftoppm pipeline
-        pdf = Path(pdf_path) if pdf_path and Path(pdf_path).exists() else out_dir / "slides.pdf"
-        if not pdf.exists():
-            if not export_pdf(path, pdf):
-                raise RuntimeError("PDF export failed. Is a presentation app installed?")
+    # PDF + pdftoppm pipeline
+    pdf = out_dir / "slides.pdf"
+    if not export_pdf(out, pdf):
+        raise RuntimeError("PDF export failed. Is LibreOffice (soffice) installed?")
 
-        cmd = ["pdftoppm", "-png", "-scale-to", "1280", str(pdf), str(out_dir / "page")]
-        result = subprocess.run(cmd, capture_output=True, text=True)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-        if result.returncode != 0:
-            raise RuntimeError(f"PNG conversion failed. Is poppler (pdftoppm) installed? {result.stderr}")
+    cmd = ["pdftoppm", "-png", "-scale-to", "1280", str(pdf), str(out_dir / "page")]
+    result = subprocess.run(cmd, capture_output=True, text=True)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+    if result.returncode != 0:
+        raise RuntimeError(f"PNG conversion failed. Is poppler (pdftoppm) installed? {result.stderr}")
 
-        # Rename with slide titles
-        prs = Presentation(str(path))
-        titles = _extract_slide_titles(prs)
+    # Rename with slide titles
+    prs = Presentation(str(out))
+    titles = _extract_slide_titles(prs)
 
-        generated = []
-        for png in sorted(glob.glob(str(out_dir / "page-*.png"))):
-            match = re.match(r"page-(\d+)\.png", Path(png).name)
-            if match:
-                num = int(match.group(1))
-                if pages_set and num not in pages_set:
-                    Path(png).unlink()
-                    continue
-                new_name = f"page{num:02d}-{titles.get(num, 'notitle')}.png"
-                new_path = out_dir / new_name
-                Path(png).rename(new_path)
-                generated.append(str(new_path))
+    generated = []
+    for png in sorted(glob.glob(str(out_dir / "page-*.png"))):
+        match = re.match(r"page-(\d+)\.png", Path(png).name)
+        if match:
+            num = int(match.group(1))
+            if pages_set and num not in pages_set:
+                Path(png).unlink()
+                continue
+            new_name = f"page{num:02d}-{titles.get(num, 'notitle')}.png"
+            new_path = out_dir / new_name
+            Path(png).rename(new_path)
+            generated.append(str(new_path))
 
-        # Cleanup PDF only if we generated it
-        if not pdf_path:
-            pdf.unlink(missing_ok=True)
+    pdf.unlink(missing_ok=True)
 
     if grid:
         _apply_grid_overlay(generated)
 
-    return {"preview_dir": str(out_dir), "files": generated}
-
-
-def _preview_win32(pptx_path: Path, output_dir: Path, pages_set: set[int] | None) -> list[str]:
-    """Windows native PNG export via PowerShell COM."""
-    import glob
-    import shutil
-    import subprocess
-
-    from pptx import Presentation
-
-    png_dir = output_dir / "ppt_png"
-    png_dir.mkdir(parents=True, exist_ok=True)
-    ps_cmd = (
-        f"$app = New-Object -ComObject PowerPoint.Application; "
-        f"$prs = $app.Presentations.Open('{pptx_path}', "
-        f"[Microsoft.Office.Core.MsoTriState]::msoTrue, "
-        f"[Microsoft.Office.Core.MsoTriState]::msoFalse, "
-        f"[Microsoft.Office.Core.MsoTriState]::msoFalse); "
-        f"$prs.SaveAs('{png_dir}', 18); "
-        f"$prs.Close(); $app.Quit()"
-    )
-    result = subprocess.run(["powershell.exe", "-Command", ps_cmd], capture_output=True, timeout=60)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-    if result.returncode != 0:
-        stderr = result.stderr.decode("cp932", errors="replace") if result.stderr else ""
-        raise RuntimeError(f"PNG export failed: {stderr}")
-
-    prs = Presentation(str(pptx_path))
-    titles = _extract_slide_titles(prs)
-
-    png_files = sorted(glob.glob(str(png_dir / "**" / "*.png"), recursive=True))
-    if not png_files:
-        png_files = sorted(glob.glob(str(png_dir / "**" / "*.PNG"), recursive=True))
-
-    generated = []
-    for idx, png in enumerate(png_files, 1):
-        if pages_set and idx not in pages_set:
-            Path(png).unlink()
-            continue
-        new_name = f"page{idx:02d}-{titles.get(idx, 'notitle')}.png"
-        new_path = output_dir / new_name
-        Path(png).rename(new_path)
-        generated.append(str(new_path))
-
-    shutil.rmtree(png_dir, ignore_errors=True)
-    return generated
+    return {"preview_dir": str(out_dir), "files": generated, "output_path": str(out)}
 
 
 def _extract_slide_titles(prs) -> dict[int, str]:

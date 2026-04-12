@@ -177,8 +177,8 @@ export class DataStack extends cdk.Stack {
 
     // --- Register default templates in Amazon DynamoDB ---
     const templates = [
-      { id: "sample_template_dark", name: "sample_template_dark", isDefault: true },
-      { id: "sample_template_light", name: "sample_template_light", isDefault: false },
+      { id: "blank-dark", name: "blank-dark", isDefault: true },
+      { id: "blank-light", name: "blank-light", isDefault: false },
     ];
 
     for (const tmpl of templates) {

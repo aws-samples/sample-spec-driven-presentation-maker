@@ -80,17 +80,6 @@ def preview_url(s3_key: str) -> Optional[str]:
     return _cf_signed_url(s3_key) or presigned_url(s3_client, BUCKET_NAME, s3_key)
 
 
-def _preview_url_for_slide(deck_id: str, slide_id: str) -> Optional[str]:
-    """Return preview URL for a slide, checking webp then png existence."""
-    for ext in ("webp", "png"):
-        s3_key = f"previews/{deck_id}/{slide_id}.{ext}"
-        try:
-            s3_client.head_object(Bucket=BUCKET_NAME, Key=s3_key)
-            return _cf_signed_url(s3_key) or presigned_url(s3_client, BUCKET_NAME, s3_key)
-        except Exception:
-            continue
-    return None
-
 cors_origins = [o.strip() for o in CORS_ALLOWED_ORIGINS.split(",") if o.strip()]
 cors_config = CORSConfig(
     allow_origin=cors_origins[0],
@@ -148,6 +137,48 @@ def _delete_kb_vectors(deck_id: str, user_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _list_preview_keys(deck_id: str) -> dict:
+    """List all preview keys for a deck in one S3 call.
+
+    Returns:
+        Dict mapping S3 key to LastModified epoch (int) under previews/{deck_id}/.
+    """
+    prefix = f"previews/{deck_id}/"
+    resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
+    return {
+        obj["Key"]: int(obj["LastModified"].timestamp())
+        for obj in resp.get("Contents", [])
+    }
+
+
+def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: dict) -> tuple[Optional[str], Optional[int]]:
+    """Resolve the best preview URL for a slide from cached keys.
+
+    Fallback order: webp > png.
+    For S3 presigned URL fallback, appends &_t=<epoch> cache-buster.
+    CloudFront signed URLs are returned as-is (extra params break signature).
+
+    Args:
+        deck_id: Deck identifier.
+        slide_id: Slide identifier (e.g. slide_01).
+        preview_keys: Dict mapping S3 key to LastModified epoch from _list_preview_keys.
+
+    Returns:
+        Tuple of (presigned URL or None, LastModified epoch or None).
+    """
+    prefix = f"previews/{deck_id}/"
+    for candidate in (f"{prefix}{slide_id}.webp", f"{prefix}{slide_id}.png"):
+        if candidate in preview_keys:
+            url = preview_url(candidate)
+            if url:
+                mtime = preview_keys[candidate]
+                if "Key-Pair-Id=" not in url:
+                    sep = "&" if "?" in url else "?"
+                    url = f"{url}{sep}_t={mtime}"
+                return url, mtime
+    return None, None
+
+
 def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
     """Get thumbnail URLs for deck items.
 
@@ -167,9 +198,11 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
 
         key = deck.get("thumbnailS3Key")
         if key:
-            thumb_url = preview_url(key) or presigned_url(s3_client, BUCKET_NAME, key)
+            thumb_url = preview_url(key)
         else:
-            thumb_url = _preview_url_for_slide(deck_id, "slide_01")
+            # Fallback: first slide preview
+            preview_keys = _list_preview_keys(deck_id)
+            thumb_url, _ = _resolve_preview_url(deck_id, "slide_01", preview_keys)
 
         extras[deck_id] = {"thumbnailUrl": thumb_url}
     return extras
@@ -394,10 +427,13 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         pres_key = f"decks/{deck_id}/presentation.json"
         resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=pres_key)
         presentation = json.loads(resp["Body"].read())
+        preview_keys = _list_preview_keys(deck_id)
         for i, s in enumerate(presentation.get("slides", [])):
             sid = f"slide_{i + 1:02d}"
-            slide_preview = _preview_url_for_slide(deck_id, sid)
+            slide_preview, slide_mtime = _resolve_preview_url(deck_id, sid, preview_keys)
             slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
+            if slide_mtime is not None:
+                slide_entry["previewUpdatedAt"] = slide_mtime
             if include_json:
                 slide_entry["slideJson"] = json.dumps(s)
             slides.append(slide_entry)
@@ -609,6 +645,7 @@ def search_slides_api() -> Dict[str, Any]:
 
     results: List[Dict] = []
     seen: set = set()
+    seen_decks: Dict[str, set] = {}
     for r in response.get("retrievalResults", []):
         meta = r.get("metadata", {})
         deck_id = meta.get("deckId", "")
@@ -618,10 +655,14 @@ def search_slides_api() -> Dict[str, Any]:
             continue
         seen.add(dedup_key)
 
-        # Generate preview URL (CloudFront or presigned fallback)
+        # Generate preview URL — slideId matches preview filename
         slide_preview_url = ""
         if deck_id and slide_id:
-            slide_preview_url = _preview_url_for_slide(deck_id, slide_id) or ""
+            # Lazy-load preview keys per deck
+            if deck_id not in seen_decks:
+                seen_decks[deck_id] = _list_preview_keys(deck_id)
+            slide_preview_url, _ = _resolve_preview_url(deck_id, slide_id, seen_decks[deck_id])
+            slide_preview_url = slide_preview_url or ""
 
         results.append({
             "deckId": deck_id,

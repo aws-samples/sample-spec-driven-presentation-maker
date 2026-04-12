@@ -139,7 +139,7 @@ def load_slides_json_or_pptx(path):
     if path.endswith('.pptx'):
         with tempfile.TemporaryDirectory() as tmpdir:
             subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                [sys.executable, str(Path(__file__).resolve().parent.parent.parent / 'scripts' / 'pptx_to_json.py'), path, '-o', tmpdir, '--no-autofit'],
+                [sys.executable, str(Path(__file__).resolve().parent.parent.parent / 'scripts' / 'pptx_to_json.py'), path, '-o', tmpdir],
                 capture_output=True, text=True, check=True
             )
             with open(Path(tmpdir) / 'slides.json') as f:
@@ -182,12 +182,8 @@ def load_slides_json_or_pptx(path):
             for slide_def in data.get("slides", []):
                 builder.add_slide(resolve_override(slide_def, id_map))
             builder.save(tmp_pptx)
-            # Apply autofit via detected presentation backend
-            from sdpm.preview import refresh_autofit, unlock_height_constraints
-            refresh_autofit(tmp_pptx)
-            unlock_height_constraints(tmp_pptx)
             subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                [sys.executable, str(Path(__file__).resolve().parent.parent.parent / 'scripts' / 'pptx_to_json.py'), str(tmp_pptx), '-o', tmpdir, '--no-autofit'],
+                [sys.executable, str(Path(__file__).resolve().parent.parent.parent / 'scripts' / 'pptx_to_json.py'), str(tmp_pptx), '-o', tmpdir],
                 capture_output=True, text=True, check=True
             )
             with open(Path(tmpdir) / 'slides.json') as f:

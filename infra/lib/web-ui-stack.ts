@@ -128,6 +128,7 @@ function handler(event) {
       minTtl: cdk.Duration.seconds(0),
       enableAcceptEncodingGzip: true,
       enableAcceptEncodingBrotli: true,
+      queryStringBehavior: cloudfront.CacheQueryStringBehavior.allowList("_t"),
     });
 
     // --- Preview origin ---

@@ -12,7 +12,6 @@ ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 _DEFAULTS = {
     "output_dir": "~/Documents/SDPM-Presentations",
     "extra_sources": [],
-    "preview": {"backend": ""},
 }
 
 _cache: Optional[dict] = None
@@ -40,8 +39,3 @@ def get_output_dir() -> Path:
 def get_extra_sources() -> list[dict]:
     """Extra asset sources list."""
     return get_config().get("extra_sources", [])
-
-
-def get_preview_config() -> dict:
-    """Preview settings dict."""
-    return get_config().get("preview", _DEFAULTS["preview"])

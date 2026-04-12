@@ -59,7 +59,7 @@ interface ChatPanelProps {
   chatSessionId?: string
   slidePreviewUrls?: (string | null)[]
   onDeckCreated?: (deckId: string) => void
-  onPptxRequested?: () => void
+  onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
 }
 
@@ -68,7 +68,7 @@ export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPptxRequested, onWorkflowPhase }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -564,8 +564,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             }
             onDeckCreated(resultDeckId)
           }
-          if (toolUseData?.completed && toolName === "generate_pptx" && onPptxRequested) {
-            onPptxRequested()
+          if (toolUseData?.completed && (toolName === "generate_pptx" || toolName.endsWith("_generate_pptx")) && onPreviewInvalidated) {
+            onPreviewInvalidated()
           }
 
           // Tool result: update existing ToolUse with result/status

@@ -39,7 +39,7 @@ interface ChatPanelShellProps {
   chatSessionId?: string
   slidePreviewUrls?: (string | null)[]
   onDeckCreated?: (deckId: string) => void
-  onPptxRequested?: () => void
+  onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
   chatRef?: React.RefObject<ChatPanelHandle | null>
   inline?: boolean
@@ -47,7 +47,7 @@ interface ChatPanelShellProps {
 
 export function ChatPanelShell({
   open, onClose, chatTab, onChatTabChange,
-  deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPptxRequested, onWorkflowPhase, chatRef: externalChatRef,
+  deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, chatRef: externalChatRef,
   inline = false,
 }: ChatPanelShellProps) {
   const internalChatRef = useRef<ChatPanelHandle>(null)
@@ -146,7 +146,7 @@ export function ChatPanelShell({
           deckName="New Deck"
           slidePreviewUrls={panelAOwnsCurrentDeck ? (slidePreviewUrls || []) : []}
           onDeckCreated={handlePanelADeckCreated}
-          onPptxRequested={onPptxRequested}
+          onPreviewInvalidated={onPreviewInvalidated}
           onWorkflowPhase={onWorkflowPhase}
         />
       </div>
@@ -162,7 +162,7 @@ export function ChatPanelShell({
             chatSessionId={chatSessionId}
             slidePreviewUrls={slidePreviewUrls || []}
             onDeckCreated={handlePanelBDeckCreated}
-            onPptxRequested={onPptxRequested}
+            onPreviewInvalidated={onPreviewInvalidated}
             onWorkflowPhase={onWorkflowPhase}
           />
         </div>

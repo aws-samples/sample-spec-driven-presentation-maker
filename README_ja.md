@@ -98,7 +98,7 @@ npm install && npx cdk deploy --all
 |---|---|:---:|
 | Kiro CLI で個人利用 | Layer 1: `skill/` | 不要 |
 | ローカル MCP（Claude Desktop, VS Code, Kiro） | Layer 2: `skill/` + `mcp-local/` | 不要 |
-| チームデプロイ | Layer 3: + `mcp-server/` + `infra/` + `png-worker/` | 必要 |
+| チームデプロイ | Layer 3: + `mcp-server/` + `infra/` | 必要 |
 | フルスタック | Layer 4: + `agent/` + `api/` + `web-ui/` | 必要 |
 
 詳細は[アーキテクチャ](docs/ja/architecture.md)を参照してください。
@@ -131,9 +131,8 @@ npm install && npx cdk deploy --all
 spec-driven-presentation-maker/
 ├── skill/            Layer 1 — エンジン、リファレンス、テンプレート
 ├── mcp-local/        Layer 2 — ローカル stdio MCP サーバー
-├── mcp-server/       Layer 3 — Streamable HTTP MCP サーバー
+├── mcp-server/       Layer 3 — Streamable HTTP MCP サーバー（LibreOffice 内蔵）
 ├── infra/            Layer 3-4 — CDK スタック
-├── png-worker/       Layer 3 — PPTX→PNG 変換（Fargate + SQS）
 ├── agent/            Layer 4 — Strands Agent
 ├── api/              Layer 4 — 統合 REST API Lambda
 ├── web-ui/           Layer 4 — React Web UI

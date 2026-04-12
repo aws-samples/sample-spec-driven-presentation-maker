@@ -38,7 +38,7 @@ from sdpm.layout import (
     _layout_translate,
     box_to_elements,
 )
-from sdpm.preview import _is_wsl
+from sdpm.preview.backend import _is_wsl
 from sdpm.utils.effects import apply_effects  # noqa: F401
 from sdpm.utils.image import apply_image_effects, resolve_image_path  # noqa: F401
 from sdpm.utils.io import read_json, write_json
@@ -75,14 +75,11 @@ def _resolve_template(data, input_path):
 def cmd_generate(args):
     """Generate PPTX from JSON."""
     from sdpm.api import generate
-    from sdpm.preview import get_tmp_project_dir
 
     try:
         result = generate(
             json_path=args.input if args.input and args.input != "-" else None,
             output_path=args.output,
-            no_autofit=args.no_autofit,
-            no_preview=args.no_preview,
         )
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -106,71 +103,22 @@ def cmd_generate(args):
             print(f"  {w}")
         print("  → MUST FIX unless the layout type is intentionally asymmetric.")
 
-    if not args.no_preview:
-        tmp_project = None
-        if args.input and args.input != "-":
-            tmp_project = get_tmp_project_dir(args.input)
-        preview_dir = tmp_project / 'preview' if tmp_project else Path("/tmp/pptx-preview")
-        preview_dir.mkdir(parents=True, exist_ok=True)
-        preview_args = argparse.Namespace(
-            input=str(result["output_path"]),
-            pages=None,
-            no_grid=True,
-            _pdf_path=result.get("pdf_path"),
-            _output_dir=str(preview_dir),
-        )
-        cmd_preview(preview_args)
 
-
-def _export_png_win32(pptx_path, output_dir):
-    """Export PPTX to PNG via PowerShell COM (Windows native)."""
-    import subprocess
-    png_dir = output_dir / "ppt_png"
-    png_dir.mkdir(parents=True, exist_ok=True)
-    ps_cmd = (
-        f"$app = New-Object -ComObject PowerPoint.Application; "
-        f"$prs = $app.Presentations.Open('{pptx_path}', "
-        f"[Microsoft.Office.Core.MsoTriState]::msoTrue, "
-        f"[Microsoft.Office.Core.MsoTriState]::msoFalse, "
-        f"[Microsoft.Office.Core.MsoTriState]::msoFalse); "
-        f"$prs.SaveAs('{png_dir}', 18); "
-        f"$prs.Close(); $app.Quit()"
-    )
-    result = subprocess.run(["powershell.exe", "-Command", ps_cmd], capture_output=True, timeout=60)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-    stderr = result.stderr.decode("cp932", errors="replace") if result.stderr else ""
-    if result.returncode != 0:
-        print(f"Error: PNG export failed: {stderr}", file=sys.stderr)
-        sys.exit(1)
-    return png_dir
 def cmd_preview(args):
-    """Export PPTX slides as PNG images."""
+    """Export slides as PNG images from JSON."""
     from sdpm.api import preview as api_preview
-
-    pptx_path = Path(args.input).resolve()
-    if not pptx_path.exists():
-        print(f"Error: File not found: {pptx_path}", file=sys.stderr)
-        sys.exit(1)
 
     pages_list = None
     if args.pages:
         pages_list = [int(p.strip()) for p in args.pages.split(",")]
 
-    # Determine output dir
-    output_dir = None
-    if hasattr(args, '_output_dir') and args._output_dir:
-        output_dir = args._output_dir
-
-    pre_pdf = getattr(args, '_pdf_path', None)
-
     try:
         result = api_preview(
-            pptx_path=pptx_path,
+            json_path=args.input,
             pages=pages_list,
-            output_dir=output_dir,
             grid=not args.no_grid,
-            pdf_path=pre_pdf,
         )
-    except RuntimeError as e:
+    except (FileNotFoundError, RuntimeError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
@@ -181,6 +129,29 @@ def cmd_preview(args):
 
 
 
+
+
+def cmd_measure(args):
+    """Measure text bounding boxes from slides JSON."""
+    from sdpm.api import measure
+
+    slides_list = None
+    if args.pages:
+        slides_list = [int(p.strip()) for p in args.pages.split(",")]
+
+    try:
+        result = measure(
+            json_path=args.input,
+            slides=slides_list,
+        )
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    print(result)
 
 
 def cmd_search_assets(args):
@@ -750,20 +721,22 @@ def cmd_analyze_template(args):
     # Generate color usage and cache preview PNGs if not cached
     if not result["color_usage"]:
         import shutil
+        import subprocess
 
         from sdpm.analyzer import cache_color_usage, cache_preview_pngs, extract_color_usage_from_pngs
+        from sdpm.preview import export_pdf
         preview_dir = Path("/tmp/pptx-preview")
         if preview_dir.exists():
             shutil.rmtree(preview_dir)
+        preview_dir.mkdir(parents=True, exist_ok=True)
         try:
-            import contextlib
-            import io
-            preview_args = type('Args', (), {
-                'input': str(template_path), 'pages': None, 'no_grid': True,
-                'no_open': True, '_output_dir': str(preview_dir)
-            })()
-            with contextlib.redirect_stdout(io.StringIO()):
-                cmd_preview(preview_args)
+            pdf_path = preview_dir / "slides.pdf"
+            if export_pdf(template_path, pdf_path):
+                subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+                    ["pdftoppm", "-png", "-scale-to", "1280", str(pdf_path), str(preview_dir / "page")],
+                    capture_output=True, text=True,
+                )
+                pdf_path.unlink(missing_ok=True)
         except Exception:
             pass
         usage = extract_color_usage_from_pngs(preview_dir)
@@ -951,14 +924,16 @@ def main():
     p_gen = subparsers.add_parser("generate", help="Generate PPTX from JSON")
     p_gen.add_argument("input", nargs="?", help="Input JSON file (or - for stdin)")
     p_gen.add_argument("-o", "--output", required=True, help="Output PPTX path")
-    p_gen.add_argument("--no-autofit", action="store_true", help="Skip PowerPoint autofit refresh")
-    p_gen.add_argument("--no-preview", action="store_true", help="Skip automatic preview after generation")
     p_gen.add_argument("--keep-empty-placeholders", action="store_true", help="Keep empty placeholders visible")
 
     p_prev = subparsers.add_parser("preview", help="Export slides as PNG images")
-    p_prev.add_argument("input", help="Input PPTX file")
+    p_prev.add_argument("input", help="Input JSON file")
     p_prev.add_argument("-p", "--pages", help="Pages to export (e.g. 1,3,5)")
     p_prev.add_argument("--no-grid", action="store_true", help="Disable 5% grid overlay")
+
+    p_meas = subparsers.add_parser("measure", help="Measure text bounding boxes from slides JSON")
+    p_meas.add_argument("input", help="Input JSON file")
+    p_meas.add_argument("-p", "--pages", help="Slide numbers to measure (e.g. 1,3,5)")
 
     p_search = subparsers.add_parser("search-assets", help="Search assets (icons, images, etc.)")
     p_search.add_argument("query", help="Search keywords (space-separated)")
@@ -1036,6 +1011,8 @@ def main():
         cmd_generate(args)
     elif args.command == "preview":
         cmd_preview(args)
+    elif args.command == "measure":
+        cmd_measure(args)
     elif args.command == "search-assets":
         cmd_search_assets(args)
     elif args.command == "list-asset-sources":

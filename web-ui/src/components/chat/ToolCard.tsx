@@ -28,7 +28,7 @@ import {
   BookOpen, List, Search, FolderPlus, Pencil, Image,
   Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench,
   Check, FileText, Download, Play, Code, Palette,
-  LayoutTemplate, Package, AlertCircle,
+  LayoutTemplate, Package, AlertCircle, Ruler,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -70,6 +70,7 @@ const TOOL_META: Record<string, ToolMeta> = {
   read_uploaded_file: { Icon: FileText,        label: "Reading file",           category: "explore" },
   generate_pptx:      { Icon: Download,        label: "Generating PPTX",        category: "produce" },
   generate_preview:   { Icon: Image,           label: "Generating preview",     category: "produce" },
+  measure_slides:     { Icon: Ruler,           label: "Measuring slides",       category: "produce" },
   // MCP Server tools
   init_presentation:  { Icon: FolderPlus,      label: "Initializing deck",      category: "build" },
   analyze_template:   { Icon: LayoutTemplate,  label: "Analyzing template",     category: "explore" },
@@ -88,6 +89,7 @@ const TOOL_META: Record<string, ToolMeta> = {
   run_python:         { Icon: Code,            label: "Running code",           category: "compute" },
   code_to_slide:      { Icon: Code,            label: "Code to slide",          category: "build" },
   pptx_to_json:       { Icon: FileText,        label: "Converting PPTX",        category: "explore" },
+  grid:               { Icon: LayoutTemplate,  label: "Computing layout",       category: "compute" },
   // MCP prefixed tools (Strands adds prefix from MCPClient)
   spec_driven_presentation_maker_init_presentation:  { Icon: FolderPlus,     label: "Initializing deck",     category: "build" },
   spec_driven_presentation_maker_analyze_template:   { Icon: LayoutTemplate, label: "Analyzing template",    category: "explore" },
@@ -104,9 +106,11 @@ const TOOL_META: Record<string, ToolMeta> = {
   spec_driven_presentation_maker_list_asset_sources: { Icon: Package,        label: "Listing asset sources", category: "explore" },
   spec_driven_presentation_maker_get_preview:        { Icon: Image,          label: "Getting preview",       category: "produce" },
   spec_driven_presentation_maker_generate_pptx:      { Icon: Download,       label: "Generating PPTX",       category: "produce" },
+  spec_driven_presentation_maker_measure_slides:     { Icon: Ruler,          label: "Measuring slides",      category: "produce" },
   spec_driven_presentation_maker_run_python:         { Icon: Code,           label: "Running code",          category: "compute" },
   spec_driven_presentation_maker_code_to_slide:      { Icon: Code,           label: "Code to slide",         category: "build" },
   spec_driven_presentation_maker_pptx_to_json:       { Icon: FileText,       label: "Converting PPTX",       category: "explore" },
+  spec_driven_presentation_maker_grid:               { Icon: LayoutTemplate, label: "Computing layout",      category: "compute" },
 }
 
 /**
@@ -120,6 +124,11 @@ function getDetail(name: string, input?: Record<string, unknown>): string {
   if (!input || Object.keys(input).length === 0) return ""
   if ((name === "write_slide" || name.endsWith("_write_slide")) && input.slide_id) return String(input.slide_id)
   if ((name === "create_deck" || name.endsWith("_init_presentation")) && input.name) return String(input.name)
+  if ((name === "measure_slides" || name.endsWith("_measure_slides")) && input.slide_numbers) {
+    const nums = input.slide_numbers as number[]
+    return `Pages ${nums.join(", ")}`
+  }
+  if ((name === "measure_slides" || name.endsWith("_measure_slides")) && !input.slide_numbers) return "All slides"
   if (input.purpose) { const p = String(input.purpose); return p.length > 40 ? p.slice(0, 40) + "…" : p }
   if (input.path) { const p = String(input.path); return p.split("/").pop() || p }
   if (input.template) return String(input.template)
@@ -144,6 +153,13 @@ function getResultSummary(name: string, result?: Record<string, unknown>, status
     return "Failed"
   }
   if (!result) return ""
+  if ((name === "measure_slides" || name.endsWith("_measure_slides")) && Array.isArray(result.slides)) {
+    const overflows = (result.slides as Record<string, unknown>[]).filter((s) => {
+      const els = s.overflow_elements
+      return Array.isArray(els) && els.length > 0
+    }).length
+    return overflows > 0 ? `${overflows} overflow${overflows > 1 ? "s" : ""} detected` : "All clear"
+  }
   if (result.deckId) return `deck ${String(result.deckId).slice(0, 8)}`
   if (Array.isArray(result.results)) return `${result.results.length} found`
   if (Array.isArray(result.layouts)) return `${result.layouts.length} layouts`

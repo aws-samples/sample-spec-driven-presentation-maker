@@ -15,7 +15,6 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as ecr_assets from "aws-cdk-lib/aws-ecr-assets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 import * as path from "path";
 
@@ -30,10 +29,6 @@ interface RuntimeStackProps extends cdk.StackProps {
   oidcDiscoveryUrl: string;
   /** Allowed client IDs for JWT authorizer. */
   allowedClients: string[];
-  /** SQS queue URL for PNG generation jobs. Empty if PNG Worker not deployed. */
-  pngQueueUrl?: string;
-  /** SQS queue for IAM permission grants. Undefined if PNG Worker not deployed. */
-  pngQueue?: sqs.IQueue;
   /** KB SSM parameter name (empty if KB not enabled). */
   kbSsmParamName?: string;
   /** S3 Vector Bucket name (empty if KB not enabled). */
@@ -104,11 +99,6 @@ export class RuntimeStack extends cdk.Stack {
       })
     );
 
-    // --- SQS permissions for PNG job submission ---
-    if (props.pngQueue) {
-      props.pngQueue.grantSendMessages(runtimeRole);
-    }
-
     // --- KB permissions (Amazon Titan Embed + S3 Vectors + Amazon Bedrock Retrieve) ---
     if (props.vectorBucketName) {
       runtimeRole.addToPolicy(
@@ -171,7 +161,6 @@ export class RuntimeStack extends cdk.Stack {
         DECKS_TABLE: props.table.tableName,
         PPTX_BUCKET: props.pptxBucket.bucketName,
         RESOURCE_BUCKET: props.resourceBucket.bucketName,
-        PNG_QUEUE_URL: props.pngQueueUrl ?? "",
         AWS_DEFAULT_REGION: this.region,
         KB_SSM_PARAM: props.kbSsmParamName ?? "",
         VECTOR_BUCKET_NAME: props.vectorBucketName ?? "",

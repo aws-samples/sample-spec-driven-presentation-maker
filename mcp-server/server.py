@@ -48,33 +48,23 @@ _INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generat
 
 **Critical constraint:** Do NOT make any decisions about slide structure, content, design, or layout before loading the workflow. The workflow files contain the full process including briefing, outline, and art direction. Wait until the workflow is loaded and follow it step by step.
 
-**Present the options and ask which to do:**
+## Workflow: New Presentation
 
-A. New presentation — create slides from scratch
-B. Edit existing PPTX — modify a provided file
-C. Hand-edit sync — continue from a user-edited PPTX
-D. Create style — build a reusable style guide
-
-## Workflow A: New Presentation
-
-When no existing PPTX is provided.
 → Read `read_workflows(["create-new-1-briefing"])` to start. Follow each file's Next Step from there.
-
-## Workflow B: Edit Existing PPTX
-
-When an existing PPTX is provided.
-→ Read `read_workflows(["edit-existing"])` to start.
-
-## Workflow C: Hand-Edit Sync
-
-When the user hand-edits the generated PPTX in PowerPoint and then asks for further changes.
-→ Read `read_workflows(["create-new-4-hand-edit-sync"])` to start.
-
-## Workflow D: Create Style
-
-When the user wants to create a new reusable style guide.
-→ Read `read_workflows(["create-style"])` to start.
 """
+
+# TODO: Add these workflows when web UI supports them
+# ## Workflow B: Edit Existing PPTX
+# When an existing PPTX is provided.
+# → Read `read_workflows(["edit-existing"])` to start.
+#
+# ## Workflow C: Hand-Edit Sync
+# When the user hand-edits the generated PPTX in PowerPoint and then asks for further changes.
+# → Read `read_workflows(["create-new-4-hand-edit-sync"])` to start.
+#
+# ## Workflow D: Create Style
+# When the user wants to create a new reusable style guide.
+# → Read `read_workflows(["create-style"])` to start.
 
 mcp = FastMCP(
     "spec-driven-presentation-maker",
@@ -123,7 +113,6 @@ _kb_id = os.environ.get("KB_ID", "")
 _kb_ssm_param = os.environ.get("KB_SSM_PARAM", "")
 _vector_bucket_name = os.environ.get("VECTOR_BUCKET_NAME", "")
 _vector_index_name = os.environ.get("VECTOR_INDEX_NAME", "")
-_png_queue_url = os.environ.get("PNG_QUEUE_URL", "")
 
 if not _table_name:
     raise ValueError("DECKS_TABLE environment variable is required")
@@ -137,7 +126,6 @@ _storage = AwsStorage(
     s3_client=boto3.client("s3", region_name=_region),
     pptx_bucket=_pptx_bucket,
     resource_bucket=_resource_bucket,
-    png_queue_url=_png_queue_url,
 )
 
 
@@ -369,7 +357,7 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
     """Get PNG preview images for visual review by the agent.
 
     Returns actual slide images that the model can see and analyze.
-    Available after generate_pptx + PNG worker processing.
+    Available after generate_pptx completes.
 
     - quality="low" (800px): Review all slides at once — check flow, structure, design consistency.
     - quality="high" (1280px): Precise review of specific slides — check text, layout details.
@@ -392,11 +380,95 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
             deck_id=deck_id, slide_numbers=slide_numbers, storage=_storage, quality=quality,
         )
     except _storage._s3.exceptions.NoSuchKey:
-        return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first, then wait for PNG worker to finish."}]
+        return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first."}]
     except Exception as e:
         if "NoSuchKey" in str(e):
-            return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first, then wait for PNG worker to finish."}]
+            return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first."}]
         raise
+
+
+@mcp.tool()
+def measure_slides(deck_id: str, slide_numbers: list[int] | None = None) -> str:
+    """Measure text bounding boxes for overflow detection.
+    Builds PPTX from presentation.json, generates SVG via LibreOffice, and extracts bbox data.
+    Does NOT require generate_pptx — works directly from workspace JSON.
+    After returning the measure report, generates draft WebP previews in the background.
+
+    Args:
+        deck_id: The deck ID to measure.
+        slide_numbers: Optional list of 1-based slide numbers. All slides if None.
+
+    Returns:
+        Measure report as text.
+    """
+    _check_deck_access(deck_id, action="read")
+    import asyncio
+    import shutil
+    import subprocess
+    import tempfile
+    import traceback
+
+    try:
+        from sdpm.builder import PPTXBuilder, resolve_override
+        from sdpm.preview.measure import measure_from_svg, format_measure_report
+        from tools.generate import _prepare_workspace, generate_previews
+
+        user_id = _get_user_id()
+        tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
+
+        # Build PPTX from JSON
+        builder = PPTXBuilder(**build_kwargs)
+        id_map: dict[str, dict] = {}
+        for s in slides:
+            if "id" in s:
+                id_map[s["id"]] = s
+        for s in slides:
+            builder.add_slide(resolve_override(s, id_map))
+        pptx_path = tmpdir / "measure.pptx"
+        builder.save(pptx_path)
+
+        # PPTX → SVG via LibreOffice (for bbox extraction)
+        env = os.environ.copy()
+        env["HOME"] = str(tmpdir)
+        subprocess.run(  # nosec B603
+            ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
+            env=env, capture_output=True, text=True, timeout=120, check=True,
+        )
+        svg_path = tmpdir / "measure.svg"
+        if not svg_path.exists():
+            shutil.rmtree(tmpdir, ignore_errors=True)
+            return json.dumps({"error": "LibreOffice SVG export failed"})
+
+        # Measure bboxes
+        results = measure_from_svg(svg_path=svg_path, slide_indices=slide_numbers)
+        report = format_measure_report(results)
+
+        # Schedule background draft WebP generation (tmpdir cleanup in task)
+        async def _generate_draft_webp() -> None:
+            try:
+                preview_dir = Path(tempfile.mkdtemp())
+                try:
+                    webp_files = generate_previews(pptx_path, preview_dir)
+                    for i, webp_path in enumerate(webp_files):
+                        s3_key = f"previews/{deck_id}/slide_{i + 1:02d}.webp"
+                        _storage.upload_file(key=s3_key, data=webp_path.read_bytes(), content_type="image/webp")
+                    logger.info("Measure WebP previews uploaded: %d slides for deck %s", len(webp_files), deck_id)
+                finally:
+                    shutil.rmtree(preview_dir, ignore_errors=True)
+            except Exception as e:
+                logger.warning("Draft WebP generation failed for deck %s: %s", deck_id, e)
+            finally:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+
+        try:
+            asyncio.get_event_loop().create_task(_generate_draft_webp())
+        except Exception:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+        return report
+    except Exception as e:
+        logger.exception("measure_slides failed: deck=%s", deck_id)
+        return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
 
 
 # --- Asset Tools ---

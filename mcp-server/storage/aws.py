@@ -23,7 +23,6 @@ class AwsStorage(Storage):
         s3_client: boto3 S3 client.
         pptx_bucket: S3 bucket for decks, includes, PPTX output, previews.
         resource_bucket: S3 bucket for templates, assets, references.
-        png_queue_url: SQS queue URL for PNG generation jobs. Empty string if PNG Worker not deployed.
     """
 
     def __init__(
@@ -32,14 +31,11 @@ class AwsStorage(Storage):
         s3_client: Any,
         pptx_bucket: str,
         resource_bucket: str,
-        png_queue_url: str = "",
     ) -> None:
         self._table = table
         self._s3 = s3_client
         self._pptx_bucket = pptx_bucket
         self._resource_bucket = resource_bucket
-        self._png_queue_url = png_queue_url
-        self._sqs: Any = None  # Lazy-init to avoid import when queue not configured
 
     @property
     def pptx_bucket(self) -> str:
@@ -221,21 +217,3 @@ class AwsStorage(Storage):
             batch = [{"Key": k} for k in keys[i:i + 1000]]
             self._s3.delete_objects(Bucket=target_bucket, Delete={"Objects": batch})
         return len(keys)
-
-    # --- PNG Job ---
-
-    def send_png_job(self, message: dict) -> None:
-        """Send PNG generation job to SQS. No-op if queue not configured.
-
-        Args:
-            message: Dict with deckId, userId, bucket, key.
-        """
-        if not self._png_queue_url:
-            return
-        if self._sqs is None:
-            import boto3
-            self._sqs = boto3.client("sqs", region_name=self._s3.meta.region_name)
-        self._sqs.send_message(
-            QueueUrl=self._png_queue_url,
-            MessageBody=json.dumps(message),
-        )
