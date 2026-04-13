@@ -9,7 +9,7 @@
 
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { SlidePreview, getDeckWithJson } from "@/services/deckService"
 import type { SpecFiles } from "@/services/deckService"
 import { Download, FileJson, Layers, Loader2, LayoutGrid, Rows3 } from "lucide-react"
@@ -52,11 +52,6 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   const [jsonLoading, setJsonLoading] = useState(false)
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
-
-  /* ── Track which slides had composeUrl on initial render ── */
-  const initialComposeIds = useRef<Set<string>>(new Set(
-    slides.filter(s => s.composeUrl).map(s => s.slideId)
-  ))
 
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
@@ -336,7 +331,6 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 defsUrl={defsUrl}
                 composeUrl={slide.composeUrl}
                 slideId={slide.slideId}
-                initialLoad={initialComposeIds.current.has(slide.slideId)}
                 onAnimate={() => handleAnimate(slide.slideId)}
                 fallback={
                   <SlideThumbnail

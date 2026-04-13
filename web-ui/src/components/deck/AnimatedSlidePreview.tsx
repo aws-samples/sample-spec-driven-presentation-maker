@@ -4,14 +4,12 @@
  * AnimatedSlidePreview — Builds SVG from compose JSON and animates
  * changed components with agent cursors, wireframes, and typewriter.
  *
- * Diff-based: only changed/new components animate; unchanged show instantly.
- * Key: class+bbox for stable identity across insertions/deletions.
+ * Backend provides `changed: boolean` per component — no frontend diff needed.
  */
 
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import DOMPurify from "dompurify"
 
 // --- Constants ---
 const COMPOSE_VERSION = 1
@@ -34,6 +32,7 @@ interface ComposeComponent {
   bbox: { x: number; y: number; w: number; h: number } | null
   text: string
   svg: string
+  changed: boolean
 }
 
 interface ComposeData {
@@ -53,25 +52,9 @@ interface AnimatedSlidePreviewProps {
   defsUrl: string
   composeUrl: string
   slideId?: string
-  /** When true, skip animation on first render (page already had compose data). */
-  initialLoad?: boolean
-  /** Called when this slide actually has components to animate. */
   onAnimate?: () => void
   onComplete?: () => void
-  /** Fallback to render when compose version mismatches or fetch fails. */
   fallback?: React.ReactNode
-}
-
-// --- Helpers ---
-
-function makeFingerprint(c: ComposeComponent): string {
-  return `${c.class}|${c.text}`
-}
-
-function makeKey(c: ComposeComponent): string {
-  return c.bbox
-    ? `${c.class}|${c.bbox.x},${c.bbox.y},${c.bbox.w},${c.bbox.h}`
-    : `${c.class}|none`
 }
 
 function assignAgent(comp: ComposeComponent) {
@@ -80,55 +63,42 @@ function assignAgent(comp: ComposeComponent) {
   if (comp.text.length > 20) return AGENTS[1]
   if (cls === "Graphic" || cls.includes("image")) return AGENTS[2]
   if (cls.includes("ConnectorShape") || cls.includes("line")) return AGENTS[3]
-  return AGENTS[4] // Decorator — deterministic, no random
+  return AGENTS[4]
 }
 
-function sanitizeSvg(raw: string): string {
-  // TODO: Re-enable DOMPurify with correct SVG config after visual verification
-  return raw
-}
-
-// --- Component ---
-
-export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad, onAnimate, onComplete, fallback }: AnimatedSlidePreviewProps) {
+export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, onAnimate, onComplete, fallback }: AnimatedSlidePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const prevCompRef = useRef<Map<string, string> | null>(null)
-  const intervalsRef = useRef<number[]>([])
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const intervalsRef = useRef<number[]>([])
+  const lastComposeUrlRef = useRef("")
   const [error, setError] = useState(false)
   const reducedMotion = useRef(
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
   )
 
   const cleanup = useCallback(() => {
-    intervalsRef.current.forEach(clearInterval)
-    intervalsRef.current = []
     timersRef.current.forEach(clearTimeout)
     timersRef.current = []
+    intervalsRef.current.forEach(clearInterval)
+    intervalsRef.current = []
   }, [])
 
   useEffect(() => () => cleanup(), [cleanup])
-
-  const lastComposeUrlRef = useRef<string>("")
 
   useEffect(() => {
     let cancelled = false
 
     async function run() {
       try {
-        const [defsResp, compResp] = await Promise.all([fetch(defsUrl), fetch(composeUrl)])
-        if (cancelled || !defsResp.ok || !compResp.ok) { setError(true); return }
-
         const compUrlBase = composeUrl.split("?")[0]
-
-        // Skip if same compose URL (defs change alone doesn't need re-render)
         if (compUrlBase === lastComposeUrlRef.current) return
         lastComposeUrlRef.current = compUrlBase
 
-        const defsText = await defsResp.text()
-        const compText = await compResp.text()
-        const defsData: DefsData = JSON.parse(defsText)
-        const data: ComposeData = JSON.parse(compText)
+        const [defsResp, compResp] = await Promise.all([fetch(defsUrl), fetch(composeUrl)])
+        if (cancelled || !defsResp.ok || !compResp.ok) { setError(true); return }
+
+        const defsData: DefsData = await defsResp.json()
+        const data: ComposeData = await compResp.json()
 
         if (defsData.version !== COMPOSE_VERSION || data.version !== COMPOSE_VERSION) {
           setError(true); return
@@ -139,35 +109,17 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
 
         cleanup()
 
-        // --- Diff detection ---
-        // First load: show everything instantly (no animation).
-        // Subsequent updates: animate only changed/new components.
+        // Animation targets from backend `changed` flag
         const animTargets = new Set<number>()
-        const prevMap = prevCompRef.current
-        if (prevMap) {
-          data.components.forEach((comp, i) => {
-            const key = makeKey(comp)
-            const prevFp = prevMap.get(key)
-            if (prevFp === undefined || prevFp !== makeFingerprint(comp)) {
-              animTargets.add(i)
-            }
-          })
-        } else if (!initialLoad) {
-          // First compose arrived during session → animate all
-          data.components.forEach((_, i) => animTargets.add(i))
-        }
-
-        // Save for next diff
-        const newMap = new Map<string, string>()
-        data.components.forEach(c => newMap.set(makeKey(c), makeFingerprint(c)))
-        prevCompRef.current = newMap
+        data.components.forEach((comp, i) => {
+          if (comp.changed) animTargets.add(i)
+        })
 
         if (animTargets.size > 0) onAnimate?.()
 
         // --- Build SVG ---
         const vb = data.viewBox.split(" ").map(Number)
         container.innerHTML = ""
-        // Remove old overlays
         container.parentElement?.querySelectorAll(".asp-overlay").forEach(el => el.remove())
 
         const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg")
@@ -179,7 +131,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
         // Background
         if (data.bgSvg) {
           const g = document.createElementNS("http://www.w3.org/2000/svg", "g")
-          g.innerHTML = sanitizeSvg(data.bgSvg)
+          g.innerHTML = data.bgSvg
           svgEl.appendChild(g)
         } else {
           const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
@@ -191,26 +143,21 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
 
         // Defs
         const defsG = document.createElementNS("http://www.w3.org/2000/svg", "g")
-        defsG.innerHTML = sanitizeSvg(defsData.defs)
+        defsG.innerHTML = defsData.defs
         while (defsG.firstChild) svgEl.appendChild(defsG.firstChild)
 
         // Components
         data.components.forEach((comp, i) => {
           const g = document.createElementNS("http://www.w3.org/2000/svg", "g")
-          g.innerHTML = sanitizeSvg(comp.svg)
+          g.innerHTML = comp.svg
           g.dataset.index = String(i)
-          if (!animTargets.has(i) || reducedMotion.current) {
-            g.style.opacity = "1"
-          } else {
-            g.style.opacity = "0"
-          }
+          g.style.opacity = (animTargets.has(i) && !reducedMotion.current) ? "0" : "1"
           svgEl.appendChild(g)
         })
 
         container.appendChild(svgEl)
 
-        // --- Reduced motion: done ---
-        if (reducedMotion.current) {
+        if (reducedMotion.current || animTargets.size === 0) {
           onComplete?.()
           return
         }
@@ -231,7 +178,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
           const pctW = (comp.bbox.w / vb[2]) * 100
           const pctH = (comp.bbox.h / vb[3]) * 100
 
-          // Phase 1: cursor fly-in
           const t1 = setTimeout(() => {
             if (cancelled) return
             const cursor = document.createElement("div")
@@ -245,7 +191,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
               cursor.style.top = `${pctT}%`
             })
 
-            // Phase 2: wireframe
             const t2 = setTimeout(() => {
               if (cancelled) return
               const wf = document.createElement("div")
@@ -253,13 +198,11 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
               wf.style.cssText = `left:${pctL}%;top:${pctT}%;width:${pctW}%;height:${pctH}%;border:1px solid ${agent.color};border-radius:2px;box-shadow:inset 0 0 16px ${agent.glow};opacity:1;clip-path:inset(0 100% 100% 0);animation:asp-wf-drag 0.35s cubic-bezier(0.16,1,0.3,1) forwards;`
               overlayContainer.appendChild(wf)
 
-              // Move cursor to bottom-right
               const endL = ((comp.bbox!.x + comp.bbox!.w) / vb[2]) * 100
               const endT = ((comp.bbox!.y + comp.bbox!.h) / vb[3]) * 100
               cursor.style.left = `${endL}%`
               cursor.style.top = `${endT}%`
 
-              // Phase 3: materialize
               const t3 = setTimeout(() => {
                 if (cancelled) return
                 const g = svgEl.querySelector(`g[data-index="${i}"]`) as SVGGElement | null
@@ -270,7 +213,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
                   requestAnimationFrame(() => { g.style.filter = "brightness(1) saturate(1)" })
                   typewrite(g)
                 }
-                // Fade out wireframe + cursor
                 const t4 = setTimeout(() => {
                   wf.style.transition = "opacity 0.4s ease-out"
                   wf.style.opacity = "0"
@@ -286,7 +228,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
           timersRef.current.push(t1)
         })
 
-        // onComplete after all animations
         const totalTime = staggerIdx * STAGGER_MS + WIREFRAME_LEAD_MS + 1000
         const tDone = setTimeout(() => {
           if (!cancelled) {
@@ -295,7 +236,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
           }
         }, totalTime)
         timersRef.current.push(tDone)
-
       } catch {
         if (!cancelled) setError(true)
       }
@@ -303,7 +243,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
 
     run()
     return () => { cancelled = true }
-  }, [defsUrl, composeUrl, cleanup, onComplete])
+  }, [defsUrl, composeUrl, cleanup, onComplete, onAnimate])
 
   if (error && fallback) return <>{fallback}</>
 
@@ -314,41 +254,36 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
   )
 }
 
-// --- Typewriter ---
-
 function typewrite(compEl: SVGGElement) {
-  const textEls = compEl.querySelectorAll(".SVGTextShape")
-  textEls.forEach(textEl => {
-    const tspans = textEl.querySelectorAll("tspan")
-    const leafSpans: { el: Element; fullText: string; saved: Record<string, string> }[] = []
-    let totalChars = 0
-    tspans.forEach(ts => {
-      if (ts.querySelectorAll("tspan").length === 0 && ts.textContent) {
-        const saved: Record<string, string> = {}
-        for (const attr of ["textLength", "lengthAdjust"]) {
-          if (ts.hasAttribute(attr)) {
-            saved[attr] = ts.getAttribute(attr)!
-            ts.removeAttribute(attr)
-          }
+  const tspans = compEl.querySelectorAll("tspan")
+  const leafSpans: { el: Element; fullText: string; saved: Record<string, string> }[] = []
+  let totalChars = 0
+  tspans.forEach(ts => {
+    if (ts.querySelectorAll("tspan").length === 0 && ts.textContent) {
+      const saved: Record<string, string> = {}
+      for (const attr of ["textLength", "lengthAdjust"]) {
+        if (ts.hasAttribute(attr)) {
+          saved[attr] = ts.getAttribute(attr)!
+          ts.removeAttribute(attr)
         }
-        totalChars += ts.textContent.length
-        leafSpans.push({ el: ts, fullText: ts.textContent, saved })
-        ts.textContent = ""
       }
-    })
-    if (!leafSpans.length) return
-    const charMs = Math.max(MIN_CHAR_MS, Math.min(MAX_CHAR_MS, Math.floor(TYPE_DURATION_MS / totalChars)))
-    let spanIdx = 0, charIdx = 0
-    const iv = window.setInterval(() => {
-      if (spanIdx >= leafSpans.length) { clearInterval(iv); return }
-      const span = leafSpans[spanIdx]
-      charIdx++
-      span.el.textContent = span.fullText.slice(0, charIdx)
-      if (charIdx >= span.fullText.length) {
-        for (const [a, v] of Object.entries(span.saved)) span.el.setAttribute(a, v)
-        spanIdx++
-        charIdx = 0
-      }
-    }, charMs)
+      totalChars += ts.textContent.length
+      leafSpans.push({ el: ts, fullText: ts.textContent, saved })
+      ts.textContent = ""
+    }
   })
+  if (!leafSpans.length) return
+  const charMs = Math.max(MIN_CHAR_MS, Math.min(MAX_CHAR_MS, Math.floor(TYPE_DURATION_MS / totalChars)))
+  let spanIdx = 0, charIdx = 0
+  const iv = window.setInterval(() => {
+    if (spanIdx >= leafSpans.length) { clearInterval(iv); return }
+    const span = leafSpans[spanIdx]
+    charIdx++
+    span.el.textContent = span.fullText.slice(0, charIdx)
+    if (charIdx >= span.fullText.length) {
+      for (const [a, v] of Object.entries(span.saved)) span.el.setAttribute(a, v)
+      spanIdx++
+      charIdx = 0
+    }
+  }, charMs)
 }

@@ -732,9 +732,9 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
             if save:
                 # Compose: SVG → optimized JSON for WebUI animation
                 # Runs synchronously — measured at ~300ms for 8 slides (≪3s threshold)
-                # Intentionally re-extracts defs each time (60KB PUT, negligible cost)
                 try:
                     from tools.compose import extract_optimized_defs, split_slide_components, count_slides
+                    import hashlib as _hashlib
                     svg_path = tmpdir / "measure.svg"
                     if not svg_path.exists():
                         _export_svg(tmpdir, pptx_path)
@@ -742,26 +742,77 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                         import json as _json
                         import time as _time
                         _epoch = int(_time.time())
+                        compose_prefix = f"decks/{deck_id}/compose/"
+
+                        # 1. List old compose keys (for cleanup + prev data)
+                        old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
+
+                        # 2. Load previous slide compose data keyed by sourceHash
+                        prev_by_hash: dict[str, list[dict]] = {}
+                        for k in old_keys:
+                            if "/slide_" not in k:
+                                continue
+                            try:
+                                raw = _storage.download_file_from_pptx_bucket(k)
+                                prev_data = _json.loads(raw)
+                                h = prev_data.get("sourceHash")
+                                if h and "components" in prev_data:
+                                    prev_by_hash[h] = prev_data["components"]
+                            except Exception:
+                                pass
+
+                        # 3. Upload defs
                         defs_data = extract_optimized_defs(svg_path)
                         _storage.upload_file(
-                            key=f"decks/{deck_id}/compose/defs_{_epoch}.json",
+                            key=f"{compose_prefix}defs_{_epoch}.json",
                             data=_json.dumps(defs_data, ensure_ascii=False).encode(),
                             content_type="application/json",
                         )
-                        # Generate compose for all slides (diff handled by frontend)
+
+                        # 4. Generate compose for all slides with changed flags
                         _total = count_slides(svg_path)
                         for sn in range(1, _total + 1):
                             try:
                                 comp_data = split_slide_components(svg_path, sn)
+                                # sourceHash from slide JSON
+                                src_hash = ""
+                                if sn <= len(slides):
+                                    src_hash = _hashlib.md5(_json.dumps(slides[sn - 1], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+                                comp_data["sourceHash"] = src_hash
+
+                                # Diff: find prev slide by sourceHash
+                                prev_comps = prev_by_hash.get(src_hash)
+                                if prev_comps is not None:
+                                    # Component-level diff
+                                    def _mk(c: dict) -> str:
+                                        b = c.get("bbox")
+                                        return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
+                                    def _fp(c: dict) -> str:
+                                        return f"{c['class']}|{c.get('text', '')}"
+                                    prev_map = {_mk(c): _fp(c) for c in prev_comps}
+                                    for c in comp_data["components"]:
+                                        k = _mk(c)
+                                        c["changed"] = k not in prev_map or prev_map[k] != _fp(c)
+                                else:
+                                    for c in comp_data["components"]:
+                                        c["changed"] = True
+
                                 _storage.upload_file(
-                                    key=f"decks/{deck_id}/compose/slide_{sn}_{_epoch}.json",
+                                    key=f"{compose_prefix}slide_{sn}_{_epoch}.json",
                                     data=_json.dumps(comp_data, ensure_ascii=False).encode(),
                                     content_type="application/json",
                                 )
                             except Exception:
                                 logger.error("compose failed for slide %d", sn, exc_info=True)
+
+                        # 5. Cleanup old compose files
+                        for k in old_keys:
+                            try:
+                                _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                            except Exception:
+                                pass
                 except Exception:
-                    logger.error("compose defs failed", exc_info=True)
+                    logger.error("compose failed", exc_info=True)
 
                 # tmpdir cleanup (WebP generation only in generate_pptx)
                 shutil.rmtree(tmpdir, ignore_errors=True)
