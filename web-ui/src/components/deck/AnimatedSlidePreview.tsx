@@ -94,8 +94,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
   const skipRef = useRef(skipAnimation)
   composeUrlRef.current = composeUrl
   defsUrlRef.current = defsUrl
-  // When skipAnimation transitions false→true (deck ready), re-check current URL
-  if (skipRef.current && !skipAnimation) lastComposeUrlRef.current = ""
   skipRef.current = skipAnimation
 
   useEffect(() => {
@@ -124,7 +122,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
 
           cleanup()
 
-          // skipAnimation = instant. Otherwise use backend changed flag.
           const animTargets = new Set<number>()
           if (!skipRef.current) {
             data.components.forEach((comp, i) => {

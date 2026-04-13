@@ -56,7 +56,9 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
   const scrollTargetRef = useRef<string | null | undefined>(undefined)
-  const deckReadyRef = useRef(false)
+  // If deck opened with slides → existing deck → first compose is instant
+  const hadSlidesOnMount = useRef(slides.length > 0)
+  const firstComposeSeenRef = useRef(false)
 
   useEffect(() => {
     let anyChanged = false
@@ -64,12 +66,16 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
       const key = slide.composeUrl?.split("?")[0] || ""
       const prev = prevComposeKeys.current.get(slide.slideId) || ""
       if (key && prev && key !== prev) anyChanged = true
-      // New slide added after deck was ready
-      if (key && !prev && deckReadyRef.current) anyChanged = true
+      if (key && !prev && firstComposeSeenRef.current) anyChanged = true
       if (key) prevComposeKeys.current.set(slide.slideId, key)
     }
-    if (!deckReadyRef.current && slides.some(s => s.composeUrl)) {
-      deckReadyRef.current = true
+    // Mark first compose seen (skip animation for existing decks)
+    if (!firstComposeSeenRef.current && slides.some(s => s.composeUrl)) {
+      if (hadSlidesOnMount.current) {
+        // Existing deck: suppress animation for this first batch
+        anyChanged = false
+      }
+      firstComposeSeenRef.current = true
     }
     if (anyChanged) scrollTargetRef.current = null // arm scroll for next onAnimate
   }, [slides])
@@ -337,7 +343,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 defsUrl={defsUrl}
                 composeUrl={slide.composeUrl}
                 slideId={slide.slideId}
-                skipAnimation={!deckReadyRef.current}
+                skipAnimation={hadSlidesOnMount.current && !firstComposeSeenRef.current}
                 onAnimate={() => handleAnimate(slide.slideId)}
                 fallback={
                   <SlideThumbnail
