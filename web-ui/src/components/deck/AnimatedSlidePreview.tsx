@@ -5,6 +5,7 @@
  * changed components with agent cursors, wireframes, and typewriter.
  *
  * Backend provides `changed: boolean` per component — no frontend diff needed.
+ * First render = instant (page load). Subsequent composeUrl changes = animate changed.
  */
 
 "use client"
@@ -71,6 +72,9 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, onAnimate, 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const intervalsRef = useRef<number[]>([])
   const lastComposeUrlRef = useRef("")
+  const hasRenderedRef = useRef(false)
+  const animatingRef = useRef(false)
+  const pendingUrlRef = useRef<string | null>(null)
   const [error, setError] = useState(false)
   const reducedMotion = useRef(
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -92,6 +96,13 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, onAnimate, 
       try {
         const compUrlBase = composeUrl.split("?")[0]
         if (compUrlBase === lastComposeUrlRef.current) return
+        // Defer if animating — will be picked up after animation completes
+        if (animatingRef.current) {
+          pendingUrlRef.current = composeUrl
+          return
+        }
+        const isFirstRender = !hasRenderedRef.current
+        hasRenderedRef.current = true
         lastComposeUrlRef.current = compUrlBase
 
         const [defsResp, compResp] = await Promise.all([fetch(defsUrl), fetch(composeUrl)])
@@ -109,13 +120,20 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, onAnimate, 
 
         cleanup()
 
-        // Animation targets from backend `changed` flag
+        // First render = instant (page load). Subsequent = use backend changed flag.
         const animTargets = new Set<number>()
-        data.components.forEach((comp, i) => {
-          if (comp.changed) animTargets.add(i)
-        })
+        if (!isFirstRender) {
+          data.components.forEach((comp, i) => {
+            if (comp.changed) animTargets.add(i)
+          })
+        }
 
-        if (animTargets.size > 0) onAnimate?.()
+        console.log(`[ASP] ${slideId}: ${animTargets.size}/${data.components.length} changed, first=${isFirstRender}, url=${compUrlBase.split('/').pop()}`)
+
+        if (animTargets.size > 0) {
+          onAnimate?.()
+          animatingRef.current = true
+        }
 
         // --- Build SVG ---
         const vb = data.viewBox.split(" ").map(Number)
@@ -232,6 +250,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, onAnimate, 
         const tDone = setTimeout(() => {
           if (!cancelled) {
             overlayContainer.remove()
+            animatingRef.current = false
             onComplete?.()
           }
         }, totalTime)
