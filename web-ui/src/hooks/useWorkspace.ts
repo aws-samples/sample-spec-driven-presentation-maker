@@ -97,13 +97,16 @@ export function useWorkspace(
     const INTERVALS = [1000, 2000, 4000, 6000]
     let step = 0
 
+    let cancelled = false
+
     async function poll() {
-      if (!idToken || !deckIdToLoad || deckIdToLoad === "__polling__") {
-        scheduleNext()
+      if (cancelled || !idToken || !deckIdToLoad || deckIdToLoad === "__polling__") {
+        if (!cancelled) scheduleNext()
         return
       }
       try {
         const data = await getDeck(deckIdToLoad, idToken)
+        if (cancelled) return
         // Detect slide changes (added/removed/preview updated)
         const slideKey = data.slides.map((s) => {
           const base = s.previewUrl?.split("?")[0] || ""
@@ -157,7 +160,7 @@ export function useWorkspace(
       } catch {
         // Deck may not exist yet
       }
-      scheduleNext()
+      if (!cancelled) scheduleNext()
     }
 
     function scheduleNext() {
@@ -173,6 +176,7 @@ export function useWorkspace(
     }
 
     return () => {
+      cancelled = true
       if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current)
     }
   }, [isAuthenticated, idToken, activeDeckId, createdDeckId])
