@@ -55,6 +55,8 @@ interface AnimatedSlidePreviewProps {
   slideId?: string
   /** When true, skip animation on first render (page already had compose data). */
   initialLoad?: boolean
+  /** Called when this slide actually has components to animate. */
+  onAnimate?: () => void
   onComplete?: () => void
   /** Fallback to render when compose version mismatches or fetch fails. */
   fallback?: React.ReactNode
@@ -84,7 +86,7 @@ function sanitizeSvg(raw: string): string {
 
 // --- Component ---
 
-export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad, onComplete, fallback }: AnimatedSlidePreviewProps) {
+export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad, onAnimate, onComplete, fallback }: AnimatedSlidePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const prevCompRef = useRef<Map<string, string> | null>(null)
   const intervalsRef = useRef<number[]>([])
@@ -155,6 +157,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
         const newMap = new Map<string, string>()
         data.components.forEach(c => newMap.set(makeKey(c), c.svg))
         prevCompRef.current = newMap
+
+        if (animTargets.size > 0) onAnimate?.()
 
         // --- Build SVG ---
         const vb = data.viewBox.split(" ").map(Number)
