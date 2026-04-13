@@ -789,7 +789,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                                 # sourceHash from slide JSON
                                 src_hash = ""
                                 if sn <= len(slides):
-                                    src_hash = _hashlib.md5(_json.dumps(slides[sn - 1], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+                                    src_hash = _hashlib.md5(_json.dumps(slides[sn - 1], sort_keys=True, ensure_ascii=False).encode(), usedforsecurity=False).hexdigest()
                                 comp_data["sourceHash"] = src_hash
 
                                 # Diff: find prev slide by sourceHash, fallback to same slot number
