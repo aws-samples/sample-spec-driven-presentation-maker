@@ -50,7 +50,6 @@ web-ui/public/aws-exports.json
 !.kiro/steering/
 .kiro/steering/*
 !.kiro/steering/principles.md
-!.kiro/steering/tech.md
 !.kiro/steering/versioning.md
 !.kiro/steering/steering-policy.md
 
