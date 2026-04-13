@@ -768,24 +768,24 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
 
             # Lint (filter to measured slides; lint uses 0-based index)
             if measure_slides:
-              try:
-                from sdpm.schema.lint import lint as lint_slides
-                presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
-                slide_set = set(measure_slides)
-                lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in slide_set]
-                if lint_diag:
-                    result["errors"] = {"lintDiagnostics": lint_diag}
-              except Exception as e:
-                logger.warning("Lint failed: %s", e)
+                try:
+                    from sdpm.schema.lint import lint as lint_slides
+                    presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
+                    slide_set = set(measure_slides)
+                    lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in slide_set]
+                    if lint_diag:
+                        result["errors"] = {"lintDiagnostics": lint_diag}
+                except Exception as e:
+                    logger.warning("Lint failed: %s", e)
 
-              # Layout bias (filter to measured slides; bias uses 1-based)
-              try:
-                from sdpm.preview import check_layout_imbalance_data
-                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in slide_set]
-                if layout_bias:
-                    result["warnings"] = {"layoutBias": layout_bias}
-              except Exception as e:
-                logger.warning("Layout bias check failed: %s", e)
+                # Layout bias (filter to measured slides; bias uses 1-based)
+                try:
+                    from sdpm.preview import check_layout_imbalance_data
+                    layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in slide_set]
+                    if layout_bias:
+                        result["warnings"] = {"layoutBias": layout_bias}
+                except Exception as e:
+                    logger.warning("Layout bias check failed: %s", e)
 
             if save:
                 # Compose: SVG → optimized JSON for WebUI animation
@@ -809,6 +809,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                         prev_by_hash: dict[str, list[dict]] = {}
                         prev_by_slot: list[list[dict]] = []  # ordered by slide number
                         prev_slot_map: dict[int, list[dict]] = {}
+                        import re as _re
                         for k in old_keys:
                             if "/slide_" not in k:
                                 continue
@@ -820,7 +821,6 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                                 if h:
                                     prev_by_hash[h] = comps
                                 # Extract slot number from key: slide_{N}_{epoch}.json
-                                import re as _re
                                 m = _re.search(r"/slide_(\d+)_", k)
                                 if m:
                                     prev_slot_map[int(m.group(1))] = comps
