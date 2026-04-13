@@ -53,6 +53,7 @@ interface AnimatedSlidePreviewProps {
   defsUrl: string
   composeUrl: string
   slideId?: string
+  skipAnimation?: boolean
   onAnimate?: () => void
   onComplete?: () => void
   fallback?: React.ReactNode
@@ -67,14 +68,12 @@ function assignAgent(comp: ComposeComponent) {
   return AGENTS[4]
 }
 
-export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, onAnimate, onComplete, fallback }: AnimatedSlidePreviewProps) {
+export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimation, onAnimate, onComplete, fallback }: AnimatedSlidePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const intervalsRef = useRef<number[]>([])
   const lastComposeUrlRef = useRef("")
-  const hasRenderedRef = useRef(false)
   const animatingRef = useRef(false)
-  const pendingUrlRef = useRef<string | null>(null)
   const [error, setError] = useState(false)
   const reducedMotion = useRef(
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -89,46 +88,46 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, onAnimate, 
 
   useEffect(() => () => cleanup(), [cleanup])
 
+  // Track latest props in refs so the interval can read them without re-triggering
+  const composeUrlRef = useRef(composeUrl)
+  const defsUrlRef = useRef(defsUrl)
+  composeUrlRef.current = composeUrl
+  defsUrlRef.current = defsUrl
+
   useEffect(() => {
     let cancelled = false
 
-    async function run() {
-      try {
-        const compUrlBase = composeUrl.split("?")[0]
-        if (compUrlBase === lastComposeUrlRef.current) return
-        // Defer if animating — will be picked up after animation completes
-        if (animatingRef.current) {
-          pendingUrlRef.current = composeUrl
-          return
-        }
-        const isFirstRender = !hasRenderedRef.current
-        hasRenderedRef.current = true
-        lastComposeUrlRef.current = compUrlBase
+    function check() {
+      const compUrlBase = composeUrlRef.current.split("?")[0]
+      if (compUrlBase === lastComposeUrlRef.current) return
+      if (animatingRef.current) return  // defer until animation completes
+      lastComposeUrlRef.current = compUrlBase
 
-        const [defsResp, compResp] = await Promise.all([fetch(defsUrl), fetch(composeUrl)])
-        if (cancelled || !defsResp.ok || !compResp.ok) { setError(true); return }
+      ;(async () => {
+        try {
+          const [defsResp, compResp] = await Promise.all([fetch(defsUrlRef.current), fetch(composeUrlRef.current)])
+          if (cancelled || !defsResp.ok || !compResp.ok) { setError(true); return }
 
-        const defsData: DefsData = await defsResp.json()
-        const data: ComposeData = await compResp.json()
+          const defsData: DefsData = await defsResp.json()
+          const data: ComposeData = await compResp.json()
 
-        if (defsData.version !== COMPOSE_VERSION || data.version !== COMPOSE_VERSION) {
-          setError(true); return
-        }
+          if (defsData.version !== COMPOSE_VERSION || data.version !== COMPOSE_VERSION) {
+            setError(true); return
+          }
 
-        const container = containerRef.current
-        if (!container || cancelled) return
+          const container = containerRef.current
+          if (!container || cancelled) return
 
-        cleanup()
+          cleanup()
 
-        // First render = instant (page load). Subsequent = use backend changed flag.
-        const animTargets = new Set<number>()
-        if (!isFirstRender) {
-          data.components.forEach((comp, i) => {
-            if (comp.changed) animTargets.add(i)
-          })
-        }
+          // skipAnimation = instant. Otherwise use backend changed flag.
+          const animTargets = new Set<number>()
+          if (!skipAnimation) {
+            data.components.forEach((comp, i) => {
+              if (comp.changed) animTargets.add(i)
+            })
+          }
 
-        console.log(`[ASP] ${slideId}: ${animTargets.size}/${data.components.length} changed, first=${isFirstRender}, url=${compUrlBase.split('/').pop()}`)
 
         if (animTargets.size > 0) {
           onAnimate?.()
@@ -248,21 +247,24 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, onAnimate, 
 
         const totalTime = staggerIdx * STAGGER_MS + WIREFRAME_LEAD_MS + 1000
         const tDone = setTimeout(() => {
-          if (!cancelled) {
-            overlayContainer.remove()
-            animatingRef.current = false
-            onComplete?.()
-          }
+          animatingRef.current = false
+          overlayContainer.remove()
+          onComplete?.()
+          // Check if a new composeUrl arrived during animation
+          check()
         }, totalTime)
         timersRef.current.push(tDone)
       } catch {
-        if (!cancelled) setError(true)
+        setError(true)
       }
+      })()
     }
 
-    run()
-    return () => { cancelled = true }
-  }, [defsUrl, composeUrl, cleanup, onComplete, onAnimate])
+    check()
+    const iv = window.setInterval(check, 1000)
+    return () => { cancelled = true; clearInterval(iv); cleanup() }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slideId])
 
   if (error && fallback) return <>{fallback}</>
 
