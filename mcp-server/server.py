@@ -686,8 +686,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
     result: dict = {"output": output}
 
     # Post-processing: measure_slides triggers PPTX build → measure/lint/bias
-    # WebP preview generation runs when measure_slides is present and save=True
-    if deck_id and measure_slides:
+    if deck_id and (measure_slides or save):
         import shutil
         import traceback
 
@@ -698,30 +697,46 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
             tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
             pptx_path = _build_pptx(tmpdir, slides, build_kwargs)
 
-            # Measure
-            try:
-                result["measure"] = _run_measure(tmpdir, pptx_path, measure_slides)
-            except Exception as e:
-                result["measure"] = json.dumps({"error": str(e)})
+            # SVG export (needed for both measure and compose)
+            svg_path = tmpdir / "measure.svg"
+            env = os.environ.copy()
+            env["HOME"] = str(tmpdir)
+            subprocess.run(
+                ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
+                env=env, capture_output=True, text=True, timeout=120, check=True,
+            )
+
+            # Measure (only when requested)
+            if measure_slides:
+                try:
+                    from sdpm.preview.measure import measure_from_svg, format_measure_report
+                    if svg_path.exists():
+                        results = measure_from_svg(svg_path=svg_path, slide_indices=measure_slides)
+                        result["measure"] = format_measure_report(results)
+                    else:
+                        result["measure"] = json.dumps({"error": "LibreOffice SVG export failed"})
+                except Exception as e:
+                    result["measure"] = json.dumps({"error": str(e)})
 
             # Lint (filter to measured slides; lint uses 0-based index)
-            try:
+            if measure_slides:
+              try:
                 from sdpm.schema.lint import lint as lint_slides
                 presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
                 slide_set = set(measure_slides)
                 lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in slide_set]
                 if lint_diag:
                     result["errors"] = {"lintDiagnostics": lint_diag}
-            except Exception as e:
+              except Exception as e:
                 logger.warning("Lint failed: %s", e)
 
-            # Layout bias (filter to measured slides; bias uses 1-based)
-            try:
+              # Layout bias (filter to measured slides; bias uses 1-based)
+              try:
                 from sdpm.preview import check_layout_imbalance_data
                 layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in slide_set]
                 if layout_bias:
                     result["warnings"] = {"layoutBias": layout_bias}
-            except Exception as e:
+              except Exception as e:
                 logger.warning("Layout bias check failed: %s", e)
 
             if save:
