@@ -60,7 +60,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
 
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
-  const scrollTargetRef = useRef<string | null>(null)
+  const scrollTargetRef = useRef<string | null | undefined>(undefined)
 
   useEffect(() => {
     let anyChanged = false
@@ -70,12 +70,11 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
       if (prev && key && key !== prev) anyChanged = true
       if (key) prevComposeKeys.current.set(slide.slideId, key)
     }
-    if (anyChanged) scrollTargetRef.current = null // reset, let onAnimate decide
+    if (anyChanged) scrollTargetRef.current = null // arm scroll for next onAnimate
   }, [slides])
 
   const handleAnimate = useCallback((slideId: string) => {
-    // Scroll to the first slide that actually animates
-    if (scrollTargetRef.current !== undefined && scrollTargetRef.current === null && containerRef.current) {
+    if (scrollTargetRef.current === null && containerRef.current) {
       scrollTargetRef.current = slideId
       const el = containerRef.current.querySelector(`[data-slide-id="${slideId}"]`)
       if (el) {
