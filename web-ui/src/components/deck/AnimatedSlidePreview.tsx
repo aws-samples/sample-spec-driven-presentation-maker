@@ -15,8 +15,8 @@ import DOMPurify from "dompurify"
 
 // --- Constants ---
 const COMPOSE_VERSION = 1
-const STAGGER_MS = 180
-const WIREFRAME_LEAD_MS = 280
+const STAGGER_MS = 260
+const WIREFRAME_LEAD_MS = 400
 const TYPE_DURATION_MS = 800
 const MIN_CHAR_MS = 15
 const MAX_CHAR_MS = 50
