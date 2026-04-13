@@ -53,6 +53,11 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
 
+  /* ── Track which slides had composeUrl on initial render ── */
+  const initialComposeIds = useRef<Set<string>>(new Set(
+    slides.filter(s => s.composeUrl).map(s => s.slideId)
+  ))
+
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
 
@@ -68,7 +73,14 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     }
     if (firstChanged && containerRef.current) {
       const el = containerRef.current.querySelector(`[data-slide-id="${firstChanged}"]`)
-      el?.scrollIntoView({ behavior: "smooth", block: "center" })
+      if (el) {
+        // Scroll so the full slide is visible with some top padding
+        const container = containerRef.current
+        const elRect = el.getBoundingClientRect()
+        const containerRect = container.getBoundingClientRect()
+        const offset = elRect.top - containerRect.top + container.scrollTop - 24
+        container.scrollTo({ top: offset, behavior: "smooth" })
+      }
     }
   }, [slides])
 
@@ -321,6 +333,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 defsUrl={defsUrl}
                 composeUrl={slide.composeUrl}
                 slideId={slide.slideId}
+                initialLoad={initialComposeIds.current.has(slide.slideId)}
                 fallback={
                   <SlideThumbnail
                     src={slide.previewUrl}
