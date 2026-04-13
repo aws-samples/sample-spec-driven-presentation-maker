@@ -129,6 +129,29 @@ export function useWorkspace(
           } else {
             stablePreviewUrls.current.delete(s.slideId)
           }
+          // Stabilise composeUrl with same pattern
+          if (s.composeUrl) {
+            const cacheKey = `${s.slideId}:compose`
+            const cached = stablePreviewUrls.current.get(cacheKey)
+            const base = s.composeUrl.split("?")[0]
+            const cachedBase = cached?.url.split("?")[0] || ""
+            if (base !== cachedBase) {
+              stablePreviewUrls.current.set(cacheKey, { url: s.composeUrl })
+            } else if (cached) {
+              s.composeUrl = cached.url
+            }
+          }
+        }
+        // Stabilise defsUrl
+        if (data.defsUrl) {
+          const cached = stablePreviewUrls.current.get("__defs__")
+          const base = data.defsUrl.split("?")[0]
+          const cachedBase = cached?.url.split("?")[0] || ""
+          if (base !== cachedBase) {
+            stablePreviewUrls.current.set("__defs__", { url: data.defsUrl })
+          } else if (cached) {
+            data.defsUrl = cached.url
+          }
         }
         setDeck(data)
       } catch {

@@ -18,9 +18,11 @@ import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
+import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
 
 interface SlideCarouselProps {
   slides: SlidePreview[]
+  defsUrl?: string | null
   deckId?: string
   deckName?: string
   pptxUrl?: string | null
@@ -44,7 +46,7 @@ interface SlideCarouselProps {
   idToken?: string
 }
 
-export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, idToken }: SlideCarouselProps) {
+export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, idToken }: SlideCarouselProps) {
   const slidesWithPreview = slides.filter((s) => s.previewUrl)
   const auth = useAuth()
   const [jsonLoading, setJsonLoading] = useState(false)
@@ -294,16 +296,34 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
           </div>
         ) : (
           slidesWithPreview.map((slide, i) => (
-            <SlideThumbnail
-              key={slide.slideId}
-              src={slide.previewUrl}
-              alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
-              index={i}
-              slideId={slide.slideId}
-              onClick={() => onSlideClick?.(i + 1)}
-              updated={updatedIds.has(slide.slideId)}
-              className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
-            />
+            slide.composeUrl && defsUrl ? (
+              <AnimatedSlidePreview
+                key={slide.slideId}
+                defsUrl={defsUrl}
+                composeUrl={slide.composeUrl}
+                fallback={
+                  <SlideThumbnail
+                    src={slide.previewUrl}
+                    alt={`Slide ${i + 1}`}
+                    index={i}
+                    slideId={slide.slideId}
+                    onClick={() => onSlideClick?.(i + 1)}
+                    className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
+                  />
+                }
+              />
+            ) : (
+              <SlideThumbnail
+                key={slide.slideId}
+                src={slide.previewUrl}
+                alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
+                index={i}
+                slideId={slide.slideId}
+                onClick={() => onSlideClick?.(i + 1)}
+                updated={updatedIds.has(slide.slideId)}
+                className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
+              />
+            )
           ))
         )}
       </div>

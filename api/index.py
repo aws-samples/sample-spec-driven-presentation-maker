@@ -424,15 +424,29 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=pres_key)
         presentation = json.loads(resp["Body"].read())
         preview_keys = _list_preview_keys(deck_id)
+        # Check compose data existence (defs + per-slide)
+        compose_keys = set()
+        try:
+            for obj in s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/compose/").get("Contents", []):
+                compose_keys.add(obj["Key"])
+        except Exception:
+            pass
+        defs_key = f"decks/{deck_id}/compose/defs.json"
+        has_defs = defs_key in compose_keys
+
         for i, s in enumerate(presentation.get("slides", [])):
             sid = f"slide_{i + 1:02d}"
             slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
             slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
+            # Compose URL for animation
+            compose_key = f"decks/{deck_id}/compose/slide_{i + 1}.json"
+            if compose_key in compose_keys:
+                slide_entry["composeUrl"] = preview_url(compose_key)
             if include_json:
                 slide_entry["slideJson"] = json.dumps(s)
             slides.append(slide_entry)
     except Exception:
-        pass
+        has_defs = False
 
     # Read spec files from S3 (brief.md, outline.md, art-direction.html/.md)
     specs: Dict[str, Any] = {}
@@ -467,6 +481,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         "slideCount": len(slides),
         "slides": slides,
         "specs": specs,
+        "defsUrl": preview_url(defs_key) if has_defs else None,
         "pptxUrl": (_cf_signed_url(pptx_key) or presigned_url(s3_client, BUCKET_NAME, pptx_key)) if pptx_key else None,
         "updatedAt": deck.get("updatedAt", ""),
         "chatSessionId": deck.get("chatSessionId"),
