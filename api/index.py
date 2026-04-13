@@ -445,7 +445,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
                     best_epoch, best_key = epoch, k
             return best_key
 
-        defs_key = _latest_compose_key(f"decks/{deck_id}/compose/defs", compose_keys)
+        defs_key = _latest_compose_key(f"decks/{deck_id}/compose/defs_", compose_keys)
         has_defs = defs_key is not None
 
         for i, s in enumerate(presentation.get("slides", [])):
@@ -453,7 +453,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
             slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
             slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
             # Compose URL for animation (epoch-keyed)
-            compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}", compose_keys)
+            compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}_", compose_keys)
             if compose_key:
                 slide_entry["composeUrl"] = preview_url(compose_key)
             if include_json:
