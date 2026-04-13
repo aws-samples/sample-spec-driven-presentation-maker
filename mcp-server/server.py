@@ -725,6 +725,33 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 logger.warning("Layout bias check failed: %s", e)
 
             if save:
+                # Compose: SVG → optimized JSON for WebUI animation
+                # Runs synchronously — measured at ~300ms for 8 slides (≪3s threshold)
+                # Intentionally re-extracts defs each time (60KB PUT, negligible cost)
+                try:
+                    from tools.compose import extract_optimized_defs, split_slide_components
+                    svg_path = tmpdir / "measure.svg"
+                    if svg_path.exists():
+                        import json as _json
+                        defs_data = extract_optimized_defs(svg_path)
+                        _storage.upload_file(
+                            key=f"decks/{deck_id}/compose/defs.json",
+                            data=_json.dumps(defs_data, ensure_ascii=False).encode(),
+                            content_type="application/json",
+                        )
+                        for sn in measure_slides:
+                            try:
+                                comp_data = split_slide_components(svg_path, sn)
+                                _storage.upload_file(
+                                    key=f"decks/{deck_id}/compose/slide_{sn}.json",
+                                    data=_json.dumps(comp_data, ensure_ascii=False).encode(),
+                                    content_type="application/json",
+                                )
+                            except Exception:
+                                logger.error("compose failed for slide %d", sn, exc_info=True)
+                except Exception:
+                    logger.error("compose defs failed", exc_info=True)
+
                 from server_utils import schedule_webp_background
                 schedule_webp_background(deck_id, pptx_path, tmpdir, _storage)
             else:

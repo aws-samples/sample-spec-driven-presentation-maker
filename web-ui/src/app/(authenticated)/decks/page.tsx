@@ -123,6 +123,7 @@ export default function DecksPage() {
                 ) : (
                   <SlideCarousel
                     slides={ws.deck?.slides || []}
+                    defsUrl={ws.deck?.defsUrl}
                     deckId={ws.isNew ? ws.createdDeckId || undefined : ws.activeDeckId!}
                     deckName={ws.deck?.name}
                     pptxUrl={ws.deck?.pptxUrl}

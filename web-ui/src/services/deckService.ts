@@ -19,6 +19,7 @@ export interface DeckSummary {
 export interface SlidePreview {
   slideId: string
   previewUrl: string | null
+  composeUrl?: string | null
   updatedAt: string
   slideJson?: string
 }
@@ -34,6 +35,7 @@ export interface DeckDetail {
   name: string
   slideOrder: string[]
   slides: SlidePreview[]
+  defsUrl?: string | null
   pptxUrl: string | null
   specs?: SpecFiles | null
   updatedAt: string
