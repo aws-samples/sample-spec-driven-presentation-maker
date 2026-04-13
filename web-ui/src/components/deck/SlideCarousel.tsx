@@ -47,7 +47,7 @@ interface SlideCarouselProps {
 }
 
 export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, idToken }: SlideCarouselProps) {
-  const slidesWithPreview = slides.filter((s) => s.previewUrl)
+  const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
   const auth = useAuth()
   const [jsonLoading, setJsonLoading] = useState(false)
   const { viewMode, setViewMode } = usePreferences()

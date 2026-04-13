@@ -205,7 +205,7 @@ export function useWorkspace(
   const isNew = activeDeckId === "new"
   const isOwner = deck?.role === "owner" || deck?.role === undefined
   const canChat = isOwner || isNew
-  const hasSlides = deck && deck.slides.some((s) => s.previewUrl)
+  const hasSlides = deck && deck.slides.some((s) => s.previewUrl || s.composeUrl)
   const waitingForPng = pptxRequested
 
   // Reset flag once previews change after generate_pptx
