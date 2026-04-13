@@ -39,6 +39,12 @@ def _strip_fonts(defs_el: etree._Element) -> None:
         font.getparent().remove(font)
 
 
+def count_slides(svg_path: Path) -> int:
+    """Return the number of slides in a LibreOffice SVG."""
+    root = etree.parse(str(svg_path)).getroot()
+    return len(root.findall(f".//{{{SVG_NS}}}g[@class='Slide']"))
+
+
 def extract_optimized_defs(svg_path: Path) -> dict:
     """Extract shared defs: strip SVG fonts, convert PNG→WebP.
 
@@ -71,7 +77,55 @@ def split_slide_components(svg_path: Path, slide_num: int) -> dict:
     if page_g is None:
         raise ValueError("No Page group found")
 
-    # Components
+    # --- Background ---
+    bg_fill = "#000"
+    bg_svg = None
+
+    # 1) Slide-specific custom background (Page > defs.SlideBackground)
+    slide_bg_defs = page_g.find(f"{{{SVG_NS}}}defs[@class='SlideBackground']")
+    if slide_bg_defs is not None:
+        parts = []
+        for child in slide_bg_defs:
+            cls = child.get("class", "")
+            if cls in ("Background", "BackgroundObjects"):
+                parts.append(etree.tostring(child, encoding="unicode"))
+                if cls == "Background":
+                    for el in child.iter():
+                        f = el.get("fill")
+                        if f and f != "none":
+                            bg_fill = f
+                            break
+        if parts:
+            bg_svg = _convert_images("\n".join(parts))
+
+    # 2) Fallback: master page background
+    if bg_svg is None:
+        meta_slides = root.find(f".//{{{SVG_NS}}}g[@id='ooo:meta_slides']")
+        if meta_slides is not None:
+            meta = meta_slides.find(f".//{{{SVG_NS}}}g[@id='ooo:meta_slide_{slide_num - 1}']")
+            if meta is not None:
+                master_id = meta.get(f"{{{OOO_NS}}}master", "")
+                if master_id:
+                    master_g = root.find(f".//*[@id='{master_id}']")
+                    if master_g is not None:
+                        parts = []
+                        bg_g = master_g.find(f"{{{SVG_NS}}}g[@class='Background']")
+                        if bg_g is not None:
+                            parts.append(etree.tostring(bg_g, encoding="unicode"))
+                            for el in bg_g.iter():
+                                f = el.get("fill")
+                                if f and f != "none":
+                                    bg_fill = f
+                                    break
+                        bo_g = master_g.find(f"{{{SVG_NS}}}g[@class='BackgroundObjects']")
+                        if bo_g is not None:
+                            for child in bo_g:
+                                if child.get("visibility") != "hidden":
+                                    parts.append(etree.tostring(child, encoding="unicode"))
+                        if parts:
+                            bg_svg = _convert_images("\n".join(parts))
+
+    # --- Components ---
     components = []
     for shape_g in page_g:
         if shape_g.tag != f"{{{SVG_NS}}}g":
@@ -96,34 +150,6 @@ def split_slide_components(svg_path: Path, slide_num: int) -> dict:
             "text": text,
             "svg": _convert_images(etree.tostring(shape_g, encoding="unicode")),
         })
-
-    # Background from master page
-    bg_fill = "#000"
-    bg_svg = None
-    meta_slides = root.find(f".//{{{SVG_NS}}}g[@id='ooo:meta_slides']")
-    if meta_slides is not None:
-        meta = meta_slides.find(f".//{{{SVG_NS}}}g[@id='ooo:meta_slide_{slide_num - 1}']")
-        if meta is not None:
-            master_id = meta.get(f"{{{OOO_NS}}}master", "")
-            if master_id:
-                master_g = root.find(f".//*[@id='{master_id}']")
-                if master_g is not None:
-                    parts = []
-                    bg_g = master_g.find(f"{{{SVG_NS}}}g[@class='Background']")
-                    if bg_g is not None:
-                        parts.append(etree.tostring(bg_g, encoding="unicode"))
-                        for el in bg_g.iter():
-                            f = el.get("fill")
-                            if f and f != "none":
-                                bg_fill = f
-                                break
-                    bo_g = master_g.find(f"{{{SVG_NS}}}g[@class='BackgroundObjects']")
-                    if bo_g is not None:
-                        for child in bo_g:
-                            if child.get("visibility") != "hidden":
-                                parts.append(etree.tostring(child, encoding="unicode"))
-                    if parts:
-                        bg_svg = _convert_images("\n".join(parts))
 
     return {
         "version": 1,

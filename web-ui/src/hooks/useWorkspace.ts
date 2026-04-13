@@ -129,7 +129,7 @@ export function useWorkspace(
           } else {
             stablePreviewUrls.current.delete(s.slideId)
           }
-          // Stabilise composeUrl with same pattern
+          // Stabilise composeUrl with same pattern as previewUrl
           if (s.composeUrl) {
             const cacheKey = `${s.slideId}:compose`
             const cached = stablePreviewUrls.current.get(cacheKey)
