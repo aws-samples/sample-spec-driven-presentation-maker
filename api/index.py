@@ -424,23 +424,37 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=pres_key)
         presentation = json.loads(resp["Body"].read())
         preview_keys = _list_preview_keys(deck_id)
-        # Check compose data existence (defs + per-slide)
+        # Check compose data existence (defs + per-slide, epoch-keyed like previews)
         compose_keys = set()
         try:
             for obj in s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/compose/").get("Contents", []):
                 compose_keys.add(obj["Key"])
         except Exception:
             pass
-        defs_key = f"decks/{deck_id}/compose/defs.json"
-        has_defs = defs_key in compose_keys
+
+        import re as _re
+        def _latest_compose_key(prefix: str, keys: set) -> Optional[str]:
+            """Pick the key with the highest epoch from epoch-keyed compose files."""
+            best_epoch, best_key = -1, None
+            for k in keys:
+                if not k.startswith(prefix):
+                    continue
+                m = _re.search(r"_(\d+)\.json$", k)
+                epoch = int(m.group(1)) if m else 0
+                if epoch > best_epoch:
+                    best_epoch, best_key = epoch, k
+            return best_key
+
+        defs_key = _latest_compose_key(f"decks/{deck_id}/compose/defs", compose_keys)
+        has_defs = defs_key is not None
 
         for i, s in enumerate(presentation.get("slides", [])):
             sid = f"slide_{i + 1:02d}"
             slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
             slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
-            # Compose URL for animation
-            compose_key = f"decks/{deck_id}/compose/slide_{i + 1}.json"
-            if compose_key in compose_keys:
+            # Compose URL for animation (epoch-keyed)
+            compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}", compose_keys)
+            if compose_key:
                 slide_entry["composeUrl"] = preview_url(compose_key)
             if include_json:
                 slide_entry["slideJson"] = json.dumps(s)

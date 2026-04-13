@@ -15,7 +15,7 @@ import DOMPurify from "dompurify"
 
 // --- Constants ---
 const COMPOSE_VERSION = 1
-const STAGGER_MS = 420
+const STAGGER_MS = 180
 const WIREFRAME_LEAD_MS = 280
 const TYPE_DURATION_MS = 800
 const MIN_CHAR_MS = 15
@@ -100,6 +100,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, onComplete, fallback
 
   useEffect(() => () => cleanup(), [cleanup])
 
+  const lastJsonRef = useRef<string>("")
+
   useEffect(() => {
     let cancelled = false
 
@@ -108,8 +110,16 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, onComplete, fallback
         const [defsResp, compResp] = await Promise.all([fetch(defsUrl), fetch(composeUrl)])
         if (cancelled || !defsResp.ok || !compResp.ok) { setError(true); return }
 
-        const defsData: DefsData = await defsResp.json()
-        const data: ComposeData = await compResp.json()
+        const defsText = await defsResp.text()
+        const compText = await compResp.text()
+        const combined = defsText + compText
+
+        // Skip if content unchanged
+        if (combined === lastJsonRef.current) return
+        lastJsonRef.current = combined
+
+        const defsData: DefsData = JSON.parse(defsText)
+        const data: ComposeData = JSON.parse(compText)
 
         if (defsData.version !== COMPOSE_VERSION || data.version !== COMPOSE_VERSION) {
           setError(true); return
@@ -121,11 +131,11 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, onComplete, fallback
         cleanup()
 
         // --- Diff detection ---
+        // First load: show everything instantly (no animation).
+        // Subsequent updates: animate only changed/new components.
         const animTargets = new Set<number>()
         const prevMap = prevCompRef.current
-        if (!prevMap) {
-          data.components.forEach((_, i) => animTargets.add(i))
-        } else {
+        if (prevMap) {
           data.components.forEach((comp, i) => {
             const key = makeKey(comp)
             const prevSvg = prevMap.get(key)

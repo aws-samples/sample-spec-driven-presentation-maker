@@ -729,21 +729,25 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 # Runs synchronously — measured at ~300ms for 8 slides (≪3s threshold)
                 # Intentionally re-extracts defs each time (60KB PUT, negligible cost)
                 try:
-                    from tools.compose import extract_optimized_defs, split_slide_components
+                    from tools.compose import extract_optimized_defs, split_slide_components, count_slides
                     svg_path = tmpdir / "measure.svg"
                     if svg_path.exists():
                         import json as _json
+                        import time as _time
+                        _epoch = int(_time.time())
                         defs_data = extract_optimized_defs(svg_path)
                         _storage.upload_file(
-                            key=f"decks/{deck_id}/compose/defs.json",
+                            key=f"decks/{deck_id}/compose/defs_{_epoch}.json",
                             data=_json.dumps(defs_data, ensure_ascii=False).encode(),
                             content_type="application/json",
                         )
-                        for sn in measure_slides:
+                        # Generate compose for all slides (diff handled by frontend)
+                        _total = count_slides(svg_path)
+                        for sn in range(1, _total + 1):
                             try:
                                 comp_data = split_slide_components(svg_path, sn)
                                 _storage.upload_file(
-                                    key=f"decks/{deck_id}/compose/slide_{sn}.json",
+                                    key=f"decks/{deck_id}/compose/slide_{sn}_{_epoch}.json",
                                     data=_json.dumps(comp_data, ensure_ascii=False).encode(),
                                     content_type="application/json",
                                 )
@@ -752,8 +756,8 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 except Exception:
                     logger.error("compose defs failed", exc_info=True)
 
-                from server_utils import schedule_webp_background
-                schedule_webp_background(deck_id, pptx_path, tmpdir, _storage)
+                # tmpdir cleanup (WebP generation only in generate_pptx)
+                shutil.rmtree(tmpdir, ignore_errors=True)
             else:
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as e:
