@@ -403,19 +403,23 @@ def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> Path:
     return pptx_path
 
 
-def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int]) -> str:
-    """PPTX → SVG → bbox measurement → report string."""
+def _export_svg(tmpdir: Path, pptx_path: Path) -> Path:
+    """PPTX → SVG via LibreOffice. Returns svg_path."""
     import subprocess
-
-    from sdpm.preview.measure import measure_from_svg, format_measure_report
-
     env = os.environ.copy()
     env["HOME"] = str(tmpdir)
-    subprocess.run(  # nosec B603
+    subprocess.run(
         ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
         env=env, capture_output=True, text=True, timeout=120, check=True,
     )
-    svg_path = tmpdir / "measure.svg"
+    return tmpdir / "measure.svg"
+
+
+def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int]) -> str:
+    """PPTX → SVG → bbox measurement → report string."""
+    from sdpm.preview.measure import measure_from_svg, format_measure_report
+
+    svg_path = _export_svg(tmpdir, pptx_path)
     if not svg_path.exists():
         return json.dumps({"error": "LibreOffice SVG export failed"})
 
@@ -697,24 +701,10 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
             tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
             pptx_path = _build_pptx(tmpdir, slides, build_kwargs)
 
-            # SVG export (needed for both measure and compose)
-            svg_path = tmpdir / "measure.svg"
-            env = os.environ.copy()
-            env["HOME"] = str(tmpdir)
-            subprocess.run(
-                ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
-                env=env, capture_output=True, text=True, timeout=120, check=True,
-            )
-
-            # Measure (only when requested)
+            # Measure (runs SVG export internally)
             if measure_slides:
                 try:
-                    from sdpm.preview.measure import measure_from_svg, format_measure_report
-                    if svg_path.exists():
-                        results = measure_from_svg(svg_path=svg_path, slide_indices=measure_slides)
-                        result["measure"] = format_measure_report(results)
-                    else:
-                        result["measure"] = json.dumps({"error": "LibreOffice SVG export failed"})
+                    result["measure"] = _run_measure(tmpdir, pptx_path, measure_slides)
                 except Exception as e:
                     result["measure"] = json.dumps({"error": str(e)})
 
@@ -746,6 +736,8 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 try:
                     from tools.compose import extract_optimized_defs, split_slide_components, count_slides
                     svg_path = tmpdir / "measure.svg"
+                    if not svg_path.exists():
+                        _export_svg(tmpdir, pptx_path)
                     if svg_path.exists():
                         import json as _json
                         import time as _time
