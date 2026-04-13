@@ -107,6 +107,7 @@ export function useWorkspace(
       try {
         const data = await getDeck(deckIdToLoad, idToken)
         if (cancelled) return
+        console.log(`[poll] slides=${data.slides.length}, compose=${data.slides.filter((s: any) => s.composeUrl).length}, defsUrl=${!!data.defsUrl}, epoch=${data.slides[0]?.composeUrl?.split('?')[0]?.match(/\d{10}/)?.[0] || 'none'}`)
         // Detect slide changes (added/removed/preview updated)
         const slideKey = data.slides.map((s) => {
           const base = s.previewUrl?.split("?")[0] || ""
@@ -139,6 +140,7 @@ export function useWorkspace(
             const base = s.composeUrl.split("?")[0]
             const cachedBase = cached?.url.split("?")[0] || ""
             if (base !== cachedBase) {
+              console.log(`[useWorkspace] composeUrl changed: ${s.slideId}`, cachedBase.split('/').pop(), '→', base.split('/').pop())
               stablePreviewUrls.current.set(cacheKey, { url: s.composeUrl })
             } else if (cached) {
               s.composeUrl = cached.url

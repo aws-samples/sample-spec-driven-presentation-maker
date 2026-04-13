@@ -805,19 +805,31 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                         # 1. List old compose keys (for cleanup + prev data)
                         old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
 
-                        # 2. Load previous slide compose data keyed by sourceHash
+                        # 2. Load previous slide compose data keyed by sourceHash + slot number
                         prev_by_hash: dict[str, list[dict]] = {}
+                        prev_by_slot: list[list[dict]] = []  # ordered by slide number
+                        prev_slot_map: dict[int, list[dict]] = {}
                         for k in old_keys:
                             if "/slide_" not in k:
                                 continue
                             try:
                                 raw = _storage.download_file_from_pptx_bucket(k)
                                 prev_data = _json.loads(raw)
+                                comps = prev_data.get("components", [])
                                 h = prev_data.get("sourceHash")
-                                if h and "components" in prev_data:
-                                    prev_by_hash[h] = prev_data["components"]
+                                if h:
+                                    prev_by_hash[h] = comps
+                                # Extract slot number from key: slide_{N}_{epoch}.json
+                                import re as _re
+                                m = _re.search(r"/slide_(\d+)_", k)
+                                if m:
+                                    prev_slot_map[int(m.group(1))] = comps
                             except Exception:
                                 pass
+                        # Build ordered list
+                        if prev_slot_map:
+                            max_slot = max(prev_slot_map.keys())
+                            prev_by_slot = [prev_slot_map.get(i, []) for i in range(1, max_slot + 1)]
 
                         # 3. Upload defs
                         defs_data = extract_optimized_defs(svg_path)
@@ -838,8 +850,10 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                                     src_hash = _hashlib.md5(_json.dumps(slides[sn - 1], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
                                 comp_data["sourceHash"] = src_hash
 
-                                # Diff: find prev slide by sourceHash
+                                # Diff: find prev slide by sourceHash, fallback to same slot number
                                 prev_comps = prev_by_hash.get(src_hash)
+                                if prev_comps is None and sn <= len(prev_by_slot):
+                                    prev_comps = prev_by_slot[sn - 1]
                                 if prev_comps is not None:
                                     # Component-level diff
                                     def _mk(c: dict) -> str:
