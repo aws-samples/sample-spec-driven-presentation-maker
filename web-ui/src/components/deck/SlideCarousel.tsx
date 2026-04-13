@@ -56,14 +56,20 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
   const scrollTargetRef = useRef<string | null | undefined>(undefined)
+  const deckReadyRef = useRef(false)
 
   useEffect(() => {
     let anyChanged = false
     for (const slide of slides) {
       const key = slide.composeUrl?.split("?")[0] || ""
       const prev = prevComposeKeys.current.get(slide.slideId) || ""
-      if (prev && key && key !== prev) anyChanged = true
+      if (key && prev && key !== prev) anyChanged = true
+      // New slide added after deck was ready
+      if (key && !prev && deckReadyRef.current) anyChanged = true
       if (key) prevComposeKeys.current.set(slide.slideId, key)
+    }
+    if (!deckReadyRef.current && slides.some(s => s.composeUrl)) {
+      deckReadyRef.current = true
     }
     if (anyChanged) scrollTargetRef.current = null // arm scroll for next onAnimate
   }, [slides])
@@ -331,6 +337,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 defsUrl={defsUrl}
                 composeUrl={slide.composeUrl}
                 slideId={slide.slideId}
+                skipAnimation={!deckReadyRef.current}
                 onAnimate={() => handleAnimate(slide.slideId)}
                 fallback={
                   <SlideThumbnail
