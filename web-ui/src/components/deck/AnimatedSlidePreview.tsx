@@ -53,6 +53,8 @@ interface AnimatedSlidePreviewProps {
   defsUrl: string
   composeUrl: string
   slideId?: string
+  /** When true, skip animation on first render (page already had compose data). */
+  initialLoad?: boolean
   onComplete?: () => void
   /** Fallback to render when compose version mismatches or fetch fails. */
   fallback?: React.ReactNode
@@ -82,7 +84,7 @@ function sanitizeSvg(raw: string): string {
 
 // --- Component ---
 
-export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, onComplete, fallback }: AnimatedSlidePreviewProps) {
+export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad, onComplete, fallback }: AnimatedSlidePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const prevCompRef = useRef<Map<string, string> | null>(null)
   const intervalsRef = useRef<number[]>([])
@@ -144,6 +146,9 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, onComplete,
               animTargets.add(i)
             }
           })
+        } else if (!initialLoad) {
+          // First compose arrived during session → animate all
+          data.components.forEach((_, i) => animTargets.add(i))
         }
 
         // Save for next diff
