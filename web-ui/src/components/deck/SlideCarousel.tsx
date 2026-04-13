@@ -53,6 +53,25 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
 
+  /* ── Compose update detection → auto-scroll to changed slide ── */
+  const prevComposeKeys = useRef<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    let firstChanged: string | null = null
+    for (const slide of slides) {
+      const key = slide.composeUrl?.split("?")[0] || ""
+      const prev = prevComposeKeys.current.get(slide.slideId) || ""
+      if (prev && key && key !== prev && !firstChanged) {
+        firstChanged = slide.slideId
+      }
+      if (key) prevComposeKeys.current.set(slide.slideId, key)
+    }
+    if (firstChanged && containerRef.current) {
+      const el = containerRef.current.querySelector(`[data-slide-id="${firstChanged}"]`)
+      el?.scrollIntoView({ behavior: "smooth", block: "center" })
+    }
+  }, [slides])
+
   /* ── Slide update detection for glow highlight ── */
   const prevUrlKeys = useRef<Map<string, string>>(new Map())
   const [updatedIds, setUpdatedIds] = useState<Set<string>>(new Set())
@@ -301,6 +320,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 key={slide.slideId}
                 defsUrl={defsUrl}
                 composeUrl={slide.composeUrl}
+                slideId={slide.slideId}
                 fallback={
                   <SlideThumbnail
                     src={slide.previewUrl}

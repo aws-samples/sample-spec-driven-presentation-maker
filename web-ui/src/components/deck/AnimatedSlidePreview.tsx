@@ -52,6 +52,7 @@ interface DefsData {
 interface AnimatedSlidePreviewProps {
   defsUrl: string
   composeUrl: string
+  slideId?: string
   onComplete?: () => void
   /** Fallback to render when compose version mismatches or fetch fails. */
   fallback?: React.ReactNode
@@ -81,7 +82,7 @@ function sanitizeSvg(raw: string): string {
 
 // --- Component ---
 
-export function AnimatedSlidePreview({ defsUrl, composeUrl, onComplete, fallback }: AnimatedSlidePreviewProps) {
+export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, onComplete, fallback }: AnimatedSlidePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const prevCompRef = useRef<Map<string, string> | null>(null)
   const intervalsRef = useRef<number[]>([])
@@ -294,7 +295,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, onComplete, fallback
   if (error && fallback) return <>{fallback}</>
 
   return (
-    <div className="aspect-[16/9] relative overflow-hidden rounded-lg bg-black">
+    <div data-slide-id={slideId} className="aspect-[16/9] relative overflow-hidden rounded-lg bg-black">
       <div ref={containerRef} className="absolute inset-0" />
     </div>
   )
