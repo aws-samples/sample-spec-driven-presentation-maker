@@ -60,21 +60,25 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
 
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
+  const scrollTargetRef = useRef<string | null>(null)
 
   useEffect(() => {
-    let firstChanged: string | null = null
+    let anyChanged = false
     for (const slide of slides) {
       const key = slide.composeUrl?.split("?")[0] || ""
       const prev = prevComposeKeys.current.get(slide.slideId) || ""
-      if (prev && key && key !== prev && !firstChanged) {
-        firstChanged = slide.slideId
-      }
+      if (prev && key && key !== prev) anyChanged = true
       if (key) prevComposeKeys.current.set(slide.slideId, key)
     }
-    if (firstChanged && containerRef.current) {
-      const el = containerRef.current.querySelector(`[data-slide-id="${firstChanged}"]`)
+    if (anyChanged) scrollTargetRef.current = null // reset, let onAnimate decide
+  }, [slides])
+
+  const handleAnimate = useCallback((slideId: string) => {
+    // Scroll to the first slide that actually animates
+    if (scrollTargetRef.current !== undefined && scrollTargetRef.current === null && containerRef.current) {
+      scrollTargetRef.current = slideId
+      const el = containerRef.current.querySelector(`[data-slide-id="${slideId}"]`)
       if (el) {
-        // Scroll so the full slide is visible with some top padding
         const container = containerRef.current
         const elRect = el.getBoundingClientRect()
         const containerRect = container.getBoundingClientRect()
@@ -82,7 +86,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
         container.scrollTo({ top: offset, behavior: "smooth" })
       }
     }
-  }, [slides])
+  }, [])
 
   /* ── Slide update detection for glow highlight ── */
   const prevUrlKeys = useRef<Map<string, string>>(new Map())
@@ -334,6 +338,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 composeUrl={slide.composeUrl}
                 slideId={slide.slideId}
                 initialLoad={initialComposeIds.current.has(slide.slideId)}
+                onAnimate={() => handleAnimate(slide.slideId)}
                 fallback={
                   <SlideThumbnail
                     src={slide.previewUrl}
