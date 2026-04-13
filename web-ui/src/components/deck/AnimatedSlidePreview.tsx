@@ -64,6 +64,10 @@ interface AnimatedSlidePreviewProps {
 
 // --- Helpers ---
 
+function makeFingerprint(c: ComposeComponent): string {
+  return `${c.class}|${c.text}`
+}
+
 function makeKey(c: ComposeComponent): string {
   return c.bbox
     ? `${c.class}|${c.bbox.x},${c.bbox.y},${c.bbox.w},${c.bbox.h}`
@@ -105,7 +109,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
 
   useEffect(() => () => cleanup(), [cleanup])
 
-  const lastJsonRef = useRef<string>("")
+  const lastComposeUrlRef = useRef<string>("")
 
   useEffect(() => {
     let cancelled = false
@@ -115,14 +119,14 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
         const [defsResp, compResp] = await Promise.all([fetch(defsUrl), fetch(composeUrl)])
         if (cancelled || !defsResp.ok || !compResp.ok) { setError(true); return }
 
+        const compUrlBase = composeUrl.split("?")[0]
+
+        // Skip if same compose URL (defs change alone doesn't need re-render)
+        if (compUrlBase === lastComposeUrlRef.current) return
+        lastComposeUrlRef.current = compUrlBase
+
         const defsText = await defsResp.text()
         const compText = await compResp.text()
-        const combined = defsText + compText
-
-        // Skip if content unchanged
-        if (combined === lastJsonRef.current) return
-        lastJsonRef.current = combined
-
         const defsData: DefsData = JSON.parse(defsText)
         const data: ComposeData = JSON.parse(compText)
 
@@ -143,8 +147,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
         if (prevMap) {
           data.components.forEach((comp, i) => {
             const key = makeKey(comp)
-            const prevSvg = prevMap.get(key)
-            if (prevSvg === undefined || prevSvg !== comp.svg) {
+            const prevFp = prevMap.get(key)
+            if (prevFp === undefined || prevFp !== makeFingerprint(comp)) {
               animTargets.add(i)
             }
           })
@@ -155,7 +159,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, initialLoad
 
         // Save for next diff
         const newMap = new Map<string, string>()
-        data.components.forEach(c => newMap.set(makeKey(c), c.svg))
+        data.components.forEach(c => newMap.set(makeKey(c), makeFingerprint(c)))
         prevCompRef.current = newMap
 
         if (animTargets.size > 0) onAnimate?.()
