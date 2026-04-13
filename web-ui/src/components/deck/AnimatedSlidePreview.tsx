@@ -91,8 +91,12 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
   // Track latest props in refs so the interval can read them without re-triggering
   const composeUrlRef = useRef(composeUrl)
   const defsUrlRef = useRef(defsUrl)
+  const skipRef = useRef(skipAnimation)
   composeUrlRef.current = composeUrl
   defsUrlRef.current = defsUrl
+  // When skipAnimation transitions false→true (deck ready), re-check current URL
+  if (skipRef.current && !skipAnimation) lastComposeUrlRef.current = ""
+  skipRef.current = skipAnimation
 
   useEffect(() => {
     let cancelled = false
@@ -122,7 +126,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
 
           // skipAnimation = instant. Otherwise use backend changed flag.
           const animTargets = new Set<number>()
-          if (!skipAnimation) {
+          if (!skipRef.current) {
             data.components.forEach((comp, i) => {
               if (comp.changed) animTargets.add(i)
             })
