@@ -367,6 +367,8 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
         total = sum(len(g["slugs"]) for g in slide_groups)
         done_count = 0
 
+        summaries = {", ".join(g["slugs"]): "" for g in slide_groups}
+
         for gi, group in enumerate(slide_groups):
             slugs_label = ", ".join(group["slugs"])
             yield {"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"}
@@ -387,14 +389,17 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
                             last_tool = name
                             yield {"group": gi + 1, "slugs": slugs_label, "tool": name}
 
+                # Capture composer's final response
+                composer_response = str(composer.messages[-1].get("content", [{}])[-1].get("text", "")) if composer.messages else ""
                 generated.extend(group["slugs"])
                 done_count += len(group["slugs"])
-                yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
+                yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total, "summary": composer_response}
+                summaries[slugs_label] = composer_response
             except Exception as e:
                 errors.append({"slugs": group["slugs"], "error": str(e)})
                 yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(e)}
 
-        yield _json.dumps({"generated_slides": generated, "errors": errors})
+        yield _json.dumps({"generated_slides": generated, "errors": errors, "summaries": summaries})
 
     return compose_slides
 
