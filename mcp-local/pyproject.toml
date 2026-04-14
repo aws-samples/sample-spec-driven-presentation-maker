@@ -13,7 +13,7 @@ sdpm-skill = { path = "../skill" }
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
+    "pytest>=9.0.3",
     "ruff",
 ]
 
