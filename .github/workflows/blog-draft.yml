@@ -1,4 +1,3 @@
-# checkov:skip=CKV_GHA_7: workflow_dispatch inputs are required for PR number selection
 name: Blog draft
 
 on:
