@@ -307,7 +307,7 @@ Height includes the language label (22px). Code body height is `height - 22`.
 ```json
 {
   "type": "image",
-  "src": "screenshot.png",
+  "src": "profile.png",
   "x": 192, "y": 216, "width": 600, "height": 400,
   "mask": "circle|rounded_rectangle|hexagon|diamond|triangle|pentagon|star_5_point|heart|trapezoid",
   "maskAdjustments": [0.15],
@@ -317,7 +317,7 @@ Height includes the language label (22px). Code body height is `height - 22`.
   "saturation": -100
 }
 ```
-- `mask`: clip image to a shape. For circular profiles, rounded screenshots, etc.
+- `mask`: clip image to a shape. For circular profile photos, decorative hexagons, etc. **Omit for screenshots and web images** — display them as plain rectangles by default.
 - `maskAdjustments`: corner radius for rounded_rectangle, etc. (0–1)
 - `crop`: trim the image (% per side, cutting inward)
 - `brightness`: brightness adjustment (-100–100, 0=no change)
