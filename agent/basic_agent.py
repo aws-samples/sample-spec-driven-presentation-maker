@@ -217,23 +217,40 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
 
     composer_prompt = _build_system_prompt(_COMPOSER_PROMPT_TEMPLATE, mcp_instructions)
 
-    @strands_tool
+    @strands_tool(
+        name="compose_slides",
+        description="Compose slides by delegating to composer agents. "
+        "Call when Phase 1 is complete and slides need to be generated.",
+        inputSchema={
+            "json": {
+                "type": "object",
+                "properties": {
+                    "slide_groups": {
+                        "type": "array",
+                        "description": "List of groups to compose. Each group has slugs and instruction.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "slugs": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Slide slugs to generate (e.g. ['title', 'problem'])",
+                                },
+                                "instruction": {
+                                    "type": "string",
+                                    "description": "What to compose, including deck_id and context",
+                                },
+                            },
+                            "required": ["slugs", "instruction"],
+                        },
+                    },
+                },
+                "required": ["slide_groups"],
+            }
+        },
+    )
     def compose_slides(slide_groups: list) -> dict:
-        """Compose slides by delegating to composer agents.
-
-        Call this tool when Phase 1 is complete and slides need to be generated.
-        Each group is processed by a separate composer agent that reads specs,
-        builds slides, generates PPTX, measures, previews, and polishes.
-
-        Args:
-            slide_groups: List of groups to compose. Each group is a dict with:
-                - slugs: list of slide slugs to generate (e.g. ["title", "problem"])
-                - instruction: what to compose, including deck_id and context
-
-        Returns:
-            Report dict with generated_slides, outline_check, preview_images,
-            measure_summary, and errors.
-        """
+        """Compose slides by delegating to composer agents."""
         generated = []
         errors = []
 
