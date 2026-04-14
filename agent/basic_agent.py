@@ -149,7 +149,7 @@ Respond in the same language as the user.
 
 ## Your Role
 - Conduct Phase 1: briefing, outline design, art direction — all through user dialogue
-- When Phase 1 is complete and the user approves, call `compose_slides` to delegate slide generation to the composer agent
+- When Phase 1 is complete and the user approves, call `compose_slides(deck_id=..., slide_groups=[...])` to delegate slide generation to the composer agent
 - You do NOT write slide JSON yourself. You do NOT call build/measure/preview tools directly
 - After compose_slides returns, review the report and relay results to the user
 - For user modification requests, translate them into instructions and call compose_slides again
@@ -168,28 +168,35 @@ You are the composer agent for spec-driven-presentation-maker.
 You handle Phase 2 (compose slides) and Phase 3 (review + polish).
 You work silently — no user interaction. Execute the instruction fully and return.
 
-{mcp_instructions}
+## Architecture
+- Edit workspace files via `run_python(deck_id=..., save=True)` using normal file I/O
+- Measure: `run_python(code=..., deck_id=..., save=True, measure_slides=["slug"])` — always specify measure_slides when editing slides
+- MCP tools: generate_pptx, get_preview for build and preview
+- Do NOT call read_workflows, read_guides, read_examples — all references are pre-loaded below
 
 ## Your Role
 - Read the instruction provided, which specifies which slides to compose
 - deck.json is READ-ONLY — do not modify it
 - Write each slide to slides/{{slug}}.json via run_python
-- Follow the compose and review workflows loaded from MCP tools
+- Follow the compose workflow below — you already have everything you need
 - After composing, generate PPTX, measure, preview, and polish autonomously
 
 ## Constraints
 - Do NOT ask the user anything — you have no user interaction
 - Do NOT modify deck.json, specs/brief.md, specs/outline.md, or specs/art-direction.html
 - Write ONLY the slides assigned to you
+
+{prefetched_context}
 """
 
 
-def _build_system_prompt(template: str, mcp_instructions: str) -> str:
-    """Build system prompt with current timestamp and MCP server instructions.
+def _build_system_prompt(template: str, mcp_instructions: str = "", **kwargs: str) -> str:
+    """Build system prompt with current timestamp and optional placeholders.
 
     Args:
-        template: Prompt template string with {now} and {mcp_instructions} placeholders.
-        mcp_instructions: Concatenated instructions from MCP servers.
+        template: Prompt template string with {now} and optional placeholders.
+        mcp_instructions: MCP server instructions (for SPEC agent).
+        **kwargs: Additional placeholder replacements (e.g. prefetched_context).
 
     Returns:
         Formatted system prompt string.
@@ -198,12 +205,92 @@ def _build_system_prompt(template: str, mcp_instructions: str) -> str:
 
     jst = timezone(timedelta(hours=9))
     now_str = datetime.now(jst).strftime("%Y-%m-%d %H:%M JST")
-    return template.replace("{now}", now_str).replace("{mcp_instructions}", mcp_instructions)
+    result = template.replace("{now}", now_str).replace("{mcp_instructions}", mcp_instructions)
+    for key, value in kwargs.items():
+        result = result.replace("{" + key + "}", value)
+    return result
 
 
 # ---------------------------------------------------------------------------
 # Compose Slides Tool (Agents as Tools pattern)
 # ---------------------------------------------------------------------------
+
+# References to prefetch for composer (tool_name, arguments, label)
+_COMPOSER_PREFETCH = [
+    ("read_workflows", {"names": ["create-new-2-compose"]}, "Compose Workflow"),
+    ("read_workflows", {"names": ["slide-json-spec"]}, "Slide JSON Spec"),
+    ("read_guides", {"names": ["grid"]}, "Grid Guide"),
+    ("read_examples", {"names": ["components/all"]}, "Components Reference"),
+    ("read_examples", {"names": ["patterns"]}, "Patterns Catalog"),
+]
+
+
+def _prefetch_context(mcp_client, deck_id: str = "") -> str:
+    """Prefetch all Phase 2 references via MCPClient.call_tool_sync.
+
+    Args:
+        mcp_client: MCPClient instance.
+        deck_id: Deck ID for fetching deck-specific specs.
+
+    Returns:
+        Concatenated reference text with section headers.
+
+    Raises:
+        RuntimeError: If any common reference fails to load.
+    """
+    import json as _json
+    import uuid
+
+    sections = []
+    for tool_name, args, label in _COMPOSER_PREFETCH:
+        result = mcp_client.call_tool_sync(
+            tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
+            name=tool_name,
+            arguments=args,
+        )
+        if result.get("status") == "error":
+            raise RuntimeError(f"Failed to prefetch {label}: {result.get('content')}")
+        text = ""
+        for item in result.get("content", []):
+            if isinstance(item, dict) and "text" in item:
+                text += item["text"]
+        if text:
+            sections.append(f"## {label}\n\n{text}")
+
+    # Fetch deck-specific specs via run_python
+    if deck_id:
+        code = (
+            "import json\n"
+            "specs = {}\n"
+            "for name in ['specs/brief.md', 'specs/outline.md', 'specs/art-direction.html', 'deck.json']:\n"
+            "    try:\n"
+            "        specs[name] = open(name).read()\n"
+            "    except FileNotFoundError:\n"
+            "        pass\n"
+            "print(json.dumps(specs, ensure_ascii=False))\n"
+        )
+        result = mcp_client.call_tool_sync(
+            tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
+            name="run_python",
+            arguments={"code": code, "deck_id": deck_id},
+        )
+        if result.get("status") == "error":
+            raise RuntimeError(f"Failed to prefetch specs for deck {deck_id}: {result.get('content')}")
+        for item in result.get("content", []):
+            if isinstance(item, dict) and "text" in item:
+                try:
+                    output = _json.loads(item["text"])
+                    # output may be wrapped in {"output": "..."} by sandbox
+                    if isinstance(output, dict) and "output" in output:
+                        output = _json.loads(output["output"])
+                    if not isinstance(output, dict) or not output:
+                        raise RuntimeError(f"Specs empty for deck {deck_id} — workspace may not exist")
+                    for filename, content in output.items():
+                        sections.append(f"## {filename}\n\n{content}")
+                except _json.JSONDecodeError as e:
+                    raise RuntimeError(f"Failed to parse specs for deck {deck_id}: {e}") from e
+
+    return "\n\n---\n\n".join(sections)
 
 
 def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
@@ -212,14 +299,15 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
     Args:
         mcp_servers: List of MCPClient instances for the composer agent.
         model: BedrockModel instance.
-        mcp_instructions: Pre-collected MCP server instructions (cached).
+        mcp_instructions: Pre-collected MCP server instructions (unused, kept for signature compat).
 
     Returns:
         A @tool-decorated function.
     """
     from strands import tool as strands_tool
 
-    composer_prompt = _build_system_prompt(_COMPOSER_PROMPT_TEMPLATE, mcp_instructions)
+    # Find the primary MCP client for prefetching
+    mcp_client = mcp_servers[0] if mcp_servers else None
 
     @strands_tool(
         name="compose_slides",
@@ -229,6 +317,10 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
             "json": {
                 "type": "object",
                 "properties": {
+                    "deck_id": {
+                        "type": "string",
+                        "description": "Deck ID for the presentation workspace",
+                    },
                     "slide_groups": {
                         "type": "array",
                         "description": "List of groups to compose. Each group has slugs and instruction.",
@@ -242,23 +334,33 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
                                 },
                                 "instruction": {
                                     "type": "string",
-                                    "description": "What to compose, including deck_id and context",
+                                    "description": "What to compose for this group",
                                 },
                             },
                             "required": ["slugs", "instruction"],
                         },
                     },
                 },
-                "required": ["slide_groups"],
+                "required": ["deck_id", "slide_groups"],
             }
         },
     )
-    async def compose_slides(slide_groups: list):
+    async def compose_slides(deck_id: str, slide_groups: list):
         """Compose slides by delegating to composer agents.
 
+        Prefetches all Phase 2 references once, then injects into composer prompt.
         Async generator: yields progress dicts, then returns final result str.
         """
         import json as _json
+
+        # Prefetch all references (Python call, no LLM turns)
+        yield {"status": "prefetching", "message": "Loading references..."}
+        prefetched = _prefetch_context(mcp_client, deck_id=deck_id) if mcp_client else ""
+
+        composer_prompt = _build_system_prompt(
+            _COMPOSER_PROMPT_TEMPLATE,
+            prefetched_context=prefetched,
+        )
 
         generated = []
         errors = []
