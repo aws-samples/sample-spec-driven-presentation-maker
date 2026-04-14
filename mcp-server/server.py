@@ -275,16 +275,18 @@ def save_web_image(url: str, deck_id: str, filename: str = "") -> str:
 
 
 @mcp.tool()
-def read_uploaded_file(upload_id: str, deck_id: str) -> list:
+def read_uploaded_file(upload_id: str, deck_id: str, page_start: int = 0) -> list:
     """Read an uploaded file's content. Returns text for documents, visual preview for images/PDFs.
 
     For images: saves original to deck workspace for use in slides, returns visual preview.
     For PDFs: extracts text and embedded images, saves images to deck workspace.
+      Use page_start to paginate through long PDFs (e.g. page_start=20 for pages 21-40).
     For PPTX: returns extracted text and guidance to use pptx_to_json.
 
     Args:
         deck_id: The deck ID. Must be initialized first via init_presentation().
         upload_id: The upload identifier from the [Attached: ...] message.
+        page_start: Page offset for PDF pagination (default 0). Use the value from the truncation message.
 
     Returns:
         Text content and/or image previews for visual analysis.
@@ -297,6 +299,7 @@ def read_uploaded_file(upload_id: str, deck_id: str) -> list:
         deck_id=deck_id,
         user_id=_get_user_id(),
         storage=_storage,
+        page_start=page_start,
     )
 
 

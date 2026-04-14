@@ -43,6 +43,7 @@ def read_uploaded_file(
     deck_id: str,
     user_id: str,
     storage: Storage,
+    page_start: int = 0,
 ) -> list:
     """Read an uploaded file, returning text and/or ImageContent.
 
@@ -91,16 +92,16 @@ def read_uploaded_file(
 
     # --- PDF ---
     if file_type == "application/pdf" and s3_key:
-        return _read_pdf(storage, deck_id, s3_key, file_name)
+        return _read_pdf(storage, deck_id, s3_key, file_name, page_start=page_start)
 
     return [f"Unsupported file type: {file_type} ({file_name})"]
 
 
-def _read_pdf(storage: Storage, deck_id: str, s3_key: str, file_name: str) -> list:
+def _read_pdf(storage: Storage, deck_id: str, s3_key: str, file_name: str, *, page_start: int = 0) -> list:
     """Extract text and images from PDF.
 
     Safety limits:
-    - MAX_PAGES: pages to process per call
+    - MAX_PAGES: pages to process per call (use page_start to paginate)
     - MAX_IMAGES: total image previews (JPEG) to return
     - Images beyond the limit are saved to deck workspace but not previewed
     """
@@ -112,39 +113,47 @@ def _read_pdf(storage: Storage, deck_id: str, s3_key: str, file_name: str) -> li
     data = storage.download_file_from_pptx_bucket(s3_key)
     reader = PdfReader(io.BytesIO(data))
     total_pages = len(reader.pages)
+    page_end = min(page_start + MAX_PAGES, total_pages)
 
     result: list = []
     all_text = []
     img_idx = 0
     preview_count = 0
 
-    for pi, page in enumerate(reader.pages[:MAX_PAGES], 1):
+    for pi in range(page_start, page_end):
+        page = reader.pages[pi]
+        page_num = pi + 1  # 1-based display
+
         text = page.extract_text() or ""
         if text.strip():
-            all_text.append(f"### Page {pi}\n{text.strip()}")
+            all_text.append(f"### Page {page_num}\n{text.strip()}")
 
         for image in page.images:
             img_idx += 1
             ext = image.name.rsplit(".", 1)[-1] if "." in image.name else "png"
-            img_name = f"pdf_p{pi}_img{img_idx}.{ext}"
+            img_name = f"pdf_p{page_num}_img{img_idx}.{ext}"
             src = _save_image_to_deck(storage, deck_id, img_name, image.data)
             if preview_count < MAX_IMAGES:
                 try:
                     jpeg = _to_jpeg(image.data)
-                    result.append(f"PDF page {pi} image → `{src}`")
+                    result.append(f"PDF page {page_num} image → `{src}`")
                     result.append(Image(data=jpeg, format="jpeg"))
                     preview_count += 1
                 except Exception:
-                    result.append(f"PDF page {pi} image → `{src}` (preview unavailable)")
+                    result.append(f"PDF page {page_num} image → `{src}` (preview unavailable)")
             else:
-                result.append(f"PDF page {pi} image → `{src}` (saved, preview limit reached)")
+                result.append(f"PDF page {page_num} image → `{src}` (saved, preview limit reached)")
 
     if all_text:
-        result.insert(0, f"## Text from {file_name}\n\n" + "\n\n".join(all_text))
+        header = f"## Text from {file_name} ({total_pages} pages, showing pages {page_start + 1}-{page_end})"
+        result.insert(0, header + "\n\n" + "\n\n".join(all_text))
     elif not result:
         result.append(f"No extractable text or images found in {file_name}.")
 
-    if total_pages > MAX_PAGES:
-        result.append(f"\n[{total_pages - MAX_PAGES} more pages not processed. Total: {total_pages} pages]")
+    if page_end < total_pages:
+        result.append(
+            f"\n[{total_pages - page_end} more pages not shown. "
+            f"Call read_uploaded_file with page_start={page_end} to continue reading.]"
+        )
 
     return result
