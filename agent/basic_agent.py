@@ -24,6 +24,7 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
 from strands.models import BedrockModel
+from strands.models.bedrock import CacheConfig
 from strands.tools.mcp import MCPClient
 from tools.upload_tools import list_uploads
 from tools.web_tools import web_fetch
@@ -242,6 +243,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
     model = BedrockModel(
         model_id=os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-4-6"),
         temperature=0.1,
+        cache_config=CacheConfig(strategy="auto"),
     )
 
     # --- Build MCP server list with resilience ---
