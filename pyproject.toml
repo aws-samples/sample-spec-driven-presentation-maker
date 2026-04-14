@@ -11,7 +11,7 @@ sdpm-skill = { path = "skill", editable = true }
 [dependency-groups]
 dev = [
     "sdpm-skill",
-    "pytest>=9.0.2",
+    "pytest>=9.0.3",
     "ruff",
     "python-pptx",
     "lxml",
