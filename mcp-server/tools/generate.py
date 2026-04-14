@@ -149,7 +149,7 @@ def _prepare_workspace(
             json.dumps(deck_meta, ensure_ascii=False), encoding="utf-8"
         )
         has_deck_json = True
-    except (ValueError, Exception):
+    except ValueError:
         pass
 
     if has_deck_json:
@@ -161,7 +161,7 @@ def _prepare_workspace(
             specs_dir.mkdir(parents=True, exist_ok=True)
             (specs_dir / "outline.md").write_bytes(data)
         except Exception:
-            pass
+            logger.warning("outline.md not found for deck %s", deck_id)
 
         # Download slides/*.json
         slide_keys = storage.list_files(

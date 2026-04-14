@@ -19,7 +19,11 @@ def _resolve_template(data: dict, input_path: str | Path | None, templates_dir: 
     Returns (template_path, custom_template) or raises FileNotFoundError.
     """
     if data.get("template"):
-        base_dir = Path(input_path).parent if input_path else Path(".")
+        if input_path:
+            p = Path(input_path)
+            base_dir = p if p.is_dir() else p.parent
+        else:
+            base_dir = Path(".")
         template = base_dir / data["template"]
         if template.exists():
             return template, True
@@ -222,7 +226,7 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
     templates_dir = Path(__file__).parent.parent / "templates"
     warnings: list[str] = []
 
-    template_file, custom = _resolve_template(data, str(input_path) if not input_path.is_dir() else None, templates_dir)
+    template_file, custom = _resolve_template(data, str(input_path), templates_dir)
 
     # Auto-fill fonts
     from sdpm.analyzer import extract_fonts as _extract_fonts
