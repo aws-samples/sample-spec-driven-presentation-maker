@@ -571,7 +571,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               const newToolUses = [...last.toolUses]
               const existing = newToolUses[idx].streamMessages || []
               newToolUses[idx] = { ...newToolUses[idx], streamMessages: [...existing, msg] }
-              updated[updated.length - 1] = { ...last, toolUses: newToolUses }
+              const toolMap = new Map(newToolUses.map((t) => [t.toolUseId, t]))
+              const blocks = rebuildBlocks(lastTextSnapshot, toolMap)
+              updated[updated.length - 1] = { ...last, toolUses: newToolUses, blocks }
               return updated
             })
             return

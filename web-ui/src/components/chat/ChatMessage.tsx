@@ -249,7 +249,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                   input={block.tool.input}
                   status={block.tool.status}
                   result={block.tool.result}
-                  isActive={isStreaming && !block.tool.status && i === blocks.length - 1}
+                  isActive={isStreaming && !block.tool.status && (i === blocks.length - 1 || (block.tool.streamMessages?.length ?? 0) > 0)}
                   streamMessages={block.tool.streamMessages}
                 />
               )
