@@ -68,24 +68,6 @@ def generate_previews(pptx_path: Path, output_dir: Path) -> list[Path]:
     return webp_files
 
 
-def _parse_outline_slugs(outline_path: Path) -> list[str]:
-    """Parse outline.md and return ordered list of slugs.
-
-    Format: ``- [slug] Message text``
-    """
-    import re as _re
-
-    pattern = _re.compile(r"^-\s*\[([a-z0-9-]+)\]\s*")
-    slugs: list[str] = []
-    if not outline_path.exists():
-        return slugs
-    for line in outline_path.read_text(encoding="utf-8").splitlines():
-        m = pattern.match(line)
-        if m:
-            slugs.append(m.group(1))
-    return slugs
-
-
 def _assemble_slides(tmpdir: Path) -> list[dict]:
     """Assemble slide list from workspace directory.
 
@@ -102,7 +84,8 @@ def _assemble_slides(tmpdir: Path) -> list[dict]:
     """
     deck_json_path = tmpdir / "deck.json"
     if deck_json_path.exists():
-        slugs = _parse_outline_slugs(tmpdir / "specs" / "outline.md")
+        from sdpm.api import parse_outline_slugs
+        slugs = parse_outline_slugs(tmpdir / "specs" / "outline.md")
         slides: list[dict] = []
         for slug in slugs:
             slide_path = tmpdir / "slides" / f"{slug}.json"

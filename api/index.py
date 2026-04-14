@@ -425,6 +425,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         s3_client.head_object(Bucket=BUCKET_NAME, Key=deck_json_key)
 
         # Parse outline.md for slug order
+        # Canonical implementation: sdpm.api.parse_outline_slugs (not importable in Lambda)
         import re as _re
         slugs = []
         try:

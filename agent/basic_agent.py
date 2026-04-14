@@ -258,7 +258,6 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
 
         Async generator: yields progress dicts, then returns final result str.
         """
-        from typing import AsyncIterator
         import json as _json
 
         generated = []
