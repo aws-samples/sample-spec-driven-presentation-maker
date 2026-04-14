@@ -82,44 +82,75 @@ def web_fetch(url: str, max_chars: int = 20000, start: int = 0, include_images: 
 def _handle_pdf(url: str, data: bytes) -> dict:
     """Extract text, page images, and embedded images from PDF bytes.
 
-    Returns three types of content per page:
-    - Text extraction for reading
-    - Page rendering (PNG) for visual analysis
-    - Embedded images extracted as raw bytes (no CSS/rendering effects)
-      for reuse in presentations
+    Safety limits to prevent oversized responses:
+    - Processes up to MAX_PAGES pages per call (use page_start to paginate)
+    - Renders up to MAX_PAGE_IMAGES page images for visual analysis
+    - Embedded images are listed as metadata only; agent can fetch individually
+    - Total response size is capped at MAX_RESPONSE_BYTES
     """
     import pymupdf
 
+    MAX_PAGES = 5
+    MAX_PAGE_IMAGES = 3
+    MAX_EMBEDDED_IMAGES = 10
+    MAX_RESPONSE_BYTES = 10 * 1024 * 1024  # 10 MB
+
     doc = pymupdf.open(stream=data, filetype="pdf")
+    total_pages = doc.page_count
     content: list[dict] = []
-    content.append({"text": f"PDF: {url} ({doc.page_count} pages)"})
+    content.append({"text": f"PDF: {url} ({total_pages} pages, showing pages 1-{min(MAX_PAGES, total_pages)})"})
+
+    response_bytes = 0
+    page_images_rendered = 0
+    embedded_images_count = 0
 
     for i, page in enumerate(doc):
-        # Text extraction
+        if i >= MAX_PAGES:
+            break
+
+        # Text extraction (lightweight)
         text = page.get_text()
         if text.strip():
             content.append({"text": f"--- Page {i + 1} ---\n{text.strip()}"})
 
-        # Render page as image for visual analysis
-        pix = page.get_pixmap(dpi=150)
-        img_bytes = pix.tobytes("png")
-        content.append({"image": {"format": "png", "source": {"bytes": img_bytes}}})
+        # Render page as image (limited count)
+        if page_images_rendered < MAX_PAGE_IMAGES:
+            pix = page.get_pixmap(dpi=150)
+            img_bytes = pix.tobytes("png")
+            if response_bytes + len(img_bytes) > MAX_RESPONSE_BYTES:
+                content.append({"text": f"[Page {i + 1} image skipped: response size limit reached]"})
+                break
+            content.append({"image": {"format": "png", "source": {"bytes": img_bytes}}})
+            response_bytes += len(img_bytes)
+            page_images_rendered += 1
+        else:
+            content.append({"text": f"[Page {i + 1} image skipped: page image limit ({MAX_PAGE_IMAGES}) reached]"})
 
-        # Extract embedded images (raw, without rendering effects)
+        # List embedded images as metadata only
         for img_info in page.get_images(full=True):
+            embedded_images_count += 1
+            if embedded_images_count > MAX_EMBEDDED_IMAGES:
+                break
             xref = img_info[0]
             try:
                 base_image = doc.extract_image(xref)
-                if not base_image or not base_image.get("image"):
+                if not base_image:
                     continue
-                ext = base_image.get("ext", "png")
-                fmt = {"png": "png", "jpeg": "jpeg", "jpg": "jpeg", "webp": "webp"}.get(ext)
-                if not fmt:
-                    continue
-                content.append({"text": f"[Embedded image on page {i + 1}: {base_image.get('width', '?')}x{base_image.get('height', '?')} {ext}]"})
-                content.append({"image": {"format": fmt, "source": {"bytes": base_image["image"]}}})
+                w = base_image.get("width", "?")
+                h = base_image.get("height", "?")
+                ext = base_image.get("ext", "?")
+                size = len(base_image.get("image", b""))
+                content.append({"text": f"[Embedded image page {i + 1}: {w}x{h} {ext}, {size} bytes, xref={xref}]"})
             except Exception:
                 continue
+
+    if total_pages > MAX_PAGES:
+        content.append({
+            "text": f"\n[{total_pages - MAX_PAGES} more pages not shown. "
+            f"Call web_fetch with page_start={MAX_PAGES} to continue reading.]"
+        })
+    if embedded_images_count > MAX_EMBEDDED_IMAGES:
+        content.append({"text": f"[{embedded_images_count - MAX_EMBEDDED_IMAGES}+ more embedded images not listed]"})
 
     doc.close()
     return {"status": "success", "content": content}

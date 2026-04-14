@@ -97,17 +97,28 @@ def read_uploaded_file(
 
 
 def _read_pdf(storage: Storage, deck_id: str, s3_key: str, file_name: str) -> list:
-    """Extract text and images from PDF."""
+    """Extract text and images from PDF.
+
+    Safety limits:
+    - MAX_PAGES: pages to process per call
+    - MAX_IMAGES: total image previews (JPEG) to return
+    - Images beyond the limit are saved to deck workspace but not previewed
+    """
     from pypdf import PdfReader
+
+    MAX_PAGES = 20
+    MAX_IMAGES = 10
 
     data = storage.download_file_from_pptx_bucket(s3_key)
     reader = PdfReader(io.BytesIO(data))
+    total_pages = len(reader.pages)
 
     result: list = []
     all_text = []
     img_idx = 0
+    preview_count = 0
 
-    for pi, page in enumerate(reader.pages, 1):
+    for pi, page in enumerate(reader.pages[:MAX_PAGES], 1):
         text = page.extract_text() or ""
         if text.strip():
             all_text.append(f"### Page {pi}\n{text.strip()}")
@@ -117,16 +128,23 @@ def _read_pdf(storage: Storage, deck_id: str, s3_key: str, file_name: str) -> li
             ext = image.name.rsplit(".", 1)[-1] if "." in image.name else "png"
             img_name = f"pdf_p{pi}_img{img_idx}.{ext}"
             src = _save_image_to_deck(storage, deck_id, img_name, image.data)
-            try:
-                jpeg = _to_jpeg(image.data)
-                result.append(f"PDF page {pi} image → `{src}`")
-                result.append(Image(data=jpeg, format="jpeg"))
-            except Exception:
-                result.append(f"PDF page {pi} image → `{src}` (preview unavailable)")
+            if preview_count < MAX_IMAGES:
+                try:
+                    jpeg = _to_jpeg(image.data)
+                    result.append(f"PDF page {pi} image → `{src}`")
+                    result.append(Image(data=jpeg, format="jpeg"))
+                    preview_count += 1
+                except Exception:
+                    result.append(f"PDF page {pi} image → `{src}` (preview unavailable)")
+            else:
+                result.append(f"PDF page {pi} image → `{src}` (saved, preview limit reached)")
 
     if all_text:
         result.insert(0, f"## Text from {file_name}\n\n" + "\n\n".join(all_text))
     elif not result:
         result.append(f"No extractable text or images found in {file_name}.")
+
+    if total_pages > MAX_PAGES:
+        result.append(f"\n[{total_pages - MAX_PAGES} more pages not processed. Total: {total_pages} pages]")
 
     return result
