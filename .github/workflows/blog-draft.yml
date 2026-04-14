@@ -44,13 +44,25 @@ jobs:
           echo "branch_name=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
           echo "Branch: ${BRANCH_NAME}"
 
+      - name: Clone zenn-blog (instruction + push target)
+        env:
+          BLOG_REPO_TOKEN: ${{ secrets.BLOG_REPO_TOKEN }}
+        run: |
+          git clone "https://x-access-token:${BLOG_REPO_TOKEN}@github.com/okamoto-aws/zenn-blog.git" /tmp/zenn-blog
+
       - name: Generate blog draft with Kiro CLI
         env:
           KIRO_API_KEY: ${{ secrets.KIRO_API_KEY }}
           PR_NUMBERS: ${{ inputs.pr_numbers }}
           BLOG_THEME: ${{ inputs.blog_theme }}
         run: |
-          # Build prompt
+          # Load instruction from private repo (if exists)
+          INSTRUCTION=""
+          if [ -f /tmp/zenn-blog/instruction.md ]; then
+            INSTRUCTION=$(cat /tmp/zenn-blog/instruction.md)
+          fi
+
+          # Build PR data
           PR_DATA=""
           for pr in $(echo "$PR_NUMBERS" | tr ',' ' '); do
             META=$(cat "/tmp/pr-data/pr-${pr}-meta.json")
@@ -69,18 +81,9 @@ jobs:
             THEME_INSTRUCTION="テーマ/切り口: ${BLOG_THEME}"
           fi
 
-          PROMPT="あなたはAWS Solutions Architectのテックブロガーです。
-          以下のPRの内容をもとに、Zenn (zenn.dev/aws_japan) 向けの日本語ブログ記事をドラフトしてください。
+          PROMPT="${INSTRUCTION}
 
           ${THEME_INSTRUCTION}
-
-          要件:
-          - Zennのfrontmatter (title, emoji, type, topics, published: false, publication_name: aws_japan) を含める
-          - 技術的に正確で、具体的なユースケースを交えて説明する
-          - コードブロックや設定例があれば含める
-          - 「この記事は個人の見解であり、所属する組織の公式見解ではありません。」を冒頭に入れる
-          - 画像が必要な箇所は <!-- TODO: [📸 画像プレースホルダ] 説明 --> で示す
-          - ファイル名は slug 形式で出力の最初の行に記載: filename: sdpm-xxx.md
 
           PR データ:
           ${PR_DATA}
@@ -118,8 +121,6 @@ jobs:
           FILENAME=$(cat /tmp/blog-filename.txt)
           REPO="okamoto-aws/zenn-blog"
 
-          # Clone zenn-blog
-          git clone "https://x-access-token:${BLOG_REPO_TOKEN}@github.com/${REPO}.git" /tmp/zenn-blog
           cd /tmp/zenn-blog
           git checkout publish
           git checkout -b "$BRANCH_NAME"
