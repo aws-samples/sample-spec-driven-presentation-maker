@@ -17,7 +17,7 @@ def _detect_content_type(response: requests.Response) -> str:
 
 
 @tool
-def web_fetch(url: str, max_chars: int = 20000, start: int = 0) -> dict | str:
+def web_fetch(url: str, max_chars: int = 20000, start: int = 0, include_images: bool = False) -> dict | str:
     """Fetch a web page, PDF, or image from a URL.
 
     - HTML pages are returned as Markdown text.
@@ -26,10 +26,15 @@ def web_fetch(url: str, max_chars: int = 20000, start: int = 0) -> dict | str:
 
     For long HTML pages, use 'start' to paginate through the content.
 
+    When include_images is True, image references (![alt](url)) are preserved in the
+    Markdown output. You can then fetch individual images by calling web_fetch(url) on
+    the image URLs that are relevant for the presentation.
+
     Args:
         url: The URL to fetch.
         max_chars: Maximum characters to return for HTML (default 20000).
         start: Character offset to start from, for HTML reading continuation.
+        include_images: If True, keep image URLs in Markdown output (default False).
 
     Returns:
         Markdown text for HTML, or structured ToolResult for PDF/image.
@@ -60,7 +65,7 @@ def web_fetch(url: str, max_chars: int = 20000, start: int = 0) -> dict | str:
     # --- HTML (default) ---
     h = html2text.HTML2Text()
     h.ignore_links = False
-    h.ignore_images = True
+    h.ignore_images = not include_images
     h.body_width = 0
     markdown = h.handle(response.text)
 

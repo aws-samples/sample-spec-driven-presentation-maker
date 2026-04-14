@@ -475,6 +475,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         .join("\n\n")
       fullMessage = `${fullMessage}\n\n${snippetInfo}`
     }
+    if (fetchWebImages) {
+      fullMessage = `[Option: include_images=true — When using web_fetch on HTML pages, pass include_images=true to preserve image URLs. Then fetch relevant images individually for use in the presentation.]\n\n${fullMessage}`
+    }
 
     const sentSnippets = snippets.map((s) => ({ label: s.label || "Text snippet", text: s.text }))
     const sentAttachments = uploadedFiles.map((f) => ({ fileName: f.fileName, fileType: f.fileType }))
