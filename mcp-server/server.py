@@ -245,7 +245,8 @@ def save_web_image(url: str, deck_id: str, filename: str = "") -> str:
     """
     import mimetypes
     import urllib.parse
-    import urllib.request
+
+    import requests as http_requests
 
     _check_deck_access(deck_id, action="edit_slide")
 
@@ -254,10 +255,12 @@ def save_web_image(url: str, deck_id: str, filename: str = "") -> str:
         return json.dumps({"error": f"Only http/https URLs are allowed, got: {parsed.scheme}"})
 
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; sdpm-agent/1.0)"})
-        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
-            data = resp.read()
-            ct = resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        resp = http_requests.get(
+            url, headers={"User-Agent": "Mozilla/5.0 (compatible; sdpm-agent/1.0)"}, timeout=30
+        )
+        resp.raise_for_status()
+        data = resp.content
+        ct = resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
     except Exception as e:
         return json.dumps({"error": f"Failed to download: {e}"})
 
