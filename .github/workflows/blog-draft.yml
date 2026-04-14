@@ -44,11 +44,12 @@ jobs:
           echo "branch_name=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
           echo "Branch: ${BRANCH_NAME}"
 
-      - name: Clone zenn-blog (instruction + push target)
+      - name: Clone blog repo (instruction + push target)
         env:
           BLOG_REPO_TOKEN: ${{ secrets.BLOG_REPO_TOKEN }}
+          BLOG_REPO: ${{ secrets.BLOG_REPO }}
         run: |
-          git clone "https://x-access-token:${BLOG_REPO_TOKEN}@github.com/okamoto-aws/zenn-blog.git" /tmp/zenn-blog
+          git clone "https://x-access-token:${BLOG_REPO_TOKEN}@github.com/${BLOG_REPO}.git" /tmp/zenn-blog
 
       - name: Generate blog draft with Kiro CLI
         env:
@@ -112,14 +113,14 @@ jobs:
 
           echo "Generated: $FILENAME ($(wc -c < /tmp/blog-draft.md) bytes)"
 
-      - name: Push to zenn-blog and create PR
+      - name: Push to blog repo and create PR
         env:
           BLOG_REPO_TOKEN: ${{ secrets.BLOG_REPO_TOKEN }}
+          BLOG_REPO: ${{ secrets.BLOG_REPO }}
           BRANCH_NAME: ${{ steps.collect.outputs.branch_name }}
           PR_NUMBERS: ${{ inputs.pr_numbers }}
         run: |
           FILENAME=$(cat /tmp/blog-filename.txt)
-          REPO="okamoto-aws/zenn-blog"
 
           cd /tmp/zenn-blog
           git checkout publish
@@ -141,7 +142,7 @@ jobs:
 
           # Create PR
           PR_URL=$(gh pr create \
-            --repo "$REPO" \
+            --repo "$BLOG_REPO" \
             --base publish \
             --head "$BRANCH_NAME" \
             --title "📝 Blog draft: ${FILENAME}" \
