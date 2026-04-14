@@ -202,44 +202,58 @@ def _build_system_prompt(template: str, mcp_instructions: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _make_compose_slides(mcp_servers: list, model):
-    """Create compose_slides tool with closed-over MCP servers and model.
+def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
+    """Create compose_slides tool with closed-over MCP servers, model, and instructions.
 
     Args:
         mcp_servers: List of MCPClient instances for the composer agent.
         model: BedrockModel instance.
+        mcp_instructions: Pre-collected MCP server instructions (cached).
 
     Returns:
         A @tool-decorated function.
     """
     from strands import tool as strands_tool
 
+    composer_prompt = _build_system_prompt(_COMPOSER_PROMPT_TEMPLATE, mcp_instructions)
+
     @strands_tool
-    def compose_slides(instruction: str) -> str:
-        """Compose slides by delegating to a composer agent.
+    def compose_slides(slide_groups: list) -> dict:
+        """Compose slides by delegating to composer agents.
 
         Call this tool when Phase 1 is complete and slides need to be generated.
-        The composer agent will read the specs, design and build slides, then
-        generate PPTX, measure, preview, and polish autonomously.
+        Each group is processed by a separate composer agent that reads specs,
+        builds slides, generates PPTX, measures, previews, and polishes.
 
         Args:
-            instruction: What to compose. Include deck_id and which slides to generate.
-                Example: "Compose all slides for deck abc123. Follow the compose workflow."
+            slide_groups: List of groups to compose. Each group is a dict with:
+                - slugs: list of slide slugs to generate (e.g. ["title", "problem"])
+                - instruction: what to compose, including deck_id and context
 
         Returns:
-            Composer agent's final response describing what was done.
+            Report dict with generated_slides, outline_check, preview_images,
+            measure_summary, and errors.
         """
-        mcp_instructions = _collect_mcp_instructions(mcp_servers)
-        composer_prompt = _build_system_prompt(_COMPOSER_PROMPT_TEMPLATE, mcp_instructions)
+        generated = []
+        errors = []
 
-        composer = Agent(
-            system_prompt=composer_prompt,
-            tools=[*mcp_servers],
-            model=model,
-            callback_handler=None,
-        )
-        response = composer(instruction)
-        return str(response)
+        for group in slide_groups:
+            composer = Agent(
+                system_prompt=composer_prompt,
+                tools=[*mcp_servers],
+                model=model,
+                callback_handler=None,
+            )
+            try:
+                composer(group["instruction"])
+                generated.extend(group["slugs"])
+            except Exception as e:
+                errors.append({"slugs": group["slugs"], "error": str(e)})
+
+        return {
+            "generated_slides": generated,
+            "errors": errors,
+        }
 
     return compose_slides
 
@@ -337,7 +351,8 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
 
     # Agent.__init__ triggers MCP client connections.
     # If optional MCP servers fail during init, retry with required-only.
-    compose_slides = _make_compose_slides(mcp_servers, model)
+    mcp_instructions = _collect_mcp_instructions(mcp_servers)
+    compose_slides = _make_compose_slides(mcp_servers, model, mcp_instructions)
     tools = [*mcp_servers, compose_slides, list_uploads, web_fetch]
     try:
         agent = Agent(
@@ -366,7 +381,8 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
 
         mcp_servers = required_servers
         mcp_status = new_status
-        compose_slides = _make_compose_slides(mcp_servers, model)
+        mcp_instructions = _collect_mcp_instructions(mcp_servers)
+        compose_slides = _make_compose_slides(mcp_servers, model, mcp_instructions)
         agent = Agent(
             name="SdpmSpecAgent",
             system_prompt="",
@@ -379,7 +395,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
     # Now that MCP clients are initialized, inject their instructions.
     agent.system_prompt = _build_system_prompt(
         _SPEC_AGENT_PROMPT_TEMPLATE,
-        mcp_instructions=_collect_mcp_instructions(mcp_servers),
+        mcp_instructions=mcp_instructions,
     )
 
     return agent, mcp_status
