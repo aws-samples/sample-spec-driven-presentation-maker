@@ -54,9 +54,9 @@ Example:
 Once the structure is confirmed, derive the full slide list from the brief and write `specs/outline.md`.
 
 **Each line = 1 slide = 1 message** — what it changes in the audience and how.
-`[N: label]` — label is a short identifier for the outline, not the slide title.
+`[slug]` — slug is a short kebab-case identifier that becomes the slide filename (`slides/{slug}.json`).
 
-When multiple slides share the same visual base, give them the same label prefix.
+When multiple slides share the same visual base, give them the same slug prefix.
 The stable base lets the audience focus on what changed, not re-read the whole slide.
 Typical cases:
 - Building up a diagram layer by layer — a complex picture shown all at once overwhelms; adding one piece at a time guides the eye
@@ -65,9 +65,9 @@ Typical cases:
 - Swapping content in the same frame — identical layout makes differences stand out (case studies, comparisons, options)
 
 ```markdown
-- [1: Title] What it changes in the audience and how
-- [2: Current state] What it changes in the audience and how
-- [3: Feature A] What it changes in the audience and how
+- [title] What it changes in the audience and how
+- [current-state] What it changes in the audience and how
+- [feature-a] What it changes in the audience and how
 ```
 
 Present the outline to the user and ask for feedback.
@@ -76,12 +76,12 @@ Example:
 
 > Here's the slide list based on the brief:
 >
-> - [1: Title] Audience knows the topic and speaker
-> - [2: Big picture] Audience sees how much has changed — sets expectation for depth
-> - [3: Architecture - components] Audience grasps the building blocks
-> - [4: Architecture - data flow] Audience understands how data moves between components
-> - [5: Architecture - security] Audience sees where guardrails are applied
-> - [6: Next steps] Audience has a concrete action to take Monday morning
+> - [title] Audience knows the topic and speaker
+> - [big-picture] Audience sees how much has changed — sets expectation for depth
+> - [arch-components] Audience grasps the building blocks
+> - [arch-data-flow] Audience understands how data moves between components
+> - [arch-security] Audience sees where guardrails are applied
+> - [next-steps] Audience has a concrete action to take Monday morning
 >
 > Want to add, remove, reorder, or reword anything?
 
