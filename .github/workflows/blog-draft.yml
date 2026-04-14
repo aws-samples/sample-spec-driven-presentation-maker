@@ -54,6 +54,8 @@ jobs:
           KIRO_API_KEY: ${{ secrets.KIRO_API_KEY }}
           PR_NUMBERS: ${{ inputs.pr_numbers }}
           BLOG_THEME: ${{ inputs.blog_theme }}
+          NO_COLOR: "1"
+          TERM: dumb
         run: |
           INSTRUCTION=""
           if [ -f /tmp/zenn-blog/instruction.md ]; then
@@ -87,16 +89,16 @@ jobs:
           PR データ:
           ${PR_DATA}
 
-          Markdown のみを出力してください。余計な説明やコメントは不要です。"
+          出力先: /tmp/blog-draft.md にMarkdownファイルとして書き出してください。
+          ファイルの1行目に filename: sdpm-xxx.md の形式でファイル名を記載してください。"
 
-          kiro-cli chat --no-interactive --trust-all-tools "$PROMPT" > /tmp/blog-draft-raw.txt 2>/dev/null
+          kiro-cli chat --no-interactive --trust-all-tools "$PROMPT" 2>/dev/null
 
-          # Strip ANSI escape sequences and TUI artifacts
-          sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b\][^\x07]*\x07//g; s/\[0m//g; s/\[2K//g; s/\[1G//g; s/\[1A//g; s/\[\?25[lh]//g' /tmp/blog-draft-raw.txt > /tmp/blog-draft-clean.txt
+          echo "Output file: $(wc -c < /tmp/blog-draft.md 2>/dev/null || echo 'NOT FOUND') bytes"
 
-          grep '^> ' /tmp/blog-draft-clean.txt | sed 's/^> //' > /tmp/blog-draft.md
           if [ ! -s /tmp/blog-draft.md ]; then
-            cp /tmp/blog-draft-clean.txt /tmp/blog-draft.md
+            echo "::error::Kiro CLI did not produce /tmp/blog-draft.md"
+            exit 1
           fi
 
           FILENAME=$(head -5 /tmp/blog-draft.md | grep -oP 'filename:\s*\K\S+' || echo "")
