@@ -558,11 +558,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             return
           }
 
-          // Tool stream event — append progress message to existing tool
+          // Tool stream event — append progress to existing tool
           if (toolUseData?.stream && toolUseData?.toolUseId) {
             const d = toolUseData.data || {}
-            const msg = d.tool ? String(d.tool) : d.status ? `${d.slugs || ""} ${d.status}` : ""
-            if (!msg) return
             setMessages((prev) => {
               const updated = [...prev]
               const last = updated[updated.length - 1]
@@ -570,7 +568,33 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               if (idx < 0) return prev
               const newToolUses = [...last.toolUses]
               const existing = newToolUses[idx].streamMessages || []
-              newToolUses[idx] = { ...newToolUses[idx], streamMessages: [...existing, msg] }
+
+              let next: typeof existing
+              if (d.toolResult) {
+                // Tool completed — update existing entry's status
+                next = existing.map((e) =>
+                  typeof e === "object" && e.toolUseId === d.toolResult
+                    ? { ...e, status: d.toolStatus || "success" }
+                    : e
+                )
+              } else if (d.toolUpdate) {
+                // Input update for existing tool (e.g. purpose now available)
+                next = existing.map((e) =>
+                  typeof e === "object" && e.toolUseId === d.toolUpdate
+                    ? { ...e, input: d.input }
+                    : e
+                )
+              } else if (d.tool) {
+                // New sub-tool started
+                next = [...existing, { tool: d.tool, input: d.input, group: d.group, slugs: d.slugs, toolUseId: d.toolUseId || "" }]
+              } else if (d.status) {
+                // Group status event
+                next = [...existing, { status: d.status, group: d.group, slugs: d.slugs, total_groups: d.total_groups, done: d.done, total: d.total, summary: d.summary, message: d.message }]
+              } else {
+                return prev
+              }
+
+              newToolUses[idx] = { ...newToolUses[idx], streamMessages: next }
               const toolMap = new Map(newToolUses.map((t) => [t.toolUseId, t]))
               const blocks = rebuildBlocks(lastTextSnapshot, toolMap)
               updated[updated.length - 1] = { ...last, toolUses: newToolUses, blocks }

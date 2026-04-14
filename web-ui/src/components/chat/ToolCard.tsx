@@ -175,8 +175,13 @@ interface ToolCardProps {
   status?: "success" | "error"
   result?: Record<string, unknown>
   isActive?: boolean
-  /** Streaming progress messages from tool execution. */
-  streamMessages?: string[]
+  /** Streaming progress events from tool execution. */
+  streamMessages?: Record<string, unknown>[]
+}
+
+/** Strip MCP prefix from tool name for display lookup. */
+function stripPrefix(n: string): string {
+  return n.replace(/^spec_driven_presentation_maker_/, "")
 }
 
 export function ToolCard({ name, input, status, result, isActive = false, streamMessages }: ToolCardProps) {
@@ -284,15 +289,78 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
             {summary || detail}
           </p>
         )}
-        {/* Streaming progress — latest message */}
-        {isActive && streamMessages && streamMessages.length > 0 && (
-          <p
-            className="text-[11px] truncate mt-0.5 leading-tight"
-            style={{ color: `${colors.accent}88`, animation: "tool-active-shimmer 2s ease-in-out infinite" }}
-          >
-            {streamMessages[streamMessages.length - 1]}
-          </p>
-        )}
+        {/* Streaming progress — sub-tool activity feed */}
+        {isActive && streamMessages && streamMessages.length > 0 && (() => {
+          // Separate group status events from sub-tool events
+          const groupEvents = streamMessages.filter((e) => e.status)
+          const toolEvents = streamMessages.filter((e) => e.tool)
+          const latestGroup = groupEvents[groupEvents.length - 1]
+          const groupLabel = latestGroup
+            ? latestGroup.status === "done"
+              ? `✓ ${latestGroup.slugs} complete`
+              : latestGroup.status === "error"
+                ? `✗ ${latestGroup.slugs} failed`
+                : latestGroup.total_groups
+                  ? `Group ${latestGroup.group}/${latestGroup.total_groups} · ${latestGroup.slugs}`
+                  : latestGroup.message || String(latestGroup.status)
+            : null
+
+          return (
+            <div className="mt-1.5 space-y-0.5">
+              {/* Group header */}
+              {groupLabel && (
+                <p className="text-[11px] font-medium tracking-[-0.01em] mb-1" style={{ color: `${colors.accent}cc` }}>
+                  {groupLabel}
+                </p>
+              )}
+              {/* Sub-tool list — show last 4 */}
+              {toolEvents.slice(-4).map((ev, i) => {
+                const toolName = stripPrefix(String(ev.tool))
+                const sub = TOOL_META[toolName] || { Icon: Wrench, label: toolName.replace(/_/g, " "), category: "other" as ToolCategory }
+                const subColors = CAT[sub.category]
+                const isLast = i === Math.min(toolEvents.length, 4) - 1
+                const subDetail = getDetail(toolName, ev.input as Record<string, unknown> | undefined)
+                const isDone = ev.status === "success"
+                const isFailed = ev.status === "error"
+                return (
+                  <div
+                    key={`${ev.tool}-${i}`}
+                    className="flex items-center gap-1.5 py-0.5 transition-all duration-300"
+                    style={{ opacity: isLast ? 1 : isDone ? 0.5 : 0.35 }}
+                  >
+                    <div className="flex-none w-4 h-4 rounded flex items-center justify-center" style={{ background: `${subColors.accent}12` }}>
+                      {isDone ? (
+                        <Check className="h-2 w-2" style={{ color: subColors.accent }} />
+                      ) : isFailed ? (
+                        <AlertCircle className="h-2 w-2" style={{ color: ERR.accent }} />
+                      ) : isLast ? (
+                        <svg className="w-4 h-4" viewBox="0 0 16 16">
+                          <circle cx="8" cy="8" r="5" fill="none" stroke={subColors.accent} strokeWidth="1" strokeDasharray="10 22" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
+                        </svg>
+                      ) : (
+                        <sub.Icon className="h-2 w-2" style={{ color: `${subColors.accent}80` }} />
+                      )}
+                    </div>
+                    <span className="text-[11px] truncate" style={{ color: isLast ? subColors.accent : `${subColors.accent}88` }}>
+                      {sub.label}
+                    </span>
+                    {subDetail && (
+                      <span className="text-[10px] truncate max-w-[140px]" style={{ color: `${subColors.accent}55` }}>
+                        {subDetail}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+              {/* Completed count */}
+              {toolEvents.filter((e) => e.status === "success").length > 0 && (
+                <p className="text-[10px] mt-0.5" style={{ color: `${colors.accent}55` }}>
+                  {toolEvents.filter((e) => e.status === "success").length} of {toolEvents.length} steps complete
+                </p>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Right-side status dot */}

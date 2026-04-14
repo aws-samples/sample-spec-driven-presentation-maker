@@ -128,7 +128,7 @@ export interface ToolUse {
   status?: "success" | "error"
   result?: Record<string, unknown>
   /** Streaming progress messages from tool (e.g. compose_slides sub-agent progress). */
-  streamMessages?: string[]
+  streamMessages?: Record<string, unknown>[]
 }
 
 export type MessageBlock = { type: "text"; text: string } | { type: "tool"; tool: ToolUse }
