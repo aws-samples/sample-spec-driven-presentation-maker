@@ -147,7 +147,9 @@ Respond in the same language as the user.
 
 ## Web Fetch
 - Use web_fetch(url) to read a specific URL as Markdown
-- If a user message starts with <!--sdpm:include_images=true-->, pass include_images=true when calling web_fetch on HTML pages to preserve image URLs in the output. Then fetch relevant images individually for use in the presentation.
+- If a user message starts with <!--sdpm:include_images=true-->, pass include_images=true when calling web_fetch on HTML pages to preserve image URLs in the output.
+- To use a web image in slides: call save_web_image(url, deck_id) with the image URL. It downloads the image to the deck workspace and returns {"src": "images/filename"} for use in slide JSON.
+- Do NOT use read_uploaded_file for web images — use save_web_image instead.
 """
 
 
