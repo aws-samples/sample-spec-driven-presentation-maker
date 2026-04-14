@@ -17,7 +17,6 @@ import logging
 import os
 import re
 import sys
-import urllib.parse
 from contextvars import ContextVar
 from pathlib import Path
 
@@ -245,6 +244,7 @@ def save_web_image(url: str, deck_id: str, filename: str = "") -> str:
         JSON with the saved image path (use as "src" in slide elements).
     """
     import mimetypes
+    import urllib.parse
     import urllib.request
 
     _check_deck_access(deck_id, action="edit_slide")
