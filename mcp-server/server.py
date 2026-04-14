@@ -621,18 +621,21 @@ def code_to_slide(deck_id: str, code: str, name: str,
 
 @mcp.tool()
 def run_python(code: str, deck_id: str | None = None, save: bool = False,
-               files: list[str] | None = None, measure_slides: list[int] | None = None,
+               files: list[str] | None = None, measure_slides: list[str] | None = None,
                purpose: str = "") -> str:
     """Execute Python code in a secure sandbox.
 
     Use this tool to edit the deck workspace or for general computation.
 
     If deck_id is provided, the entire deck workspace is loaded as files:
-        presentation.json   — slide data (read/write via json.load/json.dump)
+        deck.json           — deck metadata (template, fonts, defaultTextColor)
+        slides/{slug}.json  — per-slide data (read/write via json.load/json.dump)
         specs/brief.md     — briefing document
         specs/art-direction.html — design direction (HTML)
         specs/outline.md    — slide outline (1 line = 1 slide = 1 message)
         includes/           — code block JSON files (created by code_to_slide)
+
+    Legacy decks with presentation.json are also supported (read-only compat).
 
     All files are accessible via normal file I/O (open, read, write).
     If save=True, all modified/new workspace files are written back to S3.
@@ -642,16 +645,16 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
         - Text bbox measurement (overflow detection via LibreOffice SVG)
         - Lint diagnostics (JSON schema validation)
         - Layout bias detection
-    Pass the 1-based slide numbers you edited, e.g. measure_slides=[3, 5].
+    Pass the slugs of slides you edited, e.g. measure_slides=["title", "feature-a"].
 
     If files are provided (S3 keys), they are downloaded and available by filename.
     Supported: text files (CSV, JSON, TXT, Markdown, Python). Binary files are not supported.
     Example: files=["uploads/tmp/user/abc/data.csv"] → accessible as "data.csv" in code.
 
     Examples:
-        Edit slides:   run_python(code="...", deck_id="abc", save=True, measure_slides=[3, 5])
+        Edit slides:   run_python(code="...", deck_id="abc", save=True, measure_slides=["title", "feature-a"])
         Edit specs:    run_python(code="open('specs/brief.md','w').write('...')", deck_id="abc", save=True)
-        Measure only:  run_python(code="print('ok')", deck_id="abc", measure_slides=[1, 2])
+        Measure only:  run_python(code="print('ok')", deck_id="abc", measure_slides=["title"])
         Compute:       run_python(code="print(2**100)")
         CSV:           run_python(code="import pandas as pd; print(pd.read_csv('data.csv'))",
                                   files=["uploads/tmp/user/x/data.csv"])
@@ -661,7 +664,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
         deck_id: Deck ID to load workspace from. Optional.
         save: If True, save modified workspace files back to S3. Requires deck_id.
         files: S3 keys of files to make available in the sandbox. Optional.
-        measure_slides: List of 1-based slide numbers to measure after execution. Requires deck_id.
+        measure_slides: List of slide slugs to measure after execution. Requires deck_id.
         purpose: Brief user-facing description of what this code does,
             written in the user's language (e.g. 'Analyzing slide structure',
             'Adding 3 comparison slides'). Shown in the UI.
@@ -692,24 +695,36 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
         import traceback
 
         try:
-            from tools.generate import _prepare_workspace
+            from tools.generate import _assemble_slides, _prepare_workspace
 
             user_id = _get_user_id()
             tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
             pptx_path = _build_pptx(tmpdir, slides, build_kwargs)
 
+            # Build slug → page number mapping
+            slug_to_page: dict[str, int] = {}
+            for i, s in enumerate(slides):
+                sid = s.get("id", "")
+                if sid:
+                    slug_to_page[sid] = i + 1
+            page_numbers = [slug_to_page[slug] for slug in measure_slides if slug in slug_to_page]
+
             # Measure
             try:
-                result["measure"] = _run_measure(tmpdir, pptx_path, measure_slides)
+                if page_numbers:
+                    measure_result = _run_measure(tmpdir, pptx_path, page_numbers)
+                    result["measure"] = measure_result
+                else:
+                    result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})
             except Exception as e:
                 result["measure"] = json.dumps({"error": str(e)})
 
-            # Lint (filter to measured slides; lint uses 0-based index)
+            # Lint (filter to measured slugs)
             try:
                 from sdpm.schema.lint import lint as lint_slides
-                presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
-                slide_set = set(measure_slides)
-                lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in slide_set]
+                presentation = {"slides": slides}
+                page_set = set(page_numbers)
+                lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in page_set]
                 if lint_diag:
                     result["errors"] = {"lintDiagnostics": lint_diag}
             except Exception as e:
@@ -718,7 +733,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
             # Layout bias (filter to measured slides; bias uses 1-based)
             try:
                 from sdpm.preview import check_layout_imbalance_data
-                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in slide_set]
+                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in page_set]
                 if layout_bias:
                     result["warnings"] = {"layoutBias": layout_bias}
             except Exception as e:

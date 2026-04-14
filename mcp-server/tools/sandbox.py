@@ -9,7 +9,9 @@ Wraps the Code Interpreter API to execute Python code in an isolated sandbox.
 Used by run_python MCP tool for deck workspace editing and general computation.
 
 Deck workspace layout (when deck_id is provided):
-    presentation.json   — slide data
+    deck.json           — deck metadata (new format)
+    slides/             — per-slide JSON files (new format)
+    presentation.json   — slide data (legacy format)
     specs/              — brief.md, art-direction.html, outline.md
     includes/           — code block JSON files
 """
@@ -26,7 +28,7 @@ from storage import Storage
 logger = logging.getLogger(__name__)
 
 # Files managed by the deck workspace — only these are synced back to S3.
-_WORKSPACE_PREFIXES = ("presentation.json", "specs/", "includes/")
+_WORKSPACE_PREFIXES = ("deck.json", "presentation.json", "slides/", "specs/", "includes/")
 
 
 def execute_in_sandbox(
@@ -167,31 +169,34 @@ def _save_deck_workspace(
     deck_id: str,
     paths: list[str],
 ) -> None:
-    """Read workspace files from sandbox and write back to S3.
+    """Read workspace files from sandbox via prefix scan and write back to S3.
 
-    Uses executeCode to read files via Python — avoids reliance on
-    readFiles API response format which is not well documented.
+    Scans the sandbox for files matching _WORKSPACE_PREFIXES instead of
+    relying on the upload paths list. This ensures newly created files
+    (e.g., slides/{slug}.json) are automatically saved.
 
     Args:
         client: Bedrock AgentCore client.
         session_id: Code Interpreter session ID.
         storage: Storage backend.
         deck_id: Deck identifier.
-        paths: Relative file paths to read back (from _upload_deck_workspace).
+        paths: Ignored (kept for signature compatibility).
     """
-    if not paths:
-        return
-
-    # Read all workspace files via executeCode + JSON dump
-    paths_repr = repr(paths)
+    # Scan sandbox for all workspace files via executeCode
+    prefixes_repr = repr(_WORKSPACE_PREFIXES)
     code = (
         "import json, os\n"
-        f"_paths = {paths_repr}\n"
+        f"_prefixes = {prefixes_repr}\n"
         "_result = {}\n"
-        "for _p in _paths:\n"
-        "    if os.path.isfile(_p):\n"
-        "        with open(_p, 'r') as _f:\n"
-        "            _result[_p] = _f.read()\n"
+        "for root, dirs, files in os.walk('.'):\n"
+        "    for f in files:\n"
+        "        rel = os.path.relpath(os.path.join(root, f), '.')\n"
+        "        if any(rel == p or rel.startswith(p) for p in _prefixes):\n"
+        "            try:\n"
+        "                with open(rel, 'r') as fh:\n"
+        "                    _result[rel] = fh.read()\n"
+        "            except Exception:\n"
+        "                pass\n"
         "print(json.dumps(_result))\n"
     )
     response = client.invoke_code_interpreter(

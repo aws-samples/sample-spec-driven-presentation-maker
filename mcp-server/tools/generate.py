@@ -68,6 +68,59 @@ def generate_previews(pptx_path: Path, output_dir: Path) -> list[Path]:
     return webp_files
 
 
+def _parse_outline_slugs(outline_path: Path) -> list[str]:
+    """Parse outline.md and return ordered list of slugs.
+
+    Format: ``- [slug] Message text``
+    """
+    import re as _re
+
+    pattern = _re.compile(r"^-\s*\[([a-z0-9-]+)\]\s*")
+    slugs: list[str] = []
+    if not outline_path.exists():
+        return slugs
+    for line in outline_path.read_text(encoding="utf-8").splitlines():
+        m = pattern.match(line)
+        if m:
+            slugs.append(m.group(1))
+    return slugs
+
+
+def _assemble_slides(tmpdir: Path) -> list[dict]:
+    """Assemble slide list from workspace directory.
+
+    New format (deck.json exists): reads outline.md for slug order,
+    then loads slides/{slug}.json in order. Missing slides are skipped silently.
+
+    Legacy format (presentation.json exists): reads slides directly.
+
+    Args:
+        tmpdir: Workspace directory.
+
+    Returns:
+        Ordered list of slide dicts.
+    """
+    deck_json_path = tmpdir / "deck.json"
+    if deck_json_path.exists():
+        slugs = _parse_outline_slugs(tmpdir / "specs" / "outline.md")
+        slides: list[dict] = []
+        for slug in slugs:
+            slide_path = tmpdir / "slides" / f"{slug}.json"
+            if not slide_path.exists():
+                continue
+            slide = json.loads(slide_path.read_text(encoding="utf-8"))
+            slide.setdefault("id", slug)
+            slides.append(slide)
+        return slides
+
+    pres_path = tmpdir / "presentation.json"
+    if pres_path.exists():
+        data = json.loads(pres_path.read_text(encoding="utf-8"))
+        return data.get("slides", [])
+
+    raise ValueError(f"No deck.json or presentation.json found in {tmpdir}")
+
+
 def _prepare_workspace(
     deck_id: str,
     user_id: str,
@@ -86,17 +139,53 @@ def _prepare_workspace(
     if not deck:
         raise ValueError(f"Deck {deck_id} not found.")
 
-    presentation = storage.get_presentation_json(deck_id)
-    if not isinstance(presentation, dict):
-        raise ValueError(f"Deck {deck_id} has invalid presentation.json.")
-    slides = presentation.get("slides", [])
-    if not isinstance(slides, list) or not slides:
-        raise ValueError(f"Deck {deck_id} has no slides.")
-
     tmpdir = Path(tempfile.mkdtemp())
-    (tmpdir / "presentation.json").write_text(
-        json.dumps(presentation, ensure_ascii=False), encoding="utf-8"
-    )
+
+    # Detect format: try deck.json first, fall back to presentation.json
+    has_deck_json = False
+    try:
+        deck_meta = storage.get_deck_json(deck_id)
+        (tmpdir / "deck.json").write_text(
+            json.dumps(deck_meta, ensure_ascii=False), encoding="utf-8"
+        )
+        has_deck_json = True
+    except (ValueError, Exception):
+        pass
+
+    if has_deck_json:
+        # Download outline.md
+        outline_key = f"decks/{deck_id}/specs/outline.md"
+        try:
+            data = storage.download_file_from_pptx_bucket(outline_key)
+            specs_dir = tmpdir / "specs"
+            specs_dir.mkdir(parents=True, exist_ok=True)
+            (specs_dir / "outline.md").write_bytes(data)
+        except Exception:
+            pass
+
+        # Download slides/*.json
+        slide_keys = storage.list_files(
+            prefix=f"decks/{deck_id}/slides/", bucket=storage.pptx_bucket
+        )
+        for key in slide_keys:
+            rel = key.replace(f"decks/{deck_id}/", "")
+            dest = tmpdir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(storage.download_file_from_pptx_bucket(key))
+
+        presentation = {**deck_meta}
+    else:
+        presentation = storage.get_presentation_json(deck_id)
+        if not isinstance(presentation, dict):
+            raise ValueError(f"Deck {deck_id} has invalid presentation.json.")
+        (tmpdir / "presentation.json").write_text(
+            json.dumps(presentation, ensure_ascii=False), encoding="utf-8"
+        )
+
+    # Assemble slides
+    slides = _assemble_slides(tmpdir)
+    if not slides:
+        raise ValueError(f"Deck {deck_id} has no slides.")
 
     # Download includes
     for key in storage.list_files(prefix=f"decks/{deck_id}/includes/", bucket=storage.pptx_bucket):
