@@ -30,7 +30,8 @@ import { AttachmentPreview, Attachment, SnippetAttachment } from "./AttachmentPr
 import { FileDropZone } from "./FileDropZone"
 import { SnippetInput } from "./SnippetInput"
 import { useIsMobile } from "@/hooks/UseMobile"
-import { Send, Square } from "lucide-react"
+import { Send, Square, ChevronRight } from "lucide-react"
+import { usePreferences } from "@/hooks/usePreferences"
 import { toast } from "sonner"
 
 interface Message {
@@ -103,6 +104,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const auth = useAuth()
   const { onCompositionStart, onCompositionEnd, getIsComposing } = useCompositionSafe()
   const isMobile = useIsMobile()
+  const { fetchWebImages, setFetchWebImages } = usePreferences()
+  const [optionsOpen, setOptionsOpen] = useState(false)
 
   /**
    * Insert text at the current cursor position in the textarea.
@@ -804,6 +807,31 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               onRemoveSnippet={removeSnippet}
               onEditSnippet={editSnippet}
             />
+
+            {/* Options expander */}
+            <div className="px-2">
+              <button
+                type="button"
+                onClick={() => setOptionsOpen((v) => !v)}
+                className="flex items-center gap-1 text-[11px] text-foreground-muted hover:text-foreground transition-colors py-1"
+              >
+                <ChevronRight className={`h-3 w-3 transition-transform ${optionsOpen ? "rotate-90" : ""}`} />
+                Options
+              </button>
+              {optionsOpen && (
+                <label className="flex items-center gap-2 pb-1.5 pl-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={fetchWebImages}
+                    onChange={(e) => setFetchWebImages(e.target.checked)}
+                    className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
+                  />
+                  <span className="text-[11px] text-foreground-muted select-none">
+                    Webサイトの画像を取り込む（プレゼンテーションに使われる可能性があります）
+                  </span>
+                </label>
+              )}
+            </div>
 
             <div className="flex items-end gap-2 px-2 py-2">
               <PlusMenu
