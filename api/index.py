@@ -416,23 +416,67 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
     deck = decision.deck
     pptx_key = deck.get("pptxS3Key")
 
-    # Read presentation.json from S3
+    # Read slides from S3 — try new format (deck.json + slides/*.json) first, fall back to presentation.json
     slides = []
     include_json = (app.current_event.get_query_string_value("include") or "") == "slideJson"
     try:
-        pres_key = f"decks/{deck_id}/presentation.json"
-        resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=pres_key)
-        presentation = json.loads(resp["Body"].read())
+        # New format: deck.json exists → read outline.md for slug order, then slides/*.json
+        deck_json_key = f"decks/{deck_id}/deck.json"
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=deck_json_key)
+
+        # Parse outline.md for slug order
+        import re as _re
+        slugs = []
+        try:
+            outline_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/specs/outline.md")
+            outline_text = outline_resp["Body"].read().decode("utf-8")
+            slug_re = _re.compile(r"^-\s*\[([a-z0-9-]+)\]\s*")
+            for line in outline_text.splitlines():
+                m = slug_re.match(line)
+                if m:
+                    slugs.append(m.group(1))
+        except Exception:
+            pass
+
+        # If no outline slugs, list slides/ directory
+        if not slugs:
+            prefix = f"decks/{deck_id}/slides/"
+            resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
+            for obj in resp.get("Contents", []):
+                name = obj["Key"].rsplit("/", 1)[-1]
+                if name.endswith(".json"):
+                    slugs.append(name[:-5])
+
         preview_keys = _list_preview_keys(deck_id)
-        for i, s in enumerate(presentation.get("slides", [])):
-            sid = f"slide_{i + 1:02d}"
-            slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
-            slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
-            if include_json:
-                slide_entry["slideJson"] = json.dumps(s)
-            slides.append(slide_entry)
+        for i, slug in enumerate(slugs):
+            slide_key = f"decks/{deck_id}/slides/{slug}.json"
+            try:
+                slide_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=slide_key)
+                s = json.loads(slide_resp["Body"].read())
+                sid = f"slide_{i + 1:02d}"
+                slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
+                slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
+                if include_json:
+                    slide_entry["slideJson"] = json.dumps(s)
+                slides.append(slide_entry)
+            except Exception:
+                continue
     except Exception:
-        pass
+        # Fall back to legacy presentation.json
+        try:
+            pres_key = f"decks/{deck_id}/presentation.json"
+            resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=pres_key)
+            presentation = json.loads(resp["Body"].read())
+            preview_keys = _list_preview_keys(deck_id)
+            for i, s in enumerate(presentation.get("slides", [])):
+                sid = f"slide_{i + 1:02d}"
+                slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
+                slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
+                if include_json:
+                    slide_entry["slideJson"] = json.dumps(s)
+                slides.append(slide_entry)
+        except Exception:
+            pass
 
     # Read spec files from S3 (brief.md, outline.md, art-direction.html/.md)
     specs: Dict[str, Any] = {}
