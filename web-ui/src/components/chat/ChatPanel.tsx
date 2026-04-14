@@ -827,7 +827,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
                   />
                   <span className="text-[11px] text-foreground-muted select-none">
-                    Webサイトの画像を取り込む（プレゼンテーションに使われる可能性があります）
+                    Fetch images from websites (may be used in presentations)
                   </span>
                 </label>
               )}
