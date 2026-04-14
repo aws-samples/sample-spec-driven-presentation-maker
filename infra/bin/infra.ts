@@ -54,7 +54,7 @@ if (externalOidc && externalClients) {
   allowedClients = externalClients;
 } else {
   // Default Amazon Cognito (demo/quickstart)
-  authStack = new AuthStack(app, "SdpmAuth", { env });
+  authStack = new AuthStack(app, "SdpmAuth", { env, description: "Spec-Driven Presentation Maker - Auth (uksb-ynuz0lkrea)(tag:auth)" });
   oidcDiscoveryUrl = authStack.oidcDiscoveryUrl;
   allowedClients = [authStack.clientId];
 }
@@ -62,10 +62,11 @@ if (externalOidc && externalClients) {
 // --- Required stacks ---
 const searchSlides = config.features?.searchSlides === true;
 const observability = config.features?.observability === true;
-const data = new DataStack(app, "SdpmData", { env, searchSlides, observability });
+const data = new DataStack(app, "SdpmData", { env, searchSlides, observability, description: "Spec-Driven Presentation Maker - Data (uksb-ynuz0lkrea)(tag:data)" });
 
 const runtime = new RuntimeStack(app, "SdpmRuntime", {
   env,
+  description: "Spec-Driven Presentation Maker - Runtime (uksb-ynuz0lkrea)(tag:runtime)",
   table: data.table,
   pptxBucket: data.pptxBucket,
   resourceBucket: data.resourceBucket,
@@ -79,6 +80,7 @@ const runtime = new RuntimeStack(app, "SdpmRuntime", {
 if (config.stacks?.agent) {
   const agent = new AgentStack(app, "SdpmAgent", {
     env,
+    description: "Spec-Driven Presentation Maker - Agent (uksb-ynuz0lkrea)(tag:agent)",
     table: data.table,
     pptxBucket: data.pptxBucket,
     mcpRuntimeArn: runtime.runtimeArn,
@@ -93,6 +95,7 @@ if (config.stacks?.agent) {
     }
     new WebUiStack(app, "SdpmWebUi", {
       env,
+      description: "Spec-Driven Presentation Maker - Web UI (uksb-ynuz0lkrea)(tag:web-ui)",
       table: data.table,
       pptxBucket: data.pptxBucket,
       resourceBucket: data.resourceBucket,

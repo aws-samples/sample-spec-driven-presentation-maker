@@ -9,6 +9,7 @@ dependencies = [
     "sdpm-skill",
     "aws-opentelemetry-distro>=0.10.0",
     "pypdf",
+    "requests",
 ]
 
 [tool.setuptools.packages.find]
