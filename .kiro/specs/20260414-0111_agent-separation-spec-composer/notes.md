@@ -304,3 +304,24 @@ Phase Cの最初の2ブロック（16タスク）を実装完了。
 1. **`_resolve_template` のディレクトリ入力**: `Path(input_path).parent` がディレクトリの親を返してしまう。`is_dir()` チェックを追加し、ディレクトリならそのまま `base_dir` として使用。
 2. **`_prepare_workspace` の例外キャッチ範囲**: `except (ValueError, Exception)` → `except ValueError` に限定。S3接続エラー等のインフラ障害を握りつぶすのは危険。`ValueError` は `get_deck_json` が「not found」を示す正常系フォールバック。
 3. **outline.md ダウンロード失敗の silent pass**: `except Exception: pass` → warning ログ追加。S3のNoSuchKeyはbotocore.exceptions.ClientErrorのサブクラスだが、Storage抽象化を超えてキャッチするのは設計違反のため、広いキャッチ + ログで対応。
+
+### [2026-04-14 14:38] エージェント分離実装（commit: 73f2eba）
+
+Strands Agents SDK の Agents as Tools パターンを調査し、3つの実装方法を確認:
+1. Agent を直接 tools に渡す（SDK が自動変換、input: str のみ）
+2. `.as_tool()` でカスタマイズ（名前・説明・コンテキスト保持）
+3. `@tool` デコレータで完全制御（前後処理、複数パラメータ、エラーハンドリング）
+
+方法3を採用。理由: Phase B で asyncio.gather に切り替える必要があり、戻り値の加工やエラーハンドリングが必要。
+
+#### 実装内容
+- `_SPEC_AGENT_PROMPT_TEMPLATE`: Phase 1 専用。compose_slides を呼んで実装を委譲。build/measure/preview は直接使わない。
+- `_COMPOSER_PROMPT_TEMPLATE`: Phase 2+3 専用。ユーザー対話なし。deck.json は読み取り専用。
+- `_make_compose_slides()`: クロージャで mcp_servers と model を閉じ込め、`@strands_tool` でラップ。内部で `Agent()` を毎回生成（ステートレス）。`callback_handler=None` で composer の出力を抑制。
+- `create_agent`: `SdpmAgent` → `SdpmSpecAgent` にリネーム。tools に compose_slides を追加。
+- briefing ワークフロー: Constraints & Requests（MUST NOT/MUST/PREFER）と Materials（テーブル）セクションを追加。
+
+#### 設計判断
+- compose_slides の戻り値: Phase C では `str(response)` で十分。構造化レポート（generated_slides, measure_summary 等）は Phase B で各 composer の結果を集約する際に必要になるため、Phase B で実装する。
+- MCP tools は両エージェントにフルセット提供。制約は system prompt で制御（ツール分割しない方針）。
+- composer の `callback_handler=None`: 親エージェントのストリーミングに composer の出力が混ざるのを防止。

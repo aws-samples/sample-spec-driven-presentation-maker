@@ -23,11 +23,11 @@
 - [x] WebUI OutlineView.tsx の表示調整（ノード円に index+1、slug を太字、message を下に）
 
 ### エージェント分離
-- [ ] SPECエージェントの system prompt 作成
-- [ ] compose_slides の `@tool` 定義と system prompt 作成（Phase C: 直列実行）
-- [ ] compose_slides の戻り値レポート実装（generated_slides, outline_check, preview_images, measure_summary, errors）
-- [ ] briefing ワークフロー強化（制約・個別要望・素材一覧セクション追加）
-- [ ] SPECエージェント → compose_slides 呼び出しの統合テスト
+- [x] SPECエージェントの system prompt 作成
+- [x] compose_slides の `@tool` 定義と system prompt 作成（Phase C: 直列実行）
+- [x] compose_slides の戻り値レポート実装（generated_slides, outline_check, preview_images, measure_summary, errors）
+- [x] briefing ワークフロー強化（制約・個別要望・素材一覧セクション追加）
+- [x] SPECエージェント → compose_slides 呼び出しの統合テスト
 
 ### Phase C 検証
 - [ ] ファイル分割でgenerate_pptxが正常動作することを確認
