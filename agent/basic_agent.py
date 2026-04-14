@@ -302,6 +302,18 @@ def _prefetch_context(mcp_client, deck_id: str = "") -> str:
     return "# Pre-loaded References (already executed — do NOT re-fetch)\n\n" + "\n\n---\n\n".join(sections)
 
 
+def _try_parse_input(raw):
+    """Try to parse tool input; return dict or None."""
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str) and raw.startswith("{"):
+        try:
+            return json.loads(raw)
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
 def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
     """Create compose_slides tool with closed-over MCP servers, model, and instructions.
 
@@ -386,16 +398,42 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
 
             # Realtime progress via invoke_async + callback_handler + asyncio.Queue
             progress_q: asyncio.Queue = asyncio.Queue()
-            last_tool_name = ""
+            last_tool_id = ""
+            last_tool_had_input = False
 
             def _on_event(**kwargs):
-                nonlocal last_tool_name
+                nonlocal last_tool_id, last_tool_had_input
                 tu = kwargs.get("current_tool_use")
                 if tu:
+                    tid = tu.get("toolUseId", "")
                     name = tu.get("name", "")
-                    if name and name != last_tool_name:
-                        last_tool_name = name
-                        progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name})
+                    if not (tid and name):
+                        pass
+                    elif tid != last_tool_id:
+                        # New tool — send immediately (input may be incomplete)
+                        last_tool_id = tid
+                        last_tool_had_input = False
+                        inp = _try_parse_input(tu.get("input", ""))
+                        if inp:
+                            last_tool_had_input = True
+                        progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "input": inp, "toolUseId": tid})
+                    elif not last_tool_had_input:
+                        # Same tool — resend once input is parseable
+                        inp = _try_parse_input(tu.get("input", ""))
+                        if inp:
+                            last_tool_had_input = True
+                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "toolUpdate": tid, "input": inp})
+                # Tool result
+                msg = kwargs.get("message")
+                if isinstance(msg, dict) and msg.get("role") == "user":
+                    for block in msg.get("content", []):
+                        if isinstance(block, dict) and "toolResult" in block:
+                            tr = block["toolResult"]
+                            progress_q.put_nowait({
+                                "group": gi + 1, "slugs": slugs_label,
+                                "toolResult": tr.get("toolUseId", ""),
+                                "toolStatus": tr.get("status", ""),
+                            })
 
             composer = Agent(
                 system_prompt=composer_prompt,
@@ -502,6 +540,11 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
         temperature=0.1,
     )
 
+    composer_model = BedrockModel(
+        model_id=os.environ.get("COMPOSER_MODEL_ID", os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-4-6")),
+        temperature=0.1,
+    )
+
     # --- Build MCP server list with resilience ---
     factories = [
         lambda: _mcp_agentcore_runtime(jwt_token=jwt_token),
@@ -524,7 +567,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
     # Agent.__init__ triggers MCP client connections.
     # If optional MCP servers fail during init, retry with required-only.
     mcp_instructions = _collect_mcp_instructions(mcp_servers)
-    compose_slides = _make_compose_slides(mcp_servers, model, mcp_instructions)
+    compose_slides = _make_compose_slides(mcp_servers, composer_model, mcp_instructions)
     tools = [*mcp_servers, compose_slides, list_uploads, web_fetch]
     try:
         agent = Agent(
@@ -554,7 +597,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
         mcp_servers = required_servers
         mcp_status = new_status
         mcp_instructions = _collect_mcp_instructions(mcp_servers)
-        compose_slides = _make_compose_slides(mcp_servers, model, mcp_instructions)
+        compose_slides = _make_compose_slides(mcp_servers, composer_model, mcp_instructions)
         agent = Agent(
             name="SdpmSpecAgent",
             system_prompt="",
