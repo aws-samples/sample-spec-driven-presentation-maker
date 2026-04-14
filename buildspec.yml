@@ -42,4 +42,4 @@ phases:
           echo "Building web-ui..."
           cd web-ui && npm ci && npm run build && cd ..
         fi
-      - cd infra && cdk ${CDK_COMMAND:-deploy} --all --require-approval never
+      - cd infra && cdk ${CDK_COMMAND:-deploy} SdpmData SdpmRuntime SdpmAgent --require-approval never
