@@ -135,12 +135,21 @@ def _mcp_aws_pricing() -> MCPClient:
 # System Prompt
 # ---------------------------------------------------------------------------
 
-_SYSTEM_PROMPT_TEMPLATE = """Current date and time: {now}
+_SPEC_AGENT_PROMPT_TEMPLATE = """Current date and time: {now}
 
-You are a helpful assistant. You have access to various tools via MCP.
-Follow the instructions provided by each MCP server to use their tools effectively.
+You are the SPEC agent for spec-driven-presentation-maker.
+You handle Phase 1 (briefing → outline → art-direction) through user dialogue.
 Respond in the same language as the user.
+
 {mcp_instructions}
+
+## Your Role
+- Conduct Phase 1: briefing, outline design, art direction — all through user dialogue
+- When Phase 1 is complete and the user approves, call `compose_slides` to delegate slide generation to the composer agent
+- You do NOT write slide JSON yourself. You do NOT call build/measure/preview tools directly
+- After compose_slides returns, review the report and relay results to the user
+- For user modification requests, translate them into instructions and call compose_slides again
+
 ## File Uploads
 - When a user message contains [Attached: filename (uploadId: xxx)], use read_uploaded_file(upload_id, deck_id) to read content. If no deck exists yet, call init_presentation() first.
 - Use list_uploads(session_id) to see all files in the current session
@@ -149,11 +158,33 @@ Respond in the same language as the user.
 - Use web_fetch(url) to read a specific URL as Markdown
 """
 
+_COMPOSER_PROMPT_TEMPLATE = """Current date and time: {now}
 
-def _build_system_prompt(mcp_instructions: str) -> str:
+You are the composer agent for spec-driven-presentation-maker.
+You handle Phase 2 (compose slides) and Phase 3 (review + polish).
+You work silently — no user interaction. Execute the instruction fully and return.
+
+{mcp_instructions}
+
+## Your Role
+- Read the instruction provided, which specifies which slides to compose
+- deck.json is READ-ONLY — do not modify it
+- Write each slide to slides/{{slug}}.json via run_python
+- Follow the compose and review workflows loaded from MCP tools
+- After composing, generate PPTX, measure, preview, and polish autonomously
+
+## Constraints
+- Do NOT ask the user anything — you have no user interaction
+- Do NOT modify deck.json, specs/brief.md, specs/outline.md, or specs/art-direction.html
+- Write ONLY the slides assigned to you
+"""
+
+
+def _build_system_prompt(template: str, mcp_instructions: str) -> str:
     """Build system prompt with current timestamp and MCP server instructions.
 
     Args:
+        template: Prompt template string with {now} and {mcp_instructions} placeholders.
         mcp_instructions: Concatenated instructions from MCP servers.
 
     Returns:
@@ -163,7 +194,54 @@ def _build_system_prompt(mcp_instructions: str) -> str:
 
     jst = timezone(timedelta(hours=9))
     now_str = datetime.now(jst).strftime("%Y-%m-%d %H:%M JST")
-    return _SYSTEM_PROMPT_TEMPLATE.replace("{now}", now_str).replace("{mcp_instructions}", mcp_instructions)
+    return template.replace("{now}", now_str).replace("{mcp_instructions}", mcp_instructions)
+
+
+# ---------------------------------------------------------------------------
+# Compose Slides Tool (Agents as Tools pattern)
+# ---------------------------------------------------------------------------
+
+
+def _make_compose_slides(mcp_servers: list, model):
+    """Create compose_slides tool with closed-over MCP servers and model.
+
+    Args:
+        mcp_servers: List of MCPClient instances for the composer agent.
+        model: BedrockModel instance.
+
+    Returns:
+        A @tool-decorated function.
+    """
+    from strands import tool as strands_tool
+
+    @strands_tool
+    def compose_slides(instruction: str) -> str:
+        """Compose slides by delegating to a composer agent.
+
+        Call this tool when Phase 1 is complete and slides need to be generated.
+        The composer agent will read the specs, design and build slides, then
+        generate PPTX, measure, preview, and polish autonomously.
+
+        Args:
+            instruction: What to compose. Include deck_id and which slides to generate.
+                Example: "Compose all slides for deck abc123. Follow the compose workflow."
+
+        Returns:
+            Composer agent's final response describing what was done.
+        """
+        mcp_instructions = _collect_mcp_instructions(mcp_servers)
+        composer_prompt = _build_system_prompt(_COMPOSER_PROMPT_TEMPLATE, mcp_instructions)
+
+        composer = Agent(
+            system_prompt=composer_prompt,
+            tools=[*mcp_servers],
+            model=model,
+            callback_handler=None,
+        )
+        response = composer(instruction)
+        return str(response)
+
+    return compose_slides
 
 
 # ---------------------------------------------------------------------------
@@ -259,10 +337,11 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
 
     # Agent.__init__ triggers MCP client connections.
     # If optional MCP servers fail during init, retry with required-only.
-    tools = [*mcp_servers, list_uploads, web_fetch]
+    compose_slides = _make_compose_slides(mcp_servers, model)
+    tools = [*mcp_servers, compose_slides, list_uploads, web_fetch]
     try:
         agent = Agent(
-            name="SdpmAgent",
+            name="SdpmSpecAgent",
             system_prompt="",
             tools=tools,
             model=model,
@@ -287,10 +366,11 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
 
         mcp_servers = required_servers
         mcp_status = new_status
+        compose_slides = _make_compose_slides(mcp_servers, model)
         agent = Agent(
-            name="SdpmAgent",
+            name="SdpmSpecAgent",
             system_prompt="",
-            tools=[*mcp_servers, list_uploads, web_fetch],
+            tools=[*mcp_servers, compose_slides, list_uploads, web_fetch],
             model=model,
             session_manager=session_manager,
             trace_attributes={"user.id": user_id, "session.id": session_id},
@@ -298,6 +378,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
 
     # Now that MCP clients are initialized, inject their instructions.
     agent.system_prompt = _build_system_prompt(
+        _SPEC_AGENT_PROMPT_TEMPLATE,
         mcp_instructions=_collect_mcp_instructions(mcp_servers),
     )
 
