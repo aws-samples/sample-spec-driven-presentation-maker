@@ -111,6 +111,8 @@ const TOOL_META: Record<string, ToolMeta> = {
   spec_driven_presentation_maker_code_to_slide:      { Icon: Code,           label: "Code to slide",         category: "build" },
   spec_driven_presentation_maker_pptx_to_json:       { Icon: FileText,       label: "Converting PPTX",       category: "explore" },
   spec_driven_presentation_maker_grid:               { Icon: LayoutTemplate, label: "Computing layout",      category: "compute" },
+  // Agent tools
+  compose_slides:     { Icon: Package,         label: "Composing slides",       category: "produce" },
 }
 
 /**
@@ -173,9 +175,11 @@ interface ToolCardProps {
   status?: "success" | "error"
   result?: Record<string, unknown>
   isActive?: boolean
+  /** Streaming progress messages from tool execution. */
+  streamMessages?: string[]
 }
 
-export function ToolCard({ name, input, status, result, isActive = false }: ToolCardProps) {
+export function ToolCard({ name, input, status, result, isActive = false, streamMessages }: ToolCardProps) {
   const meta = TOOL_META[name] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
   const isError = status === "error"
   const isComplete = !!status
@@ -278,6 +282,15 @@ export function ToolCard({ name, input, status, result, isActive = false }: Tool
             style={{ color: isComplete ? `${colors.accent}99` : "oklch(1 0 0 / 25%)" }}
           >
             {summary || detail}
+          </p>
+        )}
+        {/* Streaming progress — latest message */}
+        {isActive && streamMessages && streamMessages.length > 0 && (
+          <p
+            className="text-[11px] truncate mt-0.5 leading-tight"
+            style={{ color: `${colors.accent}88`, animation: "tool-active-shimmer 2s ease-in-out infinite" }}
+          >
+            {streamMessages[streamMessages.length - 1]}
           </p>
         )}
       </div>

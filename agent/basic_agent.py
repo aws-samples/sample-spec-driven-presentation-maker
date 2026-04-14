@@ -249,12 +249,23 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
             }
         },
     )
-    def compose_slides(slide_groups: list) -> dict:
-        """Compose slides by delegating to composer agents."""
+    async def compose_slides(slide_groups: list):
+        """Compose slides by delegating to composer agents.
+
+        Async generator: yields progress dicts, then returns final result str.
+        """
+        from typing import AsyncIterator
+        import json as _json
+
         generated = []
         errors = []
+        total = sum(len(g["slugs"]) for g in slide_groups)
+        done_count = 0
 
-        for group in slide_groups:
+        for gi, group in enumerate(slide_groups):
+            slugs_label = ", ".join(group["slugs"])
+            yield {"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"}
+
             composer = Agent(
                 system_prompt=composer_prompt,
                 tools=[*mcp_servers],
@@ -262,15 +273,23 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
                 callback_handler=None,
             )
             try:
-                composer(group["instruction"])
+                last_tool = ""
+                async for event in composer.stream_async(group["instruction"]):
+                    # Forward composer's tool usage as progress
+                    if tu := event.get("current_tool_use"):
+                        name = tu.get("name", "")
+                        if name and name != last_tool:
+                            last_tool = name
+                            yield {"group": gi + 1, "slugs": slugs_label, "tool": name}
+
                 generated.extend(group["slugs"])
+                done_count += len(group["slugs"])
+                yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
             except Exception as e:
                 errors.append({"slugs": group["slugs"], "error": str(e)})
+                yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(e)}
 
-        return {
-            "generated_slides": generated,
-            "errors": errors,
-        }
+        yield _json.dumps({"generated_slides": generated, "errors": errors})
 
     return compose_slides
 
@@ -613,6 +632,12 @@ async def agent_stream(payload, context):
                         # ToolResultEvent — not yielded by stream_async (is_callback_event=False)
                         # Handled via ToolResultMessageEvent below instead
                         pass
+                    elif isinstance(event, dict) and "tool_stream_event" in event:
+                        tse = event["tool_stream_event"]
+                        data = tse.get("data")
+                        tu = tse.get("tool_use", {})
+                        if isinstance(data, dict):
+                            yield {"toolStream": {"toolUseId": tu.get("toolUseId", last_tool_use_id), "name": tu.get("name", ""), "data": data}}
                     elif isinstance(event, dict) and "message" in event:
                         msg = event["message"]
                         if isinstance(msg, dict) and msg.get("role") == "user":

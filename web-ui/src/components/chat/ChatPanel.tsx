@@ -51,6 +51,9 @@ interface ToolUseCallbackData {
   status?: "success" | "error"
   result?: Record<string, unknown>
   input?: Record<string, unknown>
+  /** Tool streaming progress event. */
+  stream?: boolean
+  data?: Record<string, unknown>
 }
 
 interface ChatPanelProps {
@@ -550,6 +553,25 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               const updated = [...prev]
               const last = updated[updated.length - 1]
               updated[updated.length - 1] = { ...last, mcpStatus: incoming }
+              return updated
+            })
+            return
+          }
+
+          // Tool stream event — append progress message to existing tool
+          if (toolUseData?.stream && toolUseData?.toolUseId) {
+            const d = toolUseData.data || {}
+            const msg = d.tool ? String(d.tool) : d.status ? `${d.slugs || ""} ${d.status}` : ""
+            if (!msg) return
+            setMessages((prev) => {
+              const updated = [...prev]
+              const last = updated[updated.length - 1]
+              const idx = last.toolUses.findIndex((t) => t.toolUseId === toolUseData.toolUseId)
+              if (idx < 0) return prev
+              const newToolUses = [...last.toolUses]
+              const existing = newToolUses[idx].streamMessages || []
+              newToolUses[idx] = { ...newToolUses[idx], streamMessages: [...existing, msg] }
+              updated[updated.length - 1] = { ...last, toolUses: newToolUses }
               return updated
             })
             return
