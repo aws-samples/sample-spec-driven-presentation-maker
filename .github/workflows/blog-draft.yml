@@ -1,0 +1,180 @@
+name: Blog draft
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_numbers:
+        description: 'PR numbers (comma-separated, e.g. 42,57,63)'
+        required: true
+      blog_theme:
+        description: 'Blog theme/angle (optional)'
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Kiro CLI
+        run: curl -fsSL https://cli.kiro.dev/install | bash
+
+      - name: Collect PR data
+        id: collect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBERS: ${{ inputs.pr_numbers }}
+        run: |
+          mkdir -p /tmp/pr-data
+          BRANCH_PARTS=""
+          for pr in $(echo "$PR_NUMBERS" | tr ',' ' '); do
+            echo "--- Collecting PR #${pr} ---"
+            gh pr view "$pr" --json title,body,number --jq '{title,body,number}' > "/tmp/pr-data/pr-${pr}-meta.json"
+            gh pr diff "$pr" > "/tmp/pr-data/pr-${pr}.diff"
+            BRANCH_PARTS="${BRANCH_PARTS}${pr}-"
+          done
+          # Generate branch name slug from first PR title
+          FIRST_PR=$(echo "$PR_NUMBERS" | cut -d',' -f1)
+          SLUG=$(gh pr view "$FIRST_PR" --json title --jq '.title' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | head -c 40)
+          BRANCH_NAME="sdpm/pr${BRANCH_PARTS}${SLUG}"
+          echo "branch_name=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
+          echo "Branch: ${BRANCH_NAME}"
+
+      - name: Generate blog draft with Kiro CLI
+        env:
+          KIRO_API_KEY: ${{ secrets.KIRO_API_KEY }}
+          PR_NUMBERS: ${{ inputs.pr_numbers }}
+          BLOG_THEME: ${{ inputs.blog_theme }}
+        run: |
+          # Build prompt
+          PR_DATA=""
+          for pr in $(echo "$PR_NUMBERS" | tr ',' ' '); do
+            META=$(cat "/tmp/pr-data/pr-${pr}-meta.json")
+            DIFF=$(head -c 50000 "/tmp/pr-data/pr-${pr}.diff")
+            PR_DATA="${PR_DATA}
+          === PR #${pr} ===
+          ${META}
+
+          Diff (truncated):
+          ${DIFF}
+          "
+          done
+
+          THEME_INSTRUCTION=""
+          if [ -n "$BLOG_THEME" ]; then
+            THEME_INSTRUCTION="テーマ/切り口: ${BLOG_THEME}"
+          fi
+
+          PROMPT="あなたはAWS Solutions Architectのテックブロガーです。
+          以下のPRの内容をもとに、Zenn (zenn.dev/aws_japan) 向けの日本語ブログ記事をドラフトしてください。
+
+          ${THEME_INSTRUCTION}
+
+          要件:
+          - Zennのfrontmatter (title, emoji, type, topics, published: false, publication_name: aws_japan) を含める
+          - 技術的に正確で、具体的なユースケースを交えて説明する
+          - コードブロックや設定例があれば含める
+          - 「この記事は個人の見解であり、所属する組織の公式見解ではありません。」を冒頭に入れる
+          - 画像が必要な箇所は <!-- TODO: [📸 画像プレースホルダ] 説明 --> で示す
+          - ファイル名は slug 形式で出力の最初の行に記載: filename: sdpm-xxx.md
+
+          PR データ:
+          ${PR_DATA}
+
+          Markdown のみを出力してください。"
+
+          kiro-cli chat --no-interactive --trust-all-tools "$PROMPT" > /tmp/blog-draft-raw.txt 2>/dev/null
+
+          # Extract markdown content (lines starting with "> " are the response)
+          grep '^> ' /tmp/blog-draft-raw.txt | sed 's/^> //' > /tmp/blog-draft.md
+          # Continuation lines (no "> " prefix)
+          # Use the full stdout as fallback if grep finds nothing
+          if [ ! -s /tmp/blog-draft.md ]; then
+            cp /tmp/blog-draft-raw.txt /tmp/blog-draft.md
+          fi
+
+          # Extract filename from first line if present
+          FILENAME=$(head -5 /tmp/blog-draft.md | grep -oP 'filename:\s*\K\S+' || echo "")
+          if [ -z "$FILENAME" ]; then
+            FILENAME="sdpm-draft-$(date +%Y%m%d).md"
+          fi
+          echo "$FILENAME" > /tmp/blog-filename.txt
+
+          # Remove the filename directive line from content
+          sed -i '/^filename:/d' /tmp/blog-draft.md
+
+          echo "Generated: $FILENAME ($(wc -c < /tmp/blog-draft.md) bytes)"
+
+      - name: Push to zenn-blog and create PR
+        env:
+          BLOG_REPO_TOKEN: ${{ secrets.BLOG_REPO_TOKEN }}
+          BRANCH_NAME: ${{ steps.collect.outputs.branch_name }}
+          PR_NUMBERS: ${{ inputs.pr_numbers }}
+        run: |
+          FILENAME=$(cat /tmp/blog-filename.txt)
+          REPO="okamoto-aws/zenn-blog"
+
+          # Clone zenn-blog
+          git clone "https://x-access-token:${BLOG_REPO_TOKEN}@github.com/${REPO}.git" /tmp/zenn-blog
+          cd /tmp/zenn-blog
+          git checkout publish
+          git checkout -b "$BRANCH_NAME"
+
+          # Copy draft
+          cp /tmp/blog-draft.md "articles/${FILENAME}"
+          git add "articles/${FILENAME}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          PR_LIST=$(echo "$PR_NUMBERS" | tr ',' ' ' | xargs -I{} echo "- https://github.com/${{ github.repository }}/pull/{}")
+          git commit -m "📝 Blog draft: ${FILENAME}
+
+          Source PRs:
+          ${PR_LIST}"
+
+          git push origin "$BRANCH_NAME"
+
+          # Create PR
+          PR_URL=$(gh pr create \
+            --repo "$REPO" \
+            --base publish \
+            --head "$BRANCH_NAME" \
+            --title "📝 Blog draft: ${FILENAME}" \
+            --body "Auto-generated blog draft from SDPM CI.
+
+          **Source PRs:**
+          ${PR_LIST}
+
+          **Theme:** ${{ inputs.blog_theme }}
+
+          ---
+          Review, edit, and merge to publish on Zenn." \
+            2>&1)
+
+          echo "$PR_URL" > /tmp/blog-pr-url.txt
+          echo "PR created: $PR_URL"
+
+      - name: Label source PRs as blog:done
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBERS: ${{ inputs.pr_numbers }}
+        run: |
+          for pr in $(echo "$PR_NUMBERS" | tr ',' ' '); do
+            gh pr edit "$pr" --remove-label "blog:pending" --add-label "blog:done" 2>/dev/null || true
+            echo "Labeled PR #${pr} as blog:done"
+          done
+
+      - name: Notify Slack
+        if: always() && secrets.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          PR_URL=$(cat /tmp/blog-pr-url.txt 2>/dev/null || echo "N/A")
+          SUBJECT="📝 Blog draft ready: PR ${{ inputs.pr_numbers }}"
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"subject\":\"${SUBJECT}\",\"url\":\"${PR_URL}\"}"
