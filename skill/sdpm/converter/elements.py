@@ -923,8 +923,13 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
     if hasattr(shape, 'click_action') and shape.click_action.hyperlink:
         elem["link"] = shape.click_action.hyperlink.address
     
-    # Extract image effects (mask, crop, adjustments) and visual effects
+    # Extract image effects into _originalEffects (underscore-prefixed so builder
+    # ignores them by default).  When reusing images in new slides, agents should
+    # NOT copy _originalEffects — this prevents unintended mask/crop/color changes.
+    # To faithfully reproduce the original slide, spread _originalEffects into the
+    # element: { ...elem, ...elem._originalEffects }.
     try:
+        effects: dict = {}
         pic_el = shape._element
         sp_pr = pic_el.find(f'{{{_NS["p"]}}}spPr')
         if sp_pr is not None:
@@ -934,9 +939,9 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
                 prst = prst_geom.get('prst')
                 mask_rmap = {"ellipse": "circle", "roundRect": "rounded_rectangle", "hexagon": "hexagon", "diamond": "diamond", "triangle": "triangle", "pentagon": "pentagon", "star5": "star_5_point", "heart": "heart", "trapezoid": "trapezoid"}
                 if prst and prst != 'rect' and prst in mask_rmap:
-                    elem["mask"] = mask_rmap[prst]
+                    effects["mask"] = mask_rmap[prst]
             # Visual effects
-            elem.update(_extract_visual_effects(sp_pr, theme_colors, color_mapping))
+            effects.update(_extract_visual_effects(sp_pr, theme_colors, color_mapping))
 
         blip_fill = pic_el.find(f'{{{_NS["p"]}}}blipFill')
         if blip_fill is not None:
@@ -950,7 +955,7 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
                         key = {"l": "left", "t": "top", "r": "right", "b": "bottom"}[side]
                         crop[key] = int(v) / 1000
                 if crop:
-                    elem["crop"] = crop
+                    effects["crop"] = crop
             # Brightness/Contrast/Saturation
             blip = blip_fill.find(f'{{{_NS["a"]}}}blip')
             if blip is not None:
@@ -959,21 +964,21 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
                     b = lum.get('bright')
                     c = lum.get('contrast')
                     if b:
-                        elem["brightness"] = round(int(b) / 1000)
+                        effects["brightness"] = round(int(b) / 1000)
                     if c:
-                        elem["contrast"] = round(int(c) / 1000)
+                        effects["contrast"] = round(int(c) / 1000)
                 sat = blip.find(f'{{{_NS["a"]}}}hsl')
                 if sat is not None:
                     v = sat.get('sat')
                     if v:
-                        elem["saturation"] = round(int(v) / 1000)
+                        effects["saturation"] = round(int(v) / 1000)
                 duo = blip.find(f'{{{_NS["a"]}}}duotone')
                 if duo is not None:
                     colors = []
                     for srgb in duo.findall(f'{{{_NS["a"]}}}srgbClr'):
                         colors.append(_hex(srgb))
                     if len(colors) >= 2:
-                        elem["duotone"] = colors[:2]
+                        effects["duotone"] = colors[:2]
                 # Preserve blip effects XML for lossless roundtrip (biLevel, etc.)
                 from lxml import etree as _et
                 blip_effects = []
@@ -982,7 +987,9 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
                     if tag in ('biLevel', 'grayscl', 'clrChange', 'clrRepl'):
                         blip_effects.append(_et.tostring(child, encoding='unicode'))
                 if blip_effects:
-                    elem["_blipEffects"] = blip_effects
+                    effects["_blipEffects"] = blip_effects
+        if effects:
+            elem["_originalEffects"] = effects
     except Exception:
         pass
     

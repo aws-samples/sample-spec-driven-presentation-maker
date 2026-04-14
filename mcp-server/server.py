@@ -228,16 +228,73 @@ def analyze_template(template: str) -> str:
 
 
 @mcp.tool()
-def read_uploaded_file(upload_id: str, deck_id: str) -> list:
+def save_web_image(url: str, deck_id: str, filename: str = "") -> str:
+    """Download an image from a URL and save it to the deck workspace for use in slides.
+
+    Use this after web_fetch(include_images=true) identifies images you want to use.
+    The image is saved to decks/{deck_id}/images/{filename} and can be referenced
+    in slide JSON as "images/{filename}".
+
+    Args:
+        url: The image URL to download.
+        deck_id: The deck ID to save the image into.
+        filename: Optional filename. If omitted, derived from the URL.
+
+    Returns:
+        JSON with the saved image path (use as "src" in slide elements).
+    """
+    import mimetypes
+    import urllib.parse
+
+    import requests as http_requests
+
+    _check_deck_access(deck_id, action="edit_slide")
+
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return json.dumps({"error": f"Only http/https URLs are allowed, got: {parsed.scheme}"})
+
+    try:
+        resp = http_requests.get(
+            url, headers={"User-Agent": "Mozilla/5.0 (compatible; sdpm-agent/1.0)"}, timeout=30
+        )
+        resp.raise_for_status()
+        data = resp.content
+        ct = resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
+    except Exception as e:
+        return json.dumps({"error": f"Failed to download: {e}"})
+
+    allowed = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"}
+    if ct not in allowed:
+        return json.dumps({"error": f"Not an image: {ct}"})
+
+    if not filename:
+        basename = os.path.basename(url.split("?")[0].split("#")[0]) or "image"
+        ext = mimetypes.guess_extension(ct) or ".png"
+        if not basename.endswith(ext):
+            basename = basename.rsplit(".", 1)[0] + ext if "." in basename else basename + ext
+        filename = basename
+
+    key = f"decks/{deck_id}/images/{filename}"
+    _storage.upload_file(key=key, data=data, content_type=ct)
+    src = f"images/{filename}"
+    logger.info("save_web_image: %s → %s (%d bytes)", url, key, len(data))
+    return json.dumps({"status": "ok", "src": src, "size": len(data)})
+
+
+@mcp.tool()
+def read_uploaded_file(upload_id: str, deck_id: str, page_start: int = 0) -> list:
     """Read an uploaded file's content. Returns text for documents, visual preview for images/PDFs.
 
     For images: saves original to deck workspace for use in slides, returns visual preview.
     For PDFs: extracts text and embedded images, saves images to deck workspace.
+      Use page_start to paginate through long PDFs (e.g. page_start=20 for pages 21-40).
     For PPTX: returns extracted text and guidance to use pptx_to_json.
 
     Args:
         deck_id: The deck ID. Must be initialized first via init_presentation().
         upload_id: The upload identifier from the [Attached: ...] message.
+        page_start: Page offset for PDF pagination (default 0). Use the value from the truncation message.
 
     Returns:
         Text content and/or image previews for visual analysis.
@@ -250,6 +307,7 @@ def read_uploaded_file(upload_id: str, deck_id: str) -> list:
         deck_id=deck_id,
         user_id=_get_user_id(),
         storage=_storage,
+        page_start=page_start,
     )
 
 

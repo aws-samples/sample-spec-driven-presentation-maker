@@ -58,8 +58,8 @@
   --background-hover: oklch(0.16 0.005 260);
   --background-panel: oklch(0.08 0.005 260);
   --foreground: oklch(0.95 0 0);
-  --foreground-secondary: oklch(0.65 0 0);
-  --foreground-muted: oklch(0.40 0 0);
+  --foreground-secondary: oklch(0.75 0 0);
+  --foreground-muted: oklch(0.65 0 0);
   --card: oklch(0.14 0.005 260);
   --card-foreground: oklch(0.95 0 0);
   --popover: oklch(0.14 0.005 260);

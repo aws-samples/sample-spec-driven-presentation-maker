@@ -156,12 +156,21 @@ zip -r "${SOURCE_ZIP}" . \
   -x ".pytest_cache/*" \
   -x ".DS_Store" \
   -x "_plan_*" \
+  -x "tmp/*" \
+  -x ".ash/*" \
   > /dev/null
 
 SOURCE_KEY="source/$(date +%Y%m%d-%H%M%S).zip"
 echo "Uploading to s3://${SOURCE_BUCKET}/${SOURCE_KEY} ..."
 aws s3 cp "${SOURCE_ZIP}" "s3://${SOURCE_BUCKET}/${SOURCE_KEY}" ${AWS_OPTS} --quiet
 rm -rf "${TMPDIR}"
+
+# Verify upload
+if ! aws s3api head-object --bucket "${SOURCE_BUCKET}" --key "${SOURCE_KEY}" ${AWS_OPTS} > /dev/null 2>&1; then
+  echo "ERROR: Upload verification failed — ${SOURCE_KEY} not found in S3."
+  echo "The zip may be too large for the available disk space (CloudShell has 1GB limit)."
+  exit 1
+fi
 
 # ---- CodeBuild service role ----
 ROLE_NAME="${PROJECT_NAME}-role"
