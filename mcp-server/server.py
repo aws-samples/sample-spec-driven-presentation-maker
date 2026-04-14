@@ -228,6 +228,53 @@ def analyze_template(template: str) -> str:
 
 
 @mcp.tool()
+def save_web_image(url: str, deck_id: str, filename: str = "") -> str:
+    """Download an image from a URL and save it to the deck workspace for use in slides.
+
+    Use this after web_fetch(include_images=true) identifies images you want to use.
+    The image is saved to decks/{deck_id}/images/{filename} and can be referenced
+    in slide JSON as "images/{filename}".
+
+    Args:
+        url: The image URL to download.
+        deck_id: The deck ID to save the image into.
+        filename: Optional filename. If omitted, derived from the URL.
+
+    Returns:
+        JSON with the saved image path (use as "src" in slide elements).
+    """
+    import mimetypes
+    import urllib.request
+
+    _check_deck_access(deck_id, action="edit_slide")
+
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; sdpm-agent/1.0)"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = resp.read()
+            ct = resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
+    except Exception as e:
+        return json.dumps({"error": f"Failed to download: {e}"})
+
+    allowed = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"}
+    if ct not in allowed:
+        return json.dumps({"error": f"Not an image: {ct}"})
+
+    if not filename:
+        basename = os.path.basename(url.split("?")[0].split("#")[0]) or "image"
+        ext = mimetypes.guess_extension(ct) or ".png"
+        if not basename.endswith(ext):
+            basename = basename.rsplit(".", 1)[0] + ext if "." in basename else basename + ext
+        filename = basename
+
+    key = f"decks/{deck_id}/images/{filename}"
+    _storage.upload_file(key=key, data=data, content_type=ct)
+    src = f"images/{filename}"
+    logger.info("save_web_image: %s → %s (%d bytes)", url, key, len(data))
+    return json.dumps({"status": "ok", "src": src, "size": len(data)})
+
+
+@mcp.tool()
 def read_uploaded_file(upload_id: str, deck_id: str) -> list:
     """Read an uploaded file's content. Returns text for documents, visual preview for images/PDFs.
 
