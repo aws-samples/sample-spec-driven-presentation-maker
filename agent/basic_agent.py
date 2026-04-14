@@ -390,7 +390,15 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
                             yield {"group": gi + 1, "slugs": slugs_label, "tool": name}
 
                 # Capture composer's final response
-                composer_response = str(composer.messages[-1].get("content", [{}])[-1].get("text", "")) if composer.messages else ""
+                composer_response = ""
+                for msg in reversed(composer.messages):
+                    if msg.get("role") == "assistant":
+                        for block in reversed(msg.get("content", [])):
+                            if isinstance(block, dict) and "text" in block:
+                                composer_response = block["text"]
+                                break
+                        if composer_response:
+                            break
                 generated.extend(group["slugs"])
                 done_count += len(group["slugs"])
                 yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total, "summary": composer_response}
