@@ -25,8 +25,12 @@ from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
+from strands.telemetry import StrandsTelemetry
 from tools.upload_tools import list_uploads
 from tools.web_tools import web_fetch
+
+# Enable Strands OTEL tracing (ADOT auto-instrumentation handles export)
+StrandsTelemetry()
 
 logger = logging.getLogger("sdpm.agent")
 
