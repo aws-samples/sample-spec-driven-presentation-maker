@@ -89,24 +89,32 @@ jobs:
           PR データ:
           ${PR_DATA}
 
-          出力先: /tmp/blog-draft.md にMarkdownファイルとして書き出してください。
-          ファイルの1行目に filename: sdpm-xxx.md の形式でファイル名を記載してください。"
+          Zenn frontmatter (---で始まる) から始まるMarkdownのみを出力してください。余計な説明は不要です。"
 
-          kiro-cli chat --no-interactive --trust-all-tools "$PROMPT" 2>/dev/null
+          kiro-cli chat --no-interactive --trust-all-tools "$PROMPT" > /tmp/blog-draft-raw.txt 2>/dev/null
 
-          echo "Output file: $(wc -c < /tmp/blog-draft.md 2>/dev/null || echo 'NOT FOUND') bytes"
+          echo "Raw output: $(wc -c < /tmp/blog-draft-raw.txt) bytes"
+
+          # Extract markdown starting from Zenn frontmatter (first ---)
+          sed -n '/^---$/,$ p' /tmp/blog-draft-raw.txt > /tmp/blog-draft.md
+
+          echo "Extracted: $(wc -c < /tmp/blog-draft.md) bytes"
 
           if [ ! -s /tmp/blog-draft.md ]; then
-            echo "::error::Kiro CLI did not produce /tmp/blog-draft.md"
+            echo "::error::Failed to extract blog draft from Kiro CLI output"
             exit 1
           fi
 
-          FILENAME=$(head -5 /tmp/blog-draft.md | grep -oP 'filename:\s*\K\S+' || echo "")
-          if [ -z "$FILENAME" ]; then
+          # Generate filename from frontmatter title or fallback
+          TITLE=$(grep '^title:' /tmp/blog-draft.md | head -1 | sed 's/^title:\s*"//;s/"$//')
+          if [ -n "$TITLE" ]; then
+            FILENAME=$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//' | head -c 50)
+            FILENAME="sdpm-${FILENAME}.md"
+          else
             FILENAME="sdpm-draft-$(date +%Y%m%d).md"
           fi
           echo "$FILENAME" > /tmp/blog-filename.txt
-          sed -i '/^filename:/d' /tmp/blog-draft.md
+          echo "Filename: $FILENAME"
 
       - name: Push to blog repo and create PR
         env:
