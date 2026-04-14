@@ -20,7 +20,7 @@ version = {attr = "sdpm.__version__"}
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
+    "pytest>=9.0.3",
     "ruff",
 ]
 
