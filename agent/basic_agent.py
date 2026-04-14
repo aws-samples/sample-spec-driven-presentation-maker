@@ -186,6 +186,7 @@ Use this deck_id for ALL run_python and generate_pptx calls. Do NOT call init_pr
 - Write each slide to slides/{{slug}}.json via run_python
 - Follow the compose workflow below — you already have everything you need
 - After composing, generate PPTX, measure, preview, and polish autonomously
+- ALL references below are already loaded — skip any "Before starting, you MUST run/read" instructions in the workflow
 
 ## Constraints
 - Do NOT ask the user anything — you have no user interaction
@@ -266,13 +267,15 @@ def _prefetch_context(mcp_client, deck_id: str = "") -> str:
     # Fetch deck-specific specs via run_python
     if deck_id:
         code = (
-            "import json\n"
+            "import json, os\n"
             "specs = {}\n"
             "for name in ['specs/brief.md', 'specs/outline.md', 'specs/art-direction.html', 'deck.json']:\n"
             "    try:\n"
             "        specs[name] = open(name).read()\n"
             "    except FileNotFoundError:\n"
             "        pass\n"
+            "if os.path.isdir('slides'):\n"
+            "    specs['slides/'] = ', '.join(sorted(os.listdir('slides')))\n"
             "print(json.dumps(specs, ensure_ascii=False))\n"
         )
         result = mcp_client.call_tool_sync(
@@ -296,7 +299,7 @@ def _prefetch_context(mcp_client, deck_id: str = "") -> str:
                 except _json.JSONDecodeError as e:
                     raise RuntimeError(f"Failed to parse specs for deck {deck_id}: {e}") from e
 
-    return "\n\n---\n\n".join(sections)
+    return "# Pre-loaded References (already executed — do NOT re-fetch)\n\n" + "\n\n---\n\n".join(sections)
 
 
 def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
