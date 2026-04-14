@@ -352,6 +352,7 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
         Async generator: yields progress dicts, then returns final result str.
         """
         import json as _json
+        import queue
 
         # Prefetch all references (Python call, no LLM turns)
         yield {"status": "prefetching", "message": "Loading references..."}
@@ -373,32 +374,37 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
             slugs_label = ", ".join(group["slugs"])
             yield {"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"}
 
+            # Collect tool names via callback_handler
+            progress_q: queue.Queue = queue.Queue()
+            last_tool_name = ""
+
+            def _progress_handler(**kwargs):
+                nonlocal last_tool_name
+                tu = kwargs.get("current_tool_use")
+                if tu:
+                    name = tu.get("name", "")
+                    if name and name != last_tool_name:
+                        last_tool_name = name
+                        progress_q.put(name)
+
             composer = Agent(
                 system_prompt=composer_prompt,
                 tools=[*mcp_servers],
                 model=model,
-                callback_handler=None,
+                callback_handler=_progress_handler,
             )
             try:
-                last_tool = ""
-                async for event in composer.stream_async(group["instruction"]):
-                    # Forward composer's tool usage as progress
-                    if tu := event.get("current_tool_use"):
-                        name = tu.get("name", "")
-                        if name and name != last_tool:
-                            last_tool = name
-                            yield {"group": gi + 1, "slugs": slugs_label, "tool": name}
+                # Synchronous call — the standard Agents as Tools pattern
+                import asyncio
+                response = await asyncio.to_thread(composer, group["instruction"])
+
+                # Drain progress queue
+                while not progress_q.empty():
+                    tool_name = progress_q.get_nowait()
+                    yield {"group": gi + 1, "slugs": slugs_label, "tool": tool_name}
 
                 # Capture composer's final response
-                composer_response = ""
-                for msg in reversed(composer.messages):
-                    if msg.get("role") == "assistant":
-                        for block in reversed(msg.get("content", [])):
-                            if isinstance(block, dict) and "text" in block:
-                                composer_response = block["text"]
-                                break
-                        if composer_response:
-                            break
+                composer_response = str(response)
                 generated.extend(group["slugs"])
                 done_count += len(group["slugs"])
                 yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total, "summary": composer_response}
