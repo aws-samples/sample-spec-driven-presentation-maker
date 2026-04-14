@@ -351,8 +351,8 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
         Prefetches all Phase 2 references once, then injects into composer prompt.
         Async generator: yields progress dicts, then returns final result str.
         """
+        import asyncio
         import json as _json
-        import queue
 
         # Prefetch all references (Python call, no LLM turns)
         yield {"status": "prefetching", "message": "Loading references..."}
@@ -374,36 +374,38 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
             slugs_label = ", ".join(group["slugs"])
             yield {"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"}
 
-            # Collect tool names via callback_handler
-            progress_q: queue.Queue = queue.Queue()
+            # Realtime progress via invoke_async + callback_handler + asyncio.Queue
+            progress_q: asyncio.Queue = asyncio.Queue()
             last_tool_name = ""
 
-            def _progress_handler(**kwargs):
+            def _on_event(**kwargs):
                 nonlocal last_tool_name
                 tu = kwargs.get("current_tool_use")
                 if tu:
                     name = tu.get("name", "")
                     if name and name != last_tool_name:
                         last_tool_name = name
-                        progress_q.put(name)
+                        progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name})
 
             composer = Agent(
                 system_prompt=composer_prompt,
                 tools=[*mcp_servers],
                 model=model,
-                callback_handler=_progress_handler,
+                callback_handler=_on_event,
             )
             try:
-                # Synchronous call — the standard Agents as Tools pattern
-                import asyncio
-                response = await asyncio.to_thread(composer, group["instruction"])
-
-                # Drain progress queue
+                task = asyncio.create_task(composer.invoke_async(group["instruction"]))
+                while not task.done():
+                    try:
+                        item = await asyncio.wait_for(progress_q.get(), timeout=0.2)
+                        yield item
+                    except asyncio.TimeoutError:
+                        pass
+                # Drain remaining
                 while not progress_q.empty():
-                    tool_name = progress_q.get_nowait()
-                    yield {"group": gi + 1, "slugs": slugs_label, "tool": tool_name}
+                    yield progress_q.get_nowait()
 
-                # Capture composer's final response
+                response = await task
                 composer_response = str(response)
                 generated.extend(group["slugs"])
                 done_count += len(group["slugs"])
