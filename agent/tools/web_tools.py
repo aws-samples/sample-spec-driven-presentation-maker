@@ -17,7 +17,13 @@ def _detect_content_type(response: requests.Response) -> str:
 
 
 @tool
-def web_fetch(url: str, max_chars: int = 20000, start: int = 0, include_images: bool = False) -> dict | str:
+def web_fetch(
+    url: str,
+    max_chars: int = 20000,
+    start: int = 0,
+    include_images: bool = False,
+    page_start: int = 0,
+) -> dict | str:
     """Fetch a web page, PDF, or image from a URL.
 
     - HTML pages are returned as Markdown text.
@@ -25,6 +31,7 @@ def web_fetch(url: str, max_chars: int = 20000, start: int = 0, include_images: 
     - Images (PNG, JPEG, GIF, WebP) are returned as image content for vision analysis.
 
     For long HTML pages, use 'start' to paginate through the content.
+    For PDFs, use 'page_start' to skip pages (e.g. page_start=5 for pages 6-10).
 
     When include_images is True, image references (![alt](url)) are preserved in the
     Markdown output. You can then fetch individual images by calling web_fetch(url) on
@@ -35,6 +42,7 @@ def web_fetch(url: str, max_chars: int = 20000, start: int = 0, include_images: 
         max_chars: Maximum characters to return for HTML (default 20000).
         start: Character offset to start from, for HTML reading continuation.
         include_images: If True, keep image URLs in Markdown output (default False).
+        page_start: Page offset for PDF pagination (default 0). Use the value from the truncation message.
 
     Returns:
         Markdown text for HTML, or structured ToolResult for PDF/image.
@@ -60,7 +68,7 @@ def web_fetch(url: str, max_chars: int = 20000, start: int = 0, include_images: 
 
     # --- PDF ---
     if ct == "application/pdf":
-        return _handle_pdf(url, response.content)
+        return _handle_pdf(url, response.content, page_start=page_start)
 
     # --- HTML (default) ---
     h = html2text.HTML2Text()
@@ -79,7 +87,7 @@ def web_fetch(url: str, max_chars: int = 20000, start: int = 0, include_images: 
     return chunk
 
 
-def _handle_pdf(url: str, data: bytes) -> dict:
+def _handle_pdf(url: str, data: bytes, *, page_start: int = 0) -> dict:
     """Extract text, page images, and embedded images from PDF bytes.
 
     Safety limits to prevent oversized responses:
@@ -97,15 +105,20 @@ def _handle_pdf(url: str, data: bytes) -> dict:
 
     doc = pymupdf.open(stream=data, filetype="pdf")
     total_pages = doc.page_count
+    page_end = min(page_start + MAX_PAGES, total_pages)
     content: list[dict] = []
-    content.append({"text": f"PDF: {url} ({total_pages} pages, showing pages 1-{min(MAX_PAGES, total_pages)})"})
+    content.append({
+        "text": f"PDF: {url} ({total_pages} pages, showing pages {page_start + 1}-{page_end})"
+    })
 
     response_bytes = 0
     page_images_rendered = 0
     embedded_images_count = 0
 
     for i, page in enumerate(doc):
-        if i >= MAX_PAGES:
+        if i < page_start:
+            continue
+        if i >= page_end:
             break
 
         # Text extraction (lightweight)
@@ -144,10 +157,10 @@ def _handle_pdf(url: str, data: bytes) -> dict:
             except Exception:
                 continue
 
-    if total_pages > MAX_PAGES:
+    if page_end < total_pages:
         content.append({
-            "text": f"\n[{total_pages - MAX_PAGES} more pages not shown. "
-            f"Call web_fetch with page_start={MAX_PAGES} to continue reading.]"
+            "text": f"\n[{total_pages - page_end} more pages not shown. "
+            f"Call web_fetch with page_start={page_end} to continue reading.]"
         })
     if embedded_images_count > MAX_EMBEDDED_IMAGES:
         content.append({"text": f"[{embedded_images_count - MAX_EMBEDDED_IMAGES}+ more embedded images not listed]"})
