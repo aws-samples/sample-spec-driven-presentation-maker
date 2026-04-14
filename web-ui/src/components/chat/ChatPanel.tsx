@@ -209,7 +209,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   input: (tu.input as Record<string, unknown>) || {},
                 })
               } else if (b.text && toolUses.length === 0) {
-                text += (text ? "\n" : "") + (b.text as string)
+                const cleaned = (b.text as string).replace(/<!--sdpm:[^>]*-->\n?/g, "")
+                if (cleaned) text += (text ? "\n" : "") + cleaned
               }
             }
           }
