@@ -42,4 +42,6 @@ phases:
           echo "Building web-ui..."
           cd web-ui && npm ci && npm run build && cd ..
         fi
-      - cd infra && cdk ${CDK_COMMAND:-deploy} --all --require-approval never
+      # Bootstrap CDK if not already done (idempotent)
+      - cd infra && cdk bootstrap --quiet || true
+      - cdk ${CDK_COMMAND:-deploy} --all --require-approval never
