@@ -89,31 +89,32 @@ jobs:
           PR データ:
           ${PR_DATA}
 
-          Markdown のみを出力してください。余計な説明やコメントは不要です。"
+          Zenn frontmatter (---で始まる) から始まるMarkdownのみを出力してください。余計な説明は不要です。"
 
           kiro-cli chat --no-interactive --trust-all-tools "$PROMPT" > /tmp/blog-draft-raw.txt 2>/dev/null
 
-          # Debug: show raw output size
-          echo "Raw output: $(wc -c < /tmp/blog-draft-raw.txt) bytes, $(wc -l < /tmp/blog-draft-raw.txt) lines"
+          echo "Raw output: $(wc -c < /tmp/blog-draft-raw.txt) bytes"
 
-          # Strip ANSI escape sequences and TUI artifacts
-          sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b\][^\x07]*\x07//g; s/\[0m//g; s/\[2K//g; s/\[1G//g; s/\[1A//g; s/\[\?25[lh]//g' /tmp/blog-draft-raw.txt > /tmp/blog-draft-clean.txt
-          echo "Clean output: $(wc -c < /tmp/blog-draft-clean.txt) bytes"
+          # Extract markdown starting from Zenn frontmatter (first ---)
+          sed -n '/^---$/,$ p' /tmp/blog-draft-raw.txt > /tmp/blog-draft.md
 
-          grep '^> ' /tmp/blog-draft-clean.txt | sed 's/^> //' > /tmp/blog-draft.md
-          echo "Grep > lines: $(wc -c < /tmp/blog-draft.md) bytes"
+          echo "Extracted: $(wc -c < /tmp/blog-draft.md) bytes"
+
           if [ ! -s /tmp/blog-draft.md ]; then
-            echo "No > lines found, using clean output as-is"
-            cp /tmp/blog-draft-clean.txt /tmp/blog-draft.md
+            echo "::error::Failed to extract blog draft from Kiro CLI output"
+            exit 1
           fi
-          echo "Final output: $(wc -c < /tmp/blog-draft.md) bytes"
 
-          FILENAME=$(head -5 /tmp/blog-draft.md | grep -oP 'filename:\s*\K\S+' || echo "")
-          if [ -z "$FILENAME" ]; then
+          # Generate filename from frontmatter title or fallback
+          TITLE=$(grep '^title:' /tmp/blog-draft.md | head -1 | sed 's/^title:\s*"//;s/"$//')
+          if [ -n "$TITLE" ]; then
+            FILENAME=$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//' | head -c 50)
+            FILENAME="sdpm-${FILENAME}.md"
+          else
             FILENAME="sdpm-draft-$(date +%Y%m%d).md"
           fi
           echo "$FILENAME" > /tmp/blog-filename.txt
-          sed -i '/^filename:/d' /tmp/blog-draft.md
+          echo "Filename: $FILENAME"
 
       - name: Push to blog repo and create PR
         env:
