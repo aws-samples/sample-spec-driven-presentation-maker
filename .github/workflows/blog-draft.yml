@@ -1,3 +1,4 @@
+# checkov:skip=CKV_GHA_7: workflow_dispatch inputs are required for PR number selection
 name: Blog draft
 
 on:
@@ -37,14 +38,12 @@ jobs:
             gh pr diff "$pr" > "/tmp/pr-data/pr-${pr}.diff"
             BRANCH_PARTS="${BRANCH_PARTS}${pr}-"
           done
-          # Generate branch name slug from first PR title
           FIRST_PR=$(echo "$PR_NUMBERS" | cut -d',' -f1)
           SLUG=$(gh pr view "$FIRST_PR" --json title --jq '.title' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | head -c 40)
           BRANCH_NAME="sdpm/pr${BRANCH_PARTS}${SLUG}"
           echo "branch_name=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
-          echo "Branch: ${BRANCH_NAME}"
 
-      - name: Clone blog repo (instruction + push target)
+      - name: Clone blog repo
         env:
           BLOG_REPO_TOKEN: ${{ secrets.BLOG_REPO_TOKEN }}
           BLOG_REPO: ${{ secrets.BLOG_REPO }}
@@ -57,13 +56,11 @@ jobs:
           PR_NUMBERS: ${{ inputs.pr_numbers }}
           BLOG_THEME: ${{ inputs.blog_theme }}
         run: |
-          # Load instruction from private repo (if exists)
           INSTRUCTION=""
           if [ -f /tmp/zenn-blog/instruction.md ]; then
             INSTRUCTION=$(cat /tmp/zenn-blog/instruction.md)
           fi
 
-          # Build PR data
           PR_DATA=""
           for pr in $(echo "$PR_NUMBERS" | tr ',' ' '); do
             META=$(cat "/tmp/pr-data/pr-${pr}-meta.json")
@@ -93,32 +90,27 @@ jobs:
 
           kiro-cli chat --no-interactive --trust-all-tools "$PROMPT" > /tmp/blog-draft-raw.txt 2>/dev/null
 
-          # Extract markdown content (lines starting with "> " are the response)
           grep '^> ' /tmp/blog-draft-raw.txt | sed 's/^> //' > /tmp/blog-draft.md
-          # Continuation lines (no "> " prefix)
-          # Use the full stdout as fallback if grep finds nothing
           if [ ! -s /tmp/blog-draft.md ]; then
             cp /tmp/blog-draft-raw.txt /tmp/blog-draft.md
           fi
 
-          # Extract filename from first line if present
           FILENAME=$(head -5 /tmp/blog-draft.md | grep -oP 'filename:\s*\K\S+' || echo "")
           if [ -z "$FILENAME" ]; then
             FILENAME="sdpm-draft-$(date +%Y%m%d).md"
           fi
           echo "$FILENAME" > /tmp/blog-filename.txt
-
-          # Remove the filename directive line from content
           sed -i '/^filename:/d' /tmp/blog-draft.md
-
-          echo "Generated: $FILENAME ($(wc -c < /tmp/blog-draft.md) bytes)"
 
       - name: Push to blog repo and create PR
         env:
           BLOG_REPO_TOKEN: ${{ secrets.BLOG_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.BLOG_REPO_TOKEN }}
           BLOG_REPO: ${{ secrets.BLOG_REPO }}
           BRANCH_NAME: ${{ steps.collect.outputs.branch_name }}
           PR_NUMBERS: ${{ inputs.pr_numbers }}
+          BLOG_THEME: ${{ inputs.blog_theme }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           FILENAME=$(cat /tmp/blog-filename.txt)
 
@@ -126,13 +118,12 @@ jobs:
           git checkout publish
           git checkout -b "$BRANCH_NAME"
 
-          # Copy draft
           cp /tmp/blog-draft.md "articles/${FILENAME}"
           git add "articles/${FILENAME}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          PR_LIST=$(echo "$PR_NUMBERS" | tr ',' ' ' | xargs -I{} echo "- https://github.com/${{ github.repository }}/pull/{}")
+          PR_LIST=$(echo "$PR_NUMBERS" | tr ',' ' ' | xargs -I{} echo "- https://github.com/${GITHUB_REPOSITORY}/pull/{}")
           git commit -m "📝 Blog draft: ${FILENAME}
 
           Source PRs:
@@ -140,7 +131,6 @@ jobs:
 
           git push origin "$BRANCH_NAME"
 
-          # Create PR
           PR_URL=$(gh pr create \
             --repo "$BLOG_REPO" \
             --base publish \
@@ -151,14 +141,13 @@ jobs:
           **Source PRs:**
           ${PR_LIST}
 
-          **Theme:** ${{ inputs.blog_theme }}
+          **Theme:** ${BLOG_THEME}
 
           ---
-          Review, edit, and merge to publish on Zenn." \
+          Review, edit, and merge to publish." \
             2>&1)
 
           echo "$PR_URL" > /tmp/blog-pr-url.txt
-          echo "PR created: $PR_URL"
 
       - name: Label source PRs as blog:done
         env:
@@ -167,16 +156,17 @@ jobs:
         run: |
           for pr in $(echo "$PR_NUMBERS" | tr ',' ' '); do
             gh pr edit "$pr" --remove-label "blog:pending" --add-label "blog:done" 2>/dev/null || true
-            echo "Labeled PR #${pr} as blog:done"
           done
 
       - name: Notify Slack
-        if: always() && secrets.SLACK_WEBHOOK_URL != ''
+        if: always()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          PR_NUMBERS: ${{ inputs.pr_numbers }}
         run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then exit 0; fi
           PR_URL=$(cat /tmp/blog-pr-url.txt 2>/dev/null || echo "N/A")
-          SUBJECT="📝 Blog draft ready: PR ${{ inputs.pr_numbers }}"
+          SUBJECT="📝 Blog draft ready: PR ${PR_NUMBERS}"
           curl -s -X POST "$SLACK_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "{\"subject\":\"${SUBJECT}\",\"url\":\"${PR_URL}\"}"
