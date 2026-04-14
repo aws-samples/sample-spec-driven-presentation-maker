@@ -147,6 +147,7 @@ Respond in the same language as the user.
 
 ## Web Fetch
 - Use web_fetch(url) to read a specific URL as Markdown
+- If a user message starts with <!--sdpm:include_images=true-->, pass include_images=true when calling web_fetch on HTML pages to preserve image URLs in the output. Then fetch relevant images individually for use in the presentation.
 """
 
 
