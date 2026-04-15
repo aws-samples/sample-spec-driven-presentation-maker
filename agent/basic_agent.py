@@ -151,6 +151,23 @@ Respond in the same language as the user.
 - After compose_slides returns, review the report and relay results to the user
 - For user modification requests, translate them into instructions and call compose_slides again
 
+## Slide Group Assignment for compose_slides
+When calling compose_slides, split the outline into groups using this 2-step process:
+
+**Step 1 — Form core groups** (slides that MUST share the same design):
+- Override-inherited slides (same slug prefix, e.g. demo-1, demo-2) → same group (required)
+- Structurally identical roles (e.g. all intro slides, all demo slides) → same group (strongly recommended)
+- Slides the user explicitly asked to unify → same group
+
+**Step 2 — Distribute independent slides** for load balancing:
+- Assign remaining slides (title, closing, etc.) to existing groups so each group has roughly equal work
+- Do NOT create a group with only independent slides
+
+Rules:
+- Do NOT consider adjacent-slide layout diversity (handled by post-review)
+- No constraint on group count or size (concurrency is controlled by semaphore)
+- Do NOT create a core group with only 1 slide (nothing to unify — treat as independent)
+
 ## File Uploads
 - When a user message contains [Attached: filename (uploadId: xxx)], use read_uploaded_file(upload_id, deck_id) to read content. If no deck exists yet, call init_presentation() first.
 - Use list_uploads(session_id) to see all files in the current session
@@ -492,7 +509,52 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
             except Exception as e:
                 yield {"group": gi + 1, "slugs": slugs_label, "status": "retry_failed", "error": str(e)}
 
-        yield _json.dumps({"generated_slides": generated, "errors": errors, "summaries": summaries})
+        # Post-compose: build PPTX + assemble report
+        yield {"status": "building", "message": "Building final PPTX..."}
+        report = {"generated_slides": generated, "errors": errors, "summaries": summaries}
+
+        if generated and mcp_client:
+            import uuid
+
+            # Generate PPTX
+            try:
+                build_result = mcp_client.call_tool_sync(
+                    tool_use_id=f"build-{uuid.uuid4().hex[:8]}",
+                    name="generate_pptx",
+                    arguments={"deck_id": deck_id},
+                )
+                build_text = ""
+                for item in build_result.get("content", []):
+                    if isinstance(item, dict) and "text" in item:
+                        build_text += item["text"]
+                report["build"] = build_text
+            except Exception as e:
+                report["build_error"] = str(e)
+
+            # Outline check: compare generated vs expected
+            try:
+                outline_result = mcp_client.call_tool_sync(
+                    tool_use_id=f"outline-{uuid.uuid4().hex[:8]}",
+                    name="run_python",
+                    arguments={"code": "import json\noutline = open('specs/outline.md').read()\nimport re\nslugs = re.findall(r'^-\\s*\\[([a-z0-9-]+)\\]', outline, re.MULTILINE)\nprint(json.dumps(slugs))", "deck_id": deck_id},
+                )
+                for item in outline_result.get("content", []):
+                    if isinstance(item, dict) and "text" in item:
+                        try:
+                            output = _json.loads(item["text"])
+                            if isinstance(output, dict) and "output" in output:
+                                expected = _json.loads(output["output"])
+                            else:
+                                expected = output
+                            missing = [s for s in expected if s not in generated]
+                            extra = [s for s in generated if s not in expected]
+                            report["outline_check"] = {"expected": expected, "missing": missing, "extra": extra}
+                        except _json.JSONDecodeError:
+                            pass
+            except Exception:
+                pass
+
+        yield _json.dumps(report)
 
     return compose_slides
 
