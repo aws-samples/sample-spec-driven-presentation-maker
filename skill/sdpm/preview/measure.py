@@ -158,12 +158,21 @@ def split_svg_per_slide(svg_text: str) -> list[str]:
     return result
 
 
-def format_measure_report(results: dict[int, list[ElementBBox]]) -> str:
-    """Format measurement results as human-readable text."""
+def format_measure_report(
+    results: dict[int, list[ElementBBox]],
+    page_to_slug: dict[int, str] | None = None,
+) -> str:
+    """Format measurement results as human-readable text.
+
+    Args:
+        results: Mapping of 1-based page number to element bboxes.
+        page_to_slug: Optional mapping of page number to slug for slug-based labels.
+    """
     lines: list[str] = []
     lines.append("📐 Text measurement (actual rendered size):")
     for slide_num in sorted(results.keys()):
-        lines.append(f"Slide {slide_num}:")
+        label = page_to_slug.get(slide_num, str(slide_num)) if page_to_slug else str(slide_num)
+        lines.append(f"Slide {label}:")
         for bbox in results[slide_num]:
             lines.append(f'  at ({bbox.x_px}, {bbox.y_px}) w={bbox.w_px} h={bbox.h_px} lines={bbox.lines} | "{bbox.text_preview}"')
     lines.append("Compare each h with your declared height. Large difference means text doesn't fit — adjust text content or width first.")

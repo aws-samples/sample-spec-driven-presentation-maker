@@ -403,7 +403,8 @@ def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> Path:
     return pptx_path
 
 
-def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int]) -> str:
+def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int],
+                 page_to_slug: dict[int, str] | None = None) -> str:
     """PPTX → SVG → bbox measurement → report string."""
     import subprocess
 
@@ -420,7 +421,7 @@ def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int]) -> str
         return json.dumps({"error": "LibreOffice SVG export failed"})
 
     results = measure_from_svg(svg_path=svg_path, slide_indices=slide_numbers)
-    return format_measure_report(results)
+    return format_measure_report(results, page_to_slug=page_to_slug)
 
 
 # --- Asset Tools ---
@@ -708,11 +709,12 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 if sid:
                     slug_to_page[sid] = i + 1
             page_numbers = [slug_to_page[slug] for slug in measure_slides if slug in slug_to_page]
+            page_to_slug = {v: k for k, v in slug_to_page.items()}
 
             # Measure
             try:
                 if page_numbers:
-                    measure_result = _run_measure(tmpdir, pptx_path, page_numbers)
+                    measure_result = _run_measure(tmpdir, pptx_path, page_numbers, page_to_slug=page_to_slug)
                     result["measure"] = measure_result
                 else:
                     result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})

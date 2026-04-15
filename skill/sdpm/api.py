@@ -346,13 +346,13 @@ def generate(
 
 def measure(
     json_path: str | Path,
-    slides: list[int] | None = None,
+    slides: list[int] | list[str] | None = None,
 ) -> str:
     """Build PPTX from JSON, convert to SVG, extract text bboxes.
 
     Args:
-        json_path: Path to the slides JSON file.
-        slides: Slide numbers to measure (1-based). None for all.
+        json_path: Path to the slides JSON file or directory.
+        slides: Slide numbers (1-based int) or slugs (str) to measure. None for all.
 
     Returns:
         Text report of bbox measurements.
@@ -364,6 +364,21 @@ def measure(
 
     config = _resolve_config(json_path)
 
+    # Resolve slugs to page numbers and build reverse mapping
+    page_to_slug: dict[int, str] | None = None
+    slide_indices: list[int] | None = None
+
+    if slides and isinstance(slides[0], str):
+        slug_to_page = {}
+        for i, s in enumerate(config.slides):
+            sid = s.get("id", "")
+            if sid:
+                slug_to_page[sid] = i + 1
+        slide_indices = [slug_to_page[slug] for slug in slides if slug in slug_to_page]
+        page_to_slug = {v: k for k, v in slug_to_page.items()}
+    else:
+        slide_indices = slides
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_pptx = Path(tmp_dir) / "measure.pptx"
         _build(config, tmp_pptx)
@@ -374,8 +389,8 @@ def measure(
             raise RuntimeError("SVG export failed. Is LibreOffice (soffice) installed?")
 
         try:
-            results = measure_from_svg(svg_path, slides)
-            return format_measure_report(results)
+            results = measure_from_svg(svg_path, slide_indices)
+            return format_measure_report(results, page_to_slug=page_to_slug)
         finally:
             import shutil
             if svg_path:
