@@ -218,3 +218,15 @@ global_settings:
         Uses public.ecr.aws/docker/library/python:3.13-slim from
         ECR Public Gallery. This is the official Python image mirror on ECR.
       expiration: "2027-03-29"
+
+    # --- GitHub Actions workflow_dispatch inputs ---
+    # blog-draft.yml requires user-provided PR numbers to select which PRs
+    # to generate a blog draft from. This is by design, not a supply chain risk.
+
+    - rule_id: "CKV_GHA_7"
+      path: ".github/workflows/blog-draft.yml"
+      reason: >
+        workflow_dispatch inputs (pr_numbers, blog_theme) are required for
+        PR selection. Inputs are used only via env: variables to prevent
+        shell injection. Not a supply chain concern.
+      expiration: "2027-03-29"
