@@ -21,6 +21,7 @@ import traceback
 import urllib.parse
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
+from botocore.config import Config as BotocoreConfig
 from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
 from strands.models import BedrockModel
@@ -687,6 +688,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
         model_id=os.environ.get("COMPOSER_MODEL_ID", os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-4-6")),
         temperature=0.1,
         cache_config=CacheConfig(strategy="auto"),
+        boto_client_config=BotocoreConfig(user_agent_extra="strands-agents", read_timeout=30),
     )
 
     # --- Build MCP server list with resilience ---
