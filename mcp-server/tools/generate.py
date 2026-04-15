@@ -227,7 +227,7 @@ def _prepare_workspace(
                 template_key = t.get("s3Key", "")
                 break
     if not template_key:
-        template_key = deck.get("templateS3Key", "templates/default.pptx")
+        template_key = deck.get("templateS3Key", "templates/blank-dark.pptx")
     template_path = tmpdir / "template.pptx"
     template_path.write_bytes(storage.download_file(key=template_key))
 

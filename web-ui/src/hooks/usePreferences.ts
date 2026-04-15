@@ -13,9 +13,10 @@ const KEY = "sdpm-prefs"
 interface Prefs {
   sendWithEnter: boolean
   viewMode: "full" | "grid"
+  fetchWebImages: boolean
 }
 
-const DEFAULTS: Prefs = { sendWithEnter: false, viewMode: "full" }
+const DEFAULTS: Prefs = { sendWithEnter: false, viewMode: "full", fetchWebImages: false }
 
 /**
  * Read preferences from localStorage, falling back to defaults.
@@ -48,5 +49,7 @@ export function usePreferences() {
     setSendWithEnter: useCallback((v: boolean) => update({ sendWithEnter: v }), [update]),
     viewMode: prefs.viewMode,
     setViewMode: useCallback((v: "full" | "grid") => update({ viewMode: v }), [update]),
+    fetchWebImages: prefs.fetchWebImages,
+    setFetchWebImages: useCallback((v: boolean) => update({ fetchWebImages: v }), [update]),
   }
 }

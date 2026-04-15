@@ -97,13 +97,16 @@ export function useWorkspace(
     const INTERVALS = [1000, 2000, 4000, 6000]
     let step = 0
 
+    let cancelled = false
+
     async function poll() {
-      if (!idToken || !deckIdToLoad || deckIdToLoad === "__polling__") {
-        scheduleNext()
+      if (cancelled || !idToken || !deckIdToLoad || deckIdToLoad === "__polling__") {
+        if (!cancelled) scheduleNext()
         return
       }
       try {
         const data = await getDeck(deckIdToLoad, idToken)
+        if (cancelled) return
         // Detect slide changes (added/removed/preview updated)
         const slideKey = data.slides.map((s) => {
           const base = s.previewUrl?.split("?")[0] || ""
@@ -129,12 +132,35 @@ export function useWorkspace(
           } else {
             stablePreviewUrls.current.delete(s.slideId)
           }
+          // Stabilise composeUrl with same pattern as previewUrl
+          if (s.composeUrl) {
+            const cacheKey = `${s.slideId}:compose`
+            const cached = stablePreviewUrls.current.get(cacheKey)
+            const base = s.composeUrl.split("?")[0]
+            const cachedBase = cached?.url.split("?")[0] || ""
+            if (base !== cachedBase) {
+              stablePreviewUrls.current.set(cacheKey, { url: s.composeUrl })
+            } else if (cached) {
+              s.composeUrl = cached.url
+            }
+          }
+        }
+        // Stabilise defsUrl
+        if (data.defsUrl) {
+          const cached = stablePreviewUrls.current.get("__defs__")
+          const base = data.defsUrl.split("?")[0]
+          const cachedBase = cached?.url.split("?")[0] || ""
+          if (base !== cachedBase) {
+            stablePreviewUrls.current.set("__defs__", { url: data.defsUrl })
+          } else if (cached) {
+            data.defsUrl = cached.url
+          }
         }
         setDeck(data)
       } catch {
         // Deck may not exist yet
       }
-      scheduleNext()
+      if (!cancelled) scheduleNext()
     }
 
     function scheduleNext() {
@@ -150,6 +176,7 @@ export function useWorkspace(
     }
 
     return () => {
+      cancelled = true
       if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current)
     }
   }, [isAuthenticated, idToken, activeDeckId, createdDeckId])
@@ -182,7 +209,7 @@ export function useWorkspace(
   const isNew = activeDeckId === "new"
   const isOwner = deck?.role === "owner" || deck?.role === undefined
   const canChat = isOwner || isNew
-  const hasSlides = deck && deck.slides.some((s) => s.previewUrl)
+  const hasSlides = deck && deck.slides.some((s) => s.previewUrl || s.composeUrl)
   const waitingForPng = pptxRequested
 
   // Reset flag once previews change after generate_pptx

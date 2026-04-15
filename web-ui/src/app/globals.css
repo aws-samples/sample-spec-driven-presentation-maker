@@ -58,8 +58,8 @@
   --background-hover: oklch(0.16 0.005 260);
   --background-panel: oklch(0.08 0.005 260);
   --foreground: oklch(0.95 0 0);
-  --foreground-secondary: oklch(0.65 0 0);
-  --foreground-muted: oklch(0.40 0 0);
+  --foreground-secondary: oklch(0.75 0 0);
+  --foreground-muted: oklch(0.65 0 0);
   --card: oklch(0.14 0.005 260);
   --card-foreground: oklch(0.95 0 0);
   --popover: oklch(0.14 0.005 260);
@@ -595,4 +595,10 @@ body {
 }
 .msg-assistant-enter {
   animation: msg-assistant-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* --- AnimatedSlidePreview keyframes --- */
+@keyframes asp-wf-drag {
+  0%   { clip-path: inset(0 100% 100% 0); }
+  100% { clip-path: inset(0 0 0 0); }
 }

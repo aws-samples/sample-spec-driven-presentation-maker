@@ -228,16 +228,73 @@ def analyze_template(template: str) -> str:
 
 
 @mcp.tool()
-def read_uploaded_file(upload_id: str, deck_id: str) -> list:
+def save_web_image(url: str, deck_id: str, filename: str = "") -> str:
+    """Download an image from a URL and save it to the deck workspace for use in slides.
+
+    Use this after web_fetch(include_images=true) identifies images you want to use.
+    The image is saved to decks/{deck_id}/images/{filename} and can be referenced
+    in slide JSON as "images/{filename}".
+
+    Args:
+        url: The image URL to download.
+        deck_id: The deck ID to save the image into.
+        filename: Optional filename. If omitted, derived from the URL.
+
+    Returns:
+        JSON with the saved image path (use as "src" in slide elements).
+    """
+    import mimetypes
+    import urllib.parse
+
+    import requests as http_requests
+
+    _check_deck_access(deck_id, action="edit_slide")
+
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return json.dumps({"error": f"Only http/https URLs are allowed, got: {parsed.scheme}"})
+
+    try:
+        resp = http_requests.get(
+            url, headers={"User-Agent": "Mozilla/5.0 (compatible; sdpm-agent/1.0)"}, timeout=30
+        )
+        resp.raise_for_status()
+        data = resp.content
+        ct = resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
+    except Exception as e:
+        return json.dumps({"error": f"Failed to download: {e}"})
+
+    allowed = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"}
+    if ct not in allowed:
+        return json.dumps({"error": f"Not an image: {ct}"})
+
+    if not filename:
+        basename = os.path.basename(url.split("?")[0].split("#")[0]) or "image"
+        ext = mimetypes.guess_extension(ct) or ".png"
+        if not basename.endswith(ext):
+            basename = basename.rsplit(".", 1)[0] + ext if "." in basename else basename + ext
+        filename = basename
+
+    key = f"decks/{deck_id}/images/{filename}"
+    _storage.upload_file(key=key, data=data, content_type=ct)
+    src = f"images/{filename}"
+    logger.info("save_web_image: %s → %s (%d bytes)", url, key, len(data))
+    return json.dumps({"status": "ok", "src": src, "size": len(data)})
+
+
+@mcp.tool()
+def read_uploaded_file(upload_id: str, deck_id: str, page_start: int = 0) -> list:
     """Read an uploaded file's content. Returns text for documents, visual preview for images/PDFs.
 
     For images: saves original to deck workspace for use in slides, returns visual preview.
     For PDFs: extracts text and embedded images, saves images to deck workspace.
+      Use page_start to paginate through long PDFs (e.g. page_start=20 for pages 21-40).
     For PPTX: returns extracted text and guidance to use pptx_to_json.
 
     Args:
         deck_id: The deck ID. Must be initialized first via init_presentation().
         upload_id: The upload identifier from the [Attached: ...] message.
+        page_start: Page offset for PDF pagination (default 0). Use the value from the truncation message.
 
     Returns:
         Text content and/or image previews for visual analysis.
@@ -250,6 +307,7 @@ def read_uploaded_file(upload_id: str, deck_id: str) -> list:
         deck_id=deck_id,
         user_id=_get_user_id(),
         storage=_storage,
+        page_start=page_start,
     )
 
 
@@ -403,20 +461,24 @@ def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> Path:
     return pptx_path
 
 
-def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int],
-                 page_to_slug: dict[int, str] | None = None) -> str:
-    """PPTX → SVG → bbox measurement → report string."""
+def _export_svg(tmpdir: Path, pptx_path: Path) -> Path:
+    """PPTX → SVG via LibreOffice. Returns svg_path."""
     import subprocess
-
-    from sdpm.preview.measure import measure_from_svg, format_measure_report
-
     env = os.environ.copy()
     env["HOME"] = str(tmpdir)
-    subprocess.run(  # nosec B603
+    subprocess.run(
         ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
         env=env, capture_output=True, text=True, timeout=120, check=True,
     )
-    svg_path = tmpdir / "measure.svg"
+    return tmpdir / "measure.svg"
+
+
+def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int],
+                 page_to_slug: dict[int, str] | None = None) -> str:
+    """PPTX → SVG → bbox measurement → report string."""
+    from sdpm.preview.measure import measure_from_svg, format_measure_report
+
+    svg_path = _export_svg(tmpdir, pptx_path)
     if not svg_path.exists():
         return json.dumps({"error": "LibreOffice SVG export failed"})
 
@@ -690,8 +752,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
     result: dict = {"output": output}
 
     # Post-processing: measure_slides triggers PPTX build → measure/lint/bias
-    # WebP preview generation runs when measure_slides is present and save=True
-    if deck_id and measure_slides:
+    if deck_id and (measure_slides or save):
         import shutil
         import traceback
 
@@ -742,8 +803,106 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 logger.warning("Layout bias check failed: %s", e)
 
             if save:
-                from server_utils import schedule_webp_background
-                schedule_webp_background(deck_id, pptx_path, tmpdir, _storage)
+                # Compose: SVG → optimized JSON for WebUI animation
+                # Runs synchronously — measured at ~300ms for 8 slides (≪3s threshold)
+                try:
+                    from tools.compose import extract_optimized_defs, split_slide_components, count_slides
+                    import hashlib as _hashlib
+                    svg_path = tmpdir / "measure.svg"
+                    if not svg_path.exists():
+                        _export_svg(tmpdir, pptx_path)
+                    if svg_path.exists():
+                        import json as _json
+                        import time as _time
+                        _epoch = int(_time.time())
+                        compose_prefix = f"decks/{deck_id}/compose/"
+
+                        # 1. List old compose keys (for cleanup + prev data)
+                        old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
+
+                        # 2. Load previous slide compose data keyed by sourceHash + slot number
+                        prev_by_hash: dict[str, list[dict]] = {}
+                        prev_by_slot: list[list[dict]] = []  # ordered by slide number
+                        prev_slot_map: dict[int, list[dict]] = {}
+                        import re as _re
+                        for k in old_keys:
+                            if "/slide_" not in k:
+                                continue
+                            try:
+                                raw = _storage.download_file_from_pptx_bucket(k)
+                                prev_data = _json.loads(raw)
+                                comps = prev_data.get("components", [])
+                                h = prev_data.get("sourceHash")
+                                if h:
+                                    prev_by_hash[h] = comps
+                                # Extract slot number from key: slide_{N}_{epoch}.json
+                                m = _re.search(r"/slide_(\d+)_", k)
+                                if m:
+                                    prev_slot_map[int(m.group(1))] = comps
+                            except Exception:
+                                pass
+                        # Build ordered list
+                        if prev_slot_map:
+                            max_slot = max(prev_slot_map.keys())
+                            prev_by_slot = [prev_slot_map.get(i, []) for i in range(1, max_slot + 1)]
+
+                        # 3. Upload defs
+                        defs_data = extract_optimized_defs(svg_path)
+                        _storage.upload_file(
+                            key=f"{compose_prefix}defs_{_epoch}.json",
+                            data=_json.dumps(defs_data, ensure_ascii=False).encode(),
+                            content_type="application/json",
+                        )
+
+                        # 4. Generate compose for all slides with changed flags
+                        _total = count_slides(svg_path)
+                        for sn in range(1, _total + 1):
+                            try:
+                                comp_data = split_slide_components(svg_path, sn)
+                                # sourceHash from slide JSON
+                                src_hash = ""
+                                if sn <= len(slides):
+                                    src_hash = _hashlib.md5(_json.dumps(slides[sn - 1], sort_keys=True, ensure_ascii=False).encode(), usedforsecurity=False).hexdigest()
+                                comp_data["sourceHash"] = src_hash
+
+                                # Diff: find prev slide by sourceHash, fallback to same slot number
+                                prev_comps = prev_by_hash.get(src_hash)
+                                if prev_comps is None and sn <= len(prev_by_slot):
+                                    prev_comps = prev_by_slot[sn - 1]
+                                if prev_comps is not None:
+                                    # Component-level diff
+                                    def _mk(c: dict) -> str:
+                                        b = c.get("bbox")
+                                        return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
+                                    def _fp(c: dict) -> str:
+                                        return f"{c['class']}|{c.get('text', '')}"
+                                    prev_map = {_mk(c): _fp(c) for c in prev_comps}
+                                    for c in comp_data["components"]:
+                                        k = _mk(c)
+                                        c["changed"] = k not in prev_map or prev_map[k] != _fp(c)
+                                else:
+                                    for c in comp_data["components"]:
+                                        c["changed"] = True
+
+                                _storage.upload_file(
+                                    key=f"{compose_prefix}slide_{sn}_{_epoch}.json",
+                                    data=_json.dumps(comp_data, ensure_ascii=False).encode(),
+                                    content_type="application/json",
+                                )
+                            except Exception:
+                                logger.error("compose failed for slide %d", sn, exc_info=True)
+
+                        # 5. Cleanup old compose files
+                        for k in old_keys:
+                            try:
+                                _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                            except Exception:
+                                pass
+                except Exception:
+                    logger.error("compose failed", exc_info=True)
+
+                # tmpdir cleanup (WebP generation only in generate_pptx)
+                shutil.rmtree(tmpdir, ignore_errors=True)
             else:
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as e:

@@ -30,7 +30,8 @@ import { AttachmentPreview, Attachment, SnippetAttachment } from "./AttachmentPr
 import { FileDropZone } from "./FileDropZone"
 import { SnippetInput } from "./SnippetInput"
 import { useIsMobile } from "@/hooks/UseMobile"
-import { Send, Square } from "lucide-react"
+import { Send, Square, ChevronRight } from "lucide-react"
+import { usePreferences } from "@/hooks/usePreferences"
 import { toast } from "sonner"
 
 interface Message {
@@ -106,6 +107,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const auth = useAuth()
   const { onCompositionStart, onCompositionEnd, getIsComposing } = useCompositionSafe()
   const isMobile = useIsMobile()
+  const { fetchWebImages, setFetchWebImages } = usePreferences()
+  const [optionsOpen, setOptionsOpen] = useState(false)
 
   /**
    * Insert text at the current cursor position in the textarea.
@@ -160,7 +163,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           const snippets: { label: string; text: string }[] = []
 
           if (typeof m.content === "string") {
-            text = m.content
+            text = m.content.replace(/<!--sdpm:[^>]*-->\n?/g, "")
           } else if (Array.isArray(m.content)) {
             // toolResult messages: attach result to matching toolUse in previous assistant
             if (m.role === "user" && m.content.some((b: Record<string, unknown>) => b.toolResult)) {
@@ -209,7 +212,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   input: (tu.input as Record<string, unknown>) || {},
                 })
               } else if (b.text && toolUses.length === 0) {
-                text += (text ? "\n" : "") + (b.text as string)
+                const cleaned = (b.text as string).replace(/<!--sdpm:[^>]*-->\n?/g, "")
+                if (cleaned) text += (text ? "\n" : "") + cleaned
               }
             }
           }
@@ -474,6 +478,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         .map((s) => `---snippet---\n${s.text}\n---/snippet---`)
         .join("\n\n")
       fullMessage = `${fullMessage}\n\n${snippetInfo}`
+    }
+    if (fetchWebImages) {
+      fullMessage = `<!--sdpm:include_images=true-->\n${fullMessage}`
     }
 
     const sentSnippets = snippets.map((s) => ({ label: s.label || "Text snippet", text: s.text }))
@@ -845,6 +852,31 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               onRemoveSnippet={removeSnippet}
               onEditSnippet={editSnippet}
             />
+
+            {/* Options expander */}
+            <div className="px-2">
+              <button
+                type="button"
+                onClick={() => setOptionsOpen((v) => !v)}
+                className="flex items-center gap-1 text-[11px] text-foreground-muted hover:text-foreground transition-colors py-1"
+              >
+                <ChevronRight className={`h-3 w-3 transition-transform ${optionsOpen ? "rotate-90" : ""}`} />
+                Options
+              </button>
+              {optionsOpen && (
+                <label className="flex items-center gap-2 pb-1.5 pl-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={fetchWebImages}
+                    onChange={(e) => setFetchWebImages(e.target.checked)}
+                    className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
+                  />
+                  <span className="text-[11px] text-foreground-muted select-none">
+                    Fetch images from websites (may be used in presentations)
+                  </span>
+                </label>
+              )}
+            </div>
 
             <div className="flex items-end gap-2 px-2 py-2">
               <PlusMenu

@@ -427,6 +427,30 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
     except Exception:
         pass
 
+    # Collect compose keys for animation (epoch-keyed, used by both formats)
+    compose_keys = set()
+    try:
+        for obj in s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/compose/").get("Contents", []):
+            compose_keys.add(obj["Key"])
+    except Exception:
+        pass
+
+    import re as _re
+    def _latest_compose_key(prefix: str, keys: set) -> Optional[str]:
+        """Pick the key with the highest epoch from epoch-keyed compose files."""
+        best_epoch, best_key = -1, None
+        for k in keys:
+            if not k.startswith(prefix):
+                continue
+            m = _re.search(r"_(\d+)\.json$", k)
+            epoch = int(m.group(1)) if m else 0
+            if epoch > best_epoch:
+                best_epoch, best_key = epoch, k
+        return best_key
+
+    defs_key = _latest_compose_key(f"decks/{deck_id}/compose/defs_", compose_keys)
+    has_defs = defs_key is not None
+
     if has_deck_json:
         # New format: outline.md for slug order, then slides/*.json
         # Canonical implementation: sdpm.api.parse_outline_slugs (not importable in Lambda)
@@ -461,6 +485,9 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
                 sid = f"slide_{i + 1:02d}"
                 slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
                 slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
+                compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}_", compose_keys)
+                if compose_key:
+                    slide_entry["composeUrl"] = preview_url(compose_key)
                 if include_json:
                     slide_entry["slideJson"] = json.dumps(s)
                 slides.append(slide_entry)
@@ -477,6 +504,9 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
                 sid = f"slide_{i + 1:02d}"
                 slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
                 slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
+                compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}_", compose_keys)
+                if compose_key:
+                    slide_entry["composeUrl"] = preview_url(compose_key)
                 if include_json:
                     slide_entry["slideJson"] = json.dumps(s)
                 slides.append(slide_entry)
@@ -516,6 +546,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         "slideCount": len(slides),
         "slides": slides,
         "specs": specs,
+        "defsUrl": preview_url(defs_key) if has_defs else None,
         "pptxUrl": (_cf_signed_url(pptx_key) or presigned_url(s3_client, BUCKET_NAME, pptx_key)) if pptx_key else None,
         "updatedAt": deck.get("updatedAt", ""),
         "chatSessionId": deck.get("chatSessionId"),

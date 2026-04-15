@@ -9,7 +9,7 @@
 
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { SlidePreview, getDeckWithJson } from "@/services/deckService"
 import type { SpecFiles } from "@/services/deckService"
 import { Download, FileJson, Layers, Loader2, LayoutGrid, Rows3 } from "lucide-react"
@@ -18,9 +18,11 @@ import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
+import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
 
 interface SlideCarouselProps {
   slides: SlidePreview[]
+  defsUrl?: string | null
   deckId?: string
   deckName?: string
   pptxUrl?: string | null
@@ -44,12 +46,53 @@ interface SlideCarouselProps {
   idToken?: string
 }
 
-export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, idToken }: SlideCarouselProps) {
-  const slidesWithPreview = slides.filter((s) => s.previewUrl)
+export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, idToken }: SlideCarouselProps) {
+  const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
   const auth = useAuth()
   const [jsonLoading, setJsonLoading] = useState(false)
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
+
+  /* ── Compose update detection → auto-scroll to changed slide ── */
+  const prevComposeKeys = useRef<Map<string, string>>(new Map())
+  const scrollTargetRef = useRef<string | null | undefined>(undefined)
+  // If deck opened with slides → existing deck → first compose is instant
+  const hadSlidesOnMount = useRef(slides.length > 0)
+  const firstComposeSeenRef = useRef(false)
+
+  useEffect(() => {
+    let anyChanged = false
+    for (const slide of slides) {
+      const key = slide.composeUrl?.split("?")[0] || ""
+      const prev = prevComposeKeys.current.get(slide.slideId) || ""
+      if (key && prev && key !== prev) anyChanged = true
+      if (key && !prev && firstComposeSeenRef.current) anyChanged = true
+      if (key) prevComposeKeys.current.set(slide.slideId, key)
+    }
+    // Mark first compose seen (skip animation for existing decks)
+    if (!firstComposeSeenRef.current && slides.some(s => s.composeUrl)) {
+      if (hadSlidesOnMount.current) {
+        // Existing deck: suppress animation for this first batch
+        anyChanged = false
+      }
+      firstComposeSeenRef.current = true
+    }
+    if (anyChanged) scrollTargetRef.current = null // arm scroll for next onAnimate
+  }, [slides])
+
+  const handleAnimate = useCallback((slideId: string) => {
+    if (scrollTargetRef.current === null && containerRef.current) {
+      scrollTargetRef.current = slideId
+      const el = containerRef.current.querySelector(`[data-slide-id="${slideId}"]`)
+      if (el) {
+        const container = containerRef.current
+        const elRect = el.getBoundingClientRect()
+        const containerRect = container.getBoundingClientRect()
+        const offset = elRect.top - containerRect.top + container.scrollTop - 24
+        container.scrollTo({ top: offset, behavior: "smooth" })
+      }
+    }
+  }, [])
 
   /* ── Slide update detection for glow highlight ── */
   const prevUrlKeys = useRef<Map<string, string>>(new Map())
@@ -294,16 +337,37 @@ export function SlideCarousel({ slides, deckId, deckName, pptxUrl, isLoading, on
           </div>
         ) : (
           slidesWithPreview.map((slide, i) => (
-            <SlideThumbnail
-              key={slide.slideId}
-              src={slide.previewUrl}
-              alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
-              index={i}
-              slideId={slide.slideId}
-              onClick={() => onSlideClick?.(i + 1)}
-              updated={updatedIds.has(slide.slideId)}
-              className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
-            />
+            slide.composeUrl && defsUrl ? (
+              <AnimatedSlidePreview
+                key={slide.slideId}
+                defsUrl={defsUrl}
+                composeUrl={slide.composeUrl}
+                slideId={slide.slideId}
+                skipAnimation={hadSlidesOnMount.current && !firstComposeSeenRef.current}
+                onAnimate={() => handleAnimate(slide.slideId)}
+                fallback={
+                  <SlideThumbnail
+                    src={slide.previewUrl}
+                    alt={`Slide ${i + 1}`}
+                    index={i}
+                    slideId={slide.slideId}
+                    onClick={() => onSlideClick?.(i + 1)}
+                    className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
+                  />
+                }
+              />
+            ) : (
+              <SlideThumbnail
+                key={slide.slideId}
+                src={slide.previewUrl}
+                alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
+                index={i}
+                slideId={slide.slideId}
+                onClick={() => onSlideClick?.(i + 1)}
+                updated={updatedIds.has(slide.slideId)}
+                className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
+              />
+            )
           ))
         )}
       </div>

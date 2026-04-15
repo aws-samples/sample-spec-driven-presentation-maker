@@ -72,3 +72,11 @@ Do not share:
 1. Does the logic exist in the Engine? → Use it
 2. Is it infrastructure-dependent? → S3/DynamoDB dependencies allow MCP Remote independent implementation
 3. Is the difference only in presentation/output? → Engine API returns data, each layer controls output
+
+## PR前ローカルチェック
+
+PR作成前に以下をローカルで実行し、CI待ちを減らす:
+
+```bash
+ash scan --mode local --fail-on-findings
+```
