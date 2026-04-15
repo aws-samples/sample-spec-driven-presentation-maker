@@ -819,9 +819,6 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                         import re as _re
                         compose_prefix = f"decks/{deck_id}/compose/"
 
-                        # Determine which slugs to generate compose for
-                        compose_slugs = measure_slides if measure_slides else list(slug_to_page.keys())
-
                         # List existing compose keys (for prev data + cleanup)
                         old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
 
@@ -844,6 +841,13 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                         def _fp(c: dict) -> str:
                             return f"{c['class']}|{c.get('text', '')}"
 
+                        # Determine which slugs to generate compose for
+                        # Always include slugs that have no existing compose (migration + first build)
+                        compose_slugs = set(measure_slides) if measure_slides else set(slug_to_page.keys())
+                        for s in slug_to_page:
+                            if not _latest_key(f"{compose_prefix}{s}_"):
+                                compose_slugs.add(s)
+
                         # Upload defs (prepare epoch — newest snapshot wins)
                         defs_data = extract_optimized_defs(svg_path)
                         _storage.upload_file(
@@ -852,6 +856,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                             content_type="application/json",
                         )
                         # Cleanup old defs (only delete defs older than our epoch)
+                        # Also remove legacy slide_{N}_*.json files
                         for k in old_keys:
                             if "/defs_" in k:
                                 m = _re.search(r"_(\d+)\.json$", k)
@@ -860,6 +865,11 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                                         _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
                                     except Exception:
                                         pass
+                            elif _re.search(r"/slide_\d+_\d+\.json$", k):
+                                try:
+                                    _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                                except Exception:
+                                    pass
 
                         # Generate compose for each measured slug
                         for slug in compose_slugs:
