@@ -377,87 +377,120 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
         """Compose slides by delegating to composer agents.
 
         Prefetches all Phase 2 references once, then injects into composer prompt.
+        Runs groups in parallel (controlled by COMPOSER_MAX_CONCURRENCY env var).
         Async generator: yields progress dicts, then returns final result str.
         """
         import asyncio
         import json as _json
+        import os
+
+        max_concurrency = int(os.environ.get("COMPOSER_MAX_CONCURRENCY", "3"))
+        sem = asyncio.Semaphore(max_concurrency)
 
         # Prefetch common references once (Python call, no LLM turns)
         yield {"status": "prefetching", "message": "Loading references..."}
         common_sections = _prefetch_common_references(mcp_client) if mcp_client else []
 
-        generated = []
-        errors = []
         total = sum(len(g["slugs"]) for g in slide_groups)
+        progress_q: asyncio.Queue = asyncio.Queue()
         done_count = 0
 
-        summaries = {", ".join(g["slugs"]): "" for g in slide_groups}
+        async def run_group(gi: int, group: dict) -> dict:
+            """Run a single composer group under semaphore."""
+            async with sem:
+                slugs_label = ", ".join(group["slugs"])
+                progress_q.put_nowait({"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"})
 
-        for gi, group in enumerate(slide_groups):
-            slugs_label = ", ".join(group["slugs"])
-            yield {"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"}
+                deck_sections = _prefetch_deck_specs(mcp_client, deck_id, group["slugs"]) if mcp_client else []
+                prefetched = _build_prefetched_context(common_sections, deck_sections)
+                composer_prompt = _build_system_prompt(
+                    _COMPOSER_PROMPT_TEMPLATE,
+                    prefetched_context=prefetched,
+                    deck_id=deck_id,
+                )
 
-            # Prefetch deck specs with this group's assigned slugs
-            deck_sections = _prefetch_deck_specs(mcp_client, deck_id, group["slugs"]) if mcp_client else []
-            prefetched = _build_prefetched_context(common_sections, deck_sections)
-            composer_prompt = _build_system_prompt(
-                _COMPOSER_PROMPT_TEMPLATE,
-                prefetched_context=prefetched,
-                deck_id=deck_id,
-            )
+                last_tool_id = ""
 
-            # Realtime progress via invoke_async + callback_handler + asyncio.Queue
-            progress_q: asyncio.Queue = asyncio.Queue()
-            last_tool_id = ""
+                def _on_event(**kwargs):
+                    nonlocal last_tool_id
+                    tu = kwargs.get("current_tool_use")
+                    if tu:
+                        tid = tu.get("toolUseId", "")
+                        name = tu.get("name", "")
+                        if tid and name and tid != last_tool_id:
+                            last_tool_id = tid
+                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name})
+                    msg = kwargs.get("message")
+                    if isinstance(msg, dict) and msg.get("role") == "user":
+                        for block in msg.get("content", []):
+                            if isinstance(block, dict) and "toolResult" in block:
+                                tr = block["toolResult"]
+                                progress_q.put_nowait({
+                                    "group": gi + 1, "slugs": slugs_label,
+                                    "toolResult": tr.get("toolUseId", ""),
+                                    "toolStatus": tr.get("status", ""),
+                                })
 
-            def _on_event(**kwargs):
-                nonlocal last_tool_id
-                tu = kwargs.get("current_tool_use")
-                if tu:
-                    tid = tu.get("toolUseId", "")
-                    name = tu.get("name", "")
-                    if tid and name and tid != last_tool_id:
-                        last_tool_id = tid
-                        progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name})
-                # Tool result
-                msg = kwargs.get("message")
-                if isinstance(msg, dict) and msg.get("role") == "user":
-                    for block in msg.get("content", []):
-                        if isinstance(block, dict) and "toolResult" in block:
-                            tr = block["toolResult"]
-                            progress_q.put_nowait({
-                                "group": gi + 1, "slugs": slugs_label,
-                                "toolResult": tr.get("toolUseId", ""),
-                                "toolStatus": tr.get("status", ""),
-                            })
+                composer = Agent(
+                    system_prompt=composer_prompt,
+                    tools=[*mcp_servers],
+                    model=model,
+                    callback_handler=_on_event,
+                )
+                response = await composer.invoke_async(group["instruction"])
+                progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "status": "done"})
+                return {"slugs": group["slugs"], "response": str(response)}
 
-            composer = Agent(
-                system_prompt=composer_prompt,
-                tools=[*mcp_servers],
-                model=model,
-                callback_handler=_on_event,
-            )
+        # Launch all groups
+        tasks = [asyncio.create_task(run_group(gi, g)) for gi, g in enumerate(slide_groups)]
+
+        # Drain progress queue until all tasks complete
+        while not all(t.done() for t in tasks):
             try:
-                task = asyncio.create_task(composer.invoke_async(group["instruction"]))
-                while not task.done():
-                    try:
-                        item = await asyncio.wait_for(progress_q.get(), timeout=0.2)
-                        yield item
-                    except asyncio.TimeoutError:
-                        pass
-                # Drain remaining
+                item = await asyncio.wait_for(progress_q.get(), timeout=0.2)
+                yield item
+            except asyncio.TimeoutError:
+                pass
+        while not progress_q.empty():
+            yield progress_q.get_nowait()
+
+        # Collect results
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        generated = []
+        errors = []
+        summaries = {}
+        retry_groups = []
+
+        for gi, result in enumerate(results):
+            group = slide_groups[gi]
+            slugs_label = ", ".join(group["slugs"])
+            if isinstance(result, Exception):
+                errors.append({"slugs": group["slugs"], "error": str(result)})
+                retry_groups.append((gi, group))
+                yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(result)}
+            else:
+                generated.extend(result["slugs"])
+                done_count += len(result["slugs"])
+                summaries[slugs_label] = result["response"]
+                yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
+
+        # Retry failed groups once (serial)
+        for gi, group in retry_groups:
+            slugs_label = ", ".join(group["slugs"])
+            yield {"group": gi + 1, "slugs": slugs_label, "status": "retrying"}
+            try:
+                result = await run_group(gi, group)
                 while not progress_q.empty():
                     yield progress_q.get_nowait()
-
-                response = await task
-                composer_response = str(response)
-                generated.extend(group["slugs"])
-                done_count += len(group["slugs"])
-                yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total, "summary": composer_response}
-                summaries[slugs_label] = composer_response
+                generated.extend(result["slugs"])
+                done_count += len(result["slugs"])
+                summaries[slugs_label] = result["response"]
+                # Remove from errors
+                errors = [e for e in errors if e["slugs"] != group["slugs"]]
+                yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
             except Exception as e:
-                errors.append({"slugs": group["slugs"], "error": str(e)})
-                yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(e)}
+                yield {"group": gi + 1, "slugs": slugs_label, "status": "retry_failed", "error": str(e)}
 
         yield _json.dumps({"generated_slides": generated, "errors": errors, "summaries": summaries})
 
