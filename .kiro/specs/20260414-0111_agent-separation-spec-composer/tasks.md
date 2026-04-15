@@ -86,8 +86,8 @@
 - [x] changed 判定を同一 slug の前回 compose との component-level diff に簡素化
 - [x] API Lambda の compose キーマッチングを slug ベースに変更
 - [x] 未使用 import (count_slides) を削除
-- [ ] 並列 composer で compose が競合せず両方アニメーションされることを確認
-- [ ] defs の後勝ちで描画が壊れないことを確認
+- [x] 並列 composer で compose が競合せず両方アニメーションされることを確認
+- [x] defs の後勝ちで描画が壊れないことを確認
 
 ---
 **Created**: 2026-04-14

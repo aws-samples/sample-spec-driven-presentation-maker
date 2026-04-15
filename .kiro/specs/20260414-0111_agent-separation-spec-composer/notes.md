@@ -143,3 +143,24 @@ compose/animation 機能を使えるようにしたかった。
 
 #### デプロイ
 compose 並列安全化を含めてデプロイ実行。
+
+### [2026-04-15 15:36] compose 並列安全化 — 検証完了
+
+#### 検証結果
+- デプロイ後、d45cee32 デッキで動作確認
+- 各スライドの compose が slug ベースのキー（`{slug}_{epoch}.json`）で正しく生成されている
+- API Lambda が slug ベースでマッチし、composeUrl を正しく返している
+- defs の不整合は発生しなかった（clipPath 参照が compose SVG 内に存在しないケース）
+- アニメーション表示が正常に動作
+
+#### 修正した問題
+1. `_latest_key` の呼び出しが `old_keys` 取得より前にあった → 順序修正
+2. compose 未生成の slug を自動的に compose_slugs に追加するロジック追加（旧形式からの移行 + 初回ビルド対応）
+3. 旧形式 `slide_{N}_*.json` の自動削除追加
+4. 未使用 import `count_slides` 削除
+
+#### defs 整合性の調査
+S3 上の title（epoch 1776225420）と defs（epoch 1776225758）を比較分析。
+compose SVG 内に clipPath/href 参照が0件だったため、defs の epoch 不一致による描画崩れは発生しなかった。
+ただし clipPath を多用するスライド（画像クリッピング等）では将来的に問題になる可能性がある。
+現時点では defs インライン化は保留し、問題が顕在化した時点で対応する。
