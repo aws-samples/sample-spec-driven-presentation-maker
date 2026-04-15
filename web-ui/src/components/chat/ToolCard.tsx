@@ -346,7 +346,6 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
                       const toolName = stripPrefix(String(ev.tool))
                       const sub = TOOL_META[toolName] || { Icon: Wrench, label: toolName.replace(/_/g, " "), category: "other" as ToolCategory }
                       const subColors = CAT[sub.category]
-                      const subDetail = getDetail(toolName, ev.input as Record<string, unknown> | undefined)
                       const isLast = i === Math.min(tools.length, 3) - 1
                       return (
                         <div key={`${g}-${ev.tool}-${i}`} className="flex items-center gap-1.5 py-0.5 ml-5" style={{ opacity: isLast ? 1 : 0.4 }}>
@@ -360,7 +359,7 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
                             )}
                           </div>
                           <span className="text-[11px] truncate" style={{ color: isLast ? subColors.accent : `${subColors.accent}88` }}>
-                            {sub.label}{subDetail ? ` · ${subDetail}` : ""}
+                            {sub.label}
                           </span>
                         </div>
                       )
