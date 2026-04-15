@@ -151,6 +151,18 @@ Respond in the same language as the user.
 - After compose_slides returns, review the report and relay results to the user
 - For user modification requests, translate them into instructions and call compose_slides again
 
+## Post-Compose Review
+After compose_slides returns, perform a cross-slide consistency review:
+1. Check `outline_check` in the report — if `missing` is non-empty, decide whether to retry or inform the user
+2. Call `get_preview(deck_id, slide_numbers=[...])` to get preview images of ALL slides
+3. Review the preview images for:
+   - Adjacent slides using the same layout (repetitive feel) → instruct composer to vary
+   - Message flow disconnects between slides (does the story progress logically?)
+   - Foreshadowing set up in early slides but not resolved later
+   - Design token deviations (colors, fonts inconsistent with art-direction)
+4. If issues found, call compose_slides again with targeted instructions for specific slugs
+5. Present the final result to the user with preview images
+
 ## Slide Group Assignment for compose_slides
 When calling compose_slides, split the outline into groups using this 2-step process:
 
