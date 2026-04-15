@@ -567,7 +567,12 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
                     yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
 
         except Exception as e:
-            errors.append({"slugs": "all", "error": str(e)})
+            failed_slugs = [s for g in slide_groups for s in g["slugs"] if s not in generated]
+            errors.append({
+                "slugs": failed_slugs,
+                "error": str(e),
+                "phase": "prefetch" if not generated else "compose",
+            })
 
         # Post-compose: build PPTX + assemble report
         yield {"status": "building", "message": "Building final PPTX..."}
