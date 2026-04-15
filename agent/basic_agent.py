@@ -654,6 +654,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
     composer_model = BedrockModel(
         model_id=os.environ.get("COMPOSER_MODEL_ID", os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-4-6")),
         temperature=0.1,
+        cache_config=CacheConfig(strategy="auto"),
     )
 
     # --- Build MCP server list with resilience ---
