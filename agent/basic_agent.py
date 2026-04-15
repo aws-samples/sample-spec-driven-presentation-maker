@@ -374,7 +374,7 @@ def _build_deck_context(deck_sections: list[str]) -> str:
     return "# Deck-Specific References\n\n" + "\n\n---\n\n".join(deck_sections)
 
 
-def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str, mcp_factories: list | None = None):
+def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
     """Create compose_slides tool with closed-over MCP servers, model, and instructions.
 
     Args:
@@ -468,48 +468,40 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str, mcp_fa
 
             async def run_group(gi: int, group: dict) -> dict:
                 """Run a single composer group under semaphore."""
-                group_mcp: list[MCPClient] = []
-                try:
-                    async with sem:
-                        slugs_label = ", ".join(group["slugs"])
-                        progress_q.put_nowait({"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"})
+                async with sem:
+                    slugs_label = ", ".join(group["slugs"])
+                    progress_q.put_nowait({"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"})
 
-                        deck_sections = _prefetch_deck_specs(mcp_client, deck_id, group["slugs"]) if mcp_client else []
-                        deck_context = _build_deck_context(deck_sections)
+                    deck_sections = _prefetch_deck_specs(mcp_client, deck_id, group["slugs"]) if mcp_client else []
+                    deck_context = _build_deck_context(deck_sections)
 
-                        # User message: common refs (cacheable) + deck specs (per-group) + instruction
-                        user_content = (
-                            f"{common_ref_text}\n\n---\n\n{deck_context}\n\n---\n\n"
-                            f"{group['instruction']}"
-                        )
+                    # User message: common refs (cacheable) + deck specs (per-group) + instruction
+                    user_content = (
+                        f"{common_ref_text}\n\n---\n\n{deck_context}\n\n---\n\n"
+                        f"{group['instruction']}"
+                    )
 
-                        last_tool_id = ""
+                    last_tool_id = ""
 
-                        def _on_event(**kwargs):
-                            nonlocal last_tool_id
-                            tu = kwargs.get("current_tool_use")
-                            if tu:
-                                tid = tu.get("toolUseId", "")
-                                name = tu.get("name", "")
-                                if tid and name and tid != last_tool_id:
-                                    last_tool_id = tid
-                                    progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "toolUseId": tid})
+                    def _on_event(**kwargs):
+                        nonlocal last_tool_id
+                        tu = kwargs.get("current_tool_use")
+                        if tu:
+                            tid = tu.get("toolUseId", "")
+                            name = tu.get("name", "")
+                            if tid and name and tid != last_tool_id:
+                                last_tool_id = tid
+                                progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "toolUseId": tid})
 
-                        # Per-composer MCP connections (isolated from other groups)
-                        if mcp_factories:
-                            for factory in mcp_factories:
-                                group_mcp.append(factory())
-                        composer_tools: list = group_mcp if group_mcp else [*mcp_servers]
-
-                        composer = Agent(
-                            system_prompt=[
-                                {"text": static_prompt},
-                                {"cachePoint": {"type": "default"}},
-                            ],
-                            tools=composer_tools,
-                            model=model,
-                            callback_handler=_on_event,
-                        )
+                    composer = Agent(
+                        system_prompt=[
+                            {"text": static_prompt},
+                            {"cachePoint": {"type": "default"}},
+                        ],
+                        tools=[*mcp_servers],
+                        model=model,
+                        callback_handler=_on_event,
+                    )
                     from strands.hooks.events import BeforeToolCallEvent, AfterToolCallEvent
 
                     async def _before_tool(event: BeforeToolCallEvent):
@@ -540,33 +532,12 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str, mcp_fa
                             return {"slugs": group["slugs"], "response": str(response)}
                         except Exception as e:
                             if attempt < max_retries:
-                                # Reconnect MCP and rebuild composer, preserving conversation
-                                prev_messages = list(composer.messages)
-                                for srv in group_mcp:
-                                    srv.stop(None, None, None)
-                                group_mcp.clear()
-                                if mcp_factories:
-                                    for factory in mcp_factories:
-                                        group_mcp.append(factory())
-                                composer_tools = group_mcp if group_mcp else [*mcp_servers]
-                                composer = Agent(
-                                    system_prompt=[{"text": static_prompt}, {"cachePoint": {"type": "default"}}],
-                                    tools=composer_tools,
-                                    model=model,
-                                    callback_handler=_on_event,
-                                )
-                                composer.messages.extend(prev_messages)
-                                composer.hooks.add_callback(BeforeToolCallEvent, _before_tool)
-                                composer.hooks.add_callback(AfterToolCallEvent, _after_tool)
                                 progress_q.put_nowait({
                                     "group": gi + 1, "slugs": slugs_label,
                                     "status": "retrying", "attempt": attempt + 1, "error": str(e),
                                 })
                                 continue
                             raise
-                finally:
-                    for srv in group_mcp:
-                        srv.stop(None, None, None)
 
             # Launch all groups
             tasks = [asyncio.create_task(run_group(gi, g)) for gi, g in enumerate(slide_groups)]
@@ -743,12 +714,10 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
 
     mcp_servers: list[MCPClient] = []
     mcp_status: list[dict] = []
-    composer_mcp_factories: list = []
 
     for (name, required), factory in zip(_MCP_DEFS, factories):
         try:
             mcp_servers.append(factory())
-            composer_mcp_factories.append(factory)
             mcp_status.append({"name": name, "status": "ok"})
         except Exception as e:
             mcp_status.append({"name": name, "status": "error", "error": str(e)})
@@ -758,7 +727,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
     # Agent.__init__ triggers MCP client connections.
     # If optional MCP servers fail during init, retry with required-only.
     mcp_instructions = _collect_mcp_instructions(mcp_servers)
-    compose_slides = _make_compose_slides(mcp_servers, composer_model, mcp_instructions, mcp_factories=composer_mcp_factories)
+    compose_slides = _make_compose_slides(mcp_servers, composer_model, mcp_instructions)
     tools = [*mcp_servers, compose_slides, list_uploads, web_fetch]
     try:
         agent = Agent(
@@ -788,7 +757,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
         mcp_servers = required_servers
         mcp_status = new_status
         mcp_instructions = _collect_mcp_instructions(mcp_servers)
-        compose_slides = _make_compose_slides(mcp_servers, composer_model, mcp_instructions, mcp_factories=composer_mcp_factories)
+        compose_slides = _make_compose_slides(mcp_servers, composer_model, mcp_instructions)
         agent = Agent(
             name="SdpmSpecAgent",
             system_prompt="",
