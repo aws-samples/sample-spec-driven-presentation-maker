@@ -305,6 +305,10 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
               entry.status = ev
             }
             else if (ev.tool) entry.tools.push(ev)
+            else if (ev.toolResult) {
+              const t = entry.tools.find((t) => t.toolUseId === ev.toolResult)
+              if (t) t.toolStatus = ev.toolStatus
+            }
           }
 
           // Ungrouped status messages (prefetching, building, etc.)
@@ -351,16 +355,23 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
                     {!isDone && tools.slice(-3).map((ev, i) => {
                       const toolName = stripPrefix(String(ev.tool))
                       const sub = TOOL_META[toolName] || { Icon: Wrench, label: toolName.replace(/_/g, " "), category: "other" as ToolCategory }
-                      const subColors = CAT[sub.category]
+                      const isToolErr = ev.toolStatus === "error"
+                      const isToolDone = !!ev.toolStatus
+                      const subColors = isToolErr ? ERR : CAT[sub.category]
                       const subDetail = getDetail(toolName, ev.input as Record<string, unknown> | undefined)
                       const isLast = i === Math.min(tools.length, 3) - 1
+                      const showSpinner = isLast && !isToolDone
                       return (
                         <div key={`${g}-${ev.tool}-${i}`} className="flex items-center gap-1.5 py-0.5 ml-5" style={{ opacity: isLast ? 1 : 0.4 }}>
                           <div className="flex-none w-3.5 h-3.5 rounded flex items-center justify-center" style={{ background: `${subColors.accent}10` }}>
-                            {isLast ? (
+                            {showSpinner ? (
                               <svg className="w-3.5 h-3.5" viewBox="0 0 14 14">
                                 <circle cx="7" cy="7" r="4.5" fill="none" stroke={subColors.accent} strokeWidth="1" strokeDasharray="8 20" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
                               </svg>
+                            ) : isToolErr ? (
+                              <AlertCircle className="h-2 w-2" style={{ color: ERR.accent }} />
+                            ) : isToolDone ? (
+                              <Check className="h-2 w-2" style={{ color: subColors.accent }} />
                             ) : (
                               <sub.Icon className="h-2 w-2" style={{ color: `${subColors.accent}80` }} />
                             )}
