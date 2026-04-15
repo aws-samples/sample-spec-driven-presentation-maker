@@ -129,3 +129,17 @@ compose/animation 機能を使えるようにしたかった。
 - `mcp-server/server.py`: compose 生成ブロックを全面書き換え（-50行, +45行）
 - `api/index.py`: compose キーマッチングを `slide_{N}_` → `{slug}_` に変更（1行）
 - `import time` 追加（epoch 取得用）
+
+### [2026-04-15 11:46] compose 並列安全化 — デプロイ判断
+
+#### 互換性確認
+- 新規デッキ: 問題なし
+- 既存デッキ（旧 compose `slide_{N}_*.json` あり）: API Lambda でマッチしない → アニメーションなし、静止画フォールバック。次の `run_python(save=True)` で新形式に自動切り替え
+- 旧形式の S3 ファイル: 残るが参照されない（実害なし）
+- WebUI / MCP tool / Engine: 変更なし
+
+#### 追加修正
+- `count_slides` の未使用 import を削除
+
+#### デプロイ
+compose 並列安全化を含めてデプロイ実行。

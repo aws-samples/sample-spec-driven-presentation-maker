@@ -85,6 +85,7 @@
 - [x] sourceHash / prev_by_hash / prev_by_slot / prev_slot_map を削除（slug ベースで直接引くため不要）
 - [x] changed 判定を同一 slug の前回 compose との component-level diff に簡素化
 - [x] API Lambda の compose キーマッチングを slug ベースに変更
+- [x] 未使用 import (count_slides) を削除
 - [ ] 並列 composer で compose が競合せず両方アニメーションされることを確認
 - [ ] defs の後勝ちで描画が壊れないことを確認
 
