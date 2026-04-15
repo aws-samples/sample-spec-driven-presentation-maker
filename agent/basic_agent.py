@@ -522,10 +522,11 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str, mcp_fa
 
                     async def _after_tool(event: AfterToolCallEvent):
                         tu = event.tool_use
+                        is_err = isinstance(event.result, dict) and event.result.get("status") == "error"
                         progress_q.put_nowait({
                             "group": gi + 1, "slugs": slugs_label,
                             "toolResult": tu.get("toolUseId", ""),
-                            "toolStatus": "error" if isinstance(event.result, dict) and event.result.get("status") == "error" else "success",
+                            "toolStatus": "error" if is_err else "success",
                         })
 
                     composer.hooks.add_callback(BeforeToolCallEvent, _before_tool)
