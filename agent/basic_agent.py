@@ -226,7 +226,7 @@ Use this deck_id for ALL run_python and generate_pptx calls. Do NOT call init_pr
 - Do NOT modify deck.json, specs/brief.md, specs/outline.md, or specs/art-direction.html
 - Write ONLY the slides assigned to you
 
-{prefetched_context}
+{common_context}
 """
 
 
@@ -256,25 +256,33 @@ def _build_system_prompt(template: str, mcp_instructions: str = "", **kwargs: st
 # ---------------------------------------------------------------------------
 
 # References to prefetch for composer (tool_name, arguments, label)
-_COMPOSER_PREFETCH = [
+# System prompt: workflow/spec (how to work)
+_COMPOSER_PREFETCH_SYSTEM = [
     ("read_workflows", {"names": ["create-new-2-compose"]}, "Compose Workflow"),
     ("read_workflows", {"names": ["slide-json-spec"]}, "Slide JSON Spec"),
+]
+# User message: reference data (what to reference)
+_COMPOSER_PREFETCH_REFS = [
     ("read_guides", {"names": ["grid"]}, "Grid Guide"),
     ("read_examples", {"names": ["components/all"]}, "Components Reference"),
     ("read_examples", {"names": ["patterns"]}, "Patterns Catalog"),
 ]
 
 
-def _prefetch_common_references(mcp_client) -> list[str]:
-    """Prefetch common Phase 2 references (workflows, guides, examples).
+def _prefetch_sections(mcp_client, prefetch_list: list) -> list[str]:
+    """Prefetch references from MCP server.
+
+    Args:
+        mcp_client: MCPClient instance.
+        prefetch_list: List of (tool_name, arguments, label) tuples.
 
     Returns:
-        List of section strings (reusable across groups).
+        List of section strings.
     """
     import uuid
 
     sections = []
-    for tool_name, args, label in _COMPOSER_PREFETCH:
+    for tool_name, args, label in prefetch_list:
         result = mcp_client.call_tool_sync(
             tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
             name=tool_name,
@@ -351,10 +359,18 @@ def _prefetch_deck_specs(mcp_client, deck_id: str, assigned_slugs: list[str]) ->
     return sections
 
 
-def _build_prefetched_context(common_sections: list[str], deck_sections: list[str]) -> str:
-    """Combine common and deck-specific sections into prefetched context."""
-    all_sections = common_sections + deck_sections
-    return "# Pre-loaded References (already executed — do NOT re-fetch)\n\n" + "\n\n---\n\n".join(all_sections)
+def _build_common_context(common_sections: list[str]) -> str:
+    """Build common reference context (shared across all groups, cacheable)."""
+    if not common_sections:
+        return ""
+    return "# Pre-loaded References (already executed — do NOT re-fetch)\n\n" + "\n\n---\n\n".join(common_sections)
+
+
+def _build_deck_context(deck_sections: list[str]) -> str:
+    """Build deck-specific context (varies per group, not cacheable)."""
+    if not deck_sections:
+        return ""
+    return "# Deck-Specific References\n\n" + "\n\n---\n\n".join(deck_sections)
 
 
 def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
@@ -423,9 +439,21 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
         max_concurrency = int(os.environ.get("COMPOSER_MAX_CONCURRENCY", "3"))
         sem = asyncio.Semaphore(max_concurrency)
 
-        # Prefetch common references once (Python call, no LLM turns)
+        # Prefetch references once (Python call, no LLM turns)
         yield {"status": "prefetching", "message": "Loading references..."}
-        common_sections = _prefetch_common_references(mcp_client) if mcp_client else []
+        system_sections = _prefetch_sections(mcp_client, _COMPOSER_PREFETCH_SYSTEM) if mcp_client else []
+        ref_sections = _prefetch_sections(mcp_client, _COMPOSER_PREFETCH_REFS) if mcp_client else []
+
+        # Build system prompt (workflow/spec — how to work)
+        system_context = _build_common_context(system_sections)
+        static_prompt = _build_system_prompt(
+            _COMPOSER_PROMPT_TEMPLATE,
+            common_context=system_context,
+            deck_id=deck_id,
+        )
+
+        # Build common reference text (guides/examples — shared across groups)
+        common_ref_text = _build_common_context(ref_sections)
 
         total = sum(len(g["slugs"]) for g in slide_groups)
         progress_q: asyncio.Queue = asyncio.Queue()
@@ -438,11 +466,12 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
                 progress_q.put_nowait({"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"})
 
                 deck_sections = _prefetch_deck_specs(mcp_client, deck_id, group["slugs"]) if mcp_client else []
-                prefetched = _build_prefetched_context(common_sections, deck_sections)
-                composer_prompt = _build_system_prompt(
-                    _COMPOSER_PROMPT_TEMPLATE,
-                    prefetched_context=prefetched,
-                    deck_id=deck_id,
+                deck_context = _build_deck_context(deck_sections)
+
+                # User message: common refs (cacheable) + deck specs (per-group) + instruction
+                user_content = (
+                    f"{common_ref_text}\n\n---\n\n{deck_context}\n\n---\n\n"
+                    f"{group['instruction']}"
                 )
 
                 last_tool_id = ""
@@ -468,12 +497,15 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
                                 })
 
                 composer = Agent(
-                    system_prompt=composer_prompt,
+                    system_prompt=[
+                        {"text": static_prompt},
+                        {"cachePoint": {"type": "default"}},
+                    ],
                     tools=[*mcp_servers],
                     model=model,
                     callback_handler=_on_event,
                 )
-                response = await composer.invoke_async(group["instruction"])
+                response = await composer.invoke_async(user_content)
                 progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "status": "done"})
                 return {"slugs": group["slugs"], "response": str(response)}
 
