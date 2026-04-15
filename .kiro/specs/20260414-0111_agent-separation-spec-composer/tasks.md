@@ -77,5 +77,16 @@
 - [ ] 全スライドの品質均一性を確認（後半品質低下がないこと）
 - [ ] コンテキストサイズが1エージェント構成より削減されていることを確認（トークン数計測）
 
+### compose 並列安全化
+- [x] compose キーを slug ベースに変更（`slide_{N}_{epoch}.json` → `{slug}_{epoch}.json`）
+- [x] compose 生成を measure_slides の slug に限定（全スライド再生成を廃止）
+- [x] 旧 compose 削除を担当 slug のキーだけに限定
+- [x] epoch を `_prepare_workspace` 開始時点に変更（最新 slides スナップショットの後勝ち）
+- [x] sourceHash / prev_by_hash / prev_by_slot / prev_slot_map を削除（slug ベースで直接引くため不要）
+- [x] changed 判定を同一 slug の前回 compose との component-level diff に簡素化
+- [x] API Lambda の compose キーマッチングを slug ベースに変更
+- [ ] 並列 composer で compose が競合せず両方アニメーションされることを確認
+- [ ] defs の後勝ちで描画が壊れないことを確認
+
 ---
 **Created**: 2026-04-14

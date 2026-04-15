@@ -810,7 +810,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 # Uses _prepare_epoch (snapshot time) so the composer with the
                 # newest slides/ snapshot wins on defs via epoch comparison.
                 try:
-                    from tools.compose import extract_optimized_defs, split_slide_components, count_slides
+                    from tools.compose import extract_optimized_defs, split_slide_components
                     svg_path = tmpdir / "measure.svg"
                     if not svg_path.exists():
                         _export_svg(tmpdir, pptx_path)

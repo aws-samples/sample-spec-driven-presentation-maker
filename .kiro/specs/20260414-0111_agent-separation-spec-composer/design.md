@@ -251,6 +251,16 @@ OutlineSlide:
 - `title` → `slug` にリネーム
 - 表示: ノード円に連番（index+1）、slug を太字、message を下に
 
+### API Lambda compose キー変更
+
+```python
+# 現在: ページ番号ベース
+compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}_", compose_keys)
+
+# 変更後: slug ベース
+compose_key = _latest_compose_key(f"decks/{deck_id}/compose/{slug}_", compose_keys)
+```
+
 ## compose_slides 戻り値
 
 SPECエージェントが次のアクションを判断するための報告を返す:
@@ -352,6 +362,79 @@ def put_slide_json(self, deck_id: str, slug: str, data: dict) -> None: ...
 ```
 
 outline パースは Storage の責務ではなく `_assemble_slides` に置く。
+
+## compose JSON 並列安全設計
+
+### 問題
+
+現状の compose 生成は `run_python(save=True)` のたびに全スライド分の compose JSON を再生成・旧 compose を全削除する。
+並列 composer がほぼ同時に `run_python(save=True)` を完了すると:
+- 各 composer の `_prepare_workspace` 時点の slides スナップショットが異なる
+- compose upload の順序と prepare の順序が一致しない（ビルド時間の差）
+- 後に upload した composer の compose が勝つが、そのスナップショットが最新とは限らない
+- 他の composer が書いた compose を旧ファイルとして削除する
+
+### 設計原則
+
+**最新の slides/ スナップショットを使ってビルドした composer の compose が勝つべき。**
+
+### 変更
+
+| 項目 | 現状 | 変更後 |
+|---|---|---|
+| compose キー | `compose/slide_{N}_{epoch}.json` | `compose/{slug}_{epoch}.json` |
+| 生成範囲 | 全スライド | `measure_slides` で指定された slug だけ |
+| 旧 compose 削除 | `compose/` 以下を全削除 | 担当 slug のキーだけ削除 |
+| epoch | compose upload 時刻 | `_prepare_workspace` 開始時点 |
+| changed 判定 | sourceHash + スロット番号フォールバック | 同一 slug の前回 compose と component-level diff |
+| defs | epoch 付き全削除+再生成 | prepare epoch で後勝ち（最新スナップショットの defs が勝つ） |
+
+### 削除されるコード
+
+sourceHash、prev_by_hash、prev_by_slot、prev_slot_map — slug ベースで前回 compose を直接引けるため不要。
+
+### なぜ安全か
+
+- 各 composer は自分の担当 slug の compose だけ書く → 書き込み対象が重ならない
+- defs は後勝ちだが、全 composer が同じテンプレート・同じ outline から PPTX をビルドするため、
+  同じスライドには同じ clipPath id が振られる → defs の後勝ちで描画が壊れない
+- changed フラグは同一 slug の前回 compose と diff するだけ → 他の composer の影響を受けない
+- 最終 `generate_pptx` で全スライド揃った状態の compose が生成され、正規化される
+
+### compose 生成フロー（変更後）
+
+```python
+# run_python(save=True) 内
+_epoch = int(time.time())  # prepare 開始時に記録
+tmpdir, slides, build_kwargs = _prepare_workspace(...)
+pptx_path = _build_pptx(...)
+
+# compose: measure_slides の slug だけ生成
+compose_prefix = f"decks/{deck_id}/compose/"
+svg_path = _export_svg(tmpdir, pptx_path)
+
+# defs: prepare epoch で後勝ち
+defs_data = extract_optimized_defs(svg_path)
+storage.upload_file(key=f"{compose_prefix}defs_{_epoch}.json", ...)
+
+# 担当 slug だけ
+for slug in measure_slugs:
+    page_num = slug_to_page[slug]
+    comp_data = split_slide_components(svg_path, page_num)
+
+    # 前回 compose を同一 slug から取得して diff
+    prev_key = _latest_key(f"{compose_prefix}{slug}_", old_keys)
+    prev_comps = load_prev(prev_key) if prev_key else None
+    mark_changed(comp_data, prev_comps)
+
+    storage.upload_file(key=f"{compose_prefix}{slug}_{_epoch}.json", ...)
+
+    # 旧 compose は担当 slug のキーだけ削除
+    delete_old(f"{compose_prefix}{slug}_", old_keys)
+
+# defs の旧キーも削除（自分の epoch より古いもの）
+delete_old_defs(compose_prefix, old_keys, _epoch)
+```
 
 ## エラーハンドリング（並列エージェント）
 

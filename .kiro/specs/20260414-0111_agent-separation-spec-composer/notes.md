@@ -97,3 +97,35 @@ compose/animation 機能を使えるようにしたかった。
 #### 学び
 マージで他ブランチの変更を取り込む際、「そのまま統合」ではなく「前提の変化に合わせて不要コードを削る」判断が重要。
 旧フォーマット対応を残したままだと、今後の変更で常に2パスのテストが必要になり、開発速度が落ちる。
+
+### [2026-04-15 11:20] compose JSON 並列安全化
+
+#### 問題の発見
+並列 composer がほぼ同時に `run_python(save=True)` を完了した場合、compose JSON の生成で競合が発生する。
+現状は全スライド分の compose を毎回再生成 + 旧 compose を全削除するため:
+- 他の composer の成果が退行する（古いスナップショットで上書き）
+- 他の composer が書いた compose を旧ファイルとして削除する
+- WebUI のリアルタイムアニメーションが片方だけ発火し、もう片方が消える
+
+#### 議論の経緯
+1. 「compose 生成を generate_pptx だけに限定」案 → リアルタイムプレビューが死ぬので却下
+2. 「担当 slug だけ書く」案 → 正しいが defs の扱いが課題
+3. 「defs を init 時に固定」案 → clipPath/画像等がスライド内容に依存するため不可
+4. 「defs インライン化」案 → データ重複が大きい
+5. 「defs コンテンツハッシュ管理」案 → 複雑
+6. 「後勝ち」の定義を整理 → 最新の slides/ スナップショットを使った composer が勝つべき
+7. epoch を prepare 時点にすれば後勝ちが正しく機能する
+8. defs も同じ原理で後勝ち — 同じテンプレート・同じ outline なので clipPath id は同一
+
+#### 設計決定
+- compose キーを `{slug}_{epoch}.json` に変更（ページ番号ベースを廃止）
+- 生成範囲を `measure_slides` の slug に限定
+- 旧 compose 削除を担当 slug のキーだけに限定
+- epoch を `_prepare_workspace` 開始時点に変更
+- sourceHash 突合を全削除（slug ベースで前回 compose を直接引けるため不要）
+- defs は prepare epoch で後勝ち
+
+#### 実装（commit 予定）
+- `mcp-server/server.py`: compose 生成ブロックを全面書き換え（-50行, +45行）
+- `api/index.py`: compose キーマッチングを `slide_{N}_` → `{slug}_` に変更（1行）
+- `import time` 追加（epoch 取得用）
