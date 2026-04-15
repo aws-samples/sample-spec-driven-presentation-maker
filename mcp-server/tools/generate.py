@@ -1,6 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""PPTX generation — builds PowerPoint from S3 presentation.json.
+"""PPTX generation — builds PowerPoint from S3 deck workspace.
 
 Slide content may originate from LLM-generated text. Review output before distribution.
 Generated PPTX files are uploaded to S3 with server-side encryption.
@@ -9,8 +9,8 @@ Presigned URLs are used for time-limited access to output files.
 # Security: AWS manages infrastructure security. You manage access control,
 # data classification, and IAM policies. See SECURITY.md for details.
 
-Reads presentation.json + includes from S3, resolves include references,
-and builds PPTX via sdpm.builder.
+Reads deck.json + outline.md + slides/*.json + includes from S3,
+resolves include references, and builds PPTX via sdpm.builder.
 """
 
 import json
@@ -71,10 +71,8 @@ def generate_previews(pptx_path: Path, output_dir: Path) -> list[Path]:
 def _assemble_slides(tmpdir: Path) -> list[dict]:
     """Assemble slide list from workspace directory.
 
-    New format (deck.json exists): reads outline.md for slug order,
-    then loads slides/{slug}.json in order. Missing slides are skipped silently.
-
-    Legacy format (presentation.json exists): reads slides directly.
+    Reads outline.md for slug order, then loads slides/{slug}.json in order.
+    Missing slides are skipped silently.
 
     Args:
         tmpdir: Workspace directory.
@@ -82,26 +80,19 @@ def _assemble_slides(tmpdir: Path) -> list[dict]:
     Returns:
         Ordered list of slide dicts.
     """
-    deck_json_path = tmpdir / "deck.json"
-    if deck_json_path.exists():
-        from sdpm.api import parse_outline_slugs
-        slugs = parse_outline_slugs(tmpdir / "specs" / "outline.md")
-        slides: list[dict] = []
-        for slug in slugs:
-            slide_path = tmpdir / "slides" / f"{slug}.json"
-            if not slide_path.exists():
-                continue
-            slide = json.loads(slide_path.read_text(encoding="utf-8"))
-            slide.setdefault("id", slug)
-            slides.append(slide)
-        return slides
-
-    pres_path = tmpdir / "presentation.json"
-    if pres_path.exists():
-        data = json.loads(pres_path.read_text(encoding="utf-8"))
-        return data.get("slides", [])
-
-    raise ValueError(f"No deck.json or presentation.json found in {tmpdir}")
+    from sdpm.api import parse_outline_slugs
+    slugs = parse_outline_slugs(tmpdir / "specs" / "outline.md")
+    slides: list[dict] = []
+    for slug in slugs:
+        slide_path = tmpdir / "slides" / f"{slug}.json"
+        if not slide_path.exists():
+            continue
+        slide = json.loads(slide_path.read_text(encoding="utf-8"))
+        slide.setdefault("id", slug)
+        slides.append(slide)
+    if not slides:
+        raise ValueError(f"No slides found in {tmpdir}")
+    return slides
 
 
 def _prepare_workspace(
@@ -124,46 +115,33 @@ def _prepare_workspace(
 
     tmpdir = Path(tempfile.mkdtemp())
 
-    # Detect format: try deck.json first, fall back to presentation.json
-    has_deck_json = False
+    # Download deck.json
+    deck_meta = storage.get_deck_json(deck_id)
+    (tmpdir / "deck.json").write_text(
+        json.dumps(deck_meta, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # Download outline.md
+    outline_key = f"decks/{deck_id}/specs/outline.md"
     try:
-        deck_meta = storage.get_deck_json(deck_id)
-        (tmpdir / "deck.json").write_text(
-            json.dumps(deck_meta, ensure_ascii=False), encoding="utf-8"
-        )
-        has_deck_json = True
-    except ValueError:
-        pass
+        data = storage.download_file_from_pptx_bucket(outline_key)
+        specs_dir = tmpdir / "specs"
+        specs_dir.mkdir(parents=True, exist_ok=True)
+        (specs_dir / "outline.md").write_bytes(data)
+    except Exception:
+        logger.warning("outline.md not found for deck %s", deck_id)
 
-    if has_deck_json:
-        # Download outline.md
-        outline_key = f"decks/{deck_id}/specs/outline.md"
-        try:
-            data = storage.download_file_from_pptx_bucket(outline_key)
-            specs_dir = tmpdir / "specs"
-            specs_dir.mkdir(parents=True, exist_ok=True)
-            (specs_dir / "outline.md").write_bytes(data)
-        except Exception:
-            logger.warning("outline.md not found for deck %s", deck_id)
+    # Download slides/*.json
+    slide_keys = storage.list_files(
+        prefix=f"decks/{deck_id}/slides/", bucket=storage.pptx_bucket
+    )
+    for key in slide_keys:
+        rel = key.replace(f"decks/{deck_id}/", "")
+        dest = tmpdir / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(storage.download_file_from_pptx_bucket(key))
 
-        # Download slides/*.json
-        slide_keys = storage.list_files(
-            prefix=f"decks/{deck_id}/slides/", bucket=storage.pptx_bucket
-        )
-        for key in slide_keys:
-            rel = key.replace(f"decks/{deck_id}/", "")
-            dest = tmpdir / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(storage.download_file_from_pptx_bucket(key))
-
-        presentation = {**deck_meta}
-    else:
-        presentation = storage.get_presentation_json(deck_id)
-        if not isinstance(presentation, dict):
-            raise ValueError(f"Deck {deck_id} has invalid presentation.json.")
-        (tmpdir / "presentation.json").write_text(
-            json.dumps(presentation, ensure_ascii=False), encoding="utf-8"
-        )
+    presentation = {**deck_meta}
 
     # Assemble slides
     slides = _assemble_slides(tmpdir)
