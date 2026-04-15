@@ -28,7 +28,7 @@ from storage import Storage
 logger = logging.getLogger(__name__)
 
 # Files managed by the deck workspace — only these are synced back to S3.
-_WORKSPACE_PREFIXES = ("deck.json", "presentation.json", "slides/", "specs/", "includes/")
+_WORKSPACE_PREFIXES = ("deck.json", "slides/", "specs/", "includes/")
 
 
 def execute_in_sandbox(

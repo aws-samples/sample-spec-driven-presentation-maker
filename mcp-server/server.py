@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import sys
+import time
 from contextvars import ContextVar
 from pathlib import Path
 
@@ -760,6 +761,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
             from tools.generate import _assemble_slides, _prepare_workspace
 
             user_id = _get_user_id()
+            _prepare_epoch = int(time.time())
             tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
             pptx_path = _build_pptx(tmpdir, slides, build_kwargs)
 
@@ -804,78 +806,80 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
 
             if save:
                 # Compose: SVG → optimized JSON for WebUI animation
-                # Runs synchronously — measured at ~300ms for 8 slides (≪3s threshold)
+                # Only generates compose for measure_slides slugs (parallel-safe).
+                # Uses _prepare_epoch (snapshot time) so the composer with the
+                # newest slides/ snapshot wins on defs via epoch comparison.
                 try:
                     from tools.compose import extract_optimized_defs, split_slide_components, count_slides
-                    import hashlib as _hashlib
                     svg_path = tmpdir / "measure.svg"
                     if not svg_path.exists():
                         _export_svg(tmpdir, pptx_path)
                     if svg_path.exists():
                         import json as _json
-                        import time as _time
-                        _epoch = int(_time.time())
+                        import re as _re
                         compose_prefix = f"decks/{deck_id}/compose/"
 
-                        # 1. List old compose keys (for cleanup + prev data)
+                        # Determine which slugs to generate compose for
+                        compose_slugs = measure_slides if measure_slides else list(slug_to_page.keys())
+
+                        # List existing compose keys (for prev data + cleanup)
                         old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
 
-                        # 2. Load previous slide compose data keyed by sourceHash + slot number
-                        prev_by_hash: dict[str, list[dict]] = {}
-                        prev_by_slot: list[list[dict]] = []  # ordered by slide number
-                        prev_slot_map: dict[int, list[dict]] = {}
-                        import re as _re
-                        for k in old_keys:
-                            if "/slide_" not in k:
-                                continue
-                            try:
-                                raw = _storage.download_file_from_pptx_bucket(k)
-                                prev_data = _json.loads(raw)
-                                comps = prev_data.get("components", [])
-                                h = prev_data.get("sourceHash")
-                                if h:
-                                    prev_by_hash[h] = comps
-                                # Extract slot number from key: slide_{N}_{epoch}.json
-                                m = _re.search(r"/slide_(\d+)_", k)
-                                if m:
-                                    prev_slot_map[int(m.group(1))] = comps
-                            except Exception:
-                                pass
-                        # Build ordered list
-                        if prev_slot_map:
-                            max_slot = max(prev_slot_map.keys())
-                            prev_by_slot = [prev_slot_map.get(i, []) for i in range(1, max_slot + 1)]
+                        def _latest_key(prefix: str) -> str | None:
+                            best_ep, best_k = -1, None
+                            for k in old_keys:
+                                if not k.startswith(prefix):
+                                    continue
+                                m = _re.search(r"_(\d+)\.json$", k)
+                                ep = int(m.group(1)) if m else 0
+                                if ep > best_ep:
+                                    best_ep, best_k = ep, k
+                            return best_k
 
-                        # 3. Upload defs
+                        # Component-level diff helpers
+                        def _mk(c: dict) -> str:
+                            b = c.get("bbox")
+                            return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
+
+                        def _fp(c: dict) -> str:
+                            return f"{c['class']}|{c.get('text', '')}"
+
+                        # Upload defs (prepare epoch — newest snapshot wins)
                         defs_data = extract_optimized_defs(svg_path)
                         _storage.upload_file(
-                            key=f"{compose_prefix}defs_{_epoch}.json",
+                            key=f"{compose_prefix}defs_{_prepare_epoch}.json",
                             data=_json.dumps(defs_data, ensure_ascii=False).encode(),
                             content_type="application/json",
                         )
+                        # Cleanup old defs (only delete defs older than our epoch)
+                        for k in old_keys:
+                            if "/defs_" in k:
+                                m = _re.search(r"_(\d+)\.json$", k)
+                                if m and int(m.group(1)) < _prepare_epoch:
+                                    try:
+                                        _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                                    except Exception:
+                                        pass
 
-                        # 4. Generate compose for all slides with changed flags
-                        _total = count_slides(svg_path)
-                        for sn in range(1, _total + 1):
+                        # Generate compose for each measured slug
+                        for slug in compose_slugs:
+                            pn = slug_to_page.get(slug)
+                            if not pn:
+                                continue
                             try:
-                                comp_data = split_slide_components(svg_path, sn)
-                                # sourceHash from slide JSON
-                                src_hash = ""
-                                if sn <= len(slides):
-                                    src_hash = _hashlib.md5(_json.dumps(slides[sn - 1], sort_keys=True, ensure_ascii=False).encode(), usedforsecurity=False).hexdigest()
-                                comp_data["sourceHash"] = src_hash
+                                comp_data = split_slide_components(svg_path, pn)
 
-                                # Diff: find prev slide by sourceHash, fallback to same slot number
-                                prev_comps = prev_by_hash.get(src_hash)
-                                if prev_comps is None and sn <= len(prev_by_slot):
-                                    prev_comps = prev_by_slot[sn - 1]
+                                # Diff against previous compose for same slug
+                                prev_key = _latest_key(f"{compose_prefix}{slug}_")
+                                prev_comps = None
+                                if prev_key:
+                                    try:
+                                        raw = _storage.download_file_from_pptx_bucket(prev_key)
+                                        prev_comps = _json.loads(raw).get("components")
+                                    except Exception:
+                                        pass
+
                                 if prev_comps is not None:
-                                    # Component-level diff
-                                    def _mk(c: dict) -> str:
-                                        b = c.get("bbox")
-                                        return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
-                                    def _fp(c: dict) -> str:
-                                        return f"{c['class']}|{c.get('text', '')}"
                                     prev_map = {_mk(c): _fp(c) for c in prev_comps}
                                     for c in comp_data["components"]:
                                         k = _mk(c)
@@ -885,19 +889,20 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                                         c["changed"] = True
 
                                 _storage.upload_file(
-                                    key=f"{compose_prefix}slide_{sn}_{_epoch}.json",
+                                    key=f"{compose_prefix}{slug}_{_prepare_epoch}.json",
                                     data=_json.dumps(comp_data, ensure_ascii=False).encode(),
                                     content_type="application/json",
                                 )
-                            except Exception:
-                                logger.error("compose failed for slide %d", sn, exc_info=True)
 
-                        # 5. Cleanup old compose files
-                        for k in old_keys:
-                            try:
-                                _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                                # Cleanup old compose for this slug only
+                                for k in old_keys:
+                                    if k.startswith(f"{compose_prefix}{slug}_") and not k.endswith(f"{slug}_{_prepare_epoch}.json"):
+                                        try:
+                                            _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                                        except Exception:
+                                            pass
                             except Exception:
-                                pass
+                                logger.error("compose failed for slug %s", slug, exc_info=True)
                 except Exception:
                     logger.error("compose failed", exc_info=True)
 

@@ -476,7 +476,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
             sid = f"slide_{i + 1:02d}"
             slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
             slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
-            compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}_", compose_keys)
+            compose_key = _latest_compose_key(f"decks/{deck_id}/compose/{slug}_", compose_keys)
             if compose_key:
                 slide_entry["composeUrl"] = preview_url(compose_key)
             if include_json:
