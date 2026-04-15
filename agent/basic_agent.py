@@ -539,6 +539,24 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str, mcp_fa
                             return {"slugs": group["slugs"], "response": str(response)}
                         except Exception as e:
                             if attempt < max_retries:
+                                # Reconnect MCP and rebuild composer, preserving conversation
+                                prev_messages = list(composer.messages)
+                                for srv in group_mcp:
+                                    srv.stop(None, None, None)
+                                group_mcp.clear()
+                                if mcp_factories:
+                                    for factory in mcp_factories:
+                                        group_mcp.append(factory())
+                                composer_tools = group_mcp if group_mcp else [*mcp_servers]
+                                composer = Agent(
+                                    system_prompt=[{"text": static_prompt}, {"cachePoint": {"type": "default"}}],
+                                    tools=composer_tools,
+                                    model=model,
+                                    callback_handler=_on_event,
+                                )
+                                composer.messages.extend(prev_messages)
+                                composer.hooks.add_callback(BeforeToolCallEvent, _before_tool)
+                                composer.hooks.add_callback(AfterToolCallEvent, _after_tool)
                                 progress_q.put_nowait({
                                     "group": gi + 1, "slugs": slugs_label,
                                     "status": "retrying", "attempt": attempt + 1, "error": str(e),
