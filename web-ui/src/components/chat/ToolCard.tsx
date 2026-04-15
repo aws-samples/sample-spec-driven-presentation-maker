@@ -291,73 +291,82 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
         )}
         {/* Streaming progress — sub-tool activity feed */}
         {isActive && streamMessages && streamMessages.length > 0 && (() => {
-          // Separate group status events from sub-tool events
-          const groupEvents = streamMessages.filter((e) => e.status)
-          const toolEvents = streamMessages.filter((e) => e.tool)
-          const latestGroup = groupEvents[groupEvents.length - 1]
-          const groupLabel = latestGroup
-            ? latestGroup.status === "done"
-              ? `✓ ${latestGroup.slugs} complete`
-              : latestGroup.status === "error"
-                ? `✗ ${latestGroup.slugs} failed`
-                : latestGroup.total_groups
-                  ? `Group ${latestGroup.group}/${latestGroup.total_groups} · ${latestGroup.slugs}`
-                  : latestGroup.message || String(latestGroup.status)
-            : null
+          // Group events by group number for parallel display
+          const groupMap = new Map<number, { status?: Record<string, unknown>; tools: Record<string, unknown>[] }>()
+          const ungrouped: Record<string, unknown>[] = []
+
+          for (const ev of streamMessages) {
+            const g = typeof ev.group === "number" ? ev.group : 0
+            if (g === 0) { ungrouped.push(ev); continue }
+            if (!groupMap.has(g)) groupMap.set(g, { tools: [] })
+            const entry = groupMap.get(g)!
+            if (ev.status) entry.status = ev
+            else if (ev.tool) entry.tools.push(ev)
+          }
+
+          // Ungrouped status messages (prefetching, building, etc.)
+          const statusMsg = ungrouped.filter((e) => e.message).pop()
 
           return (
-            <div className="mt-1.5 space-y-0.5">
-              {/* Group header */}
-              {groupLabel && (
-                <p className="text-[11px] font-medium tracking-[-0.01em] mb-1" style={{ color: `${colors.accent}cc` }}>
-                  {groupLabel}
+            <div className="mt-1.5 space-y-1.5">
+              {statusMsg && (
+                <p className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: `${colors.accent}cc` }}>
+                  {String(statusMsg.message)}
                 </p>
               )}
-              {/* Sub-tool list — show last 4 */}
-              {toolEvents.slice(-4).map((ev, i) => {
-                const toolName = stripPrefix(String(ev.tool))
-                const sub = TOOL_META[toolName] || { Icon: Wrench, label: toolName.replace(/_/g, " "), category: "other" as ToolCategory }
-                const subColors = CAT[sub.category]
-                const isLast = i === Math.min(toolEvents.length, 4) - 1
-                const subDetail = getDetail(toolName, undefined)
-                const isDone = ev.status === "success"
-                const isFailed = ev.status === "error"
+              {[...groupMap.entries()].map(([g, { status: gStatus, tools }]) => {
+                const totalGroups = gStatus?.total_groups ?? groupMap.size
+                const slugs = gStatus?.slugs ?? tools[0]?.slugs ?? ""
+                const isDone = gStatus?.status === "done"
+                const isErr = gStatus?.status === "error" || gStatus?.status === "retry_failed"
+                const isRetrying = gStatus?.status === "retrying"
+                const groupAccent = isErr ? ERR.accent : colors.accent
+
                 return (
-                  <div
-                    key={`${ev.tool}-${i}`}
-                    className="flex items-center gap-1.5 py-0.5 transition-all duration-300"
-                    style={{ opacity: isLast ? 1 : isDone ? 0.5 : 0.35 }}
-                  >
-                    <div className="flex-none w-4 h-4 rounded flex items-center justify-center" style={{ background: `${subColors.accent}12` }}>
-                      {isDone ? (
-                        <Check className="h-2 w-2" style={{ color: subColors.accent }} />
-                      ) : isFailed ? (
-                        <AlertCircle className="h-2 w-2" style={{ color: ERR.accent }} />
-                      ) : isLast ? (
-                        <svg className="w-4 h-4" viewBox="0 0 16 16">
-                          <circle cx="8" cy="8" r="5" fill="none" stroke={subColors.accent} strokeWidth="1" strokeDasharray="10 22" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
-                        </svg>
-                      ) : (
-                        <sub.Icon className="h-2 w-2" style={{ color: `${subColors.accent}80` }} />
-                      )}
-                    </div>
-                    <span className="text-[11px] truncate" style={{ color: isLast ? subColors.accent : `${subColors.accent}88` }}>
-                      {sub.label}
-                    </span>
-                    {subDetail && (
-                      <span className="text-[10px] truncate max-w-[140px]" style={{ color: `${subColors.accent}55` }}>
-                        {subDetail}
+                  <div key={g} className="rounded-lg px-2 py-1.5 transition-all duration-300" style={{ background: `${groupAccent}08` }}>
+                    {/* Group header */}
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <div className="flex-none w-3.5 h-3.5 rounded flex items-center justify-center" style={{ background: `${groupAccent}15` }}>
+                        {isDone ? (
+                          <Check className="h-2 w-2" style={{ color: groupAccent }} />
+                        ) : isErr ? (
+                          <AlertCircle className="h-2 w-2" style={{ color: ERR.accent }} />
+                        ) : (
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 14 14">
+                            <circle cx="7" cy="7" r="4.5" fill="none" stroke={groupAccent} strokeWidth="1" strokeDasharray="8 20" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: `${groupAccent}cc` }}>
+                        {isRetrying ? "Retrying" : `Group ${g}/${totalGroups}`} · {String(slugs)}
                       </span>
-                    )}
+                    </div>
+                    {/* Sub-tool list — show last 3 per group */}
+                    {!isDone && tools.slice(-3).map((ev, i) => {
+                      const toolName = stripPrefix(String(ev.tool))
+                      const sub = TOOL_META[toolName] || { Icon: Wrench, label: toolName.replace(/_/g, " "), category: "other" as ToolCategory }
+                      const subColors = CAT[sub.category]
+                      const isLast = i === Math.min(tools.length, 3) - 1
+                      return (
+                        <div key={`${g}-${ev.tool}-${i}`} className="flex items-center gap-1.5 py-0.5 ml-5" style={{ opacity: isLast ? 1 : 0.4 }}>
+                          <div className="flex-none w-3.5 h-3.5 rounded flex items-center justify-center" style={{ background: `${subColors.accent}10` }}>
+                            {isLast ? (
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14">
+                                <circle cx="7" cy="7" r="4.5" fill="none" stroke={subColors.accent} strokeWidth="1" strokeDasharray="8 20" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
+                              </svg>
+                            ) : (
+                              <sub.Icon className="h-2 w-2" style={{ color: `${subColors.accent}80` }} />
+                            )}
+                          </div>
+                          <span className="text-[11px] truncate" style={{ color: isLast ? subColors.accent : `${subColors.accent}88` }}>
+                            {sub.label}
+                          </span>
+                        </div>
+                      )
+                    })}
                   </div>
                 )
               })}
-              {/* Completed count */}
-              {toolEvents.filter((e) => e.status === "success").length > 0 && (
-                <p className="text-[10px] mt-0.5" style={{ color: `${colors.accent}55` }}>
-                  {toolEvents.filter((e) => e.status === "success").length} of {toolEvents.length} steps complete
-                </p>
-              )}
             </div>
           )
         })()}
