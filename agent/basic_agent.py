@@ -437,7 +437,7 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
         import json as _json
         import os
 
-        max_concurrency = int(os.environ.get("COMPOSER_MAX_CONCURRENCY", "3"))
+        max_concurrency = int(os.environ.get("COMPOSER_MAX_CONCURRENCY", "10"))
         sem = asyncio.Semaphore(max_concurrency)
 
         # Prefetch references once (Python call, no LLM turns)
