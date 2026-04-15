@@ -585,8 +585,16 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     : e
                 )
               } else if (d.tool) {
-                // New sub-tool started
-                next = [...existing, { tool: d.tool, group: d.group, slugs: d.slugs, input: d.input }]
+                // New sub-tool started (or update with input)
+                const existingIdx = existing.findIndex((e) => typeof e === "object" && e.toolUseId === d.toolUseId)
+                if (existingIdx >= 0 && d.input) {
+                  // Update existing entry with input
+                  next = existing.map((e, idx) => idx === existingIdx ? { ...e, input: d.input } : e)
+                } else if (existingIdx < 0) {
+                  next = [...existing, { tool: d.tool, group: d.group, slugs: d.slugs, toolUseId: d.toolUseId, input: d.input }]
+                } else {
+                  return prev
+                }
               } else if (d.status) {
                 // Group status event
                 next = [...existing, { status: d.status, group: d.group, slugs: d.slugs, total_groups: d.total_groups, done: d.done, total: d.total, summary: d.summary, message: d.message }]

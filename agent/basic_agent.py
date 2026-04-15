@@ -485,17 +485,23 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
                         name = tu.get("name", "")
                         if tid and name and tid != last_tool_id:
                             last_tool_id = tid
-                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "toolUseId": tid, "input": tu.get("input", {})})
-                    msg = kwargs.get("message")
-                    if isinstance(msg, dict) and msg.get("role") == "user":
-                        for block in msg.get("content", []):
-                            if isinstance(block, dict) and "toolResult" in block:
-                                tr = block["toolResult"]
-                                progress_q.put_nowait({
-                                    "group": gi + 1, "slugs": slugs_label,
-                                    "toolResult": tr.get("toolUseId", ""),
-                                    "toolStatus": tr.get("status", ""),
-                                })
+                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "toolUseId": tid})
+
+                async def _before_tool(event):
+                    tu = event.tool_use
+                    progress_q.put_nowait({
+                        "group": gi + 1, "slugs": slugs_label,
+                        "tool": tu.get("name", ""), "toolUseId": tu.get("toolUseId", ""),
+                        "input": tu.get("input", {}),
+                    })
+
+                async def _after_tool(event):
+                    tu = event.tool_use
+                    progress_q.put_nowait({
+                        "group": gi + 1, "slugs": slugs_label,
+                        "toolResult": tu.get("toolUseId", ""),
+                        "toolStatus": "error" if event.result and event.result.get("status") == "error" else "success",
+                    })
 
                 composer = Agent(
                     system_prompt=[
@@ -506,6 +512,9 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
                     model=model,
                     callback_handler=_on_event,
                 )
+                from strands.hooks.events import BeforeToolCallEvent, AfterToolCallEvent
+                composer.hooks.add_callback(BeforeToolCallEvent, _before_tool)
+                composer.hooks.add_callback(AfterToolCallEvent, _after_tool)
                 response = await composer.invoke_async(user_content)
                 progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "status": "done"})
                 return {"slugs": group["slugs"], "response": str(response)}
