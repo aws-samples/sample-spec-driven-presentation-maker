@@ -577,16 +577,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     ? { ...e, status: d.toolStatus || "success" }
                     : e
                 )
-              } else if (d.toolUpdate) {
-                // Input update for existing tool (e.g. purpose now available)
-                next = existing.map((e) =>
-                  typeof e === "object" && e.toolUseId === d.toolUpdate
-                    ? { ...e, input: d.input }
-                    : e
-                )
               } else if (d.tool) {
                 // New sub-tool started
-                next = [...existing, { tool: d.tool, input: d.input, group: d.group, slugs: d.slugs, toolUseId: d.toolUseId || "" }]
+                next = [...existing, { tool: d.tool, group: d.group, slugs: d.slugs }]
               } else if (d.status) {
                 // Group status event
                 next = [...existing, { status: d.status, group: d.group, slugs: d.slugs, total_groups: d.total_groups, done: d.done, total: d.total, summary: d.summary, message: d.message }]

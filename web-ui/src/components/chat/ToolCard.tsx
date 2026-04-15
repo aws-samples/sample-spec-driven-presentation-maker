@@ -319,7 +319,7 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
                 const sub = TOOL_META[toolName] || { Icon: Wrench, label: toolName.replace(/_/g, " "), category: "other" as ToolCategory }
                 const subColors = CAT[sub.category]
                 const isLast = i === Math.min(toolEvents.length, 4) - 1
-                const subDetail = getDetail(toolName, ev.input as Record<string, unknown> | undefined)
+                const subDetail = getDetail(toolName, undefined)
                 const isDone = ev.status === "success"
                 const isFailed = ev.status === "error"
                 return (

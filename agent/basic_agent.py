@@ -25,12 +25,8 @@ from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
-from strands.telemetry import StrandsTelemetry
 from tools.upload_tools import list_uploads
 from tools.web_tools import web_fetch
-
-# Enable Strands OTEL tracing (ADOT auto-instrumentation handles export)
-StrandsTelemetry()
 
 logger = logging.getLogger("sdpm.agent")
 
@@ -302,18 +298,6 @@ def _prefetch_context(mcp_client, deck_id: str = "") -> str:
     return "# Pre-loaded References (already executed — do NOT re-fetch)\n\n" + "\n\n---\n\n".join(sections)
 
 
-def _try_parse_input(raw):
-    """Try to parse tool input; return dict or None."""
-    if isinstance(raw, dict):
-        return raw
-    if isinstance(raw, str) and raw.startswith("{"):
-        try:
-            return json.loads(raw)
-        except (ValueError, TypeError):
-            return None
-    return None
-
-
 def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
     """Create compose_slides tool with closed-over MCP servers, model, and instructions.
 
@@ -399,30 +383,16 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
             # Realtime progress via invoke_async + callback_handler + asyncio.Queue
             progress_q: asyncio.Queue = asyncio.Queue()
             last_tool_id = ""
-            last_tool_had_input = False
 
             def _on_event(**kwargs):
-                nonlocal last_tool_id, last_tool_had_input
+                nonlocal last_tool_id
                 tu = kwargs.get("current_tool_use")
                 if tu:
                     tid = tu.get("toolUseId", "")
                     name = tu.get("name", "")
-                    if not (tid and name):
-                        pass
-                    elif tid != last_tool_id:
-                        # New tool — send immediately (input may be incomplete)
+                    if tid and name and tid != last_tool_id:
                         last_tool_id = tid
-                        last_tool_had_input = False
-                        inp = _try_parse_input(tu.get("input", ""))
-                        if inp:
-                            last_tool_had_input = True
-                        progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "input": inp, "toolUseId": tid})
-                    elif not last_tool_had_input:
-                        # Same tool — resend once input is parseable
-                        inp = _try_parse_input(tu.get("input", ""))
-                        if inp:
-                            last_tool_had_input = True
-                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "toolUpdate": tid, "input": inp})
+                        progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name})
                 # Tool result
                 msg = kwargs.get("message")
                 if isinstance(msg, dict) and msg.get("role") == "user":
