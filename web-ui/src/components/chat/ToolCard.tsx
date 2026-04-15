@@ -28,7 +28,7 @@ import {
   BookOpen, List, Search, FolderPlus, Pencil, Image,
   Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench,
   Check, FileText, Download, Play, Code, Palette,
-  LayoutTemplate, Package, AlertCircle, Ruler,
+  LayoutTemplate, Package, AlertCircle, Ruler, RefreshCw,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -300,7 +300,10 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
             if (g === 0) { ungrouped.push(ev); continue }
             if (!groupMap.has(g)) groupMap.set(g, { tools: [] })
             const entry = groupMap.get(g)!
-            if (ev.status) entry.status = ev
+            if (ev.status) {
+              if (ev.status === "retrying") entry.tools = []
+              entry.status = ev
+            }
             else if (ev.tool) entry.tools.push(ev)
           }
 
@@ -320,6 +323,7 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
                 const isDone = gStatus?.status === "done"
                 const isErr = gStatus?.status === "error" || gStatus?.status === "retry_failed"
                 const isRetrying = gStatus?.status === "retrying"
+                const retryAttempt = typeof gStatus?.attempt === "number" ? gStatus.attempt : 0
                 const groupAccent = isErr ? ERR.accent : colors.accent
 
                 return (
@@ -331,6 +335,8 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
                           <Check className="h-2 w-2" style={{ color: groupAccent }} />
                         ) : isErr ? (
                           <AlertCircle className="h-2 w-2" style={{ color: ERR.accent }} />
+                        ) : isRetrying ? (
+                          <RefreshCw className="h-2 w-2" style={{ color: groupAccent, animation: "tool-spinner 1s linear infinite" }} />
                         ) : (
                           <svg className="w-3.5 h-3.5" viewBox="0 0 14 14">
                             <circle cx="7" cy="7" r="4.5" fill="none" stroke={groupAccent} strokeWidth="1" strokeDasharray="8 20" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
@@ -338,7 +344,7 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
                         )}
                       </div>
                       <span className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: `${groupAccent}cc` }}>
-                        {isRetrying ? "Retrying" : `Group ${g}/${totalGroups}`} · {String(slugs)}
+                        {isRetrying ? `Retrying (${retryAttempt})` : `Group ${g}/${totalGroups}`} · {String(slugs)}
                       </span>
                     </div>
                     {/* Sub-tool list — show last 3 per group */}
