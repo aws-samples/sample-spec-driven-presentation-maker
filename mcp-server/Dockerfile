@@ -2,6 +2,7 @@
 # Platform: ARM64 (required by AgentCore Runtime)
 # Listens on 0.0.0.0:8000/mcp (stateless streamable-http)
 # Includes LibreOffice + poppler for synchronous PNG/SVG generation
+# cache-bust: 20260413-1457
 
 FROM --platform=linux/arm64 public.ecr.aws/docker/library/fedora:41
 
