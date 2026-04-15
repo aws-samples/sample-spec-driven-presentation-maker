@@ -516,9 +516,21 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
 
                 composer.hooks.add_callback(BeforeToolCallEvent, _before_tool)
                 composer.hooks.add_callback(AfterToolCallEvent, _after_tool)
-                response = await composer.invoke_async(user_content)
-                progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "status": "done"})
-                return {"slugs": group["slugs"], "response": str(response)}
+
+                max_retries = 2
+                for attempt in range(max_retries + 1):
+                    try:
+                        response = await composer.invoke_async(user_content if attempt == 0 else None)
+                        progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "status": "done"})
+                        return {"slugs": group["slugs"], "response": str(response)}
+                    except Exception as e:
+                        if attempt < max_retries:
+                            progress_q.put_nowait({
+                                "group": gi + 1, "slugs": slugs_label,
+                                "status": "retrying", "attempt": attempt + 1, "error": str(e),
+                            })
+                            continue
+                        raise
 
         # Launch all groups
         tasks = [asyncio.create_task(run_group(gi, g)) for gi, g in enumerate(slide_groups)]
@@ -539,37 +551,18 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
         generated = []
         errors = []
         summaries = {}
-        retry_groups = []
 
         for gi, result in enumerate(results):
             group = slide_groups[gi]
             slugs_label = ", ".join(group["slugs"])
             if isinstance(result, Exception):
                 errors.append({"slugs": group["slugs"], "error": str(result)})
-                retry_groups.append((gi, group))
                 yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(result)}
             else:
                 generated.extend(result["slugs"])
                 done_count += len(result["slugs"])
                 summaries[slugs_label] = result["response"]
                 yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
-
-        # Retry failed groups once (serial)
-        for gi, group in retry_groups:
-            slugs_label = ", ".join(group["slugs"])
-            yield {"group": gi + 1, "slugs": slugs_label, "status": "retrying"}
-            try:
-                result = await run_group(gi, group)
-                while not progress_q.empty():
-                    yield progress_q.get_nowait()
-                generated.extend(result["slugs"])
-                done_count += len(result["slugs"])
-                summaries[slugs_label] = result["response"]
-                # Remove from errors
-                errors = [e for e in errors if e["slugs"] != group["slugs"]]
-                yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
-            except Exception as e:
-                yield {"group": gi + 1, "slugs": slugs_label, "status": "retry_failed", "error": str(e)}
 
         # Post-compose: build PPTX + assemble report
         yield {"status": "building", "message": "Building final PPTX..."}
