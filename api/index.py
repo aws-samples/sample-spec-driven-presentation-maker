@@ -419,12 +419,16 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
     # Read slides from S3 — try new format (deck.json + slides/*.json) first, fall back to presentation.json
     slides = []
     include_json = (app.current_event.get_query_string_value("include") or "") == "slideJson"
+    # Detect format: check if deck.json exists
+    has_deck_json = False
     try:
-        # New format: deck.json exists → read outline.md for slug order, then slides/*.json
-        deck_json_key = f"decks/{deck_id}/deck.json"
-        s3_client.head_object(Bucket=BUCKET_NAME, Key=deck_json_key)
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/deck.json")
+        has_deck_json = True
+    except Exception:
+        pass
 
-        # Parse outline.md for slug order
+    if has_deck_json:
+        # New format: outline.md for slug order, then slides/*.json
         # Canonical implementation: sdpm.api.parse_outline_slugs (not importable in Lambda)
         import re as _re
         slugs = []
@@ -462,8 +466,8 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
                 slides.append(slide_entry)
             except Exception:
                 continue
-    except Exception:
-        # Fall back to legacy presentation.json
+    else:
+        # Legacy format: presentation.json
         try:
             pres_key = f"decks/{deck_id}/presentation.json"
             resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=pres_key)

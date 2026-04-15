@@ -83,11 +83,8 @@ def execute_in_sandbox(
 
     try:
         # Load deck workspace into sandbox
-        workspace_paths: list[str] = []
         if deck_id:
-            workspace_paths = _upload_deck_workspace(
-                client, session_id, storage, deck_id,
-            )
+            _upload_deck_workspace(client, session_id, storage, deck_id)
 
         # Upload additional files by basename
         if files:
@@ -110,7 +107,7 @@ def execute_in_sandbox(
         # Save modified workspace files back to S3
         if save and deck_id:
             _save_deck_workspace(
-                client, session_id, storage, deck_id, workspace_paths,
+                client, session_id, storage, deck_id,
             )
             logger.info("Deck workspace saved for deck %s", deck_id)
 
@@ -167,7 +164,6 @@ def _save_deck_workspace(
     session_id: str,
     storage: Storage,
     deck_id: str,
-    paths: list[str],
 ) -> None:
     """Read workspace files from sandbox via prefix scan and write back to S3.
 
@@ -180,7 +176,6 @@ def _save_deck_workspace(
         session_id: Code Interpreter session ID.
         storage: Storage backend.
         deck_id: Deck identifier.
-        paths: Ignored (kept for signature compatibility).
     """
     # Scan sandbox for all workspace files via executeCode
     prefixes_repr = repr(_WORKSPACE_PREFIXES)
