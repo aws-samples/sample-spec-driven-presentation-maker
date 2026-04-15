@@ -485,7 +485,7 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
                         name = tu.get("name", "")
                         if tid and name and tid != last_tool_id:
                             last_tool_id = tid
-                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name})
+                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "toolUseId": tid, "input": tu.get("input", {})})
                     msg = kwargs.get("message")
                     if isinstance(msg, dict) and msg.get("role") == "user":
                         for block in msg.get("content", []):
