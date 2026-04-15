@@ -440,129 +440,134 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
         max_concurrency = int(os.environ.get("COMPOSER_MAX_CONCURRENCY", "10"))
         sem = asyncio.Semaphore(max_concurrency)
 
-        # Prefetch references once (Python call, no LLM turns)
-        yield {"status": "prefetching", "message": "Loading references..."}
-        system_sections = _prefetch_sections(mcp_client, _COMPOSER_PREFETCH_SYSTEM) if mcp_client else []
-        ref_sections = _prefetch_sections(mcp_client, _COMPOSER_PREFETCH_REFS) if mcp_client else []
-
-        # Build system prompt (workflow/spec — how to work)
-        system_context = _build_common_context(system_sections)
-        static_prompt = _build_system_prompt(
-            _COMPOSER_PROMPT_TEMPLATE,
-            common_context=system_context,
-            deck_id=deck_id,
-        )
-
-        # Build common reference text (guides/examples — shared across groups)
-        common_ref_text = _build_common_context(ref_sections)
-
-        total = sum(len(g["slugs"]) for g in slide_groups)
-        progress_q: asyncio.Queue = asyncio.Queue()
-        done_count = 0
-
-        async def run_group(gi: int, group: dict) -> dict:
-            """Run a single composer group under semaphore."""
-            async with sem:
-                slugs_label = ", ".join(group["slugs"])
-                progress_q.put_nowait({"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"})
-
-                deck_sections = _prefetch_deck_specs(mcp_client, deck_id, group["slugs"]) if mcp_client else []
-                deck_context = _build_deck_context(deck_sections)
-
-                # User message: common refs (cacheable) + deck specs (per-group) + instruction
-                user_content = (
-                    f"{common_ref_text}\n\n---\n\n{deck_context}\n\n---\n\n"
-                    f"{group['instruction']}"
-                )
-
-                last_tool_id = ""
-
-                def _on_event(**kwargs):
-                    nonlocal last_tool_id
-                    tu = kwargs.get("current_tool_use")
-                    if tu:
-                        tid = tu.get("toolUseId", "")
-                        name = tu.get("name", "")
-                        if tid and name and tid != last_tool_id:
-                            last_tool_id = tid
-                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "toolUseId": tid})
-
-                composer = Agent(
-                    system_prompt=[
-                        {"text": static_prompt},
-                        {"cachePoint": {"type": "default"}},
-                    ],
-                    tools=[*mcp_servers],
-                    model=model,
-                    callback_handler=_on_event,
-                )
-                from strands.hooks.events import BeforeToolCallEvent, AfterToolCallEvent
-
-                async def _before_tool(event: BeforeToolCallEvent):
-                    tu = event.tool_use
-                    progress_q.put_nowait({
-                        "group": gi + 1, "slugs": slugs_label,
-                        "tool": tu.get("name", ""), "toolUseId": tu.get("toolUseId", ""),
-                        "input": tu.get("input", {}),
-                    })
-
-                async def _after_tool(event: AfterToolCallEvent):
-                    tu = event.tool_use
-                    progress_q.put_nowait({
-                        "group": gi + 1, "slugs": slugs_label,
-                        "toolResult": tu.get("toolUseId", ""),
-                        "toolStatus": "error" if isinstance(event.result, dict) and event.result.get("status") == "error" else "success",
-                    })
-
-                composer.hooks.add_callback(BeforeToolCallEvent, _before_tool)
-                composer.hooks.add_callback(AfterToolCallEvent, _after_tool)
-
-                max_retries = 2
-                for attempt in range(max_retries + 1):
-                    try:
-                        response = await composer.invoke_async(user_content if attempt == 0 else None)
-                        progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "status": "done"})
-                        return {"slugs": group["slugs"], "response": str(response)}
-                    except Exception as e:
-                        if attempt < max_retries:
-                            progress_q.put_nowait({
-                                "group": gi + 1, "slugs": slugs_label,
-                                "status": "retrying", "attempt": attempt + 1, "error": str(e),
-                            })
-                            continue
-                        raise
-
-        # Launch all groups
-        tasks = [asyncio.create_task(run_group(gi, g)) for gi, g in enumerate(slide_groups)]
-
-        # Drain progress queue until all tasks complete
-        while not all(t.done() for t in tasks):
-            try:
-                item = await asyncio.wait_for(progress_q.get(), timeout=0.2)
-                yield item
-            except asyncio.TimeoutError:
-                pass
-        while not progress_q.empty():
-            yield progress_q.get_nowait()
-
-        # Collect results
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
         generated = []
         errors = []
         summaries = {}
+        total = sum(len(g["slugs"]) for g in slide_groups)
+        done_count = 0
 
-        for gi, result in enumerate(results):
-            group = slide_groups[gi]
-            slugs_label = ", ".join(group["slugs"])
-            if isinstance(result, Exception):
-                errors.append({"slugs": group["slugs"], "error": str(result)})
-                yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(result)}
-            else:
-                generated.extend(result["slugs"])
-                done_count += len(result["slugs"])
-                summaries[slugs_label] = result["response"]
-                yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
+        try:
+
+            # Prefetch references once (Python call, no LLM turns)
+            yield {"status": "prefetching", "message": "Loading references..."}
+            system_sections = _prefetch_sections(mcp_client, _COMPOSER_PREFETCH_SYSTEM) if mcp_client else []
+            ref_sections = _prefetch_sections(mcp_client, _COMPOSER_PREFETCH_REFS) if mcp_client else []
+
+            # Build system prompt (workflow/spec — how to work)
+            system_context = _build_common_context(system_sections)
+            static_prompt = _build_system_prompt(
+                _COMPOSER_PROMPT_TEMPLATE,
+                common_context=system_context,
+                deck_id=deck_id,
+            )
+
+            # Build common reference text (guides/examples — shared across groups)
+            common_ref_text = _build_common_context(ref_sections)
+
+            progress_q: asyncio.Queue = asyncio.Queue()
+
+            async def run_group(gi: int, group: dict) -> dict:
+                """Run a single composer group under semaphore."""
+                async with sem:
+                    slugs_label = ", ".join(group["slugs"])
+                    progress_q.put_nowait({"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"})
+
+                    deck_sections = _prefetch_deck_specs(mcp_client, deck_id, group["slugs"]) if mcp_client else []
+                    deck_context = _build_deck_context(deck_sections)
+
+                    # User message: common refs (cacheable) + deck specs (per-group) + instruction
+                    user_content = (
+                        f"{common_ref_text}\n\n---\n\n{deck_context}\n\n---\n\n"
+                        f"{group['instruction']}"
+                    )
+
+                    last_tool_id = ""
+
+                    def _on_event(**kwargs):
+                        nonlocal last_tool_id
+                        tu = kwargs.get("current_tool_use")
+                        if tu:
+                            tid = tu.get("toolUseId", "")
+                            name = tu.get("name", "")
+                            if tid and name and tid != last_tool_id:
+                                last_tool_id = tid
+                                progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "toolUseId": tid})
+
+                    composer = Agent(
+                        system_prompt=[
+                            {"text": static_prompt},
+                            {"cachePoint": {"type": "default"}},
+                        ],
+                        tools=[*mcp_servers],
+                        model=model,
+                        callback_handler=_on_event,
+                    )
+                    from strands.hooks.events import BeforeToolCallEvent, AfterToolCallEvent
+
+                    async def _before_tool(event: BeforeToolCallEvent):
+                        tu = event.tool_use
+                        progress_q.put_nowait({
+                            "group": gi + 1, "slugs": slugs_label,
+                            "tool": tu.get("name", ""), "toolUseId": tu.get("toolUseId", ""),
+                            "input": tu.get("input", {}),
+                        })
+
+                    async def _after_tool(event: AfterToolCallEvent):
+                        tu = event.tool_use
+                        progress_q.put_nowait({
+                            "group": gi + 1, "slugs": slugs_label,
+                            "toolResult": tu.get("toolUseId", ""),
+                            "toolStatus": "error" if isinstance(event.result, dict) and event.result.get("status") == "error" else "success",
+                        })
+
+                    composer.hooks.add_callback(BeforeToolCallEvent, _before_tool)
+                    composer.hooks.add_callback(AfterToolCallEvent, _after_tool)
+
+                    max_retries = 2
+                    for attempt in range(max_retries + 1):
+                        try:
+                            response = await composer.invoke_async(user_content if attempt == 0 else None)
+                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "status": "done"})
+                            return {"slugs": group["slugs"], "response": str(response)}
+                        except Exception as e:
+                            if attempt < max_retries:
+                                progress_q.put_nowait({
+                                    "group": gi + 1, "slugs": slugs_label,
+                                    "status": "retrying", "attempt": attempt + 1, "error": str(e),
+                                })
+                                continue
+                            raise
+
+            # Launch all groups
+            tasks = [asyncio.create_task(run_group(gi, g)) for gi, g in enumerate(slide_groups)]
+
+            # Drain progress queue until all tasks complete
+            while not all(t.done() for t in tasks):
+                try:
+                    item = await asyncio.wait_for(progress_q.get(), timeout=0.2)
+                    yield item
+                except asyncio.TimeoutError:
+                    pass
+            while not progress_q.empty():
+                yield progress_q.get_nowait()
+
+            # Collect results
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for gi, result in enumerate(results):
+                group = slide_groups[gi]
+                slugs_label = ", ".join(group["slugs"])
+                if isinstance(result, Exception):
+                    errors.append({"slugs": group["slugs"], "error": str(result)})
+                    yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(result)}
+                else:
+                    generated.extend(result["slugs"])
+                    done_count += len(result["slugs"])
+                    summaries[slugs_label] = result["response"]
+                    yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
+
+        except Exception as e:
+            errors.append({"slugs": "all", "error": str(e)})
 
         # Post-compose: build PPTX + assemble report
         yield {"status": "building", "message": "Building final PPTX..."}
