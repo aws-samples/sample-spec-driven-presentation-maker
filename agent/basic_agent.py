@@ -183,6 +183,7 @@ Use this deck_id for ALL run_python and generate_pptx calls. Do NOT call init_pr
 - Follow the compose workflow below — you already have everything you need
 - After composing, generate PPTX, measure, preview, and polish autonomously
 - ALL references below are already loaded — skip any "Before starting, you MUST run/read" instructions in the workflow
+- Your assigned slides are pre-loaded below. Other slides in slides/ are listed by name only — read them via run_python if you need to reference their content
 
 ## Constraints
 - Do NOT ask the user anything — you have no user interaction
@@ -228,20 +229,12 @@ _COMPOSER_PREFETCH = [
 ]
 
 
-def _prefetch_context(mcp_client, deck_id: str = "") -> str:
-    """Prefetch all Phase 2 references via MCPClient.call_tool_sync.
-
-    Args:
-        mcp_client: MCPClient instance.
-        deck_id: Deck ID for fetching deck-specific specs.
+def _prefetch_common_references(mcp_client) -> list[str]:
+    """Prefetch common Phase 2 references (workflows, guides, examples).
 
     Returns:
-        Concatenated reference text with section headers.
-
-    Raises:
-        RuntimeError: If any common reference fails to load.
+        List of section strings (reusable across groups).
     """
-    import json as _json
     import uuid
 
     sections = []
@@ -259,43 +252,73 @@ def _prefetch_context(mcp_client, deck_id: str = "") -> str:
                 text += item["text"]
         if text:
             sections.append(f"## {label}\n\n{text}")
+    return sections
 
-    # Fetch deck-specific specs via run_python
-    if deck_id:
-        code = (
-            "import json, os\n"
-            "specs = {}\n"
-            "for name in ['specs/brief.md', 'specs/outline.md', 'specs/art-direction.html', 'deck.json']:\n"
-            "    try:\n"
-            "        specs[name] = open(name).read()\n"
-            "    except FileNotFoundError:\n"
-            "        pass\n"
-            "if os.path.isdir('slides'):\n"
-            "    specs['slides/'] = ', '.join(sorted(os.listdir('slides')))\n"
-            "print(json.dumps(specs, ensure_ascii=False))\n"
-        )
-        result = mcp_client.call_tool_sync(
-            tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
-            name="run_python",
-            arguments={"code": code, "deck_id": deck_id},
-        )
-        if result.get("status") == "error":
-            raise RuntimeError(f"Failed to prefetch specs for deck {deck_id}: {result.get('content')}")
-        for item in result.get("content", []):
-            if isinstance(item, dict) and "text" in item:
-                try:
-                    output = _json.loads(item["text"])
-                    # output may be wrapped in {"output": "..."} by sandbox
-                    if isinstance(output, dict) and "output" in output:
-                        output = _json.loads(output["output"])
-                    if not isinstance(output, dict) or not output:
-                        raise RuntimeError(f"Specs empty for deck {deck_id} — workspace may not exist")
-                    for filename, content in output.items():
-                        sections.append(f"## {filename}\n\n{content}")
-                except _json.JSONDecodeError as e:
-                    raise RuntimeError(f"Failed to parse specs for deck {deck_id}: {e}") from e
 
-    return "# Pre-loaded References (already executed — do NOT re-fetch)\n\n" + "\n\n---\n\n".join(sections)
+def _prefetch_deck_specs(mcp_client, deck_id: str, assigned_slugs: list[str]) -> list[str]:
+    """Prefetch deck-specific specs and assigned slide contents.
+
+    Args:
+        mcp_client: MCPClient instance.
+        deck_id: Deck ID.
+        assigned_slugs: Slugs to load in full. Others listed by name only.
+
+    Returns:
+        List of section strings.
+    """
+    import json as _json
+    import uuid
+
+    slugs_repr = repr(assigned_slugs)
+    code = (
+        "import json, os\n"
+        "specs = {}\n"
+        f"_assigned = set({slugs_repr})\n"
+        "for name in ['specs/brief.md', 'specs/outline.md', 'specs/art-direction.html', 'deck.json']:\n"
+        "    try:\n"
+        "        specs[name] = open(name).read()\n"
+        "    except FileNotFoundError:\n"
+        "        pass\n"
+        "if os.path.isdir('slides'):\n"
+        "    _others = []\n"
+        "    for f in sorted(os.listdir('slides')):\n"
+        "        slug = f.removesuffix('.json')\n"
+        "        if slug in _assigned:\n"
+        "            specs[f'slides/{f}'] = open(f'slides/{f}').read()\n"
+        "        else:\n"
+        "            _others.append(f)\n"
+        "    if _others:\n"
+        "        specs['slides/ (other, read via run_python if needed)'] = ', '.join(_others)\n"
+        "print(json.dumps(specs, ensure_ascii=False))\n"
+    )
+    result = mcp_client.call_tool_sync(
+        tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
+        name="run_python",
+        arguments={"code": code, "deck_id": deck_id},
+    )
+    if result.get("status") == "error":
+        raise RuntimeError(f"Failed to prefetch specs for deck {deck_id}: {result.get('content')}")
+
+    sections = []
+    for item in result.get("content", []):
+        if isinstance(item, dict) and "text" in item:
+            try:
+                output = _json.loads(item["text"])
+                if isinstance(output, dict) and "output" in output:
+                    output = _json.loads(output["output"])
+                if not isinstance(output, dict) or not output:
+                    raise RuntimeError(f"Specs empty for deck {deck_id} — workspace may not exist")
+                for filename, content in output.items():
+                    sections.append(f"## {filename}\n\n{content}")
+            except _json.JSONDecodeError as e:
+                raise RuntimeError(f"Failed to parse specs for deck {deck_id}: {e}") from e
+    return sections
+
+
+def _build_prefetched_context(common_sections: list[str], deck_sections: list[str]) -> str:
+    """Combine common and deck-specific sections into prefetched context."""
+    all_sections = common_sections + deck_sections
+    return "# Pre-loaded References (already executed — do NOT re-fetch)\n\n" + "\n\n---\n\n".join(all_sections)
 
 
 def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
@@ -359,15 +382,9 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
         import asyncio
         import json as _json
 
-        # Prefetch all references (Python call, no LLM turns)
+        # Prefetch common references once (Python call, no LLM turns)
         yield {"status": "prefetching", "message": "Loading references..."}
-        prefetched = _prefetch_context(mcp_client, deck_id=deck_id) if mcp_client else ""
-
-        composer_prompt = _build_system_prompt(
-            _COMPOSER_PROMPT_TEMPLATE,
-            prefetched_context=prefetched,
-            deck_id=deck_id,
-        )
+        common_sections = _prefetch_common_references(mcp_client) if mcp_client else []
 
         generated = []
         errors = []
@@ -379,6 +396,15 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
         for gi, group in enumerate(slide_groups):
             slugs_label = ", ".join(group["slugs"])
             yield {"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"}
+
+            # Prefetch deck specs with this group's assigned slugs
+            deck_sections = _prefetch_deck_specs(mcp_client, deck_id, group["slugs"]) if mcp_client else []
+            prefetched = _build_prefetched_context(common_sections, deck_sections)
+            composer_prompt = _build_system_prompt(
+                _COMPOSER_PROMPT_TEMPLATE,
+                prefetched_context=prefetched,
+                deck_id=deck_id,
+            )
 
             # Realtime progress via invoke_async + callback_handler + asyncio.Queue
             progress_q: asyncio.Queue = asyncio.Queue()
