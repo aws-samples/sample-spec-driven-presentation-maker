@@ -10,23 +10,29 @@
     "glob",
     "use_subagent",
     "web_search",
-    "web_fetch"
+    "web_fetch",
+    "@sdpm"
   ],
   "allowedTools": [
     "fs_read",
     "grep",
-    "glob"
+    "glob",
+    "@sdpm"
   ],
   "toolsSettings": {
     "subagent": {
       "availableAgents": ["sdpm-composer"],
       "trustedAgents": ["sdpm-composer"]
     },
-    "fs_write": {
-      "allowedPaths": ["~/Documents/SDPM-Presentations/**"]
-    },
     "execute_bash": {
       "autoAllowReadonly": true
+    }
+  },
+  "mcpServers": {
+    "sdpm": {
+      "command": "python3",
+      "args": ["mcp-local/server.py"],
+      "timeout": 120000
     }
   },
   "hooks": {
@@ -39,7 +45,6 @@
     ]
   },
   "resources": [
-    "file://prompts/system-prompt.md",
     "skill://skill/references/workflows/*.md"
   ],
   "welcomeMessage": "What presentation would you like to create?"

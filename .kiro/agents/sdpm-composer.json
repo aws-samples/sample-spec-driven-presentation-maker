@@ -7,22 +7,25 @@
     "fs_write",
     "execute_bash",
     "grep",
-    "glob"
+    "glob",
+    "@sdpm"
   ],
   "allowedTools": [
     "fs_read",
     "fs_write",
     "execute_bash",
     "grep",
-    "glob"
+    "glob",
+    "@sdpm"
   ],
-  "toolsSettings": {
-    "fs_write": {
-      "allowedPaths": ["~/Documents/SDPM-Presentations/**"]
+  "mcpServers": {
+    "sdpm": {
+      "command": "python3",
+      "args": ["mcp-local/server.py"],
+      "timeout": 120000
     }
   },
   "resources": [
-    "file://prompts/system-prompt.md",
     "skill://skill/references/workflows/create-new-2-compose.md",
     "skill://skill/references/workflows/slide-json-spec.md"
   ]
