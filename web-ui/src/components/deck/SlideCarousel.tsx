@@ -118,6 +118,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /* ── Spec tab state + auto-focus ── */
   const [specTab, setSpecTab] = useState<SpecTab>("brief")
   const prevSpecsRef = useRef<SpecFiles | null | undefined>(null)
+  // Suppress animation for 3s after slides tab becomes visible
+  const [settled, setSettled] = useState(false)
+  useEffect(() => {
+    if (specTab !== "slides") { setSettled(false); return }
+    const t = setTimeout(() => setSettled(true), 3000)
+    return () => clearTimeout(t)
+  }, [specTab])
 
   /**
    * Auto-focus: when a spec file transitions from null to non-null,
@@ -343,7 +350,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 defsUrl={defsUrl}
                 composeUrl={slide.composeUrl}
                 slideId={slide.slideId}
-                skipAnimation={hadSlidesOnMount.current && !firstComposeSeenRef.current}
+                skipAnimation={!settled || (hadSlidesOnMount.current && !firstComposeSeenRef.current)}
                 onAnimate={() => handleAnimate(slide.slideId)}
                 fallback={
                   <SlideThumbnail
