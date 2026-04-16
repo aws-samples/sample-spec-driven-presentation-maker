@@ -76,6 +76,21 @@ function handleLine(line: string) {
     return;
   }
 
+  // Permission request — auto-approve
+  if (msg.method === "session/request_permission") {
+    const params = msg.params as Record<string, unknown>;
+    const reqId = msg.id as string;
+    if (reqId && child) {
+      const reply = JSON.stringify({
+        jsonrpc: "2.0",
+        id: reqId,
+        result: { optionId: "allow_always" },
+      }) + "\n";
+      child.write(reply).catch(() => {});
+    }
+    return;
+  }
+
   // JSON-RPC notification (no id)
   if (msg.method === "session/update") {
     const params = msg.params as Record<string, unknown>;
