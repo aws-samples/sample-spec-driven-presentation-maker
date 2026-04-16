@@ -82,35 +82,33 @@ function handleLine(line: string) {
       }
     }
 
-    if (type === "tool_use") {
+    if (type === "tool_call") {
       if (toolCallback) {
+        const toolCallId = update.toolCallId as string || "";
+        const name = (update.title || update.name || "") as string;
         const status = update.status as string;
-        const name = update.name as string || "";
-        const toolUseId = update.toolUseId as string || "";
-        const input = update.input as Record<string, unknown> || {};
 
-        if (status === "started") {
-          toolCallback(name, { toolUseId, name, input: {}, started: true });
-        } else if (status === "completed") {
+        if (status === "completed" || status === "error") {
           toolCallback(name, {
-            toolUseId, name,
-            status: update.error ? "error" : "success",
+            toolUseId: toolCallId, name,
+            status: status === "error" ? "error" : "success",
             result: update.result || {},
             completed: true,
           });
         } else {
-          toolCallback(name, { toolUseId, name, input });
+          // started or in-progress
+          toolCallback(name, { toolUseId: toolCallId, name, input: update.input || {}, started: true });
         }
       }
     }
 
     if (type === "tool_call_update") {
       if (toolCallback) {
-        toolCallback(update.name as string || "__tool_stream__", {
-          toolUseId: update.toolUseId,
-          name: update.name,
+        toolCallback(update.title as string || "__tool_stream__", {
+          toolUseId: update.toolCallId,
+          name: update.title || update.name,
           stream: true,
-          data: update.data || {},
+          data: update,
         });
       }
     }
