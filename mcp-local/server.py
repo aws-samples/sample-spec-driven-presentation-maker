@@ -361,6 +361,75 @@ def pptx_to_json(pptx_path: str) -> str:
 
 
 @mcp.tool()
+def run_python(code: str, deck_id: str = "", save: bool = False,
+               measure_slides: list[str] | None = None, purpose: str = "") -> str:
+    """Execute Python code in the deck workspace or for general computation.
+
+    If deck_id is provided (as output_dir path), the code runs with cwd set to that directory.
+    All workspace files are accessible via normal file I/O (open, read, write).
+
+    **Always specify measure_slides when editing slides.** Runs validation after execution:
+        - Text bbox measurement (overflow detection via LibreOffice SVG)
+
+    Examples:
+        Edit slides:   run_python(code="...", deck_id="/path/to/deck", save=True, measure_slides=["title"])
+        Edit specs:    run_python(code="open('specs/brief.md','w').write('...')", deck_id="/path/to/deck", save=True)
+        Compute:       run_python(code="print(2**100)")
+
+    Args:
+        code: Python code to execute.
+        deck_id: Deck output_dir path. Optional.
+        save: Unused in local mode (files are written directly). Kept for API compat.
+        measure_slides: List of slide slugs to measure after execution. Requires deck_id.
+        purpose: Brief description shown in UI.
+
+    Returns:
+        JSON string: {"output", "measure"?}
+    """
+    import os
+    import subprocess
+    import tempfile
+
+    result: dict = {}
+
+    # Determine working directory
+    cwd = deck_id if deck_id and Path(deck_id).is_dir() else None
+
+    # Execute code
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write(code)
+            f.flush()
+            proc = subprocess.run(
+                [sys.executable, f.name],
+                capture_output=True, text=True, timeout=120,
+                cwd=cwd,
+            )
+            os.unlink(f.name)
+        output = proc.stdout
+        if proc.stderr:
+            output += "\n" + proc.stderr
+        result["output"] = output.strip()
+    except subprocess.TimeoutExpired:
+        result["output"] = "Error: execution timed out (120s)"
+    except Exception as e:
+        result["output"] = f"Error: {e}"
+
+    # Post-processing: measure
+    if cwd and measure_slides:
+        try:
+            json_path = str(Path(cwd) / "presentation.json")
+            if Path(json_path).exists():
+                pages = ",".join(measure_slides) if measure_slides else ""
+                measure_result = _measure(slides_json_path=json_path, pages=pages)
+                result["measure"] = measure_result
+        except Exception as e:
+            result["measure"] = f"Measure error: {e}"
+
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp.tool()
 def grid(spec: str, purpose: str = "") -> str:
     """Compute CSS Grid layout coordinates from a grid specification.
     Use before placing elements to calculate exact positions.
