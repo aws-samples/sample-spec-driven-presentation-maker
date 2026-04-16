@@ -44,6 +44,7 @@ async function rpcRequest(method: string, params: Record<string, unknown> = {}):
 /** Handle a line of stdout from kiro-cli acp. */
 function handleLine(line: string) {
   if (!line.trim()) return;
+  console.log("[acp raw]", line.substring(0, 200));
   let msg: Record<string, unknown>;
   try {
     msg = JSON.parse(line);
@@ -59,22 +60,32 @@ function handleLine(line: string) {
     return;
   }
 
+  // prompt response with stopReason → treat as turn end
+  if (msg.id != null && msg.result) {
+    const result = msg.result as Record<string, unknown>;
+    if (result.stopReason && turnEndResolve) {
+      turnEndResolve();
+      turnEndResolve = null;
+    }
+    return;
+  }
+
   // JSON-RPC notification (no id)
-  if (msg.method === "session/notification") {
+  if (msg.method === "session/update") {
     const params = msg.params as Record<string, unknown>;
     const update = params.update as Record<string, unknown>;
     if (!update) return;
 
-    const type = update.type as string;
+    const type = update.sessionUpdate as string;
 
-    if (type === "AgentMessageChunk") {
-      const content = update.content as string;
-      if (content && streamCallback) {
-        streamCallback(content);
+    if (type === "agent_message_chunk") {
+      const content = update.content as Record<string, unknown>;
+      if (content?.text && streamCallback) {
+        streamCallback(content.text as string);
       }
     }
 
-    if (type === "ToolCall") {
+    if (type === "tool_use") {
       if (toolCallback) {
         const status = update.status as string;
         const name = update.name as string || "";
@@ -96,7 +107,7 @@ function handleLine(line: string) {
       }
     }
 
-    if (type === "ToolCallUpdate") {
+    if (type === "tool_call_update") {
       if (toolCallback) {
         toolCallback(update.name as string || "__tool_stream__", {
           toolUseId: update.toolUseId,
@@ -107,7 +118,7 @@ function handleLine(line: string) {
       }
     }
 
-    if (type === "TurnEnd") {
+    if (type === "turn_end" || type === "end_turn") {
       if (turnEndResolve) {
         turnEndResolve();
         turnEndResolve = null;
@@ -212,11 +223,10 @@ export async function invokeAgent(
 
   await rpcRequest("session/prompt", {
     sessionId,
-    content: [{ type: "text", text: query }],
+    prompt: [{ type: "text", text: query }],
   });
 
-  await turnEnd;
-
+  // rpcRequest resolves when stopReason response arrives — turn is done
   streamCallback = null;
   toolCallback = null;
   return completion;
