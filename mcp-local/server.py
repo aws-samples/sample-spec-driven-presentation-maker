@@ -433,6 +433,64 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
         except Exception as e:
             result["measure"] = f"Measure error: {e}"
 
+    # Post-processing: build PPTX + SVG compose (when save=True)
+    if cwd and save:
+        json_path = str(Path(cwd) / "presentation.json")
+        if Path(json_path).exists():
+            # Build PPTX
+            try:
+                build_result = _generate_pptx(
+                    slides_json_path=json_path, output_path="", skill_dir=_SKILL_DIR
+                )
+                pptx_out = build_result.get("output_path", "")
+                result["pptx"] = pptx_out
+            except Exception as e:
+                pptx_out = ""
+                result["pptx_error"] = str(e)
+
+            # SVG compose for WebUI animation
+            try:
+                import shutil as _shutil
+                lo = _shutil.which("soffice")
+                if not lo:
+                    _lo_mac = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+                    if Path(_lo_mac).exists():
+                        lo = _lo_mac
+                if lo and pptx_out:
+                    import subprocess as _sp
+                    import tempfile as _tf
+                    pptx_path = Path(pptx_out)
+                    if pptx_path.exists():
+                        with _tf.TemporaryDirectory() as tmpdir:
+                            env = dict(__import__("os").environ)
+                            env["HOME"] = tmpdir
+                            _sp.run(
+                                [lo, "--headless", "--convert-to", "svg", "--outdir", tmpdir, str(pptx_path)],
+                                capture_output=True, timeout=120, env=env,
+                            )
+                            # Find the generated SVG (named after input file)
+                            svg_files = list(Path(tmpdir).glob("*.svg"))
+                            if svg_files:
+                                svg_path = svg_files[0]
+                                from compose import extract_optimized_defs, split_slide_components, count_slides
+                                compose_dir = Path(cwd) / "compose"
+                                compose_dir.mkdir(exist_ok=True)
+                                # Write defs
+                                defs = extract_optimized_defs(svg_path)
+                                (compose_dir / "defs.json").write_text(
+                                    json.dumps(defs, ensure_ascii=False), encoding="utf-8"
+                                )
+                                # Write per-slide components
+                                total = count_slides(svg_path)
+                                for sn in range(1, total + 1):
+                                    comp = split_slide_components(svg_path, sn)
+                                    (compose_dir / f"slide_{sn}.json").write_text(
+                                        json.dumps(comp, ensure_ascii=False), encoding="utf-8"
+                                    )
+                                result["compose"] = f"{total} slides composed"
+            except Exception as e:
+                result["compose_error"] = str(e)
+
     return json.dumps(result, ensure_ascii=False)
 
 

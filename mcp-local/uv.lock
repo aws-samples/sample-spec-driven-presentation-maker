@@ -1065,7 +1065,9 @@ name = "sdpm-mcp-local"
 version = "1.0.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "lxml" },
     { name = "mcp", extra = ["cli"] },
+    { name = "pillow" },
     { name = "sdpm-skill" },
 ]
 
@@ -1077,7 +1079,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "lxml" },
     { name = "mcp", extras = ["cli"] },
+    { name = "pillow" },
     { name = "sdpm-skill", directory = "../skill" },
 ]
 

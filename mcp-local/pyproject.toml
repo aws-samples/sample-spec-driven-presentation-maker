@@ -6,6 +6,8 @@ requires-python = ">=3.10"
 dependencies = [
     "mcp[cli]",
     "sdpm-skill",
+    "lxml",
+    "Pillow",
 ]
 
 [tool.uv.sources]
