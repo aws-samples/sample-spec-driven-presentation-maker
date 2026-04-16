@@ -215,3 +215,9 @@
 - run_python の cwd はデッキディレクトリ（~/Documents/SDPM-Presentations/xxx/）
 - ワークフローが `cp references/examples/styles/{name}.html` を指示するが、references/ はデッキディレクトリにない
 - Web 版は apply_style ツールでこれを処理 → mcp-local にも追加した
+
+### subagent 進捗の UI 表示
+- Web 版は compose_slides の toolStream でグループ別進捗を送る
+- デスクトップ版は kiro-cli の _kiro.dev/subagent/list_update で状態通知
+- subagent/list_update を toolStream 形式に変換して ToolCard に渡す必要がある
+- subagent の tool_call イベントも「Spawning agent crew」ToolCard 内に表示すべき

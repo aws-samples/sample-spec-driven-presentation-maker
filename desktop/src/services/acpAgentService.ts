@@ -27,6 +27,7 @@ const pending = new Map<number, PendingResolve>();
 let streamCallback: ((text: string) => void) | null = null;
 let toolCallback: ((name: string, data: unknown) => void) | null = null;
 let turnEndResolve: (() => void) | null = null;
+let subagentToolCallId: string | null = null; // Track the parent's subagent tool call
 
 /** Send a JSON-RPC request to kiro-cli acp. */
 async function rpcRequest(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
@@ -95,7 +96,34 @@ function handleLine(line: string) {
   // JSON-RPC notification (no id) — only process our session
   if (msg.method === "session/update") {
     const params = msg.params as Record<string, unknown>;
-    if (params.sessionId !== sessionId) return; // Ignore subagent sessions
+    const msgSessionId = params.sessionId as string;
+
+    // Subagent session — forward tool events as progress to parent's subagent ToolCard
+    if (msgSessionId !== sessionId && subagentToolCallId && toolCallback) {
+      const update = params.update as Record<string, unknown>;
+      if (!update) return;
+      const type = update.sessionUpdate as string;
+      if (type === "tool_call" || type === "tool_call_update") {
+        const title = (update.title || "") as string;
+        const toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
+        const status = update.status as string;
+        toolCallback("compose_slides", {
+          toolUseId: subagentToolCallId,
+          name: "compose_slides",
+          stream: true,
+          data: {
+            tool: toolName,
+            status: status || "running",
+            group: 1,
+            slugs: toolName,
+            message: status === "completed" ? `✓ ${toolName}` : `⟳ ${toolName}`,
+          },
+        });
+      }
+      return;
+    }
+
+    if (msgSessionId !== sessionId) return; // Ignore other sessions
     const update = params.update as Record<string, unknown>;
     if (!update) return;
 
@@ -114,6 +142,10 @@ function handleLine(line: string) {
         const title = (update.title || update.name || "") as string;
         const name = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
         const input = (update.rawInput || update.input || {}) as Record<string, unknown>;
+        // Track subagent tool call for progress forwarding
+        if (title === "Spawning agent crew" || name === "subagent") {
+          subagentToolCallId = toolCallId;
+        }
         toolCallback(name, { toolUseId: toolCallId, name, input, started: true });
       }
     }
