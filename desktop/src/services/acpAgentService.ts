@@ -60,7 +60,8 @@ function handleLine(line: string) {
   // prompt response with stopReason → treat as turn end
   if (msg.id != null && msg.result) {
     const result = msg.result as Record<string, unknown>;
-    if (result.stopReason && turnEndResolve) {
+    if (result.stopReason === "end_turn" && turnEndResolve) {
+      console.log("[acp] turn ended via response id:", msg.id);
       turnEndResolve();
       turnEndResolve = null;
     }
@@ -243,9 +244,13 @@ export async function invokeAgent(
   rpcRequest("session/prompt", {
     sessionId,
     prompt: [{ type: "text", text: query }],
-  }).then(() => {
-    // rpcRequest resolves when stopReason response arrives
-    if (turnEndResolve) { turnEndResolve(); turnEndResolve = null; }
+  }).then((res) => {
+    // Only resolve on end_turn, not tool_use
+    const r = res as Record<string, unknown> | undefined;
+    console.log("[acp] prompt response:", JSON.stringify(r));
+    if (r?.stopReason === "end_turn") {
+      if (turnEndResolve) { turnEndResolve(); turnEndResolve = null; }
+    }
   });
 
   await turnEnd;
