@@ -41,7 +41,7 @@ async function rpcRequest(method: string, params: Record<string, unknown> = {}):
 /** Handle a line of stdout from kiro-cli acp. */
 function handleLine(line: string) {
   if (!line.trim()) return;
-  console.log("[acp raw]", line.substring(0, 200));
+  console.log("[acp raw]", line.substring(0, 500));
   let msg: Record<string, unknown>;
   try {
     msg = JSON.parse(line);
@@ -86,30 +86,52 @@ function handleLine(line: string) {
       if (toolCallback) {
         const toolCallId = update.toolCallId as string || "";
         const name = (update.title || update.name || "") as string;
-        const status = update.status as string;
-
-        if (status === "completed" || status === "error") {
-          toolCallback(name, {
-            toolUseId: toolCallId, name,
-            status: status === "error" ? "error" : "success",
-            result: update.result || {},
-            completed: true,
-          });
-        } else {
-          // started or in-progress
-          toolCallback(name, { toolUseId: toolCallId, name, input: update.input || {}, started: true });
-        }
+        toolCallback(name, { toolUseId: toolCallId, name, input: update.input || {}, started: true });
       }
     }
 
     if (type === "tool_call_update") {
       if (toolCallback) {
-        toolCallback(update.title as string || "__tool_stream__", {
-          toolUseId: update.toolCallId,
-          name: update.title || update.name,
-          stream: true,
-          data: update,
-        });
+        const toolCallId = update.toolCallId as string || "";
+        const title = (update.title || "") as string;
+        const status = update.status as string;
+        // Extract tool name from title like "Running: @sdpm/init_presentation"
+        const toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
+
+        if (status === "completed") {
+          // Parse rawOutput to extract result
+          let result: Record<string, unknown> = {};
+          try {
+            const rawOutput = update.rawOutput as Record<string, unknown>;
+            const items = rawOutput?.items as Array<Record<string, unknown>>;
+            if (items?.[0]) {
+              const json = items[0].Json as Record<string, unknown>;
+              const content = json?.content as Array<Record<string, unknown>>;
+              if (content?.[0]?.text) {
+                result = JSON.parse(content[0].text as string);
+              }
+            }
+          } catch {}
+
+          // Derive deckId from output_dir if present (mcp-local returns output_dir, not deckId)
+          if (result.output_dir && !result.deckId) {
+            const dirName = (result.output_dir as string).split("/").pop() || "";
+            result.deckId = dirName;
+          }
+
+          toolCallback(toolName, {
+            toolUseId: toolCallId, name: toolName,
+            status: "success",
+            result,
+            completed: true,
+          });
+        } else {
+          toolCallback(toolName, {
+            toolUseId: toolCallId, name: toolName,
+            stream: true,
+            data: update,
+          });
+        }
       }
     }
 

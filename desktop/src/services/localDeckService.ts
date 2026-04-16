@@ -52,43 +52,69 @@ async function writeIndex(index: DeckIndex): Promise<void> {
 }
 
 export async function listDecks(_idToken?: string): Promise<{ decks: DeckSummary[]; favoriteIds: string[] }> {
-  const index = await readIndex();
+  const base = await basePath();
+  await ensureDir(base);
   const summaries: DeckSummary[] = [];
 
-  for (const entry of index.decks) {
-    const dp = await deckPath(entry.deckId);
-    let slideCount = 0;
-    let thumbnailUrl: string | null = null;
+  // Read favorites from index if exists
+  const index = await readIndex();
 
-    try {
+  // Scan directories directly (each subdirectory is a deck)
+  try {
+    const entries = await readDir(base);
+    for (const entry of entries) {
+      if (!entry.isDirectory || !entry.name) continue;
+      const deckId = entry.name;
+      const dp = await join(base, deckId);
+      let slideCount = 0;
+      let name = deckId;
+
+      // Read deck name from presentation.json or deck.json
+      for (const fname of ["deck.json", "presentation.json"]) {
+        const p = await join(dp, fname);
+        if (await exists(p)) {
+          try {
+            const json = JSON.parse(await readTextFile(p));
+            name = json.name || deckId;
+          } catch {}
+          break;
+        }
+      }
+
+      // Count slides
       const slidesDir = await join(dp, "slides");
       if (await exists(slidesDir)) {
         const files = await readDir(slidesDir);
         slideCount = files.filter((f) => f.name?.endsWith(".json")).length;
       }
-      const previewDir = await join(dp, "preview");
-      const firstPreview = await join(previewDir, "slide_1.png");
-      if (await exists(firstPreview)) {
-        thumbnailUrl = convertFileSrc(firstPreview);
-      }
-    } catch { /* ignore */ }
 
-    summaries.push({
-      deckId: entry.deckId,
-      name: entry.name,
-      slideCount,
-      updatedAt: entry.updatedAt,
-      thumbnailUrl,
-    });
-  }
+      summaries.push({
+        deckId,
+        name,
+        slideCount,
+        updatedAt: new Date().toISOString(),
+        thumbnailUrl: null,
+      });
+    }
+  } catch {}
+
+  // Sort by name (newest first since names start with date)
+  summaries.sort((a, b) => b.deckId.localeCompare(a.deckId));
 
   return { decks: summaries, favoriteIds: index.favoriteIds };
 }
 
 export async function getDeck(deckId: string, _idToken?: string): Promise<DeckDetail> {
   const dp = await deckPath(deckId);
-  const deckJsonPath = await join(dp, "deck.json");
-  const deckJson = JSON.parse(await readTextFile(deckJsonPath));
+  // Support both deck.json (web) and presentation.json (mcp-local)
+  let deckJson: Record<string, unknown> = {};
+  for (const fname of ["deck.json", "presentation.json"]) {
+    const p = await join(dp, fname);
+    if (await exists(p)) {
+      deckJson = JSON.parse(await readTextFile(p));
+      break;
+    }
+  }
 
   const slides: SlidePreview[] = [];
   const slidesDir = await join(dp, "slides");
@@ -140,10 +166,15 @@ export async function getDeck(deckId: string, _idToken?: string): Promise<DeckDe
 
 export async function patchDeck(deckId: string, updates: Record<string, string>, _idToken?: string): Promise<void> {
   const dp = await deckPath(deckId);
-  const deckJsonPath = await join(dp, "deck.json");
-  const deckJson = JSON.parse(await readTextFile(deckJsonPath));
-  Object.assign(deckJson, updates);
-  await writeTextFile(deckJsonPath, JSON.stringify(deckJson, null, 2));
+  for (const fname of ["deck.json", "presentation.json"]) {
+    const p = await join(dp, fname);
+    if (await exists(p)) {
+      const deckJson = JSON.parse(await readTextFile(p));
+      Object.assign(deckJson, updates);
+      await writeTextFile(p, JSON.stringify(deckJson, null, 2));
+      return;
+    }
+  }
 }
 
 export async function deleteDeck(deckId: string, _idToken?: string): Promise<void> {
