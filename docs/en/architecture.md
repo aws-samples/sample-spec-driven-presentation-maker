@@ -75,9 +75,11 @@ DynamoDB:
   TEMPLATE#{id}/META                — template metadata
 
 S3 (pptx bucket):
-  decks/{deckId}/presentation.json  — slide data
+  decks/{deckId}/deck.json          — deck metadata (template, fonts, defaultTextColor)
+  decks/{deckId}/slides/{slug}.json — per-slide data
   decks/{deckId}/specs/             — brief.md, outline.md, art-direction.html
   decks/{deckId}/includes/          — code block JSON
+  decks/{deckId}/compose/           — per-slide SVG compose JSON (for Web UI animation)
   previews/{deckId}/{slideId}.png   — slide previews
 
 S3 (resource bucket):
@@ -92,9 +94,10 @@ Using `run_python(deck_id=..., save=True)` loads the entire deck workspace into 
 The agent can read and write files using standard Python file I/O (`open`, `json.load`, etc.), and `save=True` writes changes back to S3.
 
 ```
-presentation.json   — {"slides": [...], "fonts": {...}}
+deck.json           — deck metadata (template, fonts, defaultTextColor)
+slides/{slug}.json  — per-slide data (one file per slide, slug from outline)
 specs/brief.md          — briefing (audience, purpose, key messages)
-specs/outline.md        — one line per slide, each line = one message
+specs/outline.md        — one line per slide: - [slug] message
 specs/art-direction.html — visual design direction (HTML style guide)
 includes/           — code block JSON files
 ```
@@ -113,7 +116,7 @@ When `generate_pptx` is called, previews are generated inline:
 
 ```
 generate_pptx:
-  1. Build PPTX from presentation.json
+  1. Build PPTX from deck workspace (deck.json + slides/*.json)
   2. LibreOffice: PPTX → PDF
   3. pdftoppm: PDF → per-page PNG
   4. Pillow: PNG → WebP (quality=85)
