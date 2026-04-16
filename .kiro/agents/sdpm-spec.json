@@ -30,8 +30,8 @@
   },
   "mcpServers": {
     "sdpm": {
-      "command": "python3",
-      "args": ["mcp-local/server.py"],
+      "command": "uv",
+      "args": ["run", "--directory", "mcp-local", "python", "server.py"],
       "timeout": 120000
     }
   },
