@@ -48,6 +48,20 @@
 - compose (SVG split) is NOT in Engine API — it's in `mcp-server/tools/compose.py`
 - For local version, compose may need to be extracted to a standalone script or skipped initially
 
+### Vite alias resolution order matters
+- More specific paths must come BEFORE less specific ones
+- `@/services/deckService` must be before `@` (catch-all)
+- `react-oidc-context` catches all direct imports from the library
+- `@/hooks/useAuth` catches AppShell's custom hook wrapper
+- `@/lib/auth` catches createCognitoAuthConfig import in useAuth.ts
+- Tested: Vite resolves aliases in declaration order, first match wins
+
+### Two separate auth shims needed
+- `authShim.ts` → replaces `react-oidc-context` (useAuth, useAutoSignin, AuthProvider)
+- `useAuthShim.ts` → replaces `@/hooks/useAuth` (custom wrapper used by AppShell)
+- Different return shapes: react-oidc-context returns signinRedirect/signoutRedirect,
+  custom hook returns signIn/signOut/token
+
 ### DecksPage imports useAuth() — needs adapter
 - web-ui/src/app/(authenticated)/decks/page.tsx uses `useAuth()` from react-oidc-context
 - Desktop version has no auth — need either:
