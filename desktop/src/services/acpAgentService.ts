@@ -10,6 +10,15 @@
 
 import { Command, type Child } from "@tauri-apps/plugin-shell";
 
+/** Resolve project root (one level up from desktop/). */
+async function resolveProjectRoot(): Promise<string> {
+  const { resolveResource } = await import("@tauri-apps/api/path");
+  // In dev mode, Tauri runs from desktop/src-tauri, so go up to project root
+  // Use a simple heuristic: go up from current dir until we find prompts/
+  // For now, hardcode relative to desktop/
+  return "..";
+}
+
 let child: Child | null = null;
 let requestId = 0;
 let sessionId: string | null = null;
@@ -111,7 +120,9 @@ function handleLine(line: string) {
 export async function startAgent(): Promise<void> {
   if (child) return;
 
-  const cmd = Command.create("kiro-cli", ["acp", "--agent", "sdpm-spec"]);
+  const cmd = Command.create("kiro-cli", ["acp", "--agent", "sdpm-spec"], {
+    cwd: await resolveProjectRoot(),
+  });
 
   cmd.stdout.on("data", (line: string) => {
     // stdout may contain multiple JSON lines
@@ -125,24 +136,35 @@ export async function startAgent(): Promise<void> {
   });
 
   cmd.on("close", () => {
+    console.warn("[acp] process closed");
     child = null;
     sessionId = null;
   });
 
+  cmd.on("error", (err: string) => {
+    console.error("[acp] process error:", err);
+  });
+
   child = await cmd.spawn();
+  console.log("[acp] spawned kiro-cli acp");
 
   // Initialize ACP connection
-  await rpcRequest("initialize", {
+  const initResult = await rpcRequest("initialize", {
     protocolVersion: 1,
     clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } },
     clientInfo: { name: "sdpm-desktop", version: "0.1.0" },
   });
 
+  console.log("[acp] initialized:", JSON.stringify(initResult));
+
   // Create session
-  const result = await rpcRequest("session/new", {
-    cwd: process.env.HOME + "/Documents/SDPM-Presentations",
-  }) as Record<string, unknown>;
+  const { homeDir } = await import("@tauri-apps/api/path");
+  const home = await homeDir();
+  const cwd = `${home.replace(/\/+$/, "")}/Documents/SDPM-Presentations`;
+  console.log("[acp] creating session with cwd:", cwd);
+  const result = await rpcRequest("session/new", { cwd, mcpServers: [] }) as Record<string, unknown>;
   sessionId = result.sessionId as string;
+  console.log("[acp] session created:", sessionId);
 }
 
 /** Stop the kiro-cli acp process. */
@@ -168,7 +190,9 @@ export async function invokeAgent(
   signal?: AbortSignal,
 ): Promise<string> {
   if (!child || !sessionId) {
+    console.log("[acp] starting agent...");
     await startAgent();
+    console.log("[acp] agent started, sessionId:", sessionId);
   }
 
   let completion = "";
