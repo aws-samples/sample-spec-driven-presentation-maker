@@ -205,3 +205,13 @@
 - LibreOffice is ~500MB+
 - Bundling increases installer size significantly
 - Alternative: prompt user to install separately on first launch
+
+### 二重管理の現状
+避けられない二重管理が2箇所ある:
+1. **プロンプト**: kiro-cli は MCP instructions をシステムプロンプトに統合しない。sdpm-spec.json に MCP instructions をインラインで複製している。kiro-cli の仕様変更で解消可能。
+2. **CSS**: Tailwind v4 の @source + @import の制約で globals.css を desktop/src/app.css にコピー。globals.css 変更時に手動同期が必要。
+
+### run_python の cwd 問題
+- run_python の cwd はデッキディレクトリ（~/Documents/SDPM-Presentations/xxx/）
+- ワークフローが `cp references/examples/styles/{name}.html` を指示するが、references/ はデッキディレクトリにない
+- Web 版は apply_style ツールでこれを処理 → mcp-local にも追加した
