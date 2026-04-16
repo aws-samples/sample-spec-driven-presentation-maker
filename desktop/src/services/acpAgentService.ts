@@ -244,7 +244,11 @@ export async function invokeAgent(
   });
 
   signal?.addEventListener("abort", () => {
-    rpcRequest("session/cancel", { sessionId }).catch(() => {});
+    // Send cancel directly without rpcRequest (don't consume an id)
+    if (child && sessionId) {
+      const msg = JSON.stringify({ jsonrpc: "2.0", method: "session/cancel", params: { sessionId } }) + "\n";
+      child.write(msg).catch(() => {});
+    }
   });
 
   // Send prompt — don't await (response comes as stopReason later)
