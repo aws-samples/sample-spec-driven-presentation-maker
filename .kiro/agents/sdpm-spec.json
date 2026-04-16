@@ -1,7 +1,7 @@
 {
   "name": "sdpm-spec",
   "description": "SPEC agent for spec-driven-presentation-maker. Handles briefing, outline, art-direction through user dialogue, then delegates slide generation to composer sub-agent.",
-  "prompt": "file://prompts/system-prompt.md",
+  "prompt": "file://../../prompts/system-prompt.md",
   "tools": [
     "fs_read",
     "fs_write",
