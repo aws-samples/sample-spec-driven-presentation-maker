@@ -48,6 +48,13 @@
 - compose (SVG split) is NOT in Engine API — it's in `mcp-server/tools/compose.py`
 - For local version, compose may need to be extracted to a standalone script or skipped initially
 
+### Vite alias for shared components
+- `@` → `../web-ui/src/` allows importing shared components without copying
+- `@desktop` → `./src/` for desktop-specific code
+- This means `web-ui/src/components/` is used directly — zero duplication
+- Caveat: web-ui dependencies (react-oidc-context, etc.) will be in desktop's node_modules too
+- May need to conditionally exclude auth-related imports
+
 ### kiro-cli agent config: file:// paths are relative to cwd
 - `.kiro/agents/sdpm-spec.json` uses `file://prompts/system-prompt.md`
 - This resolves relative to the project root (where kiro-cli is launched)
