@@ -134,6 +134,42 @@
 - Tauri's Rust side logs a warning if LibreOffice is not found
 - Future: could use Tauri's dialog plugin to show a proper UI prompt
 
+### mcp-local と mcp-server のツール差分（ブロッカー）
+デスクトップ版が Web 版と同じ挙動にならない根本原因。別ブランチ（main から）で対応すべき。
+
+**必須（ブロッカー）:**
+- `run_python` — スライド編集の核心。mcp-server から移植。ローカル版はサンドボックスなしで直接実行でよい
+- `get_preview` — 引数が異なる（mcp-local: `slides_json_path`, mcp-server: `deck_id + slide_numbers`）。mcp-server の API に合わせる
+
+**重要:**
+- `save_web_image` — Web 画像をデッキに保存
+- `apply_style` — スタイル適用
+- `read_uploaded_file` — ファイルアップロード読み取り
+
+**対応方針:**
+1. `feat/mcp-local-parity` ブランチを main から切る
+2. mcp-local に不足ツールを追加（mcp-server の実装を参考に、Storage を直接ファイル I/O に置換）
+3. get_preview の引数を mcp-server に合わせる
+4. マージ後、feat/local-desktop-app にマージ
+
+### mcp-local と mcp-server のツール差分（ブロッカー）
+デスクトップ版が Web 版と同じ挙動にならない根本原因。別ブランチ（main から）で対応すべき。
+
+必須（ブロッカー）:
+- `run_python` — スライド編集の核心。mcp-server から移植。ローカル版はサンドボックスなしで直接実行でよい
+- `get_preview` — 引数不一致（local: slides_json_path, server: deck_id + slide_numbers）
+
+重要:
+- `save_web_image` — Web 画像をデッキに保存
+- `apply_style` — スタイル適用
+- `read_uploaded_file` — ファイルアップロード読み取り
+
+対応方針:
+1. `feat/mcp-local-parity` ブランチを main から切る
+2. mcp-local に不足ツールを追加
+3. get_preview の引数を mcp-server に合わせる
+4. マージ後、feat/local-desktop-app にマージ
+
 ### ACP protocol field names differ from documentation
 - Method: `session/update` (not `session/notification`)
 - Type field: `update.sessionUpdate` (not `update.type`)
