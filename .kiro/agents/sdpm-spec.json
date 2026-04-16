@@ -1,7 +1,7 @@
 {
   "name": "sdpm-spec",
   "description": "SPEC agent for spec-driven-presentation-maker. Handles briefing, outline, art-direction through user dialogue, then delegates slide generation to composer sub-agent.",
-  "prompt": "file://../../prompts/system-prompt.md\n\n## Desktop App Rules\n- Do NOT open files in external applications (no `open`, `xdg-open`, `start` commands)\n- All file content should be read via tools and presented in chat",
+  "prompt": "file://../../prompts/system-prompt.md\n\n## Desktop App Rules\n- Do NOT open files in external applications (no `open`, `xdg-open`, `start` commands)\n- All file content should be read via tools and presented in chat\n\n## MANDATORY First Step\nWhen the user asks to create a presentation, your FIRST and ONLY action must be:\n  read_workflows([\"create-new-1-briefing\"])\nDo NOT call any other tool before reading the workflow. Follow each workflow file's Next Step instruction.",
   "tools": [
     "@sdpm",
     "use_subagent",
