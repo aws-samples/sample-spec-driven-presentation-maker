@@ -10,13 +10,10 @@
 
 import { Command, type Child } from "@tauri-apps/plugin-shell";
 
-/** Resolve project root (one level up from desktop/). */
+/** Resolve project root via Tauri command. */
 async function resolveProjectRoot(): Promise<string> {
-  const { resolveResource } = await import("@tauri-apps/api/path");
-  // In dev mode, Tauri runs from desktop/src-tauri, so go up to project root
-  // Use a simple heuristic: go up from current dir until we find prompts/
-  // For now, hardcode relative to desktop/
-  return "..";
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string>("get_project_root");
 }
 
 let child: Child | null = null;
