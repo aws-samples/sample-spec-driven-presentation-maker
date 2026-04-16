@@ -170,8 +170,47 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
             except Exception as e:
                 result["preview_error"] = str(e)
 
-            # SVG compose (blocked by macOS LibreOffice single-page issue — skip for now)
-            # TODO: re-enable when SVG multi-page export is resolved
+            # SVG compose for WebUI animation (requires LibreOffice 25.8.6+)
+            try:
+                import shutil as _sh
+                lo = _sh.which("soffice") or (
+                    "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+                    if Path("/Applications/LibreOffice.app/Contents/MacOS/soffice").exists()
+                    else None
+                )
+                pptx_out = result.get("pptx", "")
+                if lo and pptx_out:
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        env = dict(os.environ)
+                        env["HOME"] = tmpdir
+                        subprocess.run(
+                            [lo, "--headless", "--convert-to", "svg", "--outdir", tmpdir, pptx_out],
+                            capture_output=True, timeout=120, env=env,
+                        )
+                        svg_files = list(Path(tmpdir).glob("*.svg"))
+                        if svg_files:
+                            from compose import extract_optimized_defs, split_slide_components, count_slides
+                            svg_path = svg_files[0]
+                            n = count_slides(svg_path)
+                            compose_dir = Path(cwd) / "compose"
+                            compose_dir.mkdir(exist_ok=True)
+                            (compose_dir / "defs.json").write_text(
+                                json.dumps(extract_optimized_defs(svg_path), ensure_ascii=False),
+                                encoding="utf-8",
+                            )
+                            composed = 0
+                            for sn in range(1, n):  # skip DummySlide at index 0
+                                try:
+                                    comp = split_slide_components(svg_path, sn)
+                                    (compose_dir / f"slide_{sn}.json").write_text(
+                                        json.dumps(comp, ensure_ascii=False), encoding="utf-8"
+                                    )
+                                    composed += 1
+                                except Exception:
+                                    pass
+                            result["compose"] = f"{composed} slides composed"
+            except Exception as e:
+                result["compose_error"] = str(e)
 
     return json.dumps(result, ensure_ascii=False)
 

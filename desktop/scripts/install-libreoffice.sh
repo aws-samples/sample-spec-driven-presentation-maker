@@ -5,16 +5,28 @@
 set -e
 
 check_libreoffice() {
+  local version=""
   if command -v libreoffice &>/dev/null; then
-    echo "LibreOffice found: $(libreoffice --version 2>/dev/null | head -1)"
-    return 0
+    version=$(libreoffice --version 2>/dev/null | head -1)
+  elif [ -x "/Applications/LibreOffice.app/Contents/MacOS/soffice" ]; then
+    version=$(/Applications/LibreOffice.app/Contents/MacOS/soffice --version 2>/dev/null | head -1)
+  else
+    return 1
   fi
-  # macOS: check /Applications
-  if [ -d "/Applications/LibreOffice.app" ]; then
-    echo "LibreOffice found: /Applications/LibreOffice.app"
-    return 0
+  echo "LibreOffice found: $version"
+  # Extract version (e.g. "LibreOffice 25.8.6.2 ..." -> "25.8.6")
+  local ver=$(echo "$version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  # Require 25.8.6+ (macOS SVG multi-slide export fix)
+  if [ -z "$ver" ]; then return 1; fi
+  local IFS=.
+  read -r major minor patch <<< "$ver"
+  if [ "$major" -lt 25 ] || \
+     { [ "$major" -eq 25 ] && [ "$minor" -lt 8 ]; } || \
+     { [ "$major" -eq 25 ] && [ "$minor" -eq 8 ] && [ "$patch" -lt 6 ]; }; then
+    echo "LibreOffice $ver is too old. Requires 25.8.6+ for multi-slide SVG export."
+    return 1
   fi
-  return 1
+  return 0
 }
 
 if check_libreoffice; then

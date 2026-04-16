@@ -31,20 +31,39 @@ pub fn run() {
 }
 
 fn check_libreoffice() -> bool {
-    if Command::new("libreoffice")
-        .arg("--version")
-        .output()
-        .is_ok_and(|o| o.status.success())
-    {
-        return true;
-    }
-    #[cfg(target_os = "macos")]
-    if std::path::Path::new("/Applications/LibreOffice.app").exists() {
-        return true;
-    }
-    #[cfg(target_os = "windows")]
-    if std::path::Path::new(r"C:\Program Files\LibreOffice\program\soffice.exe").exists() {
-        return true;
+    // Try: libreoffice on PATH, /Applications/LibreOffice.app (macOS), Program Files (Windows)
+    let candidates: Vec<String> = {
+        let mut v = vec!["libreoffice".to_string()];
+        #[cfg(target_os = "macos")]
+        v.push("/Applications/LibreOffice.app/Contents/MacOS/soffice".to_string());
+        #[cfg(target_os = "windows")]
+        v.push(r"C:\Program Files\LibreOffice\program\soffice.exe".to_string());
+        v
+    };
+    for cmd in &candidates {
+        if let Ok(out) = Command::new(cmd).arg("--version").output() {
+            if out.status.success() {
+                let s = String::from_utf8_lossy(&out.stdout);
+                // Parse "LibreOffice 25.8.6.2 ..." -> (25, 8, 6)
+                if let Some(ver) = s.split_whitespace().find(|p| p.contains('.') && p.chars().next().is_some_and(|c| c.is_ascii_digit())) {
+                    let parts: Vec<&str> = ver.split('.').collect();
+                    if parts.len() >= 3 {
+                        let (ma, mi, pa) = (
+                            parts[0].parse::<u32>().unwrap_or(0),
+                            parts[1].parse::<u32>().unwrap_or(0),
+                            parts[2].parse::<u32>().unwrap_or(0),
+                        );
+                        // Require 25.8.6+ (multi-slide SVG export fix)
+                        let ok = ma > 25 || (ma == 25 && mi > 8) || (ma == 25 && mi == 8 && pa >= 6);
+                        if !ok {
+                            eprintln!("WARNING: LibreOffice {ver} is too old. Requires 25.8.6+ for SVG multi-slide export.");
+                        }
+                        return ok;
+                    }
+                }
+                return true;
+            }
+        }
     }
     false
 }

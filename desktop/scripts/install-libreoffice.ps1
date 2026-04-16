@@ -1,9 +1,18 @@
 # Install LibreOffice on Windows if not present.
 
 $loPath = "C:\Program Files\LibreOffice"
-if (Test-Path "$loPath\program\soffice.exe") {
-    Write-Host "LibreOffice found: $loPath"
-    exit 0
+$soffice = "$loPath\program\soffice.exe"
+if (Test-Path $soffice) {
+    $verOutput = & $soffice --version 2>&1 | Select-Object -First 1
+    Write-Host "LibreOffice found: $verOutput"
+    if ($verOutput -match '(\d+)\.(\d+)\.(\d+)') {
+        $major = [int]$Matches[1]; $minor = [int]$Matches[2]; $patch = [int]$Matches[3]
+        # Require 25.8.6+ (macOS SVG multi-slide export fix; applied cross-platform for consistency)
+        if ($major -gt 25 -or ($major -eq 25 -and $minor -gt 8) -or ($major -eq 25 -and $minor -eq 8 -and $patch -ge 6)) {
+            exit 0
+        }
+        Write-Host "LibreOffice $($Matches[0]) is too old. Requires 25.8.6+."
+    }
 }
 
 Write-Host "LibreOffice is required for slide preview and PPTX generation."

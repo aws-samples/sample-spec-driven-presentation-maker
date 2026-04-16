@@ -221,3 +221,17 @@
 - デスクトップ版は kiro-cli の _kiro.dev/subagent/list_update で状態通知
 - subagent/list_update を toolStream 形式に変換して ToolCard に渡す必要がある
 - subagent の tool_call イベントも「Spawning agent crew」ToolCard 内に表示すべき
+
+### macOS LibreOffice SVG は1ページのみ出力（→ 25.8.6 で解決）
+- `soffice --headless --convert-to svg` は macOS 版 25.8.4.2 で1ページ目のみ出力
+- 原因: `filterImpressOrDraw()` で headless でも `getCurrentFrame()` が有効なフレームを返すため、現在ページ1枚フォールバックに入る（`mSelectedPages.resize(1)`）
+- **解決**: 25.8.6 で `ConversionRequestOrigin=="CommandLine"` を検知して `bPageProvided=true` を立てる修正が入り、全ページパスに乗るようになった
+- 検証: 25.8.6.2 で 8スライドの PPTX → `number-of-slides=8`, `container-id*` 8個の SVG を出力
+- **最低バージョン要件: 25.8.6 以上**。install-libreoffice スクリプトと Rust 側起動チェックに反映すること
+
+### LibreOfficeKit (LOK) は macOS では使えない
+- macOS 版 LibreOffice は GUI VCL プラグイン（libvclplug_osxlo.dylib）のみをバンドル
+- headless VCL プラグイン（libvclplug_svp.dylib）が存在しない
+- LOK 初期化時に NSWindow をメインスレッドで作ろうとしてクラッシュする
+- `SAL_USE_VCLPLUGIN=svp` 環境変数も無視される（プラグインファイル自体がないため）
+- → macOS ネイティブでの LOK 経由の回避策は不可能。ネイティブ soffice バイナリ + 25.8.6+ が唯一の解
