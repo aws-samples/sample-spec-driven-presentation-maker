@@ -18,10 +18,10 @@ jobs:
         env:
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
-          if echo "$LABELS" | grep -qE '"blog:(pending|skip)"'; then
+          if echo "$LABELS" | grep -qE '"blog:(pending|skip|done)"'; then
             echo "✅ Blog label found"
           else
-            echo "::error::PR に blog:pending または blog:skip ラベルを付けてください"
+            echo "::error::PR に blog:pending または blog:skip または blog:done ラベルを付けてください"
             exit 1
           fi
 
