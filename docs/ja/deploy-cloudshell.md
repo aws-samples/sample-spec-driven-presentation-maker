@@ -57,7 +57,7 @@ chmod +x scripts/deploy.sh
 ./scripts/deploy.sh --region us-east-1 --observability
 ```
 
-> **注意:** `--observability` は Bedrock の Model Invocation Logging（MIL）をアカウント・リージョン単位で設定します。既に MIL が設定されている場合、スクリプトが既存設定の上書きについて警告し、確認を求めます。
+> **注意:** `--observability` は Bedrock の Model Invocation Logging（MIL）をアカウント・リージョン単位で設定します。既に MIL が設定されている場合、スクリプトが警告を表示し、既存設定を保護するため MIL の設定を自動的にスキップします。
 
 **外部 IdP を使う場合:**
 
@@ -204,7 +204,7 @@ rm -rf ~/sample-spec-driven-presentation-maker
 
 **--observability で「既に設定済み」と警告される**
 
-Bedrock Model Invocation Logging はアカウント・リージョンで 1 つしか設定できません。既存の設定がある場合、`deploy.sh` は上書きの確認を求めます。既存のログ送信先（CloudWatch Logs グループ名）が表示されるので、上書きして問題ないか確認してから `y` を入力してください。上書きすると、既存の MIL 設定は復元できません。
+Bedrock Model Invocation Logging はアカウント・リージョンで 1 つしか設定できません。既存の設定がある場合、`deploy.sh` は既存のログ送信先（CloudWatch Logs グループ名）を表示し、MIL の設定を自動的にスキップします。デプロイは observability を無効にした状態で続行されます。SDPM の observability を使用するには、既存の MIL 設定を手動で削除してから `--observability` を付けて再実行してください。
 
 ## 推定月額料金
 

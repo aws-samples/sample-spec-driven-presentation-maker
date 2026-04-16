@@ -4,7 +4,7 @@
 
 ## Deployment
 - WebUI: `AWS_DEFAULT_REGION=<region> bash scripts/deploy_webui.sh`
-- CDK stacks: SdpmWebUi, SdpmAgent, SdpmRuntime, SdpmPngWorker, SdpmData, SdpmAuth
+- CDK stacks: SdpmWebUi, SdpmAgent, SdpmRuntime, SdpmData, SdpmAuth
 
 ## Security Scanning
 - ASH (Automated Security Helper) v3

@@ -57,7 +57,7 @@ Choose options based on your use case.
 ./scripts/deploy.sh --region us-east-1 --observability
 ```
 
-> **Note:** `--observability` configures Bedrock Model Invocation Logging (MIL) at the account/region level. If MIL is already configured, the script will warn about overwriting the existing configuration and ask for confirmation.
+> **Note:** `--observability` configures Bedrock Model Invocation Logging (MIL) at the account/region level. If MIL is already configured, the script will display a warning and automatically skip the MIL setup to preserve the existing configuration.
 
 **With an external IdP:**
 
@@ -204,7 +204,7 @@ rm -rf ~/sample-spec-driven-presentation-maker
 
 **--observability warns "already configured"**
 
-Bedrock Model Invocation Logging allows only one configuration per account/region. If an existing configuration is found, `deploy.sh` will prompt for confirmation before overwriting. The existing log destination (CloudWatch Logs group name) is displayed — verify it's safe to overwrite before entering `y`. Once overwritten, the previous MIL configuration cannot be restored.
+Bedrock Model Invocation Logging allows only one configuration per account/region. If an existing configuration is found, `deploy.sh` will display a warning with the existing log group name and automatically skip the MIL setup. The deployment continues with observability disabled to preserve the existing configuration. To use SDPM's observability, first remove the existing MIL configuration manually, then re-run with `--observability`.
 
 ## Estimated Monthly Cost
 

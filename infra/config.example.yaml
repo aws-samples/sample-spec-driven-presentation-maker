@@ -15,7 +15,7 @@ stacks:
 
 features:
   searchSlides: false   # Semantic slide search (requires Bedrock Knowledge Base)
-  observability: false  # Bedrock Model Invocation Logging (account-level, overwrites existing config)
+  observability: false  # Bedrock Model Invocation Logging (account-level, skipped if already configured)
 
 # Model configuration for the Agent (Layer 4).
 # Use inference profile IDs for cross-region routing.

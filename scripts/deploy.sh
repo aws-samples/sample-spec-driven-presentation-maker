@@ -103,13 +103,9 @@ if [ "${OBSERVABILITY}" = "true" ] && [ "${CDK_COMMAND}" = "deploy" ]; then
   if [ "${EXISTING_MIL}" != "None" ] && [ -n "${EXISTING_MIL}" ]; then
     echo "⚠️  WARNING: Bedrock Model Invocation Logging is already configured in this account/region."
     echo "   Existing log group: ${EXISTING_MIL}"
-    echo "   --observability will OVERWRITE the existing configuration."
+    echo "   Skipping --observability to preserve the existing configuration."
     echo ""
-    read -r -p "Continue? [y/N] " confirm
-    if [[ ! "${confirm}" =~ ^[Yy]$ ]]; then
-      echo "Aborted."
-      exit 0
-    fi
+    OBSERVABILITY="false"
   fi
 fi
 
