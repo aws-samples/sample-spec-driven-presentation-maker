@@ -134,6 +134,15 @@
 - Tauri's Rust side logs a warning if LibreOffice is not found
 - Future: could use Tauri's dialog plugin to show a proper UI prompt
 
+### ACP protocol field names differ from documentation
+- Method: `session/update` (not `session/notification`)
+- Type field: `update.sessionUpdate` (not `update.type`)
+- Values: `agent_message_chunk` (not `AgentMessageChunk`), snake_case not PascalCase
+- session/new requires `mcpServers: []` (array, not object, not optional)
+- session/prompt requires `prompt: [{type:"text",text:"..."}]` (array of content blocks)
+- Turn completion: response to session/prompt has `{stopReason:"end_turn"}` — no separate TurnEnd notification
+- file:// in agent config resolves relative to .kiro/agents/, not project root
+
 ### GitHub Actions: Tauri action handles cross-platform builds
 - tauri-apps/tauri-action@v0 handles signing, bundling, and artifact upload
 - Triggered on `desktop-v*` tags or manual dispatch
