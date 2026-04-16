@@ -18,31 +18,14 @@
     },
     "shell:allow-stdin-write",
     "shell:allow-kill",
-    {
-      "identifier": "fs:allow-read-text-file",
-      "allow": [{ "path": "$HOME/Documents/SDPM-Presentations/**" }]
-    },
-    {
-      "identifier": "fs:allow-write-text-file",
-      "allow": [{ "path": "$HOME/Documents/SDPM-Presentations/**" }]
-    },
-    {
-      "identifier": "fs:allow-read-dir",
-      "allow": [{ "path": "$HOME/Documents/SDPM-Presentations/**" }]
-    },
-    {
-      "identifier": "fs:allow-mkdir",
-      "allow": [{ "path": "$HOME/Documents/SDPM-Presentations/**" }]
-    },
-    {
-      "identifier": "fs:allow-remove",
-      "allow": [{ "path": "$HOME/Documents/SDPM-Presentations/**" }]
-    },
-    {
-      "identifier": "fs:allow-exists",
-      "allow": [{ "path": "$HOME/Documents/SDPM-Presentations/**" }]
-    },
+    "fs:default",
+    "fs:allow-exists",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
     "fs:allow-write-file",
-    "core:asset:default"
+    "fs:allow-read-dir",
+    "fs:allow-mkdir",
+    "fs:allow-remove",
+    "fs:scope-home-recursive"
   ]
 }
