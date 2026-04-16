@@ -51,17 +51,24 @@ function handleLine(line: string) {
 
   // JSON-RPC response (has id)
   if (msg.id != null && pending.has(msg.id as number)) {
+    console.log("[acp] resolving pending id:", msg.id);
     const resolve = pending.get(msg.id as number)!;
     pending.delete(msg.id as number);
     resolve(msg.result);
+    // Also check if this is end_turn
+    const r = msg.result as Record<string, unknown> | undefined;
+    if (r?.stopReason === "end_turn" && turnEndResolve) {
+      turnEndResolve();
+      turnEndResolve = null;
+    }
     return;
   }
 
-  // prompt response with stopReason → treat as turn end
+  // Subsequent response (id not in pending) — check for end_turn
   if (msg.id != null && msg.result) {
     const result = msg.result as Record<string, unknown>;
+    console.log("[acp] unmatched response id:", msg.id, "stopReason:", result.stopReason);
     if (result.stopReason === "end_turn" && turnEndResolve) {
-      console.log("[acp] turn ended via response id:", msg.id);
       turnEndResolve();
       turnEndResolve = null;
     }
