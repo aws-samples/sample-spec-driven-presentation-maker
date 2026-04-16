@@ -80,6 +80,7 @@ function handleLine(line: string) {
   if (msg.method === "session/request_permission") {
     const params = msg.params as Record<string, unknown>;
     const reqId = msg.id as string;
+    console.log("[acp] permission request, id:", reqId, "tool:", JSON.stringify((params.toolCall as Record<string,unknown>)?.title));
     if (reqId && child) {
       const reply = JSON.stringify({
         jsonrpc: "2.0",
@@ -91,9 +92,10 @@ function handleLine(line: string) {
     return;
   }
 
-  // JSON-RPC notification (no id)
+  // JSON-RPC notification (no id) — only process our session
   if (msg.method === "session/update") {
     const params = msg.params as Record<string, unknown>;
+    if (params.sessionId !== sessionId) return; // Ignore subagent sessions
     const update = params.update as Record<string, unknown>;
     if (!update) return;
 
