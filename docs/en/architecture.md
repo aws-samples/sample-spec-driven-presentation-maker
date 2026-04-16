@@ -56,7 +56,7 @@ Layer 2 with storage swapped to Amazon DynamoDB + S3, plus authentication and au
 
 ```
 MCP Client → AgentCore Runtime → MCP Server Container
-                                   ├── 17+ MCP tools
+                                   ├── 21 MCP tools
                                    ├── LibreOffice (PPTX → PDF/SVG)
                                    ├── DynamoDB (decks, templates)
                                    ├── S3 (PPTX, previews, references, assets)
@@ -64,6 +64,9 @@ MCP Client → AgentCore Runtime → MCP Server Container
 ```
 
 Additional tools over Layer 2:
+- `save_web_image` — Download a web image and save it to the deck workspace
+- `read_uploaded_file` — Read content from a user-uploaded file (PDF, PPTX, text)
+- `apply_style` — Apply a named style preset to a deck
 - `run_python` — Execute Python in Amazon Bedrock AgentCore Code Interpreter sandbox (edit deck workspace, analyze data)
 - `search_slides` — Semantic slide search via Amazon Bedrock Knowledge Base (optional)
 
@@ -78,6 +81,7 @@ S3 (pptx bucket):
   decks/{deckId}/presentation.json  — slide data
   decks/{deckId}/specs/             — brief.md, outline.md, art-direction.html
   decks/{deckId}/includes/          — code block JSON
+  decks/{deckId}/compose/           — per-slide SVG compose JSON (for Web UI animation)
   previews/{deckId}/{slideId}.png   — slide previews
 
 S3 (resource bucket):
@@ -118,9 +122,13 @@ generate_pptx:
   3. pdftoppm: PDF → per-page PNG
   4. Pillow: PNG → WebP (quality=85)
   5. Upload WebP previews to S3
+  6. LibreOffice: PPTX → SVG (for compose + text measurement)
+  7. SVG → per-slide compose JSON (for Web UI animation)
 ```
 
 The agent uses `get_preview` to retrieve preview images and visually review slides.
+
+The compose pipeline (step 6–7) extracts optimized SVG components per slide and uploads them as JSON to S3. The Web UI uses these to render animated slide transitions without re-fetching full preview images.
 
 ### Text Measurement
 
@@ -133,8 +141,8 @@ enabling overflow detection during the Build loop without visual review.
 
 A reference implementation of a full-stack application.
 
-- **Agent** — Strands Agent on Amazon Bedrock AgentCore Runtime, connects to Layer 3 MCP Server
-- **Web UI** — React + Tailwind CSS + shadcn/ui, deployed via S3 + Amazon CloudFront
+- **Agent** — Strands Agent on Amazon Bedrock AgentCore Runtime, connects to Layer 3 MCP Server. Includes built-in tools: `web_fetch` (URL → Markdown, supports HTML/PDF/images) and `list_uploads` (list session uploads)
+- **Web UI** — React + Tailwind CSS + shadcn/ui, deployed via S3 + Amazon CloudFront. Features animated slide preview via SVG compose pipeline
 - **API** — Lambda-backed REST API (deck CRUD, file upload, chat history)
 - **Auth** — Amazon Cognito User Pool with hosted UI
 
@@ -223,8 +231,18 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 
 | Tool | Description |
 |------|-------------|
+| `save_web_image` | Download a web image and save it to the deck workspace |
+| `read_uploaded_file` | Read content from a user-uploaded file (PDF, PPTX, text) |
+| `apply_style` | Apply a named style preset to a deck |
 | `run_python` | Execute Python in Code Interpreter sandbox |
 | `search_slides` | Semantic slide search (optional, requires Amazon Bedrock KB) |
+
+### Agent-Level Tools (Layer 4)
+
+| Tool | Description |
+|------|-------------|
+| `web_fetch` | Fetch a URL and convert to Markdown (supports HTML, PDF, images) |
+| `list_uploads` | List files uploaded in the current chat session |
 
 ---
 
