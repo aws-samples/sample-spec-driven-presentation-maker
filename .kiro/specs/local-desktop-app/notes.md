@@ -48,6 +48,19 @@
 - compose (SVG split) is NOT in Engine API — it's in `mcp-server/tools/compose.py`
 - For local version, compose may need to be extracted to a standalone script or skipped initially
 
+### ACP AgentMessageChunk may be incremental or full
+- ACP spec says `AgentMessageChunk` contains streaming content
+- Unclear if it's incremental (delta) or accumulated (full text so far)
+- Current implementation assumes incremental (appends to completion)
+- If it's full text, need to change to replacement instead of append
+- Test early in Task 4 verification
+
+### ACP session/prompt is fire-and-forget
+- `session/prompt` returns immediately (just acknowledgement)
+- Actual response comes via `session/notification` stream
+- TurnEnd notification signals completion
+- This matches the SSE pattern in agentCoreService.js well
+
 ### Vite alias for shared components
 - `@` → `../web-ui/src/` allows importing shared components without copying
 - `@desktop` → `./src/` for desktop-specific code
