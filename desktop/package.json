@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --open false",
     "build": "tsc && vite build",
     "tauri": "tauri"
   },
