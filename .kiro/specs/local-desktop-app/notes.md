@@ -134,6 +134,11 @@
 - Tauri's Rust side logs a warning if LibreOffice is not found
 - Future: could use Tauri's dialog plugin to show a proper UI prompt
 
+### New Chat needs ACP session reset
+- ChatPanel generates new sessionId on "New Chat" but ACP session stays the same
+- Need to call session/new again when sessionId changes
+- acpAgentService should track sessionId and recreate ACP session when it changes
+
 ### mcp-local と mcp-server のツール差分（ブロッカー）
 デスクトップ版が Web 版と同じ挙動にならない根本原因。別ブランチ（main から）で対応すべき。
 

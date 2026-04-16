@@ -19,6 +19,7 @@ async function resolveProjectRoot(): Promise<string> {
 let child: Child | null = null;
 let requestId = 0;
 let sessionId: string | null = null;
+let currentChatSessionId: string | null = null;
 
 type PendingResolve = (value: unknown) => void;
 const pending = new Map<number, PendingResolve>();
@@ -229,7 +230,18 @@ export async function invokeAgent(
   if (!child || !sessionId) {
     console.log("[acp] starting agent...");
     await startAgent();
+    currentChatSessionId = _sessionId;
     console.log("[acp] agent started, sessionId:", sessionId);
+  } else if (_sessionId !== currentChatSessionId) {
+    // New chat — create new ACP session (reuse same process)
+    console.log("[acp] new chat session, creating new ACP session");
+    const { homeDir } = await import("@tauri-apps/api/path");
+    const home = await homeDir();
+    const cwd = `${home.replace(/\/+$/, "")}/Documents/SDPM-Presentations`;
+    const result = await rpcRequest("session/new", { cwd, mcpServers: [] }) as Record<string, unknown>;
+    sessionId = result.sessionId as string;
+    currentChatSessionId = _sessionId;
+    console.log("[acp] new ACP session:", sessionId);
   }
 
   let completion = "";
