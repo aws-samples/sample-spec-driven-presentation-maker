@@ -57,7 +57,7 @@ function handleLine(line: string) {
     resolve(msg.result);
     // Also check if this is end_turn
     const r = msg.result as Record<string, unknown> | undefined;
-    if (r?.stopReason === "end_turn" && turnEndResolve) {
+    if ((r?.stopReason === "end_turn" || r?.stopReason === "cancelled") && turnEndResolve) {
       turnEndResolve();
       turnEndResolve = null;
     }
@@ -68,7 +68,7 @@ function handleLine(line: string) {
   if (msg.id != null && msg.result) {
     const result = msg.result as Record<string, unknown>;
     console.log("[acp] unmatched response id:", msg.id, "stopReason:", result.stopReason);
-    if (result.stopReason === "end_turn" && turnEndResolve) {
+    if ((result.stopReason === "end_turn" || result.stopReason === "cancelled") && turnEndResolve) {
       turnEndResolve();
       turnEndResolve = null;
     }
@@ -259,7 +259,7 @@ export async function invokeAgent(
     // Only resolve on end_turn, not tool_use
     const r = res as Record<string, unknown> | undefined;
     console.log("[acp] prompt response:", JSON.stringify(r));
-    if (r?.stopReason === "end_turn") {
+    if (r?.stopReason === "end_turn" || r?.stopReason === "cancelled") {
       if (turnEndResolve) { turnEndResolve(); turnEndResolve = null; }
     }
   });
