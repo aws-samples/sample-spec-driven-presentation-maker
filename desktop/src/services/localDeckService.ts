@@ -1,0 +1,197 @@
+/**
+ * Local Deck Service — filesystem-based deck operations.
+ *
+ * Same interface as web-ui/src/services/deckService.ts so components work unchanged.
+ * Storage: ~/Documents/SDPM-Presentations/{deckId}/
+ */
+
+import { readDir, readTextFile, writeTextFile, exists, mkdir, remove } from "@tauri-apps/plugin-fs";
+import { homeDir, join } from "@tauri-apps/api/path";
+import { convertFileSrc } from "@tauri-apps/api/core";
+
+import type { DeckSummary, DeckDetail, SlidePreview, SpecFiles, ChatMessage, StyleEntry } from "@/services/deckService";
+
+const BASE_DIR_NAME = "Documents/SDPM-Presentations";
+
+async function basePath(): Promise<string> {
+  const home = await homeDir();
+  return await join(home, BASE_DIR_NAME);
+}
+
+async function deckPath(deckId: string): Promise<string> {
+  return await join(await basePath(), deckId);
+}
+
+async function ensureDir(path: string): Promise<void> {
+  if (!(await exists(path))) {
+    await mkdir(path, { recursive: true });
+  }
+}
+
+/** Index file tracking all decks and favorites. */
+interface DeckIndex {
+  decks: { deckId: string; name: string; updatedAt: string }[];
+  favoriteIds: string[];
+}
+
+async function readIndex(): Promise<DeckIndex> {
+  const indexPath = await join(await basePath(), "decks.json");
+  try {
+    const text = await readTextFile(indexPath);
+    return JSON.parse(text);
+  } catch {
+    return { decks: [], favoriteIds: [] };
+  }
+}
+
+async function writeIndex(index: DeckIndex): Promise<void> {
+  const base = await basePath();
+  await ensureDir(base);
+  const indexPath = await join(base, "decks.json");
+  await writeTextFile(indexPath, JSON.stringify(index, null, 2));
+}
+
+export async function listDecks(_idToken?: string): Promise<{ decks: DeckSummary[]; favoriteIds: string[] }> {
+  const index = await readIndex();
+  const summaries: DeckSummary[] = [];
+
+  for (const entry of index.decks) {
+    const dp = await deckPath(entry.deckId);
+    let slideCount = 0;
+    let thumbnailUrl: string | null = null;
+
+    try {
+      const slidesDir = await join(dp, "slides");
+      if (await exists(slidesDir)) {
+        const files = await readDir(slidesDir);
+        slideCount = files.filter((f) => f.name?.endsWith(".json")).length;
+      }
+      const previewDir = await join(dp, "preview");
+      const firstPreview = await join(previewDir, "slide_1.png");
+      if (await exists(firstPreview)) {
+        thumbnailUrl = convertFileSrc(firstPreview);
+      }
+    } catch { /* ignore */ }
+
+    summaries.push({
+      deckId: entry.deckId,
+      name: entry.name,
+      slideCount,
+      updatedAt: entry.updatedAt,
+      thumbnailUrl,
+    });
+  }
+
+  return { decks: summaries, favoriteIds: index.favoriteIds };
+}
+
+export async function getDeck(deckId: string, _idToken?: string): Promise<DeckDetail> {
+  const dp = await deckPath(deckId);
+  const deckJsonPath = await join(dp, "deck.json");
+  const deckJson = JSON.parse(await readTextFile(deckJsonPath));
+
+  const slides: SlidePreview[] = [];
+  const slidesDir = await join(dp, "slides");
+  const slideOrder: string[] = deckJson.slideOrder || [];
+
+  if (await exists(slidesDir)) {
+    const files = await readDir(slidesDir);
+    for (const f of files) {
+      if (!f.name?.endsWith(".json")) continue;
+      const slug = f.name.replace(".json", "");
+      const previewPath = await join(dp, "preview", `${slug}.png`);
+      const composePath = await join(dp, "compose", `${slug}.json`);
+      slides.push({
+        slideId: slug,
+        previewUrl: (await exists(previewPath)) ? convertFileSrc(previewPath) : null,
+        composeUrl: (await exists(composePath)) ? convertFileSrc(composePath) : null,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  // Read specs
+  let specs: SpecFiles | null = null;
+  try {
+    const specsDir = await join(dp, "specs");
+    const brief = await safeRead(await join(specsDir, "brief.md"));
+    const outline = await safeRead(await join(specsDir, "outline.md"));
+    const artDirection = await safeRead(await join(specsDir, "art-direction.html"));
+    if (brief || outline || artDirection) {
+      specs = { brief, outline, artDirection };
+    }
+  } catch { /* ignore */ }
+
+  const pptxPath = await join(dp, "output.pptx");
+  const defsPath = await join(dp, "compose", "defs.json");
+
+  return {
+    deckId,
+    name: deckJson.name || deckId,
+    slideOrder,
+    slides,
+    defsUrl: (await exists(defsPath)) ? convertFileSrc(defsPath) : null,
+    pptxUrl: (await exists(pptxPath)) ? convertFileSrc(pptxPath) : null,
+    specs,
+    updatedAt: new Date().toISOString(),
+    chatSessionId: deckJson.chatSessionId,
+  };
+}
+
+export async function patchDeck(deckId: string, updates: Record<string, string>, _idToken?: string): Promise<void> {
+  const dp = await deckPath(deckId);
+  const deckJsonPath = await join(dp, "deck.json");
+  const deckJson = JSON.parse(await readTextFile(deckJsonPath));
+  Object.assign(deckJson, updates);
+  await writeTextFile(deckJsonPath, JSON.stringify(deckJson, null, 2));
+}
+
+export async function deleteDeck(deckId: string, _idToken?: string): Promise<void> {
+  const dp = await deckPath(deckId);
+  await remove(dp, { recursive: true });
+  const index = await readIndex();
+  index.decks = index.decks.filter((d) => d.deckId !== deckId);
+  index.favoriteIds = index.favoriteIds.filter((id) => id !== deckId);
+  await writeIndex(index);
+}
+
+export async function toggleFavorite(deckId: string, action: "add" | "remove", _idToken?: string): Promise<boolean> {
+  const index = await readIndex();
+  if (action === "add" && !index.favoriteIds.includes(deckId)) {
+    index.favoriteIds.push(deckId);
+  } else if (action === "remove") {
+    index.favoriteIds = index.favoriteIds.filter((id) => id !== deckId);
+  }
+  await writeIndex(index);
+  return action === "add";
+}
+
+export async function getChatHistory(sessionId: string, _idToken?: string): Promise<ChatMessage[]> {
+  // Chat history is managed by kiro-cli ACP sessions (~/.kiro/sessions/cli/)
+  // For now, return empty — kiro-cli persists its own history
+  return [];
+}
+
+export async function fetchStyles(_idToken?: string): Promise<StyleEntry[]> {
+  // TODO: read from skill/templates/ directory
+  return [];
+}
+
+async function safeRead(path: string): Promise<string | null> {
+  try {
+    if (await exists(path)) return await readTextFile(path);
+  } catch { /* ignore */ }
+  return null;
+}
+
+// Stubs for Web-only features (no-op in local mode)
+export async function getDeckWithJson(deckId: string, idToken?: string) { return getDeck(deckId, idToken); }
+export async function searchSlides() { return []; }
+export async function updateVisibility() {}
+export async function listPublicDecks() { return []; }
+export async function shareDeck() { return { collaborators: [], collaboratorAliases: {} }; }
+export async function listSharedDecks() { return []; }
+export async function searchUsers() { return []; }
+export async function listFavorites(_idToken?: string) { return []; }
+export async function batchGetSlidePreviewUrls() { return new Map(); }
+export async function fetchStyleHtml() { return ""; }

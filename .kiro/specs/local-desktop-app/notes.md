@@ -48,6 +48,21 @@
 - compose (SVG split) is NOT in Engine API — it's in `mcp-server/tools/compose.py`
 - For local version, compose may need to be extracted to a standalone script or skipped initially
 
+### Tauri FS plugin needed alongside Shell plugin
+- localDeckService.ts uses @tauri-apps/plugin-fs (readDir, readTextFile, etc.)
+- Need to add tauri-plugin-fs to Cargo.toml and lib.rs
+- Also need @tauri-apps/api for path utilities and convertFileSrc
+
+### convertFileSrc for local file preview URLs
+- Tauri's convertFileSrc() converts local paths to asset:// protocol URLs
+- This lets <img src={previewUrl}> work with local PNG files
+- Same pattern for compose SVG JSON and PPTX download links
+
+### Chat history lives in kiro-cli sessions
+- kiro-cli ACP persists sessions to ~/.kiro/sessions/cli/
+- No need to duplicate chat history storage
+- getChatHistory() returns empty — kiro-cli manages its own
+
 ### ACP AgentMessageChunk may be incremental or full
 - ACP spec says `AgentMessageChunk` contains streaming content
 - Unclear if it's incremental (delta) or accumulated (full text so far)

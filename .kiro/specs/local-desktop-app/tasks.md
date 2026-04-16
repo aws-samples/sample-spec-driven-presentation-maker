@@ -28,27 +28,27 @@ Initialize Tauri project with React frontend.
 
 ### Task 4: ACP Bridge Service
 Implement kiro-cli ACP communication from Tauri frontend.
-- [ ] Create `desktop/src/services/acpAgentService.ts` (spawn kiro-cli, JSON-RPC over stdin/stdout)
-- [ ] Create `desktop/src/services/acpParser.ts` (ACP notifications → strandsParser format)
-- [ ] Implement: `session/new`, `session/prompt`, `session/cancel`
-- [ ] Implement: streaming via `session/notification` → `onStreamUpdate` / `onToolUse` callbacks
+- [x] Create `desktop/src/services/acpAgentService.ts` (spawn kiro-cli, JSON-RPC over stdin/stdout)
+- [x] Create `desktop/src/services/acpParser.ts` (ACP notifications → strandsParser format)
+- [x] Implement: `session/new`, `session/prompt`, `session/cancel`
+- [x] Implement: streaming via `session/notification` → `onStreamUpdate` / `onToolUse` callbacks
 - [ ] Test: send message, receive streaming text + tool events in UI
 
 ## Phase 3: Local Services
 
 ### Task 5: Local Deck Service
 Implement deck CRUD on local filesystem.
-- [ ] Create `desktop/src/services/localDeckService.ts`
-- [ ] Implement: `listDecks()` → read `~/Documents/SDPM-Presentations/decks.json`
-- [ ] Implement: `getDeck(deckId)` → read deck directory, generate preview URLs as `file://` or data URIs
-- [ ] Implement: `patchDeck()`, `deleteDeck()`, `toggleFavorite()`
+- [x] Create `desktop/src/services/localDeckService.ts`
+- [x] Implement: `listDecks()` → read `~/Documents/SDPM-Presentations/decks.json`
+- [x] Implement: `getDeck(deckId)` → read deck directory, generate preview URLs as `file://` or data URIs
+- [x] Implement: `patchDeck()`, `deleteDeck()`, `toggleFavorite()`
 - [ ] Implement: deck polling (watch filesystem for changes)
 - [ ] Test: create deck via agent, see it appear in deck list
 
 ### Task 6: Local Upload Service
 Implement file import for local app.
-- [ ] Create `desktop/src/services/localUploadService.ts`
-- [ ] Implement: copy file to deck workspace, extract text (PDF/PPTX)
+- [x] Create `desktop/src/services/localUploadService.ts`
+- [x] Implement: copy file to deck workspace, extract text (PDF/PPTX)
 - [ ] Test: attach PDF in chat, agent reads content
 
 ### Task 7: Service Provider
