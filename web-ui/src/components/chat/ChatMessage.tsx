@@ -127,6 +127,8 @@ export interface ToolUse {
   input?: Record<string, unknown>
   status?: "success" | "error"
   result?: Record<string, unknown>
+  /** Streaming progress messages from tool (e.g. compose_slides sub-agent progress). */
+  streamMessages?: Record<string, unknown>[]
 }
 
 export type MessageBlock = { type: "text"; text: string } | { type: "tool"; tool: ToolUse }
@@ -247,7 +249,8 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                   input={block.tool.input}
                   status={block.tool.status}
                   result={block.tool.result}
-                  isActive={isStreaming && !block.tool.status && i === blocks.length - 1 && Object.keys(block.tool.input || {}).length === 0}
+                  isActive={isStreaming && !block.tool.status && (i === blocks.length - 1 || (block.tool.streamMessages?.length ?? 0) > 0)}
+                  streamMessages={block.tool.streamMessages}
                 />
               )
             )}
@@ -294,7 +297,8 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                     input={latestTool.input}
                     status={latestTool.status}
                     result={latestTool.result}
-                    isActive={isStreaming && !latestTool.status && (Object.keys(latestTool.input || {}).length === 0)}
+                    isActive={isStreaming && !latestTool.status}
+                    streamMessages={latestTool.streamMessages}
                   />
                 )}
                 {olderTools.length > 0 && (

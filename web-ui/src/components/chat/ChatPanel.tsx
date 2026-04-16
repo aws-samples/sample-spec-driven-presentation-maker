@@ -52,6 +52,9 @@ interface ToolUseCallbackData {
   status?: "success" | "error"
   result?: Record<string, unknown>
   input?: Record<string, unknown>
+  /** Tool streaming progress event. */
+  stream?: boolean
+  data?: Record<string, unknown>
 }
 
 interface ChatPanelProps {
@@ -562,6 +565,51 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             return
           }
 
+          // Tool stream event — append progress to existing tool
+          if (toolUseData?.stream && toolUseData?.toolUseId) {
+            const d = toolUseData.data || {}
+            setMessages((prev) => {
+              const updated = [...prev]
+              const last = updated[updated.length - 1]
+              const idx = last.toolUses.findIndex((t) => t.toolUseId === toolUseData.toolUseId)
+              if (idx < 0) return prev
+              const newToolUses = [...last.toolUses]
+              const existing = newToolUses[idx].streamMessages || []
+
+              let next: typeof existing
+              if (d.toolResult) {
+                // Tool completed — update existing entry's status
+                next = existing.map((e) =>
+                  typeof e === "object" && e.toolUseId === d.toolResult
+                    ? { ...e, status: d.toolStatus || "success" }
+                    : e
+                )
+              } else if (d.tool) {
+                // New sub-tool started (or update with input from hook)
+                const existingIdx = existing.findIndex((e) => typeof e === "object" && e.toolUseId === d.toolUseId)
+                if (existingIdx >= 0 && d.input) {
+                  next = existing.map((e, idx) => idx === existingIdx ? { ...e, input: d.input } : e)
+                } else if (existingIdx < 0) {
+                  next = [...existing, { tool: d.tool, group: d.group, slugs: d.slugs, toolUseId: d.toolUseId, input: d.input }]
+                } else {
+                  return prev
+                }
+              } else if (d.status) {
+                // Group status event
+                next = [...existing, { status: d.status, group: d.group, slugs: d.slugs, total_groups: d.total_groups, done: d.done, total: d.total, summary: d.summary, message: d.message, attempt: d.attempt, error: d.error }]
+              } else {
+                return prev
+              }
+
+              newToolUses[idx] = { ...newToolUses[idx], streamMessages: next }
+              const toolMap = new Map(newToolUses.map((t) => [t.toolUseId, t]))
+              const blocks = rebuildBlocks(lastTextSnapshot, toolMap)
+              updated[updated.length - 1] = { ...last, toolUses: newToolUses, blocks }
+              return updated
+            })
+            return
+          }
+
           // Tool result (completed) — detect deckId from any tool's result
           if (toolUseData?.completed && toolUseData?.result?.deckId && onDeckCreated) {
             // Link chat session to deck for history restore
@@ -607,6 +655,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             else if (first.includes("outline")) onWorkflowPhase("outline")
             else if (first.includes("art-direction")) onWorkflowPhase("artDirection")
             else if (first.includes("compose")) onWorkflowPhase("slides")
+          }
+          if (onWorkflowPhase && (toolName === "compose_slides" || toolName.endsWith("_compose_slides"))) {
+            onWorkflowPhase("slides")
           }
 
           // Record position only on first encounter

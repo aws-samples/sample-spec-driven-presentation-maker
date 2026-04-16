@@ -104,6 +104,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
       if (compUrlBase === lastComposeUrlRef.current) return
       if (animatingRef.current) return  // defer until animation completes
       lastComposeUrlRef.current = compUrlBase
+      setError(false)
 
       ;(async () => {
         try {

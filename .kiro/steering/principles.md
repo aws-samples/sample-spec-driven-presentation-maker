@@ -2,16 +2,23 @@
 
 # Principles
 
-## Architecture: 3-Layer Structure
+## Architecture: 4-Layer Structure
 
 ```
-Layer 1: CLI (skill/scripts/pptx_builder.py)
+Layer 4: Agent + Web UI (agent/, web-ui/)
+  ↓ uses
+Layer 3: MCP Remote (mcp-server/)   ← AWS (S3/DynamoDB)
   ↓ uses
 Skill Engine (skill/sdpm/)          ← Single source of business logic
-  ↑ uses                ↑ uses
-Layer 2: MCP Local      Layer 3: MCP Remote
-(mcp-local/)            (mcp-server/)
+  ↑ uses
+Layer 2: MCP Local (mcp-local/)
+  ↑ uses
+Layer 1: CLI (skill/scripts/pptx_builder.py)
 ```
+
+Layer 4 hosts the Strands Agent (SPEC agent + composer agents) and the React Web UI.
+The SPEC agent handles user dialogue (Phase 1). Composer agents handle slide generation
+(Phase 2+3) via the `compose_slides` tool (Agents as Tools pattern).
 
 ## Engine (`skill/sdpm/`)
 

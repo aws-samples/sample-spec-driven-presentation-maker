@@ -7,9 +7,11 @@
  * data that the OutlineView component can render as a timeline.
  *
  * Supports two formats:
- *   Phase A (skeleton): `- [N: Title] Message`
- *   Phase B (enriched): `- [N: Title] Message` with indented `- key: value` sub-items
+ *   Skeleton: `- [slug] Message`
+ *   Enriched: `- [slug] Message` with indented `- key: value` sub-items
  *
+ * Slugs are kebab-case identifiers that map to slides/{slug}.json files.
+ * Slide order is determined by line order in the outline.
  * Sub-item keys are fixed: what_to_say, evidence, what_to_show, notes.
  */
 
@@ -24,8 +26,7 @@ export interface OutlineSubItem {
 
 /** A parsed slide entry from the outline markdown. */
 export interface OutlineSlide {
-  num: number
-  title: string
+  slug: string
   message: string
   subItems: OutlineSubItem[]
 }
@@ -33,8 +34,8 @@ export interface OutlineSlide {
 /** Visual state of a slide in the timeline. */
 export type SlideState = "skeleton" | "active" | "done"
 
-/** Regex matching a slide entry line: `- [N: Title] Message` */
-const SLIDE_RE = /^-\s*\[(\d+):\s*([^\]]+)\]\s*(.*)/
+/** Regex matching a slide entry line: `- [slug] Message` */
+const SLIDE_RE = /^-\s*\[([a-z0-9-]+)\]\s*(.*)/
 
 /** Regex matching a sub-item line: `  - key: value` */
 const SUB_ITEM_RE = /^\s+-\s*(what_to_say|evidence|what_to_show|notes):\s*(.*)/
@@ -57,9 +58,8 @@ export function parseOutline(markdown: string): OutlineSlide[] {
     const slideMatch = line.match(SLIDE_RE)
     if (slideMatch) {
       current = {
-        num: parseInt(slideMatch[1], 10),
-        title: slideMatch[2].trim(),
-        message: slideMatch[3].trim(),
+        slug: slideMatch[1],
+        message: slideMatch[2].trim(),
         subItems: [],
       }
       slides.push(current)

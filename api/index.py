@@ -406,7 +406,7 @@ def list_public() -> Dict[str, Any]:
 
 @app.get("/decks/<deck_id>")
 def get_deck(deck_id: str) -> Dict[str, Any]:
-    """Get deck details with presigned URLs. Reads slides from S3 presentation.json."""
+    """Get deck details with presigned URLs. Reads slides from S3 (deck.json + slides/*.json)."""
     user_id = get_user_id(app.current_event)
 
     decision = authorize(user_id, deck_id, "read", table)
@@ -416,51 +416,74 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
     deck = decision.deck
     pptx_key = deck.get("pptxS3Key")
 
-    # Read presentation.json from S3
+    # Read slides from S3 (deck.json + slides/*.json format)
     slides = []
     include_json = (app.current_event.get_query_string_value("include") or "") == "slideJson"
+
+    # Collect compose keys for animation (epoch-keyed)
+    compose_keys = set()
     try:
-        pres_key = f"decks/{deck_id}/presentation.json"
-        resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=pres_key)
-        presentation = json.loads(resp["Body"].read())
-        preview_keys = _list_preview_keys(deck_id)
-        # Check compose data existence (defs + per-slide, epoch-keyed like previews)
-        compose_keys = set()
+        for obj in s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/compose/").get("Contents", []):
+            compose_keys.add(obj["Key"])
+    except Exception:
+        pass
+
+    import re as _re
+    def _latest_compose_key(prefix: str, keys: set) -> Optional[str]:
+        """Pick the key with the highest epoch from epoch-keyed compose files."""
+        best_epoch, best_key = -1, None
+        for k in keys:
+            if not k.startswith(prefix):
+                continue
+            m = _re.search(r"_(\d+)\.json$", k)
+            epoch = int(m.group(1)) if m else 0
+            if epoch > best_epoch:
+                best_epoch, best_key = epoch, k
+        return best_key
+
+    defs_key = _latest_compose_key(f"decks/{deck_id}/compose/defs_", compose_keys)
+    has_defs = defs_key is not None
+
+    # outline.md for slug order, then slides/*.json
+    # Canonical implementation: sdpm.api.parse_outline_slugs (not importable in Lambda)
+    slugs = []
+    try:
+        outline_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/specs/outline.md")
+        outline_text = outline_resp["Body"].read().decode("utf-8")
+        slug_re = _re.compile(r"^-\s*\[([a-z0-9-]+)\]\s*")
+        for line in outline_text.splitlines():
+            m = slug_re.match(line)
+            if m:
+                slugs.append(m.group(1))
+    except Exception:
+        pass
+
+    # If no outline slugs, list slides/ directory
+    if not slugs:
+        prefix = f"decks/{deck_id}/slides/"
+        resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
+        for obj in resp.get("Contents", []):
+            name = obj["Key"].rsplit("/", 1)[-1]
+            if name.endswith(".json"):
+                slugs.append(name[:-5])
+
+    preview_keys = _list_preview_keys(deck_id)
+    for i, slug in enumerate(slugs):
+        slide_key = f"decks/{deck_id}/slides/{slug}.json"
         try:
-            for obj in s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/compose/").get("Contents", []):
-                compose_keys.add(obj["Key"])
-        except Exception:
-            pass
-
-        import re as _re
-        def _latest_compose_key(prefix: str, keys: set) -> Optional[str]:
-            """Pick the key with the highest epoch from epoch-keyed compose files."""
-            best_epoch, best_key = -1, None
-            for k in keys:
-                if not k.startswith(prefix):
-                    continue
-                m = _re.search(r"_(\d+)\.json$", k)
-                epoch = int(m.group(1)) if m else 0
-                if epoch > best_epoch:
-                    best_epoch, best_key = epoch, k
-            return best_key
-
-        defs_key = _latest_compose_key(f"decks/{deck_id}/compose/defs_", compose_keys)
-        has_defs = defs_key is not None
-
-        for i, s in enumerate(presentation.get("slides", [])):
+            slide_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=slide_key)
+            s = json.loads(slide_resp["Body"].read())
             sid = f"slide_{i + 1:02d}"
             slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
             slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
-            # Compose URL for animation (epoch-keyed)
-            compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}_", compose_keys)
+            compose_key = _latest_compose_key(f"decks/{deck_id}/compose/{slug}_", compose_keys)
             if compose_key:
                 slide_entry["composeUrl"] = preview_url(compose_key)
             if include_json:
                 slide_entry["slideJson"] = json.dumps(s)
             slides.append(slide_entry)
-    except Exception:
-        has_defs = False
+        except Exception:
+            continue
 
     # Read spec files from S3 (brief.md, outline.md, art-direction.html/.md)
     specs: Dict[str, Any] = {}

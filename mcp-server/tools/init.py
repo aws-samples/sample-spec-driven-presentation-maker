@@ -1,10 +1,11 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Presentation initialization — creates Deck + specs/ + empty presentation.json in S3."""
+"""Presentation initialization — creates Deck + deck.json + specs/ in S3."""
 
 # Security: AWS manages infrastructure security. You manage access control,
 # data classification, and IAM policies. See SECURITY.md for details.
 
+import json
 from typing import Any
 
 from storage import Storage
@@ -19,10 +20,10 @@ def init_presentation(
     user_id: str,
     storage: Storage,
 ) -> dict[str, Any]:
-    """Create a Deck, write empty presentation.json and spec files to S3.
+    """Create a Deck, write deck.json and spec files to S3.
 
     Template is NOT set at init time — it is selected later during the
-    design workflow and written to the deck via run_python / analyze_template.
+    design workflow and written to deck.json via run_python / analyze_template.
 
     Args:
         name: Presentation name (used as Deck display name).
@@ -36,11 +37,11 @@ def init_presentation(
     deck = create_deck(name=name, user_id=user_id, storage=storage)
     deck_id = deck["deckId"]
 
-    # Write empty presentation.json to S3
-    presentation: dict[str, Any] = {"slides": []}
-    storage.put_presentation_json(deck_id=deck_id, data=presentation)
+    # Write empty deck.json to S3
+    deck_json: dict[str, Any] = {}
+    storage.put_deck_json(deck_id=deck_id, data=deck_json)
 
-    workspace = ["presentation.json"]
+    workspace = ["deck.json"]
 
     # Always create brief.md and outline.md
     for spec_file in _SPEC_FILES_ALWAYS:
