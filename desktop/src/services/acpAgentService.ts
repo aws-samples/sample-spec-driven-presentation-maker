@@ -109,8 +109,10 @@ function handleLine(line: string) {
     if (type === "tool_call") {
       if (toolCallback) {
         const toolCallId = update.toolCallId as string || "";
-        const name = (update.title || update.name || "") as string;
-        toolCallback(name, { toolUseId: toolCallId, name, input: update.input || {}, started: true });
+        const title = (update.title || update.name || "") as string;
+        const name = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
+        const input = (update.rawInput || update.input || {}) as Record<string, unknown>;
+        toolCallback(name, { toolUseId: toolCallId, name, input, started: true });
       }
     }
 
