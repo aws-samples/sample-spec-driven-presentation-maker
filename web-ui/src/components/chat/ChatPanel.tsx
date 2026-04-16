@@ -656,6 +656,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             else if (first.includes("art-direction")) onWorkflowPhase("artDirection")
             else if (first.includes("compose")) onWorkflowPhase("slides")
           }
+          if (onWorkflowPhase && (toolName === "compose_slides" || toolName.endsWith("_compose_slides"))) {
+            onWorkflowPhase("slides")
+          }
 
           // Record position only on first encounter
           if (!toolPositions.has(toolUse.toolUseId)) {

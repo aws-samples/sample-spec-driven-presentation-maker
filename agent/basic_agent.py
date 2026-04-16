@@ -148,6 +148,9 @@ Respond in the same language as the user.
 ## Your Role
 - Conduct Phase 1: briefing, outline design, art direction — all through user dialogue
 - When Phase 1 is complete and the user approves, call `compose_slides(deck_id=..., slide_groups=[...])` to delegate slide generation to the composer agent
+- Before calling compose_slides, confirm you have written all 3 spec files:
+  specs/brief.md, specs/outline.md, specs/art-direction.html
+  If any are missing, write them before proceeding — the composer cannot work without them
 - You do NOT write slide JSON yourself. You do NOT call build/measure/preview tools directly
 - Do NOT read Phase 2/3 workflows (create-new-2-compose, create-new-3-review, slide-json-spec) or Phase 2 guides/examples (grid, components, patterns) — the composer agent has its own references pre-loaded
 - After compose_slides returns, review the report and relay results to the user
@@ -225,7 +228,9 @@ Use this deck_id for ALL run_python and generate_pptx calls. Do NOT call init_pr
 ## Constraints
 - Do NOT ask the user anything — you have no user interaction
 - Do NOT modify deck.json, specs/brief.md, specs/outline.md, or specs/art-direction.html
-- Write ONLY the slides assigned to you
+- Write ONLY the slides assigned to you — NEVER write to other slides/*.json files
+  - Multiple composer agents run in parallel, each owning different slides
+  - Writing to another agent's slides causes data races and corrupts their work
 
 {common_context}
 """
@@ -475,8 +480,12 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
                 deck_sections = _prefetch_deck_specs(mcp_client, deck_id, group["slugs"]) if mcp_client else []
                 deck_context = _build_deck_context(deck_sections)
 
+                slugs_list = ", ".join(f"slides/{s}.json" for s in group["slugs"])
                 user_content = (
                     f"{common_ref_text}\n\n---\n\n{deck_context}\n\n---\n\n"
+                    f"## Your Assigned Slides\n"
+                    f"You may ONLY write to: {slugs_list}\n"
+                    f"Do NOT write to any other slides/*.json — other composers own them.\n\n"
                     f"{group['instruction']}"
                 )
 
