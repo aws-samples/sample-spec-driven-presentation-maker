@@ -13,6 +13,10 @@ import type { DeckSummary, DeckDetail, SlidePreview, SpecFiles, ChatMessage, Sty
 
 const BASE_DIR_NAME = "Documents/SDPM-Presentations";
 
+// Stable references to avoid React re-render loops
+const _emptyArray: string[] = [];
+const _emptyObject: Record<string, string> = {};
+
 async function basePath(): Promise<string> {
   const home = await homeDir();
   return await join(home, BASE_DIR_NAME);
@@ -161,6 +165,10 @@ export async function getDeck(deckId: string, _idToken?: string): Promise<DeckDe
     specs,
     updatedAt: new Date().toISOString(),
     chatSessionId: deckJson.chatSessionId,
+    visibility: "private" as const,
+    isOwner: true,
+    collaborators: _emptyArray,
+    collaboratorAliases: _emptyObject,
   };
 }
 
