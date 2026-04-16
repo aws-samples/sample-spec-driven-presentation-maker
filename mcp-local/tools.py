@@ -95,9 +95,10 @@ def list_asset_sources(skill_dir: Path) -> dict[str, Any]:
 
 
 def list_styles(skill_dir: Path) -> dict[str, Any]:
-    """List available design styles."""
-    from sdpm.reference import list_styles as _list_styles
+    """List available design styles and open gallery in browser."""
+    from sdpm.reference import list_styles as _list_styles, open_styles_gallery
     styles_dir = skill_dir / "references" / "examples" / "styles"
+    open_styles_gallery(styles_dir)
     return {"styles": _list_styles(styles_dir)}
 
 

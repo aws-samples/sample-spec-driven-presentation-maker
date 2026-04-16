@@ -20,7 +20,7 @@
   "mcpServers": {
     "sdpm": {
       "command": "uv",
-      "args": ["run", "--directory", "mcp-local", "python", "server.py"],
+      "args": ["run", "--directory", "mcp-local", "python", "server_acp.py"],
       "timeout": 120000
     }
   },

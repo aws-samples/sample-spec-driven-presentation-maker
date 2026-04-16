@@ -46,16 +46,34 @@ from tools import (  # noqa: E402
 # Clients that don't will rely on start_presentation's tool description.
 _INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generation from JSON.
 
-## Architecture
-- The agent edits workspace files via `run_python(deck_id=..., save=True)` using normal file I/O
-- MCP tools handle: workflow guidance, initialization, PPTX generation, preview, references
-- MCP tools do NOT handle: slide editing, spec writing (agent responsibility via run_python)
-
 **Critical constraint:** Do NOT make any decisions about slide structure, content, design, or layout before loading the workflow. The workflow files contain the full process including briefing, outline, and art direction. Wait until the workflow is loaded and follow it step by step.
 
-## Workflow: New Presentation
+**Present the options and ask which to do:**
 
+A. New presentation — create slides from scratch
+B. Edit existing PPTX — modify a provided file
+C. Hand-edit sync — continue from a user-edited PPTX
+D. Create style — build a reusable style guide
+
+## Workflow A: New Presentation
+
+When no existing PPTX is provided.
 → Read `read_workflows(["create-new-1-briefing"])` to start. Follow each file's Next Step from there.
+
+## Workflow B: Edit Existing PPTX
+
+When an existing PPTX is provided.
+→ Read `read_workflows(["edit-existing"])` to start.
+
+## Workflow C: Hand-Edit Sync
+
+When the user hand-edits the generated PPTX in PowerPoint and then asks for further changes.
+→ Read `read_workflows(["create-new-4-hand-edit-sync"])` to start.
+
+## Workflow D: Create Style
+
+When the user wants to create a new reusable style guide.
+→ Read `read_workflows(["create-style"])` to start.
 """
 
 mcp = FastMCP(
@@ -365,133 +383,6 @@ def apply_style(deck_id: str, style: str) -> str:
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dest)
     return json.dumps({"status": "ok", "path": str(dest), "style": style})
-
-
-@mcp.tool()
-def run_python(code: str, deck_id: str = "", save: bool = False,
-               measure_slides: list[str] | None = None, purpose: str = "") -> str:
-    """Execute Python code in the deck workspace or for general computation.
-
-    If deck_id is provided (as output_dir path), the code runs with cwd set to that directory.
-    All workspace files are accessible via normal file I/O (open, read, write).
-
-    **Always specify measure_slides when editing slides.** Runs validation after execution:
-        - Text bbox measurement (overflow detection via LibreOffice SVG)
-
-    Examples:
-        Edit slides:   run_python(code="...", deck_id="/path/to/deck", save=True, measure_slides=["title"])
-        Edit specs:    run_python(code="open('specs/brief.md','w').write('...')", deck_id="/path/to/deck", save=True)
-        Compute:       run_python(code="print(2**100)")
-
-    Args:
-        code: Python code to execute.
-        deck_id: Deck output_dir path. Optional.
-        save: Unused in local mode (files are written directly). Kept for API compat.
-        measure_slides: List of slide slugs to measure after execution. Requires deck_id.
-        purpose: Brief description shown in UI.
-
-    Returns:
-        JSON string: {"output", "measure"?}
-    """
-    import os
-    import subprocess
-    import tempfile
-
-    result: dict = {}
-
-    # Determine working directory
-    cwd = deck_id if deck_id and Path(deck_id).is_dir() else None
-
-    # Execute code
-    try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write(code)
-            f.flush()
-            proc = subprocess.run(
-                [sys.executable, f.name],
-                capture_output=True, text=True, timeout=120,
-                cwd=cwd,
-            )
-            os.unlink(f.name)
-        output = proc.stdout
-        if proc.stderr:
-            output += "\n" + proc.stderr
-        result["output"] = output.strip()
-    except subprocess.TimeoutExpired:
-        result["output"] = "Error: execution timed out (120s)"
-    except Exception as e:
-        result["output"] = f"Error: {e}"
-
-    # Post-processing: measure
-    if cwd and measure_slides:
-        try:
-            json_path = str(Path(cwd) / "presentation.json")
-            if Path(json_path).exists():
-                pages = ",".join(measure_slides) if measure_slides else ""
-                measure_result = _measure(slides_json_path=json_path, pages=pages)
-                result["measure"] = measure_result
-        except Exception as e:
-            result["measure"] = f"Measure error: {e}"
-
-    # Post-processing: build PPTX + SVG compose (when save=True)
-    if cwd and save:
-        json_path = str(Path(cwd) / "presentation.json")
-        if Path(json_path).exists():
-            # Build PPTX
-            try:
-                build_result = _generate_pptx(
-                    slides_json_path=json_path, output_path="", skill_dir=_SKILL_DIR
-                )
-                pptx_out = build_result.get("output_path", "")
-                result["pptx"] = pptx_out
-            except Exception as e:
-                pptx_out = ""
-                result["pptx_error"] = str(e)
-
-            # SVG compose for WebUI animation
-            try:
-                import shutil as _shutil
-                lo = _shutil.which("soffice")
-                if not lo:
-                    _lo_mac = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
-                    if Path(_lo_mac).exists():
-                        lo = _lo_mac
-                if lo and pptx_out:
-                    import subprocess as _sp
-                    import tempfile as _tf
-                    pptx_path = Path(pptx_out)
-                    if pptx_path.exists():
-                        with _tf.TemporaryDirectory() as tmpdir:
-                            env = dict(__import__("os").environ)
-                            env["HOME"] = tmpdir
-                            _sp.run(
-                                [lo, "--headless", "--convert-to", "svg", "--outdir", tmpdir, str(pptx_path)],
-                                capture_output=True, timeout=120, env=env,
-                            )
-                            # Find the generated SVG (named after input file)
-                            svg_files = list(Path(tmpdir).glob("*.svg"))
-                            if svg_files:
-                                svg_path = svg_files[0]
-                                from compose import extract_optimized_defs, split_slide_components, count_slides
-                                compose_dir = Path(cwd) / "compose"
-                                compose_dir.mkdir(exist_ok=True)
-                                # Write defs
-                                defs = extract_optimized_defs(svg_path)
-                                (compose_dir / "defs.json").write_text(
-                                    json.dumps(defs, ensure_ascii=False), encoding="utf-8"
-                                )
-                                # Write per-slide components
-                                total = count_slides(svg_path)
-                                for sn in range(1, total + 1):
-                                    comp = split_slide_components(svg_path, sn)
-                                    (compose_dir / f"slide_{sn}.json").write_text(
-                                        json.dumps(comp, ensure_ascii=False), encoding="utf-8"
-                                    )
-                                result["compose"] = f"{total} slides composed"
-            except Exception as e:
-                result["compose_error"] = str(e)
-
-    return json.dumps(result, ensure_ascii=False)
 
 
 @mcp.tool()
