@@ -48,6 +48,24 @@
 - compose (SVG split) is NOT in Engine API — it's in `mcp-server/tools/compose.py`
 - For local version, compose may need to be extracted to a standalone script or skipped initially
 
+### DecksPage imports useAuth() — needs adapter
+- web-ui/src/app/(authenticated)/decks/page.tsx uses `useAuth()` from react-oidc-context
+- Desktop version has no auth — need either:
+  (a) Create a useAuth() shim that returns { isAuthenticated: true, user: { id_token: "local" } }
+  (b) Or refactor DecksPage to accept auth via props/context
+- Option (a) is simpler and doesn't touch web-ui code
+- Create desktop/src/lib/authShim.ts that provides the same hook interface
+
+### Shared components import paths
+- Components use `@/services/deckService` etc. directly
+- Desktop's Vite alias maps `@` to `web-ui/src/`
+- This means components will import the AWS service implementations
+- Need to either: use module aliasing in Vite to redirect service imports,
+  or use the ServiceProvider pattern where components get services from context
+- The ServiceProvider approach requires components to be refactored to use context
+- The Vite alias approach is zero-change to web-ui but fragile
+- Decision: start with Vite alias overrides for service modules, revisit if needed
+
 ### Tauri FS plugin needed alongside Shell plugin
 - localDeckService.ts uses @tauri-apps/plugin-fs (readDir, readTextFile, etc.)
 - Need to add tauri-plugin-fs to Cargo.toml and lib.rs
