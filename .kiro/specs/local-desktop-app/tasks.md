@@ -61,9 +61,9 @@ Wire up local services to UI components.
 
 ### Task 8: LibreOffice Dependency
 Handle LibreOffice installation.
-- [ ] Create `desktop/scripts/install-libreoffice.sh` (macOS/Linux)
-- [ ] Create `desktop/scripts/install-libreoffice.ps1` (Windows)
-- [ ] Add first-launch check in Tauri app (detect LibreOffice, prompt install if missing)
+- [x] Create `desktop/scripts/install-libreoffice.sh` (macOS/Linux)
+- [x] Create `desktop/scripts/install-libreoffice.ps1` (Windows)
+- [x] Add first-launch check in Tauri app (detect LibreOffice, prompt install if missing)
 - [ ] Test: fresh machine → app prompts → LibreOffice installed → preview works
 
 ### Task 9: Tauri Build & Distribution
@@ -71,7 +71,7 @@ Package as native desktop app.
 - [ ] Configure Tauri bundler for macOS (.dmg)
 - [ ] Configure Tauri bundler for Windows (.exe / NSIS)
 - [ ] Configure Tauri bundler for Linux (AppImage)
-- [ ] Add GitHub Actions workflow for cross-platform builds
+- [x] Add GitHub Actions workflow for cross-platform builds
 - [ ] Test: install from package, full workflow works
 
 ## Notes

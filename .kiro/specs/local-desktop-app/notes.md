@@ -120,6 +120,17 @@
 - This resolves relative to the project root (where kiro-cli is launched)
 - Works for dev mode; for Tauri packaged app, need to ensure cwd is set correctly
 
+### LibreOffice bundling deferred
+- Bundling LibreOffice (~500MB+) into the installer is impractical for initial release
+- Current approach: startup check + install script (brew/apt/choco/winget)
+- Tauri's Rust side logs a warning if LibreOffice is not found
+- Future: could use Tauri's dialog plugin to show a proper UI prompt
+
+### GitHub Actions: Tauri action handles cross-platform builds
+- tauri-apps/tauri-action@v0 handles signing, bundling, and artifact upload
+- Triggered on `desktop-v*` tags or manual dispatch
+- macOS builds both aarch64 and x86_64 targets
+
 ## Risks
 
 ### ToolCallUpdate granularity (unverified)
