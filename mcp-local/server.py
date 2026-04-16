@@ -361,31 +361,6 @@ def pptx_to_json(pptx_path: str) -> str:
 
 
 @mcp.tool()
-def apply_style(deck_id: str, style: str) -> str:
-    """Copy a style HTML file to the deck's specs/art-direction.html.
-
-    Args:
-        deck_id: Deck output_dir path.
-        style: Style name (e.g. "elegant-dark").
-
-    Returns:
-        JSON with status and the copied file path.
-    """
-    import shutil
-    styles_dir = _SKILL_DIR / "references" / "examples" / "styles"
-    src = styles_dir / f"{style}.html"
-    if not src.exists():
-        return json.dumps({"error": f"Style not found: {style}. Available: {[s.stem for s in styles_dir.glob('*.html')]}"})
-    deck_path = Path(deck_id)
-    if not deck_path.is_dir():
-        return json.dumps({"error": f"Deck directory not found: {deck_id}"})
-    dest = deck_path / "specs" / "art-direction.html"
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dest)
-    return json.dumps({"status": "ok", "path": str(dest), "style": style})
-
-
-@mcp.tool()
 def grid(spec: str, purpose: str = "") -> str:
     """Compute CSS Grid layout coordinates from a grid specification.
     Use before placing elements to calculate exact positions.
