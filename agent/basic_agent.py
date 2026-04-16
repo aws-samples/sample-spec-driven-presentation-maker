@@ -433,12 +433,13 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
         Runs groups in parallel (controlled by COMPOSER_MAX_CONCURRENCY env var).
         Async generator: yields progress dicts, then returns final result str.
         """
-        import asyncio
         import json as _json
         import os
+        import queue
+        import time
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
         max_concurrency = int(os.environ.get("COMPOSER_MAX_CONCURRENCY", "10"))
-        sem = asyncio.Semaphore(max_concurrency)
 
         generated = []
         errors = []
@@ -464,108 +465,117 @@ def _make_compose_slides(mcp_servers: list, model, mcp_instructions: str):
             # Build common reference text (guides/examples — shared across groups)
             common_ref_text = _build_common_context(ref_sections)
 
-            progress_q: asyncio.Queue = asyncio.Queue()
+            progress_q: queue.Queue = queue.Queue()
 
-            async def run_group(gi: int, group: dict) -> dict:
-                """Run a single composer group under semaphore."""
-                async with sem:
-                    slugs_label = ", ".join(group["slugs"])
-                    progress_q.put_nowait({"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"})
-
-                    deck_sections = _prefetch_deck_specs(mcp_client, deck_id, group["slugs"]) if mcp_client else []
-                    deck_context = _build_deck_context(deck_sections)
-
-                    # User message: common refs (cacheable) + deck specs (per-group) + instruction
-                    user_content = (
-                        f"{common_ref_text}\n\n---\n\n{deck_context}\n\n---\n\n"
-                        f"{group['instruction']}"
-                    )
-
-                    last_tool_id = ""
-
-                    def _on_event(**kwargs):
-                        nonlocal last_tool_id
-                        tu = kwargs.get("current_tool_use")
-                        if tu:
-                            tid = tu.get("toolUseId", "")
-                            name = tu.get("name", "")
-                            if tid and name and tid != last_tool_id:
-                                last_tool_id = tid
-                                progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "toolUseId": tid})
-
-                    composer = Agent(
-                        system_prompt=[
-                            {"text": static_prompt},
-                            {"cachePoint": {"type": "default"}},
-                        ],
-                        tools=[*mcp_servers],
-                        model=model,
-                        callback_handler=_on_event,
-                    )
-                    from strands.hooks.events import BeforeToolCallEvent, AfterToolCallEvent
-
-                    async def _before_tool(event: BeforeToolCallEvent):
-                        tu = event.tool_use
-                        progress_q.put_nowait({
-                            "group": gi + 1, "slugs": slugs_label,
-                            "tool": tu.get("name", ""), "toolUseId": tu.get("toolUseId", ""),
-                            "input": tu.get("input", {}),
-                        })
-
-                    async def _after_tool(event: AfterToolCallEvent):
-                        tu = event.tool_use
-                        is_err = isinstance(event.result, dict) and event.result.get("status") == "error"
-                        progress_q.put_nowait({
-                            "group": gi + 1, "slugs": slugs_label,
-                            "toolResult": tu.get("toolUseId", ""),
-                            "toolStatus": "error" if is_err else "success",
-                        })
-
-                    composer.hooks.add_callback(BeforeToolCallEvent, _before_tool)
-                    composer.hooks.add_callback(AfterToolCallEvent, _after_tool)
-
-                    max_retries = 2
-                    for attempt in range(max_retries + 1):
-                        try:
-                            response = await composer.invoke_async(user_content if attempt == 0 else None)
-                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "status": "done"})
-                            return {"slugs": group["slugs"], "response": str(response)}
-                        except Exception as e:
-                            if attempt < max_retries:
-                                progress_q.put_nowait({
-                                    "group": gi + 1, "slugs": slugs_label,
-                                    "status": "retrying", "attempt": attempt + 1, "error": str(e),
-                                })
-                                continue
-                            raise
-
-            # Launch all groups
-            tasks = [asyncio.create_task(run_group(gi, g)) for gi, g in enumerate(slide_groups)]
-
-            # Drain progress queue until all tasks complete
-            while not all(t.done() for t in tasks):
-                try:
-                    item = await asyncio.wait_for(progress_q.get(), timeout=0.2)
-                    yield item
-                except asyncio.TimeoutError:
-                    pass
-            while not progress_q.empty():
-                yield progress_q.get_nowait()
-
-            # Collect results
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for gi, result in enumerate(results):
-                group = slide_groups[gi]
+            def run_group(gi: int, group: dict) -> dict:
+                """Run a single composer group in a thread."""
                 slugs_label = ", ".join(group["slugs"])
-                if isinstance(result, Exception):
-                    errors.append({"slugs": group["slugs"], "error": str(result)})
-                    yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(result)}
-                else:
-                    generated.extend(result["slugs"])
-                    done_count += len(result["slugs"])
-                    summaries[slugs_label] = result["response"]
-                    yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
+                progress_q.put_nowait({"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"})
+
+                deck_sections = _prefetch_deck_specs(mcp_client, deck_id, group["slugs"]) if mcp_client else []
+                deck_context = _build_deck_context(deck_sections)
+
+                user_content = (
+                    f"{common_ref_text}\n\n---\n\n{deck_context}\n\n---\n\n"
+                    f"{group['instruction']}"
+                )
+
+                last_tool_id = ""
+
+                def _on_event(**kwargs):
+                    nonlocal last_tool_id
+                    tu = kwargs.get("current_tool_use")
+                    if tu:
+                        tid = tu.get("toolUseId", "")
+                        name = tu.get("name", "")
+                        if tid and name and tid != last_tool_id:
+                            last_tool_id = tid
+                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "toolUseId": tid})
+
+                composer = Agent(
+                    system_prompt=[
+                        {"text": static_prompt},
+                        {"cachePoint": {"type": "default"}},
+                    ],
+                    tools=[*mcp_servers],
+                    model=model,
+                    callback_handler=_on_event,
+                )
+                from strands.hooks.events import BeforeToolCallEvent, AfterToolCallEvent
+
+                async def _before_tool(event: BeforeToolCallEvent):
+                    tu = event.tool_use
+                    progress_q.put_nowait({
+                        "group": gi + 1, "slugs": slugs_label,
+                        "tool": tu.get("name", ""), "toolUseId": tu.get("toolUseId", ""),
+                        "input": tu.get("input", {}),
+                    })
+
+                async def _after_tool(event: AfterToolCallEvent):
+                    tu = event.tool_use
+                    is_err = isinstance(event.result, dict) and event.result.get("status") == "error"
+                    progress_q.put_nowait({
+                        "group": gi + 1, "slugs": slugs_label,
+                        "toolResult": tu.get("toolUseId", ""),
+                        "toolStatus": "error" if is_err else "success",
+                    })
+
+                composer.hooks.add_callback(BeforeToolCallEvent, _before_tool)
+                composer.hooks.add_callback(AfterToolCallEvent, _after_tool)
+
+                max_retries = 2
+                for attempt in range(max_retries + 1):
+                    try:
+                        response = composer(user_content if attempt == 0 else None)
+                        progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "status": "done"})
+                        return {"slugs": group["slugs"], "response": str(response)}
+                    except Exception as e:
+                        if attempt < max_retries:
+                            progress_q.put_nowait({
+                                "group": gi + 1, "slugs": slugs_label,
+                                "status": "retrying", "attempt": attempt + 1, "error": str(e),
+                            })
+                            continue
+                        raise
+
+            # Launch all groups in thread pool
+            with ThreadPoolExecutor(max_workers=max_concurrency) as pool:
+                futures = {pool.submit(run_group, gi, g): gi for gi, g in enumerate(slide_groups)}
+
+                # Drain progress queue until all futures complete
+                while futures:
+                    # Yield queued progress events
+                    while not progress_q.empty():
+                        try:
+                            yield progress_q.get_nowait()
+                        except queue.Empty:
+                            break
+
+                    # Check for completed futures
+                    done_futures = [f for f in futures if f.done()]
+                    for f in done_futures:
+                        gi = futures.pop(f)
+                        group = slide_groups[gi]
+                        slugs_label = ", ".join(group["slugs"])
+                        try:
+                            result = f.result()
+                            generated.extend(result["slugs"])
+                            done_count += len(result["slugs"])
+                            summaries[slugs_label] = result["response"]
+                            yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
+                        except Exception as e:
+                            errors.append({"slugs": group["slugs"], "error": str(e)})
+                            yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(e)}
+
+                    if futures:
+                        time.sleep(0.2)
+
+            # Drain remaining progress events
+            while not progress_q.empty():
+                try:
+                    yield progress_q.get_nowait()
+                except queue.Empty:
+                    break
 
         except Exception as e:
             failed_slugs = [s for g in slide_groups for s in g["slugs"] if s not in generated]
@@ -702,7 +712,11 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
         model_id=os.environ.get("COMPOSER_MODEL_ID", os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-4-6")),
         temperature=0.1,
         cache_config=CacheConfig(strategy="auto"),
-        boto_client_config=BotocoreConfig(user_agent_extra="strands-agents", read_timeout=30),
+        boto_client_config=BotocoreConfig(
+            user_agent_extra="strands-agents",
+            read_timeout=120,
+            retries={"max_attempts": 5, "mode": "adaptive"},
+        ),
     )
 
     # --- Build MCP server list with resilience ---

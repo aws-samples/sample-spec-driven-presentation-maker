@@ -596,7 +596,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 }
               } else if (d.status) {
                 // Group status event
-                next = [...existing, { status: d.status, group: d.group, slugs: d.slugs, total_groups: d.total_groups, done: d.done, total: d.total, summary: d.summary, message: d.message }]
+                next = [...existing, { status: d.status, group: d.group, slugs: d.slugs, total_groups: d.total_groups, done: d.done, total: d.total, summary: d.summary, message: d.message, attempt: d.attempt, error: d.error }]
               } else {
                 return prev
               }

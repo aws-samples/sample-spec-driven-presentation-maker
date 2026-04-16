@@ -349,6 +349,9 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
                       </div>
                       <span className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: `${groupAccent}cc` }}>
                         {isRetrying ? `Retrying (${retryAttempt})` : `Group ${g}/${totalGroups}`} · {String(slugs)}
+                        {isRetrying && gStatus?.error && (
+                          <span className="ml-1 opacity-60" title={String(gStatus.error)}>— {String(gStatus.error).slice(0, 300)}</span>
+                        )}
                       </span>
                     </div>
                     {/* Sub-tool list — show last 3 per group */}
