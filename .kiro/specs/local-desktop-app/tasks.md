@@ -4,16 +4,16 @@
 
 ### Task 1: Prompt Extraction
 Extract agent prompts to shared files. Web version reads from same files (behavior unchanged).
-- [ ] Create `prompts/spec-agent.md` from `_SPEC_AGENT_PROMPT_TEMPLATE` in `agent/basic_agent.py`
+- [x] Create `prompts/spec-agent.md` from `_SPEC_AGENT_PROMPT_TEMPLATE` in `agent/basic_agent.py`
 - [ ] Create `prompts/composer-agent.md` from `_COMPOSER_PROMPT_TEMPLATE` in `agent/basic_agent.py`
-- [ ] Modify `agent/basic_agent.py` to read from `prompts/` (fallback to inline for backward compat)
+- [x] Modify `agent/basic_agent.py` to read from `prompts/` (fallback to inline for backward compat)
 - [ ] Verify Web version agent behavior is unchanged
 
 ### Task 2: Kiro-cli Custom Agent Configs
 Create agent configurations for kiro-cli ACP.
-- [ ] Create `.kiro/agents/sdpm-spec.json` (prompt, tools, subagent settings, hooks)
-- [ ] Create `.kiro/agents/sdpm-composer.json` (prompt, tools, no user interaction)
-- [ ] Create `desktop/scripts/auto-build.py` (postToolUse hook: detect slide edit → build + measure + compose)
+- [x] Create `.kiro/agents/sdpm-spec.json` (prompt, tools, subagent settings, hooks)
+- [x] Create `.kiro/agents/sdpm-composer.json` (prompt, tools, no user interaction)
+- [x] Create `desktop/scripts/auto-build.py` (postToolUse hook: detect slide edit → build + measure + compose)
 - [ ] Test: `kiro-cli acp --agent sdpm-spec` starts and responds to prompts
 
 ## Phase 2: Tauri App Shell

@@ -31,6 +31,28 @@
 - Hook receives tool_input (file path) via stdin JSON
 - Script checks if path matches */slides/*.json, runs Engine build
 
+### main branch prompt is pre-separation
+- main has a single `_SYSTEM_PROMPT_TEMPLATE` (no SPEC/Composer split)
+- `feat/agent-separation-spec-composer` branch has the detailed prompts
+- Extract what's on main now; when separation branch merges, update `prompts/`
+- Web version wraps prompt with `{now}` and `{mcp_instructions}` placeholders
+- kiro-cli handles timestamp and MCP instructions itself, so prompt file should be the core content only
+- `agent/basic_agent.py` adds the wrapper; `.kiro/agents/` references the file directly
+
+### auto-build.py needs Engine API alignment
+- Web version's `run_python` calls `generate.generate_pptx()` and `preview.measure()` with S3 storage
+- Local version's `auto-build.py` calls `sdpm.api.generate()` and `sdpm.api.measure()` directly
+- Engine API (`skill/sdpm/api.py`) works with local file paths — no S3 dependency
+- But `generate()` expects a `json_path` pointing to the old `presentation.json` or new `deck.json`
+- Need to verify Engine API accepts the local deck directory structure
+- compose (SVG split) is NOT in Engine API — it's in `mcp-server/tools/compose.py`
+- For local version, compose may need to be extracted to a standalone script or skipped initially
+
+### kiro-cli agent config: file:// paths are relative to cwd
+- `.kiro/agents/sdpm-spec.json` uses `file://prompts/system-prompt.md`
+- This resolves relative to the project root (where kiro-cli is launched)
+- Works for dev mode; for Tauri packaged app, need to ensure cwd is set correctly
+
 ## Risks
 
 ### ToolCallUpdate granularity (unverified)

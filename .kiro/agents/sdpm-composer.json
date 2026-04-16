@@ -1,0 +1,29 @@
+{
+  "name": "sdpm-composer",
+  "description": "Composer agent for spec-driven-presentation-maker. Writes slide JSON, builds PPTX, measures, and polishes autonomously. No user interaction.",
+  "prompt": "file://prompts/system-prompt.md",
+  "tools": [
+    "fs_read",
+    "fs_write",
+    "execute_bash",
+    "grep",
+    "glob"
+  ],
+  "allowedTools": [
+    "fs_read",
+    "fs_write",
+    "execute_bash",
+    "grep",
+    "glob"
+  ],
+  "toolsSettings": {
+    "fs_write": {
+      "allowedPaths": ["~/Documents/SDPM-Presentations/**"]
+    }
+  },
+  "resources": [
+    "file://prompts/system-prompt.md",
+    "skill://skill/references/workflows/create-new-2-compose.md",
+    "skill://skill/references/workflows/slide-json-spec.md"
+  ]
+}

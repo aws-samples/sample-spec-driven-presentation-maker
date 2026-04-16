@@ -1,0 +1,46 @@
+{
+  "name": "sdpm-spec",
+  "description": "SPEC agent for spec-driven-presentation-maker. Handles briefing, outline, art-direction through user dialogue, then delegates slide generation to composer sub-agent.",
+  "prompt": "file://prompts/system-prompt.md",
+  "tools": [
+    "fs_read",
+    "fs_write",
+    "execute_bash",
+    "grep",
+    "glob",
+    "use_subagent",
+    "web_search",
+    "web_fetch"
+  ],
+  "allowedTools": [
+    "fs_read",
+    "grep",
+    "glob"
+  ],
+  "toolsSettings": {
+    "subagent": {
+      "availableAgents": ["sdpm-composer"],
+      "trustedAgents": ["sdpm-composer"]
+    },
+    "fs_write": {
+      "allowedPaths": ["~/Documents/SDPM-Presentations/**"]
+    },
+    "execute_bash": {
+      "autoAllowReadonly": true
+    }
+  },
+  "hooks": {
+    "postToolUse": [
+      {
+        "matcher": "fs_write",
+        "command": "python3 desktop/scripts/auto-build.py",
+        "description": "Auto-build PPTX + measure after slide JSON edit"
+      }
+    ]
+  },
+  "resources": [
+    "file://prompts/system-prompt.md",
+    "skill://skill/references/workflows/*.md"
+  ],
+  "welcomeMessage": "What presentation would you like to create?"
+}
