@@ -3,29 +3,18 @@
   "description": "SPEC agent for spec-driven-presentation-maker. Handles briefing, outline, art-direction through user dialogue, then delegates slide generation to composer sub-agent.",
   "prompt": "file://../../prompts/system-prompt.md\n\n## Desktop App Rules\n- Do NOT open files in external applications (no `open`, `xdg-open`, `start` commands)\n- All file content should be read via tools and presented in chat",
   "tools": [
-    "fs_read",
-    "fs_write",
-    "execute_bash",
-    "grep",
-    "glob",
+    "@sdpm",
     "use_subagent",
     "web_search",
-    "web_fetch",
-    "@sdpm"
+    "web_fetch"
   ],
   "allowedTools": [
-    "fs_read",
-    "grep",
-    "glob",
     "@sdpm"
   ],
   "toolsSettings": {
     "subagent": {
       "availableAgents": ["sdpm-composer"],
       "trustedAgents": ["sdpm-composer"]
-    },
-    "execute_bash": {
-      "autoAllowReadonly": true
     }
   },
   "mcpServers": {
@@ -34,15 +23,6 @@
       "args": ["run", "--directory", "mcp-local", "python", "server.py"],
       "timeout": 120000
     }
-  },
-  "hooks": {
-    "postToolUse": [
-      {
-        "matcher": "fs_write",
-        "command": "python3 desktop/scripts/auto-build.py",
-        "description": "Auto-build PPTX + measure after slide JSON edit"
-      }
-    ]
   },
   "resources": [
     "skill://skill/references/workflows/*.md"
