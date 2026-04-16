@@ -118,6 +118,7 @@ function handleLine(line: string) {
             const dirName = (result.output_dir as string).split("/").pop() || "";
             result.deckId = dirName;
           }
+          console.log("[acp tool completed]", toolName, "deckId:", result.deckId, "result keys:", Object.keys(result));
 
           toolCallback(toolName, {
             toolUseId: toolCallId, name: toolName,
