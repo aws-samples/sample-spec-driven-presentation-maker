@@ -4,6 +4,9 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react()],
+  css: {
+    postcss: "./postcss.config.mjs",
+  },
   resolve: {
     alias: {
       // Service overrides — local implementations replace AWS ones

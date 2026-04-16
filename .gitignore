@@ -68,3 +68,8 @@ skill/sdpm/.cache/
 
 # Temporary workspace
 tmp/
+
+# Tauri build artifacts
+desktop/src-tauri/target/
+desktop/node_modules/
+desktop/dist/

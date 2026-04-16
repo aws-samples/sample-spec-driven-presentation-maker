@@ -205,3 +205,6 @@ export function generateSessionId(): string {
 
 /** No-op config setter (for compatibility with agentCoreService). */
 export async function setAgentConfig(): Promise<void> {}
+
+// Alias for ChatPanel.tsx compatibility
+export { invokeAgent as invokeAgentCore };

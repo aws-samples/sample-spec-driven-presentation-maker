@@ -1,0 +1,3 @@
+/* Desktop entry CSS — scan web-ui + desktop sources, then import shared styles */
+@source "../../web-ui/src/**/*.{ts,tsx}";
+@source "../src/**/*.{ts,tsx}";

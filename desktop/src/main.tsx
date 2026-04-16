@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "@desktop/app.css";
 import "@/app/globals.css";
 import { ServiceProvider } from "@desktop/lib/serviceProvider";
 import { Toaster } from "sonner";

@@ -10,7 +10,6 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "title": "spec-driven-presentation-maker",
     "windows": [
       {
         "title": "spec-driven-presentation-maker",
