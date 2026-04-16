@@ -97,20 +97,25 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
                measure_slides: list[str] | None = None, purpose: str = "") -> str:
     """Execute Python code in the deck workspace or for general computation.
 
-    If deck_id is provided, the code runs with cwd set to that directory.
-    All workspace files are accessible via normal file I/O.
+    If deck_id is provided (as output_dir path), the code runs with cwd set
+    to that directory. Deck structure:
+        deck.json           — metadata (template, fonts, defaultTextColor)
+        specs/outline.md    — slide order (``- [slug] Message``)
+        slides/{slug}.json  — per-slide data
+        includes/           — code blocks, images
+    Legacy decks with presentation.json are also supported.
 
     **Always specify measure_slides when editing slides.**
 
     Args:
         code: Python code to execute.
         deck_id: Deck output_dir path. Optional.
-        save: When True, triggers PPTX build + preview after execution.
-        measure_slides: Slide slugs to measure after execution.
+        save: When True, triggers PPTX build + preview + SVG compose after execution.
+        measure_slides: Slide slugs to measure after execution (e.g. ["title", "feature-a"]).
         purpose: Brief description shown in UI.
 
     Returns:
-        JSON: {"output", "measure"?, "pptx"?, "preview"?}
+        JSON: {"output", "measure"?, "pptx"?, "preview"?, "compose"?}
     """
     result: dict = {}
     cwd = deck_id if deck_id and Path(deck_id).is_dir() else None
@@ -134,83 +139,97 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
     except Exception as e:
         result["output"] = f"Error: {e}"
 
+    if not cwd:
+        return json.dumps(result, ensure_ascii=False)
+
+    # Determine deck input path: directory (new format) or presentation.json (legacy)
+    deck_dir = Path(cwd)
+    legacy_json = deck_dir / "presentation.json"
+    # sdpm.api accepts a directory (new format) or a .json file (legacy)
+    deck_input = str(legacy_json) if legacy_json.exists() else str(deck_dir)
+
+    # Build slug → page number mapping from outline.md (for slug-based measure_slides)
+    def _slug_to_page() -> dict[str, int]:
+        from sdpm.api import parse_outline_slugs
+        slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
+        return {slug: i + 1 for i, slug in enumerate(slugs)}
+
     # Post-processing: measure
-    if cwd and measure_slides:
+    if measure_slides:
         try:
-            json_path = str(Path(cwd) / "presentation.json")
-            if Path(json_path).exists():
-                pages = ",".join(measure_slides) if measure_slides else ""
-                result["measure"] = _measure(slides_json_path=json_path, pages=pages)
+            s2p = _slug_to_page()
+            page_nums = [s2p[s] for s in measure_slides if s in s2p]
+            pages = ",".join(str(p) for p in page_nums)
+            result["measure"] = _measure(slides_json_path=deck_input, pages=pages) if pages \
+                else "No matching slides found for given slugs"
         except Exception as e:
             result["measure"] = f"Measure error: {e}"
 
-    # Post-processing: build PPTX + preview (when save=True)
-    if cwd and save:
-        json_path = str(Path(cwd) / "presentation.json")
-        if Path(json_path).exists():
-            try:
-                build_result = _generate_pptx(
-                    slides_json_path=json_path, output_path="", skill_dir=_SKILL_DIR
-                )
-                result["pptx"] = build_result.get("output_path", "")
-            except Exception as e:
-                result["pptx_error"] = str(e)
+    # Post-processing: build PPTX + preview + SVG compose (when save=True)
+    if save:
+        try:
+            build_result = _generate_pptx(
+                slides_json_path=deck_input, output_path="", skill_dir=_SKILL_DIR
+            )
+            result["pptx"] = build_result.get("output_path", "")
+        except Exception as e:
+            result["pptx_error"] = str(e)
 
-            try:
-                preview_result = _preview(slides_json_path=json_path, pages="", output_path="")
-                if isinstance(preview_result, dict) and preview_result.get("files"):
-                    import shutil
-                    preview_dir = Path(cwd) / "preview"
-                    preview_dir.mkdir(exist_ok=True)
-                    for png_path in preview_result["files"]:
-                        src = Path(png_path)
-                        if src.exists():
-                            shutil.copy2(src, preview_dir / src.name)
-                    result["preview"] = f"{len(preview_result['files'])} PNGs"
-            except Exception as e:
-                result["preview_error"] = str(e)
+        try:
+            preview_result = _preview(slides_json_path=deck_input, pages="", output_path="")
+            if isinstance(preview_result, dict) and preview_result.get("files"):
+                import shutil as _shutil
+                preview_dir = deck_dir / "preview"
+                preview_dir.mkdir(exist_ok=True)
+                for png_path in preview_result["files"]:
+                    src = Path(png_path)
+                    if src.exists():
+                        _shutil.copy2(src, preview_dir / src.name)
+                result["preview"] = f"{len(preview_result['files'])} PNGs"
+        except Exception as e:
+            result["preview_error"] = str(e)
 
-            # SVG compose for WebUI animation (requires LibreOffice 25.8.6+)
-            try:
-                import shutil as _sh
-                lo = _sh.which("soffice") or (
-                    "/Applications/LibreOffice.app/Contents/MacOS/soffice"
-                    if Path("/Applications/LibreOffice.app/Contents/MacOS/soffice").exists()
-                    else None
-                )
-                pptx_out = result.get("pptx", "")
-                if lo and pptx_out:
-                    with tempfile.TemporaryDirectory() as tmpdir:
-                        env = dict(os.environ)
-                        env["HOME"] = tmpdir
-                        subprocess.run(
-                            [lo, "--headless", "--convert-to", "svg", "--outdir", tmpdir, pptx_out],
-                            capture_output=True, timeout=120, env=env,
+        # SVG compose for WebUI animation (requires LibreOffice 25.8.6+)
+        try:
+            import shutil as _sh
+            lo = _sh.which("soffice") or (
+                "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+                if Path("/Applications/LibreOffice.app/Contents/MacOS/soffice").exists()
+                else None
+            )
+            pptx_out = result.get("pptx", "")
+            if lo and pptx_out:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    env = dict(os.environ)
+                    env["HOME"] = tmpdir
+                    subprocess.run(
+                        [lo, "--headless", "--convert-to", "svg", "--outdir", tmpdir, pptx_out],
+                        capture_output=True, timeout=120, env=env,
+                    )
+                    svg_files = list(Path(tmpdir).glob("*.svg"))
+                    if svg_files:
+                        from compose import extract_optimized_defs, split_slide_components, count_slides
+                        svg_path = svg_files[0]
+                        n = count_slides(svg_path)
+                        compose_dir = deck_dir / "compose"
+                        compose_dir.mkdir(exist_ok=True)
+                        (compose_dir / "defs.json").write_text(
+                            json.dumps(extract_optimized_defs(svg_path), ensure_ascii=False),
+                            encoding="utf-8",
                         )
-                        svg_files = list(Path(tmpdir).glob("*.svg"))
-                        if svg_files:
-                            from compose import extract_optimized_defs, split_slide_components, count_slides
-                            svg_path = svg_files[0]
-                            n = count_slides(svg_path)
-                            compose_dir = Path(cwd) / "compose"
-                            compose_dir.mkdir(exist_ok=True)
-                            (compose_dir / "defs.json").write_text(
-                                json.dumps(extract_optimized_defs(svg_path), ensure_ascii=False),
-                                encoding="utf-8",
-                            )
-                            composed = 0
-                            for sn in range(1, n):  # skip DummySlide at index 0
-                                try:
-                                    comp = split_slide_components(svg_path, sn)
-                                    (compose_dir / f"slide_{sn}.json").write_text(
-                                        json.dumps(comp, ensure_ascii=False), encoding="utf-8"
-                                    )
-                                    composed += 1
-                                except Exception:
-                                    pass
-                            result["compose"] = f"{composed} slides composed"
-            except Exception as e:
-                result["compose_error"] = str(e)
+                        composed = 0
+                        for sn in range(1, n):  # skip DummySlide at index 0
+                            try:
+                                comp = split_slide_components(svg_path, sn)
+                                (compose_dir / f"slide_{sn}.json").write_text(
+                                    json.dumps(comp, ensure_ascii=False), encoding="utf-8"
+                                )
+                                composed += 1
+                            except Exception:
+                                pass
+                        result["compose"] = f"{composed} slides composed"
+        except Exception as e:
+            result["compose_error"] = str(e)
 
     return json.dumps(result, ensure_ascii=False)
 
