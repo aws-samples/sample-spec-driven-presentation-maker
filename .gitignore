@@ -73,3 +73,6 @@ tmp/
 desktop/src-tauri/target/
 desktop/node_modules/
 desktop/dist/
+
+mcp-local/.venv/
+mcp-local/__pycache__/
