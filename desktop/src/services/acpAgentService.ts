@@ -239,12 +239,17 @@ export async function invokeAgent(
     rpcRequest("session/cancel", { sessionId }).catch(() => {});
   });
 
-  await rpcRequest("session/prompt", {
+  // Send prompt — don't await (response comes as stopReason later)
+  rpcRequest("session/prompt", {
     sessionId,
     prompt: [{ type: "text", text: query }],
+  }).then(() => {
+    // rpcRequest resolves when stopReason response arrives
+    if (turnEndResolve) { turnEndResolve(); turnEndResolve = null; }
   });
 
-  // rpcRequest resolves when stopReason response arrives — turn is done
+  await turnEnd;
+
   streamCallback = null;
   toolCallback = null;
   return completion;
