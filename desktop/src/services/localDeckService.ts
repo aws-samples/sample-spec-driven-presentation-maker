@@ -213,8 +213,25 @@ export async function getChatHistory(sessionId: string, _idToken?: string): Prom
 }
 
 export async function fetchStyles(_idToken?: string): Promise<StyleEntry[]> {
-  // TODO: read from skill/templates/ directory
-  return [];
+  // Read style HTML files from skill/references/examples/styles/
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const projectRoot = await invoke<string>("get_project_root");
+    const stylesDir = await join(projectRoot, "skill", "references", "examples", "styles");
+    if (!(await exists(stylesDir))) return [];
+    const files = await readDir(stylesDir);
+    const styles: StyleEntry[] = [];
+    for (const f of files) {
+      if (!f.name?.endsWith(".html")) continue;
+      const name = f.name.replace(".html", "");
+      const htmlPath = await join(stylesDir, f.name);
+      const coverHtml = await readTextFile(htmlPath);
+      styles.push({ name, description: name, coverHtml });
+    }
+    return styles;
+  } catch {
+    return [];
+  }
 }
 
 async function safeRead(path: string): Promise<string | null> {
@@ -234,4 +251,12 @@ export async function listSharedDecks() { return []; }
 export async function searchUsers() { return []; }
 export async function listFavorites(_idToken?: string) { return []; }
 export async function batchGetSlidePreviewUrls() { return new Map(); }
-export async function fetchStyleHtml() { return ""; }
+export async function fetchStyleHtml(name: string, _idToken?: string): Promise<string> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const projectRoot = await invoke<string>("get_project_root");
+    const htmlPath = await join(projectRoot, "skill", "references", "examples", "styles", `${name}.html`);
+    if (await exists(htmlPath)) return await readTextFile(htmlPath);
+  } catch {}
+  return "";
+}
