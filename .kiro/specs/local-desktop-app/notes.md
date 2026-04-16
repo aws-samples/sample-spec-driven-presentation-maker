@@ -48,6 +48,14 @@
 - compose (SVG split) is NOT in Engine API — it's in `mcp-server/tools/compose.py`
 - For local version, compose may need to be extracted to a standalone script or skipped initially
 
+### globals.css cannot be @import-ed from desktop
+- globals.css has its own `@import "tailwindcss"` which creates a separate Tailwind context
+- Desktop's `@source` directives were in a different context → utility classes not generated
+- Fix: copy globals.css content into desktop/src/app.css (minus the @import "tailwindcss" line)
+- This is CSS config duplication, not component duplication — acceptable trade-off
+- When globals.css changes, desktop/src/app.css needs manual sync
+- TODO: consider a build script to auto-generate app.css from globals.css
+
 ### Vite alias resolution order matters
 - More specific paths must come BEFORE less specific ones
 - `@/services/deckService` must be before `@` (catch-all)
