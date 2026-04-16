@@ -146,7 +146,8 @@ export async function getDeck(deckId: string, _idToken?: string): Promise<DeckDe
     const specsDir = await join(dp, "specs");
     const brief = await safeRead(await join(specsDir, "brief.md"));
     const outline = await safeRead(await join(specsDir, "outline.md"));
-    const artDirection = await safeRead(await join(specsDir, "art-direction.html"));
+    const artDirection = await safeRead(await join(specsDir, "art-direction.html"))
+      || await safeRead(await join(specsDir, "art-direction.md"));
     if (brief || outline || artDirection) {
       specs = { brief, outline, artDirection };
     }
