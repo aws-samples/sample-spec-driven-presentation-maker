@@ -211,33 +211,106 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
                         from compose import extract_optimized_defs, split_slide_components, count_slides
                         from sdpm.api import parse_outline_slugs
                         import time as _t
+                        import re as _re
                         svg_path = svg_files[0]
                         n = count_slides(svg_path)
                         compose_dir = deck_dir / "compose"
                         compose_dir.mkdir(exist_ok=True)
                         epoch = int(_t.time())
-                        # defs_{epoch}.json for latest-epoch pickup by consumers
+
+                        # Index previous compose by slug → latest epoch path
+                        prev_by_slug: dict[str, Path] = {}
+                        if compose_dir.exists():
+                            for f in compose_dir.iterdir():
+                                m = _re.match(r"^(.+)_(\d+)\.json$", f.name)
+                                if m and not f.name.startswith("defs_"):
+                                    slug, ep = m.group(1), int(m.group(2))
+                                    cur = prev_by_slug.get(slug)
+                                    if not cur or int(_re.search(r"_(\d+)\.json$", cur.name).group(1)) < ep:
+                                        prev_by_slug[slug] = f
+
+                        def _mk(c: dict) -> str:
+                            b = c.get("bbox")
+                            return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
+
+                        def _fp(c: dict) -> str:
+                            return f"{c['class']}|{c.get('text', '')}"
+
+                        # Write defs_{epoch}.json
                         (compose_dir / f"defs_{epoch}.json").write_text(
                             json.dumps(extract_optimized_defs(svg_path), ensure_ascii=False),
                             encoding="utf-8",
                         )
-                        # Map slide index → slug via outline.md
+
+                        # Determine which slugs to regenerate:
+                        # - measure_slides (edited this turn) always
+                        # - any slug without existing compose (first build / new slides)
+                        # - slides/*.json modified since the newest prior compose epoch
+                        # - if no prior compose at all, regen ALL
                         slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
+                        target_slugs: set[str] = set(measure_slides or [])
+                        # Add slugs without existing compose
+                        target_slugs |= {s for s in slugs if s not in prev_by_slug}
+                        # Add slugs whose slides/*.json was modified after prior compose
+                        if prev_by_slug:
+                            for slug in slugs:
+                                prev_f = prev_by_slug.get(slug)
+                                slide_f = deck_dir / "slides" / f"{slug}.json"
+                                if slide_f.exists() and prev_f:
+                                    try:
+                                        if slide_f.stat().st_mtime > prev_f.stat().st_mtime:
+                                            target_slugs.add(slug)
+                                    except OSError:
+                                        pass
+                        # First build (no prior compose) → regen all
+                        if not prev_by_slug:
+                            target_slugs = set(slugs)
+
                         composed = 0
                         for sn in range(1, n):  # skip DummySlide at index 0
-                            idx = sn - 1  # outline is 0-based after dummy skip
+                            idx = sn - 1
                             if idx >= len(slugs):
                                 break
                             slug = slugs[idx]
+                            if slug not in target_slugs:
+                                continue
                             try:
-                                comp = split_slide_components(svg_path, sn)
+                                comp_data = split_slide_components(svg_path, sn)
+                                # Diff against previous compose for this slug
+                                prev_file = prev_by_slug.get(slug)
+                                if prev_file and prev_file.exists():
+                                    try:
+                                        prev_comps = json.loads(prev_file.read_text(encoding="utf-8")).get("components", [])
+                                        prev_map = {_mk(c): _fp(c) for c in prev_comps}
+                                        for c in comp_data["components"]:
+                                            k = _mk(c)
+                                            c["changed"] = k not in prev_map or prev_map[k] != _fp(c)
+                                    except Exception:
+                                        for c in comp_data["components"]:
+                                            c["changed"] = True
+                                else:
+                                    for c in comp_data["components"]:
+                                        c["changed"] = True
                                 (compose_dir / f"{slug}_{epoch}.json").write_text(
-                                    json.dumps(comp, ensure_ascii=False), encoding="utf-8"
+                                    json.dumps(comp_data, ensure_ascii=False), encoding="utf-8"
                                 )
                                 composed += 1
                             except Exception:
                                 pass
+
+                        # Cleanup old defs (keep only newest)
+                        for f in compose_dir.iterdir():
+                            m = _re.match(r"^defs_(\d+)\.json$", f.name)
+                            if m and int(m.group(1)) < epoch:
+                                try: f.unlink()
+                                except Exception: pass
+
                         result["compose"] = f"{composed} slides composed"
+                        if n <= 2 and len(slugs) > 1:
+                            result["compose_error"] = (
+                                f"LibreOffice exported only {n - 1} slide(s) to SVG but outline has "
+                                f"{len(slugs)} slides. Upgrade LibreOffice to 25.8.6+ (macOS multi-slide SVG fix)."
+                            )
         except Exception as e:
             result["compose_error"] = str(e)
 
