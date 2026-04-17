@@ -31,34 +31,44 @@ export type ChatTabKey = "new" | "deck"
 
 const isTauri = !!(globalThis as Record<string,unknown>).__TAURI_INTERNALS__
 
-const MODELS = [
-  { id: "", label: "Default" },
-  { id: "anthropic.claude-sonnet-4-20250514-v1:0", label: "Claude Sonnet 4" },
-  { id: "anthropic.claude-opus-4-20250514-v1:0", label: "Claude Opus 4" },
-  { id: "us.anthropic.claude-sonnet-4-20250514-v1:0", label: "Claude Sonnet 4 (cross-region)" },
-  { id: "us.anthropic.claude-opus-4-20250514-v1:0", label: "Claude Opus 4 (cross-region)" },
-]
+/** Model info populated by acpAgentService on session/new */
+interface AcpModel { modelId: string; name: string; description?: string }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const g = globalThis as any
+if (!g.__sdpmModels) g.__sdpmModels = { current: "", available: [] as AcpModel[], listeners: new Set<() => void>() }
+
+export function setAcpModels(current: string, available: AcpModel[]) {
+  g.__sdpmModels.current = current
+  g.__sdpmModels.available = available.filter(m => !m.name.startsWith("[Internal]") && !m.description?.startsWith("[Internal]") && !m.description?.startsWith("[Deprecated]"))
+  g.__sdpmModels.listeners.forEach((fn: () => void) => fn())
+}
 
 function ModelSelector() {
-  const [model, setModelState] = useState("")
+  const [model, setModelState] = useState<string>(g.__sdpmModels.current || "")
+  const [models, setModels] = useState<AcpModel[]>(g.__sdpmModels.available || [])
+
+  useEffect(() => {
+    const update = () => {
+      setModels([...g.__sdpmModels.available])
+      setModelState(g.__sdpmModels.current)
+    }
+    g.__sdpmModels.listeners.add(update)
+    return () => { g.__sdpmModels.listeners.delete(update) }
+  }, [])
+
+  if (models.length === 0) return null
+
   return (
     <select
       value={model}
       onChange={async (e) => {
         const v = e.target.value
         setModelState(v)
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const ti = (window as any).__TAURI_INTERNALS__
-          if (ti) {
-            // Store in sessionStorage; acpAgentService reads it on startAgent
-            sessionStorage.setItem("sdpm-model", v)
-          }
-        } catch { /* ignore */ }
+        sessionStorage.setItem("sdpm-model", v)
       }}
-      className="text-[11px] bg-transparent border border-border rounded px-1.5 py-0.5 text-foreground-muted hover:text-foreground focus:outline-none focus:ring-1 focus:ring-brand-teal"
+      className="text-[11px] bg-transparent border border-border rounded px-1.5 py-0.5 text-foreground-muted hover:text-foreground focus:outline-none focus:ring-1 focus:ring-brand-teal max-w-[140px]"
     >
-      {MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+      {models.map(m => <option key={m.modelId} value={m.modelId}>{m.name}</option>)}
     </select>
   )
 }

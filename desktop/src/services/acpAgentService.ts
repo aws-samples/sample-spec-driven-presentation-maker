@@ -256,16 +256,6 @@ function handleLine(line: string) {
 /** Current model override (null = kiro-cli default). */
 let currentModel: string | null = null;
 
-/** Set the model for the next agent start. Takes effect on next startAgent/new chat. */
-export function setModel(model: string | null): void {
-  currentModel = model;
-}
-
-/** Get the current model setting. */
-export function getModel(): string | null {
-  return currentModel;
-}
-
 /** Start the kiro-cli acp process. */
 export async function startAgent(): Promise<void> {
   if (child) return;
@@ -322,6 +312,20 @@ export async function startAgent(): Promise<void> {
   const result = await rpcRequest("session/new", { cwd, mcpServers: [] }) as Record<string, unknown>;
   sessionId = result.sessionId as string;
   console.log("[acp] session created:", sessionId);
+
+  // Populate model selector from ACP response
+  const modelsInfo = result.models as { currentModelId?: string; availableModels?: { modelId: string; name: string; description?: string }[] } | undefined;
+  if (modelsInfo?.availableModels) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const g = globalThis as any;
+    if (g.__sdpmModels) {
+      g.__sdpmModels.current = modelsInfo.currentModelId || "";
+      g.__sdpmModels.available = modelsInfo.availableModels.filter(
+        (m: { description?: string }) => !m.description?.startsWith("[Internal]") && !m.description?.startsWith("[Deprecated]")
+      );
+      g.__sdpmModels.listeners.forEach((fn: () => void) => fn());
+    }
+  }
 }
 
 /** Stop the kiro-cli acp process. */
