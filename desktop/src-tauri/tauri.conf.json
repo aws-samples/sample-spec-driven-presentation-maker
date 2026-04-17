@@ -18,7 +18,11 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$HOME/Documents/SDPM-Presentations/**"]
+      }
     },
     "withGlobalTauri": true
   },
