@@ -283,6 +283,8 @@ waf:
 
 デフォルトアクションは **Block** で、指定された IP 範囲のみアクセスが許可されます。`waf` セクションを省略した場合、WAF リソースは作成されません。
 
+> **⚠️ IPv6 に関する注意:** `allowedIpV4AddressRanges` のみ指定し `allowedIpV6AddressRanges` を省略した場合、IPv6 によるアクセスはすべてブロックされます。最近のブラウザは IPv6 を優先的に使用するため、IPv4 アドレスが許可されていても Web UI が「Loading authentication configuration...」のまま停止することがあります。デュアルスタック環境では必ず IPv4 と IPv6 の両方を指定してください。
+
 ### セマンティックスライド検索
 
 `features.searchSlides: true` を設定すると、Amazon Bedrock Knowledge Base が作成され、デッキ横断のセマンティック検索が利用可能になります。

@@ -70,8 +70,16 @@ chmod +x scripts/deploy.sh
 **WAF IP アドレス制限を有効にする場合:**
 
 ```bash
+# IPv4 のみ（⚠️ IPv6 アクセスはすべてブロックされます — 下記の注意を参照）
 ./scripts/deploy.sh --region us-east-1 --waf-ipv4 "203.0.113.0/24,198.51.100.0/24"
+
+# IPv4 + IPv6（デュアルスタック環境では推奨）
+./scripts/deploy.sh --region us-east-1 \
+  --waf-ipv4 "203.0.113.0/24" \
+  --waf-ipv6 "2001:db8::/32"
 ```
+
+> **⚠️ IPv6 に関する注意:** `--waf-ipv4` のみ指定し `--waf-ipv6` を省略した場合、IPv6 によるアクセスはすべてブロックされます。最近のブラウザは IPv6 を優先するため、Web UI が停止しているように見えることがあります。デュアルスタック環境では必ず両方を指定してください。
 
 **`infra/config.yaml` を使う場合:**
 

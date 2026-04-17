@@ -70,8 +70,16 @@ Choose options based on your use case.
 **With WAF IP address restriction:**
 
 ```bash
+# IPv4 only (⚠️ this blocks all IPv6 access — see note below)
 ./scripts/deploy.sh --region us-east-1 --waf-ipv4 "203.0.113.0/24,198.51.100.0/24"
+
+# IPv4 + IPv6 (recommended for dual-stack networks)
+./scripts/deploy.sh --region us-east-1 \
+  --waf-ipv4 "203.0.113.0/24" \
+  --waf-ipv6 "2001:db8::/32"
 ```
+
+> **⚠️ IPv6 Note:** If you specify only `--waf-ipv4` without `--waf-ipv6`, all IPv6 access is blocked. Modern browsers often prefer IPv6, which can cause the Web UI to appear stuck. Always specify both if your network uses dual-stack.
 
 **Using `infra/config.yaml`:**
 
