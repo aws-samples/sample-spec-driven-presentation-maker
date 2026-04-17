@@ -76,8 +76,6 @@ export class WebUiStack extends cdk.Stack {
     });
 
     // --- Amazon CloudFront ---
-    const oai = new cloudfront.OriginAccessIdentity(this, "OAI");
-    siteBucket.grantRead(oai);
 
     // CloudFront Function to rewrite directory requests to index.html
     // (S3 REST API does not support index documents for subdirectories)
@@ -158,7 +156,7 @@ function handler(event) {
 
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
-        origin: new origins.S3Origin(siteBucket, { originAccessIdentity: oai }),
+        origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         functionAssociations: [{
           function: urlRewrite,
@@ -166,9 +164,11 @@ function handler(event) {
         }],
       },
       defaultRootObject: "index.html",
+      // 404 → /index.html for SPA client-side routing.
+      // With OAC, S3 returns 404 (not 403) for missing keys, so this
+      // fallback handles SPA routing without interfering with WAF blocks.
       errorResponses: [
         { httpStatus: 404, responseHttpStatus: 200, responsePagePath: "/index.html" },
-        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: "/index.html" },
       ],
     });
 
