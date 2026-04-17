@@ -65,6 +65,70 @@ def list_styles() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Override init_presentation for subagent-branch deck format (deck.json + slides/)
+# ---------------------------------------------------------------------------
+mcp._tool_manager._tools.pop("init_presentation", None)
+
+
+@mcp.tool()
+def init_presentation(name: str, template: str = "") -> str:
+    """Initialize a presentation workspace (deck.json + slides/ + specs/ format).
+
+    Creates:
+        deck.json             — metadata (template, fonts, defaultTextColor)
+        slides/               — empty directory for slides/{slug}.json
+        specs/brief.md        — empty
+        specs/outline.md      — empty
+        specs/art-direction.html — empty
+
+    Args:
+        name: Presentation name (used in directory name).
+        template: Optional template name (e.g. "blank-dark") or path.
+
+    Returns:
+        JSON with output_dir, deck_json path, template info.
+    """
+    from datetime import datetime
+    from sdpm.analyzer import extract_fonts
+
+    base_dir = Path.home() / "Documents" / "SDPM-Presentations"
+    ts = datetime.now().strftime("%Y%m%d-%H%M")
+    dir_name = f"{ts}-{name}" if name else ts
+    out_dir = base_dir / dir_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    deck_data: dict = {}
+    if template:
+        templates_dir = _SKILL_DIR / "templates"
+        template_src = Path(template).expanduser()
+        if not template_src.exists():
+            candidate = templates_dir / (template if template.endswith(".pptx") else f"{template}.pptx")
+            if candidate.exists():
+                template_src = candidate
+        if template_src.exists():
+            deck_data["template"] = template_src.name
+            try:
+                deck_data["fonts"] = extract_fonts(template_src.resolve())
+            except Exception:
+                pass
+
+    (out_dir / "deck.json").write_text(json.dumps(deck_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out_dir / "slides").mkdir(exist_ok=True)
+    specs_dir = out_dir / "specs"
+    specs_dir.mkdir(exist_ok=True)
+    for fname in ("brief.md", "outline.md", "art-direction.html"):
+        (specs_dir / fname).touch()
+
+    return json.dumps({
+        "output_dir": str(out_dir),
+        "deck_json": str(out_dir / "deck.json"),
+        "template": deck_data.get("template", ""),
+        "fonts": deck_data.get("fonts", {}),
+        "workspace": ["deck.json", "slides/", "specs/brief.md", "specs/outline.md", "specs/art-direction.html"],
+    }, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
 # ACP-only tools
 # ---------------------------------------------------------------------------
 @mcp.tool()
