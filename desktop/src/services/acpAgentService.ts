@@ -307,9 +307,15 @@ export async function startAgent(): Promise<void> {
 /** Stop the kiro-cli acp process. */
 export async function stopAgent(): Promise<void> {
   if (child) {
-    await child.kill();
+    try { await child.kill(); } catch { /* already dead */ }
     child = null;
     sessionId = null;
+    pending.clear();
+    subagentGroups.clear();
+    subagentToolCallId = null;
+    subagentQueryQueue = [];
+    totalGroups = 0;
+    turnEndResolve = null;
   }
 }
 
@@ -332,13 +338,11 @@ export async function invokeAgent(
     currentChatSessionId = _sessionId;
     console.log("[acp] agent started, sessionId:", sessionId);
   } else if (_sessionId !== currentChatSessionId) {
-    // New chat — create new ACP session (reuse same process)
-    console.log("[acp] new chat session, creating new ACP session");
-    const { homeDir } = await import("@tauri-apps/api/path");
-    const home = await homeDir();
-    const cwd = `${home.replace(/\/+$/, "")}/Documents/SDPM-Presentations`;
-    const result = await rpcRequest("session/new", { cwd, mcpServers: [] }) as Record<string, unknown>;
-    sessionId = result.sessionId as string;
+    // New chat — restart kiro-cli acp process to ensure a clean agent context
+    // (session/new alone sometimes loses the --agent sdpm-spec configuration).
+    console.log("[acp] new chat session, restarting ACP process");
+    await stopAgent();
+    await startAgent();
     currentChatSessionId = _sessionId;
     console.log("[acp] new ACP session:", sessionId);
   }
