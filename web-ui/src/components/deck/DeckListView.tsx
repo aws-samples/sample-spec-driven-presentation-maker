@@ -39,7 +39,8 @@ interface Tab {
 }
 
 /** Available tabs in the deck list. */
-const TABS: Tab[] = [
+const isTauri = !!(globalThis as Record<string,unknown>).__TAURI_INTERNALS__
+const TABS: Tab[] = isTauri ? [] : [
   { key: "mine", label: "My Decks", icon: Lock },
   { key: "favorites", label: "Favorites", icon: Star },
   { key: "shared", label: "Shared", icon: Users },
