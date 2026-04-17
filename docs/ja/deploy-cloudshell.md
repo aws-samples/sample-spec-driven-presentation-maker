@@ -57,7 +57,7 @@ chmod +x scripts/deploy.sh
 ./scripts/deploy.sh --region us-east-1 --observability
 ```
 
-> **注意:** `--observability` は Bedrock の Model Invocation Logging（MIL）をアカウント・リージョン単位で設定します。既に MIL が設定されている場合、スクリプトが既存設定の上書きについて警告し、確認を求めます。
+> **注意:** `--observability` は Bedrock の Model Invocation Logging（MIL）をアカウント・リージョン単位で設定します。既に MIL が設定されている場合、スクリプトが警告を表示し、既存設定を保護するため MIL の設定を自動的にスキップします。
 
 **外部 IdP を使う場合:**
 
@@ -204,48 +204,46 @@ rm -rf ~/sample-spec-driven-presentation-maker
 
 **--observability で「既に設定済み」と警告される**
 
-Bedrock Model Invocation Logging はアカウント・リージョンで 1 つしか設定できません。既存の設定がある場合、`deploy.sh` は上書きの確認を求めます。既存のログ送信先（CloudWatch Logs グループ名）が表示されるので、上書きして問題ないか確認してから `y` を入力してください。上書きすると、既存の MIL 設定は復元できません。
+Bedrock Model Invocation Logging はアカウント・リージョンで 1 つしか設定できません。既存の設定がある場合、`deploy.sh` は既存のログ送信先（CloudWatch Logs グループ名）を表示し、MIL の設定を自動的にスキップします。デプロイは observability を無効にした状態で続行されます。SDPM の observability を使用するには、既存の MIL 設定を手動で削除してから `--observability` を付けて再実行してください。
 
 ## 推定月額料金
 
-Layer 4 フルスタック（us-east-1）の試算です。社内チーム 10 人程度、月 100 デッキ生成を想定しています。
+> **2026 年 4 月時点の公開価格に基づく概算です。** AWS の各サービス料金は変更される可能性があります。最新の料金は各サービスの公式ページを参照してください: [Amazon Bedrock 料金](https://aws.amazon.com/bedrock/pricing/)、[AgentCore 料金](https://aws.amazon.com/bedrock/agentcore/pricing/)、[S3](https://aws.amazon.com/s3/pricing/)、[DynamoDB](https://aws.amazon.com/dynamodb/pricing/)。
+
+Layer 4 フルスタック（us-east-1）の試算です。社内チーム 10 人程度、月 20 デッキ生成を想定しています。
 
 ### 固定費（常時稼働）
 
-| リソース | 構成 | 推定月額 |
-|---|---|---|
-| CloudFront | 転送量 10GB/月程度 | ~$1 |
-| Cognito User Pool | 50,000 MAU まで無料 | $0 |
-| API Gateway REST | 月数千リクエスト | ~$0.5 |
-| Lambda（API） | 月数千リクエスト | ~$0.5 |
-| S3（3 バケット） | 数 GB 保存 + リクエスト | ~$1 |
-| DynamoDB On-Demand | 少量の読み書き | ~$1 |
-| ECR（2 イメージ） | 数 GB 保存 | ~$1 |
-| CloudWatch Logs | ログ保存 | ~$1 |
+| リソース | 推定月額 |
+|---|---|
+| CloudFront | ~$1 |
+| Cognito User Pool | $0 |
+| API Gateway REST + Lambda（API） | ~$1 |
+| S3（3 バケット） | ~$1 |
+| DynamoDB On-Demand | ~$1 |
+| ECR（2 イメージ） | ~$1 |
+| CloudWatch Logs | ~$1 |
 
 ### 従量費（利用量依存）
 
-| リソース | 単価目安 | 月 100 デッキ想定 |
-|---|---|---|
-| AgentCore Runtime（MCP Server） | コンテナ稼働時間課金 | ~$10-20 |
-| AgentCore Runtime（Agent） | コンテナ稼働時間課金 | ~$10-20 |
-| Bedrock Claude Opus 4.6（Agent LLM） | 入力 $15 / 出力 $75 per 1M tokens | ~$30-80 |
-| AgentCore Code Interpreter | セッション課金 | ~$5-10 |
-| AgentCore Memory | イベント保存 | ~$1 |
+| リソース | 月 20 デッキ想定 |
+|---|---|
+| AgentCore Runtime（MCP Server + Agent） | ~$5-10 |
+| Bedrock Claude Sonnet 4.6（Agent LLM） | ~$80-130 |
+| AgentCore Code Interpreter | ~$1-3 |
+| AgentCore Memory | ~$1 |
 
 ### 合計
 
-**月 $60〜140 程度**（利用量により変動）
+**月 $95〜145 程度**（利用量により変動）
 
 ### コスト削減のポイント
 
 | 方法 | 削減額 | 備考 |
 |---|---|---|
-| LLM を Sonnet 4.6 に変更 | LLM 費用 1/5〜1/10 | v1.0 からデフォルト。`config.yaml` でモデル変更可能 |
+| プロンプトキャッシュ | LLM 費用最大 80% 削減 | 対応モデルではデフォルトで有効 |
 | `--search` を付けない（デフォルト） | KB + S3 Vectors 費用なし | セマンティック検索が不要なら省略 |
 | `--observability` を付けない（デフォルト） | CloudWatch Logs 費用なし | MIL ログの保存・転送費用が不要 |
-
-> 料金は 2026 年 3 月時点の公開価格に基づく概算です。最新の料金は [AWS 料金ページ](https://aws.amazon.com/pricing/) を参照してください。
 
 ## 関連ドキュメント
 
