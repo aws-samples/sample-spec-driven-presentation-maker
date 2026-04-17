@@ -153,17 +153,46 @@ export async function getDeck(deckId: string, _idToken?: string): Promise<DeckDe
     }
   }
 
+  // Parse outline.md for slide order (matches skill/sdpm.api.parse_outline_slugs)
+  const parseOutlineSlugs = async (): Promise<string[]> => {
+    const specsDir = await join(dp, "specs");
+    const outlineText = await safeRead(await join(specsDir, "outline.md"));
+    if (!outlineText) return [];
+    const re = /^-\s*\[([a-z0-9-]+)\]\s*/;
+    return outlineText.split("\n").map((l) => re.exec(l)?.[1]).filter((s): s is string => !!s);
+  };
+  const outlineSlugs = await parseOutlineSlugs();
+
+  // Index preview PNG files by page number (page01-*.png → 1)
+  const previewByPage = new Map<number, string>(); // page num (1-based) → filename
+  const previewDir = await join(dp, "preview");
+  if (await exists(previewDir)) {
+    const previewFiles = await readDir(previewDir);
+    for (const f of previewFiles) {
+      if (!f.name?.endsWith(".png")) continue;
+      const m = f.name.match(/^page(\d+)[-.]/);
+      if (m) previewByPage.set(parseInt(m[1], 10), f.name);
+    }
+  }
+
   if (await exists(slidesDir)) {
-    const files = await readDir(slidesDir);
-    for (const f of files) {
-      if (!f.name?.endsWith(".json")) continue;
-      const slug = f.name.replace(".json", "");
-      const previewPath = await join(dp, "preview", `${slug}.png`);
+    // Iterate in outline order; fall back to readdir order if outline missing
+    let slugList = outlineSlugs;
+    if (slugList.length === 0) {
+      const files = await readDir(slidesDir);
+      slugList = files.filter((f) => f.name?.endsWith(".json")).map((f) => f.name!.replace(".json", ""));
+    }
+    for (let i = 0; i < slugList.length; i++) {
+      const slug = slugList[i];
+      const slideJsonPath = await join(slidesDir, `${slug}.json`);
+      if (!(await exists(slideJsonPath))) continue;
+      const previewFile = previewByPage.get(i + 1);
+      const previewPath = previewFile ? await join(dp, "preview", previewFile) : null;
       const composeFile = composeBySlug.get(slug);
       const composePath = composeFile ? await join(dp, "compose", composeFile) : null;
       slides.push({
         slideId: slug,
-        previewUrl: (await exists(previewPath)) ? convertFileSrc(previewPath) : null,
+        previewUrl: previewPath ? convertFileSrc(previewPath) : null,
         composeUrl: composePath ? convertFileSrc(composePath) : null,
         updatedAt: new Date().toISOString(),
       });
