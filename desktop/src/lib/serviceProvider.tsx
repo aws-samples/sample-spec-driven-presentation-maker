@@ -54,6 +54,10 @@ export function ServiceProvider({ children }: PropsWithChildren) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+// Expose ensureAgent for cross-module access (web-ui ChatPanelShell)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).__sdpmEnsureAgent = agentService.ensureAgent;
+
 export function useServices(): ServiceContext {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useServices must be used within ServiceProvider");

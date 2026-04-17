@@ -347,6 +347,11 @@ export async function stopAgent(): Promise<void> {
  * Invoke the agent with a prompt. Same signature as agentCoreService.invokeAgentCore
  * so ChatPanel.tsx works unchanged.
  */
+/** Ensure the agent process is running (idempotent). Call early to populate model list. */
+export async function ensureAgent(): Promise<void> {
+  if (!child) await startAgent();
+}
+
 export async function invokeAgent(
   query: string,
   _sessionId: string,
