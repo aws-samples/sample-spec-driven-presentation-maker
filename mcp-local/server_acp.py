@@ -484,10 +484,10 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
                         # (builder skips missing). Build a PPTX-order list so
                         # SVG slide index → slug mapping is correct.
                         pptx_slugs = [s for s in slugs if (deck_dir / "slides" / f"{s}.json").exists()]
-                        target_slugs: set[str] = set(measure_slides or [])
+                        # Matches mcp-server: measure_slides targets those; empty means all.
+                        # Always include slugs missing compose (migration / new slides).
+                        target_slugs: set[str] = set(measure_slides) if measure_slides else set(pptx_slugs)
                         target_slugs |= {s for s in pptx_slugs if s not in prev_by_slug}
-                        if not prev_by_slug:
-                            target_slugs = set(pptx_slugs)
 
                         composed = 0
                         for sn in range(1, n):  # skip DummySlide at index 0
