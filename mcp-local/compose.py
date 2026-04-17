@@ -20,6 +20,9 @@ logger = logging.getLogger("sdpm.compose")
 SVG_NS = "http://www.w3.org/2000/svg"
 OOO_NS = "http://xml.openoffice.org/svg/export"
 _PNG_B64_RE = re.compile(r"data:image/png;base64,([A-Za-z0-9+/=]+)")
+# Strip textLength/lengthAdjust on <text>/<tspan> — webkit compresses glyphs
+# when these are present, while measure reads BoundingBox rects (unaffected).
+_TEXT_LENGTH_RE = re.compile(r'\s(?:textLength|lengthAdjust)="[^"]*"')
 
 
 def _png_to_webp_b64(match: re.Match) -> str:
@@ -31,7 +34,7 @@ def _png_to_webp_b64(match: re.Match) -> str:
 
 
 def _convert_images(svg_str: str) -> str:
-    return _PNG_B64_RE.sub(_png_to_webp_b64, svg_str)
+    return _TEXT_LENGTH_RE.sub("", _PNG_B64_RE.sub(_png_to_webp_b64, svg_str))
 
 
 def _strip_fonts(defs_el: etree._Element) -> None:

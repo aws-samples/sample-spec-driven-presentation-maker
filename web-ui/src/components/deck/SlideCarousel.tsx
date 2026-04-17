@@ -60,6 +60,8 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   // (outline-only slides without compose don't count as "existing" — new decks animate on first compose)
   const hadSlidesOnMount = useRef(slides.some((s) => !!s.composeUrl))
   const firstComposeSeenRef = useRef(false)
+  // eslint-disable-next-line no-console
+  console.log("[SlideCarousel] mount: slides.length=", slides.length, "hadComposeOnMount=", hadSlidesOnMount.current, "slugs=", slides.map(s => `${s.slideId}(${!!s.composeUrl})`).join(","))
 
   useEffect(() => {
     let anyChanged = false
