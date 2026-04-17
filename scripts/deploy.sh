@@ -18,6 +18,10 @@
 
 set -euo pipefail
 
+# Ensure we run from the repository root regardless of where the script is invoked
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "${SCRIPT_DIR}/.."
+
 # ---- Defaults ----
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 PROFILE=""
