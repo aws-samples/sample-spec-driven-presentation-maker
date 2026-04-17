@@ -31,6 +31,26 @@ WAF_IPV6=""
 CDK_COMMAND="deploy"
 PROJECT_NAME="sdpm-deploy"
 
+# ---- Load defaults from infra/config.yaml if present ----
+# CLI arguments below will override these values.
+CONFIG_FILE="infra/config.yaml"
+if [ -f "${CONFIG_FILE}" ]; then
+  _agent=$(grep -E "^\s*agent:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
+  _webui=$(grep -E "^\s*webUi:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
+  if [ "${_agent}" = "false" ] && [ "${_webui}" = "false" ]; then
+    LAYER="3"
+  fi
+  _search=$(grep -E "^\s*searchSlides:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
+  [ -n "${_search}" ] && SEARCH_SLIDES="${_search}"
+  _obs=$(grep -E "^\s*observability:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
+  [ -n "${_obs}" ] && OBSERVABILITY="${_obs}"
+  # WAF IPv4/IPv6: collect list items under each key
+  WAF_IPV4=$(awk '/allowedIpV4AddressRanges:/{f=1;next} f && /^[[:space:]]*-/{gsub(/["]/,"",$2); printf "%s,", $2; next} f && !/^[[:space:]]*-/{f=0}' "${CONFIG_FILE}" | sed 's/,$//')
+  WAF_IPV6=$(awk '/allowedIpV6AddressRanges:/{f=1;next} f && /^[[:space:]]*-/{gsub(/["]/,"",$2); printf "%s,", $2; next} f && !/^[[:space:]]*-/{f=0}' "${CONFIG_FILE}" | sed 's/,$//')
+  _oidc=$(grep -E "^\s*oidcDiscoveryUrl:" "${CONFIG_FILE}" | head -1 | sed -E 's/^[^:]+:\s*"?([^"]*)"?\s*$/\1/' || true)
+  [ -n "${_oidc}" ] && OIDC_URL="${_oidc}"
+fi
+
 # ---- Parse arguments ----
 usage() {
   cat <<EOF
@@ -100,6 +120,8 @@ echo "Region:  ${REGION}"
 echo "Layer:   ${LAYER}"
 echo "Search:  ${SEARCH_SLIDES}"
 echo "Observ:  ${OBSERVABILITY}"
+echo "WAF v4:  ${WAF_IPV4:-(none)}"
+echo "WAF v6:  ${WAF_IPV6:-(none)}"
 echo "Command: ${CDK_COMMAND}"
 echo ""
 
