@@ -485,7 +485,9 @@ def _extract_slide_titles(prs) -> dict[int, str]:
         title = ""
         if slide.shapes.title:
             title = slide.shapes.title.text.strip().replace("\n", " ")[:30]
+        # Sanitise for filenames: drop reserved chars, collapse whitespace, trim.
         title = re.sub(r'[\\/:*?"<>|]', "", title)
+        title = re.sub(r'\s+', "_", title).strip("_")
         titles[i] = title or "notitle"
     return titles
 

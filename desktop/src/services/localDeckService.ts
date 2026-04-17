@@ -182,11 +182,15 @@ export async function getDeck(deckId: string, _idToken?: string): Promise<DeckDe
       const files = await readDir(slidesDir);
       slugList = files.filter((f) => f.name?.endsWith(".json")).map((f) => f.name!.replace(".json", ""));
     }
+    // PPTX page number advances only for slugs that have a slides/*.json file
+    // (the builder skips missing slides). Keep a separate counter.
+    let pageNum = 0;
     for (let i = 0; i < slugList.length; i++) {
       const slug = slugList[i];
       const slideJsonPath = await join(slidesDir, `${slug}.json`);
       if (!(await exists(slideJsonPath))) continue;
-      const previewFile = previewByPage.get(i + 1);
+      pageNum++;
+      const previewFile = previewByPage.get(pageNum);
       const previewPath = previewFile ? await join(dp, "preview", previewFile) : null;
       const composeFile = composeBySlug.get(slug);
       const composePath = composeFile ? await join(dp, "compose", composeFile) : null;
