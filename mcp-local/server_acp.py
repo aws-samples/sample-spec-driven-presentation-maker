@@ -90,20 +90,65 @@ def generate_pptx(deck_id: str) -> str:
 
 
 @mcp.tool()
-def get_preview(deck_id: str, slide_numbers: list[int] | None = None) -> str:
-    """Generate PNG previews of slides.
+def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -> list:
+    """Get PNG preview images for visual review by the agent.
+
+    Returns actual slide images that the model can see and analyze.
+    Available after run_python(save=True) or generate_pptx completes.
+
+    - quality="low" (800px): Review all slides at once — check flow, structure, design consistency.
+    - quality="high" (1280px): Precise review of specific slides — check text, layout details.
 
     Args:
         deck_id: Deck directory path.
-        slide_numbers: 1-based slide numbers to preview. None/empty for all.
+        slide_numbers: List of 1-based slide numbers to preview (required, at least one).
+        quality: "low" (800px) or "high" (1280px).
 
     Returns:
-        JSON with generated PNG file paths.
+        List of text labels and slide images for visual inspection.
     """
-    from tools import preview as _prev
-    pages = ",".join(str(n) for n in (slide_numbers or []))
-    pptx_out = str(Path(deck_id) / "output.pptx")
-    return json.dumps(_prev(slides_json_path=deck_id, pages=pages, output_path=pptx_out), ensure_ascii=False)
+    from mcp.server.fastmcp.utilities.types import Image
+    from PIL import Image as PILImage
+    import io
+
+    if not slide_numbers:
+        return [{"type": "text", "text": "Error: slide_numbers must not be empty"}]
+    if quality not in ("low", "high"):
+        quality = "high"
+    max_edge = 800 if quality == "low" else 1280
+
+    preview_dir = Path(deck_id) / "preview"
+    if not preview_dir.exists():
+        return [{"type": "text", "text": f"Preview not available yet. Run run_python(deck_id=\"{deck_id}\", save=True) or generate_pptx first."}]
+
+    # Index preview files by 1-based page number
+    page_files: dict[int, Path] = {}
+    for f in preview_dir.iterdir():
+        if not f.name.endswith(".png"):
+            continue
+        import re as _re
+        m = _re.match(r"^page(\d+)[-.]", f.name)
+        if m:
+            page_files[int(m.group(1))] = f
+
+    result: list = []
+    for n in slide_numbers:
+        p = page_files.get(n)
+        if not p or not p.exists():
+            result.append({"type": "text", "text": f"Slide {n}: preview not found"})
+            continue
+        img = PILImage.open(p)
+        w, h = img.size
+        if max(w, h) > max_edge:
+            scale = max_edge / max(w, h)
+            img = img.resize((int(w * scale), int(h * scale)), PILImage.LANCZOS)
+        if img.mode == "RGBA":
+            img = img.convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        result.append(f"Slide {n}")
+        result.append(Image(data=buf.getvalue(), format="jpeg"))
+    return result
 
 
 @mcp.tool()
