@@ -124,17 +124,47 @@ export async function getDeck(deckId: string, _idToken?: string): Promise<DeckDe
   const slidesDir = await join(dp, "slides");
   const slideOrder: string[] = deckJson.slideOrder || [];
 
+  // Index compose files by slug → latest epoch
+  const composeBySlug = new Map<string, string>(); // slug → filename
+  let defsFilename: string | null = null;
+  const composeDir = await join(dp, "compose");
+  if (await exists(composeDir)) {
+    const composeFiles = await readDir(composeDir);
+    const epochOf = (name: string): number => {
+      const m = name.match(/_(\d+)\.json$/);
+      return m ? parseInt(m[1], 10) : 0;
+    };
+    let defsEpoch = -1;
+    for (const f of composeFiles) {
+      const n = f.name;
+      if (!n?.endsWith(".json")) continue;
+      if (n.startsWith("defs_")) {
+        const e = epochOf(n);
+        if (e > defsEpoch) { defsEpoch = e; defsFilename = n; }
+        continue;
+      }
+      // Parse "{slug}_{epoch}.json"
+      const m = n.match(/^(.+)_(\d+)\.json$/);
+      if (!m) continue;
+      const [, slug, epochStr] = m;
+      const e = parseInt(epochStr, 10);
+      const cur = composeBySlug.get(slug);
+      if (!cur || epochOf(cur) < e) composeBySlug.set(slug, n);
+    }
+  }
+
   if (await exists(slidesDir)) {
     const files = await readDir(slidesDir);
     for (const f of files) {
       if (!f.name?.endsWith(".json")) continue;
       const slug = f.name.replace(".json", "");
       const previewPath = await join(dp, "preview", `${slug}.png`);
-      const composePath = await join(dp, "compose", `${slug}.json`);
+      const composeFile = composeBySlug.get(slug);
+      const composePath = composeFile ? await join(dp, "compose", composeFile) : null;
       slides.push({
         slideId: slug,
         previewUrl: (await exists(previewPath)) ? convertFileSrc(previewPath) : null,
-        composeUrl: (await exists(composePath)) ? convertFileSrc(composePath) : null,
+        composeUrl: composePath ? convertFileSrc(composePath) : null,
         updatedAt: new Date().toISOString(),
       });
     }
@@ -154,14 +184,14 @@ export async function getDeck(deckId: string, _idToken?: string): Promise<DeckDe
   } catch { /* ignore */ }
 
   const pptxPath = await join(dp, "output.pptx");
-  const defsPath = await join(dp, "compose", "defs.json");
+  const defsPath = defsFilename ? await join(dp, "compose", defsFilename) : null;
 
   return {
     deckId,
     name: deckJson.name || deckId,
     slideOrder,
     slides,
-    defsUrl: (await exists(defsPath)) ? convertFileSrc(defsPath) : null,
+    defsUrl: defsPath ? convertFileSrc(defsPath) : null,
     pptxUrl: (await exists(pptxPath)) ? convertFileSrc(pptxPath) : null,
     specs,
     updatedAt: new Date().toISOString(),

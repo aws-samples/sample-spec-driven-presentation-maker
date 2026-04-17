@@ -209,19 +209,29 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
                     svg_files = list(Path(tmpdir).glob("*.svg"))
                     if svg_files:
                         from compose import extract_optimized_defs, split_slide_components, count_slides
+                        from sdpm.api import parse_outline_slugs
+                        import time as _t
                         svg_path = svg_files[0]
                         n = count_slides(svg_path)
                         compose_dir = deck_dir / "compose"
                         compose_dir.mkdir(exist_ok=True)
-                        (compose_dir / "defs.json").write_text(
+                        epoch = int(_t.time())
+                        # defs_{epoch}.json for latest-epoch pickup by consumers
+                        (compose_dir / f"defs_{epoch}.json").write_text(
                             json.dumps(extract_optimized_defs(svg_path), ensure_ascii=False),
                             encoding="utf-8",
                         )
+                        # Map slide index → slug via outline.md
+                        slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
                         composed = 0
                         for sn in range(1, n):  # skip DummySlide at index 0
+                            idx = sn - 1  # outline is 0-based after dummy skip
+                            if idx >= len(slugs):
+                                break
+                            slug = slugs[idx]
                             try:
                                 comp = split_slide_components(svg_path, sn)
-                                (compose_dir / f"slide_{sn}.json").write_text(
+                                (compose_dir / f"{slug}_{epoch}.json").write_text(
                                     json.dumps(comp, ensure_ascii=False), encoding="utf-8"
                                 )
                                 composed += 1

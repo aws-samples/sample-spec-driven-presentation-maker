@@ -28,6 +28,17 @@ let streamCallback: ((text: string) => void) | null = null;
 let toolCallback: ((name: string, data: unknown) => void) | null = null;
 let turnEndResolve: (() => void) | null = null;
 let subagentToolCallId: string | null = null; // Track the parent's subagent tool call
+let totalGroups = 0; // Number of subagents spawned in current crew
+let subagentQueryQueue: string[] = []; // Pending slugs, consumed in arrival order
+const subagentGroups = new Map<string, { group: number; slugs: string }>(); // msgSessionId → group/slugs
+
+/** Extract slide slugs from subagent query string.
+ *  e.g. "deck_id=/x/y. Build slides: title, agenda, closing. See specs/." → "title, agenda, closing"
+ */
+function extractSlugs(query: string): string {
+  const m = query.match(/slides?:\s*([a-z0-9,\-\s]+?)(?:\.|$|\n)/i);
+  return m ? m[1].trim() : "";
+}
 
 /** Send a JSON-RPC request to kiro-cli acp. */
 async function rpcRequest(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
@@ -103,22 +114,44 @@ function handleLine(line: string) {
       const update = params.update as Record<string, unknown>;
       if (!update) return;
       const type = update.sessionUpdate as string;
-      if (type === "tool_call" || type === "tool_call_update") {
-        const title = (update.title || "") as string;
-        const toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
-        const status = update.status as string;
+
+      // Resolve group/slugs for this subagent session
+      let groupInfo = subagentGroups.get(msgSessionId);
+      if (!groupInfo) {
+        const idx = subagentGroups.size;
+        const slugs = subagentQueryQueue[idx] || `group ${idx + 1}`;
+        groupInfo = { group: idx + 1, slugs };
+        subagentGroups.set(msgSessionId, groupInfo);
+        // Emit "starting" status for this new group
         toolCallback("compose_slides", {
           toolUseId: subagentToolCallId,
           name: "compose_slides",
           stream: true,
-          data: {
-            tool: toolName,
-            status: status || "running",
-            group: 1,
-            slugs: toolName,
-            message: status === "completed" ? `✓ ${toolName}` : `⟳ ${toolName}`,
-          },
+          data: { group: groupInfo.group, total_groups: totalGroups, slugs: groupInfo.slugs, status: "starting" },
         });
+      }
+
+      const emit = (data: Record<string, unknown>) => toolCallback!("compose_slides", {
+        toolUseId: subagentToolCallId,
+        name: "compose_slides",
+        stream: true,
+        data: { group: groupInfo!.group, slugs: groupInfo!.slugs, ...data },
+      });
+
+      if (type === "tool_call") {
+        const title = (update.title || "") as string;
+        const toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
+        emit({ tool: toolName, toolUseId: update.toolCallId as string || "", input: update.rawInput || {} });
+      } else if (type === "tool_call_update") {
+        const status = update.status as string;
+        if (status === "completed" || status === "error" || status === "failed") {
+          emit({
+            toolResult: update.toolCallId as string || "",
+            toolStatus: status === "completed" ? "success" : "error",
+          });
+        }
+      } else if (type === "turn_end" || type === "end_turn") {
+        emit({ status: "done" });
       }
       return;
     }
@@ -144,7 +177,18 @@ function handleLine(line: string) {
         const input = (update.rawInput || update.input || {}) as Record<string, unknown>;
         // Track subagent tool call for progress forwarding
         if (title === "Spawning agent crew" || name === "subagent") {
+        // Track subagent tool call for progress forwarding
+        if (title === "Spawning agent crew" || name === "subagent" || name === "use_subagent") {
           subagentToolCallId = toolCallId;
+          subagentGroups.clear();
+          // Parse subagent queries to count groups and pre-register slugs by order
+          const content = (input.content as Record<string, unknown> | undefined);
+          const subagents = (content?.subagents as Array<Record<string, unknown>> | undefined) || [];
+          totalGroups = subagents.length;
+          // We don't know the mapping from subagent query → session yet; slugs are matched
+          // by arrival order in the subagent session handler below.
+          // Remember queries so we can assign slugs in arrival order.
+          subagentQueryQueue = subagents.map((s) => extractSlugs(String(s.query || "")));
         }
         toolCallback(name, { toolUseId: toolCallId, name, input, started: true });
       }
@@ -203,6 +247,7 @@ function handleLine(line: string) {
       }
     }
   }
+}
 }
 
 /** Start the kiro-cli acp process. */
