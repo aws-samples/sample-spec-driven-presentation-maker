@@ -811,6 +811,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 # newest slides/ snapshot wins on defs via epoch comparison.
                 try:
                     from tools.compose import extract_optimized_defs, split_slide_components
+                    import hashlib as _hashlib
                     svg_path = tmpdir / "measure.svg"
                     if not svg_path.exists():
                         _export_svg(tmpdir, pptx_path)
@@ -879,17 +880,31 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                             try:
                                 comp_data = split_slide_components(svg_path, pn)
 
+                                # sourceHash from slide JSON (content-based diff)
+                                src_hash = _hashlib.md5(
+                                    _json.dumps(slides[pn - 1], sort_keys=True, ensure_ascii=False).encode(),
+                                    usedforsecurity=False,
+                                ).hexdigest() if pn <= len(slides) else ""
+                                comp_data["sourceHash"] = src_hash
+
                                 # Diff against previous compose for same slug
                                 prev_key = _latest_key(f"{compose_prefix}{slug}_")
                                 prev_comps = None
+                                prev_hash = None
                                 if prev_key:
                                     try:
                                         raw = _storage.download_file_from_pptx_bucket(prev_key)
-                                        prev_comps = _json.loads(raw).get("components")
+                                        prev_data = _json.loads(raw)
+                                        prev_comps = prev_data.get("components")
+                                        prev_hash = prev_data.get("sourceHash")
                                     except Exception:
                                         pass
 
-                                if prev_comps is not None:
+                                # If sourceHash unchanged, all components are unchanged
+                                if prev_comps is not None and prev_hash == src_hash and src_hash:
+                                    for c in comp_data["components"]:
+                                        c["changed"] = False
+                                elif prev_comps is not None:
                                     prev_map = {_mk(c): _fp(c) for c in prev_comps}
                                     for c in comp_data["components"]:
                                         k = _mk(c)
