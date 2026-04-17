@@ -360,7 +360,27 @@ print(data.get('nextForwardToken', ''))
         echo ""
         echo "1. Open the Cognito User Pool console to create a user"
         echo "2. Open the CloudFront URL to access the Web UI"
-      else
+      fi
+
+      # MCP connection info (available for both Layer 3 and Layer 4)
+      MCP_SERVER_URL=$(aws cloudformation describe-stacks \
+        --stack-name SdpmRuntime ${AWS_OPTS} \
+        --query 'Stacks[0].Outputs[?OutputKey==`McpServerUrl`].OutputValue' \
+        --output text 2>/dev/null || echo "")
+      MCP_CLIENT_ID=$(aws cloudformation describe-stacks \
+        --stack-name SdpmRuntime ${AWS_OPTS} \
+        --query 'Stacks[0].Outputs[?OutputKey==`McpOAuthClientId`].OutputValue' \
+        --output text 2>/dev/null || echo "")
+
+      if [ -n "${MCP_SERVER_URL}" ] && [ "${MCP_SERVER_URL}" != "None" ]; then
+        echo ""
+        echo "========================================="
+        echo "  MCP Server URL      : ${MCP_SERVER_URL}"
+        echo "  OAuth Client ID     : ${MCP_CLIENT_ID}"
+        echo "========================================="
+      fi
+
+      if [ -z "${SITE_URL}" ] && [ -z "${MCP_SERVER_URL}" ]; then
         echo "Check CloudFormation outputs for endpoints."
       fi
 

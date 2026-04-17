@@ -27,3 +27,11 @@ features:
 model:
   modelId: "global.anthropic.claude-sonnet-4-6"
   # modelId: "global.anthropic.claude-opus-4-6-v1"
+
+# OAuth callback URLs for external MCP clients (Layer 3).
+# These are used by the Cognito McpClient App Client.
+# Add URLs for any MCP client that will connect via OAuth 2.1 discovery.
+auth:
+  mcpCallbackUrls:
+    - https://claude.ai/api/mcp/auth_callback
+    - https://claude.com/api/mcp/auth_callback

@@ -20,6 +20,10 @@ phases:
         features:
           searchSlides: ${FEATURE_SEARCH_SLIDES:-false}
           observability: ${FEATURE_OBSERVABILITY:-false}
+        auth:
+          mcpCallbackUrls:
+            - https://claude.ai/api/mcp/auth_callback
+            - https://claude.com/api/mcp/auth_callback
         EOF
       - |
         if [ -n "${AUTH_OIDC_URL}" ] && [ -n "${AUTH_ALLOWED_CLIENTS}" ]; then
