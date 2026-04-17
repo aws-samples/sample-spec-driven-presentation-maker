@@ -64,6 +64,14 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   console.log("[SlideCarousel] mount: slides.length=", slides.length, "hadComposeOnMount=", hadSlidesOnMount.current, "slugs=", slides.map(s => `${s.slideId}(${!!s.composeUrl})`).join(","))
   // eslint-disable-next-line no-console
   console.log("[SlideCarousel] render slidesWithPreview:", slides.filter(s => s.previewUrl || s.composeUrl).map(s => s.slideId).join(","))
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log("[SlideCarousel] ★ TRUE MOUNT")
+    return () => {
+      // eslint-disable-next-line no-console
+      console.log("[SlideCarousel] ✗ TRUE UNMOUNT")
+    }
+  }, [])
 
   useEffect(() => {
     let anyChanged = false
