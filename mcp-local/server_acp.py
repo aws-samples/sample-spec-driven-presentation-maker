@@ -102,7 +102,8 @@ def get_preview(deck_id: str, slide_numbers: list[int] | None = None) -> str:
     """
     from tools import preview as _prev
     pages = ",".join(str(n) for n in (slide_numbers or []))
-    return json.dumps(_prev(slides_json_path=deck_id, pages=pages, output_path=""), ensure_ascii=False)
+    pptx_out = str(Path(deck_id) / "output.pptx")
+    return json.dumps(_prev(slides_json_path=deck_id, pages=pages, output_path=pptx_out), ensure_ascii=False)
 
 
 @mcp.tool()
@@ -357,7 +358,7 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
             _tmp_preview = Path("/tmp/pptx-preview")
             if _tmp_preview.exists():
                 _shutil.rmtree(_tmp_preview, ignore_errors=True)
-            preview_result = _preview(slides_json_path=deck_input, pages="", output_path="")
+            preview_result = _preview(slides_json_path=deck_input, pages="", output_path=str(deck_dir / "output.pptx"))
             if isinstance(preview_result, dict) and preview_result.get("files"):
                 preview_dir = deck_dir / "preview"
                 # Clear deck's preview dir so page count always matches current build
