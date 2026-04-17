@@ -26,6 +26,8 @@ SEARCH_SLIDES="false"
 OBSERVABILITY="false"
 OIDC_URL=""
 ALLOWED_CLIENTS=""
+WAF_IPV4=""
+WAF_IPV6=""
 CDK_COMMAND="deploy"
 PROJECT_NAME="sdpm-deploy"
 
@@ -48,6 +50,9 @@ Options:
   --oidc-url URL           External IdP OIDC Discovery URL
   --allowed-clients IDS    Comma-separated JWT allowed client IDs
 
+  --waf-ipv4 CIDRS         Comma-separated IPv4 CIDR ranges for WAF (e.g. "1.2.3.4/32,10.0.0.0/8")
+  --waf-ipv6 CIDRS         Comma-separated IPv6 CIDR ranges for WAF
+
   --destroy                Destroy all stacks
 
   -h, --help               Show this help
@@ -65,6 +70,8 @@ while [[ $# -gt 0 ]]; do
     --observability)  OBSERVABILITY="true"; shift ;;
     --oidc-url)       OIDC_URL="$2"; shift 2 ;;
     --allowed-clients) ALLOWED_CLIENTS="$2"; shift 2 ;;
+    --waf-ipv4)       WAF_IPV4="$2"; shift 2 ;;
+    --waf-ipv6)       WAF_IPV6="$2"; shift 2 ;;
     --destroy)        CDK_COMMAND="destroy"; shift ;;
     -h|--help)        usage ;;
     *)                echo "Unknown option: $1"; usage ;;
@@ -209,6 +216,8 @@ ENV_VARS_JSON=$(cat <<EOF
   {"name":"FEATURE_OBSERVABILITY", "value":"${OBSERVABILITY}",     "type":"PLAINTEXT"},
   {"name":"AUTH_OIDC_URL",         "value":"${OIDC_URL}",          "type":"PLAINTEXT"},
   {"name":"AUTH_ALLOWED_CLIENTS",  "value":"${ALLOWED_CLIENTS}",   "type":"PLAINTEXT"},
+  {"name":"WAF_IPV4",              "value":"${WAF_IPV4}",          "type":"PLAINTEXT"},
+  {"name":"WAF_IPV6",              "value":"${WAF_IPV6}",          "type":"PLAINTEXT"},
   {"name":"CDK_COMMAND",           "value":"${CDK_COMMAND}",       "type":"PLAINTEXT"}
 ]
 EOF
