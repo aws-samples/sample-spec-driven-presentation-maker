@@ -56,8 +56,9 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
   const scrollTargetRef = useRef<string | null | undefined>(undefined)
-  // If deck opened with slides → existing deck → first compose is instant
-  const hadSlidesOnMount = useRef(slides.length > 0)
+  // If deck opened with compose already present → existing deck → first compose is instant
+  // (outline-only slides without compose don't count as "existing" — new decks animate on first compose)
+  const hadSlidesOnMount = useRef(slides.some((s) => !!s.composeUrl))
   const firstComposeSeenRef = useRef(false)
 
   useEffect(() => {
