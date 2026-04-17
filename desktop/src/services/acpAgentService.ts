@@ -105,7 +105,7 @@ function handleLine(line: string) {
   }
 
   // JSON-RPC notification (no id) — only process our session
-  if (msg.method === "session/update") {
+  if (msg.method === "session/update" || msg.method === "_kiro.dev/session/update") {
     const params = msg.params as Record<string, unknown>;
     const msgSessionId = params.sessionId as string;
 
@@ -169,7 +169,7 @@ function handleLine(line: string) {
       }
     }
 
-    if (type === "tool_call") {
+    if (type === "tool_call" || type === "tool_call_chunk") {
       if (toolCallback) {
         const toolCallId = update.toolCallId as string || "";
         const title = (update.title || update.name || "") as string;
