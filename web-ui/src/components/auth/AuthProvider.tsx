@@ -22,6 +22,7 @@ interface CognitoAuthConfig {
 const AuthProvider = ({ children }: PropsWithChildren) => {
   const [authConfig, setAuthConfig] = useState<CognitoAuthConfig | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const initRef = useRef(false)
 
   useEffect(() => {
@@ -35,6 +36,12 @@ const AuthProvider = ({ children }: PropsWithChildren) => {
         setAuthConfig(config)
       } catch (error) {
         console.error("Failed to load auth configuration:", error)
+        const msg = error instanceof Error ? error.message : String(error)
+        if (msg.includes("403")) {
+          setError("Access denied. Your network may not be permitted to access this application. Please contact your administrator.")
+        } else {
+          setError(msg)
+        }
       } finally {
         setLoading(false)
       }
@@ -54,7 +61,10 @@ const AuthProvider = ({ children }: PropsWithChildren) => {
   if (!authConfig) {
     return (
       <div className="flex items-center justify-center min-h-screen text-xl">
-        Failed to load authentication configuration
+        <div className="text-center max-w-lg">
+          <p className="font-semibold">Failed to load authentication configuration</p>
+          {error && <p className="mt-2 text-sm text-gray-500">{error}</p>}
+        </div>
       </div>
     )
   }
