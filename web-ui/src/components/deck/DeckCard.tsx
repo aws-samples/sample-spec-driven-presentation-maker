@@ -24,7 +24,9 @@ import { DeckSummary } from "@/services/deckService"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Layers, Star, MoreHorizontal, Trash2, Building2, Lock, Share2, Download, Users, Link } from "lucide-react"
+import { Layers, Star, MoreHorizontal, Trash2, Building2, Lock, Share2, Download, Users, Link, FolderOpen } from "lucide-react"
+
+const isTauri = !!(globalThis as Record<string,unknown>).__TAURI_INTERNALS__
 
 interface DeckCardProps {
   deck: DeckSummary
@@ -132,11 +134,11 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
             </DropdownMenuItem>
             {onDownload && (
               <DropdownMenuItem onClick={() => onDownload(deck.deckId)}>
-                <Download className="h-3.5 w-3.5" />
-                Download PPTX
+                {isTauri ? <FolderOpen className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
+                {isTauri ? "Open PPTX" : "Download PPTX"}
               </DropdownMenuItem>
             )}
-            {isOwner && onToggleVisibility && (
+            {!isTauri && isOwner && onToggleVisibility && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -147,7 +149,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
                 </DropdownMenuItem>
               </>
             )}
-            {isOwner && onShare && (
+            {!isTauri && isOwner && onShare && (
               <DropdownMenuItem onClick={() => onShare(deck.deckId)}>
                 <Share2 className="h-3.5 w-3.5" />
                 Share
@@ -194,7 +196,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
             <Layers className="h-2.5 w-2.5" />
             {deck.slideCount}
           </div>
-          {(deck.visibility || "private") === "public" ? (
+          {!isTauri && ((deck.visibility || "private") === "public" ? (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium backdrop-blur-md"
               style={{ background: "oklch(0.55 0.15 160 / 0.35)", color: "oklch(0.9 0.1 160)" }}>
               <Building2 className="h-2.5 w-2.5" />
@@ -205,8 +207,8 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
               <Lock className="h-2.5 w-2.5" />
               Private
             </div>
-          )}
-          {deck.collaborators && deck.collaborators.length > 0 && (
+          ))}
+          {!isTauri && deck.collaborators && deck.collaborators.length > 0 && (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium backdrop-blur-md"
               style={{ background: "oklch(0.55 0.12 220 / 0.35)", color: "oklch(0.9 0.08 220)" }}
               title={deck.collaborators.join(", ")}

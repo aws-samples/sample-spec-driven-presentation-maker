@@ -12,13 +12,15 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { SlidePreview, getDeckWithJson } from "@/services/deckService"
 import type { SpecFiles } from "@/services/deckService"
-import { Download, FileJson, Layers, Loader2, LayoutGrid, Rows3 } from "lucide-react"
+import { Download, FileJson, Layers, Loader2, LayoutGrid, Rows3, FolderOpen } from "lucide-react"
 import { useAuth } from "react-oidc-context"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
+
+const isTauri = !!(globalThis as Record<string,unknown>).__TAURI_INTERNALS__
 
 interface SlideCarouselProps {
   slides: SlidePreview[]
@@ -210,6 +212,27 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     } finally {
       setJsonLoading(false)
     }
+  }
+
+  /** Tauri: open deck directory in Finder/Explorer */
+  async function handleJsonOpen() {
+    if (!deckId) return
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const shell = (window as any).__TAURI_INTERNALS__
+      if (shell?.invoke) await shell.invoke("plugin:shell|open", { path: deckId })
+    } catch { /* ignore */ }
+  }
+
+  /** Tauri: open output.pptx with default app */
+  async function handlePptxOpen() {
+    if (!pptxUrl) return
+    try {
+      const filePath = decodeURIComponent(pptxUrl.replace(/^asset:\/\/localhost\//, "/").split("?")[0])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const shell = (window as any).__TAURI_INTERNALS__
+      if (shell?.invoke) await shell.invoke("plugin:shell|open", { path: filePath })
+    } catch { /* ignore */ }
   }
 
   /**
@@ -439,25 +462,36 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
             </div>
             {deckId && (
               <button
-                onClick={handleJsonDownload}
+                onClick={isTauri ? handleJsonOpen : handleJsonDownload}
                 disabled={jsonLoading}
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors disabled:opacity-50"
-                aria-label="Download JSON"
+                aria-label={isTauri ? "Open JSON" : "Download JSON"}
               >
                 {jsonLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileJson className="h-3.5 w-3.5" />}
                 JSON
               </button>
             )}
             {pptxUrl && (
-              <a
-                href={pptxUrl}
-                download
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground no-underline px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
-                aria-label="Download PPTX"
-              >
-                <Download className="h-3.5 w-3.5" />
-                PPTX
-              </a>
+              isTauri ? (
+                <button
+                  onClick={handlePptxOpen}
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
+                  aria-label="Open PPTX"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  PPTX
+                </button>
+              ) : (
+                <a
+                  href={pptxUrl}
+                  download
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground no-underline px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
+                  aria-label="Download PPTX"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  PPTX
+                </a>
+              )
             )}
           </div>
         </div>
