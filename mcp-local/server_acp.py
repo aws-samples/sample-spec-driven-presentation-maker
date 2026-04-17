@@ -221,11 +221,10 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
     # Post-processing: measure
     if measure_slides:
         try:
-            s2p = _slug_to_page()
-            page_nums = [s2p[s] for s in measure_slides if s in s2p]
-            pages = ",".join(str(p) for p in page_nums)
-            result["measure"] = _measure(slides_json_path=deck_input, pages=pages) if pages \
-                else "No matching slides found for given slugs"
+            # Call sdpm.api.measure directly with slug list — it resolves slug→page
+            # and reports using slug names via format_measure_report(page_to_slug=...)
+            from sdpm.api import measure as _sdpm_measure
+            result["measure"] = _sdpm_measure(json_path=deck_input, slides=list(measure_slides))
         except Exception as e:
             result["measure"] = f"Measure error: {e}"
 
