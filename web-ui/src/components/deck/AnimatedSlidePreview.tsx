@@ -117,7 +117,13 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
             try { await document.fonts.ready } catch { /* ignore */ }
           }
           const [defsResp, compResp] = await Promise.all([fetch(defsUrlRef.current), fetch(composeUrlRef.current)])
-          if (cancelled || !defsResp.ok || !compResp.ok) { setError(true); return }
+          // eslint-disable-next-line no-console
+          console.log("[AnimPrev]", slideId, "fetch defs:", defsResp.status, "compose:", compResp.status, "cancelled:", cancelled)
+          if (cancelled || !defsResp.ok || !compResp.ok) {
+            // eslint-disable-next-line no-console
+            console.log("[AnimPrev]", slideId, "→ setError (cancelled or !ok)")
+            setError(true); return
+          }
 
           const defsData: DefsData = await defsResp.json()
           const data: ComposeData = await compResp.json()

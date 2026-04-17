@@ -62,6 +62,8 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   const firstComposeSeenRef = useRef(false)
   // eslint-disable-next-line no-console
   console.log("[SlideCarousel] mount: slides.length=", slides.length, "hadComposeOnMount=", hadSlidesOnMount.current, "slugs=", slides.map(s => `${s.slideId}(${!!s.composeUrl})`).join(","))
+  // eslint-disable-next-line no-console
+  console.log("[SlideCarousel] render slidesWithPreview:", slides.filter(s => s.previewUrl || s.composeUrl).map(s => s.slideId).join(","))
 
   useEffect(() => {
     let anyChanged = false
