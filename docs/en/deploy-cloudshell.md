@@ -57,7 +57,7 @@ Choose options based on your use case.
 ./scripts/deploy.sh --region us-east-1 --observability
 ```
 
-> **Note:** `--observability` configures Bedrock Model Invocation Logging (MIL) at the account/region level. If MIL is already configured, the script will warn about overwriting the existing configuration and ask for confirmation.
+> **Note:** `--observability` configures Bedrock Model Invocation Logging (MIL) at the account/region level. If MIL is already configured, the script will display a warning and automatically skip the MIL setup to preserve the existing configuration.
 
 **With an external IdP:**
 
@@ -204,48 +204,46 @@ rm -rf ~/sample-spec-driven-presentation-maker
 
 **--observability warns "already configured"**
 
-Bedrock Model Invocation Logging allows only one configuration per account/region. If an existing configuration is found, `deploy.sh` will prompt for confirmation before overwriting. The existing log destination (CloudWatch Logs group name) is displayed — verify it's safe to overwrite before entering `y`. Once overwritten, the previous MIL configuration cannot be restored.
+Bedrock Model Invocation Logging allows only one configuration per account/region. If an existing configuration is found, `deploy.sh` will display a warning with the existing log group name and automatically skip the MIL setup. The deployment continues with observability disabled to preserve the existing configuration. To use SDPM's observability, first remove the existing MIL configuration manually, then re-run with `--observability`.
 
 ## Estimated Monthly Cost
 
-Estimates for Layer 4 full stack (us-east-1). Assumes a team of ~10 users generating ~100 decks per month.
+> **Estimated as of April 2026.** AWS service pricing is subject to change. Always refer to the official pricing pages for the latest rates: [Amazon Bedrock Pricing](https://aws.amazon.com/bedrock/pricing/), [AgentCore Pricing](https://aws.amazon.com/bedrock/agentcore/pricing/), [S3](https://aws.amazon.com/s3/pricing/), [DynamoDB](https://aws.amazon.com/dynamodb/pricing/).
+
+Estimates for Layer 4 full stack (us-east-1). Assumes a team of ~10 users generating ~20 decks per month.
 
 ### Fixed Costs (Always Running)
 
-| Resource | Configuration | Est. Monthly |
-|---|---|---|
-| CloudFront | ~10GB transfer/month | ~$1 |
-| Cognito User Pool | Free up to 50,000 MAU | $0 |
-| API Gateway REST | A few thousand requests/month | ~$0.5 |
-| Lambda (API) | A few thousand requests/month | ~$0.5 |
-| S3 (3 buckets) | A few GB storage + requests | ~$1 |
-| DynamoDB On-Demand | Low read/write volume | ~$1 |
-| ECR (2 images) | A few GB storage | ~$1 |
-| CloudWatch Logs | Log storage | ~$1 |
+| Resource | Est. Monthly |
+|---|---|
+| CloudFront | ~$1 |
+| Cognito User Pool | $0 |
+| API Gateway REST + Lambda (API) | ~$1 |
+| S3 (3 buckets) | ~$1 |
+| DynamoDB On-Demand | ~$1 |
+| ECR (2 images) | ~$1 |
+| CloudWatch Logs | ~$1 |
 
 ### Variable Costs (Usage-Dependent)
 
-| Resource | Unit Price | Est. for 100 Decks/Month |
-|---|---|---|
-| AgentCore Runtime (MCP Server) | Container runtime charges | ~$10-20 |
-| AgentCore Runtime (Agent) | Container runtime charges | ~$10-20 |
-| Bedrock Claude Opus 4.6 (Agent LLM) | Input $15 / Output $75 per 1M tokens | ~$30-80 |
-| AgentCore Code Interpreter | Session charges | ~$5-10 |
-| AgentCore Memory | Event storage | ~$1 |
+| Resource | Est. for 20 Decks/Month |
+|---|---|
+| AgentCore Runtime (MCP Server + Agent) | ~$5-10 |
+| Bedrock Claude Sonnet 4.6 (Agent LLM) | ~$80-130 |
+| AgentCore Code Interpreter | ~$1-3 |
+| AgentCore Memory | ~$1 |
 
 ### Total
 
-**~$60–140/month** (varies with usage)
+**~$95–145/month** (varies with usage)
 
 ### Cost Reduction Tips
 
 | Method | Savings | Notes |
 |---|---|---|
-| Switch LLM to Sonnet 4.6 | LLM cost 1/5–1/10 | Default since v1.0. Use `config.yaml` to switch models |
+| Prompt caching | LLM cost up to 80% reduction | Enabled by default for supported models |
 | Don't use `--search` (default) | No KB + S3 Vectors cost | Skip if semantic search isn't needed |
 | Don't use `--observability` (default) | No CloudWatch Logs cost | Skip if MIL logging isn't needed |
-
-> Estimates based on published pricing as of March 2026. See [AWS Pricing](https://aws.amazon.com/pricing/) for current rates.
 
 ## Related Documents
 
