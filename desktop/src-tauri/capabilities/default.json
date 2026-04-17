@@ -18,7 +18,6 @@
     },
     "shell:allow-stdin-write",
     "shell:allow-kill",
-    "shell:allow-open",
     "fs:default",
     "fs:allow-exists",
     "fs:allow-read-text-file",

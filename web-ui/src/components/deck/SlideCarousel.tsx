@@ -219,9 +219,9 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     if (!deckId) return
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const shell = (window as any).__TAURI_INTERNALS__
-      if (shell?.invoke) await shell.invoke("plugin:shell|open", { path: deckId })
-    } catch { /* ignore */ }
+      const ti = (window as any).__TAURI_INTERNALS__
+      if (ti?.invoke) await ti.invoke("open_path", { path: deckId })
+    } catch (e) { console.error("[handleJsonOpen]", e) }
   }
 
   /** Tauri: open output.pptx with default app */
@@ -230,9 +230,9 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     try {
       const filePath = decodeURIComponent(pptxUrl.replace(/^asset:\/\/localhost\//, "/").split("?")[0])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const shell = (window as any).__TAURI_INTERNALS__
-      if (shell?.invoke) await shell.invoke("plugin:shell|open", { path: filePath })
-    } catch { /* ignore */ }
+      const ti = (window as any).__TAURI_INTERNALS__
+      if (ti?.invoke) await ti.invoke("open_path", { path: filePath })
+    } catch (e) { console.error("[handlePptxOpen]", e) }
   }
 
   /**
