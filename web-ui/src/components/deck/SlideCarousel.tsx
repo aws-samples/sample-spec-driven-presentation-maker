@@ -353,7 +353,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 defsUrl={defsUrl}
                 composeUrl={slide.composeUrl}
                 slideId={slide.slideId}
-                skipAnimation={(hadSlidesOnMount.current && !settled) || (hadSlidesOnMount.current && !firstComposeSeenRef.current)}
+                skipAnimation={hadSlidesOnMount.current && !firstComposeSeenRef.current}
                 onAnimate={() => handleAnimate(slide.slideId)}
                 fallback={
                   <SlideThumbnail

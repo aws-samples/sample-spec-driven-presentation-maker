@@ -100,9 +100,12 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
     let cancelled = false
 
     function check() {
-      const compUrlBase = composeUrlRef.current.split("?")[0]
+      const compUrlBase = composeUrlRef.current?.split("?")[0] || ""
+      if (!compUrlBase) return
       if (compUrlBase === lastComposeUrlRef.current) return
       if (animatingRef.current) return  // defer until animation completes
+      // eslint-disable-next-line no-console
+      console.log("[AnimPrev]", slideId, "new url, skip=", skipRef.current)
       lastComposeUrlRef.current = compUrlBase
       setError(false)
 
