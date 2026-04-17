@@ -220,7 +220,9 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ti = (window as any).__TAURI_INTERNALS__
-      if (ti?.invoke) await ti.invoke("open_path", { path: deckId })
+      if (!ti?.invoke) return
+      const home = await ti.invoke("plugin:path|resolve_directory", { directory: 21 }) as string
+      await ti.invoke("open_path", { path: `${home}/Documents/SDPM-Presentations/${deckId}` })
     } catch (e) { console.error("[handleJsonOpen]", e) }
   }
 
