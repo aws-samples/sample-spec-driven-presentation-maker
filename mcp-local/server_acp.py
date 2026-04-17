@@ -168,18 +168,28 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
     # Post-processing: build PPTX + preview + SVG compose (when save=True)
     if save:
         try:
+            # Force output.pptx inside deck dir (sdpm.api default goes to parent for directory input)
+            pptx_out = str(deck_dir / "output.pptx")
             build_result = _generate_pptx(
-                slides_json_path=deck_input, output_path="", skill_dir=_SKILL_DIR
+                slides_json_path=deck_input, output_path=pptx_out, skill_dir=_SKILL_DIR
             )
-            result["pptx"] = build_result.get("output_path", "")
+            result["pptx"] = build_result.get("output_path", pptx_out)
         except Exception as e:
             result["pptx_error"] = str(e)
 
         try:
+            # preview API writes PNGs to /tmp/pptx-preview (fixed path).
+            # Clear first to avoid stale files from other decks.
+            import shutil as _shutil
+            _tmp_preview = Path("/tmp/pptx-preview")
+            if _tmp_preview.exists():
+                _shutil.rmtree(_tmp_preview, ignore_errors=True)
             preview_result = _preview(slides_json_path=deck_input, pages="", output_path="")
             if isinstance(preview_result, dict) and preview_result.get("files"):
-                import shutil as _shutil
                 preview_dir = deck_dir / "preview"
+                # Clear deck's preview dir so page count always matches current build
+                if preview_dir.exists():
+                    _shutil.rmtree(preview_dir)
                 preview_dir.mkdir(exist_ok=True)
                 for png_path in preview_result["files"]:
                     src = Path(png_path)
