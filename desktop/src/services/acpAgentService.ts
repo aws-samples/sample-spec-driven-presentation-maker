@@ -260,12 +260,7 @@ let currentModel: string | null = null;
 export async function startAgent(): Promise<void> {
   if (child) return;
 
-  // Read model from sessionStorage (set by UI ModelSelector)
-  const storedModel = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("sdpm-model") : null;
-  if (storedModel) currentModel = storedModel;
-
   const args = ["acp", "--agent", "sdpm-spec"];
-  if (currentModel) args.push("--model", currentModel);
 
   const cmd = Command.create("kiro-cli", args, {
     cwd: await resolveProjectRoot(),
@@ -298,7 +293,7 @@ export async function startAgent(): Promise<void> {
   // Initialize ACP connection
   const initResult = await rpcRequest("initialize", {
     protocolVersion: 1,
-    clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } },
+    clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
     clientInfo: { name: "sdpm-desktop", version: "0.1.0" },
   });
 
@@ -325,6 +320,16 @@ export async function startAgent(): Promise<void> {
       );
       g.__sdpmModels.listeners.forEach((fn: () => void) => fn());
     }
+  }
+
+  // Apply stored model preference via ACP standard method
+  const storedModel = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("sdpm-model") : null;
+  if (storedModel && storedModel !== modelsInfo?.currentModelId) {
+    try {
+      await rpcRequest("session/set_config_option", {
+        sessionId, configId: "model", value: storedModel,
+      });
+    } catch { /* agent may not support configOptions yet */ }
   }
 }
 
@@ -353,6 +358,12 @@ export async function ensureAgent(): Promise<void> {
   if (child) return;
   if (!startPromise) startPromise = startAgent().finally(() => { startPromise = null; });
   return startPromise;
+}
+
+/** Set a session config option via ACP standard method. */
+export async function setConfigOption(configId: string, value: string): Promise<void> {
+  if (!child || !sessionId) return;
+  await rpcRequest("session/set_config_option", { sessionId, configId, value });
 }
 
 export async function invokeAgent(

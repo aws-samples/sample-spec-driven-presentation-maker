@@ -65,6 +65,10 @@ function ModelSelector() {
         const v = e.target.value
         setModelState(v)
         sessionStorage.setItem("sdpm-model", v)
+        // Send ACP set_config_option if agent is running
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const setConfig = (globalThis as any).__sdpmSetConfigOption as ((id: string, value: string) => Promise<void>) | undefined
+        if (setConfig) setConfig("model", v).catch(() => {})
       }}
       className="text-[11px] bg-transparent border border-border rounded px-1.5 py-0.5 text-foreground-muted hover:text-foreground focus:outline-none focus:ring-1 focus:ring-brand-teal max-w-[140px]"
     >
