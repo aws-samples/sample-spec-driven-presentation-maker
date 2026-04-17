@@ -226,10 +226,12 @@ function handleLine(line: string) {
             completed: true,
           });
         } else {
+          // In-progress update — ensure the toolUse is registered (in case tool_call was missed)
+          const input = (update.rawInput || update.input || {}) as Record<string, unknown>;
           toolCallback(toolName, {
             toolUseId: toolCallId, name: toolName,
-            stream: true,
-            data: update,
+            input,
+            started: true,
           });
         }
       }
