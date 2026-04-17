@@ -150,7 +150,7 @@ export default function DecksPage() {
                     }}
                     ownerAlias={!ws.isOwner ? ws.deck?.ownerAlias : undefined}
                     headerActions={
-                      ws.activeDeckId && !ws.isNew ? (
+                      ws.activeDeckId && !ws.isNew && !(globalThis as Record<string,unknown>).__TAURI_INTERNALS__ ? (
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => list.handleToggleFavorite(ws.activeDeckId!, list.favoriteIds.has(ws.activeDeckId!) ? "remove" : "add")}
