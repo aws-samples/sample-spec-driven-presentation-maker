@@ -103,7 +103,7 @@ export function ChatPanelShell({
     if (!isTauri) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ensure = (globalThis as any).__sdpmEnsureAgent as (() => Promise<void>) | undefined
-    if (ensure) ensure().catch(() => {})
+    if (ensure) ensure().catch(() => { /* agent may not be ready yet */ })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // When Panel A creates a deck, store the deckId so we know Panel A "owns" it

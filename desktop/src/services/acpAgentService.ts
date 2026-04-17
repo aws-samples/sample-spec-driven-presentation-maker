@@ -348,8 +348,11 @@ export async function stopAgent(): Promise<void> {
  * so ChatPanel.tsx works unchanged.
  */
 /** Ensure the agent process is running (idempotent). Call early to populate model list. */
+let startPromise: Promise<void> | null = null;
 export async function ensureAgent(): Promise<void> {
-  if (!child) await startAgent();
+  if (child) return;
+  if (!startPromise) startPromise = startAgent().finally(() => { startPromise = null; });
+  return startPromise;
 }
 
 export async function invokeAgent(
@@ -363,7 +366,7 @@ export async function invokeAgent(
 ): Promise<string> {
   if (!child || !sessionId) {
     console.log("[acp] starting agent...");
-    await startAgent();
+    await ensureAgent();
     currentChatSessionId = _sessionId;
     console.log("[acp] agent started, sessionId:", sessionId);
   } else if (_sessionId !== currentChatSessionId) {
