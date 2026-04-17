@@ -429,24 +429,14 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
                         # Determine which slugs to regenerate:
                         # - measure_slides (edited this turn) always
                         # - any slug without existing compose (first build / new slides)
-                        # - slides/*.json modified since the newest prior compose epoch
-                        # - if no prior compose at all, regen ALL
+                        # - first build (no prior compose at all) → regen ALL
+                        # Matches mcp-server (subagent branch) behavior. Deliberately no
+                        # mtime-based detection — parallel composers share deck, so mtime
+                        # would over-fire. Each composer's save=True should target its
+                        # own slug via measure_slides.
                         slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
                         target_slugs: set[str] = set(measure_slides or [])
-                        # Add slugs without existing compose
                         target_slugs |= {s for s in slugs if s not in prev_by_slug}
-                        # Add slugs whose slides/*.json was modified after prior compose
-                        if prev_by_slug:
-                            for slug in slugs:
-                                prev_f = prev_by_slug.get(slug)
-                                slide_f = deck_dir / "slides" / f"{slug}.json"
-                                if slide_f.exists() and prev_f:
-                                    try:
-                                        if slide_f.stat().st_mtime > prev_f.stat().st_mtime:
-                                            target_slugs.add(slug)
-                                    except OSError:
-                                        pass
-                        # First build (no prior compose) → regen all
                         if not prev_by_slug:
                             target_slugs = set(slugs)
 
