@@ -284,19 +284,18 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
 
 function typewrite(compEl: SVGGElement) {
   const tspans = compEl.querySelectorAll("tspan")
-  const leafSpans: { el: Element; fullText: string; saved: Record<string, string> }[] = []
+  const leafSpans: { el: Element; fullText: string }[] = []
   let totalChars = 0
   tspans.forEach(ts => {
     if (ts.querySelectorAll("tspan").length === 0 && ts.textContent) {
-      const saved: Record<string, string> = {}
+      // Strip textLength / lengthAdjust permanently — restoring them after typewriter
+      // completes causes webkit (Tauri wry) to horizontally compress glyphs.
+      // Natural glyph spacing is visually acceptable.
       for (const attr of ["textLength", "lengthAdjust"]) {
-        if (ts.hasAttribute(attr)) {
-          saved[attr] = ts.getAttribute(attr)!
-          ts.removeAttribute(attr)
-        }
+        ts.removeAttribute(attr)
       }
       totalChars += ts.textContent.length
-      leafSpans.push({ el: ts, fullText: ts.textContent, saved })
+      leafSpans.push({ el: ts, fullText: ts.textContent })
       ts.textContent = ""
     }
   })
@@ -309,7 +308,6 @@ function typewrite(compEl: SVGGElement) {
     charIdx++
     span.el.textContent = span.fullText.slice(0, charIdx)
     if (charIdx >= span.fullText.length) {
-      for (const [a, v] of Object.entries(span.saved)) span.el.setAttribute(a, v)
       spanIdx++
       charIdx = 0
     }
