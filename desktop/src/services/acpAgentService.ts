@@ -253,11 +253,31 @@ function handleLine(line: string) {
   }
 }
 
+/** Current model override (null = kiro-cli default). */
+let currentModel: string | null = null;
+
+/** Set the model for the next agent start. Takes effect on next startAgent/new chat. */
+export function setModel(model: string | null): void {
+  currentModel = model;
+}
+
+/** Get the current model setting. */
+export function getModel(): string | null {
+  return currentModel;
+}
+
 /** Start the kiro-cli acp process. */
 export async function startAgent(): Promise<void> {
   if (child) return;
 
-  const cmd = Command.create("kiro-cli", ["acp", "--agent", "sdpm-spec"], {
+  // Read model from sessionStorage (set by UI ModelSelector)
+  const storedModel = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("sdpm-model") : null;
+  if (storedModel) currentModel = storedModel;
+
+  const args = ["acp", "--agent", "sdpm-spec"];
+  if (currentModel) args.push("--model", currentModel);
+
+  const cmd = Command.create("kiro-cli", args, {
     cwd: await resolveProjectRoot(),
   });
 

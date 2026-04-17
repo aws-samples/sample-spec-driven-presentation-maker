@@ -29,6 +29,40 @@ import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
 
 export type ChatTabKey = "new" | "deck"
 
+const isTauri = !!(globalThis as Record<string,unknown>).__TAURI_INTERNALS__
+
+const MODELS = [
+  { id: "", label: "Default" },
+  { id: "anthropic.claude-sonnet-4-20250514-v1:0", label: "Claude Sonnet 4" },
+  { id: "anthropic.claude-opus-4-20250514-v1:0", label: "Claude Opus 4" },
+  { id: "us.anthropic.claude-sonnet-4-20250514-v1:0", label: "Claude Sonnet 4 (cross-region)" },
+  { id: "us.anthropic.claude-opus-4-20250514-v1:0", label: "Claude Opus 4 (cross-region)" },
+]
+
+function ModelSelector() {
+  const [model, setModelState] = useState("")
+  return (
+    <select
+      value={model}
+      onChange={async (e) => {
+        const v = e.target.value
+        setModelState(v)
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const ti = (window as any).__TAURI_INTERNALS__
+          if (ti) {
+            // Store in sessionStorage; acpAgentService reads it on startAgent
+            sessionStorage.setItem("sdpm-model", v)
+          }
+        } catch { /* ignore */ }
+      }}
+      className="text-[11px] bg-transparent border border-border rounded px-1.5 py-0.5 text-foreground-muted hover:text-foreground focus:outline-none focus:ring-1 focus:ring-brand-teal"
+    >
+      {MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+    </select>
+  )
+}
+
 interface ChatPanelShellProps {
   open: boolean
   onClose: () => void
@@ -201,6 +235,7 @@ export function ChatPanelShell({
                 <MessageSquare className="h-2.5 w-2.5 text-brand-teal" />
               </div>
               <span className="text-[13px] font-semibold tracking-[-0.01em]">Chat</span>
+              {isTauri && <ModelSelector />}
             </div>
             <div className="flex items-center gap-0.5">
               <button
