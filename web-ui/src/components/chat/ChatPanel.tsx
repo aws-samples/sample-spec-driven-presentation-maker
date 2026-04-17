@@ -138,7 +138,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       try {
         const response = await fetch("/aws-exports.json")
         const config = await response.json()
-        await setAgentConfig(config.agentRuntimeArn, config.awsRegion || "us-east-1", config.agentPattern)
+        await setAgentConfig(config.agentRuntimeArn, config.awsRegion || "us-east-1")
         setConfigLoaded(true)
       } catch (err) {
         console.error("Failed to load agent config:", err)

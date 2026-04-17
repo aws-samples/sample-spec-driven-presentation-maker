@@ -4,12 +4,9 @@
  * AgentCore Service - Streaming Response Handler
  *
  * Handles streaming responses from AgentCore agents using Server-Sent Events (SSE).
- *
- * CUSTOMIZATION FOR OTHER AGENT TYPES:
- * This service dynamically loads the appropriate parser based on the agent pattern.
- * The parser processes each streaming event. See strandsParser.js and langgraphParser.js for examples.
- * To support other agent frameworks, create a new parser file and update config.yaml.
  */
+
+import * as parser from './strandsParser.js';
 
 // Generate a UUID
 const generateId = () => {
@@ -22,18 +19,10 @@ const AGENT_CONFIG = {
   AWS_REGION: "us-east-1",
 }
 
-let currentParser = null;
-
 // Set configuration from environment or aws-exports
-export const setAgentConfig = async (runtimeArn, region = "us-east-1", agentPattern = "strands-single-agent") => {
+export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
   AGENT_CONFIG.AGENT_RUNTIME_ARN = runtimeArn
   AGENT_CONFIG.AWS_REGION = region
-  
-  if (agentPattern === 'langgraph-single-agent') {
-    currentParser = await import('./langgraphParser.js');
-  } else {
-    currentParser = await import('./strandsParser.js');
-  }
 }
 
 /**
@@ -96,7 +85,7 @@ export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessTo
     let buffer = '';
 
     // Reset parser state for new request
-    if (currentParser.resetParserState) currentParser.resetParserState();
+    if (parser.resetParserState) parser.resetParserState();
 
     // Handle streaming response
     if (response.body) {
@@ -117,7 +106,7 @@ export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessTo
 
           for (const line of lines) {
             if (line.trim()) {
-              completion = currentParser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
+              completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
             }
           }
         }

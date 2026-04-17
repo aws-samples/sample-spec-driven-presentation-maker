@@ -340,7 +340,6 @@ function handler(event) {
       agentRuntimeArn: "${AgentRuntimeArn}",
       apiBaseUrl: "${ApiBaseUrl}",
       awsRegion: "${AWS::Region}",
-      agentPattern: "strands-single-agent",
     }), {
       UserPoolId: props.userPool.userPoolId,
       ClientId: props.userPoolClient.userPoolClientId,
