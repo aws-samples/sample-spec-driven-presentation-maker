@@ -67,6 +67,22 @@ chmod +x scripts/deploy.sh
   --allowed-clients "client-id-1,client-id-2"
 ```
 
+**WAF IP アドレス制限を有効にする場合:**
+
+```bash
+./scripts/deploy.sh --region us-east-1 --waf-ipv4 "203.0.113.0/24,198.51.100.0/24"
+```
+
+**`infra/config.yaml` を使う場合:**
+
+`infra/config.yaml` が存在する場合、`deploy.sh` はその内容をデフォルト値として読み込みます。CLI 引数は config ファイルの値を上書きします。デプロイのたびに CLI フラグを繰り返す必要がなくなります。
+
+```bash
+cp infra/config.example.yaml infra/config.yaml
+# config.yaml を編集して stacks, features, WAF 等を設定
+./scripts/deploy.sh --region us-east-1
+```
+
 **スタックの削除:**
 
 ```bash
@@ -181,6 +197,8 @@ echo "上記 URL にアクセスしてログインしてください。"
 | `--observability` | Bedrock Model Invocation Logging を有効化 | 無効 |
 | `--oidc-url URL` | 外部 IdP の OIDC Discovery URL | — |
 | `--allowed-clients IDS` | JWT の許可クライアント ID（カンマ区切り） | — |
+| `--waf-ipv4 CIDRS` | WAF 用 IPv4 CIDR 範囲（カンマ区切り） | — |
+| `--waf-ipv6 CIDRS` | WAF 用 IPv6 CIDR 範囲（カンマ区切り） | — |
 | `--destroy` | 全スタックを削除 | — |
 
 ## トラブルシューティング

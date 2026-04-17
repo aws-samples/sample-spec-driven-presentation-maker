@@ -67,6 +67,22 @@ Choose options based on your use case.
   --allowed-clients "client-id-1,client-id-2"
 ```
 
+**With WAF IP address restriction:**
+
+```bash
+./scripts/deploy.sh --region us-east-1 --waf-ipv4 "203.0.113.0/24,198.51.100.0/24"
+```
+
+**Using `infra/config.yaml`:**
+
+If `infra/config.yaml` exists, `deploy.sh` loads it as defaults. CLI arguments override config file values. This is useful for persisting settings across deployments without repeating CLI flags.
+
+```bash
+cp infra/config.example.yaml infra/config.yaml
+# Edit config.yaml to set stacks, features, WAF, etc.
+./scripts/deploy.sh --region us-east-1
+```
+
 **Destroy all stacks:**
 
 ```bash
@@ -181,6 +197,8 @@ echo "Open the URL above to sign in."
 | `--observability` | Enable Bedrock Model Invocation Logging | Disabled |
 | `--oidc-url URL` | External IdP OIDC Discovery URL | — |
 | `--allowed-clients IDS` | Comma-separated JWT allowed client IDs | — |
+| `--waf-ipv4 CIDRS` | Comma-separated IPv4 CIDR ranges for WAF | — |
+| `--waf-ipv6 CIDRS` | Comma-separated IPv6 CIDR ranges for WAF | — |
 | `--destroy` | Destroy all stacks | — |
 
 ## Troubleshooting
