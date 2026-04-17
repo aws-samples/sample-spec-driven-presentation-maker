@@ -176,18 +176,13 @@ function handleLine(line: string) {
         const name = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
         const input = (update.rawInput || update.input || {}) as Record<string, unknown>;
         // Track subagent tool call for progress forwarding
-        if (title === "Spawning agent crew" || name === "subagent") {
-        // Track subagent tool call for progress forwarding
         if (title === "Spawning agent crew" || name === "subagent" || name === "use_subagent") {
           subagentToolCallId = toolCallId;
           subagentGroups.clear();
-          // Parse subagent queries to count groups and pre-register slugs by order
+          // Parse subagent queries to count groups and pre-register slugs by arrival order
           const content = (input.content as Record<string, unknown> | undefined);
           const subagents = (content?.subagents as Array<Record<string, unknown>> | undefined) || [];
           totalGroups = subagents.length;
-          // We don't know the mapping from subagent query → session yet; slugs are matched
-          // by arrival order in the subagent session handler below.
-          // Remember queries so we can assign slugs in arrival order.
           subagentQueryQueue = subagents.map((s) => extractSlugs(String(s.query || "")));
         }
         toolCallback(name, { toolUseId: toolCallId, name, input, started: true });
@@ -247,7 +242,6 @@ function handleLine(line: string) {
       }
     }
   }
-}
 }
 
 /** Start the kiro-cli acp process. */
