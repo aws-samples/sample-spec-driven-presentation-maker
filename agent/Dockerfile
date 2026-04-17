@@ -13,7 +13,8 @@ RUN uv pip install --no-cache -r requirements.txt
 RUN useradd -m -u 1000 bedrock_agentcore
 USER bedrock_agentcore
 
-COPY basic_agent.py .
+COPY basic_agent.py agent_factory.py composer.py mcp_clients.py session.py streaming.py ./
+COPY prompts/ prompts/
 COPY tools/ tools/
 
 EXPOSE 8080
