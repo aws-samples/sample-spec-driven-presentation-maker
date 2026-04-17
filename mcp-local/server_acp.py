@@ -480,17 +480,21 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
                         # would over-fire. Each composer's save=True should target its
                         # own slug via measure_slides.
                         slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
+                        # PPTX contains only slugs whose slides/*.json exists
+                        # (builder skips missing). Build a PPTX-order list so
+                        # SVG slide index → slug mapping is correct.
+                        pptx_slugs = [s for s in slugs if (deck_dir / "slides" / f"{s}.json").exists()]
                         target_slugs: set[str] = set(measure_slides or [])
-                        target_slugs |= {s for s in slugs if s not in prev_by_slug}
+                        target_slugs |= {s for s in pptx_slugs if s not in prev_by_slug}
                         if not prev_by_slug:
-                            target_slugs = set(slugs)
+                            target_slugs = set(pptx_slugs)
 
                         composed = 0
                         for sn in range(1, n):  # skip DummySlide at index 0
                             idx = sn - 1
-                            if idx >= len(slugs):
+                            if idx >= len(pptx_slugs):
                                 break
-                            slug = slugs[idx]
+                            slug = pptx_slugs[idx]
                             if slug not in target_slugs:
                                 continue
                             try:
