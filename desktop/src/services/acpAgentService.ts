@@ -173,7 +173,7 @@ function handleLine(line: string) {
       if (toolCallback) {
         const toolCallId = update.toolCallId as string || "";
         const title = (update.title || update.name || "") as string;
-        const name = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
+        let name = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
         const input = (update.rawInput || update.input || {}) as Record<string, unknown>;
         // Track subagent tool call for progress forwarding
         if (title === "Spawning agent crew" || name === "subagent" || name === "use_subagent") {
@@ -184,6 +184,9 @@ function handleLine(line: string) {
           const subagents = (content?.subagents as Array<Record<string, unknown>> | undefined) || [];
           totalGroups = subagents.length;
           subagentQueryQueue = subagents.map((s) => extractSlugs(String(s.query || "")));
+          // Rename to "compose_slides" so Web UI TOOL_META matches and subagent
+          // stream events (also using "compose_slides") attach to this toolUse.
+          name = "compose_slides";
         }
         toolCallback(name, { toolUseId: toolCallId, name, input, started: true });
       }
@@ -195,7 +198,11 @@ function handleLine(line: string) {
         const title = (update.title || "") as string;
         const status = update.status as string;
         // Extract tool name from title like "Running: @sdpm/init_presentation"
-        const toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
+        let toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
+        // If this update corresponds to the tracked subagent, rename for UI match
+        if (toolCallId && toolCallId === subagentToolCallId) {
+          toolName = "compose_slides";
+        }
 
         if (status === "completed") {
           // Parse rawOutput to extract result
