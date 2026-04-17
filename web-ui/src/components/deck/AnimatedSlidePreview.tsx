@@ -108,6 +108,11 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
 
       ;(async () => {
         try {
+          // Wait for fonts to load — webkit/wry computes textLength against
+          // the wrong metrics if fonts aren't ready, causing compressed text.
+          if (typeof document !== "undefined" && document.fonts?.ready) {
+            try { await document.fonts.ready } catch { /* ignore */ }
+          }
           const [defsResp, compResp] = await Promise.all([fetch(defsUrlRef.current), fetch(composeUrlRef.current)])
           if (cancelled || !defsResp.ok || !compResp.ok) { setError(true); return }
 
