@@ -65,6 +65,116 @@ def list_styles() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Override tools to match mcp-server (Web) signatures for subagent-branch parity.
+# ACP uses deck_id = filesystem path (vs Web's UUID).
+# ---------------------------------------------------------------------------
+for _name in ("generate_pptx", "get_preview", "code_to_slide", "pptx_to_json", "analyze_template"):
+    mcp._tool_manager._tools.pop(_name, None)
+
+
+@mcp.tool()
+def generate_pptx(deck_id: str) -> str:
+    """Generate PPTX from deck workspace (deck.json + slides/*.json + outline.md).
+
+    Args:
+        deck_id: Deck directory path.
+
+    Returns:
+        JSON with output_path and slide summary.
+    """
+    from tools import generate_pptx as _gen
+    return json.dumps(
+        _gen(slides_json_path=deck_id, output_path=str(Path(deck_id) / "output.pptx"), skill_dir=_SKILL_DIR),
+        ensure_ascii=False,
+    )
+
+
+@mcp.tool()
+def get_preview(deck_id: str, slide_numbers: list[int] | None = None) -> str:
+    """Generate PNG previews of slides.
+
+    Args:
+        deck_id: Deck directory path.
+        slide_numbers: 1-based slide numbers to preview. None/empty for all.
+
+    Returns:
+        JSON with generated PNG file paths.
+    """
+    from tools import preview as _prev
+    pages = ",".join(str(n) for n in (slide_numbers or []))
+    return json.dumps(_prev(slides_json_path=deck_id, pages=pages, output_path=""), ensure_ascii=False)
+
+
+@mcp.tool()
+def code_to_slide(
+    deck_id: str, code: str, name: str,
+    language: str = "python", theme: str = "dark",
+    x: int = 0, y: int = 0, width: int = 800, height: int = 300,
+) -> str:
+    """Generate a code block JSON and save to deck/includes/{name}.json.
+
+    Use the returned include_path in slide JSON as ``{"type": "include", "src": "includes/{name}.json"}``.
+
+    Args:
+        deck_id: Deck directory path.
+        code: Source code text.
+        name: Basename for the includes file (without .json extension).
+        language: Programming language for syntax highlighting.
+        theme: Color theme ("dark" or "light").
+        x: X position in pixels.
+        y: Y position in pixels.
+        width: Width in pixels.
+        height: Height in pixels.
+
+    Returns:
+        JSON with include_path for use in slide JSON.
+    """
+    from tools import code_block as _code
+    elements = _code(code=code, language=language, theme=theme, x=x, y=y, width=width, height=height)
+    includes_dir = Path(deck_id) / "includes"
+    includes_dir.mkdir(parents=True, exist_ok=True)
+    include_path = includes_dir / f"{name}.json"
+    include_path.write_text(json.dumps(elements, ensure_ascii=False), encoding="utf-8")
+    return json.dumps({
+        "include_path": f"includes/{name}.json",
+        "absolute_path": str(include_path),
+        "element_count": len(elements),
+    }, ensure_ascii=False)
+
+
+@mcp.tool()
+def pptx_to_json(pptx_path: str) -> str:
+    """Convert an existing PPTX file to JSON representation.
+
+    Args:
+        pptx_path: Local path to the .pptx file.
+
+    Returns:
+        JSON representation of the PPTX slides.
+    """
+    from tools import pptx_to_json as _conv
+    return json.dumps(_conv(pptx_path=pptx_path), ensure_ascii=False)
+
+
+@mcp.tool()
+def analyze_template(template: str, layout: str = "") -> str:
+    """Analyze a PPTX template — extract layouts, theme colors, fonts.
+
+    Args:
+        template: Template name (e.g. "sample_template_dark") or full path.
+        layout: Optional layout name/index for detailed placeholder info.
+
+    Returns:
+        JSON with layouts, theme colors, fonts, and optional layout_detail.
+    """
+    from tools import analyze_template as _at
+    return json.dumps(
+        _at(template_path=template, layout=layout, skill_dir=_SKILL_DIR),
+        ensure_ascii=False,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Override init_presentation for subagent-branch deck format (deck.json + slides/)
 # ---------------------------------------------------------------------------
 mcp._tool_manager._tools.pop("init_presentation", None)
