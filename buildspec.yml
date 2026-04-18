@@ -44,4 +44,4 @@ phases:
         fi
       # Bootstrap CDK if not already done (idempotent)
       - cd infra && cdk bootstrap --quiet || true
-      - cdk ${CDK_COMMAND:-deploy} --all --require-approval never
+      - cdk ${CDK_COMMAND:-deploy} ${STACK:---all} --require-approval never

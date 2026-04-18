@@ -28,6 +28,7 @@ OIDC_URL=""
 ALLOWED_CLIENTS=""
 CDK_COMMAND="deploy"
 PROJECT_NAME="sdpm-deploy"
+STACK=""
 
 # ---- Parse arguments ----
 usage() {
@@ -49,6 +50,8 @@ Options:
   --allowed-clients IDS    Comma-separated JWT allowed client IDs
 
   --destroy                Destroy all stacks
+  --stack ARGS             CDK stack selector/flags (e.g. "SdpmRuntime --exclusively")
+                           Default: --all
 
   -h, --help               Show this help
 EOF
@@ -66,6 +69,7 @@ while [[ $# -gt 0 ]]; do
     --oidc-url)       OIDC_URL="$2"; shift 2 ;;
     --allowed-clients) ALLOWED_CLIENTS="$2"; shift 2 ;;
     --destroy)        CDK_COMMAND="destroy"; shift ;;
+    --stack)          STACK="$2"; shift 2 ;;
     -h|--help)        usage ;;
     *)                echo "Unknown option: $1"; usage ;;
   esac
@@ -209,7 +213,8 @@ ENV_VARS_JSON=$(cat <<EOF
   {"name":"FEATURE_OBSERVABILITY", "value":"${OBSERVABILITY}",     "type":"PLAINTEXT"},
   {"name":"AUTH_OIDC_URL",         "value":"${OIDC_URL}",          "type":"PLAINTEXT"},
   {"name":"AUTH_ALLOWED_CLIENTS",  "value":"${ALLOWED_CLIENTS}",   "type":"PLAINTEXT"},
-  {"name":"CDK_COMMAND",           "value":"${CDK_COMMAND}",       "type":"PLAINTEXT"}
+  {"name":"CDK_COMMAND",           "value":"${CDK_COMMAND}",       "type":"PLAINTEXT"},
+  {"name":"STACK",                 "value":"${STACK}",             "type":"PLAINTEXT"}
 ]
 EOF
 )
