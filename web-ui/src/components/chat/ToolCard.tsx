@@ -174,8 +174,9 @@ interface ToolCardProps {
   toolUseId?: string
   /** Session ID — forwarded to ComposeCard for soft-stop. */
   sessionId?: string
-  /** Auth token — forwarded to ComposeCard for soft-stop. */
+  /** Auth token — forwarded to ComposeCard (ID token: previews) / (Access token: cancel). */
   idToken?: string
+  accessToken?: string
 }
 
 /** Strip MCP prefix from tool name for display lookup. */
@@ -183,7 +184,7 @@ export function stripPrefix(n: string): string {
   return n.replace(/^spec_driven_presentation_maker_/, "")
 }
 
-export function ToolCard({ name, input, status, result, isActive = false, streamMessages, deckSlugs, toolUseId, sessionId, idToken }: ToolCardProps) {
+export function ToolCard({ name, input, status, result, isActive = false, streamMessages, deckSlugs, toolUseId, sessionId, idToken, accessToken }: ToolCardProps) {
   // Dispatch: compose_slides has a dedicated rich card.
   if (name === "compose_slides" || name.endsWith("_compose_slides")) {
     return (
@@ -196,7 +197,7 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
         deckSlugs={deckSlugs}
         toolUseId={toolUseId}
         sessionId={sessionId}
-        idToken={idToken}
+        accessToken={accessToken}
       />
     )
   }

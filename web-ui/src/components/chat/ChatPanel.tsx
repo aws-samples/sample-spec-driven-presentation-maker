@@ -859,6 +859,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     attachments={msg.attachments}
                     isStreaming={isLoading && i === messages.length - 1}
                     idToken={auth.user?.id_token}
+                    accessToken={auth.user?.access_token}
                     deckSlugs={slideSlugs}
                     sessionId={sessionId}
                   />

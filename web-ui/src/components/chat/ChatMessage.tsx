@@ -148,9 +148,11 @@ interface ChatMessageProps {
   deckSlugs?: string[]
   /** Session ID — forwarded to ComposeCard for soft-stop calls. */
   sessionId?: string
+  /** Cognito Access Token — forwarded to ComposeCard for soft-stop (client_id claim lives on the access token). */
+  accessToken?: string
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, deckSlugs, sessionId }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, deckSlugs, sessionId, accessToken }: ChatMessageProps) {
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
@@ -259,6 +261,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                   deckSlugs={deckSlugs}
                   sessionId={sessionId}
                   idToken={idToken}
+                  accessToken={accessToken}
                 />
               )
             )}
@@ -311,6 +314,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                     deckSlugs={deckSlugs}
                     sessionId={sessionId}
                     idToken={idToken}
+                    accessToken={accessToken}
                   />
                 )}
                 {olderTools.length > 0 && (

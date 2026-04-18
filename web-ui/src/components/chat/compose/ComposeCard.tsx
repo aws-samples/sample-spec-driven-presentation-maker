@@ -57,10 +57,11 @@ interface ComposeCardProps {
   deckSlugs?: string[]
   toolUseId?: string
   sessionId?: string
-  idToken?: string
+  /** Cognito Access Token — the AgentCore JWT authorizer matches client_id against the access token, not the id token. */
+  accessToken?: string
 }
 
-export function ComposeCard({ input, status, result, isActive, streamMessages = [], deckSlugs = [], toolUseId, sessionId, idToken }: ComposeCardProps) {
+export function ComposeCard({ input, status, result, isActive, streamMessages = [], deckSlugs = [], toolUseId, sessionId, accessToken }: ComposeCardProps) {
   const [stopping, setStopping] = useState(false)
   const state: ComposeState = useMemo(
     () => parseComposeState(streamMessages, input),
@@ -99,11 +100,11 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
         totalSlides={totalSlides}
         doneSlides={doneSlides}
         isActive={isActive}
-        canCancel={isActive && !stopping && !!(toolUseId && sessionId && idToken)}
+        canCancel={isActive && !stopping && !!(toolUseId && sessionId && accessToken)}
         onCancel={async () => {
-          if (!toolUseId || !sessionId || !idToken) return
+          if (!toolUseId || !sessionId || !accessToken) return
           setStopping(true)
-          await stopComposeSlides(sessionId, toolUseId, idToken)
+          await stopComposeSlides(sessionId, toolUseId, accessToken)
         }}
         stopping={stopping}
       />
