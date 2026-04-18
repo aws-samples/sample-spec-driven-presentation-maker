@@ -9,6 +9,7 @@
  */
 
 import { Command, type Child } from "@tauri-apps/plugin-shell";
+import { getAgentAdapter } from "./acpAgentAdapter";
 
 /** Resolve project root via Tauri command. */
 async function resolveProjectRoot(): Promise<string> {
@@ -175,15 +176,17 @@ function handleLine(line: string) {
         const title = (update.title || update.name || "") as string;
         let name = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
         const input = (update.rawInput || update.input || {}) as Record<string, unknown>;
-        // Track subagent tool call for progress forwarding
-        if (title === "Spawning agent crew" || name === "subagent" || name === "use_subagent") {
+        // Track subagent tool call for progress forwarding (agent-specific tool name)
+        const adapter = getAgentAdapter();
+        const isSubagentCall = title === "Spawning agent crew" || name === "subagent" || name === adapter.subagentTool;
+        if (isSubagentCall) {
           subagentToolCallId = toolCallId;
           subagentGroups.clear();
-          // Parse subagent queries to count groups and pre-register slugs by arrival order
-          const content = (input.content as Record<string, unknown> | undefined);
-          const subagents = (content?.subagents as Array<Record<string, unknown>> | undefined) || [];
-          totalGroups = subagents.length;
-          subagentQueryQueue = subagents.map((s) => extractSlugs(String(s.query || "")));
+          // Parse subagent queries via adapter to count groups and pre-register slugs
+          const content = (input.content as Record<string, unknown> | undefined) || input;
+          const queries = adapter.extractSubagentQueries(content);
+          totalGroups = queries.length;
+          subagentQueryQueue = queries.map((q) => extractSlugs(q));
           // Rename to "compose_slides" so Web UI TOOL_META matches and subagent
           // stream events (also using "compose_slides") attach to this toolUse.
           name = "compose_slides";
@@ -260,9 +263,8 @@ let currentModel: string | null = null;
 export async function startAgent(): Promise<void> {
   if (child) return;
 
-  // kiro-cli + --agent flag (required by kiro-cli's ACP impl).
-  // Other ACP agents: customize this spawn call.
-  const cmd = Command.create("kiro-cli", ["acp", "--agent", "sdpm-spec"], {
+  const adapter = getAgentAdapter();
+  const cmd = Command.create(adapter.command, adapter.args, {
     cwd: await resolveProjectRoot(),
   });
 
@@ -397,22 +399,27 @@ export async function invokeAgent(
     currentChatSessionId = _sessionId;
     console.log("[acp] agent started, sessionId:", sessionId);
   } else if (_sessionId !== currentChatSessionId) {
-    // New chat — create new ACP session (standard). If agent identity is lost
-    // after session/new (kiro-cli bug), fall back to process restart.
-    console.log("[acp] new chat session, creating new ACP session");
-    try {
-      const { homeDir } = await import("@tauri-apps/api/path");
-      const home = await homeDir();
-      const cwd = `${home.replace(/\/+$/, "")}/Documents/SDPM-Presentations`;
-      const result = await rpcRequest("session/new", { cwd, mcpServers: [] }) as Record<string, unknown>;
-      sessionId = result.sessionId as string;
-      currentChatSessionId = _sessionId;
-    } catch {
-      // Fallback: full process restart (kiro-cli workaround)
-      console.log("[acp] session/new failed, restarting process");
+    const adapter = getAgentAdapter();
+    if (adapter.restartOnNewChat) {
+      console.log("[acp] new chat — restarting process (adapter requires it)");
       await stopAgent();
       await startAgent();
       currentChatSessionId = _sessionId;
+    } else {
+      console.log("[acp] new chat — creating new ACP session");
+      try {
+        const { homeDir } = await import("@tauri-apps/api/path");
+        const home = await homeDir();
+        const cwd = `${home.replace(/\/+$/, "")}/Documents/SDPM-Presentations`;
+        const result = await rpcRequest("session/new", { cwd, mcpServers: [] }) as Record<string, unknown>;
+        sessionId = result.sessionId as string;
+        currentChatSessionId = _sessionId;
+      } catch {
+        console.log("[acp] session/new failed, restarting process");
+        await stopAgent();
+        await startAgent();
+        currentChatSessionId = _sessionId;
+      }
     }
     console.log("[acp] new ACP session:", sessionId);
   }

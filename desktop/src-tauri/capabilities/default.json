@@ -8,12 +8,9 @@
     {
       "identifier": "shell:allow-spawn",
       "allow": [
-        {
-          "name": "kiro-cli",
-          "cmd": "kiro-cli",
-          "args": true,
-          "sidecar": false
-        }
+        { "name": "kiro-cli", "cmd": "kiro-cli", "args": true, "sidecar": false },
+        { "name": "claude", "cmd": "claude", "args": true, "sidecar": false },
+        { "name": "opencode", "cmd": "opencode", "args": true, "sidecar": false }
       ]
     },
     "shell:allow-stdin-write",
