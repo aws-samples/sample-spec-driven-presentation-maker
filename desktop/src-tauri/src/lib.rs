@@ -21,16 +21,48 @@ fn open_path(path: String) -> Result<(), String> {
     open::that(&path).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn check_libreoffice_cmd() -> bool {
+    check_libreoffice()
+}
+
+#[tauri::command]
+async fn install_libreoffice() -> Result<String, String> {
+    let script = std::env::current_dir()
+        .ok()
+        .and_then(|cwd| cwd.ancestors().find(|p| p.join("desktop/scripts/install-libreoffice.sh").exists()).map(|p| p.to_path_buf()))
+        .map(|root| root.join("desktop/scripts/install-libreoffice.sh"))
+        .ok_or_else(|| "install-libreoffice.sh not found".to_string())?;
+
+    #[cfg(target_os = "macos")]
+    let status = Command::new("bash").arg(&script).status()
+        .map_err(|e| format!("failed to run install script: {e}"))?;
+    #[cfg(target_os = "windows")]
+    let status = Command::new("powershell")
+        .args(["-ExecutionPolicy", "Bypass", "-File"])
+        .arg(&script.with_extension("ps1"))
+        .status()
+        .map_err(|e| format!("failed to run install script: {e}"))?;
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    let status = Command::new("bash").arg(&script).status()
+        .map_err(|e| format!("failed to run install script: {e}"))?;
+
+    if status.success() {
+        Ok("LibreOffice installed".to_string())
+    } else {
+        Err(format!("install failed (exit code {})", status.code().unwrap_or(-1)))
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    if !check_libreoffice() {
-        eprintln!("WARNING: LibreOffice not found. Preview and PPTX generation will not work.");
-    }
-
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![get_project_root, open_path])
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            get_project_root, open_path, check_libreoffice_cmd, install_libreoffice
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

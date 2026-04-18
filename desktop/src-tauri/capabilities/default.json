@@ -16,6 +16,8 @@
     },
     "shell:allow-stdin-write",
     "shell:allow-kill",
+    "dialog:allow-ask",
+    "dialog:allow-message",
     "fs:default",
     "fs:allow-exists",
     "fs:allow-read-text-file",
