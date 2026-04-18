@@ -292,17 +292,21 @@ export async function startAgent(): Promise<void> {
     console.warn("[acp stderr]", line);
   });
 
-  cmd.on("close", () => {
-    console.warn("[acp] process closed");
-    child = null;
-    sessionId = null;
-  });
-
   cmd.on("error", (err: string) => {
     console.error("[acp] process error:", err);
   });
 
-  child = await cmd.spawn();
+  const spawnedChild = await cmd.spawn();
+  child = spawnedChild;
+  cmd.on("close", () => {
+    // Only clear state if this is still the active child (prevents stale
+    // 'close' from old process wiping the new one's state during restart)
+    if (child === spawnedChild) {
+      console.warn("[acp] process closed");
+      child = null;
+      sessionId = null;
+    }
+  });
   console.log("[acp] spawned kiro-cli acp");
 
   // Initialize ACP connection
