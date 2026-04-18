@@ -63,9 +63,12 @@ export function ComposeCard({ input, status, isActive, streamMessages = [], deck
   )
 
   const hasError = status === "error" || state.agents.some((a) => a.status === "error")
-  // Stopped: parent no longer active and no final tool result arrived.
-  // (status is set by ChatPanel only on actual tool completion.)
-  const isStopped = !isActive && !status && !hasError
+  // Incomplete: any agent never reached a terminal state (done/error).
+  // This happens when the user stopped mid-compose even if compose_slides
+  // itself returned a final tool result (status === "success").
+  const hasIncomplete = state.agents.some((a) => a.status !== "done" && a.status !== "error")
+  // Stopped: parent no longer active AND some agents never finished.
+  const isStopped = !isActive && hasIncomplete && !hasError
   const isDone = !isActive && !isStopped && (status === "success" || state.phase === "done")
   const doneSlides = state.agents.filter((a) => a.status === "done").reduce((s, a) => s + a.slugs.length, 0)
 
