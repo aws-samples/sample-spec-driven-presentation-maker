@@ -126,7 +126,7 @@ export function AgentSettingsDialog({ open, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" onClick={onClose}>
       <div className="bg-background border border-border rounded-lg w-full max-w-2xl max-h-[80vh] overflow-auto p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">ACP Agents</h2>

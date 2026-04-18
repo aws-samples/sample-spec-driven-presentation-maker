@@ -108,7 +108,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
     <div className="flex flex-col h-screen relative z-10">
       {/* ── Header ── */}
       <header
-        className="header-glass safe-top flex-none flex items-center justify-between px-5 h-12 border-b border-border"
+        className="header-glass safe-top flex-none flex items-center justify-between px-5 h-12 border-b border-border relative z-[70]"
         role="banner"
       >
         <nav className="flex items-center gap-2.5" aria-label="Main navigation">
