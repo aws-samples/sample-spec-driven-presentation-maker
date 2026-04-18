@@ -307,7 +307,7 @@ function AgentCard({ agent, existingSlugs, timing, now, indexDelay }: AgentCardP
               <span key={slug}>
                 <span
                   className="transition-colors duration-500"
-                  style={{ color: existingSlugs.has(slug) ? C.existing : C.fgMuted }}
+                  style={{ color: existingSlugs.has(slug) ? C.existing : C.fgStrong }}
                 >
                   {slug}
                 </span>
@@ -395,11 +395,12 @@ function PopOut({
   return (
     <div
       role="tooltip"
-      className="fixed z-[9999] rounded-xl overflow-hidden pointer-events-none"
+      className="fixed z-[9999] rounded-xl overflow-hidden flex flex-col"
       style={{
         left: rect.left,
         top: rect.top,
         width: rect.width,
+        maxHeight: "min(60vh, 480px)",
         background: C.popBg,
         boxShadow: `
           0 1px 0 oklch(1 0 0 / 6%) inset,
@@ -413,10 +414,10 @@ function PopOut({
       {/* Top accent line — agent's color */}
       <div
         aria-hidden="true"
-        className="h-[1px] w-full"
+        className="h-[1px] w-full flex-none"
         style={{ background: `linear-gradient(90deg, transparent, ${color} 40%, ${color} 60%, transparent)` }}
       />
-      <div className="p-5">
+      <div className="p-4 overflow-y-auto" style={{ maxHeight: "60vh" }}>
         {/* Instruction */}
         <div>
           <div
@@ -426,12 +427,10 @@ function PopOut({
             Instruction
           </div>
           <div
-            className="text-[13px] whitespace-pre-wrap"
+            className="text-[12.5px] whitespace-pre-wrap break-words"
             style={{
               color: C.fgLabel,
-              fontFamily: "'Instrument Serif', Cambria, Georgia, serif",
-              fontSize: "14.5px",
-              lineHeight: 1.65,
+              lineHeight: 1.6,
             }}
           >
             {agent.instruction || <span style={{ color: C.fgMuted }}>(no instruction)</span>}

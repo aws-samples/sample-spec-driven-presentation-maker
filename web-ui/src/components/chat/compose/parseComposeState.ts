@@ -49,14 +49,12 @@ export function parseComposeState(
   const slideGroups = (input?.slide_groups as SlideGroup[] | undefined) || []
 
   // Discover agents from either input (if already present) or stream events.
-  // compose_slides is a streaming tool — input arrives only at completion,
-  // so during execution we must derive agents from `starting` events.
-  const bySlugs = new Map<string, AgentState>()
+  // Key by groupIndex (authoritative from backend); slugs may be missing on some events.
+  const byGroup = new Map<number, AgentState>()
 
   // Seed from input if available
   slideGroups.forEach((g, i) => {
-    const slugsLabel = (g.slugs || []).join(", ")
-    bySlugs.set(slugsLabel, {
+    byGroup.set(i + 1, {
       groupIndex: i + 1,
       slugs: g.slugs || [],
       instruction: g.instruction || "",
@@ -66,10 +64,9 @@ export function parseComposeState(
     })
   })
 
-  // Helper: ensure an agent entry exists for a stream event.
+  // Helper: ensure an agent entry exists for a given group.
   function ensureAgent(g: number, slugsLabel: string): AgentState {
-    const key = slugsLabel
-    let a = bySlugs.get(key)
+    let a = byGroup.get(g)
     if (!a) {
       a = {
         groupIndex: g,
@@ -79,10 +76,9 @@ export function parseComposeState(
         retryAttempt: 0,
         activity: [],
       }
-      bySlugs.set(key, a)
-    } else {
-      // Update groupIndex from event (authoritative)
-      a.groupIndex = g
+      byGroup.set(g, a)
+    } else if (!a.slugs.length && slugsLabel) {
+      a.slugs = slugsLabel.split(", ").map((s) => s.trim()).filter(Boolean)
     }
     return a
   }
@@ -146,7 +142,7 @@ export function parseComposeState(
     }
   }
 
-  const agents = [...bySlugs.values()].sort((a, b) => a.groupIndex - b.groupIndex)
+  const agents = [...byGroup.values()].sort((a, b) => a.groupIndex - b.groupIndex)
   const totalGroups = Math.max(agents.length, totalGroupsFromStream, slideGroups.length)
 
   if (phase === "running" && doneGroupCount === totalGroups && totalGroups > 0) {
