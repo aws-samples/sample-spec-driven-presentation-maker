@@ -52,7 +52,7 @@ interface DefsData {
 interface AnimatedSlidePreviewProps {
   defsUrl: string
   composeUrl: string
-  slideId?: string
+  slug?: string
   skipAnimation?: boolean
   onAnimate?: () => void
   onComplete?: () => void
@@ -68,7 +68,7 @@ function assignAgent(comp: ComposeComponent) {
   return AGENTS[4]
 }
 
-export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimation, onAnimate, onComplete, fallback }: AnimatedSlidePreviewProps) {
+export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, onAnimate, onComplete, fallback }: AnimatedSlidePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const intervalsRef = useRef<number[]>([])
@@ -266,12 +266,12 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
     const iv = window.setInterval(check, 1000)
     return () => { cancelled = true; clearInterval(iv); cleanup() }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slideId])
+  }, [slug])
 
   if (error && fallback) return <>{fallback}</>
 
   return (
-    <div data-slide-id={slideId} className="aspect-[16/9] relative overflow-hidden rounded-lg bg-black">
+    <div data-slide-id={slug} className="aspect-[16/9] relative overflow-hidden rounded-lg bg-black">
       <div ref={containerRef} className="absolute inset-0" />
     </div>
   )

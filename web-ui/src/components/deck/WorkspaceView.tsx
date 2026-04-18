@@ -87,7 +87,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 max-w-5xl">
             {deck.slides.map((slide, i) => (
               <div
-                key={slide.slideId}
+                key={slide.slug}
                 className="animate-card-in rounded-xl overflow-hidden border border-border bg-card cursor-pointer group hover:-translate-y-[2px] hover:border-border-hover hover:shadow-[0_6px_24px_oklch(0_0_0/40%)] transition-all duration-300"
                 style={{ "--delay": `${i * 50}ms` } as React.CSSProperties}
               >
@@ -96,7 +96,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
                     <PreviewImage
                       src={slide.previewUrl}
                       deckId={deck.deckId}
-                      slideId={slide.slideId}
+                      slug={slide.slug}
                       idToken={auth.user?.id_token}
                       alt={`Slide ${i + 1}`}
                       className="w-full h-full object-cover"

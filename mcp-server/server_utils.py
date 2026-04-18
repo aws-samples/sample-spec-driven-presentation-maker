@@ -14,7 +14,7 @@ logger = logging.getLogger("sdpm.mcp")
 
 
 async def _generate_webp_background(
-    deck_id: str, pptx_path: Path, tmpdir: Path, storage: Storage,
+    deck_id: str, pptx_path: Path, tmpdir: Path, storage: Storage, slugs: list[str],
 ) -> None:
     """Background WebP preview generation → S3 upload → tmpdir cleanup."""
     from tools.generate import generate_previews
@@ -26,7 +26,8 @@ async def _generate_webp_background(
             epoch = int(__import__("time").time())
             webp_files = generate_previews(pptx_path, preview_dir)
             for i, webp_path in enumerate(webp_files):
-                s3_key = f"previews/{deck_id}/slide_{i + 1:02d}_{epoch}.webp"
+                slug = slugs[i] if i < len(slugs) else f"slide_{i + 1:02d}"
+                s3_key = f"previews/{deck_id}/{slug}_{epoch}.webp"
                 storage.upload_file(key=s3_key, data=webp_path.read_bytes(), content_type="image/webp")
             for key in old_keys:
                 try:
@@ -43,12 +44,12 @@ async def _generate_webp_background(
 
 
 def schedule_webp_background(
-    deck_id: str, pptx_path: Path, tmpdir: Path, storage: Storage,
+    deck_id: str, pptx_path: Path, tmpdir: Path, storage: Storage, slugs: list[str],
 ) -> None:
     """Schedule background WebP generation. Falls back to tmpdir cleanup on error."""
     try:
         asyncio.get_event_loop().create_task(
-            _generate_webp_background(deck_id, pptx_path, tmpdir, storage)
+            _generate_webp_background(deck_id, pptx_path, tmpdir, storage, slugs)
         )
     except Exception:
         shutil.rmtree(tmpdir, ignore_errors=True)

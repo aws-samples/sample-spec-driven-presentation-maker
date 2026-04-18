@@ -17,7 +17,7 @@ export interface DeckSummary {
 }
 
 export interface SlidePreview {
-  slideId: string
+  slug: string
   previewUrl: string | null
   composeUrl?: string | null
   updatedAt: string
@@ -146,7 +146,7 @@ export async function getDeckWithJson(deckId: string, idToken: string): Promise<
 
 export interface SlideSearchResult {
   deckId: string
-  slideId: string
+  slug: string
   deckName: string
   ownerAlias: string
   pageNumber: number
@@ -347,19 +347,19 @@ export async function listFavorites(idToken: string): Promise<DeckSummary[]> {
  * Batch-fetch presigned URLs for specific slide PNGs.
  * Uses session-level cache to avoid redundant API calls.
  *
- * @param items - Array of {deckId, slideId} to fetch
+ * @param items - Array of {deckId, slug} to fetch
  * @param idToken - Cognito ID token
- * @returns Map of "deckId:slideId" to presigned URL (or null)
+ * @returns Map of "deckId:slug" to presigned URL (or null)
  */
 export async function batchGetSlidePreviewUrls(
-  items: { deckId: string; slideId: string }[],
+  items: { deckId: string; slug: string }[],
   idToken: string,
 ): Promise<Map<string, string | null>> {
   const result = new Map<string, string | null>()
-  const uncached: { deckId: string; slideId: string }[] = []
+  const uncached: { deckId: string; slug: string }[] = []
 
   for (const item of items) {
-    const key = `${item.deckId}:${item.slideId}`
+    const key = `${item.deckId}:${item.slug}`
     if (previewUrlCache.has(key)) {
       result.set(key, previewUrlCache.get(key)!)
     } else {
@@ -380,9 +380,9 @@ export async function batchGetSlidePreviewUrls(
   })
 
   if (response.ok) {
-    const data: { deckId: string; slideId: string; previewUrl: string | null }[] = await response.json()
+    const data: { deckId: string; slug: string; previewUrl: string | null }[] = await response.json()
     for (const item of data) {
-      const key = `${item.deckId}:${item.slideId}`
+      const key = `${item.deckId}:${item.slug}`
       previewUrlCache.set(key, item.previewUrl)
       result.set(key, item.previewUrl)
     }

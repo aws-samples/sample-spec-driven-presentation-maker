@@ -110,7 +110,7 @@ export function useWorkspace(
         // Detect slide changes (added/removed/preview updated)
         const slideKey = data.slides.map((s) => {
           const base = s.previewUrl?.split("?")[0] || ""
-          return `${s.slideId}:${base}`
+          return `${s.slug}:${base}`
         }).join("|")
         if (slideKey !== prevSlideKeyRef.current) {
           prevSlideKeyRef.current = slideKey
@@ -120,21 +120,21 @@ export function useWorkspace(
         // Update cache when the underlying S3 key changes (epoch in path).
         for (const s of data.slides) {
           if (s.previewUrl) {
-            const cached = stablePreviewUrls.current.get(s.slideId)
+            const cached = stablePreviewUrls.current.get(s.slug)
             const stableKey = (slide: typeof s) => {
               return slide.previewUrl?.split("?")[0] || ""
             }
             if (stableKey(s) !== (cached ? stableKey({ previewUrl: cached.url } as typeof s) : "")) {
-              stablePreviewUrls.current.set(s.slideId, { url: s.previewUrl })
+              stablePreviewUrls.current.set(s.slug, { url: s.previewUrl })
             } else if (cached) {
               s.previewUrl = cached.url
             }
           } else {
-            stablePreviewUrls.current.delete(s.slideId)
+            stablePreviewUrls.current.delete(s.slug)
           }
           // Stabilise composeUrl with same pattern as previewUrl
           if (s.composeUrl) {
-            const cacheKey = `${s.slideId}:compose`
+            const cacheKey = `${s.slug}:compose`
             const cached = stablePreviewUrls.current.get(cacheKey)
             const base = s.composeUrl.split("?")[0]
             const cachedBase = cached?.url.split("?")[0] || ""
@@ -189,10 +189,10 @@ export function useWorkspace(
   }, [])
 
   const openDeck = useCallback((deckIdOrHash: string) => {
-    const slideId = parseSlideFromHash("?" + deckIdOrHash.split("?")[1] || "")
+    const slug = parseSlideFromHash("?" + deckIdOrHash.split("?")[1] || "")
     const deckId = deckIdOrHash.split("?")[0]
     window.location.hash = deckId
-    setScrollToSlide(slideId)
+    setScrollToSlide(slug)
     setChatOpen(true)
     setChatTab("deck")
   }, [])
@@ -216,7 +216,7 @@ export function useWorkspace(
   const prevPngKeyRef = useRef<string>("")
   useEffect(() => {
     if (!pptxRequested || !deck?.slides) return
-    const pngKey = deck.slides.map((s) => `${s.slideId}:${s.previewUrl?.split("?")[0] || ""}`).join("|")
+    const pngKey = deck.slides.map((s) => `${s.slug}:${s.previewUrl?.split("?")[0] || ""}`).join("|")
     if (prevPngKeyRef.current && pngKey !== prevPngKeyRef.current) {
       setPptxRequested(false)
     }

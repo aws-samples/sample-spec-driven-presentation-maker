@@ -64,10 +64,10 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     let anyChanged = false
     for (const slide of slides) {
       const key = slide.composeUrl?.split("?")[0] || ""
-      const prev = prevComposeKeys.current.get(slide.slideId) || ""
+      const prev = prevComposeKeys.current.get(slide.slug) || ""
       if (key && prev && key !== prev) anyChanged = true
       if (key && !prev && firstComposeSeenRef.current) anyChanged = true
-      if (key) prevComposeKeys.current.set(slide.slideId, key)
+      if (key) prevComposeKeys.current.set(slide.slug, key)
     }
     // Mark first compose seen (skip animation for existing decks)
     if (!firstComposeSeenRef.current && slides.some(s => s.composeUrl)) {
@@ -80,10 +80,10 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     if (anyChanged) scrollTargetRef.current = null // arm scroll for next onAnimate
   }, [slides])
 
-  const handleAnimate = useCallback((slideId: string) => {
+  const handleAnimate = useCallback((slug: string) => {
     if (scrollTargetRef.current === null && containerRef.current) {
-      scrollTargetRef.current = slideId
-      const el = containerRef.current.querySelector(`[data-slide-id="${slideId}"]`)
+      scrollTargetRef.current = slug
+      const el = containerRef.current.querySelector(`[data-slide-id="${slug}"]`)
       if (el) {
         const container = containerRef.current
         const elRect = el.getBoundingClientRect()
@@ -102,11 +102,11 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     const newUpdated = new Set<string>()
     for (const slide of slides) {
       const newKey = slide.previewUrl?.split("?")[0] || ""
-      const prevKey = prevUrlKeys.current.get(slide.slideId) || ""
+      const prevKey = prevUrlKeys.current.get(slide.slug) || ""
       if (prevKey && newKey && newKey !== prevKey) {
-        newUpdated.add(slide.slideId)
+        newUpdated.add(slide.slug)
       }
-      if (newKey) prevUrlKeys.current.set(slide.slideId, newKey)
+      if (newKey) prevUrlKeys.current.set(slide.slug, newKey)
     }
     if (newUpdated.size > 0) {
       setUpdatedIds(newUpdated)
@@ -326,13 +326,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
             {slidesWithPreview.map((slide, i) => (
               <SlideThumbnail
-                key={slide.slideId}
+                key={slide.slug}
                 src={slide.previewUrl}
                 alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
                 index={i}
-                slideId={slide.slideId}
+                slug={slide.slug}
                 onClick={() => onSlideClick?.(i + 1)}
-                updated={updatedIds.has(slide.slideId)}
+                updated={updatedIds.has(slide.slug)}
                 className="border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 cursor-pointer group"
               >
 
@@ -346,18 +346,18 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
           slidesWithPreview.map((slide, i) => (
             slide.composeUrl && defsUrl ? (
               <AnimatedSlidePreview
-                key={slide.slideId}
+                key={slide.slug}
                 defsUrl={defsUrl}
                 composeUrl={slide.composeUrl}
-                slideId={slide.slideId}
+                slug={slide.slug}
                 skipAnimation={!settled || (hadSlidesOnMount.current && !firstComposeSeenRef.current)}
-                onAnimate={() => handleAnimate(slide.slideId)}
+                onAnimate={() => handleAnimate(slide.slug)}
                 fallback={
                   <SlideThumbnail
                     src={slide.previewUrl}
                     alt={`Slide ${i + 1}`}
                     index={i}
-                    slideId={slide.slideId}
+                    slug={slide.slug}
                     onClick={() => onSlideClick?.(i + 1)}
                     className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
                   />
@@ -365,13 +365,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
               />
             ) : (
               <SlideThumbnail
-                key={slide.slideId}
+                key={slide.slug}
                 src={slide.previewUrl}
                 alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
                 index={i}
-                slideId={slide.slideId}
+                slug={slide.slug}
                 onClick={() => onSlideClick?.(i + 1)}
-                updated={updatedIds.has(slide.slideId)}
+                updated={updatedIds.has(slide.slug)}
                 className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
               />
             )

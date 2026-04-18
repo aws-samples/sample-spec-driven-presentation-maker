@@ -63,7 +63,7 @@ interface ChatPanelProps {
   chatSessionId?: string
   slidePreviewUrls?: (string | null)[]
   /** Current deck slide IDs — forwarded to ComposeCard for slug existence rendering. */
-  slideIds?: string[]
+  slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
@@ -74,7 +74,7 @@ export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, slideIds, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -845,7 +845,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     attachments={msg.attachments}
                     isStreaming={isLoading && i === messages.length - 1}
                     idToken={auth.user?.id_token}
-                    deckSlideIds={slideIds}
+                    deckSlugs={slideSlugs}
                   />
                 </div>
               ))}

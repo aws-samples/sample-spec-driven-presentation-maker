@@ -97,10 +97,10 @@ interface ComposeCardProps {
   result?: Record<string, unknown>
   isActive: boolean
   streamMessages?: Record<string, unknown>[]
-  deckSlideIds?: string[]
+  deckSlugs?: string[]
 }
 
-export function ComposeCard({ input, status, isActive, streamMessages = [], deckSlideIds = [] }: ComposeCardProps) {
+export function ComposeCard({ input, status, isActive, streamMessages = [], deckSlugs = [] }: ComposeCardProps) {
   const state: ComposeState = useMemo(
     () => parseComposeState(streamMessages, input),
     [streamMessages, input],
@@ -121,7 +121,7 @@ export function ComposeCard({ input, status, isActive, streamMessages = [], deck
     ? Math.max(...timings.map((t) => t.end || 0), now) - startTime
     : now - startTime
 
-  const existingSlugs = new Set(deckSlideIds)
+  const existingSlugs = new Set(deckSlugs)
 
   const totalSlides = state.agents.reduce((sum, a) => sum + a.slugs.length, 0)
 
@@ -301,7 +301,7 @@ function AgentCard({ agent, existingSlugs, timing, now, indexDelay }: AgentCardP
               opacity: isError ? 0.8 : 1,
             }}
           />
-          {/* Slugs */}
+          {/* Slugs — existing (written via compose) = violet accent; not yet = fgStrong */}
           <span className="flex-1 min-w-0 text-[13px] font-medium tracking-[-0.015em] truncate">
             {agent.slugs.map((slug, i) => (
               <span key={slug}>

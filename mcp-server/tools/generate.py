@@ -282,8 +282,9 @@ def generate_pptx(
         })
 
         # Preview: epoch-keyed WebP (background)
+        slugs = [s.get("id") or f"slide_{i + 1:02d}" for i, s in enumerate(slides)]
         from server_utils import schedule_webp_background
-        schedule_webp_background(deck_id, out, tmpdir, storage)
+        schedule_webp_background(deck_id, out, tmpdir, storage, slugs)
     except Exception:
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise
