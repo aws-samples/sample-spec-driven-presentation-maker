@@ -50,29 +50,25 @@ function getToolMeta(tool: string) {
 interface ComposeCardProps {
   input?: Record<string, unknown>
   status?: "success" | "error"
-  result?: Record<string, unknown>
+  result?: Record<string, unknown> | string
   isActive: boolean
   streamMessages?: Record<string, unknown>[]
   deckSlugs?: string[]
 }
 
-export function ComposeCard({ input, status, isActive, streamMessages = [], deckSlugs = [] }: ComposeCardProps) {
+export function ComposeCard({ input, status, result, isActive, streamMessages = [], deckSlugs = [] }: ComposeCardProps) {
   const state: ComposeState = useMemo(
     () => parseComposeState(streamMessages, input),
     [streamMessages, input],
   )
 
   const hasError = status === "error" || state.agents.some((a) => a.status === "error")
-  // Determine completion:
-  //   - If the tool returned a final result (status set), trust it as done/error.
-  //     History restore also falls into this case — past tool calls have status.
-  //   - If no status, the tool never completed → stopped.
-  //   - (In live execution, compose_slides may rarely yield a final report even
-  //     when stopped, because its terminal yield is outside the group try block.
-  //     We accept this as "done with partial slides"; it matches the server's
-  //     own view.)
-  const isStopped = !isActive && !status && !hasError && state.agents.length > 0
-  const isDone = !isActive && !isStopped && (status === "success" || state.phase === "done")
+  // Stopped: no terminal tool result was recorded (status undefined). Covers
+  // both live stop (StopRuntimeSession before final yield) and history
+  // restore of a session that was interrupted mid-tool (toolUse persisted in
+  // Memory without a matching toolResult).
+  const isStopped = !isActive && !hasError && !status && state.agents.length > 0
+  const isDone = !isActive && !isStopped && !hasError && (status === "success" || state.phase === "done")
   const doneSlides = state.agents.filter((a) => a.status === "done").reduce((s, a) => s + a.slugs.length, 0)
 
   const existingSlugs = new Set(deckSlugs)

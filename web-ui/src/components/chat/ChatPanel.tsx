@@ -233,7 +233,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   toolUseId: (tu.toolUseId as string) || "",
                   name: (tu.name as string) || "",
                   input: (tu.input as Record<string, unknown>) || {},
-                  status: "success",
                 }})
               }
             }
