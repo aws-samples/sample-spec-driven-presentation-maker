@@ -58,22 +58,8 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
   const scrollTargetRef = useRef<string | null | undefined>(undefined)
-  // If deck opened with compose already present → existing deck → first compose is instant
-  // (outline-only slides without compose don't count as "existing" — new decks animate on first compose)
-  const hadSlidesOnMount = useRef(slides.some((s) => !!s.composeUrl))
+  const hadSlidesOnMount = useRef(slides.length > 0)
   const firstComposeSeenRef = useRef(false)
-  // eslint-disable-next-line no-console
-  console.log("[SlideCarousel] mount: slides.length=", slides.length, "hadComposeOnMount=", hadSlidesOnMount.current, "slugs=", slides.map(s => `${s.slideId}(${!!s.composeUrl})`).join(","))
-  // eslint-disable-next-line no-console
-  console.log("[SlideCarousel] render slidesWithPreview:", slides.filter(s => s.previewUrl || s.composeUrl).map(s => s.slideId).join(","))
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log("[SlideCarousel] ★ TRUE MOUNT")
-    return () => {
-      // eslint-disable-next-line no-console
-      console.log("[SlideCarousel] ✗ TRUE UNMOUNT")
-    }
-  }, [])
 
   useEffect(() => {
     let anyChanged = false

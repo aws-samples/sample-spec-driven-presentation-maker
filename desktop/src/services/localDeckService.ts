@@ -184,8 +184,12 @@ export async function getDeck(deckId: string, _idToken?: string): Promise<DeckDe
     }
     // PPTX page number advances only for slugs that have a slides/*.json file
     // (the builder skips missing slides). Keep a separate counter.
+    // Match Web API behavior: don't expose slides until at least one compose exists
+    // (SlideCarousel uses slides.length > 0 to detect "existing deck" — outline-only
+    // shouldn't trigger that path).
+    const anyCompose = composeBySlug.size > 0;
     let pageNum = 0;
-    for (let i = 0; i < slugList.length; i++) {
+    if (anyCompose) for (let i = 0; i < slugList.length; i++) {
       const slug = slugList[i];
       const slideJsonPath = await join(slidesDir, `${slug}.json`);
       if (!(await exists(slideJsonPath))) continue;
