@@ -146,6 +146,7 @@ def make_compose_slides(mcp_servers: list, model):
         A @tool-decorated async generator function.
     """
     mcp_client = mcp_servers[0] if mcp_servers else None
+    max_concurrency = int(os.environ.get("COMPOSER_MAX_CONCURRENCY", "10"))
 
     @strands_tool(
         name="compose_slides",
@@ -153,15 +154,12 @@ def make_compose_slides(mcp_servers: list, model):
         description=(
             "Delegate slide generation to parallel composer agents. Each group "
             "is handled by an independent composer that writes slides/<slug>.json. "
+            f"Up to {max_concurrency} groups run concurrently. "
             "Use this once Phase 1 (dialogue) is complete and outline.md is finalized.\n\n"
-            "Group slides that share visual/narrative context (e.g., same chapter, "
-            "same data source) so one composer can design them cohesively. Split "
-            "groups to unlock parallelism — each group runs concurrently "
-            "(up to COMPOSER_MAX_CONCURRENCY, default 10).\n\n"
-            "The `instruction` is the composer's sole guidance: be concrete. "
-            "Include narrative intent, tone, required data/facts, layout hints, "
-            "and any figure/icon references. Do not omit content expecting the "
-            "composer to infer it — it cannot see the full conversation."
+            "The composer reads specs/ (brief, outline, art-direction) for all content "
+            "and design decisions. The instruction only needs to specify which slides "
+            "to compose. Add user requests or review feedback if applicable, but do NOT "
+            "invent layout or design directives — the composer makes those decisions."
         ),
         inputSchema={
             "json": {
@@ -175,8 +173,7 @@ def make_compose_slides(mcp_servers: list, model):
                         "type": "array",
                         "description": (
                             "Groups of slides to compose in parallel. Each group becomes "
-                            "one composer agent. Keep related slides together (shared "
-                            "narrative, data, or visual style). Typical group size: 1–4 slides."
+                            "one composer agent."
                         ),
                         "items": {
                             "type": "object",
@@ -194,17 +191,14 @@ def make_compose_slides(mcp_servers: list, model):
                                 "instruction": {
                                     "type": "string",
                                     "description": (
-                                        "Detailed composition brief for this group's composer. Include:\n"
-                                        "  • Narrative purpose — why these slides exist in the deck\n"
-                                        "  • Concrete content — facts, numbers, quotes, examples to include\n"
-                                        "  • Tone/style — formal, casual, technical, persuasive\n"
-                                        "  • Layout hints — hero stat, comparison table, timeline, code block, etc.\n"
-                                        "  • Visual assets — icons, images, charts the composer should search for\n"
-                                        "  • Cross-slide continuity — how this group connects to adjacent slides\n"
-                                        "Avoid vague directives like 'make it nice'. The composer cannot see "
-                                        "the original conversation; the instruction must stand alone."
+                                        "Instruction for the composer. Keep minimal:\n"
+                                        "  • Initial generation: 'Compose these slides following specs/'\n"
+                                        "  • User requests: pass through the user's words as-is\n"
+                                        "  • Review fixes: describe the problem, not the solution "
+                                        "(e.g. 'slides X and Y lack visual consistency' not 'use timeline layout')\n"
+                                        "Do NOT add layout, design, or style directives on your own — "
+                                        "the composer has design expertise and reads art-direction.html."
                                     ),
-                                    "minLength": 40,
                                 },
                             },
                             "required": ["slugs", "instruction"],
@@ -223,7 +217,6 @@ def make_compose_slides(mcp_servers: list, model):
         Runs groups in parallel. Async generator: yields progress dicts, then returns final result str.
         """
         parent_tool_use_id = tool_context.tool_use["toolUseId"]
-        max_concurrency = int(os.environ.get("COMPOSER_MAX_CONCURRENCY", "10"))
 
         generated = []
         errors = []
@@ -237,15 +230,12 @@ def make_compose_slides(mcp_servers: list, model):
             system_sections = _prefetch_sections(mcp_client, _PREFETCH_SYSTEM) if mcp_client else []
             ref_sections = _prefetch_sections(mcp_client, _PREFETCH_REFS) if mcp_client else []
 
-            system_context = _build_common_context(system_sections)
+            system_context = _build_common_context(system_sections + ref_sections)
             composer_template = load_prompt("composer")
             static_prompt = build_system_prompt(
                 composer_template,
                 common_context=system_context,
-                deck_id=deck_id,
             )
-
-            common_ref_text = _build_common_context(ref_sections)
 
             progress_q: queue.Queue = queue.Queue()
 
@@ -259,7 +249,10 @@ def make_compose_slides(mcp_servers: list, model):
 
                 slugs_list = ", ".join(f"slides/{s}.json" for s in group["slugs"])
                 user_content = (
-                    f"{common_ref_text}\n\n---\n\n{deck_context}\n\n---\n\n"
+                    f"{deck_context}\n\n---\n\n"
+                    f"## Target Deck\n"
+                    f"deck_id: {deck_id}\n"
+                    f"Use this deck_id for ALL run_python and generate_pptx calls.\n\n"
                     f"## Your Assigned Slides\n"
                     f"You may ONLY write to: {slugs_list}\n"
                     f"Do NOT write to any other slides/*.json — other composers own them.\n\n"

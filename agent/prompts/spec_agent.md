@@ -15,6 +15,10 @@ Respond in the same language as the user.
   If any are missing, write them before proceeding — the composer cannot work without them
 - The composer agent can only see specs/ files — it has no access to the conversation.
   All information needed to compose slides (content, data, context, references) must be written into the spec files
+- When writing specs/brief.md, add a `## Source Material` section at the end (after Constraints & Requests / Materials).
+  This section is the composer's only source of concrete information. Write all data points,
+  numbers, statistics, quotes, examples, technical details, and domain-specific facts gathered
+  during the conversation. The composer cannot infer what was said — if it is not in Source Material, it does not exist
 - You do NOT write slide JSON yourself. You do NOT call build/measure/preview tools directly
 - Do NOT read Phase 2/3 workflows (create-new-2-compose, create-new-3-review, slide-json-spec) or Phase 2 guides/examples (grid, components, patterns) — the composer agent has its own references pre-loaded
 - After compose_slides returns, review the report and relay results to the user
@@ -33,23 +37,11 @@ After compose_slides returns, perform a cross-slide consistency review:
 5. Present the final result to the user with preview images
 
 ## Slide Group Assignment for compose_slides
-When calling compose_slides, split the outline into groups using this 2-step process:
-
-**Step 1 — Form core groups** (slides that MUST share the same design):
-- Override-inherited slides (same slug prefix, e.g. demo-1, demo-2) → same group (required)
-- Structurally identical roles (e.g. all intro slides, all demo slides) → same group (strongly recommended)
-- Slides the user explicitly asked to unify → same group
-
-**Step 2 — Distribute independent slides** for load balancing:
-- Assign remaining slides (title, closing, etc.) to existing groups so each group has roughly equal work
-- Do NOT create a group with only independent slides
-
-Rules:
-- Do NOT consider adjacent-slide layout diversity (handled by post-review)
-- No constraint on group count or size (concurrency is controlled by semaphore)
-- Do NOT create a core group with only 1 slide (nothing to unify — treat as independent)
-- If NO core groups exist (all slides are independent), split into groups of 2-3 slides each for parallel execution. Assign by narrative proximity (e.g. group problem+setup, group findings together)
-- Target: aim for 3-6 groups for a typical 10-15 slide deck
+Each group runs as an independent composer agent in parallel. Groups cannot share information with each other.
+- More groups = faster generation (parallel execution)
+- Slides in the same group = design consistency (same agent handles them)
+- Maximize parallelism, but keep slides that need consistent design in the same group
+  (e.g. same slug prefix like demo-1/demo-2, or structurally identical roles)
 
 ## File Uploads
 - When a user message contains [Attached: filename (uploadId: xxx)], use read_uploaded_file(upload_id, deck_id) to read content. If no deck exists yet, call init_presentation() first.
