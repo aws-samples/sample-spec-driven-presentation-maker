@@ -69,13 +69,19 @@ export default function DecksPage() {
     chatRef.current?.insertAtCursor(msg)
   }, [ws.deck?.specs?.artDirection])
 
-  /** Handle "New Style" — open chat with preset prompt. */
+  /** Handle "New Style" — open chat with preset prompt + toast cue. */
   const handleNewStyle = useCallback(() => {
     ws.setChatTab("new")
     ws.setChatOpen(true)
     setTimeout(() => {
       chatRef.current?.insertAtCursor("I want to create a new style. ")
     }, 400)
+    import("sonner").then(({ toast }) => {
+      toast("Let's design a style", {
+        description: "Tell the assistant the look you want.",
+        icon: "🎨",
+      })
+    })
   }, [ws])
 
   /* ── Render ── */
@@ -262,19 +268,27 @@ export default function DecksPage() {
         />
       )}
 
-      {uploadTemplateOpen && idToken && (
+      {uploadTemplateOpen !== undefined && idToken && (
         <UploadTemplateDialog
           idToken={idToken}
-          onClose={() => setUploadTemplateOpen(false)}
-          onUploaded={() => {}}
+          open={uploadTemplateOpen}
+          onOpenChange={setUploadTemplateOpen}
         />
       )}
 
-      {myResourcesType && idToken && (
+      {idToken && (
         <MyResourcesList
-          type={myResourcesType}
+          type={myResourcesType ?? "styles"}
           idToken={idToken}
-          onClose={() => setMyResourcesType(null)}
+          open={myResourcesType !== null}
+          onOpenChange={(o) => { if (!o) setMyResourcesType(null) }}
+          onCreateNew={
+            myResourcesType === "styles"
+              ? handleNewStyle
+              : myResourcesType === "templates"
+                ? () => setUploadTemplateOpen(true)
+                : undefined
+          }
         />
       )}
 
