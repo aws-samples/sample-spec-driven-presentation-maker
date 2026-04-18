@@ -63,23 +63,30 @@ export function ComposeCard({ input, status, isActive, streamMessages = [], deck
   )
 
   const isDone = !isActive && (status === "success" || state.phase === "done")
+  const hasError = status === "error" || state.agents.some((a) => a.status === "error")
+  const doneSlides = state.agents.filter((a) => a.status === "done").reduce((s, a) => s + a.slugs.length, 0)
 
   const existingSlugs = new Set(deckSlugs)
   const totalSlides = state.agents.reduce((sum, a) => sum + a.slugs.length, 0)
+
+  const shellBg = hasError ? "oklch(0.65 0.2 25 / 6%)" : CAT.produce.bg
+  const shellBorder = hasError ? "oklch(0.65 0.2 25 / 18%)" : CAT.produce.border
 
   return (
     <section
       aria-label="Composing slides"
       className="tool-card-enter relative rounded-xl"
       style={{
-        background: CAT.produce.bg,
-        boxShadow: `inset 0 0 0 1px ${CAT.produce.border}`,
+        background: shellBg,
+        boxShadow: `inset 0 0 0 1px ${shellBorder}`,
       }}
     >
       <Header
         state={state}
         isDone={isDone}
+        hasError={hasError}
         totalSlides={totalSlides}
+        doneSlides={doneSlides}
         isActive={isActive}
       />
       <div className="px-3 pb-3 flex flex-col gap-2">
@@ -102,21 +109,28 @@ export function ComposeCard({ input, status, isActive, streamMessages = [], deck
 // --- Header -----------------------------------------------------------------
 
 function Header({
-  state, isDone, totalSlides, isActive,
+  state, isDone, hasError, totalSlides, doneSlides, isActive,
 }: {
   state: ComposeState
   isDone: boolean
+  hasError: boolean
   totalSlides: number
+  doneSlides: number
   isActive: boolean
 }) {
   const hasAgents = state.totalGroups > 0
-  const label = isDone
+  const isFinished = isDone || (hasError && !isActive)
+  const label = hasError && !isActive
+    ? doneSlides > 0
+      ? `Composed ${doneSlides} of ${totalSlides} slides — some failed`
+      : "Failed to compose slides"
+    : isDone
     ? `Composed ${totalSlides || state.totalGroups} slides`
     : hasAgents
     ? `Composing ${totalSlides} slides · ${state.totalGroups} agents in parallel`
     : state.statusMessage || "Preparing…"
 
-  const accent = CAT.produce.accent
+  const accent = hasError ? STATE.error : CAT.produce.accent
 
   return (
     <header className="flex items-center gap-2.5 px-3 pt-3 pb-2">
@@ -124,7 +138,7 @@ function Header({
         className="flex-none w-7 h-7 rounded-lg flex items-center justify-center relative"
         style={{ background: `${accent}18` }}
       >
-        {isActive && !isDone ? (
+        {isActive && !isFinished ? (
           <svg className="absolute inset-0 w-7 h-7" viewBox="0 0 28 28">
             <circle
               cx="14" cy="14" r="12"
@@ -134,7 +148,9 @@ function Header({
             />
           </svg>
         ) : null}
-        {isDone ? (
+        {hasError && !isActive ? (
+          <AlertCircle className="h-3.5 w-3.5" style={{ color: accent }} />
+        ) : isDone ? (
           <Check className="h-3.5 w-3.5" style={{ color: accent }} />
         ) : (
           <Package className="h-3.5 w-3.5" style={{ color: accent }} />
