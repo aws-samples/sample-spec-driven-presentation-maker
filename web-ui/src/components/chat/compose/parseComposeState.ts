@@ -124,6 +124,7 @@ export function parseComposeState(
       const toolName = String(ev.tool)
       const toolUseId = String(ev.toolUseId || "")
       const inp = (ev.input as Record<string, unknown> | undefined)
+      const evStatus = ev.status as string | undefined
       const existing = agent.activity.find((a) => a.toolUseId === toolUseId)
       if (!existing) {
         agent.activity.push({
@@ -131,14 +132,13 @@ export function parseComposeState(
           tool: toolName,
           label: activityLabel(toolName, inp),
           category: activityCategory(toolName),
-          status: "active",
+          status: evStatus === "error" ? "error" : evStatus === "success" ? "success" : "active",
         })
+      } else if (evStatus) {
+        // ChatPanel merges toolResult into the existing tool entry as status field.
+        existing.status = evStatus === "error" ? "error" : "success"
       }
       if (agent.status === "starting") agent.status = "working"
-    } else if (ev.toolResult) {
-      const tid = String(ev.toolResult)
-      const act = agent.activity.find((a) => a.toolUseId === tid)
-      if (act) act.status = ev.toolStatus === "error" ? "error" : "success"
     }
   }
 
