@@ -19,7 +19,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react"
 import { parseComposeState, type AgentState, type ComposeState } from "./parseComposeState"
-import { CAT } from "../ToolCard"
+import { CAT } from "../toolPalette"
 
 // --- Color tokens ---
 const STATE = {

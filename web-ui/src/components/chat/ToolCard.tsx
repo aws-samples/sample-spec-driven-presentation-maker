@@ -32,22 +32,12 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { ComposeCard } from "./compose/ComposeCard"
-
-type ToolCategory = "build" | "explore" | "produce" | "compute" | "other"
+import { CAT, type ToolCategory } from "./toolPalette"
 
 interface ToolMeta {
   Icon: LucideIcon
   label: string
   category: ToolCategory
-}
-
-/** Accent palette per category — oklch for perceptual uniformity. */
-export const CAT: Record<ToolCategory, { accent: string; bg: string; glow: string; border: string }> = {
-  build:   { accent: "oklch(0.75 0.14 185)", bg: "oklch(0.75 0.14 185 / 6%)",  glow: "oklch(0.75 0.14 185 / 12%)", border: "oklch(0.75 0.14 185 / 18%)" },
-  explore: { accent: "oklch(0.80 0.14 80)",  bg: "oklch(0.80 0.14 80 / 6%)",   glow: "oklch(0.80 0.14 80 / 12%)",  border: "oklch(0.80 0.14 80 / 18%)" },
-  produce: { accent: "oklch(0.72 0.16 300)", bg: "oklch(0.72 0.16 300 / 6%)",  glow: "oklch(0.72 0.16 300 / 12%)", border: "oklch(0.72 0.16 300 / 18%)" },
-  compute: { accent: "oklch(0.78 0.12 220)", bg: "oklch(0.78 0.12 220 / 6%)",  glow: "oklch(0.78 0.12 220 / 12%)", border: "oklch(0.78 0.12 220 / 18%)" },
-  other:   { accent: "oklch(0.55 0 0)",      bg: "oklch(0.55 0 0 / 4%)",       glow: "oklch(0.55 0 0 / 8%)",       border: "oklch(0.55 0 0 / 12%)" },
 }
 
 const ERR = { accent: "oklch(0.65 0.2 25)", bg: "oklch(0.65 0.2 25 / 6%)", border: "oklch(0.65 0.2 25 / 18%)" }
