@@ -104,6 +104,9 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
       if (!compUrlBase) return
       if (compUrlBase === lastComposeUrlRef.current) return
       if (animatingRef.current) return  // defer until animation completes
+      // Snapshot skip at URL-change detection time (before async fetch) —
+      // parent's setState may flip skipRef during fetch latency.
+      const skipThisUpdate = skipRef.current
       lastComposeUrlRef.current = compUrlBase
       setError(false)
 
@@ -132,13 +135,13 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
           cleanup()
 
           const animTargets = new Set<number>()
-          if (!skipRef.current) {
+          if (!skipThisUpdate) {
             data.components.forEach((comp, i) => {
               if (comp.changed) animTargets.add(i)
             })
           }
           // eslint-disable-next-line no-console
-          console.log("[AnimPrev]", slideId, "skip=", skipRef.current, "targets=", animTargets.size)
+          console.log("[AnimPrev]", slideId, "skip=", skipThisUpdate, "targets=", animTargets.size)
 
 
         if (animTargets.size > 0) {
