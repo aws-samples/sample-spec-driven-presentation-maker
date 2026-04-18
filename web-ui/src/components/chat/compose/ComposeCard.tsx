@@ -63,10 +63,13 @@ export function ComposeCard({ input, status, isActive, streamMessages = [], deck
   )
 
   const hasError = status === "error" || state.agents.some((a) => a.status === "error")
-  // Stopped: parent no longer active, no tool result, and we saw live progress
-  // events (streamMessages). Without streamMessages, we're restoring from
-  // history — treat as completed (past tense), not stopped.
-  const isStopped = !isActive && !status && !hasError && streamMessages.length > 0
+  // Stopped: no final tool result arrived. Covers two cases:
+  //   - Live: user clicked Stop and StopRuntimeSession killed the container
+  //     before compose_slides yielded its final report (status undefined).
+  //   - History restore: a past session was stopped mid-tool; the toolUse is
+  //     persisted in Memory but no matching toolResult exists (status undefined).
+  // Both are the same signal from the UI's perspective.
+  const isStopped = !isActive && !status && !hasError
   const isDone = !isActive && !isStopped && (status === "success" || state.phase === "done")
   const doneSlides = state.agents.filter((a) => a.status === "done").reduce((s, a) => s + a.slugs.length, 0)
 
@@ -101,7 +104,7 @@ export function ComposeCard({ input, status, isActive, streamMessages = [], deck
             agent={agent}
             existingSlugs={existingSlugs}
             indexDelay={i}
-            parentActive={isActive}
+            parentStopped={isStopped}
           />
         ))}
       </div>
@@ -183,17 +186,17 @@ interface AgentCardProps {
   agent: AgentState
   existingSlugs: Set<string>
   indexDelay: number
-  parentActive: boolean
+  parentStopped: boolean
 }
 
-function AgentCard({ agent, existingSlugs, indexDelay, parentActive }: AgentCardProps) {
+function AgentCard({ agent, existingSlugs, indexDelay, parentStopped }: AgentCardProps) {
   const [userToggled, setUserToggled] = useState<boolean | null>(null)
   // Default expansion: error → expanded, otherwise collapsed. User toggle overrides.
   const expanded = userToggled ?? agent.status === "error"
 
-  // Stopped: parent no longer active but agent hasn't reached a terminal state.
-  // Treat as done-but-incomplete; suppress spinners.
-  const isStopped = !parentActive && agent.status !== "done" && agent.status !== "error"
+  // Stopped: parent card determined this compose was stopped and this agent
+  // never reached a terminal state. Treat as done-but-incomplete; suppress spinners.
+  const isStopped = parentStopped && agent.status !== "done" && agent.status !== "error"
   const isWorking = agent.status === "working" && !isStopped
   const isRetrying = agent.status === "retrying" && !isStopped
   const isDone = agent.status === "done"
