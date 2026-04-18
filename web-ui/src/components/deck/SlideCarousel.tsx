@@ -58,15 +58,10 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
   const scrollTargetRef = useRef<string | null | undefined>(undefined)
-  // Track per-deck whether we've seen compose. Survives SlideCarousel remounts
-  // (Desktop re-renders frequently on poll cycles).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const globalSeen = (globalThis as any).__sdpmDeckComposeSeen as Map<string, boolean> | undefined
-    || ((globalThis as unknown as Record<string, unknown>).__sdpmDeckComposeSeen = new Map<string, boolean>()) as Map<string, boolean>
-  const deckKey = deckId || "unknown"
-  // If deck opened with compose already present AND we've seen it before → existing deck
-  const hadSlidesOnMount = useRef(slides.some((s) => !!s.composeUrl) && globalSeen.get(deckKey) === true)
-  const firstComposeSeenRef = useRef(globalSeen.get(deckKey) === true)
+  // If deck opened with compose already present → existing deck → first compose is instant
+  // (outline-only slides without compose don't count as "existing" — new decks animate on first compose)
+  const hadSlidesOnMount = useRef(slides.some((s) => !!s.composeUrl))
+  const firstComposeSeenRef = useRef(false)
   // eslint-disable-next-line no-console
   console.log("[SlideCarousel] mount: slides.length=", slides.length, "hadComposeOnMount=", hadSlidesOnMount.current, "slugs=", slides.map(s => `${s.slideId}(${!!s.composeUrl})`).join(","))
   // eslint-disable-next-line no-console
@@ -96,7 +91,6 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
         anyChanged = false
       }
       firstComposeSeenRef.current = true
-      globalSeen.set(deckKey, true) // Remember across remounts
     }
     if (anyChanged) scrollTargetRef.current = null // arm scroll for next onAnimate
   }, [slides])
