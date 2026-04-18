@@ -25,8 +25,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Layers, Star, MoreHorizontal, Trash2, Building2, Lock, Share2, Download, Users, Link, FolderOpen } from "lucide-react"
+import { isTauri } from "@/lib/platform"
 
-const isTauri = !!(globalThis as Record<string,unknown>).__TAURI_INTERNALS__
 
 interface DeckCardProps {
   deck: DeckSummary

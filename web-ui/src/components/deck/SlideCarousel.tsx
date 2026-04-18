@@ -19,8 +19,8 @@ import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
+import { isTauri } from "@/lib/platform"
 
-const isTauri = !!(globalThis as Record<string,unknown>).__TAURI_INTERNALS__
 
 interface SlideCarouselProps {
   slides: SlidePreview[]

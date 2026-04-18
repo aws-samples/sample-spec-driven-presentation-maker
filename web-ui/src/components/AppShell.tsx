@@ -22,8 +22,8 @@ import { useAuth } from "@/hooks/useAuth"
 import { usePreferences } from "@/hooks/usePreferences"
 import { Layers, ChevronLeft, MessageSquare, CircleUser, LogOut, Bot } from "lucide-react"
 import { AgentSettingsDialog } from "@/components/chat/AgentSettingsDialog"
+import { isTauri } from "@/lib/platform"
 
-const isTauri = !!(globalThis as Record<string,unknown>).__TAURI_INTERNALS__
 
 interface AppShellProps {
   children: ReactNode

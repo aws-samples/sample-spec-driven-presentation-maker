@@ -26,10 +26,10 @@
 import { useRef, useEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
+import { isTauri } from "@/lib/platform"
 
 export type ChatTabKey = "new" | "deck"
 
-const isTauri = !!(globalThis as Record<string,unknown>).__TAURI_INTERNALS__
 
 /** Model info populated by acpAgentService on session/new */
 interface AcpModel { modelId: string; name: string; description?: string }

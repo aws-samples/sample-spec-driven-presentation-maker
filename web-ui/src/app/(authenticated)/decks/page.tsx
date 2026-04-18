@@ -34,6 +34,7 @@ import { useSwipe } from "@/hooks/useSwipe"
 import { useDeckList } from "@/hooks/useDeckList"
 import { useWorkspace } from "@/hooks/useWorkspace"
 import { Plus, MessageSquare, Image as ImageIcon, Star } from "lucide-react"
+import { isBrowser } from "@/lib/platform"
 
 export default function DecksPage() {
   const auth = useAuth()
@@ -150,7 +151,7 @@ export default function DecksPage() {
                     }}
                     ownerAlias={!ws.isOwner ? ws.deck?.ownerAlias : undefined}
                     headerActions={
-                      ws.activeDeckId && !ws.isNew && !(globalThis as Record<string,unknown>).__TAURI_INTERNALS__ ? (
+                      ws.activeDeckId && !ws.isNew && isBrowser ? (
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => list.handleToggleFavorite(ws.activeDeckId!, list.favoriteIds.has(ws.activeDeckId!) ? "remove" : "add")}

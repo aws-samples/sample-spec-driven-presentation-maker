@@ -30,6 +30,7 @@ import { EmptyState } from "@/components/deck/EmptyState"
 import { SearchResultsGrid } from "@/components/deck/SearchResultsGrid"
 import { Search, X, Plus, Lock, Star, Users, Building2, Sparkles } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { isTauri } from "@/lib/platform"
 
 /** Tab definition for the list view. */
 interface Tab {
@@ -39,7 +40,6 @@ interface Tab {
 }
 
 /** Available tabs in the deck list. */
-const isTauri = !!(globalThis as Record<string,unknown>).__TAURI_INTERNALS__
 const TABS: Tab[] = isTauri ? [] : [
   { key: "mine", label: "My Decks", icon: Lock },
   { key: "favorites", label: "Favorites", icon: Star },
