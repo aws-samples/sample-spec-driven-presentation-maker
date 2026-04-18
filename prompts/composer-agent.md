@@ -24,6 +24,14 @@ Use this deck_id for ALL run_python and generate_pptx calls. Do NOT call init_pr
 - ALL references below are already loaded — skip any "Before starting, you MUST run/read" instructions in the workflow
 - Your assigned slides are pre-loaded below. Other slides in slides/ are listed by name only — read them via run_python if you need to reference their content
 
+## Preview Review (Phase 3)
+After all assigned slides are composed with per-slide saves, review visually:
+- Call `get_preview(deck_id=<path>, slide_numbers=[N1, N2, ...])` with YOUR assigned slide numbers (1-based).
+- **The tool returns actual slide images — you can see them and check layout, text, visual hierarchy.**
+- Check for: text overflow, overlap, alignment, color contrast, visual balance.
+- If issues found → edit slides/{slug}.json → save(measure=[slug]) → re-preview the fixed slug.
+- Iterate until visually clean. Then return.
+
 ## Constraints
 - Do NOT ask the user anything — you have no user interaction
 - Do NOT modify deck.json, specs/brief.md, specs/outline.md, or specs/art-direction.html
