@@ -239,6 +239,35 @@ def make_compose_slides(mcp_servers: list, model):
 
             progress_q: queue.Queue = queue.Queue()
 
+            # Prefetch template analysis once (shared across all groups)
+            template_analysis = ""
+            if mcp_client:
+                try:
+                    probe = mcp_client.call_tool_sync(
+                        tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
+                        name="run_python",
+                        arguments={
+                            "code": "import json; print(json.load(open('deck.json')).get('template',''))",
+                            "deck_id": deck_id,
+                        },
+                    )
+                    tmpl_name = ""
+                    for item in probe.get("content", []):
+                        if isinstance(item, dict) and "text" in item:
+                            out = json.loads(item["text"])
+                            tmpl_name = (out.get("output", "") if isinstance(out, dict) else str(out)).strip()
+                    if tmpl_name:
+                        tmpl_result = mcp_client.call_tool_sync(
+                            tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
+                            name="analyze_template",
+                            arguments={"template": tmpl_name},
+                        )
+                        for item in tmpl_result.get("content", []):
+                            if isinstance(item, dict) and "text" in item:
+                                template_analysis = f"## Template Analysis: {tmpl_name}\n\n{item['text']}"
+                except Exception:
+                    pass
+
             def run_group(gi: int, group: dict) -> dict:
                 """Run a single composer group in a thread."""
                 slugs_label = ", ".join(group["slugs"])
@@ -248,8 +277,10 @@ def make_compose_slides(mcp_servers: list, model):
                 deck_context = _build_deck_context(deck_sections)
 
                 slugs_list = ", ".join(f"slides/{s}.json" for s in group["slugs"])
+                tmpl_section = f"{template_analysis}\n\n---\n\n" if template_analysis else ""
                 user_content = (
                     f"{deck_context}\n\n---\n\n"
+                    f"{tmpl_section}"
                     f"## Target Deck\n"
                     f"deck_id: {deck_id}\n"
                     f"Use this deck_id for ALL run_python and generate_pptx calls.\n\n"

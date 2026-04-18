@@ -144,7 +144,7 @@ export function parseComposeState(
           existing.label = activityLabel(toolName, inp)
         }
       }
-      if (agent.status === "starting") agent.status = "working"
+      if (agent.status === "starting" || agent.status === "retrying") agent.status = "working"
     }
   }
 

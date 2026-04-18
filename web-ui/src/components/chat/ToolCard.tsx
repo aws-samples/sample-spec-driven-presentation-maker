@@ -321,7 +321,10 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
               if (ev.status === "retrying") entry.tools = []
               entry.status = ev
             }
-            else if (ev.tool) entry.tools.push(ev)
+            else if (ev.tool) {
+              entry.tools.push(ev)
+              if (entry.status?.status === "retrying") entry.status = undefined
+            }
             else if (ev.toolResult) {
               const t = entry.tools.find((t) => t.toolUseId === ev.toolResult)
               if (t) t.toolStatus = ev.toolStatus
