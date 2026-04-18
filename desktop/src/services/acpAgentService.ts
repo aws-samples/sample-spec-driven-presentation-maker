@@ -55,7 +55,6 @@ async function rpcRequest(method: string, params: Record<string, unknown> = {}):
 /** Handle a line of stdout from kiro-cli acp. */
 function handleLine(line: string) {
   if (!line.trim()) return;
-  console.log("[acp raw]", line.substring(0, 500));
   let msg: Record<string, unknown>;
   try {
     msg = JSON.parse(line);
@@ -65,7 +64,6 @@ function handleLine(line: string) {
 
   // JSON-RPC response (has id)
   if (msg.id != null && pending.has(msg.id as number)) {
-    console.log("[acp] resolving pending id:", msg.id);
     const resolve = pending.get(msg.id as number)!;
     pending.delete(msg.id as number);
     resolve(msg.result);
@@ -81,7 +79,6 @@ function handleLine(line: string) {
   // Subsequent response (id not in pending) — check for end_turn
   if (msg.id != null && msg.result) {
     const result = msg.result as Record<string, unknown>;
-    console.log("[acp] unmatched response id:", msg.id, "stopReason:", result.stopReason);
     if ((result.stopReason === "end_turn" || result.stopReason === "cancelled") && turnEndResolve) {
       turnEndResolve();
       turnEndResolve = null;
@@ -93,7 +90,6 @@ function handleLine(line: string) {
   if (msg.method === "session/request_permission") {
     const params = msg.params as Record<string, unknown>;
     const reqId = msg.id as string;
-    console.log("[acp] permission request, id:", reqId, "tool:", JSON.stringify((params.toolCall as Record<string,unknown>)?.title));
     if (reqId && child) {
       const reply = JSON.stringify({
         jsonrpc: "2.0",
@@ -227,7 +223,6 @@ function handleLine(line: string) {
             const dirName = (result.output_dir as string).split("/").pop() || "";
             result.deckId = dirName;
           }
-          console.log("[acp tool completed]", toolName, "deckId:", result.deckId, "result keys:", Object.keys(result));
 
           toolCallback(toolName, {
             toolUseId: toolCallId, name: toolName,
@@ -323,7 +318,6 @@ export async function startAgent(): Promise<void> {
     clientInfo: { name: "sdpm-desktop", version: "0.1.0" },
   });
 
-  console.log("[acp] initialized:", JSON.stringify(initResult));
 
   // Create session
   const { homeDir } = await import("@tauri-apps/api/path");
@@ -474,7 +468,6 @@ export async function invokeAgent(
   }).then((res) => {
     // Only resolve on end_turn, not tool_use
     const r = res as Record<string, unknown> | undefined;
-    console.log("[acp] prompt response:", JSON.stringify(r));
     if (r?.stopReason === "end_turn" || r?.stopReason === "cancelled") {
       if (turnEndResolve) { turnEndResolve(); turnEndResolve = null; }
     }
