@@ -96,6 +96,9 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
   defsUrlRef.current = defsUrl
   skipRef.current = skipAnimation
 
+  // Expose check() via ref so the composeUrl-change effect can trigger it
+  const checkRef = useRef<() => void>(() => {})
+
   useEffect(() => {
     let cancelled = false
 
@@ -275,10 +278,16 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
     }
 
     check()
+    checkRef.current = check
     const iv = window.setInterval(check, 1000)
     return () => { cancelled = true; clearInterval(iv); cleanup() }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slideId])
+
+  // React immediately to composeUrl prop changes (avoid 1s interval lag)
+  useEffect(() => {
+    checkRef.current?.()
+  }, [composeUrl])
 
   if (error && fallback) return <>{fallback}</>
 

@@ -50,6 +50,23 @@ interface SlideCarouselProps {
 
 export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, idToken }: SlideCarouselProps) {
   const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
+  // eslint-disable-next-line no-console
+  const slugs = slides.map(s => s.slideId)
+  // eslint-disable-next-line no-console
+  if (new Set(slugs).size !== slugs.length) console.warn("[SlideCarousel] duplicate slugs:", slugs)
+  // Check compose URL duplicates across different slugs
+  // eslint-disable-next-line no-console
+  const urlBySlug: Record<string,string> = {}
+  const dupUrls: string[] = []
+  for (const s of slidesWithPreview) {
+    const u = s.composeUrl?.split("?")[0] || ""
+    if (u && Object.values(urlBySlug).includes(u)) dupUrls.push(`${s.slideId}→${u}`)
+    if (u) urlBySlug[s.slideId] = u
+  }
+  // eslint-disable-next-line no-console
+  if (dupUrls.length) console.warn("[SlideCarousel] same composeUrl used for multiple slides:", dupUrls, urlBySlug)
+  // eslint-disable-next-line no-console
+  console.log("[SlideCarousel] slug→url:", slidesWithPreview.map(s => `${s.slideId}: ${s.composeUrl?.split("/").pop()?.split("?")[0]}`))
   const auth = useAuth()
   const [jsonLoading, setJsonLoading] = useState(false)
   const { viewMode, setViewMode } = usePreferences()
