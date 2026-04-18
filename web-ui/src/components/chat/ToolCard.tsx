@@ -43,7 +43,7 @@ interface ToolMeta {
 const ERR = { accent: "oklch(0.65 0.2 25)", bg: "oklch(0.65 0.2 25 / 6%)", border: "oklch(0.65 0.2 25 / 18%)" }
 
 /** Icon, label, and category per tool name. */
-const TOOL_META: Record<string, ToolMeta> = {
+export const TOOL_META: Record<string, ToolMeta> = {
   // Native agent tools
   create_deck:        { Icon: FolderPlus,      label: "Creating deck",          category: "build" },
   write_slide:        { Icon: Pencil,          label: "Writing slide",          category: "build" },
@@ -173,7 +173,7 @@ interface ToolCardProps {
 }
 
 /** Strip MCP prefix from tool name for display lookup. */
-function stripPrefix(n: string): string {
+export function stripPrefix(n: string): string {
   return n.replace(/^spec_driven_presentation_maker_/, "")
 }
 
