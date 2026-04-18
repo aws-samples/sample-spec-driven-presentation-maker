@@ -260,6 +260,7 @@ spec-driven-presentation-maker は OIDC 準拠の任意の IdP（Identity Provid
 | SdpmAgent | Strands Agent（Amazon Bedrock AgentCore Runtime） | `stacks.agent` |
 | SdpmWebUi | S3 + Amazon CloudFront + Amazon API Gateway + Lambda | `stacks.webUi` |
 | SdpmAuth | Amazon Cognito User Pool（agent または webUi 有効時に自動作成） | （自動） |
+| SdpmCloudFrontWaf | CloudFront 用 AWS WAF WebACL（us-east-1） | `waf.*` |
 
 ---
 

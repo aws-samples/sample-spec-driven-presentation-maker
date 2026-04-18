@@ -27,3 +27,12 @@ features:
 model:
   modelId: "global.anthropic.claude-sonnet-4-6"
   # modelId: "global.anthropic.claude-opus-4-6-v1"
+
+# WAF IP address restriction (optional).
+# When specified, only the listed IP ranges can access CloudFront and API Gateway.
+# waf:
+#   allowedIpV4AddressRanges:
+#     - "192.168.0.0/16"
+#     - "10.0.0.0/8"
+#   allowedIpV6AddressRanges:
+#     - "2001:db8::/32"

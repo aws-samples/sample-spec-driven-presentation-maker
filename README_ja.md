@@ -109,6 +109,7 @@ npm install && npx cdk deploy --all
 - **認可**: API・ストレージ層でのリソースレベル RBAC
 - **暗号化**: S3 サーバーサイド暗号化（SSE-S3）、DynamoDB 保存時暗号化
 - **ネットワーク**: CloudFront + OAI による静的アセット配信、API Gateway + Cognito 認可
+- **WAF**: AWS WAF による IP アドレス制限（IPv4/IPv6）を CloudFront・API Gateway にオプション適用
 
 ---
 
@@ -189,7 +190,7 @@ This project has adopted the [Amazon Open Source Code of Conduct](https://aws.gi
 
 1. 監査ログ用に AWS CloudTrail を有効化
 2. VPC 内で実行する場合は S3・DynamoDB の VPC エンドポイントを設定
-3. CloudFront と API Gateway に AWS WAF ルールを設定
+3. CloudFront と API Gateway に AWS WAF ルールを設定（組み込みサポート: `config.yaml` で `waf.allowedIpV4AddressRanges` / `waf.allowedIpV6AddressRanges` を設定 — 複数 CIDR 範囲指定可、または `deploy.sh` の `--waf-ipv4` / `--waf-ipv6` を使用）
 4. ドメインに合わせて CORS 設定を見直し
 5. 全バケットで S3 アクセスログを有効化
 6. Cognito の高度なセキュリティ機能（MFA、漏洩認証情報検出）を設定
