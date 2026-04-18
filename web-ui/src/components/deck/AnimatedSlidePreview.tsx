@@ -104,9 +104,10 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
       if (!compUrlBase) return
       if (compUrlBase === lastComposeUrlRef.current) return
       if (animatingRef.current) return  // defer until animation completes
-      // Snapshot skip at URL-change detection time (before async fetch) —
-      // parent's setState may flip skipRef during fetch latency.
-      const skipThisUpdate = skipRef.current
+      // Skip only on the first URL seen after mount (initial load for existing
+      // deck). Subsequent URL changes (user edits) always animate.
+      const isFirstUrl = !lastComposeUrlRef.current
+      const skipThisUpdate = skipRef.current && isFirstUrl
       lastComposeUrlRef.current = compUrlBase
       setError(false)
 
