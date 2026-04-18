@@ -80,8 +80,16 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
   const existingSlugs = new Set(deckSlugs)
   const totalSlides = state.agents.reduce((sum, a) => sum + a.slugs.length, 0)
 
-  const shellBg = hasError ? "oklch(0.65 0.2 25 / 6%)" : CAT.produce.bg
-  const shellBorder = hasError ? "oklch(0.65 0.2 25 / 18%)" : CAT.produce.border
+  const shellBg = hasError
+    ? "oklch(0.65 0.2 25 / 6%)"
+    : stopping && isActive
+    ? `${STATE.retry}0f`
+    : CAT.produce.bg
+  const shellBorder = hasError
+    ? "oklch(0.65 0.2 25 / 18%)"
+    : stopping && isActive
+    ? `${STATE.retry}40`
+    : CAT.produce.border
 
   return (
     <section
@@ -116,6 +124,7 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
             existingSlugs={existingSlugs}
             indexDelay={i}
             parentStopped={isStopped}
+            parentStopping={stopping && isActive}
           />
         ))}
       </div>
@@ -145,7 +154,8 @@ function Header({
 }) {
   const hasAgents = state.totalGroups > 0
   const isFinished = isDone || (hasError && !isActive) || isStopped
-  const label = stopping && isActive
+  const isStopping = stopping && isActive
+  const label = isStopping
     ? "Stopping — finalizing partial results…"
     : isStopped
     ? doneSlides > 0
@@ -161,7 +171,13 @@ function Header({
     ? `Composing ${totalSlides} slides · ${state.totalGroups} agents in parallel`
     : state.statusMessage || "Preparing…"
 
-  const accent = hasError ? STATE.error : isStopped ? C.fgMuted : CAT.produce.accent
+  const accent = hasError
+    ? STATE.error
+    : isStopping
+    ? STATE.retry
+    : isStopped
+    ? C.fgMuted
+    : CAT.produce.accent
 
   return (
     <header className="flex items-center gap-2.5 px-3 pt-3 pb-2">
@@ -190,10 +206,23 @@ function Header({
       <span
         className="flex-1 min-w-0 text-[12.5px] font-medium tracking-[-0.01em] truncate"
         style={{ color: accent }}
+        aria-live="polite"
       >
         {label}
       </span>
-      {canCancel ? (
+      {isStopping ? (
+        <span
+          className="flex-none inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium"
+          style={{ color: accent, background: `${accent}14` }}
+          aria-label="Cancel requested, stopping"
+        >
+          <RefreshCw
+            className="h-3 w-3"
+            style={{ animation: "tool-spinner 1.2s linear infinite" }}
+          />
+          Stopping…
+        </span>
+      ) : canCancel ? (
         <button
           type="button"
           onClick={onCancel}
@@ -215,9 +244,10 @@ interface AgentCardProps {
   existingSlugs: Set<string>
   indexDelay: number
   parentStopped: boolean
+  parentStopping: boolean
 }
 
-function AgentCard({ agent, existingSlugs, indexDelay, parentStopped }: AgentCardProps) {
+function AgentCard({ agent, existingSlugs, indexDelay, parentStopped, parentStopping }: AgentCardProps) {
   const [userToggled, setUserToggled] = useState<boolean | null>(null)
   // Default expansion: error → expanded, otherwise collapsed. User toggle overrides.
   const expanded = userToggled ?? agent.status === "error"
@@ -225,6 +255,9 @@ function AgentCard({ agent, existingSlugs, indexDelay, parentStopped }: AgentCar
   // Stopped: parent card determined this compose was stopped and this agent
   // never reached a terminal state. Treat as done-but-incomplete; suppress spinners.
   const isStopped = parentStopped && agent.status !== "done" && agent.status !== "error"
+  // Stopping-in-flight: parent asked us to stop but this agent is still working.
+  // Indicates "cancellation in progress" — amber accent instead of violet.
+  const isStoppingInFlight = parentStopping && agent.status !== "done" && agent.status !== "error"
   const isWorking = agent.status === "working" && !isStopped
   const isRetrying = agent.status === "retrying" && !isStopped
   const isDone = agent.status === "done"
@@ -238,7 +271,13 @@ function AgentCard({ agent, existingSlugs, indexDelay, parentStopped }: AgentCar
   const detailId = `compose-agent-${agent.groupIndex}-detail`
 
   // State dot/icon
-  const markerColor = isError ? STATE.error : isRetrying ? STATE.retry : STATE.working
+  const markerColor = isError
+    ? STATE.error
+    : isStoppingInFlight
+    ? STATE.retry
+    : isRetrying
+    ? STATE.retry
+    : STATE.working
 
   return (
     <div
@@ -336,6 +375,7 @@ function AgentCard({ agent, existingSlugs, indexDelay, parentStopped }: AgentCar
           agent={agent}
           latestActivity={latestActivity}
           isStopped={isStopped}
+          isStoppingInFlight={isStoppingInFlight}
         />
       )}
 
@@ -401,10 +441,12 @@ function LatestActivityRow({
   agent,
   latestActivity,
   isStopped,
+  isStoppingInFlight,
 }: {
   agent: AgentState
   latestActivity: AgentState["activity"][number] | null
   isStopped: boolean
+  isStoppingInFlight: boolean
 }) {
   // Stopped by user: show static "Stopped" label, no spinner
   if (isStopped) {
@@ -413,6 +455,25 @@ function LatestActivityRow({
         <span className="flex-none w-2 h-2 rounded-full" style={{ background: C.fgMuted }} />
         <span className="text-[11.5px] truncate tracking-[-0.005em]" style={{ color: C.fgMuted }}>
           Stopped
+        </span>
+      </div>
+    )
+  }
+
+  // Stopping-in-flight: parent requested cancel but this agent hasn't wrapped
+  // up yet. Show amber "Stopping…" so the user sees cancellation is propagating.
+  if (isStoppingInFlight) {
+    return (
+      <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
+        <RefreshCw
+          className="flex-none h-3 w-3"
+          style={{ color: STATE.retry, animation: "tool-spinner 1.2s linear infinite" }}
+        />
+        <span
+          className="text-[11.5px] truncate tracking-[-0.005em]"
+          style={{ color: STATE.retry }}
+        >
+          Stopping<span className="thinking-dots" aria-hidden="true" />
         </span>
       </div>
     )
