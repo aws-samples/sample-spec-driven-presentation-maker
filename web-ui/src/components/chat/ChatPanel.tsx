@@ -17,7 +17,7 @@
 
 import { useEffect, useRef, useState, useImperativeHandle, forwardRef, FormEvent, KeyboardEvent, useCallback } from "react"
 import { useAuth } from "react-oidc-context"
-import { invokeAgentCore, generateSessionId, setAgentConfig } from "@/services/agentCoreService"
+import { invokeAgentCore, generateSessionId, setAgentConfig, stopRuntimeSession } from "@/services/agentCoreService"
 import { getChatHistory, listDecks, patchDeck, DeckSummary } from "@/services/deckService"
 import { uploadFile, validateFile, canAddMoreFiles, UploadedFile } from "@/services/uploadService"
 import { useCompositionSafe } from "@/hooks/useCompositionSafe"
@@ -709,11 +709,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   /**
    * Stop the current streaming response.
-   * Aborts the fetch connection; the server will stop at the next safe point
-   * when a new request arrives for the same session.
+   * Aborts the fetch connection and calls StopRuntimeSession to immediately
+   * terminate the AgentCore Runtime session (including all ThreadPool-based
+   * composer agents inside the container).
    */
   const handleStop = () => {
     abortControllerRef.current?.abort()
+    const token = auth.user?.access_token
+    if (token) stopRuntimeSession(sessionId, token)
   }
 
   const handleSubmit = (e: FormEvent) => {

@@ -128,6 +128,31 @@ export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessTo
 }
 
 /**
+ * Stop a running AgentCore Runtime session.
+ * Immediately terminates the specified session and stops any ongoing streaming responses,
+ * including all ThreadPool-based composer agents inside the container.
+ * Fire-and-forget: errors are logged but not thrown.
+ */
+export const stopRuntimeSession = async (sessionId, accessToken) => {
+  try {
+    if (!sessionId || !accessToken || !AGENT_CONFIG.AGENT_RUNTIME_ARN) return
+    const endpoint = `https://bedrock-agentcore.${AGENT_CONFIG.AWS_REGION}.amazonaws.com`
+    const escapedAgentArn = encodeURIComponent(AGENT_CONFIG.AGENT_RUNTIME_ARN)
+    const url = `${endpoint}/runtimes/${escapedAgentArn}/stopruntimesession?qualifier=DEFAULT`
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": sessionId,
+      },
+    })
+  } catch (error) {
+    console.error("Error stopping AgentCore session:", error)
+  }
+}
+
+/**
  * Generate a new session ID
  */
 export const generateSessionId = () => {
