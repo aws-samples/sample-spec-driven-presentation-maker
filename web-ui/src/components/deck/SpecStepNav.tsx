@@ -20,6 +20,7 @@ import { Layers, FileText, Palette, ArrowLeft, Check } from "lucide-react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { fetchStyles, fetchStyleHtml, type StyleEntry, type SpecFiles } from "@/services/deckService"
+import { listUserStyles, getUserStyle } from "@/services/resourcesService"
 import { OutlineView } from "./OutlineView"
 
 /** Tab key union type for spec viewer navigation. */
@@ -213,9 +214,10 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
   type ArtDirectionMode = "gallery" | "preview" | "result"
   const [adMode, setAdMode] = useState<ArtDirectionMode>(content ? "result" : "gallery")
   const [styles, setStyles] = useState<StyleEntry[]>([])
+  const [galleryTab, setGalleryTab] = useState<"examples" | "user">("examples")
   const [stylesLoading, setStylesLoading] = useState(false)
   const stylesLoadedRef = useRef(false)
-  const [preview, setPreview] = useState<{ name: string; html: string } | null>(null)
+  const [preview, setPreview] = useState<{ name: string; scope: "examples" | "user"; html: string } | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const galleryScrollRef = useRef(0)
   const galleryContainerRef = useRef<HTMLDivElement>(null)
@@ -228,15 +230,19 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     if (!content && adMode === "result") setAdMode("gallery")
   }, [content, specKey, adMode, preview])
 
-  // Fetch styles when gallery is shown
+  // Fetch styles when gallery is shown (examples + user styles merged)
   useEffect(() => {
     if (specKey !== "artDirection" || adMode !== "gallery" || stylesLoadedRef.current || !idToken) return
     let cancelled = false
     setStylesLoading(true)
-    fetchStyles(idToken).then((s) => {
+    Promise.all([fetchStyles(idToken), listUserStyles(idToken)]).then(([examples, user]) => {
       if (cancelled) return
       stylesLoadedRef.current = true
-      setStyles(s)
+      const merged: StyleEntry[] = [
+        ...examples.map(s => ({ ...s, scope: "examples" as const })),
+        ...user.map(s => ({ name: s.name, description: s.description, coverHtml: s.coverHtml || "", scope: "user" as const })),
+      ]
+      setStyles(merged)
       setStylesLoading(false)
     })
     return () => { cancelled = true }
@@ -302,18 +308,24 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
 
     // GALLERY state
     if (adMode === "gallery") {
-      const handleCardClick = async (name: string) => {
+      const handleCardClick = async (name: string, scope: "examples" | "user") => {
         if (galleryContainerRef.current) galleryScrollRef.current = galleryContainerRef.current.scrollTop
         userRequestedGallery.current = false
         setPreviewLoading(true)
-        setPreview({ name, html: "" })
+        setPreview({ name, scope, html: "" })
         setAdMode("preview")
         if (idToken) {
-          const html = await fetchStyleHtml(name, idToken)
-          setPreview({ name, html })
+          const html = scope === "user"
+            ? await getUserStyle(name, idToken)
+            : await fetchStyleHtml(name, idToken)
+          setPreview({ name, scope, html })
         }
         setPreviewLoading(false)
       }
+
+      const visibleStyles = styles.filter(s => (s.scope || "examples") === galleryTab)
+      const userCount = styles.filter(s => s.scope === "user").length
+      const exampleCount = styles.filter(s => (s.scope || "examples") === "examples").length
 
       return (
         <div ref={galleryContainerRef} className="flex-1 overflow-y-auto">
@@ -333,6 +345,25 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
               </button>
             )}
           </div>
+          {/* Tabs */}
+          <div className="flex gap-1 px-6 pt-3 border-b border-white/[0.04]">
+            <button
+              onClick={() => setGalleryTab("examples")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-t-md transition-colors ${
+                galleryTab === "examples" ? "text-foreground bg-white/[0.06]" : "text-foreground-muted hover:text-foreground-secondary"
+              }`}
+            >
+              Examples{exampleCount > 0 && <span className="text-[10px] text-foreground-muted ml-1">· {exampleCount}</span>}
+            </button>
+            <button
+              onClick={() => setGalleryTab("user")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-t-md transition-colors ${
+                galleryTab === "user" ? "text-foreground bg-white/[0.06]" : "text-foreground-muted hover:text-foreground-secondary"
+              }`}
+            >
+              My{userCount > 0 && <span className="text-[10px] text-foreground-muted ml-1">· {userCount}</span>}
+            </button>
+          </div>
           {/* Grid */}
           <div className="p-6">
             {stylesLoading ? (
@@ -341,10 +372,21 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
                   <div key={i} className="aspect-[16/10] rounded-xl bg-white/[0.03] animate-pulse" />
                 ))}
               </div>
+            ) : visibleStyles.length === 0 ? (
+              <div className="text-center py-20 text-xs text-foreground-muted">
+                {galleryTab === "user"
+                  ? "No personal styles yet. Use Customize → New Style to create one."
+                  : "No example styles available."}
+              </div>
             ) : (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                {styles.map((style, i) => (
-                  <StyleCard key={style.name} style={style} index={i} onClick={handleCardClick} />
+                {visibleStyles.map((style, i) => (
+                  <StyleCard
+                    key={`${style.scope}:${style.name}`}
+                    style={style}
+                    index={i}
+                    onClick={(n) => handleCardClick(n, style.scope || "examples")}
+                  />
                 ))}
               </div>
             )}

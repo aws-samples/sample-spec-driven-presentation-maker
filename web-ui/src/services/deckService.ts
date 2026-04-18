@@ -396,6 +396,8 @@ export interface StyleEntry {
   name: string
   description: string
   coverHtml: string
+  /** "examples" (system-provided) or "user" (personal). */
+  scope?: "examples" | "user"
 }
 
 /**

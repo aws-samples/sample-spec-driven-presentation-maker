@@ -26,6 +26,8 @@ import { DeckListView } from "@/components/deck/DeckListView"
 import { SlideCarousel } from "@/components/deck/SlideCarousel"
 import { DeckActions } from "@/components/deck/DeckActions"
 import { DeleteDeckModal } from "@/components/deck/DeleteDeckModal"
+import { UploadTemplateDialog } from "@/components/deck/UploadTemplateDialog"
+import { MyResourcesList } from "@/components/deck/MyResourcesList"
 import { ChatPanelShell } from "@/components/chat/ChatPanelShell"
 import { ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { updateVisibility, shareDeck } from "@/services/deckService"
@@ -50,6 +52,8 @@ export default function DecksPage() {
   const [fabOpen, setFabOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"chat" | "preview">("chat")
   const [workflowPhase, setWorkflowPhase] = useState<string | null>(null)
+  const [uploadTemplateOpen, setUploadTemplateOpen] = useState(false)
+  const [myResourcesType, setMyResourcesType] = useState<"styles" | "templates" | null>(null)
   const chatRef = useRef<ChatPanelHandle>(null)
   const swipeRef = useSwipe(
     () => setActiveTab("preview"),
@@ -64,6 +68,15 @@ export default function DecksPage() {
       : `I'll use the "${name}" style. `
     chatRef.current?.insertAtCursor(msg)
   }, [ws.deck?.specs?.artDirection])
+
+  /** Handle "New Style" — open chat with preset prompt. */
+  const handleNewStyle = useCallback(() => {
+    ws.setChatTab("new")
+    ws.setChatOpen(true)
+    setTimeout(() => {
+      chatRef.current?.insertAtCursor("I want to create a new style. ")
+    }, 400)
+  }, [ws])
 
   /* ── Render ── */
   return (
@@ -207,6 +220,10 @@ export default function DecksPage() {
                 onToggleVisibility={list.handleToggleVisibility}
                 onDownload={list.handleDownload}
                 loading={list.loading}
+                onNewStyle={handleNewStyle}
+                onUploadTemplate={() => setUploadTemplateOpen(true)}
+                onMyStyles={() => setMyResourcesType("styles")}
+                onMyTemplates={() => setMyResourcesType("templates")}
               />
               {list.error && (
                 <div className="max-w-5xl mx-auto px-5 sm:px-8">
@@ -242,6 +259,22 @@ export default function DecksPage() {
           deckName={list.deleteTarget.name}
           onConfirm={list.confirmDelete}
           onCancel={() => list.setDeleteTarget(null)}
+        />
+      )}
+
+      {uploadTemplateOpen && idToken && (
+        <UploadTemplateDialog
+          idToken={idToken}
+          onClose={() => setUploadTemplateOpen(false)}
+          onUploaded={() => {}}
+        />
+      )}
+
+      {myResourcesType && idToken && (
+        <MyResourcesList
+          type={myResourcesType}
+          idToken={idToken}
+          onClose={() => setMyResourcesType(null)}
         />
       )}
 

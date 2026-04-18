@@ -28,6 +28,7 @@ import { DeckSummary, SlideSearchResult } from "@/services/deckService"
 import { DeckCard } from "@/components/deck/DeckCard"
 import { EmptyState } from "@/components/deck/EmptyState"
 import { SearchResultsGrid } from "@/components/deck/SearchResultsGrid"
+import { CustomizeMenu } from "@/components/deck/CustomizeMenu"
 import { Search, X, Plus, Lock, Star, Users, Building2, Sparkles } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -63,12 +64,17 @@ interface DeckListViewProps {
   onShare?: (deckId: string) => void
   onDownload?: (deckId: string) => void
   loading: boolean
+  onNewStyle?: () => void
+  onUploadTemplate?: () => void
+  onMyStyles?: () => void
+  onMyTemplates?: () => void
 }
 
 export function DeckListView({
   decks, activeTab, onTabChange, searchQuery, onSearchChange,
   searchResults, searching, onDeckOpen, onNewDeck, favoriteIds,
   onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, loading,
+  onNewStyle, onUploadTemplate, onMyStyles, onMyTemplates,
 }: DeckListViewProps) {
   const showSearch = searchQuery.length >= 2
 
@@ -85,6 +91,14 @@ export function DeckListView({
           </p>
         </div>
         <div className="hidden sm:flex items-center gap-2">
+          {onNewStyle && onUploadTemplate && onMyStyles && onMyTemplates && (
+            <CustomizeMenu
+              onNewStyle={onNewStyle}
+              onUploadTemplate={onUploadTemplate}
+              onMyStyles={onMyStyles}
+              onMyTemplates={onMyTemplates}
+            />
+          )}
           <button
             onClick={onNewDeck}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-[12px] font-semibold rounded-lg bg-brand-teal text-primary-foreground transition-all hover:brightness-110"
