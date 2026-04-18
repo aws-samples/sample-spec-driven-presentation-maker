@@ -412,6 +412,21 @@ body {
   animation: slide-update-glow 1.5s ease-out both;
 }
 
+/* ── Compose card: left bar breathing (working) ── */
+@keyframes compose-bar-breath {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.95; }
+}
+
+/* ── Compose card: left bar flicker (retrying) ── */
+@keyframes compose-bar-flicker {
+  0%, 100% { opacity: 0.9; }
+  20%      { opacity: 0.3; }
+  45%      { opacity: 0.8; }
+  60%      { opacity: 0.35; }
+  80%      { opacity: 0.9; }
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .tool-card-enter,
@@ -420,6 +435,7 @@ body {
   @keyframes tool-spinner { to { transform: rotate(360deg); } }
   @keyframes tool-active-shimmer { 0%, 100% { opacity: 0.8; } }
   @keyframes tool-pulse { 0%, 100% { opacity: 0.6; } }
+  .compose-bar { animation: none !important; opacity: 0.7 !important; }
   .brief-waiting,
   .outline-waiting,
   .art-waiting,

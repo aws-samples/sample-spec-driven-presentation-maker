@@ -144,9 +144,11 @@ interface ChatMessageProps {
   isStreaming?: boolean
   /** Cognito ID token for fetching slide previews. */
   idToken?: string
+  /** Current deck slide IDs — forwarded to ToolCard/ComposeCard for slug existence. */
+  deckSlideIds?: string[]
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, deckSlideIds }: ChatMessageProps) {
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
@@ -251,6 +253,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                   result={block.tool.result}
                   isActive={isStreaming && !block.tool.status && (i === blocks.length - 1 || (block.tool.streamMessages?.length ?? 0) > 0)}
                   streamMessages={block.tool.streamMessages}
+                  deckSlideIds={deckSlideIds}
                 />
               )
             )}
@@ -299,6 +302,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                     result={latestTool.result}
                     isActive={isStreaming && !latestTool.status}
                     streamMessages={latestTool.streamMessages}
+                    deckSlideIds={deckSlideIds}
                   />
                 )}
                 {olderTools.length > 0 && (

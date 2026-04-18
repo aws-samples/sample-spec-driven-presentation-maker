@@ -31,6 +31,7 @@ import {
   LayoutTemplate, Package, AlertCircle, Ruler, RefreshCw,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import { ComposeCard } from "./compose/ComposeCard"
 
 type ToolCategory = "build" | "explore" | "produce" | "compute" | "other"
 
@@ -177,6 +178,8 @@ interface ToolCardProps {
   isActive?: boolean
   /** Streaming progress events from tool execution. */
   streamMessages?: Record<string, unknown>[]
+  /** Current deck slide IDs — used by ComposeCard for slug existence rendering. */
+  deckSlideIds?: string[]
 }
 
 /** Strip MCP prefix from tool name for display lookup. */
@@ -184,7 +187,21 @@ function stripPrefix(n: string): string {
   return n.replace(/^spec_driven_presentation_maker_/, "")
 }
 
-export function ToolCard({ name, input, status, result, isActive = false, streamMessages }: ToolCardProps) {
+export function ToolCard({ name, input, status, result, isActive = false, streamMessages, deckSlideIds }: ToolCardProps) {
+  // Dispatch: compose_slides has a dedicated rich card.
+  if (name === "compose_slides" || name.endsWith("_compose_slides")) {
+    return (
+      <ComposeCard
+        input={input}
+        status={status}
+        result={result}
+        isActive={isActive}
+        streamMessages={streamMessages}
+        deckSlideIds={deckSlideIds}
+      />
+    )
+  }
+
   const meta = TOOL_META[name] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
   const isError = status === "error"
   const isComplete = !!status
