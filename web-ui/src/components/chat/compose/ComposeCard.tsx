@@ -14,7 +14,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Package, ChevronRight, Check, AlertCircle, RefreshCw, Wrench } from "lucide-react"
+import { Package, ChevronRight, Check, AlertCircle, RefreshCw, Sparkles, Wrench } from "lucide-react"
 import { parseComposeState, type AgentState, type ComposeState } from "./parseComposeState"
 import { stripPrefix } from "./activityLabel"
 import { CAT } from "../toolPalette"
@@ -196,17 +196,28 @@ function AgentCard({ agent, existingSlugs, indexDelay }: AgentCardProps) {
             className="flex-none h-3 w-3"
             style={{ color: STATE.working }}
           />
+        ) : isWorking || isRetrying ? (
+          <svg
+            aria-hidden="true"
+            className="flex-none h-3 w-3"
+            viewBox="0 0 14 14"
+          >
+            <circle
+              cx="7" cy="7" r="5.5"
+              fill="none"
+              stroke={markerColor}
+              strokeWidth="1.5"
+              strokeDasharray="10 28"
+              strokeLinecap="round"
+              style={{ animation: "tool-spinner 1.1s linear infinite" }}
+            />
+          </svg>
         ) : (
           <span
             aria-hidden="true"
             className="relative flex-none w-2 h-2 rounded-full"
             style={{
               background: markerColor,
-              animation: isWorking
-                ? "compose-breath 1.8s ease-in-out infinite"
-                : isRetrying
-                ? "compose-flicker 1.1s linear infinite"
-                : undefined,
               opacity: isStarting ? 0.5 : 1,
             }}
           />
@@ -296,7 +307,13 @@ function AgentCard({ agent, existingSlugs, indexDelay }: AgentCardProps) {
             <Section
               label={`Activity · ${agent.activity.length} step${agent.activity.length === 1 ? "" : "s"}`}
             >
-              <ActivityTimeline activity={agent.activity} />
+              <ActivityTimeline
+                activity={agent.activity}
+                showThinking={
+                  (isWorking || isRetrying) &&
+                  agent.activity[agent.activity.length - 1]?.status !== "active"
+                }
+              />
             </Section>
           )}
 
@@ -356,10 +373,38 @@ function LatestActivityRow({
     )
   }
 
-  // No activity yet
-  if (!latestActivity) return null
+  // Done: show the last activity (no Thinking, no dots)
+  if (agent.status === "done") {
+    if (!latestActivity) return null
+    const catColor = CAT[latestActivity.category].accent
+    const meta = getToolMeta(latestActivity.tool)
+    const labelColor = `color-mix(in oklch, ${catColor} 55%, ${C.fgDim})`
+    return (
+      <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
+        <meta.Icon className="flex-none h-3 w-3" style={{ color: catColor }} />
+        <span
+          className="text-[11.5px] truncate tracking-[-0.005em]"
+          style={{ color: labelColor }}
+        >
+          {latestActivity.label}
+        </span>
+      </div>
+    )
+  }
 
-  const isActive = latestActivity.status === "active"
+  // No activity yet, or last activity already finished → Thinking
+  const isThinking = !latestActivity || latestActivity.status !== "active"
+  if (isThinking) {
+    return (
+      <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
+        <Sparkles className="flex-none h-3 w-3" style={{ color: C.fgDim }} />
+        <span className="text-[11.5px] truncate tracking-[-0.005em]" style={{ color: C.fgDim }}>
+          Thinking<span className="thinking-dots" aria-hidden="true" />
+        </span>
+      </div>
+    )
+  }
+
   const isErrStep = latestActivity.status === "error"
   const catColor = CAT[latestActivity.category].accent
   const meta = getToolMeta(latestActivity.tool)
@@ -367,25 +412,20 @@ function LatestActivityRow({
   const iconColor = isErrStep ? STATE.error : catColor
   const labelColor = isErrStep
     ? STATE.error
-    : isActive
-    ? `color-mix(in oklch, ${catColor} 85%, white 15%)`
-    : `color-mix(in oklch, ${catColor} 55%, ${C.fgDim})`
+    : `color-mix(in oklch, ${catColor} 85%, white 15%)`
 
   return (
     <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
       <meta.Icon
         className="flex-none h-3 w-3"
-        style={{
-          color: iconColor,
-          animation: isActive ? "compose-breath 1.8s ease-in-out infinite" : undefined,
-        }}
+        style={{ color: iconColor }}
       />
       <span
         className="text-[11.5px] truncate tracking-[-0.005em]"
         style={{ color: labelColor }}
       >
         {latestActivity.label}
-        {isActive ? "…" : ""}
+        <span className="thinking-dots" aria-hidden="true" />
         {isErrStep ? "  ✗" : ""}
       </span>
     </div>
@@ -410,7 +450,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 
 // --- ActivityTimeline ------------------------------------------------------
 
-function ActivityTimeline({ activity }: { activity: AgentState["activity"] }) {
+function ActivityTimeline({ activity, showThinking }: { activity: AgentState["activity"]; showThinking: boolean }) {
   return (
     <ol className="flex flex-col gap-1">
       {activity.map((a) => {
@@ -428,22 +468,27 @@ function ActivityTimeline({ activity }: { activity: AgentState["activity"] }) {
           <li key={a.toolUseId} className="flex items-center gap-2">
             <meta.Icon
               className="flex-none h-3 w-3"
-              style={{
-                color: iconColor,
-                animation: isActive ? "compose-breath 1.8s ease-in-out infinite" : undefined,
-              }}
+              style={{ color: iconColor }}
             />
             <span
               className="text-[11.5px] truncate tracking-[-0.005em]"
               style={{ color: labelColor }}
             >
               {a.label}
-              {isActive ? "…" : ""}
+              {isActive && <span className="thinking-dots" aria-hidden="true" />}
               {isErr ? "  ✗" : ""}
             </span>
           </li>
         )
       })}
+      {showThinking && (
+        <li className="flex items-center gap-2">
+          <Sparkles className="flex-none h-3 w-3" style={{ color: C.fgDim }} />
+          <span className="text-[11.5px] truncate tracking-[-0.005em]" style={{ color: C.fgDim }}>
+            Thinking<span className="thinking-dots" aria-hidden="true" />
+          </span>
+        </li>
+      )}
     </ol>
   )
 }
