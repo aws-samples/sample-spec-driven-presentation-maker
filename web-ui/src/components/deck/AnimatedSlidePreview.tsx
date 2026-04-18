@@ -104,8 +104,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
       if (!compUrlBase) return
       if (compUrlBase === lastComposeUrlRef.current) return
       if (animatingRef.current) return  // defer until animation completes
-      // eslint-disable-next-line no-console
-      console.log("[AnimPrev]", slideId, "new url, skip=", skipRef.current)
       lastComposeUrlRef.current = compUrlBase
       setError(false)
 
@@ -117,11 +115,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
             try { await document.fonts.ready } catch { /* ignore */ }
           }
           const [defsResp, compResp] = await Promise.all([fetch(defsUrlRef.current), fetch(composeUrlRef.current)])
-          // eslint-disable-next-line no-console
-          console.log("[AnimPrev]", slideId, "fetch defs:", defsResp.status, "compose:", compResp.status, "cancelled:", cancelled)
           if (cancelled || !defsResp.ok || !compResp.ok) {
-            // eslint-disable-next-line no-console
-            console.log("[AnimPrev]", slideId, "→ setError (cancelled or !ok)")
             setError(true); return
           }
 
@@ -143,8 +137,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
               if (comp.changed) animTargets.add(i)
             })
           }
-          // eslint-disable-next-line no-console
-          console.log("[AnimPrev]", slideId, "components=", data.components.length, "animTargets=", animTargets.size, "reducedMotion=", reducedMotion.current)
 
 
         if (animTargets.size > 0) {
