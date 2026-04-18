@@ -18,6 +18,7 @@
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { parseComposeState, type AgentState, type ComposeState } from "./parseComposeState"
 import { CAT } from "../toolPalette"
 
@@ -206,6 +207,7 @@ function AgentCard({ agent, existingSlugs, timing, now, indexDelay }: AgentCardP
   const cardRef = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState(false)
   const [tilt, setTilt] = useState({ x: 0, y: 0 })
+  const [popRect, setPopRect] = useState<{ left: number; top: number; width: number } | null>(null)
   const popTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const color = agentColor(agent.groupIndex, agent.status)
@@ -230,6 +232,11 @@ function AgentCard({ agent, existingSlugs, timing, now, indexDelay }: AgentCardP
   // --- Hover pop-out state ---
   function handleEnter() {
     if (popTimer.current) clearTimeout(popTimer.current)
+    const el = cardRef.current
+    if (el) {
+      const r = el.getBoundingClientRect()
+      setPopRect({ left: r.left, top: r.bottom + 8, width: r.width })
+    }
     setHover(true)
   }
   function handleLeave() {
@@ -365,12 +372,10 @@ function AgentCard({ agent, existingSlugs, timing, now, indexDelay }: AgentCardP
       </div>
       </div>
 
-      {/* Hover pop-out */}
-      {hover && (
-        <PopOut
-          agent={agent}
-          color={color}
-        />
+      {/* Hover pop-out (portaled to body to escape overflow clipping) */}
+      {hover && popRect && typeof document !== "undefined" && createPortal(
+        <PopOut agent={agent} color={color} rect={popRect} />,
+        document.body,
       )}
     </div>
   )
@@ -378,12 +383,23 @@ function AgentCard({ agent, existingSlugs, timing, now, indexDelay }: AgentCardP
 
 // --- Pop-out ----------------------------------------------------------------
 
-function PopOut({ agent, color }: { agent: AgentState; color: string }) {
+function PopOut({
+  agent,
+  color,
+  rect,
+}: {
+  agent: AgentState
+  color: string
+  rect: { left: number; top: number; width: number }
+}) {
   return (
     <div
       role="tooltip"
-      className="absolute left-0 right-0 top-full mt-2 z-50 rounded-xl overflow-hidden"
+      className="fixed z-[9999] rounded-xl overflow-hidden pointer-events-none"
       style={{
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
         background: C.popBg,
         boxShadow: `
           0 1px 0 oklch(1 0 0 / 6%) inset,
