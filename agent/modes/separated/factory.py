@@ -10,7 +10,6 @@ from strands import Agent
 from strands.models import BedrockModel
 from strands.models.bedrock import CacheConfig
 
-from composer import make_compose_slides
 from mcp_clients import (
     MCP_DEFS,
     collect_mcp_instructions,
@@ -18,6 +17,7 @@ from mcp_clients import (
     mcp_aws_knowledge,
     mcp_aws_pricing,
 )
+from modes.separated.composer import make_compose_slides
 from prompts import build_system_prompt, load_prompt
 from session import fix_excess_tool_results
 from tools.upload_tools import list_uploads
@@ -33,8 +33,8 @@ _MCP_FACTORIES = [
 ]
 
 
-def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, list[dict]]:
-    """Create a Strands Agent with MCP tools and memory.
+def create_separated_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, list[dict]]:
+    """Create a Strands Agent with MCP tools and memory (separated mode: SPEC + Composer).
 
     Args:
         user_id: User identifier (JWT sub claim).

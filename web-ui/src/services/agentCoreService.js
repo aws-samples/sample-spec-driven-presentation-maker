@@ -28,7 +28,7 @@ export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
 /**
  * Invokes the AgentCore runtime with streaming support
  */
-export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal) => {
+export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode) => {
   try {
     if (!userId) {
       throw new Error("No valid user ID found in session. Please ensure you are authenticated.")
@@ -67,6 +67,7 @@ export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessTo
       prompt: query,
       runtimeSessionId: sessionId,
       userId: userId,
+      mode: mode || "separated",
     }
 
     const response = await fetch(url, {

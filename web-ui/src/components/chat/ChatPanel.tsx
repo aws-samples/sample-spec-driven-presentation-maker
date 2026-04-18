@@ -107,7 +107,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const auth = useAuth()
   const { onCompositionStart, onCompositionEnd, getIsComposing } = useCompositionSafe()
   const isMobile = useIsMobile()
-  const { fetchWebImages, setFetchWebImages } = usePreferences()
+  const { fetchWebImages, setFetchWebImages, singleAgentMode, setSingleAgentMode } = usePreferences()
   const [optionsOpen, setOptionsOpen] = useState(false)
 
   /**
@@ -683,6 +683,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           })
         },
         controller.signal,
+        singleAgentMode ? "single" : "separated",
       )
     } catch (err) {
       // AbortError is expected when user clicks stop — don't show error
@@ -874,17 +875,30 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 Options
               </button>
               {optionsOpen && (
-                <label className="flex items-center gap-2 pb-1.5 pl-4 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={fetchWebImages}
-                    onChange={(e) => setFetchWebImages(e.target.checked)}
-                    className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
-                  />
-                  <span className="text-[11px] text-foreground-muted select-none">
-                    Fetch images from websites (may be used in presentations)
-                  </span>
-                </label>
+                <div className="flex flex-col gap-1 pb-1.5 pl-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={fetchWebImages}
+                      onChange={(e) => setFetchWebImages(e.target.checked)}
+                      className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
+                    />
+                    <span className="text-[11px] text-foreground-muted select-none">
+                      Fetch images from websites (may be used in presentations)
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={singleAgentMode}
+                      onChange={(e) => setSingleAgentMode(e.target.checked)}
+                      className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
+                    />
+                    <span className="text-[11px] text-foreground-muted select-none">
+                      Single agent mode (experimental) — one agent handles everything
+                    </span>
+                  </label>
+                </div>
               )}
             </div>
 
