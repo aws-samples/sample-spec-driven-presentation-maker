@@ -264,6 +264,29 @@ export async function startAgent(): Promise<void> {
   if (child) return;
 
   const adapter = getAgentAdapter();
+
+  // Regenerate the SPEC agent config with adapter-specific subagent instruction,
+  // so switching ACP agent (VITE_SDPM_ACP_AGENT) picks the right invocation syntax.
+  try {
+    const { readTextFile, writeTextFile, exists } = await import("@tauri-apps/plugin-fs");
+    const { join } = await import("@tauri-apps/api/path");
+    const root = await resolveProjectRoot();
+    const tmplPath = await join(root, "prompts", "spec-agent-acp.md");
+    const outPath = await join(root, ".kiro", "agents", "sdpm-spec.json");
+    if (await exists(tmplPath)) {
+      const tmpl = await readTextFile(tmplPath);
+      const prompt = tmpl.replace(/\{subagent_instruction\}/g, adapter.subagentInstruction);
+      const current = JSON.parse(await readTextFile(outPath));
+      if (current.prompt !== prompt) {
+        current.prompt = prompt;
+        await writeTextFile(outPath, JSON.stringify(current, null, 2));
+        console.log("[acp] updated SPEC agent prompt for adapter:", adapter.command);
+      }
+    }
+  } catch (e) {
+    console.warn("[acp] prompt regen skipped:", e);
+  }
+
   const cmd = Command.create(adapter.command, adapter.args, {
     cwd: await resolveProjectRoot(),
   });
