@@ -21,29 +21,15 @@
     "fs:default",
     "fs:allow-exists",
     {
-      "identifier": "fs:allow-read-text-file",
-      "allow": [{ "path": "**" }]
+      "identifier": "fs:scope",
+      "allow": [{ "path": "**/*" }]
     },
-    {
-      "identifier": "fs:allow-write-text-file",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-write-file",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-read-dir",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-mkdir",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-remove",
-      "allow": [{ "path": "**" }]
-    },
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "fs:allow-write-file",
+    "fs:allow-read-dir",
+    "fs:allow-mkdir",
+    "fs:allow-remove",
     "fs:scope-home-recursive"
   ]
 }
