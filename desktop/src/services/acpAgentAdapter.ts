@@ -1,31 +1,30 @@
 /**
- * ACP Agent adapters — abstract over per-agent subagent/tool differences.
- *
- * ACP spec has no subagent concept; each agent implements it as a tool:
- *   kiro-cli  → use_subagent(subagents: [{query, agent_name}])
- *   claude    → Task(subagent_type, description, prompt)
- *   opencode  → task(description, prompt)  [and others similar to Task]
- *
- * Switch via VITE_SDPM_ACP_AGENT env (default: "kiro-cli").
+ * ACP Agent adapter — reads active agent config from localStorage
+ * (set via AgentSettingsDialog). Falls back to kiro-cli defaults.
  */
 
 export interface AgentAdapter {
-  /** Process spawn config. */
   command: string;
   args: string[];
-  /** ACP tool name used to invoke sub-sessions for parallel compose. */
   subagentTool: string;
-  /** SPEC prompt snippet explaining how to invoke subagents for THIS agent. */
   subagentInstruction: string;
-  /** Extract per-subagent slug list from a tool-call's rawInput. */
   extractSubagentQueries: (rawInput: Record<string, unknown>) => string[];
-  /** Restart process on new chat? (kiro-cli bug workaround) */
   restartOnNewChat: boolean;
-  /** Enforce ASCII-only subagent queries? (kiro-cli UTF-8 bug) */
   asciiOnlyQueries: boolean;
 }
 
-const KIRO_CLI: AgentAdapter = {
+interface StoredAgent {
+  id: string;
+  displayName: string;
+  path: string;
+  args: string[];
+  subagentTool: string;
+  subagentInstruction: string;
+  restartOnNewChat: boolean;
+  subagentQueryField: "query" | "prompt";
+}
+
+const DEFAULT: AgentAdapter = {
   command: "kiro-cli",
   args: ["acp", "--agent", "sdpm-spec"],
   subagentTool: "use_subagent",
@@ -39,41 +38,39 @@ const KIRO_CLI: AgentAdapter = {
   asciiOnlyQueries: true,
 };
 
-const CLAUDE_CODE: AgentAdapter = {
-  command: "claude",
-  args: ["--acp"],
-  subagentTool: "Task",
-  subagentInstruction:
-    'Use `Task` tool with `subagent_type: "sdpm-composer"`, `description: "<brief>"`, `prompt: "deck_id=... slides: slug1, slug2"`. Invoke multiple Task calls in parallel (max 4).',
-  extractSubagentQueries: (raw) => {
+function makeExtractor(field: "query" | "prompt"): AgentAdapter["extractSubagentQueries"] {
+  if (field === "query") {
+    return (raw) => {
+      const subs = raw?.subagents as { query?: string }[] | undefined;
+      return subs?.map((s) => s?.query || "") || [];
+    };
+  }
+  // "prompt" field — a single subagent per call; raw itself has prompt
+  return (raw) => {
     const p = raw?.prompt as string | undefined;
     return p ? [p] : [];
-  },
-  restartOnNewChat: false,
-  asciiOnlyQueries: false,
-};
-
-const OPENCODE: AgentAdapter = {
-  command: "opencode",
-  args: ["acp"],
-  subagentTool: "task",
-  subagentInstruction:
-    'Use `task` tool with `description: "<brief>"`, `prompt: "deck_id=... slides: slug1, slug2"`. Invoke multiple task calls in parallel.',
-  extractSubagentQueries: (raw) => {
-    const p = raw?.prompt as string | undefined;
-    return p ? [p] : [];
-  },
-  restartOnNewChat: false,
-  asciiOnlyQueries: false,
-};
-
-const ADAPTERS: Record<string, AgentAdapter> = {
-  "kiro-cli": KIRO_CLI,
-  claude: CLAUDE_CODE,
-  opencode: OPENCODE,
-};
+  };
+}
 
 export function getAgentAdapter(): AgentAdapter {
-  const name = (import.meta.env.VITE_SDPM_ACP_AGENT as string) || "kiro-cli";
-  return ADAPTERS[name] || KIRO_CLI;
+  try {
+    const stored = localStorage.getItem("sdpm-acp-agents");
+    const activeId = localStorage.getItem("sdpm-acp-active") || "kiro-cli";
+    if (stored) {
+      const agents: StoredAgent[] = JSON.parse(stored);
+      const a = agents.find((x) => x.id === activeId) || agents[0];
+      if (a) {
+        return {
+          command: a.path,
+          args: a.args,
+          subagentTool: a.subagentTool,
+          subagentInstruction: a.subagentInstruction,
+          extractSubagentQueries: makeExtractor(a.subagentQueryField),
+          restartOnNewChat: a.restartOnNewChat,
+          asciiOnlyQueries: a.id === "kiro-cli",
+        };
+      }
+    }
+  } catch { /* ignore */ }
+  return DEFAULT;
 }

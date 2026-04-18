@@ -25,7 +25,8 @@
 
 import { useRef, useEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
-import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
+import { MessageSquare, PanelRightClose, SquarePen, Layers, Settings } from "lucide-react"
+import { AgentSettingsDialog } from "@/components/chat/AgentSettingsDialog"
 
 export type ChatTabKey = "new" | "deck"
 
@@ -101,6 +102,7 @@ export function ChatPanelShell({
   const internalChatRef = useRef<ChatPanelHandle>(null)
   const chatRef = externalChatRef || internalChatRef
   const panelRef = useRef<HTMLElement>(null)
+  const [showAgentSettings, setShowAgentSettings] = useState(false)
 
   // Start ACP agent early so model list is available immediately
   useEffect(() => {
@@ -227,11 +229,17 @@ export function ChatPanelShell({
   )
 
   if (inline) {
-    return <div className="h-full flex flex-col">{chatContent}</div>
+    return (
+      <>
+        <AgentSettingsDialog open={showAgentSettings} onClose={() => setShowAgentSettings(false)} />
+        <div className="h-full flex flex-col">{chatContent}</div>
+      </>
+    )
   }
 
   return (
     <>
+      <AgentSettingsDialog open={showAgentSettings} onClose={() => setShowAgentSettings(false)} />
       {open && (
         <div
           className="sm:hidden fixed inset-0 z-40 bg-black/60"
@@ -260,6 +268,16 @@ export function ChatPanelShell({
               {isTauri && <ModelSelector />}
             </div>
             <div className="flex items-center gap-0.5">
+              {isTauri && (
+                <button
+                  onClick={() => setShowAgentSettings(true)}
+                  title="Agent settings"
+                  className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-background-hover transition-all"
+                  aria-label="Agent settings"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                </button>
+              )}
               <button
                 onClick={handleNewChat}
                 title="New chat"
