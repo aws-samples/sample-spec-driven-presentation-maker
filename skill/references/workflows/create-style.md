@@ -182,10 +182,13 @@ Each slide demonstrates the design while explaining the reasoning.
 
 #### 3c. Write the HTML
 
-Now write `references/examples/styles/{name}.html`.
-Write incrementally — do NOT generate the entire HTML at once.
-Start with the skeleton (head, `:root` variables, base CSS), then add one slide at a time.
-This avoids timeouts and makes each slide reviewable.
+Build the HTML in memory (agent session) incrementally — do NOT generate the entire
+HTML at once. Start with the skeleton (head, `:root` variables, base CSS), then add
+one slide at a time. This avoids timeouts and makes each slide reviewable.
+
+Do NOT write the file to `references/examples/styles/`. That directory is the
+system-provided examples set (read-only). User styles are saved via the
+`save_user_style` MCP tool in Step 3e below.
 
 **Layout guidance (from standard templates):**
 Typical placeholder positions across templates:
@@ -277,8 +280,8 @@ HTML to slides.json: the agent reads the variables, not the rendered pixels.
 
 #### 3d. Review with user
 
-Open the HTML in a browser and show it to the user.
-Ask: "This is the style. Does this capture what you want?"
+Show the HTML to the user (render in-line via the web preview, or share the HTML for
+external viewing). Ask: "This is the style. Does this capture what you want?"
 
 If the user wants changes, modify and show again. Iterate until confirmed.
 This cycle is expected — the first version is rarely final.
@@ -290,3 +293,19 @@ This cycle is expected — the first version is rarely final.
 - An agent reading the HTML can reproduce the style in slides.json
 
 Write in the user's language.
+
+#### 3e. Save the style
+
+Once the user approves, confirm the save parameters with them:
+- **Name**: short identifier (alphanumeric/dash/underscore, 1-64 chars) e.g. `my-brand`
+- **Description**: one-line description that will appear in the style gallery
+- **Scope**: `user` (saves as a personal style in My Styles)
+
+Then call the `save_user_style` MCP tool with the final HTML:
+
+```
+save_user_style(name="my-brand", description="…", html="<!DOCTYPE html>…")
+```
+
+After saving, offer next actions: "Saved as user/my-brand. Would you like to apply
+it to a deck, or create another?"

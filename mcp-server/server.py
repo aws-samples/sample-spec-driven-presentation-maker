@@ -529,25 +529,31 @@ def list_asset_sources() -> str:
 
 @mcp.tool()
 def list_styles() -> str:
-    """List available design styles for presentations.
+    """List available design styles (examples + user styles).
 
     Workflow equivalent: ``examples styles``
 
     Returns:
-        JSON with list of styles (name + description).
+        JSON with list of styles (name, description, scope).
     """
-    return json.dumps(reference.list_styles(storage=_storage), ensure_ascii=False)
+    try:
+        user_id = _get_user_id()
+    except Exception:
+        user_id = ""
+    return json.dumps(
+        reference.list_styles(storage=_storage, user_id=user_id or None),
+        ensure_ascii=False,
+    )
 
 
 @mcp.tool()
-def apply_style(deck_id: str, style: str) -> str:
+def apply_style(deck_id: str, style: str, scope: str = "examples") -> str:
     """Copy a style as the deck's art direction. Call during Art Direction phase.
-
-    Copies references/examples/styles/{style}.html → specs/art-direction.html.
 
     Args:
         deck_id: Deck ID.
         style: Style name from list_styles (e.g. "elegant-dark").
+        scope: "examples" (default) or "user".
 
     Returns:
         JSON confirmation.
@@ -555,11 +561,45 @@ def apply_style(deck_id: str, style: str) -> str:
     _check_deck_access(deck_id)
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", style):
         raise ValueError("Invalid style name")
-    html_key = f"references/examples/styles/{style}.html"
-    html_bytes = _storage.download_file(key=html_key)
+    if scope not in ("examples", "user"):
+        raise ValueError("Invalid scope")
+    if scope == "user":
+        from shared.resources import resource_s3_key
+        user_id = _get_user_id()
+        html_key = resource_s3_key("user", user_id, "styles", style)
+    else:
+        html_key = f"references/examples/styles/{style}.html"
+    html_bytes = _storage.download_file_from_pptx_bucket(key=html_key) if scope == "user" \
+        else _storage.download_file(key=html_key)
     dest_key = f"decks/{deck_id}/specs/art-direction.html"
     _storage.upload_file(key=dest_key, data=html_bytes, content_type="text/html")
-    return json.dumps({"applied": style, "path": "specs/art-direction.html"})
+    return json.dumps({"applied": style, "scope": scope, "path": "specs/art-direction.html"})
+
+
+@mcp.tool()
+def save_user_style(name: str, description: str, html: str) -> str:
+    """Save (create or update) a user-scoped style.
+
+    Use at the end of the create-style workflow to persist the HTML
+    as the current user's personal style.
+
+    Args:
+        name: Style name (alphanumeric/dash/underscore, 1-64 chars).
+        description: Short description.
+        html: Full style HTML.
+
+    Returns:
+        JSON with saved style info.
+    """
+    from tools import user_resources as _ur
+    user_id = _get_user_id()
+    return json.dumps(
+        _ur.save_user_style(
+            name=name, description=description, html=html,
+            user_id=user_id, storage=_storage,
+        ),
+        ensure_ascii=False,
+    )
 
 
 @mcp.tool()

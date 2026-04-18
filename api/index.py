@@ -46,7 +46,8 @@ CF_DOMAIN = os.environ.get("CF_DOMAIN", "")
 CF_KEY_PAIR_ID = os.environ.get("CF_KEY_PAIR_ID", "")
 CF_PRIVATE_KEY_PARAM = os.environ.get("CF_PRIVATE_KEY_PARAM", "")
 
-# Module-level cache for styles (references are static, deployed once).
+# Module-level cache for example styles (deployed once via references/).
+# User styles are fetched per-request and not cached here.
 _styles_cache: Optional[List[Dict[str, str]]] = None
 
 # Resolve KB ID from SSM if KB_ID looks like an SSM param path
@@ -310,6 +311,237 @@ def get_style(name: str) -> Dict[str, Any]:
     except Exception:
         return {"error": f"Style not found: {name}"}, 404
     return {"name": name, "fullHtml": body}
+
+
+# ---------------------------------------------------------------------------
+# User resource endpoints (styles, templates)
+# ---------------------------------------------------------------------------
+
+from shared.resources import (
+    resource_s3_key,
+    resource_pk,
+    resource_sk,
+    extract_name,
+    is_valid_name,
+    sk_prefix,
+)
+
+
+def _get_cover_from_html(html: str) -> str:
+    """Extract cover HTML for gallery preview."""
+    return _extract_cover_html(html)
+
+
+@app.get("/resources/user/styles")
+def list_user_styles() -> Dict[str, Any]:
+    """List current user's styles.
+
+    Returns:
+        Dict with styles list (name, description, coverHtml).
+    """
+    user_id = get_user_id(app.current_event)
+    resp = table.query(
+        KeyConditionExpression=Key("PK").eq(resource_pk("user", user_id))
+        & Key("SK").begins_with(sk_prefix("styles")),
+    )
+    styles: List[Dict[str, Any]] = []
+    for item in resp.get("Items", []):
+        name = extract_name(item["SK"], "styles")
+        key = resource_s3_key("user", user_id, "styles", name)
+        try:
+            body = s3_client.get_object(Bucket=BUCKET_NAME, Key=key)["Body"].read().decode("utf-8")
+            cover = _get_cover_from_html(body)
+        except Exception:
+            cover = ""
+        styles.append({
+            "name": name,
+            "description": item.get("description", ""),
+            "coverHtml": cover,
+        })
+    return {"styles": styles}
+
+
+@app.get("/resources/user/styles/<name>")
+def get_user_style(name: str) -> Dict[str, Any]:
+    """Get full HTML for a user style."""
+    if not is_valid_name(name):
+        return {"error": "Invalid name"}, 400
+    user_id = get_user_id(app.current_event)
+    key = resource_s3_key("user", user_id, "styles", name)
+    try:
+        body = s3_client.get_object(Bucket=BUCKET_NAME, Key=key)["Body"].read().decode("utf-8")
+    except Exception:
+        return {"error": "Not found"}, 404
+    return {"name": name, "fullHtml": body}
+
+
+@app.post("/resources/user/styles")
+def create_user_style() -> Dict[str, Any]:
+    """Create or update a user style.
+
+    Body: {name, description?, html}
+    """
+    user_id = get_user_id(app.current_event)
+    body = app.current_event.json_body or {}
+    name = body.get("name", "")
+    html = body.get("html", "")
+    description = body.get("description", "")
+    if not is_valid_name(name):
+        return {"error": "Invalid name"}, 400
+    if not html or not isinstance(html, str):
+        return {"error": "html required"}, 400
+
+    key = resource_s3_key("user", user_id, "styles", name)
+    s3_client.put_object(
+        Bucket=BUCKET_NAME, Key=key,
+        Body=html.encode("utf-8"), ContentType="text/html",
+    )
+    now = now_iso()
+    existing = table.get_item(
+        Key={"PK": resource_pk("user", user_id), "SK": resource_sk("styles", name)}
+    ).get("Item")
+    item = {
+        "PK": resource_pk("user", user_id),
+        "SK": resource_sk("styles", name),
+        "name": name,
+        "description": description,
+        "s3Key": key,
+        "createdBy": existing.get("createdBy", user_id) if existing else user_id,
+        "createdAt": existing.get("createdAt", now) if existing else now,
+        "updatedBy": user_id,
+        "updatedAt": now,
+    }
+    table.put_item(Item=item)
+    return {"name": name, "description": description, "updatedAt": now}
+
+
+@app.delete("/resources/user/styles/<name>")
+def delete_user_style(name: str) -> Dict[str, Any]:
+    """Delete a user style."""
+    if not is_valid_name(name):
+        return {"error": "Invalid name"}, 400
+    user_id = get_user_id(app.current_event)
+    key = resource_s3_key("user", user_id, "styles", name)
+    try:
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
+    except Exception:
+        pass
+    table.delete_item(
+        Key={"PK": resource_pk("user", user_id), "SK": resource_sk("styles", name)}
+    )
+    return {"deleted": name}
+
+
+@app.get("/resources/user/templates")
+def list_user_templates() -> Dict[str, Any]:
+    """List current user's templates."""
+    user_id = get_user_id(app.current_event)
+    resp = table.query(
+        KeyConditionExpression=Key("PK").eq(resource_pk("user", user_id))
+        & Key("SK").begins_with(sk_prefix("templates")),
+    )
+    templates = [
+        {
+            "id": extract_name(item["SK"], "templates"),
+            "name": item.get("name", ""),
+            "description": item.get("description", ""),
+            "updatedAt": item.get("updatedAt", ""),
+        }
+        for item in resp.get("Items", [])
+    ]
+    return {"templates": templates}
+
+
+@app.post("/resources/user/templates")
+def create_user_template() -> Dict[str, Any]:
+    """Register a user template from a pre-uploaded S3 key.
+
+    Body: {name, description?, uploadId} — uploadId refers to an object
+    uploaded via /uploads/presign.
+    """
+    user_id = get_user_id(app.current_event)
+    body = app.current_event.json_body or {}
+    name = body.get("name", "").strip()
+    description = body.get("description", "")
+    upload_id = body.get("uploadId", "")
+    if not name or len(name) > 128:
+        return {"error": "name required (1-128 chars)"}, 400
+    if not upload_id or not re.fullmatch(r"[a-zA-Z0-9_-]+", upload_id):
+        return {"error": "uploadId required"}, 400
+
+    # Look up upload record (created by /uploads/presign)
+    upload_item = table.get_item(
+        Key={"PK": deck_pk(user_id), "SK": upload_sk(upload_id)}
+    ).get("Item")
+    if not upload_item:
+        return {"error": "Upload not found"}, 404
+    upload_key = upload_item.get("s3KeyRaw", "")
+    if not upload_key.endswith(".pptx"):
+        return {"error": "Only .pptx files are supported"}, 400
+
+    try:
+        obj = s3_client.head_object(Bucket=BUCKET_NAME, Key=upload_key)
+    except Exception:
+        return {"error": "Upload not found"}, 404
+    if obj.get("ContentLength", 0) > MAX_FILE_SIZE:
+        return {"error": "File too large"}, 413
+
+    template_id = uuid.uuid4().hex[:12]
+    dest_key = resource_s3_key("user", user_id, "templates", template_id)
+    s3_client.copy_object(
+        Bucket=BUCKET_NAME,
+        Key=dest_key,
+        CopySource={"Bucket": BUCKET_NAME, "Key": upload_key},
+    )
+    s3_client.delete_object(Bucket=BUCKET_NAME, Key=upload_key)
+    table.delete_item(Key={"PK": deck_pk(user_id), "SK": upload_sk(upload_id)})
+
+    # Analyze template (best-effort)
+    analysis_json = "{}"
+    fonts: Dict[str, Any] = {"fullwidth": None, "halfwidth": None}
+    try:
+        import tempfile
+        from pathlib import Path as _P
+        from sdpm.analyzer import analyze_template as _analyze, extract_fonts as _extract_fonts
+        tmp = _P(tempfile.mkdtemp()) / "template.pptx"
+        tmp.write_bytes(s3_client.get_object(Bucket=BUCKET_NAME, Key=dest_key)["Body"].read())
+        analysis_json = json.dumps(_analyze(tmp), ensure_ascii=False)
+        fonts = _extract_fonts(tmp)
+    except Exception as e:
+        logger.warning(f"Template analysis failed: {e}")
+
+    now = now_iso()
+    table.put_item(Item={
+        "PK": resource_pk("user", user_id),
+        "SK": resource_sk("templates", template_id),
+        "name": name,
+        "description": description,
+        "s3Key": dest_key,
+        "analysisJson": analysis_json,
+        "fonts": fonts,
+        "createdBy": user_id,
+        "createdAt": now,
+        "updatedBy": user_id,
+        "updatedAt": now,
+    })
+    return {"id": template_id, "name": name, "updatedAt": now}
+
+
+@app.delete("/resources/user/templates/<template_id>")
+def delete_user_template(template_id: str) -> Dict[str, Any]:
+    """Delete a user template."""
+    if not re.fullmatch(r"[a-zA-Z0-9_-]+", template_id):
+        return {"error": "Invalid id"}, 400
+    user_id = get_user_id(app.current_event)
+    key = resource_s3_key("user", user_id, "templates", template_id)
+    try:
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
+    except Exception:
+        pass
+    table.delete_item(
+        Key={"PK": resource_pk("user", user_id), "SK": resource_sk("templates", template_id)}
+    )
+    return {"deleted": template_id}
 
 
 # ---------------------------------------------------------------------------

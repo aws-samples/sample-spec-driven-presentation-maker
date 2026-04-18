@@ -200,41 +200,60 @@ def _render_pptx_from_bytes(pptx_bytes: bytes, pages: list[int] | None = None) -
         tmp_path.unlink(missing_ok=True)
 
 
-def list_styles(storage: Storage) -> dict[str, Any]:
-    """List available design styles from references/examples/styles/.
+def list_styles(storage: Storage, user_id: str | None = None) -> dict[str, Any]:
+    """List available design styles from examples + user scope.
 
     Extracts name and description from each HTML file's <title> tag.
 
     Args:
         storage: Storage backend instance.
+        user_id: Optional user id to include user's own styles.
 
     Returns:
-        Dict with styles list (name + description).
+        Dict with styles list (name, description, scope).
     """
     cache_key = "list:styles"
     cached = _cache.get(cache_key)
     if cached and (time.time() - cached[1]) < CACHE_TTL:
-        return {"styles": cached[0]}
+        examples = cached[0]
+    else:
+        prefix = "references/examples/styles/"
+        files = storage.list_files(prefix=prefix)
+        examples: list[dict[str, str]] = []
+        for f in files:
+            if not f.endswith(".html"):
+                continue
+            name = f.removeprefix(prefix).removesuffix(".html")
+            description = ""
+            try:
+                content = storage.download_file(key=f).decode("utf-8")
+                m = re.search(r"<title>(.*?)</title>", content, re.IGNORECASE)
+                if m:
+                    description = m.group(1).strip()
+            except Exception:
+                pass
+            examples.append({"name": name, "description": description, "scope": "examples"})
+        _cache[cache_key] = (examples, time.time())
 
-    prefix = "references/examples/styles/"
-    files = storage.list_files(prefix=prefix)
-    styles: list[dict[str, str]] = []
-    for f in files:
-        if not f.endswith(".html"):
-            continue
-        name = f.removeprefix(prefix).removesuffix(".html")
-        description = ""
+    user_styles: list[dict[str, str]] = []
+    if user_id:
         try:
-            content = storage.download_file(key=f).decode("utf-8")
-            m = re.search(r"<title>(.*?)</title>", content, re.IGNORECASE)
-            if m:
-                description = m.group(1).strip()
+            from shared.resources import sk_prefix, resource_pk, extract_name
+            from boto3.dynamodb.conditions import Key
+            resp = storage.table.query(
+                KeyConditionExpression=Key("PK").eq(resource_pk("user", user_id))
+                & Key("SK").begins_with(sk_prefix("styles")),
+            )
+            for item in resp.get("Items", []):
+                user_styles.append({
+                    "name": extract_name(item["SK"], "styles"),
+                    "description": item.get("description", ""),
+                    "scope": "user",
+                })
         except Exception:
             pass
-        styles.append({"name": name, "description": description})
 
-    _cache[cache_key] = (styles, time.time())
-    return {"styles": styles}
+    return {"styles": [*examples, *user_styles]}
 
 
 def read_examples(names: list[str], storage: Storage) -> dict[str, Any]:
