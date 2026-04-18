@@ -107,7 +107,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const auth = useAuth()
   const { onCompositionStart, onCompositionEnd, getIsComposing } = useCompositionSafe()
   const isMobile = useIsMobile()
-  const { fetchWebImages, setFetchWebImages, singleAgentMode, setSingleAgentMode } = usePreferences()
+  const { fetchWebImages, setFetchWebImages, parallelAgents, setParallelAgents } = usePreferences()
   const [optionsOpen, setOptionsOpen] = useState(false)
 
   /**
@@ -683,7 +683,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           })
         },
         controller.signal,
-        singleAgentMode ? "single" : "separated",
+        parallelAgents ? "separated" : "single",
       )
     } catch (err) {
       // AbortError is expected when user clicks stop — don't show error
@@ -890,12 +890,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={singleAgentMode}
-                      onChange={(e) => setSingleAgentMode(e.target.checked)}
+                      checked={parallelAgents}
+                      onChange={(e) => setParallelAgents(e.target.checked)}
                       className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
                     />
                     <span className="text-[11px] text-foreground-muted select-none">
-                      Single agent mode (experimental) — one agent handles everything
+                      Parallel agents (experimental) — SPEC + Composer with parallel slide generation
                     </span>
                   </label>
                 </div>
