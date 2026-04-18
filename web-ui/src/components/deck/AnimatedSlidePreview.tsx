@@ -137,6 +137,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
               if (comp.changed) animTargets.add(i)
             })
           }
+          // eslint-disable-next-line no-console
+          console.log("[AnimPrev]", slideId, "skip=", skipRef.current, "targets=", animTargets.size)
 
 
         if (animTargets.size > 0) {
