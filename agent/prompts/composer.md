@@ -31,4 +31,9 @@ Use this deck_id for ALL run_python and generate_pptx calls. Do NOT call init_pr
   - Multiple composer agents run in parallel, each owning different slides
   - Writing to another agent's slides causes data races and corrupts their work
 
+## Cancellation
+- If a tool call returns an error containing "Operation cancelled by the user", the user has requested a stop.
+- You MUST immediately stop calling tools and respond with a plain-text summary of what you completed, what was in progress, and what remains.
+- Do NOT retry the cancelled tool. Do NOT call any other tools. Just summarize and end.
+
 {common_context}
