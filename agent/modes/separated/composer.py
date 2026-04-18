@@ -122,34 +122,66 @@ def make_compose_slides(mcp_servers: list, model):
 
     @strands_tool(
         name="compose_slides",
-        description="Compose slides by delegating to composer agents. "
-        "Call when Phase 1 is complete and slides need to be generated.",
+        description=(
+            "Delegate slide generation to parallel composer agents. Each group "
+            "is handled by an independent composer that writes slides/<slug>.json. "
+            "Use this once Phase 1 (dialogue) is complete and outline.md is finalized.\n\n"
+            "Group slides that share visual/narrative context (e.g., same chapter, "
+            "same data source) so one composer can design them cohesively. Split "
+            "groups to unlock parallelism — each group runs concurrently "
+            "(up to COMPOSER_MAX_CONCURRENCY, default 10).\n\n"
+            "The `instruction` is the composer's sole guidance: be concrete. "
+            "Include narrative intent, tone, required data/facts, layout hints, "
+            "and any figure/icon references. Do not omit content expecting the "
+            "composer to infer it — it cannot see the full conversation."
+        ),
         inputSchema={
             "json": {
                 "type": "object",
                 "properties": {
                     "deck_id": {
                         "type": "string",
-                        "description": "Deck ID for the presentation workspace",
+                        "description": "Deck ID for the presentation workspace (e.g. 'abc12345').",
                     },
                     "slide_groups": {
                         "type": "array",
-                        "description": "List of groups to compose. Each group has slugs and instruction.",
+                        "description": (
+                            "Groups of slides to compose in parallel. Each group becomes "
+                            "one composer agent. Keep related slides together (shared "
+                            "narrative, data, or visual style). Typical group size: 1–4 slides."
+                        ),
                         "items": {
                             "type": "object",
                             "properties": {
                                 "slugs": {
                                     "type": "array",
                                     "items": {"type": "string"},
-                                    "description": "Slide slugs to generate",
+                                    "description": (
+                                        "Slugs of slides this group's composer will write. "
+                                        "Must match slugs declared in outline.md. "
+                                        "Example: ['intro', 'agenda']."
+                                    ),
+                                    "minItems": 1,
                                 },
                                 "instruction": {
                                     "type": "string",
-                                    "description": "What to compose for this group",
+                                    "description": (
+                                        "Detailed composition brief for this group's composer. Include:\n"
+                                        "  • Narrative purpose — why these slides exist in the deck\n"
+                                        "  • Concrete content — facts, numbers, quotes, examples to include\n"
+                                        "  • Tone/style — formal, casual, technical, persuasive\n"
+                                        "  • Layout hints — hero stat, comparison table, timeline, code block, etc.\n"
+                                        "  • Visual assets — icons, images, charts the composer should search for\n"
+                                        "  • Cross-slide continuity — how this group connects to adjacent slides\n"
+                                        "Avoid vague directives like 'make it nice'. The composer cannot see "
+                                        "the original conversation; the instruction must stand alone."
+                                    ),
+                                    "minLength": 40,
                                 },
                             },
                             "required": ["slugs", "instruction"],
                         },
+                        "minItems": 1,
                     },
                 },
                 "required": ["deck_id", "slide_groups"],
