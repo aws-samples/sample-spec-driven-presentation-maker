@@ -256,13 +256,13 @@ function handleLine(line: string) {
 /** Current model override (null = kiro-cli default). */
 let currentModel: string | null = null;
 
-/** Start the kiro-cli acp process. */
+/** Start the ACP agent process. */
 export async function startAgent(): Promise<void> {
   if (child) return;
 
-  const args = ["acp", "--agent", "sdpm-spec"];
-
-  const cmd = Command.create("kiro-cli", args, {
+  // kiro-cli + --agent flag (required by kiro-cli's ACP impl).
+  // Other ACP agents: customize this spawn call.
+  const cmd = Command.create("kiro-cli", ["acp", "--agent", "sdpm-spec"], {
     cwd: await resolveProjectRoot(),
   });
 
@@ -308,15 +308,31 @@ export async function startAgent(): Promise<void> {
   sessionId = result.sessionId as string;
   console.log("[acp] session created:", sessionId);
 
-  // Populate model selector from ACP response
-  const modelsInfo = result.models as { currentModelId?: string; availableModels?: { modelId: string; name: string; description?: string }[] } | undefined;
-  if (modelsInfo?.availableModels) {
+  // Populate model selector — prefer ACP standard configOptions, fall back to kiro-cli's `models`
+  type ConfigOption = { id: string; category?: string; currentValue: string; options: { value: string; name: string; description?: string }[] };
+  const configOptions = result.configOptions as ConfigOption[] | undefined;
+  const modelOpt = configOptions?.find(o => o.category === "model" || o.id === "model");
+
+  let currentModelId = "";
+  let availableModels: { modelId: string; name: string; description?: string }[] = [];
+  if (modelOpt) {
+    currentModelId = modelOpt.currentValue;
+    availableModels = modelOpt.options.map(o => ({ modelId: o.value, name: o.name, description: o.description }));
+  } else {
+    // kiro-cli non-standard shape
+    const modelsInfo = result.models as { currentModelId?: string; availableModels?: typeof availableModels } | undefined;
+    if (modelsInfo?.availableModels) {
+      currentModelId = modelsInfo.currentModelId || "";
+      availableModels = modelsInfo.availableModels;
+    }
+  }
+  if (availableModels.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const g = globalThis as any;
     if (g.__sdpmModels) {
-      g.__sdpmModels.current = modelsInfo.currentModelId || "";
-      g.__sdpmModels.available = modelsInfo.availableModels.filter(
-        (m: { description?: string }) => !m.description?.startsWith("[Internal]") && !m.description?.startsWith("[Deprecated]")
+      g.__sdpmModels.current = currentModelId;
+      g.__sdpmModels.available = availableModels.filter(
+        m => !m.description?.startsWith("[Internal]") && !m.description?.startsWith("[Deprecated]")
       );
       g.__sdpmModels.listeners.forEach((fn: () => void) => fn());
     }
@@ -324,7 +340,7 @@ export async function startAgent(): Promise<void> {
 
   // Apply stored model preference via ACP standard method
   const storedModel = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("sdpm-model") : null;
-  if (storedModel && storedModel !== modelsInfo?.currentModelId) {
+  if (storedModel && storedModel !== currentModelId) {
     try {
       await rpcRequest("session/set_config_option", {
         sessionId, configId: "model", value: storedModel,
@@ -381,12 +397,23 @@ export async function invokeAgent(
     currentChatSessionId = _sessionId;
     console.log("[acp] agent started, sessionId:", sessionId);
   } else if (_sessionId !== currentChatSessionId) {
-    // New chat — restart kiro-cli acp process to ensure a clean agent context
-    // (session/new alone sometimes loses the --agent sdpm-spec configuration).
-    console.log("[acp] new chat session, restarting ACP process");
-    await stopAgent();
-    await startAgent();
-    currentChatSessionId = _sessionId;
+    // New chat — create new ACP session (standard). If agent identity is lost
+    // after session/new (kiro-cli bug), fall back to process restart.
+    console.log("[acp] new chat session, creating new ACP session");
+    try {
+      const { homeDir } = await import("@tauri-apps/api/path");
+      const home = await homeDir();
+      const cwd = `${home.replace(/\/+$/, "")}/Documents/SDPM-Presentations`;
+      const result = await rpcRequest("session/new", { cwd, mcpServers: [] }) as Record<string, unknown>;
+      sessionId = result.sessionId as string;
+      currentChatSessionId = _sessionId;
+    } catch {
+      // Fallback: full process restart (kiro-cli workaround)
+      console.log("[acp] session/new failed, restarting process");
+      await stopAgent();
+      await startAgent();
+      currentChatSessionId = _sessionId;
+    }
     console.log("[acp] new ACP session:", sessionId);
   }
 
