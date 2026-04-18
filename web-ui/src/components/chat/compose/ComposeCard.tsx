@@ -43,7 +43,7 @@ const C = {
   hairlineStrong: "oklch(1 0 0 / 10%)",
   cardBg: "oklch(0.14 0.005 280 / 60%)",
   cardBgHover: "oklch(0.16 0.008 285 / 70%)",
-  popBg: "oklch(0.14 0.008 290)",
+  popBg: "oklch(0.11 0.006 285)",
 }
 
 /** Per-agent hue offset for subtle individuality (±10° around violet 300). */
@@ -254,22 +254,27 @@ function AgentCard({ agent, existingSlugs, timing, now, indexDelay }: AgentCardP
   return (
     <div
       ref={cardRef}
-      className="agent-card relative rounded-xl overflow-visible"
-      style={{
-        background: hover ? C.cardBgHover : C.cardBg,
-        boxShadow: `
-          0 1px 0 oklch(1 0 0 / 4%) inset,
-          0 2px 8px oklch(0 0 0 / 25%),
-          0 0 0 1px oklch(1 0 0 / 5%)
-        `,
-        transform: `perspective(800px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
-        transition: "background 160ms ease, transform 220ms ease",
-        animation: `compose-card-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) ${indexDelay * 80}ms both`,
-      }}
+      className="relative"
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
       onMouseMove={handleMouseMove}
+      style={{
+        animation: `compose-card-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) ${indexDelay * 80}ms both`,
+      }}
     >
+      <div
+        className="agent-card relative rounded-xl overflow-visible"
+        style={{
+          background: hover ? C.cardBgHover : C.cardBg,
+          boxShadow: `
+            0 1px 0 oklch(1 0 0 / 4%) inset,
+            0 2px 8px oklch(0 0 0 / 25%),
+            0 0 0 1px oklch(1 0 0 / 5%)
+          `,
+          transform: `perspective(800px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+          transition: "background 160ms ease, transform 220ms ease",
+        }}
+      >
       <div className="relative px-3.5 py-3">
         {/* Agent state glyph */}
         <div className="flex items-center gap-2.5">
@@ -358,6 +363,7 @@ function AgentCard({ agent, existingSlugs, timing, now, indexDelay }: AgentCardP
           </div>
         )}
       </div>
+      </div>
 
       {/* Hover pop-out */}
       {hover && (
@@ -376,7 +382,7 @@ function PopOut({ agent, color }: { agent: AgentState; color: string }) {
   return (
     <div
       role="tooltip"
-      className="absolute left-0 right-0 top-full mt-2 z-20 rounded-xl overflow-hidden"
+      className="absolute left-0 right-0 top-full mt-2 z-50 rounded-xl overflow-hidden"
       style={{
         background: C.popBg,
         boxShadow: `
