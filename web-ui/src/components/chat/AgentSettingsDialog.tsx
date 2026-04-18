@@ -12,13 +12,13 @@ import { X, Plus, Trash2 } from "lucide-react"
 export interface AgentConfig {
   id: string
   displayName: string
-  path: string        // executable command (e.g. "kiro-cli", "/usr/local/bin/claude")
-  args: string[]      // ["acp"] or ["acp", "--agent", "sdpm-spec"]
-  env?: Record<string, string>
+  path: string
+  args: string[]
+  env: Record<string, string>
   subagentTool: string
   subagentInstruction: string
   restartOnNewChat: boolean
-  subagentQueryField: "query" | "prompt"  // How to extract slug list from subagent call
+  subagentQueryField: "query" | "prompt"
 }
 
 const PRESETS: AgentConfig[] = [
@@ -27,6 +27,7 @@ const PRESETS: AgentConfig[] = [
     displayName: "Kiro CLI",
     path: "kiro-cli",
     args: ["acp", "--agent", "sdpm-spec"],
+    env: {},
     subagentTool: "use_subagent",
     subagentInstruction: 'Use `use_subagent` with `subagents: [{"query": "deck_id=... slides: slug1, slug2", "agent_name": "sdpm-composer"}, ...]` (max 4 parallel). ASCII-only queries.',
     restartOnNewChat: true,
@@ -37,6 +38,7 @@ const PRESETS: AgentConfig[] = [
     displayName: "Claude Code",
     path: "claude",
     args: ["--acp"],
+    env: {},
     subagentTool: "Task",
     subagentInstruction: 'Use `Task` tool with `subagent_type: "sdpm-composer"`, `description: "<brief>"`, `prompt: "deck_id=... slides: slug1, slug2"`. Invoke multiple Task calls in parallel (max 4).',
     restartOnNewChat: false,
@@ -107,6 +109,7 @@ export function AgentSettingsDialog({ open, onClose }: Props) {
       displayName: "Custom Agent",
       path: "",
       args: [],
+      env: {},
       subagentTool: "task",
       subagentInstruction: "Use task tool to delegate slides.",
       restartOnNewChat: false,
@@ -154,8 +157,18 @@ export function AgentSettingsDialog({ open, onClose }: Props) {
                 <label className="text-foreground-muted self-center">Path</label>
                 <input className="bg-transparent border border-border rounded px-2 py-1" value={a.path} onChange={e => update(i, { path: e.target.value })} placeholder="kiro-cli or /usr/local/bin/claude" />
 
-                <label className="text-foreground-muted self-center">Arguments</label>
-                <input className="bg-transparent border border-border rounded px-2 py-1" value={a.args.join(" ")} onChange={e => update(i, { args: e.target.value.split(" ").filter(Boolean) })} placeholder="acp --agent sdpm-spec" />
+                <label className="text-foreground-muted self-start pt-1">Arguments</label>
+                <textarea className="bg-transparent border border-border rounded px-2 py-1 font-mono text-[11px]" rows={2} value={a.args.join("\n")} onChange={e => update(i, { args: e.target.value.split("\n").filter(Boolean) })} placeholder="acp&#10;--agent&#10;sdpm-spec" />
+
+                <label className="text-foreground-muted self-start pt-1">Env</label>
+                <textarea className="bg-transparent border border-border rounded px-2 py-1 font-mono text-[11px]" rows={2} value={Object.entries(a.env || {}).map(([k, v]) => `${k}=${v}`).join("\n")} onChange={e => {
+                  const env: Record<string, string> = {}
+                  for (const line of e.target.value.split("\n")) {
+                    const m = line.match(/^([^=]+)=(.*)$/)
+                    if (m) env[m[1].trim()] = m[2]
+                  }
+                  update(i, { env })
+                }} placeholder="API_KEY=xxx&#10;LOG_LEVEL=debug" />
 
                 <label className="text-foreground-muted self-center">Subagent Tool</label>
                 <input className="bg-transparent border border-border rounded px-2 py-1" value={a.subagentTool} onChange={e => update(i, { subagentTool: e.target.value })} placeholder="use_subagent / Task / task" />

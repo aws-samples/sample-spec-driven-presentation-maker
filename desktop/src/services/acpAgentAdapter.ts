@@ -6,6 +6,7 @@
 export interface AgentAdapter {
   command: string;
   args: string[];
+  env: Record<string, string>;
   subagentTool: string;
   subagentInstruction: string;
   extractSubagentQueries: (rawInput: Record<string, unknown>) => string[];
@@ -18,6 +19,7 @@ interface StoredAgent {
   displayName: string;
   path: string;
   args: string[];
+  env: Record<string, string>;
   subagentTool: string;
   subagentInstruction: string;
   restartOnNewChat: boolean;
@@ -27,6 +29,7 @@ interface StoredAgent {
 const DEFAULT: AgentAdapter = {
   command: "kiro-cli",
   args: ["acp", "--agent", "sdpm-spec"],
+  env: {},
   subagentTool: "use_subagent",
   subagentInstruction:
     'Use `use_subagent` with `subagents: [{"query": "deck_id=... slides: slug1, slug2", "agent_name": "sdpm-composer"}, ...]` (max 4 parallel). ASCII-only queries.',
@@ -63,6 +66,7 @@ export function getAgentAdapter(): AgentAdapter {
         return {
           command: a.path,
           args: a.args,
+          env: a.env || {},
           subagentTool: a.subagentTool,
           subagentInstruction: a.subagentInstruction,
           extractSubagentQueries: makeExtractor(a.subagentQueryField),

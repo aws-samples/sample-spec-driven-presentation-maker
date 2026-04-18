@@ -289,6 +289,7 @@ export async function startAgent(): Promise<void> {
 
   const cmd = Command.create(adapter.command, adapter.args, {
     cwd: await resolveProjectRoot(),
+    env: adapter.env,
   });
 
   cmd.stdout.on("data", (line: string) => {
