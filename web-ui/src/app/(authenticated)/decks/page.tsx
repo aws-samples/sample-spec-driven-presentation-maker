@@ -122,6 +122,13 @@ export default function DecksPage() {
                     inline
                   />
                 ) : (
+                  // Desktop: defer SlideCarousel mount until deck data loads so
+                  // hadSlidesOnMount captures the real slide count, not the
+                  // initial empty-deck state (Web's useRef capture has same
+                  // issue but is masked by different timing).
+                  isTauri && ws.isWorkspace && !ws.isNew && !ws.deck ? (
+                    <div className="w-full h-full" />
+                  ) : (
                   <SlideCarousel
                     slides={ws.deck?.slides || []}
                     defsUrl={ws.deck?.defsUrl}
@@ -187,6 +194,7 @@ export default function DecksPage() {
                       ) : undefined
                     }
                   />
+                  )
                 )}
               </div>
             </>
