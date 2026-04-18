@@ -44,17 +44,17 @@ def _resize_to_jpeg(data: bytes, quality: str) -> bytes:
 
 def get_preview(
     deck_id: str,
-    slide_numbers: list[int],
+    slugs: list[str],
     storage: Storage,
     quality: str = "high",
 ) -> list:
     """Fetch slide previews from S3, resize, convert to JPEG, and return as Image list.
 
-    Uses build_slide_key_map to resolve epoch-based S3 keys.
+    Resolves each slug to the latest epoch-keyed webp in S3.
 
     Args:
         deck_id: The deck ID.
-        slide_numbers: List of 1-based slide numbers to preview (at least one required).
+        slugs: List of slide slugs to preview.
         storage: Storage backend instance.
         quality: "low" (800px long edge) or "high" (1280px long edge).
 
@@ -67,12 +67,12 @@ def get_preview(
     key_map = build_slide_key_map(all_keys)
 
     result: list = []
-    for n in slide_numbers:
-        key = key_map.get(n)
+    for slug in slugs:
+        key = key_map.get(slug)
         if not key:
-            raise Exception(f"NoSuchKey: preview not found for slide {n}")
+            raise Exception(f"NoSuchKey: preview not found for slide '{slug}'")
         data = storage.download_file_from_pptx_bucket(key=key)
         jpeg_data = _resize_to_jpeg(data=data, quality=quality)
-        result.append(f"Slide {n}")
+        result.append(f"Slide {slug}")
         result.append(Image(data=jpeg_data, format="jpeg"))
     return result

@@ -412,7 +412,7 @@ def generate_pptx(deck_id: str) -> str:
 
 
 @mcp.tool()
-def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -> list:
+def get_preview(deck_id: str, slugs: list[str], quality: str = "high") -> list:
     """Get PNG preview images for visual review by the agent.
 
     Returns actual slide images that the model can see and analyze.
@@ -423,20 +423,20 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
 
     Args:
         deck_id: The deck ID.
-        slide_numbers: List of 1-based slide numbers to preview (required, at least one).
+        slugs: List of slide slugs to preview (required, at least one). Example: ["intro", "pricing"].
         quality: "low" (800px, ~480 tokens/slide) or "high" (1280px, ~1229 tokens/slide).
 
     Returns:
         List of text labels and slide images for visual inspection.
     """
     _check_deck_access(deck_id, action="preview")
-    if not slide_numbers:
-        return [{"type": "text", "text": "Error: slide_numbers must not be empty"}]
+    if not slugs:
+        return [{"type": "text", "text": "Error: slugs must not be empty"}]
     if quality not in ("low", "high"):
         quality = "high"
     try:
         return preview.get_preview(
-            deck_id=deck_id, slide_numbers=slide_numbers, storage=_storage, quality=quality,
+            deck_id=deck_id, slugs=slugs, storage=_storage, quality=quality,
         )
     except _storage._s3.exceptions.NoSuchKey:
         return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first."}]
