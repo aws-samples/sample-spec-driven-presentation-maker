@@ -63,13 +63,15 @@ export function ComposeCard({ input, status, isActive, streamMessages = [], deck
   )
 
   const hasError = status === "error" || state.agents.some((a) => a.status === "error")
-  // Stopped: no final tool result arrived. Covers two cases:
-  //   - Live: user clicked Stop and StopRuntimeSession killed the container
-  //     before compose_slides yielded its final report (status undefined).
-  //   - History restore: a past session was stopped mid-tool; the toolUse is
-  //     persisted in Memory but no matching toolResult exists (status undefined).
-  // Both are the same signal from the UI's perspective.
-  const isStopped = !isActive && !status && !hasError
+  // Determine completion:
+  //   - If the tool returned a final result (status set), trust it as done/error.
+  //     History restore also falls into this case — past tool calls have status.
+  //   - If no status, the tool never completed → stopped.
+  //   - (In live execution, compose_slides may rarely yield a final report even
+  //     when stopped, because its terminal yield is outside the group try block.
+  //     We accept this as "done with partial slides"; it matches the server's
+  //     own view.)
+  const isStopped = !isActive && !status && !hasError && state.agents.length > 0
   const isDone = !isActive && !isStopped && (status === "success" || state.phase === "done")
   const doneSlides = state.agents.filter((a) => a.status === "done").reduce((s, a) => s + a.slugs.length, 0)
 
