@@ -138,6 +138,10 @@ function handleLine(line: string) {
       if (type === "tool_call") {
         const title = (update.title || "") as string;
         const toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title;
+        if (toolName === "get_preview") {
+          const input = update.rawInput as { slide_numbers?: number[] } | undefined;
+          console.log(`[subagent ${groupInfo!.group}]`, "get_preview", input?.slide_numbers || []);
+        }
         emit({ tool: toolName, toolUseId: update.toolCallId as string || "", input: update.rawInput || {} });
       } else if (type === "tool_call_update") {
         const status = update.status as string;
