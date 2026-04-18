@@ -14,10 +14,11 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Package, ChevronRight, Check, AlertCircle, RefreshCw, Sparkles, Wrench } from "lucide-react"
+import { Package, ChevronRight, Check, AlertCircle, RefreshCw, Sparkles, Wrench, X } from "lucide-react"
 import { parseComposeState, type AgentState, type ComposeState } from "./parseComposeState"
 import { stripPrefix } from "./activityLabel"
 import { CAT } from "../toolPalette"
+import { stopComposeSlides } from "@/services/agentCoreService"
 import { TOOL_META } from "../ToolCard"
 
 // --- Tokens -----------------------------------------------------------------
@@ -54,9 +55,13 @@ interface ComposeCardProps {
   isActive: boolean
   streamMessages?: Record<string, unknown>[]
   deckSlugs?: string[]
+  toolUseId?: string
+  sessionId?: string
+  idToken?: string
 }
 
-export function ComposeCard({ input, status, result, isActive, streamMessages = [], deckSlugs = [] }: ComposeCardProps) {
+export function ComposeCard({ input, status, result, isActive, streamMessages = [], deckSlugs = [], toolUseId, sessionId, idToken }: ComposeCardProps) {
+  const [stopping, setStopping] = useState(false)
   const state: ComposeState = useMemo(
     () => parseComposeState(streamMessages, input),
     [streamMessages, input],
@@ -94,6 +99,13 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
         totalSlides={totalSlides}
         doneSlides={doneSlides}
         isActive={isActive}
+        canCancel={isActive && !stopping && !!(toolUseId && sessionId && idToken)}
+        onCancel={async () => {
+          if (!toolUseId || !sessionId || !idToken) return
+          setStopping(true)
+          await stopComposeSlides(sessionId, toolUseId, idToken)
+        }}
+        stopping={stopping}
       />
       <div className="px-3 pb-3 flex flex-col gap-2">
         {state.agents.map((agent, i) => (
@@ -117,6 +129,7 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
 
 function Header({
   state, isDone, isStopped, hasError, totalSlides, doneSlides, isActive,
+  canCancel, onCancel, stopping,
 }: {
   state: ComposeState
   isDone: boolean
@@ -125,10 +138,15 @@ function Header({
   totalSlides: number
   doneSlides: number
   isActive: boolean
+  canCancel: boolean
+  onCancel: () => void
+  stopping: boolean
 }) {
   const hasAgents = state.totalGroups > 0
   const isFinished = isDone || (hasError && !isActive) || isStopped
-  const label = isStopped
+  const label = stopping && isActive
+    ? "Stopping — finalizing partial results…"
+    : isStopped
     ? doneSlides > 0
       ? `Stopped · ${doneSlides} of ${totalSlides} slides composed`
       : "Stopped"
@@ -174,6 +192,17 @@ function Header({
       >
         {label}
       </span>
+      {canCancel ? (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-none inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-foreground/70 hover:text-foreground/95 hover:bg-white/5 transition-colors"
+          aria-label="Cancel compose slides"
+        >
+          <X className="h-3 w-3" />
+          Cancel
+        </button>
+      ) : null}
     </header>
   )
 }

@@ -15,7 +15,7 @@
 
 "use client"
 
-import { useEffect, useRef, useState, useImperativeHandle, forwardRef, FormEvent, KeyboardEvent, useCallback } from "react"
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef, FormEvent, KeyboardEvent, useCallback, useMemo } from "react"
 import { useAuth } from "react-oidc-context"
 import { invokeAgentCore, generateSessionId, setAgentConfig, stopRuntimeSession } from "@/services/agentCoreService"
 import { getChatHistory, listDecks, patchDeck, DeckSummary } from "@/services/deckService"
@@ -718,6 +718,18 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (token) stopRuntimeSession(sessionId, token)
   }
 
+  // Disable the global Stop while a compose_slides tool is in flight; the
+  // compose card exposes its own soft-stop. Prevents accidental microVM kill
+  // that would discard the partial report.
+  const composeInFlight = useMemo(() => {
+    if (!isLoading) return false
+    const last = messages[messages.length - 1]
+    if (!last || last.role !== "assistant") return false
+    const lastTool = last.toolUses[last.toolUses.length - 1]
+    if (!lastTool || lastTool.status) return false
+    return lastTool.name === "compose_slides" || lastTool.name.endsWith("_compose_slides")
+  }, [isLoading, messages])
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     handleSend(input)
@@ -848,6 +860,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     isStreaming={isLoading && i === messages.length - 1}
                     idToken={auth.user?.id_token}
                     deckSlugs={slideSlugs}
+                    sessionId={sessionId}
                   />
                 </div>
               ))}
@@ -949,7 +962,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 <button
                   type="button"
                   onClick={handleStop}
-                  className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-white/10 hover:bg-white/20"
+                  disabled={composeInFlight}
+                  title={composeInFlight ? "Use the Cancel button on the compose card" : "Stop generation"}
+                  className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/10"
                   aria-label="Stop generation"
                 >
                   <Square className="h-3 w-3 fill-current" />

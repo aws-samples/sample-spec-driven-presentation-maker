@@ -146,9 +146,11 @@ interface ChatMessageProps {
   idToken?: string
   /** Current deck slide IDs — forwarded to ToolCard/ComposeCard for slug existence. */
   deckSlugs?: string[]
+  /** Session ID — forwarded to ComposeCard for soft-stop calls. */
+  sessionId?: string
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, deckSlugs }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, deckSlugs, sessionId }: ChatMessageProps) {
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
@@ -248,12 +250,15 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 <ToolCard
                   key={block.tool.toolUseId}
                   name={block.tool.name}
+                  toolUseId={block.tool.toolUseId}
                   input={block.tool.input}
                   status={block.tool.status}
                   result={block.tool.result}
                   isActive={isStreaming && !block.tool.status && (i === blocks.length - 1 || (block.tool.streamMessages?.length ?? 0) > 0)}
                   streamMessages={block.tool.streamMessages}
                   deckSlugs={deckSlugs}
+                  sessionId={sessionId}
+                  idToken={idToken}
                 />
               )
             )}
@@ -297,12 +302,15 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 {latestTool && (
                   <ToolCard
                     name={latestTool.name}
+                    toolUseId={latestTool.toolUseId}
                     input={latestTool.input}
                     status={latestTool.status}
                     result={latestTool.result}
                     isActive={isStreaming && !latestTool.status}
                     streamMessages={latestTool.streamMessages}
                     deckSlugs={deckSlugs}
+                    sessionId={sessionId}
+                    idToken={idToken}
                   />
                 )}
                 {olderTools.length > 0 && (

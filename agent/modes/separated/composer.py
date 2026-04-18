@@ -8,11 +8,38 @@ import queue
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 
 from strands import Agent, tool as strands_tool
 from strands.hooks.events import AfterToolCallEvent, BeforeToolCallEvent
+from strands.types.tools import ToolContext
 
 from prompts import build_system_prompt, load_prompt
+
+
+# Soft-stop signal: the webui cancel button sends InvokeAgentRuntimeCommand
+# to `touch /tmp/compose_stops/{parent_tool_use_id}` inside this microVM.
+# The BeforeToolCallEvent hook polls for that file and, on hit, feeds the
+# STOP_PROMPT to the LLM as the cancelled tool's result so the composer
+# winds down with a plain-text partial summary.
+_STOP_SIGNAL_DIR = "/tmp/compose_stops"
+STOP_PROMPT = (
+    "[SYSTEM INTERRUPT]\n"
+    "The user has requested an immediate halt to this task.\n\n"
+    "Please stop all further tool invocations and respond in plain text only.\n"
+    "Summarize concisely what you have accomplished so far:\n"
+    "- Which slides or artifacts were completed\n"
+    "- What was in progress when stopped\n"
+    "- Any context that would be useful to resume later\n\n"
+    "Do not attempt any more tool calls. End your response with a plain-text summary."
+)
+
+
+def _is_compose_stopped(parent_tool_use_id: str) -> bool:
+    try:
+        return os.path.exists(os.path.join(_STOP_SIGNAL_DIR, parent_tool_use_id))
+    except Exception:
+        return False
 
 # References to prefetch for composer
 _PREFETCH_SYSTEM = [
@@ -122,6 +149,7 @@ def make_compose_slides(mcp_servers: list, model):
 
     @strands_tool(
         name="compose_slides",
+        context=True,
         description=(
             "Delegate slide generation to parallel composer agents. Each group "
             "is handled by an independent composer that writes slides/<slug>.json. "
@@ -188,12 +216,13 @@ def make_compose_slides(mcp_servers: list, model):
             }
         },
     )
-    async def compose_slides(deck_id: str, slide_groups: list):
+    async def compose_slides(deck_id: str, slide_groups: list, tool_context: ToolContext):
         """Compose slides by delegating to composer agents.
 
         Prefetches all Phase 2 references once, then injects into composer prompt.
         Runs groups in parallel. Async generator: yields progress dicts, then returns final result str.
         """
+        parent_tool_use_id = tool_context.tool_use["toolUseId"]
         max_concurrency = int(os.environ.get("COMPOSER_MAX_CONCURRENCY", "10"))
 
         generated = []
@@ -278,6 +307,14 @@ def make_compose_slides(mcp_servers: list, model):
                 )
 
                 async def _before_tool(event: BeforeToolCallEvent):
+                    # Soft-stop: if the user cancelled this compose_slides
+                    # invocation, hand the LLM the STOP_PROMPT instead of
+                    # executing the tool. The model is instructed to emit a
+                    # plain-text partial summary and stop calling tools, so
+                    # the composer loop terminates naturally.
+                    if _is_compose_stopped(parent_tool_use_id):
+                        event.cancel_tool = STOP_PROMPT
+                        return
                     tu = event.tool_use
                     progress_q.put_nowait({
                         "group": gi + 1, "slugs": slugs_label,
@@ -358,6 +395,9 @@ def make_compose_slides(mcp_servers: list, model):
         # Post-compose: build PPTX + assemble report
         yield {"status": "building", "message": "Building final PPTX..."}
         report = {"generated_slides": generated, "errors": errors, "summaries": summaries}
+        if _is_compose_stopped(parent_tool_use_id):
+            report["stopped"] = True
+            report["stopped_at"] = datetime.now(timezone.utc).isoformat()
 
         if generated and mcp_client:
             # Generate PPTX

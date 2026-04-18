@@ -153,6 +153,37 @@ export const stopRuntimeSession = async (sessionId, accessToken) => {
 }
 
 /**
+ * Soft-stop an in-flight compose_slides tool invocation.
+ * Runs `touch /tmp/compose_stops/{toolUseId}` inside the session's microVM via
+ * InvokeAgentRuntimeCommand. The composer's BeforeToolCallEvent hook picks up
+ * the file and feeds STOP_PROMPT to the LLM as the cancelled tool result, so
+ * the agent wraps up with a plain-text partial summary.
+ * Fire-and-forget: errors are logged, not thrown.
+ */
+export const stopComposeSlides = async (sessionId, toolUseId, accessToken) => {
+  try {
+    if (!sessionId || !toolUseId || !accessToken || !AGENT_CONFIG.AGENT_RUNTIME_ARN) return
+    const endpoint = `https://bedrock-agentcore.${AGENT_CONFIG.AWS_REGION}.amazonaws.com`
+    const escapedAgentArn = encodeURIComponent(AGENT_CONFIG.AGENT_RUNTIME_ARN)
+    const url = `${endpoint}/runtimes/${escapedAgentArn}/commands?qualifier=DEFAULT`
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": sessionId,
+      },
+      body: JSON.stringify({
+        command: `/bin/bash -c "mkdir -p /tmp/compose_stops && touch /tmp/compose_stops/${toolUseId}"`,
+        timeout: 10,
+      }),
+    })
+  } catch (error) {
+    console.error("Error stopping compose_slides:", error)
+  }
+}
+
+/**
  * Generate a new session ID
  */
 export const generateSessionId = () => {
