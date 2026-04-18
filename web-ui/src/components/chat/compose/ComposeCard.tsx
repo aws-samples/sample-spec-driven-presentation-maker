@@ -14,7 +14,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Package, ChevronRight, Check, AlertCircle, RefreshCw, Sparkles, Wrench, X } from "lucide-react"
+import { Package, ChevronRight, Check, AlertCircle, RefreshCw, Sparkles, Wrench, X, Info } from "lucide-react"
 import { parseComposeState, type AgentState, type ComposeState } from "./parseComposeState"
 import { stripPrefix } from "./activityLabel"
 import { CAT } from "../toolPalette"
@@ -68,12 +68,25 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
     [streamMessages, input],
   )
 
+  // Parse the final report (the tool's last yield = JSON string). Gives us
+  // `stopped`, `notice`, and per-group `summaries` for the soft-stop UI.
+  const report = useMemo(() => {
+    if (!result) return null
+    try {
+      const raw = typeof result === "string" ? result : JSON.stringify(result)
+      const obj = typeof result === "object" && result !== null ? result as Record<string, unknown> : JSON.parse(raw)
+      return obj as { stopped?: boolean; notice?: string; summaries?: Record<string, string>; stopped_at?: string }
+    } catch {
+      return null
+    }
+  }, [result])
+
   const hasError = status === "error" || state.agents.some((a) => a.status === "error")
-  // Stopped: no terminal tool result was recorded (status undefined). Covers
-  // both live stop (StopRuntimeSession before final yield) and history
-  // restore of a session that was interrupted mid-tool (toolUse persisted in
-  // Memory without a matching toolResult).
-  const isStopped = !isActive && !hasError && !status && state.agents.length > 0
+  // Stopped: either a hard-stop (tool result never arrived — status undefined)
+  // or a soft-stop (compose_slides returned normally with `stopped: true`).
+  const isSoftStopped = !!report?.stopped
+  const isHardStopped = !isActive && !hasError && !status && state.agents.length > 0
+  const isStopped = isHardStopped || isSoftStopped
   const isDone = !isActive && !isStopped && !hasError && (status === "success" || state.phase === "done")
   const doneSlides = state.agents.filter((a) => a.status === "done").reduce((s, a) => s + a.slugs.length, 0)
 
@@ -128,6 +141,9 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
           />
         ))}
       </div>
+      {isSoftStopped && (report?.notice || report?.summaries) && (
+        <StopSummary notice={report.notice} summaries={report.summaries} />
+      )}
       <span className="sr-only" aria-live="polite">
         {state.doneGroupCount} of {state.totalGroups} agents completed
       </span>
@@ -629,5 +645,62 @@ function ActivityTimeline({ activity, showThinking }: { activity: AgentState["ac
         </li>
       )}
     </ol>
+  )
+}
+
+// --- StopSummary: shown after a soft-stop -----------------------------------
+
+function StopSummary({ notice, summaries }: { notice?: string; summaries?: Record<string, string> }) {
+  const [open, setOpen] = useState(false)
+  const entries = summaries ? Object.entries(summaries) : []
+
+  return (
+    <div
+      className="mx-3 mb-3 rounded-lg p-3 flex flex-col gap-2"
+      style={{ background: `${STATE.retry}10`, boxShadow: `inset 0 0 0 1px ${STATE.retry}30` }}
+    >
+      {notice && (
+        <div className="flex items-start gap-1.5">
+          <Info className="flex-none h-3.5 w-3.5 mt-0.5" style={{ color: STATE.retry }} />
+          <div className="text-[12px] leading-relaxed" style={{ color: C.fgLabel }}>
+            {notice}
+          </div>
+        </div>
+      )}
+      {entries.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            className="inline-flex items-center gap-1 text-[10.5px] font-medium uppercase hover:opacity-80 transition-opacity"
+            style={{ color: C.smallLabel, letterSpacing: "0.14em" }}
+          >
+            <ChevronRight
+              className="h-3 w-3 transition-transform duration-200"
+              style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
+            />
+            What the composers did · {entries.length} group{entries.length === 1 ? "" : "s"}
+          </button>
+          {open && (
+            <ol className="mt-2 flex flex-col gap-2">
+              {entries.map(([group, text]) => (
+                <li key={group} className="flex flex-col gap-1">
+                  <div className="text-[11px] font-medium" style={{ color: C.fgLabel }}>
+                    {group}
+                  </div>
+                  <div
+                    className="text-[11.5px] leading-relaxed whitespace-pre-wrap break-words"
+                    style={{ color: C.fgDim }}
+                  >
+                    {text}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
