@@ -96,6 +96,7 @@ export function ComposeCard({ input, status, isActive, streamMessages = [], deck
             agent={agent}
             existingSlugs={existingSlugs}
             indexDelay={i}
+            parentActive={isActive}
           />
         ))}
       </div>
@@ -172,18 +173,22 @@ interface AgentCardProps {
   agent: AgentState
   existingSlugs: Set<string>
   indexDelay: number
+  parentActive: boolean
 }
 
-function AgentCard({ agent, existingSlugs, indexDelay }: AgentCardProps) {
+function AgentCard({ agent, existingSlugs, indexDelay, parentActive }: AgentCardProps) {
   const [userToggled, setUserToggled] = useState<boolean | null>(null)
   // Default expansion: error → expanded, otherwise collapsed. User toggle overrides.
   const expanded = userToggled ?? agent.status === "error"
 
-  const isWorking = agent.status === "working"
-  const isRetrying = agent.status === "retrying"
+  // Stopped: parent no longer active but agent hasn't reached a terminal state.
+  // Treat as done-but-incomplete; suppress spinners.
+  const isStopped = !parentActive && agent.status !== "done" && agent.status !== "error"
+  const isWorking = agent.status === "working" && !isStopped
+  const isRetrying = agent.status === "retrying" && !isStopped
   const isDone = agent.status === "done"
   const isError = agent.status === "error"
-  const isStarting = agent.status === "starting"
+  const isStarting = agent.status === "starting" && !isStopped
 
   const latestActivity = agent.activity.length
     ? agent.activity[agent.activity.length - 1]
@@ -289,6 +294,7 @@ function AgentCard({ agent, existingSlugs, indexDelay }: AgentCardProps) {
         <LatestActivityRow
           agent={agent}
           latestActivity={latestActivity}
+          isStopped={isStopped}
         />
       )}
 
@@ -326,6 +332,7 @@ function AgentCard({ agent, existingSlugs, indexDelay }: AgentCardProps) {
               <ActivityTimeline
                 activity={agent.activity}
                 showThinking={
+                  !isStopped &&
                   (isWorking || isRetrying) &&
                   agent.activity[agent.activity.length - 1]?.status !== "active"
                 }
@@ -352,10 +359,24 @@ function AgentCard({ agent, existingSlugs, indexDelay }: AgentCardProps) {
 function LatestActivityRow({
   agent,
   latestActivity,
+  isStopped,
 }: {
   agent: AgentState
   latestActivity: AgentState["activity"][number] | null
+  isStopped: boolean
 }) {
+  // Stopped by user: show static "Stopped" label, no spinner
+  if (isStopped) {
+    return (
+      <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
+        <span className="flex-none w-2 h-2 rounded-full" style={{ background: C.fgMuted }} />
+        <span className="text-[11.5px] truncate tracking-[-0.005em]" style={{ color: C.fgMuted }}>
+          Stopped
+        </span>
+      </div>
+    )
+  }
+
   // Error: show error message truncated, red
   if (agent.status === "error") {
     return (
