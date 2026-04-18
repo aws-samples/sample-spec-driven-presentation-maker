@@ -48,6 +48,8 @@ Rules:
 - Do NOT consider adjacent-slide layout diversity (handled by post-review)
 - No constraint on group count or size (concurrency is controlled by semaphore)
 - Do NOT create a core group with only 1 slide (nothing to unify — treat as independent)
+- If NO core groups exist (all slides are independent), split into groups of 2-3 slides each for parallel execution. Assign by narrative proximity (e.g. group problem+setup, group findings together)
+- Target: aim for 3-6 groups for a typical 10-15 slide deck
 
 ## File Uploads
 - When a user message contains [Attached: filename (uploadId: xxx)], use read_uploaded_file(upload_id, deck_id) to read content. If no deck exists yet, call init_presentation() first.
