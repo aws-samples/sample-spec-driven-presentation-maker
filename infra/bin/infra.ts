@@ -25,6 +25,7 @@ import { AuthStack } from "../lib/auth-stack";
 import { RuntimeStack } from "../lib/runtime-stack";
 import { AgentStack } from "../lib/agent-stack";
 import { WebUiStack } from "../lib/web-ui-stack";
+import { CloudFrontWafStack } from "../lib/cloudfront-waf-stack";
 
 // Load deployment configuration
 const configPath = path.join(__dirname, "../config.yaml");
@@ -77,6 +78,22 @@ const runtime = new RuntimeStack(app, "SdpmRuntime", {
   vectorIndexName: data.vectorIndexName || undefined,
 });
 
+// --- WAF IP restriction (optional) ---
+const allowedIpV4AddressRanges: string[] | undefined = config.waf?.allowedIpV4AddressRanges;
+const allowedIpV6AddressRanges: string[] | undefined = config.waf?.allowedIpV6AddressRanges;
+const wafEnabled = !!(allowedIpV4AddressRanges || allowedIpV6AddressRanges);
+
+// CloudFront WAF must be in us-east-1
+const cloudFrontWafStack = wafEnabled
+  ? new CloudFrontWafStack(app, "SdpmCloudFrontWaf", {
+      env: { account: env.account, region: "us-east-1" },
+      crossRegionReferences: true,
+      description: "Spec-Driven Presentation Maker - CloudFront WAF (uksb-ynuz0lkrea)(tag:waf)",
+      allowedIpV4AddressRanges,
+      allowedIpV6AddressRanges,
+    })
+  : undefined;
+
 if (config.stacks?.agent) {
   const agent = new AgentStack(app, "SdpmAgent", {
     env,
@@ -95,6 +112,7 @@ if (config.stacks?.agent) {
     }
     new WebUiStack(app, "SdpmWebUi", {
       env,
+      crossRegionReferences: wafEnabled,
       description: "Spec-Driven Presentation Maker - Web UI (uksb-ynuz0lkrea)(tag:web-ui)",
       table: data.table,
       pptxBucket: data.pptxBucket,
@@ -106,6 +124,9 @@ if (config.stacks?.agent) {
       kbId: searchSlides ? data.kbSsmParamName : undefined,
       vectorBucketName: data.vectorBucketName || undefined,
       vectorIndexName: data.vectorIndexName || undefined,
+      webAclId: cloudFrontWafStack?.webAclArn,
+      allowedIpV4AddressRanges,
+      allowedIpV6AddressRanges,
     });
   }
 }

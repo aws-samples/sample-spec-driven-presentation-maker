@@ -25,8 +25,10 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import { CfnWebACLAssociation } from "aws-cdk-lib/aws-wafv2";
 import { Construct } from "constructs";
 import * as path from "path";
+import { CommonWebAcl } from "./construct/common-web-acl";
 
 interface WebUiStackProps extends cdk.StackProps {
   /** Amazon DynamoDB table from DataStack. */
@@ -49,6 +51,12 @@ interface WebUiStackProps extends cdk.StackProps {
   vectorBucketName?: string;
   /** S3 Vector Index name (empty if KB not enabled). */
   vectorIndexName?: string;
+  /** CloudFront WAF WebACL ARN (from CloudFrontWafStack in us-east-1). */
+  webAclId?: string;
+  /** Allowed IPv4 CIDR ranges for regional WAF. */
+  allowedIpV4AddressRanges?: string[];
+  /** Allowed IPv6 CIDR ranges for regional WAF. */
+  allowedIpV6AddressRanges?: string[];
 }
 
 export class WebUiStack extends cdk.Stack {
@@ -68,8 +76,6 @@ export class WebUiStack extends cdk.Stack {
     });
 
     // --- Amazon CloudFront ---
-    const oai = new cloudfront.OriginAccessIdentity(this, "OAI");
-    siteBucket.grantRead(oai);
 
     // CloudFront Function to rewrite directory requests to index.html
     // (S3 REST API does not support index documents for subdirectories)
@@ -150,7 +156,7 @@ function handler(event) {
 
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
-        origin: new origins.S3Origin(siteBucket, { originAccessIdentity: oai }),
+        origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         functionAssociations: [{
           function: urlRewrite,
@@ -158,9 +164,11 @@ function handler(event) {
         }],
       },
       defaultRootObject: "index.html",
+      // 404 → /index.html for SPA client-side routing.
+      // With OAC, S3 returns 404 (not 403) for missing keys, so this
+      // fallback handles SPA routing without interfering with WAF blocks.
       errorResponses: [
         { httpStatus: 404, responseHttpStatus: 200, responsePagePath: "/index.html" },
-        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: "/index.html" },
       ],
     });
 
@@ -427,6 +435,24 @@ function handler(event) {
         }),
       ]),
     });
+
+    // --- WAF: CloudFront WebACL (from us-east-1 stack) ---
+    if (props.webAclId) {
+      cfnDist.addPropertyOverride("DistributionConfig.WebACLId", props.webAclId);
+    }
+
+    // --- WAF: Regional WAF for API Gateway ---
+    if (props.allowedIpV4AddressRanges || props.allowedIpV6AddressRanges) {
+      const regionalWaf = new CommonWebAcl(this, "RegionalWaf", {
+        scope: "REGIONAL",
+        allowedIpV4AddressRanges: props.allowedIpV4AddressRanges,
+        allowedIpV6AddressRanges: props.allowedIpV6AddressRanges,
+      });
+      new CfnWebACLAssociation(this, "ApiWafAssociation", {
+        resourceArn: api.deploymentStage.stageArn,
+        webAclArn: regionalWaf.webAclArn,
+      });
+    }
 
     // --- Outputs ---
     new cdk.CfnOutput(this, "SiteUrl", { value: this.siteUrl });
