@@ -62,8 +62,11 @@ export function ComposeCard({ input, status, isActive, streamMessages = [], deck
     [streamMessages, input],
   )
 
-  const isDone = !isActive && (status === "success" || state.phase === "done")
   const hasError = status === "error" || state.agents.some((a) => a.status === "error")
+  // Stopped: parent no longer active and no final tool result arrived.
+  // (status is set by ChatPanel only on actual tool completion.)
+  const isStopped = !isActive && !status && !hasError
+  const isDone = !isActive && !isStopped && (status === "success" || state.phase === "done")
   const doneSlides = state.agents.filter((a) => a.status === "done").reduce((s, a) => s + a.slugs.length, 0)
 
   const existingSlugs = new Set(deckSlugs)
@@ -84,6 +87,7 @@ export function ComposeCard({ input, status, isActive, streamMessages = [], deck
       <Header
         state={state}
         isDone={isDone}
+        isStopped={isStopped}
         hasError={hasError}
         totalSlides={totalSlides}
         doneSlides={doneSlides}
@@ -110,18 +114,23 @@ export function ComposeCard({ input, status, isActive, streamMessages = [], deck
 // --- Header -----------------------------------------------------------------
 
 function Header({
-  state, isDone, hasError, totalSlides, doneSlides, isActive,
+  state, isDone, isStopped, hasError, totalSlides, doneSlides, isActive,
 }: {
   state: ComposeState
   isDone: boolean
+  isStopped: boolean
   hasError: boolean
   totalSlides: number
   doneSlides: number
   isActive: boolean
 }) {
   const hasAgents = state.totalGroups > 0
-  const isFinished = isDone || (hasError && !isActive)
-  const label = hasError && !isActive
+  const isFinished = isDone || (hasError && !isActive) || isStopped
+  const label = isStopped
+    ? doneSlides > 0
+      ? `Stopped · ${doneSlides} of ${totalSlides} slides composed`
+      : "Stopped"
+    : hasError && !isActive
     ? doneSlides > 0
       ? `Composed ${doneSlides} of ${totalSlides} slides — some failed`
       : "Failed to compose slides"
@@ -131,7 +140,7 @@ function Header({
     ? `Composing ${totalSlides} slides · ${state.totalGroups} agents in parallel`
     : state.statusMessage || "Preparing…"
 
-  const accent = hasError ? STATE.error : CAT.produce.accent
+  const accent = hasError ? STATE.error : isStopped ? C.fgMuted : CAT.produce.accent
 
   return (
     <header className="flex items-center gap-2.5 px-3 pt-3 pb-2">
