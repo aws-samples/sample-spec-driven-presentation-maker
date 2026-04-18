@@ -71,7 +71,11 @@ export function DeckListView({
   searchResults, searching, onDeckOpen, onNewDeck, favoriteIds,
   onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, loading,
 }: DeckListViewProps) {
-  const showSearch = searchQuery.length >= 2
+  // Tauri: no server-side slide search; filter decks by name client-side instead.
+  const showSearch = !isTauri && searchQuery.length >= 2
+  const filteredDecks = (isTauri && searchQuery)
+    ? decks.filter(d => (d.name || "").toLowerCase().includes(searchQuery.toLowerCase()))
+    : decks
 
   return (
     <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
@@ -165,7 +169,7 @@ export function DeckListView({
                 </div>
               ))}
             </div>
-          ) : decks.length === 0 ? (
+          ) : filteredDecks.length === 0 ? (
             <EmptyState
               icon={Sparkles}
               title={activeTab === "mine" ? "No decks yet" : `No ${TABS.find(t => t.key === activeTab)?.label.toLowerCase() || "decks"} yet`}
@@ -178,7 +182,7 @@ export function DeckListView({
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {decks.map((deck, i) => (
+              {filteredDecks.map((deck, i) => (
                 <DeckCard
                   key={deck.deckId}
                   deck={deck}
