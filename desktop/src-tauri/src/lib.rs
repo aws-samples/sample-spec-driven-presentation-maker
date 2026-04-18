@@ -54,6 +54,21 @@ async fn install_libreoffice() -> Result<String, String> {
     }
 }
 
+#[tauri::command]
+fn regen_spec_prompt(template_path: String, target_path: String, subagent_instruction: String) -> Result<(), String> {
+    let tmpl = std::fs::read_to_string(&template_path).map_err(|e| format!("read template: {e}"))?;
+    let prompt = tmpl.replace("{subagent_instruction}", &subagent_instruction);
+    let current = std::fs::read_to_string(&target_path).map_err(|e| format!("read target: {e}"))?;
+    let mut json: serde_json::Value = serde_json::from_str(&current).map_err(|e| format!("parse: {e}"))?;
+    if json.get("prompt").and_then(|v| v.as_str()) == Some(&prompt) {
+        return Ok(());
+    }
+    json["prompt"] = serde_json::Value::String(prompt);
+    let out = serde_json::to_string_pretty(&json).map_err(|e| format!("serialize: {e}"))?;
+    std::fs::write(&target_path, out).map_err(|e| format!("write: {e}"))?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -61,7 +76,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            get_project_root, open_path, check_libreoffice_cmd, install_libreoffice
+            get_project_root, open_path, check_libreoffice_cmd, install_libreoffice, regen_spec_prompt
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
