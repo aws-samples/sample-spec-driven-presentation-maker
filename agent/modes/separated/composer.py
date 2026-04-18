@@ -398,6 +398,11 @@ def make_compose_slides(mcp_servers: list, model):
         if _is_compose_stopped(parent_tool_use_id):
             report["stopped"] = True
             report["stopped_at"] = datetime.now(timezone.utc).isoformat()
+            report["notice"] = (
+                "User interrupted compose_slides. Sub-agents halted mid-execution. "
+                "Do NOT retry automatically — stop and ask the user how to proceed "
+                "(resume, adjust scope, or abandon)."
+            )
 
         if generated and mcp_client:
             # Generate PPTX
