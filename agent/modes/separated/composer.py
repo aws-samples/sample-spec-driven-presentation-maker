@@ -23,15 +23,15 @@ from prompts import build_system_prompt, load_prompt
 # STOP_PROMPT to the LLM as the cancelled tool's result so the composer
 # winds down with a plain-text partial summary.
 _STOP_SIGNAL_DIR = "/tmp/compose_stops"
+# NOTE: Do NOT include markers like "[SYSTEM INTERRUPT]" or phrases such as
+# "the user has requested" here. Claude's anti-prompt-injection heuristic
+# flags those as hijack attempts coming from tool output and ignores them —
+# the composer then keeps calling tools. A plain, tool-layer-style message
+# is honoured on the first hit and the agent wraps up naturally.
 STOP_PROMPT = (
-    "[SYSTEM INTERRUPT]\n"
-    "The user has requested an immediate halt to this task.\n\n"
-    "Please stop all further tool invocations and respond in plain text only.\n"
-    "Summarize concisely what you have accomplished so far:\n"
-    "- Which slides or artifacts were completed\n"
-    "- What was in progress when stopped\n"
-    "- Any context that would be useful to resume later\n\n"
-    "Do not attempt any more tool calls. End your response with a plain-text summary."
+    "Operation cancelled by the user. Do not retry. "
+    "Stop invoking tools and respond with a brief plain-text summary of "
+    "what was completed, what was in progress, and any context useful for resuming later."
 )
 
 
