@@ -42,7 +42,7 @@ interface ToolMeta {
 }
 
 /** Accent palette per category — oklch for perceptual uniformity. */
-const CAT: Record<ToolCategory, { accent: string; bg: string; glow: string; border: string }> = {
+export const CAT: Record<ToolCategory, { accent: string; bg: string; glow: string; border: string }> = {
   build:   { accent: "oklch(0.75 0.14 185)", bg: "oklch(0.75 0.14 185 / 6%)",  glow: "oklch(0.75 0.14 185 / 12%)", border: "oklch(0.75 0.14 185 / 18%)" },
   explore: { accent: "oklch(0.80 0.14 80)",  bg: "oklch(0.80 0.14 80 / 6%)",   glow: "oklch(0.80 0.14 80 / 12%)",  border: "oklch(0.80 0.14 80 / 18%)" },
   produce: { accent: "oklch(0.72 0.16 300)", bg: "oklch(0.72 0.16 300 / 6%)",  glow: "oklch(0.72 0.16 300 / 12%)", border: "oklch(0.72 0.16 300 / 18%)" },

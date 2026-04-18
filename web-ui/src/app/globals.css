@@ -427,6 +427,47 @@ body {
   80%      { opacity: 0.9; }
 }
 
+/* ── Compose agent dot: organic breathing with glow halo ── */
+@keyframes compose-breath {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.15);
+    box-shadow: 0 0 10px 2px currentColor;
+    opacity: 1;
+  }
+}
+
+/* ── Compose agent dot: unstable flicker (retry) ── */
+@keyframes compose-flicker {
+  0%, 100% { opacity: 0.95; transform: scale(1); }
+  18%      { opacity: 0.35; transform: scale(0.9); }
+  40%      { opacity: 0.85; transform: scale(1.05); }
+  55%      { opacity: 0.4;  transform: scale(0.95); }
+  78%      { opacity: 0.9;  transform: scale(1); }
+}
+
+/* ── Compose card: stagger entrance ── */
+@keyframes compose-card-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Compose pop-out: fade/slide/scale enter ── */
+@keyframes compose-popout-enter {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Compose pop-out: activity row stagger ── */
+@keyframes compose-popout-row-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .tool-card-enter,
@@ -436,6 +477,9 @@ body {
   @keyframes tool-active-shimmer { 0%, 100% { opacity: 0.8; } }
   @keyframes tool-pulse { 0%, 100% { opacity: 0.6; } }
   .compose-bar { animation: none !important; opacity: 0.7 !important; }
+  .agent-card { animation: none !important; }
+  @keyframes compose-breath { 0%, 100% { opacity: 0.85; } }
+  @keyframes compose-flicker { 0%, 100% { opacity: 0.85; } }
   .brief-waiting,
   .outline-waiting,
   .art-waiting,

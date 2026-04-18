@@ -13,6 +13,41 @@ export function stripPrefix(name: string): string {
   return name.replace(/^spec_driven_presentation_maker_/, "")
 }
 
+export type ActivityCategory = "build" | "explore" | "produce" | "compute" | "other"
+
+/** Map a tool (without MCP prefix) to its category for color coding. */
+export function activityCategory(tool: string): ActivityCategory {
+  const name = stripPrefix(tool)
+  switch (name) {
+    case "run_python":
+    case "grid":
+      return "compute"
+    case "generate_pptx":
+    case "code_to_slide":
+    case "get_preview":
+    case "save_web_image":
+      return "produce"
+    case "apply_style":
+    case "init_presentation":
+    case "pptx_to_json":
+      return "build"
+    case "search_assets":
+    case "read_examples":
+    case "read_guides":
+    case "read_workflows":
+    case "list_styles":
+    case "list_guides":
+    case "list_workflows":
+    case "list_templates":
+    case "list_asset_sources":
+    case "read_uploaded_file":
+    case "analyze_template":
+      return "explore"
+    default:
+      return "other"
+  }
+}
+
 export function activityLabel(tool: string, input?: Record<string, unknown>): string {
   const name = stripPrefix(tool)
 

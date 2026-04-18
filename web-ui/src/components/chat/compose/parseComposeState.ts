@@ -7,12 +7,13 @@
  * Output: overall + per-agent state for ComposeCard rendering.
  */
 
-import { activityLabel } from "./activityLabel"
+import { activityLabel, activityCategory, type ActivityCategory } from "./activityLabel"
 
 export interface ComposeActivity {
   toolUseId: string
   tool: string
   label: string
+  category: ActivityCategory
   status: "active" | "success" | "error"
 }
 
@@ -45,20 +46,50 @@ export function parseComposeState(
   streamMessages: Record<string, unknown>[],
   input?: Record<string, unknown>,
 ): ComposeState {
-  const slideGroups = (input?.slide_groups as SlideGroup[]) || []
-  const totalGroups = slideGroups.length
+  const slideGroups = (input?.slide_groups as SlideGroup[] | undefined) || []
 
-  const agents: AgentState[] = slideGroups.map((g, i) => ({
-    groupIndex: i + 1,
-    slugs: g.slugs || [],
-    instruction: g.instruction || "",
-    status: "starting",
-    retryAttempt: 0,
-    activity: [],
-  }))
+  // Discover agents from either input (if already present) or stream events.
+  // compose_slides is a streaming tool — input arrives only at completion,
+  // so during execution we must derive agents from `starting` events.
+  const bySlugs = new Map<string, AgentState>()
+
+  // Seed from input if available
+  slideGroups.forEach((g, i) => {
+    const slugsLabel = (g.slugs || []).join(", ")
+    bySlugs.set(slugsLabel, {
+      groupIndex: i + 1,
+      slugs: g.slugs || [],
+      instruction: g.instruction || "",
+      status: "starting",
+      retryAttempt: 0,
+      activity: [],
+    })
+  })
+
+  // Helper: ensure an agent entry exists for a stream event.
+  function ensureAgent(g: number, slugsLabel: string): AgentState {
+    const key = slugsLabel
+    let a = bySlugs.get(key)
+    if (!a) {
+      a = {
+        groupIndex: g,
+        slugs: slugsLabel ? slugsLabel.split(", ").map((s) => s.trim()).filter(Boolean) : [],
+        instruction: "",
+        status: "starting",
+        retryAttempt: 0,
+        activity: [],
+      }
+      bySlugs.set(key, a)
+    } else {
+      // Update groupIndex from event (authoritative)
+      a.groupIndex = g
+    }
+    return a
+  }
 
   let phase: ComposeState["phase"] = "running"
   let statusMessage: string | null = null
+  let totalGroupsFromStream = 0
   let doneGroupCount = 0
 
   for (const ev of streamMessages) {
@@ -71,11 +102,17 @@ export function parseComposeState(
       continue
     }
 
-    const agent = agents[g - 1]
-    if (!agent) continue
+    if (typeof ev.total_groups === "number" && ev.total_groups > totalGroupsFromStream) {
+      totalGroupsFromStream = ev.total_groups
+    }
+
+    const slugsLabel = typeof ev.slugs === "string" ? ev.slugs : ""
+    const agent = ensureAgent(g, slugsLabel)
 
     if (ev.status === "starting") {
       agent.status = "working"
+      // Once running, clear prefetching phase message
+      if (phase === "prefetching") { phase = "running"; statusMessage = null }
     } else if (ev.status === "retrying") {
       agent.status = "retrying"
       agent.retryAttempt = typeof ev.attempt === "number" ? ev.attempt : agent.retryAttempt + 1
@@ -97,6 +134,7 @@ export function parseComposeState(
           toolUseId,
           tool: toolName,
           label: activityLabel(toolName, inp),
+          category: activityCategory(toolName),
           status: "active",
         })
       }
@@ -107,6 +145,9 @@ export function parseComposeState(
       if (act) act.status = ev.toolStatus === "error" ? "error" : "success"
     }
   }
+
+  const agents = [...bySlugs.values()].sort((a, b) => a.groupIndex - b.groupIndex)
+  const totalGroups = Math.max(agents.length, totalGroupsFromStream, slideGroups.length)
 
   if (phase === "running" && doneGroupCount === totalGroups && totalGroups > 0) {
     phase = "done"

@@ -28,6 +28,7 @@ async def stream_agent(agent: Agent, user_query: str, session_id: str, cancel: a
     """
     last_tool_use = None
     last_tool_use_id = ""
+    last_yielded_input: dict = {}  # track fully-parsed input we've already sent
     tool_name_map: dict[str, str] = {}
     in_tool_execution = False
 
@@ -38,6 +39,19 @@ async def stream_agent(agent: Agent, user_query: str, session_id: str, cancel: a
         except (ValueError, TypeError):
             parsed = {}
         return {"toolUse": {"name": tu.get("name", ""), "toolUseId": tu.get("toolUseId", ""), "input": parsed if isinstance(parsed, dict) else {}}}
+
+    def _parse_input(tu: dict) -> dict | None:
+        """Try to parse tool input JSON. Returns parsed dict or None if incomplete."""
+        raw = tu.get("input", "")
+        if isinstance(raw, dict):
+            return raw if raw else None
+        if not isinstance(raw, str) or not raw:
+            return None
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else None
+        except (ValueError, TypeError):
+            return None
 
     def _should_stop() -> bool:
         return cancel.is_set() and not in_tool_execution
@@ -64,10 +78,17 @@ async def stream_agent(agent: Agent, user_query: str, session_id: str, cancel: a
                         if last_tool_use:
                             yield _tool_payload(last_tool_use)
                         last_tool_use_id = tu_id
+                        last_yielded_input = {}
                         tool_name_map[tu_id] = tu.get("name", "")
                         in_tool_execution = True
                         yield {"toolStart": {"name": tu.get("name", ""), "toolUseId": tu_id}}
                     last_tool_use = dict(tu)
+                    # Early-emit full input as soon as JSON is parseable,
+                    # so the UI can show instructions before the streaming tool finishes.
+                    parsed = _parse_input(tu)
+                    if parsed and parsed != last_yielded_input:
+                        last_yielded_input = parsed
+                        yield {"toolUse": {"name": tu.get("name", ""), "toolUseId": tu_id, "input": parsed}}
                 elif isinstance(event, dict) and "tool_stream_event" in event:
                     tse = event["tool_stream_event"]
                     data = tse.get("data")
