@@ -194,14 +194,15 @@ export async function getDeck(deckId: string, _idToken?: string): Promise<DeckDe
       const slideJsonPath = await join(slidesDir, `${slug}.json`);
       if (!(await exists(slideJsonPath))) continue;
       pageNum++;
+      const composeFile = composeBySlug.get(slug);
+      if (!composeFile) continue; // skip slides without compose — avoid WebP flash
+      const composePath = await join(dp, "compose", composeFile);
       const previewFile = previewByPage.get(pageNum);
       const previewPath = previewFile ? await join(dp, "preview", previewFile) : null;
-      const composeFile = composeBySlug.get(slug);
-      const composePath = composeFile ? await join(dp, "compose", composeFile) : null;
       slides.push({
         slideId: slug,
         previewUrl: previewPath ? convertFileSrc(previewPath) : null,
-        composeUrl: composePath ? convertFileSrc(composePath) : null,
+        composeUrl: convertFileSrc(composePath),
         updatedAt: new Date().toISOString(),
       });
     }
