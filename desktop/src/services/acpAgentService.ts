@@ -294,15 +294,26 @@ export async function startAgent(): Promise<void> {
 
   cmd.on("error", (err: string) => {
     console.error("[acp] process error:", err);
+    errorCallback?.(`ACP agent error: ${err}`);
   });
 
-  const spawnedChild = await cmd.spawn();
+  let spawnedChild;
+  try {
+    spawnedChild = await cmd.spawn();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[acp] failed to spawn:", msg);
+    errorCallback?.(`Failed to start "${adapter.command}": ${msg}. Check that it's installed and on PATH.`);
+    throw e;
+  }
   child = spawnedChild;
   cmd.on("close", () => {
-    // Only clear state if this is still the active child (prevents stale
-    // 'close' from old process wiping the new one's state during restart)
     if (child === spawnedChild) {
       console.warn("[acp] process closed");
+      // Notify user only if we didn't expect the close (sessionId was active)
+      if (sessionId) {
+        errorCallback?.(`ACP agent (${adapter.command}) exited unexpectedly.`);
+      }
       child = null;
       sessionId = null;
     }
@@ -386,6 +397,12 @@ export async function stopAgent(): Promise<void> {
  * Invoke the agent with a prompt. Same signature as agentCoreService.invokeAgentCore
  * so ChatPanel.tsx works unchanged.
  */
+/** Error callback — set by UI to show toast/dialog on agent failures. */
+let errorCallback: ((msg: string) => void) | null = null;
+export function setAgentErrorCallback(cb: ((msg: string) => void) | null): void {
+  errorCallback = cb;
+}
+
 /** Ensure the agent process is running (idempotent). Call early to populate model list. */
 let startPromise: Promise<void> | null = null;
 export async function ensureAgent(): Promise<void> {

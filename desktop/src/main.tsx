@@ -15,6 +15,14 @@ const DecksPage = React.lazy(() => import("@/app/(authenticated)/decks/page"));
 
 function App() {
   useEffect(() => {
+    // Register ACP agent error handler (shows toast on spawn/close failures)
+    (async () => {
+      try {
+        const { setAgentErrorCallback } = await import("@desktop/services/acpAgentService");
+        setAgentErrorCallback((msg) => toast.error(msg, { duration: 10000 }));
+      } catch { /* ignore */ }
+    })();
+
     (async () => {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
