@@ -238,6 +238,7 @@ def make_compose_slides(mcp_servers: list, model):
                 )
 
                 last_tool_id = ""
+                last_input_by_tid: dict[str, dict] = {}
 
                 def _on_event(**kwargs):
                     nonlocal last_tool_id
@@ -245,9 +246,26 @@ def make_compose_slides(mcp_servers: list, model):
                     if tu:
                         tid = tu.get("toolUseId", "")
                         name = tu.get("name", "")
-                        if tid and name and tid != last_tool_id:
+                        if not tid or not name:
+                            return
+                        if tid != last_tool_id:
                             last_tool_id = tid
                             progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "toolUseId": tid})
+                        # Early-emit input once it becomes JSON-parseable
+                        raw = tu.get("input", "")
+                        parsed: dict | None = None
+                        if isinstance(raw, dict) and raw:
+                            parsed = raw
+                        elif isinstance(raw, str) and raw:
+                            try:
+                                p = json.loads(raw)
+                                if isinstance(p, dict):
+                                    parsed = p
+                            except (ValueError, TypeError):
+                                parsed = None
+                        if parsed and parsed != last_input_by_tid.get(tid):
+                            last_input_by_tid[tid] = parsed
+                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "toolUseId": tid, "input": parsed})
 
                 composer = Agent(
                     system_prompt=[

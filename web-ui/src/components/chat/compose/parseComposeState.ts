@@ -134,9 +134,15 @@ export function parseComposeState(
           category: activityCategory(toolName),
           status: evStatus === "error" ? "error" : evStatus === "success" ? "success" : "active",
         })
-      } else if (evStatus) {
-        // ChatPanel merges toolResult into the existing tool entry as status field.
-        existing.status = evStatus === "error" ? "error" : "success"
+      } else {
+        if (evStatus) {
+          // ChatPanel merges toolResult into the existing tool entry as status field.
+          existing.status = evStatus === "error" ? "error" : "success"
+        }
+        if (inp) {
+          // Input arrived after toolStart — refine label from generic placeholder.
+          existing.label = activityLabel(toolName, inp)
+        }
       }
       if (agent.status === "starting") agent.status = "working"
     }
