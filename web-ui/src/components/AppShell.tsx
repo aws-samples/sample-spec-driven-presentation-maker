@@ -20,7 +20,10 @@
 import { ReactNode, useState, useRef, useEffect, useCallback } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { usePreferences } from "@/hooks/usePreferences"
-import { Layers, ChevronLeft, MessageSquare, CircleUser, LogOut } from "lucide-react"
+import { Layers, ChevronLeft, MessageSquare, CircleUser, LogOut, Bot } from "lucide-react"
+import { AgentSettingsDialog } from "@/components/chat/AgentSettingsDialog"
+
+const isTauri = !!(globalThis as Record<string,unknown>).__TAURI_INTERNALS__
 
 interface AppShellProps {
   children: ReactNode
@@ -36,6 +39,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
   const email = user?.profile?.email || ""
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuVisible, setMenuVisible] = useState(false)
+  const [showAgentSettings, setShowAgentSettings] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const itemsRef = useRef<(HTMLButtonElement | null)[]>([])
@@ -196,17 +200,35 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
 
                 <div className="my-1 border-t border-white/[0.06]" />
 
-                {/* Sign out */}
-                <button
-                  ref={el => { itemsRef.current[1] = el }}
-                  role="menuitem"
-                  onClick={() => { closeMenu(); signOut() }}
-                  className="w-full flex items-center gap-2 px-3.5 py-2 text-[12px] font-medium text-foreground/70 hover:text-red-400 hover:bg-red-500/10 transition-colors menu-item-stagger"
-                  style={{ "--stagger": "30ms" } as React.CSSProperties}
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  <span>Sign out</span>
-                </button>
+                {/* Agent Settings (Tauri only) */}
+                {isTauri && (
+                  <>
+                    <button
+                      role="menuitem"
+                      onClick={() => { closeMenu(); setShowAgentSettings(true) }}
+                      className="w-full flex items-center gap-2 px-3.5 py-2 text-[12px] font-medium text-foreground/70 hover:bg-white/[0.06] transition-colors menu-item-stagger"
+                      style={{ "--stagger": "15ms" } as React.CSSProperties}
+                    >
+                      <Bot className="h-3.5 w-3.5" />
+                      <span>ACP Agents</span>
+                    </button>
+                    <div className="my-1 border-t border-white/[0.06]" />
+                  </>
+                )}
+
+                {/* Sign out (web only) */}
+                {!isTauri && (
+                  <button
+                    ref={el => { itemsRef.current[1] = el }}
+                    role="menuitem"
+                    onClick={() => { closeMenu(); signOut() }}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 text-[12px] font-medium text-foreground/70 hover:text-red-400 hover:bg-red-500/10 transition-colors menu-item-stagger"
+                    style={{ "--stagger": "30ms" } as React.CSSProperties}
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    <span>Sign out</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -215,6 +237,9 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
 
       {/* ── Content area ── */}
       {children}
+
+      {/* Agent settings dialog (Tauri only) */}
+      {isTauri && <AgentSettingsDialog open={showAgentSettings} onClose={() => setShowAgentSettings(false)} />}
     </div>
   )
 }
