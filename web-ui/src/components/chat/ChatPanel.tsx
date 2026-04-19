@@ -718,9 +718,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (token) stopRuntimeSession(sessionId, token)
   }
 
-  // Disable the global Stop while a compose_slides tool is in flight; the
-  // compose card exposes its own soft-stop. Prevents accidental microVM kill
-  // that would discard the partial report.
+  // Track whether compose_slides is the active in-flight tool — used only to
+  // reshape the Stop tooltip. The button itself stays enabled so the user
+  // always has a final-resort force stop.
   const composeInFlight = useMemo(() => {
     if (!isLoading) return false
     const last = messages[messages.length - 1]
@@ -963,10 +963,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 <button
                   type="button"
                   onClick={handleStop}
-                  disabled={composeInFlight}
-                  title={composeInFlight ? "Use the Cancel button on the compose card" : "Stop generation"}
-                  className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/10"
-                  aria-label="Stop generation"
+                  title={composeInFlight ? "Force stop — partial report may be lost" : "Stop generation"}
+                  className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-white/10 hover:bg-white/20"
+                  aria-label={composeInFlight ? "Force stop generation" : "Stop generation"}
                 >
                   <Square className="h-3 w-3 fill-current" />
                 </button>
