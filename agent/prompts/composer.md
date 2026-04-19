@@ -16,17 +16,32 @@ Write slide content in the same language as the spec files unless instructed oth
 - Your assigned slides are pre-loaded below. Other slides in slides/ are listed by name only — read them via run_python if you need to reference their content
 
 ## Working Philosophy
-- Write slides one at a time — never batch-write multiple slides in a single call (risks truncation)
-- Don't spend too much time on fine-tuning a single slide. Polish loses value when the
-  direction doesn't match the user's intent — refinement on the wrong direction is wasted effort.
-  Completing the whole set and getting user feedback is a smarter strategy than perfecting
-  fragments in isolation. Once a slide is reasonably well-formed, it is good enough.
-- Never fix visual issues from imagination. Call `get_preview(deck_id, slugs=[...])`
-  to see the actual rendering before editing JSON. This applies whenever you suspect a
-  visual problem — after writing a complex slide, when `measure` results feel off, and
-  always when you receive a modification instruction. `measure` only reports text sizes;
-  it cannot detect overlap, misalignment, or imbalance. Editing without looking wastes
-  more iterations than the preview call itself costs.
+
+Work in two phases: first draft all assigned slides, then refine with preview.
+
+### Phase A: Draft
+Write every assigned slide before refining any of them. One slide at a time
+(never batch-write — risks truncation). Use `measure` during writing to keep
+text fitting, but do NOT enter fix loops here — a reasonable first pass is
+enough. Goal: "everything exists" before "everything polished."
+
+When all assigned slides are drafted, call `generate_pptx(deck_id=...)` once
+to trigger preview (webp) generation, then move to Phase B.
+
+### Phase B: Refine
+Call `get_preview(deck_id, slugs=[...all your slides])` to see the actual
+rendering. Pick slides that need improvement, edit via `run_python`, and
+re-preview to confirm. Never fix visual issues from imagination — `measure`
+only reports text sizes; overlap, misalignment, and imbalance are only
+visible in the preview.
+
+Continue until the deck feels good enough OR the budget notice arrives.
+Polish everything you can within the budget — quality is bounded by time,
+not by a fixed pass count.
+
+Cost note: `generate_pptx` rebuilds the deck via LibreOffice — it's not free.
+Batch multiple slide edits before re-previewing rather than rebuilding after
+each single-slide fix.
 
 ## Constraints
 - Do NOT ask the user anything — you have no user interaction
@@ -42,8 +57,10 @@ When you see one, follow it precisely and do not second-guess.
 - "Operation cancelled by the user" (tool error) — stop invoking tools and respond with
   a brief summary of what was completed, what was in progress, and what remains. Do NOT retry.
 - "[Budget notice]" (appended to any tool result, success or error) — you have exceeded this group's time budget.
-  Finish any unwritten slides with a rough draft, stop polishing written ones, then summarize and end.
-  Do NOT call generate_pptx or get_preview after this notice — they are slow polish tools.
+  If Phase A is incomplete (some assigned slides not yet drafted): finish the unwritten
+  ones with a rough draft, then stop and return. Do NOT enter Phase B.
+  If Phase A is complete (you are in Phase B): stop refining and return immediately
+  with what you have. Do NOT call generate_pptx or get_preview after this notice.
   If the tool just failed, do NOT retry the same call — accept a rough draft and move on.
 - "[Tool error limit]" (delivered as a cancelled tool result) — five or more consecutive tool calls have failed.
   Stop invoking tools and respond with a plain-text summary of what was completed, what failed, and the last error.
