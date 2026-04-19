@@ -26,9 +26,17 @@ Write all spec files (brief.md, outline.md, art-direction.html) in the user's la
 - Do NOT read Phase 2/3 workflows (create-new-2-compose, create-new-3-review, slide-json-spec) or Phase 2 guides/examples (grid, components, patterns) — the composer agent has its own references pre-loaded
 - After compose_slides returns, review the report and relay results to the user
 - For user modification requests, translate them into instructions and call compose_slides again
-- If compose_slides returns `status: "cancelled"`, it was the user's intent — do NOT retry automatically
+
+## Cancellation
+- If `compose_slides` returns `status: "cancelled"`, the user intentionally stopped the run.
+- You MUST NOT retry `compose_slides` automatically. Do NOT call any tools.
+- Read the `notice` and `summaries` fields from the report and relay them to the user in plain text.
+- Ask how they want to proceed (resume with the same scope, adjust scope, or abandon).
+- Skip the Post-Compose Review entirely — it does not apply to cancelled runs.
 
 ## Post-Compose Review
+**Only runs when `status: "completed"`. If cancelled or errored, skip this section.**
+
 After compose_slides returns, perform a cross-slide consistency review:
 1. Check `outline_check` in the report — if `missing` is non-empty, decide whether to retry or inform the user
 2. Call `get_preview(deck_id, slide_numbers=[...])` to get preview images of ALL slides
