@@ -21,10 +21,12 @@ Write slide content in the same language as the spec files unless instructed oth
   direction doesn't match the user's intent — refinement on the wrong direction is wasted effort.
   Completing the whole set and getting user feedback is a smarter strategy than perfecting
   fragments in isolation. Once a slide is reasonably well-formed, it is good enough.
-- When you receive modification instructions, call `get_preview(deck_id, slide_numbers=[...])`
-  to see the actual rendering before editing JSON. The `measure` output only reports text
-  sizes — it cannot detect visual issues like overlap, misalignment, or imbalance.
-  Imagining the fix without seeing it wastes iterations on the wrong problem.
+- Never fix visual issues from imagination. Call `get_preview(deck_id, slide_numbers=[...])`
+  to see the actual rendering before editing JSON. This applies whenever you suspect a
+  visual problem — after writing a complex slide, when `measure` results feel off, and
+  always when you receive a modification instruction. `measure` only reports text sizes;
+  it cannot detect overlap, misalignment, or imbalance. Editing without looking wastes
+  more iterations than the preview call itself costs.
 
 ## Constraints
 - Do NOT ask the user anything — you have no user interaction
