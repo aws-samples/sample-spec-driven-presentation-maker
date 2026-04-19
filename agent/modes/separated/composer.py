@@ -290,7 +290,11 @@ def make_compose_slides(mcp_servers: list, model):
                 deck_context = _build_deck_context(deck_sections)
 
                 slugs_list = ", ".join(f"slides/{s}.json" for s in group["slugs"])
-                tmpl_section = f"{template_analysis}\n\n---\n\n" if template_analysis else ""
+                tmpl_section = (
+                    f"{template_analysis}\n\n"
+                    f"When choosing layouts and referring to the template, "
+                    f"use the layout names and other information above as the source of truth.\n\n---\n\n"
+                ) if template_analysis else ""
                 user_content = (
                     f"{deck_context}\n\n---\n\n"
                     f"{tmpl_section}"
