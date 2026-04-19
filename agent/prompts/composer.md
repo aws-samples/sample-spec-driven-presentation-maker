@@ -30,8 +30,8 @@ to make previews available, then move to Phase B.
 
 ### Phase B: Refine
 Call `get_preview(deck_id, slugs=[...all your slides])` to see the actual
-rendering. Pick slides that need improvement, edit via `run_python`
-(with `measure_slides=[slug]`), and re-preview to confirm.
+rendering. Pick slides that need improvement, edit via `run_python`, and
+re-preview to confirm.
 
 Preview and measure are complementary — use both:
 - **Preview** catches visual issues: overlap, misalignment, imbalance,
