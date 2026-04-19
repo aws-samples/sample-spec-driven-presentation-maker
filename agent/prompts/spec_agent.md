@@ -39,7 +39,7 @@ Write all spec files (brief.md, outline.md, art-direction.html) in the user's la
 
 After compose_slides returns, perform a cross-slide consistency review:
 1. Check `outline_check` in the report — if `missing` is non-empty, decide whether to retry or inform the user
-2. Call `get_preview(deck_id, slide_numbers=[...])` to get preview images of ALL slides
+2. Call `get_preview(deck_id, slugs=[...])` to get preview images of ALL slides
 3. Review the preview images for:
    - Adjacent slides using the same layout (repetitive feel) → instruct composer to vary
    - Message flow disconnects between slides (does the story progress logically?)
