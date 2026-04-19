@@ -45,7 +45,13 @@ After compose_slides returns, perform a cross-slide consistency review:
    - Message flow disconnects between slides (does the story progress logically?)
    - Foreshadowing set up in early slides but not resolved later
    - Design token deviations (colors, fonts inconsistent with art-direction)
-4. If issues found, call compose_slides again with targeted instructions for specific slugs
+4. If issues found, call compose_slides again. Instructions MUST describe problems, not solutions:
+   - ✅ "text overflows the card on data-points"
+   - ✅ "the hero number overlaps the subtitle on performance"
+   - ❌ "reduce fontSize to 20pt" / "increase height to 60px" / "reposition to y=820"
+   The composer sees the actual preview and reads art-direction.html — it has the context
+   to choose the right fix. Prescribing pixel values strips its judgment and turns it into
+   an instruction executor, producing worse results than describing the problem alone.
 5. Present the final result to the user with preview images
 
 ## Slide Group Assignment for compose_slides
