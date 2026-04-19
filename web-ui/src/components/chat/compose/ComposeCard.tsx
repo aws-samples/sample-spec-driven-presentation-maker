@@ -136,6 +136,7 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
             agent={agent}
             existingSlugs={existingSlugs}
             indexDelay={i}
+            parentActive={isActive}
             parentStopped={isStopped}
             parentStopping={stopping && isActive}
           />
@@ -259,14 +260,17 @@ interface AgentCardProps {
   agent: AgentState
   existingSlugs: Set<string>
   indexDelay: number
+  parentActive: boolean
   parentStopped: boolean
   parentStopping: boolean
 }
 
-function AgentCard({ agent, existingSlugs, indexDelay, parentStopped, parentStopping }: AgentCardProps) {
+function AgentCard({ agent, existingSlugs, indexDelay, parentActive, parentStopped, parentStopping }: AgentCardProps) {
   const [userToggled, setUserToggled] = useState<boolean | null>(null)
-  // Default expansion: error → expanded, otherwise collapsed. User toggle overrides.
-  const expanded = userToggled ?? agent.status === "error"
+  // Default expansion: expand only when the parent compose is finished AND this
+  // agent ended in error. Mid-run transient errors (the agent recovers and keeps
+  // working) should not auto-open the detail panel.
+  const expanded = userToggled ?? (!parentActive && agent.status === "error")
 
   // Stopped: parent card determined this compose was stopped and this agent
   // never reached a terminal state. Treat as done-but-incomplete; suppress spinners.

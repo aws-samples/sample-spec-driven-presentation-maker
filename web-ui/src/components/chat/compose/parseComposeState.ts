@@ -147,7 +147,10 @@ export function parseComposeState(
           existing.label = activityLabel(toolName, inp)
         }
       }
-      if (agent.status === "starting" || agent.status === "retrying") agent.status = "working"
+      // Recover from any non-terminal state on new activity (starting/retrying/error).
+      // A stream of tool events from the backend means the agent is actively working,
+      // even if a transient group-level error was emitted earlier.
+      if (agent.status !== "done") agent.status = "working"
     }
   }
 
