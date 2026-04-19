@@ -89,6 +89,7 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
   const isStopped = isHardStopped || isSoftStopped
   const isDone = !isActive && !isStopped && !hasError && (status === "success" || state.phase === "done")
   const doneSlides = state.agents.filter((a) => a.status === "done").reduce((s, a) => s + a.slugs.length, 0)
+  const rushedCount = state.agents.filter((a) => a.budgetReached).length
 
   const existingSlugs = new Set(deckSlugs)
   const totalSlides = state.agents.reduce((sum, a) => sum + a.slugs.length, 0)
@@ -120,6 +121,7 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
         hasError={hasError}
         totalSlides={totalSlides}
         doneSlides={doneSlides}
+        rushedCount={rushedCount}
         isActive={isActive}
         canCancel={isActive && !stopping && !!(toolUseId && sessionId && accessToken)}
         onCancel={async () => {
@@ -155,7 +157,7 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
 // --- Header -----------------------------------------------------------------
 
 function Header({
-  state, isDone, isStopped, hasError, totalSlides, doneSlides, isActive,
+  state, isDone, isStopped, hasError, totalSlides, doneSlides, rushedCount, isActive,
   canCancel, onCancel, stopping,
 }: {
   state: ComposeState
@@ -164,6 +166,7 @@ function Header({
   hasError: boolean
   totalSlides: number
   doneSlides: number
+  rushedCount: number
   isActive: boolean
   canCancel: boolean
   onCancel: () => void
@@ -227,6 +230,15 @@ function Header({
       >
         {label}
       </span>
+      {rushedCount > 0 && !isStopping && (
+        <span
+          className="flex-none inline-flex items-center rounded-md px-1.5 py-0.5 text-[10.5px] font-medium"
+          style={{ color: STATE.retry, background: `${STATE.retry}14`, fontFamily: MONO }}
+          title={`${rushedCount} composer${rushedCount > 1 ? "s" : ""} hit the time budget — rough drafts may need another pass`}
+        >
+          {rushedCount} rushed
+        </span>
+      )}
       {isStopping ? (
         <span
           className="flex-none inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium"
@@ -370,18 +382,20 @@ function AgentCard({ agent, existingSlugs, indexDelay, parentActive, parentStopp
           </span>
         )}
 
-        {/* Budget nudge badge */}
+        {/* Budget nudge badge — this composer hit the time budget and was asked to wrap up */}
         {agent.budgetReached && (
           <span
-            className="text-[10.5px] flex-none px-1.5 py-0.5 rounded"
+            role="status"
+            aria-live="polite"
+            className="text-[10.5px] flex-none px-1.5 py-0.5 rounded animate-in fade-in slide-in-from-right-1 duration-300"
             style={{
               color: STATE.retry,
               background: `${STATE.retry}14`,
               fontFamily: MONO,
             }}
-            title="Time budget reached — composer was asked to wrap up"
+            title="Time budget reached — this composer wrote a rough draft to finish on time. Consider re-running for these slides."
           >
-            wrap up
+            rushed
           </span>
         )}
 
