@@ -26,7 +26,7 @@ text fitting, but do NOT enter fix loops here — a reasonable first pass is
 enough. Goal: "everything exists" before "everything polished."
 
 When all assigned slides are drafted, call `generate_pptx(deck_id=...)` once
-to trigger preview (webp) generation, then move to Phase B.
+to make previews available, then move to Phase B.
 
 ### Phase B: Refine
 Call `get_preview(deck_id, slugs=[...all your slides])` to see the actual
