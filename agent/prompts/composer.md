@@ -30,9 +30,13 @@ Write slide content in the same language as the spec files unless instructed oth
   - Multiple composer agents run in parallel, each owning different slides
   - Writing to another agent's slides causes data races and corrupts their work
 
-## Cancellation
-- If a tool call returns an error containing "Operation cancelled by the user", the user has requested a stop.
-- You MUST immediately stop calling tools and respond with a plain-text summary of what you completed, what was in progress, and what remains.
-- Do NOT retry the cancelled tool. Do NOT call any other tools. Just summarize and end.
+## System Messages (Harness)
+The harness may inject signals into tool errors or tool results to guide your behavior.
+When you see one, follow it precisely and do not second-guess.
+
+- "Operation cancelled by the user" (tool error) — stop invoking tools and respond with
+  a brief summary of what was completed, what was in progress, and what remains. Do NOT retry.
+- "[Budget notice]" (appended to tool result) — you have exceeded this group's time budget.
+  Finish any unwritten slides with a rough draft, stop polishing written ones, then summarize and end.
 
 {common_context}

@@ -281,6 +281,9 @@ def make_compose_slides(mcp_servers: list, model):
             def run_group(gi: int, group: dict) -> dict:
                 """Run a single composer group in a thread."""
                 slugs_label = ", ".join(group["slugs"])
+                # Early exit: cancelled before we even started
+                if _is_compose_stopped(parent_tool_use_id):
+                    return {"slugs": [], "response": "skipped (cancelled)"}
                 progress_q.put_nowait({"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"})
 
                 deck_sections = _prefetch_deck_specs(mcp_client, deck_id, group["slugs"]) if mcp_client else []
@@ -400,34 +403,37 @@ def make_compose_slides(mcp_servers: list, model):
                             continue
                         raise
 
-            # Launch all groups in thread pool
-            with ThreadPoolExecutor(max_workers=max_concurrency) as pool:
-                futures = {pool.submit(run_group, gi, g): gi for gi, g in enumerate(slide_groups)}
+            # Launch all groups in thread pool (skip if already cancelled during prefetch)
+            if _is_compose_stopped(parent_tool_use_id):
+                pass  # fall through to report assembly with status: cancelled
+            else:
+                with ThreadPoolExecutor(max_workers=max_concurrency) as pool:
+                    futures = {pool.submit(run_group, gi, g): gi for gi, g in enumerate(slide_groups)}
 
-                while futures:
-                    while not progress_q.empty():
-                        try:
-                            yield progress_q.get_nowait()
-                        except queue.Empty:
-                            break
+                    while futures:
+                        while not progress_q.empty():
+                            try:
+                                yield progress_q.get_nowait()
+                            except queue.Empty:
+                                break
 
-                    done_futures = [f for f in futures if f.done()]
-                    for f in done_futures:
-                        gi = futures.pop(f)
-                        group = slide_groups[gi]
-                        slugs_label = ", ".join(group["slugs"])
-                        try:
-                            result = f.result()
-                            generated.extend(result["slugs"])
-                            done_count += len(result["slugs"])
-                            summaries[slugs_label] = result["response"]
-                            yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
-                        except Exception as e:
-                            errors.append({"slugs": group["slugs"], "error": str(e)})
-                            yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(e)}
+                        done_futures = [f for f in futures if f.done()]
+                        for f in done_futures:
+                            gi = futures.pop(f)
+                            group = slide_groups[gi]
+                            slugs_label = ", ".join(group["slugs"])
+                            try:
+                                result = f.result()
+                                generated.extend(result["slugs"])
+                                done_count += len(result["slugs"])
+                                summaries[slugs_label] = result["response"]
+                                yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
+                            except Exception as e:
+                                errors.append({"slugs": group["slugs"], "error": str(e)})
+                                yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(e)}
 
-                    if futures:
-                        time.sleep(0.2)
+                        if futures:
+                            time.sleep(0.2)
 
             while not progress_q.empty():
                 try:
