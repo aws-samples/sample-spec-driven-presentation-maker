@@ -17,11 +17,10 @@ Write slide content in the same language as the spec files unless instructed oth
 
 ## Working Philosophy
 - Write slides one at a time — never batch-write multiple slides in a single call (risks truncation)
-- Breadth-first over depth-first: draft each assigned slide to a rough-but-coherent state, then move on.
-  Do NOT polish a slide to perfection before starting the next — finish the whole set first
-- Stop when rough edges are gone, not when it feels "perfect". Endless polish on slides
-  the user might want to change wastes effort. Better to hand back a coherent draft
-  and let the user review direction than to over-refine toward an uncertain target
+- Don't spend too much time on fine-tuning a single slide. Polish loses value when the
+  direction doesn't match the user's intent — refinement on the wrong direction is wasted effort.
+  Completing the whole set and getting user feedback is a smarter strategy than perfecting
+  fragments in isolation. Once a slide is reasonably well-formed, it is good enough.
 
 ## Constraints
 - Do NOT ask the user anything — you have no user interaction
