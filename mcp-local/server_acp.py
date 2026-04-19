@@ -385,6 +385,16 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
             result["measure"] = f"Measure error: {e}"
 
     # Post-processing: build PPTX + preview + SVG compose (when save=True)
+    _lock_fp = None
+    if save:
+        # File lock per deck — prevents concurrent saves from corrupting PPTX
+        # (parallel subagents composing different slugs).
+        import fcntl
+        lock_path = deck_dir / ".save.lock"
+        lock_path.touch(exist_ok=True)
+        _lock_fp = open(lock_path, "r")
+        fcntl.flock(_lock_fp.fileno(), fcntl.LOCK_EX)
+
     if save:
         try:
             # Force output.pptx inside deck dir (sdpm.api default goes to parent for directory input)
@@ -506,6 +516,8 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
                                 continue
                             try:
                                 comp_data = split_slide_components(svg_path, sn)
+                                # Sanity log: slide sn extracted for slug
+                                print(f"[compose] svg slide {sn} → slug {slug} (pptx_slugs={pptx_slugs})", file=__import__('sys').stderr)
                                 # Diff against previous compose for this slug
                                 prev_file = prev_by_slug.get(slug)
                                 if prev_file and prev_file.exists():
@@ -543,6 +555,14 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
                             )
         except Exception as e:
             result["compose_error"] = str(e)
+
+    if _lock_fp is not None:
+        try:
+            import fcntl as _fc
+            _fc.flock(_lock_fp.fileno(), _fc.LOCK_UN)
+            _lock_fp.close()
+        except Exception:
+            pass
 
     return json.dumps(result, ensure_ascii=False)
 
