@@ -47,6 +47,17 @@ BUDGET_PROMPT = (
     "and what could use another pass."
 )
 
+# Stop a composer that is stuck in a failure loop. After this many consecutive
+# tool errors, the next tool call is cancelled and the LLM is told to stop and
+# summarize instead of retrying further.
+ERROR_LIMIT = 5
+ERROR_LIMIT_PROMPT = (
+    "Tool calls have failed 5 times in a row. "
+    "Further attempts are unlikely to succeed — stop calling tools. "
+    "Respond with a plain-text summary: which slides were completed, "
+    "which failed, and the last error you saw."
+)
+
 
 def _is_compose_stopped(parent_tool_use_id: str) -> bool:
     try:
@@ -313,6 +324,7 @@ def make_compose_slides(mcp_servers: list, model):
                 # Time budget: slug_count * seconds-per-slide. Periodic nudge (1st then every 3rd) to stop polishing.
                 deadline = time.time() + len(group["slugs"]) * _SECONDS_PER_SLIDE
                 budget_nudge_count = 0
+                consecutive_errors = 0
 
                 last_tool_id = ""
                 last_input_by_tid: dict[str, dict] = {}
@@ -363,6 +375,9 @@ def make_compose_slides(mcp_servers: list, model):
                     if _is_compose_stopped(parent_tool_use_id):
                         event.cancel_tool = STOP_PROMPT
                         return
+                    if consecutive_errors >= ERROR_LIMIT:
+                        event.cancel_tool = ERROR_LIMIT_PROMPT
+                        return
                     tu = event.tool_use
                     progress_q.put_nowait({
                         "group": gi + 1, "slugs": slugs_label,
@@ -390,6 +405,19 @@ def make_compose_slides(mcp_servers: list, model):
                                 "group": gi + 1, "slugs": slugs_label,
                                 "status": "budget_reached",
                             })
+                    # Consecutive tool-error tripwire: after ERROR_LIMIT failures
+                    # in a row, the next _before_tool call will cancel the tool
+                    # and hand the LLM ERROR_LIMIT_PROMPT. Success resets.
+                    nonlocal consecutive_errors
+                    if is_err:
+                        consecutive_errors += 1
+                        if consecutive_errors == ERROR_LIMIT:
+                            progress_q.put_nowait({
+                                "group": gi + 1, "slugs": slugs_label,
+                                "status": "error_limit",
+                            })
+                    else:
+                        consecutive_errors = 0
                     progress_q.put_nowait({
                         "group": gi + 1, "slugs": slugs_label,
                         "toolResult": tu.get("toolUseId", ""),

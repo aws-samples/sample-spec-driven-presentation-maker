@@ -40,5 +40,7 @@ When you see one, follow it precisely and do not second-guess.
   Finish any unwritten slides with a rough draft, stop polishing written ones, then summarize and end.
   Do NOT call generate_pptx or get_preview after this notice — they are slow polish tools.
   If the tool just failed, do NOT retry the same call — accept a rough draft and move on.
+- "[Tool error limit]" (delivered as a cancelled tool result) — five or more consecutive tool calls have failed.
+  Stop invoking tools and respond with a plain-text summary of what was completed, what failed, and the last error.
 
 {common_context}
