@@ -955,8 +955,14 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
             else:
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as e:
-            logger.exception("run_python post-processing failed: deck=%s", deck_id)
-            result["measure"] = json.dumps({"error": str(e), "traceback": traceback.format_exc()})
+            msg = str(e)
+            # "No slides found" is expected during early phases (outline/brief
+            # editing before any slide JSON exists). Silently skip measure.
+            if "No slides found" in msg or "has no slides" in msg:
+                pass
+            else:
+                logger.exception("run_python post-processing failed: deck=%s", deck_id)
+                result["measure"] = json.dumps({"error": msg, "traceback": traceback.format_exc()})
 
     return json.dumps(result, ensure_ascii=False)
 

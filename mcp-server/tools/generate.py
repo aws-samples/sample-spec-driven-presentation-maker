@@ -200,8 +200,9 @@ def _prepare_workspace(
     template_key = ""
     tmpl_name = presentation.get("template", "")
     if tmpl_name:
+        normalized = tmpl_name.removesuffix(".pptx")
         for t in storage.list_templates():
-            if t.get("name") == tmpl_name or t.get("name") + ".pptx" == tmpl_name:
+            if t.get("name") == normalized:
                 template_key = t.get("s3Key", "")
                 break
     if not template_key:
