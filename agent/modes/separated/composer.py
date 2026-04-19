@@ -41,6 +41,8 @@ BUDGET_PROMPT = (
     "finish them with a rough-but-coherent draft. "
     "Do NOT polish slides that are already written — stop measuring and refining. "
     "Do NOT call generate_pptx or get_preview — they are slow polish tools. "
+    "If a tool just failed, do NOT retry the same call — accept a rough draft "
+    "for that slide and move on. "
     "Once all slides exist, respond with a brief summary noting what is done "
     "and what could use another pass."
 )
@@ -372,10 +374,11 @@ def make_compose_slides(mcp_servers: list, model):
                     tu = event.tool_use
                     is_err = isinstance(event.result, dict) and event.result.get("status") == "error"
                     # Time-budget nudge: append BUDGET_PROMPT periodically to keep
-                    # the composer reminded. Injected into successful tool results
-                    # only so tool work is preserved. 1st hit + every 3rd after.
+                    # the composer reminded. Injected into both success and error
+                    # tool results (same text for both — LLM selects the relevant
+                    # guidance from context). 1st hit + every 3rd after.
                     nonlocal budget_nudge_count
-                    if not is_err and time.time() > deadline:
+                    if time.time() > deadline:
                         budget_nudge_count += 1
                         if budget_nudge_count == 1 or budget_nudge_count % 3 == 0:
                             if isinstance(event.result, dict):

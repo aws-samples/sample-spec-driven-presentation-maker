@@ -36,8 +36,9 @@ When you see one, follow it precisely and do not second-guess.
 
 - "Operation cancelled by the user" (tool error) — stop invoking tools and respond with
   a brief summary of what was completed, what was in progress, and what remains. Do NOT retry.
-- "[Budget notice]" (appended to tool result) — you have exceeded this group's time budget.
+- "[Budget notice]" (appended to any tool result, success or error) — you have exceeded this group's time budget.
   Finish any unwritten slides with a rough draft, stop polishing written ones, then summarize and end.
   Do NOT call generate_pptx or get_preview after this notice — they are slow polish tools.
+  If the tool just failed, do NOT retry the same call — accept a rough draft and move on.
 
 {common_context}
