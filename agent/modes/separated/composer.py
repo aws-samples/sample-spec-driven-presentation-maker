@@ -40,6 +40,7 @@ BUDGET_PROMPT = (
     "Time budget reached. If any assigned slides are still unwritten, "
     "finish them with a rough-but-coherent draft. "
     "Do NOT polish slides that are already written — stop measuring and refining. "
+    "Do NOT call generate_pptx or get_preview — they are slow polish tools. "
     "Once all slides exist, respond with a brief summary noting what is done "
     "and what could use another pass."
 )
@@ -307,9 +308,9 @@ def make_compose_slides(mcp_servers: list, model):
                     f"{group['instruction']}"
                 )
 
-                # Time budget: slug_count * seconds-per-slide. One-shot nudge to stop polishing.
+                # Time budget: slug_count * seconds-per-slide. Periodic nudge (1st then every 3rd) to stop polishing.
                 deadline = time.time() + len(group["slugs"]) * _SECONDS_PER_SLIDE
-                budget_nudged = False
+                budget_nudge_count = 0
 
                 last_tool_id = ""
                 last_input_by_tid: dict[str, dict] = {}
@@ -370,19 +371,22 @@ def make_compose_slides(mcp_servers: list, model):
                 async def _after_tool(event: AfterToolCallEvent):
                     tu = event.tool_use
                     is_err = isinstance(event.result, dict) and event.result.get("status") == "error"
-                    # Time-budget nudge: append BUDGET_PROMPT to the successful tool
-                    # result so the composer sees it but the tool's work is preserved.
-                    nonlocal budget_nudged
-                    if not budget_nudged and not is_err and time.time() > deadline:
-                        budget_nudged = True
-                        if isinstance(event.result, dict):
-                            content = list(event.result.get("content") or [])
-                            content.append({"text": f"\n\n[Budget notice] {BUDGET_PROMPT}"})
-                            event.result = {**event.result, "content": content}
-                        progress_q.put_nowait({
-                            "group": gi + 1, "slugs": slugs_label,
-                            "status": "budget_reached",
-                        })
+                    # Time-budget nudge: append BUDGET_PROMPT periodically to keep
+                    # the composer reminded. Injected into successful tool results
+                    # only so tool work is preserved. 1st hit + every 3rd after.
+                    nonlocal budget_nudge_count
+                    if not is_err and time.time() > deadline:
+                        budget_nudge_count += 1
+                        if budget_nudge_count == 1 or budget_nudge_count % 3 == 0:
+                            if isinstance(event.result, dict):
+                                content = list(event.result.get("content") or [])
+                                content.append({"text": f"\n\n[Budget notice] {BUDGET_PROMPT}"})
+                                event.result = {**event.result, "content": content}
+                        if budget_nudge_count == 1:
+                            progress_q.put_nowait({
+                                "group": gi + 1, "slugs": slugs_label,
+                                "status": "budget_reached",
+                            })
                     progress_q.put_nowait({
                         "group": gi + 1, "slugs": slugs_label,
                         "toolResult": tu.get("toolUseId", ""),
