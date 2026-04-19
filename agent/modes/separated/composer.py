@@ -34,6 +34,17 @@ STOP_PROMPT = (
     "what was completed, what was in progress, and any context useful for resuming later."
 )
 
+# Time budget per slide — when exceeded, nudge the composer to wrap up polishing
+# and finish any unwritten slides. Injected into tool results (non-disruptive).
+_SECONDS_PER_SLIDE = int(os.environ.get("COMPOSER_SECONDS_PER_SLIDE", "90"))
+BUDGET_PROMPT = (
+    "Time budget reached. If any assigned slides are still unwritten, "
+    "finish them with a rough-but-coherent draft. "
+    "Do NOT polish slides that are already written — stop measuring and refining. "
+    "Once all slides exist, respond with a brief summary noting what is done "
+    "and what could use another pass."
+)
+
 
 def _is_compose_stopped(parent_tool_use_id: str) -> bool:
     try:
@@ -43,13 +54,13 @@ def _is_compose_stopped(parent_tool_use_id: str) -> bool:
 
 # References to prefetch for composer
 _PREFETCH_SYSTEM = [
-    ("read_workflows", {"names": ["create-new-2-compose"]}, "Compose Workflow"),
-    ("read_workflows", {"names": ["slide-json-spec"]}, "Slide JSON Spec"),
+    ("read_workflows", {"names": ["create-new-2-compose"]}, "create-new-2-compose"),
+    ("read_workflows", {"names": ["slide-json-spec"]}, "slide-json-spec"),
 ]
 _PREFETCH_REFS = [
-    ("read_guides", {"names": ["grid"]}, "Grid Guide"),
-    ("read_examples", {"names": ["components/all"]}, "Components Reference"),
-    ("read_examples", {"names": ["patterns"]}, "Patterns Catalog"),
+    ("read_guides", {"names": ["grid"]}, "grid"),
+    ("read_examples", {"names": ["components/all"]}, "components/all"),
+    ("read_examples", {"names": ["patterns"]}, "patterns"),
 ]
 
 
@@ -290,6 +301,10 @@ def make_compose_slides(mcp_servers: list, model):
                     f"{group['instruction']}"
                 )
 
+                # Time budget: slug_count * seconds-per-slide. One-shot nudge to stop polishing.
+                deadline = time.time() + len(group["slugs"]) * _SECONDS_PER_SLIDE
+                budget_nudged = False
+
                 last_tool_id = ""
                 last_input_by_tid: dict[str, dict] = {}
 
@@ -349,6 +364,15 @@ def make_compose_slides(mcp_servers: list, model):
                 async def _after_tool(event: AfterToolCallEvent):
                     tu = event.tool_use
                     is_err = isinstance(event.result, dict) and event.result.get("status") == "error"
+                    # Time-budget nudge: append BUDGET_PROMPT to the successful tool
+                    # result so the composer sees it but the tool's work is preserved.
+                    nonlocal budget_nudged
+                    if not budget_nudged and not is_err and time.time() > deadline:
+                        budget_nudged = True
+                        if isinstance(event.result, dict):
+                            content = list(event.result.get("content") or [])
+                            content.append({"text": f"\n\n[Budget notice] {BUDGET_PROMPT}"})
+                            event.result = {**event.result, "content": content}
                     progress_q.put_nowait({
                         "group": gi + 1, "slugs": slugs_label,
                         "toolResult": tu.get("toolUseId", ""),

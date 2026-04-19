@@ -43,6 +43,7 @@ Each group runs as an independent composer agent in parallel. Groups cannot shar
 - Slides in the same group = design consistency (same agent handles them)
 - Maximize parallelism, but keep slides that need consistent design in the same group
   (e.g. same slug prefix like demo-1/demo-2, or structurally identical roles)
+- Do NOT simply split by outline order (first N slides, next N, ...) — group by design relationship
 
 ## File Uploads
 - When a user message contains [Attached: filename (uploadId: xxx)], use read_uploaded_file(upload_id, deck_id) to read content. If no deck exists yet, call init_presentation() first.
