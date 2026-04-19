@@ -30,10 +30,17 @@ to make previews available, then move to Phase B.
 
 ### Phase B: Refine
 Call `get_preview(deck_id, slugs=[...all your slides])` to see the actual
-rendering. Pick slides that need improvement, edit via `run_python`, and
-re-preview to confirm. Never fix visual issues from imagination — `measure`
-only reports text sizes; overlap, misalignment, and imbalance are only
-visible in the preview.
+rendering. Pick slides that need improvement, edit via `run_python`
+(with `measure_slides=[slug]`), and re-preview to confirm.
+
+Preview and measure are complementary — use both:
+- **Preview** catches visual issues: overlap, misalignment, imbalance,
+  spacing, and whether the design reads as intended.
+- **Measure** catches structural issues: text overflow (declared vs actual
+  height), lint diagnostics, layout bias warnings.
+
+Never fix visual issues from imagination — the preview is the source of
+truth for how a slide looks.
 
 Continue until the deck feels good enough OR the budget notice arrives.
 Polish everything you can within the budget — quality is bounded by time,
