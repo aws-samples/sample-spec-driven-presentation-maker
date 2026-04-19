@@ -311,6 +311,14 @@ def generate_pptx(
             for i, s in enumerate(slides, 1)
         ],
     }
+    warnings: dict = {}
     if kb_error:
-        result["warnings"] = {"kbSyncFailed": kb_error}
+        warnings["kbSyncFailed"] = kb_error
+    if builder.invalid_layouts:
+        warnings["invalidLayouts"] = [
+            {"slug": e["slug"], "attempted": e["attempted"], "used": e["used"]}
+            for e in builder.invalid_layouts
+        ]
+    if warnings:
+        result["warnings"] = warnings
     return result

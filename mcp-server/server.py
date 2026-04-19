@@ -446,8 +446,8 @@ def get_preview(deck_id: str, slugs: list[str], quality: str = "high") -> list:
         raise
 
 
-def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> Path:
-    """Build PPTX from slides JSON. Returns path to built file."""
+def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> tuple[Path, list[dict]]:
+    """Build PPTX from slides JSON. Returns (pptx_path, invalid_layouts)."""
     from sdpm.builder import PPTXBuilder, resolve_override
 
     builder = PPTXBuilder(**build_kwargs)
@@ -459,7 +459,7 @@ def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> Path:
         builder.add_slide(resolve_override(s, id_map))
     pptx_path = tmpdir / "measure.pptx"
     builder.save(pptx_path)
-    return pptx_path
+    return pptx_path, list(builder.invalid_layouts)
 
 
 def _export_svg(tmpdir: Path, pptx_path: Path) -> Path:
@@ -763,7 +763,8 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
             user_id = _get_user_id()
             _prepare_epoch = int(time.time())
             tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
-            pptx_path = _build_pptx(tmpdir, slides, build_kwargs)
+            pptx_path, invalid_layouts = _build_pptx(tmpdir, slides, build_kwargs)
+            invalid_slug_set = {e["slug"] for e in invalid_layouts if e.get("slug")}
 
             # Build slug → page number mapping
             slug_to_page: dict[str, int] = {}
@@ -803,6 +804,19 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                     result["warnings"] = {"layoutBias": layout_bias}
             except Exception as e:
                 logger.warning("Layout bias check failed: %s", e)
+
+            # Invalid-layout errors scoped to measured slugs only. Each
+            # composer owns a subset of slides, so leaking another group's
+            # mistake would be noise (they cannot fix it anyway).
+            measured_set = set(measure_slides or [])
+            my_invalids = [e for e in invalid_layouts if e.get("slug") in measured_set]
+            if my_invalids:
+                errs = result.setdefault("errors", {})
+                for e in my_invalids:
+                    errs[e["slug"]] = {
+                        "invalidLayout": e["attempted"],
+                        "available": e["available"],
+                    }
 
             if save:
                 # Compose: SVG → optimized JSON for WebUI animation
@@ -874,6 +888,11 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
 
                         # Generate compose for each measured slug
                         for slug in compose_slugs:
+                            if slug in invalid_slug_set:
+                                # Do not surface a fallback-rendered slide as a
+                                # live-preview artifact. The composer for this
+                                # slug will see the error and fix the layout.
+                                continue
                             pn = slug_to_page.get(slug)
                             if not pn:
                                 continue
