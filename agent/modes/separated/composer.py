@@ -8,7 +8,6 @@ import queue
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
 
 from strands import Agent, tool as strands_tool
 from strands.hooks.events import AfterToolCallEvent, BeforeToolCallEvent
@@ -373,6 +372,10 @@ def make_compose_slides(mcp_servers: list, model):
                             content = list(event.result.get("content") or [])
                             content.append({"text": f"\n\n[Budget notice] {BUDGET_PROMPT}"})
                             event.result = {**event.result, "content": content}
+                        progress_q.put_nowait({
+                            "group": gi + 1, "slugs": slugs_label,
+                            "status": "budget_reached",
+                        })
                     progress_q.put_nowait({
                         "group": gi + 1, "slugs": slugs_label,
                         "toolResult": tu.get("toolUseId", ""),
@@ -442,14 +445,17 @@ def make_compose_slides(mcp_servers: list, model):
 
         # Post-compose: build PPTX + assemble report
         yield {"status": "building", "message": "Building final PPTX..."}
-        report = {"generated_slides": generated, "errors": errors, "summaries": summaries}
-        if _is_compose_stopped(parent_tool_use_id):
-            report["stopped"] = True
-            report["stopped_at"] = datetime.now(timezone.utc).isoformat()
+        cancelled = _is_compose_stopped(parent_tool_use_id)
+        report = {
+            "status": "cancelled" if cancelled else "completed",
+            "generated_slides": generated,
+            "errors": errors,
+            "summaries": summaries,
+        }
+        if cancelled:
             report["notice"] = (
-                "User interrupted compose_slides. Sub-agents halted mid-execution. "
-                "Do NOT retry automatically — stop and ask the user how to proceed "
-                "(resume, adjust scope, or abandon)."
+                "Stopped by user cancellation. Do NOT retry automatically — "
+                "ask the user how to proceed (resume, adjust scope, or abandon)."
             )
 
         if generated and mcp_client:

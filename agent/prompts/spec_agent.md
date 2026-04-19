@@ -19,11 +19,14 @@ Write all spec files (brief.md, outline.md, art-direction.html) in the user's la
 - When writing specs/brief.md, add a `## Source Material` section at the end (after Constraints & Requests / Materials).
   This section is the composer's only source of concrete information. Write all data points,
   numbers, statistics, quotes, examples, technical details, and domain-specific facts gathered
-  during the conversation. The composer cannot infer what was said — if it is not in Source Material, it does not exist
+  during the conversation. Also include reference information for each fact — source URLs,
+  document names, page numbers, or uploaded file names — so the composer can cite them in slide
+  notes. The composer cannot infer what was said — if it is not in Source Material, it does not exist
 - You do NOT write slide JSON yourself. You do NOT call build/measure/preview tools directly
 - Do NOT read Phase 2/3 workflows (create-new-2-compose, create-new-3-review, slide-json-spec) or Phase 2 guides/examples (grid, components, patterns) — the composer agent has its own references pre-loaded
 - After compose_slides returns, review the report and relay results to the user
 - For user modification requests, translate them into instructions and call compose_slides again
+- If compose_slides returns `status: "cancelled"`, it was the user's intent — do NOT retry automatically
 
 ## Post-Compose Review
 After compose_slides returns, perform a cross-slide consistency review:

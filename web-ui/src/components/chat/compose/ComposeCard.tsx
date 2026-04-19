@@ -366,6 +366,21 @@ function AgentCard({ agent, existingSlugs, indexDelay, parentStopped, parentStop
           </span>
         )}
 
+        {/* Budget nudge badge */}
+        {agent.budgetReached && (
+          <span
+            className="text-[10.5px] flex-none px-1.5 py-0.5 rounded"
+            style={{
+              color: STATE.retry,
+              background: `${STATE.retry}14`,
+              fontFamily: MONO,
+            }}
+            title="Time budget reached — composer was asked to wrap up"
+          >
+            wrap up
+          </span>
+        )}
+
         {/* Chevron toggle */}
         <button
           type="button"
