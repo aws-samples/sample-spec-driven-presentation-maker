@@ -33,42 +33,32 @@ Write all spec files (brief.md, outline.md, art-direction.html) in the user's la
 - Ask how they want to proceed (resume with the same scope, adjust scope, or abandon).
 - Skip the Post-Compose Review entirely — it does not apply to cancelled runs.
 
-## Post-Compose Review
+## Post-Compose Workflow
 **Only runs when `status: "completed"`. If cancelled or errored, skip this section.**
 
-SPEC agent owns deck-level consistency. Individual slide defects (text overflow,
-element overlap, broken layout) are the composer's responsibility — it previews
-and fixes them itself. Focus here on what only a whole-deck view can catch.
+Run a 3-step workflow: consistency review by a single composer, then
+verification, then parallel per-slide fixes if defects remain.
 
 1. Check `outline_check` in the report — if `missing` is non-empty, decide whether to retry or inform the user
-2. Call `get_preview(deck_id, slugs=[...])` to get preview images of ALL slides
-3. Review the preview images on two axes:
-   - **Design consistency**: does the deck feel like one artifact? Check color
-     usage, typography rhythm, component style (card shape, border treatment,
-     decoration), and alignment of recurring elements. Divergence across slides
-     breaks the sense of a unified deck.
-   - **Story consistency**: does the narrative flow? Check message transitions
-     between adjacent slides, whether foreshadowing set up early is resolved
-     later, and whether the logical structure advances.
-4. If issues found, call compose_slides again. Keep instructions short and
-   problem-focused — trust the composer to decide how to fix:
-   - ✅ "card styling lacks a unified treatment across the deck"
-   - ✅ "typography rhythm drifts through the deck — heading weights and sizes feel inconsistent"
-   - ✅ "the narrative loses momentum in the middle — the problem setup doesn't pay off"
-   - ✅ "text overflows on data-points"
-   - ❌ "reduce fontSize to 20pt" / "increase height to 60px" / "reposition to y=820"
-   - ❌ Long prescriptive lists of what to change on each slide
-   The composer sees the preview, reads art-direction.html, and decides the
-   fix. Over-specifying turns it into an instruction executor and produces
-   worse results. State the problem, then step back.
-
-   Group the fixes by type:
-   - **Per-slide defects** (overflow, overlap, broken layout on specific
-     slides): parallelize freely — each fix is self-contained.
-   - **Cross-slide consistency** (unified design language, story flow,
-     typography/color rhythm): use a single group covering all affected
-     slides — one composer must see the whole context, otherwise isolated
-     composers reintroduce the inconsistency.
+2. **Consistency review pass**: call `compose_slides(deck_id, slide_groups=[{
+     "slugs": [...all slugs in the deck...],
+     "instruction": "Consistency review."
+   }])`.
+   One group covering the entire deck — the composer reviews cross-slide
+   inconsistencies (labeling, decorative elements, typography, writing
+   style, hierarchy) using get_preview. See composer's Consistency Review
+   Mode for the full criteria.
+3. **Verification**: call `get_preview(deck_id, slugs=[...])` to see the
+   post-review state. Look for individual-slide defects that remain:
+   text overflow, element overlap, broken layout, alignment issues.
+   Cross-slide consistency should already be handled by Step 2, so do
+   not re-review for that here.
+4. **Per-slide fix pass** (only if defects found in Step 3): call
+   `compose_slides` again with **parallel groups, one per affected
+   slide**. Instructions MUST describe the problem, not the solution:
+   - ✅ "text overflows the card on data-points"
+   - ❌ "reduce fontSize to 20pt" / "increase height to 60px"
+   Each fix is self-contained so parallelism is safe and fast.
 5. Present the final result to the user with preview images
 
 ## Slide Group Assignment for Initial Authoring

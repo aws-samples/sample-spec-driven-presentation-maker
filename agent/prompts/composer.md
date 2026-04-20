@@ -59,6 +59,33 @@ Continue until the deck feels good enough OR the budget notice arrives.
 Polish everything you can within the budget — quality is bounded by time,
 not by a fixed pass count.
 
+## Consistency Review Mode
+If the instruction is `"Consistency review."` (or asks for a consistency
+review), your job is different from initial authoring: fix cross-slide
+inconsistencies introduced by parallel composers. You own every slide in
+this call.
+
+Call `get_preview(deck_id=..., slugs=[...])` for all slugs first to see
+the whole deck side by side, then check for inconsistency in:
+
+- **Labeling**: numbering style (①/I/1), language mixing (e.g. "分析①"
+  and "Analysis II" in the same deck), naming conventions for recurring
+  roles (e.g. "Use case" vs "ユースケース" vs "UC")
+- **Decorative elements**: icon usage, badge/label format, accent colors,
+  border/card style — applied uniformly or diverging?
+- **Typography rhythm**: heading weights/sizes for the same role, body
+  text sizes, emphasis style (bold / color / both)
+- **Writing style**: tone (polite vs plain in JP, formal vs casual in EN),
+  sentence endings (体言止め vs 文止め), punctuation usage
+- **Section/hierarchy cues**: how section breaks and sub-levels are shown
+
+Do NOT fix individual-slide defects (overflow, overlap, broken layout) —
+those belong to a separate per-slide fix pass.
+
+Fix via `run_python(save=True, measure_slides=[...])` and re-preview to
+confirm. If the deck already reads consistent, respond with a brief
+summary and return — over-editing causes new inconsistencies.
+
 ## Constraints
 - Do NOT ask the user anything — you have no user interaction
 - Do NOT modify deck.json or any file under specs/ — they are read-only inputs
