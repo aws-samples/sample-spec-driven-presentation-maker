@@ -950,6 +950,33 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 except Exception:
                     logger.error("compose failed", exc_info=True)
 
+                # Preview: sync WebP generation so composer can immediately view
+                # via get_preview(slugs=[...]) — lowers the barrier from a
+                # 2-step (generate_pptx → get_preview) to 1-step feedback loop.
+                if measure_slides:
+                    try:
+                        from tools.generate import generate_previews
+                        preview_dir = tmpdir / "preview_out"
+                        preview_dir.mkdir(exist_ok=True)
+                        webp_files = generate_previews(pptx_path, preview_dir)
+                        uploaded = []
+                        for slug in measure_slides:
+                            page = slug_to_page.get(slug)
+                            if page and page <= len(webp_files):
+                                _storage.upload_file(
+                                    key=f"previews/{deck_id}/{slug}_{_prepare_epoch}.webp",
+                                    data=webp_files[page - 1].read_bytes(),
+                                    content_type="image/webp",
+                                )
+                                uploaded.append(slug)
+                        if uploaded:
+                            result["previewHint"] = (
+                                f"Preview images generated for {', '.join(uploaded)}. "
+                                f"Call get_preview(deck_id=\"{deck_id}\", slugs=[...]) to view."
+                            )
+                    except Exception:
+                        logger.warning("preview generation failed", exc_info=True)
+
                 # tmpdir cleanup (WebP generation only in generate_pptx)
                 shutil.rmtree(tmpdir, ignore_errors=True)
             else:
