@@ -325,8 +325,35 @@ function handler(event) {
     styles.addResource("{name}").addMethod("GET", integration, auth);
 
     // --- Deploy web-ui static files to S3 ---
+    // Bundle the web-ui at synth time so changes are auto-picked up without a
+    // manual `npm run build`. Prefers local Node.js; falls back to Docker.
+    const webUiDir = path.join(__dirname, "../../web-ui");
     const deployment = new s3deploy.BucketDeployment(this, "DeploySite", {
-      sources: [s3deploy.Source.asset(path.join(__dirname, "../../web-ui/build"))],
+      sources: [
+        s3deploy.Source.asset(webUiDir, {
+          bundling: {
+            image: cdk.DockerImage.fromRegistry("node:20-slim"),
+            command: [
+              "bash", "-c",
+              "npm ci && npm run build && cp -r build/. /asset-output/",
+            ],
+            local: {
+              tryBundle(outputDir: string): boolean {
+                const { execSync } = require("child_process");
+                try {
+                  execSync("npm --version", { stdio: "ignore" });
+                } catch {
+                  return false;
+                }
+                execSync("npm ci", { cwd: webUiDir, stdio: "inherit" });
+                execSync("npm run build", { cwd: webUiDir, stdio: "inherit" });
+                execSync(`cp -r ${webUiDir}/build/. ${outputDir}/`, { stdio: "inherit" });
+                return true;
+              },
+            },
+          },
+        }),
+      ],
       destinationBucket: siteBucket,
       distribution,
       distributionPaths: ["/*"],
