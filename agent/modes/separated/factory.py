@@ -152,10 +152,10 @@ def create_separated_agent(user_id: str, session_id: str, jwt_token: str) -> tup
         common_context = ""
 
     spec_agent_template = load_prompt("spec_agent")
-    agent.system_prompt = build_system_prompt(
-        spec_agent_template,
-        common_context=common_context,
-    )
+    agent.system_prompt = [
+        {"text": build_system_prompt(spec_agent_template, common_context=common_context)},
+        {"cachePoint": {"type": "default"}},
+    ]
 
     # Attach LoopGuard as hard-stop fallback when soft prompts fail
     from strands.hooks.events import AfterToolCallEvent
