@@ -159,12 +159,15 @@ def _build_deck_context(sections: list[str]) -> str:
     return "# Deck-Specific References\n\n" + "\n\n---\n\n".join(sections)
 
 
-def make_compose_slides(mcp_servers: list, model):
+def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None):
     """Create compose_slides tool with closed-over MCP servers and model.
 
     Args:
-        mcp_servers: List of MCPClient instances for the composer agent.
+        mcp_servers: List of MCPClient instances exposed as composer tools.
         model: BedrockModel instance.
+        composer_mcp_factory: Optional callable returning a fresh MCPClient for
+            prefetch/per-group isolation. If None, falls back to mcp_servers[0]
+            (legacy shared-client behavior).
 
     Returns:
         A @tool-decorated async generator function.
@@ -356,12 +359,20 @@ def make_compose_slides(mcp_servers: list, model):
                             last_input_by_tid[tid] = parsed
                             progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "tool": name, "toolUseId": tid, "input": parsed})
 
+                # Per-group MCP isolation: create a fresh MCPClient scoped to this
+                # group so a session death cannot cascade to other groups. Started
+                # here and stopped in finally after the composer run completes.
+                _group_mcp = composer_mcp_factory() if composer_mcp_factory else None
+                _group_tools = list(mcp_servers)
+                if _group_mcp is not None:
+                    _group_tools[0] = _group_mcp  # replace Presentation Maker MCP
+
                 composer = Agent(
                     system_prompt=[
                         {"text": static_prompt},
                         {"cachePoint": {"type": "default"}},
                     ],
-                    tools=[*mcp_servers],
+                    tools=_group_tools,
                     model=model,
                     callback_handler=_on_event,
                 )
@@ -427,20 +438,42 @@ def make_compose_slides(mcp_servers: list, model):
                 composer.hooks.add_callback(BeforeToolCallEvent, _before_tool)
                 composer.hooks.add_callback(AfterToolCallEvent, _after_tool)
 
+                # Hard-stop guard: cancels the composer agent if tool loop/cap
+                # is detected (complements the soft ERROR_LIMIT_PROMPT nudge).
+                from resilience import LoopGuard
+                guard = LoopGuard(
+                    max_tool_calls=int(os.environ.get("COMPOSER_MAX_TOOL_CALLS", "150")),
+                )
+                composer.hooks.add_callback(AfterToolCallEvent, guard.after_tool)
+
                 max_retries = 2
-                for attempt in range(max_retries + 1):
-                    try:
-                        response = composer(user_content if attempt == 0 else None)
-                        progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "status": "done"})
-                        return {"slugs": group["slugs"], "response": str(response)}
-                    except Exception as e:
-                        if attempt < max_retries:
-                            progress_q.put_nowait({
-                                "group": gi + 1, "slugs": slugs_label,
-                                "status": "retrying", "attempt": attempt + 1, "error": str(e),
-                            })
-                            continue
-                        raise
+                try:
+                    for attempt in range(max_retries + 1):
+                        try:
+                            response = composer(user_content if attempt == 0 else None)
+                            if guard.cancelled:
+                                progress_q.put_nowait({
+                                    "group": gi + 1, "slugs": slugs_label,
+                                    "status": "guard_stopped", "reason": guard.cancel_reason,
+                                })
+                                return {"slugs": group["slugs"], "response": f"stopped: {guard.cancel_reason}"}
+                            progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "status": "done"})
+                            return {"slugs": group["slugs"], "response": str(response)}
+                        except Exception as e:
+                            if attempt < max_retries:
+                                progress_q.put_nowait({
+                                    "group": gi + 1, "slugs": slugs_label,
+                                    "status": "retrying", "attempt": attempt + 1, "error": str(e),
+                                })
+                                continue
+                            raise
+                finally:
+                    # Release the per-group MCPClient's background thread.
+                    if _group_mcp is not None:
+                        try:
+                            _group_mcp.stop(None, None, None)
+                        except Exception:
+                            logger.warning("group MCP stop failed", exc_info=True)
 
             # Launch all groups in thread pool (skip if already cancelled during prefetch)
             if _is_compose_stopped(parent_tool_use_id):

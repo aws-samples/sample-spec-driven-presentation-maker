@@ -94,7 +94,12 @@ def create_separated_agent(user_id: str, session_id: str, jwt_token: str) -> tup
                 raise
 
     mcp_instructions = collect_mcp_instructions(mcp_servers)
-    compose_slides = make_compose_slides(mcp_servers, composer_model)
+
+    # Composer MCP factory: each group gets a fresh MCPClient to isolate
+    # connection failures. If one group's MCP session dies, others are unaffected.
+    composer_mcp_factory = lambda: mcp_agentcore_runtime(jwt_token=jwt_token)  # noqa: E731
+
+    compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory)
     tools = [*mcp_servers, compose_slides, list_uploads, web_fetch]
 
     try:
@@ -124,7 +129,7 @@ def create_separated_agent(user_id: str, session_id: str, jwt_token: str) -> tup
         mcp_servers = required_servers
         mcp_status = new_status
         mcp_instructions = collect_mcp_instructions(mcp_servers)
-        compose_slides = make_compose_slides(mcp_servers, composer_model)
+        compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory)
         agent = Agent(
             name="SdpmSpecAgent",
             system_prompt="",
@@ -139,6 +144,12 @@ def create_separated_agent(user_id: str, session_id: str, jwt_token: str) -> tup
         spec_agent_template,
         mcp_instructions=mcp_instructions,
     )
+
+    # Attach LoopGuard as hard-stop fallback when soft prompts fail
+    from strands.hooks.events import AfterToolCallEvent
+    from resilience import LoopGuard
+    guard = LoopGuard(max_tool_calls=int(os.environ.get("SPEC_MAX_TOOL_CALLS", "300")))
+    agent.hooks.add_callback(AfterToolCallEvent, guard.after_tool)
 
     fix_excess_tool_results(agent.messages)
 
