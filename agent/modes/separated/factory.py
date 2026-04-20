@@ -12,12 +12,12 @@ from strands.models.bedrock import CacheConfig
 
 from mcp_clients import (
     MCP_DEFS,
-    collect_mcp_instructions,
     mcp_agentcore_runtime,
     mcp_aws_knowledge,
     mcp_aws_pricing,
 )
 from modes.separated.composer import make_compose_slides
+from modes.separated.composer import _prefetch_sections, _build_common_context
 from prompts import build_system_prompt, load_prompt
 from session import fix_excess_tool_results
 from tools.upload_tools import list_uploads
@@ -30,6 +30,11 @@ _MCP_FACTORIES = [
     lambda jwt_token: mcp_agentcore_runtime(jwt_token=jwt_token),
     lambda jwt_token: mcp_aws_knowledge(),
     lambda jwt_token: mcp_aws_pricing(),
+]
+
+# Workflow to prefetch for SPEC agent (Phase 1 entry point)
+_SPEC_PREFETCH = [
+    ("read_workflows", {"names": ["create-new-1-briefing"]}, "create-new-1-briefing"),
 ]
 
 
@@ -93,8 +98,6 @@ def create_separated_agent(user_id: str, session_id: str, jwt_token: str) -> tup
             if required:
                 raise
 
-    mcp_instructions = collect_mcp_instructions(mcp_servers)
-
     # Composer MCP factory: each group gets a fresh MCPClient to isolate
     # connection failures. If one group's MCP session dies, others are unaffected.
     composer_mcp_factory = lambda: mcp_agentcore_runtime(jwt_token=jwt_token)  # noqa: E731
@@ -128,7 +131,6 @@ def create_separated_agent(user_id: str, session_id: str, jwt_token: str) -> tup
 
         mcp_servers = required_servers
         mcp_status = new_status
-        mcp_instructions = collect_mcp_instructions(mcp_servers)
         compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory)
         agent = Agent(
             name="SdpmSpecAgent",
@@ -139,10 +141,20 @@ def create_separated_agent(user_id: str, session_id: str, jwt_token: str) -> tup
             trace_attributes={"user.id": user_id, "session.id": session_id},
         )
 
+    # Prefetch Phase 1 entry workflow so the SPEC agent starts with it pre-loaded.
+    # Falls back to empty context on failure — agent startup must not break here
+    # because SPEC agent is the user-facing entry point.
+    try:
+        prefetch_sections = _prefetch_sections(mcp_servers[0], _SPEC_PREFETCH) if mcp_servers else []
+        common_context = _build_common_context(prefetch_sections)
+    except Exception as e:
+        logger.warning("SPEC agent workflow prefetch failed: %s", e)
+        common_context = ""
+
     spec_agent_template = load_prompt("spec_agent")
     agent.system_prompt = build_system_prompt(
         spec_agent_template,
-        mcp_instructions=mcp_instructions,
+        common_context=common_context,
     )
 
     # Attach LoopGuard as hard-stop fallback when soft prompts fail
