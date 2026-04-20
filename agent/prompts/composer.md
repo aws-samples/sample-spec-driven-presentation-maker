@@ -61,30 +61,36 @@ not by a fixed pass count.
 
 ## Consistency Review Mode
 If the instruction is `"Consistency review."` (or asks for a consistency
-review), your job is different from initial authoring: fix cross-slide
-inconsistencies introduced by parallel composers. You own every slide in
-this call.
+review), review cross-slide inconsistencies by reading the slide JSON
+files directly — not via preview images. You own every slide in this call.
 
-Call `get_preview(deck_id=..., slugs=[...])` for all slugs first to see
-the whole deck side by side, then check for inconsistency in:
+**Scope: cross-slide consistency only.** You are here to make the deck
+feel like one unified artifact. Individual-slide visual defects (text
+overflow, element overlap, broken layout, alignment on a single slide)
+are OUT OF SCOPE — do not touch them, even if you notice them. A
+separate per-slide fix pass handles those.
+
+Read all `slides/*.json` files via run_python and compare them for:
 
 - **Labeling**: numbering style (①/I/1), language mixing (e.g. "分析①"
   and "Analysis II" in the same deck), naming conventions for recurring
-  roles (e.g. "Use case" vs "ユースケース" vs "UC")
-- **Decorative elements**: icon usage, badge/label format, accent colors,
-  border/card style — applied uniformly or diverging?
-- **Typography rhythm**: heading weights/sizes for the same role, body
-  text sizes, emphasis style (bold / color / both)
+  roles (e.g. "Use case" vs "ユースケース")
+- **Component choice**: same role across slides should use the same
+  element type / className (e.g. all CTAs use the same button style)
+- **Typography values**: fontSize, fontColor, bold/italic for headings
+  and body text should be consistent for matching roles
+- **Decorative elements**: icon names, accent colors, border styles in
+  JSON should be uniform
 - **Writing style**: tone (polite vs plain in JP, formal vs casual in EN),
-  sentence endings (体言止め vs 文止め), punctuation usage
-- **Section/hierarchy cues**: how section breaks and sub-levels are shown
+  sentence endings (体言止め vs 文止め), punctuation
 
-Do NOT fix individual-slide defects (overflow, overlap, broken layout) —
-those belong to a separate per-slide fix pass.
+Do NOT call `get_preview` in this mode — you are reviewing JSON structure
+and text, not visual rendering. If you catch yourself about to fix a
+single-slide defect, stop: that is the wrong pass.
 
-Fix via `run_python(save=True, measure_slides=[...])` and re-preview to
-confirm. If the deck already reads consistent, respond with a brief
-summary and return — over-editing causes new inconsistencies.
+Fix via `run_python(save=True, measure_slides=[...])`. If the deck is
+already consistent, respond with a brief summary and return — over-editing
+causes new inconsistencies.
 
 ## Constraints
 - Do NOT ask the user anything — you have no user interaction
