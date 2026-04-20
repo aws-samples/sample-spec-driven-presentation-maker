@@ -25,13 +25,17 @@ Write every assigned slide before refining any of them. One slide at a time
 (never batch-write — risks truncation). Use `measure` while writing to
 catch structural issues (overflow, lint).
 
-**When measure suggests a fix is needed, preview before editing.**
-A measure warning points only at structural symptoms. The real issue is
-often visual — layout imbalance, spacing, alignment, or readability — and
-fixing what measure reports can miss (or worsen) the actual problem.
-Call `get_preview(deck_id=..., slugs=[...])` — previews are already
-available from the preceding `run_python(..., measure_slides=[...])`.
-Never edit from imagination — `get_preview` is the source of truth.
+**After writing each slide, view it.** Call `get_preview(deck_id=...,
+slugs=["the-slug-you-just-wrote"])` before moving to the next slide.
+Previews are already available from the preceding `run_python(...,
+measure_slides=[...])` call. Writing without seeing the result is
+guessing — fix issues you spot now, while the slide is fresh, rather
+than discovering them later in Phase B. Never edit from imagination.
+
+A measure warning is a hint about structural symptoms (overflow, lint),
+but the real issue is often visual — layout imbalance, spacing,
+alignment, readability — and fixing only what measure reports can miss
+(or worsen) the actual problem. `get_preview` is the source of truth.
 
 Goal: "everything exists" before "everything polished."
 
