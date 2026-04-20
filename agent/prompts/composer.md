@@ -21,17 +21,28 @@ Work in two phases: first draft all assigned slides, then refine with preview.
 
 ### Phase A: Draft
 Write every assigned slide before refining any of them. One slide at a time
-(never batch-write — risks truncation). Use `measure` during writing to keep
-text fitting, but do NOT enter fix loops here — a reasonable first pass is
-enough. Goal: "everything exists" before "everything polished."
+(never batch-write — risks truncation). Use `measure` while writing to
+catch structural issues (overflow, lint).
+
+**When measure suggests a fix is needed, preview before editing.**
+A measure warning points only at structural symptoms. The real issue is
+often visual — layout imbalance, spacing, alignment, or readability — and
+fixing what measure reports can miss (or worsen) the actual problem.
+To preview: call `generate_pptx(deck_id=...)` first (required — it builds
+the preview images), then `get_preview(deck_id=..., slugs=[...])`. Never
+edit from imagination — `get_preview` is the source of truth.
+
+Goal: "everything exists" before "everything polished."
 
 When all assigned slides are drafted, call `generate_pptx(deck_id=...)` once
 to make previews available, then move to Phase B.
 
 ### Phase B: Refine
 Call `get_preview(deck_id, slugs=[...all your slides])` to see the actual
-rendering. Pick slides that need improvement, edit via `run_python`, and
-re-preview to confirm.
+rendering. **If you were given modification instructions, do this first
+before editing — the instruction describes the symptom, but you need to
+see the current state to decide the right fix.** Pick slides that need
+improvement, edit via `run_python`, and re-preview to confirm.
 
 Preview and measure are complementary — use both:
 - **Preview** catches visual issues: overlap, misalignment, imbalance,

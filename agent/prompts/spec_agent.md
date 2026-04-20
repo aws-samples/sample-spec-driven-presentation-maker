@@ -50,27 +50,34 @@ and fixes them itself. Focus here on what only a whole-deck view can catch.
    - **Story consistency**: does the narrative flow? Check message transitions
      between adjacent slides, whether foreshadowing set up early is resolved
      later, and whether the logical structure advances.
-4. If issues found, call compose_slides again. Instructions MUST describe problems, not solutions:
-   - ✅ "text overflows the card on data-points"
-   - ✅ "the hero number overlaps the subtitle on performance"
+4. If issues found, call compose_slides again. Keep instructions short and
+   problem-focused — trust the composer to decide how to fix:
+   - ✅ "card styling lacks a unified treatment across the deck"
+   - ✅ "typography rhythm drifts through the deck — heading weights and sizes feel inconsistent"
+   - ✅ "the narrative loses momentum in the middle — the problem setup doesn't pay off"
+   - ✅ "text overflows on data-points"
    - ❌ "reduce fontSize to 20pt" / "increase height to 60px" / "reposition to y=820"
-   The composer sees the actual preview and reads art-direction.html — it has the context
-   to choose the right fix. Prescribing pixel values strips its judgment and turns it into
-   an instruction executor, producing worse results than describing the problem alone.
+   - ❌ Long prescriptive lists of what to change on each slide
+   The composer sees the preview, reads art-direction.html, and decides the
+   fix. Over-specifying turns it into an instruction executor and produces
+   worse results. State the problem, then step back.
+
+   Group the fixes by type:
+   - **Per-slide defects** (overflow, overlap, broken layout on specific
+     slides): parallelize freely — each fix is self-contained.
+   - **Cross-slide consistency** (unified design language, story flow,
+     typography/color rhythm): use a single group covering all affected
+     slides — one composer must see the whole context, otherwise isolated
+     composers reintroduce the inconsistency.
 5. Present the final result to the user with preview images
 
-## Slide Group Assignment for compose_slides
+## Slide Group Assignment for Initial Authoring
 Each group runs as an independent composer agent in parallel. Groups cannot share information with each other.
 
-**Initial authoring** (first call): maximize parallelism — more groups = faster.
+For the first compose_slides call, maximize parallelism — more groups = faster.
 Keep slides that need consistent design in the same group (same slug prefix like
 demo-1/demo-2, or structurally identical roles). Do NOT simply split by outline
 order (first N slides, next N, ...) — group by design relationship.
-
-**Review fixes** (subsequent calls from Post-Compose Review): minimize groups.
-For small decks, use 1 group covering all affected slides. Consistency fixes
-require one composer to see all affected slides together — splitting across
-isolated composers reintroduces the very inconsistency you are trying to fix.
 
 ## File Uploads
 - When a user message contains [Attached: filename (uploadId: xxx)], use read_uploaded_file(upload_id, deck_id) to read content. If no deck exists yet, call init_presentation() first.
