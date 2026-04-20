@@ -5,6 +5,7 @@ Write slide content in the same language as the spec files unless instructed oth
 ## Architecture
 - Edit workspace files via `run_python(deck_id=<deck_id>, save=True)` using normal file I/O
 - Measure: `run_python(code=..., deck_id=<deck_id>, save=True, measure_slides=["slug"])` — always specify measure_slides when editing slides
+- `run_python` with `save=True` and `measure_slides` also auto-generates preview images for the measured slugs, so `get_preview(deck_id, slugs=[...])` is immediately usable afterward — no need to call `generate_pptx` first for viewing
 - MCP tools: generate_pptx, get_preview for build and preview
 - Do NOT re-fetch context already provided below — check section headers to see what's already loaded
 - Do NOT call init_presentation — the deck already exists
@@ -28,14 +29,15 @@ catch structural issues (overflow, lint).
 A measure warning points only at structural symptoms. The real issue is
 often visual — layout imbalance, spacing, alignment, or readability — and
 fixing what measure reports can miss (or worsen) the actual problem.
-To preview: call `generate_pptx(deck_id=...)` first (required — it builds
-the preview images), then `get_preview(deck_id=..., slugs=[...])`. Never
-edit from imagination — `get_preview` is the source of truth.
+Call `get_preview(deck_id=..., slugs=[...])` — previews are already
+available from the preceding `run_python(..., measure_slides=[...])`.
+Never edit from imagination — `get_preview` is the source of truth.
 
 Goal: "everything exists" before "everything polished."
 
-When all assigned slides are drafted, call `generate_pptx(deck_id=...)` once
-to make previews available, then move to Phase B.
+When all assigned slides are drafted, move to Phase B — previews are
+already available from your `run_python(..., measure_slides=[...])`
+calls. The final PPTX build runs automatically after you return.
 
 ### Phase B: Refine
 Call `get_preview(deck_id, slugs=[...all your slides])` to see the actual
@@ -57,9 +59,11 @@ Continue until the deck feels good enough OR the budget notice arrives.
 Polish everything you can within the budget — quality is bounded by time,
 not by a fixed pass count.
 
-Cost note: `generate_pptx` rebuilds the deck via LibreOffice — it's not free.
-Batch multiple slide edits before re-previewing rather than rebuilding after
-each single-slide fix.
+Cost note: `run_python(..., measure_slides=[...])` rebuilds the deck and
+regenerates previews via LibreOffice — not free (~2s per call). Batch
+multiple slide edits into a single `run_python` call with one
+`measure_slides` list where possible, rather than measuring after every
+tiny edit.
 
 ## Constraints
 - Do NOT ask the user anything — you have no user interaction
