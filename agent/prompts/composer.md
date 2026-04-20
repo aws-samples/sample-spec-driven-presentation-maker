@@ -59,12 +59,6 @@ Continue until the deck feels good enough OR the budget notice arrives.
 Polish everything you can within the budget — quality is bounded by time,
 not by a fixed pass count.
 
-Cost note: `run_python(..., measure_slides=[...])` rebuilds the deck and
-regenerates previews via LibreOffice — not free (~2s per call). Batch
-multiple slide edits into a single `run_python` call with one
-`measure_slides` list where possible, rather than measuring after every
-tiny edit.
-
 ## Constraints
 - Do NOT ask the user anything — you have no user interaction
 - Do NOT modify deck.json or any file under specs/ — they are read-only inputs
