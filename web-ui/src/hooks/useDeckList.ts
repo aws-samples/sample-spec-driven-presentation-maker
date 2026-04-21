@@ -132,7 +132,6 @@ export function useDeckList(
   const handleDownload = useCallback((deckId: string) => {
     const target = decks.find((d) => d.deckId === deckId)
     if (!target?.pptxUrl) return
-    // TODO: Phase 3 — local mode will use API Route to open file
     window.open(target.pptxUrl, "_blank")
   }, [decks])
 

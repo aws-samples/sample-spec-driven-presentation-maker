@@ -217,18 +217,16 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     }
   }
 
-  /** Local: open deck directory in Finder/Explorer (stub — will use API Route in Phase 3) */
+  /** Local: open deck directory in Finder/Explorer */
   async function handleJsonOpen() {
     if (!deckId || !IS_LOCAL) return
-    // TODO: Phase 3 — call local API to open folder
-    console.warn("[handleJsonOpen] local folder open not yet implemented")
+    window.open(`/api/preview/${deckId}/`, "_blank")
   }
 
-  /** Local: open output.pptx with default app (stub — will use API Route in Phase 3) */
+  /** Local: open output.pptx with default app */
   async function handlePptxOpen() {
     if (!pptxUrl || !IS_LOCAL) return
-    // TODO: Phase 3 — call local API to open file
-    console.warn("[handlePptxOpen] local file open not yet implemented")
+    window.open(pptxUrl, "_blank")
   }
 
   /**
