@@ -19,8 +19,7 @@ import os
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
-from modes.separated.factory import create_separated_agent
-from modes.single.factory import create_single_agent
+from factory import create_agent
 from streaming import stream_agent
 
 logger = logging.getLogger("sdpm.agent")
@@ -83,12 +82,7 @@ async def agent_stream(payload, context):
     try:
         os.environ["_CURRENT_SESSION_ID"] = session_id
         mode = payload.get("mode", "separated")
-        if mode == "single":
-            agent, mcp_status = create_single_agent(user_id=user_id, session_id=session_id, jwt_token=jwt_token)
-        elif mode == "vibe":
-            agent, mcp_status = create_separated_agent(user_id=user_id, session_id=session_id, jwt_token=jwt_token, prompt_key="vibe_agent")
-        else:
-            agent, mcp_status = create_separated_agent(user_id=user_id, session_id=session_id, jwt_token=jwt_token)
+        agent, mcp_status = create_agent(mode=mode, user_id=user_id, session_id=session_id, jwt_token=jwt_token)
 
         yield {"mcp_status": mcp_status}
 

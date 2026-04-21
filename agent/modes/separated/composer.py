@@ -77,24 +77,8 @@ _PREFETCH_REFS = [
 ]
 
 
-def _prefetch_sections(mcp_client, prefetch_list: list) -> list[str]:
-    """Prefetch references from MCP server."""
-    sections = []
-    for tool_name, args, label in prefetch_list:
-        result = mcp_client.call_tool_sync(
-            tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
-            name=tool_name,
-            arguments=args,
-        )
-        if result.get("status") == "error":
-            raise RuntimeError(f"Failed to prefetch {label}: {result.get('content')}")
-        text = ""
-        for item in result.get("content", []):
-            if isinstance(item, dict) and "text" in item:
-                text += item["text"]
-        if text:
-            sections.append(f"## {label}\n\n{text}")
-    return sections
+# Canonical implementation lives in factory.py — import for backward compat
+from factory import prefetch_sections as _prefetch_sections  # noqa: E402
 
 
 def _prefetch_deck_specs(mcp_client, deck_id: str, assigned_slugs: list[str]) -> list[str]:
@@ -145,11 +129,8 @@ def _prefetch_deck_specs(mcp_client, deck_id: str, assigned_slugs: list[str]) ->
     return sections
 
 
-def _build_common_context(sections: list[str]) -> str:
-    """Build common reference context (shared across all groups, cacheable)."""
-    if not sections:
-        return ""
-    return "# Pre-loaded References (already executed — do NOT re-fetch)\n\n" + "\n\n---\n\n".join(sections)
+# Canonical implementation lives in factory.py — import for backward compat
+from factory import build_common_context as _build_common_context  # noqa: E402
 
 
 def _build_deck_context(sections: list[str]) -> str:
