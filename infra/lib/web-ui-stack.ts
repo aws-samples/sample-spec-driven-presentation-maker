@@ -335,7 +335,7 @@ function handler(event) {
             image: cdk.DockerImage.fromRegistry("node:20-slim"),
             command: [
               "bash", "-c",
-              "npm ci && npm run build && cp -r build/. /asset-output/",
+              "npm ci && npm run build:cloud && cp -r build/. /asset-output/",
             ],
             local: {
               tryBundle(outputDir: string): boolean {
@@ -346,7 +346,7 @@ function handler(event) {
                   return false;
                 }
                 execSync("npm ci", { cwd: webUiDir, stdio: "inherit" });
-                execSync("npm run build", { cwd: webUiDir, stdio: "inherit" });
+                execSync("npm run build:cloud", { cwd: webUiDir, stdio: "inherit" });
                 execSync(`cp -r ${webUiDir}/build/. ${outputDir}/`, { stdio: "inherit" });
                 return true;
               },
