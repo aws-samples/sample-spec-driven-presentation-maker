@@ -62,6 +62,7 @@ const previewUrlCache = new Map<string, string | null>()
  * @returns Base URL string ending with /
  */
 async function getApiBaseUrl(): Promise<string> {
+  if (IS_LOCAL) return "/api/"
   if (apiBaseUrl) return apiBaseUrl
 
   const response = await fetch("/aws-exports.json")
@@ -78,7 +79,7 @@ async function getApiBaseUrl(): Promise<string> {
  */
 export async function listDecks(idToken: string): Promise<{ decks: DeckSummary[]; favoriteIds: string[] }> {
   if (IS_LOCAL) {
-    const response = await fetch("/api/decks")
+    const response = await fetch("/api/decks/")
     if (!response.ok) throw new Error(`Failed to list decks: ${response.status}`)
     return response.json()
   }
@@ -104,7 +105,7 @@ export async function listDecks(idToken: string): Promise<{ decks: DeckSummary[]
  */
 export async function getDeck(deckId: string, idToken: string): Promise<DeckDetail> {
   if (IS_LOCAL) {
-    const response = await fetch(`/api/decks/${deckId}`)
+    const response = await fetch(`/api/decks/${deckId}/`)
     if (!response.ok) throw new Error(`Failed to get deck: ${response.status}`)
     return response.json()
   }
@@ -198,6 +199,7 @@ export interface ChatMessage {
  * @returns Array of chat messages sorted by timestamp
  */
 export async function getChatHistory(sessionId: string, idToken: string): Promise<ChatMessage[]> {
+  if (IS_LOCAL) return []
   const base = await getApiBaseUrl()
   const response = await fetch(`${base}chat/${sessionId}`, {
     headers: { Authorization: `Bearer ${idToken}` },
@@ -232,6 +234,7 @@ export async function updateVisibility(deckId: string, visibility: "public" | "p
  * @returns Array of public deck summaries
  */
 export async function listPublicDecks(idToken: string): Promise<DeckSummary[]> {
+  if (IS_LOCAL) return []
   const base = await getApiBaseUrl()
   const response = await fetch(`${base}decks/public`, {
     headers: { Authorization: `Bearer ${idToken}` },
@@ -269,6 +272,7 @@ export async function shareDeck(deckId: string, collaboratorId: string, idToken:
  * @returns Array of shared deck summaries
  */
 export async function listSharedDecks(idToken: string): Promise<DeckSummary[]> {
+  if (IS_LOCAL) return []
   const base = await getApiBaseUrl()
   const response = await fetch(`${base}decks/shared`, {
     headers: { Authorization: `Bearer ${idToken}` },
@@ -345,6 +349,7 @@ export async function toggleFavorite(deckId: string, action: "add" | "remove", i
  * @returns Array of favorite deck summaries
  */
 export async function listFavorites(idToken: string): Promise<DeckSummary[]> {
+  if (IS_LOCAL) return []
   const base = await getApiBaseUrl()
   const resp = await fetch(`${base}decks/favorites`, {
     headers: { Authorization: `Bearer ${idToken}` },

@@ -20,7 +20,7 @@
 "use client"
 
 import { useState, useRef, useCallback } from "react"
-import { useAuth } from "react-oidc-context"
+import { useAuth } from "@/hooks/useAuth"
 import { AppShell } from "@/components/AppShell"
 import { DeckListView } from "@/components/deck/DeckListView"
 import { SlideCarousel } from "@/components/deck/SlideCarousel"

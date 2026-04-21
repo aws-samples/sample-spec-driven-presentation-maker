@@ -139,10 +139,7 @@ export async function ensureAgent(): Promise<void> {
       .map(o => ({ modelId: o.value, name: o.name, description: o.description }))
   }
 
-  // Apply stored model preference
-  const storedModel = typeof sessionStorage !== "undefined" ? null : null // server-side, no sessionStorage
   // Model preference is managed client-side via /api/agent/models PUT
-}
 }
 
 /** Create a new ACP session (for new chat). */
