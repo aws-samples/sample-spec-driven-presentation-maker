@@ -293,7 +293,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slideId, skipAnimati
 
   return (
     <div data-slide-id={slideId} className="aspect-[16/9] relative overflow-hidden rounded-lg bg-black">
-      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={containerRef} className="absolute inset-0" data-slide-id={slideId} />
     </div>
   )
 }

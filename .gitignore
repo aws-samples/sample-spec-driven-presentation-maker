@@ -76,3 +76,11 @@ desktop/dist/
 
 mcp-local/.venv/
 mcp-local/__pycache__/
+
+# User-generated outputs
+output/
+
+# Tauri auto-generated IDE schemas (capabilities.json is kept)
+desktop/src-tauri/gen/schemas/acl-manifests.json
+desktop/src-tauri/gen/schemas/desktop-schema.json
+desktop/src-tauri/gen/schemas/macOS-schema.json
