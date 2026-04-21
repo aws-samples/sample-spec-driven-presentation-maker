@@ -19,7 +19,7 @@ import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
-import { isTauri } from "@/lib/platform"
+import { CloudOnly, LocalOnly, IS_LOCAL } from "@/lib/mode"
 
 
 interface SlideCarouselProps {
@@ -217,27 +217,18 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     }
   }
 
-  /** Tauri: open deck directory in Finder/Explorer */
+  /** Local: open deck directory in Finder/Explorer (stub — will use API Route in Phase 3) */
   async function handleJsonOpen() {
-    if (!deckId) return
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ti = (window as any).__TAURI_INTERNALS__
-      if (!ti?.invoke) return
-      const home = await ti.invoke("plugin:path|resolve_directory", { directory: 21 }) as string
-      await ti.invoke("open_path", { path: `${home}/Documents/SDPM-Presentations/${deckId}` })
-    } catch (e) { console.error("[handleJsonOpen]", e) }
+    if (!deckId || !IS_LOCAL) return
+    // TODO: Phase 3 — call local API to open folder
+    console.warn("[handleJsonOpen] local folder open not yet implemented")
   }
 
-  /** Tauri: open output.pptx with default app */
+  /** Local: open output.pptx with default app (stub — will use API Route in Phase 3) */
   async function handlePptxOpen() {
-    if (!pptxUrl) return
-    try {
-      const filePath = decodeURIComponent(pptxUrl.replace(/^asset:\/\/localhost\//, "/").split("?")[0])
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ti = (window as any).__TAURI_INTERNALS__
-      if (ti?.invoke) await ti.invoke("open_path", { path: filePath })
-    } catch (e) { console.error("[handlePptxOpen]", e) }
+    if (!pptxUrl || !IS_LOCAL) return
+    // TODO: Phase 3 — call local API to open file
+    console.warn("[handlePptxOpen] local file open not yet implemented")
   }
 
   /**
@@ -467,17 +458,17 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
             </div>
             {deckId && (
               <button
-                onClick={isTauri ? handleJsonOpen : handleJsonDownload}
+                onClick={IS_LOCAL ? handleJsonOpen : handleJsonDownload}
                 disabled={jsonLoading}
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors disabled:opacity-50"
-                aria-label={isTauri ? "Open JSON" : "Download JSON"}
+                aria-label={IS_LOCAL ? "Open JSON" : "Download JSON"}
               >
                 {jsonLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileJson className="h-3.5 w-3.5" />}
                 JSON
               </button>
             )}
             {pptxUrl && (
-              isTauri ? (
+              IS_LOCAL ? (
                 <button
                   onClick={handlePptxOpen}
                   className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"

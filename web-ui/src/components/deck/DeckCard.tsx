@@ -25,7 +25,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Layers, Star, MoreHorizontal, Trash2, Building2, Lock, Share2, Download, Users, Link, FolderOpen } from "lucide-react"
-import { isTauri } from "@/lib/platform"
+import { CloudOnly, IS_LOCAL } from "@/lib/mode"
 
 
 interface DeckCardProps {
@@ -134,11 +134,12 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
             </DropdownMenuItem>
             {onDownload && (
               <DropdownMenuItem onClick={() => onDownload(deck.deckId)}>
-                {isTauri ? <FolderOpen className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
-                {isTauri ? "Open PPTX" : "Download PPTX"}
+                {IS_LOCAL ? <FolderOpen className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
+                {IS_LOCAL ? "Open PPTX" : "Download PPTX"}
               </DropdownMenuItem>
             )}
-            {!isTauri && isOwner && onToggleVisibility && (
+            <CloudOnly>
+            {isOwner && onToggleVisibility && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -149,12 +150,13 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
                 </DropdownMenuItem>
               </>
             )}
-            {!isTauri && isOwner && onShare && (
+            {isOwner && onShare && (
               <DropdownMenuItem onClick={() => onShare(deck.deckId)}>
                 <Share2 className="h-3.5 w-3.5" />
                 Share
               </DropdownMenuItem>
             )}
+            </CloudOnly>
             {isOwner && onDelete && (
               <>
                 <DropdownMenuSeparator />
@@ -196,7 +198,8 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
             <Layers className="h-2.5 w-2.5" />
             {deck.slideCount}
           </div>
-          {!isTauri && ((deck.visibility || "private") === "public" ? (
+          <CloudOnly>
+          {(deck.visibility || "private") === "public" ? (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium backdrop-blur-md"
               style={{ background: "oklch(0.55 0.15 160 / 0.35)", color: "oklch(0.9 0.1 160)" }}>
               <Building2 className="h-2.5 w-2.5" />
@@ -207,8 +210,8 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
               <Lock className="h-2.5 w-2.5" />
               Private
             </div>
-          ))}
-          {!isTauri && deck.collaborators && deck.collaborators.length > 0 && (
+          )}
+          {deck.collaborators && deck.collaborators.length > 0 && (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium backdrop-blur-md"
               style={{ background: "oklch(0.55 0.12 220 / 0.35)", color: "oklch(0.9 0.08 220)" }}
               title={deck.collaborators.join(", ")}
@@ -217,6 +220,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
               {deck.collaborators.length}
             </div>
           )}
+          </CloudOnly>
         </div>
       </div>
 

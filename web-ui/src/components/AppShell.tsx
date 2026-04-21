@@ -22,7 +22,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { usePreferences } from "@/hooks/usePreferences"
 import { Layers, ChevronLeft, MessageSquare, CircleUser, LogOut, Bot } from "lucide-react"
 import { AgentSettingsDialog } from "@/components/chat/AgentSettingsDialog"
-import { isTauri } from "@/lib/platform"
+import { CloudOnly, LocalOnly } from "@/lib/mode"
 
 
 interface AppShellProps {
@@ -200,8 +200,8 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
 
                 <div className="my-1 border-t border-white/[0.06]" />
 
-                {/* Agent Settings (Tauri only) */}
-                {isTauri && (
+                {/* Agent Settings (local only) */}
+                <LocalOnly>
                   <>
                     <button
                       role="menuitem"
@@ -214,10 +214,10 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                     </button>
                     <div className="my-1 border-t border-white/[0.06]" />
                   </>
-                )}
+                </LocalOnly>
 
-                {/* Sign out (web only) */}
-                {!isTauri && (
+                {/* Sign out (cloud only) */}
+                <CloudOnly>
                   <button
                     ref={el => { itemsRef.current[1] = el }}
                     role="menuitem"
@@ -228,7 +228,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                     <LogOut className="h-3.5 w-3.5" />
                     <span>Sign out</span>
                   </button>
-                )}
+                </CloudOnly>
               </div>
             )}
           </div>
@@ -238,8 +238,10 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
       {/* ── Content area ── */}
       {children}
 
-      {/* Agent settings dialog (Tauri only) */}
-      {isTauri && <AgentSettingsDialog open={showAgentSettings} onClose={() => setShowAgentSettings(false)} />}
+      {/* Agent settings dialog (local only) */}
+      <LocalOnly>
+        <AgentSettingsDialog open={showAgentSettings} onClose={() => setShowAgentSettings(false)} />
+      </LocalOnly>
     </div>
   )
 }

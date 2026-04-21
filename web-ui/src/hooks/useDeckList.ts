@@ -132,13 +132,8 @@ export function useDeckList(
   const handleDownload = useCallback((deckId: string) => {
     const target = decks.find((d) => d.deckId === deckId)
     if (!target?.pptxUrl) return
-    const ti = (window as Record<string,unknown>).__TAURI_INTERNALS__ as { invoke?: (cmd: string, args: Record<string,string>) => Promise<void> } | undefined
-    if (ti?.invoke) {
-      const filePath = decodeURIComponent(target.pptxUrl.replace(/^asset:\/\/localhost\//, "/").split("?")[0])
-      ti.invoke("open_path", { path: filePath }).catch(() => {})
-    } else {
-      window.open(target.pptxUrl, "_blank")
-    }
+    // TODO: Phase 3 — local mode will use API Route to open file
+    window.open(target.pptxUrl, "_blank")
   }, [decks])
 
   const confirmDelete = useCallback(async () => {

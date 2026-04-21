@@ -116,7 +116,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
 
       ;(async () => {
         try {
-          // Wait for fonts to load — webkit/wry computes textLength against
+          // Wait for fonts to load — webkit computes textLength against
           // the wrong metrics if fonts aren't ready, causing compressed text.
           if (typeof document !== "undefined" && document.fonts?.ready) {
             try { await document.fonts.ready } catch { /* ignore */ }
@@ -305,7 +305,7 @@ function typewrite(compEl: SVGGElement) {
   tspans.forEach(ts => {
     if (ts.querySelectorAll("tspan").length === 0 && ts.textContent) {
       // Strip textLength / lengthAdjust permanently — restoring them after typewriter
-      // completes causes webkit (Tauri wry) to horizontally compress glyphs.
+      // completes causes webkit to horizontally compress glyphs.
       // Natural glyph spacing is visually acceptable.
       for (const attr of ["textLength", "lengthAdjust"]) {
         ts.removeAttribute(attr)

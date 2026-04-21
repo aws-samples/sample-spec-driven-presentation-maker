@@ -30,7 +30,7 @@ import { EmptyState } from "@/components/deck/EmptyState"
 import { SearchResultsGrid } from "@/components/deck/SearchResultsGrid"
 import { Search, X, Plus, Lock, Star, Users, Building2, Sparkles } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { isTauri } from "@/lib/platform"
+import { IS_LOCAL } from "@/lib/mode"
 
 /** Tab definition for the list view. */
 interface Tab {
@@ -40,7 +40,7 @@ interface Tab {
 }
 
 /** Available tabs in the deck list. */
-const TABS: Tab[] = isTauri ? [] : [
+const TABS: Tab[] = IS_LOCAL ? [] : [
   { key: "mine", label: "My Decks", icon: Lock },
   { key: "favorites", label: "Favorites", icon: Star },
   { key: "shared", label: "Shared", icon: Users },
@@ -72,8 +72,8 @@ export function DeckListView({
   onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, loading,
 }: DeckListViewProps) {
   // Tauri: no server-side slide search; filter decks by name client-side instead.
-  const showSearch = !isTauri && searchQuery.length >= 2
-  const filteredDecks = (isTauri && searchQuery)
+  const showSearch = !IS_LOCAL && searchQuery.length >= 2
+  const filteredDecks = (IS_LOCAL && searchQuery)
     ? decks.filter(d => (d.name || "").toLowerCase().includes(searchQuery.toLowerCase()))
     : decks
 

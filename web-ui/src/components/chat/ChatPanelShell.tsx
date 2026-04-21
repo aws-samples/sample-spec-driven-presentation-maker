@@ -26,7 +26,7 @@
 import { useRef, useEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
-import { isTauri } from "@/lib/platform"
+import { LocalOnly, IS_LOCAL } from "@/lib/mode"
 
 export type ChatTabKey = "new" | "deck"
 
@@ -105,7 +105,7 @@ export function ChatPanelShell({
 
   // Start ACP agent early so model list is available immediately
   useEffect(() => {
-    if (!isTauri) return
+    if (!IS_LOCAL) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ensure = (globalThis as any).__sdpmEnsureAgent as (() => Promise<void>) | undefined
     if (ensure) ensure().catch(() => { /* agent may not be ready yet */ })
@@ -260,7 +260,7 @@ export function ChatPanelShell({
                 <MessageSquare className="h-2.5 w-2.5 text-brand-teal" />
               </div>
               <span className="text-[13px] font-semibold tracking-[-0.01em]">Chat</span>
-              {isTauri && <ModelSelector />}
+              <LocalOnly><ModelSelector /></LocalOnly>
             </div>
             <div className="flex items-center gap-0.5">
               <button

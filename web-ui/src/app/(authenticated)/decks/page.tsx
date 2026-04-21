@@ -34,7 +34,7 @@ import { useSwipe } from "@/hooks/useSwipe"
 import { useDeckList } from "@/hooks/useDeckList"
 import { useWorkspace } from "@/hooks/useWorkspace"
 import { Plus, MessageSquare, Image as ImageIcon, Star } from "lucide-react"
-import { isBrowser } from "@/lib/platform"
+import { IS_LOCAL } from "@/lib/mode"
 
 export default function DecksPage() {
   const auth = useAuth()
@@ -123,11 +123,10 @@ export default function DecksPage() {
                     inline
                   />
                 ) : (
-                  // Desktop: defer SlideCarousel mount until deck data loads so
+                  // Local: defer SlideCarousel mount until deck data loads so
                   // hadSlidesOnMount captures the real slide count, not the
-                  // initial empty-deck state (Web's useRef capture has same
-                  // issue but is masked by different timing).
-                  isTauri && ws.isWorkspace && !ws.isNew && !ws.deck ? (
+                  // initial empty-deck state.
+                  IS_LOCAL && ws.isWorkspace && !ws.isNew && !ws.deck ? (
                     <div className="w-full h-full" />
                   ) : (
                   <SlideCarousel
@@ -159,7 +158,7 @@ export default function DecksPage() {
                     }}
                     ownerAlias={!ws.isOwner ? ws.deck?.ownerAlias : undefined}
                     headerActions={
-                      ws.activeDeckId && !ws.isNew && isBrowser ? (
+                      ws.activeDeckId && !ws.isNew && typeof window !== "undefined" ? (
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => list.handleToggleFavorite(ws.activeDeckId!, list.favoriteIds.has(ws.activeDeckId!) ? "remove" : "add")}
