@@ -32,6 +32,7 @@ import { FileDropZone } from "./FileDropZone"
 import { SnippetInput } from "./SnippetInput"
 import { useIsMobile } from "@/hooks/UseMobile"
 import { Send, Square, ChevronRight } from "lucide-react"
+import { ModeSelector } from "./ModeSelector"
 import { usePreferences } from "@/hooks/usePreferences"
 import { toast } from "sonner"
 
@@ -114,7 +115,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const auth = useAuth()
   const { onCompositionStart, onCompositionEnd, getIsComposing } = useCompositionSafe()
   const isMobile = useIsMobile()
-  const { fetchWebImages, setFetchWebImages, parallelAgents, setParallelAgents } = usePreferences()
+  const { fetchWebImages, setFetchWebImages, parallelAgents, setParallelAgents, agentMode, setAgentMode } = usePreferences()
   const [optionsOpen, setOptionsOpen] = useState(false)
 
   /**
@@ -690,7 +691,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           })
         },
         controller.signal,
-        parallelAgents ? "separated" : "single",
+        agentMode === "vibe" ? "vibe" : (parallelAgents ? "separated" : "single"),
       )
     } catch (err) {
       // AbortError is expected when user clicks stop — don't show error
@@ -846,14 +847,15 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               ))}
             </div>
           ) : isInitial ? (
-            <div className="h-full flex flex-col items-center justify-center text-center">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-brand-teal-soft mb-4">
-                <Send className="h-4 w-4 text-brand-teal" />
+            <div className="h-full flex flex-col items-center justify-center text-center px-4">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-teal-soft mb-5">
+                <Send className="h-5 w-5 text-brand-teal" />
               </div>
-              <h2 className="text-[14px] font-semibold tracking-[-0.01em] mb-1">{deckName || "New Deck"}</h2>
-              <p className="text-[12px] text-foreground-muted leading-relaxed">
-                Describe the presentation you want to create.
+              <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-1">Let&apos;s present</h2>
+              <p className="text-[13px] text-foreground-muted leading-relaxed mb-8">
+                Drop a URL, paste notes, or describe your idea
               </p>
+              <ModeSelector value={agentMode} onChange={setAgentMode} />
             </div>
           ) : (
             <div className="space-y-4">

@@ -85,6 +85,8 @@ async def agent_stream(payload, context):
         mode = payload.get("mode", "separated")
         if mode == "single":
             agent, mcp_status = create_single_agent(user_id=user_id, session_id=session_id, jwt_token=jwt_token)
+        elif mode == "vibe":
+            agent, mcp_status = create_separated_agent(user_id=user_id, session_id=session_id, jwt_token=jwt_token, prompt_key="vibe_agent")
         else:
             agent, mcp_status = create_separated_agent(user_id=user_id, session_id=session_id, jwt_token=jwt_token)
 

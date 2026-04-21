@@ -38,7 +38,7 @@ _SPEC_PREFETCH = [
 ]
 
 
-def create_separated_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, list[dict]]:
+def create_separated_agent(user_id: str, session_id: str, jwt_token: str, prompt_key: str = "spec_agent") -> tuple[Agent, list[dict]]:
     """Create a Strands Agent with MCP tools and memory (separated mode: SPEC + Composer).
 
     Args:
@@ -151,7 +151,7 @@ def create_separated_agent(user_id: str, session_id: str, jwt_token: str) -> tup
         logger.warning("SPEC agent workflow prefetch failed: %s", e)
         common_context = ""
 
-    spec_agent_template = load_prompt("spec_agent")
+    spec_agent_template = load_prompt(prompt_key)
     agent.system_prompt = [
         {"text": build_system_prompt(spec_agent_template, common_context=common_context)},
         {"cachePoint": {"type": "default"}},
