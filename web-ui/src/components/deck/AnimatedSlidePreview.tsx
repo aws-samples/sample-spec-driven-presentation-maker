@@ -96,20 +96,35 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   defsUrlRef.current = defsUrl
   skipRef.current = skipAnimation
 
+  // Expose check() via ref so the composeUrl-change effect can trigger it
+  const checkRef = useRef<() => void>(() => {})
+
   useEffect(() => {
     let cancelled = false
 
     function check() {
-      const compUrlBase = composeUrlRef.current.split("?")[0]
+      const compUrlBase = composeUrlRef.current?.split("?")[0] || ""
+      if (!compUrlBase) return
       if (compUrlBase === lastComposeUrlRef.current) return
       if (animatingRef.current) return  // defer until animation completes
+      // Skip only on the first URL seen after mount (initial load for existing
+      // deck). Subsequent URL changes (user edits) always animate.
+      const isFirstUrl = !lastComposeUrlRef.current
+      const skipThisUpdate = skipRef.current && isFirstUrl
       lastComposeUrlRef.current = compUrlBase
       setError(false)
 
       ;(async () => {
         try {
+          // Wait for fonts to load — webkit computes textLength against
+          // the wrong metrics if fonts aren't ready, causing compressed text.
+          if (typeof document !== "undefined" && document.fonts?.ready) {
+            try { await document.fonts.ready } catch { /* ignore */ }
+          }
           const [defsResp, compResp] = await Promise.all([fetch(defsUrlRef.current), fetch(composeUrlRef.current)])
-          if (cancelled || !defsResp.ok || !compResp.ok) { setError(true); return }
+          if (cancelled || !defsResp.ok || !compResp.ok) {
+            setError(true); return
+          }
 
           const defsData: DefsData = await defsResp.json()
           const data: ComposeData = await compResp.json()
@@ -124,7 +139,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           cleanup()
 
           const animTargets = new Set<number>()
-          if (!skipRef.current) {
+          if (!skipThisUpdate) {
             data.components.forEach((comp, i) => {
               if (comp.changed) animTargets.add(i)
             })
@@ -263,35 +278,40 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     }
 
     check()
+    checkRef.current = check
     const iv = window.setInterval(check, 1000)
     return () => { cancelled = true; clearInterval(iv); cleanup() }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
 
+  // React immediately to composeUrl prop changes (avoid 1s interval lag)
+  useEffect(() => {
+    checkRef.current?.()
+  }, [composeUrl])
+
   if (error && fallback) return <>{fallback}</>
 
   return (
     <div data-slide-id={slug} className="aspect-[16/9] relative overflow-hidden rounded-lg bg-black">
-      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={containerRef} className="absolute inset-0" data-slide-id={slug} />
     </div>
   )
 }
 
 function typewrite(compEl: SVGGElement) {
   const tspans = compEl.querySelectorAll("tspan")
-  const leafSpans: { el: Element; fullText: string; saved: Record<string, string> }[] = []
+  const leafSpans: { el: Element; fullText: string }[] = []
   let totalChars = 0
   tspans.forEach(ts => {
     if (ts.querySelectorAll("tspan").length === 0 && ts.textContent) {
-      const saved: Record<string, string> = {}
+      // Strip textLength / lengthAdjust permanently — restoring them after typewriter
+      // completes causes webkit to horizontally compress glyphs.
+      // Natural glyph spacing is visually acceptable.
       for (const attr of ["textLength", "lengthAdjust"]) {
-        if (ts.hasAttribute(attr)) {
-          saved[attr] = ts.getAttribute(attr)!
-          ts.removeAttribute(attr)
-        }
+        ts.removeAttribute(attr)
       }
       totalChars += ts.textContent.length
-      leafSpans.push({ el: ts, fullText: ts.textContent, saved })
+      leafSpans.push({ el: ts, fullText: ts.textContent })
       ts.textContent = ""
     }
   })
@@ -304,7 +324,6 @@ function typewrite(compEl: SVGGElement) {
     charIdx++
     span.el.textContent = span.fullText.slice(0, charIdx)
     if (charIdx >= span.fullText.length) {
-      for (const [a, v] of Object.entries(span.saved)) span.el.setAttribute(a, v)
       spanIdx++
       charIdx = 0
     }

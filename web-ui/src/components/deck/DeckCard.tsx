@@ -24,7 +24,9 @@ import { DeckSummary } from "@/services/deckService"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Layers, Star, MoreHorizontal, Trash2, Building2, Lock, Share2, Download, Users, Link } from "lucide-react"
+import { Layers, Star, MoreHorizontal, Trash2, Building2, Lock, Share2, Download, Users, Link, FolderOpen } from "lucide-react"
+import { CloudOnly, IS_LOCAL } from "@/lib/mode"
+
 
 interface DeckCardProps {
   deck: DeckSummary
@@ -132,10 +134,11 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
             </DropdownMenuItem>
             {onDownload && (
               <DropdownMenuItem onClick={() => onDownload(deck.deckId)}>
-                <Download className="h-3.5 w-3.5" />
-                Download PPTX
+                {IS_LOCAL ? <FolderOpen className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
+                {IS_LOCAL ? "Open PPTX" : "Download PPTX"}
               </DropdownMenuItem>
             )}
+            <CloudOnly>
             {isOwner && onToggleVisibility && (
               <>
                 <DropdownMenuSeparator />
@@ -153,6 +156,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
                 Share
               </DropdownMenuItem>
             )}
+            </CloudOnly>
             {isOwner && onDelete && (
               <>
                 <DropdownMenuSeparator />
@@ -194,6 +198,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
             <Layers className="h-2.5 w-2.5" />
             {deck.slideCount}
           </div>
+          <CloudOnly>
           {(deck.visibility || "private") === "public" ? (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium backdrop-blur-md"
               style={{ background: "oklch(0.55 0.15 160 / 0.35)", color: "oklch(0.9 0.1 160)" }}>
@@ -215,6 +220,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
               {deck.collaborators.length}
             </div>
           )}
+          </CloudOnly>
         </div>
       </div>
 

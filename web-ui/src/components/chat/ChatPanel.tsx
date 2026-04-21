@@ -16,7 +16,8 @@
 "use client"
 
 import { useEffect, useRef, useState, useImperativeHandle, forwardRef, FormEvent, KeyboardEvent, useCallback, useMemo } from "react"
-import { useAuth } from "react-oidc-context"
+import { useAuth } from "@/hooks/useAuth"
+import { IS_LOCAL } from "@/lib/mode"
 import { invokeAgentCore, generateSessionId, setAgentConfig, stopRuntimeSession } from "@/services/agentCoreService"
 import { getChatHistory, listDecks, patchDeck, DeckSummary } from "@/services/deckService"
 import { uploadFile, validateFile, canAddMoreFiles, UploadedFile } from "@/services/uploadService"
@@ -134,8 +135,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     },
   }), [input])
 
-  // Load agent config
+  // Load agent config (cloud only — local mode uses API routes)
   useEffect(() => {
+    if (IS_LOCAL) { setConfigLoaded(true); return }
     async function loadConfig() {
       try {
         const response = await fetch("/aws-exports.json")

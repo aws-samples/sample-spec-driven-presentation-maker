@@ -26,8 +26,46 @@
 import { useRef, useEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
+import { LocalOnly, IS_LOCAL } from "@/lib/mode"
 
 export type ChatTabKey = "new" | "deck"
+
+
+/** Model info for local ACP agent */
+interface AcpModel { modelId: string; name: string; description?: string }
+
+function ModelSelector() {
+  const [model, setModelState] = useState<string>("")
+  const [models, setModels] = useState<AcpModel[]>([])
+
+  useEffect(() => {
+    fetch("/api/agent/models").then(r => r.json()).then(data => {
+      setModels(data.available || [])
+      setModelState(data.current || "")
+    }).catch(() => {})
+  }, [])
+
+  if (models.length === 0) return null
+
+  return (
+    <select
+      value={model}
+      onChange={async (e) => {
+        const v = e.target.value
+        setModelState(v)
+        sessionStorage.setItem("sdpm-model", v)
+        fetch("/api/agent/models", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ modelId: v }),
+        }).catch(() => {})
+      }}
+      className="text-[11px] bg-transparent border border-border rounded px-1.5 py-0.5 text-foreground-muted hover:text-foreground focus:outline-none focus:ring-1 focus:ring-brand-teal max-w-[140px]"
+    >
+      {models.map(m => <option key={m.modelId} value={m.modelId}>{m.name}</option>)}
+    </select>
+  )
+}
 
 interface ChatPanelShellProps {
   open: boolean
@@ -54,6 +92,12 @@ export function ChatPanelShell({
   const internalChatRef = useRef<ChatPanelHandle>(null)
   const chatRef = externalChatRef || internalChatRef
   const panelRef = useRef<HTMLElement>(null)
+
+  // Start ACP agent early so model list is available immediately
+  useEffect(() => {
+    if (!IS_LOCAL) return
+    fetch("/api/agent/models").catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // When Panel A creates a deck, store the deckId so we know Panel A "owns" it
   const [panelADeckId, setPanelADeckId] = useState<string | null>(null)
@@ -204,6 +248,7 @@ export function ChatPanelShell({
                 <MessageSquare className="h-2.5 w-2.5 text-brand-teal" />
               </div>
               <span className="text-[13px] font-semibold tracking-[-0.01em]">Chat</span>
+              <LocalOnly><ModelSelector /></LocalOnly>
             </div>
             <div className="flex items-center gap-0.5">
               <button

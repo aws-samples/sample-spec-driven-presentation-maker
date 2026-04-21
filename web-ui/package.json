@@ -5,7 +5,9 @@
   "license": "MIT-0",
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:local": "NEXT_PUBLIC_MODE=local next dev --turbopack",
     "build": "next build",
+    "build:cloud": "bash -c 'trap \"mv src/app/_api src/app/api 2>/dev/null\" EXIT; mv src/app/api src/app/_api && next build'",
     "start": "next start",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",

@@ -12,13 +12,15 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { SlidePreview, getDeckWithJson } from "@/services/deckService"
 import type { SpecFiles } from "@/services/deckService"
-import { Download, FileJson, Layers, Loader2, LayoutGrid, Rows3 } from "lucide-react"
-import { useAuth } from "react-oidc-context"
+import { Download, FileJson, Layers, Loader2, LayoutGrid, Rows3, FolderOpen } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
+import { CloudOnly, LocalOnly, IS_LOCAL } from "@/lib/mode"
+
 
 interface SlideCarouselProps {
   slides: SlidePreview[]
@@ -48,6 +50,23 @@ interface SlideCarouselProps {
 
 export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, idToken }: SlideCarouselProps) {
   const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
+  // eslint-disable-next-line no-console
+  const slugs = slides.map(s => s.slug)
+  // eslint-disable-next-line no-console
+  if (new Set(slugs).size !== slugs.length) console.warn("[SlideCarousel] duplicate slugs:", slugs)
+  // Check compose URL duplicates across different slugs
+  // eslint-disable-next-line no-console
+  const urlBySlug: Record<string,string> = {}
+  const dupUrls: string[] = []
+  for (const s of slidesWithPreview) {
+    const u = s.composeUrl?.split("?")[0] || ""
+    if (u && Object.values(urlBySlug).includes(u)) dupUrls.push(`${s.slug}→${u}`)
+    if (u) urlBySlug[s.slug] = u
+  }
+  // eslint-disable-next-line no-console
+  if (dupUrls.length) console.warn("[SlideCarousel] same composeUrl used for multiple slides:", dupUrls, urlBySlug)
+  // eslint-disable-next-line no-console
+  console.log("[SlideCarousel] slug→url:", slidesWithPreview.map(s => `${s.slug}: ${s.composeUrl?.split("/").pop()?.split("?")[0]}`))
   const auth = useAuth()
   const [jsonLoading, setJsonLoading] = useState(false)
   const { viewMode, setViewMode } = usePreferences()
@@ -56,7 +75,6 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
   const scrollTargetRef = useRef<string | null | undefined>(undefined)
-  // If deck opened with slides → existing deck → first compose is instant
   const hadSlidesOnMount = useRef(slides.length > 0)
   const firstComposeSeenRef = useRef(false)
 
@@ -197,6 +215,18 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     } finally {
       setJsonLoading(false)
     }
+  }
+
+  /** Local: open deck directory in Finder/Explorer */
+  async function handleJsonOpen() {
+    if (!deckId || !IS_LOCAL) return
+    window.open(`/api/preview/${deckId}/`, "_blank")
+  }
+
+  /** Local: open output.pptx with default app */
+  async function handlePptxOpen() {
+    if (!pptxUrl || !IS_LOCAL) return
+    window.open(pptxUrl, "_blank")
   }
 
   /**
@@ -426,25 +456,36 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
             </div>
             {deckId && (
               <button
-                onClick={handleJsonDownload}
+                onClick={IS_LOCAL ? handleJsonOpen : handleJsonDownload}
                 disabled={jsonLoading}
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors disabled:opacity-50"
-                aria-label="Download JSON"
+                aria-label={IS_LOCAL ? "Open JSON" : "Download JSON"}
               >
                 {jsonLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileJson className="h-3.5 w-3.5" />}
                 JSON
               </button>
             )}
             {pptxUrl && (
-              <a
-                href={pptxUrl}
-                download
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground no-underline px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
-                aria-label="Download PPTX"
-              >
-                <Download className="h-3.5 w-3.5" />
-                PPTX
-              </a>
+              IS_LOCAL ? (
+                <button
+                  onClick={handlePptxOpen}
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
+                  aria-label="Open PPTX"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  PPTX
+                </button>
+              ) : (
+                <a
+                  href={pptxUrl}
+                  download
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground no-underline px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
+                  aria-label="Download PPTX"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  PPTX
+                </a>
+              )
             )}
           </div>
         </div>

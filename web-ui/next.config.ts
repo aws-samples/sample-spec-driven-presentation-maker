@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: MIT-0
 import type { NextConfig } from "next"
 
+const isLocal = process.env.NEXT_PUBLIC_MODE === "local"
+
 const nextConfig: NextConfig = {
   distDir: "build",
-  output: "export",
+  ...(isLocal ? {} : { output: "export" as const }),
   trailingSlash: true,
   typescript: {
     ignoreBuildErrors: true,

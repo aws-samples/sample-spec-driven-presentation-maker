@@ -16,7 +16,7 @@
 import { DeckDetail } from "@/services/deckService"
 import { Share2, Download, Layers } from "lucide-react"
 import { PreviewImage } from "@/components/ui/PreviewImage"
-import { useAuth } from "react-oidc-context"
+import { useAuth } from "@/hooks/useAuth"
 
 interface WorkspaceViewProps {
   deck: DeckDetail
