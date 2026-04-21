@@ -33,12 +33,16 @@ const LOCAL_AUTH = {
 export function useAuth() {
   // In local mode, OidcAuthProvider is absent so useOidcAuth() returns undefined.
   // We call it unconditionally to satisfy React's rules of hooks, then discard the result.
-  // try-catch guards against future library versions that might throw without a Provider.
+  // Suppress the console.warn from react-oidc-context in local mode.
   let auth: ReturnType<typeof useOidcAuth> | undefined
+  const origWarn = IS_LOCAL ? console.warn : null
+  if (IS_LOCAL) console.warn = () => {}
   try {
     auth = useOidcAuth()
   } catch {
     auth = undefined
+  } finally {
+    if (origWarn) console.warn = origWarn
   }
 
   const [authConfig, setAuthConfig] = useState<CognitoAuthConfig | null>(null)
