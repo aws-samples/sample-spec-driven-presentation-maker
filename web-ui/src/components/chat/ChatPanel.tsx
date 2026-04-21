@@ -107,6 +107,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const mentionPopupRef = useRef<{ _handleKeyDown?: (e: KeyboardEvent) => boolean } | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+  const currentDeckId = useRef(deckId)
+  currentDeckId.current = deckId
   const auth = useAuth()
   const { onCompositionStart, onCompositionEnd, getIsComposing } = useCompositionSafe()
   const isMobile = useIsMobile()
@@ -158,7 +162,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       if (!idToken || !sessionId) return
       setHistoryLoading(true)
       try {
-      const history = await getChatHistory(sessionId, idToken)
+      const history = await getChatHistory(sessionId, idToken, deckId || undefined)
       if (history.length > 0) {
         const parsed: typeof messages = []
         for (const m of history) {
@@ -705,6 +709,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     } finally {
       abortControllerRef.current = null
       setIsLoading(false)
+      // Save chat messages to disk in local mode
+      if (IS_LOCAL && currentDeckId.current) {
+        fetch("/api/agent/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deckId: currentDeckId.current, messages: messagesRef.current }),
+        }).catch(() => {})
+      }
     }
   }
 

@@ -4,24 +4,17 @@
  * Local ACP Session Load — restores an existing session.
  * Returns SSE stream of replayed history (session/update notifications).
  */
-import { ensureAgent, loadSession, getSessionId, subscribe } from "@/lib/local/acp-process"
-import { createSSEStream } from "@/lib/local/sse-bridge"
+import { ensureAgent, loadSession, getSessionId, subscribe, readChatFromDeck } from "@/lib/local/acp-process"
 
 export async function POST(req: Request) {
-  const { sessionId: savedSessionId } = await req.json()
+  const { sessionId: savedSessionId, deckId } = await req.json()
   if (!savedSessionId) return Response.json({ error: "sessionId required" }, { status: 400 })
 
+  // Restore agent context (replay is ignored by client)
   await ensureAgent()
   await loadSession(savedSessionId)
 
-  const sessionId = getSessionId()!
-  const stream = createSSEStream({ sessionId, subscribe })
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  })
+  // Return saved chat messages
+  const messages = deckId ? readChatFromDeck(deckId) : []
+  return Response.json({ messages })
 }

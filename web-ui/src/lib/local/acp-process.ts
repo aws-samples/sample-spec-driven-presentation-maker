@@ -159,16 +159,30 @@ export async function loadSession(savedSessionId: string): Promise<void> {
 /** Save sessionId to deck's .session file. */
 export function saveSessionToDeck(deckId: string): void {
   if (!sessionId) return
-  const sessionFile = path.join(DECK_ROOT, deckId, ".session")
   const fs = require("fs") as typeof import("fs")
-  fs.writeFileSync(sessionFile, sessionId, "utf-8")
+  const dir = path.join(DECK_ROOT, deckId)
+  if (!fs.existsSync(dir)) return
+  fs.writeFileSync(path.join(dir, ".session"), sessionId, "utf-8")
 }
 
 /** Read sessionId from deck's .session file. */
 export function readSessionFromDeck(deckId: string): string | null {
-  const sessionFile = path.join(DECK_ROOT, deckId, ".session")
   const fs = require("fs") as typeof import("fs")
-  try { return fs.readFileSync(sessionFile, "utf-8").trim() } catch { return null }
+  try { return fs.readFileSync(path.join(DECK_ROOT, deckId, ".session"), "utf-8").trim() } catch { return null }
+}
+
+/** Save chat messages to deck's .chat.json file. */
+export function saveChatToDeck(deckId: string, messages: unknown[]): void {
+  const fs = require("fs") as typeof import("fs")
+  const dir = path.join(DECK_ROOT, deckId)
+  if (!fs.existsSync(dir)) return
+  fs.writeFileSync(path.join(dir, ".chat.json"), JSON.stringify(messages), "utf-8")
+}
+
+/** Read chat messages from deck's .chat.json file. */
+export function readChatFromDeck(deckId: string): unknown[] {
+  const fs = require("fs") as typeof import("fs")
+  try { return JSON.parse(fs.readFileSync(path.join(DECK_ROOT, deckId, ".chat.json"), "utf-8")) } catch { return [] }
 }
 
 // Cleanup on process exit

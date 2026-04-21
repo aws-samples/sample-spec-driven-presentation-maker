@@ -198,8 +198,19 @@ export interface ChatMessage {
  * @param idToken - Cognito ID token
  * @returns Array of chat messages sorted by timestamp
  */
-export async function getChatHistory(sessionId: string, idToken: string): Promise<ChatMessage[]> {
-  if (IS_LOCAL) return []
+export async function getChatHistory(sessionId: string, idToken: string, deckId?: string): Promise<ChatMessage[]> {
+  if (IS_LOCAL) {
+    if (!deckId) return []
+    // Load session context + saved messages
+    const res = await fetch("/api/agent/load", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, deckId }),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return data.messages || []
+  }
   const base = await getApiBaseUrl()
   const response = await fetch(`${base}chat/${sessionId}`, {
     headers: { Authorization: `Bearer ${idToken}` },
