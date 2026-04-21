@@ -11,6 +11,7 @@ import path from "path"
 import os from "os"
 
 export const DECK_ROOT = path.join(os.homedir(), "Documents", "SDPM-Presentations")
+const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
 
 type PendingResolve = (value: unknown) => void
 type NotifyListener = (msg: Record<string, unknown>) => void
@@ -42,7 +43,7 @@ function handleLine(line: string) {
     const reqId = msg.id as string
     if (reqId && child) {
       child.stdin!.write(JSON.stringify({
-        jsonrpc: "2.0", id: reqId, result: { optionId: "allow_always" },
+        jsonrpc: "2.0", id: reqId, result: { outcome: { outcome: "selected", optionId: "allow_always" } },
       }) + "\n")
     }
     return
@@ -96,10 +97,10 @@ export async function setConfigOption(configId: string, value: string): Promise<
 export async function ensureAgent(): Promise<void> {
   if (child) return
 
-  const projectRoot = path.resolve(process.cwd(), "..")
+  const mcpLocalDir = MCP_LOCAL_DIR
 
   child = spawn("kiro-cli", ["acp", "--agent", "sdpm-spec"], {
-    cwd: projectRoot,
+    cwd: mcpLocalDir,
     stdio: ["pipe", "pipe", "pipe"],
   })
 
@@ -129,7 +130,7 @@ export async function ensureAgent(): Promise<void> {
 
   const AGENT_NAME = "sdpm-spec"
 
-  const result = await rpcRequest("session/new", { cwd: DECK_ROOT, mcpServers: [], agent: AGENT_NAME }) as Record<string, unknown>
+  const result = await rpcRequest("session/new", { cwd: MCP_LOCAL_DIR, mcpServers: [], agent: AGENT_NAME }) as Record<string, unknown>
   sessionId = result.sessionId as string
 
   // Extract model info from session/new response
@@ -145,14 +146,14 @@ export async function ensureAgent(): Promise<void> {
 
 /** Create a new ACP session (for new chat). */
 export async function newSession(): Promise<void> {
-  const result = await rpcRequest("session/new", { cwd: DECK_ROOT, mcpServers: [], agent: "sdpm-spec" }) as Record<string, unknown>
+  const result = await rpcRequest("session/new", { cwd: MCP_LOCAL_DIR, mcpServers: [], agent: "sdpm-spec" }) as Record<string, unknown>
   sessionId = result.sessionId as string
 }
 
 /** Load an existing ACP session (replays history via session/update notifications). */
 export async function loadSession(savedSessionId: string): Promise<void> {
   await ensureAgent()
-  const result = await rpcRequest("session/load", { sessionId: savedSessionId, cwd: DECK_ROOT, mcpServers: [] }) as Record<string, unknown>
+  const result = await rpcRequest("session/load", { sessionId: savedSessionId, cwd: MCP_LOCAL_DIR, mcpServers: [] }) as Record<string, unknown>
   sessionId = result.sessionId as string || savedSessionId
 }
 
