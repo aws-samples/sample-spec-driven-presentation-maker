@@ -50,7 +50,7 @@ jobs:
           fi
         working-directory: web-ui
       - name: Build
-        run: npm run build
+        run: npm run build:cloud
         working-directory: web-ui
 
   infra:
