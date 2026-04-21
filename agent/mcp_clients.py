@@ -41,14 +41,18 @@ def mcp_agentcore_runtime(jwt_token: str) -> MCPClient:
 
 
 def mcp_aws_knowledge() -> MCPClient:
-    """Pattern 2: IAM-authenticated AWS Knowledge MCP with public fallback."""
-    region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
+    """Pattern 2: IAM-authenticated AWS Knowledge MCP with public fallback.
+
+    Note: AWS MCP Server is currently only available in us-east-1.
+    We hard-code the endpoint region regardless of the agent's region.
+    """
     try:
         from mcp_proxy_for_aws.client import aws_iam_streamablehttp_client
         return MCPClient(
             lambda: aws_iam_streamablehttp_client(
-                endpoint=f"https://aws-mcp.{region}.api.aws/mcp",
+                endpoint="https://aws-mcp.us-east-1.api.aws/mcp",
                 aws_service="aws-mcp",
+                aws_region="us-east-1",
             ),
         )
     except Exception:
