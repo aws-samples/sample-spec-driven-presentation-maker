@@ -93,16 +93,19 @@ def _mcp_aws_knowledge() -> MCPClient:
     Primary: IAM-authenticated endpoint (higher rate limits).
     Fallback: Public unauthenticated endpoint.
 
+    Note: AWS MCP Server is currently only available in us-east-1.
+    We hard-code the endpoint region regardless of the agent's region.
+
     Returns:
         MCPClient for AWS Knowledge MCP.
     """
-    region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
     try:
         from mcp_proxy_for_aws.client import aws_iam_streamablehttp_client
         return MCPClient(
             lambda: aws_iam_streamablehttp_client(
-                endpoint=f"https://aws-mcp.{region}.api.aws/mcp",
+                endpoint="https://aws-mcp.us-east-1.api.aws/mcp",
                 aws_service="aws-mcp",
+                aws_region="us-east-1",
             ),
         )
     except Exception:

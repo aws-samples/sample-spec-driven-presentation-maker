@@ -66,6 +66,20 @@ export class RuntimeStack extends cdk.Stack {
         resources: [props.pptxBucket.bucketArn, props.resourceBucket.bucketArn],
       })
     );
+
+    // CloudWatch Logs (AgentCore writes stdout/stderr directly via execution role)
+    runtimeRole.addToPolicy(new iam.PolicyStatement({
+      actions: ["logs:CreateLogGroup", "logs:DescribeLogStreams"],
+      resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock-agentcore/runtimes/*`],
+    }));
+    runtimeRole.addToPolicy(new iam.PolicyStatement({
+      actions: ["logs:DescribeLogGroups"],
+      resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:*`],
+    }));
+    runtimeRole.addToPolicy(new iam.PolicyStatement({
+      actions: ["logs:CreateLogStream", "logs:PutLogEvents"],
+      resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`],
+    }));
     runtimeRole.addToPolicy(
       new iam.PolicyStatement({
         actions: [

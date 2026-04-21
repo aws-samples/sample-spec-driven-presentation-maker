@@ -65,6 +65,20 @@ export class AgentStack extends cdk.Stack {
     props.table.grantReadWriteData(role);
     props.pptxBucket.grantReadWrite(role);
 
+    // CloudWatch Logs (AgentCore writes stdout/stderr directly via execution role)
+    role.addToPolicy(new iam.PolicyStatement({
+      actions: ["logs:CreateLogGroup", "logs:DescribeLogStreams"],
+      resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock-agentcore/runtimes/*`],
+    }));
+    role.addToPolicy(new iam.PolicyStatement({
+      actions: ["logs:DescribeLogGroups"],
+      resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:*`],
+    }));
+    role.addToPolicy(new iam.PolicyStatement({
+      actions: ["logs:CreateLogStream", "logs:PutLogEvents"],
+      resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`],
+    }));
+
     // AWS Pricing API (used by aws-pricing-mcp-server, stdio MCP)
     role.addToPolicy(
       new iam.PolicyStatement({
