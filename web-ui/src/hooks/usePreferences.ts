@@ -14,9 +14,10 @@ interface Prefs {
   sendWithEnter: boolean
   viewMode: "full" | "grid"
   fetchWebImages: boolean
+  parallelAgents: boolean
 }
 
-const DEFAULTS: Prefs = { sendWithEnter: false, viewMode: "full", fetchWebImages: false }
+const DEFAULTS: Prefs = { sendWithEnter: false, viewMode: "full", fetchWebImages: false, parallelAgents: true }
 
 /**
  * Read preferences from localStorage, falling back to defaults.
@@ -51,5 +52,7 @@ export function usePreferences() {
     setViewMode: useCallback((v: "full" | "grid") => update({ viewMode: v }), [update]),
     fetchWebImages: prefs.fetchWebImages,
     setFetchWebImages: useCallback((v: boolean) => update({ fetchWebImages: v }), [update]),
+    parallelAgents: prefs.parallelAgents,
+    setParallelAgents: useCallback((v: boolean) => update({ parallelAgents: v }), [update]),
   }
 }

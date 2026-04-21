@@ -21,11 +21,11 @@ interface SlideThumbnailProps {
   className?: string
   updated?: boolean
   /** data-slide-id for scroll-to-slide targeting. */
-  slideId?: string
+  slug?: string
   children?: React.ReactNode
 }
 
-export function SlideThumbnail({ src, alt, index, onClick, className, updated, slideId, children }: SlideThumbnailProps) {
+export function SlideThumbnail({ src, alt, index, onClick, className, updated, slug, children }: SlideThumbnailProps) {
   const [loaded, setLoaded] = useState(false)
   const prevSrc = useRef(src)
 
@@ -44,7 +44,7 @@ export function SlideThumbnail({ src, alt, index, onClick, className, updated, s
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick() } } : undefined}
-      data-slide-id={slideId}
+      data-slide-id={slug}
     >
       {/* Skeleton layer */}
       {!loaded && <div className="slide-skeleton absolute inset-0" />}

@@ -31,8 +31,8 @@ import {
   LayoutTemplate, Package, AlertCircle, Ruler, RefreshCw,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-
-type ToolCategory = "build" | "explore" | "produce" | "compute" | "other"
+import { ComposeCard } from "./compose/ComposeCard"
+import { CAT, type ToolCategory } from "./toolPalette"
 
 interface ToolMeta {
   Icon: LucideIcon
@@ -40,19 +40,10 @@ interface ToolMeta {
   category: ToolCategory
 }
 
-/** Accent palette per category — oklch for perceptual uniformity. */
-const CAT: Record<ToolCategory, { accent: string; bg: string; glow: string; border: string }> = {
-  build:   { accent: "oklch(0.75 0.14 185)", bg: "oklch(0.75 0.14 185 / 6%)",  glow: "oklch(0.75 0.14 185 / 12%)", border: "oklch(0.75 0.14 185 / 18%)" },
-  explore: { accent: "oklch(0.80 0.14 80)",  bg: "oklch(0.80 0.14 80 / 6%)",   glow: "oklch(0.80 0.14 80 / 12%)",  border: "oklch(0.80 0.14 80 / 18%)" },
-  produce: { accent: "oklch(0.72 0.16 300)", bg: "oklch(0.72 0.16 300 / 6%)",  glow: "oklch(0.72 0.16 300 / 12%)", border: "oklch(0.72 0.16 300 / 18%)" },
-  compute: { accent: "oklch(0.78 0.12 220)", bg: "oklch(0.78 0.12 220 / 6%)",  glow: "oklch(0.78 0.12 220 / 12%)", border: "oklch(0.78 0.12 220 / 18%)" },
-  other:   { accent: "oklch(0.55 0 0)",      bg: "oklch(0.55 0 0 / 4%)",       glow: "oklch(0.55 0 0 / 8%)",       border: "oklch(0.55 0 0 / 12%)" },
-}
-
 const ERR = { accent: "oklch(0.65 0.2 25)", bg: "oklch(0.65 0.2 25 / 6%)", border: "oklch(0.65 0.2 25 / 18%)" }
 
 /** Icon, label, and category per tool name. */
-const TOOL_META: Record<string, ToolMeta> = {
+export const TOOL_META: Record<string, ToolMeta> = {
   // Native agent tools
   create_deck:        { Icon: FolderPlus,      label: "Creating deck",          category: "build" },
   write_slide:        { Icon: Pencil,          label: "Writing slide",          category: "build" },
@@ -177,14 +168,40 @@ interface ToolCardProps {
   isActive?: boolean
   /** Streaming progress events from tool execution. */
   streamMessages?: Record<string, unknown>[]
+  /** Current deck slide IDs — used by ComposeCard for slug existence rendering. */
+  deckSlugs?: string[]
+  /** tool use id — forwarded to ComposeCard for soft-stop. */
+  toolUseId?: string
+  /** Session ID — forwarded to ComposeCard for soft-stop. */
+  sessionId?: string
+  /** Auth token — forwarded to ComposeCard (ID token: previews) / (Access token: cancel). */
+  idToken?: string
+  accessToken?: string
 }
 
 /** Strip MCP prefix from tool name for display lookup. */
-function stripPrefix(n: string): string {
+export function stripPrefix(n: string): string {
   return n.replace(/^spec_driven_presentation_maker_/, "")
 }
 
-export function ToolCard({ name, input, status, result, isActive = false, streamMessages }: ToolCardProps) {
+export function ToolCard({ name, input, status, result, isActive = false, streamMessages, deckSlugs, toolUseId, sessionId, idToken, accessToken }: ToolCardProps) {
+  // Dispatch: compose_slides has a dedicated rich card.
+  if (name === "compose_slides" || name.endsWith("_compose_slides")) {
+    return (
+      <ComposeCard
+        input={input}
+        status={status}
+        result={result}
+        isActive={isActive}
+        streamMessages={streamMessages}
+        deckSlugs={deckSlugs}
+        toolUseId={toolUseId}
+        sessionId={sessionId}
+        accessToken={accessToken}
+      />
+    )
+  }
+
   const meta = TOOL_META[name] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
   const isError = status === "error"
   const isComplete = !!status
@@ -304,7 +321,10 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
               if (ev.status === "retrying") entry.tools = []
               entry.status = ev
             }
-            else if (ev.tool) entry.tools.push(ev)
+            else if (ev.tool) {
+              entry.tools.push(ev)
+              if (entry.status?.status === "retrying") entry.status = undefined
+            }
             else if (ev.toolResult) {
               const t = entry.tools.find((t) => t.toolUseId === ev.toolResult)
               if (t) t.toolStatus = ev.toolStatus

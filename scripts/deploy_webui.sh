@@ -8,10 +8,16 @@ set -euo pipefail
 
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 STACK="SdpmWebUi"
-BUILD_DIR="$(dirname "$0")/../web-ui/build"
+WEBUI_DIR="$(dirname "$0")/../web-ui"
+BUILD_DIR="$WEBUI_DIR/build"
+
+# Always rebuild to avoid shipping a stale build/ (missing chunks cause
+# CloudFront to SPA-fallback HTML to .js requests -> "Unexpected token '<'").
+echo "Building web-ui..."
+(cd "$WEBUI_DIR" && rm -rf build && npm run build)
 
 if [ ! -d "$BUILD_DIR" ]; then
-  echo "Error: $BUILD_DIR not found. Run 'npm run build' in web-ui/ first."
+  echo "Error: $BUILD_DIR not found after build."
   exit 1
 fi
 

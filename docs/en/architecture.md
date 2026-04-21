@@ -56,7 +56,7 @@ Layer 2 with storage swapped to Amazon DynamoDB + S3, plus authentication and au
 
 ```
 MCP Client → AgentCore Runtime → MCP Server Container
-                                   ├── 21 MCP tools
+                                   ├── 20 MCP tools
                                    ├── LibreOffice (PPTX → PDF/SVG)
                                    ├── DynamoDB (decks, templates)
                                    ├── S3 (PPTX, previews, references, assets)
@@ -263,6 +263,7 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | SdpmAgent | Strands Agent (Amazon Bedrock AgentCore Runtime) | `stacks.agent` |
 | SdpmWebUi | S3 + Amazon CloudFront + Amazon API Gateway + Lambda | `stacks.webUi` |
 | SdpmAuth | Amazon Cognito User Pool (auto-created when agent or webUi enabled) | (auto) |
+| SdpmCloudFrontWaf | AWS WAF WebACL for CloudFront (us-east-1) | `waf.*` |
 
 ---
 

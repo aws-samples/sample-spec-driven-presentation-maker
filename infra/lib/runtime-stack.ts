@@ -66,6 +66,20 @@ export class RuntimeStack extends cdk.Stack {
         resources: [props.pptxBucket.bucketArn, props.resourceBucket.bucketArn],
       })
     );
+
+    // CloudWatch Logs (AgentCore writes stdout/stderr directly via execution role)
+    runtimeRole.addToPolicy(new iam.PolicyStatement({
+      actions: ["logs:CreateLogGroup", "logs:DescribeLogStreams"],
+      resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock-agentcore/runtimes/*`],
+    }));
+    runtimeRole.addToPolicy(new iam.PolicyStatement({
+      actions: ["logs:DescribeLogGroups"],
+      resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:*`],
+    }));
+    runtimeRole.addToPolicy(new iam.PolicyStatement({
+      actions: ["logs:CreateLogStream", "logs:PutLogEvents"],
+      resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`],
+    }));
     runtimeRole.addToPolicy(
       new iam.PolicyStatement({
         actions: [
@@ -74,6 +88,42 @@ export class RuntimeStack extends cdk.Stack {
           "ecr:GetAuthorizationToken",
         ],
         resources: ["*"],
+      })
+    );
+
+    // CloudWatch Logs / X-Ray / Metrics — required for AgentCore Runtime observability
+    // https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html
+    runtimeRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+        ],
+        resources: [
+          `arn:aws:logs:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:log-group:/aws/bedrock-agentcore/runtimes/*`,
+          `arn:aws:logs:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`,
+        ],
+      })
+    );
+    runtimeRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords",
+          "xray:GetSamplingRules",
+          "xray:GetSamplingTargets",
+        ],
+        resources: ["*"],
+      })
+    );
+    runtimeRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["cloudwatch:PutMetricData"],
+        resources: ["*"],
+        conditions: { StringEquals: { "cloudwatch:namespace": "bedrock-agentcore" } },
       })
     );
 

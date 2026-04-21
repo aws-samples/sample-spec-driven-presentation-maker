@@ -15,9 +15,9 @@
 
 "use client"
 
-import { useEffect, useRef, useState, useImperativeHandle, forwardRef, FormEvent, KeyboardEvent, useCallback } from "react"
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef, FormEvent, KeyboardEvent, useCallback, useMemo } from "react"
 import { useAuth } from "react-oidc-context"
-import { invokeAgentCore, generateSessionId, setAgentConfig } from "@/services/agentCoreService"
+import { invokeAgentCore, generateSessionId, setAgentConfig, stopRuntimeSession } from "@/services/agentCoreService"
 import { getChatHistory, listDecks, patchDeck, DeckSummary } from "@/services/deckService"
 import { uploadFile, validateFile, canAddMoreFiles, UploadedFile } from "@/services/uploadService"
 import { useCompositionSafe } from "@/hooks/useCompositionSafe"
@@ -62,6 +62,8 @@ interface ChatPanelProps {
   deckName?: string
   chatSessionId?: string
   slidePreviewUrls?: (string | null)[]
+  /** Current deck slide IDs — forwarded to ComposeCard for slug existence rendering. */
+  slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
@@ -72,7 +74,7 @@ export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -107,7 +109,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const auth = useAuth()
   const { onCompositionStart, onCompositionEnd, getIsComposing } = useCompositionSafe()
   const isMobile = useIsMobile()
-  const { fetchWebImages, setFetchWebImages } = usePreferences()
+  const { fetchWebImages, setFetchWebImages, parallelAgents, setParallelAgents } = usePreferences()
   const [optionsOpen, setOptionsOpen] = useState(false)
 
   /**
@@ -138,7 +140,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       try {
         const response = await fetch("/aws-exports.json")
         const config = await response.json()
-        await setAgentConfig(config.agentRuntimeArn, config.awsRegion || "us-east-1", config.agentPattern)
+        await setAgentConfig(config.agentRuntimeArn, config.awsRegion || "us-east-1")
         setConfigLoaded(true)
       } catch (err) {
         console.error("Failed to load agent config:", err)
@@ -231,7 +233,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   toolUseId: (tu.toolUseId as string) || "",
                   name: (tu.name as string) || "",
                   input: (tu.input as Record<string, unknown>) || {},
-                  status: "success",
                 }})
               }
             }
@@ -683,6 +684,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           })
         },
         controller.signal,
+        parallelAgents ? "separated" : "single",
       )
     } catch (err) {
       // AbortError is expected when user clicks stop — don't show error
@@ -706,12 +708,27 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   /**
    * Stop the current streaming response.
-   * Aborts the fetch connection; the server will stop at the next safe point
-   * when a new request arrives for the same session.
+   * Aborts the fetch connection and calls StopRuntimeSession to immediately
+   * terminate the AgentCore Runtime session (including all ThreadPool-based
+   * composer agents inside the container).
    */
   const handleStop = () => {
     abortControllerRef.current?.abort()
+    const token = auth.user?.access_token
+    if (token) stopRuntimeSession(sessionId, token)
   }
+
+  // Track whether compose_slides is the active in-flight tool — used only to
+  // reshape the Stop tooltip. The button itself stays enabled so the user
+  // always has a final-resort force stop.
+  const composeInFlight = useMemo(() => {
+    if (!isLoading) return false
+    const last = messages[messages.length - 1]
+    if (!last || last.role !== "assistant") return false
+    const lastTool = last.toolUses[last.toolUses.length - 1]
+    if (!lastTool || lastTool.status) return false
+    return lastTool.name === "compose_slides" || lastTool.name.endsWith("_compose_slides")
+  }, [isLoading, messages])
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -842,6 +859,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     attachments={msg.attachments}
                     isStreaming={isLoading && i === messages.length - 1}
                     idToken={auth.user?.id_token}
+                    accessToken={auth.user?.access_token}
+                    deckSlugs={slideSlugs}
+                    sessionId={sessionId}
                   />
                 </div>
               ))}
@@ -874,17 +894,30 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 Options
               </button>
               {optionsOpen && (
-                <label className="flex items-center gap-2 pb-1.5 pl-4 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={fetchWebImages}
-                    onChange={(e) => setFetchWebImages(e.target.checked)}
-                    className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
-                  />
-                  <span className="text-[11px] text-foreground-muted select-none">
-                    Fetch images from websites (may be used in presentations)
-                  </span>
-                </label>
+                <div className="flex flex-col gap-1 pb-1.5 pl-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={fetchWebImages}
+                      onChange={(e) => setFetchWebImages(e.target.checked)}
+                      className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
+                    />
+                    <span className="text-[11px] text-foreground-muted select-none">
+                      Fetch images from websites (may be used in presentations)
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={parallelAgents}
+                      onChange={(e) => setParallelAgents(e.target.checked)}
+                      className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
+                    />
+                    <span className="text-[11px] text-foreground-muted select-none">
+                      Parallel agents (experimental) — SPEC + Composer with parallel slide generation
+                    </span>
+                  </label>
+                </div>
               )}
             </div>
 
@@ -930,8 +963,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 <button
                   type="button"
                   onClick={handleStop}
+                  title={composeInFlight ? "Force stop — partial report may be lost" : "Stop generation"}
                   className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-white/10 hover:bg-white/20"
-                  aria-label="Stop generation"
+                  aria-label={composeInFlight ? "Force stop generation" : "Stop generation"}
                 >
                   <Square className="h-3 w-3 fill-current" />
                 </button>

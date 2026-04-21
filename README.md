@@ -109,6 +109,7 @@ See [Architecture](docs/en/architecture.md) for details.
 - **Authorization**: Resource-level RBAC enforced at API and storage layers
 - **Encryption**: S3 server-side encryption (SSE-S3), DynamoDB encryption at rest
 - **Network**: CloudFront with OAI for static assets, API Gateway with Cognito authorizer
+- **WAF**: Optional IP address restriction via AWS WAF (IPv4/IPv6) on CloudFront and API Gateway
 
 ---
 
@@ -191,7 +192,7 @@ regulatory and compliance requirements before deployment.
 
 1. Enable AWS CloudTrail for audit logging
 2. Configure VPC endpoints for S3 and DynamoDB if running in a VPC
-3. Set up AWS WAF rules on CloudFront and API Gateway
+3. Set up AWS WAF rules on CloudFront and API Gateway (built-in support: set `waf.allowedIpV4AddressRanges` / `waf.allowedIpV6AddressRanges` in `config.yaml` — accepts multiple CIDR ranges, or use `--waf-ipv4` / `--waf-ipv6` with `deploy.sh`)
 4. Review and tighten CORS configuration for your domain
 5. Enable S3 access logging on all buckets
 6. Configure Cognito advanced security features (MFA, compromised credentials)

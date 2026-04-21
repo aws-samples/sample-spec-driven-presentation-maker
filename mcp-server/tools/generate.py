@@ -200,8 +200,9 @@ def _prepare_workspace(
     template_key = ""
     tmpl_name = presentation.get("template", "")
     if tmpl_name:
+        normalized = tmpl_name.removesuffix(".pptx")
         for t in storage.list_templates():
-            if t.get("name") == tmpl_name or t.get("name") + ".pptx" == tmpl_name:
+            if t.get("name") == normalized:
                 template_key = t.get("s3Key", "")
                 break
     if not template_key:
@@ -282,8 +283,9 @@ def generate_pptx(
         })
 
         # Preview: epoch-keyed WebP (background)
+        slugs = [s.get("id") or f"slide_{i + 1:02d}" for i, s in enumerate(slides)]
         from server_utils import schedule_webp_background
-        schedule_webp_background(deck_id, out, tmpdir, storage)
+        schedule_webp_background(deck_id, out, tmpdir, storage, slugs)
     except Exception:
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise
@@ -310,6 +312,14 @@ def generate_pptx(
             for i, s in enumerate(slides, 1)
         ],
     }
+    warnings: dict = {}
     if kb_error:
-        result["warnings"] = {"kbSyncFailed": kb_error}
+        warnings["kbSyncFailed"] = kb_error
+    if builder.invalid_layouts:
+        warnings["invalidLayouts"] = [
+            {"slug": e["slug"], "attempted": e["attempted"], "used": e["used"]}
+            for e in builder.invalid_layouts
+        ]
+    if warnings:
+        result["warnings"] = warnings
     return result

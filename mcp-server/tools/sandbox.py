@@ -156,6 +156,19 @@ def _upload_deck_workspace(
         _write_files(client, session_id, file_contents)
         logger.info("Uploaded %d files to sandbox for deck %s", len(file_contents), deck_id)
 
+    # Ensure workspace directories exist even when empty, so agent code like
+    # open("slides/title.json", "w") works on the first write without needing
+    # an explicit os.makedirs step.
+    client.invoke_code_interpreter(
+        codeInterpreterIdentifier="aws.codeinterpreter.v1",
+        sessionId=session_id,
+        name="executeCode",
+        arguments={
+            "language": "python",
+            "code": "import os\nfor d in ('slides', 'specs', 'includes', 'images'):\n    os.makedirs(d, exist_ok=True)\n",
+        },
+    )
+
     return [f["path"] for f in file_contents]
 
 

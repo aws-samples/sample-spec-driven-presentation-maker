@@ -200,7 +200,7 @@ export async function getDeck(deckId: string, _idToken?: string): Promise<DeckDe
       const previewFile = previewByPage.get(pageNum);
       const previewPath = previewFile ? await join(dp, "preview", previewFile) : null;
       slides.push({
-        slideId: slug,
+        slug: slug,
         previewUrl: previewPath ? convertFileSrc(previewPath) : null,
         composeUrl: convertFileSrc(composePath),
         updatedAt: new Date().toISOString(),

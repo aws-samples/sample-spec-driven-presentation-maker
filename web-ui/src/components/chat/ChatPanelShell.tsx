@@ -86,6 +86,7 @@ interface ChatPanelShellProps {
   deckName: string | null
   chatSessionId?: string
   slidePreviewUrls?: (string | null)[]
+  slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
@@ -95,7 +96,7 @@ interface ChatPanelShellProps {
 
 export function ChatPanelShell({
   open, onClose, chatTab, onChatTabChange,
-  deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, chatRef: externalChatRef,
+  deckId, deckName, chatSessionId, slidePreviewUrls, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, chatRef: externalChatRef,
   inline = false,
 }: ChatPanelShellProps) {
   const internalChatRef = useRef<ChatPanelHandle>(null)
@@ -201,6 +202,7 @@ export function ChatPanelShell({
           deckId="new"
           deckName="New Deck"
           slidePreviewUrls={panelAOwnsCurrentDeck ? (slidePreviewUrls || []) : []}
+          slideSlugs={panelAOwnsCurrentDeck ? (slideSlugs || []) : []}
           onDeckCreated={handlePanelADeckCreated}
           onPreviewInvalidated={onPreviewInvalidated}
           onWorkflowPhase={onWorkflowPhase}
@@ -217,6 +219,7 @@ export function ChatPanelShell({
             deckName={deckName || undefined}
             chatSessionId={chatSessionId}
             slidePreviewUrls={slidePreviewUrls || []}
+            slideSlugs={slideSlugs || []}
             onDeckCreated={handlePanelBDeckCreated}
             onPreviewInvalidated={onPreviewInvalidated}
             onWorkflowPhase={onWorkflowPhase}

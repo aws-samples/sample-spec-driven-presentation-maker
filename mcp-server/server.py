@@ -412,7 +412,7 @@ def generate_pptx(deck_id: str) -> str:
 
 
 @mcp.tool()
-def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -> list:
+def get_preview(deck_id: str, slugs: list[str], quality: str = "high") -> list:
     """Get PNG preview images for visual review by the agent.
 
     Returns actual slide images that the model can see and analyze.
@@ -423,20 +423,20 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
 
     Args:
         deck_id: The deck ID.
-        slide_numbers: List of 1-based slide numbers to preview (required, at least one).
+        slugs: List of slide slugs to preview (required, at least one). Example: ["intro", "pricing"].
         quality: "low" (800px, ~480 tokens/slide) or "high" (1280px, ~1229 tokens/slide).
 
     Returns:
         List of text labels and slide images for visual inspection.
     """
     _check_deck_access(deck_id, action="preview")
-    if not slide_numbers:
-        return [{"type": "text", "text": "Error: slide_numbers must not be empty"}]
+    if not slugs:
+        return [{"type": "text", "text": "Error: slugs must not be empty"}]
     if quality not in ("low", "high"):
         quality = "high"
     try:
         return preview.get_preview(
-            deck_id=deck_id, slide_numbers=slide_numbers, storage=_storage, quality=quality,
+            deck_id=deck_id, slugs=slugs, storage=_storage, quality=quality,
         )
     except _storage._s3.exceptions.NoSuchKey:
         return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first."}]
@@ -446,8 +446,8 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
         raise
 
 
-def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> Path:
-    """Build PPTX from slides JSON. Returns path to built file."""
+def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> tuple[Path, list[dict]]:
+    """Build PPTX from slides JSON. Returns (pptx_path, invalid_layouts)."""
     from sdpm.builder import PPTXBuilder, resolve_override
 
     builder = PPTXBuilder(**build_kwargs)
@@ -459,7 +459,7 @@ def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> Path:
         builder.add_slide(resolve_override(s, id_map))
     pptx_path = tmpdir / "measure.pptx"
     builder.save(pptx_path)
-    return pptx_path
+    return pptx_path, list(builder.invalid_layouts)
 
 
 def _export_svg(tmpdir: Path, pptx_path: Path) -> Path:
@@ -763,7 +763,8 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
             user_id = _get_user_id()
             _prepare_epoch = int(time.time())
             tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
-            pptx_path = _build_pptx(tmpdir, slides, build_kwargs)
+            pptx_path, invalid_layouts = _build_pptx(tmpdir, slides, build_kwargs)
+            invalid_slug_set = {e["slug"] for e in invalid_layouts if e.get("slug")}
 
             # Build slug → page number mapping
             slug_to_page: dict[str, int] = {}
@@ -804,6 +805,19 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
             except Exception as e:
                 logger.warning("Layout bias check failed: %s", e)
 
+            # Invalid-layout errors scoped to measured slugs only. Each
+            # composer owns a subset of slides, so leaking another group's
+            # mistake would be noise (they cannot fix it anyway).
+            measured_set = set(measure_slides or [])
+            my_invalids = [e for e in invalid_layouts if e.get("slug") in measured_set]
+            if my_invalids:
+                errs = result.setdefault("errors", {})
+                for e in my_invalids:
+                    errs[e["slug"]] = {
+                        "invalidLayout": e["attempted"],
+                        "available": e["available"],
+                    }
+
             if save:
                 # Compose: SVG → optimized JSON for WebUI animation
                 # Only generates compose for measure_slides slugs (parallel-safe).
@@ -811,6 +825,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 # newest slides/ snapshot wins on defs via epoch comparison.
                 try:
                     from tools.compose import extract_optimized_defs, split_slide_components
+                    import hashlib as _hashlib
                     svg_path = tmpdir / "measure.svg"
                     if not svg_path.exists():
                         _export_svg(tmpdir, pptx_path)
@@ -873,23 +888,42 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
 
                         # Generate compose for each measured slug
                         for slug in compose_slugs:
+                            if slug in invalid_slug_set:
+                                # Do not surface a fallback-rendered slide as a
+                                # live-preview artifact. The composer for this
+                                # slug will see the error and fix the layout.
+                                continue
                             pn = slug_to_page.get(slug)
                             if not pn:
                                 continue
                             try:
                                 comp_data = split_slide_components(svg_path, pn)
 
+                                # sourceHash from slide JSON (content-based diff)
+                                src_hash = _hashlib.md5(
+                                    _json.dumps(slides[pn - 1], sort_keys=True, ensure_ascii=False).encode(),
+                                    usedforsecurity=False,
+                                ).hexdigest() if pn <= len(slides) else ""
+                                comp_data["sourceHash"] = src_hash
+
                                 # Diff against previous compose for same slug
                                 prev_key = _latest_key(f"{compose_prefix}{slug}_")
                                 prev_comps = None
+                                prev_hash = None
                                 if prev_key:
                                     try:
                                         raw = _storage.download_file_from_pptx_bucket(prev_key)
-                                        prev_comps = _json.loads(raw).get("components")
+                                        prev_data = _json.loads(raw)
+                                        prev_comps = prev_data.get("components")
+                                        prev_hash = prev_data.get("sourceHash")
                                     except Exception:
                                         pass
 
-                                if prev_comps is not None:
+                                # If sourceHash unchanged, all components are unchanged
+                                if prev_comps is not None and prev_hash == src_hash and src_hash:
+                                    for c in comp_data["components"]:
+                                        c["changed"] = False
+                                elif prev_comps is not None:
                                     prev_map = {_mk(c): _fp(c) for c in prev_comps}
                                     for c in comp_data["components"]:
                                         k = _mk(c)
@@ -916,13 +950,46 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                 except Exception:
                     logger.error("compose failed", exc_info=True)
 
+                # Preview: sync WebP generation so composer can immediately view
+                # via get_preview(slugs=[...]) — lowers the barrier from a
+                # 2-step (generate_pptx → get_preview) to 1-step feedback loop.
+                if measure_slides:
+                    try:
+                        from tools.generate import generate_previews
+                        preview_dir = tmpdir / "preview_out"
+                        preview_dir.mkdir(exist_ok=True)
+                        webp_files = generate_previews(pptx_path, preview_dir)
+                        uploaded = []
+                        for slug in measure_slides:
+                            page = slug_to_page.get(slug)
+                            if page and page <= len(webp_files):
+                                _storage.upload_file(
+                                    key=f"previews/{deck_id}/{slug}_{_prepare_epoch}.webp",
+                                    data=webp_files[page - 1].read_bytes(),
+                                    content_type="image/webp",
+                                )
+                                uploaded.append(slug)
+                        if uploaded:
+                            result["previewHint"] = (
+                                f"Preview images generated for {', '.join(uploaded)}. "
+                                f"Call get_preview(deck_id=\"{deck_id}\", slugs=[...]) to view."
+                            )
+                    except Exception:
+                        logger.warning("preview generation failed", exc_info=True)
+
                 # tmpdir cleanup (WebP generation only in generate_pptx)
                 shutil.rmtree(tmpdir, ignore_errors=True)
             else:
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as e:
-            logger.exception("run_python post-processing failed: deck=%s", deck_id)
-            result["measure"] = json.dumps({"error": str(e), "traceback": traceback.format_exc()})
+            msg = str(e)
+            # "No slides found" is expected during early phases (outline/brief
+            # editing before any slide JSON exists). Silently skip measure.
+            if "No slides found" in msg or "has no slides" in msg:
+                pass
+            else:
+                logger.exception("run_python post-processing failed: deck=%s", deck_id)
+                result["measure"] = json.dumps({"error": msg, "traceback": traceback.format_exc()})
 
     return json.dumps(result, ensure_ascii=False)
 

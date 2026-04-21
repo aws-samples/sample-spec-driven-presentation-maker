@@ -18,6 +18,10 @@
 
 set -euo pipefail
 
+# Ensure we run from the repository root regardless of where the script is invoked
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "${SCRIPT_DIR}/.."
+
 # ---- Defaults ----
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 PROFILE=""
@@ -26,8 +30,31 @@ SEARCH_SLIDES="false"
 OBSERVABILITY="false"
 OIDC_URL=""
 ALLOWED_CLIENTS=""
+WAF_IPV4=""
+WAF_IPV6=""
 CDK_COMMAND="deploy"
 PROJECT_NAME="sdpm-deploy"
+STACK=""
+
+# ---- Load defaults from infra/config.yaml if present ----
+# CLI arguments below will override these values.
+CONFIG_FILE="infra/config.yaml"
+if [ -f "${CONFIG_FILE}" ]; then
+  _agent=$(grep -E "^\s*agent:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
+  _webui=$(grep -E "^\s*webUi:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
+  if [ "${_agent}" = "false" ] && [ "${_webui}" = "false" ]; then
+    LAYER="3"
+  fi
+  _search=$(grep -E "^\s*searchSlides:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
+  [ -n "${_search}" ] && SEARCH_SLIDES="${_search}"
+  _obs=$(grep -E "^\s*observability:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
+  [ -n "${_obs}" ] && OBSERVABILITY="${_obs}"
+  # WAF IPv4/IPv6: collect list items under each key
+  WAF_IPV4=$(awk '/allowedIpV4AddressRanges:/{f=1;next} f && /^[[:space:]]*-/{gsub(/["]/,"",$2); printf "%s,", $2; next} f && !/^[[:space:]]*-/{f=0}' "${CONFIG_FILE}" | sed 's/,$//')
+  WAF_IPV6=$(awk '/allowedIpV6AddressRanges:/{f=1;next} f && /^[[:space:]]*-/{gsub(/["]/,"",$2); printf "%s,", $2; next} f && !/^[[:space:]]*-/{f=0}' "${CONFIG_FILE}" | sed 's/,$//')
+  _oidc=$(grep -E "^\s*oidcDiscoveryUrl:" "${CONFIG_FILE}" | head -1 | sed -E 's/^[^:]+:\s*"?([^"]*)"?\s*$/\1/' || true)
+  [ -n "${_oidc}" ] && OIDC_URL="${_oidc}"
+fi
 
 # ---- Parse arguments ----
 usage() {
@@ -48,7 +75,12 @@ Options:
   --oidc-url URL           External IdP OIDC Discovery URL
   --allowed-clients IDS    Comma-separated JWT allowed client IDs
 
+  --waf-ipv4 CIDRS         Comma-separated IPv4 CIDR ranges for WAF (e.g. "1.2.3.4/32,10.0.0.0/8")
+  --waf-ipv6 CIDRS         Comma-separated IPv6 CIDR ranges for WAF
+
   --destroy                Destroy all stacks
+  --stack ARGS             CDK stack selector/flags (e.g. "SdpmRuntime --exclusively")
+                           Default: --all
 
   -h, --help               Show this help
 EOF
@@ -65,7 +97,10 @@ while [[ $# -gt 0 ]]; do
     --observability)  OBSERVABILITY="true"; shift ;;
     --oidc-url)       OIDC_URL="$2"; shift 2 ;;
     --allowed-clients) ALLOWED_CLIENTS="$2"; shift 2 ;;
+    --waf-ipv4)       WAF_IPV4="$2"; shift 2 ;;
+    --waf-ipv6)       WAF_IPV6="$2"; shift 2 ;;
     --destroy)        CDK_COMMAND="destroy"; shift ;;
+    --stack)          STACK="$2"; shift 2 ;;
     -h|--help)        usage ;;
     *)                echo "Unknown option: $1"; usage ;;
   esac
@@ -93,6 +128,8 @@ echo "Region:  ${REGION}"
 echo "Layer:   ${LAYER}"
 echo "Search:  ${SEARCH_SLIDES}"
 echo "Observ:  ${OBSERVABILITY}"
+echo "WAF v4:  ${WAF_IPV4:-(none)}"
+echo "WAF v6:  ${WAF_IPV6:-(none)}"
 echo "Command: ${CDK_COMMAND}"
 echo ""
 
@@ -103,13 +140,9 @@ if [ "${OBSERVABILITY}" = "true" ] && [ "${CDK_COMMAND}" = "deploy" ]; then
   if [ "${EXISTING_MIL}" != "None" ] && [ -n "${EXISTING_MIL}" ]; then
     echo "⚠️  WARNING: Bedrock Model Invocation Logging is already configured in this account/region."
     echo "   Existing log group: ${EXISTING_MIL}"
-    echo "   --observability will OVERWRITE the existing configuration."
+    echo "   Skipping --observability to preserve the existing configuration."
     echo ""
-    read -r -p "Continue? [y/N] " confirm
-    if [[ ! "${confirm}" =~ ^[Yy]$ ]]; then
-      echo "Aborted."
-      exit 0
-    fi
+    OBSERVABILITY="false"
   fi
 fi
 
@@ -213,7 +246,10 @@ ENV_VARS_JSON=$(cat <<EOF
   {"name":"FEATURE_OBSERVABILITY", "value":"${OBSERVABILITY}",     "type":"PLAINTEXT"},
   {"name":"AUTH_OIDC_URL",         "value":"${OIDC_URL}",          "type":"PLAINTEXT"},
   {"name":"AUTH_ALLOWED_CLIENTS",  "value":"${ALLOWED_CLIENTS}",   "type":"PLAINTEXT"},
-  {"name":"CDK_COMMAND",           "value":"${CDK_COMMAND}",       "type":"PLAINTEXT"}
+  {"name":"WAF_IPV4",              "value":"${WAF_IPV4}",          "type":"PLAINTEXT"},
+  {"name":"WAF_IPV6",              "value":"${WAF_IPV6}",          "type":"PLAINTEXT"},
+  {"name":"CDK_COMMAND",           "value":"${CDK_COMMAND}",       "type":"PLAINTEXT"},
+  {"name":"STACK",                 "value":"${STACK}",             "type":"PLAINTEXT"}
 ]
 EOF
 )

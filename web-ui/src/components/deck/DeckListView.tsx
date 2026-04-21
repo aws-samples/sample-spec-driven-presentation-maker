@@ -127,7 +127,7 @@ export function DeckListView({
         <SearchResultsGrid
           results={searchResults || []}
           searching={searching || false}
-          onSlideClick={(deckId, slideId) => onDeckOpen(`${deckId}?slide=${slideId}`)}
+          onSlideClick={(deckId, slug) => onDeckOpen(`${deckId}?slide=${slug}`)}
         />
       ) : (
         <>

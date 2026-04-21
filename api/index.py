@@ -148,28 +148,23 @@ def _list_preview_keys(deck_id: str) -> set:
     return {obj["Key"] for obj in resp.get("Contents", [])}
 
 
-def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: set) -> Optional[str]:
+def _resolve_preview_url(deck_id: str, slug: str, preview_keys: set) -> Optional[str]:
     """Resolve the best preview URL for a slide from cached keys.
 
-    Uses build_slide_key_map to pick the latest epoch key.
+    Uses build_slide_key_map to pick the latest epoch key for the given slug.
 
     Args:
         deck_id: Deck identifier.
-        slide_id: Slide identifier (e.g. slide_01).
+        slug: Slide slug (e.g. "intro").
         preview_keys: Set of S3 keys from _list_preview_keys.
 
     Returns:
         Presigned/signed URL or None.
     """
     from shared.preview import build_slide_key_map
-    import re as _re
 
-    m = _re.search(r"(\d+)$", slide_id)
-    if not m:
-        return None
-    num = int(m.group(1))
     key_map = build_slide_key_map(preview_keys)
-    key = key_map.get(num)
+    key = key_map.get(slug)
     if not key:
         return None
     return preview_url(key)
@@ -196,9 +191,12 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
         if key:
             thumb_url = preview_url(key)
         else:
-            # Fallback: first slide preview
+            # Fallback: first slide preview (any slug, whichever exists)
             preview_keys = _list_preview_keys(deck_id)
-            thumb_url = _resolve_preview_url(deck_id, "slide_01", preview_keys)
+            from shared.preview import build_slide_key_map
+            km = build_slide_key_map(preview_keys)
+            first_key = next(iter(km.values()), None) if km else None
+            thumb_url = preview_url(first_key) if first_key else None
 
         extras[deck_id] = {"thumbnailUrl": thumb_url}
     return extras
@@ -473,9 +471,8 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         try:
             slide_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=slide_key)
             s = json.loads(slide_resp["Body"].read())
-            sid = f"slide_{i + 1:02d}"
-            slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
-            slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
+            slide_preview = _resolve_preview_url(deck_id, slug, preview_keys)
+            slide_entry: Dict[str, Any] = {"slug": slug, "previewUrl": slide_preview}
             compose_key = _latest_compose_key(f"decks/{deck_id}/compose/{slug}_", compose_keys)
             if compose_key:
                 slide_entry["composeUrl"] = preview_url(compose_key)

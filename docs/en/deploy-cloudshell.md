@@ -57,7 +57,7 @@ Choose options based on your use case.
 ./scripts/deploy.sh --region us-east-1 --observability
 ```
 
-> **Note:** `--observability` configures Bedrock Model Invocation Logging (MIL) at the account/region level. If MIL is already configured, the script will warn about overwriting the existing configuration and ask for confirmation.
+> **Note:** `--observability` configures Bedrock Model Invocation Logging (MIL) at the account/region level. If MIL is already configured, the script will display a warning and automatically skip the MIL setup to preserve the existing configuration.
 
 **With an external IdP:**
 
@@ -65,6 +65,30 @@ Choose options based on your use case.
 ./scripts/deploy.sh --region us-east-1 \
   --oidc-url "https://your-idp.example.com/.well-known/openid-configuration" \
   --allowed-clients "client-id-1,client-id-2"
+```
+
+**With WAF IP address restriction:**
+
+```bash
+# IPv4 only (⚠️ this blocks all IPv6 access — see note below)
+./scripts/deploy.sh --region us-east-1 --waf-ipv4 "203.0.113.0/24,198.51.100.0/24"
+
+# IPv4 + IPv6 (recommended for dual-stack networks)
+./scripts/deploy.sh --region us-east-1 \
+  --waf-ipv4 "203.0.113.0/24" \
+  --waf-ipv6 "2001:db8::/32"
+```
+
+> **⚠️ IPv6 Note:** If you specify only `--waf-ipv4` without `--waf-ipv6`, all IPv6 access is blocked. Modern browsers often prefer IPv6, which can cause the Web UI to appear stuck. Always specify both if your network uses dual-stack.
+
+**Using `infra/config.yaml`:**
+
+If `infra/config.yaml` exists, `deploy.sh` loads it as defaults. CLI arguments override config file values. This is useful for persisting settings across deployments without repeating CLI flags.
+
+```bash
+cp infra/config.example.yaml infra/config.yaml
+# Edit config.yaml to set stacks, features, WAF, etc.
+./scripts/deploy.sh --region us-east-1
 ```
 
 **Destroy all stacks:**
@@ -181,6 +205,8 @@ echo "Open the URL above to sign in."
 | `--observability` | Enable Bedrock Model Invocation Logging | Disabled |
 | `--oidc-url URL` | External IdP OIDC Discovery URL | — |
 | `--allowed-clients IDS` | Comma-separated JWT allowed client IDs | — |
+| `--waf-ipv4 CIDRS` | Comma-separated IPv4 CIDR ranges for WAF | — |
+| `--waf-ipv6 CIDRS` | Comma-separated IPv6 CIDR ranges for WAF | — |
 | `--destroy` | Destroy all stacks | — |
 
 ## Troubleshooting
@@ -204,7 +230,7 @@ rm -rf ~/sample-spec-driven-presentation-maker
 
 **--observability warns "already configured"**
 
-Bedrock Model Invocation Logging allows only one configuration per account/region. If an existing configuration is found, `deploy.sh` will prompt for confirmation before overwriting. The existing log destination (CloudWatch Logs group name) is displayed — verify it's safe to overwrite before entering `y`. Once overwritten, the previous MIL configuration cannot be restored.
+Bedrock Model Invocation Logging allows only one configuration per account/region. If an existing configuration is found, `deploy.sh` will display a warning with the existing log group name and automatically skip the MIL setup. The deployment continues with observability disabled to preserve the existing configuration. To use SDPM's observability, first remove the existing MIL configuration manually, then re-run with `--observability`.
 
 ## Estimated Monthly Cost
 
