@@ -96,8 +96,10 @@ export async function setConfigOption(configId: string, value: string): Promise<
 export async function ensureAgent(): Promise<void> {
   if (child) return
 
+  const projectRoot = path.resolve(process.cwd(), "..")
+
   child = spawn("kiro-cli", ["acp", "--agent", "sdpm-spec"], {
-    cwd: process.cwd(),
+    cwd: projectRoot,
     stdio: ["pipe", "pipe", "pipe"],
   })
 
@@ -125,18 +127,17 @@ export async function ensureAgent(): Promise<void> {
     clientInfo: { name: "sdpm-local", version: "0.1.0" },
   })
 
-  const result = await rpcRequest("session/new", { cwd: DECK_ROOT, mcpServers: [] }) as Record<string, unknown>
+  const AGENT_NAME = "sdpm-spec"
+
+  const result = await rpcRequest("session/new", { cwd: DECK_ROOT, mcpServers: [], agent: AGENT_NAME }) as Record<string, unknown>
   sessionId = result.sessionId as string
 
   // Extract model info from session/new response
-  type ConfigOption = { id: string; category?: string; currentValue: string; options: { value: string; name: string; description?: string }[] }
-  const configOptions = result.configOptions as ConfigOption[] | undefined
-  const modelOpt = configOptions?.find(o => o.category === "model" || o.id === "model")
-  if (modelOpt) {
-    currentModelId = modelOpt.currentValue
-    availableModels = modelOpt.options
+  const modelsData = result.models as { currentModelId?: string; availableModels?: AcpModel[] } | undefined
+  if (modelsData) {
+    currentModelId = modelsData.currentModelId || ""
+    availableModels = (modelsData.availableModels || [])
       .filter(o => !o.description?.startsWith("[Internal]") && !o.description?.startsWith("[Deprecated]"))
-      .map(o => ({ modelId: o.value, name: o.name, description: o.description }))
   }
 
   // Model preference is managed client-side via /api/agent/models PUT
@@ -144,7 +145,7 @@ export async function ensureAgent(): Promise<void> {
 
 /** Create a new ACP session (for new chat). */
 export async function newSession(): Promise<void> {
-  const result = await rpcRequest("session/new", { cwd: DECK_ROOT, mcpServers: [] }) as Record<string, unknown>
+  const result = await rpcRequest("session/new", { cwd: DECK_ROOT, mcpServers: [], agent: "sdpm-spec" }) as Record<string, unknown>
   sessionId = result.sessionId as string
 }
 

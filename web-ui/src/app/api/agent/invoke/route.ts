@@ -8,16 +8,13 @@ import { ensureAgent, newSession, getSessionId, rpcRequest, subscribe } from "@/
 import { createSSEStream } from "@/lib/local/sse-bridge"
 
 export async function POST(req: Request) {
-  const { query, sessionId: clientSessionId } = await req.json()
+  const { query, sessionId: clientSessionId, newChat } = await req.json()
 
   await ensureAgent()
 
-  // New chat session requested
-  if (clientSessionId && clientSessionId !== getSessionId()) {
-    try { await newSession() } catch {
-      // Process may be stale — will be restarted on next ensureAgent()
-      await ensureAgent()
-    }
+  // Only create new session when explicitly requested (New Chat button)
+  if (newChat) {
+    await newSession()
   }
 
   const sessionId = getSessionId()!

@@ -79,7 +79,7 @@ async function getApiBaseUrl(): Promise<string> {
  */
 export async function listDecks(idToken: string): Promise<{ decks: DeckSummary[]; favoriteIds: string[] }> {
   if (IS_LOCAL) {
-    const response = await fetch("/api/decks/")
+    const response = await fetch("/api/decks")
     if (!response.ok) throw new Error(`Failed to list decks: ${response.status}`)
     return response.json()
   }
@@ -105,7 +105,7 @@ export async function listDecks(idToken: string): Promise<{ decks: DeckSummary[]
  */
 export async function getDeck(deckId: string, idToken: string): Promise<DeckDetail> {
   if (IS_LOCAL) {
-    const response = await fetch(`/api/decks/${deckId}/`)
+    const response = await fetch(`/api/decks/${deckId}`)
     if (!response.ok) throw new Error(`Failed to get deck: ${response.status}`)
     return response.json()
   }

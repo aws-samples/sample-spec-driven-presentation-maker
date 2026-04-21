@@ -137,6 +137,11 @@ export function ChatPanelShell({
 
   /** New chat button: reset Panel A to fresh state. */
   const handleNewChat = () => {
+    if (IS_LOCAL) fetch("/api/agent/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newChat: true }),
+    }).catch(() => {})
     if (chatTab === "new" || panelAOwnsCurrentDeck) {
       setPanelAKey((k) => k + 1)
       setPanelADeckId(null)
