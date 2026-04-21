@@ -4,21 +4,20 @@
  * Local ACP Agent Invoke — API Route that bridges kiro-cli acp to SSE.
  * Local mode only (`NEXT_PUBLIC_MODE=local`).
  */
-import { ensureAgent, newSession, getSessionId, rpcRequest, subscribe } from "@/lib/local/acp-process"
+import { ensureAgent, newSession, getSessionId, rpcRequest, subscribe, saveSessionToDeck } from "@/lib/local/acp-process"
 import { createSSEStream } from "@/lib/local/sse-bridge"
 
 export async function POST(req: Request) {
-  const { query, sessionId: clientSessionId, newChat } = await req.json()
+  const { query } = await req.json()
 
   await ensureAgent()
 
-  // Only create new session when explicitly requested (New Chat button)
-  if (newChat) {
-    await newSession()
-  }
-
   const sessionId = getSessionId()!
-  const stream = createSSEStream({ sessionId, subscribe })
+  const stream = createSSEStream({
+    sessionId,
+    subscribe,
+    onDeckId: (deckId) => saveSessionToDeck(deckId),
+  })
 
   // Send prompt (don't await — response comes via notifications)
   rpcRequest("session/prompt", {

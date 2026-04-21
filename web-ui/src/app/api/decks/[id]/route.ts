@@ -105,7 +105,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     pptxUrl: fs.existsSync(pptxPath) ? `/api/preview/${deckId}/output.pptx` : null,
     specs,
     updatedAt: new Date().toISOString(),
-    chatSessionId: deckJson.chatSessionId,
+    chatSessionId: safeRead(path.join(dp, ".session"))?.trim() || null,
     visibility: "private",
     isOwner: true,
     collaborators: [],

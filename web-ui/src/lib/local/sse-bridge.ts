@@ -10,6 +10,7 @@
 interface BridgeOptions {
   sessionId: string
   subscribe: (fn: (msg: Record<string, unknown>) => void) => () => void
+  onDeckId?: (deckId: string) => void
 }
 
 function extractSlugs(q: string): string {
@@ -17,7 +18,7 @@ function extractSlugs(q: string): string {
   return m ? m[1].trim() : ""
 }
 
-export function createSSEStream({ sessionId, subscribe }: BridgeOptions): ReadableStream {
+export function createSSEStream({ sessionId, subscribe, onDeckId }: BridgeOptions): ReadableStream {
   const encoder = new TextEncoder()
 
   return new ReadableStream({
@@ -124,6 +125,7 @@ export function createSSEStream({ sessionId, subscribe }: BridgeOptions): Readab
             if (result.output_dir && !result.deckId) {
               result.deckId = (result.output_dir as string).split("/").pop() || ""
             }
+            if (result.deckId && onDeckId) onDeckId(result.deckId as string)
             send({ toolResult: { toolUseId: toolCallId, name: toolName, status: "success", content: JSON.stringify(result) } })
           }
         }

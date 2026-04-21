@@ -149,6 +149,28 @@ export async function newSession(): Promise<void> {
   sessionId = result.sessionId as string
 }
 
+/** Load an existing ACP session (replays history via session/update notifications). */
+export async function loadSession(savedSessionId: string): Promise<void> {
+  await ensureAgent()
+  const result = await rpcRequest("session/load", { sessionId: savedSessionId, cwd: DECK_ROOT, mcpServers: [] }) as Record<string, unknown>
+  sessionId = result.sessionId as string || savedSessionId
+}
+
+/** Save sessionId to deck's .session file. */
+export function saveSessionToDeck(deckId: string): void {
+  if (!sessionId) return
+  const sessionFile = path.join(DECK_ROOT, deckId, ".session")
+  const fs = require("fs") as typeof import("fs")
+  fs.writeFileSync(sessionFile, sessionId, "utf-8")
+}
+
+/** Read sessionId from deck's .session file. */
+export function readSessionFromDeck(deckId: string): string | null {
+  const sessionFile = path.join(DECK_ROOT, deckId, ".session")
+  const fs = require("fs") as typeof import("fs")
+  try { return fs.readFileSync(sessionFile, "utf-8").trim() } catch { return null }
+}
+
 // Cleanup on process exit
 for (const sig of ["exit", "SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => { child?.kill(); child = null })
