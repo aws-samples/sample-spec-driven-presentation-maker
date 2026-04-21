@@ -48,7 +48,7 @@ export interface DeckDetail {
   collaboratorAliases?: Record<string, string>
 }
 
-const IS_LOCAL = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_MODE === 'local'
+const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === 'local'
 
 let apiBaseUrl = ""
 

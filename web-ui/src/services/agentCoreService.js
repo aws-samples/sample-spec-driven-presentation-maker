@@ -8,7 +8,7 @@
 
 import * as parser from './strandsParser.js';
 
-const IS_LOCAL = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_MODE === 'local';
+const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === 'local';
 
 // Generate a UUID
 const generateId = () => {

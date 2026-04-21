@@ -14,7 +14,7 @@ BUILD_DIR="$WEBUI_DIR/build"
 # Always rebuild to avoid shipping a stale build/ (missing chunks cause
 # CloudFront to SPA-fallback HTML to .js requests -> "Unexpected token '<'").
 echo "Building web-ui..."
-(cd "$WEBUI_DIR" && rm -rf build && npm run build)
+(cd "$WEBUI_DIR" && rm -rf build && npm run build:cloud)
 
 if [ ! -d "$BUILD_DIR" ]; then
   echo "Error: $BUILD_DIR not found after build."
