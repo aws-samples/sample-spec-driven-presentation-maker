@@ -31,29 +31,18 @@ import { LocalOnly, IS_LOCAL } from "@/lib/mode"
 export type ChatTabKey = "new" | "deck"
 
 
-/** Model info populated by acpAgentService on session/new */
+/** Model info for local ACP agent */
 interface AcpModel { modelId: string; name: string; description?: string }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const g = globalThis as any
-if (!g.__sdpmModels) g.__sdpmModels = { current: "", available: [] as AcpModel[], listeners: new Set<() => void>() }
-
-export function setAcpModels(current: string, available: AcpModel[]) {
-  g.__sdpmModels.current = current
-  g.__sdpmModels.available = available.filter(m => !m.name.startsWith("[Internal]") && !m.description?.startsWith("[Internal]") && !m.description?.startsWith("[Deprecated]"))
-  g.__sdpmModels.listeners.forEach((fn: () => void) => fn())
-}
 
 function ModelSelector() {
-  const [model, setModelState] = useState<string>(g.__sdpmModels.current || "")
-  const [models, setModels] = useState<AcpModel[]>(g.__sdpmModels.available || [])
+  const [model, setModelState] = useState<string>("")
+  const [models, setModels] = useState<AcpModel[]>([])
 
   useEffect(() => {
-    const update = () => {
-      setModels([...g.__sdpmModels.available])
-      setModelState(g.__sdpmModels.current)
-    }
-    g.__sdpmModels.listeners.add(update)
-    return () => { g.__sdpmModels.listeners.delete(update) }
+    fetch("/api/agent/models").then(r => r.json()).then(data => {
+      setModels(data.available || [])
+      setModelState(data.current || "")
+    }).catch(() => {})
   }, [])
 
   if (models.length === 0) return null
@@ -65,10 +54,11 @@ function ModelSelector() {
         const v = e.target.value
         setModelState(v)
         sessionStorage.setItem("sdpm-model", v)
-        // Send ACP set_config_option if agent is running
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const setConfig = (globalThis as any).__sdpmSetConfigOption as ((id: string, value: string) => Promise<void>) | undefined
-        if (setConfig) setConfig("model", v).catch(() => {})
+        fetch("/api/agent/models", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ modelId: v }),
+        }).catch(() => {})
       }}
       className="text-[11px] bg-transparent border border-border rounded px-1.5 py-0.5 text-foreground-muted hover:text-foreground focus:outline-none focus:ring-1 focus:ring-brand-teal max-w-[140px]"
     >
@@ -106,9 +96,7 @@ export function ChatPanelShell({
   // Start ACP agent early so model list is available immediately
   useEffect(() => {
     if (!IS_LOCAL) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ensure = (globalThis as any).__sdpmEnsureAgent as (() => Promise<void>) | undefined
-    if (ensure) ensure().catch(() => { /* agent may not be ready yet */ })
+    fetch("/api/agent/models").catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // When Panel A creates a deck, store the deckId so we know Panel A "owns" it

@@ -76,6 +76,22 @@ export function rpcNotify(method: string, params: Record<string, unknown> = {}):
 /** Get the current ACP session ID. */
 export function getSessionId(): string | null { return sessionId }
 
+export interface AcpModel { modelId: string; name: string; description?: string }
+
+let currentModelId = ""
+let availableModels: AcpModel[] = []
+
+/** Get available models (populated after ensureAgent). */
+export function getModels(): { current: string; available: AcpModel[] } {
+  return { current: currentModelId, available: availableModels }
+}
+
+/** Set a session config option (e.g. model selection). */
+export async function setConfigOption(configId: string, value: string): Promise<void> {
+  if (!child || !sessionId) return
+  await rpcRequest("session/set_config_option", { sessionId, configId, value })
+}
+
 /** Ensure the ACP process is running and a session exists. */
 export async function ensureAgent(): Promise<void> {
   if (child) return
@@ -111,6 +127,22 @@ export async function ensureAgent(): Promise<void> {
 
   const result = await rpcRequest("session/new", { cwd: DECK_ROOT, mcpServers: [] }) as Record<string, unknown>
   sessionId = result.sessionId as string
+
+  // Extract model info from session/new response
+  type ConfigOption = { id: string; category?: string; currentValue: string; options: { value: string; name: string; description?: string }[] }
+  const configOptions = result.configOptions as ConfigOption[] | undefined
+  const modelOpt = configOptions?.find(o => o.category === "model" || o.id === "model")
+  if (modelOpt) {
+    currentModelId = modelOpt.currentValue
+    availableModels = modelOpt.options
+      .filter(o => !o.description?.startsWith("[Internal]") && !o.description?.startsWith("[Deprecated]"))
+      .map(o => ({ modelId: o.value, name: o.name, description: o.description }))
+  }
+
+  // Apply stored model preference
+  const storedModel = typeof sessionStorage !== "undefined" ? null : null // server-side, no sessionStorage
+  // Model preference is managed client-side via /api/agent/models PUT
+}
 }
 
 /** Create a new ACP session (for new chat). */

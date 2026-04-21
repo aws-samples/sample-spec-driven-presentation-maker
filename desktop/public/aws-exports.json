@@ -1,8 +1,0 @@
-{
-  "agentRuntimeArn": "local",
-  "awsRegion": "local",
-  "agentPattern": "local",
-  "apiBaseUrl": "local://",
-  "authority": "local",
-  "client_id": "local"
-}
