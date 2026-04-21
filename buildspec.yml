@@ -21,16 +21,36 @@ phases:
           searchSlides: ${FEATURE_SEARCH_SLIDES:-false}
           observability: ${FEATURE_OBSERVABILITY:-false}
         EOF
+        sed -i 's/^        //' infra/config.yaml
+      - |
+        if [ -n "${WAF_IPV4}" ] || [ -n "${WAF_IPV6}" ]; then
+          echo "waf:" >> infra/config.yaml
+          if [ -n "${WAF_IPV4}" ]; then
+            echo "  allowedIpV4AddressRanges:" >> infra/config.yaml
+            IFS=',' read -ra CIDRS <<< "${WAF_IPV4}"
+            for c in "${CIDRS[@]}"; do
+              echo "    - \"${c}\"" >> infra/config.yaml
+            done
+          fi
+          if [ -n "${WAF_IPV6}" ]; then
+            echo "  allowedIpV6AddressRanges:" >> infra/config.yaml
+            IFS=',' read -ra CIDRS <<< "${WAF_IPV6}"
+            for c in "${CIDRS[@]}"; do
+              echo "    - \"${c}\"" >> infra/config.yaml
+            done
+          fi
+        fi
       - |
         if [ -n "${AUTH_OIDC_URL}" ] && [ -n "${AUTH_ALLOWED_CLIENTS}" ]; then
-          cat >> infra/config.yaml <<EOF
+          cat >> infra/config.yaml <<AUTHEOF
         auth:
           oidcDiscoveryUrl: "${AUTH_OIDC_URL}"
           allowedClients:
-        EOF
+        AUTHEOF
+          sed -i '/^auth:/,$ s/^        //' infra/config.yaml
           IFS=',' read -ra CLIENTS <<< "${AUTH_ALLOWED_CLIENTS}"
           for c in "${CLIENTS[@]}"; do
-            echo "    - \"${c}\"" >> infra/config.yaml
+            echo "  - \"${c}\"" >> infra/config.yaml
           done
         fi
       - cat infra/config.yaml

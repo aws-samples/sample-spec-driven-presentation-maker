@@ -264,6 +264,27 @@ If you change the stack configuration, run `npx cdk deploy SdpmWebUi`.
 
 ## Optional Features
 
+### WAF IP Address Restriction
+
+Set `waf.allowedIpV4AddressRanges` and/or `waf.allowedIpV6AddressRanges` in `config.yaml` to restrict access to CloudFront and API Gateway by IP address.
+
+```yaml
+waf:
+  allowedIpV4AddressRanges:
+    - "10.0.0.0/8"
+    - "192.168.0.0/16"
+  allowedIpV6AddressRanges:
+    - "2001:db8::/32"
+```
+
+When configured, CDK creates:
+- **SdpmCloudFrontWaf** stack in `us-east-1` (WAFv2 CLOUDFRONT scope requirement) — attached to CloudFront
+- **Regional WAF** in the deploy region — attached to API Gateway
+
+Default action is **Block** — only the listed IP ranges are allowed. When the `waf` section is omitted, no WAF resources are created.
+
+> **⚠️ IPv6 Note:** If you specify only `allowedIpV4AddressRanges` without `allowedIpV6AddressRanges`, all IPv6 access is blocked. Modern browsers often prefer IPv6 when available, which can cause the Web UI to hang on "Loading authentication configuration..." even if your IPv4 address is allowed. Always specify both IPv4 and IPv6 ranges if your network uses dual-stack.
+
 ### Semantic Slide Search
 
 Set `features.searchSlides: true` to create a Amazon Bedrock Knowledge Base for cross-deck semantic search.

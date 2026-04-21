@@ -263,6 +263,7 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | SdpmAgent | Strands Agent (Amazon Bedrock AgentCore Runtime) | `stacks.agent` |
 | SdpmWebUi | S3 + Amazon CloudFront + Amazon API Gateway + Lambda | `stacks.webUi` |
 | SdpmAuth | Amazon Cognito User Pool (auto-created when agent or webUi enabled) | (auto) |
+| SdpmCloudFrontWaf | AWS WAF WebACL for CloudFront (us-east-1) | `waf.*` |
 
 ---
 
