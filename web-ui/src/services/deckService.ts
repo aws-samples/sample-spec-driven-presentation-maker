@@ -48,6 +48,8 @@ export interface DeckDetail {
   collaboratorAliases?: Record<string, string>
 }
 
+const IS_LOCAL = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_MODE === 'local'
+
 let apiBaseUrl = ""
 
 /** Session-level cache for slide preview presigned URLs. */
@@ -75,6 +77,11 @@ async function getApiBaseUrl(): Promise<string> {
  * @returns Array of deck summaries with thumbnail presigned URLs
  */
 export async function listDecks(idToken: string): Promise<{ decks: DeckSummary[]; favoriteIds: string[] }> {
+  if (IS_LOCAL) {
+    const response = await fetch("/api/decks")
+    if (!response.ok) throw new Error(`Failed to list decks: ${response.status}`)
+    return response.json()
+  }
   const base = await getApiBaseUrl()
   const response = await fetch(`${base}decks`, {
     headers: { Authorization: `Bearer ${idToken}` },
@@ -96,6 +103,11 @@ export async function listDecks(idToken: string): Promise<{ decks: DeckSummary[]
  * @returns Deck detail with slides array and pptxUrl
  */
 export async function getDeck(deckId: string, idToken: string): Promise<DeckDetail> {
+  if (IS_LOCAL) {
+    const response = await fetch(`/api/decks/${deckId}`)
+    if (!response.ok) throw new Error(`Failed to get deck: ${response.status}`)
+    return response.json()
+  }
   const base = await getApiBaseUrl()
   const response = await fetch(`${base}decks/${deckId}`, {
     headers: { Authorization: `Bearer ${idToken}` },

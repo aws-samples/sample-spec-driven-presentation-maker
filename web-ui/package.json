@@ -5,7 +5,8 @@
   "license": "MIT-0",
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "dev:local": "NEXT_PUBLIC_MODE=local next dev --turbopack",
+    "build": "if [ \"$NEXT_PUBLIC_MODE\" = 'local' ]; then next build; else mv src/app/api src/app/_api 2>/dev/null; next build; mv src/app/_api src/app/api 2>/dev/null; fi",
     "start": "next start",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",

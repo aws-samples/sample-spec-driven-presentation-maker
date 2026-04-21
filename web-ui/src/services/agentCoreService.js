@@ -8,6 +8,8 @@
 
 import * as parser from './strandsParser.js';
 
+const IS_LOCAL = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_MODE === 'local';
+
 // Generate a UUID
 const generateId = () => {
   return crypto.randomUUID();
@@ -29,6 +31,11 @@ export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
  * Invokes the AgentCore runtime with streaming support
  */
 export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode) => {
+  // Local mode: proxy through Next.js API Route → kiro-cli acp
+  if (IS_LOCAL) {
+    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal);
+  }
+
   try {
     if (!userId) {
       throw new Error("No valid user ID found in session. Please ensure you are authenticated.")
@@ -188,4 +195,52 @@ export const stopComposeSlides = async (sessionId, toolUseId, accessToken) => {
  */
 export const generateSessionId = () => {
   return generateId()
+}
+
+/**
+ * Invoke the local ACP agent via API Route.
+ * Reads SSE stream from /api/agent/invoke and feeds events through the same
+ * strandsParser used by the cloud path, so ChatPanel works unchanged.
+ */
+const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal) => {
+  const response = await fetch('/api/agent/invoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, sessionId }),
+    signal,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Local agent error: ${response.status}: ${errorText}`);
+  }
+
+  let completion = '';
+  let buffer = '';
+
+  if (parser.resetParserState) parser.resetParserState();
+
+  if (response.body) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.trim()) {
+            completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  return completion;
 }
