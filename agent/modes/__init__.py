@@ -4,36 +4,88 @@
 
 from dataclasses import dataclass, field
 
+from composition import Part, Source
+
 
 @dataclass
 class ModeConfig:
     """Agent mode configuration.
 
     Attributes:
-        prompt_key: Filename (without .md) under prompts/.
+        parts: Ordered prompt parts (static .md files, MCP prefetch, or callables).
         use_composer: Include compose_slides tool.
-        prefetch: List of (tool_name, args, label) to prefetch and inject as message history.
-        inject_mcp_instructions: Inject collect_mcp_instructions into prompt.
     """
 
-    prompt_key: str
+    parts: list[Part] = field(default_factory=list)
     use_composer: bool = True
-    prefetch: list = field(default_factory=list)
-    inject_mcp_instructions: bool = False
+
+
+# Shared parts — referenced by multiple modes
+_COMMON_LANGUAGE = Part(Source.file("common/language"), target="system")
+_CAP_UPLOAD = Part(Source.file("capability/upload"), target="system")
+_CAP_WEB_FETCH = Part(Source.file("capability/web_fetch"), target="system")
+_WF_CANCELLATION = Part(Source.file("workflow/cancellation"), target="system")
+_WF_POST_COMPOSE = Part(Source.file("workflow/post_compose"), target="system")
+_WF_SLIDE_GROUPS = Part(Source.file("workflow/slide_groups"), target="system")
+
+_PREFETCH_BRIEFING = Part(
+    Source.mcp("read_workflows", {"names": ["create-new-1-briefing"]}),
+    target="history:tool_result",
+    label="read_workflows",
+)
 
 
 MODES: dict[str, ModeConfig] = {
-    "separated": ModeConfig(
-        prompt_key="spec_agent",
-        prefetch=[("read_workflows", {"names": ["create-new-1-briefing"]}, "create-new-1-briefing")],
-    ),
-    "vibe": ModeConfig(
-        prompt_key="vibe_agent",
-        prefetch=[("read_workflows", {"names": ["create-new-1-briefing"]}, "create-new-1-briefing")],
-    ),
+    "separated": ModeConfig(parts=[
+        _COMMON_LANGUAGE,
+        Part(Source.file("role/spec_agent"), target="system"),
+        _WF_CANCELLATION,
+        _WF_POST_COMPOSE,
+        _WF_SLIDE_GROUPS,
+        _CAP_UPLOAD,
+        _CAP_WEB_FETCH,
+        _PREFETCH_BRIEFING,
+    ]),
+    "vibe": ModeConfig(parts=[
+        _COMMON_LANGUAGE,
+        Part(Source.file("role/vibe_agent"), target="system"),
+        _WF_CANCELLATION,
+        _WF_POST_COMPOSE,
+        _WF_SLIDE_GROUPS,
+        _CAP_UPLOAD,
+        _CAP_WEB_FETCH,
+        _PREFETCH_BRIEFING,
+    ]),
     "single": ModeConfig(
-        prompt_key="single_agent",
+        parts=[
+            _COMMON_LANGUAGE,
+            Part(Source.file("role/single_agent"), target="system"),
+            _CAP_UPLOAD,
+            _CAP_WEB_FETCH,
+        ],
         use_composer=False,
-        inject_mcp_instructions=True,
+    ),
+    # Composer is a sub-agent invoked by compose_slides; ModeConfig is used
+    # by compose_slides to build its prompt via the same resolve_parts path.
+    # Dynamic parts (deck specs, template analysis) are added at runtime.
+    "composer": ModeConfig(
+        parts=[
+            Part(Source.file("role/composer"), target="system"),
+            Part(
+                Source.mcp("read_workflows", {"names": ["create-new-2-compose"]}),
+                target="system", label="create-new-2-compose",
+            ),
+            Part(
+                Source.mcp("read_workflows", {"names": ["slide-json-spec"]}),
+                target="system", label="slide-json-spec",
+            ),
+            Part(Source.mcp("read_guides", {"names": ["grid"]}),
+                 target="history:tool_result", label="read_guides"),
+            Part(Source.mcp("read_examples", {"names": ["components/all"]}),
+                 target="history:tool_result", label="read_examples"),
+            Part(Source.mcp("read_examples", {"names": ["patterns"]}),
+                 target="history:tool_result", label="read_examples"),
+        ],
+        use_composer=False,
     ),
 }

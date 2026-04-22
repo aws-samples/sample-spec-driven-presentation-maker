@@ -13,7 +13,8 @@ from strands import Agent, tool as strands_tool
 from strands.hooks.events import AfterToolCallEvent, BeforeToolCallEvent
 from strands.types.tools import ToolContext
 
-from prompts import build_system_prompt, load_prompt
+from composition import resolve_parts
+from modes import MODES  # imported lazily in compose_slides if needed
 
 
 # Soft-stop signal: the webui cancel button sends InvokeAgentRuntimeCommand
@@ -65,21 +66,6 @@ def _is_compose_stopped(parent_tool_use_id: str) -> bool:
     except Exception:
         return False
 
-# References to prefetch for composer
-_PREFETCH_SYSTEM = [
-    ("read_workflows", {"names": ["create-new-2-compose"]}, "create-new-2-compose"),
-    ("read_workflows", {"names": ["slide-json-spec"]}, "slide-json-spec"),
-]
-_PREFETCH_REFS = [
-    ("read_guides", {"names": ["grid"]}, "grid"),
-    ("read_examples", {"names": ["components/all"]}, "components/all"),
-    ("read_examples", {"names": ["patterns"]}, "patterns"),
-]
-
-
-# Canonical implementation lives in factory.py — import for backward compat
-from prefetch import prefetch_sections as _prefetch_sections  # noqa: E402
-
 
 def _prefetch_deck_specs(mcp_client, deck_id: str, assigned_slugs: list[str]) -> list[str]:
     """Prefetch deck-specific specs and assigned slide contents."""
@@ -127,10 +113,6 @@ def _prefetch_deck_specs(mcp_client, deck_id: str, assigned_slugs: list[str]) ->
             except json.JSONDecodeError as e:
                 raise RuntimeError(f"Failed to parse specs for deck {deck_id}: {e}") from e
     return sections
-
-
-# Canonical implementation lives in factory.py — import for backward compat
-from prefetch import build_common_context as _build_common_context  # noqa: E402
 
 
 def _build_deck_context(sections: list[str]) -> str:
@@ -233,17 +215,13 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None):
         done_count = 0
 
         try:
-            # Prefetch references once
+            # Prefetch static composer parts (role prompt + refs) via composition
             yield {"status": "prefetching", "message": "Loading references..."}
-            system_sections = _prefetch_sections(mcp_client, _PREFETCH_SYSTEM) if mcp_client else []
-            ref_sections = _prefetch_sections(mcp_client, _PREFETCH_REFS) if mcp_client else []
-
-            system_context = _build_common_context(system_sections + ref_sections)
-            composer_template = load_prompt("composer")
-            static_prompt = build_system_prompt(
-                composer_template,
-                common_context=system_context,
+            composer_cfg = MODES["composer"]
+            composer_system, composer_history = resolve_parts(
+                composer_cfg.parts, mcp_client=mcp_client, context={}
             )
+            static_prompt = composer_system
 
             progress_q: queue.Queue = queue.Queue()
 
@@ -353,6 +331,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None):
                         {"text": static_prompt},
                         {"cachePoint": {"type": "default"}},
                     ],
+                    messages=list(composer_history),
                     tools=_group_tools,
                     model=model,
                     callback_handler=_on_event,

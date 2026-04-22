@@ -18,10 +18,9 @@ from mcp_clients import (
     mcp_aws_knowledge,
     mcp_aws_pricing,
 )
+from composition import resolve_parts
 from modes import MODES
 from modes.separated.composer import make_compose_slides
-from prefetch import build_common_context, inject_prefill, prefetch_sections
-from prompts import build_system_prompt, load_prompt
 from resilience import LoopGuard
 from session import fix_excess_tool_results
 from tools.upload_tools import list_uploads
@@ -132,30 +131,30 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str) -> tu
             trace_attributes={"user.id": user_id, "session.id": session_id},
         )
 
-    # Prefetch + prefill (new sessions only)
-    if cfg.prefetch:
-        try:
-            sections = prefetch_sections(mcp_servers[0], cfg.prefetch) if mcp_servers else []
-            if sections and len(agent.messages) == 0:
-                inject_prefill(agent.messages, sections, cfg.prefetch)
-        except Exception as e:
-            logger.warning("Workflow prefetch failed: %s", e)
+    # Prompts + history (parts-based)
+    context = {"mcp_instructions": collect_mcp_instructions(mcp_servers)}
 
-    # System prompt
-    prompt_kwargs = {}
-    if cfg.inject_mcp_instructions:
-        prompt_kwargs["mcp_instructions"] = collect_mcp_instructions(mcp_servers)
-    template = load_prompt(cfg.prompt_key)
-    prompt = build_system_prompt(template, **prompt_kwargs)
+    try:
+        system_prompt, initial_messages = resolve_parts(
+            cfg.parts,
+            mcp_client=mcp_servers[0] if mcp_servers else None,
+            context=context,
+        )
+    except Exception as e:
+        logger.warning("Prompt resolve failed: %s", e)
+        system_prompt, initial_messages = "", []
 
-    if cfg.prefetch:
-        # No common_context in prompt — it's in message history now
+    # Apply to agent (cache point when we have prefetched history)
+    has_history = bool(initial_messages)
+    if has_history and len(agent.messages) == 0:
+        agent.messages.extend(initial_messages)
+    if has_history:
         agent.system_prompt = [
-            {"text": prompt},
+            {"text": system_prompt},
             {"cachePoint": {"type": "default"}},
         ]
     else:
-        agent.system_prompt = prompt
+        agent.system_prompt = system_prompt
 
     # LoopGuard
     guard = LoopGuard(max_tool_calls=int(os.environ.get("SPEC_MAX_TOOL_CALLS", "300")))

@@ -12,7 +12,7 @@ Write slide content in the same language as the spec files unless instructed oth
 
 ## Your Role
 - Read the instruction provided, which specifies which slides to compose
-- Write each slide to slides/{{slug}}.json via run_python
+- Write each slide to slides/{slug}.json via run_python
 - Follow the `create-new-2-compose` workflow below
 - Your assigned slides are pre-loaded below. Other slides in slides/ are listed by name only — read them via run_python if you need to reference their content
 
@@ -117,5 +117,3 @@ When you see one, follow it precisely and do not second-guess.
   If the tool just failed, do NOT retry the same call — accept a rough draft and move on.
 - "[Tool error limit]" (delivered as a cancelled tool result) — five or more consecutive tool calls have failed.
   Stop invoking tools and respond with a plain-text summary of what was completed, what failed, and the last error.
-
-{common_context}
