@@ -741,7 +741,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
     if deck_id:
         _check_deck_access(deck_id, action="edit_slide" if save else "read")
 
-    output = sandbox_mod.execute_in_sandbox(
+    output, outline_rejected = sandbox_mod.execute_in_sandbox(
         code=code,
         storage=_storage,
         region=_region,
@@ -751,6 +751,13 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
     )
 
     result: dict = {"output": output}
+
+    if outline_rejected:
+        errs = result.setdefault("errors", {})
+        errs["outline"] = (
+            "outline.md format violation. "
+            "Read workflow `create-new-1-outline` for the correct format."
+        )
 
     # Post-processing: measure_slides triggers PPTX build → measure/lint/bias
     if deck_id and (measure_slides or save):

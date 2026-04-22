@@ -20,7 +20,6 @@ from mcp_clients import (
     mcp_aws_pricing,
 )
 from modes import MODES
-from modes.separated.composer import make_compose_slides
 from prompts import build_system_prompt, load_prompt
 from resilience import LoopGuard
 from session import fix_excess_tool_results
@@ -159,6 +158,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str) -> tu
             ),
         )
         composer_mcp_factory = lambda: mcp_agentcore_runtime(jwt_token=jwt_token)  # noqa: E731
+        from modes.separated.composer import make_compose_slides
         compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory)
         tools.append(compose_slides)
 
@@ -184,6 +184,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str) -> tu
         mcp_status = new_status
         tools = [*mcp_servers, list_uploads, web_fetch]
         if cfg.use_composer:
+            from modes.separated.composer import make_compose_slides
             compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory)
             tools.append(compose_slides)
         agent = Agent(

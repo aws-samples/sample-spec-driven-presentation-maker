@@ -368,6 +368,17 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
     # sdpm.api accepts a directory (new format) or a .json file (legacy)
     deck_input = str(legacy_json) if legacy_json.exists() else str(deck_dir)
 
+    # Lint outline.md — warn on failure
+    outline_path = deck_dir / "specs" / "outline.md"
+    if outline_path.exists() and outline_path.read_text(encoding="utf-8").strip():
+        from sdpm.schema.lint_outline import lint_outline
+
+        if lint_outline(outline_path.read_text(encoding="utf-8")):
+            result.setdefault("warnings", {})["outline"] = (
+                "outline.md format violation. "
+                "Read workflow `create-new-1-outline` for the correct format."
+            )
+
     # Build slug → page number mapping from outline.md (for slug-based measure_slides)
     def _slug_to_page() -> dict[str, int]:
         from sdpm.api import parse_outline_slugs
