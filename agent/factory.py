@@ -4,7 +4,6 @@
 
 import logging
 import os
-import uuid
 
 from botocore.config import Config as BotocoreConfig
 from strands import Agent
@@ -20,6 +19,8 @@ from mcp_clients import (
     mcp_aws_pricing,
 )
 from modes import MODES
+from modes.separated.composer import make_compose_slides
+from prefetch import build_common_context, inject_prefill, prefetch_sections
 from prompts import build_system_prompt, load_prompt
 from resilience import LoopGuard
 from session import fix_excess_tool_results
@@ -33,66 +34,6 @@ _MCP_FACTORIES = [
     lambda jwt_token: mcp_aws_knowledge(),
     lambda jwt_token: mcp_aws_pricing(),
 ]
-
-
-# ---------------------------------------------------------------------------
-# Prefetch helpers (canonical location — composer.py imports from here)
-# ---------------------------------------------------------------------------
-
-def prefetch_sections(mcp_client, prefetch_list: list) -> list[str]:
-    """Prefetch references from MCP server via synchronous tool calls."""
-    sections = []
-    for tool_name, args, label in prefetch_list:
-        result = mcp_client.call_tool_sync(
-            tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
-            name=tool_name,
-            arguments=args,
-        )
-        if result.get("status") == "error":
-            raise RuntimeError(f"Failed to prefetch {label}: {result.get('content')}")
-        text = ""
-        for item in result.get("content", []):
-            if isinstance(item, dict) and "text" in item:
-                text += item["text"]
-        if text:
-            sections.append(f"## {label}\n\n{text}")
-    return sections
-
-
-def build_common_context(sections: list[str]) -> str:
-    """Build common reference context string from prefetched sections."""
-    if not sections:
-        return ""
-    return "# Pre-loaded References (already executed — do NOT re-fetch)\n\n" + "\n\n---\n\n".join(sections)
-
-
-# ---------------------------------------------------------------------------
-# Prefill injection
-# ---------------------------------------------------------------------------
-
-def _inject_prefill(messages: list, sections: list[str], prefetch_list: list) -> None:
-    """Inject prefetched content as fake tool call history.
-
-    Only called when len(agent.messages) == 0 (new session).
-    Restored sessions already contain the prefill from the first run.
-    """
-    for (tool_name, args, label), section in zip(prefetch_list, sections):
-        tool_use_id = f"prefill-{uuid.uuid4().hex[:8]}"
-        messages.extend([
-            {
-                "role": "assistant",
-                "content": [
-                    {"text": f"I'll read the {label} workflow."},
-                    {"toolUse": {"toolUseId": tool_use_id, "name": tool_name, "input": args}},
-                ],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {"toolResult": {"toolUseId": tool_use_id, "content": [{"text": section}], "status": "success"}},
-                ],
-            },
-        ])
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +99,6 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str) -> tu
             ),
         )
         composer_mcp_factory = lambda: mcp_agentcore_runtime(jwt_token=jwt_token)  # noqa: E731
-        from modes.separated.composer import make_compose_slides
         compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory)
         tools.append(compose_slides)
 
@@ -184,7 +124,6 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str) -> tu
         mcp_status = new_status
         tools = [*mcp_servers, list_uploads, web_fetch]
         if cfg.use_composer:
-            from modes.separated.composer import make_compose_slides
             compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory)
             tools.append(compose_slides)
         agent = Agent(
@@ -198,7 +137,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str) -> tu
         try:
             sections = prefetch_sections(mcp_servers[0], cfg.prefetch) if mcp_servers else []
             if sections and len(agent.messages) == 0:
-                _inject_prefill(agent.messages, sections, cfg.prefetch)
+                inject_prefill(agent.messages, sections, cfg.prefetch)
         except Exception as e:
             logger.warning("Workflow prefetch failed: %s", e)
 

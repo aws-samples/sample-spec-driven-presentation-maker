@@ -78,7 +78,7 @@ _PREFETCH_REFS = [
 
 
 # Canonical implementation lives in factory.py — import for backward compat
-from factory import prefetch_sections as _prefetch_sections  # noqa: E402
+from prefetch import prefetch_sections as _prefetch_sections  # noqa: E402
 
 
 def _prefetch_deck_specs(mcp_client, deck_id: str, assigned_slugs: list[str]) -> list[str]:
@@ -130,7 +130,7 @@ def _prefetch_deck_specs(mcp_client, deck_id: str, assigned_slugs: list[str]) ->
 
 
 # Canonical implementation lives in factory.py — import for backward compat
-from factory import build_common_context as _build_common_context  # noqa: E402
+from prefetch import build_common_context as _build_common_context  # noqa: E402
 
 
 def _build_deck_context(sections: list[str]) -> str:

@@ -13,7 +13,7 @@ RUN uv pip install --no-cache -r requirements.txt
 RUN useradd -m -u 1000 bedrock_agentcore
 USER bedrock_agentcore
 
-COPY basic_agent.py factory.py mcp_clients.py resilience.py session.py streaming.py ./
+COPY basic_agent.py factory.py mcp_clients.py prefetch.py resilience.py session.py streaming.py ./
 COPY prompts/ prompts/
 COPY modes/ modes/
 COPY tools/ tools/
