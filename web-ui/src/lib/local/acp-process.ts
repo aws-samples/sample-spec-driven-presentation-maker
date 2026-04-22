@@ -13,6 +13,13 @@ import os from "os"
 export const DECK_ROOT = path.join(os.homedir(), "Documents", "SDPM-Presentations")
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
 
+function resolveDeckDir(deckId: string): string | null {
+  const root = path.resolve(DECK_ROOT)
+  const dir = path.resolve(root, deckId)
+  if (dir !== root && !dir.startsWith(root + path.sep)) return null
+  return dir
+}
+
 type PendingResolve = (value: unknown) => void
 type NotifyListener = (msg: Record<string, unknown>) => void
 
@@ -161,29 +168,33 @@ export async function loadSession(savedSessionId: string): Promise<void> {
 export function saveSessionToDeck(deckId: string): void {
   if (!sessionId) return
   const fs = require("fs") as typeof import("fs")
-  const dir = path.join(DECK_ROOT, deckId)
-  if (!fs.existsSync(dir)) return
+  const dir = resolveDeckDir(deckId)
+  if (!dir || !fs.existsSync(dir)) return
   fs.writeFileSync(path.join(dir, ".session"), sessionId, "utf-8")
 }
 
 /** Read sessionId from deck's .session file. */
 export function readSessionFromDeck(deckId: string): string | null {
   const fs = require("fs") as typeof import("fs")
-  try { return fs.readFileSync(path.join(DECK_ROOT, deckId, ".session"), "utf-8").trim() } catch { return null }
+  const dir = resolveDeckDir(deckId)
+  if (!dir) return null
+  try { return fs.readFileSync(path.join(dir, ".session"), "utf-8").trim() } catch { return null }
 }
 
 /** Save chat messages to deck's .chat.json file. */
 export function saveChatToDeck(deckId: string, messages: unknown[]): void {
   const fs = require("fs") as typeof import("fs")
-  const dir = path.join(DECK_ROOT, deckId)
-  if (!fs.existsSync(dir)) return
+  const dir = resolveDeckDir(deckId)
+  if (!dir || !fs.existsSync(dir)) return
   fs.writeFileSync(path.join(dir, ".chat.json"), JSON.stringify(messages), "utf-8")
 }
 
 /** Read chat messages from deck's .chat.json file. */
 export function readChatFromDeck(deckId: string): unknown[] {
   const fs = require("fs") as typeof import("fs")
-  try { return JSON.parse(fs.readFileSync(path.join(DECK_ROOT, deckId, ".chat.json"), "utf-8")) } catch { return [] }
+  const dir = resolveDeckDir(deckId)
+  if (!dir) return []
+  try { return JSON.parse(fs.readFileSync(path.join(dir, ".chat.json"), "utf-8")) } catch { return [] }
 }
 
 // Cleanup on process exit
