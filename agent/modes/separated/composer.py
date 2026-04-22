@@ -10,10 +10,11 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 from strands import Agent, tool as strands_tool
-from strands.hooks.events import AfterToolCallEvent, BeforeToolCallEvent
+from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent, BeforeToolCallEvent
 from strands.types.tools import ToolContext
 
 from composition import resolve_parts
+from cost_logger import log_usage
 from modes import MODES  # imported lazily in compose_slides if needed
 
 
@@ -335,7 +336,12 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None):
                     tools=_group_tools,
                     model=model,
                     callback_handler=_on_event,
+                    trace_attributes={
+                        "group.index": gi,
+                        "group.slugs": ",".join(group["slugs"]),
+                    },
                 )
+                composer.hooks.add_callback(AfterInvocationEvent, log_usage)
 
                 async def _before_tool(event: BeforeToolCallEvent):
                     # Soft-stop: if the user cancelled this compose_slides

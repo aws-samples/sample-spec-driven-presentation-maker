@@ -7,10 +7,11 @@ import os
 
 from botocore.config import Config as BotocoreConfig
 from strands import Agent
-from strands.hooks.events import AfterToolCallEvent
+from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent
 from strands.models import BedrockModel
 from strands.models.bedrock import CacheConfig
 
+from cost_logger import log_usage
 from mcp_clients import (
     MCP_DEFS,
     collect_mcp_instructions,
@@ -159,6 +160,9 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str) -> tu
     # LoopGuard
     guard = LoopGuard(max_tool_calls=int(os.environ.get("SPEC_MAX_TOOL_CALLS", "300")))
     agent.hooks.add_callback(AfterToolCallEvent, guard.after_tool)
+
+    # Cost logger
+    agent.hooks.add_callback(AfterInvocationEvent, log_usage)
 
     fix_excess_tool_results(agent.messages)
 
