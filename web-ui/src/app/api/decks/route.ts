@@ -9,9 +9,7 @@
 
 import fs from "fs"
 import path from "path"
-import os from "os"
-
-const DECK_ROOT = path.join(os.homedir(), "Documents", "SDPM-Presentations")
+import { DECK_ROOT } from "@/lib/local/deck-paths"
 
 export async function GET() {
   if (!fs.existsSync(DECK_ROOT)) {

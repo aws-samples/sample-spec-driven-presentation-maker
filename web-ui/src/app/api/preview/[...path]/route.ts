@@ -10,9 +10,7 @@
 
 import fs from "fs"
 import path from "path"
-import os from "os"
-
-const DECK_ROOT = path.join(os.homedir(), "Documents", "SDPM-Presentations")
+import { resolveDeckPath } from "@/lib/local/deck-paths"
 
 const MIME: Record<string, string> = {
   ".png": "image/png",
@@ -25,10 +23,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ path: s
   const segments = (await params).path
   if (!segments || segments.length < 2) return new Response("Not found", { status: 404 })
 
-  const filePath = path.join(DECK_ROOT, ...segments)
-
-  // Prevent path traversal
-  if (!filePath.startsWith(DECK_ROOT)) return new Response("Forbidden", { status: 403 })
+  const [deckId, ...rest] = segments
+  const filePath = resolveDeckPath(deckId, ...rest)
+  if (!filePath) return new Response("Forbidden", { status: 403 })
   if (!fs.existsSync(filePath)) return new Response("Not found", { status: 404 })
 
   const ext = path.extname(filePath)

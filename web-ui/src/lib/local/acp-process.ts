@@ -8,31 +8,10 @@
  */
 import { spawn, type ChildProcess } from "child_process"
 import path from "path"
-import os from "os"
+import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
 
-export const DECK_ROOT = path.join(os.homedir(), "Documents", "SDPM-Presentations")
+export { DECK_ROOT }
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
-
-function resolveDeckDir(deckId: string): string | null {
-  // Restrict to a single safe path segment (no separators).
-  if (!/^[A-Za-z0-9._-]+$/.test(deckId)) return null
-
-  const fs = require("fs") as typeof import("fs")
-  const root = path.resolve(DECK_ROOT)
-  const dir = path.resolve(root, deckId)
-
-  // First-level containment check on normalized paths.
-  if (dir !== root && !dir.startsWith(root + path.sep)) return null
-
-  try {
-    const rootReal = fs.realpathSync.native(root)
-    const dirReal = fs.realpathSync.native(dir)
-    if (dirReal !== rootReal && !dirReal.startsWith(rootReal + path.sep)) return null
-    return dirReal
-  } catch {
-    return null
-  }
-}
 
 type PendingResolve = (value: unknown) => void
 type NotifyListener = (msg: Record<string, unknown>) => void

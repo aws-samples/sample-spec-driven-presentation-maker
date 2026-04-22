@@ -9,9 +9,7 @@
 
 import fs from "fs"
 import path from "path"
-import os from "os"
-
-const DECK_ROOT = path.join(os.homedir(), "Documents", "SDPM-Presentations")
+import { resolveDeckDir } from "@/lib/local/deck-paths"
 
 function safeRead(p: string): string | null {
   try { return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : null } catch { return null }
@@ -19,8 +17,8 @@ function safeRead(p: string): string | null {
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: deckId } = await params
-  const dp = path.join(DECK_ROOT, deckId)
-  if (!fs.existsSync(dp)) return new Response("Not found", { status: 404 })
+  const dp = resolveDeckDir(deckId)
+  if (!dp || !fs.existsSync(dp)) return new Response("Not found", { status: 404 })
 
   // Read deck metadata
   let deckJson: Record<string, unknown> = {}
