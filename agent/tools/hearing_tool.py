@@ -21,8 +21,11 @@ def hearing(
 ) -> str:
     """Present structured questions to the user via a rich UI card.
 
-    Use this tool when you need specific input from the user and want to
-    provide clear options rather than asking open-ended questions.
+    ALWAYS use this tool when you need the user to make a choice or
+    judgment — not just for initial interviews but also for mid-workflow
+    decisions, confirmations with options, and next-step selections.
+    Only skip this tool for simple yes/no confirmations.
+
     Always include your reasoning or hypothesis in the inference field
     to help the user think — never ask blank questions.
     Limit to 5 questions per call. If you need more, call again after
