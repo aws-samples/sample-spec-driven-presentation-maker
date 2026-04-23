@@ -463,8 +463,22 @@ async def agent_stream(payload, context):
         pending = None
         last_tool_use = None
         last_tool_use_id = ""
+        last_yielded_input: dict = {}  # track last emitted partial input
         tool_name_map: dict[str, str] = {}  # toolUseId → tool name
         in_tool_execution = False  # True between toolUse emission and toolResult receipt
+
+        def _try_partial_parse(raw) -> dict | None:
+            """Attempt partial JSON parse for incremental toolUse streaming."""
+            if isinstance(raw, dict):
+                return raw if raw else None
+            if not isinstance(raw, str) or not raw:
+                return None
+            try:
+                from partial_json_parser import loads as partial_loads
+                parsed = partial_loads(raw)
+                return parsed if isinstance(parsed, dict) and parsed else None
+            except Exception:
+                return None
 
         def _tool_payload(tu: dict) -> dict:
             """Build toolUse SSE payload from accumulated tool use data."""
@@ -503,10 +517,16 @@ async def agent_stream(payload, context):
                             if last_tool_use:
                                 yield _tool_payload(last_tool_use)
                             last_tool_use_id = tu_id
+                            last_yielded_input = {}
                             tool_name_map[tu_id] = tu.get("name", "")
                             in_tool_execution = True
                             yield {"toolStart": {"name": tu.get("name", ""), "toolUseId": tu_id}}
                         last_tool_use = dict(tu)
+                        # Early-emit partial input so UI can render incrementally
+                        parsed = _try_partial_parse(tu.get("input", ""))
+                        if parsed and parsed != last_yielded_input:
+                            last_yielded_input = parsed
+                            yield {"toolUse": {"name": tu.get("name", ""), "toolUseId": tu_id, "input": parsed}}
                     elif isinstance(event, dict) and event.get("type") == "tool_result":
                         # ToolResultEvent — not yielded by stream_async (is_callback_event=False)
                         # Handled via ToolResultMessageEvent below instead
