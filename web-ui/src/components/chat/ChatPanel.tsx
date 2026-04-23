@@ -775,7 +775,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             </div>
           ) : (
             <div className="space-y-4">
-              {messages.map((msg, i) => (
+              {(() => {
+                const lastUserIdx = messages.findLastIndex((m) => m.role === "user")
+                return messages.map((msg, i) => (
                 <div key={i}>
                   {msg.mcpStatus && (
                     <div className="mb-2 ml-10">
@@ -791,9 +793,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     attachments={msg.attachments}
                     isStreaming={isLoading && i === messages.length - 1}
                     idToken={auth.user?.id_token}
+                    onSend={handleSend}
+                    hearingDisabled={i < lastUserIdx}
                   />
                 </div>
-              ))}
+              ))
+              })()}
               <div ref={messagesEndRef} />
             </div>
           )}

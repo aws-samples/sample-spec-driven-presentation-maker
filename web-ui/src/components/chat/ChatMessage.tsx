@@ -23,8 +23,18 @@ import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { ChevronRight, Sparkles, FileText as FileTextIcon, Image as ImageIcon } from "lucide-react"
 import { ToolCard, ToolCardCompact } from "./ToolCard"
+import { HearingCard } from "./HearingCard"
 import { SnippetBlock } from "./SnippetBlock"
 import { batchGetSlidePreviewUrls } from "@/services/deckService"
+
+type HearingQuestion = { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }
+
+function extractQuestions(input: Record<string, unknown>): HearingQuestion[] {
+  if (Array.isArray(input.questions)) return input.questions as HearingQuestion[]
+  return ["q0","q1","q2","q3","q4"]
+    .map((k) => input[k] ? { id: k, ...(input[k] as object) } : null)
+    .filter(Boolean) as HearingQuestion[]
+}
 
 const MENTION_RE = /(@Page\s\d+|@\[[^\]]+\])/g
 const SLIDE_PREVIEW_RE = /\[slide-preview:([a-f0-9]+):([a-z0-9_]+)\]/g
@@ -142,9 +152,13 @@ interface ChatMessageProps {
   isStreaming?: boolean
   /** Cognito ID token for fetching slide previews. */
   idToken?: string
+  /** Callback to send a message (used by HearingCard). */
+  onSend?: (text: string) => void
+  /** Whether hearing cards should be disabled (a new message was sent). */
+  hearingDisabled?: boolean
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, onSend, hearingDisabled = false }: ChatMessageProps) {
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
@@ -240,6 +254,14 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
             {blocks.map((block, i) =>
               block.type === "text" ? (
                 <div key={`t-${i}`}>{renderTextBlock(block.text, i === blocks.length - 1)}</div>
+              ) : block.tool.name === "hearing" && block.tool.input?.inference ? (
+                <HearingCard
+                  key={block.tool.toolUseId}
+                  inference={String(block.tool.input.inference)}
+                  questions={extractQuestions(block.tool.input as Record<string, unknown>)}
+                  disabled={hearingDisabled}
+                  onSubmit={(text) => onSend?.(text)}
+                />
               ) : (
                 <ToolCard
                   key={block.tool.toolUseId}
