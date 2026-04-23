@@ -16,6 +16,8 @@ def hearing(
     q0: dict,
     q1: dict = None,
     q2: dict = None,
+    q3: dict = None,
+    q4: dict = None,
 ) -> str:
     """Present structured questions to the user via a rich UI card.
 
@@ -23,7 +25,7 @@ def hearing(
     provide clear options rather than asking open-ended questions.
     Always include your reasoning or hypothesis in the inference field
     to help the user think — never ask blank questions.
-    Limit to 3 questions per call. If you need more, call again after
+    Limit to 5 questions per call. If you need more, call again after
     the user responds.
 
     The Web UI renders a dedicated selection card. The user's answers
@@ -41,6 +43,8 @@ def hearing(
             - placeholder (str, optional): Hint text for free_text type
         q1: Second question (optional, same schema as q0).
         q2: Third question (optional, same schema as q0).
+        q3: Fourth question (optional, same schema as q0).
+        q4: Fifth question (optional, same schema as q0).
 
     Returns:
         Confirmation that the questions were displayed. Wait for the
