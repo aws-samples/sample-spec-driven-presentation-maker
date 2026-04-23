@@ -135,9 +135,9 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
                         onClick={() => q.type === "single_select" ? toggleSingle(q.id, opt) : toggleMulti(q.id, opt)}
                         className="relative px-3 py-1.5 rounded-full text-[12px] transition-all duration-150 active:scale-[0.96] focus:outline-none"
                         style={{
-                          background: selected ? ACCENT : "oklch(1 0 0 / 6%)",
-                          color: selected ? "oklch(0.98 0 0)" : "oklch(0.80 0 0)",
-                          border: `1px solid ${selected ? ACCENT : "oklch(1 0 0 / 12%)"}`,
+                          background: selected ? "oklch(0.40 0.17 305)" : "oklch(1 0 0 / 6%)",
+                          color: selected ? "oklch(0.92 0.05 305)" : "oklch(0.80 0 0)",
+                          border: `1px solid ${selected ? "oklch(0.55 0.17 305)" : "oklch(1 0 0 / 12%)"}`,
                           boxShadow: selected ? `0 0 10px -2px ${ACCENT_GLOW}` : "none",
                         }}
                       >
