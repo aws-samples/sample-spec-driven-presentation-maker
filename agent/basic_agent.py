@@ -28,6 +28,7 @@ from strands.models.bedrock import CacheConfig
 from strands.tools.mcp import MCPClient
 from tools.upload_tools import list_uploads
 from tools.web_tools import web_fetch
+from tools.hearing_tool import hearing
 
 logger = logging.getLogger("sdpm.agent")
 
@@ -270,7 +271,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
 
     # Agent.__init__ triggers MCP client connections.
     # If optional MCP servers fail during init, retry with required-only.
-    tools = [*mcp_servers, list_uploads, web_fetch]
+    tools = [*mcp_servers, list_uploads, web_fetch, hearing]
     try:
         agent = Agent(
             name="SdpmAgent",
@@ -301,7 +302,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
         agent = Agent(
             name="SdpmAgent",
             system_prompt="",
-            tools=[*mcp_servers, list_uploads, web_fetch],
+            tools=[*mcp_servers, list_uploads, web_fetch, hearing],
             model=model,
             session_manager=session_manager,
             trace_attributes={"user.id": user_id, "session.id": session_id},

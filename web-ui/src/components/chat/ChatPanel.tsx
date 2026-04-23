@@ -791,6 +791,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     attachments={msg.attachments}
                     isStreaming={isLoading && i === messages.length - 1}
                     idToken={auth.user?.id_token}
+                    onSend={handleSend}
+                    hearingDisabled={messages.slice(i + 1).some((m) => m.role === "user")}
                   />
                 </div>
               ))}

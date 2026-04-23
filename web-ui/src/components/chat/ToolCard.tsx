@@ -91,6 +91,7 @@ const TOOL_META: Record<string, ToolMeta> = {
   pptx_to_json:       { Icon: FileText,        label: "Converting PPTX",        category: "explore" },
   grid:               { Icon: LayoutTemplate,  label: "Computing layout",       category: "compute" },
   // MCP prefixed tools (Strands adds prefix from MCPClient)
+  hearing:            { Icon: BookOpen,        label: "Asking questions",       category: "explore" },
   spec_driven_presentation_maker_init_presentation:  { Icon: FolderPlus,     label: "Initializing deck",     category: "build" },
   spec_driven_presentation_maker_analyze_template:   { Icon: LayoutTemplate, label: "Analyzing template",    category: "explore" },
   spec_driven_presentation_maker_start_presentation: { Icon: Play,           label: "Starting workflow",      category: "explore" },

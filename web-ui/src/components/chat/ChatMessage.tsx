@@ -23,6 +23,7 @@ import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { ChevronRight, Sparkles, FileText as FileTextIcon, Image as ImageIcon } from "lucide-react"
 import { ToolCard, ToolCardCompact } from "./ToolCard"
+import { HearingCard } from "./HearingCard"
 import { SnippetBlock } from "./SnippetBlock"
 import { batchGetSlidePreviewUrls } from "@/services/deckService"
 
@@ -142,9 +143,13 @@ interface ChatMessageProps {
   isStreaming?: boolean
   /** Cognito ID token for fetching slide previews. */
   idToken?: string
+  /** Callback to send a message (used by HearingCard). */
+  onSend?: (text: string) => void
+  /** Whether hearing cards should be disabled (a new message was sent). */
+  hearingDisabled?: boolean
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, onSend, hearingDisabled = false }: ChatMessageProps) {
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
@@ -240,6 +245,15 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
             {blocks.map((block, i) =>
               block.type === "text" ? (
                 <div key={`t-${i}`}>{renderTextBlock(block.text, i === blocks.length - 1)}</div>
+              ) : block.tool.name === "hearing" && block.tool.input?.inference ? (
+                <HearingCard
+                  key={block.tool.toolUseId}
+                  inference={String(block.tool.input.inference)}
+                  questions={(block.tool.input.questions as { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }[]) || []}
+                  disabled={hearingDisabled}
+                  onSubmit={(text) => onSend?.(text)}
+                  onCancel={() => onSend?.("")}
+                />
               ) : (
                 <ToolCard
                   key={block.tool.toolUseId}
