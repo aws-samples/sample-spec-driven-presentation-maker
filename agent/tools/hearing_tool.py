@@ -11,13 +11,20 @@ from strands import tool
 
 
 @tool
-def hearing(inference: str, questions: list[dict]) -> str:
+def hearing(
+    inference: str,
+    q0: dict,
+    q1: dict = None,
+    q2: dict = None,
+) -> str:
     """Present structured questions to the user via a rich UI card.
 
     Use this tool when you need specific input from the user and want to
     provide clear options rather than asking open-ended questions.
     Always include your reasoning or hypothesis in the inference field
     to help the user think — never ask blank questions.
+    Limit to 3 questions per call. If you need more, call again after
+    the user responds.
 
     The Web UI renders a dedicated selection card. The user's answers
     are returned as a normal chat message in the next turn.
@@ -26,13 +33,14 @@ def hearing(inference: str, questions: list[dict]) -> str:
         inference: Your reasoning or hypothesis to share with the user.
             This is displayed prominently above the questions to provide
             context and stimulate the user's thinking.
-        questions: List of question objects. Each question has:
-            - id (str): Unique question identifier (e.g. "q1")
+        q0: First question object with keys:
             - type (str): "single_select", "multi_select", or "free_text"
             - text (str): The question text
             - options (list[str], optional): Choices for select types
             - recommended (str or list[str], optional): Suggested choice(s)
             - placeholder (str, optional): Hint text for free_text type
+        q1: Second question (optional, same schema as q0).
+        q2: Third question (optional, same schema as q0).
 
     Returns:
         Confirmation that the questions were displayed. Wait for the

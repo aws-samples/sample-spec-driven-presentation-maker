@@ -249,7 +249,10 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 <HearingCard
                   key={block.tool.toolUseId}
                   inference={String(block.tool.input.inference)}
-                  questions={(block.tool.input.questions as { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }[]) || []}
+                  questions={
+                    (block.tool.input.questions as { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }[])
+                    || ["q0","q1","q2"].map((k, i) => block.tool.input?.[k] ? { id: k, ...block.tool.input[k] as object } : null).filter(Boolean) as { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }[]
+                  }
                   disabled={hearingDisabled}
                   onSubmit={(text) => onSend?.(text)}
                   onCancel={() => onSend?.("")}
