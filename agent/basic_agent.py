@@ -483,10 +483,9 @@ async def agent_stream(payload, context):
 
         def _tool_payload(tu: dict) -> dict:
             """Build toolUse SSE payload from accumulated tool use data."""
-            import json as _json
             raw = tu.get("input", "")
             try:
-                parsed = _json.loads(raw) if isinstance(raw, str) and raw else raw
+                parsed = json.loads(raw) if isinstance(raw, str) and raw else raw
             except (ValueError, TypeError):
                 parsed = {}
             return {"toolUse": {"name": tu.get("name", ""), "toolUseId": tu.get("toolUseId", ""), "input": parsed if isinstance(parsed, dict) else {}}}

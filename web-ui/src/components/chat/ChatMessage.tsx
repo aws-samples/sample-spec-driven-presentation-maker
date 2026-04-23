@@ -27,6 +27,15 @@ import { HearingCard } from "./HearingCard"
 import { SnippetBlock } from "./SnippetBlock"
 import { batchGetSlidePreviewUrls } from "@/services/deckService"
 
+type HearingQuestion = { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }
+
+function extractQuestions(input: Record<string, unknown>): HearingQuestion[] {
+  if (Array.isArray(input.questions)) return input.questions as HearingQuestion[]
+  return ["q0","q1","q2","q3","q4"]
+    .map((k) => input[k] ? { id: k, ...(input[k] as object) } : null)
+    .filter(Boolean) as HearingQuestion[]
+}
+
 const MENTION_RE = /(@Page\s\d+|@\[[^\]]+\])/g
 const SLIDE_PREVIEW_RE = /\[slide-preview:([a-f0-9]+):([a-z0-9_]+)\]/g
 const COLOR_CODE_RE = /(#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3}))\b/g
@@ -249,13 +258,9 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 <HearingCard
                   key={block.tool.toolUseId}
                   inference={String(block.tool.input.inference)}
-                  questions={
-                    (block.tool.input.questions as { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }[])
-                    || ["q0","q1","q2","q3","q4"].map((k, i) => block.tool.input?.[k] ? { id: k, ...block.tool.input[k] as object } : null).filter(Boolean) as { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }[]
-                  }
+                  questions={extractQuestions(block.tool.input as Record<string, unknown>)}
                   disabled={hearingDisabled}
                   onSubmit={(text) => onSend?.(text)}
-                  onCancel={() => onSend?.("（スキップ）")}
                 />
               ) : (
                 <ToolCard

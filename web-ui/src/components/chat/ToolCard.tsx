@@ -32,7 +32,7 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
-type ToolCategory = "build" | "explore" | "produce" | "compute" | "other"
+type ToolCategory = "build" | "explore" | "produce" | "compute" | "hearing" | "other"
 
 interface ToolMeta {
   Icon: LucideIcon
@@ -41,11 +41,12 @@ interface ToolMeta {
 }
 
 /** Accent palette per category — oklch for perceptual uniformity. */
-const CAT: Record<ToolCategory, { accent: string; bg: string; glow: string; border: string }> = {
+export const CAT: Record<ToolCategory, { accent: string; bg: string; glow: string; border: string }> = {
   build:   { accent: "oklch(0.75 0.14 185)", bg: "oklch(0.75 0.14 185 / 6%)",  glow: "oklch(0.75 0.14 185 / 12%)", border: "oklch(0.75 0.14 185 / 18%)" },
   explore: { accent: "oklch(0.80 0.14 80)",  bg: "oklch(0.80 0.14 80 / 6%)",   glow: "oklch(0.80 0.14 80 / 12%)",  border: "oklch(0.80 0.14 80 / 18%)" },
   produce: { accent: "oklch(0.72 0.16 300)", bg: "oklch(0.72 0.16 300 / 6%)",  glow: "oklch(0.72 0.16 300 / 12%)", border: "oklch(0.72 0.16 300 / 18%)" },
   compute: { accent: "oklch(0.78 0.12 220)", bg: "oklch(0.78 0.12 220 / 6%)",  glow: "oklch(0.78 0.12 220 / 12%)", border: "oklch(0.78 0.12 220 / 18%)" },
+  hearing: { accent: "oklch(0.74 0.16 330)", bg: "oklch(0.74 0.16 330 / 6%)",  glow: "oklch(0.74 0.16 330 / 12%)", border: "oklch(0.74 0.16 330 / 18%)" },
   other:   { accent: "oklch(0.55 0 0)",      bg: "oklch(0.55 0 0 / 4%)",       glow: "oklch(0.55 0 0 / 8%)",       border: "oklch(0.55 0 0 / 12%)" },
 }
 
@@ -91,7 +92,7 @@ const TOOL_META: Record<string, ToolMeta> = {
   pptx_to_json:       { Icon: FileText,        label: "Converting PPTX",        category: "explore" },
   grid:               { Icon: LayoutTemplate,  label: "Computing layout",       category: "compute" },
   // MCP prefixed tools (Strands adds prefix from MCPClient)
-  hearing:            { Icon: BookOpen,        label: "Asking questions",       category: "explore" },
+  hearing:            { Icon: BookOpen,        label: "Asking questions",       category: "hearing" },
   spec_driven_presentation_maker_init_presentation:  { Icon: FolderPlus,     label: "Initializing deck",     category: "build" },
   spec_driven_presentation_maker_analyze_template:   { Icon: LayoutTemplate, label: "Analyzing template",    category: "explore" },
   spec_driven_presentation_maker_start_presentation: { Icon: Play,           label: "Starting workflow",      category: "explore" },

@@ -4,11 +4,9 @@
 
 import { useState } from "react"
 import { Lightbulb, Send } from "lucide-react"
+import { CAT } from "./ToolCard"
 
-const ACCENT = "oklch(0.76 0.17 305)"
-const ACCENT_DIM = "oklch(0.76 0.17 305 / 15%)"
-const ACCENT_BORDER = "oklch(0.76 0.17 305 / 25%)"
-const ACCENT_GLOW = "oklch(0.76 0.17 305 / 10%)"
+const P = CAT.hearing
 
 interface Question {
   id: string
@@ -24,7 +22,6 @@ interface HearingCardProps {
   questions: Question[]
   disabled?: boolean
   onSubmit: (text: string) => void
-  onCancel: () => void
 }
 
 function isRecommended(option: string, rec?: string | string[]): boolean {
@@ -52,7 +49,7 @@ function formatAnswers(questions: Question[], answers: Answers): string {
     .join("\n")
 }
 
-export function HearingCard({ inference, questions, disabled = false, onSubmit, onCancel }: HearingCardProps) {
+export function HearingCard({ inference, questions, disabled = false, onSubmit }: HearingCardProps) {
   const [answers, setAnswers] = useState<Answers>({ selections: {}, notes: {} })
   const [submitted, setSubmitted] = useState(false)
 
@@ -100,15 +97,15 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
       aria-disabled={isDisabled}
       className={`rounded-xl transition-all duration-300 ${isDisabled ? "opacity-50 pointer-events-none" : ""}`}
       style={{
-        border: `1px solid ${isDisabled ? "oklch(1 0 0 / 5%)" : ACCENT_BORDER}`,
-        background: isDisabled ? "oklch(1 0 0 / 2%)" : "oklch(0.76 0.17 305 / 6%)",
-        boxShadow: isDisabled ? "none" : `0 0 30px -4px oklch(0.76 0.17 305 / 12%)`,
+        border: `1px solid ${isDisabled ? "oklch(1 0 0 / 5%)" : P.border}`,
+        background: isDisabled ? "oklch(1 0 0 / 2%)" : P.bg,
+        boxShadow: isDisabled ? "none" : `0 0 30px -4px ${P.glow}`,
       }}
     >
       {/* Inference */}
       <div className="flex items-start gap-2.5 px-4 pt-3.5 pb-2">
-        <Lightbulb className="h-4 w-4 mt-0.5 flex-none" style={{ color: ACCENT }} />
-        <p className="text-[13px] leading-relaxed" style={{ color: "oklch(0.82 0.12 305)" }}>{inference}</p>
+        <Lightbulb className="h-4 w-4 mt-0.5 flex-none" style={{ color: P.accent }} />
+        <p className="text-[13px] leading-relaxed" style={{ color: P.accent }}>{inference}</p>
       </div>
 
       {/* Questions */}
@@ -116,7 +113,6 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
         {questions.map((q) => (
           <fieldset key={q.id} className="space-y-2.5 animate-in fade-in-0 duration-300">
             {!q.text ? (
-              /* Skeleton for question still streaming */
               <div className="space-y-2">
                 <div className="h-4 w-2/3 rounded bg-white/[4%] animate-pulse" />
                 <div className="flex gap-1.5">
@@ -129,7 +125,6 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
             <>
             <legend className="text-[13px] font-medium text-foreground">{q.text}</legend>
 
-            {/* Chip-based select */}
             {(q.type === "single_select" || q.type === "multi_select") && q.options && (
               <>
                 <div className="flex flex-wrap gap-1.5" role={q.type === "single_select" ? "radiogroup" : "group"} aria-label={q.text}>
@@ -147,17 +142,17 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
                         onClick={() => q.type === "single_select" ? toggleSingle(q.id, opt) : toggleMulti(q.id, opt)}
                         className="relative px-3 py-1.5 rounded-full text-[12px] transition-all duration-150 active:scale-[0.96] focus:outline-none"
                         style={{
-                          background: selected ? "oklch(0.40 0.17 305)" : "oklch(1 0 0 / 6%)",
-                          color: selected ? "oklch(0.92 0.05 305)" : "oklch(0.80 0 0)",
-                          border: `1px solid ${selected ? "oklch(0.55 0.17 305)" : "oklch(1 0 0 / 12%)"}`,
-                          boxShadow: selected ? `0 0 10px -2px ${ACCENT_GLOW}` : "none",
+                          background: selected ? P.border : "oklch(1 0 0 / 6%)",
+                          color: selected ? "oklch(0.95 0 0)" : "oklch(0.80 0 0)",
+                          border: `1px solid ${selected ? P.accent : "oklch(1 0 0 / 12%)"}`,
+                          boxShadow: selected ? `0 0 10px -2px ${P.glow}` : "none",
                         }}
                       >
                         {opt}
                         {rec && !selected && (
                           <span
                             className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
-                            style={{ background: ACCENT }}
+                            style={{ background: P.accent }}
                             title="Recommended"
                           />
                         )}
@@ -165,7 +160,6 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
                     )
                   })}
                 </div>
-                {/* Note field for select questions */}
                 <input
                   type="text"
                   value={answers.notes[q.id] || ""}
@@ -177,13 +171,12 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
                     background: "oklch(1 0 0 / 2%)",
                     border: "1px solid oklch(1 0 0 / 4%)",
                   }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = ACCENT_BORDER }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = P.border }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "oklch(1 0 0 / 4%)" }}
                 />
               </>
             )}
 
-            {/* Free text */}
             {q.type === "free_text" && (
               <textarea
                 value={(answers.selections[q.id] as string) || ""}
@@ -196,7 +189,7 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
                   background: "oklch(1 0 0 / 3%)",
                   border: "1px solid oklch(1 0 0 / 5%)",
                 }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = ACCENT_BORDER }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = P.border }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = "oklch(1 0 0 / 5%)" }}
               />
             )}
@@ -206,28 +199,20 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
         ))}
       </div>
 
-      {/* Actions */}
       {!isDisabled && (
         <div className="flex justify-end gap-2 px-4 pb-3.5">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-3 py-1.5 text-[12px] text-foreground/40 hover:text-foreground/60 transition-colors rounded-lg focus:outline-none"
-          >
-            Skip
-          </button>
           <button
             type="button"
             onClick={handleSubmit}
             disabled={!hasAnswer}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium active:scale-[0.97] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 focus:outline-none"
             style={{
-              background: ACCENT_DIM,
-              color: ACCENT,
-              boxShadow: hasAnswer ? `0 0 12px -3px ${ACCENT_GLOW}` : "none",
+              background: P.bg,
+              color: P.accent,
+              boxShadow: hasAnswer ? `0 0 12px -3px ${P.glow}` : "none",
             }}
-            onMouseEnter={(e) => { if (hasAnswer) e.currentTarget.style.background = "oklch(0.74 0.16 305 / 20%)" }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = ACCENT_DIM }}
+            onMouseEnter={(e) => { if (hasAnswer) e.currentTarget.style.background = P.border }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = P.bg }}
           >
             <Send className="h-3 w-3" />
             Submit
