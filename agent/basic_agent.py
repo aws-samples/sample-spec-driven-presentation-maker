@@ -477,7 +477,8 @@ async def agent_stream(payload, context):
                 from partial_json_parser import loads as partial_loads
                 parsed = partial_loads(raw)
                 return parsed if isinstance(parsed, dict) and parsed else None
-            except Exception:
+            except Exception as exc:
+                logger.debug("Partial JSON parse failed (len=%d): %s", len(raw), exc)
                 return None
 
         def _tool_payload(tu: dict) -> dict:
@@ -523,7 +524,9 @@ async def agent_stream(payload, context):
                             yield {"toolStart": {"name": tu.get("name", ""), "toolUseId": tu_id}}
                         last_tool_use = dict(tu)
                         # Early-emit partial input so UI can render incrementally
-                        parsed = _try_partial_parse(tu.get("input", ""))
+                        raw_input = tu.get("input", "")
+                        logger.debug("current_tool_use input type=%s len=%s", type(raw_input).__name__, len(raw_input) if isinstance(raw_input, str) else "n/a")
+                        parsed = _try_partial_parse(raw_input)
                         if parsed and parsed != last_yielded_input:
                             last_yielded_input = parsed
                             yield {"toolUse": {"name": tu.get("name", ""), "toolUseId": tu_id, "input": parsed}}
