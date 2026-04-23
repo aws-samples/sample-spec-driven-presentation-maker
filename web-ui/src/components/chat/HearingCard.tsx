@@ -114,7 +114,19 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
       {/* Questions */}
       <div className="px-4 pb-3 space-y-4" role="group">
         {questions.map((q) => (
-          <fieldset key={q.id} className="space-y-2.5">
+          <fieldset key={q.id} className="space-y-2.5 animate-in fade-in-0 duration-300">
+            {!q.text ? (
+              /* Skeleton for question still streaming */
+              <div className="space-y-2">
+                <div className="h-4 w-2/3 rounded bg-white/[4%] animate-pulse" />
+                <div className="flex gap-1.5">
+                  <div className="h-7 w-20 rounded-full bg-white/[3%] animate-pulse" />
+                  <div className="h-7 w-24 rounded-full bg-white/[3%] animate-pulse" />
+                  <div className="h-7 w-16 rounded-full bg-white/[3%] animate-pulse" />
+                </div>
+              </div>
+            ) : (
+            <>
             <legend className="text-[13px] font-medium text-foreground">{q.text}</legend>
 
             {/* Chip-based select */}
@@ -187,6 +199,8 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
                 onFocus={(e) => { e.currentTarget.style.borderColor = ACCENT_BORDER }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = "oklch(1 0 0 / 5%)" }}
               />
+            )}
+          </>
             )}
           </fieldset>
         ))}
