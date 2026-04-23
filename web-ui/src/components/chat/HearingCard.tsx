@@ -5,10 +5,6 @@
 import { useState } from "react"
 import { Lightbulb, Send } from "lucide-react"
 
-/**
- * Hearing accent — oklch violet matching ToolCard "produce" category
- * but slightly warmer to distinguish interactive cards from output tools.
- */
 const ACCENT = "oklch(0.74 0.16 305)"
 const ACCENT_DIM = "oklch(0.74 0.16 305 / 12%)"
 const ACCENT_BORDER = "oklch(0.74 0.16 305 / 20%)"
@@ -36,29 +32,50 @@ function isRecommended(option: string, rec?: string | string[]): boolean {
   return Array.isArray(rec) ? rec.includes(option) : rec === option
 }
 
-function formatAnswers(questions: Question[], answers: Record<string, string | string[]>): string {
+interface Answers {
+  selections: Record<string, string | string[]>
+  notes: Record<string, string>
+}
+
+function formatAnswers(questions: Question[], answers: Answers): string {
   return questions
     .map((q) => {
-      const a = answers[q.id]
-      if (!a || (Array.isArray(a) && a.length === 0)) return null
-      const val = Array.isArray(a) ? a.join(", ") : a
-      return val ? `${q.text}: ${val}` : null
+      const sel = answers.selections[q.id]
+      const note = answers.notes[q.id]?.trim()
+      const selText = sel ? (Array.isArray(sel) ? sel.join(", ") : sel) : ""
+      if (!selText && !note) return null
+      if (selText && note) return `${q.text}: ${selText}（${note}）`
+      if (selText) return `${q.text}: ${selText}`
+      return `${q.text}: ${note}`
     })
     .filter(Boolean)
     .join("\n")
 }
 
 export function HearingCard({ inference, questions, disabled = false, onSubmit, onCancel }: HearingCardProps) {
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
+  const [answers, setAnswers] = useState<Answers>({ selections: {}, notes: {} })
   const [submitted, setSubmitted] = useState(false)
 
-  const setSingle = (id: string, value: string) => setAnswers((p) => ({ ...p, [id]: value }))
+  const toggleSingle = (id: string, value: string) =>
+    setAnswers((p) => ({
+      ...p,
+      selections: { ...p.selections, [id]: p.selections[id] === value ? "" : value },
+    }))
+
   const toggleMulti = (id: string, value: string) =>
     setAnswers((p) => {
-      const cur = (p[id] as string[]) || []
-      return { ...p, [id]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] }
+      const cur = (p.selections[id] as string[]) || []
+      return {
+        ...p,
+        selections: { ...p.selections, [id]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] },
+      }
     })
-  const setText = (id: string, value: string) => setAnswers((p) => ({ ...p, [id]: value }))
+
+  const setNote = (id: string, value: string) =>
+    setAnswers((p) => ({ ...p, notes: { ...p.notes, [id]: value } }))
+
+  const setText = (id: string, value: string) =>
+    setAnswers((p) => ({ ...p, selections: { ...p.selections, [id]: value } }))
 
   const handleSubmit = () => {
     const text = formatAnswers(questions, answers)
@@ -69,16 +86,12 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
   }
 
   const hasAnswer = questions.some((q) => {
-    const a = answers[q.id]
-    return a && (typeof a === "string" ? a.trim() : a.length > 0)
+    const sel = answers.selections[q.id]
+    const note = answers.notes[q.id]?.trim()
+    return note || (sel && (typeof sel === "string" ? sel.trim() : sel.length > 0))
   })
 
   const isDisabled = disabled || submitted
-
-  /* Style objects using oklch accent — avoids Tailwind purple mismatch with project palette */
-  const optionBase = { border: `1px solid oklch(1 0 0 / 5%)`, background: "oklch(1 0 0 / 3%)" }
-  const optionHover = { border: `1px solid oklch(1 0 0 / 8%)`, background: "oklch(1 0 0 / 5%)" }
-  const optionSelected = { border: `1px solid ${ACCENT_BORDER}`, background: ACCENT_DIM }
 
   return (
     <div
@@ -101,88 +114,67 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
       {/* Questions */}
       <div className="px-4 pb-3 space-y-4" role="group">
         {questions.map((q) => (
-          <fieldset key={q.id} className="space-y-2">
+          <fieldset key={q.id} className="space-y-2.5">
             <legend className="text-[13px] font-medium text-foreground/80">{q.text}</legend>
 
-            {q.type === "single_select" && q.options && (
-              <div className="space-y-1.5" role="radiogroup" aria-label={q.text}>
-                {q.options.map((opt) => {
-                  const selected = answers[q.id] === opt
-                  return (
-                    <label
-                      key={opt}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150"
-                      style={{
-                        ...(selected ? optionSelected : optionBase),
-                        transform: selected ? "scale(1.01)" : "scale(1)",
-                      }}
-                      onMouseEnter={(e) => { if (!selected) Object.assign(e.currentTarget.style, optionHover) }}
-                      onMouseLeave={(e) => { if (!selected) Object.assign(e.currentTarget.style, optionBase) }}
-                    >
-                      <input type="radio" name={q.id} value={opt} checked={selected} onChange={() => setSingle(q.id, opt)} className="sr-only" />
-                      <div
-                        className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-colors duration-150"
-                        style={{ borderColor: selected ? ACCENT : "oklch(1 0 0 / 12%)" }}
-                      >
-                        {selected && <div className="w-1.5 h-1.5 rounded-full animate-in zoom-in-50 duration-150" style={{ background: ACCENT }} />}
-                      </div>
-                      <span className="text-[12px] text-foreground/70 flex-1">{opt}</span>
-                      {isRecommended(opt, q.recommended) && (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ background: ACCENT_DIM, color: ACCENT }}>
-                          Recommended
-                        </span>
-                      )}
-                    </label>
-                  )
-                })}
-              </div>
-            )}
-
-            {q.type === "multi_select" && q.options && (
-              <div className="space-y-1.5" role="group" aria-label={q.text}>
-                {q.options.map((opt) => {
-                  const checked = ((answers[q.id] as string[]) || []).includes(opt)
-                  return (
-                    <label
-                      key={opt}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150"
-                      style={{
-                        ...(checked ? optionSelected : optionBase),
-                        transform: checked ? "scale(1.01)" : "scale(1)",
-                      }}
-                      onMouseEnter={(e) => { if (!checked) Object.assign(e.currentTarget.style, optionHover) }}
-                      onMouseLeave={(e) => { if (!checked) Object.assign(e.currentTarget.style, optionBase) }}
-                    >
-                      <input type="checkbox" checked={checked} onChange={() => toggleMulti(q.id, opt)} className="sr-only" aria-label={opt} />
-                      <div
-                        className="w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all duration-150"
+            {/* Chip-based select */}
+            {(q.type === "single_select" || q.type === "multi_select") && q.options && (
+              <>
+                <div className="flex flex-wrap gap-1.5" role={q.type === "single_select" ? "radiogroup" : "group"} aria-label={q.text}>
+                  {q.options.map((opt) => {
+                    const selected = q.type === "single_select"
+                      ? answers.selections[q.id] === opt
+                      : ((answers.selections[q.id] as string[]) || []).includes(opt)
+                    const rec = isRecommended(opt, q.recommended)
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        role={q.type === "single_select" ? "radio" : "checkbox"}
+                        aria-checked={selected}
+                        onClick={() => q.type === "single_select" ? toggleSingle(q.id, opt) : toggleMulti(q.id, opt)}
+                        className="relative px-3 py-1.5 rounded-full text-[12px] transition-all duration-150 active:scale-[0.96] focus:outline-none"
                         style={{
-                          borderColor: checked ? ACCENT : "oklch(1 0 0 / 12%)",
-                          background: checked ? ACCENT : "transparent",
-                          transform: checked ? "scale(1.05)" : "scale(1)",
+                          background: selected ? ACCENT : "oklch(1 0 0 / 4%)",
+                          color: selected ? "oklch(0.98 0 0)" : "oklch(0.65 0 0)",
+                          border: `1px solid ${selected ? ACCENT : "oklch(1 0 0 / 8%)"}`,
+                          boxShadow: selected ? `0 0 10px -2px ${ACCENT_GLOW}` : "none",
                         }}
                       >
-                        {checked && (
-                          <svg className="w-2.5 h-2.5 text-white animate-in zoom-in-50 duration-150" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M2 6l3 3 5-5" />
-                          </svg>
+                        {opt}
+                        {rec && !selected && (
+                          <span
+                            className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
+                            style={{ background: ACCENT }}
+                            title="Recommended"
+                          />
                         )}
-                      </div>
-                      <span className="text-[12px] text-foreground/70 flex-1">{opt}</span>
-                      {isRecommended(opt, q.recommended) && (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ background: ACCENT_DIM, color: ACCENT }}>
-                          Recommended
-                        </span>
-                      )}
-                    </label>
-                  )
-                })}
-              </div>
+                      </button>
+                    )
+                  })}
+                </div>
+                {/* Note field for select questions */}
+                <input
+                  type="text"
+                  value={answers.notes[q.id] || ""}
+                  onChange={(e) => setNote(q.id, e.target.value)}
+                  placeholder="補足があれば..."
+                  aria-label={`${q.text} — additional notes`}
+                  className="w-full px-3 py-1.5 rounded-lg text-[12px] text-foreground/60 placeholder:text-foreground/20 focus:outline-none transition-colors duration-150"
+                  style={{
+                    background: "oklch(1 0 0 / 2%)",
+                    border: "1px solid oklch(1 0 0 / 4%)",
+                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = ACCENT_BORDER }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = "oklch(1 0 0 / 4%)" }}
+                />
+              </>
             )}
 
+            {/* Free text */}
             {q.type === "free_text" && (
               <textarea
-                value={(answers[q.id] as string) || ""}
+                value={(answers.selections[q.id] as string) || ""}
                 onChange={(e) => setText(q.id, e.target.value)}
                 placeholder={q.placeholder}
                 rows={2}
@@ -190,7 +182,7 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
                 className="w-full px-3 py-2 rounded-lg text-[12px] text-foreground/70 placeholder:text-foreground/25 focus:outline-none resize-y min-h-[2.5rem] transition-colors duration-150"
                 style={{
                   background: "oklch(1 0 0 / 3%)",
-                  border: `1px solid oklch(1 0 0 / 5%)`,
+                  border: "1px solid oklch(1 0 0 / 5%)",
                 }}
                 onFocus={(e) => { e.currentTarget.style.borderColor = ACCENT_BORDER }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = "oklch(1 0 0 / 5%)" }}
@@ -207,7 +199,6 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
             type="button"
             onClick={onCancel}
             className="px-3 py-1.5 text-[12px] text-foreground/40 hover:text-foreground/60 transition-colors rounded-lg focus:outline-none"
-            style={{ boxShadow: "none" }}
           >
             Skip
           </button>
