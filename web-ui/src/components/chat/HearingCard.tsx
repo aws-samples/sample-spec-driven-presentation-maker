@@ -5,10 +5,10 @@
 import { useState } from "react"
 import { Lightbulb, Send } from "lucide-react"
 
-const ACCENT = "oklch(0.74 0.16 305)"
-const ACCENT_DIM = "oklch(0.74 0.16 305 / 12%)"
-const ACCENT_BORDER = "oklch(0.74 0.16 305 / 20%)"
-const ACCENT_GLOW = "oklch(0.74 0.16 305 / 8%)"
+const ACCENT = "oklch(0.76 0.17 305)"
+const ACCENT_DIM = "oklch(0.76 0.17 305 / 15%)"
+const ACCENT_BORDER = "oklch(0.76 0.17 305 / 25%)"
+const ACCENT_GLOW = "oklch(0.76 0.17 305 / 10%)"
 
 interface Question {
   id: string
@@ -101,21 +101,21 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
       className={`rounded-xl transition-all duration-300 ${isDisabled ? "opacity-50 pointer-events-none" : ""}`}
       style={{
         border: `1px solid ${isDisabled ? "oklch(1 0 0 / 5%)" : ACCENT_BORDER}`,
-        background: isDisabled ? "oklch(1 0 0 / 2%)" : "oklch(0.74 0.16 305 / 5%)",
-        boxShadow: isDisabled ? "none" : `0 0 30px -4px oklch(0.74 0.16 305 / 10%)`,
+        background: isDisabled ? "oklch(1 0 0 / 2%)" : "oklch(0.76 0.17 305 / 6%)",
+        boxShadow: isDisabled ? "none" : `0 0 30px -4px oklch(0.76 0.17 305 / 12%)`,
       }}
     >
       {/* Inference */}
       <div className="flex items-start gap-2.5 px-4 pt-3.5 pb-2">
         <Lightbulb className="h-4 w-4 mt-0.5 flex-none" style={{ color: ACCENT }} />
-        <p className="text-[13px] leading-relaxed" style={{ color: "oklch(0.78 0.12 305)" }}>{inference}</p>
+        <p className="text-[13px] leading-relaxed" style={{ color: "oklch(0.82 0.12 305)" }}>{inference}</p>
       </div>
 
       {/* Questions */}
       <div className="px-4 pb-3 space-y-4" role="group">
         {questions.map((q) => (
           <fieldset key={q.id} className="space-y-2.5">
-            <legend className="text-[13px] font-medium text-foreground/90">{q.text}</legend>
+            <legend className="text-[13px] font-medium text-foreground">{q.text}</legend>
 
             {/* Chip-based select */}
             {(q.type === "single_select" || q.type === "multi_select") && q.options && (
@@ -135,9 +135,9 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit, 
                         onClick={() => q.type === "single_select" ? toggleSingle(q.id, opt) : toggleMulti(q.id, opt)}
                         className="relative px-3 py-1.5 rounded-full text-[12px] transition-all duration-150 active:scale-[0.96] focus:outline-none"
                         style={{
-                          background: selected ? ACCENT : "oklch(1 0 0 / 4%)",
-                          color: selected ? "oklch(0.98 0 0)" : "oklch(0.75 0 0)",
-                          border: `1px solid ${selected ? ACCENT : "oklch(1 0 0 / 10%)"}`,
+                          background: selected ? ACCENT : "oklch(1 0 0 / 6%)",
+                          color: selected ? "oklch(0.98 0 0)" : "oklch(0.80 0 0)",
+                          border: `1px solid ${selected ? ACCENT : "oklch(1 0 0 / 12%)"}`,
                           boxShadow: selected ? `0 0 10px -2px ${ACCENT_GLOW}` : "none",
                         }}
                       >
