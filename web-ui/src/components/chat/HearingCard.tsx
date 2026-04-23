@@ -41,7 +41,7 @@ function formatAnswers(questions: Question[], answers: Answers): string {
       const note = answers.notes[q.id]?.trim()
       const selText = sel ? (Array.isArray(sel) ? sel.join(", ") : sel) : ""
       if (!selText && !note) return null
-      if (selText && note) return `${q.text}: ${selText}（${note}）`
+      if (selText && note) return `${q.text}: ${selText} (${note})`
       if (selText) return `${q.text}: ${selText}`
       return `${q.text}: ${note}`
     })
@@ -164,7 +164,7 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit }
                   type="text"
                   value={answers.notes[q.id] || ""}
                   onChange={(e) => setNote(q.id, e.target.value)}
-                  placeholder="補足があれば..."
+                  placeholder="Additional notes..."
                   aria-label={`${q.text} — additional notes`}
                   className="w-full px-3 py-1.5 rounded-lg text-[12px] text-foreground/70 placeholder:text-foreground/30 focus:outline-none transition-colors duration-150"
                   style={{
