@@ -312,23 +312,91 @@ def apply_style(deck_id: str, style: str) -> str:
     return json.dumps({"status": "ok", "path": str(dest), "style": style})
 
 
+def _rejection_message(violations: list[str], has_deck: bool) -> str:
+    """Build an error message that helps the LLM rewrite rejected code."""
+    lines = ["Code rejected by sandbox:"]
+    lines.extend(f"  {v}" for v in violations)
+    if has_deck:
+        lines.append("")
+        lines.append("Use sandbox functions instead:")
+        lines.append("  read_json(path) → dict    write_json(path, data)")
+        lines.append("  read_text(path) → str     write_text(path, text)")
+        lines.append('  list_files(subdir=".") → list[str]')
+        lines.append("")
+        lines.append("Example:")
+        lines.append('  data = read_json("slides/title.json")')
+        lines.append('  data["elements"][0]["text"] = "New Title"')
+        lines.append('  write_json("slides/title.json", data)')
+    else:
+        lines.append("")
+        lines.append("Only print and built-in functions are available (no file I/O).")
+    return "\n".join(lines)
+
+
 @mcp.tool()
 def run_python(code: str, deck_id: str = "", save: bool = False,
                measure_slides: list[str] | None = None, purpose: str = "") -> str:
-    """Execute Python code in the deck workspace or for general computation.
+    """Execute Python code in a sandboxed environment.
 
-    If deck_id is provided (as output_dir path), the code runs with cwd set
-    to that directory. Deck structure:
-        deck.json           — metadata (template, fonts, defaultTextColor)
-        specs/outline.md    — slide order (``- [slug] Message``)
-        slides/{slug}.json  — per-slide data
-        includes/           — code blocks, images
-    Legacy decks with presentation.json are also supported.
+    Code runs in a restricted subprocess. `import` statements and direct file
+    access (`open()`) are NOT available. Use the provided sandbox functions instead.
+
+    ## Sandbox functions (available when deck_id is provided)
+
+        read_json(path)          → dict/list   Read a JSON file
+        write_json(path, data)   → None        Write data as JSON
+        read_text(path)          → str         Read a text file
+        write_text(path, text)   → None        Write a text file
+        list_files(subdir=".")   → list[str]   List filenames in a subdirectory
+
+    All paths are relative to the deck directory (e.g. "slides/title.json").
+    Access outside the deck directory is denied.
+
+    ## Built-in functions available
+
+    print, len, range, enumerate, sorted, isinstance, type, str, int, float,
+    bool, list, dict, tuple, set, min, max, sum, abs, round, any, all, zip,
+    map, filter, reversed
+
+    ## When deck_id is NOT provided (general computation)
+
+    Only print and built-in functions above are available.
+    No file operations.
+
+    ## Examples
+
+        # Read and edit a slide
+        data = read_json("slides/title.json")
+        data["elements"][0]["text"] = "New Title"
+        write_json("slides/title.json", data)
+
+        # Write a spec file
+        content = \"\"\"# Brief
+
+Topic: AI-powered presentation tool
+Audience: Developers
+\"\"\"
+        write_text("specs/brief.md", content)
+
+        # Read deck metadata
+        deck = read_json("deck.json")
+        print(deck["template"])
+
+        # Read a spec file
+        outline = read_text("specs/outline.md")
+        print(outline)
+
+        # List slide files
+        files = list_files("slides")
+        print(files)
+
+        # General computation (no deck_id)
+        print(2 ** 100)
 
     **Always specify measure_slides when editing slides.**
 
     Args:
-        code: Python code to execute.
+        code: Python code to execute (no import statements allowed).
         deck_id: Deck output_dir path. Optional.
         save: When True, triggers PPTX build + preview + SVG compose after execution.
         measure_slides: Slide slugs to measure after execution (e.g. ["title", "feature-a"]).
@@ -340,16 +408,24 @@ def run_python(code: str, deck_id: str = "", save: bool = False,
     result: dict = {}
     cwd = deck_id if deck_id and Path(deck_id).is_dir() else None
 
-    # Execute code
+    # Layer 1: AST inspection
+    from sandbox import check_code, make_runner
+
+    violations = check_code(code)
+    if violations:
+        result["output"] = _rejection_message(violations, has_deck=bool(cwd))
+        return json.dumps(result, ensure_ascii=False)
+
+    # Layer 2-4: Sandboxed subprocess execution
     try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write(code)
-            f.flush()
-            proc = subprocess.run(
-                [sys.executable, f.name],
-                capture_output=True, text=True, timeout=120, cwd=cwd,
-            )
-            os.unlink(f.name)
+        runner = make_runner(deck_id if cwd else "")
+        args = [sys.executable, "-c", runner]
+        if cwd:
+            args.append(deck_id)
+        proc = subprocess.run(
+            args, input=code,
+            capture_output=True, text=True, timeout=120, cwd=cwd,
+        )
         output = proc.stdout
         if proc.stderr:
             output += "\n" + proc.stderr
