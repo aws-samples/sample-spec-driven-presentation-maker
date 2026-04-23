@@ -525,7 +525,6 @@ async def agent_stream(payload, context):
                         last_tool_use = dict(tu)
                         # Early-emit partial input so UI can render incrementally
                         raw_input = tu.get("input", "")
-                        logger.info("current_tool_use input type=%s len=%s", type(raw_input).__name__, len(raw_input) if isinstance(raw_input, str) else "n/a")
                         parsed = _try_partial_parse(raw_input)
                         if parsed and parsed != last_yielded_input:
                             last_yielded_input = parsed
