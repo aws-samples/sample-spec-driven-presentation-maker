@@ -255,7 +255,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                   }
                   disabled={hearingDisabled}
                   onSubmit={(text) => onSend?.(text)}
-                  onCancel={() => onSend?.("")}
+                  onCancel={() => onSend?.("（スキップ）")}
                 />
               ) : (
                 <ToolCard

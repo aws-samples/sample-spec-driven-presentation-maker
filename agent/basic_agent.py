@@ -29,6 +29,7 @@ from strands.tools.mcp import MCPClient
 from tools.upload_tools import list_uploads
 from tools.web_tools import web_fetch
 from tools.hearing_tool import hearing
+from partial_json_parser import loads as _partial_loads
 
 logger = logging.getLogger("sdpm.agent")
 
@@ -474,8 +475,7 @@ async def agent_stream(payload, context):
             if not isinstance(raw, str) or not raw:
                 return None
             try:
-                from partial_json_parser import loads as partial_loads
-                parsed = partial_loads(raw)
+                parsed = _partial_loads(raw)
                 return parsed if isinstance(parsed, dict) and parsed else None
             except Exception as exc:
                 logger.debug("Partial JSON parse failed (len=%d): %s", len(raw), exc)
