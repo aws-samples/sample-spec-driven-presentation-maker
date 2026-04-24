@@ -292,11 +292,10 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     checkRef.current?.()
   }, [composeUrl])
 
-  if (error && fallback) return <>{fallback}</>
-
   return (
     <div data-slide-id={slug} className="aspect-[16/9] relative overflow-hidden rounded-lg bg-black">
       <div ref={containerRef} className="absolute inset-0" data-slide-id={slug} />
+      {error && fallback && <div className="absolute inset-0">{fallback}</div>}
     </div>
   )
 }
