@@ -44,7 +44,13 @@ export async function GET() {
       if (fs.existsSync(slidesDir)) {
         slideCount = fs.readdirSync(slidesDir).filter(f => f.endsWith(".json")).length
       }
-      return { deckId, name, slideCount, updatedAt: new Date().toISOString(), thumbnailUrl: null }
+      let thumbnailUrl: string | null = null
+      const previewDir = path.join(dp, "preview")
+      if (fs.existsSync(previewDir)) {
+        const first = fs.readdirSync(previewDir).filter(f => f.endsWith(".png")).sort()[0]
+        if (first) thumbnailUrl = `/api/preview/${deckId}/preview/${first}`
+      }
+      return { deckId, name, slideCount, updatedAt: new Date().toISOString(), thumbnailUrl }
     })
     .sort((a, b) => b.deckId.localeCompare(a.deckId))
 
