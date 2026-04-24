@@ -171,10 +171,10 @@ def _resolve_preview_url(deck_id: str, slug: str, preview_keys: set) -> Optional
 
 
 def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
-    """Get thumbnail URLs for deck items.
+    """Get thumbnail URLs for deck items (DDB-only, no S3 fallback).
 
-    Reads presentation.json from S3 only when needed for thumbnail fallback.
-    slideCount comes from DDB (written by generate_pptx).
+    Returns thumbnailUrl from DDB thumbnailS3Key. Decks without a stored key
+    return null so the UI can show a gradient placeholder immediately.
 
     Args:
         deck_items: List of DDB deck records.
@@ -185,20 +185,8 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
     extras: Dict[str, Dict] = {}
     for deck in deck_items:
         deck_id = extract_deck_id(deck["SK"])
-        thumb_url = None
-
         key = deck.get("thumbnailS3Key")
-        if key:
-            thumb_url = preview_url(key)
-        else:
-            # Fallback: first slide preview (any slug, whichever exists)
-            preview_keys = _list_preview_keys(deck_id)
-            from shared.preview import build_slide_key_map
-            km = build_slide_key_map(preview_keys)
-            first_key = next(iter(km.values()), None) if km else None
-            thumb_url = preview_url(first_key) if first_key else None
-
-        extras[deck_id] = {"thumbnailUrl": thumb_url}
+        extras[deck_id] = {"thumbnailUrl": preview_url(key) if key else None}
     return extras
 
 
@@ -655,6 +643,24 @@ def toggle_favorite(deck_id: str) -> Dict[str, Any]:
     else:
         table.delete_item(Key={"PK": deck_pk(user_id), "SK": fav_sk(deck_id)})
     return {"favorited": action == "add"}
+
+
+@app.post("/decks/thumbnails")
+def batch_get_thumbnails() -> List[Dict[str, Any]]:
+    """Lazy-load thumbnails for decks that have no thumbnailS3Key in DDB.
+
+    Falls back to the first slide preview in S3.
+    """
+    user_id = get_user_id(app.current_event)
+    deck_ids: List[str] = app.current_event.json_body or []
+    results = []
+    for deck_id in deck_ids[:20]:
+        preview_keys = _list_preview_keys(deck_id)
+        from shared.preview import build_slide_key_map
+        km = build_slide_key_map(preview_keys)
+        first_key = next(iter(km.values()), None) if km else None
+        results.append({"deckId": deck_id, "thumbnailUrl": preview_url(first_key) if first_key else None})
+    return results
 
 
 # ---------------------------------------------------------------------------

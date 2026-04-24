@@ -44,9 +44,9 @@ async def _generate_webp_background(
                 thumb_img.thumbnail((480, 270), Image.LANCZOS)
                 thumb_path = preview_dir / "thumbnail.webp"
                 thumb_img.save(thumb_path, "WEBP", quality=70)
-                thumb_key = f"thumbnails/{deck_id}/{slugs[0]}_{epoch}.webp"
+                thumb_key = f"previews/{deck_id}/thumbnail_{epoch}.webp"
                 storage.upload_file(key=thumb_key, data=thumb_path.read_bytes(), content_type="image/webp")
-                old_thumbs = storage.list_files(prefix=f"thumbnails/{deck_id}/", bucket=storage.pptx_bucket)
+                old_thumbs = [k for k in storage.list_files(prefix=f"previews/{deck_id}/thumbnail_", bucket=storage.pptx_bucket)]
                 for k in old_thumbs:
                     if k != thumb_key:
                         try:

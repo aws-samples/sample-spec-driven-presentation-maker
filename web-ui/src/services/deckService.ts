@@ -419,6 +419,32 @@ export async function batchGetSlidePreviewUrls(
   return result
 }
 
+/**
+ * Lazy-load thumbnail URLs for decks missing thumbnailS3Key.
+ *
+ * @param deckIds - Deck IDs without thumbnails
+ * @param idToken - Cognito ID token
+ * @returns Map of deckId to thumbnail URL (or null)
+ */
+export async function batchGetThumbnails(
+  deckIds: string[],
+  idToken: string,
+): Promise<Map<string, string | null>> {
+  if (deckIds.length === 0) return new Map()
+  const base = await getApiBaseUrl()
+  const response = await fetch(`${base}decks/thumbnails`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(deckIds),
+  })
+  const result = new Map<string, string | null>()
+  if (response.ok) {
+    const data: { deckId: string; thumbnailUrl: string | null }[] = await response.json()
+    for (const item of data) result.set(item.deckId, item.thumbnailUrl)
+  }
+  return result
+}
+
 /** Style entry returned by GET /styles. */
 export interface StyleEntry {
   name: string

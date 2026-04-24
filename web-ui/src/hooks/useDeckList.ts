@@ -18,7 +18,7 @@ import {
   listDecks, DeckSummary,
   listPublicDecks, listSharedDecks, listFavorites,
   updateVisibility, deleteDeck, toggleFavorite,
-  searchSlides, SlideSearchResult,
+  searchSlides, SlideSearchResult, batchGetThumbnails,
 } from "@/services/deckService"
 import { toast } from "sonner"
 
@@ -55,20 +55,30 @@ export function useDeckList(
           listFavorites(idToken!),
         ])
         // Merge: preserve existing thumbnailUrl if deckId matches to avoid image flicker
-        setDecks((prev) => {
-          const prevMap = new Map(prev.map((d) => [d.deckId, d]))
-          return myData.decks.map((d) => {
-            const existing = prevMap.get(d.deckId)
-            if (existing && existing.thumbnailUrl && d.thumbnailUrl) {
-              return { ...d, thumbnailUrl: existing.thumbnailUrl }
-            }
-            return d
-          })
+        const mergedDecks = myData.decks.map((d) => {
+          const prevMap = new Map(decks.map((p) => [p.deckId, p]))
+          const existing = prevMap.get(d.deckId)
+          if (existing && existing.thumbnailUrl && d.thumbnailUrl) {
+            return { ...d, thumbnailUrl: existing.thumbnailUrl }
+          }
+          return d
         })
+        setDecks(mergedDecks)
         setFavoriteIds(new Set(myData.favoriteIds))
         setPublicDecks(pubDecks)
         setSharedDecks(shDecks)
         setFavoriteDecks(favDecks)
+
+        // Lazy-load thumbnails for decks without thumbnailS3Key
+        const missing = mergedDecks.filter((d) => !d.thumbnailUrl).map((d) => d.deckId)
+        if (missing.length > 0) {
+          batchGetThumbnails(missing, idToken!).then((thumbs) => {
+            setDecks((prev) => prev.map((d) => {
+              const url = thumbs.get(d.deckId)
+              return url ? { ...d, thumbnailUrl: url } : d
+            }))
+          })
+        }
       } catch (err) {
         if (!initialLoadDone.current) {
           setError(err instanceof Error ? err.message : "Failed to load decks")
