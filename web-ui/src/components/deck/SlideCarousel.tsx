@@ -191,7 +191,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   }, [scrollToSlide, slidesWithPreview.length, onScrollComplete])
 
   /** Local: open deck directory in Finder/Explorer */
-  async function handleJsonOpen() {
+  async function handleFolderOpen() {
     if (!deckId || !IS_LOCAL) return
     fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch(() => {})
   }
@@ -429,7 +429,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
             </div>
             {IS_LOCAL && deckId && (
               <button
-                onClick={handleJsonOpen}
+                onClick={handleFolderOpen}
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
                 aria-label="Open folder"
               >
