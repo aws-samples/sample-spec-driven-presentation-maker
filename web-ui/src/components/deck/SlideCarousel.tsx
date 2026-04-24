@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * SlideCarousel — Vertical scroll layout for slide PNG previews with spec step navigation.
- * Shows all slides stacked vertically with PPTX and JSON download links.
+ * Shows all slides stacked vertically with PPTX download and folder open links.
  * Features a polished loading animation during PPTX generation.
  * Integrates SpecStepNav for viewing brief/outline/art-direction content.
  */
