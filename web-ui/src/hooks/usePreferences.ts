@@ -6,7 +6,7 @@
  * @returns { sendWithEnter, setSendWithEnter, viewMode, setViewMode }
  */
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 
 const KEY = "sdpm-prefs"
 
@@ -36,7 +36,10 @@ function read(): Prefs {
 }
 
 export function usePreferences() {
-  const [prefs, setPrefs] = useState<Prefs>(read)
+  const [prefs, setPrefs] = useState<Prefs>(DEFAULTS)
+
+  // Hydrate from localStorage after mount to avoid SSR mismatch
+  useEffect(() => { setPrefs(read()) }, [])
 
   const update = useCallback((patch: Partial<Prefs>) => {
     setPrefs((prev) => {
