@@ -626,6 +626,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               patchDeck(resultDeckId, { chatSessionId: sessionId }, idToken).catch(() => {})
             }
             onDeckCreated(resultDeckId)
+            // Save chat history so far (hearing messages before deck existed)
+            if (IS_LOCAL) {
+              fetch("/api/agent/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ deckId: resultDeckId, messages: messagesRef.current }),
+              }).catch(() => {})
+            }
           }
           if (toolUseData?.completed && (toolName === "generate_pptx" || toolName.endsWith("_generate_pptx")) && onPreviewInvalidated) {
             onPreviewInvalidated()
