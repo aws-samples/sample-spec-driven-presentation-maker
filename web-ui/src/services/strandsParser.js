@@ -62,7 +62,7 @@ export const parseStreamingChunk = (line, currentCompletion, updateCallback, too
       if (toolUseId && toolUseId === _lastToolUseId) return currentCompletion;
       _lastToolUseId = toolUseId;
 
-      if (toolCallback) toolCallback(json.toolStart.name, { toolUseId, name: json.toolStart.name, input: {}, started: true });
+      if (toolCallback) toolCallback(json.toolStart.name, { toolUseId, name: json.toolStart.name, input: json.toolStart.input || {}, started: true });
       return currentCompletion;
     }
 

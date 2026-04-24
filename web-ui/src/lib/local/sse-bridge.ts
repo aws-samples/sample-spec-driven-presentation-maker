@@ -106,7 +106,14 @@ export function createSSEStream({ sessionId, subscribe, onDeckId }: BridgeOption
             totalGroups = groupTexts.length
             subagentQueryQueue.length = 0
             groupTexts.forEach((q: string) => subagentQueryQueue.push(extractSlugs(q)))
+            // Build slide_groups for ComposeCard (Cloud format)
+            const slideGroups = groupTexts.map((q: string) => ({
+              slugs: extractSlugs(q).split(", ").map((s: string) => s.trim()).filter(Boolean),
+              instruction: q,
+            }))
             name = "compose_slides"
+            send({ toolStart: { toolUseId: toolCallId, name, input: { slide_groups: slideGroups } } })
+            return
           }
           send({ toolStart: { toolUseId: toolCallId, name } })
         }
