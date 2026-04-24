@@ -160,7 +160,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   useEffect(() => {
     async function loadHistory() {
       const idToken = auth.user?.id_token
-      if (!idToken || !sessionId) return
+      if (!IS_LOCAL && !idToken) return
+      if (!sessionId) return
       setHistoryLoading(true)
       try {
       const history = await getChatHistory(sessionId, idToken, deckId || undefined)
@@ -619,6 +620,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           }
 
           // Tool result (completed) — detect deckId from any tool's result
+          if (toolUseData?.completed) {
+            console.log("[chat] tool completed:", toolName, "result keys:", Object.keys(toolUseData.result || {}), "deckId:", toolUseData.result?.deckId)
+          }
           if (toolUseData?.completed && toolUseData?.result?.deckId && onDeckCreated) {
             // Link chat session to deck for history restore
             const resultDeckId = String(toolUseData.result.deckId)
