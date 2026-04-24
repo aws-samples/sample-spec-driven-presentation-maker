@@ -200,7 +200,7 @@ export interface ChatMessage {
  */
 export async function getChatHistory(sessionId: string, idToken: string, deckId?: string): Promise<ChatMessage[]> {
   if (IS_LOCAL) {
-    if (!deckId) return []
+    if (!deckId || deckId === "new") return []
     // Load session context + saved messages
     const res = await fetch("/api/agent/load", {
       method: "POST",
