@@ -92,6 +92,8 @@ export function createSSEStream({ sessionId, subscribe, onDeckId }: BridgeOption
           const title = (update.title || update.name || "") as string
           let name = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title
           const input = (update.rawInput || update.input || {}) as Record<string, unknown>
+          // tool_call_chunk arrives first but has no input; wait for tool_call
+          if (type === "tool_call_chunk" && Object.keys(input).length === 0) return
           if (title === "Spawning agent crew" || name === "subagent") {
             subagentToolCallId = toolCallId
             subagentGroups.clear()
@@ -115,7 +117,7 @@ export function createSSEStream({ sessionId, subscribe, onDeckId }: BridgeOption
             send({ toolStart: { toolUseId: toolCallId, name, input: { slide_groups: slideGroups } } })
             return
           }
-          send({ toolStart: { toolUseId: toolCallId, name } })
+          send({ toolStart: { toolUseId: toolCallId, name, input } })
         }
 
         if (type === "tool_call_update") {
