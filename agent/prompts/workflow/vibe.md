@@ -36,6 +36,14 @@ Rules:
 2. Choose the style that best fits the brief's purpose, audience, and tone
 3. Call `apply_style(deck_id, style)` to set art direction
 4. If the user specified a style or tone, honor that instead of inferring
+5. Read `specs/art-direction.html` and extract `:root` CSS variables, then update `deck.json`:
+   ```json
+   {
+     "template": "{template}.pptx",
+     "fonts": {"fullwidth": "{fullwidth font}", "halfwidth": "{halfwidth font}"},
+     "defaultTextColor": "{--color-text value}"
+   }
+   ```
 
 ### Step 6: Compose
 

@@ -465,22 +465,38 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
             if name.endswith(".json"):
                 slugs.append(name[:-5])
 
+    # Legacy fallback: presentation.json (pre-slug era, numbered slides)
+    legacy_slides: Optional[list] = None
+    if not slugs:
+        try:
+            pres_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/presentation.json")
+            presentation = json.loads(pres_resp["Body"].read())
+            legacy_slides = presentation.get("slides", [])
+            slugs = [f"slide_{i + 1:02d}" for i in range(len(legacy_slides))]
+        except Exception:
+            pass
+
     preview_keys = _list_preview_keys(deck_id)
     for i, slug in enumerate(slugs):
-        slide_key = f"decks/{deck_id}/slides/{slug}.json"
-        try:
-            slide_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=slide_key)
-            s = json.loads(slide_resp["Body"].read())
-            slide_preview = _resolve_preview_url(deck_id, slug, preview_keys)
-            slide_entry: Dict[str, Any] = {"slug": slug, "previewUrl": slide_preview}
-            compose_key = _latest_compose_key(f"decks/{deck_id}/compose/{slug}_", compose_keys)
-            if compose_key:
-                slide_entry["composeUrl"] = preview_url(compose_key)
-            if include_json:
-                slide_entry["slideJson"] = json.dumps(s)
-            slides.append(slide_entry)
-        except Exception:
-            continue
+        slide_data = None
+        if legacy_slides is not None:
+            slide_data = legacy_slides[i]
+        else:
+            try:
+                slide_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/slides/{slug}.json")
+                slide_data = json.loads(slide_resp["Body"].read())
+            except Exception:
+                continue
+        slide_preview = _resolve_preview_url(deck_id, slug, preview_keys)
+        slide_entry: Dict[str, Any] = {"slug": slug, "previewUrl": slide_preview}
+        compose_key = _latest_compose_key(f"decks/{deck_id}/compose/{slug}_", compose_keys)
+        if not compose_key:
+            compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}_", compose_keys)
+        if compose_key:
+            slide_entry["composeUrl"] = preview_url(compose_key)
+        if include_json:
+            slide_entry["slideJson"] = json.dumps(slide_data)
+        slides.append(slide_entry)
 
     # Read spec files from S3 (brief.md, outline.md, art-direction.html/.md)
     specs: Dict[str, Any] = {}

@@ -34,8 +34,8 @@ export interface OutlineSlide {
 /** Visual state of a slide in the timeline. */
 export type SlideState = "skeleton" | "active" | "done"
 
-/** Regex matching a slide entry line: `- [slug] Message` */
-const SLIDE_RE = /^-\s*\[([a-z0-9-]+)\]\s*(.*)/
+/** Regex matching a slide entry line: `- [slug] Message` or legacy `- [N: Name] Message` */
+const SLIDE_RE = /^-\s*\[([^\]]+)\]\s*(.*)/
 
 /** Regex matching a sub-item line: `  - key: value` */
 const SUB_ITEM_RE = /^\s+-\s*(what_to_say|evidence|what_to_show|notes):\s*(.*)/
