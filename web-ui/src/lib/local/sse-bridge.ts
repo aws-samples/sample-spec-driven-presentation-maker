@@ -95,11 +95,17 @@ export function createSSEStream({ sessionId, subscribe, onDeckId }: BridgeOption
           if (title === "Spawning agent crew" || name === "subagent") {
             subagentToolCallId = toolCallId
             subagentGroups.clear()
+            // Extract group queries from use_subagent input
+            // Cloud: input.content.queries[]  |  kiro-cli: input.stages[].prompt_template
             const content = (input.content as Record<string, unknown> | undefined) || input
             const queries = (content.queries as string[]) || []
-            totalGroups = queries.length
+            const stages = (input.stages as Array<Record<string, unknown>>) || []
+            const groupTexts = queries.length > 0
+              ? queries
+              : stages.map((s) => (s.prompt_template as string) || (s.name as string) || "")
+            totalGroups = groupTexts.length
             subagentQueryQueue.length = 0
-            queries.forEach((q: string) => subagentQueryQueue.push(extractSlugs(q)))
+            groupTexts.forEach((q: string) => subagentQueryQueue.push(extractSlugs(q)))
             name = "compose_slides"
           }
           send({ toolStart: { toolUseId: toolCallId, name } })
