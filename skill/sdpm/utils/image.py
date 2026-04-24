@@ -105,8 +105,13 @@ def apply_image_effects(pic_element, elem_def):
             if blip is not None:
                 for hsl in blip.findall(qn('a:hsl')):
                     blip.remove(hsl)
-                hsl = etree.SubElement(blip, qn('a:hsl'))
-                hsl.set('sat', str(int(saturation * 1000)))
+                # Use satMod inside colorChange for cross-platform compatibility
+                # (a:hsl is not reliably supported on macOS PowerPoint)
+                sat_pct = max(0, 100 + saturation)  # e.g. -10 → 90%
+                for existing in blip.findall(qn('a:satMod')):
+                    blip.remove(existing)
+                sat_mod = etree.SubElement(blip, qn('a:satMod'))
+                sat_mod.set('val', str(int(sat_pct * 1000)))
 
     if duotone and isinstance(duotone, list) and len(duotone) >= 2:
         blip_fill = pic_element.find(qn('p:blipFill'))
