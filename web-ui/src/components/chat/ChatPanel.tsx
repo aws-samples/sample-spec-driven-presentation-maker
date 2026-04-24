@@ -678,6 +678,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           }
           if (onWorkflowPhase && (toolName === "compose_slides" || toolName.endsWith("_compose_slides"))) {
             onWorkflowPhase("slides")
+            // Save chat before long-running compose (survives browser close)
+            if (IS_LOCAL && currentDeckId.current) {
+              fetch("/api/agent/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ deckId: currentDeckId.current, messages: messagesRef.current }),
+              }).catch(() => {})
+            }
           }
 
           // Record position only on first encounter
