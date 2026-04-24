@@ -118,6 +118,17 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const { fetchWebImages, setFetchWebImages, parallelAgents, setParallelAgents, agentMode, setAgentMode } = usePreferences()
   const [optionsOpen, setOptionsOpen] = useState(false)
 
+  /** Persist chat messages to disk (Local mode only, no-op otherwise). */
+  const saveChat = useCallback((overrideDeckId?: string) => {
+    const did = overrideDeckId || currentDeckId.current
+    if (!IS_LOCAL || !did) return
+    fetch("/api/agent/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deckId: did, messages: messagesRef.current }),
+    }).catch(() => {})
+  }, [])
+
   /**
    * Insert text at the current cursor position in the textarea.
    * Exposed to parent via ref.
@@ -631,13 +642,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             }
             onDeckCreated(resultDeckId)
             // Save chat history so far (hearing messages before deck existed)
-            if (IS_LOCAL) {
-              fetch("/api/agent/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ deckId: resultDeckId, messages: messagesRef.current }),
-              }).catch(() => {})
-            }
+            saveChat(resultDeckId)
           }
           if (toolUseData?.completed && (toolName === "generate_pptx" || toolName.endsWith("_generate_pptx")) && onPreviewInvalidated) {
             onPreviewInvalidated()
@@ -679,13 +684,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           if (onWorkflowPhase && (toolName === "compose_slides" || toolName.endsWith("_compose_slides"))) {
             onWorkflowPhase("slides")
             // Save chat before long-running compose (survives browser close)
-            if (IS_LOCAL && currentDeckId.current) {
-              fetch("/api/agent/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ deckId: currentDeckId.current, messages: messagesRef.current }),
-              }).catch(() => {})
-            }
+            saveChat()
           }
 
           // Record position only on first encounter
@@ -731,13 +730,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       abortControllerRef.current = null
       setIsLoading(false)
       // Save chat messages to disk in local mode
-      if (IS_LOCAL && currentDeckId.current) {
-        fetch("/api/agent/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ deckId: currentDeckId.current, messages: messagesRef.current }),
-        }).catch(() => {})
-      }
+      saveChat()
     }
   }
 
