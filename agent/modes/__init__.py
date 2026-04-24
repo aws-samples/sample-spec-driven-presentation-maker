@@ -22,8 +22,6 @@ class ModeConfig:
 
 # Shared parts — referenced by multiple modes
 _COMMON_LANGUAGE = Part(Source.file("common/language"), target="system")
-_CAP_UPLOAD = Part(Source.file("capability/upload"), target="system")
-_CAP_WEB_FETCH = Part(Source.file("capability/web_fetch"), target="system")
 _WF_CANCELLATION = Part(Source.file("workflow/cancellation"), target="system")
 _WF_POST_COMPOSE = Part(Source.file("workflow/post_compose"), target="system")
 _WF_SLIDE_GROUPS = Part(Source.file("workflow/slide_groups"), target="system")
@@ -42,26 +40,20 @@ MODES: dict[str, ModeConfig] = {
         _WF_CANCELLATION,
         _WF_POST_COMPOSE,
         _WF_SLIDE_GROUPS,
-        _CAP_UPLOAD,
-        _CAP_WEB_FETCH,
         _PREFETCH_BRIEFING,
     ]),
     "vibe": ModeConfig(parts=[
         _COMMON_LANGUAGE,
         Part(Source.file("role/vibe_agent"), target="system"),
+        Part(Source.file("workflow/vibe"), target="system"),
         _WF_CANCELLATION,
         _WF_POST_COMPOSE,
         _WF_SLIDE_GROUPS,
-        _CAP_UPLOAD,
-        _CAP_WEB_FETCH,
-        _PREFETCH_BRIEFING,
     ]),
     "single": ModeConfig(
         parts=[
             _COMMON_LANGUAGE,
             Part(Source.file("role/single_agent"), target="system"),
-            _CAP_UPLOAD,
-            _CAP_WEB_FETCH,
         ],
         use_composer=False,
     ),
