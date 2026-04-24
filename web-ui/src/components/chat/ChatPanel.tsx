@@ -119,7 +119,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [optionsOpen, setOptionsOpen] = useState(false)
 
   /** Persist chat messages to disk (Local mode only, no-op otherwise). */
-  const saveChat = useCallback((overrideDeckId?: string) => {
+  const saveLocalChat = useCallback((overrideDeckId?: string) => {
     const did = overrideDeckId || currentDeckId.current
     if (!IS_LOCAL || !did) return
     fetch("/api/agent/chat", {
@@ -642,7 +642,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             }
             onDeckCreated(resultDeckId)
             // Save chat history so far (hearing messages before deck existed)
-            saveChat(resultDeckId)
+            saveLocalChat(resultDeckId)
           }
           if (toolUseData?.completed && (toolName === "generate_pptx" || toolName.endsWith("_generate_pptx")) && onPreviewInvalidated) {
             onPreviewInvalidated()
@@ -684,7 +684,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           if (onWorkflowPhase && (toolName === "compose_slides" || toolName.endsWith("_compose_slides"))) {
             onWorkflowPhase("slides")
             // Save chat before long-running compose (survives browser close)
-            saveChat()
+            saveLocalChat()
           }
 
           // Record position only on first encounter
@@ -730,7 +730,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       abortControllerRef.current = null
       setIsLoading(false)
       // Save chat messages to disk in local mode
-      saveChat()
+      saveLocalChat()
     }
   }
 
