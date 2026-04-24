@@ -51,12 +51,10 @@ function handleLine(line: string) {
   }
 
   // Forward notifications to all listeners
+  // Track subagent session IDs
   if (msg.method === "session/update" || msg.method === "_kiro.dev/session/update") {
     const p = msg.params as Record<string, unknown>
-    const u = p?.update as Record<string, unknown>
     const sid = p?.sessionId as string
-    if (u) console.log("[acp-debug]", sid === sessionId ? "MAIN" : `SUB(${sid})`, u.sessionUpdate, JSON.stringify(u).slice(0, 200))
-    // Track subagent session IDs
     if (sid && sid !== sessionId) subSessionIds.add(sid)
   }
   for (const fn of listeners) fn(msg)
@@ -79,17 +77,14 @@ export function subscribe(fn: NotifyListener): () => void {
 
 /** Send a fire-and-forget JSON-RPC notification (no id, no response). */
 export function rpcNotify(method: string, params: Record<string, unknown> = {}): void {
-  if (!child) { console.warn("[rpcNotify] no child process"); return }
-  const payload = JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n"
-  console.log("[rpcNotify]", method, JSON.stringify(params).slice(0, 100))
-  child.stdin!.write(payload)
+  if (!child) return
+  child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n")
 }
 
 /** Cancel the current session and all subagent sessions. */
 export function cancelAll(): void {
-  if (!child) { console.warn("[cancelAll] no child process"); return }
+  if (!child) return
   if (sessionId) {
-    console.log("[cancelAll] main:", sessionId, "subs:", [...subSessionIds])
     rpcNotify("session/cancel", { sessionId })
     for (const subId of subSessionIds) {
       rpcNotify("session/cancel", { sessionId: subId })

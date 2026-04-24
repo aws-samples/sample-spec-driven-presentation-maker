@@ -65,7 +65,7 @@ export function createSSEStream({ sessionId, subscribe, onDeckId }: BridgeOption
           if (type === "tool_call") {
             const title = (update.title || "") as string
             const toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title
-            send({ toolStream: { toolUseId: subagentToolCallId, name: "compose_slides", data: { group: g.group, slugs: g.slugs, tool: toolName } } })
+            send({ toolStream: { toolUseId: subagentToolCallId, name: "compose_slides", data: { group: g.group, slugs: g.slugs, tool: toolName, toolUseId: update.toolCallId } } })
           } else if (type === "tool_call_update") {
             const status = update.status as string
             if (status === "completed" || status === "error" || status === "failed") {
