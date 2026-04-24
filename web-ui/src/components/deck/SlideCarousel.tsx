@@ -10,9 +10,9 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { SlidePreview, getDeckWithJson } from "@/services/deckService"
+import { SlidePreview } from "@/services/deckService"
 import type { SpecFiles } from "@/services/deckService"
-import { Download, FileJson, Layers, Loader2, LayoutGrid, Rows3, FolderOpen } from "lucide-react"
+import { Download, Layers, Loader2, LayoutGrid, Rows3, FolderOpen } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
@@ -68,7 +68,6 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   // eslint-disable-next-line no-console
   console.log("[SlideCarousel] slug→url:", slidesWithPreview.map(s => `${s.slug}: ${s.composeUrl?.split("/").pop()?.split("?")[0]}`))
   const auth = useAuth()
-  const [jsonLoading, setJsonLoading] = useState(false)
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -190,32 +189,6 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
       }, 300)
     }
   }, [scrollToSlide, slidesWithPreview.length, onScrollComplete])
-
-  /**
-   * Fetch slideJson on demand and trigger download.
-   */
-  async function handleJsonDownload() {
-    if (!deckId || !auth.user?.id_token) return
-    setJsonLoading(true)
-    try {
-      const data = await getDeckWithJson(deckId, auth.user.id_token)
-      const jsonSlides = data.slides
-        .filter((s) => s.slideJson)
-        .map((s) => {
-          try { return JSON.parse(s.slideJson!) } catch { return s.slideJson }
-        })
-      if (jsonSlides.length === 0) return
-      const blob = new Blob([JSON.stringify(jsonSlides, null, 2)], { type: "application/json" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `${deckName || "deck"}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-    } finally {
-      setJsonLoading(false)
-    }
-  }
 
   /** Local: open deck directory in Finder/Explorer */
   async function handleJsonOpen() {
@@ -454,15 +427,14 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 <LayoutGrid className="h-3.5 w-3.5" />
               </button>
             </div>
-            {deckId && (
+            {IS_LOCAL && deckId && (
               <button
-                onClick={IS_LOCAL ? handleJsonOpen : handleJsonDownload}
-                disabled={jsonLoading}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors disabled:opacity-50"
-                aria-label={IS_LOCAL ? "Open JSON" : "Download JSON"}
+                onClick={handleJsonOpen}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
+                aria-label="Open folder"
               >
-                {jsonLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileJson className="h-3.5 w-3.5" />}
-                JSON
+                <FolderOpen className="h-3.5 w-3.5" />
+                Folder
               </button>
             )}
             {pptxUrl && (
