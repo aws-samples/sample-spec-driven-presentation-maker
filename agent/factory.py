@@ -146,17 +146,11 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str) -> tu
         logger.warning("Prompt resolve failed: %s", e)
         system_prompt, initial_messages = "", []
 
-    # Apply to agent (cache point when we have prefetched history)
+    # Apply to agent
     has_history = bool(initial_messages)
     if has_history and len(agent.messages) == 0:
         agent.messages.extend(initial_messages)
-    if has_history:
-        agent.system_prompt = [
-            {"text": system_prompt},
-            {"cachePoint": {"type": "default"}},
-        ]
-    else:
-        agent.system_prompt = system_prompt
+    agent.system_prompt = system_prompt
 
     # LoopGuard
     guard = LoopGuard(max_tool_calls=int(os.environ.get("SPEC_MAX_TOOL_CALLS", "300")))

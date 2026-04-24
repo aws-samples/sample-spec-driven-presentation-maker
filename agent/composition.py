@@ -4,7 +4,11 @@
 
 Source: how content is fetched (file / mcp / callable).
 Part: Source + target (system / history:*).
-resolve_parts: turns list[Part] into (system_prompt_text, messages).
+resolve_parts: turns list[Part] into (system_prompt, messages).
+
+When any Part has cache_point=True, the system prompt is returned as
+Bedrock content blocks (list[dict]) with a cachePoint inserted after that part.
+Otherwise it is returned as a plain string.
 """
 
 from __future__ import annotations
@@ -46,10 +50,16 @@ class Source:
 
 @dataclass
 class Part:
-    """Prompt part: content source + injection target."""
+    """Prompt part: content source + injection target.
+
+    Set cache_point=True to insert a Bedrock cachePoint after this part's
+    system text.  Parts after the cache point hold dynamic content (e.g.
+    timestamps) that should not invalidate the cache.
+    """
     source: Source
     target: Target
-    label: str = ""  # tool name for tool_result pair / section heading
+    label: str = ""
+    cache_point: bool = False
 
 
 def _read_file(name: str) -> str:
@@ -122,8 +132,8 @@ def resolve_parts(
     parts: list[Part],
     mcp_client: Any = None,
     context: dict | None = None,
-) -> tuple[str, list[dict]]:
-    """Resolve parts into (system_prompt_text, messages).
+) -> tuple[str | list[dict], list[dict]]:
+    """Resolve parts into (system_prompt, messages).
 
     Args:
         parts: List of Part definitions.
@@ -131,10 +141,13 @@ def resolve_parts(
         context: Values for callable sources and placeholder substitution.
 
     Returns:
-        Tuple of (system prompt string, initial messages list).
+        Tuple of (system prompt, initial messages list).
+        system prompt is a plain string when no cache_point is used,
+        or a list of Bedrock content blocks when cache_point is present.
     """
     context = context or {}
-    system_chunks: list[str] = []
+    # Collect system chunks as (text, cache_point_after) pairs
+    system_chunks: list[tuple[str, bool]] = []
     messages: list[dict] = []
 
     for part in parts:
@@ -142,7 +155,7 @@ def resolve_parts(
         if not content:
             continue
         if part.target == "system":
-            system_chunks.append(content)
+            system_chunks.append((content, part.cache_point))
         elif part.target == "history:tool_result":
             messages.extend(_tool_result_pair(part.label or "prefill", content))
         elif part.target == "history:user":
@@ -152,5 +165,21 @@ def resolve_parts(
         else:
             raise ValueError(f"Unknown target: {part.target}")
 
-    system_prompt = _apply_placeholders("\n\n".join(system_chunks), context)
-    return system_prompt, messages
+    has_cache_point = any(cp for _, cp in system_chunks)
+
+    if has_cache_point:
+        # Build Bedrock content blocks, grouping consecutive chunks between cache points
+        blocks: list[dict] = []
+        buf: list[str] = []
+        for text, cp in system_chunks:
+            buf.append(text)
+            if cp:
+                blocks.append({"text": _apply_placeholders("\n\n".join(buf), context)})
+                blocks.append({"cachePoint": {"type": "default"}})
+                buf = []
+        if buf:
+            blocks.append({"text": _apply_placeholders("\n\n".join(buf), context)})
+        return blocks, messages
+    else:
+        all_text = "\n\n".join(t for t, _ in system_chunks)
+        return _apply_placeholders(all_text, context), messages

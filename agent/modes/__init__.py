@@ -24,7 +24,9 @@ class ModeConfig:
 _COMMON_LANGUAGE = Part(Source.file("common/language"), target="system")
 _WF_CANCELLATION = Part(Source.file("workflow/cancellation"), target="system")
 _WF_POST_COMPOSE = Part(Source.file("workflow/post_compose"), target="system")
-_WF_SLIDE_GROUPS = Part(Source.file("workflow/slide_groups"), target="system")
+_WF_SLIDE_GROUPS = Part(Source.file("workflow/slide_groups"), target="system",
+                        cache_point=True)
+_NOW = Part(Source.file("common/now"), target="system")
 
 _PREFETCH_BRIEFING = Part(
     Source.mcp("read_workflows", {"names": ["create-new-1-briefing"]}),
@@ -40,6 +42,7 @@ MODES: dict[str, ModeConfig] = {
         _WF_CANCELLATION,
         _WF_POST_COMPOSE,
         _WF_SLIDE_GROUPS,
+        _NOW,
         _PREFETCH_BRIEFING,
     ]),
     "vibe": ModeConfig(parts=[
@@ -49,11 +52,14 @@ MODES: dict[str, ModeConfig] = {
         _WF_CANCELLATION,
         _WF_POST_COMPOSE,
         _WF_SLIDE_GROUPS,
+        _NOW,
     ]),
     "single": ModeConfig(
         parts=[
             _COMMON_LANGUAGE,
-            Part(Source.file("role/single_agent"), target="system"),
+            Part(Source.file("role/single_agent"), target="system",
+                 cache_point=True),
+            _NOW,
         ],
         use_composer=False,
     ),
