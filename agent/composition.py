@@ -60,6 +60,7 @@ class Part:
     target: Target
     label: str = ""
     cache_point: bool = False
+    prefill_text: str = ""
 
 
 def _read_file(name: str) -> str:
@@ -94,14 +95,15 @@ def _resolve_source(source: Source, mcp_client, context: dict) -> str:
     raise ValueError(f"Unknown source type: {source.type}")
 
 
-def _tool_result_pair(label: str, content: str) -> list[dict]:
+def _tool_result_pair(label: str, content: str, prefill_text: str = "") -> list[dict]:
     """Build assistant toolUse + user toolResult pair for prefill."""
     tool_use_id = f"prefill-{uuid.uuid4().hex[:8]}"
+    text = prefill_text or f"I'll read {label}."
     return [
         {
             "role": "assistant",
             "content": [
-                {"text": f"I'll read {label}."},
+                {"text": text},
                 {"toolUse": {"toolUseId": tool_use_id, "name": label, "input": {}}},
             ],
         },
@@ -157,7 +159,8 @@ def resolve_parts(
         if part.target == "system":
             system_chunks.append((content, part.cache_point))
         elif part.target == "history:tool_result":
-            messages.extend(_tool_result_pair(part.label or "prefill", content))
+            messages.extend(_tool_result_pair(
+                part.label or "prefill", content, part.prefill_text))
         elif part.target == "history:user":
             messages.append({"role": "user", "content": [{"text": content}]})
         elif part.target == "history:assistant":

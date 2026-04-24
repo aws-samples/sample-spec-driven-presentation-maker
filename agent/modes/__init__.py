@@ -32,6 +32,7 @@ _PREFETCH_BRIEFING = Part(
     Source.mcp("read_workflows", {"names": ["create-new-1-briefing"]}),
     target="history:tool_result",
     label="read_workflows",
+    prefill_text="Starting the Briefing phase. I'll read the workflow to conduct the hearing properly.",
 )
 
 
