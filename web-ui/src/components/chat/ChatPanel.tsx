@@ -729,8 +729,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    */
   const handleStop = () => {
     abortControllerRef.current?.abort()
-    const token = auth.user?.access_token
-    if (token) stopRuntimeSession(sessionId, token)
+    if (IS_LOCAL) {
+      fetch("/api/agent/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {})
+    } else {
+      const token = auth.user?.access_token
+      if (token) stopRuntimeSession(sessionId, token)
+    }
   }
 
   // Track whether compose_slides is the active in-flight tool — used only to

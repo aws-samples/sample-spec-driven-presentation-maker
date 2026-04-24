@@ -29,21 +29,10 @@ from tools import (  # noqa: E402
 # ---------------------------------------------------------------------------
 # Override instructions for ACP (desktop app) usage
 # ---------------------------------------------------------------------------
-_ACP_INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generation from JSON.
-
-## Architecture
-- The agent edits workspace files via `run_python(deck_id=..., save=True)` using normal file I/O
-- MCP tools handle: workflow guidance, initialization, PPTX generation, preview, references
-- MCP tools do NOT handle: slide editing, spec writing (agent responsibility via run_python)
-
-**Critical constraint:** Do NOT make any decisions about slide structure, content, design, or layout before loading the workflow. The workflow files contain the full process including briefing, outline, and art direction. Wait until the workflow is loaded and follow it step by step.
-
-## Workflow: New Presentation
-
-→ Read `read_workflows(["create-new-1-briefing"])` to start. Follow each file's Next Step from there.
-"""
-
-mcp._mcp_server.instructions = _ACP_INSTRUCTIONS
+# ACP agents get all instructions from .kiro/agents/*.json prompts.
+# MCP server instructions are cleared to avoid conflicts (e.g. vibe mode
+# seeing "read workflows" instructions meant for spec mode).
+mcp._mcp_server.instructions = ""
 
 # ---------------------------------------------------------------------------
 # Override list_styles: no browser opening in ACP mode
@@ -90,7 +79,7 @@ def generate_pptx(deck_id: str) -> str:
 
 
 @mcp.tool()
-def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -> list:
+def get_preview(deck_id: str, slugs: list[str], quality: str = "high") -> list:
     """Get PNG preview images for visual review by the agent.
 
     Returns actual slide images that the model can see and analyze.
@@ -101,7 +90,7 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
 
     Args:
         deck_id: Deck directory path.
-        slide_numbers: List of 1-based slide numbers to preview (required, at least one).
+        slugs: List of slide slugs to preview (required, at least one). Example: ["intro", "pricing"].
         quality: "low" (800px) or "high" (1280px).
 
     Returns:
@@ -111,8 +100,8 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
     from PIL import Image as PILImage
     import io
 
-    if not slide_numbers:
-        return [{"type": "text", "text": "Error: slide_numbers must not be empty"}]
+    if not slugs:
+        return [{"type": "text", "text": "Error: slugs must not be empty"}]
     if quality not in ("low", "high"):
         quality = "high"
     max_edge = 800 if quality == "low" else 1280
@@ -121,21 +110,33 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
     if not preview_dir.exists():
         return [{"type": "text", "text": f"Preview not available yet. Run run_python(deck_id=\"{deck_id}\", save=True) or generate_pptx first."}]
 
+    # Build slug → 1-based page number mapping from outline.md
+    from sdpm.api import parse_outline_slugs
+    outline_path = Path(deck_id) / "specs" / "outline.md"
+    all_slugs = parse_outline_slugs(outline_path) if outline_path.exists() else []
+    # Only slugs with existing slide JSON appear in PPTX (builder skips missing)
+    pptx_slugs = [s for s in all_slugs if (Path(deck_id) / "slides" / f"{s}.json").exists()]
+    slug_to_page = {s: i + 1 for i, s in enumerate(pptx_slugs)}
+
     # Index preview files by 1-based page number
+    import re as _re
     page_files: dict[int, Path] = {}
     for f in preview_dir.iterdir():
         if not f.name.endswith(".png"):
             continue
-        import re as _re
         m = _re.match(r"^page(\d+)[-.]", f.name)
         if m:
             page_files[int(m.group(1))] = f
 
     result: list = []
-    for n in slide_numbers:
-        p = page_files.get(n)
+    for slug in slugs:
+        page_num = slug_to_page.get(slug)
+        if not page_num:
+            result.append(f"Slide '{slug}': not found in outline or slide file missing")
+            continue
+        p = page_files.get(page_num)
         if not p or not p.exists():
-            result.append({"type": "text", "text": f"Slide {n}: preview not found"})
+            result.append(f"Slide '{slug}' (page {page_num}): preview not found")
             continue
         img = PILImage.open(p)
         w, h = img.size
@@ -146,7 +147,7 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
             img = img.convert("RGB")
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=85)
-        result.append(f"Slide {n}")
+        result.append(f"Slide '{slug}' (page {page_num})")
         result.append(Image(data=buf.getvalue(), format="jpeg"))
     return result
 
@@ -287,6 +288,49 @@ def init_presentation(name: str, template: str = "") -> str:
 # ---------------------------------------------------------------------------
 # ACP-only tools
 # ---------------------------------------------------------------------------
+@mcp.tool()
+def hearing(
+    inference: str,
+    q0: dict,
+    q1: dict | None = None,
+    q2: dict | None = None,
+    q3: dict | None = None,
+    q4: dict | None = None,
+) -> str:
+    """Present structured questions to the user via a rich UI card.
+
+    ALWAYS use this tool when you need the user to make a choice or
+    judgment — not just for initial interviews but also for mid-workflow
+    decisions, confirmations with options, and next-step selections.
+    Only skip this tool for simple yes/no confirmations.
+
+    Always include your reasoning or hypothesis in the inference field
+    to help the user think — never ask blank questions.
+    Limit to 5 questions per call. If you need more, call again after
+    the user responds.
+
+    Args:
+        inference: Your reasoning or hypothesis to share with the user.
+            This is displayed prominently above the questions to provide
+            context and stimulate the user's thinking.
+        q0: First question object with keys:
+            - type (str): "single_select", "multi_select", or "free_text"
+            - text (str): The question text
+            - options (list[str], optional): Choices for select types
+            - recommended (str or list[str], optional): Suggested choice(s)
+            - placeholder (str, optional): Hint text for free_text type
+        q1: Second question (optional, same schema as q0).
+        q2: Third question (optional, same schema as q0).
+        q3: Fourth question (optional, same schema as q0).
+        q4: Fifth question (optional, same schema as q0).
+
+    Returns:
+        Confirmation that the questions were displayed. Wait for the
+        user's response in the next message.
+    """
+    return "Questions displayed to user. Wait for their response."
+
+
 @mcp.tool()
 def apply_style(deck_id: str, style: str) -> str:
     """Copy a style HTML file to the deck's specs/art-direction.html.

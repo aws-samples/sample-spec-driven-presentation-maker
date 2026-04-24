@@ -93,16 +93,35 @@ export async function setConfigOption(configId: string, value: string): Promise<
   await rpcRequest("session/set_config_option", { sessionId, configId, value })
 }
 
+let currentAgentName = "sdpm-spec"
+
 /** Ensure the ACP process is running and a session exists. */
-export async function ensureAgent(): Promise<void> {
+export async function ensureAgent(agentName: string = "sdpm-spec"): Promise<void> {
+  // If agent name changed, kill existing process to restart with new agent
+  if (child && agentName !== currentAgentName) {
+    const oldChild = child
+    child = null
+    sessionId = null
+    pending.clear()
+    listeners.clear()
+    lineBuffer = ""
+    oldChild.kill()
+    // Wait for process to exit before spawning new one
+    await new Promise<void>((resolve) => {
+      oldChild.on("close", () => resolve())
+      setTimeout(resolve, 3000) // fallback timeout
+    })
+  }
   if (child) return
 
+  currentAgentName = agentName
   const mcpLocalDir = MCP_LOCAL_DIR
 
-  child = spawn("kiro-cli", ["acp", "--agent", "sdpm-spec"], {
+  child = spawn("kiro-cli", ["acp", "--agent", agentName], {
     cwd: mcpLocalDir,
     stdio: ["pipe", "pipe", "pipe"],
   })
+  const newChild = child
 
   child.stdout!.setEncoding("utf-8")
   child.stdout!.on("data", (data: string) => {
@@ -116,10 +135,13 @@ export async function ensureAgent(): Promise<void> {
   child.stderr!.on("data", (d: string) => console.warn("[acp stderr]", d))
 
   child.on("close", () => {
-    child = null
-    sessionId = null
-    pending.clear()
-    listeners.clear()
+    // Only reset if this is still the active child (not replaced by a new spawn)
+    if (child === newChild) {
+      child = null
+      sessionId = null
+      pending.clear()
+      listeners.clear()
+    }
   })
 
   await rpcRequest("initialize", {
@@ -128,7 +150,7 @@ export async function ensureAgent(): Promise<void> {
     clientInfo: { name: "sdpm-local", version: "0.1.0" },
   })
 
-  const AGENT_NAME = "sdpm-spec"
+  const AGENT_NAME = agentName
 
   const result = await rpcRequest("session/new", { cwd: MCP_LOCAL_DIR, mcpServers: [], agent: AGENT_NAME }) as Record<string, unknown>
   sessionId = result.sessionId as string
@@ -145,16 +167,17 @@ export async function ensureAgent(): Promise<void> {
 }
 
 /** Create a new ACP session (for new chat). */
-export async function newSession(): Promise<void> {
-  const result = await rpcRequest("session/new", { cwd: MCP_LOCAL_DIR, mcpServers: [], agent: "sdpm-spec" }) as Record<string, unknown>
+export async function newSession(agentName?: string): Promise<void> {
+  const agent = agentName || currentAgentName
+  const result = await rpcRequest("session/new", { cwd: MCP_LOCAL_DIR, mcpServers: [], agent }) as Record<string, unknown>
   sessionId = result.sessionId as string
 }
 
 /** Load an existing ACP session (replays history via session/update notifications). */
 export async function loadSession(savedSessionId: string): Promise<void> {
   await ensureAgent()
-  const result = await rpcRequest("session/load", { sessionId: savedSessionId, cwd: MCP_LOCAL_DIR, mcpServers: [] }) as Record<string, unknown>
-  sessionId = result.sessionId as string || savedSessionId
+  const result = await rpcRequest("session/load", { sessionId: savedSessionId, cwd: MCP_LOCAL_DIR, mcpServers: [] }) as Record<string, unknown> | undefined
+  sessionId = (result?.sessionId as string) || savedSessionId
 }
 
 /** Save sessionId to deck's .session file. */

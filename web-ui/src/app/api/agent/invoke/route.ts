@@ -7,10 +7,18 @@
 import { ensureAgent, newSession, getSessionId, rpcRequest, subscribe, saveSessionToDeck } from "@/lib/local/acp-process"
 import { createSSEStream } from "@/lib/local/sse-bridge"
 
-export async function POST(req: Request) {
-  const { query } = await req.json()
+const MODE_TO_AGENT: Record<string, string> = {
+  vibe: "sdpm-vibe",
+  spec: "sdpm-spec",
+  separated: "sdpm-spec",
+  single: "sdpm-spec",
+}
 
-  await ensureAgent()
+export async function POST(req: Request) {
+  const { query, mode } = await req.json()
+
+  const agentName = MODE_TO_AGENT[mode || "spec"] || "sdpm-spec"
+  await ensureAgent(agentName)
 
   const sessionId = getSessionId()!
   const stream = createSSEStream({

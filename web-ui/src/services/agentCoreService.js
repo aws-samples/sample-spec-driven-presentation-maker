@@ -33,7 +33,7 @@ export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
 export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode) => {
   // Local mode: proxy through Next.js API Route → kiro-cli acp
   if (IS_LOCAL) {
-    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal);
+    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode);
   }
 
   try {
@@ -202,11 +202,11 @@ export const generateSessionId = () => {
  * Reads SSE stream from /api/agent/invoke and feeds events through the same
  * strandsParser used by the cloud path, so ChatPanel works unchanged.
  */
-const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal) => {
+const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode) => {
   const response = await fetch('/api/agent/invoke', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, sessionId }),
+    body: JSON.stringify({ query, sessionId, mode: mode || 'spec' }),
     signal,
   });
 

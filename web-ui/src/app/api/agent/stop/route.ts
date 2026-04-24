@@ -16,6 +16,11 @@ export async function POST(req: Request) {
 
   // Cancel current prompt
   const sessionId = getSessionId()
-  if (sessionId) rpcNotify("session/cancel", { sessionId })
+  if (sessionId) {
+    console.log("[agent/stop] sending session/cancel for", sessionId)
+    rpcNotify("session/cancel", { sessionId })
+  } else {
+    console.warn("[agent/stop] no sessionId, cannot cancel")
+  }
   return Response.json({ ok: true })
 }
