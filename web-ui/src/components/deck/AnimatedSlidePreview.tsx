@@ -123,6 +123,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           }
           const [defsResp, compResp] = await Promise.all([fetch(defsUrlRef.current), fetch(composeUrlRef.current)])
           if (cancelled || !defsResp.ok || !compResp.ok) {
+            // Reset so the 1s polling interval retries this URL
+            lastComposeUrlRef.current = ""
             setError(true); return
           }
 
@@ -272,6 +274,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
         }, totalTime)
         timersRef.current.push(tDone)
       } catch {
+        lastComposeUrlRef.current = ""
         setError(true)
       }
       })()
