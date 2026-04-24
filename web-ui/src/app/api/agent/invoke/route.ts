@@ -18,6 +18,7 @@ export async function POST(req: Request) {
   const { query, mode } = await req.json()
 
   const agentName = MODE_TO_AGENT[mode || "spec"] || "sdpm-spec"
+  console.log("[invoke] mode=", mode, "agentName=", agentName)
   await ensureAgent(agentName)
 
   const sessionId = getSessionId()!

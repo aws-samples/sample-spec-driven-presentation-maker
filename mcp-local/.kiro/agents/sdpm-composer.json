@@ -5,15 +5,13 @@
     "@sdpm"
   ],
   "allowedTools": [
-    "@sdpm"
+    "@sdpm/*"
   ],
   "mcpServers": {
     "sdpm": {
       "command": "uv",
       "args": [
         "run",
-        "--directory",
-        "mcp-local",
         "python",
         "server_acp.py"
       ],

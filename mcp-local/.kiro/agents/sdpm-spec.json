@@ -6,8 +6,6 @@
       "command": "uv",
       "args": [
         "run",
-        "--directory",
-        "mcp-local",
         "python",
         "server_acp.py"
       ],
@@ -27,7 +25,7 @@
     "web_fetch"
   ],
   "allowedTools": [
-    "@sdpm",
+    "@sdpm/*",
     "web_fetch",
     "web_search"
   ],

@@ -4,7 +4,7 @@
  * Local ACP Agent Stop — cancel current prompt or reset session.
  * Local mode only.
  */
-import { newSession, rpcNotify, getSessionId } from "@/lib/local/acp-process"
+import { newSession, cancelAll, getSessionId } from "@/lib/local/acp-process"
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}))
@@ -14,13 +14,6 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, sessionId: getSessionId() })
   }
 
-  // Cancel current prompt
-  const sessionId = getSessionId()
-  if (sessionId) {
-    console.log("[agent/stop] sending session/cancel for", sessionId)
-    rpcNotify("session/cancel", { sessionId })
-  } else {
-    console.warn("[agent/stop] no sessionId, cannot cancel")
-  }
+  cancelAll()
   return Response.json({ ok: true })
 }
