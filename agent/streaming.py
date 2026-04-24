@@ -7,6 +7,7 @@ import json
 import logging
 from typing import AsyncGenerator
 
+from partial_json_parser import loads as _partial_loads
 from strands import Agent
 
 logger = logging.getLogger("sdpm.agent")
@@ -41,16 +42,16 @@ async def stream_agent(agent: Agent, user_query: str, session_id: str, cancel: a
         return {"toolUse": {"name": tu.get("name", ""), "toolUseId": tu.get("toolUseId", ""), "input": parsed if isinstance(parsed, dict) else {}}}
 
     def _parse_input(tu: dict) -> dict | None:
-        """Try to parse tool input JSON. Returns parsed dict or None if incomplete."""
+        """Try to parse tool input JSON, including incomplete streaming JSON."""
         raw = tu.get("input", "")
         if isinstance(raw, dict):
             return raw if raw else None
         if not isinstance(raw, str) or not raw:
             return None
         try:
-            parsed = json.loads(raw)
-            return parsed if isinstance(parsed, dict) else None
-        except (ValueError, TypeError):
+            parsed = _partial_loads(raw)
+            return parsed if isinstance(parsed, dict) and parsed else None
+        except Exception:
             return None
 
     def _should_stop() -> bool:
