@@ -13,7 +13,41 @@ from pathlib import Path
 from typing import Any
 
 
-def _resolve_template(data: dict, input_path: str | Path | None, templates_dir: Path) -> tuple[Path, bool]:
+def _get_templates_dirs() -> list[Path]:
+    """Return ordered list of directories to search for bundled/user-local templates.
+
+    Search order (first match wins):
+      1. $SDPM_TEMPLATES_DIR — colon-separated list (same semantics as PATH)
+      2. ~/.config/sdpm/templates/ — XDG-style user-local location
+      3. Package-bundled templates/ directory (skill/templates/)
+    """
+    dirs: list[Path] = []
+    env_value = os.environ.get("SDPM_TEMPLATES_DIR")
+    if env_value:
+        dirs.extend(Path(p).expanduser() for p in env_value.split(os.pathsep) if p)
+    dirs.append(Path.home() / ".config" / "sdpm" / "templates")
+    dirs.append(Path(__file__).parent.parent / "templates")
+    return dirs
+
+
+def _find_template_in_dirs(name: str, templates_dirs: list[Path]) -> Path | None:
+    """Search for a template by name across the given directories.
+
+    Returns the first existing path, or None if not found.
+    """
+    filename = name if name.endswith(".pptx") else name + ".pptx"
+    for d in templates_dirs:
+        candidate = d / filename
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _resolve_template(
+    data: dict,
+    input_path: str | Path | None,
+    templates_dirs: list[Path],
+) -> tuple[Path, bool]:
     """Resolve template path from presentation data.
 
     Returns (template_path, custom_template) or raises FileNotFoundError.
@@ -23,10 +57,9 @@ def _resolve_template(data: dict, input_path: str | Path | None, templates_dir: 
         template = base_dir / data["template"]
         if template.exists():
             return template, True
-        name = data["template"]
-        named = templates_dir / (name if name.endswith(".pptx") else name + ".pptx")
-        if named.exists():
-            return named, True
+        found = _find_template_in_dirs(data["template"], templates_dirs)
+        if found is not None:
+            return found, True
     raise FileNotFoundError('No template specified. Set "template" in presentation JSON.')
 
 
@@ -97,12 +130,11 @@ def init(
     pres_data: dict[str, Any] = {"fonts": {"fullwidth": None, "halfwidth": None}, "slides": []}
 
     if template:
-        templates_dir = Path(__file__).parent.parent / "templates"  # skill/templates/
         template_src = Path(template).expanduser()
         if not template_src.exists():
-            candidate = templates_dir / (str(template) if str(template).endswith(".pptx") else f"{template}.pptx")
-            if candidate.exists():
-                template_src = candidate
+            found = _find_template_in_dirs(str(template), _get_templates_dirs())
+            if found is not None:
+                template_src = found
         if template_src.exists():
             template_src = template_src.resolve()
             pres_data["template"] = template_src.name
@@ -153,10 +185,10 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
         raise FileNotFoundError(f"Slides JSON not found: {json_path}")
 
     data = read_json(input_path)
-    templates_dir = Path(__file__).parent.parent / "templates"
+    templates_dirs = _get_templates_dirs()
     warnings: list[str] = []
 
-    template_file, custom = _resolve_template(data, str(input_path), templates_dir)
+    template_file, custom = _resolve_template(data, str(input_path), templates_dirs)
 
     # Auto-fill fonts
     from sdpm.analyzer import extract_fonts as _extract_fonts

@@ -102,6 +102,20 @@ skill/templates/
 └── sample_template_light.pptx
 ```
 
+#### User-local templates
+
+Custom templates can also be placed outside the package, so they survive a
+`pip install --upgrade` or a re-clone of the repository. Kiro CLI / `pptx_builder.py`
+searches the following locations in order and merges the results in
+`list_templates`:
+
+1. Directories listed in `$SDPM_TEMPLATES_DIR` (colon-separated, same semantics as `PATH`)
+2. `~/.config/sdpm/templates/`
+3. `skill/templates/` (package-bundled)
+
+A user-local template shadows a bundled one with the same file name, which
+makes it easy to override sample templates without editing the repository.
+
 ### Layer 3 (Remote MCP)
 
 Upload the template to S3 and register it in DynamoDB:

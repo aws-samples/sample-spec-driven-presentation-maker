@@ -9,7 +9,10 @@ import sys
 from pathlib import Path
 
 # Ensure sdpm package is importable
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Use .parent.parent without .resolve() to preserve symlink-based installations
+# (e.g. chezmoi-managed skill directory) — .resolve() would follow the symlink
+# and insert the upstream repo path, causing wrong templates/ directory lookup.
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import argparse
 import json
@@ -55,18 +58,16 @@ from sdpm.utils.text import normalize_spacing, parse_styled_text  # noqa: F401
 
 def _resolve_template(data, input_path):
     """Resolve template path: presentation.json "template" → templates/ lookup → error."""
-    templates_dir = Path(__file__).parent.parent / "templates"
+    from sdpm.api import _find_template_in_dirs, _get_templates_dirs
 
     if data.get("template"):
         base_dir = Path(input_path).parent if input_path and input_path != "-" else Path(".")
         template = base_dir / data["template"]
         if template.exists():
             return template, True
-        # Resolve by name from repo templates/
-        name = data["template"]
-        named = templates_dir / (name if name.endswith(".pptx") else name + ".pptx")
-        if named.exists():
-            return named, True
+        found = _find_template_in_dirs(data["template"], _get_templates_dirs())
+        if found is not None:
+            return found, True
 
     print("Error: No template specified. Set \"template\" in presentation JSON.", file=sys.stderr)
     sys.exit(1)
@@ -182,17 +183,25 @@ def cmd_list_asset_sources(args):
 
 
 def cmd_list_templates(args):
-    """List available PPTX templates."""
-    templates_dir = Path(__file__).parent.parent / "templates"
-    if not templates_dir.exists():
-        print("No templates directory found.", file=sys.stderr)
-        return
-    templates = sorted(templates_dir.glob("*.pptx"))
-    if not templates:
+    """List available PPTX templates.
+
+    Includes user-local templates (via $SDPM_TEMPLATES_DIR or ~/.config/sdpm/templates/)
+    in addition to the package-bundled ones. User-local templates shadow bundled
+    templates with the same stem.
+    """
+    from sdpm.api import _get_templates_dirs
+
+    seen: dict[str, Path] = {}
+    for d in _get_templates_dirs():
+        if not d.exists():
+            continue
+        for t in sorted(d.glob("*.pptx")):
+            seen.setdefault(t.stem, t)
+    if not seen:
         print("No templates found.", file=sys.stderr)
         return
-    for t in templates:
-        print(f"  {t.stem}")
+    for stem in sorted(seen):
+        print(f"  {stem}")
 
 
 def cmd_search_patterns(args):
@@ -684,12 +693,11 @@ def cmd_analyze_template(args):
 
     template_path = Path(args.input).resolve()
     if not template_path.exists():
-        name = args.input
-        if not name.endswith(".pptx"):
-            name += ".pptx"
-        candidate = Path(__file__).resolve().parent.parent / "templates" / name
-        if candidate.exists():
-            template_path = candidate
+        from sdpm.api import _find_template_in_dirs, _get_templates_dirs
+
+        found = _find_template_in_dirs(args.input, _get_templates_dirs())
+        if found is not None:
+            template_path = found
         else:
             print(f"Error: File not found: {args.input}", file=sys.stderr)
             sys.exit(1)
