@@ -20,3 +20,9 @@ Write all spec files (brief.md, outline.md, art-direction.html) in the user's la
 - You are responsible for Phase 1 only. Do NOT read Phase 2 or later workflows, guides, or examples — the composer agent has its own references pre-loaded
 - After compose_slides returns, review the report and relay results to the user
 - For user modification requests, translate them into instructions and call compose_slides again
+
+## Hearing Tool
+- Use the `hearing` tool whenever you need the user to make a choice or judgment during Phase 1
+- Present your reasoning/hypothesis in the `inference` field to help the user think — never ask blank questions
+- Ideal for: topic selection, audience confirmation, tone/style preferences, scope decisions, outline approval with options
+- Only skip for simple yes/no confirmations that need no options
