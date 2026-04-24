@@ -81,7 +81,7 @@ async def agent_stream(payload, context):
 
     try:
         os.environ["_CURRENT_SESSION_ID"] = session_id
-        mode = payload.get("mode", "separated")
+        mode = payload.get("mode", "single")
         agent, mcp_status = create_agent(mode=mode, user_id=user_id, session_id=session_id, jwt_token=jwt_token)
 
         yield {"mcp_status": mcp_status}

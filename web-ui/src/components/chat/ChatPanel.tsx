@@ -911,32 +911,59 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 onClick={() => setOptionsOpen((v) => !v)}
                 className="flex items-center gap-1 text-[11px] text-foreground-muted hover:text-foreground transition-colors py-1"
               >
-                <ChevronRight className={`h-3 w-3 transition-transform ${optionsOpen ? "rotate-90" : ""}`} />
+                <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${optionsOpen ? "rotate-90" : ""}`} />
                 Options
               </button>
               {optionsOpen && (
-                <div className="flex flex-col gap-1 pb-1.5 pl-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fetchWebImages}
-                      onChange={(e) => setFetchWebImages(e.target.checked)}
-                      className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
-                    />
-                    <span className="text-[11px] text-foreground-muted select-none">
-                      Fetch images from websites (may be used in presentations)
-                    </span>
+                <div className="flex flex-col gap-2 pb-2 pl-1">
+                  {/* Toggle: Fetch web images */}
+                  <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
+                    bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-[12px] text-foreground-secondary font-medium select-none">Fetch web images</span>
+                      <span className="text-[11px] text-foreground-muted select-none leading-snug">Include images from websites in presentations</span>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={fetchWebImages}
+                      onClick={() => setFetchWebImages(!fetchWebImages)}
+                      className={`relative flex-none w-9 h-5 rounded-full transition-colors duration-200 ${
+                        fetchWebImages ? "bg-brand-teal" : "bg-white/[0.1]"
+                      }`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                        fetchWebImages ? "translate-x-4" : ""
+                      }`} />
+                    </button>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={parallelAgents}
-                      onChange={(e) => setParallelAgents(e.target.checked)}
-                      className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
-                    />
-                    <span className="text-[11px] text-foreground-muted select-none">
-                      Parallel agents (experimental) — SPEC + Composer with parallel slide generation
-                    </span>
+
+                  {/* Toggle: Parallel agents (experimental) */}
+                  <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
+                    bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-[12px] text-foreground-secondary font-medium select-none flex items-center gap-2">
+                        Parallel agents
+                        <span className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[10px] font-semibold tracking-wide
+                          bg-brand-amber-soft text-brand-amber border border-brand-amber/25">
+                          🧪 Experimental
+                        </span>
+                      </span>
+                      <span className="text-[11px] text-foreground-muted select-none leading-snug">Multiple composer agents generate slides in parallel</span>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={parallelAgents}
+                      onClick={() => setParallelAgents(!parallelAgents)}
+                      className={`relative flex-none w-9 h-5 rounded-full transition-colors duration-200 ${
+                        parallelAgents ? "bg-brand-teal" : "bg-white/[0.1]"
+                      }`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                        parallelAgents ? "translate-x-4" : ""
+                      }`} />
+                    </button>
                   </label>
                 </div>
               )}

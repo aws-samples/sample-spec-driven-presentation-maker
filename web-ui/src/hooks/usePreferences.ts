@@ -18,7 +18,7 @@ interface Prefs {
   agentMode: "spec" | "vibe"
 }
 
-const DEFAULTS: Prefs = { sendWithEnter: false, viewMode: "full", fetchWebImages: false, parallelAgents: true, agentMode: "spec" }
+const DEFAULTS: Prefs = { sendWithEnter: false, viewMode: "full", fetchWebImages: false, parallelAgents: false, agentMode: "spec" }
 
 /**
  * Read preferences from localStorage, falling back to defaults.
