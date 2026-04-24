@@ -645,24 +645,6 @@ def toggle_favorite(deck_id: str) -> Dict[str, Any]:
     return {"favorited": action == "add"}
 
 
-@app.post("/decks/thumbnails")
-def batch_get_thumbnails() -> List[Dict[str, Any]]:
-    """Lazy-load thumbnails for decks that have no thumbnailS3Key in DDB.
-
-    Falls back to the first slide preview in S3.
-    """
-    user_id = get_user_id(app.current_event)
-    deck_ids: List[str] = app.current_event.json_body or []
-    results = []
-    for deck_id in deck_ids[:20]:
-        preview_keys = _list_preview_keys(deck_id)
-        from shared.preview import build_slide_key_map
-        km = build_slide_key_map(preview_keys)
-        first_key = next(iter(km.values()), None) if km else None
-        results.append({"deckId": deck_id, "thumbnailUrl": preview_url(first_key) if first_key else None})
-    return results
-
-
 # ---------------------------------------------------------------------------
 # Slide search endpoint (optional, requires KB)
 # ---------------------------------------------------------------------------
