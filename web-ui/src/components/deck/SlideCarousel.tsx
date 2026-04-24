@@ -220,13 +220,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /** Local: open deck directory in Finder/Explorer */
   async function handleJsonOpen() {
     if (!deckId || !IS_LOCAL) return
-    window.open(`/api/preview/${deckId}/`, "_blank")
+    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch(() => {})
   }
 
   /** Local: open output.pptx with default app */
   async function handlePptxOpen() {
-    if (!pptxUrl || !IS_LOCAL) return
-    window.open(pptxUrl, "_blank")
+    if (!deckId || !IS_LOCAL) return
+    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch(() => {})
   }
 
   /**
