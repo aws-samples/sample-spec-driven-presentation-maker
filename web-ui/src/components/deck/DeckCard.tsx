@@ -93,6 +93,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
 
       {/* Action buttons */}
       <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-0.5">
+        {!IS_LOCAL && (
         <button
           onClick={(e) => {
             e.preventDefault()
@@ -109,6 +110,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
         >
           <Star className={`h-3.5 w-3.5 ${isFavorite ? "fill-current" : ""}`} strokeWidth={isFavorite ? 0 : 1.5} />
         </button>
+        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
