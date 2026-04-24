@@ -102,6 +102,19 @@ skill/templates/
 └── sample_template_light.pptx
 ```
 
+#### ユーザーローカルなテンプレート
+
+パッケージ外にカスタムテンプレートを置くこともできます。この方法なら
+`pip install --upgrade` やリポジトリの再 clone でも消えません。Kiro CLI /
+`pptx_builder.py` は以下の順で検索し、`list_templates` ではマージして表示します。
+
+1. `$SDPM_TEMPLATES_DIR` に列挙されたディレクトリ (コロン区切り、`PATH` と同じセマンティクス)
+2. `~/.config/sdpm/templates/`
+3. `skill/templates/` (パッケージ同梱)
+
+同じファイル名がある場合はユーザーローカル側が優先されます。リポジトリを
+変更せずに同梱テンプレートを上書きしたいケースに便利です。
+
 ### Layer 3（リモート MCP）
 
 テンプレートを S3 にアップロードし、Amazon DynamoDB に登録します。

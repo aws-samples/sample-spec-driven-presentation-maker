@@ -164,15 +164,15 @@ def load_slides_json_or_pptx(path):
     if is_source:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_pptx = Path(tmpdir) / "tmp.pptx"
+            from sdpm.api import _find_template_in_dirs, _get_templates_dirs
             from sdpm.builder import PPTXBuilder, resolve_override
-            templates_dir = Path(__file__).resolve().parent.parent.parent / "templates"
             tpl_name = data.get("template")
             if not tpl_name:
                 raise ValueError("No \"template\" specified in JSON. Cannot build for diff.")
             template = Path(path).parent / tpl_name
             if not template.exists():
-                named = templates_dir / (tpl_name if tpl_name.endswith(".pptx") else tpl_name + ".pptx")
-                if named.exists():
+                named = _find_template_in_dirs(tpl_name, _get_templates_dirs())
+                if named is not None:
                     template = named
                 else:
                     raise FileNotFoundError(f"Template not found: '{tpl_name}'. Use list_templates to see available templates.")
