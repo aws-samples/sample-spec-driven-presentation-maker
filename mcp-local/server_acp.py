@@ -57,7 +57,7 @@ def list_styles() -> str:
 # Override tools to match mcp-server (Web) signatures for subagent-branch parity.
 # ACP uses deck_id = filesystem path (vs Web's UUID).
 # ---------------------------------------------------------------------------
-for _name in ("generate_pptx", "get_preview", "code_to_slide", "pptx_to_json", "analyze_template"):
+for _name in ("generate_pptx", "get_preview", "code_to_slide", "analyze_template"):
     mcp._tool_manager._tools.pop(_name, None)
 
 
@@ -187,20 +187,6 @@ def code_to_slide(
         "absolute_path": str(include_path),
         "element_count": len(elements),
     }, ensure_ascii=False)
-
-
-@mcp.tool()
-def pptx_to_json(pptx_path: str) -> str:
-    """Convert an existing PPTX file to JSON representation.
-
-    Args:
-        pptx_path: Local path to the .pptx file.
-
-    Returns:
-        JSON representation of the PPTX slides.
-    """
-    from tools import pptx_to_json as _conv
-    return json.dumps(_conv(pptx_path=pptx_path), ensure_ascii=False)
 
 
 @mcp.tool()

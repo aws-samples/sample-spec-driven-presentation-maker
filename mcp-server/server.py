@@ -225,62 +225,7 @@ def analyze_template(template: str) -> str:
     )
 
 
-# --- Conversion Tools ---
-
-
-@mcp.tool()
-def save_web_image(url: str, deck_id: str, filename: str = "") -> str:
-    """Download an image from a URL and save it to the deck workspace for use in slides.
-
-    Use this after web_fetch(include_images=true) identifies images you want to use.
-    The image is saved to decks/{deck_id}/images/{filename} and can be referenced
-    in slide JSON as "images/{filename}".
-
-    Args:
-        url: The image URL to download.
-        deck_id: The deck ID to save the image into.
-        filename: Optional filename. If omitted, derived from the URL.
-
-    Returns:
-        JSON with the saved image path (use as "src" in slide elements).
-    """
-    import mimetypes
-    import urllib.parse
-
-    import requests as http_requests
-
-    _check_deck_access(deck_id, action="edit_slide")
-
-    parsed = urllib.parse.urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        return json.dumps({"error": f"Only http/https URLs are allowed, got: {parsed.scheme}"})
-
-    try:
-        resp = http_requests.get(
-            url, headers={"User-Agent": "Mozilla/5.0 (compatible; sdpm-agent/1.0)"}, timeout=30
-        )
-        resp.raise_for_status()
-        data = resp.content
-        ct = resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
-    except Exception as e:
-        return json.dumps({"error": f"Failed to download: {e}"})
-
-    allowed = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"}
-    if ct not in allowed:
-        return json.dumps({"error": f"Not an image: {ct}"})
-
-    if not filename:
-        basename = os.path.basename(url.split("?")[0].split("#")[0]) or "image"
-        ext = mimetypes.guess_extension(ct) or ".png"
-        if not basename.endswith(ext):
-            basename = basename.rsplit(".", 1)[0] + ext if "." in basename else basename + ext
-        filename = basename
-
-    key = f"decks/{deck_id}/images/{filename}"
-    _storage.upload_file(key=key, data=data, content_type=ct)
-    src = f"images/{filename}"
-    logger.info("save_web_image: %s → %s (%d bytes)", url, key, len(data))
-    return json.dumps({"status": "ok", "src": src, "size": len(data)})
+# --- Upload & Attachment Tools ---
 
 
 @mcp.tool()
@@ -336,76 +281,6 @@ def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
         filename=filename,
     )
 
-
-@mcp.tool()
-def pptx_to_json(deck_id: str, upload_id: str) -> str:
-    """Convert an uploaded PPTX file to JSON representation for editing.
-    Downloads the PPTX from S3, converts via Engine, and saves presentation.json to the deck workspace.
-
-    Args:
-        deck_id: The deck ID to save the converted JSON into.
-        upload_id: The upload ID of the PPTX file.
-
-    Returns:
-        JSON with slide count and conversion status.
-    """
-    import tempfile
-    import traceback
-    from sdpm.converter import pptx_to_json as _convert
-
-    _check_deck_access(deck_id, action="edit_slide")
-    user_id = _get_user_id()
-
-    try:
-        # Look up upload record from DynamoDB
-        resp = _storage.table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"UPLOAD#{upload_id}"})
-        item = resp.get("Item")
-        if not item:
-            return json.dumps({"error": f"Upload {upload_id} not found"})
-
-        s3_key = item.get("s3KeyRaw", "")
-        if not s3_key:
-            return json.dumps({"error": "No S3 key for upload"})
-
-        # Download PPTX to temp dir and convert
-        work_dir = Path(tempfile.mkdtemp())
-        pptx_path = work_dir / "input.pptx"
-        pptx_path.write_bytes(_storage.download_file_from_pptx_bucket(s3_key))
-        result = _convert(pptx_path)
-
-        # Upload extracted images to S3 deck workspace
-        images_dir = pptx_path.with_suffix('') / "images"
-        image_count = 0
-        if images_dir.is_dir():
-            import mimetypes
-            for img_file in images_dir.iterdir():
-                if img_file.is_file():
-                    s3_img_key = f"decks/{deck_id}/images/{img_file.name}"
-                    ct = mimetypes.guess_type(img_file.name)[0] or "application/octet-stream"
-                    _storage.upload_file(key=s3_img_key, data=img_file.read_bytes(), content_type=ct)
-                    image_count += 1
-
-        # Cleanup
-        import shutil
-        shutil.rmtree(work_dir, ignore_errors=True)
-
-        # Save as presentation.json in deck workspace
-        pres_json = json.dumps(result, ensure_ascii=False)
-        pres_key = f"decks/{deck_id}/presentation.json"
-        _storage.upload_file(key=pres_key, data=pres_json.encode("utf-8"), content_type="application/json")
-
-        slide_count = len(result.get("slides", []))
-        logger.info("pptx_to_json completed: deck=%s slides=%s", deck_id, slide_count)
-        return json.dumps({
-            "status": "ok",
-            "slideCount": slide_count,
-            "deckId": deck_id,
-            "jsonPath": "presentation.json",
-            "hint": f'Use run_python(deck_id="{deck_id}") with open("presentation.json") to read/edit the converted JSON.',
-        })
-    except Exception as e:
-        logger.exception("pptx_to_json failed: deck=%s upload=%s", deck_id, upload_id)
-        return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
 
 
 # --- Generation Tools ---

@@ -25,7 +25,7 @@ The user must explicitly approve each deliverable before you move to the next su
 
 - Workflow: `create-new-1-briefing`
 - Deliverable: specs/brief.md
-- Tools: hearing, web_fetch, list_uploads
+- Tools: hearing, web_fetch
 
 The composer agent can only see specs/ files — it has no access to the conversation.
 specs/brief.md is the composer's primary source of truth. Required sections:
@@ -42,7 +42,7 @@ If it is not in the brief, it does not exist for the composer.
 
 - Workflow: `create-new-1-outline`
 - Deliverable: specs/outline.md
-- Tools: hearing, web_fetch, list_uploads
+- Tools: hearing, web_fetch
 
 ### 3. Art Direction
 

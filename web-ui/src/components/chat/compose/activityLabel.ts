@@ -26,6 +26,7 @@ export function activityCategory(tool: string): ActivityCategory {
     case "code_to_slide":
     case "get_preview":
     case "save_web_image":
+    case "import_attachment":
       return "produce"
     case "apply_style":
     case "init_presentation":
@@ -72,6 +73,7 @@ export function activityLabel(tool: string, input?: Record<string, unknown>): st
     case "generate_pptx": return "Assembling deck"
     case "code_to_slide": return "Formatting code"
     case "save_web_image": return "Saving image"
+    case "import_attachment": return "Importing file"
     case "analyze_template": return "Analyzing template"
     case "list_styles": return "Browsing styles"
     case "list_guides": return "Listing guides"

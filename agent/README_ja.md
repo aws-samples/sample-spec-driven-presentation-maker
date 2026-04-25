@@ -82,13 +82,6 @@ def _mcp_aws_pricing() -> MCPClient:
 
 ## ビルトインツール
 
-### upload_tools（`tools/upload_tools.py`）
-
-| 関数 | 説明 |
-|---|---|
-| `read_uploaded_file(upload_id)` | アップロードファイルの内容を読み取る |
-| `list_uploads(session_id)` | セッション内のアップロード一覧を取得する |
-
 ### web_tools（`tools/web_tools.py`）
 
 | 関数 | 説明 |
@@ -105,8 +98,6 @@ def _mcp_aws_pricing() -> MCPClient:
 | `MEMORY_ID` | Amazon Bedrock AgentCore Memory ID |
 | `MODEL_ID` | Bedrock モデル ID（デフォルト: `global.anthropic.claude-sonnet-4-6`） |
 | `AWS_REGION` / `AWS_DEFAULT_REGION` | AWS リージョン（デフォルト: `us-east-1`） |
-| `DECKS_TABLE` | DynamoDB テーブル名（upload_tools 用） |
-| `PPTX_BUCKET` | S3 バケット名（upload_tools 用） |
 
 ---
 
@@ -116,7 +107,6 @@ def _mcp_aws_pricing() -> MCPClient:
 agent/
 ├── basic_agent.py          # メインエージェント（エントリポイント）
 ├── tools/
-│   ├── upload_tools.py     # read_uploaded_file, list_uploads
 │   └── web_tools.py        # web_fetch
 ├── requirements.txt
 ├── Dockerfile

@@ -25,7 +25,6 @@ from modes.separated.composer import make_compose_slides
 from resilience import LoopGuard
 from session import fix_excess_tool_results
 from tools.hearing_tool import hearing
-from tools.upload_tools import list_uploads
 from tools.web_tools import web_fetch
 
 logger = logging.getLogger("sdpm.agent")
@@ -50,9 +49,6 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str) -> tu
     cfg = MODES[mode]
     memory_id = os.environ.get("MEMORY_ID", "")
     region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
-
-    import tools.upload_tools as _ut
-    _ut._current_user_id = user_id
 
     # Session manager
     session_manager = None
@@ -86,7 +82,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str) -> tu
                 raise
 
     # Tools
-    tools = [*mcp_servers, list_uploads, web_fetch, hearing]
+    tools = [*mcp_servers, web_fetch, hearing]
     composer_mcp_factory = None
     if cfg.use_composer:
         composer_model = BedrockModel(
@@ -123,7 +119,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str) -> tu
                 new_status.append({"name": name, "status": "error", "error": st.get("error", "Service unavailable")})
         mcp_servers = required_servers
         mcp_status = new_status
-        tools = [*mcp_servers, list_uploads, web_fetch, hearing]
+        tools = [*mcp_servers, web_fetch, hearing]
         if cfg.use_composer:
             compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory)
             tools.append(compose_slides)

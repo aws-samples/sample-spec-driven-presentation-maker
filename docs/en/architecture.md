@@ -35,7 +35,7 @@ Key capabilities:
 - Analyze any .pptx template (layouts, colors, fonts, placeholders)
 - Build slides from JSON with automatic layout optimization
 - Generate PPTX files from `presentation.json`
-- Convert existing PPTX back to JSON (`pptx_to_json`)
+- Convert existing PPTX back to JSON (via upload-time conversion)
 - Multi-source asset search (AWS icons, Material Symbols, custom)
 
 ---
@@ -64,8 +64,8 @@ MCP Client → AgentCore Runtime → MCP Server Container
 ```
 
 Additional tools over Layer 2:
-- `save_web_image` — Download a web image and save it to the deck workspace
-- `read_uploaded_file` — Read content from a user-uploaded file (PDF, PPTX, text)
+- `read_uploaded_file` — Read pre-converted content from a user-uploaded file (PDF, DOCX, XLSX, PPTX, text, images)
+- `import_attachment` — Import uploaded files or web images into the deck workspace
 - `apply_style` — Apply a named style preset to a deck
 - `run_python` — Execute Python in Amazon Bedrock AgentCore Code Interpreter sandbox (edit deck workspace, analyze data)
 - `search_slides` — Semantic slide search via Amazon Bedrock Knowledge Base (optional)
@@ -143,7 +143,7 @@ enabling overflow detection during the Build loop without visual review.
 
 A reference implementation of a full-stack application.
 
-- **Agent** — Strands Agent on Amazon Bedrock AgentCore Runtime, connects to Layer 3 MCP Server. Includes built-in tools: `web_fetch` (URL → Markdown, supports HTML/PDF/images) and `list_uploads` (list session uploads)
+- **Agent** — Strands Agent on Amazon Bedrock AgentCore Runtime, connects to Layer 3 MCP Server. Includes built-in tools: `web_fetch` (URL → Markdown, supports HTML/PDF/images)
 - **Web UI** — React + Tailwind CSS + shadcn/ui, deployed via S3 + Amazon CloudFront. Features animated slide preview via SVG compose pipeline
 - **API** — Lambda-backed REST API (deck CRUD, file upload, chat history)
 - **Auth** — Amazon Cognito User Pool with hosted UI
@@ -227,13 +227,13 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | References | `list_workflows`, `read_workflows` | Phase workflow instructions |
 | References | `list_guides`, `read_guides` | Design rules and guides |
 | Layout | `grid` | CSS Grid coordinate calculation |
-| Utility | `code_to_slide`, `pptx_to_json` | Code highlighting, PPTX reverse conversion |
+| Utility | `code_to_slide` | Code highlighting |
 
 ### Layer 3 Additional Tools
 
 | Tool | Description |
 |------|-------------|
-| `save_web_image` | Download a web image and save it to the deck workspace |
+| `import_attachment` | Import uploaded files or web images into the deck workspace |
 | `read_uploaded_file` | Read content from a user-uploaded file (PDF, PPTX, text) |
 | `apply_style` | Apply a named style preset to a deck |
 | `run_python` | Execute Python in Code Interpreter sandbox |
@@ -244,7 +244,6 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Tool | Description |
 |------|-------------|
 | `web_fetch` | Fetch a URL and convert to Markdown (supports HTML, PDF, images) |
-| `list_uploads` | List files uploaded in the current chat session |
 
 ---
 
