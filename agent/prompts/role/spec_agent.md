@@ -10,6 +10,32 @@ Ask about specific facts, data, examples, stories, and evidence that should
 appear on the slides. The richer the hearing, the richer the Source Material,
 and the better the composer's output.
 
+## File Attachments (Uploads)
+
+When user messages contain `[Attached: filename (uploadId: xxx)]`:
+
+1. **Read first** with `read_uploaded_file(upload_id, offset=0, limit=2000)`
+   - Works before deck creation (no deck_id needed)
+   - Output is in cat -n format (line numbers) for precise citation
+   - Paginate with `offset` for long files
+2. **Decide** whether the content is needed for slides:
+   - Needed as source material → reference in brief.md with line citation
+   - Needed for composer processing (CSV, data files) → `import_attachment` after deck creation
+   - Not needed → ignore
+3. **Import** only after `init_presentation`:
+   - `import_attachment(source=upload_id, deck_id=...)` copies to deck workspace
+   - Imported files become available to composer via `run_python` (`open("attachments/xxx.csv")`)
+   - Web images: `import_attachment(source="https://...", deck_id=...)`
+
+### Citation Format in Source Material
+
+When citing uploaded files in `specs/brief.md` Source Material:
+- Single line: `filename:L42`
+- Range: `filename:L42-L58`
+- Example: `Sales grew 15% YoY [report.md:L142-L145]`
+
+This enables the composer to look up the original context via `run_python` on the imported file.
+
 ## Phase 1 Flow
 
 Phase 1 produces 3 spec files through sequential sub-phases.
@@ -25,7 +51,7 @@ The user must explicitly approve each deliverable before you move to the next su
 
 - Workflow: `create-new-1-briefing`
 - Deliverable: specs/brief.md
-- Tools: hearing, web_fetch
+- Tools: hearing, web_fetch, read_uploaded_file, import_attachment
 
 The composer agent can only see specs/ files — it has no access to the conversation.
 specs/brief.md is the composer's primary source of truth. Required sections:
@@ -42,7 +68,7 @@ If it is not in the brief, it does not exist for the composer.
 
 - Workflow: `create-new-1-outline`
 - Deliverable: specs/outline.md
-- Tools: hearing, web_fetch
+- Tools: hearing, web_fetch, read_uploaded_file, import_attachment
 
 ### 3. Art Direction
 

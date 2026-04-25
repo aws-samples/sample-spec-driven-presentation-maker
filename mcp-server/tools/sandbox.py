@@ -28,7 +28,7 @@ from storage import Storage
 logger = logging.getLogger(__name__)
 
 # Files managed by the deck workspace — only these are synced back to S3.
-_WORKSPACE_PREFIXES = ("deck.json", "slides/", "specs/", "includes/")
+_WORKSPACE_PREFIXES = ("deck.json", "slides/", "specs/", "includes/", "attachments/")
 
 
 def execute_in_sandbox(
@@ -166,7 +166,7 @@ def _upload_deck_workspace(
         name="executeCode",
         arguments={
             "language": "python",
-            "code": "import os\nfor d in ('slides', 'specs', 'includes', 'images'):\n    os.makedirs(d, exist_ok=True)\n",
+            "code": "import os\nfor d in ('slides', 'specs', 'includes', 'images', 'attachments'):\n    os.makedirs(d, exist_ok=True)\n",
         },
     )
 

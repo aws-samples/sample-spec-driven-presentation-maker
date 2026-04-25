@@ -229,19 +229,21 @@ def analyze_template(template: str) -> str:
 
 
 @mcp.tool()
-def read_uploaded_file(upload_id: str, page_start: int = 0) -> list:
+def read_uploaded_file(upload_id: str, offset: int = 0, limit: int = 2000) -> list:
     """Read the content of a file uploaded by the user.
 
     Files are pre-processed at upload time — documents are already converted
-    to Markdown/JSON, so this tool simply returns the converted content.
-    No deck_id required — works during hearing before deck creation.
+    to Markdown/JSON. Output uses cat -n format (line numbers) for citation
+    and navigation. No deck_id required — works during hearing before deck creation.
 
     Args:
         upload_id: The upload identifier from the [Attached: ...] message.
-        page_start: Page offset for long document pagination (default 0).
+        offset: Starting line number (0-indexed). Default 0.
+        limit: Number of lines to read. Default 2000.
 
     Returns:
-        Text content (Markdown for PDF/DOCX/XLSX, JSON for PPTX) and/or image previews.
+        Text content with line numbers (cat -n style) and/or image previews.
+        Includes total line count and a continuation hint if more content exists.
     """
     from tools.upload import read_uploaded_file as _read
 
@@ -249,7 +251,8 @@ def read_uploaded_file(upload_id: str, page_start: int = 0) -> list:
         upload_id=upload_id,
         user_id=_get_user_id(),
         storage=_storage,
-        page_start=page_start,
+        offset=offset,
+        limit=limit,
     )
 
 
@@ -598,6 +601,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
         specs/art-direction.html — design direction (HTML)
         specs/outline.md    — slide outline (1 line = 1 slide = 1 message)
         includes/           — code block JSON files (created by code_to_slide)
+        attachments/        — imported files (CSV, JSON, Markdown) via import_attachment
 
     Legacy decks with presentation.json are also supported (read-only compat).
 

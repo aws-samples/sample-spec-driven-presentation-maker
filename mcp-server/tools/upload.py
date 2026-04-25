@@ -33,14 +33,24 @@ def read_uploaded_file(
     upload_id: str,
     user_id: str,
     storage: Storage,
-    page_start: int = 0,
+    offset: int = 0,
+    limit: int = 2000,
 ) -> list:
     """Read an uploaded file's pre-converted content.
 
-    Files are converted at upload time. This function returns the converted data.
+    Files are converted at upload time. This function returns the converted data
+    in cat -n format (with line numbers, like Claude Code's Read tool).
     No deck_id required — works during hearing (before deck creation).
 
-    Returns a list of str and Image objects for MCP content serialization.
+    Args:
+        upload_id: The upload identifier.
+        user_id: The user identifier.
+        storage: Storage backend.
+        offset: Starting line number (0-indexed). Default 0.
+        limit: Number of lines to read. Default 2000.
+
+    Returns:
+        List of str and Image objects for MCP content serialization.
     """
     resp = storage.table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"UPLOAD#{upload_id}"})
     item = resp.get("Item")
@@ -68,14 +78,14 @@ def read_uploaded_file(
     # --- Converted files (PDF/DOCX/XLSX/PPTX) ---
     if status == "converted":
         converted_prefix = f"uploads/{user_id}/{upload_id}/converted"
-        return _read_converted(storage, converted_prefix, file_name, warning_text, page_start)
+        return _read_converted(storage, converted_prefix, file_name, warning_text, offset, limit)
 
     # --- Text-based files (completed, no conversion needed) ---
     if status == "completed" and file_type in _TEXT_TYPES:
         text = item.get("extractedText")
         if not text and s3_key:
             text = storage.download_file_from_pptx_bucket(s3_key).decode("utf-8")
-        return [f"## Content of {file_name}\n\n{text or '(empty)'}"]
+        return [_format_cat_n(text or "", file_name, offset, limit)]
 
     # --- Images (completed, no conversion needed) ---
     if status == "completed" and file_type.startswith("image/") and s3_key:
@@ -94,49 +104,62 @@ def read_uploaded_file(
     return [f"Upload {file_name} is {status}. Please wait and try again."]
 
 
+def _format_cat_n(text: str, file_name: str, offset: int, limit: int) -> str:
+    """Format text in cat -n style with line numbers.
+
+    Args:
+        text: The full text content.
+        file_name: Display name for the header.
+        offset: Starting line (0-indexed).
+        limit: Number of lines to include.
+
+    Returns:
+        Formatted string with line numbers and range header.
+    """
+    lines = text.split("\n")
+    total = len(lines)
+    start = max(0, offset)
+    end = min(total, start + limit)
+    page_lines = lines[start:end]
+
+    # Width for line numbers (6 chars like cat -n)
+    width = max(6, len(str(end)))
+    numbered = [f"{i + 1:>{width}}\t{line}" for i, line in enumerate(page_lines, start=start)]
+
+    header = f"## Content of {file_name} (lines {start + 1}-{end} of {total})"
+    body = "\n".join(numbered)
+    footer = ""
+    if end < total:
+        footer = f"\n\n[Continue reading: call with offset={end}]"
+    return f"{header}\n\n{body}{footer}"
+
+
 def _read_converted(
-    storage: Storage, prefix: str, file_name: str, warning_text: str, page_start: int,
+    storage: Storage, prefix: str, file_name: str, warning_text: str,
+    offset: int, limit: int,
 ) -> list:
-    """Read converted files from S3 prefix."""
+    """Read converted files from S3 prefix (cat -n format)."""
     result: list = []
 
     # Try Markdown (.md)
-    md_key = None
+    md_found = False
     stem = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
     candidate = f"{prefix}/{stem}.md"
     try:
         md_data = storage.download_file_from_pptx_bucket(candidate)
-        md_key = candidate
-        md_text = md_data.decode("utf-8")
-
-        # Paginate long documents
-        lines = md_text.split("\n")
-        page_size = 200  # lines per page
-        start = page_start * page_size
-        end = start + page_size
-        page_lines = lines[start:end]
-
-        header = f"## Content of {file_name}"
-        if len(lines) > page_size:
-            total_pages = (len(lines) + page_size - 1) // page_size
-            current_page = page_start + 1
-            header += f" (page {current_page}/{total_pages})"
-
-        result.append(header + "\n\n" + "\n".join(page_lines))
-
-        if end < len(lines):
-            result.append(
-                f"\n[More content available. "
-                f"Call read_uploaded_file with page_start={page_start + 1} to continue.]"
-            )
+        result.append(_format_cat_n(md_data.decode("utf-8"), file_name, offset, limit))
+        md_found = True
     except Exception:
         pass
 
     # Try JSON (slides.json for PPTX)
-    if not md_key:
+    if not md_found:
         try:
             json_data = storage.download_file_from_pptx_bucket(f"{prefix}/slides.json")
-            result.append(f"## PPTX Content of {file_name}\n\n```json\n{json_data.decode('utf-8')}\n```")
+            # JSON is usually compact; format with line numbers too
+            import json as _json
+            pretty = _json.dumps(_json.loads(json_data), ensure_ascii=False, indent=2)
+            result.append(_format_cat_n(pretty, file_name, offset, limit))
         except Exception:
             pass
 

@@ -10,6 +10,16 @@ Write slide content in the same language as the spec files unless instructed oth
 - Do NOT re-fetch context already provided below — check section headers to see what's already loaded
 - Do NOT call init_presentation — the deck already exists
 
+## Workspace Files
+The deck workspace is loaded into `run_python` sandbox:
+- `slides/{slug}.json` — per-slide data (your main write target)
+- `specs/brief.md`, `specs/outline.md`, `specs/art-direction.html` — read-only inputs
+- `deck.json` — read-only metadata
+- `includes/` — code block JSONs
+- `attachments/` — files imported by spec-agent (CSVs, JSONs, converted Markdown from uploads)
+  - Access via `open("attachments/<filename>")` in run_python
+  - `brief.md` Source Material may cite these with `filename:L{start}-L{end}` — use the line numbers to find exact context
+
 ## Your Role
 - Read the instruction provided, which specifies which slides to compose
 - Write each slide to slides/{slug}.json via run_python
