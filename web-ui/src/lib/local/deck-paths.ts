@@ -11,7 +11,7 @@ import fs from "fs"
 import path from "path"
 import os from "os"
 
-export const DECK_ROOT = path.join(os.homedir(), "Documents", "SDPM-Presentations")
+export const DECK_ROOT = process.env.SDPM_DECK_ROOT || path.join(os.homedir(), "Documents", "SDPM-Presentations")
 
 /**
  * Resolve a user-provided deckId to an absolute directory path.

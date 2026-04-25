@@ -10,6 +10,8 @@ dependencies = [
     "aws-opentelemetry-distro>=0.10.0",
     "pypdf",
     "requests",
+    "pdfplumber>=0.11.0",
+    "markitdown[docx,xlsx]>=0.1.0",
 ]
 
 [tool.setuptools.packages.find]

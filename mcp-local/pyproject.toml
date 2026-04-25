@@ -6,6 +6,9 @@ requires-python = ">=3.10"
 dependencies = [
     "mcp[cli]",
     "sdpm-skill",
+    "pdfplumber>=0.11.0",
+    "pypdf>=4.0.0",
+    "markitdown[docx,xlsx]>=0.1.0",
 ]
 
 [tool.uv.sources]

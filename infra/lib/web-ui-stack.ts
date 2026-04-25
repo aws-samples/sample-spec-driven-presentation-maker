@@ -230,8 +230,8 @@ function handler(event) {
         },
       }),
       layers: [powertoolsLayer],
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 256,
+      timeout: cdk.Duration.seconds(120),
+      memorySize: 512,
       environment: {
         TABLE_NAME: props.table.tableName,
         PPTX_BUCKET: props.pptxBucket.bucketName,

@@ -956,7 +956,11 @@ def _extract_pptx_text(s3_key: str) -> str:
 
 @app.post("/uploads/<upload_id>/process")
 def process_upload(upload_id: str) -> Dict[str, Any]:
-    """Process an uploaded file — extract text for text-based files."""
+    """Process an uploaded file — convert binary files at upload time."""
+    import tempfile
+    from pathlib import Path as _Path
+    from shared.ingest import _IMAGE_EXTS, convert_file
+
     user_id = get_user_id(app.current_event)
     body = app.current_event.json_body or {}
     session_id: str = body.get("sessionId", "")
@@ -967,13 +971,16 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
         raise app.not_found()
 
     file_type = item.get("fileType", "")
+    file_name = item.get("fileName", "unknown")
     s3_key = item.get("s3KeyRaw", "")
     update_expr_parts = ["#st = :st", "sessionId = :sid"]
     expr_values: Dict[str, Any] = {":sid": session_id}
     expr_names = {"#st": "status"}
 
     extracted_text = None
-    _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ext = _Path(file_name).suffix.lower()
+
+    # --- Text files: read directly from S3 ---
     if file_type in _TEXT_EXTRACTABLE and s3_key:
         try:
             obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=s3_key)
@@ -983,18 +990,59 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
             expr_values[":st"] = "completed"
         except Exception:
             expr_values[":st"] = "completed"
-    elif file_type == _PPTX_MIME and s3_key:
+
+    # --- Images: no conversion needed ---
+    elif ext in _IMAGE_EXTS:
+        expr_values[":st"] = "completed"
+
+    # --- Binary files (PDF/DOCX/XLSX/PPTX): download → convert → upload ---
+    elif ext in (".pdf", ".docx", ".xlsx", ".pptx") and s3_key:
+        converted_prefix = f"uploads/{user_id}/{upload_id}/converted"
         try:
-            extracted_text = _extract_pptx_text(s3_key)
-            if extracted_text:
-                update_expr_parts.append("extractedText = :et")
-                expr_values[":et"] = extracted_text[:50000]
-            expr_values[":st"] = "completed"
-        except Exception:
-            expr_values[":st"] = "completed"
+            with tempfile.TemporaryDirectory() as tmp:
+                tmp_path = _Path(tmp)
+                local_file = tmp_path / file_name
+                output_dir = tmp_path / "converted"
+
+                obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=s3_key)
+                local_file.write_bytes(obj["Body"].read())
+
+                result = convert_file(local_file, output_dir)
+
+                if result.status == "error":
+                    expr_values[":st"] = "error"
+                    update_expr_parts.append("conversionError = :ce")
+                    expr_values[":ce"] = result.error or "Unknown error"
+                else:
+                    if output_dir.exists():
+                        for f in output_dir.rglob("*"):
+                            if f.is_file():
+                                rel = f.relative_to(output_dir)
+                                s3_dest = f"{converted_prefix}/{rel}"
+                                ct = "application/octet-stream"
+                                if f.suffix in (".md", ".txt"):
+                                    ct = "text/markdown"
+                                elif f.suffix == ".json":
+                                    ct = "application/json"
+                                elif f.suffix in (".png", ".jpg", ".jpeg"):
+                                    ct = f"image/{f.suffix.lstrip('.')}"
+                                s3_client.put_object(
+                                    Bucket=BUCKET_NAME, Key=s3_dest,
+                                    Body=f.read_bytes(), ContentType=ct,
+                                )
+
+                    expr_values[":st"] = "converted"
+                    if result.warnings:
+                        update_expr_parts.append("conversionWarnings = :cw")
+                        expr_values[":cw"] = result.warnings
+
+        except Exception as e:
+            logger.exception("Conversion failed for %s", upload_id)
+            expr_values[":st"] = "error"
+            update_expr_parts.append("conversionError = :ce")
+            expr_values[":ce"] = str(e)[:500]
+
     else:
-        # Binary files (PDF, DOCX, PPTX, images): mark completed,
-        # agent reads directly from S3 via presigned URL or further processing
         expr_values[":st"] = "completed"
 
     table.update_item(

@@ -21,6 +21,9 @@ from pathlib import Path
 _SKILL_DIR = Path(__file__).resolve().parent.parent / "skill"
 sys.path.insert(0, str(_SKILL_DIR))
 
+# Add project root to sys.path so shared/ package is importable
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from tools import (  # noqa: E402
