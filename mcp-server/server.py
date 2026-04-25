@@ -284,31 +284,56 @@ def save_web_image(url: str, deck_id: str, filename: str = "") -> str:
 
 
 @mcp.tool()
-def read_uploaded_file(upload_id: str, deck_id: str, page_start: int = 0) -> list:
-    """Read an uploaded file's content. Returns text for documents, visual preview for images/PDFs.
+def read_uploaded_file(upload_id: str, page_start: int = 0) -> list:
+    """Read the content of a file uploaded by the user.
 
-    For images: saves original to deck workspace for use in slides, returns visual preview.
-    For PDFs: extracts text and embedded images, saves images to deck workspace.
-      Use page_start to paginate through long PDFs (e.g. page_start=20 for pages 21-40).
-    For PPTX: returns extracted text and guidance to use pptx_to_json.
+    Files are pre-processed at upload time — documents are already converted
+    to Markdown/JSON, so this tool simply returns the converted content.
+    No deck_id required — works during hearing before deck creation.
 
     Args:
-        deck_id: The deck ID. Must be initialized first via init_presentation().
         upload_id: The upload identifier from the [Attached: ...] message.
-        page_start: Page offset for PDF pagination (default 0). Use the value from the truncation message.
+        page_start: Page offset for long document pagination (default 0).
 
     Returns:
-        Text content and/or image previews for visual analysis.
+        Text content (Markdown for PDF/DOCX/XLSX, JSON for PPTX) and/or image previews.
     """
     from tools.upload import read_uploaded_file as _read
 
-    _check_deck_access(deck_id, action="edit_slide")
     return _read(
         upload_id=upload_id,
-        deck_id=deck_id,
         user_id=_get_user_id(),
         storage=_storage,
         page_start=page_start,
+    )
+
+
+@mcp.tool()
+def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
+    """Import a file into the deck workspace for use in slides.
+
+    source can be an uploadId (user-uploaded file) or a URL (web image).
+    For uploadId: copies pre-converted files to the deck workspace.
+    For URL: downloads and saves to the deck workspace.
+
+    Args:
+        source: Upload ID from [Attached: ...] message, or an HTTP(S) URL.
+        deck_id: The deck ID (must be initialized via init_presentation).
+        filename: Optional output filename. If omitted, derived from source.
+
+    Returns:
+        JSON with saved file paths and image_mapping for use in slide JSON.
+        image_mapping maps original filenames (in Markdown) to deck-relative paths.
+    """
+    from tools.attachment import import_attachment as _import
+
+    _check_deck_access(deck_id, action="edit_slide")
+    return _import(
+        source=source,
+        deck_id=deck_id,
+        user_id=_get_user_id(),
+        storage=_storage,
+        filename=filename,
     )
 
 

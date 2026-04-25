@@ -1,9 +1,8 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Read uploaded files with multimodal support (images, PDF)."""
+"""Read uploaded files — returns pre-converted content (no conversion at read time)."""
 
 import io
-import mimetypes
 
 from mcp.server.fastmcp.utilities.types import Image
 from PIL import Image as PILImage
@@ -12,8 +11,8 @@ from storage import Storage
 
 _JPEG_QUALITY = 80
 _MAX_LONG_EDGE = 1280
+_MAX_IMAGE_PREVIEWS = 10
 
-_PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 _TEXT_TYPES = {"text/plain", "text/markdown", "application/json"}
 
 
@@ -30,22 +29,16 @@ def _to_jpeg(data: bytes) -> bytes:
     return buf.getvalue()
 
 
-def _save_image_to_deck(storage: Storage, deck_id: str, filename: str, data: bytes) -> str:
-    """Save image to deck workspace and return relative src path."""
-    ct = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    key = f"decks/{deck_id}/images/{filename}"
-    storage.upload_file(key=key, data=data, content_type=ct)
-    return f"images/{filename}"
-
-
 def read_uploaded_file(
     upload_id: str,
-    deck_id: str,
     user_id: str,
     storage: Storage,
     page_start: int = 0,
 ) -> list:
-    """Read an uploaded file, returning text and/or ImageContent.
+    """Read an uploaded file's pre-converted content.
+
+    Files are converted at upload time. This function returns the converted data.
+    No deck_id required — works during hearing (before deck creation).
 
     Returns a list of str and Image objects for MCP content serialization.
     """
@@ -55,105 +48,123 @@ def read_uploaded_file(
         return [f"Error: Upload {upload_id} not found."]
 
     status = item.get("status", "unknown")
-    if status not in ("completed",):
-        return [f"Upload is still {status}. Please wait and try again."]
-
-    file_type = item.get("fileType", "")
     file_name = item.get("fileName", "unknown")
+    file_type = item.get("fileType", "")
     s3_key = item.get("s3KeyRaw", "")
 
-    # --- Text-based files ---
-    if file_type in _TEXT_TYPES:
+    # Status check
+    if status == "converting":
+        return [f"Upload {file_name} is still being converted. Please wait and try again."]
+    if status == "error":
+        error = item.get("conversionError", "Unknown error")
+        return [f"Error: Conversion of {file_name} failed: {error}"]
+
+    # Warnings from conversion
+    warnings = item.get("conversionWarnings", [])
+    warning_text = ""
+    if warnings:
+        warning_text = "\n\n⚠️ Conversion warnings:\n" + "\n".join(f"- {w}" for w in warnings)
+
+    # --- Converted files (PDF/DOCX/XLSX/PPTX) ---
+    if status == "converted":
+        converted_prefix = f"uploads/{user_id}/{upload_id}/converted"
+        return _read_converted(storage, converted_prefix, file_name, warning_text, page_start)
+
+    # --- Text-based files (completed, no conversion needed) ---
+    if status == "completed" and file_type in _TEXT_TYPES:
         text = item.get("extractedText")
         if not text and s3_key:
             text = storage.download_file_from_pptx_bucket(s3_key).decode("utf-8")
         return [f"## Content of {file_name}\n\n{text or '(empty)'}"]
 
-    # --- PPTX ---
-    if file_type == _PPTX_MIME:
-        text = item.get("extractedText", "")
-        hint = f'Use pptx_to_json(deck_id="{deck_id}", upload_id="{upload_id}") to convert to editable JSON.'
-        parts = []
-        if text:
-            parts.append(f"## Content of {file_name}\n\n{text}\n\n---\n{hint}")
-        else:
-            parts.append(f"PPTX file: {file_name}. {hint}")
+    # --- Images (completed, no conversion needed) ---
+    if status == "completed" and file_type.startswith("image/") and s3_key:
+        data = storage.download_file_from_pptx_bucket(s3_key)
+        parts = [f"Image: {file_name} (use import_attachment to add to deck)"]
+        try:
+            jpeg = _to_jpeg(data)
+            parts.append(Image(data=jpeg, format="jpeg"))
+        except Exception:
+            parts.append("(preview unavailable)")
         return parts
 
-    # --- Image ---
-    if file_type.startswith("image/") and s3_key:
-        data = storage.download_file_from_pptx_bucket(s3_key)
-        src = _save_image_to_deck(storage, deck_id, file_name, data)
-        jpeg = _to_jpeg(data)
-        return [
-            f"Image saved to deck workspace as `{src}`. Use this path in slide JSON image elements.",
-            Image(data=jpeg, format="jpeg"),
-        ]
+    if status == "completed":
+        return [f"File: {file_name} (type: {file_type})"]
 
-    # --- PDF ---
-    if file_type == "application/pdf" and s3_key:
-        return _read_pdf(storage, deck_id, s3_key, file_name, page_start=page_start)
-
-    return [f"Unsupported file type: {file_type} ({file_name})"]
+    return [f"Upload {file_name} is {status}. Please wait and try again."]
 
 
-def _read_pdf(storage: Storage, deck_id: str, s3_key: str, file_name: str, *, page_start: int = 0) -> list:
-    """Extract text and images from PDF.
-
-    Safety limits:
-    - MAX_PAGES: pages to process per call (use page_start to paginate)
-    - MAX_IMAGES: total image previews (JPEG) to return
-    - Images beyond the limit are saved to deck workspace but not previewed
-    """
-    from pypdf import PdfReader
-
-    MAX_PAGES = 20
-    MAX_IMAGES = 10
-
-    data = storage.download_file_from_pptx_bucket(s3_key)
-    reader = PdfReader(io.BytesIO(data))
-    total_pages = len(reader.pages)
-    page_end = min(page_start + MAX_PAGES, total_pages)
-
+def _read_converted(
+    storage: Storage, prefix: str, file_name: str, warning_text: str, page_start: int,
+) -> list:
+    """Read converted files from S3 prefix."""
     result: list = []
-    all_text = []
-    img_idx = 0
-    preview_count = 0
 
-    for pi in range(page_start, page_end):
-        page = reader.pages[pi]
-        page_num = pi + 1  # 1-based display
+    # Try Markdown (.md)
+    md_key = None
+    stem = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
+    candidate = f"{prefix}/{stem}.md"
+    try:
+        md_data = storage.download_file_from_pptx_bucket(candidate)
+        md_key = candidate
+        md_text = md_data.decode("utf-8")
 
-        text = page.extract_text() or ""
-        if text.strip():
-            all_text.append(f"### Page {page_num}\n{text.strip()}")
+        # Paginate long documents
+        lines = md_text.split("\n")
+        page_size = 200  # lines per page
+        start = page_start * page_size
+        end = start + page_size
+        page_lines = lines[start:end]
 
-        for image in page.images:
-            img_idx += 1
-            ext = image.name.rsplit(".", 1)[-1] if "." in image.name else "png"
-            img_name = f"pdf_p{page_num}_img{img_idx}.{ext}"
-            src = _save_image_to_deck(storage, deck_id, img_name, image.data)
-            if preview_count < MAX_IMAGES:
-                try:
-                    jpeg = _to_jpeg(image.data)
-                    result.append(f"PDF page {page_num} image → `{src}`")
-                    result.append(Image(data=jpeg, format="jpeg"))
-                    preview_count += 1
-                except Exception:
-                    result.append(f"PDF page {page_num} image → `{src}` (preview unavailable)")
-            else:
-                result.append(f"PDF page {page_num} image → `{src}` (saved, preview limit reached)")
+        header = f"## Content of {file_name}"
+        if len(lines) > page_size:
+            total_pages = (len(lines) + page_size - 1) // page_size
+            current_page = page_start + 1
+            header += f" (page {current_page}/{total_pages})"
 
-    if all_text:
-        header = f"## Text from {file_name} ({total_pages} pages, showing pages {page_start + 1}-{page_end})"
-        result.insert(0, header + "\n\n" + "\n\n".join(all_text))
-    elif not result:
-        result.append(f"No extractable text or images found in {file_name}.")
+        result.append(header + "\n\n" + "\n".join(page_lines))
 
-    if page_end < total_pages:
-        result.append(
-            f"\n[{total_pages - page_end} more pages not shown. "
-            f"Call read_uploaded_file with page_start={page_end} to continue reading.]"
-        )
+        if end < len(lines):
+            result.append(
+                f"\n[More content available. "
+                f"Call read_uploaded_file with page_start={page_start + 1} to continue.]"
+            )
+    except Exception:
+        pass
+
+    # Try JSON (slides.json for PPTX)
+    if not md_key:
+        try:
+            json_data = storage.download_file_from_pptx_bucket(f"{prefix}/slides.json")
+            result.append(f"## PPTX Content of {file_name}\n\n```json\n{json_data.decode('utf-8')}\n```")
+        except Exception:
+            pass
+
+    # Image previews
+    try:
+        img_prefix = f"{prefix}/images/"
+        keys = storage.list_files(img_prefix)
+        preview_count = 0
+        for key in keys:
+            if preview_count >= _MAX_IMAGE_PREVIEWS:
+                result.append(f"({len(keys) - preview_count} more images not previewed)")
+                break
+            try:
+                img_data = storage.download_file_from_pptx_bucket(key)
+                jpeg = _to_jpeg(img_data)
+                img_name = key.rsplit("/", 1)[-1]
+                result.append(f"Extracted image: {img_name}")
+                result.append(Image(data=jpeg, format="jpeg"))
+                preview_count += 1
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    if not result:
+        result.append(f"No converted content found for {file_name}.")
+
+    if warning_text:
+        result.append(warning_text)
 
     return result
