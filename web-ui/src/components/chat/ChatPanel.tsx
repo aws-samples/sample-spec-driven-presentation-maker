@@ -448,7 +448,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     const idToken = auth.user?.id_token
     const accessToken = auth.user?.access_token
     const userId = auth.user?.profile?.sub
-    if (!accessToken || !userId || !idToken) return
+    if (!IS_LOCAL && (!accessToken || !userId || !idToken)) return
 
     // Upload pending attachments
     const uploadedFiles: UploadedFile[] = []
@@ -458,7 +458,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           setAttachments((prev) =>
             prev.map((a) => (a.id === att.id ? { ...a, status: "uploading" as const } : a)),
           )
-          const result = await uploadFile(att.file, idToken, sessionId, deckId !== "new" ? deckId : undefined)
+          const result = await uploadFile(att.file, idToken ?? "", sessionId, deckId !== "new" ? deckId : undefined)
           uploadedFiles.push(result)
           setAttachments((prev) =>
             prev.map((a) => (a.id === att.id ? { ...a, status: "completed" as const, uploadId: result.uploadId } : a)),

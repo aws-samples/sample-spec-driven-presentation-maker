@@ -9,6 +9,8 @@
 const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
 const MAX_FILES = 5
 
+const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === "local"
+
 const ALLOWED_TYPES: Record<string, string> = {
   "text/plain": "txt",
   "text/markdown": "md",
@@ -88,6 +90,34 @@ export async function uploadFile(
   deckId?: string,
   onProgress?: (status: UploadedFile) => void,
 ): Promise<UploadedFile> {
+  // Local mode: POST to /api/upload (Next.js API Route → mcp-local/upload_tools)
+  if (IS_LOCAL) {
+    const form = new FormData()
+    form.append("file", file)
+
+    const uploaded: UploadedFile = {
+      uploadId: "",
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size,
+      status: "uploading",
+    }
+    onProgress?.(uploaded)
+
+    const resp = await fetch("/api/upload", { method: "POST", body: form })
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: "Upload failed" }))
+      throw new Error(err.error || "Failed to upload file")
+    }
+    const data = await resp.json()
+    if (data.error) throw new Error(data.error)
+
+    uploaded.uploadId = data.uploadId
+    uploaded.status = data.status === "converted" || data.status === "completed" ? "completed" : "failed"
+    onProgress?.(uploaded)
+    return uploaded
+  }
+
   const base = await getApiBaseUrl()
 
   // Step 1: Get presigned URL

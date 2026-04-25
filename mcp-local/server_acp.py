@@ -684,5 +684,63 @@ Audience: Developers
     return json.dumps(result, ensure_ascii=False)
 
 
+# ---------------------------------------------------------------------------
+# Upload / attachment tools (Local version)
+# ---------------------------------------------------------------------------
+from upload_tools import (  # noqa: E402
+    read_uploaded_file as _read_uploaded_file,
+    import_attachment as _import_attachment,
+    upload_file as _upload_file,
+    cleanup_old_sessions as _cleanup_old_sessions,
+)
+
+
+@mcp.tool()
+def read_uploaded_file(upload_id: str, offset: int = 0, limit: int = 2000) -> list:
+    """Read the content of a file uploaded by the user.
+
+    Files are pre-processed at upload time (converted to Markdown/JSON for docs,
+    stored as-is for images/text). Output uses cat -n format (line numbers) for
+    citation and navigation. No deck_id required — works during hearing.
+
+    Args:
+        upload_id: The upload identifier from the [Attached: ...] message
+            (format: "sessionId/shortId_filename").
+        offset: Starting line number (0-indexed). Default 0.
+        limit: Number of lines to read. Default 2000.
+
+    Returns:
+        Text content with line numbers and/or image previews.
+    """
+    return _read_uploaded_file(upload_id=upload_id, offset=offset, limit=limit)
+
+
+@mcp.tool()
+def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
+    """Import a file into the deck workspace for use in slides.
+
+    source is either an uploadId or an HTTP(S) URL.
+    - uploadId: copies pre-converted files from session storage to deck.
+    - URL: downloads image and saves to deck.
+
+    Args:
+        source: Upload ID from [Attached: ...] message, or an HTTP(S) URL.
+        deck_id: The deck directory path (must be initialized via init_presentation).
+        filename: Optional output filename.
+
+    Returns:
+        JSON with saved file paths and image_mapping.
+    """
+    return _import_attachment(source=source, deck_id=deck_id, filename=filename)
+
+
 if __name__ == "__main__":
+    # Cleanup sessions older than 7 days at startup
+    try:
+        removed = _cleanup_old_sessions()
+        if removed:
+            print(f"[session-cleanup] Removed {removed} expired session(s)", file=sys.stderr)
+    except Exception as e:
+        print(f"[session-cleanup] Failed: {e}", file=sys.stderr)
+
     mcp.run(transport="stdio")

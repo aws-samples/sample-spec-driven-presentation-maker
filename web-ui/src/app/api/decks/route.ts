@@ -27,7 +27,7 @@ export async function GET() {
 
   const entries = fs.readdirSync(DECK_ROOT, { withFileTypes: true })
   const decks = entries
-    .filter(e => e.isDirectory())
+    .filter(e => e.isDirectory() && !e.name.startsWith("."))
     .map(e => {
       const deckId = e.name
       const dp = path.join(DECK_ROOT, deckId)
