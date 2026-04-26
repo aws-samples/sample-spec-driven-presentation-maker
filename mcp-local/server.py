@@ -41,6 +41,7 @@ from tools import (  # noqa: E402
     list_guides as _list_guides,
     read_guides as _read_guides,
     code_block as _code_block,
+    pptx_to_json as _pptx_to_json,
 )
 
 # MCP Server Instructions — same content as start_presentation returns.
@@ -341,6 +342,23 @@ def code_to_slide(
     """
     return json.dumps(
         _code_block(code=code, language=language, theme=theme, x=x, y=y, width=width, height=height),
+        ensure_ascii=False,
+    )
+
+
+@mcp.tool()
+def pptx_to_json(pptx_path: str) -> str:
+    """Convert an existing PPTX file to JSON representation.
+    Useful for editing existing presentations.
+
+    Args:
+        pptx_path: Path to the .pptx file.
+
+    Returns:
+        JSON representation of the PPTX slides.
+    """
+    return json.dumps(
+        _pptx_to_json(pptx_path=pptx_path),
         ensure_ascii=False,
     )
 

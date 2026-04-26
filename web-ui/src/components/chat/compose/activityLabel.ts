@@ -25,12 +25,10 @@ export function activityCategory(tool: string): ActivityCategory {
     case "generate_pptx":
     case "code_to_slide":
     case "get_preview":
-    case "save_web_image":
     case "import_attachment":
       return "produce"
     case "apply_style":
     case "init_presentation":
-    case "pptx_to_json":
       return "build"
     case "search_assets":
     case "read_examples":
@@ -72,7 +70,6 @@ export function activityLabel(tool: string, input?: Record<string, unknown>): st
     case "get_preview": return "Previewing slides"
     case "generate_pptx": return "Assembling deck"
     case "code_to_slide": return "Formatting code"
-    case "save_web_image": return "Saving image"
     case "import_attachment": return "Importing file"
     case "analyze_template": return "Analyzing template"
     case "list_styles": return "Browsing styles"
@@ -81,7 +78,6 @@ export function activityLabel(tool: string, input?: Record<string, unknown>): st
     case "list_templates": return "Listing templates"
     case "list_asset_sources": return "Listing asset sources"
     case "read_uploaded_file": return "Reading upload"
-    case "pptx_to_json": return "Parsing PPTX"
     case "init_presentation": return "Initializing deck"
     default: return "Thinking"
   }

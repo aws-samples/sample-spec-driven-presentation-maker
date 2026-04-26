@@ -227,7 +227,11 @@ function handler(event) {
               const { execSync } = require("child_process");
               const root = path.join(__dirname, "../..");
               try {
-                execSync(`pip install -r ${root}/api/requirements.txt -t ${outputDir}/`, { stdio: "inherit" });
+                execSync(
+                  `pip install -r ${root}/api/requirements.txt -t ${outputDir}/` +
+                  ` --platform manylinux2014_x86_64 --python-version 3.13 --only-binary=:all:`,
+                  { stdio: "inherit" },
+                );
               } catch {
                 return false;  // fall back to docker bundling
               }
