@@ -217,11 +217,20 @@ function handler(event) {
       code: lambda.Code.fromAsset(path.join(__dirname, "../.."), {
         bundling: {
           image: lambda.Runtime.PYTHON_3_13.bundlingImage,
-          command: ["bash", "-c", "cp -r /asset-input/api/* /asset-input/shared /asset-output/"],
+          command: [
+            "bash", "-c",
+            "pip install -r /asset-input/api/requirements.txt -t /asset-output/ && " +
+            "cp -r /asset-input/api/* /asset-input/shared /asset-output/",
+          ],
           local: {
             tryBundle(outputDir: string): boolean {
               const { execSync } = require("child_process");
               const root = path.join(__dirname, "../..");
+              try {
+                execSync(`pip install -r ${root}/api/requirements.txt -t ${outputDir}/`, { stdio: "inherit" });
+              } catch {
+                return false;  // fall back to docker bundling
+              }
               execSync(`cp -r ${root}/api/* ${outputDir}/`, { stdio: "inherit" });
               execSync(`cp -r ${root}/shared ${outputDir}/shared`, { stdio: "inherit" });
               return true;

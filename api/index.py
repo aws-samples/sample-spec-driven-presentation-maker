@@ -959,7 +959,7 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
     """Process an uploaded file — convert binary files at upload time."""
     import tempfile
     from pathlib import Path as _Path
-    from shared.ingest import _IMAGE_EXTS, convert_file
+    from shared.ingest import IMAGE_EXTS, convert_file
 
     user_id = get_user_id(app.current_event)
     body = app.current_event.json_body or {}
@@ -992,7 +992,7 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
             expr_values[":st"] = "completed"
 
     # --- Images: no conversion needed ---
-    elif ext in _IMAGE_EXTS:
+    elif ext in IMAGE_EXTS:
         expr_values[":st"] = "completed"
 
     # --- Binary files (PDF/DOCX/XLSX/PPTX): download → convert → upload ---

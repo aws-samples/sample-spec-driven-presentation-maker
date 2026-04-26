@@ -30,7 +30,7 @@ from pathlib import Path
 from mcp.server.fastmcp.utilities.types import Image
 from PIL import Image as PILImage
 
-from shared.ingest import _IMAGE_EXTS, _TEXT_EXTS, convert_file
+from shared.ingest import IMAGE_EXTS, TEXT_EXTS, convert_file
 
 _JPEG_QUALITY = 80
 _MAX_LONG_EDGE = 1280
@@ -120,7 +120,7 @@ def upload_file(session_id: str, file_path: str, filename: str = "") -> str:
 
     try:
         # Passthrough: images/text — just copy the raw file
-        if ext in _IMAGE_EXTS or ext in _TEXT_EXTS:
+        if ext in IMAGE_EXTS or ext in TEXT_EXTS:
             shutil.copy2(src, upload_dir / original_name)
             meta["status"] = "completed"
             meta["rawFile"] = original_name

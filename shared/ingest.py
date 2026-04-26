@@ -9,15 +9,14 @@ No I/O dependencies (S3, DynamoDB) — callers handle storage.
 Conversion matrix:
     Image/Text  → no conversion (copy as-is by caller)
     PDF         → pdfplumber (text+table+image position) + pypdf (image binary)
-    DOCX        → MarkItDown (text+image placeholder) + zipfile (image binary)
-    XLSX        → MarkItDown (table structure) + zipfile (image binary)
+    DOCX        → python-docx (text+table interleaved) + zipfile (image binary)
+    XLSX        → openpyxl (table structure) + zipfile (image binary)
     PPTX        → pptx_to_json Engine
 """
 
 from __future__ import annotations
 
 import logging
-import re
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,10 +27,16 @@ logger = logging.getLogger(__name__)
 # PDF page limit — pages beyond this are skipped with a warning.
 _PDF_MAX_PAGES = 100
 
-# File types that need no conversion (caller copies as-is).
-_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
-_TEXT_EXTS = {".csv", ".json", ".txt", ".md", ".html"}
-_PASSTHROUGH_EXTS = _IMAGE_EXTS | _TEXT_EXTS
+# File types that need no conversion (caller copies as-is). Public — used by callers
+# (api/index.py, mcp-local/upload_tools.py) to detect passthrough files.
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+TEXT_EXTS = {".csv", ".json", ".txt", ".md", ".html"}
+PASSTHROUGH_EXTS = IMAGE_EXTS | TEXT_EXTS
+
+# Backward-compat aliases (internal use within this module).
+_IMAGE_EXTS = IMAGE_EXTS
+_TEXT_EXTS = TEXT_EXTS
+_PASSTHROUGH_EXTS = PASSTHROUGH_EXTS
 
 
 @dataclass
@@ -222,27 +227,72 @@ def _rows_to_md_table(rows: list[list]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# DOCX: MarkItDown (text + image placeholders) + zipfile (image binaries)
+# DOCX: python-docx (text + tables interleaved) + zipfile (image binaries)
 # ---------------------------------------------------------------------------
 
 
 def _convert_docx(file_path: Path, output_dir: Path, images_dir: Path) -> ConversionResult:
-    """Convert DOCX to Markdown with image extraction."""
+    """Convert DOCX to Markdown with image extraction.
+
+    Iterates body elements in document order so paragraphs and tables are
+    interleaved correctly (unlike doc.paragraphs + doc.tables which are separate).
+    """
     try:
-        from markitdown import MarkItDown
+        from docx import Document
+        from docx.table import Table
+        from docx.text.paragraph import Paragraph
     except ImportError as e:
         return ConversionResult(status="error", error=f"Missing dependency: {e}")
 
     warnings: list[str] = []
     images: list[str] = []
 
-    # Text extraction via MarkItDown
     try:
-        mid = MarkItDown()
-        result = mid.convert(str(file_path))
-        markdown = result.text_content or ""
+        doc = Document(str(file_path))
     except Exception as e:
-        return ConversionResult(status="error", error=f"DOCX text extraction failed: {e}")
+        return ConversionResult(status="error", error=f"Cannot open DOCX: {e}")
+
+    lines: list[str] = []
+    num_counter = 0
+
+    for element in doc.element.body:
+        tag = element.tag.split("}")[-1]
+
+        if tag == "p":
+            para = Paragraph(element, doc)
+            style = para.style.name
+            text = para.text
+
+            if style == "Title":
+                num_counter = 0
+                lines.append(f"# {text}")
+                lines.append("")
+            elif style.startswith("Heading"):
+                num_counter = 0
+                level = int(style.split()[-1]) if style[-1].isdigit() else 1
+                lines.append(f"{'#' * level} {text}")
+                lines.append("")
+            elif style == "List Bullet":
+                lines.append(f"- {text}")
+            elif style == "List Number":
+                num_counter += 1
+                lines.append(f"{num_counter}. {text}")
+            elif text.strip():
+                num_counter = 0
+                lines.append(text)
+                lines.append("")
+            else:
+                num_counter = 0
+
+        elif tag == "tbl":
+            table = Table(element, doc)
+            rows: list[list[str]] = []
+            for row in table.rows:
+                cells = [cell.text.strip().replace("|", "\\|").replace("\n", " ") for cell in row.cells]
+                rows.append(cells)
+            if rows:
+                lines.append(_rows_to_md_table(rows))
+                lines.append("")
 
     # Image extraction via zipfile
     try:
@@ -250,7 +300,7 @@ def _convert_docx(file_path: Path, output_dir: Path, images_dir: Path) -> Conver
             media_files = [n for n in zf.namelist() if n.startswith("word/media/")]
             if media_files:
                 images_dir.mkdir(parents=True, exist_ok=True)
-                for i, media_path in enumerate(media_files):
+                for media_path in media_files:
                     img_name = Path(media_path).name
                     data = zf.read(media_path)
                     (images_dir / img_name).write_bytes(data)
@@ -258,19 +308,7 @@ def _convert_docx(file_path: Path, output_dir: Path, images_dir: Path) -> Conver
     except Exception as e:
         warnings.append(f"Image extraction failed: {e}")
 
-    # Replace base64 placeholders with filename references
-    # MarkItDown outputs ![](data:image/png;base64,...)
-    img_idx = 0
-
-    def _replace_b64(match: re.Match) -> str:
-        nonlocal img_idx
-        if img_idx < len(images):
-            name = images[img_idx]
-            img_idx += 1
-            return f"![{name}]({name})"
-        return match.group(0)
-
-    markdown = re.sub(r"!\[.*?\]\(data:image/[^)]+\)", _replace_b64, markdown)
+    markdown = "\n".join(lines)
 
     if not markdown.strip() and not images:
         return ConversionResult(status="error", error="No extractable content in DOCX.")
@@ -285,27 +323,43 @@ def _convert_docx(file_path: Path, output_dir: Path, images_dir: Path) -> Conver
 
 
 # ---------------------------------------------------------------------------
-# XLSX: MarkItDown (table structure) + zipfile (image binaries)
+# XLSX: openpyxl (table structure) + zipfile (image binaries)
 # ---------------------------------------------------------------------------
 
 
 def _convert_xlsx(file_path: Path, output_dir: Path, images_dir: Path) -> ConversionResult:
     """Convert XLSX to Markdown tables with image extraction."""
     try:
-        from markitdown import MarkItDown
+        from openpyxl import load_workbook
     except ImportError as e:
         return ConversionResult(status="error", error=f"Missing dependency: {e}")
 
     warnings: list[str] = []
     images: list[str] = []
 
-    # Table extraction via MarkItDown
     try:
-        mid = MarkItDown()
-        result = mid.convert(str(file_path))
-        markdown = result.text_content or ""
+        wb = load_workbook(str(file_path), data_only=True, read_only=True)
     except Exception as e:
-        return ConversionResult(status="error", error=f"XLSX conversion failed: {e}")
+        return ConversionResult(status="error", error=f"Cannot open XLSX: {e}")
+
+    md_parts: list[str] = []
+    try:
+        for ws in wb.worksheets:
+            rows = list(ws.iter_rows(values_only=True))
+            if not rows:
+                continue
+            lines: list[str] = [f"## {ws.title}"]
+            # Header
+            header = [str(c) if c is not None else "" for c in rows[0]]
+            lines.append("| " + " | ".join(header) + " |")
+            lines.append("| " + " | ".join("---" for _ in header) + " |")
+            # Data rows
+            for row in rows[1:]:
+                cells = [str(c) if c is not None else "" for c in row]
+                lines.append("| " + " | ".join(cells) + " |")
+            md_parts.append("\n".join(lines))
+    finally:
+        wb.close()
 
     # Image extraction via zipfile
     try:
@@ -320,6 +374,8 @@ def _convert_xlsx(file_path: Path, output_dir: Path, images_dir: Path) -> Conver
                     images.append(img_name)
     except Exception as e:
         warnings.append(f"Image extraction failed: {e}")
+
+    markdown = "\n\n".join(md_parts)
 
     if not markdown.strip() and not images:
         return ConversionResult(status="error", error="No extractable content in XLSX.")
