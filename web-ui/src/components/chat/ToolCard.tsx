@@ -60,6 +60,7 @@ export const TOOL_META: Record<string, ToolMeta> = {
   web_search:         { Icon: Globe,           label: "Web search",             category: "explore" },
   web_fetch:          { Icon: FileText,        label: "Fetching page",          category: "explore" },
   read_uploaded_file: { Icon: FileText,        label: "Reading file",           category: "explore" },
+  import_attachment:  { Icon: Download,        label: "Importing file",         category: "build" },
   generate_pptx:      { Icon: Download,        label: "Generating PPTX",        category: "produce" },
   generate_preview:   { Icon: Image,           label: "Generating preview",     category: "produce" },
   measure_slides:     { Icon: Ruler,           label: "Measuring slides",       category: "produce" },
