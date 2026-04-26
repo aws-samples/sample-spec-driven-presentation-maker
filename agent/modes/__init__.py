@@ -22,6 +22,7 @@ class ModeConfig:
 
 # Shared parts — referenced by multiple modes
 _COMMON_LANGUAGE = Part(Source.file("common/language"), target="system")
+_COMMON_ATTACHMENTS = Part(Source.file("common/attachments"), target="system")
 _WF_CANCELLATION = Part(Source.file("workflow/cancellation"), target="system")
 _WF_POST_COMPOSE = Part(Source.file("workflow/post_compose"), target="system")
 _WF_SLIDE_GROUPS = Part(Source.file("workflow/slide_groups"), target="system",
@@ -40,6 +41,7 @@ MODES: dict[str, ModeConfig] = {
     "separated": ModeConfig(parts=[
         _COMMON_LANGUAGE,
         Part(Source.file("role/spec_agent"), target="system"),
+        _COMMON_ATTACHMENTS,
         _WF_CANCELLATION,
         _WF_POST_COMPOSE,
         _WF_SLIDE_GROUPS,
@@ -49,6 +51,7 @@ MODES: dict[str, ModeConfig] = {
     "vibe": ModeConfig(parts=[
         _COMMON_LANGUAGE,
         Part(Source.file("role/vibe_agent"), target="system"),
+        _COMMON_ATTACHMENTS,
         Part(Source.file("workflow/vibe"), target="system"),
         _WF_CANCELLATION,
         _WF_POST_COMPOSE,

@@ -10,32 +10,6 @@ Ask about specific facts, data, examples, stories, and evidence that should
 appear on the slides. The richer the hearing, the richer the Source Material,
 and the better the composer's output.
 
-## File Attachments (Uploads)
-
-When user messages contain `[Attached: filename (uploadId: xxx)]`:
-
-1. **Read first** with `read_uploaded_file(upload_id, offset=0, limit=2000)`
-   - Works before deck creation (no deck_id needed)
-   - Output is in cat -n format (line numbers) for precise citation
-   - Paginate with `offset` for long files
-2. **Decide** whether the content is needed for slides:
-   - Needed as source material → reference in brief.md with line citation
-   - Needed for composer processing (CSV, data files) → `import_attachment` after deck creation
-   - Not needed → ignore
-3. **Import** only after `init_presentation`:
-   - `import_attachment(source=upload_id, deck_id=...)` copies to deck workspace
-   - Imported files become available to composer via `run_python` (`open("attachments/xxx.csv")`)
-   - Web images: `import_attachment(source="https://...", deck_id=...)`
-
-### Citation Format in Source Material
-
-When citing uploaded files in `specs/brief.md` Source Material:
-- Single line: `filename:L42`
-- Range: `filename:L42-L58`
-- Example: `Sales grew 15% YoY [report.md:L142-L145]`
-
-This enables the composer to look up the original context via `run_python` on the imported file.
-
 ## Phase 1 Flow
 
 Phase 1 produces 3 spec files through sequential sub-phases.
@@ -58,10 +32,10 @@ specs/brief.md is the composer's primary source of truth. Required sections:
 
 Presentation Goal / Audience / Format / Tone & Style / Constraints & Requests / Materials / Source Material
 
-Source Material is the composer's only source of concrete information.
-Write all data points, numbers, statistics, quotes, examples, technical details,
-and domain-specific facts gathered during the conversation, organized by topic.
-Every fact MUST have a source citation (URL or filename).
+Source Material is the composer's guide to concrete information.
+For attached files, write pointers and summaries (not full transcription) so the composer can look up originals via line numbers.
+For conversation content, write all data points, numbers, quotes, and facts organized by topic.
+Every fact MUST have a source citation (URL, filename, or filename:L{start}-L{end}).
 If it is not in the brief, it does not exist for the composer.
 
 ### 2. Outline
