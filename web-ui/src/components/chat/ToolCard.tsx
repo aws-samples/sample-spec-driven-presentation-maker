@@ -128,6 +128,7 @@ function getDetail(name: string, input?: Record<string, unknown>): string {
   if (input.purpose) { const p = String(input.purpose); return p.length > 40 ? p.slice(0, 40) + "…" : p }
   if (input.path) { const p = String(input.path); return p.split("/").pop() || p }
   if (input.template) return String(input.template)
+  if (input.style) return String(input.style)
   if (input.keyword) return `"${input.keyword}"`
   if (input.query) { const q = String(input.query); return q.length > 30 ? `"${q.slice(0, 30)}…"` : `"${q}"` }
   const v = input.name || input.slide_id
