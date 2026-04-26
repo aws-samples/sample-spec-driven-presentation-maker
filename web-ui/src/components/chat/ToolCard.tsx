@@ -130,7 +130,7 @@ function getDetail(name: string, input?: Record<string, unknown>): string {
   if (input.template) return String(input.template)
   if (input.keyword) return `"${input.keyword}"`
   if (input.query) { const q = String(input.query); return q.length > 30 ? `"${q.slice(0, 30)}…"` : `"${q}"` }
-  const v = input.name || input.slide_id || input.deck_id
+  const v = input.name || input.slide_id
   if (typeof v === "string" && v) return v.length > 30 ? v.slice(0, 30) + "…" : v
   return ""
 }
