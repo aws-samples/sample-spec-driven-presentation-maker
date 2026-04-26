@@ -98,6 +98,47 @@ def read_uploaded_file(
             parts.append("(preview unavailable)")
         return parts
 
+    # --- PPTX (completed, lazy conversion via Engine on MCP Server) ---
+    _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    if status == "completed" and file_type == _PPTX_MIME and s3_key:
+        converted_prefix = f"uploads/{user_id}/{upload_id}/converted"
+        # Check if already converted (cached)
+        cached = storage.list_files(converted_prefix)
+        if cached:
+            return _read_converted(storage, converted_prefix, file_name, warning_text, offset, limit)
+        # Lazy convert: download → convert → upload to S3
+        import tempfile
+        from pathlib import Path as _Path
+        from shared.ingest import convert_file
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                tmp_path = _Path(tmp)
+                local_file = tmp_path / file_name
+                output_dir = tmp_path / "converted"
+                local_file.write_bytes(storage.download_file_from_pptx_bucket(s3_key))
+                result = convert_file(local_file, output_dir)
+                if result.status == "error":
+                    return [f"Error: PPTX conversion failed: {result.error}"]
+                # Upload converted files to S3
+                if output_dir.exists():
+                    import mimetypes
+                    for f in output_dir.rglob("*"):
+                        if f.is_file():
+                            rel = f.relative_to(output_dir)
+                            s3_dest = f"{converted_prefix}/{rel}"
+                            ct = mimetypes.guess_type(str(f))[0] or "application/octet-stream"
+                            storage.upload_file(key=s3_dest, data=f.read_bytes(), content_type=ct)
+                # Update DynamoDB status to converted
+                storage.table.update_item(
+                    Key={"PK": f"USER#{user_id}", "SK": f"UPLOAD#{upload_id}"},
+                    UpdateExpression="SET #st = :st",
+                    ExpressionAttributeNames={"#st": "status"},
+                    ExpressionAttributeValues={":st": "converted"},
+                )
+                return _read_converted(storage, converted_prefix, file_name, warning_text, offset, limit)
+        except Exception as e:
+            return [f"Error: PPTX conversion failed: {e}"]
+
     if status == "completed":
         return [f"File: {file_name} (type: {file_type})"]
 

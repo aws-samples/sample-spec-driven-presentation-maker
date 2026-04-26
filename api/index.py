@@ -996,7 +996,7 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
         expr_values[":st"] = "completed"
 
     # --- Binary files (PDF/DOCX/XLSX/PPTX): download → convert → upload ---
-    elif ext in (".pdf", ".docx", ".xlsx", ".pptx") and s3_key:
+    elif ext in (".pdf", ".docx", ".xlsx") and s3_key:
         converted_prefix = f"uploads/{user_id}/{upload_id}/converted"
         try:
             with tempfile.TemporaryDirectory() as tmp:
