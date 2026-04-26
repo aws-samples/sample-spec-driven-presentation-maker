@@ -205,7 +205,7 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
     )
   }
 
-  const meta = TOOL_META[name] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
+  const meta = TOOL_META[stripPrefix(name)] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
   const isError = status === "error"
   const isComplete = !!status
   const colors = isError ? { ...CAT.other, accent: ERR.accent, bg: ERR.bg, border: ERR.border } : CAT[meta.category]
@@ -441,7 +441,7 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
  * @param props.input - Tool input parameters
  */
 export function ToolCardCompact({ name, input }: { name: string; input?: Record<string, unknown> }) {
-  const meta = TOOL_META[name] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
+  const meta = TOOL_META[stripPrefix(name)] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
   const colors = CAT[meta.category]
   const detail = getDetail(name, input)
 
