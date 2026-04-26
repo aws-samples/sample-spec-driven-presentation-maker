@@ -45,7 +45,6 @@ uv run python server.py
 | `list_guides` | List guide documents |
 | `read_guides` | Read guide documents |
 | `code_to_slide` | Generate code block elements JSON |
-| `pptx_to_json` | Convert PPTX to JSON |
 | `grid` | CSS Grid coordinate calculation |
 
 ## Requirements
