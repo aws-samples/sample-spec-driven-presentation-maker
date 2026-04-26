@@ -62,7 +62,7 @@ def _import_from_upload(
     if status == "completed" and file_type == _PPTX_MIME and s3_key:
         converted_prefix = f"uploads/{user_id}/{upload_id}/converted"
         # Check cache first
-        cached = storage.list_files(converted_prefix)
+        cached = storage.list_files(converted_prefix, bucket=storage.pptx_bucket)
         if not cached:
             import mimetypes as _mt
             import tempfile
@@ -159,7 +159,7 @@ def _import_converted(
     file_name: str, filename: str, short_id: str, result: dict,
 ) -> str:
     """Copy converted files from S3 upload prefix to deck workspace."""
-    keys = storage.list_files(converted_prefix)
+    keys = storage.list_files(converted_prefix, bucket=storage.pptx_bucket)
 
     for key in keys:
         rel = key[len(converted_prefix) + 1:]  # strip prefix + /

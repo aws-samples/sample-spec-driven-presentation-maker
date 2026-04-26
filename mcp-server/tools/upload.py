@@ -103,7 +103,7 @@ def read_uploaded_file(
     if status == "completed" and file_type == _PPTX_MIME and s3_key:
         converted_prefix = f"uploads/{user_id}/{upload_id}/converted"
         # Check if already converted (cached)
-        cached = storage.list_files(converted_prefix)
+        cached = storage.list_files(converted_prefix, bucket=storage.pptx_bucket)
         if cached:
             return _read_converted(storage, converted_prefix, file_name, warning_text, offset, limit)
         # Lazy convert: download → convert → upload to S3
@@ -207,7 +207,7 @@ def _read_converted(
     # Image previews
     try:
         img_prefix = f"{prefix}/images/"
-        keys = storage.list_files(img_prefix)
+        keys = storage.list_files(img_prefix, bucket=storage.pptx_bucket)
         preview_count = 0
         for key in keys:
             if preview_count >= _MAX_IMAGE_PREVIEWS:
