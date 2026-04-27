@@ -95,7 +95,7 @@ def _prefetch_deck_specs(mcp_client, deck_id: str, assigned_slugs: list[str]) ->
     result = mcp_client.call_tool_sync(
         tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
         name="run_python",
-        arguments={"code": code, "deck_id": deck_id},
+        arguments={"code": code, "deck_id": deck_id, "purpose": "prefetch deck specs"},
     )
     if result.get("status") == "error":
         raise RuntimeError(f"Failed to prefetch specs for deck {deck_id}: {result.get('content')}")
@@ -236,6 +236,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None):
                         arguments={
                             "code": "import json; print(json.load(open('deck.json')).get('template',''))",
                             "deck_id": deck_id,
+                            "purpose": "read template name",
                         },
                     )
                     tmpl_name = ""
@@ -531,6 +532,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None):
                             "print(json.dumps(slugs))"
                         ),
                         "deck_id": deck_id,
+                        "purpose": "read outline slugs",
                     },
                 )
                 for item in outline_result.get("content", []):
