@@ -587,7 +587,7 @@ def code_to_slide(deck_id: str, code: str, name: str,
 
 
 @mcp.tool()
-def run_python(deck_id: str | None, purpose: str, code: str, save: bool = False,
+def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool = False,
                files: list[str] | None = None, measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a secure sandbox.
 
