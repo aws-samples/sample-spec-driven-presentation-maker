@@ -60,8 +60,8 @@ phases:
       - |
         if grep -q "webUi: true" infra/config.yaml 2>/dev/null; then
           echo "Building web-ui..."
-          cd web-ui && npm ci && npm run build && cd ..
+          cd web-ui && npm ci && npm run build:cloud && cd ..
         fi
       # Bootstrap CDK if not already done (idempotent)
       - cd infra && cdk bootstrap --quiet || true
-      - cdk ${CDK_COMMAND:-deploy} --all --require-approval never
+      - cdk ${CDK_COMMAND:-deploy} ${STACK:---all} --require-approval never

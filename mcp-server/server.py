@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import sys
+import time
 from contextvars import ContextVar
 from pathlib import Path
 
@@ -224,162 +225,65 @@ def analyze_template(template: str) -> str:
     )
 
 
-# --- Conversion Tools ---
+# --- Upload & Attachment Tools ---
 
 
 @mcp.tool()
-def save_web_image(url: str, deck_id: str, filename: str = "") -> str:
-    """Download an image from a URL and save it to the deck workspace for use in slides.
+def read_uploaded_file(upload_id: str, offset: int = 0, limit: int = 2000) -> list:
+    """Read the content of a file uploaded by the user.
 
-    Use this after web_fetch(include_images=true) identifies images you want to use.
-    The image is saved to decks/{deck_id}/images/{filename} and can be referenced
-    in slide JSON as "images/{filename}".
-
-    Args:
-        url: The image URL to download.
-        deck_id: The deck ID to save the image into.
-        filename: Optional filename. If omitted, derived from the URL.
-
-    Returns:
-        JSON with the saved image path (use as "src" in slide elements).
-    """
-    import mimetypes
-    import urllib.parse
-
-    import requests as http_requests
-
-    _check_deck_access(deck_id, action="edit_slide")
-
-    parsed = urllib.parse.urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        return json.dumps({"error": f"Only http/https URLs are allowed, got: {parsed.scheme}"})
-
-    try:
-        resp = http_requests.get(
-            url, headers={"User-Agent": "Mozilla/5.0 (compatible; sdpm-agent/1.0)"}, timeout=30
-        )
-        resp.raise_for_status()
-        data = resp.content
-        ct = resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
-    except Exception as e:
-        return json.dumps({"error": f"Failed to download: {e}"})
-
-    allowed = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"}
-    if ct not in allowed:
-        return json.dumps({"error": f"Not an image: {ct}"})
-
-    if not filename:
-        basename = os.path.basename(url.split("?")[0].split("#")[0]) or "image"
-        ext = mimetypes.guess_extension(ct) or ".png"
-        if not basename.endswith(ext):
-            basename = basename.rsplit(".", 1)[0] + ext if "." in basename else basename + ext
-        filename = basename
-
-    key = f"decks/{deck_id}/images/{filename}"
-    _storage.upload_file(key=key, data=data, content_type=ct)
-    src = f"images/{filename}"
-    logger.info("save_web_image: %s → %s (%d bytes)", url, key, len(data))
-    return json.dumps({"status": "ok", "src": src, "size": len(data)})
-
-
-@mcp.tool()
-def read_uploaded_file(upload_id: str, deck_id: str, page_start: int = 0) -> list:
-    """Read an uploaded file's content. Returns text for documents, visual preview for images/PDFs.
-
-    For images: saves original to deck workspace for use in slides, returns visual preview.
-    For PDFs: extracts text and embedded images, saves images to deck workspace.
-      Use page_start to paginate through long PDFs (e.g. page_start=20 for pages 21-40).
-    For PPTX: returns extracted text and guidance to use pptx_to_json.
+    Files are pre-processed at upload time — documents are already converted
+    to Markdown/JSON. Output uses cat -n format (line numbers) for citation
+    and navigation. No deck_id required — works during hearing before deck creation.
 
     Args:
-        deck_id: The deck ID. Must be initialized first via init_presentation().
         upload_id: The upload identifier from the [Attached: ...] message.
-        page_start: Page offset for PDF pagination (default 0). Use the value from the truncation message.
+        offset: Starting line number (0-indexed). Default 0.
+        limit: Number of lines to read. Default 2000.
 
     Returns:
-        Text content and/or image previews for visual analysis.
+        Text content with line numbers (cat -n style) and/or image previews.
+        Includes total line count and a continuation hint if more content exists.
     """
     from tools.upload import read_uploaded_file as _read
 
-    _check_deck_access(deck_id, action="edit_slide")
     return _read(
         upload_id=upload_id,
-        deck_id=deck_id,
         user_id=_get_user_id(),
         storage=_storage,
-        page_start=page_start,
+        offset=offset,
+        limit=limit,
     )
 
 
 @mcp.tool()
-def pptx_to_json(deck_id: str, upload_id: str) -> str:
-    """Convert an uploaded PPTX file to JSON representation for editing.
-    Downloads the PPTX from S3, converts via Engine, and saves presentation.json to the deck workspace.
+def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
+    """Import a file into the deck workspace for use in slides.
+
+    source can be an uploadId (user-uploaded file) or a URL (web image).
+    For uploadId: copies pre-converted files to the deck workspace.
+    For URL: downloads and saves to the deck workspace.
 
     Args:
-        deck_id: The deck ID to save the converted JSON into.
-        upload_id: The upload ID of the PPTX file.
+        source: Upload ID from [Attached: ...] message, or an HTTP(S) URL.
+        deck_id: The deck ID (must be initialized via init_presentation).
+        filename: Optional output filename. If omitted, derived from source.
 
     Returns:
-        JSON with slide count and conversion status.
+        JSON with saved file paths and image_mapping for use in slide JSON.
+        image_mapping maps original filenames (in Markdown) to deck-relative paths.
     """
-    import tempfile
-    import traceback
-    from sdpm.converter import pptx_to_json as _convert
+    from tools.attachment import import_attachment as _import
 
     _check_deck_access(deck_id, action="edit_slide")
-    user_id = _get_user_id()
+    return _import(
+        source=source,
+        deck_id=deck_id,
+        user_id=_get_user_id(),
+        storage=_storage,
+        filename=filename,
+    )
 
-    try:
-        # Look up upload record from DynamoDB
-        resp = _storage.table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"UPLOAD#{upload_id}"})
-        item = resp.get("Item")
-        if not item:
-            return json.dumps({"error": f"Upload {upload_id} not found"})
-
-        s3_key = item.get("s3KeyRaw", "")
-        if not s3_key:
-            return json.dumps({"error": "No S3 key for upload"})
-
-        # Download PPTX to temp dir and convert
-        work_dir = Path(tempfile.mkdtemp())
-        pptx_path = work_dir / "input.pptx"
-        pptx_path.write_bytes(_storage.download_file_from_pptx_bucket(s3_key))
-        result = _convert(pptx_path)
-
-        # Upload extracted images to S3 deck workspace
-        images_dir = pptx_path.with_suffix('') / "images"
-        image_count = 0
-        if images_dir.is_dir():
-            import mimetypes
-            for img_file in images_dir.iterdir():
-                if img_file.is_file():
-                    s3_img_key = f"decks/{deck_id}/images/{img_file.name}"
-                    ct = mimetypes.guess_type(img_file.name)[0] or "application/octet-stream"
-                    _storage.upload_file(key=s3_img_key, data=img_file.read_bytes(), content_type=ct)
-                    image_count += 1
-
-        # Cleanup
-        import shutil
-        shutil.rmtree(work_dir, ignore_errors=True)
-
-        # Save as presentation.json in deck workspace
-        pres_json = json.dumps(result, ensure_ascii=False)
-        pres_key = f"decks/{deck_id}/presentation.json"
-        _storage.upload_file(key=pres_key, data=pres_json.encode("utf-8"), content_type="application/json")
-
-        slide_count = len(result.get("slides", []))
-        logger.info("pptx_to_json completed: deck=%s slides=%s", deck_id, slide_count)
-        return json.dumps({
-            "status": "ok",
-            "slideCount": slide_count,
-            "deckId": deck_id,
-            "jsonPath": "presentation.json",
-            "hint": f'Use run_python(deck_id="{deck_id}") with open("presentation.json") to read/edit the converted JSON.',
-        })
-    except Exception as e:
-        logger.exception("pptx_to_json failed: deck=%s upload=%s", deck_id, upload_id)
-        return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
 
 
 # --- Generation Tools ---
@@ -411,7 +315,7 @@ def generate_pptx(deck_id: str) -> str:
 
 
 @mcp.tool()
-def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -> list:
+def get_preview(deck_id: str, slugs: list[str], quality: str = "high") -> list:
     """Get PNG preview images for visual review by the agent.
 
     Returns actual slide images that the model can see and analyze.
@@ -422,20 +326,20 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
 
     Args:
         deck_id: The deck ID.
-        slide_numbers: List of 1-based slide numbers to preview (required, at least one).
+        slugs: List of slide slugs to preview (required, at least one). Example: ["intro", "pricing"].
         quality: "low" (800px, ~480 tokens/slide) or "high" (1280px, ~1229 tokens/slide).
 
     Returns:
         List of text labels and slide images for visual inspection.
     """
     _check_deck_access(deck_id, action="preview")
-    if not slide_numbers:
-        return [{"type": "text", "text": "Error: slide_numbers must not be empty"}]
+    if not slugs:
+        return [{"type": "text", "text": "Error: slugs must not be empty"}]
     if quality not in ("low", "high"):
         quality = "high"
     try:
         return preview.get_preview(
-            deck_id=deck_id, slide_numbers=slide_numbers, storage=_storage, quality=quality,
+            deck_id=deck_id, slugs=slugs, storage=_storage, quality=quality,
         )
     except _storage._s3.exceptions.NoSuchKey:
         return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first."}]
@@ -445,8 +349,8 @@ def get_preview(deck_id: str, slide_numbers: list[int], quality: str = "high") -
         raise
 
 
-def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> Path:
-    """Build PPTX from slides JSON. Returns path to built file."""
+def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> tuple[Path, list[dict]]:
+    """Build PPTX from slides JSON. Returns (pptx_path, invalid_layouts)."""
     from sdpm.builder import PPTXBuilder, resolve_override
 
     builder = PPTXBuilder(**build_kwargs)
@@ -458,7 +362,7 @@ def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> Path:
         builder.add_slide(resolve_override(s, id_map))
     pptx_path = tmpdir / "measure.pptx"
     builder.save(pptx_path)
-    return pptx_path
+    return pptx_path, list(builder.invalid_layouts)
 
 
 def _export_svg(tmpdir: Path, pptx_path: Path) -> Path:
@@ -473,7 +377,8 @@ def _export_svg(tmpdir: Path, pptx_path: Path) -> Path:
     return tmpdir / "measure.svg"
 
 
-def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int]) -> str:
+def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int],
+                 page_to_slug: dict[int, str] | None = None) -> str:
     """PPTX → SVG → bbox measurement → report string."""
     from sdpm.preview.measure import measure_from_svg, format_measure_report
 
@@ -482,7 +387,7 @@ def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int]) -> str
         return json.dumps({"error": "LibreOffice SVG export failed"})
 
     results = measure_from_svg(svg_path=svg_path, slide_indices=slide_numbers)
-    return format_measure_report(results)
+    return format_measure_report(results, page_to_slug=page_to_slug)
 
 
 # --- Asset Tools ---
@@ -682,19 +587,22 @@ def code_to_slide(deck_id: str, code: str, name: str,
 
 
 @mcp.tool()
-def run_python(code: str, deck_id: str | None = None, save: bool = False,
-               files: list[str] | None = None, measure_slides: list[int] | None = None,
-               purpose: str = "") -> str:
+def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool = False,
+               files: list[str] | None = None, measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a secure sandbox.
 
     Use this tool to edit the deck workspace or for general computation.
 
     If deck_id is provided, the entire deck workspace is loaded as files:
-        presentation.json   — slide data (read/write via json.load/json.dump)
+        deck.json           — deck metadata (template, fonts, defaultTextColor)
+        slides/{slug}.json  — per-slide data (read/write via json.load/json.dump)
         specs/brief.md     — briefing document
         specs/art-direction.html — design direction (HTML)
         specs/outline.md    — slide outline (1 line = 1 slide = 1 message)
         includes/           — code block JSON files (created by code_to_slide)
+        attachments/        — imported files (CSV, JSON, Markdown) via import_attachment
+
+    Legacy decks with presentation.json are also supported (read-only compat).
 
     All files are accessible via normal file I/O (open, read, write).
     If save=True, all modified/new workspace files are written back to S3.
@@ -704,16 +612,16 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
         - Text bbox measurement (overflow detection via LibreOffice SVG)
         - Lint diagnostics (JSON schema validation)
         - Layout bias detection
-    Pass the 1-based slide numbers you edited, e.g. measure_slides=[3, 5].
+    Pass the slugs of slides you edited, e.g. measure_slides=["title", "feature-a"].
 
     If files are provided (S3 keys), they are downloaded and available by filename.
     Supported: text files (CSV, JSON, TXT, Markdown, Python). Binary files are not supported.
     Example: files=["uploads/tmp/user/abc/data.csv"] → accessible as "data.csv" in code.
 
     Examples:
-        Edit slides:   run_python(code="...", deck_id="abc", save=True, measure_slides=[3, 5])
+        Edit slides:   run_python(code="...", deck_id="abc", save=True, measure_slides=["title", "feature-a"])
         Edit specs:    run_python(code="open('specs/brief.md','w').write('...')", deck_id="abc", save=True)
-        Measure only:  run_python(code="print('ok')", deck_id="abc", measure_slides=[1, 2])
+        Measure only:  run_python(code="print('ok')", deck_id="abc", measure_slides=["title"])
         Compute:       run_python(code="print(2**100)")
         CSV:           run_python(code="import pandas as pd; print(pd.read_csv('data.csv'))",
                                   files=["uploads/tmp/user/x/data.csv"])
@@ -723,7 +631,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
         deck_id: Deck ID to load workspace from. Optional.
         save: If True, save modified workspace files back to S3. Requires deck_id.
         files: S3 keys of files to make available in the sandbox. Optional.
-        measure_slides: List of 1-based slide numbers to measure after execution. Requires deck_id.
+        measure_slides: List of slide slugs to measure after execution. Requires deck_id.
         purpose: Brief user-facing description of what this code does,
             written in the user's language (e.g. 'Analyzing slide structure',
             'Adding 3 comparison slides'). Shown in the UI.
@@ -736,7 +644,7 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
     if deck_id:
         _check_deck_access(deck_id, action="edit_slide" if save else "read")
 
-    output = sandbox_mod.execute_in_sandbox(
+    output, outline_rejected = sandbox_mod.execute_in_sandbox(
         code=code,
         storage=_storage,
         region=_region,
@@ -747,120 +655,185 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
 
     result: dict = {"output": output}
 
+    if outline_rejected:
+        errs = result.setdefault("errors", {})
+        errs["outline"] = (
+            "outline.md format violation. "
+            "Read workflow `create-new-1-outline` for the correct format."
+        )
+
     # Post-processing: measure_slides triggers PPTX build → measure/lint/bias
     if deck_id and (measure_slides or save):
         import shutil
         import traceback
 
         try:
-            from tools.generate import _prepare_workspace
+            from tools.generate import _assemble_slides, _prepare_workspace
 
             user_id = _get_user_id()
+            _prepare_epoch = int(time.time())
             tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
-            pptx_path = _build_pptx(tmpdir, slides, build_kwargs)
+            pptx_path, invalid_layouts = _build_pptx(tmpdir, slides, build_kwargs)
+            invalid_slug_set = {e["slug"] for e in invalid_layouts if e.get("slug")}
 
-            # Measure (runs SVG export internally)
-            if measure_slides:
-                try:
-                    result["measure"] = _run_measure(tmpdir, pptx_path, measure_slides)
-                except Exception as e:
-                    result["measure"] = json.dumps({"error": str(e)})
+            # Build slug → page number mapping
+            slug_to_page: dict[str, int] = {}
+            for i, s in enumerate(slides):
+                sid = s.get("id", "")
+                if sid:
+                    slug_to_page[sid] = i + 1
+            page_numbers = [slug_to_page[slug] for slug in measure_slides if slug in slug_to_page]
+            page_to_slug = {v: k for k, v in slug_to_page.items()}
 
-            # Lint (filter to measured slides; lint uses 0-based index)
-            if measure_slides:
-                try:
-                    from sdpm.schema.lint import lint as lint_slides
-                    presentation = json.loads((tmpdir / "presentation.json").read_text(encoding="utf-8"))
-                    slide_set = set(measure_slides)
-                    lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in slide_set]
-                    if lint_diag:
-                        result["errors"] = {"lintDiagnostics": lint_diag}
-                except Exception as e:
-                    logger.warning("Lint failed: %s", e)
+            # Measure
+            try:
+                if page_numbers:
+                    measure_result = _run_measure(tmpdir, pptx_path, page_numbers, page_to_slug=page_to_slug)
+                    result["measure"] = measure_result
+                else:
+                    result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})
+            except Exception as e:
+                result["measure"] = json.dumps({"error": str(e)})
 
-                # Layout bias (filter to measured slides; bias uses 1-based)
-                try:
-                    from sdpm.preview import check_layout_imbalance_data
-                    layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in slide_set]
-                    if layout_bias:
-                        result["warnings"] = {"layoutBias": layout_bias}
-                except Exception as e:
-                    logger.warning("Layout bias check failed: %s", e)
+            # Lint (filter to measured slugs)
+            try:
+                from sdpm.schema.lint import lint as lint_slides
+                presentation = {"slides": slides}
+                page_set = set(page_numbers)
+                lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in page_set]
+                if lint_diag:
+                    result["errors"] = {"lintDiagnostics": lint_diag}
+            except Exception as e:
+                logger.warning("Lint failed: %s", e)
+
+            # Layout bias (filter to measured slides; bias uses 1-based)
+            try:
+                from sdpm.preview import check_layout_imbalance_data
+                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in page_set]
+                if layout_bias:
+                    result["warnings"] = {"layoutBias": layout_bias}
+            except Exception as e:
+                logger.warning("Layout bias check failed: %s", e)
+
+            # Invalid-layout errors scoped to measured slugs only. Each
+            # composer owns a subset of slides, so leaking another group's
+            # mistake would be noise (they cannot fix it anyway).
+            measured_set = set(measure_slides or [])
+            my_invalids = [e for e in invalid_layouts if e.get("slug") in measured_set]
+            if my_invalids:
+                errs = result.setdefault("errors", {})
+                for e in my_invalids:
+                    errs[e["slug"]] = {
+                        "invalidLayout": e["attempted"],
+                        "available": e["available"],
+                    }
 
             if save:
                 # Compose: SVG → optimized JSON for WebUI animation
-                # Runs synchronously — measured at ~300ms for 8 slides (≪3s threshold)
+                # Only generates compose for measure_slides slugs (parallel-safe).
+                # Uses _prepare_epoch (snapshot time) so the composer with the
+                # newest slides/ snapshot wins on defs via epoch comparison.
                 try:
-                    from tools.compose import extract_optimized_defs, split_slide_components, count_slides
+                    from tools.compose import extract_optimized_defs, split_slide_components
                     import hashlib as _hashlib
                     svg_path = tmpdir / "measure.svg"
                     if not svg_path.exists():
                         _export_svg(tmpdir, pptx_path)
                     if svg_path.exists():
                         import json as _json
-                        import time as _time
-                        _epoch = int(_time.time())
+                        import re as _re
                         compose_prefix = f"decks/{deck_id}/compose/"
 
-                        # 1. List old compose keys (for cleanup + prev data)
+                        # List existing compose keys (for prev data + cleanup)
                         old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
 
-                        # 2. Load previous slide compose data keyed by sourceHash + slot number
-                        prev_by_hash: dict[str, list[dict]] = {}
-                        prev_by_slot: list[list[dict]] = []  # ordered by slide number
-                        prev_slot_map: dict[int, list[dict]] = {}
-                        import re as _re
-                        for k in old_keys:
-                            if "/slide_" not in k:
-                                continue
-                            try:
-                                raw = _storage.download_file_from_pptx_bucket(k)
-                                prev_data = _json.loads(raw)
-                                comps = prev_data.get("components", [])
-                                h = prev_data.get("sourceHash")
-                                if h:
-                                    prev_by_hash[h] = comps
-                                # Extract slot number from key: slide_{N}_{epoch}.json
-                                m = _re.search(r"/slide_(\d+)_", k)
-                                if m:
-                                    prev_slot_map[int(m.group(1))] = comps
-                            except Exception:
-                                pass
-                        # Build ordered list
-                        if prev_slot_map:
-                            max_slot = max(prev_slot_map.keys())
-                            prev_by_slot = [prev_slot_map.get(i, []) for i in range(1, max_slot + 1)]
+                        def _latest_key(prefix: str) -> str | None:
+                            best_ep, best_k = -1, None
+                            for k in old_keys:
+                                if not k.startswith(prefix):
+                                    continue
+                                m = _re.search(r"_(\d+)\.json$", k)
+                                ep = int(m.group(1)) if m else 0
+                                if ep > best_ep:
+                                    best_ep, best_k = ep, k
+                            return best_k
 
-                        # 3. Upload defs
+                        # Component-level diff helpers
+                        def _mk(c: dict) -> str:
+                            b = c.get("bbox")
+                            return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
+
+                        def _fp(c: dict) -> str:
+                            return f"{c['class']}|{c.get('text', '')}"
+
+                        # Determine which slugs to generate compose for
+                        # Always include slugs that have no existing compose (migration + first build)
+                        compose_slugs = set(measure_slides) if measure_slides else set(slug_to_page.keys())
+                        for s in slug_to_page:
+                            if not _latest_key(f"{compose_prefix}{s}_"):
+                                compose_slugs.add(s)
+
+                        # Upload defs (prepare epoch — newest snapshot wins)
                         defs_data = extract_optimized_defs(svg_path)
                         _storage.upload_file(
-                            key=f"{compose_prefix}defs_{_epoch}.json",
+                            key=f"{compose_prefix}defs_{_prepare_epoch}.json",
                             data=_json.dumps(defs_data, ensure_ascii=False).encode(),
                             content_type="application/json",
                         )
+                        # Cleanup old defs (only delete defs older than our epoch)
+                        # Also remove legacy slide_{N}_*.json files
+                        for k in old_keys:
+                            if "/defs_" in k:
+                                m = _re.search(r"_(\d+)\.json$", k)
+                                if m and int(m.group(1)) < _prepare_epoch:
+                                    try:
+                                        _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                                    except Exception:
+                                        pass
+                            elif _re.search(r"/slide_\d+_\d+\.json$", k):
+                                try:
+                                    _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                                except Exception:
+                                    pass
 
-                        # 4. Generate compose for all slides with changed flags
-                        _total = count_slides(svg_path)
-                        for sn in range(1, _total + 1):
+                        # Generate compose for each measured slug
+                        for slug in compose_slugs:
+                            if slug in invalid_slug_set:
+                                # Do not surface a fallback-rendered slide as a
+                                # live-preview artifact. The composer for this
+                                # slug will see the error and fix the layout.
+                                continue
+                            pn = slug_to_page.get(slug)
+                            if not pn:
+                                continue
                             try:
-                                comp_data = split_slide_components(svg_path, sn)
-                                # sourceHash from slide JSON
-                                src_hash = ""
-                                if sn <= len(slides):
-                                    src_hash = _hashlib.md5(_json.dumps(slides[sn - 1], sort_keys=True, ensure_ascii=False).encode(), usedforsecurity=False).hexdigest()
+                                comp_data = split_slide_components(svg_path, pn)
+
+                                # sourceHash from slide JSON (content-based diff)
+                                src_hash = _hashlib.md5(
+                                    _json.dumps(slides[pn - 1], sort_keys=True, ensure_ascii=False).encode(),
+                                    usedforsecurity=False,
+                                ).hexdigest() if pn <= len(slides) else ""
                                 comp_data["sourceHash"] = src_hash
 
-                                # Diff: find prev slide by sourceHash, fallback to same slot number
-                                prev_comps = prev_by_hash.get(src_hash)
-                                if prev_comps is None and sn <= len(prev_by_slot):
-                                    prev_comps = prev_by_slot[sn - 1]
-                                if prev_comps is not None:
-                                    # Component-level diff
-                                    def _mk(c: dict) -> str:
-                                        b = c.get("bbox")
-                                        return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
-                                    def _fp(c: dict) -> str:
-                                        return f"{c['class']}|{c.get('text', '')}"
+                                # Diff against previous compose for same slug
+                                prev_key = _latest_key(f"{compose_prefix}{slug}_")
+                                prev_comps = None
+                                prev_hash = None
+                                if prev_key:
+                                    try:
+                                        raw = _storage.download_file_from_pptx_bucket(prev_key)
+                                        prev_data = _json.loads(raw)
+                                        prev_comps = prev_data.get("components")
+                                        prev_hash = prev_data.get("sourceHash")
+                                    except Exception:
+                                        pass
+
+                                # If sourceHash unchanged, all components are unchanged
+                                if prev_comps is not None and prev_hash == src_hash and src_hash:
+                                    for c in comp_data["components"]:
+                                        c["changed"] = False
+                                elif prev_comps is not None:
                                     prev_map = {_mk(c): _fp(c) for c in prev_comps}
                                     for c in comp_data["components"]:
                                         k = _mk(c)
@@ -870,29 +843,63 @@ def run_python(code: str, deck_id: str | None = None, save: bool = False,
                                         c["changed"] = True
 
                                 _storage.upload_file(
-                                    key=f"{compose_prefix}slide_{sn}_{_epoch}.json",
+                                    key=f"{compose_prefix}{slug}_{_prepare_epoch}.json",
                                     data=_json.dumps(comp_data, ensure_ascii=False).encode(),
                                     content_type="application/json",
                                 )
-                            except Exception:
-                                logger.error("compose failed for slide %d", sn, exc_info=True)
 
-                        # 5. Cleanup old compose files
-                        for k in old_keys:
-                            try:
-                                _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                                # Cleanup old compose for this slug only
+                                for k in old_keys:
+                                    if k.startswith(f"{compose_prefix}{slug}_") and not k.endswith(f"{slug}_{_prepare_epoch}.json"):
+                                        try:
+                                            _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                                        except Exception:
+                                            pass
                             except Exception:
-                                pass
+                                logger.error("compose failed for slug %s", slug, exc_info=True)
                 except Exception:
                     logger.error("compose failed", exc_info=True)
+
+                # Preview: sync WebP generation so composer can immediately view
+                # via get_preview(slugs=[...]) — lowers the barrier from a
+                # 2-step (generate_pptx → get_preview) to 1-step feedback loop.
+                if measure_slides:
+                    try:
+                        from tools.generate import generate_previews
+                        preview_dir = tmpdir / "preview_out"
+                        preview_dir.mkdir(exist_ok=True)
+                        webp_files = generate_previews(pptx_path, preview_dir)
+                        uploaded = []
+                        for slug in measure_slides:
+                            page = slug_to_page.get(slug)
+                            if page and page <= len(webp_files):
+                                _storage.upload_file(
+                                    key=f"previews/{deck_id}/{slug}_{_prepare_epoch}.webp",
+                                    data=webp_files[page - 1].read_bytes(),
+                                    content_type="image/webp",
+                                )
+                                uploaded.append(slug)
+                        if uploaded:
+                            result["previewHint"] = (
+                                f"Preview images generated for {', '.join(uploaded)}. "
+                                f"Call get_preview(deck_id=\"{deck_id}\", slugs=[...]) to view."
+                            )
+                    except Exception:
+                        logger.warning("preview generation failed", exc_info=True)
 
                 # tmpdir cleanup (WebP generation only in generate_pptx)
                 shutil.rmtree(tmpdir, ignore_errors=True)
             else:
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as e:
-            logger.exception("run_python post-processing failed: deck=%s", deck_id)
-            result["measure"] = json.dumps({"error": str(e), "traceback": traceback.format_exc()})
+            msg = str(e)
+            # "No slides found" is expected during early phases (outline/brief
+            # editing before any slide JSON exists). Silently skip measure.
+            if "No slides found" in msg or "has no slides" in msg:
+                pass
+            else:
+                logger.exception("run_python post-processing failed: deck=%s", deck_id)
+                result["measure"] = json.dumps({"error": msg, "traceback": traceback.format_exc()})
 
     return json.dumps(result, ensure_ascii=False)
 

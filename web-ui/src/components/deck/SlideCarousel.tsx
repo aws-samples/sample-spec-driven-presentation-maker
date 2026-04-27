@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * SlideCarousel — Vertical scroll layout for slide PNG previews with spec step navigation.
- * Shows all slides stacked vertically with PPTX and JSON download links.
+ * Shows all slides stacked vertically with PPTX download and folder open links.
  * Features a polished loading animation during PPTX generation.
  * Integrates SpecStepNav for viewing brief/outline/art-direction content.
  */
@@ -10,15 +10,17 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { SlidePreview, getDeckWithJson } from "@/services/deckService"
+import { SlidePreview } from "@/services/deckService"
 import type { SpecFiles } from "@/services/deckService"
-import { Download, FileJson, Layers, Loader2, LayoutGrid, Rows3 } from "lucide-react"
-import { useAuth } from "react-oidc-context"
+import { Download, Layers, Loader2, LayoutGrid, Rows3, FolderOpen } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
+import { CloudOnly, LocalOnly, IS_LOCAL } from "@/lib/mode"
+
 
 interface SlideCarouselProps {
   slides: SlidePreview[]
@@ -48,15 +50,30 @@ interface SlideCarouselProps {
 
 export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, idToken }: SlideCarouselProps) {
   const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
+  // eslint-disable-next-line no-console
+  const slugs = slides.map(s => s.slug)
+  // eslint-disable-next-line no-console
+  if (new Set(slugs).size !== slugs.length) console.warn("[SlideCarousel] duplicate slugs:", slugs)
+  // Check compose URL duplicates across different slugs
+  // eslint-disable-next-line no-console
+  const urlBySlug: Record<string,string> = {}
+  const dupUrls: string[] = []
+  for (const s of slidesWithPreview) {
+    const u = s.composeUrl?.split("?")[0] || ""
+    if (u && Object.values(urlBySlug).includes(u)) dupUrls.push(`${s.slug}→${u}`)
+    if (u) urlBySlug[s.slug] = u
+  }
+  // eslint-disable-next-line no-console
+  if (dupUrls.length) console.warn("[SlideCarousel] same composeUrl used for multiple slides:", dupUrls, urlBySlug)
+  // eslint-disable-next-line no-console
+  console.log("[SlideCarousel] slug→url:", slidesWithPreview.map(s => `${s.slug}: ${s.composeUrl?.split("/").pop()?.split("?")[0]}`))
   const auth = useAuth()
-  const [jsonLoading, setJsonLoading] = useState(false)
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
 
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
   const scrollTargetRef = useRef<string | null | undefined>(undefined)
-  // If deck opened with slides → existing deck → first compose is instant
   const hadSlidesOnMount = useRef(slides.length > 0)
   const firstComposeSeenRef = useRef(false)
 
@@ -64,10 +81,10 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     let anyChanged = false
     for (const slide of slides) {
       const key = slide.composeUrl?.split("?")[0] || ""
-      const prev = prevComposeKeys.current.get(slide.slideId) || ""
+      const prev = prevComposeKeys.current.get(slide.slug) || ""
       if (key && prev && key !== prev) anyChanged = true
       if (key && !prev && firstComposeSeenRef.current) anyChanged = true
-      if (key) prevComposeKeys.current.set(slide.slideId, key)
+      if (key) prevComposeKeys.current.set(slide.slug, key)
     }
     // Mark first compose seen (skip animation for existing decks)
     if (!firstComposeSeenRef.current && slides.some(s => s.composeUrl)) {
@@ -80,10 +97,10 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     if (anyChanged) scrollTargetRef.current = null // arm scroll for next onAnimate
   }, [slides])
 
-  const handleAnimate = useCallback((slideId: string) => {
+  const handleAnimate = useCallback((slug: string) => {
     if (scrollTargetRef.current === null && containerRef.current) {
-      scrollTargetRef.current = slideId
-      const el = containerRef.current.querySelector(`[data-slide-id="${slideId}"]`)
+      scrollTargetRef.current = slug
+      const el = containerRef.current.querySelector(`[data-slide-id="${slug}"]`)
       if (el) {
         const container = containerRef.current
         const elRect = el.getBoundingClientRect()
@@ -102,11 +119,11 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     const newUpdated = new Set<string>()
     for (const slide of slides) {
       const newKey = slide.previewUrl?.split("?")[0] || ""
-      const prevKey = prevUrlKeys.current.get(slide.slideId) || ""
+      const prevKey = prevUrlKeys.current.get(slide.slug) || ""
       if (prevKey && newKey && newKey !== prevKey) {
-        newUpdated.add(slide.slideId)
+        newUpdated.add(slide.slug)
       }
-      if (newKey) prevUrlKeys.current.set(slide.slideId, newKey)
+      if (newKey) prevUrlKeys.current.set(slide.slug, newKey)
     }
     if (newUpdated.size > 0) {
       setUpdatedIds(newUpdated)
@@ -118,6 +135,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /* ── Spec tab state + auto-focus ── */
   const [specTab, setSpecTab] = useState<SpecTab>("brief")
   const prevSpecsRef = useRef<SpecFiles | null | undefined>(null)
+  // Suppress animation for 3s after slides tab becomes visible
+  const [settled, setSettled] = useState(false)
+  useEffect(() => {
+    if (specTab !== "slides") { setSettled(false); return }
+    const t = setTimeout(() => setSettled(true), 3000)
+    return () => clearTimeout(t)
+  }, [specTab])
 
   /**
    * Auto-focus: when a spec file transitions from null to non-null,
@@ -166,30 +190,16 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     }
   }, [scrollToSlide, slidesWithPreview.length, onScrollComplete])
 
-  /**
-   * Fetch slideJson on demand and trigger download.
-   */
-  async function handleJsonDownload() {
-    if (!deckId || !auth.user?.id_token) return
-    setJsonLoading(true)
-    try {
-      const data = await getDeckWithJson(deckId, auth.user.id_token)
-      const jsonSlides = data.slides
-        .filter((s) => s.slideJson)
-        .map((s) => {
-          try { return JSON.parse(s.slideJson!) } catch { return s.slideJson }
-        })
-      if (jsonSlides.length === 0) return
-      const blob = new Blob([JSON.stringify(jsonSlides, null, 2)], { type: "application/json" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `${deckName || "deck"}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-    } finally {
-      setJsonLoading(false)
-    }
+  /** Local: open deck directory in Finder/Explorer */
+  async function handleFolderOpen() {
+    if (!deckId || !IS_LOCAL) return
+    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch(() => {})
+  }
+
+  /** Local: open output.pptx with default app */
+  async function handlePptxOpen() {
+    if (!deckId || !IS_LOCAL) return
+    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch(() => {})
   }
 
   /**
@@ -319,13 +329,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
             {slidesWithPreview.map((slide, i) => (
               <SlideThumbnail
-                key={slide.slideId}
+                key={slide.slug}
                 src={slide.previewUrl}
                 alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
                 index={i}
-                slideId={slide.slideId}
+                slug={slide.slug}
                 onClick={() => onSlideClick?.(i + 1)}
-                updated={updatedIds.has(slide.slideId)}
+                updated={updatedIds.has(slide.slug)}
                 className="border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 cursor-pointer group"
               >
 
@@ -339,18 +349,18 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
           slidesWithPreview.map((slide, i) => (
             slide.composeUrl && defsUrl ? (
               <AnimatedSlidePreview
-                key={slide.slideId}
+                key={slide.slug}
                 defsUrl={defsUrl}
                 composeUrl={slide.composeUrl}
-                slideId={slide.slideId}
-                skipAnimation={hadSlidesOnMount.current && !firstComposeSeenRef.current}
-                onAnimate={() => handleAnimate(slide.slideId)}
+                slug={slide.slug}
+                skipAnimation={!settled || (hadSlidesOnMount.current && !firstComposeSeenRef.current)}
+                onAnimate={() => handleAnimate(slide.slug)}
                 fallback={
                   <SlideThumbnail
                     src={slide.previewUrl}
                     alt={`Slide ${i + 1}`}
                     index={i}
-                    slideId={slide.slideId}
+                    slug={slide.slug}
                     onClick={() => onSlideClick?.(i + 1)}
                     className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
                   />
@@ -358,13 +368,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
               />
             ) : (
               <SlideThumbnail
-                key={slide.slideId}
+                key={slide.slug}
                 src={slide.previewUrl}
                 alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
                 index={i}
-                slideId={slide.slideId}
+                slug={slide.slug}
                 onClick={() => onSlideClick?.(i + 1)}
-                updated={updatedIds.has(slide.slideId)}
+                updated={updatedIds.has(slide.slug)}
                 className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
               />
             )
@@ -417,27 +427,37 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 <LayoutGrid className="h-3.5 w-3.5" />
               </button>
             </div>
-            {deckId && (
+            {IS_LOCAL && deckId && (
               <button
-                onClick={handleJsonDownload}
-                disabled={jsonLoading}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors disabled:opacity-50"
-                aria-label="Download JSON"
+                onClick={handleFolderOpen}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
+                aria-label="Open folder"
               >
-                {jsonLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileJson className="h-3.5 w-3.5" />}
-                JSON
+                <FolderOpen className="h-3.5 w-3.5" />
+                Folder
               </button>
             )}
             {pptxUrl && (
-              <a
-                href={pptxUrl}
-                download
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground no-underline px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
-                aria-label="Download PPTX"
-              >
-                <Download className="h-3.5 w-3.5" />
-                PPTX
-              </a>
+              IS_LOCAL ? (
+                <button
+                  onClick={handlePptxOpen}
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
+                  aria-label="Open PPTX"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  PPTX
+                </button>
+              ) : (
+                <a
+                  href={pptxUrl}
+                  download
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground no-underline px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
+                  aria-label="Download PPTX"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  PPTX
+                </a>
+              )
             )}
           </div>
         </div>

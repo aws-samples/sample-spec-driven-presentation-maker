@@ -34,6 +34,7 @@ WAF_IPV4=""
 WAF_IPV6=""
 CDK_COMMAND="deploy"
 PROJECT_NAME="sdpm-deploy"
+STACK=""
 
 # ---- Load defaults from infra/config.yaml if present ----
 # CLI arguments below will override these values.
@@ -78,6 +79,8 @@ Options:
   --waf-ipv6 CIDRS         Comma-separated IPv6 CIDR ranges for WAF
 
   --destroy                Destroy all stacks
+  --stack ARGS             CDK stack selector/flags (e.g. "SdpmRuntime --exclusively")
+                           Default: --all
 
   -h, --help               Show this help
 EOF
@@ -97,6 +100,7 @@ while [[ $# -gt 0 ]]; do
     --waf-ipv4)       WAF_IPV4="$2"; shift 2 ;;
     --waf-ipv6)       WAF_IPV6="$2"; shift 2 ;;
     --destroy)        CDK_COMMAND="destroy"; shift ;;
+    --stack)          STACK="$2"; shift 2 ;;
     -h|--help)        usage ;;
     *)                echo "Unknown option: $1"; usage ;;
   esac
@@ -244,7 +248,8 @@ ENV_VARS_JSON=$(cat <<EOF
   {"name":"AUTH_ALLOWED_CLIENTS",  "value":"${ALLOWED_CLIENTS}",   "type":"PLAINTEXT"},
   {"name":"WAF_IPV4",              "value":"${WAF_IPV4}",          "type":"PLAINTEXT"},
   {"name":"WAF_IPV6",              "value":"${WAF_IPV6}",          "type":"PLAINTEXT"},
-  {"name":"CDK_COMMAND",           "value":"${CDK_COMMAND}",       "type":"PLAINTEXT"}
+  {"name":"CDK_COMMAND",           "value":"${CDK_COMMAND}",       "type":"PLAINTEXT"},
+  {"name":"STACK",                 "value":"${STACK}",             "type":"PLAINTEXT"}
 ]
 EOF
 )

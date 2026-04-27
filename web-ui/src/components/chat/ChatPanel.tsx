@@ -15,9 +15,10 @@
 
 "use client"
 
-import { useEffect, useRef, useState, useImperativeHandle, forwardRef, FormEvent, KeyboardEvent, useCallback } from "react"
-import { useAuth } from "react-oidc-context"
-import { invokeAgentCore, generateSessionId, setAgentConfig } from "@/services/agentCoreService"
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef, FormEvent, KeyboardEvent, useCallback, useMemo } from "react"
+import { useAuth } from "@/hooks/useAuth"
+import { IS_LOCAL } from "@/lib/mode"
+import { invokeAgentCore, generateSessionId, setAgentConfig, stopRuntimeSession } from "@/services/agentCoreService"
 import { getChatHistory, listDecks, patchDeck, DeckSummary } from "@/services/deckService"
 import { uploadFile, validateFile, canAddMoreFiles, UploadedFile } from "@/services/uploadService"
 import { useCompositionSafe } from "@/hooks/useCompositionSafe"
@@ -31,6 +32,7 @@ import { FileDropZone } from "./FileDropZone"
 import { SnippetInput } from "./SnippetInput"
 import { useIsMobile } from "@/hooks/UseMobile"
 import { Send, Square, ChevronRight } from "lucide-react"
+import { ModeSelector } from "./ModeSelector"
 import { usePreferences } from "@/hooks/usePreferences"
 import { toast } from "sonner"
 
@@ -52,6 +54,9 @@ interface ToolUseCallbackData {
   status?: "success" | "error"
   result?: Record<string, unknown>
   input?: Record<string, unknown>
+  /** Tool streaming progress event. */
+  stream?: boolean
+  data?: Record<string, unknown>
 }
 
 interface ChatPanelProps {
@@ -59,6 +64,8 @@ interface ChatPanelProps {
   deckName?: string
   chatSessionId?: string
   slidePreviewUrls?: (string | null)[]
+  /** Current deck slide IDs — forwarded to ComposeCard for slug existence rendering. */
+  slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
@@ -69,7 +76,7 @@ export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slidePreviewUrls, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -101,11 +108,26 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const mentionPopupRef = useRef<{ _handleKeyDown?: (e: KeyboardEvent) => boolean } | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+  const currentDeckId = useRef(deckId)
+  currentDeckId.current = deckId
   const auth = useAuth()
   const { onCompositionStart, onCompositionEnd, getIsComposing } = useCompositionSafe()
   const isMobile = useIsMobile()
-  const { fetchWebImages, setFetchWebImages } = usePreferences()
+  const { fetchWebImages, setFetchWebImages, parallelAgents, setParallelAgents, agentMode, setAgentMode } = usePreferences()
   const [optionsOpen, setOptionsOpen] = useState(false)
+
+  /** Persist chat messages to disk (Local mode only, no-op otherwise). */
+  const saveLocalChat = useCallback((overrideDeckId?: string) => {
+    const did = overrideDeckId || currentDeckId.current
+    if (!IS_LOCAL || !did) return
+    fetch("/api/agent/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deckId: did, messages: messagesRef.current }),
+    }).catch(() => {})
+  }, [])
 
   /**
    * Insert text at the current cursor position in the textarea.
@@ -129,13 +151,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     },
   }), [input])
 
-  // Load agent config
+  // Load agent config (cloud only — local mode uses API routes)
   useEffect(() => {
+    if (IS_LOCAL) { setConfigLoaded(true); return }
     async function loadConfig() {
       try {
         const response = await fetch("/aws-exports.json")
         const config = await response.json()
-        await setAgentConfig(config.agentRuntimeArn, config.awsRegion || "us-east-1", config.agentPattern)
+        await setAgentConfig(config.agentRuntimeArn, config.awsRegion || "us-east-1")
         setConfigLoaded(true)
       } catch (err) {
         console.error("Failed to load agent config:", err)
@@ -148,10 +171,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   useEffect(() => {
     async function loadHistory() {
       const idToken = auth.user?.id_token
-      if (!idToken || !sessionId) return
+      if (!IS_LOCAL && !idToken) return
+      if (!sessionId) return
       setHistoryLoading(true)
       try {
-      const history = await getChatHistory(sessionId, idToken)
+      const history = await getChatHistory(sessionId, idToken, deckId || undefined)
       if (history.length > 0) {
         const parsed: typeof messages = []
         for (const m of history) {
@@ -228,7 +252,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   toolUseId: (tu.toolUseId as string) || "",
                   name: (tu.name as string) || "",
                   input: (tu.input as Record<string, unknown>) || {},
-                  status: "success",
                 }})
               }
             }
@@ -425,7 +448,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     const idToken = auth.user?.id_token
     const accessToken = auth.user?.access_token
     const userId = auth.user?.profile?.sub
-    if (!accessToken || !userId || !idToken) return
+    if (!IS_LOCAL && (!accessToken || !userId || !idToken)) return
 
     // Upload pending attachments
     const uploadedFiles: UploadedFile[] = []
@@ -435,7 +458,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           setAttachments((prev) =>
             prev.map((a) => (a.id === att.id ? { ...a, status: "uploading" as const } : a)),
           )
-          const result = await uploadFile(att.file, idToken, sessionId, deckId !== "new" ? deckId : undefined)
+          const result = await uploadFile(att.file, idToken ?? "", sessionId, deckId !== "new" ? deckId : undefined)
           uploadedFiles.push(result)
           setAttachments((prev) =>
             prev.map((a) => (a.id === att.id ? { ...a, status: "completed" as const, uploadId: result.uploadId } : a)),
@@ -562,7 +585,55 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             return
           }
 
+          // Tool stream event — append progress to existing tool
+          if (toolUseData?.stream && toolUseData?.toolUseId) {
+            const d = toolUseData.data || {}
+            setMessages((prev) => {
+              const updated = [...prev]
+              const last = updated[updated.length - 1]
+              const idx = last.toolUses.findIndex((t) => t.toolUseId === toolUseData.toolUseId)
+              if (idx < 0) return prev
+              const newToolUses = [...last.toolUses]
+              const existing = newToolUses[idx].streamMessages || []
+
+              let next: typeof existing
+              if (d.toolResult) {
+                // Tool completed — update existing entry's status
+                next = existing.map((e) =>
+                  typeof e === "object" && e.toolUseId === d.toolResult
+                    ? { ...e, status: d.toolStatus || "success" }
+                    : e
+                )
+              } else if (d.tool) {
+                // New sub-tool started (or update with input from hook)
+                const existingIdx = existing.findIndex((e) => typeof e === "object" && e.toolUseId === d.toolUseId)
+                if (existingIdx >= 0 && d.input) {
+                  next = existing.map((e, idx) => idx === existingIdx ? { ...e, input: d.input } : e)
+                } else if (existingIdx < 0) {
+                  next = [...existing, { tool: d.tool, group: d.group, slugs: d.slugs, toolUseId: d.toolUseId, input: d.input }]
+                } else {
+                  return prev
+                }
+              } else if (d.status) {
+                // Group status event
+                next = [...existing, { status: d.status, group: d.group, slugs: d.slugs, total_groups: d.total_groups, done: d.done, total: d.total, summary: d.summary, message: d.message, attempt: d.attempt, error: d.error }]
+              } else {
+                return prev
+              }
+
+              newToolUses[idx] = { ...newToolUses[idx], streamMessages: next }
+              const toolMap = new Map(newToolUses.map((t) => [t.toolUseId, t]))
+              const blocks = rebuildBlocks(lastTextSnapshot, toolMap)
+              updated[updated.length - 1] = { ...last, toolUses: newToolUses, blocks }
+              return updated
+            })
+            return
+          }
+
           // Tool result (completed) — detect deckId from any tool's result
+          if (toolUseData?.completed) {
+            console.log("[chat] tool completed:", toolName, "result keys:", Object.keys(toolUseData.result || {}), "deckId:", toolUseData.result?.deckId)
+          }
           if (toolUseData?.completed && toolUseData?.result?.deckId && onDeckCreated) {
             // Link chat session to deck for history restore
             const resultDeckId = String(toolUseData.result.deckId)
@@ -570,6 +641,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               patchDeck(resultDeckId, { chatSessionId: sessionId }, idToken).catch(() => {})
             }
             onDeckCreated(resultDeckId)
+            // Save chat history so far (hearing messages before deck existed)
+            saveLocalChat(resultDeckId)
           }
           if (toolUseData?.completed && (toolName === "generate_pptx" || toolName.endsWith("_generate_pptx")) && onPreviewInvalidated) {
             onPreviewInvalidated()
@@ -608,6 +681,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             else if (first.includes("art-direction")) onWorkflowPhase("artDirection")
             else if (first.includes("compose")) onWorkflowPhase("slides")
           }
+          if (onWorkflowPhase && (toolName === "compose_slides" || toolName.endsWith("_compose_slides"))) {
+            onWorkflowPhase("slides")
+            // Save chat before long-running compose (survives browser close)
+            saveLocalChat()
+          }
 
           // Record position only on first encounter
           if (!toolPositions.has(toolUse.toolUseId)) {
@@ -632,6 +710,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           })
         },
         controller.signal,
+        agentMode === "vibe" ? "vibe" : (parallelAgents ? "separated" : "single"),
       )
     } catch (err) {
       // AbortError is expected when user clicks stop — don't show error
@@ -650,17 +729,38 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     } finally {
       abortControllerRef.current = null
       setIsLoading(false)
+      // Save chat messages to disk in local mode
+      saveLocalChat()
     }
   }
 
   /**
    * Stop the current streaming response.
-   * Aborts the fetch connection; the server will stop at the next safe point
-   * when a new request arrives for the same session.
+   * Aborts the fetch connection and calls StopRuntimeSession to immediately
+   * terminate the AgentCore Runtime session (including all ThreadPool-based
+   * composer agents inside the container).
    */
   const handleStop = () => {
     abortControllerRef.current?.abort()
+    if (IS_LOCAL) {
+      fetch("/api/agent/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {})
+    } else {
+      const token = auth.user?.access_token
+      if (token) stopRuntimeSession(sessionId, token)
+    }
   }
+
+  // Track whether compose_slides is the active in-flight tool — used only to
+  // reshape the Stop tooltip. The button itself stays enabled so the user
+  // always has a final-resort force stop.
+  const composeInFlight = useMemo(() => {
+    if (!isLoading) return false
+    const last = messages[messages.length - 1]
+    if (!last || last.role !== "assistant") return false
+    const lastTool = last.toolUses[last.toolUses.length - 1]
+    if (!lastTool || lastTool.status) return false
+    return lastTool.name === "compose_slides" || lastTool.name.endsWith("_compose_slides")
+  }, [isLoading, messages])
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -764,14 +864,15 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               ))}
             </div>
           ) : isInitial ? (
-            <div className="h-full flex flex-col items-center justify-center text-center">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-brand-teal-soft mb-4">
-                <Send className="h-4 w-4 text-brand-teal" />
+            <div className="h-full flex flex-col items-center justify-center text-center px-4">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-teal-soft mb-5">
+                <Send className="h-5 w-5 text-brand-teal" />
               </div>
-              <h2 className="text-[14px] font-semibold tracking-[-0.01em] mb-1">{deckName || "New Deck"}</h2>
-              <p className="text-[12px] text-foreground-muted leading-relaxed">
-                Describe the presentation you want to create.
+              <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-1">Let&apos;s present</h2>
+              <p className="text-[13px] text-foreground-muted leading-relaxed mb-8">
+                Drop a URL, paste notes, or describe your idea
               </p>
+              {parallelAgents && <ModeSelector value={agentMode} onChange={setAgentMode} />}
             </div>
           ) : (
             <div className="space-y-4">
@@ -793,6 +894,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     attachments={msg.attachments}
                     isStreaming={isLoading && i === messages.length - 1}
                     idToken={auth.user?.id_token}
+                    accessToken={auth.user?.access_token}
+                    deckSlugs={slideSlugs}
+                    sessionId={sessionId}
                     onSend={handleSend}
                     hearingDisabled={i < lastUserIdx}
                   />
@@ -818,29 +922,75 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             />
 
             {/* Options expander */}
+            {!IS_LOCAL && (
             <div className="px-2">
               <button
                 type="button"
                 onClick={() => setOptionsOpen((v) => !v)}
                 className="flex items-center gap-1 text-[11px] text-foreground-muted hover:text-foreground transition-colors py-1"
               >
-                <ChevronRight className={`h-3 w-3 transition-transform ${optionsOpen ? "rotate-90" : ""}`} />
+                <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${optionsOpen ? "rotate-90" : ""}`} />
                 Options
               </button>
               {optionsOpen && (
-                <label className="flex items-center gap-2 pb-1.5 pl-4 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={fetchWebImages}
-                    onChange={(e) => setFetchWebImages(e.target.checked)}
-                    className="accent-[var(--color-brand-teal)] h-3.5 w-3.5"
-                  />
-                  <span className="text-[11px] text-foreground-muted select-none">
-                    Fetch images from websites (may be used in presentations)
-                  </span>
-                </label>
+                <div className="flex flex-col gap-2 pb-2 pl-1">
+                  {/* Toggle: Fetch web images — Cloud only */}
+                  {!IS_LOCAL && (
+                  <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
+                    bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-[12px] text-foreground-secondary font-medium select-none">Fetch web images</span>
+                      <span className="text-[11px] text-foreground-muted select-none leading-snug">Include images from websites in presentations</span>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={fetchWebImages}
+                      onClick={() => setFetchWebImages(!fetchWebImages)}
+                      className={`relative flex-none w-9 h-5 rounded-full transition-colors duration-200 ${
+                        fetchWebImages ? "bg-brand-teal" : "bg-white/[0.1]"
+                      }`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                        fetchWebImages ? "translate-x-4" : ""
+                      }`} />
+                    </button>
+                  </label>
+                  )}
+
+                  {/* Toggle: Parallel agents (experimental) — Cloud only, Local always uses parallel */}
+                  {!IS_LOCAL && (
+                  <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
+                    bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-[12px] text-foreground-secondary font-medium select-none flex items-center gap-2">
+                        Parallel agents
+                        <span className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[10px] font-semibold tracking-wide
+                          bg-brand-amber-soft text-brand-amber border border-brand-amber/25">
+                          🧪 Experimental
+                        </span>
+                      </span>
+                      <span className="text-[11px] text-foreground-muted select-none leading-snug">Multiple composer agents generate slides in parallel</span>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={parallelAgents}
+                      onClick={() => setParallelAgents(!parallelAgents)}
+                      className={`relative flex-none w-9 h-5 rounded-full transition-colors duration-200 ${
+                        parallelAgents ? "bg-brand-teal" : "bg-white/[0.1]"
+                      }`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                        parallelAgents ? "translate-x-4" : ""
+                      }`} />
+                    </button>
+                  </label>
+                  )}
+                </div>
               )}
             </div>
+            )}
 
             <div className="flex items-end gap-2 px-2 py-2">
               <PlusMenu
@@ -884,8 +1034,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 <button
                   type="button"
                   onClick={handleStop}
+                  title={composeInFlight ? "Force stop — partial report may be lost" : "Stop generation"}
                   className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-white/10 hover:bg-white/20"
-                  aria-label="Stop generation"
+                  aria-label={composeInFlight ? "Force stop generation" : "Stop generation"}
                 >
                   <Square className="h-3 w-3 fill-current" />
                 </button>

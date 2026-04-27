@@ -148,38 +148,33 @@ def _list_preview_keys(deck_id: str) -> set:
     return {obj["Key"] for obj in resp.get("Contents", [])}
 
 
-def _resolve_preview_url(deck_id: str, slide_id: str, preview_keys: set) -> Optional[str]:
+def _resolve_preview_url(deck_id: str, slug: str, preview_keys: set) -> Optional[str]:
     """Resolve the best preview URL for a slide from cached keys.
 
-    Uses build_slide_key_map to pick the latest epoch key.
+    Uses build_slide_key_map to pick the latest epoch key for the given slug.
 
     Args:
         deck_id: Deck identifier.
-        slide_id: Slide identifier (e.g. slide_01).
+        slug: Slide slug (e.g. "intro").
         preview_keys: Set of S3 keys from _list_preview_keys.
 
     Returns:
         Presigned/signed URL or None.
     """
     from shared.preview import build_slide_key_map
-    import re as _re
 
-    m = _re.search(r"(\d+)$", slide_id)
-    if not m:
-        return None
-    num = int(m.group(1))
     key_map = build_slide_key_map(preview_keys)
-    key = key_map.get(num)
+    key = key_map.get(slug)
     if not key:
         return None
     return preview_url(key)
 
 
 def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
-    """Get thumbnail URLs for deck items.
+    """Get thumbnail URLs for deck items (DDB-only, no S3 fallback).
 
-    Reads presentation.json from S3 only when needed for thumbnail fallback.
-    slideCount comes from DDB (written by generate_pptx).
+    Returns thumbnailUrl from DDB thumbnailS3Key. Decks without a stored key
+    return null so the UI can show a gradient placeholder immediately.
 
     Args:
         deck_items: List of DDB deck records.
@@ -190,17 +185,8 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
     extras: Dict[str, Dict] = {}
     for deck in deck_items:
         deck_id = extract_deck_id(deck["SK"])
-        thumb_url = None
-
         key = deck.get("thumbnailS3Key")
-        if key:
-            thumb_url = preview_url(key)
-        else:
-            # Fallback: first slide preview
-            preview_keys = _list_preview_keys(deck_id)
-            thumb_url = _resolve_preview_url(deck_id, "slide_01", preview_keys)
-
-        extras[deck_id] = {"thumbnailUrl": thumb_url}
+        extras[deck_id] = {"thumbnailUrl": preview_url(key) if key else None}
     return extras
 
 
@@ -406,7 +392,7 @@ def list_public() -> Dict[str, Any]:
 
 @app.get("/decks/<deck_id>")
 def get_deck(deck_id: str) -> Dict[str, Any]:
-    """Get deck details with presigned URLs. Reads slides from S3 presentation.json."""
+    """Get deck details with presigned URLs. Reads slides from S3 (deck.json + slides/*.json)."""
     user_id = get_user_id(app.current_event)
 
     decision = authorize(user_id, deck_id, "read", table)
@@ -416,51 +402,89 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
     deck = decision.deck
     pptx_key = deck.get("pptxS3Key")
 
-    # Read presentation.json from S3
+    # Read slides from S3 (deck.json + slides/*.json format)
     slides = []
     include_json = (app.current_event.get_query_string_value("include") or "") == "slideJson"
+
+    # Collect compose keys for animation (epoch-keyed)
+    compose_keys = set()
     try:
-        pres_key = f"decks/{deck_id}/presentation.json"
-        resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=pres_key)
-        presentation = json.loads(resp["Body"].read())
-        preview_keys = _list_preview_keys(deck_id)
-        # Check compose data existence (defs + per-slide, epoch-keyed like previews)
-        compose_keys = set()
+        for obj in s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/compose/").get("Contents", []):
+            compose_keys.add(obj["Key"])
+    except Exception:
+        pass
+
+    import re as _re
+    def _latest_compose_key(prefix: str, keys: set) -> Optional[str]:
+        """Pick the key with the highest epoch from epoch-keyed compose files."""
+        best_epoch, best_key = -1, None
+        for k in keys:
+            if not k.startswith(prefix):
+                continue
+            m = _re.search(r"_(\d+)\.json$", k)
+            epoch = int(m.group(1)) if m else 0
+            if epoch > best_epoch:
+                best_epoch, best_key = epoch, k
+        return best_key
+
+    defs_key = _latest_compose_key(f"decks/{deck_id}/compose/defs_", compose_keys)
+    has_defs = defs_key is not None
+
+    # outline.md for slug order, then slides/*.json
+    # Canonical implementation: sdpm.api.parse_outline_slugs (not importable in Lambda)
+    slugs = []
+    try:
+        outline_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/specs/outline.md")
+        outline_text = outline_resp["Body"].read().decode("utf-8")
+        slug_re = _re.compile(r"^-\s*\[([a-z0-9-]+)\]\s*")
+        for line in outline_text.splitlines():
+            m = slug_re.match(line)
+            if m:
+                slugs.append(m.group(1))
+    except Exception:
+        pass
+
+    # If no outline slugs, list slides/ directory
+    if not slugs:
+        prefix = f"decks/{deck_id}/slides/"
+        resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
+        for obj in resp.get("Contents", []):
+            name = obj["Key"].rsplit("/", 1)[-1]
+            if name.endswith(".json"):
+                slugs.append(name[:-5])
+
+    # Legacy fallback: presentation.json (pre-slug era, numbered slides)
+    legacy_slides: Optional[list] = None
+    if not slugs:
         try:
-            for obj in s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/compose/").get("Contents", []):
-                compose_keys.add(obj["Key"])
+            pres_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/presentation.json")
+            presentation = json.loads(pres_resp["Body"].read())
+            legacy_slides = presentation.get("slides", [])
+            slugs = [f"slide_{i + 1:02d}" for i in range(len(legacy_slides))]
         except Exception:
             pass
 
-        import re as _re
-        def _latest_compose_key(prefix: str, keys: set) -> Optional[str]:
-            """Pick the key with the highest epoch from epoch-keyed compose files."""
-            best_epoch, best_key = -1, None
-            for k in keys:
-                if not k.startswith(prefix):
-                    continue
-                m = _re.search(r"_(\d+)\.json$", k)
-                epoch = int(m.group(1)) if m else 0
-                if epoch > best_epoch:
-                    best_epoch, best_key = epoch, k
-            return best_key
-
-        defs_key = _latest_compose_key(f"decks/{deck_id}/compose/defs_", compose_keys)
-        has_defs = defs_key is not None
-
-        for i, s in enumerate(presentation.get("slides", [])):
-            sid = f"slide_{i + 1:02d}"
-            slide_preview = _resolve_preview_url(deck_id, sid, preview_keys)
-            slide_entry: Dict[str, Any] = {"slideId": sid, "previewUrl": slide_preview}
-            # Compose URL for animation (epoch-keyed)
+    preview_keys = _list_preview_keys(deck_id)
+    for i, slug in enumerate(slugs):
+        slide_data = None
+        if legacy_slides is not None:
+            slide_data = legacy_slides[i]
+        else:
+            try:
+                slide_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/slides/{slug}.json")
+                slide_data = json.loads(slide_resp["Body"].read())
+            except Exception:
+                continue
+        slide_preview = _resolve_preview_url(deck_id, slug, preview_keys)
+        slide_entry: Dict[str, Any] = {"slug": slug, "previewUrl": slide_preview}
+        compose_key = _latest_compose_key(f"decks/{deck_id}/compose/{slug}_", compose_keys)
+        if not compose_key:
             compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}_", compose_keys)
-            if compose_key:
-                slide_entry["composeUrl"] = preview_url(compose_key)
-            if include_json:
-                slide_entry["slideJson"] = json.dumps(s)
-            slides.append(slide_entry)
-    except Exception:
-        has_defs = False
+        if compose_key:
+            slide_entry["composeUrl"] = preview_url(compose_key)
+        if include_json:
+            slide_entry["slideJson"] = json.dumps(slide_data)
+        slides.append(slide_entry)
 
     # Read spec files from S3 (brief.md, outline.md, art-direction.html/.md)
     specs: Dict[str, Any] = {}
@@ -932,7 +956,11 @@ def _extract_pptx_text(s3_key: str) -> str:
 
 @app.post("/uploads/<upload_id>/process")
 def process_upload(upload_id: str) -> Dict[str, Any]:
-    """Process an uploaded file — extract text for text-based files."""
+    """Process an uploaded file — convert binary files at upload time."""
+    import tempfile
+    from pathlib import Path as _Path
+    from shared.ingest import IMAGE_EXTS, convert_file
+
     user_id = get_user_id(app.current_event)
     body = app.current_event.json_body or {}
     session_id: str = body.get("sessionId", "")
@@ -943,13 +971,16 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
         raise app.not_found()
 
     file_type = item.get("fileType", "")
+    file_name = item.get("fileName", "unknown")
     s3_key = item.get("s3KeyRaw", "")
     update_expr_parts = ["#st = :st", "sessionId = :sid"]
     expr_values: Dict[str, Any] = {":sid": session_id}
     expr_names = {"#st": "status"}
 
     extracted_text = None
-    _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ext = _Path(file_name).suffix.lower()
+
+    # --- Text files: read directly from S3 ---
     if file_type in _TEXT_EXTRACTABLE and s3_key:
         try:
             obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=s3_key)
@@ -959,18 +990,59 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
             expr_values[":st"] = "completed"
         except Exception:
             expr_values[":st"] = "completed"
-    elif file_type == _PPTX_MIME and s3_key:
+
+    # --- Images: no conversion needed ---
+    elif ext in IMAGE_EXTS:
+        expr_values[":st"] = "completed"
+
+    # --- Binary files (PDF/DOCX/XLSX/PPTX): download → convert → upload ---
+    elif ext in (".pdf", ".docx", ".xlsx") and s3_key:
+        converted_prefix = f"uploads/{user_id}/{upload_id}/converted"
         try:
-            extracted_text = _extract_pptx_text(s3_key)
-            if extracted_text:
-                update_expr_parts.append("extractedText = :et")
-                expr_values[":et"] = extracted_text[:50000]
-            expr_values[":st"] = "completed"
-        except Exception:
-            expr_values[":st"] = "completed"
+            with tempfile.TemporaryDirectory() as tmp:
+                tmp_path = _Path(tmp)
+                local_file = tmp_path / file_name
+                output_dir = tmp_path / "converted"
+
+                obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=s3_key)
+                local_file.write_bytes(obj["Body"].read())
+
+                result = convert_file(local_file, output_dir)
+
+                if result.status == "error":
+                    expr_values[":st"] = "error"
+                    update_expr_parts.append("conversionError = :ce")
+                    expr_values[":ce"] = result.error or "Unknown error"
+                else:
+                    if output_dir.exists():
+                        for f in output_dir.rglob("*"):
+                            if f.is_file():
+                                rel = f.relative_to(output_dir)
+                                s3_dest = f"{converted_prefix}/{rel}"
+                                ct = "application/octet-stream"
+                                if f.suffix in (".md", ".txt"):
+                                    ct = "text/markdown"
+                                elif f.suffix == ".json":
+                                    ct = "application/json"
+                                elif f.suffix in (".png", ".jpg", ".jpeg"):
+                                    ct = f"image/{f.suffix.lstrip('.')}"
+                                s3_client.put_object(
+                                    Bucket=BUCKET_NAME, Key=s3_dest,
+                                    Body=f.read_bytes(), ContentType=ct,
+                                )
+
+                    expr_values[":st"] = "converted"
+                    if result.warnings:
+                        update_expr_parts.append("conversionWarnings = :cw")
+                        expr_values[":cw"] = result.warnings
+
+        except Exception as e:
+            logger.exception("Conversion failed for %s", upload_id)
+            expr_values[":st"] = "error"
+            update_expr_parts.append("conversionError = :ce")
+            expr_values[":ce"] = str(e)[:500]
+
     else:
-        # Binary files (PDF, DOCX, PPTX, images): mark completed,
-        # agent reads directly from S3 via presigned URL or further processing
         expr_values[":st"] = "completed"
 
     table.update_item(

@@ -1,0 +1,746 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+"""ACP-specific MCP server entry point (thick version).
+
+Extends the base server.py with tools needed for the desktop app (ACP bridge):
+- run_python: subprocess execution + PPTX build + preview + SVG compose
+- list_styles override: no browser opening
+
+Usage:
+    uv run python server_acp.py
+    # or in .kiro/agents/*.json: {"command": "uv", "args": ["run", "--directory", "mcp-local", "python", "server_acp.py"]}
+"""
+
+import json
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+# Import the base server — registers all standard tools on `mcp`
+from server import mcp, _SKILL_DIR  # noqa: F401
+from tools import (  # noqa: E402
+    generate_pptx as _generate_pptx,
+    preview as _preview,
+    measure as _measure,
+)
+
+# ---------------------------------------------------------------------------
+# Override instructions for ACP (desktop app) usage
+# ---------------------------------------------------------------------------
+# ACP agents get all instructions from .kiro/agents/*.json prompts.
+# MCP server instructions are cleared to avoid conflicts (e.g. vibe mode
+# seeing "read workflows" instructions meant for spec mode).
+mcp._mcp_server.instructions = ""
+
+# ---------------------------------------------------------------------------
+# Override list_styles: no browser opening in ACP mode
+# ---------------------------------------------------------------------------
+# Remove the base version and re-register without open_styles_gallery
+mcp._tool_manager._tools.pop("list_styles", None)
+
+
+@mcp.tool()
+def list_styles() -> str:
+    """List available design styles for presentations.
+
+    Returns:
+        JSON with list of styles (name + description).
+    """
+    from sdpm.reference import list_styles as _list_styles
+    styles_dir = _SKILL_DIR / "references" / "examples" / "styles"
+    return json.dumps({"styles": _list_styles(styles_dir)}, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
+# Override tools to match mcp-server (Web) signatures for subagent-branch parity.
+# ACP uses deck_id = filesystem path (vs Web's UUID).
+# ---------------------------------------------------------------------------
+for _name in ("generate_pptx", "get_preview", "code_to_slide", "analyze_template"):
+    mcp._tool_manager._tools.pop(_name, None)
+
+
+@mcp.tool()
+def generate_pptx(deck_id: str) -> str:
+    """Generate PPTX from deck workspace (deck.json + slides/*.json + outline.md).
+
+    Args:
+        deck_id: Deck directory path.
+
+    Returns:
+        JSON with output_path and slide summary.
+    """
+    from tools import generate_pptx as _gen
+    return json.dumps(
+        _gen(slides_json_path=deck_id, output_path=str(Path(deck_id) / "output.pptx"), skill_dir=_SKILL_DIR),
+        ensure_ascii=False,
+    )
+
+
+@mcp.tool()
+def get_preview(deck_id: str, slugs: list[str], quality: str = "high") -> list:
+    """Get PNG preview images for visual review by the agent.
+
+    Returns actual slide images that the model can see and analyze.
+    Available after run_python(save=True) or generate_pptx completes.
+
+    - quality="low" (800px): Review all slides at once — check flow, structure, design consistency.
+    - quality="high" (1280px): Precise review of specific slides — check text, layout details.
+
+    Args:
+        deck_id: Deck directory path.
+        slugs: List of slide slugs to preview (required, at least one). Example: ["intro", "pricing"].
+        quality: "low" (800px) or "high" (1280px).
+
+    Returns:
+        List of text labels and slide images for visual inspection.
+    """
+    from mcp.server.fastmcp.utilities.types import Image
+    from PIL import Image as PILImage
+    import io
+
+    if not slugs:
+        return [{"type": "text", "text": "Error: slugs must not be empty"}]
+    if quality not in ("low", "high"):
+        quality = "high"
+    max_edge = 800 if quality == "low" else 1280
+
+    preview_dir = Path(deck_id) / "preview"
+    if not preview_dir.exists():
+        return [{"type": "text", "text": f"Preview not available yet. Run run_python(deck_id=\"{deck_id}\", save=True) or generate_pptx first."}]
+
+    # Build slug → 1-based page number mapping from outline.md
+    from sdpm.api import parse_outline_slugs
+    outline_path = Path(deck_id) / "specs" / "outline.md"
+    all_slugs = parse_outline_slugs(outline_path) if outline_path.exists() else []
+    # Only slugs with existing slide JSON appear in PPTX (builder skips missing)
+    pptx_slugs = [s for s in all_slugs if (Path(deck_id) / "slides" / f"{s}.json").exists()]
+    slug_to_page = {s: i + 1 for i, s in enumerate(pptx_slugs)}
+
+    # Index preview files by 1-based page number
+    import re as _re
+    page_files: dict[int, Path] = {}
+    for f in preview_dir.iterdir():
+        if not f.name.endswith(".png"):
+            continue
+        m = _re.match(r"^page(\d+)[-.]", f.name)
+        if m:
+            page_files[int(m.group(1))] = f
+
+    result: list = []
+    for slug in slugs:
+        page_num = slug_to_page.get(slug)
+        if not page_num:
+            result.append(f"Slide '{slug}': not found in outline or slide file missing")
+            continue
+        p = page_files.get(page_num)
+        if not p or not p.exists():
+            result.append(f"Slide '{slug}' (page {page_num}): preview not found")
+            continue
+        img = PILImage.open(p)
+        w, h = img.size
+        if max(w, h) > max_edge:
+            scale = max_edge / max(w, h)
+            img = img.resize((int(w * scale), int(h * scale)), PILImage.LANCZOS)
+        if img.mode == "RGBA":
+            img = img.convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        result.append(f"Slide '{slug}' (page {page_num})")
+        result.append(Image(data=buf.getvalue(), format="jpeg"))
+    return result
+
+
+@mcp.tool()
+def code_to_slide(
+    deck_id: str, code: str, name: str,
+    language: str = "python", theme: str = "dark",
+    x: int = 0, y: int = 0, width: int = 800, height: int = 300,
+) -> str:
+    """Generate a code block JSON and save to deck/includes/{name}.json.
+
+    Use the returned include_path in slide JSON as ``{"type": "include", "src": "includes/{name}.json"}``.
+
+    Args:
+        deck_id: Deck directory path.
+        code: Source code text.
+        name: Basename for the includes file (without .json extension).
+        language: Programming language for syntax highlighting.
+        theme: Color theme ("dark" or "light").
+        x: X position in pixels.
+        y: Y position in pixels.
+        width: Width in pixels.
+        height: Height in pixels.
+
+    Returns:
+        JSON with include_path for use in slide JSON.
+    """
+    from tools import code_block as _code
+    elements = _code(code=code, language=language, theme=theme, x=x, y=y, width=width, height=height)
+    includes_dir = Path(deck_id) / "includes"
+    includes_dir.mkdir(parents=True, exist_ok=True)
+    include_path = includes_dir / f"{name}.json"
+    include_path.write_text(json.dumps(elements, ensure_ascii=False), encoding="utf-8")
+    return json.dumps({
+        "include_path": f"includes/{name}.json",
+        "absolute_path": str(include_path),
+        "element_count": len(elements),
+    }, ensure_ascii=False)
+
+
+@mcp.tool()
+def analyze_template(template: str, layout: str = "") -> str:
+    """Analyze a PPTX template — extract layouts, theme colors, fonts.
+
+    Args:
+        template: Template name (e.g. "sample_template_dark") or full path.
+        layout: Optional layout name/index for detailed placeholder info.
+
+    Returns:
+        JSON with layouts, theme colors, fonts, and optional layout_detail.
+    """
+    from tools import analyze_template as _at
+    return json.dumps(
+        _at(template_path=template, layout=layout, skill_dir=_SKILL_DIR),
+        ensure_ascii=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Override init_presentation for subagent-branch deck format (deck.json + slides/)
+# ---------------------------------------------------------------------------
+mcp._tool_manager._tools.pop("init_presentation", None)
+
+
+@mcp.tool()
+def init_presentation(name: str, template: str = "") -> str:
+    """Initialize a presentation workspace (deck.json + slides/ + specs/ format).
+
+    Creates:
+        deck.json             — metadata (template, fonts, defaultTextColor)
+        slides/               — empty directory for slides/{slug}.json
+        specs/brief.md        — empty
+        specs/outline.md      — empty
+        specs/art-direction.html — empty
+
+    Args:
+        name: Presentation name (used in directory name).
+        template: Optional template name (e.g. "blank-dark") or path.
+
+    Returns:
+        JSON with output_dir, deck_json path, template info.
+    """
+    from datetime import datetime
+    from sdpm.analyzer import extract_fonts
+
+    base_dir = Path(os.environ.get("SDPM_DECK_ROOT", "")) or Path.home() / "Documents" / "SDPM-Presentations"
+    ts = datetime.now().strftime("%Y%m%d-%H%M")
+    dir_name = f"{ts}-{name}" if name else ts
+    out_dir = base_dir / dir_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    deck_data: dict = {}
+    if template:
+        templates_dir = _SKILL_DIR / "templates"
+        template_src = Path(template).expanduser()
+        if not template_src.exists():
+            candidate = templates_dir / (template if template.endswith(".pptx") else f"{template}.pptx")
+            if candidate.exists():
+                template_src = candidate
+        if template_src.exists():
+            deck_data["template"] = template_src.name
+            try:
+                deck_data["fonts"] = extract_fonts(template_src.resolve())
+            except Exception:
+                pass
+
+    (out_dir / "deck.json").write_text(json.dumps(deck_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out_dir / "slides").mkdir(exist_ok=True)
+    specs_dir = out_dir / "specs"
+    specs_dir.mkdir(exist_ok=True)
+    for fname in ("brief.md", "outline.md", "art-direction.html"):
+        (specs_dir / fname).touch()
+
+    return json.dumps({
+        "output_dir": str(out_dir),
+        "deck_json": str(out_dir / "deck.json"),
+        "template": deck_data.get("template", ""),
+        "fonts": deck_data.get("fonts", {}),
+        "workspace": ["deck.json", "slides/", "specs/brief.md", "specs/outline.md", "specs/art-direction.html"],
+    }, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
+# ACP-only tools
+# ---------------------------------------------------------------------------
+@mcp.tool()
+def hearing(
+    inference: str,
+    q0: dict,
+    q1: dict | None = None,
+    q2: dict | None = None,
+    q3: dict | None = None,
+    q4: dict | None = None,
+) -> str:
+    """Present structured questions to the user via a rich UI card.
+
+    ALWAYS use this tool when you need the user to make a choice or
+    judgment — not just for initial interviews but also for mid-workflow
+    decisions, confirmations with options, and next-step selections.
+    Only skip this tool for simple yes/no confirmations.
+
+    Always include your reasoning or hypothesis in the inference field
+    to help the user think — never ask blank questions.
+    Limit to 5 questions per call. If you need more, call again after
+    the user responds.
+
+    Args:
+        inference: Your reasoning or hypothesis to share with the user.
+            This is displayed prominently above the questions to provide
+            context and stimulate the user's thinking.
+        q0: First question object with keys:
+            - type (str): "single_select", "multi_select", or "free_text"
+            - text (str): The question text
+            - options (list[str], optional): Choices for select types
+            - recommended (str or list[str], optional): Suggested choice(s)
+            - placeholder (str, optional): Hint text for free_text type
+        q1: Second question (optional, same schema as q0).
+        q2: Third question (optional, same schema as q0).
+        q3: Fourth question (optional, same schema as q0).
+        q4: Fifth question (optional, same schema as q0).
+
+    Returns:
+        Confirmation that the questions were displayed. Wait for the
+        user's response in the next message.
+    """
+    return "Questions displayed to user. Wait for their response."
+
+
+@mcp.tool()
+def apply_style(deck_id: str, style: str) -> str:
+    """Copy a style HTML file to the deck's specs/art-direction.html.
+
+    Args:
+        deck_id: Deck output_dir path.
+        style: Style name (e.g. "elegant-dark").
+
+    Returns:
+        JSON with status and the copied file path.
+    """
+    import shutil
+    styles_dir = _SKILL_DIR / "references" / "examples" / "styles"
+    src = styles_dir / f"{style}.html"
+    if not src.exists():
+        return json.dumps({"error": f"Style not found: {style}. Available: {[s.stem for s in styles_dir.glob('*.html')]}"})
+    deck_path = Path(deck_id)
+    if not deck_path.is_dir():
+        return json.dumps({"error": f"Deck directory not found: {deck_id}"})
+    dest = deck_path / "specs" / "art-direction.html"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
+    return json.dumps({"status": "ok", "path": str(dest), "style": style})
+
+
+def _rejection_message(violations: list[str], has_deck: bool) -> str:
+    """Build an error message that helps the LLM rewrite rejected code."""
+    lines = ["Code rejected by sandbox:"]
+    lines.extend(f"  {v}" for v in violations)
+    if has_deck:
+        lines.append("")
+        lines.append("Use sandbox functions instead:")
+        lines.append("  read_json(path) → dict    write_json(path, data)")
+        lines.append("  read_text(path) → str     write_text(path, text)")
+        lines.append('  list_files(subdir=".") → list[str]')
+        lines.append("")
+        lines.append("Example:")
+        lines.append('  data = read_json("slides/title.json")')
+        lines.append('  data["elements"][0]["text"] = "New Title"')
+        lines.append('  write_json("slides/title.json", data)')
+    else:
+        lines.append("")
+        lines.append("Only print and built-in functions are available (no file I/O).")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def run_python(code: str, deck_id: str = "", save: bool = False,
+               measure_slides: list[str] | None = None, purpose: str = "") -> str:
+    """Execute Python code in a sandboxed environment.
+
+    Code runs in a restricted subprocess. `import` statements and direct file
+    access (`open()`) are NOT available. Use the provided sandbox functions instead.
+
+    ## Sandbox functions (available when deck_id is provided)
+
+        read_json(path)          → dict/list   Read a JSON file
+        write_json(path, data)   → None        Write data as JSON
+        read_text(path)          → str         Read a text file
+        write_text(path, text)   → None        Write a text file
+        list_files(subdir=".")   → list[str]   List filenames in a subdirectory
+
+    All paths are relative to the deck directory (e.g. "slides/title.json").
+    Access outside the deck directory is denied.
+
+    ## Built-in functions available
+
+    print, len, range, enumerate, sorted, isinstance, type, str, int, float,
+    bool, list, dict, tuple, set, min, max, sum, abs, round, any, all, zip,
+    map, filter, reversed
+
+    ## When deck_id is NOT provided (general computation)
+
+    Only print and built-in functions above are available.
+    No file operations.
+
+    ## Examples
+
+        # Read and edit a slide
+        data = read_json("slides/title.json")
+        data["elements"][0]["text"] = "New Title"
+        write_json("slides/title.json", data)
+
+        # Write a spec file
+        content = \"\"\"# Brief
+
+Topic: AI-powered presentation tool
+Audience: Developers
+\"\"\"
+        write_text("specs/brief.md", content)
+
+        # Read deck metadata
+        deck = read_json("deck.json")
+        print(deck["template"])
+
+        # Read a spec file
+        outline = read_text("specs/outline.md")
+        print(outline)
+
+        # List slide files
+        files = list_files("slides")
+        print(files)
+
+        # General computation (no deck_id)
+        print(2 ** 100)
+
+    **Always specify measure_slides when editing slides.**
+
+    Args:
+        code: Python code to execute (no import statements allowed).
+        deck_id: Deck output_dir path. Optional.
+        save: When True, triggers PPTX build + preview + SVG compose after execution.
+        measure_slides: Slide slugs to measure after execution (e.g. ["title", "feature-a"]).
+        purpose: Brief description shown in UI.
+
+    Returns:
+        JSON: {"output", "measure"?, "pptx"?, "preview"?, "compose"?}
+    """
+    result: dict = {}
+    cwd = deck_id if deck_id and Path(deck_id).is_dir() else None
+
+    # Layer 1: AST inspection
+    from sandbox import check_code, make_runner
+
+    violations = check_code(code)
+    if violations:
+        result["output"] = _rejection_message(violations, has_deck=bool(cwd))
+        return json.dumps(result, ensure_ascii=False)
+
+    # Layer 2-4: Sandboxed subprocess execution
+    try:
+        runner = make_runner(deck_id if cwd else "")
+        args = [sys.executable, "-c", runner]
+        if cwd:
+            args.append(deck_id)
+        proc = subprocess.run(
+            args, input=code,
+            capture_output=True, text=True, timeout=120, cwd=cwd,
+        )
+        output = proc.stdout
+        if proc.stderr:
+            output += "\n" + proc.stderr
+        result["output"] = output.strip()
+    except subprocess.TimeoutExpired:
+        result["output"] = "Error: execution timed out (120s)"
+    except Exception as e:
+        result["output"] = f"Error: {e}"
+
+    if not cwd:
+        return json.dumps(result, ensure_ascii=False)
+
+    # Determine deck input path: directory (new format) or presentation.json (legacy)
+    deck_dir = Path(cwd)
+    legacy_json = deck_dir / "presentation.json"
+    # sdpm.api accepts a directory (new format) or a .json file (legacy)
+    deck_input = str(legacy_json) if legacy_json.exists() else str(deck_dir)
+
+    # Lint outline.md — warn on failure
+    outline_path = deck_dir / "specs" / "outline.md"
+    if outline_path.exists() and outline_path.read_text(encoding="utf-8").strip():
+        from sdpm.schema.lint_outline import lint_outline
+
+        if lint_outline(outline_path.read_text(encoding="utf-8")):
+            result.setdefault("warnings", {})["outline"] = (
+                "outline.md format violation. "
+                "Read workflow `create-new-1-outline` for the correct format."
+            )
+
+    # Build slug → page number mapping from outline.md (for slug-based measure_slides)
+    def _slug_to_page() -> dict[str, int]:
+        from sdpm.api import parse_outline_slugs
+        slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
+        return {slug: i + 1 for i, slug in enumerate(slugs)}
+
+    # Post-processing: measure
+    if measure_slides:
+        try:
+            # Call sdpm.api.measure directly with slug list — it resolves slug→page
+            # and reports using slug names via format_measure_report(page_to_slug=...)
+            from sdpm.api import measure as _sdpm_measure
+            result["measure"] = _sdpm_measure(json_path=deck_input, slides=list(measure_slides))
+        except Exception as e:
+            result["measure"] = f"Measure error: {e}"
+
+    # Post-processing: build PPTX + preview + SVG compose (when save=True)
+    _lock_fp = None
+    if save:
+        # File lock per deck — prevents concurrent saves from corrupting PPTX
+        # (parallel subagents composing different slugs).
+        import fcntl
+        lock_path = deck_dir / ".save.lock"
+        lock_path.touch(exist_ok=True)
+        _lock_fp = open(lock_path, "r")
+        fcntl.flock(_lock_fp.fileno(), fcntl.LOCK_EX)
+
+    if save:
+        try:
+            # Force output.pptx inside deck dir (sdpm.api default goes to parent for directory input)
+            pptx_out = str(deck_dir / "output.pptx")
+            build_result = _generate_pptx(
+                slides_json_path=deck_input, output_path=pptx_out, skill_dir=_SKILL_DIR
+            )
+            result["pptx"] = build_result.get("output_path", pptx_out)
+        except Exception as e:
+            result["pptx_error"] = str(e)
+
+        try:
+            # preview API writes PNGs to /tmp/pptx-preview (fixed path).
+            # Clear first to avoid stale files from other decks.
+            import shutil as _shutil
+            _tmp_preview = Path("/tmp/pptx-preview")
+            if _tmp_preview.exists():
+                _shutil.rmtree(_tmp_preview, ignore_errors=True)
+            preview_result = _preview(slides_json_path=deck_input, pages="", output_path=str(deck_dir / "output.pptx"))
+            if isinstance(preview_result, dict) and preview_result.get("files"):
+                preview_dir = deck_dir / "preview"
+                # Clear deck's preview dir so page count always matches current build
+                if preview_dir.exists():
+                    _shutil.rmtree(preview_dir)
+                preview_dir.mkdir(exist_ok=True)
+                for png_path in preview_result["files"]:
+                    src = Path(png_path)
+                    if src.exists():
+                        _shutil.copy2(src, preview_dir / src.name)
+                result["preview"] = f"{len(preview_result['files'])} PNGs"
+        except Exception as e:
+            result["preview_error"] = str(e)
+
+        # SVG compose for WebUI animation (requires LibreOffice 25.8.6+)
+        try:
+            import shutil as _sh
+            lo = _sh.which("soffice") or (
+                "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+                if Path("/Applications/LibreOffice.app/Contents/MacOS/soffice").exists()
+                else None
+            )
+            pptx_out = result.get("pptx", "")
+            if lo and pptx_out:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    env = dict(os.environ)
+                    env["HOME"] = tmpdir
+                    subprocess.run(
+                        [lo, "--headless", "--convert-to", "svg", "--outdir", tmpdir, pptx_out],
+                        capture_output=True, timeout=120, env=env,
+                    )
+                    svg_files = list(Path(tmpdir).glob("*.svg"))
+                    if svg_files:
+                        from compose import extract_optimized_defs, split_slide_components, count_slides
+                        from sdpm.api import parse_outline_slugs
+                        import time as _t
+                        import re as _re
+                        svg_path = svg_files[0]
+                        n = count_slides(svg_path)
+                        compose_dir = deck_dir / "compose"
+                        compose_dir.mkdir(exist_ok=True)
+                        epoch = int(_t.time())
+
+                        # Index previous compose by slug → latest epoch path
+                        prev_by_slug: dict[str, Path] = {}
+                        if compose_dir.exists():
+                            for f in compose_dir.iterdir():
+                                m = _re.match(r"^(.+)_(\d+)\.json$", f.name)
+                                if m and not f.name.startswith("defs_"):
+                                    slug, ep = m.group(1), int(m.group(2))
+                                    cur = prev_by_slug.get(slug)
+                                    if not cur or int(_re.search(r"_(\d+)\.json$", cur.name).group(1)) < ep:
+                                        prev_by_slug[slug] = f
+
+                        def _mk(c: dict) -> str:
+                            b = c.get("bbox")
+                            return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
+
+                        def _fp(c: dict) -> str:
+                            return f"{c['class']}|{c.get('text', '')}"
+
+                        # Write defs_{epoch}.json
+                        (compose_dir / f"defs_{epoch}.json").write_text(
+                            json.dumps(extract_optimized_defs(svg_path), ensure_ascii=False),
+                            encoding="utf-8",
+                        )
+
+                        # Determine which slugs to regenerate:
+                        # - measure_slides (edited this turn) always
+                        # - any slug without existing compose (first build / new slides)
+                        # - first build (no prior compose at all) → regen ALL
+                        # Matches mcp-server (subagent branch) behavior. Deliberately no
+                        # mtime-based detection — parallel composers share deck, so mtime
+                        # would over-fire. Each composer's save=True should target its
+                        # own slug via measure_slides.
+                        slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
+                        # PPTX contains only slugs whose slides/*.json exists
+                        # (builder skips missing). Build a PPTX-order list so
+                        # SVG slide index → slug mapping is correct.
+                        pptx_slugs = [s for s in slugs if (deck_dir / "slides" / f"{s}.json").exists()]
+                        # Strict targeting:
+                        # - measure_slides → compose those
+                        # - On FIRST build (no prior compose at all) → compose all
+                        #   so the initial snapshot has compose for every slide
+                        # - Otherwise: only measure_slides. No implicit "all missing"
+                        #   inclusion — prevents batching when a composer saves
+                        #   after writing multiple slides without per-slide save.
+                        if not prev_by_slug:
+                            target_slugs: set[str] = set(pptx_slugs)
+                        else:
+                            target_slugs = set(measure_slides or [])
+
+                        composed = 0
+                        for sn in range(1, n):  # skip DummySlide at index 0
+                            idx = sn - 1
+                            if idx >= len(pptx_slugs):
+                                break
+                            slug = pptx_slugs[idx]
+                            if slug not in target_slugs:
+                                continue
+                            try:
+                                comp_data = split_slide_components(svg_path, sn)
+                                # Sanity log: slide sn extracted for slug
+                                print(f"[compose] svg slide {sn} → slug {slug} (pptx_slugs={pptx_slugs})", file=__import__('sys').stderr)
+                                # Diff against previous compose for this slug
+                                prev_file = prev_by_slug.get(slug)
+                                if prev_file and prev_file.exists():
+                                    try:
+                                        prev_comps = json.loads(prev_file.read_text(encoding="utf-8")).get("components", [])
+                                        prev_map = {_mk(c): _fp(c) for c in prev_comps}
+                                        for c in comp_data["components"]:
+                                            k = _mk(c)
+                                            c["changed"] = k not in prev_map or prev_map[k] != _fp(c)
+                                    except Exception:
+                                        for c in comp_data["components"]:
+                                            c["changed"] = True
+                                else:
+                                    for c in comp_data["components"]:
+                                        c["changed"] = True
+                                (compose_dir / f"{slug}_{epoch}.json").write_text(
+                                    json.dumps(comp_data, ensure_ascii=False), encoding="utf-8"
+                                )
+                                composed += 1
+                            except Exception:
+                                pass
+
+                        # Cleanup old defs (keep only newest)
+                        for f in compose_dir.iterdir():
+                            m = _re.match(r"^defs_(\d+)\.json$", f.name)
+                            if m and int(m.group(1)) < epoch:
+                                try: f.unlink()
+                                except Exception: pass
+
+                        result["compose"] = f"{composed} slides composed"
+                        if n <= 2 and len(slugs) > 1:
+                            result["compose_error"] = (
+                                f"LibreOffice exported only {n - 1} slide(s) to SVG but outline has "
+                                f"{len(slugs)} slides. Upgrade LibreOffice to 25.8.6+ (macOS multi-slide SVG fix)."
+                            )
+        except Exception as e:
+            result["compose_error"] = str(e)
+
+    if _lock_fp is not None:
+        try:
+            import fcntl as _fc
+            _fc.flock(_lock_fp.fileno(), _fc.LOCK_UN)
+            _lock_fp.close()
+        except Exception:
+            pass
+
+    return json.dumps(result, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
+# Upload / attachment tools (Local version)
+# ---------------------------------------------------------------------------
+from upload_tools import (  # noqa: E402
+    read_uploaded_file as _read_uploaded_file,
+    import_attachment as _import_attachment,
+    upload_file as _upload_file,
+    cleanup_old_sessions as _cleanup_old_sessions,
+)
+
+
+@mcp.tool()
+def read_uploaded_file(upload_id: str, offset: int = 0, limit: int = 2000) -> list:
+    """Read the content of a file uploaded by the user.
+
+    Files are pre-processed at upload time (converted to Markdown/JSON for docs,
+    stored as-is for images/text). Output uses cat -n format (line numbers) for
+    citation and navigation. No deck_id required — works during hearing.
+
+    Args:
+        upload_id: The upload identifier from the [Attached: ...] message
+            (format: "sessionId/shortId_filename").
+        offset: Starting line number (0-indexed). Default 0.
+        limit: Number of lines to read. Default 2000.
+
+    Returns:
+        Text content with line numbers and/or image previews.
+    """
+    return _read_uploaded_file(upload_id=upload_id, offset=offset, limit=limit)
+
+
+@mcp.tool()
+def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
+    """Import a file into the deck workspace for use in slides.
+
+    source is either an uploadId or an HTTP(S) URL.
+    - uploadId: copies pre-converted files from session storage to deck.
+    - URL: downloads image and saves to deck.
+
+    Args:
+        source: Upload ID from [Attached: ...] message, or an HTTP(S) URL.
+        deck_id: The deck directory path (must be initialized via init_presentation).
+        filename: Optional output filename.
+
+    Returns:
+        JSON with saved file paths and image_mapping.
+    """
+    return _import_attachment(source=source, deck_id=deck_id, filename=filename)
+
+
+if __name__ == "__main__":
+    # Cleanup sessions older than 7 days at startup
+    try:
+        removed = _cleanup_old_sessions()
+        if removed:
+            print(f"[session-cleanup] Removed {removed} expired session(s)", file=sys.stderr)
+    except Exception as e:
+        print(f"[session-cleanup] Failed: {e}", file=sys.stderr)
+
+    mcp.run(transport="stdio")

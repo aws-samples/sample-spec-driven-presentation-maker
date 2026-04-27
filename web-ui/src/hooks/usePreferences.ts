@@ -6,7 +6,7 @@
  * @returns { sendWithEnter, setSendWithEnter, viewMode, setViewMode }
  */
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 
 const KEY = "sdpm-prefs"
 
@@ -14,9 +14,11 @@ interface Prefs {
   sendWithEnter: boolean
   viewMode: "full" | "grid"
   fetchWebImages: boolean
+  parallelAgents: boolean
+  agentMode: "spec" | "vibe"
 }
 
-const DEFAULTS: Prefs = { sendWithEnter: false, viewMode: "full", fetchWebImages: false }
+const DEFAULTS: Prefs = { sendWithEnter: false, viewMode: "full", fetchWebImages: false, parallelAgents: false, agentMode: "spec" }
 
 /**
  * Read preferences from localStorage, falling back to defaults.
@@ -34,7 +36,10 @@ function read(): Prefs {
 }
 
 export function usePreferences() {
-  const [prefs, setPrefs] = useState<Prefs>(read)
+  const [prefs, setPrefs] = useState<Prefs>(DEFAULTS)
+
+  // Hydrate from localStorage after mount to avoid SSR mismatch
+  useEffect(() => { setPrefs(read()) }, [])
 
   const update = useCallback((patch: Partial<Prefs>) => {
     setPrefs((prev) => {
@@ -51,5 +56,9 @@ export function usePreferences() {
     setViewMode: useCallback((v: "full" | "grid") => update({ viewMode: v }), [update]),
     fetchWebImages: prefs.fetchWebImages,
     setFetchWebImages: useCallback((v: boolean) => update({ fetchWebImages: v }), [update]),
+    parallelAgents: prefs.parallelAgents,
+    setParallelAgents: useCallback((v: boolean) => update({ parallelAgents: v }), [update]),
+    agentMode: prefs.agentMode,
+    setAgentMode: useCallback((v: "spec" | "vibe") => update({ agentMode: v }), [update]),
   }
 }

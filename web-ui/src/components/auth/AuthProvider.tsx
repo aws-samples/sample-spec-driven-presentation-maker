@@ -19,7 +19,16 @@ interface CognitoAuthConfig {
   userStore?: WebStorageStateStore
 }
 
+const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === 'local'
+
 const AuthProvider = ({ children }: PropsWithChildren) => {
+  // Local mode: skip Cognito entirely
+  if (IS_LOCAL) return <>{children}</>
+
+  return <CloudAuthProvider>{children}</CloudAuthProvider>
+}
+
+const CloudAuthProvider = ({ children }: PropsWithChildren) => {
   const [authConfig, setAuthConfig] = useState<CognitoAuthConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

@@ -2,16 +2,23 @@
 
 # Principles
 
-## Architecture: 3-Layer Structure
+## Architecture: 4-Layer Structure
 
 ```
-Layer 1: CLI (skill/scripts/pptx_builder.py)
+Layer 4: Agent + Web UI (agent/, web-ui/)
+  ↓ uses
+Layer 3: MCP Remote (mcp-server/)   ← AWS (S3/DynamoDB)
   ↓ uses
 Skill Engine (skill/sdpm/)          ← Single source of business logic
-  ↑ uses                ↑ uses
-Layer 2: MCP Local      Layer 3: MCP Remote
-(mcp-local/)            (mcp-server/)
+  ↑ uses
+Layer 2: MCP Local (mcp-local/)
+  ↑ uses
+Layer 1: CLI (skill/scripts/pptx_builder.py)
 ```
+
+Layer 4 hosts the Strands Agent (SPEC agent + composer agents) and the React Web UI.
+The SPEC agent handles user dialogue (Phase 1). Composer agents handle slide generation
+(Phase 2+3) via the `compose_slides` tool (Agents as Tools pattern).
 
 ## Engine (`skill/sdpm/`)
 
@@ -73,3 +80,37 @@ PR作成前に以下をローカルで実行し、CI待ちを減らす:
 ```bash
 ash scan --mode local --fail-on-findings
 ```
+
+## Web UI: Dual-Mode (Cloud / Local)
+
+Single Next.js codebase serves two modes via build-time feature toggle `NEXT_PUBLIC_MODE`.
+Cloud mode is the primary target; Local mode exists for users who want to try the app without deploying to AWS.
+
+```
+Cloud (default)  — AWS direct (AgentCore, S3, Cognito), static export via CloudFront
+Local            — Next.js API Routes → kiro-cli ACP, filesystem storage
+```
+
+### Branching rules
+
+| Layer | How to branch |
+|-------|--------------|
+| UI components | `<CloudOnly>` / `<LocalOnly>` (declarative) |
+| Service layer | `IS_LOCAL` early return at function entry point |
+| API Routes (`src/app/api/`) | Local-only. Excluded from cloud build by `build:cloud` |
+| Local-only logic | Isolated in `src/lib/local/` |
+
+### Web-first principle
+- Web (Cloud) code must remain the cleanest path — no Local logic mixed in
+- Local is a subset: no auth, no public/shared decks, no Bedrock search
+- `build:cloud` output must be identical whether Local code exists or not
+
+### Build strategy
+- `output: "export"` and `trailingSlash: true` are cloud-only (`next.config.ts`)
+- `build:cloud` temporarily moves `src/app/api/` out to enable static export (with `trap EXIT` for safe restore)
+- This is a known workaround — Next.js does not support `output: "export"` + API Routes coexistence
+
+### Session persistence (Local)
+- `.session` file in deck directory — ACP sessionId
+- `.chat.json` file in deck directory — chat messages for UI display
+- `session/load` restores agent context; replay is not used for UI (Obsidian agent-client pattern)

@@ -115,6 +115,42 @@ export class AgentStack extends cdk.Stack {
       })
     );
 
+    // CloudWatch Logs / X-Ray / Metrics — required for AgentCore Runtime observability
+    // https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+        ],
+        resources: [
+          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock-agentcore/runtimes/*`,
+          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`,
+        ],
+      })
+    );
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords",
+          "xray:GetSamplingRules",
+          "xray:GetSamplingTargets",
+        ],
+        resources: ["*"],
+      })
+    );
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["cloudwatch:PutMetricData"],
+        resources: ["*"],
+        conditions: { StringEquals: { "cloudwatch:namespace": "bedrock-agentcore" } },
+      })
+    );
+
     image.repository.addToResourcePolicy(
       new iam.PolicyStatement({
         principals: [
@@ -162,6 +198,7 @@ export class AgentStack extends cdk.Stack {
         DECKS_TABLE: props.table.tableName,
         PPTX_BUCKET: props.pptxBucket.bucketName,
         AWS_DEFAULT_REGION: this.region,
+        COMPOSER_MAX_CONCURRENCY: "10",
         DEPLOY_TIMESTAMP: new Date().toISOString(),
       },
       description: "spec-driven-presentation-maker Strands Agent — connects to MCP Server for slide generation",

@@ -21,7 +21,7 @@ import { Search, Layers } from "lucide-react"
 interface SearchResultsGridProps {
   results: SlideSearchResult[]
   searching: boolean
-  onSlideClick: (deckId: string, slideId: string) => void
+  onSlideClick: (deckId: string, slug: string) => void
 }
 
 export function SearchResultsGrid({ results, searching, onSlideClick }: SearchResultsGridProps) {
@@ -45,9 +45,9 @@ export function SearchResultsGrid({ results, searching, onSlideClick }: SearchRe
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {results.map((r, i) => (
             <button
-              key={`${r.deckId}-${r.slideId}`}
+              key={`${r.deckId}-${r.slug}`}
               type="button"
-              onClick={() => onSlideClick(r.deckId, r.slideId)}
+              onClick={() => onSlideClick(r.deckId, r.slug)}
               className="animate-card-in group text-left rounded-xl overflow-hidden border border-border bg-card hover:border-border-hover hover:-translate-y-[2px] hover:shadow-[0_6px_24px_oklch(0_0_0/40%)] transition-all duration-300"
               style={{ "--delay": `${i * 60}ms` } as React.CSSProperties}
             >

@@ -114,6 +114,27 @@ Write `specs/brief.md` with the following:
 
 Write in natural prose, not bullet points. Prose reveals gaps in logic that bullet points hide.
 
+Add the following sections at the end of the brief:
+
+**Constraints & Requests** — capture explicit constraints and preferences from the dialogue:
+```markdown
+## Constraints & Requests
+- [MUST NOT] Do not include pricing details
+- [MUST] Include the demo architecture diagram
+- [PREFER] Use dark theme if possible
+```
+Omit this section if no constraints were mentioned.
+
+**Materials** — list any files or assets the user provided or referenced:
+```markdown
+## Materials
+| File | Description | Target Slide |
+|------|-------------|--------------|
+| logo.png | Company logo | title |
+| arch.png | Architecture diagram | architecture |
+```
+Omit this section if no materials were provided.
+
 ### 4. Wait for user review
 
 Present `specs/brief.md` to the user and wait for explicit approval of the file.

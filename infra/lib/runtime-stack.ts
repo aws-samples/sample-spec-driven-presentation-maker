@@ -91,6 +91,42 @@ export class RuntimeStack extends cdk.Stack {
       })
     );
 
+    // CloudWatch Logs / X-Ray / Metrics — required for AgentCore Runtime observability
+    // https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html
+    runtimeRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+        ],
+        resources: [
+          `arn:aws:logs:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:log-group:/aws/bedrock-agentcore/runtimes/*`,
+          `arn:aws:logs:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`,
+        ],
+      })
+    );
+    runtimeRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords",
+          "xray:GetSamplingRules",
+          "xray:GetSamplingTargets",
+        ],
+        resources: ["*"],
+      })
+    );
+    runtimeRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["cloudwatch:PutMetricData"],
+        resources: ["*"],
+        conditions: { StringEquals: { "cloudwatch:namespace": "bedrock-agentcore" } },
+      })
+    );
+
     image.repository.addToResourcePolicy(
       new iam.PolicyStatement({
         principals: [new iam.ServicePrincipal("bedrock-agentcore.amazonaws.com")],

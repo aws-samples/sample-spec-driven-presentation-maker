@@ -28,11 +28,11 @@ import {
   BookOpen, List, Search, FolderPlus, Pencil, Image,
   Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench,
   Check, FileText, Download, Play, Code, Palette,
-  LayoutTemplate, Package, AlertCircle, Ruler,
+  LayoutTemplate, Package, AlertCircle, Ruler, RefreshCw,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-
-type ToolCategory = "build" | "explore" | "produce" | "compute" | "hearing" | "other"
+import { ComposeCard } from "./compose/ComposeCard"
+import { CAT, type ToolCategory } from "./toolPalette"
 
 interface ToolMeta {
   Icon: LucideIcon
@@ -40,20 +40,11 @@ interface ToolMeta {
   category: ToolCategory
 }
 
-/** Accent palette per category — oklch for perceptual uniformity. */
-export const CAT: Record<ToolCategory, { accent: string; bg: string; glow: string; border: string }> = {
-  build:   { accent: "oklch(0.75 0.14 185)", bg: "oklch(0.75 0.14 185 / 6%)",  glow: "oklch(0.75 0.14 185 / 12%)", border: "oklch(0.75 0.14 185 / 18%)" },
-  explore: { accent: "oklch(0.80 0.14 80)",  bg: "oklch(0.80 0.14 80 / 6%)",   glow: "oklch(0.80 0.14 80 / 12%)",  border: "oklch(0.80 0.14 80 / 18%)" },
-  produce: { accent: "oklch(0.72 0.16 300)", bg: "oklch(0.72 0.16 300 / 6%)",  glow: "oklch(0.72 0.16 300 / 12%)", border: "oklch(0.72 0.16 300 / 18%)" },
-  compute: { accent: "oklch(0.78 0.12 220)", bg: "oklch(0.78 0.12 220 / 6%)",  glow: "oklch(0.78 0.12 220 / 12%)", border: "oklch(0.78 0.12 220 / 18%)" },
-  hearing: { accent: "oklch(0.74 0.16 330)", bg: "oklch(0.74 0.16 330 / 6%)",  glow: "oklch(0.74 0.16 330 / 12%)", border: "oklch(0.74 0.16 330 / 18%)" },
-  other:   { accent: "oklch(0.55 0 0)",      bg: "oklch(0.55 0 0 / 4%)",       glow: "oklch(0.55 0 0 / 8%)",       border: "oklch(0.55 0 0 / 12%)" },
-}
 
 const ERR = { accent: "oklch(0.65 0.2 25)", bg: "oklch(0.65 0.2 25 / 6%)", border: "oklch(0.65 0.2 25 / 18%)" }
 
 /** Icon, label, and category per tool name. */
-const TOOL_META: Record<string, ToolMeta> = {
+export const TOOL_META: Record<string, ToolMeta> = {
   // Native agent tools
   create_deck:        { Icon: FolderPlus,      label: "Creating deck",          category: "build" },
   write_slide:        { Icon: Pencil,          label: "Writing slide",          category: "build" },
@@ -69,6 +60,7 @@ const TOOL_META: Record<string, ToolMeta> = {
   web_search:         { Icon: Globe,           label: "Web search",             category: "explore" },
   web_fetch:          { Icon: FileText,        label: "Fetching page",          category: "explore" },
   read_uploaded_file: { Icon: FileText,        label: "Reading file",           category: "explore" },
+  import_attachment:  { Icon: Download,        label: "Importing file",         category: "build" },
   generate_pptx:      { Icon: Download,        label: "Generating PPTX",        category: "produce" },
   generate_preview:   { Icon: Image,           label: "Generating preview",     category: "produce" },
   measure_slides:     { Icon: Ruler,           label: "Measuring slides",       category: "produce" },
@@ -113,6 +105,8 @@ const TOOL_META: Record<string, ToolMeta> = {
   spec_driven_presentation_maker_code_to_slide:      { Icon: Code,           label: "Code to slide",         category: "build" },
   spec_driven_presentation_maker_pptx_to_json:       { Icon: FileText,       label: "Converting PPTX",       category: "explore" },
   spec_driven_presentation_maker_grid:               { Icon: LayoutTemplate, label: "Computing layout",      category: "compute" },
+  // Agent tools
+  compose_slides:     { Icon: Package,         label: "Composing slides",       category: "produce" },
 }
 
 /**
@@ -134,9 +128,10 @@ function getDetail(name: string, input?: Record<string, unknown>): string {
   if (input.purpose) { const p = String(input.purpose); return p.length > 40 ? p.slice(0, 40) + "…" : p }
   if (input.path) { const p = String(input.path); return p.split("/").pop() || p }
   if (input.template) return String(input.template)
+  if (input.style) return String(input.style)
   if (input.keyword) return `"${input.keyword}"`
   if (input.query) { const q = String(input.query); return q.length > 30 ? `"${q.slice(0, 30)}…"` : `"${q}"` }
-  const v = input.name || input.slide_id || input.deck_id
+  const v = input.name || input.slide_id
   if (typeof v === "string" && v) return v.length > 30 ? v.slice(0, 30) + "…" : v
   return ""
 }
@@ -175,10 +170,43 @@ interface ToolCardProps {
   status?: "success" | "error"
   result?: Record<string, unknown>
   isActive?: boolean
+  /** Streaming progress events from tool execution. */
+  streamMessages?: Record<string, unknown>[]
+  /** Current deck slide IDs — used by ComposeCard for slug existence rendering. */
+  deckSlugs?: string[]
+  /** tool use id — forwarded to ComposeCard for soft-stop. */
+  toolUseId?: string
+  /** Session ID — forwarded to ComposeCard for soft-stop. */
+  sessionId?: string
+  /** Auth token — forwarded to ComposeCard (ID token: previews) / (Access token: cancel). */
+  idToken?: string
+  accessToken?: string
 }
 
-export function ToolCard({ name, input, status, result, isActive = false }: ToolCardProps) {
-  const meta = TOOL_META[name] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
+/** Strip MCP prefix from tool name for display lookup. */
+export function stripPrefix(n: string): string {
+  return n.replace(/^spec_driven_presentation_maker_/, "")
+}
+
+export function ToolCard({ name, input, status, result, isActive = false, streamMessages, deckSlugs, toolUseId, sessionId, idToken, accessToken }: ToolCardProps) {
+  // Dispatch: compose_slides has a dedicated rich card.
+  if (name === "compose_slides" || name.endsWith("_compose_slides")) {
+    return (
+      <ComposeCard
+        input={input}
+        status={status}
+        result={result}
+        isActive={isActive}
+        streamMessages={streamMessages}
+        deckSlugs={deckSlugs}
+        toolUseId={toolUseId}
+        sessionId={sessionId}
+        accessToken={accessToken}
+      />
+    )
+  }
+
+  const meta = TOOL_META[stripPrefix(name)] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
   const isError = status === "error"
   const isComplete = !!status
   const colors = isError ? { ...CAT.other, accent: ERR.accent, bg: ERR.bg, border: ERR.border } : CAT[meta.category]
@@ -282,6 +310,111 @@ export function ToolCard({ name, input, status, result, isActive = false }: Tool
             {summary || detail}
           </p>
         )}
+        {/* Streaming progress — sub-tool activity feed */}
+        {isActive && streamMessages && streamMessages.length > 0 && (() => {
+          // Group events by group number for parallel display
+          const groupMap = new Map<number, { status?: Record<string, unknown>; tools: Record<string, unknown>[] }>()
+          const ungrouped: Record<string, unknown>[] = []
+
+          for (const ev of streamMessages) {
+            const g = typeof ev.group === "number" ? ev.group : 0
+            if (g === 0) { ungrouped.push(ev); continue }
+            if (!groupMap.has(g)) groupMap.set(g, { tools: [] })
+            const entry = groupMap.get(g)!
+            if (ev.status) {
+              if (ev.status === "retrying") entry.tools = []
+              entry.status = ev
+            }
+            else if (ev.tool) {
+              entry.tools.push(ev)
+              if (entry.status?.status === "retrying") entry.status = undefined
+            }
+            else if (ev.toolResult) {
+              const t = entry.tools.find((t) => t.toolUseId === ev.toolResult)
+              if (t) t.toolStatus = ev.toolStatus
+            }
+          }
+
+          // Ungrouped status messages (prefetching, building, etc.)
+          const statusMsg = ungrouped.filter((e) => e.message).pop()
+
+          return (
+            <div className="mt-1.5 space-y-1.5">
+              {statusMsg && (
+                <p className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: `${colors.accent}cc` }}>
+                  {String(statusMsg.message)}
+                </p>
+              )}
+              {[...groupMap.entries()].map(([g, { status: gStatus, tools }]) => {
+                const totalGroups = gStatus?.total_groups ?? groupMap.size
+                const slugs = gStatus?.slugs ?? tools[0]?.slugs ?? ""
+                const isDone = gStatus?.status === "done"
+                const isErr = gStatus?.status === "error" || gStatus?.status === "retry_failed"
+                const isRetrying = gStatus?.status === "retrying"
+                const retryAttempt = typeof gStatus?.attempt === "number" ? gStatus.attempt : 0
+                const groupAccent = isErr ? ERR.accent : colors.accent
+
+                return (
+                  <div key={g} className="rounded-lg px-2 py-1.5 transition-all duration-300" style={{ background: `${groupAccent}08` }}>
+                    {/* Group header */}
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <div className="flex-none w-3.5 h-3.5 rounded flex items-center justify-center" style={{ background: `${groupAccent}15` }}>
+                        {isDone ? (
+                          <Check className="h-2 w-2" style={{ color: groupAccent }} />
+                        ) : isErr ? (
+                          <AlertCircle className="h-2 w-2" style={{ color: ERR.accent }} />
+                        ) : isRetrying ? (
+                          <RefreshCw className="h-2 w-2" style={{ color: groupAccent, animation: "tool-spinner 1s linear infinite" }} />
+                        ) : (
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 14 14">
+                            <circle cx="7" cy="7" r="4.5" fill="none" stroke={groupAccent} strokeWidth="1" strokeDasharray="8 20" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: `${groupAccent}cc` }}>
+                        {isRetrying ? `Retrying (${retryAttempt})` : `Group ${g}/${totalGroups}`} · {String(slugs)}
+                        {isRetrying && gStatus?.error && (
+                          <span className="ml-1 opacity-60" title={String(gStatus.error)}>— {String(gStatus.error).slice(0, 300)}</span>
+                        )}
+                      </span>
+                    </div>
+                    {/* Sub-tool list — show last 3 per group */}
+                    {!isDone && tools.slice(-3).map((ev, i) => {
+                      const toolName = stripPrefix(String(ev.tool))
+                      const sub = TOOL_META[toolName] || { Icon: Wrench, label: toolName.replace(/_/g, " "), category: "other" as ToolCategory }
+                      const isToolErr = ev.toolStatus === "error"
+                      const isToolDone = !!ev.toolStatus
+                      const subColors = isToolErr ? ERR : CAT[sub.category]
+                      const subDetail = getDetail(toolName, ev.input as Record<string, unknown> | undefined)
+                      const isLast = i === Math.min(tools.length, 3) - 1
+                      const showSpinner = isLast && !isToolDone
+                      return (
+                        <div key={`${g}-${ev.tool}-${i}`} className="flex items-center gap-1.5 py-0.5 ml-5" style={{ opacity: isLast ? 1 : 0.4 }}>
+                          <div className="flex-none w-3.5 h-3.5 rounded flex items-center justify-center" style={{ background: `${subColors.accent}10` }}>
+                            {showSpinner ? (
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14">
+                                <circle cx="7" cy="7" r="4.5" fill="none" stroke={subColors.accent} strokeWidth="1" strokeDasharray="8 20" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
+                              </svg>
+                            ) : isToolErr ? (
+                              <AlertCircle className="h-2 w-2" style={{ color: ERR.accent }} />
+                            ) : isToolDone ? (
+                              <Check className="h-2 w-2" style={{ color: subColors.accent }} />
+                            ) : (
+                              <sub.Icon className="h-2 w-2" style={{ color: `${subColors.accent}80` }} />
+                            )}
+                          </div>
+                          <span className="text-[11px] truncate" style={{ color: isLast ? subColors.accent : `${subColors.accent}88` }}>
+                            {sub.label}{subDetail ? ` · ${subDetail}` : ""}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Right-side status dot */}
@@ -309,7 +442,7 @@ export function ToolCard({ name, input, status, result, isActive = false }: Tool
  * @param props.input - Tool input parameters
  */
 export function ToolCardCompact({ name, input }: { name: string; input?: Record<string, unknown> }) {
-  const meta = TOOL_META[name] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
+  const meta = TOOL_META[stripPrefix(name)] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
   const colors = CAT[meta.category]
   const detail = getDetail(name, input)
 

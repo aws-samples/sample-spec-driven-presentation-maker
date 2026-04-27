@@ -217,11 +217,24 @@ function handler(event) {
       code: lambda.Code.fromAsset(path.join(__dirname, "../.."), {
         bundling: {
           image: lambda.Runtime.PYTHON_3_13.bundlingImage,
-          command: ["bash", "-c", "cp -r /asset-input/api/* /asset-input/shared /asset-output/"],
+          command: [
+            "bash", "-c",
+            "pip install -r /asset-input/api/requirements.txt -t /asset-output/ && " +
+            "cp -r /asset-input/api/* /asset-input/shared /asset-output/",
+          ],
           local: {
             tryBundle(outputDir: string): boolean {
               const { execSync } = require("child_process");
               const root = path.join(__dirname, "../..");
+              try {
+                execSync(
+                  `pip install -r ${root}/api/requirements.txt -t ${outputDir}/` +
+                  ` --platform manylinux2014_x86_64 --python-version 3.13 --only-binary=:all:`,
+                  { stdio: "inherit" },
+                );
+              } catch {
+                return false;  // fall back to docker bundling
+              }
               execSync(`cp -r ${root}/api/* ${outputDir}/`, { stdio: "inherit" });
               execSync(`cp -r ${root}/shared ${outputDir}/shared`, { stdio: "inherit" });
               return true;
@@ -230,8 +243,8 @@ function handler(event) {
         },
       }),
       layers: [powertoolsLayer],
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 256,
+      timeout: cdk.Duration.seconds(120),
+      memorySize: 512,
       environment: {
         TABLE_NAME: props.table.tableName,
         PPTX_BUCKET: props.pptxBucket.bucketName,
@@ -335,7 +348,7 @@ function handler(event) {
             image: cdk.DockerImage.fromRegistry("node:20-slim"),
             command: [
               "bash", "-c",
-              "npm ci && npm run build && cp -r build/. /asset-output/",
+              "npm ci && npm run build:cloud && cp -r build/. /asset-output/",
             ],
             local: {
               tryBundle(outputDir: string): boolean {
@@ -346,7 +359,7 @@ function handler(event) {
                   return false;
                 }
                 execSync("npm ci", { cwd: webUiDir, stdio: "inherit" });
-                execSync("npm run build", { cwd: webUiDir, stdio: "inherit" });
+                execSync("npm run build:cloud", { cwd: webUiDir, stdio: "inherit" });
                 execSync(`cp -r ${webUiDir}/build/. ${outputDir}/`, { stdio: "inherit" });
                 return true;
               },
@@ -375,7 +388,6 @@ function handler(event) {
       agentRuntimeArn: "${AgentRuntimeArn}",
       apiBaseUrl: "${ApiBaseUrl}",
       awsRegion: "${AWS::Region}",
-      agentPattern: "strands-single-agent",
     }), {
       UserPoolId: props.userPool.userPoolId,
       ClientId: props.userPoolClient.userPoolClientId,

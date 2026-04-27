@@ -4,7 +4,7 @@
 
 import { useState } from "react"
 import { Lightbulb, Send } from "lucide-react"
-import { CAT } from "./ToolCard"
+import { CAT } from "./toolPalette"
 
 const P = CAT.hearing
 

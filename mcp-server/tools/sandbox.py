@@ -9,7 +9,9 @@ Wraps the Code Interpreter API to execute Python code in an isolated sandbox.
 Used by run_python MCP tool for deck workspace editing and general computation.
 
 Deck workspace layout (when deck_id is provided):
-    presentation.json   — slide data
+    deck.json           — deck metadata (new format)
+    slides/             — per-slide JSON files (new format)
+    presentation.json   — slide data (legacy format)
     specs/              — brief.md, art-direction.html, outline.md
     includes/           — code block JSON files
 """
@@ -26,7 +28,7 @@ from storage import Storage
 logger = logging.getLogger(__name__)
 
 # Files managed by the deck workspace — only these are synced back to S3.
-_WORKSPACE_PREFIXES = ("presentation.json", "specs/", "includes/")
+_WORKSPACE_PREFIXES = ("deck.json", "slides/", "specs/", "includes/", "attachments/")
 
 
 def execute_in_sandbox(
@@ -36,7 +38,7 @@ def execute_in_sandbox(
     deck_id: str | None = None,
     save: bool = False,
     files: list[str] | None = None,
-) -> str:
+) -> tuple[str, bool]:
     """Execute Python code in Amazon Bedrock AgentCore Code Interpreter sandbox.
 
     When deck_id is provided, the entire deck workspace is loaded into the
@@ -53,7 +55,7 @@ def execute_in_sandbox(
         files: Additional S3 keys to download into sandbox by basename.
 
     Returns:
-        Code execution output (stdout/stderr).
+        Tuple of (code execution output, outline_rejected flag).
 
     Raises:
         ValueError: If save=True without deck_id, or duplicate filenames in files.
@@ -81,11 +83,8 @@ def execute_in_sandbox(
 
     try:
         # Load deck workspace into sandbox
-        workspace_paths: list[str] = []
         if deck_id:
-            workspace_paths = _upload_deck_workspace(
-                client, session_id, storage, deck_id,
-            )
+            _upload_deck_workspace(client, session_id, storage, deck_id)
 
         # Upload additional files by basename
         if files:
@@ -106,13 +105,14 @@ def execute_in_sandbox(
         output = _collect_stream(response)
 
         # Save modified workspace files back to S3
+        outline_rejected = False
         if save and deck_id:
-            _save_deck_workspace(
-                client, session_id, storage, deck_id, workspace_paths,
+            outline_rejected = _save_deck_workspace(
+                client, session_id, storage, deck_id,
             )
             logger.info("Deck workspace saved for deck %s", deck_id)
 
-        return output
+        return output, outline_rejected
 
     finally:
         client.stop_code_interpreter_session(
@@ -157,6 +157,19 @@ def _upload_deck_workspace(
         _write_files(client, session_id, file_contents)
         logger.info("Uploaded %d files to sandbox for deck %s", len(file_contents), deck_id)
 
+    # Ensure workspace directories exist even when empty, so agent code like
+    # open("slides/title.json", "w") works on the first write without needing
+    # an explicit os.makedirs step.
+    client.invoke_code_interpreter(
+        codeInterpreterIdentifier="aws.codeinterpreter.v1",
+        sessionId=session_id,
+        name="executeCode",
+        arguments={
+            "language": "python",
+            "code": "import os\nfor d in ('slides', 'specs', 'includes', 'images', 'attachments'):\n    os.makedirs(d, exist_ok=True)\n",
+        },
+    )
+
     return [f["path"] for f in file_contents]
 
 
@@ -165,33 +178,40 @@ def _save_deck_workspace(
     session_id: str,
     storage: Storage,
     deck_id: str,
-    paths: list[str],
-) -> None:
-    """Read workspace files from sandbox and write back to S3.
+) -> bool:
+    """Read workspace files from sandbox via prefix scan and write back to S3.
 
-    Uses executeCode to read files via Python — avoids reliance on
-    readFiles API response format which is not well documented.
+    Scans the sandbox for files matching _WORKSPACE_PREFIXES instead of
+    relying on the upload paths list. This ensures newly created files
+    (e.g., slides/{slug}.json) are automatically saved.
+
+    If specs/outline.md is present and fails lint, it is excluded from the
+    S3 write-back (rejected).
 
     Args:
         client: Bedrock AgentCore client.
         session_id: Code Interpreter session ID.
         storage: Storage backend.
         deck_id: Deck identifier.
-        paths: Relative file paths to read back (from _upload_deck_workspace).
-    """
-    if not paths:
-        return
 
-    # Read all workspace files via executeCode + JSON dump
-    paths_repr = repr(paths)
+    Returns:
+        True if outline.md was rejected due to lint failure, False otherwise.
+    """
+    # Scan sandbox for all workspace files via executeCode
+    prefixes_repr = repr(_WORKSPACE_PREFIXES)
     code = (
         "import json, os\n"
-        f"_paths = {paths_repr}\n"
+        f"_prefixes = {prefixes_repr}\n"
         "_result = {}\n"
-        "for _p in _paths:\n"
-        "    if os.path.isfile(_p):\n"
-        "        with open(_p, 'r') as _f:\n"
-        "            _result[_p] = _f.read()\n"
+        "for root, dirs, files in os.walk('.'):\n"
+        "    for f in files:\n"
+        "        rel = os.path.relpath(os.path.join(root, f), '.')\n"
+        "        if any(rel == p or rel.startswith(p) for p in _prefixes):\n"
+        "            try:\n"
+        "                with open(rel, 'r') as fh:\n"
+        "                    _result[rel] = fh.read()\n"
+        "            except Exception:\n"
+        "                pass\n"
         "print(json.dumps(_result))\n"
     )
     response = client.invoke_code_interpreter(
@@ -204,6 +224,17 @@ def _save_deck_workspace(
 
     file_map: dict[str, str] = json.loads(raw)
 
+    # Lint outline.md before saving — reject on failure
+    outline_rejected = False
+    outline_key = "specs/outline.md"
+    if outline_key in file_map and file_map[outline_key].strip():
+        from sdpm.schema.lint_outline import lint_outline
+
+        if lint_outline(file_map[outline_key]):
+            del file_map[outline_key]
+            outline_rejected = True
+            logger.warning("outline.md lint failed for deck %s — not saved", deck_id)
+
     # Write back to S3
     prefix = f"decks/{deck_id}/"
     for rel_path, text in file_map.items():
@@ -213,6 +244,8 @@ def _save_deck_workspace(
             data=text.encode("utf-8"),
             content_type=_content_type(rel_path),
         )
+
+    return outline_rejected
 
 
 def _write_files(client: Any, session_id: str, content: list[dict[str, str]]) -> None:

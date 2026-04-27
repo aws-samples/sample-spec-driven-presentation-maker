@@ -7,6 +7,8 @@ import { useEffect, useState } from "react"
 import { WebStorageStateStore } from "oidc-client-ts"
 import { createCognitoAuthConfig } from "@/lib/auth"
 
+const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === "local"
+
 interface CognitoAuthConfig {
   authority: string
   client_id: string | undefined
@@ -18,34 +20,43 @@ interface CognitoAuthConfig {
   userStore?: WebStorageStateStore
 }
 
+const LOCAL_AUTH = {
+  isAuthenticated: true,
+  user: { id_token: "local", access_token: "local", profile: { sub: "local-user" } },
+  signIn: () => {},
+  signOut: () => {},
+  isLoading: false,
+  error: null,
+  token: "local",
+}
+
 export function useAuth() {
-  const auth = useOidcAuth()
+  // In local mode, OidcAuthProvider is absent so useOidcAuth() returns undefined.
+  // We call it unconditionally to satisfy React's rules of hooks, then discard the result.
+  // Suppress the console.warn from react-oidc-context in local mode.
+  let auth: ReturnType<typeof useOidcAuth> | undefined
+  const origWarn = IS_LOCAL ? console.warn : null
+  if (IS_LOCAL) console.warn = () => {}
+  try {
+    auth = useOidcAuth()
+  } catch {
+    auth = undefined
+  } finally {
+    if (origWarn) console.warn = origWarn
+  }
+
   const [authConfig, setAuthConfig] = useState<CognitoAuthConfig | null>(null)
 
   useEffect(() => {
-    async function loadConfig() {
-      try {
-        const config = await createCognitoAuthConfig()
-        setAuthConfig(config)
-      } catch (error) {
-        console.error("Failed to load auth configuration for signOut:", error)
-      }
-    }
-
-    loadConfig()
+    if (IS_LOCAL) return
+    createCognitoAuthConfig()
+      .then(setAuthConfig)
+      .catch(e => console.error("Failed to load auth configuration for signOut:", e))
   }, [])
 
-  // If no AuthProvider context, return mock auth state (no authentication)
-  if (!auth) {
-    return {
-      isAuthenticated: true,
-      user: null,
-      signIn: () => {},
-      signOut: () => {},
-      isLoading: false,
-      error: null,
-      token: null,
-    }
+  // Local mode: always return mock auth
+  if (IS_LOCAL || !auth) {
+    return LOCAL_AUTH
   }
 
   return {
@@ -59,7 +70,7 @@ export function useAuth() {
         process.env.NEXT_PUBLIC_COGNITO_REDIRECT_URI ||
         "http://localhost:3000"
 
-      auth.signoutRedirect({
+      auth!.signoutRedirect({
         extraQueryParams: {
           client_id: clientId,
           logout_uri: logoutUri,
