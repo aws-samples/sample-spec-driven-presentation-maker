@@ -959,7 +959,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   )}
 
                   {/* Toggle: Parallel agents (experimental) — Cloud only, Local always uses parallel */}
-                  {!IS_LOCAL && (
+                  {!IS_LOCAL && agentMode === "spec" && (
                   <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
                     bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
                     <div className="flex flex-col gap-0.5 min-w-0">
