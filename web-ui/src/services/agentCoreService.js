@@ -30,10 +30,10 @@ export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
 /**
  * Invokes the AgentCore runtime with streaming support
  */
-export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode) => {
+export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode, deckId) => {
   // Local mode: proxy through Next.js API Route → kiro-cli acp
   if (IS_LOCAL) {
-    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode);
+    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId);
   }
 
   try {
@@ -202,16 +202,17 @@ export const generateSessionId = () => {
  * Reads SSE stream from /api/agent/invoke and feeds events through the same
  * strandsParser used by the cloud path, so ChatPanel works unchanged.
  */
-const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode) => {
+const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId) => {
   const response = await fetch('/api/agent/invoke', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, sessionId, mode: mode || 'spec' }),
+    body: JSON.stringify({ query, sessionId, mode: mode || 'spec', deckId: deckId || undefined }),
     signal,
   });
 
   if (!response.ok) {
     const errorText = await response.text();
+    console.error('[invokeLocal] error:', errorText);
     throw new Error(`Local agent error: ${response.status}: ${errorText}`);
   }
 
@@ -233,6 +234,7 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
         buffer = lines.pop() || '';
         for (const line of lines) {
           if (line.trim()) {
+            const prev = completion;
             completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
           }
         }
@@ -244,3 +246,31 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
 
   return completion;
 }
+
+/**
+ * Reconnect to a running background session using EventSource.
+ * Supports Last-Event-ID for seamless resume after disconnect.
+ * Returns a cleanup function, or null if no session is running.
+ */
+export const reconnectLocalSession = (deckId, onStreamUpdate, onToolUse) => {
+  if (!IS_LOCAL) return null;
+
+  const url = `/api/agent/stream?deckId=${encodeURIComponent(deckId)}`;
+  const es = new EventSource(url);
+  let completion = '';
+  if (parser.resetParserState) parser.resetParserState();
+
+  es.onmessage = (event) => {
+    const line = `data: ${event.data}`;
+    completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
+  };
+
+  es.onerror = () => {
+    // EventSource auto-reconnects with Last-Event-ID
+    // If server returns non-SSE (session ended), close
+    es.close();
+  };
+
+  // Return cleanup function
+  return () => es.close();
+};

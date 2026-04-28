@@ -10,12 +10,12 @@ import { spawn } from "child_process"
 import fs from "fs"
 import os from "os"
 import path from "path"
-import { getSessionId, ensureAgent } from "@/lib/local/acp-process"
+import { getSessionId, getActiveDeckId, getProcess } from "@/lib/local/acp-process"
 
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
 
 export async function POST(req: Request): Promise<Response> {
-  await ensureAgent()
+  const did = getActiveDeckId(); if (did) await getProcess(did)
   const sessionId = getSessionId()
   if (!sessionId) {
     return Response.json({ error: "No active session" }, { status: 400 })

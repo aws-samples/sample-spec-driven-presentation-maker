@@ -177,6 +177,16 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       try {
       const history = await getChatHistory(sessionId, idToken, deckId || undefined)
       if (history.length > 0) {
+        // Local mode: .chat.json is already in ChatPanel's internal format
+        if (IS_LOCAL && history[0]?.toolUses !== undefined) {
+          setMessages(history.map((m: Record<string, unknown>) => ({
+            role: (m.role as string) || "assistant",
+            content: (typeof m.content === "string" ? m.content : "") as string,
+            toolUses: (m.toolUses as ToolUse[]) || [],
+            blocks: (m.blocks as ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[]) || undefined,
+          })))
+          return
+        }
         const parsed: typeof messages = []
         for (const m of history) {
           let text = ""
@@ -284,6 +294,144 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     }
     if (auth.isAuthenticated) loadHistory()
   }, [sessionId, auth.isAuthenticated])
+
+  // Reconnect to running background session (Local mode)
+  // Uses EventSource with Last-Event-ID for seamless SSE resume.
+  useEffect(() => {
+    if (!IS_LOCAL || !deckId || deckId === "new") return
+    let es: EventSource | null = null
+    let completion = ""
+    // Track tool positions: toolUseId → character offset in completion text
+    const toolPositions = new Map<string, number>()
+    const toolOrder: string[] = []
+
+    function buildBlocks(text: string, toolUses: ToolUse[]) {
+      const blocks: ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[] = []
+      const toolMap = new Map(toolUses.map(t => [t.toolUseId, t]))
+      let textStart = 0
+      for (const id of toolOrder) {
+        const pos = toolPositions.get(id) ?? textStart
+        const tool = toolMap.get(id)
+        if (!tool) continue
+        const slice = text.slice(textStart, pos)
+        if (slice) blocks.push({ type: "text", text: slice })
+        blocks.push({ type: "tool", tool })
+        textStart = pos
+      }
+      const trailing = text.slice(textStart)
+      if (trailing) blocks.push({ type: "text", text: trailing })
+      return blocks
+    }
+
+    const timer = setTimeout(async () => {
+      // Check if running
+      try {
+        const check = await fetch(`/api/agent/stream?deckId=${encodeURIComponent(deckId)}`)
+        const ct = check.headers.get("content-type") || ""
+        try { check.body?.getReader()?.cancel() } catch {}
+        if (!ct.includes("text/event-stream")) return
+      } catch { return }
+
+      const { parseStreamingChunk, resetParserState } = await import("@/services/strandsParser")
+      if (resetParserState) resetParserState()
+
+      es = new EventSource(`/api/agent/stream?deckId=${encodeURIComponent(deckId)}`)
+
+      let receivedData = false
+      es.onmessage = (event) => {
+        if (!receivedData) { receivedData = true; setIsLoading(true) }
+        const line = "data: " + event.data
+        completion = parseStreamingChunk(
+          line,
+          completion,
+          (streamed: string) => {
+            setMessages((prev) => {
+              const updated = [...prev]
+              const last = updated[updated.length - 1]
+              if (last?.role === "assistant") {
+                const blocks = buildBlocks(streamed, last.toolUses)
+                updated[updated.length - 1] = { ...last, content: streamed, blocks }
+                return updated
+              }
+              return [...prev, { role: "assistant" as const, content: streamed, blocks: [{ type: "text" as const, text: streamed }], toolUses: [] }]
+            })
+          },
+          (toolName: string, toolUseData: ToolUseCallbackData | undefined) => {
+            if (toolUseData && 'started' in toolUseData && (toolUseData as Record<string, unknown>).started) {
+              const tuId = toolUseData.toolUseId || ""
+              toolPositions.set(tuId, completion.length)
+              if (!toolOrder.includes(tuId)) toolOrder.push(tuId)
+              setMessages((prev) => {
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                if (!last || last.role !== "assistant") return prev
+                // Skip if tool already exists (reconnect replay)
+                if (last.toolUses.some((t: ToolUse) => t.toolUseId === tuId)) return prev
+                const newTool = { toolUseId: tuId, name: toolName, input: toolUseData.input || {} }
+                const newToolUses = [...last.toolUses, newTool]
+                const blocks = buildBlocks(last.content, newToolUses)
+                updated[updated.length - 1] = { ...last, toolUses: newToolUses, blocks }
+                return updated
+              })
+            }
+            if (toolUseData?.completed) {
+              setMessages((prev) => {
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                if (!last || last.role !== "assistant") return prev
+                const newToolUses = last.toolUses.map((t: ToolUse) =>
+                  t.toolUseId === toolUseData.toolUseId ? { ...t, status: "success" as const, result: toolUseData.result } : t
+                )
+                updated[updated.length - 1] = { ...last, toolUses: newToolUses }
+                return updated
+              })
+              saveLocalChat()
+            }
+            // Handle toolStream (compose_slides sub-agent progress)
+            if (toolUseData?.stream && toolUseData?.toolUseId) {
+              const d = (toolUseData as Record<string, unknown>).data as Record<string, unknown> || {}
+              setMessages((prev) => {
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                if (!last || last.role !== "assistant") return prev
+                const idx = last.toolUses.findIndex((t: ToolUse) => t.toolUseId === toolUseData.toolUseId)
+                if (idx < 0) return prev
+                const newToolUses = [...last.toolUses]
+                const existing = newToolUses[idx].streamMessages || []
+                let next: typeof existing
+                if (d.toolResult) {
+                  next = existing.map((e: Record<string, unknown>) =>
+                    e.toolUseId === d.toolResult ? { ...e, status: d.toolStatus || "success" } : e
+                  )
+                } else if (d.tool) {
+                  const existingIdx = existing.findIndex((e: Record<string, unknown>) => e.toolUseId === d.toolUseId)
+                  if (existingIdx < 0) {
+                    next = [...existing, { tool: d.tool, group: d.group, slugs: d.slugs, toolUseId: d.toolUseId }]
+                  } else { next = existing }
+                } else if (d.status) {
+                  next = [...existing, { status: d.status, group: d.group, slugs: d.slugs, total_groups: d.total_groups }]
+                } else { return prev }
+                newToolUses[idx] = { ...newToolUses[idx], streamMessages: next }
+                const blocks = buildBlocks(last.content, newToolUses)
+                updated[updated.length - 1] = { ...last, toolUses: newToolUses, blocks }
+                return updated
+              })
+              if (d.status === "starting" || d.status === "done") saveLocalChat()
+            }
+          },
+        )
+      }
+
+      es.onerror = () => {
+        es?.close()
+        setIsLoading(false)
+        saveLocalChat()
+      }
+    }, 800)
+
+    return () => { clearTimeout(timer); es?.close() }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deckId])
 
   // Load deck list for @mentions
   useEffect(() => {
@@ -627,6 +775,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               updated[updated.length - 1] = { ...last, toolUses: newToolUses, blocks }
               return updated
             })
+            // Save chat on compose group start/done so switching decks preserves progress
+            if (d.status === "starting" || d.status === "done") saveLocalChat()
             return
           }
 
@@ -711,6 +861,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         },
         controller.signal,
         agentMode === "vibe" ? "vibe" : (parallelAgents ? "separated" : "single"),
+        currentDeckId.current !== "new" ? currentDeckId.current : undefined,
       )
     } catch (err) {
       // AbortError is expected when user clicks stop — don't show error

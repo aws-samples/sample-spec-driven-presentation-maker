@@ -1,19 +1,22 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Local ACP Agent Stop — cancel current prompt or reset session.
- * Local mode only.
+ * Local ACP Agent Stop — cancel a specific deck's prompt.
+ * newChat=true is a no-op (process is spawned on first invoke).
  */
-import { newSession, cancelAll, getSessionId } from "@/lib/local/acp-process"
+import { cancelDeck } from "@/lib/local/acp-process"
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}))
 
   if (body.newChat) {
-    await newSession()
-    return Response.json({ ok: true, sessionId: getSessionId() })
+    // No-op: new process will be spawned when user sends first message
+    return Response.json({ ok: true })
   }
 
-  cancelAll()
+  if (body.deckId) {
+    cancelDeck(body.deckId)
+  }
+  // Without deckId, do nothing — don't cancel all background processes
   return Response.json({ ok: true })
 }

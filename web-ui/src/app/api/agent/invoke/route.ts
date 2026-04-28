@@ -1,10 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Local ACP Agent Invoke — API Route that bridges kiro-cli acp to SSE.
- * Local mode only (`NEXT_PUBLIC_MODE=local`).
+ * Local ACP Agent Invoke — sends prompt to deck-specific kiro-cli process.
+ * Each deck gets its own process; switching decks doesn't interrupt others.
  */
-import { ensureAgent, newSession, getSessionId, rpcRequest, subscribe, saveSessionToDeck } from "@/lib/local/acp-process"
+import { sendPrompt, newProcess, associateDeck, saveSessionToDeck, markSessionRunning } from "@/lib/local/acp-process"
 import { createSSEStream } from "@/lib/local/sse-bridge"
 
 const MODE_TO_AGENT: Record<string, string> = {
@@ -14,24 +14,42 @@ const MODE_TO_AGENT: Record<string, string> = {
   single: "sdpm-spec",
 }
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: Request) {
-  const { query, mode } = await req.json()
-
+  const { query, mode, deckId } = await req.json()
   const agentName = MODE_TO_AGENT[mode || "spec"] || "sdpm-spec"
-  await ensureAgent(agentName)
 
-  const sessionId = getSessionId()!
+  let effectiveDeckId: string
+  let tempKey: string | null = null
+
+  if (deckId && deckId !== "new") {
+    effectiveDeckId = deckId
+  } else {
+    // New deck — spawn process with temp key
+    const { tempKey: tk } = await newProcess(agentName)
+    tempKey = tk
+    effectiveDeckId = tk
+  }
+
+  const { sessionId, subscribe, send } = await sendPrompt(effectiveDeckId, query, agentName)
+
+  // Create SSE stream (registers listener) BEFORE sending prompt
   const stream = createSSEStream({
     sessionId,
     subscribe,
-    onDeckId: (deckId) => saveSessionToDeck(deckId),
+    onDeckId: (createdDeckId) => {
+      if (tempKey) {
+        associateDeck(tempKey, createdDeckId)
+        tempKey = null
+      }
+      saveSessionToDeck(createdDeckId)
+    },
+    onDone: () => markSessionRunning(effectiveDeckId, false),
   })
 
-  // Send prompt (don't await — response comes via notifications)
-  rpcRequest("session/prompt", {
-    sessionId,
-    prompt: [{ type: "text", text: query }],
-  })
+  // Now send the prompt — listener is already registered
+  send()
 
   return new Response(stream, {
     headers: {

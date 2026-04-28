@@ -1,10 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * ACP Process Manager — spawns and manages a single kiro-cli acp child process.
+ * ACP Process Manager — manages multiple kiro-cli acp child processes,
+ * one per active deck. Enables background processing: switching decks
+ * does not interrupt running agents.
  *
- * Provides JSON-RPC request/response and notification subscription.
- * Singleton: one process shared across all API route invocations.
+ * Max MAX_PROCESSES concurrent processes. Idle processes are evicted LRU.
  */
 import { spawn, type ChildProcess } from "child_process"
 import path from "path"
@@ -12,199 +13,316 @@ import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
 
 export { DECK_ROOT }
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
+const MAX_PROCESSES = 3
 
 type PendingResolve = (value: unknown) => void
 type NotifyListener = (msg: Record<string, unknown>) => void
 
-let child: ChildProcess | null = null
-let requestId = 0
-let sessionId: string | null = null
-const subSessionIds = new Set<string>()
-const pending = new Map<number, PendingResolve>()
-const listeners = new Set<NotifyListener>()
-let lineBuffer = ""
+interface ProcessState {
+  child: ChildProcess
+  deckId: string
+  sessionId: string | null
+  agentName: string
+  requestId: number
+  pending: Map<number, PendingResolve>
+  listeners: Set<NotifyListener>
+  lineBuffer: string
+  running: boolean
+  notifications: { id: number; msg: Record<string, unknown> }[]
+  eventIdCounter: number
+  lastActivity: number
+  subSessionIds: Set<string>
+}
 
-function handleLine(line: string) {
+const processes = new Map<string, ProcessState>()
+let activeDeckId: string | null = null
+
+// Model info (shared, populated from first process)
+export interface AcpModel { modelId: string; name: string; description?: string }
+let currentModelId = ""
+let availableModels: AcpModel[] = []
+
+// ── Per-process helpers ──
+
+function handleLine(ps: ProcessState, line: string) {
   if (!line.trim()) return
   let msg: Record<string, unknown>
   try { msg = JSON.parse(line) } catch { return }
 
   // JSON-RPC response
-  if (msg.id != null && pending.has(msg.id as number)) {
-    const resolve = pending.get(msg.id as number)!
-    pending.delete(msg.id as number)
+  if (msg.id != null && ps.pending.has(msg.id as number)) {
+    const resolve = ps.pending.get(msg.id as number)!
+    ps.pending.delete(msg.id as number)
     resolve(msg.result)
-    // Also notify listeners for end_turn detection
-    for (const fn of listeners) fn(msg)
+    for (const fn of ps.listeners) fn(msg)
     return
   }
 
   // Auto-approve permission requests
   if (msg.method === "session/request_permission") {
     const reqId = msg.id as string
-    if (reqId && child) {
-      child.stdin!.write(JSON.stringify({
+    if (reqId && ps.child) {
+      ps.child.stdin!.write(JSON.stringify({
         jsonrpc: "2.0", id: reqId, result: { outcome: { outcome: "selected", optionId: "allow_always" } },
       }) + "\n")
     }
     return
   }
 
-  // Forward notifications to all listeners
-  // Track subagent session IDs
+  // Buffer notifications
   if (msg.method === "session/update" || msg.method === "_kiro.dev/session/update") {
     const p = msg.params as Record<string, unknown>
     const sid = p?.sessionId as string
-    if (sid && sid !== sessionId) subSessionIds.add(sid)
+    if (sid && sid !== ps.sessionId) ps.subSessionIds.add(sid)
+    ps.notifications.push({ id: ++ps.eventIdCounter, msg })
+    if (ps.notifications.length > 2000) ps.notifications.shift()
   }
-  for (const fn of listeners) fn(msg)
-}
 
-/** Send a JSON-RPC request and await the response. */
-export function rpcRequest(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
-  if (!child) throw new Error("ACP agent not started")
-  const id = ++requestId
-  const msg = JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"
-  child.stdin!.write(msg)
-  return new Promise((resolve) => { pending.set(id, resolve) })
-}
-
-/** Subscribe to JSON-RPC notifications. Returns unsubscribe function. */
-export function subscribe(fn: NotifyListener): () => void {
-  listeners.add(fn)
-  return () => { listeners.delete(fn) }
-}
-
-/** Send a fire-and-forget JSON-RPC notification (no id, no response). */
-export function rpcNotify(method: string, params: Record<string, unknown> = {}): void {
-  if (!child) return
-  child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n")
-}
-
-/** Cancel the current session and all subagent sessions. */
-export function cancelAll(): void {
-  if (!child) return
-  if (sessionId) {
-    rpcNotify("session/cancel", { sessionId })
-    for (const subId of subSessionIds) {
-      rpcNotify("session/cancel", { sessionId: subId })
+  // Detect end_turn
+  if (msg.id != null && msg.result) {
+    const r = msg.result as Record<string, unknown>
+    if (r.stopReason === "end_turn" || r.stopReason === "cancelled") {
+      ps.running = false
     }
-    subSessionIds.clear()
   }
-}
-export function getSessionId(): string | null { return sessionId }
 
-export interface AcpModel { modelId: string; name: string; description?: string }
-
-let currentModelId = ""
-let availableModels: AcpModel[] = []
-
-/** Get available models (populated after ensureAgent). */
-export function getModels(): { current: string; available: AcpModel[] } {
-  return { current: currentModelId, available: availableModels }
+  for (const fn of ps.listeners) fn(msg)
 }
 
-/** Set a session config option (e.g. model selection). */
-export async function setConfigOption(configId: string, value: string): Promise<void> {
-  if (!child || !sessionId) return
-  await rpcRequest("session/set_config_option", { sessionId, configId, value })
+function rpcRequestTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+  if (!ps.child) throw new Error("Process not running")
+  const id = ++ps.requestId
+  ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n")
+  return new Promise((resolve) => { ps.pending.set(id, resolve) })
 }
 
-let currentAgentName = "sdpm-spec"
+function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}): void {
+  if (!ps.child) return
+  ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n")
+}
 
-/** Ensure the ACP process is running and a session exists. */
-export async function ensureAgent(agentName: string = "sdpm-spec"): Promise<void> {
-  // If agent name changed, kill existing process to restart with new agent
-  if (child && agentName !== currentAgentName) {
-    const oldChild = child
-    child = null
-    sessionId = null
-    pending.clear()
-    listeners.clear()
-    lineBuffer = ""
-    oldChild.kill()
-    // Wait for process to exit before spawning new one
-    await new Promise<void>((resolve) => {
-      oldChild.on("close", () => resolve())
-      setTimeout(resolve, 3000) // fallback timeout
-    })
-  }
-  if (child) return
-
-  currentAgentName = agentName
-  const mcpLocalDir = MCP_LOCAL_DIR
-
-  child = spawn("kiro-cli", ["acp", "--agent", agentName], {
-    cwd: mcpLocalDir,
+async function spawnProcess(deckId: string, agentName: string): Promise<ProcessState> {
+  const child = spawn("kiro-cli", ["acp", "--agent", agentName], {
+    cwd: MCP_LOCAL_DIR,
     stdio: ["pipe", "pipe", "pipe"],
     env: { ...process.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT },
   })
-  const newChild = child
+
+  const ps: ProcessState = {
+    child, deckId, sessionId: null, agentName,
+    requestId: 0, pending: new Map(), listeners: new Set(),
+    lineBuffer: "", running: false, notifications: [], eventIdCounter: 0,
+    lastActivity: Date.now(), subSessionIds: new Set(),
+  }
 
   child.stdout!.setEncoding("utf-8")
   child.stdout!.on("data", (data: string) => {
-    lineBuffer += data
-    const lines = lineBuffer.split("\n")
-    lineBuffer = lines.pop() || ""
-    for (const l of lines) handleLine(l)
+    ps.lineBuffer += data
+    const lines = ps.lineBuffer.split("\n")
+    ps.lineBuffer = lines.pop() || ""
+    for (const l of lines) handleLine(ps, l)
   })
 
   child.stderr!.setEncoding("utf-8")
-  child.stderr!.on("data", (d: string) => console.warn("[acp stderr]", d))
+  child.stderr!.on("data", (d: string) => console.warn(`[acp:${deckId}] stderr:`, d.trim()))
 
   child.on("close", () => {
-    // Only reset if this is still the active child (not replaced by a new spawn)
-    if (child === newChild) {
-      child = null
-      sessionId = null
-      pending.clear()
-      listeners.clear()
-    }
+    processes.delete(deckId)
   })
 
-  await rpcRequest("initialize", {
+  // Initialize ACP
+  await rpcRequestTo(ps, "initialize", {
     protocolVersion: 1,
     clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
     clientInfo: { name: "sdpm-local", version: "0.1.0" },
   })
 
-  const AGENT_NAME = agentName
+  // Create session
+  const result = await rpcRequestTo(ps, "session/new", { cwd: MCP_LOCAL_DIR, mcpServers: [], agent: agentName }) as Record<string, unknown>
+  ps.sessionId = result.sessionId as string
 
-  const result = await rpcRequest("session/new", { cwd: MCP_LOCAL_DIR, mcpServers: [], agent: AGENT_NAME }) as Record<string, unknown>
-  sessionId = result.sessionId as string
-
-  // Extract model info from session/new response
-  const modelsData = result.models as { currentModelId?: string; availableModels?: AcpModel[] } | undefined
-  if (modelsData) {
-    currentModelId = modelsData.currentModelId || ""
-    availableModels = (modelsData.availableModels || [])
-      .filter(o => !o.description?.startsWith("[Internal]") && !o.description?.startsWith("[Deprecated]"))
+  // Extract model info from first process
+  if (!availableModels.length) {
+    const modelsData = result.models as { currentModelId?: string; availableModels?: AcpModel[] } | undefined
+    if (modelsData) {
+      currentModelId = modelsData.currentModelId || ""
+      availableModels = (modelsData.availableModels || [])
+        .filter(o => !o.description?.startsWith("[Internal]") && !o.description?.startsWith("[Deprecated]"))
+    }
   }
 
-  // Model preference is managed client-side via /api/agent/models PUT
+  return ps
 }
 
-/** Create a new ACP session (for new chat). */
-export async function newSession(agentName?: string): Promise<void> {
-  const agent = agentName || currentAgentName
-  const result = await rpcRequest("session/new", { cwd: MCP_LOCAL_DIR, mcpServers: [], agent }) as Record<string, unknown>
-  sessionId = result.sessionId as string
+async function evictIfNeeded(): Promise<void> {
+  if (processes.size < MAX_PROCESSES) return
+  // Find oldest idle process (not running, not active)
+  let oldest: ProcessState | null = null
+  for (const ps of processes.values()) {
+    if (ps.running || ps.deckId === activeDeckId) continue
+    if (!oldest || ps.lastActivity < oldest.lastActivity) oldest = ps
+  }
+  if (oldest) {
+    oldest.child.kill()
+    processes.delete(oldest.deckId)
+    // Wait briefly for cleanup
+    await new Promise(r => setTimeout(r, 500))
+  }
 }
 
-/** Load an existing ACP session (replays history via session/update notifications). */
-export async function loadSession(savedSessionId: string): Promise<void> {
-  await ensureAgent()
-  const result = await rpcRequest("session/load", { sessionId: savedSessionId, cwd: MCP_LOCAL_DIR, mcpServers: [] }) as Record<string, unknown> | undefined
-  sessionId = (result?.sessionId as string) || savedSessionId
+// ── Public API ──
+
+/** Get or create a process for a deck. */
+export async function getProcess(deckId: string, agentName: string = "sdpm-spec"): Promise<ProcessState> {
+  let ps = processes.get(deckId)
+  if (ps) {
+    ps.lastActivity = Date.now()
+    return ps
+  }
+  await evictIfNeeded()
+  ps = await spawnProcess(deckId, agentName)
+  processes.set(deckId, ps)
+  activeDeckId = deckId
+  return ps
+}
+
+/** Get or create a process for a new deck (no deckId yet). Returns temp key. */
+export async function newProcess(agentName: string = "sdpm-spec"): Promise<{ ps: ProcessState; tempKey: string }> {
+  // Reuse existing idle temp process if available
+  for (const [key, ps] of processes) {
+    if (key.startsWith("_new_") && !ps.running && ps.agentName === agentName) {
+      activeDeckId = key
+      return { ps, tempKey: key }
+    }
+  }
+  const tempKey = `_new_${Date.now()}`
+  await evictIfNeeded()
+  const ps = await spawnProcess(tempKey, agentName)
+  processes.set(tempKey, ps)
+  activeDeckId = tempKey
+  return { ps, tempKey }
+}
+
+/** Re-key a temp process to a real deckId. */
+export function associateDeck(tempKey: string, deckId: string): void {
+  const ps = processes.get(tempKey)
+  if (!ps) return
+  processes.delete(tempKey)
+  ps.deckId = deckId
+  processes.set(deckId, ps)
+  if (activeDeckId === tempKey) activeDeckId = deckId
+}
+
+/** Send a prompt to a deck's process. */
+export async function sendPrompt(deckId: string, text: string, agentName?: string): Promise<{ sessionId: string; subscribe: (fn: NotifyListener) => () => void; send: () => void }> {
+  const ps = await getProcess(deckId, agentName)
+  ps.running = true
+  ps.notifications = []; ps.eventIdCounter = 0
+  ps.lastActivity = Date.now()
+
+  // Return subscribe BEFORE sending prompt to avoid race condition.
+  // Caller must: subscribe → then call send().
+  return {
+    sessionId: ps.sessionId!,
+    subscribe: (fn: NotifyListener) => {
+      ps.listeners.add(fn)
+      return () => { ps.listeners.delete(fn) }
+    },
+    send: () => {
+      rpcRequestTo(ps, "session/prompt", {
+        sessionId: ps.sessionId,
+        prompt: [{ type: "text", text }],
+      })
+    },
+  }
+}
+
+/** Cancel a deck's active prompt. */
+export function cancelDeck(deckId: string): void {
+  const ps = processes.get(deckId)
+  if (!ps) return
+  if (ps.sessionId) {
+    rpcNotifyTo(ps, "session/cancel", { sessionId: ps.sessionId })
+    for (const subId of ps.subSessionIds) {
+      rpcNotifyTo(ps, "session/cancel", { sessionId: subId })
+    }
+    ps.subSessionIds.clear()
+  }
+}
+
+/** Cancel all processes (stop button with no specific deck). */
+export function cancelAll(): void {
+  for (const ps of processes.values()) {
+    if (ps.running && ps.sessionId) {
+      rpcNotifyTo(ps, "session/cancel", { sessionId: ps.sessionId })
+      for (const subId of ps.subSessionIds) {
+        rpcNotifyTo(ps, "session/cancel", { sessionId: subId })
+      }
+      ps.subSessionIds.clear()
+    }
+  }
+}
+
+/** Check if a deck has a running process. */
+export function isSessionRunning(deckId: string): boolean {
+  return processes.get(deckId)?.running ?? false
+}
+
+/** Mark running state. */
+export function markSessionRunning(deckId: string, running: boolean): void {
+  const ps = processes.get(deckId)
+  if (ps) ps.running = running
+}
+
+/** Drain buffered notifications for a deck. */
+export function getBufferedEvents(deckId: string, afterId?: number): { id: number; msg: Record<string, unknown> }[] {
+  const ps = processes.get(deckId)
+  if (!ps) return []
+  if (afterId == null) return [...ps.notifications]
+  return ps.notifications.filter(e => e.id > afterId)
+}
+
+/** Subscribe to a deck's process notifications. */
+export function subscribeToDeck(deckId: string): { sessionId: string | null; subscribe: (fn: NotifyListener) => () => void } | null {
+  const ps = processes.get(deckId)
+  if (!ps) return null
+  return {
+    sessionId: ps.sessionId,
+    subscribe: (fn: NotifyListener) => {
+      ps.listeners.add(fn)
+      return () => { ps.listeners.delete(fn) }
+    },
+  }
+}
+
+/** Get session ID for a deck. */
+export function getSessionId(deckId?: string): string | null {
+  const id = deckId || activeDeckId
+  if (!id) return null
+  return processes.get(id)?.sessionId ?? null
+}
+
+export function getActiveDeckId(): string | null { return activeDeckId }
+export function setActiveDeckId(id: string): void { activeDeckId = id }
+
+export function getModels(): { current: string; available: AcpModel[] } {
+  return { current: currentModelId, available: availableModels }
+}
+
+export async function setConfigOption(deckId: string, configId: string, value: string): Promise<void> {
+  const ps = processes.get(deckId)
+  if (!ps?.sessionId) return
+  await rpcRequestTo(ps, "session/set_config_option", { sessionId: ps.sessionId, configId, value })
 }
 
 /** Save sessionId to deck's .session file. */
 export function saveSessionToDeck(deckId: string): void {
-  if (!sessionId) return
+  const sid = getSessionId(deckId)
+  if (!sid) return
   const fs = require("fs") as typeof import("fs")
   const dir = resolveDeckDir(deckId)
   if (!dir || !fs.existsSync(dir)) return
-  fs.writeFileSync(path.join(dir, ".session"), sessionId, "utf-8")
+  fs.writeFileSync(path.join(dir, ".session"), sid, "utf-8")
 }
 
 /** Read sessionId from deck's .session file. */
@@ -233,5 +351,8 @@ export function readChatFromDeck(deckId: string): unknown[] {
 
 // Cleanup on process exit
 for (const sig of ["exit", "SIGINT", "SIGTERM"] as const) {
-  process.on(sig, () => { child?.kill(); child = null })
+  process.on(sig, () => {
+    for (const ps of processes.values()) ps.child.kill()
+    processes.clear()
+  })
 }

@@ -93,10 +93,20 @@ export function ChatPanelShell({
   const chatRef = externalChatRef || internalChatRef
   const panelRef = useRef<HTMLElement>(null)
 
-  // Start ACP agent early so model list is available immediately
+  // Fetch models; retry until available (first process populates model list)
   useEffect(() => {
     if (!IS_LOCAL) return
-    fetch("/api/agent/models").catch(() => {})
+    let cancelled = false
+    const poll = () => {
+      fetch("/api/agent/models").then(r => r.json()).then(data => {
+        if (cancelled) return
+        const avail = data.available || []
+        if (avail.length > 0) { setModels(avail); setCurrentModel(data.current || "") }
+        else setTimeout(poll, 3000) // retry until a process is spawned
+      }).catch(() => { if (!cancelled) setTimeout(poll, 3000) })
+    }
+    poll()
+    return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // When Panel A creates a deck, store the deckId so we know Panel A "owns" it

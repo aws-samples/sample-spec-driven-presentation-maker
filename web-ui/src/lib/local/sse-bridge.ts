@@ -11,6 +11,9 @@ interface BridgeOptions {
   sessionId: string
   subscribe: (fn: (msg: Record<string, unknown>) => void) => () => void
   onDeckId?: (deckId: string) => void
+  onDone?: () => void
+  /** Pre-buffered notifications to replay before subscribing to live events. */
+  replay?: { id: number; msg: Record<string, unknown> }[]
 }
 
 function extractSlugs(q: string): string {
@@ -18,7 +21,7 @@ function extractSlugs(q: string): string {
   return m ? m[1].trim() : ""
 }
 
-export function createSSEStream({ sessionId, subscribe, onDeckId }: BridgeOptions): ReadableStream {
+export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, replay }: BridgeOptions): ReadableStream {
   const encoder = new TextEncoder()
 
   return new ReadableStream({
@@ -28,20 +31,39 @@ export function createSSEStream({ sessionId, subscribe, onDeckId }: BridgeOption
       const subagentGroups = new Map<string, { group: number; slugs: string }>()
       const subagentQueryQueue: string[] = []
 
-      function send(event: Record<string, unknown>) {
-        try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`)) } catch {}
+      let eventId = 0
+      function send(event: Record<string, unknown>, id?: number) {
+        const eid = id ?? ++eventId
+        try { controller.enqueue(encoder.encode(`id: ${eid}\ndata: ${JSON.stringify(event)}\n\n`)) } catch {}
       }
 
       function close() {
         unsubscribe()
+        onDone?.()
         try { controller.close() } catch {}
       }
 
-      const unsubscribe = subscribe((msg) => {
+      // Replay buffered notifications first (for reconnecting to background sessions)
+      let replaying = true
+      if (replay?.length) {
+        for (const { id, msg } of replay) {
+          eventId = id  // sync event ID counter
+          processMsg(msg)
+        }
+      }
+      replaying = false
+
+      const unsubscribe = subscribe(processMsg)
+
+      function processMsg(msg: Record<string, unknown>) {
         // End turn from RPC response
         if (msg.id != null && msg.result) {
           const r = msg.result as Record<string, unknown>
-          if (r.stopReason === "end_turn" || r.stopReason === "cancelled") { close(); return }
+          if (r.stopReason === "end_turn" || r.stopReason === "cancelled") {
+            if (!replaying) { close(); return }
+            // During replay, ignore end_turn from old responses
+            return
+          }
         }
 
         if (msg.method !== "session/update" && msg.method !== "_kiro.dev/session/update") return
@@ -152,8 +174,8 @@ export function createSSEStream({ sessionId, subscribe, onDeckId }: BridgeOption
           }
         }
 
-        if (type === "turn_end" || type === "end_turn") { close() }
-      })
+        if (type === "turn_end" || type === "end_turn") { if (!replaying) close() }
+      }
     },
   })
 }
