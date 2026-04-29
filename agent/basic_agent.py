@@ -28,6 +28,8 @@ from strands.models.bedrock import CacheConfig
 from strands.tools.mcp import MCPClient
 from tools.upload_tools import list_uploads
 from tools.web_tools import web_fetch
+from tools.hearing_tool import hearing
+from partial_json_parser import loads as _partial_loads
 
 logger = logging.getLogger("sdpm.agent")
 
@@ -270,7 +272,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
 
     # Agent.__init__ triggers MCP client connections.
     # If optional MCP servers fail during init, retry with required-only.
-    tools = [*mcp_servers, list_uploads, web_fetch]
+    tools = [*mcp_servers, list_uploads, web_fetch, hearing]
     try:
         agent = Agent(
             name="SdpmAgent",
@@ -301,7 +303,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
         agent = Agent(
             name="SdpmAgent",
             system_prompt="",
-            tools=[*mcp_servers, list_uploads, web_fetch],
+            tools=[*mcp_servers, list_uploads, web_fetch, hearing],
             model=model,
             session_manager=session_manager,
             trace_attributes={"user.id": user_id, "session.id": session_id},
@@ -462,15 +464,28 @@ async def agent_stream(payload, context):
         pending = None
         last_tool_use = None
         last_tool_use_id = ""
+        last_yielded_input: dict = {}  # track last emitted partial input
         tool_name_map: dict[str, str] = {}  # toolUseId → tool name
         in_tool_execution = False  # True between toolUse emission and toolResult receipt
 
+        def _try_partial_parse(raw) -> dict | None:
+            """Attempt partial JSON parse for incremental toolUse streaming."""
+            if isinstance(raw, dict):
+                return raw if raw else None
+            if not isinstance(raw, str) or not raw:
+                return None
+            try:
+                parsed = _partial_loads(raw)
+                return parsed if isinstance(parsed, dict) and parsed else None
+            except Exception as exc:
+                logger.debug("Partial JSON parse failed (len=%d): %s", len(raw), exc)
+                return None
+
         def _tool_payload(tu: dict) -> dict:
             """Build toolUse SSE payload from accumulated tool use data."""
-            import json as _json
             raw = tu.get("input", "")
             try:
-                parsed = _json.loads(raw) if isinstance(raw, str) and raw else raw
+                parsed = json.loads(raw) if isinstance(raw, str) and raw else raw
             except (ValueError, TypeError):
                 parsed = {}
             return {"toolUse": {"name": tu.get("name", ""), "toolUseId": tu.get("toolUseId", ""), "input": parsed if isinstance(parsed, dict) else {}}}
@@ -502,10 +517,17 @@ async def agent_stream(payload, context):
                             if last_tool_use:
                                 yield _tool_payload(last_tool_use)
                             last_tool_use_id = tu_id
+                            last_yielded_input = {}
                             tool_name_map[tu_id] = tu.get("name", "")
                             in_tool_execution = True
                             yield {"toolStart": {"name": tu.get("name", ""), "toolUseId": tu_id}}
                         last_tool_use = dict(tu)
+                        # Early-emit partial input so UI can render incrementally
+                        raw_input = tu.get("input", "")
+                        parsed = _try_partial_parse(raw_input)
+                        if parsed and parsed != last_yielded_input:
+                            last_yielded_input = parsed
+                            yield {"toolUse": {"name": tu.get("name", ""), "toolUseId": tu_id, "input": parsed}}
                     elif isinstance(event, dict) and event.get("type") == "tool_result":
                         # ToolResultEvent — not yielded by stream_async (is_callback_event=False)
                         # Handled via ToolResultMessageEvent below instead
