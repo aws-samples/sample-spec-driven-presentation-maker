@@ -49,6 +49,10 @@ const PRESETS: AgentConfig[] = [
 const STORAGE_KEY = "sdpm-acp-agents"
 const ACTIVE_KEY = "sdpm-acp-active"
 
+// Local mode: use API routes for server-side persistence
+// Browser mode: fall back to localStorage
+const IS_LOCAL = typeof window !== "undefined" && process.env.NEXT_PUBLIC_MODE === "local"
+
 export function loadAgents(): AgentConfig[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
@@ -59,6 +63,13 @@ export function loadAgents(): AgentConfig[] {
 
 export function saveAgents(agents: AgentConfig[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(agents))
+  if (IS_LOCAL) {
+    fetch("/api/agent/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agents }),
+    }).catch(() => {})
+  }
 }
 
 export function getActiveAgentId(): string {
@@ -67,6 +78,13 @@ export function getActiveAgentId(): string {
 
 export function setActiveAgentId(id: string) {
   localStorage.setItem(ACTIVE_KEY, id)
+  if (IS_LOCAL) {
+    fetch("/api/agent/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activeAgent: id }),
+    }).catch(() => {})
+  }
 }
 
 export function getActiveAgent(): AgentConfig {

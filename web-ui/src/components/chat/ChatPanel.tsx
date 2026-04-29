@@ -108,6 +108,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const mentionPopupRef = useRef<{ _handleKeyDown?: (e: KeyboardEvent) => boolean } | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const reconnectingRef = useRef(false)
   const messagesRef = useRef(messages)
   messagesRef.current = messages
   const currentDeckId = useRef(deckId)
@@ -121,13 +122,15 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   /** Persist chat messages to disk (Local mode only, no-op otherwise). */
   const saveLocalChat = useCallback((overrideDeckId?: string) => {
     const did = overrideDeckId || currentDeckId.current
-    if (!IS_LOCAL || !did) return
+    if (!IS_LOCAL || !did || reconnectingRef.current) return
     fetch("/api/agent/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deckId: did, messages: messagesRef.current }),
     }).catch(() => {})
   }, [])
+
+
 
   /**
    * Insert text at the current cursor position in the textarea.
@@ -335,11 +338,20 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       const { parseStreamingChunk, resetParserState } = await import("@/services/strandsParser")
       if (resetParserState) resetParserState()
 
+      reconnectingRef.current = true
       es = new EventSource(`/api/agent/stream?deckId=${encodeURIComponent(deckId)}`)
 
       let receivedData = false
+      let replayDone = false
       es.onmessage = (event) => {
         if (!receivedData) { receivedData = true; setIsLoading(true) }
+        // After replay, live events arrive with delay. Once we get data
+        // and toolOrder has been populated, replay is effectively done.
+        if (!replayDone && toolOrder.length > 0) {
+          replayDone = true
+          reconnectingRef.current = false
+          setTimeout(() => saveLocalChat(), 200)
+        }
         const line = "data: " + event.data
         completion = parseStreamingChunk(
           line,
@@ -349,8 +361,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               const updated = [...prev]
               const last = updated[updated.length - 1]
               if (last?.role === "assistant") {
-                const blocks = buildBlocks(streamed, last.toolUses)
-                updated[updated.length - 1] = { ...last, content: streamed, blocks }
+                // Only rebuild blocks if we have tool position info;
+                // otherwise preserve existing blocks from loadHistory
+                const hasPositions = toolOrder.length > 0
+                const blocks = hasPositions ? buildBlocks(streamed, last.toolUses) : last.blocks
+                updated[updated.length - 1] = { ...last, content: streamed, ...(blocks ? { blocks } : {}) }
                 return updated
               }
               return [...prev, { role: "assistant" as const, content: streamed, blocks: [{ type: "text" as const, text: streamed }], toolUses: [] }]
@@ -423,13 +438,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       }
 
       es.onerror = () => {
-        es?.close()
-        setIsLoading(false)
-        saveLocalChat()
+        if (es?.readyState === EventSource.CLOSED) {
+          reconnectingRef.current = false
+          setIsLoading(false)
+        }
       }
     }, 800)
 
-    return () => { clearTimeout(timer); es?.close() }
+    return () => { clearTimeout(timer); es?.close(); reconnectingRef.current = false }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deckId])
 
@@ -775,8 +791,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               updated[updated.length - 1] = { ...last, toolUses: newToolUses, blocks }
               return updated
             })
-            // Save chat on compose group start/done so switching decks preserves progress
-            if (d.status === "starting" || d.status === "done") saveLocalChat()
+            // Save chat on compose events so switching decks preserves subagent progress
+            // setTimeout lets React render first so messagesRef.current is up to date
+            if (d.status === "starting" || d.status === "done" || d.toolResult) setTimeout(() => saveLocalChat(), 100)
             return
           }
 
@@ -858,6 +875,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             updated[updated.length - 1] = { ...last, content: lastTextSnapshot, blocks, toolUses: newToolUses }
             return updated
           })
+          // Save after tool added (ensures compose_slides is persisted before user switches)
+          if (!toolUseData?.completed) setTimeout(() => saveLocalChat(), 100)
         },
         controller.signal,
         agentMode === "vibe" ? "vibe" : (parallelAgents ? "separated" : "single"),

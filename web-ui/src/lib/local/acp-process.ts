@@ -10,6 +10,7 @@
 import { spawn, type ChildProcess } from "child_process"
 import path from "path"
 import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
+import { getActiveAgent, type AgentConfig } from "./acp-adapter"
 
 export { DECK_ROOT }
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
@@ -30,6 +31,9 @@ interface ProcessState {
   running: boolean
   notifications: { id: number; msg: Record<string, unknown> }[]
   eventIdCounter: number
+  // Server-side chat state — updated from notifications, saved to .chat.json
+  chatMessages: Record<string, unknown>[]
+  chatDirty: boolean
   lastActivity: number
   subSessionIds: Set<string>
 }
@@ -54,7 +58,92 @@ function handleLine(ps: ProcessState, line: string) {
     const resolve = ps.pending.get(msg.id as number)!
     ps.pending.delete(msg.id as number)
     resolve(msg.result)
-    for (const fn of ps.listeners) fn(msg)
+    // Server-side chat state tracking — updates .chat.json independent of browser
+  if (msg.method === "session/update" || msg.method === "_kiro.dev/session/update") {
+    const p = msg.params as Record<string, unknown>
+    const update = p?.update as Record<string, unknown>
+    if (update) {
+      const type = update.sessionUpdate as string
+      const msgSid = p?.sessionId as string
+
+      // Only track main session messages (not subagent)
+      if (msgSid === ps.sessionId) {
+        if (type === "agent_message_chunk") {
+          const content = update.content as Record<string, unknown>
+          if (content?.text) {
+            // Append text to last assistant message
+            let last = ps.chatMessages[ps.chatMessages.length - 1] as Record<string, unknown> | undefined
+            if (!last || last.role !== "assistant") {
+              last = { role: "assistant", content: "", toolUses: [], blocks: [] }
+              ps.chatMessages.push(last)
+            }
+            last.content = (last.content as string || "") + (content.text as string)
+            ps.chatDirty = true
+          }
+        }
+        if (type === "tool_call" || type === "tool_call_chunk") {
+          const toolCallId = (update.toolCallId || "") as string
+          const title = (update.title || update.name || "") as string
+          const name = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title
+          const input = (update.rawInput || update.input || {}) as Record<string, unknown>
+          let last = ps.chatMessages[ps.chatMessages.length - 1] as Record<string, unknown> | undefined
+          if (!last || last.role !== "assistant") {
+            last = { role: "assistant", content: "", toolUses: [], blocks: [] }
+            ps.chatMessages.push(last)
+          }
+          const toolUses = (last.toolUses as Record<string, unknown>[]) || []
+          if (!toolUses.some(t => t.toolUseId === toolCallId)) {
+            toolUses.push({ toolUseId: toolCallId, name, input, streamMessages: [] })
+            last.toolUses = toolUses
+            ps.chatDirty = true
+          }
+        }
+        if (type === "tool_call_update") {
+          const status = update.status as string
+          const toolCallId = (update.toolCallId || "") as string
+          if (status === "completed" || status === "error") {
+            const last = ps.chatMessages[ps.chatMessages.length - 1] as Record<string, unknown> | undefined
+            if (last) {
+              const toolUses = (last.toolUses as Record<string, unknown>[]) || []
+              const tool = toolUses.find(t => t.toolUseId === toolCallId)
+              if (tool) {
+                tool.status = status === "completed" ? "success" : "error"
+                ps.chatDirty = true
+              }
+            }
+          }
+        }
+      }
+
+      // Track subagent toolStream events
+      if (msgSid !== ps.sessionId && ps.subSessionIds.has(msgSid)) {
+        const last = ps.chatMessages[ps.chatMessages.length - 1] as Record<string, unknown> | undefined
+        if (last) {
+          const toolUses = (last.toolUses as Record<string, unknown>[]) || []
+          // Find compose_slides tool (the one with streamMessages)
+          const composeTool = toolUses.find(t => (t.streamMessages as unknown[])?.length >= 0 && (t.name === "compose_slides" || t.name === "subagent" || (t.name as string)?.includes("subagent")))
+          if (composeTool) {
+            const sm = (composeTool.streamMessages as Record<string, unknown>[]) || []
+            if (type === "tool_call") {
+              const title = (update.title || "") as string
+              const toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title
+              sm.push({ tool: toolName, group: 0, toolUseId: update.toolCallId })
+              composeTool.streamMessages = sm
+              ps.chatDirty = true
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Periodically flush dirty chat to .chat.json
+  if (ps.chatDirty && ps.deckId && !ps.deckId.startsWith("_new_")) {
+    ps.chatDirty = false
+    saveChatToDeck(ps.deckId, ps.chatMessages)
+  }
+
+  for (const fn of ps.listeners) fn(msg)
     return
   }
 
@@ -82,6 +171,7 @@ function handleLine(ps: ProcessState, line: string) {
   if (msg.id != null && msg.result) {
     const r = msg.result as Record<string, unknown>
     if (r.stopReason === "end_turn" || r.stopReason === "cancelled") {
+
       ps.running = false
     }
   }
@@ -101,17 +191,26 @@ function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, un
   ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n")
 }
 
-async function spawnProcess(deckId: string, agentName: string): Promise<ProcessState> {
-  const child = spawn("kiro-cli", ["acp", "--agent", agentName], {
+async function spawnProcess(deckId: string, agentName: string, adapter?: AgentConfig): Promise<ProcessState> {
+  const cfg = adapter || getActiveAgent()
+  // For kiro-cli, replace agent name in args if agentFlag is set
+  let args = [...cfg.args]
+  // For kiro-cli, replace agent name in args (--agent <name>)
+  const flagIdx = args.indexOf("--agent")
+  if (flagIdx >= 0 && flagIdx + 1 < args.length) {
+    args[flagIdx + 1] = agentName
+  }
+  const child = spawn(cfg.path, args, {
     cwd: MCP_LOCAL_DIR,
     stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT },
+    env: { ...process.env, ...cfg.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT },
   })
 
   const ps: ProcessState = {
     child, deckId, sessionId: null, agentName,
     requestId: 0, pending: new Map(), listeners: new Set(),
     lineBuffer: "", running: false, notifications: [], eventIdCounter: 0,
+    chatMessages: [], chatDirty: false,
     lastActivity: Date.now(), subSessionIds: new Set(),
   }
 
@@ -220,8 +319,10 @@ export async function sendPrompt(deckId: string, text: string, agentName?: strin
   ps.notifications = []; ps.eventIdCounter = 0
   ps.lastActivity = Date.now()
 
-  // Return subscribe BEFORE sending prompt to avoid race condition.
-  // Caller must: subscribe → then call send().
+  // Initialize server-side chat state with user message
+  ps.chatMessages = [{ role: "user", content: text, toolUses: [] }]
+  ps.chatDirty = false
+
   return {
     sessionId: ps.sessionId!,
     subscribe: (fn: NotifyListener) => {

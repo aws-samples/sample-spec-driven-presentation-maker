@@ -4,7 +4,7 @@
  * Local ACP Agent Invoke — sends prompt to deck-specific kiro-cli process.
  * Each deck gets its own process; switching decks doesn't interrupt others.
  */
-import { sendPrompt, newProcess, associateDeck, saveSessionToDeck, markSessionRunning } from "@/lib/local/acp-process"
+import { sendPrompt, newProcess, associateDeck, saveSessionToDeck } from "@/lib/local/acp-process"
 import { createSSEStream } from "@/lib/local/sse-bridge"
 
 const MODE_TO_AGENT: Record<string, string> = {
@@ -45,7 +45,8 @@ export async function POST(req: Request) {
       }
       saveSessionToDeck(createdDeckId)
     },
-    onDone: () => markSessionRunning(effectiveDeckId, false),
+    // onDone intentionally omitted — SSE close happens when browser navigates away,
+    // not when agent finishes. running=false is set by handleLine on end_turn.
   })
 
   // Now send the prompt — listener is already registered
