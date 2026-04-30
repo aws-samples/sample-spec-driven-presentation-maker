@@ -335,6 +335,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         if (!ct.includes("text/event-stream")) return
       } catch { return }
 
+      setIsLoading(true)  // Immediately show loading — agent is running in background
+
       const { parseStreamingChunk, resetParserState } = await import("@/services/strandsParser")
       if (resetParserState) resetParserState()
 
@@ -344,7 +346,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       let receivedData = false
       let replayDone = false
       es.onmessage = (event) => {
-        if (!receivedData) { receivedData = true; setIsLoading(true) }
+        if (!receivedData) { receivedData = true }
         // After replay, live events arrive with delay. Once we get data
         // and toolOrder has been populated, replay is effectively done.
         if (!replayDone && toolOrder.length > 0) {

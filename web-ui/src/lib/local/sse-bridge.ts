@@ -174,7 +174,9 @@ export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, replay
           }
         }
 
-        if (type === "turn_end" || type === "end_turn") { if (!replaying) close() }
+        // Don't close on session/update turn_end — it may fire before
+        // compose_slides tool_call_update(completed). Close only on
+        // RPC response end_turn (line 62 above).
       }
     },
   })

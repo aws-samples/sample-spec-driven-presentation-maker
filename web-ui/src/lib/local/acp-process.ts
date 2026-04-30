@@ -163,6 +163,12 @@ function handleLine(ps: ProcessState, line: string) {
     const p = msg.params as Record<string, unknown>
     const sid = p?.sessionId as string
     if (sid && sid !== ps.sessionId) ps.subSessionIds.add(sid)
+    // Detect subagent turn_end → remove from active set
+    const upd = p?.update as Record<string, unknown> | undefined
+    const updType = upd?.sessionUpdate as string | undefined
+    if ((updType === "turn_end" || updType === "end_turn") && sid && sid !== ps.sessionId) {
+      ps.subSessionIds.delete(sid)
+    }
     ps.notifications.push({ id: ++ps.eventIdCounter, msg })
     if (ps.notifications.length > 2000) ps.notifications.shift()
   }
@@ -171,8 +177,9 @@ function handleLine(ps: ProcessState, line: string) {
   if (msg.id != null && msg.result) {
     const r = msg.result as Record<string, unknown>
     if (r.stopReason === "end_turn" || r.stopReason === "cancelled") {
-
-      ps.running = false
+      if (ps.subSessionIds.size === 0) {
+        ps.running = false
+      }
     }
   }
 

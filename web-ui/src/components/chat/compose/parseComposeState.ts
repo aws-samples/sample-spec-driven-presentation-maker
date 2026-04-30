@@ -47,8 +47,7 @@ export function parseComposeState(
   streamMessages: Record<string, unknown>[],
   input?: Record<string, unknown>,
 ): ComposeState {
-  const rawGroups = input?.slide_groups
-  const slideGroups: SlideGroup[] = Array.isArray(rawGroups) ? rawGroups : []
+  const slideGroups = (input?.slide_groups as SlideGroup[] | undefined) || []
 
   // Discover agents from either input (if already present) or stream events.
   // Key by groupIndex (authoritative from backend); slugs may be missing on some events.
