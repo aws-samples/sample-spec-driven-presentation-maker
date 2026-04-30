@@ -109,7 +109,7 @@ Custom templates can also be placed outside the package, so they survive a
 searches the following locations in order and merges the results in
 `list_templates`:
 
-1. Directories listed in `$SDPM_TEMPLATES_DIR` (colon-separated, same semantics as `PATH`)
+1. Directories listed in `$SDPM_TEMPLATES_DIR` (platform path separator: `:` on Unix, `;` on Windows — same semantics as `PATH`)
 2. `~/.config/sdpm/templates/`
 3. `skill/templates/` (package-bundled)
 

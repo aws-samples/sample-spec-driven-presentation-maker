@@ -108,7 +108,7 @@ skill/templates/
 `pip install --upgrade` やリポジトリの再 clone でも消えません。Kiro CLI /
 `pptx_builder.py` は以下の順で検索し、`list_templates` ではマージして表示します。
 
-1. `$SDPM_TEMPLATES_DIR` に列挙されたディレクトリ (コロン区切り、`PATH` と同じセマンティクス)
+1. `$SDPM_TEMPLATES_DIR` に列挙されたディレクトリ (プラットフォームのパス区切り文字: Unixは `:`、Windowsは `;` — `PATH` と同じセマンティクス)
 2. `~/.config/sdpm/templates/`
 3. `skill/templates/` (パッケージ同梱)
 
