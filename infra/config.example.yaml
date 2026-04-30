@@ -28,6 +28,20 @@ model:
   modelId: "global.anthropic.claude-sonnet-4-6"
   # modelId: "global.anthropic.claude-opus-4-6-v1"
 
+  # Optional — enable per-user model switching in the Settings Sheet.
+  # Comment out any model you don't want to expose to end users.
+  # All entries must be registered in infra/lib/model-metadata.ts.
+  # The modelId above must appear in this list when set.
+  # allowedModelIds:
+  #   - "global.anthropic.claude-sonnet-4-6"           # recommended (matches modelId)
+  #   - "global.anthropic.claude-opus-4-7"
+  #   - "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+  #   - "moonshotai.kimi-k2.5"
+  #   - "deepseek.v3.2"
+  #   - "qwen.qwen3-235b-a22b-2507-v1:0"
+  #   - "us.amazon.nova-pro-v1:0"
+  #   - "us.amazon.nova-lite-v1:0"
+
 # WAF IP address restriction (optional).
 # When specified, only the listed IP ranges can access CloudFront and API Gateway.
 # waf:

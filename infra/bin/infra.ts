@@ -26,6 +26,7 @@ import { RuntimeStack } from "../lib/runtime-stack";
 import { AgentStack } from "../lib/agent-stack";
 import { WebUiStack } from "../lib/web-ui-stack";
 import { CloudFrontWafStack } from "../lib/cloudfront-waf-stack";
+import { MODEL_METADATA } from "../lib/model-metadata";
 
 // Load deployment configuration
 const configPath = path.join(__dirname, "../config.yaml");
@@ -78,6 +79,39 @@ const runtime = new RuntimeStack(app, "SdpmRuntime", {
   vectorIndexName: data.vectorIndexName || undefined,
 });
 
+// --- Model configuration & validation ---
+const defaultModelId: string = config.model?.modelId ?? "global.anthropic.claude-sonnet-4-6";
+const allowedModelIds: string[] = config.model?.allowedModelIds ?? [];
+
+if (allowedModelIds.length > 0) {
+  if (!allowedModelIds.includes(defaultModelId)) {
+    throw new Error(
+      `Config error: model.modelId "${defaultModelId}" is not in model.allowedModelIds. ` +
+      `Add it to the list, or remove allowedModelIds.`,
+    );
+  }
+  const seen = new Set<string>();
+  for (const id of allowedModelIds) {
+    if (seen.has(id)) {
+      throw new Error(`Config error: model.allowedModelIds contains duplicate "${id}".`);
+    }
+    seen.add(id);
+    if (!(id in MODEL_METADATA)) {
+      throw new Error(
+        `Config error: modelId "${id}" is not registered in infra/lib/model-metadata.ts. ` +
+        `Add an entry there, or remove "${id}" from model.allowedModelIds. ` +
+        `Known IDs: ${Object.keys(MODEL_METADATA).sort().join(", ")}`,
+      );
+    }
+  }
+}
+
+const allowedModels = allowedModelIds.map((id) => ({
+  modelId: id,
+  displayName: MODEL_METADATA[id].displayName,
+  description: MODEL_METADATA[id].description,
+}));
+
 // --- WAF IP restriction (optional) ---
 const allowedIpV4AddressRanges: string[] | undefined = config.waf?.allowedIpV4AddressRanges;
 const allowedIpV6AddressRanges: string[] | undefined = config.waf?.allowedIpV6AddressRanges;
@@ -104,6 +138,7 @@ if (config.stacks?.agent) {
     oidcDiscoveryUrl,
     allowedClients,
     modelId: config.model?.modelId,
+    allowedModelIds,
   });
 
   if (config.stacks?.webUi) {
@@ -127,6 +162,8 @@ if (config.stacks?.agent) {
       webAclId: cloudFrontWafStack?.webAclArn,
       allowedIpV4AddressRanges,
       allowedIpV6AddressRanges,
+      defaultModelId,
+      allowedModels,
     });
   }
 }

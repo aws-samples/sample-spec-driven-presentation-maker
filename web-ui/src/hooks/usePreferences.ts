@@ -14,6 +14,7 @@ interface Prefs {
   sendWithEnter: boolean
   viewMode: "full" | "grid"
   fetchWebImages: boolean
+  modelId?: string
 }
 
 const DEFAULTS: Prefs = { sendWithEnter: false, viewMode: "full", fetchWebImages: false }
@@ -51,5 +52,7 @@ export function usePreferences() {
     setViewMode: useCallback((v: "full" | "grid") => update({ viewMode: v }), [update]),
     fetchWebImages: prefs.fetchWebImages,
     setFetchWebImages: useCallback((v: boolean) => update({ fetchWebImages: v }), [update]),
+    modelId: prefs.modelId,
+    setModelId: useCallback((v: string | undefined) => update({ modelId: v }), [update]),
   }
 }

@@ -31,6 +31,8 @@ interface AgentStackProps extends cdk.StackProps {
   allowedClients: string[];
   /** Bedrock model ID from config.yaml. Overridable via CDK context -c modelId=... */
   modelId?: string;
+  /** Allowed model IDs for per-user model switching; empty = feature disabled. */
+  allowedModelIds: string[];
 }
 
 export class AgentStack extends cdk.Stack {
@@ -158,6 +160,7 @@ export class AgentStack extends cdk.Stack {
       environmentVariables: {
         MCP_RUNTIME_ARN: props.mcpRuntimeArn,
         MODEL_ID: this.node.tryGetContext("modelId") || props.modelId || "global.anthropic.claude-sonnet-4-6",
+        ALLOWED_MODEL_IDS: JSON.stringify(props.allowedModelIds ?? []),
         MEMORY_ID: memoryId,
         DECKS_TABLE: props.table.tableName,
         PPTX_BUCKET: props.pptxBucket.bucketName,

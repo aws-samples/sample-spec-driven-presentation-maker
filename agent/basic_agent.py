@@ -35,6 +35,29 @@ logger = logging.getLogger("sdpm.agent")
 
 app = BedrockAgentCoreApp()
 
+_ALLOWED_MODEL_IDS: set[str] = set(json.loads(os.environ.get("ALLOWED_MODEL_IDS", "[]")))
+_DEFAULT_MODEL_ID: str = os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-4-6")
+
+
+def _resolve_model_id(requested: str | None) -> str:
+    """Resolve the effective Bedrock model ID for this invocation.
+
+    Resolution order:
+        1. If the allowed list is empty (feature not enabled),
+           ignore requested and return the default.
+        2. If requested is in the allowed list, use it.
+        3. Otherwise, use the default (log warning if requested was present but stale).
+    """
+    if not _ALLOWED_MODEL_IDS:
+        if requested:
+            logger.warning("modelId %r received but allowed list is empty; feature not enabled", requested)
+        return _DEFAULT_MODEL_ID
+    if requested and requested in _ALLOWED_MODEL_IDS:
+        return requested
+    if requested:
+        logger.warning("Requested modelId %r not in allowed list; falling back to default", requested)
+    return _DEFAULT_MODEL_ID
+
 
 # ---------------------------------------------------------------------------
 # MCP Servers
@@ -211,7 +234,7 @@ def _collect_mcp_instructions(mcp_servers: list[MCPClient]) -> str:
     return "\n\n".join(sections)
 
 
-def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, list[dict]]:
+def create_agent(user_id: str, session_id: str, jwt_token: str, model_id: str | None = None) -> tuple[Agent, list[dict]]:
     """Create a Strands Agent with MCP tools and memory.
 
     MCP servers are initialized first so that server_instructions can be
@@ -246,7 +269,7 @@ def create_agent(user_id: str, session_id: str, jwt_token: str) -> tuple[Agent, 
         )
 
     model = BedrockModel(
-        model_id=os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-4-6"),
+        model_id=_resolve_model_id(model_id),
         temperature=0.1,
         cache_config=CacheConfig(strategy="auto"),
     )
@@ -449,7 +472,8 @@ async def agent_stream(payload, context):
 
     try:
         os.environ["_CURRENT_SESSION_ID"] = session_id
-        agent, mcp_status = create_agent(user_id=user_id, session_id=session_id, jwt_token=jwt_token)
+        requested_model_id = payload.get("modelId") if isinstance(payload, dict) else None
+        agent, mcp_status = create_agent(user_id=user_id, session_id=session_id, jwt_token=jwt_token, model_id=requested_model_id)
 
         # Emit MCP status as the first SSE event
         yield {"mcp_status": mcp_status}

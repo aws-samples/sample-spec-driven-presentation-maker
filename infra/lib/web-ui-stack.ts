@@ -57,6 +57,10 @@ interface WebUiStackProps extends cdk.StackProps {
   allowedIpV4AddressRanges?: string[];
   /** Allowed IPv6 CIDR ranges for regional WAF. */
   allowedIpV6AddressRanges?: string[];
+  /** Default model ID (for "Recommended" badge in Settings). */
+  defaultModelId: string;
+  /** Allowed models with resolved display metadata. */
+  allowedModels: Array<{ modelId: string; displayName: string; description?: string }>;
 }
 
 export class WebUiStack extends cdk.Stack {
@@ -328,11 +332,17 @@ function handler(event) {
     // Bundle the web-ui at synth time so changes are auto-picked up without a
     // manual `npm run build`. Prefers local Node.js; falls back to Docker.
     const webUiDir = path.join(__dirname, "../../web-ui");
+    const allowedModelsJson = JSON.stringify(props.allowedModels);
+    const defaultModelIdStr = props.defaultModelId;
     const deployment = new s3deploy.BucketDeployment(this, "DeploySite", {
       sources: [
         s3deploy.Source.asset(webUiDir, {
           bundling: {
             image: cdk.DockerImage.fromRegistry("node:20-slim"),
+            environment: {
+              NEXT_PUBLIC_ALLOWED_MODELS: allowedModelsJson,
+              NEXT_PUBLIC_DEFAULT_MODEL_ID: defaultModelIdStr,
+            },
             command: [
               "bash", "-c",
               "npm ci && npm run build && cp -r build/. /asset-output/",
@@ -345,8 +355,13 @@ function handler(event) {
                 } catch {
                   return false;
                 }
-                execSync("npm ci", { cwd: webUiDir, stdio: "inherit" });
-                execSync("npm run build", { cwd: webUiDir, stdio: "inherit" });
+                const envForBuild = {
+                  ...process.env,
+                  NEXT_PUBLIC_ALLOWED_MODELS: allowedModelsJson,
+                  NEXT_PUBLIC_DEFAULT_MODEL_ID: defaultModelIdStr,
+                };
+                execSync("npm ci", { cwd: webUiDir, stdio: "inherit", env: envForBuild });
+                execSync("npm run build", { cwd: webUiDir, stdio: "inherit", env: envForBuild });
                 execSync(`cp -r ${webUiDir}/build/. ${outputDir}/`, { stdio: "inherit" });
                 return true;
               },
