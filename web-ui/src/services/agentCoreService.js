@@ -11,6 +11,21 @@
  * To support other agent frameworks, create a new parser file and update config.yaml.
  */
 
+import { getAllowedModels } from "@/lib/allowedModels";
+
+// Read the user's selected model from localStorage, validated against the allowed list.
+function readSelectedModelId() {
+  try {
+    const allowed = getAllowedModels();
+    if (allowed.length === 0) return undefined;
+    const prefs = JSON.parse(localStorage.getItem("sdpm-prefs") || "{}");
+    if (prefs.modelId && allowed.some((m) => m.modelId === prefs.modelId)) {
+      return prefs.modelId;
+    }
+  } catch { /* ignore */ }
+  return undefined;
+}
+
 // Generate a UUID
 const generateId = () => {
   return crypto.randomUUID();
@@ -74,10 +89,12 @@ export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessTo
     }
 
     // Create the payload
+    const selectedModelId = readSelectedModelId();
     const payload = {
       prompt: query,
       runtimeSessionId: sessionId,
       userId: userId,
+      ...(selectedModelId ? { modelId: selectedModelId } : {}),
     }
 
     const response = await fetch(url, {
