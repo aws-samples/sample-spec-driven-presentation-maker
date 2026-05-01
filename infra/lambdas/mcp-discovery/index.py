@@ -7,21 +7,31 @@ Routes:
 - GET  /authorize                 (proxy to Cognito with scope injection)
 - POST /token                     (proxy to Cognito token endpoint)
 - ANY  / or /mcp                  (Bearer auth required, proxied to AgentCore)
+
+Uses urllib3 (not urllib.request) for upstream HTTP calls so the library only
+speaks HTTP/HTTPS, eliminating the file:// scheme exposure that urllib.request
+allows. urllib3 ships with the Lambda Python runtime via boto3, so no extra
+package install is needed.
 """
 
 import json
 import os
-import urllib.error
 import urllib.parse
-import urllib.request
 
 import boto3
+import urllib3
 
 COGNITO_DOMAIN = os.environ["COGNITO_DOMAIN"]
 ISSUER = os.environ["ISSUER"]
 RUNTIME_URL = os.environ["RUNTIME_URL"]
 USER_POOL_ID = os.environ["USER_POOL_ID"]
 MCP_SCOPES = [s for s in os.environ.get("MCP_SCOPES", "openid,profile,email").split(",") if s]
+
+# Upstream HTTP client. Lambda timeout is 30s, so leave some headroom for
+# handler overhead. connect timeout is short enough to surface unreachable
+# endpoints quickly without cutting slow-but-valid responses.
+_UPSTREAM_TIMEOUT = urllib3.Timeout(connect=5.0, read=25.0)
+_http = urllib3.PoolManager(timeout=_UPSTREAM_TIMEOUT)
 
 
 def handler(event, context):
@@ -92,21 +102,18 @@ def handler(event, context):
                 "headers": {"Location": f"{COGNITO_DOMAIN}/oauth2/authorize?{new_qs}"}}
 
     if path == "/token" and method == "POST":
+        # OAuth token endpoint is always application/x-www-form-urlencoded.
+        # Don't forward the client's Content-Type header — we know what it must be.
         body = _body(event)
-        headers = {"Content-Type": event.get("headers", {}).get(
-            "content-type", "application/x-www-form-urlencoded")}
-        req = urllib.request.Request(
-            f"{COGNITO_DOMAIN}/oauth2/token", data=body.encode(),
-            headers=headers, method="POST")
-        try:
-            r = urllib.request.urlopen(req)  # nosec B310 - fixed Cognito endpoint
-            return {"statusCode": r.status,
-                    "headers": {"Content-Type": r.headers.get("Content-Type", "application/json")},
-                    "body": r.read().decode()}
-        except urllib.error.HTTPError as e:
-            return {"statusCode": e.code,
-                    "headers": {"Content-Type": "application/json"},
-                    "body": e.read().decode()}
+        r = _http.request(
+            "POST",
+            f"{COGNITO_DOMAIN}/oauth2/token",
+            body=body.encode(),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        return {"statusCode": r.status,
+                "headers": {"Content-Type": r.headers.get("Content-Type", "application/json")},
+                "body": r.data.decode()}
 
     # MCP endpoint — validate Bearer then proxy to AgentCore Runtime
     if path in ("/mcp", "/"):
@@ -114,23 +121,24 @@ def handler(event, context):
         if not auth.startswith("Bearer "):
             return _unauthorized(base_url, "unauthorized")
         body = _body(event)
-        req = urllib.request.Request(
-            RUNTIME_URL, data=body.encode() if body else None,
+        r = _http.request(
+            "POST",
+            RUNTIME_URL,
+            body=body.encode() if body else None,
             headers={"Content-Type": "application/json",
                      "Accept": "application/json, text/event-stream",
-                     "Authorization": auth}, method="POST")
-        try:
-            r = urllib.request.urlopen(req)  # nosec B310 - fixed AgentCore endpoint
+                     "Authorization": auth},
+        )
+        # On upstream 401, return WWW-Authenticate so clients re-run OAuth.
+        if r.status == 401:
+            return _unauthorized(base_url, "invalid_token")
+        if r.status >= 400:
             return {"statusCode": r.status,
-                    "headers": {"Content-Type": r.headers.get("Content-Type", "application/json")},
-                    "body": r.read().decode()}
-        except urllib.error.HTTPError as e:
-            # On upstream 401, return WWW-Authenticate so clients re-run OAuth.
-            if e.code == 401:
-                return _unauthorized(base_url, "invalid_token")
-            return {"statusCode": e.code,
                     "headers": {"Content-Type": "application/json"},
-                    "body": json.dumps({"error": "upstream_error", "status": e.code})}
+                    "body": json.dumps({"error": "upstream_error", "status": r.status})}
+        return {"statusCode": r.status,
+                "headers": {"Content-Type": r.headers.get("Content-Type", "application/json")},
+                "body": r.data.decode()}
 
     return _json(404, {"error": "not found"})
 
