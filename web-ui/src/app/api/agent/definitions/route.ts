@@ -65,8 +65,8 @@ function syncToAgentsDir(sel: AgentSelection): void {
   fs.mkdirSync(dest, { recursive: true })
   for (const [role, fixedName] of Object.entries(ROLE_TO_FIXED)) {
     const fileName = sel[role as keyof AgentSelection] || DEFAULTS[role as keyof AgentSelection]
-    if (!isSafeFileName(fileName)) continue // nosemgrep: path-join-resolve-traversal
-    const srcFile = path.join(ACP_AGENTS_DIR, fileName)
+    if (!isSafeFileName(fileName)) continue
+    const srcFile = path.join(ACP_AGENTS_DIR, fileName) // nosemgrep: path-join-resolve-traversal
     if (fs.existsSync(srcFile)) {
       fs.copyFileSync(srcFile, path.join(dest, fixedName))
     }
