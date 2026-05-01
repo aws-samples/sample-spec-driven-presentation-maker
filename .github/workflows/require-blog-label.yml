@@ -1,14 +1,16 @@
 # ============================================================================
-# ℹ️  Contributors: you can ignore this CI check if it fails on your PR.
+# ℹ️  Blog label reminder (NON-BLOCKING)
 #
-# This workflow enforces that every PR has a `blog:pending`, `blog:skip`, or
-# `blog:done` label so maintainers can decide whether to publish a blog post
-# about the change. Adding these labels requires maintainer permissions, so
-# external contributors cannot pass this check themselves.
+# This workflow is a soft reminder for maintainers to tag each PR with a
+# `blog:pending`, `blog:skip`, or `blog:done` label so they can decide
+# whether to publish a blog post about the change.
 #
-# A maintainer will add the appropriate label during review. Until then, this
-# single CI will stay red — it does NOT block the PR and you do not need to
-# do anything. Please feel free to ignore the failure email.
+# It never fails the CI check. If a label is missing, the workflow just
+# emits a ::warning:: in the Actions log. This prevents GitHub from sending
+# CI failure emails to contributors for something only maintainers can fix.
+#
+# Maintainers: add the appropriate label during review.
+# Contributors: you don't need to do anything with this check.
 # ============================================================================
 
 name: Require blog label
@@ -34,9 +36,7 @@ jobs:
           if echo "$LABELS" | grep -qE '"blog:(pending|skip|done)"'; then
             echo "✅ Blog label found"
           else
-            echo "::notice::ℹ️  External contributors can ignore this failure. A maintainer will add a blog:pending / blog:skip / blog:done label during review."
-            echo "::error::Missing blog label (blog:pending, blog:skip, or blog:done). Maintainers: please add one. Contributors: no action needed — you can ignore this."
-            exit 1
+            echo "::warning::Missing blog label (blog:pending, blog:skip, or blog:done). Maintainers: please add one during review. Contributors: you can ignore this — no action needed."
           fi
 
   auto-skip-bots:
