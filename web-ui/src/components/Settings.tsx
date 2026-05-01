@@ -108,29 +108,30 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                 </p>
               </div>
               <div className="flex flex-col gap-3">
-                {(["spec", "vibe", "composer", "single"] as const).map((role) => (
-                  <div key={role}>
-                    <label className="mb-1.5 block text-xs font-medium text-foreground capitalize">
-                      {role}
-                    </label>
-                    <select
-                      value={agentSelection[role] || ""}
-                      onChange={(e) => onAgentChange(role, e.target.value)}
-                      className="w-full rounded-lg border border-white/[0.1] bg-background/30 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand-teal/40"
-                    >
-                      {agentDefs.map((a) => (
-                        <option key={a.fileName} value={a.fileName}>
-                          {a.name}
-                        </option>
-                      ))}
-                    </select>
-                    {agentDefs.find((a) => a.fileName === agentSelection[role])?.description && (
-                      <p className="mt-1 text-[11px] text-muted-foreground/80">
-                        {agentDefs.find((a) => a.fileName === agentSelection[role])?.description}
-                      </p>
-                    )}
-                  </div>
-                ))}
+                {(["spec", "vibe", "composer", "single"] as const).map((role) => {
+                  const models = agentDefs.map((a) => ({
+                    modelId: a.fileName,
+                    displayName: a.name,
+                    description: a.description,
+                  }))
+                  return (
+                    <div key={role}>
+                      <label
+                        htmlFor={`agent-${role}`}
+                        className="mb-1.5 block text-xs font-medium text-foreground capitalize"
+                      >
+                        {role}
+                      </label>
+                      <ModelPicker
+                        models={models}
+                        value={agentSelection[role] || undefined}
+                        onChange={(id) => id && onAgentChange(role, id)}
+                        triggerId={`agent-${role}`}
+                        ariaLabel={`Select ${role} agent`}
+                      />
+                    </div>
+                  )
+                })}
               </div>
             </section>
           )}
