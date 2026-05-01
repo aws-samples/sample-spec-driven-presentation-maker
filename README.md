@@ -35,52 +35,15 @@ Spec-driven presentation applies the concept of Spec-Driven Development from sof
 
 ## Quick Start
 
-> **🚀 Want to try it quickly?** Deploy the full stack in minutes — from CloudShell in your browser or any local Linux/macOS/WSL shell, with no local CDK or Docker required.
-> See the [Recommended Deploy Guide](docs/en/deploy-cloudshell.md).
+Choose your environment and follow the setup guide:
 
-### Layer 1: Kiro CLI Skill
+| Environment | Setup |
+|---|---|
+| Agent skill (Claude Code, Codex CLI, Cursor, Kiro, Copilot) | [Getting Started — Layer 1](docs/en/getting-started.md#layer-1-kiro-cli-skill) |
+| Local MCP client (Claude Desktop, Claude Cowork) | [Getting Started — Layer 2](docs/en/getting-started.md#layer-2-local-mcp-server) |
+| Remote MCP / Web UI (AWS deployment) | [Recommended Deploy Guide](docs/en/deploy-cloudshell.md) |
 
-Copy `skill/` to your Kiro CLI skills directory. The engine, references, and sample templates are all included.
-
-You can also install the engine as a Python package:
-
-```bash
-# Latest
-pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git#subdirectory=skill
-
-# Specific version
-pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git@v0.1.0#subdirectory=skill
-```
-
-Check the installed version:
-
-```python
-import sdpm
-print(sdpm.__version__)
-```
-
-### Layer 2: Local MCP Server
-
-```bash
-cd mcp-local && uv sync
-```
-
-Add to your MCP client config:
-
-```json
-{
-  "mcpServers": {
-    "spec-driven-presentation-maker": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/mcp-local", "python", "server.py"]
-    }
-  }
-}
-```
-
-### Layer 3–4: AWS Deployment
-
-See the [Recommended Deploy Guide](docs/en/deploy-cloudshell.md) — one-command deployment from CloudShell or any local shell (no CDK/Docker install required).
+AWS deployment runs from CloudShell or any local shell — no CDK/Docker install required.
 
 ---
 

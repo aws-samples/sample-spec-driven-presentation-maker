@@ -35,52 +35,15 @@
 
 ## クイックスタート
 
-> **🚀 まずは試してみたい？** ブラウザの CloudShell またはローカル Linux/macOS/WSL から、数分でフルスタックデプロイできます。ローカルに CDK や Docker は不要です。
-> [推奨デプロイ手順](docs/ja/deploy-cloudshell.md)を参照してください。
+利用環境に応じたセットアップ手順を参照してください:
 
-### Layer 1: Kiro CLI スキル
+| 環境 | セットアップ |
+|---|---|
+| エージェントスキル（Claude Code, Codex CLI, Cursor, Kiro, Copilot） | [はじめに — Layer 1](docs/ja/getting-started.md#layer-1-kiro-cli-スキル) |
+| ローカル MCP クライアント（Claude Desktop, Claude Cowork） | [はじめに — Layer 2](docs/ja/getting-started.md#layer-2-ローカル-mcp-サーバー) |
+| リモート MCP / Web UI（AWS デプロイ） | [推奨デプロイ手順](docs/ja/deploy-cloudshell.md) |
 
-`skill/` を Kiro CLI のスキルディレクトリにコピーするだけで使えます。
-
-エンジンを Python パッケージとしてインストールすることもできます:
-
-```bash
-# 最新版
-pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git#subdirectory=skill
-
-# バージョン指定
-pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git@v0.1.0#subdirectory=skill
-```
-
-インストール済みバージョンの確認:
-
-```python
-import sdpm
-print(sdpm.__version__)
-```
-
-### Layer 2: ローカル MCP サーバー
-
-```bash
-cd mcp-local && uv sync
-```
-
-MCP クライアントの設定に追加:
-
-```json
-{
-  "mcpServers": {
-    "spec-driven-presentation-maker": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/mcp-local", "python", "server.py"]
-    }
-  }
-}
-```
-
-### Layer 3〜4: AWS デプロイ
-
-[推奨デプロイ手順](docs/ja/deploy-cloudshell.md)を参照してください。CloudShell や任意のローカルシェルからワンコマンドでデプロイでき、CDK/Docker のローカルインストールは不要です。
+AWS デプロイは CloudShell や任意のローカルシェルから実行でき、CDK/Docker のローカルインストールは不要です。
 
 ---
 
