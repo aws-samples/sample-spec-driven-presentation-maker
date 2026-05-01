@@ -87,6 +87,7 @@ const runtime = new RuntimeStack(app, "SdpmRuntime", {
   cognitoDomainPrefix: authStack?.cognitoDomainPrefix,
   mcpClientId: authStack?.mcpClientId || undefined,
   mcpCustomScope: authStack?.mcpCustomScope,
+  enableDCR: config.auth?.enableDCR !== false,
   // Prefer allowedScopes (works with DCR); fall back to allowedClients for external IdP.
   allowedScopes: authStack?.mcpCustomScope ? [authStack.mcpCustomScope] : undefined,
 });

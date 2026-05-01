@@ -88,9 +88,8 @@ export class AuthStack extends cdk.Stack {
       generateSecret: false,
     });
 
-    // External MCP client (Claude.ai, Claude Desktop, Kiro, etc.)
-    // Public client with PKCE — no secret, Authorization Code flow only.
-    // Callback URLs configured via config.yaml auth.mcpCallbackUrls.
+    // External MCP clients — static app client when mcpCallbackUrls configured,
+    // otherwise clients register dynamically via DCR.
     const mcpCallbackUrls = props?.mcpCallbackUrls ?? [];
     const mcpClient = mcpCallbackUrls.length > 0
       ? this.userPool.addClient("McpClient", {

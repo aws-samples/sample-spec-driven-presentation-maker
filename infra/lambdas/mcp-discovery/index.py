@@ -26,6 +26,7 @@ ISSUER = os.environ["ISSUER"]
 RUNTIME_URL = os.environ["RUNTIME_URL"]
 USER_POOL_ID = os.environ["USER_POOL_ID"]
 MCP_SCOPES = [s for s in os.environ.get("MCP_SCOPES", "openid,profile,email").split(",") if s]
+ENABLE_DCR = os.environ.get("ENABLE_DCR", "true").lower() == "true"
 
 # Upstream HTTP client. Lambda timeout is 30s, so leave some headroom for
 # handler overhead. connect timeout is short enough to surface unreachable
@@ -50,7 +51,7 @@ def handler(event, context):
         })
 
     if path == "/.well-known/oauth-authorization-server":
-        return _json(200, {
+        metadata = {
             "issuer": ISSUER,
             "authorization_endpoint": f"{base_url}/authorize",
             "token_endpoint": f"{base_url}/token",
@@ -61,19 +62,51 @@ def handler(event, context):
             "code_challenge_methods_supported": ["S256"],
             "scopes_supported": MCP_SCOPES,
             "token_endpoint_auth_methods_supported": ["none"],
-            "registration_endpoint": f"{base_url}/register",
-        })
+        }
+        if ENABLE_DCR:
+            metadata["registration_endpoint"] = f"{base_url}/register"
+        return _json(200, metadata)
 
-    # RFC 7591 Dynamic Client Registration — creates a Cognito App Client
+    # RFC 7591 Dynamic Client Registration — idempotent by client_name.
+    # If a client with the same name already exists, merge redirect_uris
+    # and return the existing client_id instead of creating a new one.
     if path == "/register" and method == "POST":
+        if not ENABLE_DCR:
+            return _json(403, {"error": "registration_not_supported",
+                               "error_description": "Dynamic client registration is disabled"})
         reg = json.loads(_body(event) or "{}")
         client_name = reg.get("client_name", "mcp-dynamic-client")[:64]
         redirect_uris = reg.get("redirect_uris", [])
         if not redirect_uris:
             return _json(400, {"error": "invalid_client_metadata",
                                "error_description": "redirect_uris required"})
-        resp = boto3.client("cognito-idp").create_user_pool_client(
-            UserPoolId=USER_POOL_ID, ClientName=f"dcr-{client_name}",
+        cognito = boto3.client("cognito-idp")
+        full_name = f"dcr-{client_name}"
+        existing = _find_dcr_client(cognito, full_name)
+        if existing:
+            cur = existing.get("CallbackURLs", [])
+            merged = list(dict.fromkeys(cur + redirect_uris))
+            if len(merged) > 95:
+                merged = merged[-95:]
+            cognito.update_user_pool_client(
+                UserPoolId=USER_POOL_ID,
+                ClientId=existing["ClientId"],
+                ClientName=full_name,
+                AllowedOAuthFlows=["code"], AllowedOAuthFlowsUserPoolClient=True,
+                AllowedOAuthScopes=MCP_SCOPES,
+                CallbackURLs=merged, LogoutURLs=merged,
+                SupportedIdentityProviders=["COGNITO"],
+            )
+            return _json(200, {
+                "client_id": existing["ClientId"],
+                "client_name": client_name,
+                "redirect_uris": merged,
+                "grant_types": ["authorization_code"],
+                "response_types": ["code"],
+                "token_endpoint_auth_method": "none",
+            })
+        resp = cognito.create_user_pool_client(
+            UserPoolId=USER_POOL_ID, ClientName=full_name,
             GenerateSecret=False,
             AllowedOAuthFlows=["code"], AllowedOAuthFlowsUserPoolClient=True,
             AllowedOAuthScopes=MCP_SCOPES,
@@ -97,13 +130,18 @@ def handler(event, context):
         scopes = set(params.get("scope", [" ".join(MCP_SCOPES)])[0].split())
         scopes.update(MCP_SCOPES)
         params["scope"] = [" ".join(sorted(scopes))]
+        # Ensure redirect_uri is registered on the app client.
+        # UpdateUserPoolClient in /register may not have propagated yet,
+        # so we patch the client again here as a safety net.
+        redirect_uri = params.get("redirect_uri", [None])[0]
+        client_id = params.get("client_id", [None])[0]
+        if redirect_uri and client_id:
+            _ensure_callback_url(client_id, redirect_uri)
         new_qs = urllib.parse.urlencode(params, doseq=True)
         return {"statusCode": 302,
                 "headers": {"Location": f"{COGNITO_DOMAIN}/oauth2/authorize?{new_qs}"}}
 
     if path == "/token" and method == "POST":
-        # OAuth token endpoint is always application/x-www-form-urlencoded.
-        # Don't forward the client's Content-Type header — we know what it must be.
         body = _body(event)
         r = _http.request(
             "POST",
@@ -129,7 +167,6 @@ def handler(event, context):
                      "Accept": "application/json, text/event-stream",
                      "Authorization": auth},
         )
-        # On upstream 401, return WWW-Authenticate so clients re-run OAuth.
         if r.status == 401:
             return _unauthorized(base_url, "invalid_token")
         if r.status >= 400:
@@ -141,6 +178,46 @@ def handler(event, context):
                 "body": r.data.decode()}
 
     return _json(404, {"error": "not found"})
+
+
+def _find_dcr_client(cognito, full_name):
+    """Find an existing Cognito app client by ClientName (paginated)."""
+    paginator = cognito.get_paginator("list_user_pool_clients")
+    for page in paginator.paginate(UserPoolId=USER_POOL_ID, MaxResults=60):
+        for c in page.get("UserPoolClients", []):
+            if c.get("ClientName") == full_name:
+                return cognito.describe_user_pool_client(
+                    UserPoolId=USER_POOL_ID, ClientId=c["ClientId"],
+                )["UserPoolClient"]
+    return None
+
+
+def _ensure_callback_url(client_id, redirect_uri):
+    """Add redirect_uri to the app client's CallbackURLs if missing."""
+    try:
+        cognito = boto3.client("cognito-idp")
+        resp = cognito.describe_user_pool_client(
+            UserPoolId=USER_POOL_ID, ClientId=client_id,
+        )["UserPoolClient"]
+        urls = resp.get("CallbackURLs", [])
+        if redirect_uri in urls:
+            return
+        urls.append(redirect_uri)
+        if len(urls) > 95:
+            urls = urls[-95:]
+        cognito.update_user_pool_client(
+            UserPoolId=USER_POOL_ID,
+            ClientId=client_id,
+            ClientName=resp["ClientName"],
+            AllowedOAuthFlows=resp.get("AllowedOAuthFlows", ["code"]),
+            AllowedOAuthFlowsUserPoolClient=True,
+            AllowedOAuthScopes=resp.get("AllowedOAuthScopes", MCP_SCOPES),
+            CallbackURLs=urls,
+            LogoutURLs=urls,
+            SupportedIdentityProviders=resp.get("SupportedIdentityProviders", ["COGNITO"]),
+        )
+    except Exception:
+        pass  # Best-effort — don't block the authorize redirect
 
 
 def _body(event):

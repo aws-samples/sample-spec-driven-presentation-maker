@@ -48,6 +48,8 @@ interface RuntimeStackProps extends cdk.StackProps {
   mcpClientId?: string;
   /** Fully-qualified custom OAuth scope for MCP access (e.g. `sdpm-mcp/invoke`). */
   mcpCustomScope?: string;
+  /** Enable Dynamic Client Registration (RFC 7591) for external MCP clients. Default: true. */
+  enableDCR?: boolean;
 }
 
 export class RuntimeStack extends cdk.Stack {
@@ -269,7 +271,7 @@ export class RuntimeStack extends cdk.Stack {
     // --- OAuth 2.1 Discovery for external MCP clients (RFC 9728 / RFC 8414) ---
     // HTTP API + Lambda for OAuth discovery, 401 challenge, and proxy routes.
     // Enables Claude.ai, Kiro, and other MCP clients to auto-discover OAuth config.
-    if (props.userPoolId && props.cognitoDomainPrefix && props.mcpClientId) {
+    if (props.userPoolId && props.cognitoDomainPrefix) {
       const cognitoDomain = cdk.Fn.join("", [
         "https://", props.cognitoDomainPrefix!, ".auth.", this.region, ".amazoncognito.com",
       ]);
@@ -296,15 +298,26 @@ export class RuntimeStack extends cdk.Stack {
           RUNTIME_URL: runtimeInvokeUrl,
           USER_POOL_ID: props.userPoolId!,
           MCP_SCOPES: ["openid", "profile", "email", ...(props.mcpCustomScope ? [props.mcpCustomScope] : [])].join(","),
+          ENABLE_DCR: (props.enableDCR !== false) ? "true" : "false",
         },
         timeout: cdk.Duration.seconds(30),
         memorySize: 256,
         description: "OAuth 2.1 discovery + MCP proxy for external clients",
       });
 
-      // Grant Lambda permission to create Cognito App Clients (for DCR)
+      // Grant Lambda permission to manage Cognito App Clients (for idempotent DCR)
+      const cognitoActions = props.enableDCR !== false
+        ? [
+            "cognito-idp:CreateUserPoolClient",
+            "cognito-idp:ListUserPoolClients",
+            "cognito-idp:DescribeUserPoolClient",
+            "cognito-idp:UpdateUserPoolClient",
+          ]
+        : [
+            "cognito-idp:DescribeUserPoolClient",
+          ];
       discoveryFn.addToRolePolicy(new iam.PolicyStatement({
-        actions: ["cognito-idp:CreateUserPoolClient"],
+        actions: cognitoActions,
         resources: [cdk.Fn.join("", [
           "arn:aws:cognito-idp:", this.region, ":", this.account, ":userpool/", props.userPoolId!,
         ])],
@@ -329,10 +342,12 @@ export class RuntimeStack extends cdk.Stack {
         value: httpApi.url!,
         description: "MCP Server URL for external MCP clients",
       });
-      new cdk.CfnOutput(this, "McpOAuthClientId", {
-        value: props.mcpClientId,
-        description: "OAuth Client ID for external MCP clients",
-      });
+      if (props.mcpClientId) {
+        new cdk.CfnOutput(this, "McpOAuthClientId", {
+          value: props.mcpClientId,
+          description: "OAuth Client ID for external MCP clients (static; DCR clients register dynamically)",
+        });
+      }
     }
   }
 }

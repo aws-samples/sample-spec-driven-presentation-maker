@@ -42,10 +42,18 @@ model:
     - "global.anthropic.claude-haiku-4-5-20251001-v1:0"
     - "us.amazon.nova-2-lite-v1:0"
 
-# OAuth callback URLs for external MCP clients (Layer 3).
-# These are used by the Cognito McpClient App Client.
-# Uncomment and list URLs for any MCP client that will connect via OAuth 2.1 discovery.
+# OAuth settings for external MCP clients (Layer 3).
+# enableDCR: Allow any MCP client to register dynamically via RFC 7591 (default: true).
+# mcpCallbackUrls: Static OAuth callback URLs for pre-registered MCP clients.
+#
+# Combinations:
+#   enableDCR: true  + no mcpCallbackUrls  → DCR only (default, personal/demo use)
+#   enableDCR: true  + mcpCallbackUrls     → Static client + DCR (flexible)
+#   enableDCR: false + mcpCallbackUrls     → Static client only (enterprise lockdown)
+#   enableDCR: false + no mcpCallbackUrls  → No external MCP access (WebUI only)
+#
 # auth:
+#   enableDCR: true
 #   mcpCallbackUrls:
 #     - https://claude.ai/api/mcp/auth_callback
 #     - https://claude.com/api/mcp/auth_callback

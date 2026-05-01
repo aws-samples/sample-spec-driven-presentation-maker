@@ -26,10 +26,6 @@ phases:
         features:
           searchSlides: ${FEATURE_SEARCH_SLIDES:-false}
           observability: ${FEATURE_OBSERVABILITY:-false}
-        auth:
-          mcpCallbackUrls:
-            - https://claude.ai/api/mcp/auth_callback
-            - https://claude.com/api/mcp/auth_callback
         EOF
           sed -i 's/^        //' infra/config.yaml
           if [ -n "${WAF_IPV4}" ] || [ -n "${WAF_IPV6}" ]; then
