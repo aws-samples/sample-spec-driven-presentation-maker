@@ -182,7 +182,7 @@ export function ModelPicker({
                           )}
                         </div>
                         {m.description && (
-                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
                             {m.description}
                           </p>
                         )}
