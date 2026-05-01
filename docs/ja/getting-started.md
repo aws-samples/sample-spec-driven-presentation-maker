@@ -264,6 +264,27 @@ bash scripts/deploy_webui.sh
 
 ## オプション機能
 
+### WAF IP アドレス制限
+
+`config.yaml` で `waf.allowedIpV4AddressRanges` および/または `waf.allowedIpV6AddressRanges` を設定すると、CloudFront と API Gateway へのアクセスを IP アドレスで制限できます。
+
+```yaml
+waf:
+  allowedIpV4AddressRanges:
+    - "10.0.0.0/8"
+    - "192.168.0.0/16"
+  allowedIpV6AddressRanges:
+    - "2001:db8::/32"
+```
+
+設定すると、CDK は以下を作成します:
+- **SdpmCloudFrontWaf** スタック（`us-east-1`、WAFv2 CLOUDFRONT スコープの要件）— CloudFront に関連付け
+- **リージョナル WAF**（デプロイリージョン）— API Gateway に関連付け
+
+デフォルトアクションは **Block** で、指定された IP 範囲のみアクセスが許可されます。`waf` セクションを省略した場合、WAF リソースは作成されません。
+
+> **⚠️ IPv6 に関する注意:** `allowedIpV4AddressRanges` のみ指定し `allowedIpV6AddressRanges` を省略した場合、IPv6 によるアクセスはすべてブロックされます。最近のブラウザは IPv6 を優先的に使用するため、IPv4 アドレスが許可されていても Web UI が「Loading authentication configuration...」のまま停止することがあります。デュアルスタック環境では必ず IPv4 と IPv6 の両方を指定してください。
+
 ### セマンティックスライド検索
 
 `features.searchSlides: true` を設定すると、Amazon Bedrock Knowledge Base が作成され、デッキ横断のセマンティック検索が利用可能になります。

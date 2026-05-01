@@ -8,10 +8,20 @@ set -euo pipefail
 
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 STACK="SdpmWebUi"
-BUILD_DIR="$(dirname "$0")/../web-ui/build"
+WEBUI_DIR="$(dirname "$0")/../web-ui"
+BUILD_DIR="$WEBUI_DIR/build"
+
+# Always rebuild to avoid shipping a stale build/ (missing chunks cause
+# CloudFront to SPA-fallback HTML to .js requests -> "Unexpected token '<'").
+echo "Building web-ui..."
+# Resolve model config (NEXT_PUBLIC_ALLOWED_MODELS, NEXT_PUBLIC_DEFAULT_CHAT_MODEL_ID,
+# NEXT_PUBLIC_DEFAULT_CREATE_MODEL_ID) from infra/config.yaml + infra/lib/model-metadata.ts.
+# Without this, the Settings Sheet "Models" section is hidden (allowed.length === 0).
+MODEL_ENV=$(cd "$(dirname "$0")/../infra" && node lib/resolve-model-env.js)
+(cd "$WEBUI_DIR" && rm -rf build && eval "$MODEL_ENV" && npm run build:cloud)
 
 if [ ! -d "$BUILD_DIR" ]; then
-  echo "Error: $BUILD_DIR not found. Run 'npm run build' in web-ui/ first."
+  echo "Error: $BUILD_DIR not found after build."
   exit 1
 fi
 

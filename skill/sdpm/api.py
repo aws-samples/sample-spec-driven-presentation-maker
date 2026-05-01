@@ -13,20 +13,81 @@ from pathlib import Path
 from typing import Any
 
 
-def _resolve_template(data: dict, input_path: str | Path | None, templates_dir: Path) -> tuple[Path, bool]:
+def get_templates_dirs() -> list[Path]:
+    """Return ordered list of directories to search for bundled/user-local templates.
+
+    Search order (first match wins):
+      1. $SDPM_TEMPLATES_DIR — os.pathsep-separated list (same semantics as PATH)
+      2. get_user_config_dir()/templates/ — user-local templates
+      3. Package-bundled templates/ directory (skill/templates/)
+    """
+    from sdpm.config import _get_resource_dirs
+
+    bundled = Path(__file__).parent.parent / "templates"
+    return _get_resource_dirs("SDPM_TEMPLATES_DIR", "templates", bundled)
+
+
+def get_styles_dirs() -> list[Path]:
+    """Return ordered list of directories to search for style HTMLs.
+
+    Search order (first match wins):
+      1. $SDPM_STYLES_DIR — os.pathsep-separated list (same semantics as PATH)
+      2. get_user_config_dir()/styles/ — user-local styles
+      3. Package-bundled references/examples/styles/ directory
+    """
+    from sdpm.config import _get_resource_dirs
+    from sdpm.reference import BUNDLED_STYLES_DIR
+
+    return _get_resource_dirs("SDPM_STYLES_DIR", "styles", BUNDLED_STYLES_DIR)
+
+
+def _find_style_in_dirs(name: str, styles_dirs: list[Path]) -> Path | None:
+    """Search for a style HTML by name across the given directories.
+
+    Returns the first existing path, or None if not found.
+    """
+    filename = name if name.endswith(".html") else name + ".html"
+    for d in styles_dirs:
+        candidate = d / filename
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _find_template_in_dirs(name: str, templates_dirs: list[Path]) -> Path | None:
+    """Search for a template by name across the given directories.
+
+    Returns the first existing path, or None if not found.
+    """
+    filename = name if name.endswith(".pptx") else name + ".pptx"
+    for d in templates_dirs:
+        candidate = d / filename
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _resolve_template(
+    data: dict,
+    input_path: str | Path | None,
+    templates_dirs: list[Path],
+) -> tuple[Path, bool]:
     """Resolve template path from presentation data.
 
     Returns (template_path, custom_template) or raises FileNotFoundError.
     """
     if data.get("template"):
-        base_dir = Path(input_path).parent if input_path else Path(".")
+        if input_path:
+            p = Path(input_path)
+            base_dir = p if p.is_dir() else p.parent
+        else:
+            base_dir = Path(".")
         template = base_dir / data["template"]
         if template.exists():
             return template, True
-        name = data["template"]
-        named = templates_dir / (name if name.endswith(".pptx") else name + ".pptx")
-        if named.exists():
-            return named, True
+        found = _find_template_in_dirs(data["template"], templates_dirs)
+        if found is not None:
+            return found, True
     raise FileNotFoundError('No template specified. Set "template" in presentation JSON.')
 
 
@@ -97,12 +158,11 @@ def init(
     pres_data: dict[str, Any] = {"fonts": {"fullwidth": None, "halfwidth": None}, "slides": []}
 
     if template:
-        templates_dir = Path(__file__).parent.parent / "templates"  # skill/templates/
         template_src = Path(template).expanduser()
         if not template_src.exists():
-            candidate = templates_dir / (str(template) if str(template).endswith(".pptx") else f"{template}.pptx")
-            if candidate.exists():
-                template_src = candidate
+            found = _find_template_in_dirs(str(template), get_templates_dirs())
+            if found is not None:
+                template_src = found
         if template_src.exists():
             template_src = template_src.resolve()
             pres_data["template"] = template_src.name
@@ -140,8 +200,66 @@ class BuildConfig:
     lint_diagnostics: list = field(default_factory=list)
 
 
+def _assemble_slides_from_dir(deck_dir: Path) -> tuple[dict, list[dict]]:
+    """Assemble presentation dict from deck.json + outline.md + slides/*.json.
+
+    Args:
+        deck_dir: Directory containing deck.json, specs/outline.md, slides/*.
+
+    Returns:
+        (deck_meta, slides) where deck_meta has template/fonts/defaultTextColor
+        and slides is the ordered list from outline.md.
+    """
+    from sdpm.utils.io import read_json
+
+    deck_json = deck_dir / "deck.json"
+    if not deck_json.exists():
+        raise FileNotFoundError(f"deck.json not found in {deck_dir}")
+    deck_meta = read_json(deck_json)
+
+    slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
+
+    slides: list[dict] = []
+    for slug in slugs:
+        slide_path = deck_dir / "slides" / f"{slug}.json"
+        if not slide_path.exists():
+            continue  # skip missing slides silently
+        slide = read_json(slide_path)
+        slide.setdefault("id", slug)
+        slides.append(slide)
+
+    return deck_meta, slides
+
+
+def parse_outline_slugs(outline_path: Path) -> list[str]:
+    """Parse outline.md and return ordered list of slugs.
+
+    Format: ``- [slug] Message text``
+
+    Args:
+        outline_path: Path to outline.md.
+
+    Returns:
+        List of slug strings in document order.
+    """
+    import re
+
+    pattern = re.compile(r"^-\s*\[([a-z0-9-]+)\]\s*")
+    slugs: list[str] = []
+    if not outline_path.exists():
+        return slugs
+    for line in outline_path.read_text(encoding="utf-8").splitlines():
+        m = pattern.match(line)
+        if m:
+            slugs.append(m.group(1))
+    return slugs
+
+
 def _resolve_config(json_path: str | Path) -> BuildConfig:
-    """Resolve template, fonts, icons, overrides from JSON.
+    """Resolve template, fonts, icons, overrides from JSON or directory.
+
+    Accepts either a presentation.json file path (legacy) or a directory
+    containing deck.json + specs/outline.md + slides/*.json (new format).
 
     Raises FileNotFoundError, ValueError on missing template/icons.
     """
@@ -150,13 +268,21 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
 
     input_path = Path(json_path)
     if not input_path.exists():
-        raise FileNotFoundError(f"Slides JSON not found: {json_path}")
+        raise FileNotFoundError(f"Not found: {json_path}")
 
-    data = read_json(input_path)
-    templates_dir = Path(__file__).parent.parent / "templates"
+    # Directory input: deck.json + slides/*.json
+    if input_path.is_dir():
+        deck_meta, slides = _assemble_slides_from_dir(input_path)
+        data = {**deck_meta, "slides": slides}
+        base_dir = input_path
+    else:
+        data = read_json(input_path)
+        base_dir = input_path.parent
+
+    templates_dirs = get_templates_dirs()
     warnings: list[str] = []
 
-    template_file, custom = _resolve_template(data, str(input_path), templates_dir)
+    template_file, custom = _resolve_template(data, str(input_path), templates_dirs)
 
     # Auto-fill fonts
     from sdpm.analyzer import extract_fonts as _extract_fonts
@@ -197,7 +323,7 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
         fonts=fonts,
         default_text_color=dtc,
         slides=resolved_slides,
-        base_dir=input_path.parent,
+        base_dir=base_dir,
         warnings=warnings,
         lint_diagnostics=lint_diagnostics,
     )
@@ -276,13 +402,13 @@ def generate(
 
 def measure(
     json_path: str | Path,
-    slides: list[int] | None = None,
+    slides: list[int] | list[str] | None = None,
 ) -> str:
     """Build PPTX from JSON, convert to SVG, extract text bboxes.
 
     Args:
-        json_path: Path to the slides JSON file.
-        slides: Slide numbers to measure (1-based). None for all.
+        json_path: Path to the slides JSON file or directory.
+        slides: Slide numbers (1-based int) or slugs (str) to measure. None for all.
 
     Returns:
         Text report of bbox measurements.
@@ -294,6 +420,21 @@ def measure(
 
     config = _resolve_config(json_path)
 
+    # Resolve slugs to page numbers and build reverse mapping
+    page_to_slug: dict[int, str] | None = None
+    slide_indices: list[int] | None = None
+
+    if slides and isinstance(slides[0], str):
+        slug_to_page = {}
+        for i, s in enumerate(config.slides):
+            sid = s.get("id", "")
+            if sid:
+                slug_to_page[sid] = i + 1
+        slide_indices = [slug_to_page[slug] for slug in slides if slug in slug_to_page]
+        page_to_slug = {v: k for k, v in slug_to_page.items()}
+    else:
+        slide_indices = slides
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_pptx = Path(tmp_dir) / "measure.pptx"
         _build(config, tmp_pptx)
@@ -304,8 +445,8 @@ def measure(
             raise RuntimeError("SVG export failed. Is LibreOffice (soffice) installed?")
 
         try:
-            results = measure_from_svg(svg_path, slides)
-            return format_measure_report(results)
+            results = measure_from_svg(svg_path, slide_indices)
+            return format_measure_report(results, page_to_slug=page_to_slug)
         finally:
             import shutil
             if svg_path:
@@ -400,7 +541,9 @@ def _extract_slide_titles(prs) -> dict[int, str]:
         title = ""
         if slide.shapes.title:
             title = slide.shapes.title.text.strip().replace("\n", " ")[:30]
+        # Sanitise for filenames: drop reserved chars, collapse whitespace, trim.
         title = re.sub(r'[\\/:*?"<>|]', "", title)
+        title = re.sub(r'\s+', "_", title).strip("_")
         titles[i] = title or "notitle"
     return titles
 

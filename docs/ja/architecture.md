@@ -35,7 +35,7 @@ spec-driven-presentation-maker は 4 つのレイヤーで構成されます。
 - 任意の .pptx テンプレートを自動解析（レイアウト、カラー、フォント、プレースホルダー）
 - JSON からスライドを構築（自動レイアウト最適化付き）
 - `presentation.json` から PPTX ファイルを生成
-- 既存 PPTX を JSON に逆変換（`pptx_to_json`）
+- 既存 PPTX を JSON に逆変換（アップロード時変換で自動処理）
 - マルチソースアセット検索（AWS アイコン、Material Symbols、カスタム）
 
 ---
@@ -56,7 +56,7 @@ Layer 2 のストレージを Amazon DynamoDB + S3 に差し替え、認証・�
 
 ```
 MCP Client → AgentCore Runtime → MCP Server コンテナ
-                                   ├── 21 MCP ツール
+                                   ├── 20 MCP ツール
                                    ├── LibreOffice（PPTX → PDF/SVG）
                                    ├── DynamoDB（デッキ、テンプレート）
                                    ├── S3（PPTX、プレビュー、リファレンス、アセット）
@@ -64,7 +64,8 @@ MCP Client → AgentCore Runtime → MCP Server コンテナ
 ```
 
 Layer 2 に対する追加ツール:
-- `save_web_image` — Web 画像をダウンロードしてデッキワークスペースに保存
+- `read_uploaded_file` — アップロードファイルの変換済みコンテンツを読み取る（PDF, DOCX, XLSX, PPTX, テキスト, 画像）
+- `import_attachment` — アップロードファイルまたはWeb画像をデッキワークスペースにインポート
 - `read_uploaded_file` — ユーザーがアップロードしたファイル（PDF、PPTX、テキスト）の内容を読み取り
 - `apply_style` — 名前付きスタイルプリセットをデッキに適用
 - `run_python` — Amazon Bedrock AgentCore Code Interpreter サンドボックスで Python を実行（デッキワークスペースの編集、データ分析）
@@ -78,7 +79,8 @@ DynamoDB:
   TEMPLATE#{id}/META                — テンプレートメタデータ
 
 S3（pptx バケット）:
-  decks/{deckId}/presentation.json  — スライドデータ
+  decks/{deckId}/deck.json          — デッキメタデータ（テンプレート、フォント、defaultTextColor）
+  decks/{deckId}/slides/{slug}.json — スライドごとのデータ
   decks/{deckId}/specs/             — brief.md, outline.md, art-direction.html
   decks/{deckId}/includes/          — コードブロック JSON
   decks/{deckId}/compose/           — スライドごとの SVG compose JSON（Web UI アニメーション用）
@@ -96,9 +98,10 @@ S3（リソースバケット）:
 エージェントは通常の Python ファイル I/O（`open`, `json.load` 等）でファイルを読み書きでき、`save=True` で変更が S3 に書き戻されます。
 
 ```
-presentation.json   — {"slides": [...], "fonts": {...}}
+deck.json           — デッキメタデータ（テンプレート、フォント、defaultTextColor）
+slides/{slug}.json  — スライドごとのデータ（1 ファイル = 1 スライド、slug は outline から）
 specs/brief.md          — ブリーフィング（対象者、目的、キーメッセージ）
-specs/outline.md        — 1 行 1 スライド、各行 = 1 メッセージ
+specs/outline.md        — 1 行 1 スライド: - [slug] メッセージ
 specs/art-direction.html — ビジュアルデザイン方針（HTML スタイルガイド）
 includes/           — コードブロック JSON ファイル
 ```
@@ -117,7 +120,7 @@ MCP Server コンテナには LibreOffice と poppler-utils が内蔵されて�
 
 ```
 generate_pptx:
-  1. presentation.json から PPTX をビルド
+  1. デッキワークスペース（deck.json + slides/*.json）から PPTX をビルド
   2. LibreOffice: PPTX → PDF
   3. pdftoppm: PDF → スライドごとの PNG
   4. Pillow: PNG → WebP (quality=85)
@@ -141,7 +144,7 @@ Build ループ中に視覚レビューなしでオーバーフローを検出�
 
 フルスタックアプリケーションのリファレンス実装です。
 
-- **Agent** — Strands Agent（Amazon Bedrock AgentCore Runtime 上）。Layer 3 MCP Server に接続。組み込みツール: `web_fetch`（URL → Markdown、HTML/PDF/画像対応）、`list_uploads`（セッション内アップロード一覧）
+- **Agent** — Strands Agent（Amazon Bedrock AgentCore Runtime 上）。Layer 3 MCP Server に接続。組み込みツール: `web_fetch`（URL → Markdown、HTML/PDF/画像対応）
 - **Web UI** — React + Tailwind CSS + shadcn/ui（S3 + Amazon CloudFront でデプロイ）。SVG compose パイプラインによるアニメーション付きスライドプレビュー
 - **API** — Lambda ベースの REST API（デッキ CRUD、ファイルアップロード、チャット履歴）
 - **Auth** — Amazon Cognito User Pool（ホスト UI 付き）
@@ -224,13 +227,13 @@ spec-driven-presentation-maker は OIDC 準拠の任意の IdP（Identity Provid
 | リファレンス | `list_workflows`, `read_workflows` | フェーズ別ワークフロー手順 |
 | リファレンス | `list_guides`, `read_guides` | デザインルール・ガイド |
 | レイアウト | `grid` | CSS Grid 座標計算 |
-| ユーティリティ | `code_to_slide`, `pptx_to_json` | コードハイライト、PPTX 逆変換 |
+| ユーティリティ | `code_to_slide` | コードハイライト |
 
 ### Layer 3 追加ツール
 
 | ツール | 説明 |
 |--------|------|
-| `save_web_image` | Web 画像をダウンロードしてデッキワークスペースに保存 |
+| `import_attachment` | アップロードファイルまたはWeb画像をデッキワークスペースにインポート |
 | `read_uploaded_file` | ユーザーがアップロードしたファイルの内容を読み取り |
 | `apply_style` | 名前付きスタイルプリセットをデッキに適用 |
 | `run_python` | Code Interpreter サンドボックスで Python 実行 |
@@ -241,7 +244,6 @@ spec-driven-presentation-maker は OIDC 準拠の任意の IdP（Identity Provid
 | ツール | 説明 |
 |--------|------|
 | `web_fetch` | URL を取得して Markdown に変換（HTML、PDF、画像対応） |
-| `list_uploads` | 現在のチャットセッションでアップロードされたファイル一覧 |
 
 ---
 
@@ -260,6 +262,7 @@ spec-driven-presentation-maker は OIDC 準拠の任意の IdP（Identity Provid
 | SdpmAgent | Strands Agent（Amazon Bedrock AgentCore Runtime） | `stacks.agent` |
 | SdpmWebUi | S3 + Amazon CloudFront + Amazon API Gateway + Lambda | `stacks.webUi` |
 | SdpmAuth | Amazon Cognito User Pool（agent または webUi 有効時に自動作成） | （自動） |
+| SdpmCloudFrontWaf | CloudFront 用 AWS WAF WebACL（us-east-1） | `waf.*` |
 
 ---
 

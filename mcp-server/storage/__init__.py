@@ -106,6 +106,56 @@ class Storage(ABC):
             Number of objects deleted.
         """
 
+    # --- Deck JSON (split format) ---
+
+    @abstractmethod
+    def get_deck_json(self, deck_id: str) -> dict:
+        """Read deck.json (metadata only) from S3.
+
+        Args:
+            deck_id: Deck identifier.
+
+        Returns:
+            Parsed deck metadata dict (template, fonts, defaultTextColor).
+
+        Raises:
+            ValueError: If deck.json not found.
+        """
+
+    @abstractmethod
+    def put_deck_json(self, deck_id: str, data: dict) -> None:
+        """Write deck.json to S3.
+
+        Args:
+            deck_id: Deck identifier.
+            data: Deck metadata dict.
+        """
+
+    @abstractmethod
+    def get_slide_json(self, deck_id: str, slug: str) -> dict:
+        """Read a single slide JSON from S3.
+
+        Args:
+            deck_id: Deck identifier.
+            slug: Slide slug (filename without .json).
+
+        Returns:
+            Parsed slide dict.
+
+        Raises:
+            ValueError: If slide not found.
+        """
+
+    @abstractmethod
+    def put_slide_json(self, deck_id: str, slug: str, data: dict) -> None:
+        """Write a single slide JSON to S3.
+
+        Args:
+            deck_id: Deck identifier.
+            slug: Slide slug.
+            data: Slide dict.
+        """
+
     # --- Auth ---
 
     @property

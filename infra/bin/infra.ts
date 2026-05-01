@@ -25,6 +25,8 @@ import { AuthStack } from "../lib/auth-stack";
 import { RuntimeStack } from "../lib/runtime-stack";
 import { AgentStack } from "../lib/agent-stack";
 import { WebUiStack } from "../lib/web-ui-stack";
+import { CloudFrontWafStack } from "../lib/cloudfront-waf-stack";
+import { MODEL_METADATA } from "../lib/model-metadata";
 
 // Load deployment configuration
 const configPath = path.join(__dirname, "../config.yaml");
@@ -89,6 +91,64 @@ const runtime = new RuntimeStack(app, "SdpmRuntime", {
   allowedScopes: authStack?.mcpCustomScope ? [authStack.mcpCustomScope] : undefined,
 });
 
+// --- Model configuration & validation ---
+const defaultChatModelId: string = config.model?.defaults?.chat ?? "global.anthropic.claude-sonnet-4-6";
+// Create model falls back to the chat model when `defaults.create` is omitted.
+const defaultCreateModelId: string = config.model?.defaults?.create ?? defaultChatModelId;
+const allowedModelIds: string[] = config.model?.allowedModelIds ?? [];
+
+if (allowedModelIds.length > 0) {
+  if (!allowedModelIds.includes(defaultChatModelId)) {
+    throw new Error(
+      `Config error: model.defaults.chat "${defaultChatModelId}" is not in model.allowedModelIds. ` +
+      `Add it to the list, or remove allowedModelIds.`,
+    );
+  }
+  if (!allowedModelIds.includes(defaultCreateModelId)) {
+    throw new Error(
+      `Config error: model.defaults.create "${defaultCreateModelId}" is not in model.allowedModelIds. ` +
+      `Add it to the list, or remove allowedModelIds.`,
+    );
+  }
+  const seen = new Set<string>();
+  for (const id of allowedModelIds) {
+    if (seen.has(id)) {
+      throw new Error(`Config error: model.allowedModelIds contains duplicate "${id}".`);
+    }
+    seen.add(id);
+    if (!(id in MODEL_METADATA)) {
+      throw new Error(
+        `Config error: modelId "${id}" is not registered in infra/lib/model-metadata.ts. ` +
+        `Add an entry there, or remove "${id}" from model.allowedModelIds. ` +
+        `Known IDs: ${Object.keys(MODEL_METADATA).sort().join(", ")}`,
+      );
+    }
+  }
+}
+
+const allowedModels = allowedModelIds.map((id) => ({
+  modelId: id,
+  displayName: MODEL_METADATA[id].displayName,
+  description: MODEL_METADATA[id].description,
+  composable: MODEL_METADATA[id].composable !== false,
+}));
+
+// --- WAF IP restriction (optional) ---
+const allowedIpV4AddressRanges: string[] | undefined = config.waf?.allowedIpV4AddressRanges;
+const allowedIpV6AddressRanges: string[] | undefined = config.waf?.allowedIpV6AddressRanges;
+const wafEnabled = !!(allowedIpV4AddressRanges || allowedIpV6AddressRanges);
+
+// CloudFront WAF must be in us-east-1
+const cloudFrontWafStack = wafEnabled
+  ? new CloudFrontWafStack(app, "SdpmCloudFrontWaf", {
+      env: { account: env.account, region: "us-east-1" },
+      crossRegionReferences: true,
+      description: "Spec-Driven Presentation Maker - CloudFront WAF (uksb-ynuz0lkrea)(tag:waf)",
+      allowedIpV4AddressRanges,
+      allowedIpV6AddressRanges,
+    })
+  : undefined;
+
 if (config.stacks?.agent) {
   const agent = new AgentStack(app, "SdpmAgent", {
     env,
@@ -98,7 +158,9 @@ if (config.stacks?.agent) {
     mcpRuntimeArn: runtime.runtimeArn,
     oidcDiscoveryUrl,
     allowedClients,
-    modelId: config.model?.modelId,
+    chatModelId: defaultChatModelId,
+    createModelId: defaultCreateModelId,
+    allowedModelIds,
   });
 
   if (config.stacks?.webUi) {
@@ -107,6 +169,7 @@ if (config.stacks?.agent) {
     }
     new WebUiStack(app, "SdpmWebUi", {
       env,
+      crossRegionReferences: wafEnabled,
       description: "Spec-Driven Presentation Maker - Web UI (uksb-ynuz0lkrea)(tag:web-ui)",
       table: data.table,
       pptxBucket: data.pptxBucket,
@@ -118,6 +181,12 @@ if (config.stacks?.agent) {
       kbId: searchSlides ? data.kbSsmParamName : undefined,
       vectorBucketName: data.vectorBucketName || undefined,
       vectorIndexName: data.vectorIndexName || undefined,
+      webAclId: cloudFrontWafStack?.webAclArn,
+      allowedIpV4AddressRanges,
+      allowedIpV6AddressRanges,
+      defaultChatModelId,
+      defaultCreateModelId,
+      allowedModels,
     });
   }
 }

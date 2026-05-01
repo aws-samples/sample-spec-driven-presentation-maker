@@ -145,6 +145,7 @@ function TimelineNode({ slide, state, index, isLast }: {
   isLast: boolean
 }): React.ReactElement {
   const hasDetail = slide.subItems.length > 0
+  const displayNum = index + 1
 
   // Node circle styles per state.
   const nodeStyles: Record<SlideState, React.CSSProperties> = {
@@ -172,7 +173,7 @@ function TimelineNode({ slide, state, index, isLast }: {
       className="outline-node-enter relative flex gap-4"
       style={{ "--stagger": `${index * 60}ms` } as React.CSSProperties}
       data-state={state}
-      data-slide-num={slide.num}
+      data-slide-slug={slide.slug}
     >
       {/* Vertical connector line (between nodes) */}
       <div className="flex flex-col items-center flex-none" style={{ width: "24px" }}>
@@ -186,7 +187,7 @@ function TimelineNode({ slide, state, index, isLast }: {
           `}
           style={nodeStyles[state]}
         >
-          {slide.num}
+          {displayNum}
         </div>
 
         {/* Connector line below node */}
@@ -206,7 +207,7 @@ function TimelineNode({ slide, state, index, isLast }: {
       {/* Content */}
       <div className="flex-1 min-w-0 pb-6">
         <p className="text-[14px] font-semibold text-foreground leading-snug tracking-[-0.02em]">
-          {slide.title}
+          {slide.slug}
         </p>
         {slide.message && (
           <p className="text-[12.5px] text-foreground-secondary leading-relaxed mt-0.5">
@@ -214,7 +215,7 @@ function TimelineNode({ slide, state, index, isLast }: {
           </p>
         )}
 
-        {/* Detail panel (Phase B) */}
+        {/* Detail panel */}
         {hasDetail && <DetailPanel subItems={slide.subItems} state={state} />}
       </div>
     </div>
@@ -227,7 +228,7 @@ interface OutlineViewProps {
 
 export function OutlineView({ content }: OutlineViewProps): React.ReactElement {
   const activeRef = useRef<HTMLDivElement>(null)
-  const prevActiveNum = useRef<number | null>(null)
+  const prevActiveSlug = useRef<string | null>(null)
 
   const { slides, states } = useMemo(() => {
     if (!content) return { slides: [], states: [] }
@@ -235,21 +236,21 @@ export function OutlineView({ content }: OutlineViewProps): React.ReactElement {
     return { slides: parsed, states: resolveStates(parsed) }
   }, [content])
 
-  // Find the active slide number for auto-scroll.
+  // Find the active slide index for auto-scroll.
   const activeIndex = states.indexOf("active")
-  const activeNum = activeIndex >= 0 ? slides[activeIndex].num : null
+  const activeSlug = activeIndex >= 0 ? slides[activeIndex].slug : null
 
   // Auto-scroll to active slide when it changes.
   useEffect(() => {
-    if (activeNum !== null && activeNum !== prevActiveNum.current) {
-      prevActiveNum.current = activeNum
+    if (activeSlug !== null && activeSlug !== prevActiveSlug.current) {
+      prevActiveSlug.current = activeSlug
       // Defer to allow DOM update + animation start.
       const timer = setTimeout(() => {
         activeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
       }, 150)
       return () => clearTimeout(timer)
     }
-  }, [activeNum])
+  }, [activeSlug])
 
   // Empty state.
   if (!content || slides.length === 0) {
@@ -272,7 +273,7 @@ export function OutlineView({ content }: OutlineViewProps): React.ReactElement {
         <div className="relative outline-timeline-draw">
           {slides.map((slide, i) => (
             <div
-              key={slide.num}
+              key={slide.slug}
               ref={states[i] === "active" ? activeRef : undefined}
             >
               <TimelineNode

@@ -131,7 +131,8 @@ export function useDeckList(
 
   const handleDownload = useCallback((deckId: string) => {
     const target = decks.find((d) => d.deckId === deckId)
-    if (target?.pptxUrl) window.open(target.pptxUrl, "_blank")
+    if (!target?.pptxUrl) return
+    window.open(target.pptxUrl, "_blank")
   }, [decks])
 
   const confirmDelete = useCallback(async () => {

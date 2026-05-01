@@ -9,3 +9,4 @@ mcp-proxy-for-aws>=1.1.0
 requests
 html2text
 pymupdf
+partial-json-parser

@@ -57,7 +57,7 @@ chmod +x scripts/deploy.sh
 ./scripts/deploy.sh --region us-east-1 --observability
 ```
 
-> **注意:** `--observability` は Bedrock の Model Invocation Logging（MIL）をアカウント・リージョン単位で設定します。既に MIL が設定されている場合、スクリプトが既存設定の上書きについて警告し、確認を求めます。
+> **注意:** `--observability` は Bedrock の Model Invocation Logging（MIL）をアカウント・リージョン単位で設定します。既に MIL が設定されている場合、スクリプトが警告を表示し、既存設定を保護するため MIL の設定を自動的にスキップします。
 
 **外部 IdP を使う場合:**
 
@@ -65,6 +65,30 @@ chmod +x scripts/deploy.sh
 ./scripts/deploy.sh --region us-east-1 \
   --oidc-url "https://your-idp.example.com/.well-known/openid-configuration" \
   --allowed-clients "client-id-1,client-id-2"
+```
+
+**WAF IP アドレス制限を有効にする場合:**
+
+```bash
+# IPv4 のみ（⚠️ IPv6 アクセスはすべてブロックされます — 下記の注意を参照）
+./scripts/deploy.sh --region us-east-1 --waf-ipv4 "203.0.113.0/24,198.51.100.0/24"
+
+# IPv4 + IPv6（デュアルスタック環境では推奨）
+./scripts/deploy.sh --region us-east-1 \
+  --waf-ipv4 "203.0.113.0/24" \
+  --waf-ipv6 "2001:db8::/32"
+```
+
+> **⚠️ IPv6 に関する注意:** `--waf-ipv4` のみ指定し `--waf-ipv6` を省略した場合、IPv6 によるアクセスはすべてブロックされます。最近のブラウザは IPv6 を優先するため、Web UI が停止しているように見えることがあります。デュアルスタック環境では必ず両方を指定してください。
+
+**`infra/config.yaml` を使う場合:**
+
+`infra/config.yaml` が存在する場合、`deploy.sh` はその内容をデフォルト値として読み込みます。CLI 引数は config ファイルの値を上書きします。デプロイのたびに CLI フラグを繰り返す必要がなくなります。
+
+```bash
+cp infra/config.example.yaml infra/config.yaml
+# config.yaml を編集して stacks, features, WAF 等を設定
+./scripts/deploy.sh --region us-east-1
 ```
 
 **スタックの削除:**
@@ -181,6 +205,8 @@ echo "上記 URL にアクセスしてログインしてください。"
 | `--observability` | Bedrock Model Invocation Logging を有効化 | 無効 |
 | `--oidc-url URL` | 外部 IdP の OIDC Discovery URL | — |
 | `--allowed-clients IDS` | JWT の許可クライアント ID（カンマ区切り） | — |
+| `--waf-ipv4 CIDRS` | WAF 用 IPv4 CIDR 範囲（カンマ区切り） | — |
+| `--waf-ipv6 CIDRS` | WAF 用 IPv6 CIDR 範囲（カンマ区切り） | — |
 | `--destroy` | 全スタックを削除 | — |
 
 ## トラブルシューティング
@@ -204,7 +230,7 @@ rm -rf ~/sample-spec-driven-presentation-maker
 
 **--observability で「既に設定済み」と警告される**
 
-Bedrock Model Invocation Logging はアカウント・リージョンで 1 つしか設定できません。既存の設定がある場合、`deploy.sh` は上書きの確認を求めます。既存のログ送信先（CloudWatch Logs グループ名）が表示されるので、上書きして問題ないか確認してから `y` を入力してください。上書きすると、既存の MIL 設定は復元できません。
+Bedrock Model Invocation Logging はアカウント・リージョンで 1 つしか設定できません。既存の設定がある場合、`deploy.sh` は既存のログ送信先（CloudWatch Logs グループ名）を表示し、MIL の設定を自動的にスキップします。デプロイは observability を無効にした状態で続行されます。SDPM の observability を使用するには、既存の MIL 設定を手動で削除してから `--observability` を付けて再実行してください。
 
 ## 推定月額料金
 

@@ -10,6 +10,9 @@ from pathlib import Path
 
 from sdpm.reference.providers import FileProvider, ReferenceProvider  # noqa: F401
 
+# Package-bundled styles directory (for user-local style search fallback).
+BUNDLED_STYLES_DIR = Path(__file__).resolve().parent.parent.parent / "references" / "examples" / "styles"
+
 
 def _get_description(path: Path) -> str:
     """Extract description from first non-empty line of md or pptx speaker notes."""
@@ -59,26 +62,34 @@ def _get_description(path: Path) -> str:
     return ""
 
 
-def generate_styles_index(styles_dir: Path) -> Path:
+def generate_styles_index(styles_dirs: list[Path]) -> Path:
     """Generate an index HTML with sidebar + iframe preview for style HTMLs.
+
+    Scans multiple directories; user-local styles shadow bundled ones
+    (same stem → first match wins).
 
     Returns the path to the generated index file.
     """
     import html as html_mod
     import tempfile
 
+    seen: set[str] = set()
     styles = []
-    for f in sorted(styles_dir.iterdir()):
-        if f.suffix == '.html' and not f.name.startswith('.'):
-            desc = _get_description(f)
-            # Split "name — description" from title
-            name = f.stem
-            subtitle = ""
-            if " — " in desc:
-                _, subtitle = desc.split(" — ", 1)
-            elif desc:
-                subtitle = desc
-            styles.append((name, subtitle, f.resolve()))
+    for styles_dir in styles_dirs:
+        if not styles_dir.exists():
+            continue
+        for f in sorted(styles_dir.iterdir()):
+            if f.suffix == '.html' and not f.name.startswith('.') and f.stem not in seen:
+                seen.add(f.stem)
+                desc = _get_description(f)
+                # Split "name — description" from title
+                name = f.stem
+                subtitle = ""
+                if " — " in desc:
+                    _, subtitle = desc.split(" — ", 1)
+                elif desc:
+                    subtitle = desc
+                styles.append((name, subtitle, f.resolve()))
 
     if not styles:
         return Path()
@@ -260,11 +271,11 @@ def get_pptx_notes(pptx_path, pages=None):
 # ---------------------------------------------------------------------------
 
 
-def open_styles_gallery(styles_dir: Path) -> Path | None:
+def open_styles_gallery(styles_dirs: list[Path]) -> Path | None:
     """Generate styles gallery HTML and open in browser. Returns index path or None."""
     import webbrowser
 
-    index_path = generate_styles_index(styles_dir)
+    index_path = generate_styles_index(styles_dirs)
     if index_path and index_path.exists():
         webbrowser.open(index_path.as_uri())
         return index_path
@@ -366,3 +377,20 @@ def list_styles(styles_dir: Path) -> list[dict[str, str]]:
         desc = _get_description(f)
         styles.append({"name": f.stem, "description": desc})
     return styles
+
+
+def list_styles_merged(styles_dirs: list[Path]) -> list[dict[str, str]]:
+    """List styles from multiple directories, user-local first (shadows bundled).
+
+    For each style name (file stem), only the first occurrence across the
+    given directories is kept. Typically callers pass the result of
+    ``api.get_styles_dirs()`` which orders env-overrides → user-local → bundled.
+    """
+    seen: set[str] = set()
+    result: list[dict[str, str]] = []
+    for styles_dir in styles_dirs:
+        for item in list_styles(styles_dir):
+            if item["name"] not in seen:
+                seen.add(item["name"])
+                result.append(item)
+    return result

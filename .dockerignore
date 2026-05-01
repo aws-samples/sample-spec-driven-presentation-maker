@@ -17,7 +17,6 @@ infra/node_modules
 mcp-local/
 agent/
 web-ui/
-png-worker/
 docs/
 tests/
 scripts/

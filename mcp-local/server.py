@@ -21,6 +21,9 @@ from pathlib import Path
 _SKILL_DIR = Path(__file__).resolve().parent.parent / "skill"
 sys.path.insert(0, str(_SKILL_DIR))
 
+# Add project root to sys.path so shared/ package is importable
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from tools import (  # noqa: E402
@@ -213,14 +216,22 @@ def search_assets(
 def list_templates() -> str:
     """List all available PPTX templates with name.
 
+    Includes user-local templates (via $SDPM_TEMPLATES_DIR or ~/.config/sdpm/templates/)
+    in addition to the package-bundled ones. User-local templates shadow bundled
+    templates with the same stem.
+
     Returns:
         JSON with list of template names.
     """
-    templates_dir = _SKILL_DIR / "templates"
-    if not templates_dir.exists():
-        return json.dumps({"templates": []})
-    templates = sorted(t.stem for t in templates_dir.glob("*.pptx"))
-    return json.dumps({"templates": templates})
+    from sdpm.api import get_templates_dirs
+
+    seen: dict[str, str] = {}
+    for d in get_templates_dirs():
+        if not d.exists():
+            continue
+        for t in sorted(d.glob("*.pptx")):
+            seen.setdefault(t.stem, t.stem)
+    return json.dumps({"templates": sorted(seen)})
 
 
 @mcp.tool()

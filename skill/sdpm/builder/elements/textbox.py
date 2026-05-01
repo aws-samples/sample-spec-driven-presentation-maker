@@ -56,6 +56,8 @@ class TextboxMixin:
                 txBody.insert(1, new_lst)  # after bodyPr
         
         tf = textbox.text_frame
+        tf.margin_left = 0
+        tf.margin_right = 0
         if elem.get("_noAutofit"):
             # Clean bodyPr to match original (no autofit, no wrap override)
             from pptx.oxml.ns import qn

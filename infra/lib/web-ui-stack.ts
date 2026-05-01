@@ -25,8 +25,10 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import { CfnWebACLAssociation } from "aws-cdk-lib/aws-wafv2";
 import { Construct } from "constructs";
 import * as path from "path";
+import { CommonWebAcl } from "./construct/common-web-acl";
 
 interface WebUiStackProps extends cdk.StackProps {
   /** Amazon DynamoDB table from DataStack. */
@@ -49,6 +51,18 @@ interface WebUiStackProps extends cdk.StackProps {
   vectorBucketName?: string;
   /** S3 Vector Index name (empty if KB not enabled). */
   vectorIndexName?: string;
+  /** CloudFront WAF WebACL ARN (from CloudFrontWafStack in us-east-1). */
+  webAclId?: string;
+  /** Allowed IPv4 CIDR ranges for regional WAF. */
+  allowedIpV4AddressRanges?: string[];
+  /** Allowed IPv6 CIDR ranges for regional WAF. */
+  allowedIpV6AddressRanges?: string[];
+  /** Default model ID for the chat task (for "Recommended" badge in Settings). */
+  defaultChatModelId: string;
+  /** Default model ID for the create task (for "Recommended" badge in Settings). */
+  defaultCreateModelId: string;
+  /** Allowed models with resolved display metadata. */
+  allowedModels: Array<{ modelId: string; displayName: string; description?: string }>;
 }
 
 export class WebUiStack extends cdk.Stack {
@@ -68,8 +82,6 @@ export class WebUiStack extends cdk.Stack {
     });
 
     // --- Amazon CloudFront ---
-    const oai = new cloudfront.OriginAccessIdentity(this, "OAI");
-    siteBucket.grantRead(oai);
 
     // CloudFront Function to rewrite directory requests to index.html
     // (S3 REST API does not support index documents for subdirectories)
@@ -150,7 +162,7 @@ function handler(event) {
 
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
-        origin: new origins.S3Origin(siteBucket, { originAccessIdentity: oai }),
+        origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         functionAssociations: [{
           function: urlRewrite,
@@ -158,9 +170,11 @@ function handler(event) {
         }],
       },
       defaultRootObject: "index.html",
+      // 404 → /index.html for SPA client-side routing.
+      // With OAC, S3 returns 404 (not 403) for missing keys, so this
+      // fallback handles SPA routing without interfering with WAF blocks.
       errorResponses: [
         { httpStatus: 404, responseHttpStatus: 200, responsePagePath: "/index.html" },
-        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: "/index.html" },
       ],
     });
 
@@ -209,11 +223,24 @@ function handler(event) {
       code: lambda.Code.fromAsset(path.join(__dirname, "../.."), {
         bundling: {
           image: lambda.Runtime.PYTHON_3_13.bundlingImage,
-          command: ["bash", "-c", "cp -r /asset-input/api/* /asset-input/shared /asset-output/"],
+          command: [
+            "bash", "-c",
+            "pip install -r /asset-input/api/requirements.txt -t /asset-output/ && " +
+            "cp -r /asset-input/api/* /asset-input/shared /asset-output/",
+          ],
           local: {
             tryBundle(outputDir: string): boolean {
               const { execSync } = require("child_process");
               const root = path.join(__dirname, "../..");
+              try {
+                execSync(
+                  `pip install -r ${root}/api/requirements.txt -t ${outputDir}/` +
+                  ` --platform manylinux2014_x86_64 --python-version 3.13 --only-binary=:all:`,
+                  { stdio: "inherit" },
+                );
+              } catch {
+                return false;  // fall back to docker bundling
+              }
               execSync(`cp -r ${root}/api/* ${outputDir}/`, { stdio: "inherit" });
               execSync(`cp -r ${root}/shared ${outputDir}/shared`, { stdio: "inherit" });
               return true;
@@ -222,8 +249,8 @@ function handler(event) {
         },
       }),
       layers: [powertoolsLayer],
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 256,
+      timeout: cdk.Duration.seconds(120),
+      memorySize: 512,
       environment: {
         TABLE_NAME: props.table.tableName,
         PPTX_BUCKET: props.pptxBucket.bucketName,
@@ -317,8 +344,49 @@ function handler(event) {
     styles.addResource("{name}").addMethod("GET", integration, auth);
 
     // --- Deploy web-ui static files to S3 ---
+    // Bundle the web-ui at synth time so changes are auto-picked up without a
+    // manual `npm run build`. Prefers local Node.js; falls back to Docker.
+    const webUiDir = path.join(__dirname, "../../web-ui");
+    const allowedModelsJson = JSON.stringify(props.allowedModels);
+    const defaultChatModelIdStr = props.defaultChatModelId;
+    const defaultCreateModelIdStr = props.defaultCreateModelId;
     const deployment = new s3deploy.BucketDeployment(this, "DeploySite", {
-      sources: [s3deploy.Source.asset(path.join(__dirname, "../../web-ui/build"))],
+      sources: [
+        s3deploy.Source.asset(webUiDir, {
+          bundling: {
+            image: cdk.DockerImage.fromRegistry("node:20-slim"),
+            environment: {
+              NEXT_PUBLIC_ALLOWED_MODELS: allowedModelsJson,
+              NEXT_PUBLIC_DEFAULT_CHAT_MODEL_ID: defaultChatModelIdStr,
+              NEXT_PUBLIC_DEFAULT_CREATE_MODEL_ID: defaultCreateModelIdStr,
+            },
+            command: [
+              "bash", "-c",
+              "npm ci && npm run build:cloud && cp -r build/. /asset-output/",
+            ],
+            local: {
+              tryBundle(outputDir: string): boolean {
+                const { execSync } = require("child_process");
+                try {
+                  execSync("npm --version", { stdio: "ignore" });
+                } catch {
+                  return false;
+                }
+                const envForBuild = {
+                  ...process.env,
+                  NEXT_PUBLIC_ALLOWED_MODELS: allowedModelsJson,
+                  NEXT_PUBLIC_DEFAULT_CHAT_MODEL_ID: defaultChatModelIdStr,
+                  NEXT_PUBLIC_DEFAULT_CREATE_MODEL_ID: defaultCreateModelIdStr,
+                };
+                execSync("npm ci", { cwd: webUiDir, stdio: "inherit", env: envForBuild });
+                execSync("npm run build:cloud", { cwd: webUiDir, stdio: "inherit", env: envForBuild });
+                execSync(`cp -r ${webUiDir}/build/. ${outputDir}/`, { stdio: "inherit" });
+                return true;
+              },
+            },
+          },
+        }),
+      ],
       destinationBucket: siteBucket,
       distribution,
       distributionPaths: ["/*"],
@@ -340,7 +408,6 @@ function handler(event) {
       agentRuntimeArn: "${AgentRuntimeArn}",
       apiBaseUrl: "${ApiBaseUrl}",
       awsRegion: "${AWS::Region}",
-      agentPattern: "strands-single-agent",
     }), {
       UserPoolId: props.userPool.userPoolId,
       ClientId: props.userPoolClient.userPoolClientId,
@@ -427,6 +494,24 @@ function handler(event) {
         }),
       ]),
     });
+
+    // --- WAF: CloudFront WebACL (from us-east-1 stack) ---
+    if (props.webAclId) {
+      cfnDist.addPropertyOverride("DistributionConfig.WebACLId", props.webAclId);
+    }
+
+    // --- WAF: Regional WAF for API Gateway ---
+    if (props.allowedIpV4AddressRanges || props.allowedIpV6AddressRanges) {
+      const regionalWaf = new CommonWebAcl(this, "RegionalWaf", {
+        scope: "REGIONAL",
+        allowedIpV4AddressRanges: props.allowedIpV4AddressRanges,
+        allowedIpV6AddressRanges: props.allowedIpV6AddressRanges,
+      });
+      new CfnWebACLAssociation(this, "ApiWafAssociation", {
+        resourceArn: api.deploymentStage.stageArn,
+        webAclArn: regionalWaf.webAclArn,
+      });
+    }
 
     // --- Outputs ---
     new cdk.CfnOutput(this, "SiteUrl", { value: this.siteUrl });

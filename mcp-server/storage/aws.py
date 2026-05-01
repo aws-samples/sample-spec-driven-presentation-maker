@@ -129,6 +129,44 @@ class AwsStorage(Storage):
             ContentType="application/json",
         )
 
+    # --- Deck JSON (split format) ---
+
+    def get_deck_json(self, deck_id: str) -> dict:
+        """Read deck.json from S3 pptx bucket."""
+        key = f"decks/{deck_id}/deck.json"
+        try:
+            resp = self._s3.get_object(Bucket=self._pptx_bucket, Key=key)
+            return json.loads(resp["Body"].read())
+        except self._s3.exceptions.NoSuchKey:
+            raise ValueError(f"deck.json not found for deck {deck_id}")
+
+    def put_deck_json(self, deck_id: str, data: dict) -> None:
+        """Write deck.json to S3 pptx bucket."""
+        key = f"decks/{deck_id}/deck.json"
+        body = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+        self._s3.put_object(
+            Bucket=self._pptx_bucket, Key=key, Body=body,
+            ContentType="application/json",
+        )
+
+    def get_slide_json(self, deck_id: str, slug: str) -> dict:
+        """Read slides/{slug}.json from S3 pptx bucket."""
+        key = f"decks/{deck_id}/slides/{slug}.json"
+        try:
+            resp = self._s3.get_object(Bucket=self._pptx_bucket, Key=key)
+            return json.loads(resp["Body"].read())
+        except self._s3.exceptions.NoSuchKey:
+            raise ValueError(f"slides/{slug}.json not found for deck {deck_id}")
+
+    def put_slide_json(self, deck_id: str, slug: str, data: dict) -> None:
+        """Write slides/{slug}.json to S3 pptx bucket."""
+        key = f"decks/{deck_id}/slides/{slug}.json"
+        body = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+        self._s3.put_object(
+            Bucket=self._pptx_bucket, Key=key, Body=body,
+            ContentType="application/json",
+        )
+
     # --- Template ---
 
     def list_templates(self) -> list[dict]:

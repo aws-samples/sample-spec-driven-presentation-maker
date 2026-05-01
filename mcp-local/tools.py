@@ -50,6 +50,10 @@ def generate_pptx(
 ) -> dict[str, Any]:
     """Generate PPTX from a JSON file."""
     from sdpm.api import generate
+    from sdpm.assets import invalidate_manifest_cache
+    # Invalidate caches so user-local asset/config changes are picked up
+    # in this long-lived MCP Local process.
+    invalidate_manifest_cache()
     return generate(
         json_path=slides_json_path,
         output_path=output_path or None,
@@ -76,7 +80,8 @@ def search_assets(
     source_filter: str = "", type_filter: str = "", theme_filter: str = "",
 ) -> dict[str, Any]:
     """Search assets by keyword."""
-    from sdpm.assets import search_assets as _search
+    from sdpm.assets import invalidate_manifest_cache, search_assets as _search
+    invalidate_manifest_cache()
     return {
         "query": query,
         "results": _search(
@@ -90,16 +95,23 @@ def search_assets(
 
 def list_asset_sources(skill_dir: Path) -> dict[str, Any]:
     """List available asset sources."""
-    from sdpm.assets import list_sources
+    from sdpm.assets import invalidate_manifest_cache, list_sources
+    invalidate_manifest_cache()
     return {"sources": list_sources()}
 
 
 def list_styles(skill_dir: Path) -> dict[str, Any]:
-    """List available design styles and open gallery in browser."""
-    from sdpm.reference import list_styles as _list_styles, open_styles_gallery
-    styles_dir = skill_dir / "references" / "examples" / "styles"
-    open_styles_gallery(styles_dir)
-    return {"styles": _list_styles(styles_dir)}
+    """List available design styles and open gallery in browser.
+
+    Searches user-local styles directory (``~/.config/sdpm/styles/``) in
+    addition to the package-bundled styles. User-local entries shadow
+    bundled ones with the same name.
+    """
+    from sdpm.api import get_styles_dirs
+    from sdpm.reference import list_styles_merged, open_styles_gallery
+    styles_dirs = get_styles_dirs()
+    open_styles_gallery(styles_dirs)
+    return {"styles": list_styles_merged(styles_dirs)}
 
 
 def read_examples(names: list[str], skill_dir: Path) -> dict[str, Any]:

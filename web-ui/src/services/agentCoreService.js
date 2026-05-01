@@ -4,12 +4,38 @@
  * AgentCore Service - Streaming Response Handler
  *
  * Handles streaming responses from AgentCore agents using Server-Sent Events (SSE).
- *
- * CUSTOMIZATION FOR OTHER AGENT TYPES:
- * This service dynamically loads the appropriate parser based on the agent pattern.
- * The parser processes each streaming event. See strandsParser.js and langgraphParser.js for examples.
- * To support other agent frameworks, create a new parser file and update config.yaml.
  */
+
+import * as parser from './strandsParser.js';
+import { getAllowedModels } from "@/lib/allowedModels";
+
+const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === 'local';
+
+// Read the user's selected chat model from localStorage, validated against the allowed list.
+function readSelectedChatModelId() {
+  try {
+    const allowed = getAllowedModels();
+    if (allowed.length === 0) return undefined;
+    const prefs = JSON.parse(localStorage.getItem("sdpm-prefs") || "{}");
+    if (prefs.chatModelId && allowed.some((m) => m.modelId === prefs.chatModelId)) {
+      return prefs.chatModelId;
+    }
+  } catch { /* ignore */ }
+  return undefined;
+}
+
+function readSelectedCreateModelId() {
+  try {
+    const allowed = getAllowedModels();
+    if (allowed.length === 0) return undefined;
+    const prefs = JSON.parse(localStorage.getItem("sdpm-prefs") || "{}");
+    if (prefs.createModelId) {
+      const model = allowed.find((m) => m.modelId === prefs.createModelId);
+      if (model && model.composable !== false) return prefs.createModelId;
+    }
+  } catch { /* ignore */ }
+  return undefined;
+}
 
 // Generate a UUID
 const generateId = () => {
@@ -22,24 +48,21 @@ const AGENT_CONFIG = {
   AWS_REGION: "us-east-1",
 }
 
-let currentParser = null;
-
 // Set configuration from environment or aws-exports
-export const setAgentConfig = async (runtimeArn, region = "us-east-1", agentPattern = "strands-single-agent") => {
+export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
   AGENT_CONFIG.AGENT_RUNTIME_ARN = runtimeArn
   AGENT_CONFIG.AWS_REGION = region
-  
-  if (agentPattern === 'langgraph-single-agent') {
-    currentParser = await import('./langgraphParser.js');
-  } else {
-    currentParser = await import('./strandsParser.js');
-  }
 }
 
 /**
  * Invokes the AgentCore runtime with streaming support
  */
-export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal) => {
+export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode, deckId) => {
+  // Local mode: proxy through Next.js API Route → kiro-cli acp
+  if (IS_LOCAL) {
+    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId);
+  }
+
   try {
     if (!userId) {
       throw new Error("No valid user ID found in session. Please ensure you are authenticated.")
@@ -74,10 +97,15 @@ export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessTo
     }
 
     // Create the payload
+    const selectedChatModelId = readSelectedChatModelId();
+    const selectedCreateModelId = readSelectedCreateModelId();
     const payload = {
       prompt: query,
       runtimeSessionId: sessionId,
       userId: userId,
+      mode: mode || "separated",
+      ...(selectedChatModelId ? { chatModelId: selectedChatModelId } : {}),
+      ...(selectedCreateModelId ? { createModelId: selectedCreateModelId } : {}),
     }
 
     const response = await fetch(url, {
@@ -96,7 +124,7 @@ export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessTo
     let buffer = '';
 
     // Reset parser state for new request
-    if (currentParser.resetParserState) currentParser.resetParserState();
+    if (parser.resetParserState) parser.resetParserState();
 
     // Handle streaming response
     if (response.body) {
@@ -117,7 +145,7 @@ export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessTo
 
           for (const line of lines) {
             if (line.trim()) {
-              completion = currentParser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
+              completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
             }
           }
         }
@@ -138,8 +166,142 @@ export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessTo
 }
 
 /**
+ * Stop a running AgentCore Runtime session.
+ * Immediately terminates the specified session and stops any ongoing streaming responses,
+ * including all ThreadPool-based composer agents inside the container.
+ * Fire-and-forget: errors are logged but not thrown.
+ */
+export const stopRuntimeSession = async (sessionId, accessToken) => {
+  try {
+    if (!sessionId || !accessToken || !AGENT_CONFIG.AGENT_RUNTIME_ARN) return
+    const endpoint = `https://bedrock-agentcore.${AGENT_CONFIG.AWS_REGION}.amazonaws.com`
+    const escapedAgentArn = encodeURIComponent(AGENT_CONFIG.AGENT_RUNTIME_ARN)
+    const url = `${endpoint}/runtimes/${escapedAgentArn}/stopruntimesession?qualifier=DEFAULT`
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": sessionId,
+      },
+    })
+  } catch (error) {
+    console.error("Error stopping AgentCore session:", error)
+  }
+}
+
+/**
+ * Soft-stop an in-flight compose_slides tool invocation.
+ * Runs `touch /tmp/compose_stops/{toolUseId}` inside the session's microVM via
+ * InvokeAgentRuntimeCommand. The composer's BeforeToolCallEvent hook picks up
+ * the file and feeds STOP_PROMPT to the LLM as the cancelled tool result, so
+ * the agent wraps up with a plain-text partial summary.
+ * Fire-and-forget: errors are logged, not thrown.
+ */
+export const stopComposeSlides = async (sessionId, toolUseId, accessToken) => {
+  try {
+    if (!sessionId || !toolUseId || !accessToken || !AGENT_CONFIG.AGENT_RUNTIME_ARN) return
+    const endpoint = `https://bedrock-agentcore.${AGENT_CONFIG.AWS_REGION}.amazonaws.com`
+    const escapedAgentArn = encodeURIComponent(AGENT_CONFIG.AGENT_RUNTIME_ARN)
+    const url = `${endpoint}/runtimes/${escapedAgentArn}/commands?qualifier=DEFAULT`
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": sessionId,
+      },
+      body: JSON.stringify({
+        command: `/bin/bash -c "mkdir -p /tmp/compose_stops && touch /tmp/compose_stops/${toolUseId}"`,
+        timeout: 10,
+      }),
+    })
+  } catch (error) {
+    console.error("Error stopping compose_slides:", error)
+  }
+}
+
+/**
  * Generate a new session ID
  */
 export const generateSessionId = () => {
   return generateId()
 }
+
+/**
+ * Invoke the local ACP agent via API Route.
+ * Reads SSE stream from /api/agent/invoke and feeds events through the same
+ * strandsParser used by the cloud path, so ChatPanel works unchanged.
+ */
+const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId) => {
+  const response = await fetch('/api/agent/invoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, sessionId, mode: mode || 'spec', deckId: deckId || undefined }),
+    signal,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[invokeLocal] error:', errorText);
+    throw new Error(`Local agent error: ${response.status}: ${errorText}`);
+  }
+
+  let completion = '';
+  let buffer = '';
+
+  if (parser.resetParserState) parser.resetParserState();
+
+  if (response.body) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.trim()) {
+            const prev = completion;
+            completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  return completion;
+}
+
+/**
+ * Reconnect to a running background session using EventSource.
+ * Supports Last-Event-ID for seamless resume after disconnect.
+ * Returns a cleanup function, or null if no session is running.
+ */
+export const reconnectLocalSession = (deckId, onStreamUpdate, onToolUse) => {
+  if (!IS_LOCAL) return null;
+
+  const url = `/api/agent/stream?deckId=${encodeURIComponent(deckId)}`;
+  const es = new EventSource(url);
+  let completion = '';
+  if (parser.resetParserState) parser.resetParserState();
+
+  es.onmessage = (event) => {
+    const line = `data: ${event.data}`;
+    completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
+  };
+
+  es.onerror = () => {
+    // EventSource auto-reconnects with Last-Event-ID
+    // If server returns non-SSE (session ended), close
+    es.close();
+  };
+
+  // Return cleanup function
+  return () => es.close();
+};

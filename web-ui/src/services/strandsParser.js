@@ -62,7 +62,7 @@ export const parseStreamingChunk = (line, currentCompletion, updateCallback, too
       if (toolUseId && toolUseId === _lastToolUseId) return currentCompletion;
       _lastToolUseId = toolUseId;
 
-      if (toolCallback) toolCallback(json.toolStart.name, { toolUseId, name: json.toolStart.name, input: {}, started: true });
+      if (toolCallback) toolCallback(json.toolStart.name, { toolUseId, name: json.toolStart.name, input: json.toolStart.input || {}, started: true });
       return currentCompletion;
     }
 
@@ -73,6 +73,19 @@ export const parseStreamingChunk = (line, currentCompletion, updateCallback, too
       _lastToolUseId = toolUseId;
 
       if (toolCallback) toolCallback(json.toolUse.name, json.toolUse);
+      return currentCompletion;
+    }
+
+    // Tool stream events — progress updates from streaming tools (e.g. compose_slides)
+    if (json.toolStream) {
+      if (toolCallback) {
+        toolCallback(json.toolStream.name || '__tool_stream__', {
+          toolUseId: json.toolStream.toolUseId,
+          name: json.toolStream.name,
+          stream: true,
+          data: json.toolStream.data,
+        });
+      }
       return currentCompletion;
     }
 

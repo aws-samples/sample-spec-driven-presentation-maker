@@ -14,12 +14,12 @@ interface PreviewImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   /** Deck ID for refreshing the URL via API. */
   deckId?: string
   /** Slide ID (e.g. "slide_01") for refreshing. */
-  slideId?: string
+  slug?: string
   /** Cognito ID token for API auth. */
   idToken?: string
 }
 
-export function PreviewImage({ deckId, slideId, idToken, src, onError, ...props }: PreviewImageProps) {
+export function PreviewImage({ deckId, slug, idToken, src, onError, ...props }: PreviewImageProps) {
   const [currentSrc, setCurrentSrc] = useState(src)
   const [retried, setRetried] = useState(false)
 
@@ -37,14 +37,14 @@ export function PreviewImage({ deckId, slideId, idToken, src, onError, ...props 
       })
       if (!deckResp.ok) return
       const deck = await deckResp.json()
-      const slide = deck.slides?.find((s: { slideId: string; previewUrl?: string }) => s.slideId === slideId)
+      const slide = deck.slides?.find((s: { slug: string; previewUrl?: string }) => s.slug === slug)
       if (slide?.previewUrl) {
         setCurrentSrc(slide.previewUrl)
       }
     } catch {
       onError?.(e)
     }
-  }, [deckId, slideId, idToken, retried, onError])
+  }, [deckId, slug, idToken, retried, onError])
 
   return <img {...props} src={currentSrc || src} onError={handleError} />
 }

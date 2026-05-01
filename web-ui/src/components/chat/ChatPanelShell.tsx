@@ -26,8 +26,53 @@
 import { useRef, useEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
+import { LocalOnly, IS_LOCAL } from "@/lib/mode"
 
 export type ChatTabKey = "new" | "deck"
+
+
+/** Model info for local ACP agent */
+interface AcpModel { modelId: string; name: string; description?: string }
+
+function ModelSelector() {
+  const [model, setModelState] = useState<string>("")
+  const [models, setModels] = useState<AcpModel[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    const poll = () => {
+      fetch("/api/agent/models").then(r => r.json()).then(data => {
+        if (cancelled) return
+        const avail = data.available || []
+        if (avail.length > 0) { setModels(avail); setModelState(data.current || "") }
+        else setTimeout(poll, 3000) // retry until a process is spawned
+      }).catch(() => { if (!cancelled) setTimeout(poll, 3000) })
+    }
+    poll()
+    return () => { cancelled = true }
+  }, [])
+
+  if (models.length === 0) return null
+
+  return (
+    <select
+      value={model}
+      onChange={async (e) => {
+        const v = e.target.value
+        setModelState(v)
+        sessionStorage.setItem("sdpm-model", v)
+        fetch("/api/agent/models", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ modelId: v }),
+        }).catch(() => {})
+      }}
+      className="text-[11px] bg-transparent border border-border rounded px-1.5 py-0.5 text-foreground-muted hover:text-foreground focus:outline-none focus:ring-1 focus:ring-brand-teal max-w-[140px]"
+    >
+      {models.map(m => <option key={m.modelId} value={m.modelId}>{m.name}</option>)}
+    </select>
+  )
+}
 
 interface ChatPanelShellProps {
   open: boolean
@@ -38,6 +83,7 @@ interface ChatPanelShellProps {
   deckName: string | null
   chatSessionId?: string
   slidePreviewUrls?: (string | null)[]
+  slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
@@ -47,7 +93,7 @@ interface ChatPanelShellProps {
 
 export function ChatPanelShell({
   open, onClose, chatTab, onChatTabChange,
-  deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, chatRef: externalChatRef,
+  deckId, deckName, chatSessionId, slidePreviewUrls, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, chatRef: externalChatRef,
   inline = false,
 }: ChatPanelShellProps) {
   const internalChatRef = useRef<ChatPanelHandle>(null)
@@ -92,6 +138,11 @@ export function ChatPanelShell({
 
   /** New chat button: reset Panel A to fresh state. */
   const handleNewChat = () => {
+    if (IS_LOCAL) fetch("/api/agent/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newChat: true }),
+    }).catch(() => {})
     if (chatTab === "new" || panelAOwnsCurrentDeck) {
       setPanelAKey((k) => k + 1)
       setPanelADeckId(null)
@@ -145,6 +196,7 @@ export function ChatPanelShell({
           deckId="new"
           deckName="New Deck"
           slidePreviewUrls={panelAOwnsCurrentDeck ? (slidePreviewUrls || []) : []}
+          slideSlugs={panelAOwnsCurrentDeck ? (slideSlugs || []) : []}
           onDeckCreated={handlePanelADeckCreated}
           onPreviewInvalidated={onPreviewInvalidated}
           onWorkflowPhase={onWorkflowPhase}
@@ -161,6 +213,7 @@ export function ChatPanelShell({
             deckName={deckName || undefined}
             chatSessionId={chatSessionId}
             slidePreviewUrls={slidePreviewUrls || []}
+            slideSlugs={slideSlugs || []}
             onDeckCreated={handlePanelBDeckCreated}
             onPreviewInvalidated={onPreviewInvalidated}
             onWorkflowPhase={onWorkflowPhase}
@@ -201,6 +254,7 @@ export function ChatPanelShell({
                 <MessageSquare className="h-2.5 w-2.5 text-brand-teal" />
               </div>
               <span className="text-[13px] font-semibold tracking-[-0.01em]">Chat</span>
+              <LocalOnly><ModelSelector /></LocalOnly>
             </div>
             <div className="flex items-center gap-0.5">
               <button

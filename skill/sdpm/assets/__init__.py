@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from sdpm.config import ASSETS_DIR, get_extra_sources
+from sdpm.config import ASSETS_DIR, get_extra_sources, get_user_config_dir
 from sdpm.utils.svg import _recolor_svg  # noqa: F401 - re-exported for builder
 _KNOWN_EXTS = (".svg", ".png", ".gif", ".jpg", ".jpeg")
 
@@ -28,23 +28,26 @@ def _strip_ext(name: str) -> str:
     return name
 
 
-def _load_extra_sources() -> list[dict]:
-    """Load extra asset sources from config.
-
-    Returns:
-        List of extra source dicts with 'source', 'manifest', and optional 'files_dir' keys.
-    """
-    return get_extra_sources()
-
-
-_EXTRA_SOURCES: list[dict] = _load_extra_sources()
-
 # Legacy aliases for backward compatibility
 ICON_DIR = ASSETS_DIR
 ICON_LOCAL_DIR = ASSETS_DIR
 
 # Cached merged manifest: list of dicts with "source" injected
 _manifest_cache: Optional[list[dict]] = None
+
+
+def invalidate_manifest_cache() -> None:
+    """Clear cached manifests and config so next access reloads from disk.
+
+    Call when user-local assets or config.json may have changed
+    (e.g., at the start of each MCP tool invocation in long-lived processes).
+    Also clears the config cache since `_load_manifests()` relies on
+    `get_extra_sources()` which reads from the config.
+    """
+    global _manifest_cache
+    _manifest_cache = None
+    from sdpm.config import invalidate_cache as _invalidate_config_cache
+    _invalidate_config_cache()
 
 
 def _check_recolor_protected(cfg, item: dict) -> bool:
@@ -91,7 +94,12 @@ def _load_manifest_file(
 def _load_manifests() -> list[dict]:
     """Load and merge all manifest.json files from all asset sources.
 
-    Scans ASSETS_DIR/{source}/manifest.json and extra_sources from config.json.
+    Load order (earlier entries win on name collision via first-match semantics
+    in `find_asset` / `_find_by_manifest`):
+      1. extra_sources from config.json — explicit user override
+      2. User-local: get_user_config_dir()/assets/*/manifest.json — auto-discovered
+      3. Built-in: ASSETS_DIR/{source}/manifest.json
+      4. Legacy: ASSETS_DIR.parent/icons/manifest.json (auto-detected)
 
     Returns:
         Merged list of asset entries with '_source' and '_dir' fields injected.
@@ -102,13 +110,10 @@ def _load_manifests() -> list[dict]:
 
     all_assets: list[dict] = []
 
-    # Built-in: assets/{source}/manifest.json
-    if ASSETS_DIR.exists():
-        for manifest_path in sorted(ASSETS_DIR.glob("*/manifest.json")):
-            _load_manifest_file(manifest_path, source_override=None, all_assets=all_assets)
-
-    # Extra sources from config.json
-    for entry in _EXTRA_SOURCES:
+    # 1. Extra sources from config.json (explicit override — highest priority).
+    #    Call get_extra_sources() directly so runtime config changes are picked
+    #    up after invalidate_manifest_cache().
+    for entry in get_extra_sources():
         manifest_path = Path(entry["manifest"]).expanduser()
         source_name = entry.get("source")
         files_dir = Path(entry["files_dir"]).expanduser() if "files_dir" in entry else None
@@ -117,7 +122,18 @@ def _load_manifests() -> list[dict]:
             files_dir=files_dir, recolor_protected=entry.get("recolorProtected"),
         )
 
-    # Auto-detect legacy icons/ directory (sibling of assets/)
+    # 2. User-local: get_user_config_dir()/assets/{source}/manifest.json (auto-discovered)
+    user_assets = get_user_config_dir() / "assets"
+    if user_assets.exists():
+        for manifest_path in sorted(user_assets.glob("*/manifest.json")):
+            _load_manifest_file(manifest_path, source_override=None, all_assets=all_assets)
+
+    # 3. Built-in: assets/{source}/manifest.json
+    if ASSETS_DIR.exists():
+        for manifest_path in sorted(ASSETS_DIR.glob("*/manifest.json")):
+            _load_manifest_file(manifest_path, source_override=None, all_assets=all_assets)
+
+    # 4. Auto-detect legacy icons/ directory (sibling of assets/)
     legacy_icons = ASSETS_DIR.parent / "icons"
     legacy_manifest = legacy_icons / "manifest.json"
     if legacy_manifest.exists():
@@ -281,6 +297,12 @@ def _find_in_all_sources(name: str) -> Path:
     First checks manifests (supports subdirectory paths in 'file' field),
     then falls back to direct file search in source directories.
 
+    Fallback search order mirrors `_load_manifests()`:
+      1. extra_sources (explicit override)
+      2. User-local assets under get_user_config_dir()/assets/
+      3. Built-in ASSETS_DIR
+      4. Legacy icons/
+
     Args:
         name: File name without extension.
 
@@ -299,16 +321,11 @@ def _find_in_all_sources(name: str) -> Path:
             if path.exists():
                 return path
 
-    # Fallback: direct file search
+    # Fallback: direct file search in the same priority order as _load_manifests()
     search_dirs: list[Path] = []
 
-    if ASSETS_DIR.exists():
-        for source_dir in sorted(ASSETS_DIR.iterdir()):
-            if source_dir.is_dir():
-                search_dirs.append(source_dir)
-
-    # Extra sources from config.json
-    for entry in _EXTRA_SOURCES:
+    # 1. extra_sources
+    for entry in get_extra_sources():
         if "files_dir" in entry:
             d = Path(entry["files_dir"]).expanduser()
         else:
@@ -316,7 +333,20 @@ def _find_in_all_sources(name: str) -> Path:
         if d.exists():
             search_dirs.append(d)
 
-    # Legacy icons/ directory
+    # 2. User-local assets
+    user_assets = get_user_config_dir() / "assets"
+    if user_assets.exists():
+        for source_dir in sorted(user_assets.iterdir()):
+            if source_dir.is_dir():
+                search_dirs.append(source_dir)
+
+    # 3. Built-in
+    if ASSETS_DIR.exists():
+        for source_dir in sorted(ASSETS_DIR.iterdir()):
+            if source_dir.is_dir():
+                search_dirs.append(source_dir)
+
+    # 4. Legacy icons/ directory
     legacy_icons = ASSETS_DIR.parent / "icons"
     if legacy_icons.exists() and legacy_icons not in search_dirs:
         search_dirs.append(legacy_icons)
@@ -353,7 +383,10 @@ def list_sources() -> list[dict]:
     for item in manifests:
         src = item.get("_source", "unknown")
         counts[src] = counts.get(src, 0) + 1
-    # Load descriptions from manifest files
+    # Load descriptions from manifest files.
+    # Order matches _load_manifests(): built-in as base, then user-local and
+    # extra_sources override (so user-visible description reflects the source
+    # that actually wins on name collision).
     if ASSETS_DIR.exists():
         for manifest_path in sorted(ASSETS_DIR.glob("*/manifest.json")):
             with open(manifest_path) as f:
@@ -361,7 +394,16 @@ def list_sources() -> list[dict]:
             source = data.get("source", manifest_path.parent.name)
             if "description" in data:
                 descriptions[source] = data["description"]
-    for entry in _EXTRA_SOURCES:
+    # User-local: get_user_config_dir()/assets/*/manifest.json
+    user_assets = get_user_config_dir() / "assets"
+    if user_assets.exists():
+        for manifest_path in sorted(user_assets.glob("*/manifest.json")):
+            with open(manifest_path) as f:
+                data = json.load(f)
+            source = data.get("source", manifest_path.parent.name)
+            if "description" in data:
+                descriptions[source] = data["description"]
+    for entry in get_extra_sources():
         manifest_path = Path(entry["manifest"]).expanduser()
         if manifest_path.exists():
             with open(manifest_path) as f:

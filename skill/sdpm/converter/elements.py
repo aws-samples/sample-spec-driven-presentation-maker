@@ -521,12 +521,13 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
         pass
     
     # Extract margins (EMU → px)
+    # Builder default for textbox: left/right=0, top/bottom=PowerPoint default
     tf = shape.text_frame
-    if tf.margin_left is not None and tf.margin_left != 91440:
+    if tf.margin_left is not None and tf.margin_left != 0:
         elem["marginLeft"] = round(tf.margin_left / EMU_PER_PX)
     if tf.margin_top is not None and tf.margin_top != 45720:
         elem["marginTop"] = round(tf.margin_top / EMU_PER_PX)
-    if tf.margin_right is not None and tf.margin_right != 91440:
+    if tf.margin_right is not None and tf.margin_right != 0:
         elem["marginRight"] = round(tf.margin_right / EMU_PER_PX)
     if tf.margin_bottom is not None and tf.margin_bottom != 45720:
         elem["marginBottom"] = round(tf.margin_bottom / EMU_PER_PX)

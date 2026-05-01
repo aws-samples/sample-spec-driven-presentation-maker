@@ -194,6 +194,7 @@ def main() -> None:
     manifest = {
         "source": "aws",
         "description": "AWS Architecture Icons — official service and resource icons for architecture diagrams",
+        "recolorProtected": True,
         "icons": icons,
     }
 

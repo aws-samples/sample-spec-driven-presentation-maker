@@ -43,7 +43,8 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 |------|-------------|
 | `list_templates` | List available templates |
 | `code_block` | Generate syntax-highlighted code block JSON |
-| `pptx_to_json` | Convert deck's PPTX to JSON |
+| `read_uploaded_file` | Read pre-converted uploaded file content |
+| `import_attachment` | Import file into deck workspace |
 | `search_slides` | Semantic slide search (optional, requires Amazon Bedrock KB) |
 
 ## Deployment

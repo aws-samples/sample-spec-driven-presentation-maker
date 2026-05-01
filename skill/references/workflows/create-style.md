@@ -11,7 +11,12 @@ A style captures design preferences so they don't need to be repeated every time
 
 ## Deliverable
 
-`references/examples/styles/{name}.html`
+`~/.config/sdpm/styles/{name}.html`
+
+User-local styles survive `pip install --upgrade` and are automatically picked up
+by `list_styles` and the styles gallery. The directory does not exist by default —
+create it if missing (e.g. `mkdir -p ~/.config/sdpm/styles`). On Windows this maps
+to `%APPDATA%/sdpm/styles/`.
 
 ## Inputs
 
@@ -182,7 +187,8 @@ Each slide demonstrates the design while explaining the reasoning.
 
 #### 3c. Write the HTML
 
-Now write `references/examples/styles/{name}.html`.
+Now write `~/.config/sdpm/styles/{name}.html` (Windows: `%APPDATA%/sdpm/styles/{name}.html`).
+Create the parent directory if it does not exist (`mkdir -p ~/.config/sdpm/styles`).
 Write incrementally — do NOT generate the entire HTML at once.
 Start with the skeleton (head, `:root` variables, base CSS), then add one slide at a time.
 This avoids timeouts and makes each slide reviewable.

@@ -55,6 +55,96 @@ global_settings:
         at CDK synth time. Hardcoded cp commands, no user input, build-time only.
       expiration: "2027-03-29"
 
+    - rule_id: "javascript.lang.security.detect-child-process.detect-child-process"
+      path: "web-ui/src/lib/local/acp-process.ts"
+      reason: >
+        spawn launches the local ACP agent process on the developer's machine.
+        Command path comes from hardcoded config, not user input. Local mode only.
+      expiration: "2027-03-29"
+
+    - rule_id: "javascript.lang.security.detect-child-process.detect-child-process"
+      path: "web-ui/src/app/api/open/route.ts"
+      reason: >
+        execFile opens a local file with the OS default handler (open/xdg-open).
+        Path is allowlist-validated via SAFE_SEGMENT regex. Local mode only,
+        runs on developer's machine.
+      expiration: "2027-03-29"
+
+    # --- Bandit B108: /tmp usage in local/container code ---
+
+    - rule_id: "B108"
+      path: "agent/modes/separated/composer.py"
+      reason: >
+        /tmp/compose_stops is used for inter-agent stop signalling inside
+        a Fargate container. Not shared with untrusted processes.
+      expiration: "2027-03-29"
+
+    - rule_id: "B108"
+      path: "mcp-local/server_acp.py"
+      reason: >
+        /tmp/pptx-preview is used for transient preview files in the local
+        MCP server. Runs on developer's machine only.
+      expiration: "2027-03-29"
+
+    # --- Bandit B310: urlopen in upload_tools ---
+
+    - rule_id: "B310"
+      path: "mcp-local/upload_tools.py"
+      reason: >
+        urlopen fetches user-provided URLs for image/attachment import.
+        This is intentional functionality — the user explicitly provides
+        the URL. Local mode only.
+      expiration: "2027-03-29"
+
+    # --- Semgrep dynamic-urllib in upload_tools ---
+
+    - rule_id: "python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected"
+      path: "mcp-local/upload_tools.py"
+      reason: >
+        Same as B310 above. User-provided URL for attachment import.
+        Local mode only.
+      expiration: "2027-03-29"
+
+    # --- Semgrep path-join-resolve-traversal: Local-only API routes ---
+    # All web-ui/src/app/api/ routes are Local-mode only (excluded from
+    # cloud build). They run on the developer's own machine via localhost.
+    # Path inputs come from the local UI, not from untrusted network sources.
+
+    - rule_id: "javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal"
+      path: "web-ui/src/app/api/decks/route.ts"
+      reason: >
+        Local-only API route. deckId comes from local UI, path.join results
+        are validated with startsWith guard. Not exposed to network.
+      expiration: "2027-03-29"
+
+    - rule_id: "javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal"
+      path: "web-ui/src/app/api/open/route.ts"
+      reason: >
+        Local-only API route. Inputs are allowlist-validated via SAFE_SEGMENT
+        regex + startsWith containment check.
+      expiration: "2027-03-29"
+
+    - rule_id: "javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal"
+      path: "web-ui/src/app/api/upload/route.ts"
+      reason: >
+        Local-only API route. file.name is used with a temp directory,
+        not user-controlled path traversal risk. Local mode only.
+      expiration: "2027-03-29"
+
+    - rule_id: "javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal"
+      path: "web-ui/src/lib/local/acp-process.ts"
+      reason: >
+        Local-mode session persistence. deckId is from local UI, dir is
+        constructed from DECK_ROOT + validated deckId. Not network-exposed.
+      expiration: "2027-03-29"
+
+    - rule_id: "javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal"
+      path: "web-ui/src/lib/local/deck-paths.ts"
+      reason: >
+        Shared path utility for local mode. deckId is validated by callers
+        and results are checked with startsWith guard. Not network-exposed.
+      expiration: "2027-03-29"
+
     # --- Container binding to 0.0.0.0 ---
     # MCP server runs inside a Fargate container behind AgentCore Runtime.
     # Binding to all interfaces is required for container networking.
