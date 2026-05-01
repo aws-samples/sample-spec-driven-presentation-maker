@@ -120,13 +120,15 @@ See [Recommended Deploy Guide](docs/en/deploy-cloudshell.md) for post-deployment
 
 Runs the Layer 4 Web UI against a local [Kiro](https://kiro.dev/) CLI ACP backend instead of the AWS-deployed Agent/Runtime. No AWS deployment needed.
 
+**Prerequisites:** `kiro-cli` installed and on `PATH` ([install](https://kiro.dev/docs/cli/install/)).
+
 ```bash
 cd mcp-local && uv sync        # one-time: sync MCP server deps
 cd ../web-ui && npm install
 npm run dev:local -- --port 3098
 ```
 
-Open [http://localhost:3098](http://localhost:3098). Requires `kiro-cli` on `PATH` ([install](https://kiro.dev/docs/cli/install/)).
+Open [http://localhost:3098](http://localhost:3098).
 
 This sets `NEXT_PUBLIC_MODE=local`, enables the Next.js API Routes under `web-ui/src/app/api/`, and spawns `kiro-cli acp --agent sdpm-spec` per active deck. Agent definitions live in `mcp-local/.kiro/agents/` and share the MCP toolset from `mcp-local/server_acp.py`.
 
