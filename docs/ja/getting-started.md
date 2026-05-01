@@ -299,8 +299,6 @@ waf:
 
 Amazon Bedrock Knowledge Bases と Amazon S3 Vectors を用いた、デッキ横断のセマンティック検索を標準機能として提供します。追加の設定は不要です。
 
-想定コストは標準利用（〜1,000 スライド、月 100 検索）で月額 $0.05 以下です。詳細は [コスト試算](cost.md) を参照してください。
-
 ### カスタムテンプレート・アセット
 
 独自の .pptx テンプレートやアイコンの追加方法は[カスタムテンプレートとアセット](custom-template.md)を参照してください。
@@ -311,9 +309,7 @@ Amazon Bedrock Knowledge Bases と Amazon S3 Vectors を用いた、デッキ横
 
 ### コスト
 
-- Amazon Bedrock AgentCore Runtime は 2 つのコンテナ（Agent + MCP Server）を実行します
-- Amazon Bedrock Knowledge Base + Amazon S3 Vectors がデフォルトで作成されます（スライド検索用、標準利用で月 $0.05 以下）
-- 開発・検証が終わったら `npx cdk destroy --all` でリソースを削除してください
+コストの詳細は[コスト試算](cost.md)を参照してください。開発・検証が終わったら `npx cdk destroy --all` でリソースを削除してください。
 
 ### データ保持
 

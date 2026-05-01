@@ -299,8 +299,6 @@ Default action is **Block** — only the listed IP ranges are allowed. When the 
 
 Cross-deck semantic search is provided out of the box, backed by Amazon Bedrock Knowledge Bases and Amazon S3 Vectors. No extra configuration is needed.
 
-The estimated cost is under $0.05/month for typical usage (~1,000 slides, 100 searches/month). See [Cost Estimates](cost.md) for details.
-
 ### Custom Templates and Assets
 
 For adding custom .pptx templates and icons, see [Custom Templates and Assets](custom-template.md).
@@ -311,9 +309,7 @@ For adding custom .pptx templates and icons, see [Custom Templates and Assets](c
 
 ### Cost
 
-- Amazon Bedrock AgentCore Runtime runs 2 containers (Agent + MCP Server)
-- Enabling `features.searchSlides` creates an additional Amazon Bedrock Knowledge Base
-- Delete resources with `npx cdk destroy --all` when done with development/testing
+See [Cost Estimates](cost.md) for details. Delete resources with `npx cdk destroy --all` when done with development/testing.
 
 ### Data Retention
 
