@@ -51,7 +51,6 @@ AWS にデプロイされた Agent / Runtime の代わりに、**[Kiro](https://
 ### 前提条件
 
 - `kiro-cli` がインストール済みで PATH に通っていること — [Kiro CLI インストールガイド](https://kiro.dev/docs/cli/install/)
-- `mcp-local` の依存関係が同期済みであること: `cd ../mcp-local && uv sync`
 
 ### 起動
 

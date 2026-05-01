@@ -54,7 +54,6 @@ Run the Web UI entirely on your machine, backed by **[Kiro](https://kiro.dev/) C
 ### Prerequisites
 
 - `kiro-cli` installed and on `PATH` — see [Kiro CLI install guide](https://kiro.dev/docs/cli/install/)
-- `mcp-local` dependencies synced: `cd ../mcp-local && uv sync`
 
 ### Start
 
