@@ -62,114 +62,74 @@ MCP Client → Gateway (OAuth) → Runtime (JWT Bearer) → MCP Server Container
 
 The Gateway handles client authentication. The Runtime validates the JWT and extracts the user identity (`sub` claim) for per-user deck authorization.
 
-## Option 3: Direct Runtime Access (Layer 3)
+## Option 3: OAuth 2.1 Discovery Endpoint (Layer 3, recommended)
 
-Connect directly to the Amazon Bedrock AgentCore Runtime endpoint without a Gateway. Useful for testing or single-server deployments.
+Register the **MCP Server URL** (API Gateway HTTP API created during CDK deployment) in your MCP client. Authentication is handled automatically via the OAuth 2.1 Discovery protocol.
 
-### Endpoint
+### Connection Method A: Dynamic Client Registration (DCR) — Default
 
-```
-POST https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{ENCODED_ARN}/invocations?qualifier=DEFAULT
-```
+All major MCP clients (Claude.ai, Claude Desktop, Cursor, VS Code, Kiro) support DCR (RFC 7591). Simply register the MCP Server URL in your client — the client automatically performs OAuth discovery → DCR → authorization code flow.
 
-Where `ENCODED_ARN` is the URL-encoded Runtime ARN.
-
-### Headers
-
-```
-Content-Type: application/json
-Accept: application/json, text/event-stream
-Authorization: Bearer {JWT_TOKEN}
-```
-
-### Example: List tools
-
-```bash
-# Get OAuth token
-TOKEN=$(curl -s -X POST \
-  "https://<CognitoDomain>.auth.<region>.amazoncognito.com/oauth2/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "<M2MClientId>:<M2MClientSecret>" \
-  -d "grant_type=client_credentials&scope=sdpm/invoke" \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-
-# URL-encode the Runtime ARN
-ENCODED_ARN=$(python3 -c "import urllib.parse; print(urllib.parse.quote('<RuntimeArn>', safe=''))")
-
-# Call tools/list
-curl -X POST \
-  "https://bedrock-agentcore.<region>.amazonaws.com/runtimes/${ENCODED_ARN}/invocations?qualifier=DEFAULT" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}'
-```
-
-### Example: Call a tool
-
-```bash
-curl -X POST \
-  "https://bedrock-agentcore.<region>.amazonaws.com/runtimes/${ENCODED_ARN}/invocations?qualifier=DEFAULT" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "list_templates",
-      "arguments": {}
-    },
-    "id": 2
-  }'
-```
-
-### MCP client configuration (mcp.json)
-
-To connect Claude Desktop / VS Code / Kiro to the Runtime, add one of the following to your `mcp.json`.
-
-#### With Cognito JWT authentication
-
-Obtain a JWT via the OAuth 2.0 Client Credentials flow, pass it as an environment variable, and attach it as a Bearer token via the HTTP streaming transport.
+#### MCP client configuration
 
 ```json
 {
   "mcpServers": {
     "spec-driven-presentation-maker": {
-      "url": "https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/<ENCODED_ARN>/invocations?qualifier=DEFAULT",
-      "transport": "streamable-http",
-      "headers": {
-        "Authorization": "Bearer ${SDPM_JWT_TOKEN}",
-        "Accept": "application/json, text/event-stream"
-      }
+      "url": "<McpServerUrl>"
     }
   }
 }
 ```
 
-See [Getting Started — Obtaining an OAuth Token](getting-started.md#obtaining-an-oauth-token) for how to fetch the token. Tokens expire, so long-running clients need a refresh mechanism.
+Get `<McpServerUrl>` from the CDK output `SdpmRuntime.McpServerUrl`.
 
-#### With IAM authentication
+#### Authentication flow (automatic)
 
-When you are not using Cognito (e.g. you rely on IAM-based access control without an external OIDC IdP), use [mcp-proxy-for-aws](https://github.com/aws/mcp-proxy-for-aws) to automate SigV4 signing.
-
-```json
-{
-  "mcpServers": {
-    "spec-driven-presentation-maker": {
-      "command": "uvx",
-      "args": [
-        "mcp-proxy-for-aws",
-        "--service", "bedrock-agentcore",
-        "--region", "us-east-1",
-        "--url", "https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/<ENCODED_ARN>/invocations?qualifier=DEFAULT"
-      ]
-    }
-  }
-}
+```
+MCP Client → /.well-known/oauth-authorization-server (discovery)
+           → /register (DCR: auto-obtain client_id)
+           → /authorize → Cognito login screen
+           → /token (obtain access token)
+           → / or /mcp (MCP requests with Bearer token)
 ```
 
-AWS credentials are resolved via the standard chain (`~/.aws/credentials`, environment variables, etc.).
+The only user action is logging in to Cognito.
+
+### Connection Method B: Static Client Registration (`auth.mcpCallbackUrls`)
+
+Use a static OAuth client instead of DCR when either of the following applies:
+
+- **The MCP client does not support DCR**
+- **You want to restrict access to specific clients only** (enterprise security requirements where open DCR registration is not acceptable)
+
+> **Note**: Disabling DCR will prevent connections from clients that use a different `localhost` callback port on each session.
+
+#### Setup
+
+1. Add the allowed client callback URLs to `config.yaml` and optionally disable DCR:
+
+```yaml
+auth:
+  enableDCR: false  # Disable DCR (when allowing only specific clients)
+  mcpCallbackUrls:
+    - https://claude.ai/api/mcp/auth_callback
+    - https://claude.com/api/mcp/auth_callback
+```
+
+2. Redeploy (`cdk deploy --all`)
+3. Configure the MCP client with the `SdpmRuntime.McpOAuthClientId` from CDK outputs
+
+> **Note**: When `enableDCR: false`, the `registration_endpoint` is omitted from `/.well-known/oauth-authorization-server` metadata and `/register` returns 403. Only clients with callback URLs listed in `mcpCallbackUrls` can connect.
+
+#### Deployment patterns
+
+| `mcpCallbackUrls` | `enableDCR` | Behavior |
+|---|---|---|
+| — | `true` (default) | DCR only. Personal/demo use |
+| set | `true` | Static client + DCR. Flexible |
+| set | `false` | Static client only. Enterprise lockdown |
+| — | `false` | No external MCP access. WebUI only |
 
 ---
 

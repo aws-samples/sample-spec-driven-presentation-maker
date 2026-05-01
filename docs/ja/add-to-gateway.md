@@ -46,93 +46,74 @@ Gateway がクライアント認証を処理します。Runtime は JWT を検�
 
 ---
 
-## オプション 3: Runtime 直接アクセス（Layer 3）
+## オプション 3: OAuth 2.1 Discovery エンドポイント経由（Layer 3、推奨）
 
-Gateway を使わず、Amazon Bedrock AgentCore Runtime エンドポイントに直接接続します。テストやシングルサーバー構成に適しています。
+CDK デプロイ時に作成される **MCP Server URL**（API Gateway HTTP API）を MCP クライアントに登録するだけで、OAuth 2.1 Discovery プロトコルにより認証が自動的に行われます。
 
-### エンドポイント
+### 接続方法 A: Dynamic Client Registration（DCR）— デフォルト
 
-```
-POST https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{ENCODED_ARN}/invocations?qualifier=DEFAULT
-```
+主要な MCP クライアント（Claude.ai、Claude Desktop、Cursor、VS Code、Kiro）はすべて DCR（RFC 7591）に対応しています。MCP クライアントに MCP Server URL を登録するだけで、クライアントが自動的に OAuth ディスカバリー → DCR → 認証コードフロー を実行します。
 
-`ENCODED_ARN` は URL エンコードされた Runtime ARN です。
-
-### ヘッダー
-
-```
-Content-Type: application/json
-Accept: application/json, text/event-stream
-Authorization: Bearer {JWT_TOKEN}
-```
-
-JWT トークンの取得方法は[はじめに — OAuth トークンの取得](getting-started.md#oauth-トークンの取得)を参照してください。
-
-### 例: ツールの呼び出し
-
-```bash
-curl -X POST \
-  "https://bedrock-agentcore.<region>.amazonaws.com/runtimes/${ENCODED_ARN}/invocations?qualifier=DEFAULT" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "list_templates",
-      "arguments": {}
-    },
-    "id": 2
-  }'
-```
-
-### MCP クライアント (mcp.json) での設定例
-
-Claude Desktop / VS Code / Kiro などの MCP クライアントから Runtime に接続するには、`mcp.json` に以下のいずれかを記述します。
-
-#### Cognito JWT 認証を使う場合
-
-事前に OAuth 2.0 Client Credentials フロー等で JWT トークンを取得しておき、環境変数として渡す方式です。HTTP ストリーミングトランスポートを指定し、`Authorization` ヘッダに Bearer トークンを付与します。
+#### MCP クライアント設定
 
 ```json
 {
   "mcpServers": {
     "spec-driven-presentation-maker": {
-      "url": "https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/<ENCODED_ARN>/invocations?qualifier=DEFAULT",
-      "transport": "streamable-http",
-      "headers": {
-        "Authorization": "Bearer ${SDPM_JWT_TOKEN}",
-        "Accept": "application/json, text/event-stream"
-      }
+      "url": "<McpServerUrl>"
     }
   }
 }
 ```
 
-JWT トークンの取得方法は[はじめに — OAuth トークンの取得](getting-started.md#oauth-トークンの取得)を参照してください。トークンには有効期限があるため、長時間の利用では自動更新の仕組みが必要です。
+`<McpServerUrl>` は CDK 出力の `SdpmRuntime.McpServerUrl` から取得してください。
 
-#### IAM 認証を使う場合
+#### 認証フロー（自動）
 
-Cognito を使わない構成（`config.yaml` の `auth.oidcDiscoveryUrl` で外部 IdP を使わない、かつ IAM ベースでアクセス制御する場合）では、[mcp-proxy-for-aws](https://github.com/aws/mcp-proxy-for-aws) を使って IAM SigV4 署名を自動化します。
-
-```json
-{
-  "mcpServers": {
-    "spec-driven-presentation-maker": {
-      "command": "uvx",
-      "args": [
-        "mcp-proxy-for-aws",
-        "--service", "bedrock-agentcore",
-        "--region", "us-east-1",
-        "--url", "https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/<ENCODED_ARN>/invocations?qualifier=DEFAULT"
-      ]
-    }
-  }
-}
+```
+MCP Client → /.well-known/oauth-authorization-server（ディスカバリー）
+           → /register（DCR: client_id を自動取得）
+           → /authorize → Cognito ログイン画面
+           → /token（アクセストークン取得）
+           → / or /mcp（Bearer トークンで MCP リクエスト）
 ```
 
-AWS 認証情報は通常通り `~/.aws/credentials` または環境変数で設定してください。
+ユーザーが行うのは Cognito のログインのみです。
+
+### 接続方法 B: 静的クライアント登録（`auth.mcpCallbackUrls`）
+
+以下のいずれかに該当する場合は、DCR の代わりに静的な OAuth クライアントを使用します：
+
+- **MCP クライアントが DCR に対応していない場合**
+- **DCR を許可せず、特定のクライアントのみ接続を許可したい場合**（企業環境でのセキュリティ要件）
+
+> **注意**: DCR を無効化すると、`localhost` で毎回異なるポートの callback URL を使用するクライアントは接続できません。
+
+#### 設定手順
+
+1. `config.yaml` に許可するクライアントの callback URL を記載し、必要に応じて DCR を無効化します：
+
+```yaml
+auth:
+  enableDCR: false  # DCR を無効化（特定クライアントのみ許可する場合）
+  mcpCallbackUrls:
+    - https://claude.ai/api/mcp/auth_callback
+    - https://claude.com/api/mcp/auth_callback
+```
+
+2. 再デプロイします（`cdk deploy --all`）
+3. CDK 出力の `SdpmRuntime.McpOAuthClientId` を MCP クライアントに設定します
+
+> **注意**: `enableDCR: false` に設定すると、`/.well-known/oauth-authorization-server` メタデータから `registration_endpoint` が省略され、`/register` は 403 を返します。`mcpCallbackUrls` に登録されていないクライアントは接続できません。
+
+#### デプロイパターン一覧
+
+| `mcpCallbackUrls` | `enableDCR` | 動作 |
+|---|---|---|
+| なし | `true`（デフォルト） | DCR のみ。個人・デモ向け |
+| あり | `true` | 静的クライアント＋DCR 併用 |
+| あり | `false` | 静的クライアントのみ。企業向けロックダウン |
+| なし | `false` | 外部 MCP 接続なし。WebUI 専用 |
 
 ---
 
