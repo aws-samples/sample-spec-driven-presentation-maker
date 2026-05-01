@@ -155,7 +155,9 @@ The following controls depend on your organization's environment, network topolo
 6. **Cognito advanced security (MFA, compromised-credentials detection)** — omitted by default to keep the demo frictionless
 7. **Bedrock model / region selection** — avoid cross-region inference profiles if data sovereignty is a concern
 
-See [CONTRIBUTING.md](CONTRIBUTING.md#security-issue-notifications) for more information.
+### Reporting Security Issues
+
+Found a potential vulnerability? Please do not file a public GitHub issue — follow the process in [CONTRIBUTING.md](CONTRIBUTING.md#security-issue-notifications).
 
 ## License
 

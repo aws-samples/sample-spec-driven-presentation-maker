@@ -153,7 +153,9 @@ This project has adopted the [Amazon Open Source Code of Conduct](https://aws.gi
 6. **Cognito 高度なセキュリティ（MFA、漏洩認証情報検出）** — デモ利用の摩擦を減らすためデフォルト無効
 7. **Bedrock モデル・リージョン選定** — データ主権要件がある場合はクロスリージョン推論プロファイルを避ける
 
-See [CONTRIBUTING.md](CONTRIBUTING.md#security-issue-notifications) for more information.
+### 脆弱性の報告
+
+潜在的な脆弱性を発見した場合は、GitHub の公開 Issue を作成せず、[CONTRIBUTING.md](CONTRIBUTING.md#security-issue-notifications) の手順に従って報告してください。
 
 ## License
 
