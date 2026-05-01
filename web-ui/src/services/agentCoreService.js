@@ -283,10 +283,10 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
  * Supports Last-Event-ID for seamless resume after disconnect.
  * Returns a cleanup function, or null if no session is running.
  */
-export const reconnectLocalSession = (deckId, onStreamUpdate, onToolUse) => {
+export const reconnectLocalSession = (sessionId, onStreamUpdate, onToolUse) => {
   if (!IS_LOCAL) return null;
 
-  const url = `/api/agent/stream?deckId=${encodeURIComponent(deckId)}`;
+  const url = `/api/agent/stream?sessionId=${encodeURIComponent(sessionId)}`;
   const es = new EventSource(url);
   let completion = '';
   if (parser.resetParserState) parser.resetParserState();
