@@ -327,9 +327,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     }
 
     const timer = setTimeout(async () => {
-      // Check if running
+      // Check if running — use sessionId for process lookup
+      const sid = sessionId
+      if (!sid) return
       try {
-        const check = await fetch(`/api/agent/stream?deckId=${encodeURIComponent(deckId)}`)
+        const check = await fetch(`/api/agent/stream?sessionId=${encodeURIComponent(sid)}`)
         const ct = check.headers.get("content-type") || ""
         try { check.body?.getReader()?.cancel() } catch {}
         if (!ct.includes("text/event-stream")) return
@@ -341,7 +343,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       if (resetParserState) resetParserState()
 
       reconnectingRef.current = true
-      es = new EventSource(`/api/agent/stream?deckId=${encodeURIComponent(deckId)}`)
+      es = new EventSource(`/api/agent/stream?sessionId=${encodeURIComponent(sid)}`)
 
       let receivedData = false
       let replayDone = false
@@ -912,7 +914,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const handleStop = () => {
     abortControllerRef.current?.abort()
     if (IS_LOCAL) {
-      fetch("/api/agent/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {})
+      fetch("/api/agent/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId }) }).catch(() => {})
     } else {
       const token = auth.user?.access_token
       if (token) stopRuntimeSession(sessionId, token)

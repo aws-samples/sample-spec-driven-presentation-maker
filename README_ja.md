@@ -123,6 +123,7 @@ npm install && npx cdk deploy --all
 | [エージェント接続](docs/ja/add-to-gateway.md) | Amazon Bedrock AgentCore Gateway と MCP クライアントの接続方法 |
 | [Teams・Slack 連携](docs/ja/teams-slack-integration.md) | チャットプラットフォーム連携 |
 | [テンプレート・アセット](docs/ja/custom-template.md) | カスタムテンプレートとアセットの追加 |
+| [Web UI（ローカルモード — 実験的機能）](web-ui/README_ja.md#local-mode) | Kiro CLI ACP をバックエンドにローカル環境で Web UI を動作させる（AWS 不要） |
 
 ---
 
