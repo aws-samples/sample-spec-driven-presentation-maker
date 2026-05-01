@@ -47,7 +47,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Experimental: Local Mode (Kiro ACP backend)
 
-> ⚠️ **Experimental.** Not a supported path. APIs, flags, and behavior may change or break without notice.
+> ⚠️ **Experimental.** APIs, flags, and behavior may change or break without notice.
 
 Run the Web UI entirely on your machine, backed by **[Kiro](https://kiro.dev/) CLI** via [ACP](https://agentclientprotocol.com/) (Agent Client Protocol) instead of the cloud-deployed Agent and Runtime. No AWS deployment needed. Useful for trying the UI without setting up Layer 3/4.
 

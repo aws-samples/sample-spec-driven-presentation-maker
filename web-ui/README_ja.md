@@ -44,7 +44,7 @@ npm run dev
 
 ## 実験的機能: ローカルモード（Kiro ACP バックエンド）
 
-> ⚠️ **実験段階の機能です。** 正式サポート対象ではなく、API やフラグ、挙動は予告なく変更・破壊される可能性があります。
+> ⚠️ **実験段階の機能です。** API やフラグ、挙動は予告なく変更・破壊される可能性があります。
 
 AWS にデプロイされた Agent / Runtime の代わりに、**[Kiro](https://kiro.dev/) CLI** を [ACP](https://agentclientprotocol.com/)（Agent Client Protocol）経由でバックエンドとして使用し、Web UI をすべてローカル環境で動かせます。Layer 3/4 をセットアップせずに Web UI を試したいときに便利です。
 
