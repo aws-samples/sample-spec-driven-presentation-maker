@@ -1093,7 +1093,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             />
 
             {/* Options expander */}
-            {!IS_LOCAL && (
             <div className="px-2">
               <button
                 type="button"
@@ -1129,8 +1128,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   </label>
                   )}
 
-                  {/* Toggle: Parallel agents (experimental) — Cloud only, Local always uses parallel */}
-                  {!IS_LOCAL && (
+                  {/* Toggle: Parallel agents (experimental) */}
                   <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
                     bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
                     <div className="flex flex-col gap-0.5 min-w-0">
@@ -1157,11 +1155,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                       }`} />
                     </button>
                   </label>
-                  )}
                 </div>
               )}
             </div>
-            )}
 
             <div className="flex items-end gap-2 px-2 py-2">
               <PlusMenu
