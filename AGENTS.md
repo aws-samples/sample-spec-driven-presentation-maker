@@ -123,8 +123,7 @@ Runs the Layer 4 Web UI against a local [Kiro](https://kiro.dev/) CLI ACP backen
 **Prerequisites:** `kiro-cli` installed and on `PATH` ([install](https://kiro.dev/docs/cli/install/)).
 
 ```bash
-cd mcp-local && uv sync        # one-time: sync MCP server deps
-cd ../web-ui && npm install
+cd web-ui && npm install
 npm run dev:local
 ```
 
