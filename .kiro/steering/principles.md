@@ -125,3 +125,29 @@ Update these 3 files:
 
 `compose_capable` / `composable` controls whether the model appears in the Create picker.
 Set to `false` for models below Sonnet-class capability.
+
+## Web UI: Typography & Sizing
+
+### Tailwind class convention
+
+Use Tailwind standard classes. Arbitrary values (`text-[Npx]`) are prohibited except `text-[11px]` and `text-[15px]`.
+
+| Class | Size | Use for |
+|-------|------|---------|
+| `text-sm` | 14px | Body, chat, navigation, card titles, buttons |
+| `text-xs` | 12px | Meta info, labels, secondary text |
+| `text-[11px]` | 11px | Badges only (absolute floor, no TW equivalent) |
+| `text-[15px]` | 15px | Outline headings (between sm and base) |
+
+### Rules
+
+- **11px absolute floor** — nothing smaller, ever
+- **14px for anything users read** — body, chat messages, navigation, card titles
+- **12px for supporting info** — timestamps, metadata, toolbar labels
+- **No opacity-based text sizing** — use explicit Tailwind classes
+
+### Rationale (ISO 9241-303)
+
+At 60cm viewing distance, 10px text subtends only 7.9′ visual angle (ISO minimum: 16′).
+14px at 50cm = 13.2′, comfortable for most adults including mild presbyopia.
+13px→14px costs only 7% information density (33→31 lines per 700px).
