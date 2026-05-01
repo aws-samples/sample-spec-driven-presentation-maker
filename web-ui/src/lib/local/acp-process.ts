@@ -110,7 +110,23 @@ function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, un
   ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n")
 }
 
+/** Ensure agents/ has files (first launch before Settings is opened). */
+function ensureAgentsDir(): void {
+  const fs = require("fs") as typeof import("fs")
+  const agentsDir = path.join(MCP_LOCAL_DIR, ".kiro", "agents")
+  const acpDir = path.join(MCP_LOCAL_DIR, ".kiro", "acp-agents")
+  if (!fs.existsSync(acpDir)) return
+  // Skip if agents/ already has .json files
+  if (fs.existsSync(agentsDir) && fs.readdirSync(agentsDir).some((f: string) => f.endsWith(".json"))) return
+  // Copy defaults
+  fs.mkdirSync(agentsDir, { recursive: true })
+  for (const f of fs.readdirSync(acpDir).filter((f: string) => f.endsWith(".json"))) {
+    fs.copyFileSync(path.join(acpDir, f), path.join(agentsDir, f))
+  }
+}
+
 async function spawnProcess(agentName: string, existingSessionId?: string, adapter?: AgentConfig): Promise<ProcessState> {
+  ensureAgentsDir()
   const cfg = adapter || getActiveAgent()
   let args = [...cfg.args]
   const flagIdx = args.indexOf("--agent")
