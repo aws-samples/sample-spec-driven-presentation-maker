@@ -2,7 +2,7 @@
 
 # Connecting Agents
 
-spec-driven-presentation-maker is an MCP server — it connects to any AI agent that supports the Model Context Protocol. This guide covers three connection options.
+spec-driven-presentation-maker is an MCP server — it connects to any AI agent that supports the Model Context Protocol. This guide covers the connection options.
 
 ## Option 1: Local MCP Server (Layer 2)
 
@@ -35,34 +35,7 @@ uv run --directory /path/to/mcp-local python server.py
 
 Any MCP client that supports stdio servers can connect. Refer to your client's documentation for the configuration file location.
 
-## Option 2: Amazon Bedrock AgentCore Gateway (Layer 3, recommended for teams)
-
-For multi-user deployments, connect through Amazon Bedrock AgentCore Gateway. The Gateway provides OAuth-based authentication, tool aggregation, and Cedar-based authorization.
-
-### Prerequisites
-
-- Layer 3 deployed via CDK (see [Getting Started — Layer 3](getting-started.md#layer-3-remote-mcp-server-aws))
-- Amazon Bedrock AgentCore Gateway configured in your AWS account
-
-### Register as a Gateway Target
-
-Add the spec-driven-presentation-maker Runtime as an MCP Server target on your Amazon Bedrock AgentCore Gateway:
-
-1. Get the Runtime ARN from CDK outputs (`SdpmRuntime.RuntimeArn`)
-2. Configure the Gateway to route to this Runtime
-3. Set up OAuth credentials for the Gateway → Runtime connection (M2M client credentials from CDK outputs)
-
-MCP clients that connect to the Gateway will automatically discover spec-driven-presentation-maker's tools alongside any other registered MCP servers.
-
-### Authentication Flow
-
-```
-MCP Client → Gateway (OAuth) → Runtime (JWT Bearer) → MCP Server Container
-```
-
-The Gateway handles client authentication. The Runtime validates the JWT and extracts the user identity (`sub` claim) for per-user deck authorization.
-
-## Option 3: OAuth 2.1 Discovery Endpoint (Layer 3, recommended)
+## Option 2: OAuth 2.1 Discovery Endpoint (Layer 3, recommended)
 
 Register the **MCP Server URL** (API Gateway HTTP API created during CDK deployment) in your MCP client. Authentication is handled automatically via the OAuth 2.1 Discovery protocol.
 
@@ -176,7 +149,7 @@ No additional user registration is needed — any valid JWT with a `sub` claim w
 
 ---
 
-## Option 4: Generative AI Use Cases on AWS (GenU) Integration
+## Option 3: Generative AI Use Cases on AWS (GenU) Integration
 
 > **Note:** [Generative AI Use Cases on AWS (GenU)](https://github.com/aws-samples/generative-ai-use-cases-jp) is a separate open-source project under active development. The steps below are based on GenU v5.x as of April 2026 and may change in future releases.
 

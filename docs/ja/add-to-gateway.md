@@ -3,7 +3,7 @@
 # エージェント接続ガイド
 
 spec-driven-presentation-maker は MCP サーバーです — Model Context Protocol をサポートする任意の AI エージェントに接続できます。
-このガイドでは 3 つの接続オプションを説明します。
+このガイドでは接続オプションを説明します。
 
 ---
 
@@ -17,36 +17,7 @@ Kiro Skill として使う場合は、`skill/` を Kiro のスキルディレク
 
 ---
 
-## オプション 2: Amazon Bedrock AgentCore Gateway（Layer 3、チーム利用推奨）
-
-マルチユーザー環境では、Amazon Bedrock AgentCore Gateway 経由で接続します。Gateway は OAuth ベースの認証、ツール集約、Cedar ベースの認可を提供します。
-
-### 前提条件
-
-- Layer 3 が CDK でデプロイ済み（[はじめに — Layer 3](getting-started.md#layer-3-リモート-mcp-サーバーaws)参照）
-- Amazon Bedrock AgentCore Gateway が AWS アカウントに設定済み
-
-### Gateway ターゲットとして登録
-
-spec-driven-presentation-maker Runtime を Amazon Bedrock AgentCore Gateway の MCP Server ターゲットとして追加します。
-
-1. CDK 出力から Runtime ARN を取得（`SdpmRuntime.RuntimeArn`）
-2. Gateway からこの Runtime へのルーティングを設定
-3. Gateway → Runtime 接続用の OAuth 認証情報を設定（CDK 出力の M2M クライアント情報）
-
-Gateway に接続する MCP クライアントは、spec-driven-presentation-maker のツールを他の登録済み MCP サーバーと共に自動的に検出します。
-
-### 認証フロー
-
-```
-MCP Client → Gateway (OAuth) → Runtime (JWT Bearer) → MCP Server コンテナ
-```
-
-Gateway がクライアント認証を処理します。Runtime は JWT を検証し、ユーザー ID（`sub` クレーム）を抽出してデッキ単位の認可に使用します。
-
----
-
-## オプション 3: OAuth 2.1 Discovery エンドポイント経由（Layer 3、推奨）
+## オプション 2: OAuth 2.1 Discovery エンドポイント経由（Layer 3、推奨）
 
 CDK デプロイ時に作成される **MCP Server URL**（API Gateway HTTP API）を MCP クライアントに登録するだけで、OAuth 2.1 Discovery プロトコルにより認証が自動的に行われます。
 
@@ -188,7 +159,7 @@ requestHeaderConfiguration: {
 
 ---
 
-## オプション 4: Generative AI Use Cases on AWS (GenU) 連携
+## オプション 3: Generative AI Use Cases on AWS (GenU) 連携
 
 > **注意:** [Generative AI Use Cases on AWS (GenU)](https://github.com/aws-samples/generative-ai-use-cases-jp) は活発に開発が行われている別のオープンソースプロジェクトです。以下の手順は 2026 年 4 月時点の GenU v5.x に基づいており、今後のリリースで変更される可能性があります。
 
