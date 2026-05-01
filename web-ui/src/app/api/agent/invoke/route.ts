@@ -1,10 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Local ACP Agent Invoke — sends prompt to deck-specific kiro-cli process.
- * Each deck gets its own process; switching decks doesn't interrupt others.
+ * Local ACP Agent Invoke — sends prompt to sessionId-keyed kiro-cli process.
  */
-import { sendPrompt, newProcess, associateDeck, saveSessionToDeck } from "@/lib/local/acp-process"
+import { sendPrompt, createNewProcessFor, hasProcess, getOrCreateProcess, saveSessionToDeck } from "@/lib/local/acp-process"
 import { createSSEStream } from "@/lib/local/sse-bridge"
 
 const MODE_TO_AGENT: Record<string, string> = {
@@ -17,39 +16,33 @@ const MODE_TO_AGENT: Record<string, string> = {
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
-  const { query, mode, deckId } = await req.json()
+  const { query, mode, deckId, sessionId: clientSessionId } = await req.json()
   const agentName = MODE_TO_AGENT[mode || "spec"] || "sdpm-spec"
 
-  let effectiveDeckId: string
-  let tempKey: string | null = null
-
-  if (deckId && deckId !== "new") {
-    effectiveDeckId = deckId
-  } else {
-    // New deck — spawn process with temp key
-    const { tempKey: tk } = await newProcess(agentName)
-    tempKey = tk
-    effectiveDeckId = tk
+  // Ensure a process exists for this clientSessionId
+  if (clientSessionId && !hasProcess(clientSessionId)) {
+    if (deckId && deckId !== "new") {
+      // Existing deck reopened after evict — restore via session/load
+      await getOrCreateProcess(clientSessionId, agentName)
+    } else {
+      // Fresh session — spawn new process, register under client's sessionId
+      await createNewProcessFor(clientSessionId, agentName)
+    }
+  } else if (!clientSessionId) {
+    // No sessionId at all (shouldn't happen, but handle gracefully)
+    await createNewProcessFor(crypto.randomUUID(), agentName)
   }
 
-  const { sessionId, subscribe, send } = await sendPrompt(effectiveDeckId, query, agentName)
+  const { sessionId, subscribe, send } = await sendPrompt(clientSessionId!, query, agentName)
 
-  // Create SSE stream (registers listener) BEFORE sending prompt
   const stream = createSSEStream({
     sessionId,
     subscribe,
     onDeckId: (createdDeckId) => {
-      if (tempKey) {
-        associateDeck(tempKey, createdDeckId)
-        tempKey = null
-      }
-      saveSessionToDeck(createdDeckId)
+      saveSessionToDeck(createdDeckId, sessionId)
     },
-    // onDone intentionally omitted — SSE close happens when browser navigates away,
-    // not when agent finishes. running=false is set by handleLine on end_turn.
   })
 
-  // Now send the prompt — listener is already registered
   send()
 
   return new Response(stream, {
