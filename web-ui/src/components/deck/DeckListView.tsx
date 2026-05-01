@@ -85,14 +85,14 @@ export function DeckListView({
           <h1 className="text-[36px] sm:text-[42px] font-extrabold tracking-[-0.04em] leading-[1]">
             Decks
           </h1>
-          <p className="text-[13px] text-foreground-muted mt-2.5 font-medium tracking-wide uppercase">
+          <p className="text-sm text-foreground-muted mt-2.5 font-medium tracking-wide uppercase">
             {decks.length} {decks.length === 1 ? "presentation" : "presentations"}
           </p>
         </div>
         <div className="hidden sm:flex items-center gap-2">
           <button
             onClick={onNewDeck}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-[12px] font-semibold rounded-lg bg-brand-teal text-primary-foreground transition-all hover:brightness-110"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg bg-brand-teal text-primary-foreground transition-all hover:brightness-110"
           >
             <Plus className="h-3.5 w-3.5" />
             New Deck
@@ -109,7 +109,7 @@ export function DeckListView({
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Escape") onSearchChange("") }}
           placeholder="Search slides across the organization…"
-          className="w-full pl-11 pr-10 py-3 text-[13px] bg-transparent focus:outline-none placeholder:text-foreground-muted tracking-[-0.01em]"
+          className="w-full pl-11 pr-10 py-3 text-sm bg-transparent focus:outline-none placeholder:text-foreground-muted tracking-[-0.01em]"
         />
         {searchQuery && (
           <button
@@ -137,7 +137,7 @@ export function DeckListView({
               <button
                 key={tab.key}
                 onClick={() => onTabChange(tab.key)}
-                className={`relative flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-medium transition-colors ${
+                className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors ${
                   activeTab === tab.key
                     ? "text-foreground"
                     : "text-foreground-muted hover:text-foreground-secondary"

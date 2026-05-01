@@ -61,11 +61,11 @@ export function ModeSelector({ value, onChange }: ModeSelectorProps) {
             >
               <div className="flex items-center gap-2 mb-2">
                 <m.icon className={`h-4 w-4 ${active ? "text-brand-teal" : "text-foreground-muted"}`} />
-                <span className={`text-[13px] font-semibold ${active ? "text-brand-teal" : "text-foreground-muted"}`}>
+                <span className={`text-sm font-semibold ${active ? "text-brand-teal" : "text-foreground-muted"}`}>
                   {m.label}
                 </span>
               </div>
-              <p className={`text-[11px] leading-relaxed ${active ? "text-foreground-secondary" : "text-foreground-muted"}`}>
+              <p className={`text-xs leading-relaxed ${active ? "text-foreground-secondary" : "text-foreground-muted"}`}>
                 {m.description}
               </p>
             </button>
@@ -79,11 +79,11 @@ export function ModeSelector({ value, onChange }: ModeSelectorProps) {
           ? "border-l-2 border-brand-teal/40"
           : "border-r-2 border-brand-teal/40"
       }`}>
-        <p className="text-[11px] font-medium text-foreground-muted tracking-wide uppercase mb-2">Great for</p>
+        <p className="text-xs font-medium text-foreground-muted tracking-wide uppercase mb-2">Great for</p>
         {selected.greatFor.map((item, i) => (
           <div key={i} className="flex items-center gap-2">
             <item.icon className="h-3 w-3 text-brand-teal flex-none" />
-            <span className="text-[12px] text-foreground-secondary">{item.text}</span>
+            <span className="text-xs text-foreground-secondary">{item.text}</span>
           </div>
         ))}
       </div>

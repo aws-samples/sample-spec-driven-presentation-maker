@@ -1040,7 +1040,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 <Send className="h-5 w-5 text-brand-teal" />
               </div>
               <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-1">Let&apos;s present</h2>
-              <p className="text-[13px] text-foreground-muted leading-relaxed mb-8">
+              <p className="text-sm text-foreground-muted leading-relaxed mb-8">
                 Drop a URL, paste notes, or describe your idea
               </p>
               {parallelAgents && <ModeSelector value={agentMode} onChange={setAgentMode} />}
@@ -1109,7 +1109,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
                     bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
                     <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="text-[12px] text-foreground-secondary font-medium select-none">Fetch web images</span>
+                      <span className="text-xs text-foreground-secondary font-medium select-none">Fetch web images</span>
                       <span className="text-[11px] text-foreground-muted select-none leading-snug">Include images from websites in presentations</span>
                     </div>
                     <button
@@ -1132,9 +1132,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
                     bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
                     <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="text-[12px] text-foreground-secondary font-medium select-none flex items-center gap-2">
+                      <span className="text-xs text-foreground-secondary font-medium select-none flex items-center gap-2">
                         Parallel agents
-                        <span className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[10px] font-semibold tracking-wide
+                        <span className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-semibold tracking-wide
                           bg-brand-amber-soft text-brand-amber border border-brand-amber/25">
                           🧪 Experimental
                         </span>
@@ -1186,7 +1186,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   onCompositionEnd={onCompositionEnd}
                   placeholder={isMobile ? "Ask anything…" : "Ask anything…  ⌘↵ send"}
                   aria-label="Chat message input"
-                  className="w-full bg-transparent resize-none text-[13px] min-h-[24px] max-h-[120px] py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground text-transparent selection:bg-brand-teal/30 leading-relaxed relative font-[inherit] tracking-[inherit]"
+                  className="w-full bg-transparent resize-none text-sm min-h-[24px] max-h-[120px] py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground text-transparent selection:bg-brand-teal/30 leading-relaxed relative font-[inherit] tracking-[inherit]"
                   rows={1}
                   autoFocus
                 />

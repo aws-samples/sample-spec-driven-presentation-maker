@@ -27,7 +27,7 @@ interface SearchResultsGridProps {
 export function SearchResultsGrid({ results, searching, onSlideClick }: SearchResultsGridProps) {
   return (
     <>
-      <p className="text-[12px] text-foreground-muted font-medium mb-4">
+      <p className="text-xs text-foreground-muted font-medium mb-4">
         {searching ? "Searching slides across the organization…" : `${results.length} result${results.length !== 1 ? "s" : ""} found`}
       </p>
 
@@ -65,7 +65,7 @@ export function SearchResultsGrid({ results, searching, onSlideClick }: SearchRe
                 )}
               </div>
               <div className="px-4 py-3.5">
-                <h3 className="text-[13px] font-medium text-foreground/90 truncate leading-snug">
+                <h3 className="text-sm font-medium text-foreground/90 truncate leading-snug">
                   {r.deckName || "Untitled"}
                 </h3>
                 <p className="text-[11px] text-foreground-muted mt-1 tracking-wide uppercase">
@@ -80,8 +80,8 @@ export function SearchResultsGrid({ results, searching, onSlideClick }: SearchRe
       ) : (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Search className="h-8 w-8 text-foreground-muted/20 mb-4" />
-          <p className="text-[13px] font-medium text-foreground/60 mb-1">No matching slides</p>
-          <p className="text-[12px] text-foreground-muted">Try different keywords or a broader search term.</p>
+          <p className="text-sm font-medium text-foreground/60 mb-1">No matching slides</p>
+          <p className="text-xs text-foreground-muted">Try different keywords or a broader search term.</p>
         </div>
       )}
     </>

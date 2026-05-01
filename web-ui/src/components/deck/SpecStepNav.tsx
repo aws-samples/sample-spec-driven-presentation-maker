@@ -82,7 +82,7 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
               disabled={!enabled}
               onClick={() => onTabChange(s.key)}
               className={`
-                relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium
+                relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
                 transition-all duration-300 select-none
                 ${active
                   ? isSlides
@@ -99,7 +99,7 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
                 <Layers className={`h-3.5 w-3.5 ${active ? "text-brand-amber" : ""}`} />
               ) : (
                 <span className={`
-                  inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-semibold leading-none
+                  inline-flex items-center justify-center w-4 h-4 rounded-full text-[11px] font-semibold leading-none
                   transition-all duration-300
                   ${active
                     ? "bg-brand-teal text-primary-foreground"
@@ -116,7 +116,7 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
 
               {/* Slide count badge */}
               {isSlides && slideCount > 0 && (
-                <span className={`text-[10px] font-normal ${active ? "text-brand-amber/70" : "text-foreground-muted"}`}>
+                <span className={`text-[11px] font-normal ${active ? "text-brand-amber/70" : "text-foreground-muted"}`}>
                   · {slideCount}
                 </span>
               )}
@@ -155,7 +155,7 @@ export function renderColorSwatches(text: string): (string | React.ReactElement)
             style={{ backgroundColor: part }}
             aria-label={`Color ${part}`}
           />
-          <code className="text-[12px] px-1 py-0.5 rounded bg-white/5">{part}</code>
+          <code className="text-xs px-1 py-0.5 rounded bg-white/5">{part}</code>
         </span>
       )
     }
@@ -320,7 +320,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
             <div>
-              <h2 className="text-sm font-semibold">Choose a Style</h2>
+              <h2 className="text-[15px] font-semibold">Choose a Style</h2>
               <p className="text-xs text-foreground-muted mt-0.5">Click a style to preview</p>
             </div>
             {content && (
@@ -374,7 +374,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
                 <ArrowLeft className="h-4 w-4" />
               </button>
               <div>
-                <h2 className="text-sm font-semibold">{preview.name}</h2>
+                <h2 className="text-[15px] font-semibold">{preview.name}</h2>
                 <p className="text-xs text-foreground-muted mt-0.5">Preview all slides — select to apply</p>
               </div>
             </div>
@@ -437,7 +437,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
             <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center mb-4 text-foreground-muted/40">
               <FileText className="h-5 w-5" />
             </div>
-            <p className="text-[13px] text-foreground-muted">{specName} will appear here.</p>
+            <p className="text-sm text-foreground-muted">{specName} will appear here.</p>
           </>
         )}
       </div>
@@ -509,9 +509,9 @@ function StyleCard({ style, index, onClick }: { style: StyleEntry; index: number
         <div className="absolute inset-0 bg-brand-teal/0 group-hover:bg-brand-teal/5 transition-colors duration-300" />
       </div>
       <div className="px-3 py-2.5 border-t border-white/[0.04]">
-        <p className="text-[13px] font-medium text-foreground group-hover:text-brand-teal transition-colors">{style.name}</p>
+        <p className="text-sm font-medium text-foreground group-hover:text-brand-teal transition-colors">{style.name}</p>
         {style.description && (
-          <p className="text-[11px] text-foreground-muted mt-0.5 line-clamp-1">{style.description}</p>
+          <p className="text-xs text-foreground-muted mt-0.5 line-clamp-1">{style.description}</p>
         )}
       </div>
     </button>
@@ -625,7 +625,7 @@ function BriefWaiting() {
           />
         </div>
       </div>
-      <p className="text-[13px] text-foreground-muted">Drafting the brief…</p>
+      <p className="text-sm text-foreground-muted">Drafting the brief…</p>
     </div>
   )
 }
@@ -705,7 +705,7 @@ function OutlineWaiting() {
           )
         })}
       </div>
-      <p className="text-[13px] text-foreground-muted">Structuring the outline…</p>
+      <p className="text-sm text-foreground-muted">Structuring the outline…</p>
     </div>
   )
 }
@@ -766,7 +766,7 @@ function ArtDirectionWaiting() {
           }} />
         </div>
       </div>
-      <p className="text-[13px] text-foreground-muted">Composing art direction…</p>
+      <p className="text-sm text-foreground-muted">Composing art direction…</p>
     </div>
   )
 }

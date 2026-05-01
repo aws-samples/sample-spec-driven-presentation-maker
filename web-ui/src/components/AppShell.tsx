@@ -139,7 +139,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
           {onChatToggle && (
             <button
               onClick={handleChatToggle}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
+              className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 ${
                 chatOpen
                   ? "text-brand-teal bg-brand-teal-soft"
                   : `text-foreground-secondary hover:bg-background-hover hover:text-foreground ${!chatSeen ? "chat-toggle-pulse" : ""}`
@@ -156,7 +156,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
             <button
               ref={triggerRef}
               onClick={toggleMenu}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
+              className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 ${
                 menuOpen
                   ? "bg-brand-teal-soft text-brand-teal"
                   : "text-foreground-secondary hover:bg-background-hover hover:text-foreground"
@@ -177,8 +177,8 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
               >
                 {/* User info */}
                 <div className="px-3.5 py-2">
-                  <div className="text-[11px] text-foreground/50 font-medium">{alias}</div>
-                  {email && <div className="text-[10px] text-foreground/30 mt-0.5 truncate">{email}</div>}
+                  <div className="text-xs text-foreground/50 font-medium">{alias}</div>
+                  {email && <div className="text-[11px] text-foreground/30 mt-0.5 truncate">{email}</div>}
                 </div>
 
                 <div className="my-1 border-t border-white/[0.06]" />
@@ -188,7 +188,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                   ref={el => { itemsRef.current[0] = el }}
                   role="menuitem"
                   onClick={() => { closeMenu(); setSettingsOpen(true) }}
-                  className="w-full flex items-center gap-2 px-3.5 py-2 text-[12px] font-medium text-foreground/70 hover:bg-white/[0.06] transition-colors menu-item-stagger"
+                  className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-foreground/70 hover:bg-white/[0.06] transition-colors menu-item-stagger"
                   style={{ "--stagger": "0ms" } as React.CSSProperties}
                 >
                   <SettingsIcon className="h-3.5 w-3.5" />
@@ -203,7 +203,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                     <button
                       role="menuitem"
                       onClick={() => { closeMenu(); setShowAgentSettings(true) }}
-                      className="w-full flex items-center gap-2 px-3.5 py-2 text-[12px] font-medium text-foreground/70 hover:bg-white/[0.06] transition-colors menu-item-stagger"
+                      className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-foreground/70 hover:bg-white/[0.06] transition-colors menu-item-stagger"
                       style={{ "--stagger": "15ms" } as React.CSSProperties}
                     >
                       <Bot className="h-3.5 w-3.5" />
@@ -219,7 +219,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                     ref={el => { itemsRef.current[1] = el }}
                     role="menuitem"
                     onClick={() => { closeMenu(); signOut() }}
-                    className="w-full flex items-center gap-2 px-3.5 py-2 text-[12px] font-medium text-foreground/70 hover:text-red-400 hover:bg-red-500/10 transition-colors menu-item-stagger"
+                    className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-foreground/70 hover:text-red-400 hover:bg-red-500/10 transition-colors menu-item-stagger"
                     style={{ "--stagger": "30ms" } as React.CSSProperties}
                   >
                     <LogOut className="h-3.5 w-3.5" />

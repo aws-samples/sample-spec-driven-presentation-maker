@@ -49,7 +49,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
     <div className="h-full flex flex-col animate-card-in">
       {/* Toolbar */}
       <div className="flex-none flex items-center justify-between px-5 sm:px-8 py-3 border-b border-border">
-        <div className="text-[12px] text-foreground-muted font-medium">
+        <div className="text-xs text-foreground-muted font-medium">
           {slideCount} {slideCount === 1 ? "slide" : "slides"}
           {deck.updatedAt && (
             <>
@@ -62,7 +62,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
           {onShare && (
             <button
               onClick={onShare}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg border border-border text-foreground-secondary hover:text-foreground hover:border-border-hover hover:bg-background-hover transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-foreground-secondary hover:text-foreground hover:border-border-hover hover:bg-background-hover transition-all"
             >
               <Share2 className="h-3 w-3" />
               Share
@@ -72,7 +72,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
             <a
               href={deck.pptxUrl}
               download
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg border border-border text-foreground-secondary hover:text-foreground hover:border-border-hover hover:bg-background-hover transition-all no-underline"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-foreground-secondary hover:text-foreground hover:border-border-hover hover:bg-background-hover transition-all no-underline"
             >
               <Download className="h-3 w-3" />
               PPTX
@@ -106,7 +106,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
                       <Layers className="h-6 w-6 text-foreground-muted/20" />
                     </div>
                   )}
-                  <div className="absolute bottom-2 right-2.5 text-[10px] font-medium text-white/20">
+                  <div className="absolute bottom-2 right-2.5 text-[11px] font-medium text-white/20">
                     {i + 1}
                   </div>
                 </div>
@@ -116,7 +116,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Layers className="h-10 w-10 text-foreground-muted/20 mb-4" />
-            <p className="text-[13px] text-foreground-muted">
+            <p className="text-sm text-foreground-muted">
               No slides yet. Use the chat to create slides.
             </p>
           </div>

@@ -357,7 +357,7 @@ function AgentCard({ agent, existingSlugs, indexDelay, parentActive, parentStopp
         )}
 
         {/* Slugs */}
-        <span className="flex-1 min-w-0 text-[13px] font-medium tracking-[-0.015em] truncate">
+        <span className="flex-1 min-w-0 text-sm font-medium tracking-[-0.015em] truncate">
           {agent.slugs.map((slug, i) => (
             <span key={slug}>
               <span style={{ color: existingSlugs.has(slug) ? C.existing : C.fgStrong }}>
@@ -447,7 +447,7 @@ function AgentCard({ agent, existingSlugs, indexDelay, parentActive, parentStopp
           {agent.instruction && (
             <Section label="Instruction">
               <div
-                className="text-[12px] leading-relaxed whitespace-pre-wrap break-words"
+                className="text-xs leading-relaxed whitespace-pre-wrap break-words"
                 style={{ color: C.fgLabel }}
               >
                 {agent.instruction}
@@ -695,7 +695,7 @@ function StopSummary({ notice, summaries }: { notice?: string; summaries?: Recor
       {notice && (
         <div className="flex items-start gap-1.5">
           <Info className="flex-none h-3.5 w-3.5 mt-0.5" style={{ color: STATE.retry }} />
-          <div className="text-[12px] leading-relaxed" style={{ color: C.fgLabel }}>
+          <div className="text-xs leading-relaxed" style={{ color: C.fgLabel }}>
             {notice}
           </div>
         </div>

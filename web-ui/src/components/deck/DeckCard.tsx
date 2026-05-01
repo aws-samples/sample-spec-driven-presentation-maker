@@ -196,25 +196,25 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
         )}
         {/* Badges */}
         <div className="absolute bottom-2.5 left-3 flex items-center gap-1.5">
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium text-foreground-secondary bg-black/50 backdrop-blur-md">
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-foreground-secondary bg-black/50 backdrop-blur-md">
             <Layers className="h-2.5 w-2.5" />
             {deck.slideCount}
           </div>
           <CloudOnly>
           {(deck.visibility || "private") === "public" ? (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium backdrop-blur-md"
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium backdrop-blur-md"
               style={{ background: "oklch(0.55 0.15 160 / 0.35)", color: "oklch(0.9 0.1 160)" }}>
               <Building2 className="h-2.5 w-2.5" />
               Internal
             </div>
           ) : (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium text-foreground-secondary bg-black/50 backdrop-blur-md">
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-foreground-secondary bg-black/50 backdrop-blur-md">
               <Lock className="h-2.5 w-2.5" />
               Private
             </div>
           )}
           {deck.collaborators && deck.collaborators.length > 0 && (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium backdrop-blur-md"
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium backdrop-blur-md"
               style={{ background: "oklch(0.55 0.12 220 / 0.35)", color: "oklch(0.9 0.08 220)" }}
               title={deck.collaborators.join(", ")}
             >
@@ -228,10 +228,10 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
 
       {/* Meta */}
       <div className="px-3.5 py-3">
-        <h3 className="text-[13px] font-semibold text-foreground truncate leading-snug tracking-[-0.01em]">
+        <h3 className="text-sm font-semibold text-foreground truncate leading-snug tracking-[-0.01em]">
           {deck.name}
         </h3>
-        <div className="flex items-center gap-2 mt-2 text-[12px] text-foreground/50">
+        <div className="flex items-center gap-2 mt-2 text-xs text-foreground/50">
           {deck.owner && <span>{deck.owner}</span>}
           {deck.owner && deck.updatedAt && <span className="opacity-40">·</span>}
           {deck.updatedAt && <span>{formatDate(deck.updatedAt)}</span>}

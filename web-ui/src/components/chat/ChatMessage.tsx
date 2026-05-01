@@ -82,7 +82,7 @@ function highlightMentions(text: string): (string | React.JSX.Element)[] {
             style={{ backgroundColor: part }}
             aria-label={`Color ${part}`}
           />
-          <code className="text-[12px] px-1 py-0.5 rounded bg-white/5">{part}</code>
+          <code className="text-xs px-1 py-0.5 rounded bg-white/5">{part}</code>
         </span>
       )
     }
@@ -217,7 +217,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
     const cleaned = text.replace(/\n*---snippet---\n[\s\S]*?---\/snippet---/g, "").trim()
     if (!cleaned) return null
     return (
-      <div className={`text-[13px] leading-relaxed text-foreground/85 ${isLast && isStreaming ? "streaming-cursor" : ""}`}>
+      <div className={`text-sm leading-relaxed text-foreground/85 ${isLast && isStreaming ? "streaming-cursor" : ""}`}>
         <div className="prose prose-invert prose-sm max-w-none">
           <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {renderInlinePreviews(cleaned, previewUrls)}
@@ -241,7 +241,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
       <div className={isUser ? "max-w-[85%]" : "flex-1 min-w-0"}>
         {isUser ? (
           /* User bubble */
-          <div className="text-[13px] leading-relaxed break-words px-3.5 py-2.5 rounded-2xl rounded-br-md bg-brand-teal-soft border border-brand-teal/15">
+          <div className="text-sm leading-relaxed break-words px-3.5 py-2.5 rounded-2xl rounded-br-md bg-brand-teal-soft border border-brand-teal/15">
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {attachments.map((att, i) => (
@@ -289,7 +289,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
             )}
             {/* Thinking dots when no content yet */}
             {isStreaming && !cleanContent && toolUses.length === 0 && (
-              <span className="inline-flex items-center gap-1.5 text-foreground/30 text-[12px]">
+              <span className="inline-flex items-center gap-1.5 text-foreground/30 text-sm">
                 <span className="flex gap-0.5">
                   <span className="w-1 h-1 rounded-full bg-brand-teal/60" style={{ animation: "cursor-blink 1.4s ease-in-out infinite" }} />
                   <span className="w-1 h-1 rounded-full bg-brand-teal/60" style={{ animation: "cursor-blink 1.4s ease-in-out 0.2s infinite" }} />
@@ -302,7 +302,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
           /* Assistant: fallback layout (history restore, no blocks) */
           <>
             {(cleanContent || (isStreaming && toolUses.length === 0)) && (
-              <div className="text-[13px] leading-relaxed break-words text-foreground/85">
+              <div className="text-sm leading-relaxed break-words text-foreground/85">
                 {cleanContent ? (
                   <div className={`prose prose-invert prose-sm max-w-none ${isStreaming ? "streaming-cursor" : ""}`}>
                     <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
@@ -310,7 +310,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                     </Markdown>
                   </div>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 text-foreground/30 text-[12px]">
+                  <span className="inline-flex items-center gap-1.5 text-foreground/30 text-sm">
                     <span className="flex gap-0.5">
                       <span className="w-1 h-1 rounded-full bg-brand-teal/60" style={{ animation: "cursor-blink 1.4s ease-in-out infinite" }} />
                       <span className="w-1 h-1 rounded-full bg-brand-teal/60" style={{ animation: "cursor-blink 1.4s ease-in-out 0.2s infinite" }} />

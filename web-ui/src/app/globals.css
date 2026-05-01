@@ -254,6 +254,35 @@ body {
   pointer-events: auto;
 }
 
+/* ── Chat panel resize handle ── */
+.chat-resize-handle {
+  position: absolute;
+  left: -6px;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: col-resize;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat-resize-handle::after {
+  content: "";
+  width: 4px;
+  height: 48px;
+  border-radius: 2px;
+  background: oklch(1 0 0 / 6%);
+  transition: background 0.2s ease, height 0.2s ease;
+}
+.chat-resize-handle:hover::after {
+  background: oklch(0.75 0.14 185 / 40%);
+  height: 64px;
+}
+.chat-resize-handle:active::after {
+  background: oklch(0.75 0.14 185 / 60%);
+}
+
 /* ── Chat toggle pulse (first-visit only) ── */
 @keyframes chat-pulse {
   0%, 100% { box-shadow: 0 0 0 0 oklch(0.75 0.14 185 / 30%); }
@@ -462,6 +491,7 @@ body {
 
 /* ── Chat prose overrides (dark editorial) ── */
 .prose.prose-invert {
+  font-size: 0.875rem; /* 14px base for chat readability */
   --tw-prose-body: oklch(0.85 0 0);
   --tw-prose-headings: oklch(0.95 0 0);
   --tw-prose-links: oklch(0.75 0.14 185);
@@ -515,22 +545,23 @@ body {
 
 /* ── Spec prose refinements (editorial markdown preview) ── */
 .spec-prose {
+  font-size: 0.875rem; /* 14px base — up from prose-sm ~13.6px */
   line-height: 1.75;
 }
 .spec-prose h1 {
-  font-size: 1.375rem;
+  font-size: 1.5rem; /* 24px — up from 22px */
   letter-spacing: -0.01em;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid oklch(1 0 0 / 6%);
 }
 .spec-prose h2 {
-  font-size: 1.1rem;
+  font-size: 1.125rem; /* 18px — up from 17.6px */
   letter-spacing: -0.005em;
   margin-top: 2rem;
 }
 .spec-prose h3 {
-  font-size: 0.95rem;
+  font-size: 0.9375rem; /* 15px */
   color: oklch(0.75 0.14 185);
 }
 .spec-prose li::marker {

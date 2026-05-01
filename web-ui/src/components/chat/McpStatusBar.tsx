@@ -61,7 +61,7 @@ export function McpStatusBar({ servers }: McpStatusBarProps) {
           >
             <Check className="h-3 w-3" style={{ color: OK_COLOR.accent }} />
           </div>
-          <span className="text-[12px] font-medium" style={{ color: OK_COLOR.accent }}>
+          <span className="text-xs font-medium" style={{ color: OK_COLOR.accent }}>
             {okServers.map((s) => s.name).join(" · ")}
           </span>
         </div>
@@ -86,7 +86,7 @@ export function McpStatusBar({ servers }: McpStatusBarProps) {
             <AlertCircle className="h-3 w-3" style={{ color: ERR_COLOR.accent }} />
           </div>
           <div className="min-w-0">
-            <span className="text-[12px] font-medium" style={{ color: ERR_COLOR.accent }}>
+            <span className="text-xs font-medium" style={{ color: ERR_COLOR.accent }}>
               {server.name}
             </span>
             {server.error && (

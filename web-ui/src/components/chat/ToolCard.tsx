@@ -295,7 +295,7 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
       <div className="relative flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span
-            className="text-[12px] font-medium tracking-[-0.01em] transition-colors duration-300"
+            className="text-xs font-medium tracking-[-0.01em] transition-colors duration-300"
             style={{ color: isActive ? colors.accent : isComplete ? colors.accent : "oklch(0.50 0 0)" }}
           >
             {meta.label}
