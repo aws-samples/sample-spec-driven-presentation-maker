@@ -56,7 +56,11 @@ if (externalOidc && externalClients) {
   allowedClients = externalClients;
 } else {
   // Default Amazon Cognito (demo/quickstart)
-  authStack = new AuthStack(app, "SdpmAuth", { env, description: "Spec-Driven Presentation Maker - Auth (uksb-ynuz0lkrea)(tag:auth)" });
+  authStack = new AuthStack(app, "SdpmAuth", {
+    env,
+    description: "Spec-Driven Presentation Maker - Auth (uksb-ynuz0lkrea)(tag:auth)",
+    mcpCallbackUrls: config.auth?.mcpCallbackUrls,
+  });
   oidcDiscoveryUrl = authStack.oidcDiscoveryUrl;
   allowedClients = [authStack.clientId];
 }
@@ -91,10 +95,19 @@ const runtime = new RuntimeStack(app, "SdpmRuntime", {
   pptxBucket: data.pptxBucket,
   resourceBucket: data.resourceBucket,
   oidcDiscoveryUrl,
-  allowedClients,
+  allowedClients: authStack
+    ? [authStack.clientId, ...(authStack.mcpClientId ? [authStack.mcpClientId] : [])]
+    : allowedClients,
   kbSsmParamName: data.kbSsmParamName || undefined,
   vectorBucketName: data.vectorBucketName || undefined,
   vectorIndexName: data.vectorIndexName || undefined,
+  userPoolId: authStack?.userPool.userPoolId,
+  cognitoDomainPrefix: authStack?.cognitoDomainPrefix,
+  mcpClientId: authStack?.mcpClientId || undefined,
+  mcpCustomScope: authStack?.mcpCustomScope,
+  enableDCR: config.auth?.enableDCR !== false,
+  // Prefer allowedScopes (works with DCR); fall back to allowedClients for external IdP.
+  allowedScopes: authStack?.mcpCustomScope ? [authStack.mcpCustomScope] : undefined,
 });
 
 // --- Model configuration & validation ---

@@ -94,6 +94,7 @@ export async function uploadFile(
   if (IS_LOCAL) {
     const form = new FormData()
     form.append("file", file)
+    form.append("sessionId", sessionId)
 
     const uploaded: UploadedFile = {
       uploadId: "",

@@ -207,6 +207,9 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None):
         Prefetches all Phase 2 references once, then injects into composer prompt.
         Runs groups in parallel. Async generator: yields progress dicts, then returns final result str.
         """
+        # LLM sometimes passes slide_groups as a JSON string instead of a list
+        if isinstance(slide_groups, str):
+            slide_groups = json.loads(slide_groups)
         parent_tool_use_id = tool_context.tool_use["toolUseId"]
 
         generated = []

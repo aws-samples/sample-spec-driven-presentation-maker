@@ -125,6 +125,7 @@ npm install && npx cdk deploy --all
 | [テンプレート・アセット](docs/ja/custom-template.md) | カスタムテンプレートとアセットの追加 |
 | [コスト試算](docs/ja/cost.md) | 月額コストの内訳と最適化 |
 | [削除手順](docs/ja/uninstall.md) | デプロイ済み AWS リソースの削除 |
+| [Web UI（ローカルモード — 実験的機能）](web-ui/README_ja.md#local-mode) | Kiro CLI ACP をバックエンドにローカル環境で Web UI を動作させる（AWS 不要） |
 
 ---
 

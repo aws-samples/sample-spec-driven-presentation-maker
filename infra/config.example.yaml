@@ -41,6 +41,22 @@ model:
     - "global.anthropic.claude-haiku-4-5-20251001-v1:0"
     - "us.amazon.nova-2-lite-v1:0"
 
+# OAuth settings for external MCP clients (Layer 3).
+# enableDCR: Allow any MCP client to register dynamically via RFC 7591 (default: true).
+# mcpCallbackUrls: Static OAuth callback URLs for pre-registered MCP clients.
+#
+# Combinations:
+#   enableDCR: true  + no mcpCallbackUrls  → DCR only (default, personal/demo use)
+#   enableDCR: true  + mcpCallbackUrls     → Static client + DCR (flexible)
+#   enableDCR: false + mcpCallbackUrls     → Static client only (enterprise lockdown)
+#   enableDCR: false + no mcpCallbackUrls  → No external MCP access (WebUI only)
+#
+# auth:
+#   enableDCR: true
+#   mcpCallbackUrls:
+#     - https://claude.ai/api/mcp/auth_callback
+#     - https://claude.com/api/mcp/auth_callback
+
 # WAF IP address restriction (optional).
 # When specified, only the listed IP ranges can access CloudFront and API Gateway.
 # waf:
