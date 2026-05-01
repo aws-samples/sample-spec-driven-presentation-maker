@@ -193,12 +193,20 @@ def _find_dcr_client(cognito, full_name):
 
 
 def _ensure_callback_url(client_id, redirect_uri):
-    """Add redirect_uri to the app client's CallbackURLs if missing."""
+    """Add redirect_uri to a DCR app client's CallbackURLs if missing.
+
+    Only applies to dynamically registered clients (dcr-* prefix).
+    Static clients must have their callback URLs pre-registered via
+    config.yaml mcpCallbackUrls — allowing dynamic additions would
+    bypass the redirect_uri validation that OAuth relies on.
+    """
     try:
         cognito = boto3.client("cognito-idp")
         resp = cognito.describe_user_pool_client(
             UserPoolId=USER_POOL_ID, ClientId=client_id,
         )["UserPoolClient"]
+        if not resp.get("ClientName", "").startswith("dcr-"):
+            return
         urls = resp.get("CallbackURLs", [])
         if redirect_uri in urls:
             return
