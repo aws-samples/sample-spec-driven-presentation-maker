@@ -131,16 +131,11 @@ This is sample code for demonstration and educational purposes only, not for pro
 You should work with your security and legal teams to meet your organizational security,
 regulatory and compliance requirements before deployment.
 
-### Data Protection
-- All S3 buckets use server-side encryption (SSE-S3)
-- DynamoDB tables use AWS managed encryption
-- All data in transit is encrypted via TLS
-- Block Public Access is enabled on all S3 buckets
-
 ### Security Measures Implemented
 
 - **S3 Buckets**: Public access blocked, server-side encryption (SSE-S3), versioning enabled
 - **DynamoDB**: Encryption at rest enabled, point-in-time recovery enabled
+- **Data in transit**: All traffic encrypted via TLS
 - **IAM**: Least-privilege roles scoped per service; no wildcard resource permissions
 - **API Gateway**: Cognito JWT authorizer on all endpoints
 - **CloudFront**: Origin Access Identity (OAI), HTTPS-only, security headers

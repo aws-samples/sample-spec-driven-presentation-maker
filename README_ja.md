@@ -129,16 +129,11 @@ This project has adopted the [Amazon Open Source Code of Conduct](https://aws.gi
 デプロイ前に、組織のセキュリティ・規制・コンプライアンス要件を満たすよう、
 セキュリティチームおよび法務チームと確認してください。
 
-### データ保護
-- すべてのS3バケットはサーバーサイド暗号化（SSE-S3）を使用
-- DynamoDBテーブルはAWSマネージド暗号化を使用
-- 転送中のすべてのデータはTLSで暗号化
-- すべてのS3バケットでBlock Public Accessが有効
-
 ### 実装済みセキュリティ対策
 
 - **S3 バケット**: パブリックアクセスブロック、サーバーサイド暗号化（SSE-S3）、バージョニング有効
 - **DynamoDB**: 保存時暗号化、ポイントインタイムリカバリ有効
+- **転送中データ**: すべての通信を TLS で暗号化
 - **IAM**: サービスごとにスコープされた最小権限ロール、ワイルドカードリソース権限なし
 - **API Gateway**: 全エンドポイントに Cognito JWT 認可
 - **CloudFront**: Origin Access Identity（OAI）、HTTPS のみ、セキュリティヘッダー
