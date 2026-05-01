@@ -416,7 +416,9 @@ print(data.get('nextForwardToken', ''))
         echo ""
         echo "========================================="
         echo "  MCP Server URL      : ${MCP_SERVER_URL}"
-        echo "  OAuth Client ID     : ${MCP_CLIENT_ID}"
+        if [ -n "${MCP_CLIENT_ID}" ] && [ "${MCP_CLIENT_ID}" != "None" ]; then
+          echo "  OAuth Client ID     : ${MCP_CLIENT_ID}"
+        fi
         echo "========================================="
       fi
 
