@@ -10,18 +10,16 @@ import { spawn } from "child_process"
 import fs from "fs"
 import os from "os"
 import path from "path"
-import { getSessionId, getActiveDeckId, getProcess } from "@/lib/local/acp-process"
 
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
 
 export async function POST(req: Request): Promise<Response> {
-  const did = getActiveDeckId(); if (did) await getProcess(did)
-  const sessionId = getSessionId()
+  const form = await req.formData()
+  const sessionId = form.get("sessionId") as string | null
   if (!sessionId) {
     return Response.json({ error: "No active session" }, { status: 400 })
   }
 
-  const form = await req.formData()
   const file = form.get("file")
   if (!(file instanceof File)) {
     return Response.json({ error: "file field missing" }, { status: 400 })

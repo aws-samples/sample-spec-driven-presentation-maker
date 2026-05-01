@@ -4,20 +4,18 @@
  * Local Model List/Select API.
  * Spawns a process if none exist (for initial model list).
  */
-import { getModels, setConfigOption, getActiveDeckId, newProcess } from "@/lib/local/acp-process"
+import { getModels, setConfigOption, createNewProcess } from "@/lib/local/acp-process"
 
 export async function GET() {
   const models = getModels()
   if (!models.available.length) {
-    // No process yet — spawn one so model list is populated
-    await newProcess()
+    await createNewProcess()
   }
   return Response.json(getModels())
 }
 
 export async function PUT(req: Request) {
-  const { modelId } = await req.json()
-  const deckId = getActiveDeckId()
-  if (deckId) await setConfigOption(deckId, "model", modelId)
+  const { modelId, sessionId } = await req.json()
+  if (sessionId) await setConfigOption(sessionId, "model", modelId)
   return Response.json({ ok: true })
 }

@@ -123,6 +123,7 @@ See [Architecture](docs/en/architecture.md) for details.
 | [Connecting Agents](docs/en/add-to-gateway.md) | Amazon Bedrock AgentCore Gateway and MCP client configuration |
 | [Teams & Slack Integration](docs/en/teams-slack-integration.md) | Chat platform integration |
 | [Custom Templates & Assets](docs/en/custom-template.md) | Adding custom templates and icons |
+| [Web UI (Local Mode — experimental)](web-ui/README.md#local-mode) | Run the Web UI locally against a Kiro CLI ACP backend (no AWS) |
 
 ---
 
