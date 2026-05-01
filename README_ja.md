@@ -8,7 +8,7 @@
 仕様駆動開発のアプローチでプレゼンテーション資料を作成するオープンソースツールキット。
 「何を伝えるか」を先に設計し、「どう見せるか」を AI が構築します。
 
-> 📝 コンセプトと背景は AWS ブログ [Spec-Driven Presentation Maker: 仕様駆動でスライドを生成する OSS を公開しました](https://aws.amazon.com/jp/blogs/news/spec-driven-presentation-maker-ja/) もあわせてご覧ください。
+> 📝 コンセプトと背景は AWS ブログ [Spec-Driven Presentation Maker — 伝えたいことを先に設計し、スライド構築は AI に任せる](https://aws.amazon.com/jp/blogs/news/spec-driven-presentation-maker-ja/) もあわせてご覧ください。
 
 <!-- TODO: デモ GIF/動画を撮影後に差し替え -->
 <!-- ![Demo](docs/images/demo.gif) -->
