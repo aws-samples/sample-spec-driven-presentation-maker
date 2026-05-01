@@ -37,6 +37,8 @@ Any MCP client that supports stdio servers can connect. Refer to your client's d
 
 ## Option 2: OAuth 2.1 Discovery Endpoint (Layer 3, recommended)
 
+Requires Layer 3 deployed via CDK (see [Getting Started — Layer 3](getting-started.md#layer-3-remote-mcp-server-aws)).
+
 Register the **MCP Server URL** (API Gateway HTTP API created during CDK deployment) in your MCP client. Authentication is handled automatically via the OAuth 2.1 Discovery protocol.
 
 ### Connection Method A: Dynamic Client Registration (DCR) — Default

@@ -19,6 +19,8 @@ Kiro Skill として使う場合は、`skill/` を Kiro のスキルディレク
 
 ## オプション 2: OAuth 2.1 Discovery エンドポイント経由（Layer 3、推奨）
 
+Layer 3 のデプロイが必要です（[はじめに — Layer 3](getting-started.md#layer-3-リモート-mcp-サーバーaws)参照）。
+
 CDK デプロイ時に作成される **MCP Server URL**（API Gateway HTTP API）を MCP クライアントに登録するだけで、OAuth 2.1 Discovery プロトコルにより認証が自動的に行われます。
 
 ### 接続方法 A: Dynamic Client Registration（DCR）— デフォルト
