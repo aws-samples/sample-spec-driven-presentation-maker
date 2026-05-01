@@ -110,42 +110,7 @@ function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, un
   ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n")
 }
 
-/** Copy selected agent JSONs from acp-agents/ to agents/ with fixed names. */
-function syncAgentDefaults(): void {
-  const fs = require("fs") as typeof import("fs")
-  const src = path.join(MCP_LOCAL_DIR, ".kiro", "acp-agents")
-  const dest = path.join(MCP_LOCAL_DIR, ".kiro", "agents")
-  if (!fs.existsSync(src)) return
-  fs.mkdirSync(dest, { recursive: true })
-
-  // Read selection config
-  const configPath = path.join(MCP_LOCAL_DIR, ".sdpm", "acp-agent-selection.json")
-  const defaults: Record<string, string> = {
-    spec: "sdpm-spec.json", vibe: "sdpm-vibe.json",
-    composer: "sdpm-composer.json", single: "sdpm-single.json",
-  }
-  let selection = { ...defaults }
-  try {
-    if (fs.existsSync(configPath)) {
-      selection = { ...defaults, ...JSON.parse(fs.readFileSync(configPath, "utf-8")) }
-    }
-  } catch {}
-
-  // Copy selected agent → fixed name
-  const roleToFixed: Record<string, string> = {
-    spec: "sdpm-spec.json", vibe: "sdpm-vibe.json",
-    composer: "sdpm-composer.json", single: "sdpm-single.json",
-  }
-  for (const [role, fixedName] of Object.entries(roleToFixed)) {
-    const srcFile = path.join(src, selection[role] || defaults[role])
-    if (fs.existsSync(srcFile)) {
-      fs.copyFileSync(srcFile, path.join(dest, fixedName))
-    }
-  }
-}
-
 async function spawnProcess(agentName: string, existingSessionId?: string, adapter?: AgentConfig): Promise<ProcessState> {
-  syncAgentDefaults()
   const cfg = adapter || getActiveAgent()
   let args = [...cfg.args]
   const flagIdx = args.indexOf("--agent")

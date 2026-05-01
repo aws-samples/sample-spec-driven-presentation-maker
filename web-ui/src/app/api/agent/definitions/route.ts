@@ -33,6 +33,13 @@ const DEFAULTS: AgentSelection = {
   single: "sdpm-single.json",
 }
 
+const ROLE_TO_FIXED: Record<string, string> = {
+  spec: "sdpm-spec.json",
+  vibe: "sdpm-vibe.json",
+  composer: "sdpm-composer.json",
+  single: "sdpm-single.json",
+}
+
 function readSelection(): AgentSelection {
   try {
     if (fs.existsSync(CONFIG_PATH)) {
@@ -45,6 +52,18 @@ function readSelection(): AgentSelection {
 function writeSelection(sel: AgentSelection): void {
   fs.mkdirSync(CONFIG_DIR, { recursive: true })
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(sel, null, 2) + "\n", "utf-8")
+}
+
+/** Copy selected agents to .kiro/agents/ with fixed names. */
+function syncToAgentsDir(sel: AgentSelection): void {
+  const dest = path.join(MCP_LOCAL_DIR, ".kiro", "agents")
+  fs.mkdirSync(dest, { recursive: true })
+  for (const [role, fixedName] of Object.entries(ROLE_TO_FIXED)) {
+    const srcFile = path.join(ACP_AGENTS_DIR, sel[role as keyof AgentSelection] || DEFAULTS[role as keyof AgentSelection])
+    if (fs.existsSync(srcFile)) {
+      fs.copyFileSync(srcFile, path.join(dest, fixedName))
+    }
+  }
 }
 
 function listAgentDefs(): AgentDef[] {
@@ -61,19 +80,23 @@ function listAgentDefs(): AgentDef[] {
     })
 }
 
-/** GET: list available agents + current selection */
+/** GET: list available agents + current selection. Syncs agents/ on first call. */
 export async function GET() {
+  const sel = readSelection()
+  // Ensure agents/ has current selection (covers first launch / server restart)
+  syncToAgentsDir(sel)
   return Response.json({
     agents: listAgentDefs(),
-    selection: readSelection(),
+    selection: sel,
   })
 }
 
-/** PUT: update selection */
+/** PUT: update selection and sync to agents/ */
 export async function PUT(req: Request) {
   const body = await req.json()
   const current = readSelection()
   const next = { ...current, ...body }
   writeSelection(next)
+  syncToAgentsDir(next)
   return Response.json({ ok: true, selection: next })
 }
