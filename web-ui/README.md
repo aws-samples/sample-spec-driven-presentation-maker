@@ -33,7 +33,7 @@ A React-based chat interface for creating presentations through conversational A
 
 ```bash
 cd web-ui
-npm install
+npm ci
 npm run dev     # Starts dev server with Turbopack
 ```
 
@@ -59,7 +59,7 @@ Run the Web UI entirely on your machine, backed by **[Kiro](https://kiro.dev/) C
 
 ```bash
 cd web-ui
-npm install
+npm ci
 npm run dev:local
 ```
 

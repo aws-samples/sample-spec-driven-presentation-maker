@@ -83,7 +83,7 @@ Add to your MCP client config:
 ```bash
 cd infra
 cp config.example.yaml config.yaml   # Enable/disable stacks
-npm install && npx cdk deploy --all
+npm ci && npx cdk deploy --all
 ```
 
 For detailed setup instructions for each layer, see [Getting Started](docs/en/getting-started.md).

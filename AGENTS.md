@@ -91,7 +91,7 @@ Runs the Layer 4 Web UI against a local [Kiro](https://kiro.dev/) CLI ACP backen
 Requires `kiro-cli` on `PATH`.
 
 ```bash
-cd web-ui && npm install && npm run dev:local
+cd web-ui && npm ci && npm run dev:local
 ```
 
 See [`web-ui/README.md#local-mode`](web-ui/README.md#local-mode).

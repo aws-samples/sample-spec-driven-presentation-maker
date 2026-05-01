@@ -104,7 +104,7 @@ Deploy spec-driven-presentation-maker as a remote MCP server on Amazon Bedrock A
 
 ```bash
 cd infra
-npm install
+npm ci
 cp config.example.yaml config.yaml
 ```
 

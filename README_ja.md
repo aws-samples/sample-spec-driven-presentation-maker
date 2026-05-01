@@ -83,7 +83,7 @@ MCP クライアントの設定に追加:
 ```bash
 cd infra
 cp config.example.yaml config.yaml   # スタックの有効/無効を設定
-npm install && npx cdk deploy --all
+npm ci && npx cdk deploy --all
 ```
 
 各レイヤーの詳細なセットアップ手順は[はじめに](docs/ja/getting-started.md)を参照してください。

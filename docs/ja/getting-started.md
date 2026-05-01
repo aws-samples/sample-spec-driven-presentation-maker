@@ -104,7 +104,7 @@ spec-driven-presentation-maker を Amazon Bedrock AgentCore Runtime 上のリモ
 
 ```bash
 cd infra
-npm install
+npm ci
 cp config.example.yaml config.yaml
 ```
 

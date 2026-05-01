@@ -32,7 +32,7 @@ Spec-Driven Presentation Maker の Layer 4 Web UI コンポーネント。
 
 ```bash
 cd web-ui
-npm install
+npm ci
 npm run dev
 ```
 
@@ -56,7 +56,7 @@ AWS にデプロイされた Agent / Runtime の代わりに、**[Kiro](https://
 
 ```bash
 cd web-ui
-npm install
+npm ci
 npm run dev:local
 ```
 
