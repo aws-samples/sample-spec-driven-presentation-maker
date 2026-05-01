@@ -3,6 +3,7 @@
 # Spec-Driven Presentation Maker
 
 [![License: MIT-0](https://img.shields.io/badge/License-MIT--0-yellow.svg)](LICENSE)
+[![AWS Blog](https://img.shields.io/badge/AWS%20Blog-read-orange?logo=amazonaws)](https://aws.amazon.com/jp/blogs/news/spec-driven-presentation-maker-ja/)
 
 仕様駆動開発のアプローチでプレゼンテーション資料を作成するオープンソースツールキット。
 「何を伝えるか」を先に設計し、「どう見せるか」を AI が構築します。
