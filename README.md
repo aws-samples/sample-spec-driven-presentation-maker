@@ -143,15 +143,17 @@ regulatory and compliance requirements before deployment.
 - **AI/GenAI**: Model outputs labeled as AI-generated; dataset compliance documented
 - **Logging**: CloudWatch Logs with configurable retention; Bedrock invocation logging optional
 
-### Before Production Deployment
+### Environment-Dependent Settings (Not Applied by Default)
 
-1. Enable AWS CloudTrail for audit logging
-2. Configure VPC endpoints for S3 and DynamoDB if running in a VPC
-3. Set up AWS WAF rules on CloudFront and API Gateway (built-in support: set `waf.allowedIpV4AddressRanges` / `waf.allowedIpV6AddressRanges` in `config.yaml` — accepts multiple CIDR ranges, or use `--waf-ipv4` / `--waf-ipv6` with `deploy.sh`)
-4. Review and tighten CORS configuration for your domain
-5. Enable S3 access logging on all buckets
-6. Configure Cognito advanced security features (MFA, compromised credentials)
-7. Review Amazon Bedrock model access and region settings — avoid cross-region inference profiles if data sovereignty is a concern
+The following controls depend on your organization's environment, network topology, or security policy — they cannot be safely defaulted in a sample stack. Evaluate each before production use.
+
+1. **AWS CloudTrail** — account-level setting; enable separately to avoid disrupting existing CloudTrail configurations
+2. **VPC endpoints for S3 and DynamoDB** — only relevant if you deploy inside a VPC (this stack does not)
+3. **AWS WAF IP restrictions** — built-in support, but IP ranges are environment-specific: set `waf.allowedIpV4AddressRanges` / `waf.allowedIpV6AddressRanges` in `config.yaml`, or pass `--waf-ipv4` / `--waf-ipv6` to `deploy.sh`
+4. **CORS tightening** — depends on your domain
+5. **S3 access logging** — log destination bucket and retention are your choice
+6. **Cognito advanced security (MFA, compromised-credentials detection)** — omitted by default to keep the demo frictionless
+7. **Bedrock model / region selection** — avoid cross-region inference profiles if data sovereignty is a concern
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#security-issue-notifications) for more information.
 

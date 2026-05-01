@@ -141,15 +141,17 @@ This project has adopted the [Amazon Open Source Code of Conduct](https://aws.gi
 - **AI/GenAI**: モデル出力は AI 生成として明示、データセットコンプライアンス文書化済み
 - **ログ**: CloudWatch Logs（保持期間設定可能）、Bedrock 呼び出しログ（オプション）
 
-### 本番デプロイ前の推奨事項
+### 環境依存の設定事項（デフォルトでは適用されません）
 
-1. 監査ログ用に AWS CloudTrail を有効化
-2. VPC 内で実行する場合は S3・DynamoDB の VPC エンドポイントを設定
-3. CloudFront と API Gateway に AWS WAF ルールを設定（組み込みサポート: `config.yaml` で `waf.allowedIpV4AddressRanges` / `waf.allowedIpV6AddressRanges` を設定 — 複数 CIDR 範囲指定可、または `deploy.sh` の `--waf-ipv4` / `--waf-ipv6` を使用）
-4. ドメインに合わせて CORS 設定を見直し
-5. 全バケットで S3 アクセスログを有効化
-6. Cognito の高度なセキュリティ機能（MFA、漏洩認証情報検出）を設定
-7. Amazon Bedrock のモデルアクセスとリージョン設定を確認 — データ主権が懸念される場合はクロスリージョン推論プロファイルの使用を避けること
+以下の項目は組織の環境、ネットワーク構成、セキュリティポリシーに依存するため、サンプルスタックとして安全にデフォルト適用できません。本番利用前に個別に評価してください。
+
+1. **AWS CloudTrail** — アカウント単位の設定。既存の CloudTrail 設定への影響を避けるため個別に有効化
+2. **S3・DynamoDB の VPC エンドポイント** — VPC 内にデプロイする場合のみ関連（このスタックは VPC を使用しない）
+3. **AWS WAF による IP 制限** — 組み込みサポート済み。IP 範囲は環境依存のため、`config.yaml` の `waf.allowedIpV4AddressRanges` / `waf.allowedIpV6AddressRanges` または `deploy.sh` の `--waf-ipv4` / `--waf-ipv6` で指定
+4. **CORS の限定** — 提供ドメインに依存
+5. **S3 アクセスログ** — 保管先バケットと保持期間は利用者の選択
+6. **Cognito 高度なセキュリティ（MFA、漏洩認証情報検出）** — デモ利用の摩擦を減らすためデフォルト無効
+7. **Bedrock モデル・リージョン選定** — データ主権要件がある場合はクロスリージョン推論プロファイルを避ける
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#security-issue-notifications) for more information.
 
