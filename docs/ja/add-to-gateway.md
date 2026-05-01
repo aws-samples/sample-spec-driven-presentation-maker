@@ -13,8 +13,6 @@ AWS 不要。サーバーはローカルで stdio 経由で動作します。
 
 セットアップ手順と MCP クライアント設定は[はじめに — Layer 2](getting-started.md#layer-2-ローカル-mcp-サーバー)を参照してください。
 
-Kiro Skill として使う場合は、`skill/` を Kiro のスキルディレクトリにコピーするだけです。SKILL.md がワークフロー手順を直接提供します。
-
 ---
 
 ## オプション 2: OAuth 2.1 Discovery エンドポイント経由（Layer 3、推奨）

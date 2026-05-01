@@ -8,32 +8,7 @@ spec-driven-presentation-maker is an MCP server — it connects to any AI agent 
 
 No AWS required. The server runs locally via stdio.
 
-### As an Agent Skill
-
-Copy `skill/` to your agent's skills directory. The SKILL.md file provides workflow instructions directly.
-
-### As a stdio MCP Server
-
-Add to your MCP client's configuration:
-
-```json
-{
-  "mcpServers": {
-    "spec-driven-presentation-maker": {
-      "command": "uv",
-      "args": ["run", "--directory", "/absolute/path/to/mcp-local", "python", "server.py"]
-    }
-  }
-}
-```
-
-The server command is:
-
-```bash
-uv run --directory /path/to/mcp-local python server.py
-```
-
-Any MCP client that supports stdio servers can connect. Refer to your client's documentation for the configuration file location.
+See [Getting Started — Layer 2](getting-started.md#layer-2-local-mcp-server) for setup and MCP client configuration.
 
 ## Option 2: OAuth 2.1 Discovery Endpoint (Layer 3, recommended)
 
