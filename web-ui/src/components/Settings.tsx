@@ -53,7 +53,9 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
       body: JSON.stringify({ [role]: fileName }),
     }).catch(() => {})
     const def = agentDefs.find((a) => a.fileName === fileName)
-    toast.success(`${role}: ${def?.name || fileName}`)
+    toast.success(`${role} agent updated`, {
+      description: `Now using ${def?.name || fileName}. Takes effect on next chat.`,
+    })
   }, [agentSelection, agentDefs])
 
   // Silently drop stale selections (admin may have removed the model from config).
