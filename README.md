@@ -60,14 +60,6 @@ Built on a 4-layer architecture. Each layer is a thin wrapper around the previou
 
 See [Architecture](docs/en/architecture.md) for details.
 
-### Security Architecture
-
-- **Authentication**: Cognito User Pool with JWT tokens (Layer 4)
-- **Authorization**: Resource-level RBAC enforced at API and storage layers
-- **Encryption**: S3 server-side encryption (SSE-S3), DynamoDB encryption at rest
-- **Network**: CloudFront with OAI for static assets, API Gateway with Cognito authorizer
-- **WAF**: Optional IP address restriction via AWS WAF (IPv4/IPv6) on CloudFront and API Gateway
-
 ---
 
 ## Documentation

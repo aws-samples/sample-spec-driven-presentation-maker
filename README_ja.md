@@ -60,14 +60,6 @@ AWS デプロイは CloudShell や任意のローカルシェルから実行で�
 
 詳細は[アーキテクチャ](docs/ja/architecture.md)を参照してください。
 
-### セキュリティアーキテクチャ
-
-- **認証**: Cognito User Pool による JWT トークン認証（Layer 4）
-- **認可**: API・ストレージ層でのリソースレベル RBAC
-- **暗号化**: S3 サーバーサイド暗号化（SSE-S3）、DynamoDB 保存時暗号化
-- **ネットワーク**: CloudFront + OAI による静的アセット配信、API Gateway + Cognito 認可
-- **WAF**: AWS WAF による IP アドレス制限（IPv4/IPv6）を CloudFront・API Gateway にオプション適用
-
 ---
 
 ## ドキュメント
