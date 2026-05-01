@@ -30,14 +30,6 @@ cd skill && uv sync
 
 The skill entry point is `skill/SKILL.md`. Read it to understand available workflows.
 
-### Key commands
-
-```bash
-uv run python3 scripts/pptx_builder.py examples      # Show example patterns
-uv run python3 scripts/pptx_builder.py workflows <step>  # Run a workflow step (e.g. create-new-1-outline)
-uv run python3 scripts/pptx_builder.py guides        # List available guides
-```
-
 ### Optional: Download icons
 
 ```bash
