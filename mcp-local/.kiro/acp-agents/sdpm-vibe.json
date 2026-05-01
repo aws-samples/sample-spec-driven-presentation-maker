@@ -12,7 +12,7 @@
       "timeout": 120000
     }
   },
-  "prompt": "file://../../prompts/vibe-agent.md",
+  "prompt": "file://../../acp-agent-prompts/vibe-agent.md",
   "tools": [
     "@sdpm",
     "use_subagent",

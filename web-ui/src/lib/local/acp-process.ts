@@ -110,7 +110,20 @@ function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, un
   ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n")
 }
 
+/** Copy agent JSONs from acp-agents/ to agents/ before spawning. */
+function syncAgentDefaults(): void {
+  const fs = require("fs") as typeof import("fs")
+  const src = path.join(MCP_LOCAL_DIR, ".kiro", "acp-agents")
+  const dest = path.join(MCP_LOCAL_DIR, ".kiro", "agents")
+  if (!fs.existsSync(src)) return
+  fs.mkdirSync(dest, { recursive: true })
+  for (const file of fs.readdirSync(src).filter((f: string) => f.endsWith(".json"))) {
+    fs.copyFileSync(path.join(src, file), path.join(dest, file))
+  }
+}
+
 async function spawnProcess(agentName: string, existingSessionId?: string, adapter?: AgentConfig): Promise<ProcessState> {
+  syncAgentDefaults()
   const cfg = adapter || getActiveAgent()
   let args = [...cfg.args]
   const flagIdx = args.indexOf("--agent")
