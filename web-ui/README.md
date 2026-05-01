@@ -43,6 +43,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
+<a id="local-mode"></a>
+
 ## Experimental: Local Mode (Kiro ACP backend)
 
 > ⚠️ **Experimental.** Not a supported path. APIs, flags, and behavior may change or break without notice.
