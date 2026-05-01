@@ -68,18 +68,6 @@ CDK デプロイ時に作成される **MCP Server URL**（API Gateway HTTP API�
 
 `<McpServerUrl>` は CDK 出力の `SdpmRuntime.McpServerUrl` から取得してください。
 
-#### 認証フロー（自動）
-
-```
-MCP Client → /.well-known/oauth-authorization-server（ディスカバリー）
-           → /register（DCR: client_id を自動取得）
-           → /authorize → Cognito ログイン画面
-           → /token（アクセストークン取得）
-           → / or /mcp（Bearer トークンで MCP リクエスト）
-```
-
-ユーザーが行うのは Cognito のログインのみです。
-
 ### 接続方法 B: 静的クライアント登録（`auth.mcpCallbackUrls`）
 
 以下のいずれかに該当する場合は、DCR の代わりに静的な OAuth クライアントを使用します：

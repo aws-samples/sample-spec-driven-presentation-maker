@@ -84,18 +84,6 @@ All major MCP clients (Claude.ai, Claude Desktop, Cursor, VS Code, Kiro) support
 
 Get `<McpServerUrl>` from the CDK output `SdpmRuntime.McpServerUrl`.
 
-#### Authentication flow (automatic)
-
-```
-MCP Client → /.well-known/oauth-authorization-server (discovery)
-           → /register (DCR: auto-obtain client_id)
-           → /authorize → Cognito login screen
-           → /token (obtain access token)
-           → / or /mcp (MCP requests with Bearer token)
-```
-
-The only user action is logging in to Cognito.
-
 ### Connection Method B: Static Client Registration (`auth.mcpCallbackUrls`)
 
 Use a static OAuth client instead of DCR when either of the following applies:
