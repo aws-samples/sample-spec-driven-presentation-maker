@@ -80,14 +80,7 @@ Add to your MCP client config:
 
 ### Layer 3–4: AWS Deployment
 
-Recommended: use `deploy.sh` (works in CloudShell or any local shell, no CDK/Docker install required).
-
-```bash
-bash scripts/deploy.sh --region us-east-1 --layer3   # Layer 3 only
-bash scripts/deploy.sh --region us-east-1            # Layer 4 full stack
-```
-
-See the [Recommended Deploy Guide](docs/en/deploy-cloudshell.md) for options, post-deploy steps, and troubleshooting. For local CDK deployment (development/debugging), see [Getting Started](docs/en/getting-started.md).
+See the [Recommended Deploy Guide](docs/en/deploy-cloudshell.md) — one-command deployment from CloudShell or any local shell (no CDK/Docker install required).
 
 ---
 
