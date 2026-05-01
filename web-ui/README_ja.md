@@ -40,6 +40,29 @@ npm run dev
 
 ---
 
+## 実験的機能: ローカルモード（Kiro ACP バックエンド）
+
+> ⚠️ **実験段階の機能です。** 正式サポート対象ではなく、API やフラグ、挙動は予告なく変更・破壊される可能性があります。
+
+AWS にデプロイされた Agent / Runtime の代わりに、**[Kiro](https://kiro.dev/) CLI** を [ACP](https://agentclientprotocol.com/)（Agent Client Protocol）経由でバックエンドとして使用し、Web UI をすべてローカル環境で動かせます。Layer 3/4 をセットアップせずに Web UI を試したいときに便利です。
+
+```bash
+cd web-ui
+npm install
+npm run dev:local -- --port 3098
+```
+
+[http://localhost:3098](http://localhost:3098) をブラウザで開く。
+
+このモードでは `NEXT_PUBLIC_MODE=local` が設定され、`src/app/api/` 以下の Next.js API Routes が有効化され、アクティブなデッキごとに `kiro-cli acp --agent sdpm-spec` を子プロセスとして起動します。Agent 定義は [`mcp-local/.kiro/agents/`](../mcp-local/.kiro/agents/) に、MCP ツールは [`mcp-local/server_acp.py`](../mcp-local/server_acp.py) に格納されています。
+
+前提条件:
+
+- `kiro-cli` がインストール済みで PATH に通っていること — [Kiro CLI インストールガイド](https://kiro.dev/docs/cli/install/)
+- `mcp-local` の依存関係が同期済みであること: `cd ../mcp-local && uv sync`
+
+---
+
 ## 認証
 
 ### 認証設定

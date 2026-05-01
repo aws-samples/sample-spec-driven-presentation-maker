@@ -43,6 +43,29 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
+## Experimental: Local Mode (Kiro ACP backend)
+
+> ⚠️ **Experimental.** Not a supported path. APIs, flags, and behavior may change or break without notice.
+
+Run the Web UI entirely on your machine, backed by **[Kiro](https://kiro.dev/) CLI** via [ACP](https://agentclientprotocol.com/) (Agent Client Protocol) instead of the cloud-deployed Agent and Runtime. No AWS deployment needed. Useful for trying the UI without setting up Layer 3/4.
+
+```bash
+cd web-ui
+npm install
+npm run dev:local -- --port 3098
+```
+
+Open [http://localhost:3098](http://localhost:3098).
+
+This sets `NEXT_PUBLIC_MODE=local`, enables the Next.js API Routes under `src/app/api/`, and spawns `kiro-cli acp --agent sdpm-spec` per active deck. The agent definitions live under [`mcp-local/.kiro/agents/`](../mcp-local/.kiro/agents/) and share the MCP toolset from [`mcp-local/server_acp.py`](../mcp-local/server_acp.py).
+
+Prerequisites for this mode:
+
+- `kiro-cli` installed and on `PATH` — see [Kiro CLI install guide](https://kiro.dev/docs/cli/install/)
+- `mcp-local` dependencies synced: `cd ../mcp-local && uv sync`
+
+---
+
 ## Authentication
 
 Authentication uses OIDC via Cognito User Pool. Configuration is loaded from `public/aws-exports.json` at runtime, with optional environment variable overrides.
