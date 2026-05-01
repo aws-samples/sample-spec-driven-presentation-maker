@@ -45,16 +45,22 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
   }, [open])
 
   const onAgentChange = useCallback((role: keyof AgentSelection, fileName: string) => {
+    const prev = { ...agentSelection }
     const next = { ...agentSelection, [role]: fileName }
     setAgentSelection(next)
+    const def = agentDefs.find((a) => a.fileName === fileName)
     fetch("/api/agent/definitions", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [role]: fileName }),
-    }).catch(() => {})
-    const def = agentDefs.find((a) => a.fileName === fileName)
-    toast.success(`${role} agent updated`, {
-      description: `Now using ${def?.name || fileName}. Takes effect on next chat.`,
+    }).then((r) => {
+      if (!r.ok) throw new Error()
+      toast.success(`${role} agent updated`, {
+        description: `Now using ${def?.name || fileName}. Takes effect on next chat — current chat is not affected.`,
+      })
+    }).catch(() => {
+      setAgentSelection(prev)
+      toast.error(`Failed to update ${role} agent`)
     })
   }, [agentSelection, agentDefs])
 

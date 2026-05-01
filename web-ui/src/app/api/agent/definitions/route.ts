@@ -80,14 +80,12 @@ function listAgentDefs(): AgentDef[] {
     })
 }
 
-/** GET: list available agents + current selection. Syncs agents/ on first call. */
+/** GET: list available agents + current selection. Pure read — no side effects.
+ *  agents/ bootstrap is handled by ensureAgentsDir() at spawn time. */
 export async function GET() {
-  const sel = readSelection()
-  // Ensure agents/ has current selection (covers first launch / server restart)
-  syncToAgentsDir(sel)
   return Response.json({
     agents: listAgentDefs(),
-    selection: sel,
+    selection: readSelection(),
   })
 }
 

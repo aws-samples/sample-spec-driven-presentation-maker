@@ -2,10 +2,16 @@
   "name": "sdpm-composer",
   "description": "Composer agent for spec-driven-presentation-maker. Writes slide JSON, builds PPTX, measures, and polishes autonomously. No user interaction.",
   "tools": [
-    "@sdpm"
+    "@sdpm",
+    "read",
+    "glob",
+    "grep"
   ],
   "allowedTools": [
-    "@sdpm/*"
+    "@sdpm/*",
+    "read",
+    "glob",
+    "grep"
   ],
   "mcpServers": {
     "sdpm": {
@@ -20,9 +26,9 @@
   },
   "prompt": "file://../../acp-agent-prompts/composer.md",
   "resources": [
-    "file://../../skill/references/workflows/create-new-2-compose.md",
-    "file://../../skill/references/workflows/create-new-3-review.md",
-    "file://../../skill/references/workflows/slide-json-spec.md",
-    "file://../../skill/references/guides/grid.md"
+    "file://../../../skill/references/workflows/create-new-2-compose.md",
+    "file://../../../skill/references/workflows/create-new-3-review.md",
+    "file://../../../skill/references/workflows/slide-json-spec.md",
+    "file://../../../skill/references/guides/grid.md"
   ]
 }

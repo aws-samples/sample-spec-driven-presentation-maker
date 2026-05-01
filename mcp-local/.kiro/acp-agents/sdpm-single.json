@@ -15,11 +15,17 @@
   "prompt": "file://../../acp-agent-prompts/single-agent.md",
   "tools": [
     "@sdpm",
+    "read",
+    "glob",
+    "grep",
     "web_search",
     "web_fetch"
   ],
   "allowedTools": [
     "@sdpm/*",
+    "read",
+    "glob",
+    "grep",
     "web_fetch",
     "web_search"
   ],

@@ -14,18 +14,25 @@
   },
   "prompt": "file://../../acp-agent-prompts/spec-agent.md",
   "resources": [
-    "file://../../skill/references/workflows/create-new-1-briefing.md"
+    "file://../../../skill/references/workflows/create-new-1-briefing.md"
   ],
   "tools": [
     "@sdpm",
     "use_subagent",
+    "read",
+    "glob",
+    "grep",
     "web_search",
     "web_fetch"
   ],
   "allowedTools": [
     "@sdpm/*",
+    "read",
+    "glob",
+    "grep",
     "web_fetch",
-    "web_search"
+    "web_search",
+    "use_subagent"
   ],
   "toolsSettings": {
     "subagent": {

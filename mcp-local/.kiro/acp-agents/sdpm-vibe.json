@@ -16,11 +16,17 @@
   "tools": [
     "@sdpm",
     "use_subagent",
+    "read",
+    "glob",
+    "grep",
     "web_search",
     "web_fetch"
   ],
   "allowedTools": [
     "@sdpm/*",
+    "read",
+    "glob",
+    "grep",
     "web_fetch",
     "web_search",
     "use_subagent"
@@ -37,8 +43,8 @@
   },
   "welcomeMessage": "Drop a URL, paste text, or describe what you want — I'll turn it into slides.",
   "resources": [
-    "file://../../skill/references/workflows/create-new-1-briefing.md",
-    "file://../../skill/references/workflows/create-new-1-outline.md",
-    "file://../../skill/references/workflows/create-new-1-art-direction.md"
+    "file://../../../skill/references/workflows/create-new-1-briefing.md",
+    "file://../../../skill/references/workflows/create-new-1-outline.md",
+    "file://../../../skill/references/workflows/create-new-1-art-direction.md"
   ]
 }
