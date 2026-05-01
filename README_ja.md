@@ -80,13 +80,14 @@ MCP クライアントの設定に追加:
 
 ### Layer 3〜4: AWS デプロイ
 
+推奨は `deploy.sh`（CloudShell やローカルシェルで動作、CDK/Docker のローカルインストール不要）。
+
 ```bash
-cd infra
-cp config.example.yaml config.yaml   # スタックの有効/無効を設定
-npm ci && npx cdk deploy --all
+bash scripts/deploy.sh --region us-east-1 --layer3   # Layer 3 のみ
+bash scripts/deploy.sh --region us-east-1            # Layer 4 フルスタック
 ```
 
-各レイヤーの詳細なセットアップ手順は[はじめに](docs/ja/getting-started.md)を参照してください。
+オプション・デプロイ後の手順・トラブルシューティングは[推奨デプロイ手順](docs/ja/deploy-cloudshell.md)を参照してください。開発・デバッグ用のローカル CDK デプロイは[はじめに](docs/ja/getting-started.md)を参照してください。
 
 ---
 
