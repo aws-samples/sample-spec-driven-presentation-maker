@@ -10,7 +10,7 @@ const MODE_TO_AGENT: Record<string, string> = {
   vibe: "sdpm-vibe",
   spec: "sdpm-spec",
   separated: "sdpm-spec",
-  single: "sdpm-spec",
+  single: "sdpm-single",
 }
 
 export const dynamic = 'force-dynamic'
