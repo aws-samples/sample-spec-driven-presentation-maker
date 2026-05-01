@@ -240,5 +240,5 @@ Bedrock Model Invocation Logging はアカウント・リージョンで 1 つ�
 - [はじめに](getting-started.md) — Layer 1〜4 のセットアップ手順（ローカル CDK デプロイ含む）
 - [アーキテクチャ](architecture.md) — 4 層構成、データフロー、認証モデル、MCP ツール一覧
 - [カスタムテンプレート](custom-template.md) — テンプレートとアセットの追加
-- [エージェント接続](add-to-gateway.md) — AgentCore Gateway への接続方法
+- [エージェント接続](add-to-gateway.md) — MCP クライアントの接続方法
 - [Teams・Slack 連携](teams-slack-integration.md) — チャットプラットフォーム連携

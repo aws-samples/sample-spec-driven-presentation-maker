@@ -360,4 +360,4 @@ bash scripts/deploy_webui.sh
 
 - [アーキテクチャ](architecture.md) — 4 層構成、データフロー、認証モデル
 - [カスタムテンプレート](custom-template.md) — テンプレートとアセットの追加
-- [エージェント接続](add-to-gateway.md) — Amazon Bedrock AgentCore Gateway への接続方法
+- [エージェント接続](add-to-gateway.md) — MCP クライアントの接続方法

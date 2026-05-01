@@ -240,5 +240,5 @@ See [Cost Estimates](cost.md) for a full breakdown and optimization tips.
 - [Getting Started](getting-started.md) — Setup instructions for Layer 1–4 (including local CDK deployment)
 - [Architecture](architecture.md) — 4-layer design, data flow, auth model, MCP tool reference
 - [Custom Templates](custom-template.md) — Adding templates and assets
-- [Connecting Agents](add-to-gateway.md) — AgentCore Gateway connection
+- [Connecting Agents](add-to-gateway.md) — MCP client connection guide
 - [Teams & Slack Integration](teams-slack-integration.md) — Chat platform integration

@@ -290,4 +290,4 @@ For `config.yaml` examples and deployment instructions, see [Getting Started —
 
 - [Getting Started](getting-started.md) — Setup and deployment instructions
 - [Custom Templates](custom-template.md) — Adding templates and assets
-- [Connecting Agents](add-to-gateway.md) — Amazon Bedrock AgentCore Gateway connection
+- [Connecting Agents](add-to-gateway.md) — MCP client connection guide
