@@ -7,8 +7,9 @@ import { Switch } from "@/components/ui/switch"
 import { ModelPicker } from "@/components/ModelPicker"
 import { usePreferences } from "@/hooks/usePreferences"
 import { getAllowedModels, getDefaultChatModelId, getDefaultCreateModelId } from "@/lib/allowedModels"
+import { IS_LOCAL } from "@/lib/mode"
 import { toast } from "sonner"
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState, useCallback } from "react"
 
 interface SettingsProps {
   open: boolean
@@ -28,6 +29,32 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
   const composable = useMemo(() => allowed.filter((m) => m.composable !== false), [allowed])
   const defaultChatId = useMemo(() => getDefaultChatModelId(), [])
   const defaultCreateId = useMemo(() => getDefaultCreateModelId(), [])
+
+  // ── Local: agent definition selection ──
+  interface AgentDef { fileName: string; name: string; description: string }
+  interface AgentSelection { spec: string; vibe: string; composer: string; single: string }
+  const [agentDefs, setAgentDefs] = useState<AgentDef[]>([])
+  const [agentSelection, setAgentSelection] = useState<AgentSelection>({ spec: "", vibe: "", composer: "", single: "" })
+
+  useEffect(() => {
+    if (!IS_LOCAL || !open) return
+    fetch("/api/agent/definitions").then((r) => r.json()).then((d) => {
+      setAgentDefs(d.agents || [])
+      setAgentSelection(d.selection || {})
+    }).catch(() => {})
+  }, [open])
+
+  const onAgentChange = useCallback((role: keyof AgentSelection, fileName: string) => {
+    const next = { ...agentSelection, [role]: fileName }
+    setAgentSelection(next)
+    fetch("/api/agent/definitions", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [role]: fileName }),
+    }).catch(() => {})
+    const def = agentDefs.find((a) => a.fileName === fileName)
+    toast.success(`${role}: ${def?.name || fileName}`)
+  }, [agentSelection, agentDefs])
 
   // Silently drop stale selections (admin may have removed the model from config).
   useEffect(() => {
@@ -63,6 +90,51 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
         </SheetHeader>
 
         <div className="flex flex-col gap-4 px-5 pb-6 overflow-y-auto flex-1 min-h-0">
+          {/* ── Agents (Local only) ── */}
+          {IS_LOCAL && agentDefs.length > 0 && (
+            <section
+              aria-labelledby="agent-heading"
+              className="rounded-xl border border-white/[0.06] bg-card/40 p-4"
+            >
+              <div className="mb-3">
+                <h3
+                  id="agent-heading"
+                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
+                  Agents
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Choose which agent definition each role uses.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3">
+                {(["spec", "vibe", "composer", "single"] as const).map((role) => (
+                  <div key={role}>
+                    <label className="mb-1.5 block text-xs font-medium text-foreground capitalize">
+                      {role}
+                    </label>
+                    <select
+                      value={agentSelection[role] || ""}
+                      onChange={(e) => onAgentChange(role, e.target.value)}
+                      className="w-full rounded-lg border border-white/[0.1] bg-background/30 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand-teal/40"
+                    >
+                      {agentDefs.map((a) => (
+                        <option key={a.fileName} value={a.fileName}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                    {agentDefs.find((a) => a.fileName === agentSelection[role])?.description && (
+                      <p className="mt-1 text-[11px] text-muted-foreground/80">
+                        {agentDefs.find((a) => a.fileName === agentSelection[role])?.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* ── Models (per-agent) ── */}
           {allowed.length > 0 && (
             <section
