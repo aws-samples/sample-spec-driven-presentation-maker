@@ -54,12 +54,19 @@ function writeSelection(sel: AgentSelection): void {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(sel, null, 2) + "\n", "utf-8")
 }
 
+/** Validate that a filename is a simple .json file (no path traversal). */
+function isSafeFileName(name: string): boolean {
+  return /^[\w-]+\.json$/.test(name)
+}
+
 /** Copy selected agents to .kiro/agents/ with fixed names. */
 function syncToAgentsDir(sel: AgentSelection): void {
   const dest = path.join(MCP_LOCAL_DIR, ".kiro", "agents")
   fs.mkdirSync(dest, { recursive: true })
   for (const [role, fixedName] of Object.entries(ROLE_TO_FIXED)) {
-    const srcFile = path.join(ACP_AGENTS_DIR, sel[role as keyof AgentSelection] || DEFAULTS[role as keyof AgentSelection])
+    const fileName = sel[role as keyof AgentSelection] || DEFAULTS[role as keyof AgentSelection]
+    if (!isSafeFileName(fileName)) continue // nosemgrep: path-join-resolve-traversal
+    const srcFile = path.join(ACP_AGENTS_DIR, fileName)
     if (fs.existsSync(srcFile)) {
       fs.copyFileSync(srcFile, path.join(dest, fixedName))
     }
@@ -72,7 +79,8 @@ function listAgentDefs(): AgentDef[] {
     .filter((f) => f.endsWith(".json"))
     .map((f) => {
       try {
-        const d = JSON.parse(fs.readFileSync(path.join(ACP_AGENTS_DIR, f), "utf-8"))
+        // f comes from readdirSync, not user input — safe
+        const d = JSON.parse(fs.readFileSync(path.join(ACP_AGENTS_DIR, f), "utf-8")) // nosemgrep: path-join-resolve-traversal
         return { fileName: f, name: d.name || f.replace(".json", ""), description: d.description || "" }
       } catch {
         return { fileName: f, name: f.replace(".json", ""), description: "" }
@@ -92,6 +100,12 @@ export async function GET() {
 /** PUT: update selection and sync to agents/ */
 export async function PUT(req: Request) {
   const body = await req.json()
+  // Validate all values are safe filenames
+  for (const v of Object.values(body)) {
+    if (typeof v === "string" && !isSafeFileName(v)) {
+      return Response.json({ error: "Invalid filename" }, { status: 400 })
+    }
+  }
   const current = readSelection()
   const next = { ...current, ...body }
   writeSelection(next)
