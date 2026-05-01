@@ -1,36 +1,49 @@
 # Spec-Driven Presentation Maker
 
 AI-powered presentation generation toolkit with a 4-layer architecture.
-Choose the layer that matches your environment.
 
-## Which Layer to Use
+## First: Are you developing this repo, or using it?
 
-| Your environment | Layer | AWS required |
-|---|---|:---:|
-| SKILL.md-compatible agent (Claude Code, Codex CLI, Cursor, Kiro, GitHub Copilot in VS Code, etc.) | **L1** — `skill/` | No |
-| Local MCP client (Claude Desktop, Claude Cowork, etc.) | **L2** — `mcp-local/` | No |
-| Remote-only MCP client (Claude.ai web, etc. — no local process) | **L3** — `mcp-server/` + `infra/` | Yes |
-| Web UI in browser | **L4** — Full stack | Yes |
+**Using it to generate slides with an AI agent:**
+→ Install the skill into your agent's skill directory (or as a pip package). See [Layer 1](#layer-1-agent-skill).
+Do NOT work inside this repo for everyday slide generation.
+
+**Developing / modifying this repo:**
+→ Work in place. Use `make test` / `make lint` to verify changes. Read the [Conventions](#conventions) and [Boundaries](#boundaries) sections first.
 
 ---
 
-## Layer 1: Agent Skill (Recommended)
+## Which Layer to Use
 
-Install the engine as a Python package and use via SKILL.md.
+| Environment | Layer | AWS |
+|---|---|:---:|
+| SKILL.md-compatible agent (Claude Code, Codex CLI, Cursor, Kiro, Copilot) | **L1** `skill/` | No |
+| Local MCP client (Claude Desktop, Claude Cowork) | **L2** `mcp-local/` | No |
+| Remote-only MCP client (Claude.ai web) | **L3** `mcp-server/` + `infra/` | Yes |
+| Web UI in browser | **L4** Full stack | Yes |
+
+---
+
+## Layer 1: Agent Skill
+
+The skill entry point is `skill/SKILL.md` — agents read it to discover workflows.
+
+**Install as pip package (recommended for end users):**
 
 ```bash
 pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git#subdirectory=skill
 ```
 
-Or work directly from the repo:
+**Install into an agent's skill directory** (e.g. `~/.kiro/skills/sdpm/`):
+copy or symlink `skill/` into the agent's configured skill path. Consult your agent's docs for the exact location.
+
+**Work from source (developers only):**
 
 ```bash
 cd skill && uv sync
 ```
 
-The skill entry point is `skill/SKILL.md`. Read it to understand available workflows.
-
-### Optional: Download icons
+Optional: download icons (AWS / Material):
 
 ```bash
 uv run python3 scripts/download_aws_icons.py
@@ -40,8 +53,6 @@ uv run python3 scripts/download_material_icons.py
 ---
 
 ## Layer 2: Local MCP Server
-
-For MCP clients that connect via stdio.
 
 ```bash
 cd mcp-local && uv sync
@@ -62,102 +73,61 @@ Add to your MCP client config:
 
 ---
 
-## Layer 3: Remote MCP Server (AWS)
-
-For remote MCP clients that cannot run local processes.
-
-### macOS / Linux / WSL
+## Layer 3 / 4: AWS Deployment
 
 ```bash
-bash scripts/deploy.sh --region us-east-1 --layer3
+bash scripts/deploy.sh --region us-east-1 --layer3   # Layer 3 only
+bash scripts/deploy.sh --region us-east-1            # Layer 4 full stack
 ```
 
-### Windows (no Bash)
-
-Use [AWS CloudShell](https://console.aws.amazon.com/cloudshell/):
-
-```bash
-git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
-cd sample-spec-driven-presentation-maker
-bash scripts/deploy.sh --region us-east-1 --layer3
-```
-
-See [Recommended Deploy Guide](docs/en/deploy-cloudshell.md) for details.
+Windows users or anyone without Bash: use [AWS CloudShell](https://console.aws.amazon.com/cloudshell/).
+Full details (post-deploy steps, options, troubleshooting): [Recommended Deploy Guide](docs/en/deploy-cloudshell.md).
 
 ---
 
-## Layer 4: Full Stack (Web UI)
+## Experimental: Web UI Local Mode
 
-### macOS / Linux / WSL
-
-```bash
-bash scripts/deploy.sh --region us-east-1
-```
-
-### Windows (no Bash)
-
-Use [AWS CloudShell](https://console.aws.amazon.com/cloudshell/) — same clone steps as Layer 3, then:
+Runs the Layer 4 Web UI against a local [Kiro](https://kiro.dev/) CLI ACP backend — no AWS needed.
+Requires `kiro-cli` on `PATH`.
 
 ```bash
-bash scripts/deploy.sh --region us-east-1
+cd web-ui && npm install && npm run dev:local
 ```
 
-See [Recommended Deploy Guide](docs/en/deploy-cloudshell.md) for post-deployment steps (Cognito user creation, endpoint URLs).
-
----
-
-## Experimental: Web UI Local Mode (Kiro ACP backend)
-
-> ⚠️ Experimental. APIs, flags, and behavior may change or break without notice.
-
-Runs the Layer 4 Web UI against a local [Kiro](https://kiro.dev/) CLI ACP backend instead of the AWS-deployed Agent/Runtime. No AWS deployment needed.
-
-**Prerequisites:** `kiro-cli` installed and on `PATH` ([install](https://kiro.dev/docs/cli/install/)).
-
-```bash
-cd web-ui && npm install
-npm run dev:local
-```
-
-Open [http://localhost:3000](http://localhost:3000) (Next.js picks the next free port if 3000 is taken).
-
-This sets `NEXT_PUBLIC_MODE=local`, enables the Next.js API Routes under `web-ui/src/app/api/`, and spawns `kiro-cli acp --agent sdpm-spec` per active deck. Agent definitions live in `mcp-local/.kiro/agents/` and share the MCP toolset from `mcp-local/server_acp.py`.
-
-See [`web-ui/README.md#local-mode`](web-ui/README.md#local-mode) for the full description.
+See [`web-ui/README.md#local-mode`](web-ui/README.md#local-mode).
 
 ---
 
 ## Project Structure
 
 ```
-skill/            L1 — Engine, references, templates, SKILL.md
-mcp-local/        L2 — Local stdio MCP server
-mcp-server/       L3 — Streamable HTTP MCP server (AWS)
-infra/            L3-4 — CDK stacks
-agent/            L4 — Strands Agent
-api/              L4 — REST API Lambda
-web-ui/           L4 — React Web UI
+skill/       L1 — Engine, references, templates, SKILL.md
+mcp-local/   L2 — Local stdio MCP server
+mcp-server/  L3 — Streamable HTTP MCP server (AWS)
+infra/       L3-4 — CDK stacks
+agent/       L4 — Strands Agent
+api/         L4 — REST API Lambda
+web-ui/      L4 — React Web UI
 ```
 
 ## Conventions
 
 - Engine source of truth: `skill/sdpm/`
-- Templates: `skill/templates/` (dark/light)
-- Slide spec format: JSON (see `skill/references/` for schema and examples)
-- Python: use `uv run` instead of direct `python`
-- Linting: `make lint` (ruff)
-- Tests: `make test` (pytest)
-
-## Further Documentation
-
-- [Custom Templates & Assets](docs/en/custom-template.md) — Adding .pptx templates and icons
-- [Architecture](docs/en/architecture.md) — Data flow, auth model, MCP tool reference
-- [Cost Estimates](docs/en/cost.md) — Monthly cost breakdown
-- `infra/config.yaml` — Deployment configuration (stacks, model ID, WAF, features)
+- Slide spec: JSON — schema and examples in `skill/references/`
+- Python: always `uv run`, never bare `python`
+- Verify changes: `make lint` (ruff) and `make test` (pytest) before committing
+- Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, ...)
 
 ## Boundaries
 
-- Do not modify `skill/templates/*.pptx` directly — these are base templates
+- Do not modify `skill/templates/*.pptx` directly — base templates
 - Do not modify `skill/references/` without understanding the workflow dependency chain
-- `infra/config.yaml` contains deployment settings — review before changing
-- `skill/assets/` contains downloaded icons — regenerate via download scripts, do not edit manually
+- Do not hand-edit `skill/assets/` — regenerate via download scripts
+- Review `infra/config.yaml` before changing deployment settings
+
+## Further Documentation
+
+- [Architecture](docs/en/architecture.md) — Data flow, auth model, MCP tool reference
+- [Custom Templates & Assets](docs/en/custom-template.md) — Adding .pptx templates and icons
+- [Connecting Agents](docs/en/add-to-gateway.md) — MCP client connection guide
+- [Cost Estimates](docs/en/cost.md) — Monthly cost breakdown
