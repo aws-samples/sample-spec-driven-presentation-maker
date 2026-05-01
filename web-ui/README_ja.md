@@ -58,10 +58,10 @@ AWS にデプロイされた Agent / Runtime の代わりに、**[Kiro](https://
 ```bash
 cd web-ui
 npm install
-npm run dev:local -- --port 3098
+npm run dev:local
 ```
 
-[http://localhost:3098](http://localhost:3098) をブラウザで開く。
+[http://localhost:3000](http://localhost:3000) をブラウザで開く（3000 が使用中の場合は Next.js が自動で空きポートを選びます）。
 
 ### 動作の仕組み
 

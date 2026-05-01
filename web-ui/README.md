@@ -61,10 +61,10 @@ Run the Web UI entirely on your machine, backed by **[Kiro](https://kiro.dev/) C
 ```bash
 cd web-ui
 npm install
-npm run dev:local -- --port 3098
+npm run dev:local
 ```
 
-Open [http://localhost:3098](http://localhost:3098).
+Open [http://localhost:3000](http://localhost:3000) (Next.js picks the next free port if 3000 is taken).
 
 ### How it works
 
