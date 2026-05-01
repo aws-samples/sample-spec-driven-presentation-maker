@@ -125,10 +125,10 @@ Runs the Layer 4 Web UI against a local [Kiro](https://kiro.dev/) CLI ACP backen
 ```bash
 cd mcp-local && uv sync        # one-time: sync MCP server deps
 cd ../web-ui && npm install
-npm run dev:local -- --port 3098
+npm run dev:local
 ```
 
-Open [http://localhost:3098](http://localhost:3098).
+Open [http://localhost:3000](http://localhost:3000) (Next.js picks the next free port if 3000 is taken).
 
 This sets `NEXT_PUBLIC_MODE=local`, enables the Next.js API Routes under `web-ui/src/app/api/`, and spawns `kiro-cli acp --agent sdpm-spec` per active deck. Agent definitions live in `mcp-local/.kiro/agents/` and share the MCP toolset from `mcp-local/server_acp.py`.
 
