@@ -106,12 +106,14 @@ export function ChatPanelShell({
   const panelRef = useRef<HTMLElement>(null)
 
   // Resize state
-  const [panelWidth, setPanelWidth] = useState(() => {
-    if (typeof window === "undefined") return DEFAULT_WIDTH
-    const saved = localStorage.getItem(CHAT_WIDTH_KEY)
-    return saved ? Math.max(MIN_WIDTH, Math.min(Number(saved), MAX_WIDTH_PX)) : DEFAULT_WIDTH
-  })
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH)
   const resizingRef = useRef(false)
+
+  /** Restore saved width from localStorage after mount. */
+  useEffect(() => {
+    const saved = localStorage.getItem(CHAT_WIDTH_KEY)
+    if (saved) setPanelWidth(Math.max(MIN_WIDTH, Math.min(Number(saved), MAX_WIDTH_PX)))
+  }, [])
 
   /** Apply width to panel DOM without React re-render. */
   const applyWidth = useCallback((w: number) => {
