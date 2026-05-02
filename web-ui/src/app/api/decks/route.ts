@@ -50,7 +50,9 @@ export async function GET() {
         const first = fs.readdirSync(previewDir).filter(f => f.endsWith(".png")).sort()[0]
         if (first) thumbnailUrl = `/api/preview/${deckId}/preview/${first}`
       }
-      return { deckId, name, slideCount, updatedAt: new Date().toISOString(), thumbnailUrl }
+      const pptxPath = path.join(dp, "output.pptx")
+      const pptxUrl = fs.existsSync(pptxPath) ? `/api/preview/${deckId}/output.pptx` : null
+      return { deckId, name, slideCount, updatedAt: new Date().toISOString(), thumbnailUrl, pptxUrl }
     })
     .sort((a, b) => b.deckId.localeCompare(a.deckId))
 
