@@ -10,7 +10,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  bundler: "webpack",
 }
 
 export default nextConfig

@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Layers, FileText, Palette, ArrowLeft, Check } from "lucide-react"
 import Markdown from "react-markdown"
+import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { fetchStyles, fetchStyleHtml, type StyleEntry, type SpecFiles } from "@/services/deckService"
 import { OutlineView } from "./OutlineView"
@@ -449,7 +450,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
       <article className="prose prose-invert prose-sm max-w-3xl mx-auto spec-prose">
         <Markdown
           remarkPlugins={[remarkGfm]}
-          components={specComponents}
+          components={specComponents as Components}
         >
           {content}
         </Markdown>

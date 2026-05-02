@@ -14,6 +14,9 @@ export interface DeckSummary {
   updatedAt: string
   thumbnailUrl: string | null
   owner?: string
+  visibility?: "public" | "private"
+  collaborators?: string[]
+  pptxUrl?: string | null
 }
 
 export interface SlidePreview {
