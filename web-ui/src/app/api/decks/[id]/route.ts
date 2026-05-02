@@ -9,7 +9,7 @@
 
 import fs from "fs"
 import path from "path"
-import { resolveDeckDir } from "@/lib/local/deck-paths"
+import { resolveDeckDir, DECK_ROOT } from "@/lib/local/deck-paths"
 
 function safeRead(p: string): string | null {
   try { return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : null } catch { return null }
@@ -109,4 +109,26 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     collaborators: [],
     collaboratorAliases: {},
   })
+}
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: deckId } = await params
+  const dp = resolveDeckDir(deckId)
+  if (!dp || !fs.existsSync(dp)) return new Response("Not found", { status: 404 })
+
+  fs.rmSync(dp, { recursive: true, force: true })
+
+  // Remove from decks.json index if present
+  const indexPath = path.join(DECK_ROOT, "decks.json")
+  if (fs.existsSync(indexPath)) {
+    try {
+      const index = JSON.parse(fs.readFileSync(indexPath, "utf-8"))
+      if (Array.isArray(index.decks)) {
+        index.decks = index.decks.filter((d: { deckId?: string }) => d.deckId !== deckId)
+        fs.writeFileSync(indexPath, JSON.stringify(index, null, 2))
+      }
+    } catch { /* index file corrupt — skip */ }
+  }
+
+  return Response.json({ deleted: true })
 }

@@ -325,6 +325,11 @@ export async function searchUsers(query: string, idToken: string): Promise<UserS
  * @param idToken - Cognito ID token
  */
 export async function deleteDeck(deckId: string, idToken: string): Promise<void> {
+  if (IS_LOCAL) {
+    const resp = await fetch(`/api/decks/${deckId}`, { method: "DELETE" })
+    if (!resp.ok) throw new Error(`Failed to delete deck: ${resp.status}`)
+    return
+  }
   const base = await getApiBaseUrl()
   const resp = await fetch(`${base}decks/${deckId}`, {
     method: "DELETE",
