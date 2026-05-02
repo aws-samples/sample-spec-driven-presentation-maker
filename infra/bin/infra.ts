@@ -206,6 +206,7 @@ if (config.stacks?.agent) {
       defaultChatModelId,
       defaultCreateModelId,
       allowedModels,
+      mcpCustomScope: authStack.mcpCustomScope,
     });
   }
 }

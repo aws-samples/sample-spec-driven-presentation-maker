@@ -63,6 +63,8 @@ interface WebUiStackProps extends cdk.StackProps {
   defaultCreateModelId: string;
   /** Allowed models with resolved display metadata. */
   allowedModels: Array<{ modelId: string; displayName: string; description?: string }>;
+  /** Custom OAuth scope for MCP access (e.g. `sdpm-mcp/invoke`). */
+  mcpCustomScope?: string;
 }
 
 export class WebUiStack extends cdk.Stack {
@@ -403,7 +405,7 @@ function handler(event) {
       redirect_uri: "${SiteUrl}",
       post_logout_redirect_uri: "${SiteUrl}",
       response_type: "code",
-      scope: "openid profile email",
+      scope: "openid profile email${McpScope}",
       automaticSilentRenew: true,
       agentRuntimeArn: "${AgentRuntimeArn}",
       apiBaseUrl: "${ApiBaseUrl}",
@@ -414,6 +416,7 @@ function handler(event) {
       SiteUrl: this.siteUrl,
       AgentRuntimeArn: props.agentRuntimeArn,
       ApiBaseUrl: api.url,
+      McpScope: props.mcpCustomScope ? ` ${props.mcpCustomScope}` : "",
     });
 
     const awsExports = new cr.AwsCustomResource(this, "WriteAwsExports", {
@@ -446,6 +449,7 @@ function handler(event) {
     awsExports.node.addDependency(deployment);
 
     // --- Add Amazon CloudFront URL to Amazon Cognito callback/logout URLs ---
+    const oauthScopes = ["openid", "profile", "email", ...(props.mcpCustomScope ? [props.mcpCustomScope] : [])];
     new cr.AwsCustomResource(this, "UpdateCognitoCallbackUrls", {
       onCreate: {
         service: "CognitoIdentityServiceProvider",
@@ -455,7 +459,7 @@ function handler(event) {
           ClientId: props.userPoolClient.userPoolClientId,
           SupportedIdentityProviders: ["COGNITO"],
           AllowedOAuthFlows: ["code"],
-          AllowedOAuthScopes: ["openid", "profile", "email"],
+          AllowedOAuthScopes: oauthScopes,
           AllowedOAuthFlowsUserPoolClient: true,
           CallbackURLs: ["http://localhost:3000", this.siteUrl],
           LogoutURLs: ["http://localhost:3000", this.siteUrl],
@@ -475,7 +479,7 @@ function handler(event) {
           ClientId: props.userPoolClient.userPoolClientId,
           SupportedIdentityProviders: ["COGNITO"],
           AllowedOAuthFlows: ["code"],
-          AllowedOAuthScopes: ["openid", "profile", "email"],
+          AllowedOAuthScopes: oauthScopes,
           AllowedOAuthFlowsUserPoolClient: true,
           CallbackURLs: ["http://localhost:3000", this.siteUrl],
           LogoutURLs: ["http://localhost:3000", this.siteUrl],
