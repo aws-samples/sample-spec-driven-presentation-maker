@@ -74,8 +74,8 @@ export default function DecksPage() {
       chatOpen={ws.chatOpen}
       onChatToggle={() => ws.setChatOpen((prev) => !prev)}
     >
-      <div className="flex-1 overflow-hidden relative">
-        <main className={`h-full overflow-y-auto transition-[margin] duration-350 ease-[cubic-bezier(.4,0,.6,1)] ${ws.chatOpen ? "sm:mr-[400px]" : ""}`}>
+      <div className="flex-1 overflow-hidden relative sm:flex">
+        <main className="h-full overflow-y-auto flex-1 min-w-0">
           {ws.isWorkspace ? (
             <>
               {/* Mobile tab bar */}
@@ -229,7 +229,7 @@ export default function DecksPage() {
         </main>
 
         {/* Chat Panel (persistent, desktop) — hidden on mobile workspace chat tab */}
-        <div className={isMobile && ws.isWorkspace && ws.canChat && activeTab === "chat" ? "hidden" : ""}>
+        {!(isMobile && ws.isWorkspace && ws.canChat && activeTab === "chat") && (
           <ChatPanelShell
             open={ws.chatOpen}
             onClose={() => ws.setChatOpen(false)}
@@ -244,7 +244,7 @@ export default function DecksPage() {
             onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
             onWorkflowPhase={setWorkflowPhase}
           />
-        </div>
+        )}
       </div>
 
       {list.deleteTarget && (
