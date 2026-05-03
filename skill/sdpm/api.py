@@ -41,6 +41,41 @@ def get_styles_dirs() -> list[Path]:
     return _get_resource_dirs("SDPM_STYLES_DIR", "styles", BUNDLED_STYLES_DIR)
 
 
+def list_styles_filtered(
+    styles_dirs: list[Path],
+    pinned_names: list[str],
+    include_all: bool = False,
+) -> list[dict]:
+    """List styles with pin/source metadata, optionally filtered.
+
+    Filesystem-based entry point for MCP Local / CLI.
+    Determines source ("user" vs "builtin") by checking whether each style
+    lives in the user-local directory.
+
+    Args:
+        styles_dirs: Ordered directories from get_styles_dirs().
+        pinned_names: Pinned style names from state.json.
+        include_all: Pass through to filter_styles().
+
+    Returns:
+        Filtered list with pinned/source metadata.
+    """
+    from sdpm.config import get_user_config_dir
+    from sdpm.reference import filter_styles, list_styles_merged
+
+    user_dir = get_user_config_dir() / "styles"
+    raw = list_styles_merged(styles_dirs)
+
+    # Tag source based on whether the style file exists in user dir
+    for s in raw:
+        if (user_dir / f"{s['name']}.html").exists():
+            s["source"] = "user"
+        else:
+            s["source"] = "builtin"
+
+    return filter_styles(raw, pinned_names, include_all)
+
+
 def _find_style_in_dirs(name: str, styles_dirs: list[Path]) -> Path | None:
     """Search for a style HTML by name across the given directories.
 

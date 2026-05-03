@@ -41,15 +41,16 @@ mcp._tool_manager._tools.pop("list_styles", None)
 
 
 @mcp.tool()
-def list_styles() -> str:
+def list_styles(include_all: bool = False) -> str:
     """List available design styles for presentations.
 
+    Default returns pinned + user styles only. Pass include_all=True for all.
+
     Returns:
-        JSON with list of styles (name + description).
+        JSON with list of styles (name, description, pinned, source).
     """
-    from sdpm.reference import list_styles as _list_styles
-    styles_dir = _SKILL_DIR / "references" / "examples" / "styles"
-    return json.dumps({"styles": _list_styles(styles_dir)}, ensure_ascii=False)
+    from tools import list_styles as _list_styles
+    return json.dumps(_list_styles(skill_dir=_SKILL_DIR, include_all=include_all), ensure_ascii=False)
 
 
 # ---------------------------------------------------------------------------

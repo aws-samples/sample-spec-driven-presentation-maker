@@ -149,3 +149,116 @@ def test_list_styles_single_dir_still_works(temp_styles_dir: Path) -> None:
     names = [s["name"] for s in result]
     assert "elegant-dark" in names
     assert "custom-brand" in names
+
+
+# ---------------------------------------------------------------------------
+# filter_styles
+# ---------------------------------------------------------------------------
+
+
+from sdpm.reference import filter_styles
+
+
+def test_filter_styles_adds_pinned_metadata() -> None:
+    styles = [{"name": "a", "description": ""}, {"name": "b", "description": ""}]
+    result = filter_styles(styles, pinned_names=["a"], include_all=True)
+    a = next(s for s in result if s["name"] == "a")
+    b = next(s for s in result if s["name"] == "b")
+    assert a["pinned"] is True
+    assert b["pinned"] is False
+
+
+def test_filter_styles_defaults_source_to_builtin() -> None:
+    styles = [{"name": "a", "description": ""}]
+    result = filter_styles(styles, pinned_names=[])
+    assert result[0]["source"] == "builtin"
+
+
+def test_filter_styles_preserves_existing_source() -> None:
+    styles = [{"name": "a", "description": "", "source": "user"}]
+    result = filter_styles(styles, pinned_names=[])
+    assert result[0]["source"] == "user"
+
+
+def test_filter_styles_include_all_returns_everything() -> None:
+    styles = [
+        {"name": "a", "description": "", "source": "builtin"},
+        {"name": "b", "description": "", "source": "user"},
+    ]
+    result = filter_styles(styles, pinned_names=["a"], include_all=True)
+    assert len(result) == 2
+
+
+def test_filter_styles_no_pins_returns_all() -> None:
+    styles = [
+        {"name": "a", "description": ""},
+        {"name": "b", "description": ""},
+    ]
+    result = filter_styles(styles, pinned_names=[], include_all=False)
+    assert len(result) == 2
+
+
+def test_filter_styles_with_pins_filters_to_pinned_and_user() -> None:
+    styles = [
+        {"name": "a", "description": "", "source": "builtin"},
+        {"name": "b", "description": "", "source": "user"},
+        {"name": "c", "description": "", "source": "builtin"},
+    ]
+    result = filter_styles(styles, pinned_names=["a"], include_all=False)
+    names = [s["name"] for s in result]
+    assert "a" in names  # pinned
+    assert "b" in names  # user
+    assert "c" not in names  # neither pinned nor user
+
+
+# ---------------------------------------------------------------------------
+# list_styles_filtered (filesystem integration)
+# ---------------------------------------------------------------------------
+
+
+from sdpm.api import list_styles_filtered
+
+
+def test_list_styles_filtered_tags_user_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+
+    user_dir = tmp_path / "sdpm" / "styles"
+    user_dir.mkdir(parents=True)
+    (user_dir / "my-style.html").write_text("<html><title>My Style</title></html>")
+
+    bundled = tmp_path / "bundled"
+    bundled.mkdir()
+    (bundled / "default.html").write_text("<html><title>Default</title></html>")
+
+    result = list_styles_filtered([user_dir, bundled], pinned_names=[], include_all=True)
+    my = next(s for s in result if s["name"] == "my-style")
+    default = next(s for s in result if s["name"] == "default")
+    assert my["source"] == "user"
+    assert default["source"] == "builtin"
+
+
+# ---------------------------------------------------------------------------
+# get_state / update_state
+# ---------------------------------------------------------------------------
+
+
+from sdpm.config import get_state, update_state
+
+
+def test_get_state_returns_empty_when_no_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    assert get_state() == {}
+
+
+def test_update_state_creates_and_updates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    update_state("pinned_styles", ["a", "b"])
+    state = get_state()
+    assert state["pinned_styles"] == ["a", "b"]
+
+    update_state("pinned_styles", ["a"])
+    state = get_state()
+    assert state["pinned_styles"] == ["a"]

@@ -104,3 +104,36 @@ def get_output_dir() -> Path:
 def get_extra_sources() -> list[dict]:
     """Extra asset sources list."""
     return get_config().get("extra_sources", [])
+
+
+# ── State (app-managed, separate from user-editable config) ──
+
+
+def get_state() -> dict:
+    """Load app state from state.json. Returns empty dict if missing.
+
+    state.json stores app-managed data (pinned styles, etc.) separately
+    from config.json which is user-editable settings.
+    """
+    state_path = get_user_config_dir() / "state.json"
+    if state_path.exists():
+        with open(state_path) as f:
+            return json.load(f)
+    return {}
+
+
+def update_state(key: str, value: object) -> None:
+    """Update a single key in state.json (read-modify-write).
+
+    Creates the file and parent directory if they don't exist.
+    """
+    config_dir = get_user_config_dir()
+    config_dir.mkdir(parents=True, exist_ok=True)
+    state_path = config_dir / "state.json"
+    state = {}
+    if state_path.exists():
+        with open(state_path) as f:
+            state = json.load(f)
+    state[key] = value
+    with open(state_path, "w") as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
