@@ -20,7 +20,7 @@ import { Layers, FileText, Palette, ArrowLeft, Check, Star } from "lucide-react"
 import Markdown from "react-markdown"
 import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { fetchStyles, fetchStyleHtml, type StyleEntry, type SpecFiles } from "@/services/deckService"
+import { fetchStyles, fetchStyleHtml, pinStyle, type StyleEntry, type SpecFiles } from "@/services/deckService"
 import { OutlineView } from "./OutlineView"
 
 /** Tab key union type for spec viewer navigation. */
@@ -222,15 +222,20 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
   const galleryContainerRef = useRef<HTMLDivElement>(null)
   const [allStylesOpen, setAllStylesOpen] = useState(false)
 
-  // Pin toggle — optimistic local state (Phase 1a: local only, API in 1c)
+  // Pin toggle — optimistic UI with API persistence
   // Preserve scroll position across re-renders caused by section layout changes
   const handlePinToggle = useCallback((name: string) => {
     const scrollTop = galleryContainerRef.current?.scrollTop ?? 0
-    setStyles(prev => prev.map(s => s.name === name ? { ...s, pinned: !s.pinned } : s))
+    setStyles(prev => {
+      const style = prev.find(s => s.name === name)
+      const newPinned = !style?.pinned
+      if (idToken) pinStyle(name, newPinned, idToken)
+      return prev.map(s => s.name === name ? { ...s, pinned: newPinned } : s)
+    })
     requestAnimationFrame(() => {
       if (galleryContainerRef.current) galleryContainerRef.current.scrollTop = scrollTop
     })
-  }, [])
+  }, [idToken])
 
   // Sync mode when content appears externally (e.g. polling updates art-direction)
   const userRequestedGallery = useRef(false)

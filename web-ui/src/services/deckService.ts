@@ -473,3 +473,20 @@ export async function fetchStyleHtml(name: string, idToken: string): Promise<str
   const data = await res.json()
   return data.fullHtml || ""
 }
+
+
+/**
+ * Toggle pin state for a style.
+ *
+ * @param name - Style name
+ * @param pinned - New pin state
+ * @param idToken - Cognito ID token for API Gateway authorization
+ */
+export async function pinStyle(name: string, pinned: boolean, idToken: string): Promise<void> {
+  const base = await getApiBaseUrl()
+  await fetch(`${base}styles/pin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ name, pinned }),
+  })
+}
