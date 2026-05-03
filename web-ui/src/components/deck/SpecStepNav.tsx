@@ -22,6 +22,7 @@ import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { fetchStyles, fetchStyleHtml, pinStyle, type StyleEntry, type SpecFiles } from "@/services/deckService"
 import { OutlineView } from "./OutlineView"
+import { StyleSlidePreview } from "@/components/StyleSlidePreview"
 
 /** Tab key union type for spec viewer navigation. */
 export type SpecTab = "brief" | "outline" | "artDirection" | "slides"
@@ -208,7 +209,6 @@ const specComponents = {
  */
 export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, idToken }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; idToken?: string }) {
   // Hooks must be called unconditionally — before any early returns.
-  const [containerWidth, setContainerWidth] = useState(0)
 
   // Art Direction inline gallery state
   type ArtDirectionMode = "gallery" | "preview" | "result"
@@ -276,23 +276,6 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [handleKeyDown])
-
-  // Art Direction result iframe: callback ref for ResizeObserver (handles mount/unmount across states)
-  const resultRoRef = useRef<ResizeObserver | null>(null)
-  const resultMeasuredRef = useCallback((node: HTMLDivElement | null) => {
-    if (resultRoRef.current) {
-      resultRoRef.current.disconnect()
-      resultRoRef.current = null
-    }
-    if (node) {
-      const w = node.getBoundingClientRect().width
-      if (w > 0) setContainerWidth(w)
-      resultRoRef.current = new ResizeObserver(([entry]) => {
-        setContainerWidth(entry.contentRect.width)
-      })
-      resultRoRef.current.observe(node)
-    }
-  }, [])
 
   // Outline tab: show waiting animation when no content, timeline when content exists.
   if (specKey === "outline" && !content) {
@@ -454,16 +437,15 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
           </div>
           {/* Preview content */}
           <div className="p-6">
-            <StylePreviewInline html={preview.html} loading={previewLoading} />
+            <StyleSlidePreview html={preview.html} loading={previewLoading} />
           </div>
         </div>
       )
     }
 
     // RESULT state (default when content exists)
-    const ratio = containerWidth > 0 ? containerWidth / 1920 : 1
     return (
-      <div ref={resultMeasuredRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {onStyleSelect && (
           <div className="flex justify-end px-4 py-2">
             <button
@@ -475,20 +457,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
             </button>
           </div>
         )}
-        <div style={{ width: containerWidth, height: 1080 * ratio * 10, overflow: "hidden" }}>
-          <iframe
-            srcDoc={content!}
-            sandbox="allow-same-origin"
-            title="Art Direction"
-            style={{
-              width: 1920,
-              height: 10800,
-              border: "none",
-              transformOrigin: "top left",
-              transform: `scale(${ratio})`,
-            }}
-          />
-        </div>
+        <StyleSlidePreview html={content!} loading={false} />
       </div>
     )
   }
@@ -613,64 +582,7 @@ function StyleCard({ style, index, onClick, onPin }: { style: StyleEntry; index:
 }
 
 /** Full style preview rendered via scaled iframe. */
-function StylePreviewInline({ html, loading }: { html: string; loading: boolean }) {
-  const [containerWidth, setContainerWidth] = useState(0)
-
-  // Callback ref to handle DOM element changes (e.g. after loading→content transition)
-  const roRef = useRef<ResizeObserver | null>(null)
-  const measuredRef = useCallback((node: HTMLDivElement | null) => {
-    if (roRef.current) {
-      roRef.current.disconnect()
-      roRef.current = null
-    }
-    if (node) {
-      const w = node.getBoundingClientRect().width
-      if (w > 0) setContainerWidth(w)
-      roRef.current = new ResizeObserver(([entry]) => {
-        setContainerWidth(entry.contentRect.width)
-      })
-      roRef.current.observe(node)
-    }
-  }, [])
-
-  if (loading || !html) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-6 h-6 border-2 border-brand-teal/30 border-t-brand-teal rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  const ratio = containerWidth > 0 ? containerWidth / 1920 : 0
-  const slideCount = (html.match(/class="slide"/g) || []).length || 5
-
-  return (
-    <div ref={measuredRef} className="w-full overflow-x-hidden">
-      <div style={{ width: "100%", height: ratio > 0 ? 1080 * ratio * slideCount : 400, overflow: "hidden" }}>
-        {ratio > 0 ? (
-          <iframe
-            srcDoc={html}
-            sandbox="allow-same-origin"
-            title="Style Preview"
-            style={{
-              width: 1920,
-              height: 1080 * slideCount,
-              border: "none",
-              transformOrigin: "top left",
-              transform: `scale(${ratio})`,
-            }}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="w-6 h-6 border-2 border-brand-teal/30 border-t-brand-teal rounded-full animate-spin" />
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/* ── Spec waiting animations ── */
+export /* ── Spec waiting animations ── */
 
 const WAIT_COLORS = [
   { css: "var(--wait-teal)", raw: "oklch(0.75 0.14 185)" },

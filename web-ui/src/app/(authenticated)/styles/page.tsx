@@ -13,7 +13,8 @@ import { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { AppShell } from "@/components/AppShell"
 import { fetchStyles, fetchStyleHtml, pinStyle, type StyleEntry } from "@/services/deckService"
-import { Star, Trash2, Download, Palette } from "lucide-react"
+import { StyleSlidePreview } from "@/components/StyleSlidePreview"
+import { Star, Trash2, Palette, Plus } from "lucide-react"
 
 export default function StylesPage() {
   const auth = useAuth()
@@ -22,21 +23,11 @@ export default function StylesPage() {
   const [loading, setLoading] = useState(true)
   const [preview, setPreview] = useState<{ name: string; html: string } | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [containerWidth, setContainerWidth] = useState(0)
 
   useEffect(() => {
     if (!idToken) return
     fetchStyles(idToken).then(s => { setStyles(s); setLoading(false) })
   }, [idToken])
-
-  // Measure container for iframe scaling
-  useEffect(() => {
-    if (!containerRef.current) return
-    const ro = new ResizeObserver(([e]) => setContainerWidth(e.contentRect.width))
-    ro.observe(containerRef.current)
-    return () => ro.disconnect()
-  }, [preview])
 
   const handlePin = async (name: string) => {
     const style = styles.find(s => s.name === name)
@@ -57,85 +48,82 @@ export default function StylesPage() {
 
   const userStyles = styles.filter(s => s.source === "user")
   const builtinStyles = styles.filter(s => s.source === "builtin")
-  const scale = containerWidth > 0 ? (containerWidth) / 1920 : 0.4
 
   return (
     <AppShell>
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
-          {/* Page header */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-xl font-semibold tracking-[-0.02em]">Styles</h1>
-              <p className="text-sm text-foreground-muted mt-1">Manage and preview presentation styles</p>
+        {loading ? (
+          <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h1 className="text-xl font-semibold tracking-[-0.02em]">Styles</h1>
+                <p className="text-sm text-foreground-muted mt-1">Manage and preview presentation styles</p>
+              </div>
             </div>
-          </div>
-
-          {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {[...Array(8)].map((_, i) => (
                 <div key={i} className="aspect-[16/10] rounded-xl bg-white/[0.03] animate-pulse" />
               ))}
             </div>
-          ) : preview ? (
-            /* ── Preview ── */
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setPreview(null)}
-                    className="text-sm text-foreground-muted hover:text-foreground transition-colors"
-                  >
-                    ← Back
-                  </button>
-                  <h2 className="text-sm font-semibold">{preview.name}</h2>
-                  <button
-                    onClick={() => handlePin(preview.name)}
-                    className={`p-1 rounded transition-colors ${
-                      styles.find(s => s.name === preview.name)?.pinned
-                        ? "text-brand-teal" : "text-foreground-muted hover:text-foreground"
-                    }`}
-                  >
-                    <Star className="h-3.5 w-3.5" fill={styles.find(s => s.name === preview.name)?.pinned ? "currentColor" : "none"} />
-                  </button>
-                </div>
-              </div>
-              <div ref={containerRef} className="w-full">
-                {previewLoading ? (
-                  <div className="aspect-[16/9] rounded-xl bg-white/[0.03] animate-pulse" />
-                ) : preview.html ? (
-                  <div className="rounded-xl overflow-hidden border border-white/[0.06]" style={{ height: `${1080 * scale}px` }}>
-                    <iframe
-                      srcDoc={preview.html}
-                      className="pointer-events-none"
-                      style={{ width: 1920, height: 1080, transform: `scale(${scale})`, transformOrigin: "top left" }}
-                      sandbox="allow-same-origin"
-                      title={`Preview: ${preview.name}`}
-                    />
-                  </div>
-                ) : null}
+          </div>
+        ) : preview ? (
+          /* ── Full-width preview ── */
+          <div>
+            <div className="flex items-center gap-3 px-5 sm:px-8 py-3">
+              <button
+                onClick={() => setPreview(null)}
+                className="text-sm text-foreground-muted hover:text-foreground transition-colors"
+              >
+                ← Back
+              </button>
+              <h2 className="text-sm font-semibold">{preview.name}</h2>
+              <button
+                onClick={() => handlePin(preview.name)}
+                className={`p-1 rounded transition-colors ${
+                  styles.find(s => s.name === preview.name)?.pinned
+                    ? "text-brand-teal" : "text-foreground-muted hover:text-foreground"
+                }`}
+              >
+                <Star className="h-3.5 w-3.5" fill={styles.find(s => s.name === preview.name)?.pinned ? "currentColor" : "none"} />
+              </button>
+            </div>
+            <StyleSlidePreview html={preview.html} loading={previewLoading} />
+          </div>
+        ) : (
+          /* ── Style grid ── */
+          <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h1 className="text-xl font-semibold tracking-[-0.02em]">Styles</h1>
+                <p className="text-sm text-foreground-muted mt-1">Manage and preview presentation styles</p>
               </div>
             </div>
-          ) : (
-            /* ── Style grid ── */
             <div className="flex flex-col gap-10">
               {/* User styles */}
-              {userStyles.length > 0 && (
-                <section>
-                  <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-4">My Styles</h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {userStyles.map(style => (
-                      <StyleListCard
-                        key={style.name}
-                        style={style}
-                        onPreview={handlePreview}
-                        onPin={handlePin}
-                        showDelete
-                      />
-                    ))}
-                  </div>
-                </section>
-              )}
+              <section>
+                <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-4">My Styles</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {userStyles.map(style => (
+                    <StyleListCard
+                      key={style.name}
+                      style={style}
+                      onPreview={handlePreview}
+                      onPin={handlePin}
+                      showDelete
+                    />
+                  ))}
+                  {/* New Style card */}
+                  <button
+                    className="aspect-[16/10] rounded-xl border-2 border-dashed border-white/[0.08] hover:border-white/[0.2] bg-transparent hover:bg-white/[0.02] flex flex-col items-center justify-center gap-2 transition-all duration-200 cursor-pointer group"
+                    onClick={() => {/* Phase 3: navigate to style creator */}}
+                  >
+                    <div className="w-10 h-10 rounded-full border-2 border-dashed border-white/[0.1] group-hover:border-white/[0.25] flex items-center justify-center transition-colors duration-200">
+                      <Plus className="h-5 w-5 text-foreground/20 group-hover:text-foreground/50 transition-colors duration-200" />
+                    </div>
+                    <span className="text-xs text-foreground/30 group-hover:text-foreground/60 font-medium transition-colors duration-200">New Style</span>
+                  </button>
+                </div>
+              </section>
 
               {/* Built-in styles */}
               <section>
@@ -152,8 +140,8 @@ export default function StylesPage() {
                 </div>
               </section>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </AppShell>
   )
@@ -166,24 +154,36 @@ function StyleListCard({ style, onPreview, onPin, showDelete }: {
   onPin: (name: string) => void
   showDelete?: boolean
 }) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(0.15)
+
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => setScale(entry.contentRect.width / 1920))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   return (
     <div
+      ref={cardRef}
       className="group relative rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] transition-all duration-200 cursor-pointer"
       onClick={() => onPreview(style.name)}
     >
       {/* Cover preview */}
-      <div className="aspect-[16/10] overflow-hidden">
+      <div className="relative overflow-hidden bg-black/20" style={{ height: 1080 * scale }}>
         {style.coverHtml ? (
           <iframe
             srcDoc={style.coverHtml}
-            className="w-[1920px] h-[1080px] pointer-events-none"
-            style={{ transform: "scale(0.15)", transformOrigin: "top left" }}
+            className="pointer-events-none"
+            style={{ width: 1920, height: 1080, transform: `scale(${scale})`, transformOrigin: "top left", border: "none" }}
             tabIndex={-1}
             sandbox="allow-same-origin"
             title={style.name}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center">
             <Palette className="h-8 w-8 text-foreground/10" />
           </div>
         )}
@@ -193,11 +193,11 @@ function StyleListCard({ style, onPreview, onPin, showDelete }: {
       <div className="px-3 py-2.5 border-t border-white/[0.06]">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium truncate">{style.name}</span>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          <div className="flex items-center gap-1">
             <button
               onClick={e => { e.stopPropagation(); onPin(style.name) }}
               className={`p-1 rounded transition-colors ${
-                style.pinned ? "text-brand-teal opacity-100" : "text-foreground-muted hover:text-foreground"
+                style.pinned ? "text-brand-teal" : "text-foreground-muted hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-150"
               }`}
               aria-label={style.pinned ? `Unpin ${style.name}` : `Pin ${style.name}`}
             >
@@ -206,7 +206,7 @@ function StyleListCard({ style, onPreview, onPin, showDelete }: {
             {showDelete && (
               <button
                 onClick={e => { e.stopPropagation() }}
-                className="p-1 rounded text-foreground-muted hover:text-red-400 transition-colors"
+                className="p-1 rounded text-foreground-muted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 transition-opacity duration-150"
                 aria-label={`Delete ${style.name}`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
