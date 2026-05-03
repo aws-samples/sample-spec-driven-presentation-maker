@@ -892,11 +892,21 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       if (err instanceof DOMException && err.name === "AbortError") {
         // Keep partial response as-is
       } else {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        const isRetryable = errorMessage.includes("ThrottlingException") || errorMessage.includes("throttl")
+          || errorMessage.includes("timed out") || errorMessage.includes("timeout")
+          || errorMessage.includes("not ready") || errorMessage.includes("ServiceUnavailable")
+        const isConversationLimit = errorMessage.includes("Too much media") || errorMessage.includes("too long")
+        const displayMessage = isConversationLimit
+          ? "This conversation is too long for the model to process. Please start a new chat to continue."
+          : isRetryable
+            ? "The service is temporarily busy or timed out. Please wait a moment and try again."
+            : "Sorry, something went wrong. Please try again."
         setMessages((prev) => {
           const updated = [...prev]
           updated[updated.length - 1] = {
             ...updated[updated.length - 1],
-            content: "Sorry, something went wrong. Please try again.",
+            content: displayMessage,
           }
           return updated
         })
