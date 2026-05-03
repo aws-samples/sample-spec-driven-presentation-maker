@@ -106,12 +106,20 @@ export function ChatPanelShell({
   const panelRef = useRef<HTMLElement>(null)
 
   // Resize state
-  const [panelWidth, setPanelWidth] = useState(() => {
-    if (typeof window === "undefined") return DEFAULT_WIDTH
-    const saved = localStorage.getItem(CHAT_WIDTH_KEY)
-    return saved ? Math.max(MIN_WIDTH, Math.min(Number(saved), MAX_WIDTH_PX)) : DEFAULT_WIDTH
-  })
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH)
   const resizingRef = useRef(false)
+
+  /** Restore saved width from localStorage after mount. */
+  useEffect(() => {
+    const saved = localStorage.getItem(CHAT_WIDTH_KEY)
+    if (saved) setPanelWidth(Math.max(MIN_WIDTH, Math.min(Number(saved), MAX_WIDTH_PX)))
+  }, [])
+
+  /** Apply width to panel DOM without React re-render. */
+  const applyWidth = useCallback((w: number) => {
+    const el = panelRef.current
+    if (el) el.style.width = `${w}px`
+  }, [])
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -120,25 +128,27 @@ export function ChatPanelShell({
     const startW = panelWidth
     const maxW = Math.min(MAX_WIDTH_PX, window.innerWidth * 0.5)
 
+    panelRef.current?.classList.add("is-resizing")
+
     const onMove = (ev: MouseEvent) => {
-      const delta = startX - ev.clientX
-      const newW = Math.max(MIN_WIDTH, Math.min(startW + delta, maxW))
-      setPanelWidth(newW)
+      applyWidth(Math.max(MIN_WIDTH, Math.min(startW + (startX - ev.clientX), maxW)))
     }
-    const onUp = () => {
+    const onUp = (ev: MouseEvent) => {
       resizingRef.current = false
       document.removeEventListener("mousemove", onMove)
       document.removeEventListener("mouseup", onUp)
       document.body.style.cursor = ""
       document.body.style.userSelect = ""
-      // Persist
-      setPanelWidth((w) => { localStorage.setItem(CHAT_WIDTH_KEY, String(w)); return w })
+      panelRef.current?.classList.remove("is-resizing")
+      const finalW = Math.max(MIN_WIDTH, Math.min(startW + (startX - ev.clientX), maxW))
+      localStorage.setItem(CHAT_WIDTH_KEY, String(finalW))
+      setPanelWidth(finalW)
     }
     document.body.style.cursor = "col-resize"
     document.body.style.userSelect = "none"
     document.addEventListener("mousemove", onMove)
     document.addEventListener("mouseup", onUp)
-  }, [panelWidth])
+  }, [panelWidth, applyWidth])
 
   // When Panel A creates a deck, store the deckId so we know Panel A "owns" it
   const [panelADeckId, setPanelADeckId] = useState<string | null>(null)
@@ -279,16 +289,10 @@ export function ChatPanelShell({
       <aside
         ref={panelRef}
         data-open={open}
-        className="chat-panel fixed right-0 top-12 bottom-0 z-50 w-full sm:w-auto flex flex-col bg-background-panel pb-4"
-        style={{
-          width: panelWidth,
-          maxWidth: `${panelWidth}px`,
-          boxShadow: open
-            ? "-1px 0 0 var(--border), -20px 0 40px oklch(0 0 0 / 30%)"
-            : "none",
-        }}
+        className="chat-panel fixed right-0 top-12 bottom-0 z-50 w-full sm:relative sm:right-auto sm:top-auto sm:bottom-auto sm:z-auto sm:h-full sm:flex-none"
+        style={{ width: open ? panelWidth : 0 }}
       >
-        {/* Resize handle */}
+        {/* Resize handle — absolute, left:-6px, outside inner overflow:hidden */}
         <div
           className="chat-resize-handle hidden sm:flex"
           onMouseDown={handleResizeStart}
@@ -296,6 +300,16 @@ export function ChatPanelShell({
           aria-orientation="vertical"
           aria-label="Resize chat panel"
         />
+        {/* Inner — overflow:hidden clips during close, min-width prevents text reflow */}
+        <div
+          className="chat-panel-inner h-full flex flex-col bg-background-panel pb-4"
+          style={{
+            "--chat-panel-inner-w": `${panelWidth}px`,
+            boxShadow: open
+              ? "-1px 0 0 var(--border), -20px 0 40px oklch(0 0 0 / 30%)"
+              : "none",
+          } as React.CSSProperties}
+        >
         {/* Header */}
         <div className="flex-none px-4 pt-3 pb-0">
           <div className="flex items-center justify-between mb-3">
@@ -364,6 +378,7 @@ export function ChatPanelShell({
         <div className="mx-4 mt-3 border-t border-white/[0.06]" />
 
         {chatContent}
+        </div>{/* end chat-panel-inner */}
       </aside>
     </>
   )

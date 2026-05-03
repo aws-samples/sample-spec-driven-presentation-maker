@@ -34,8 +34,9 @@ interface AppShellProps {
 
 export function AppShell({ children, deckName, onBack, chatOpen = false, onChatToggle }: AppShellProps) {
   const { user, signOut } = useAuth()
-  const alias = user?.profile?.preferred_username || user?.profile?.email?.split("@")[0] || ""
-  const email = user?.profile?.email || ""
+  const profile = user?.profile as Record<string, unknown> | undefined
+  const alias = (profile?.preferred_username as string) || (profile?.email as string)?.split("@")[0] || ""
+  const email = (profile?.email as string) || ""
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuVisible, setMenuVisible] = useState(false)
   const [showAgentSettings, setShowAgentSettings] = useState(false)

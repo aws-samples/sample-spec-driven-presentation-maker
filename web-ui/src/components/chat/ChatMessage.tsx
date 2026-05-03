@@ -20,6 +20,7 @@
 
 import { useState, useEffect } from "react"
 import Markdown from "react-markdown"
+import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { ChevronRight, Sparkles, FileText as FileTextIcon, Image as ImageIcon } from "lucide-react"
 import { ToolCard, ToolCardCompact } from "./ToolCard"
@@ -219,7 +220,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
     return (
       <div className={`text-sm leading-relaxed text-foreground/85 ${isLast && isStreaming ? "streaming-cursor" : ""}`}>
         <div className="prose prose-invert prose-sm max-w-none">
-          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents as Components}>
             {renderInlinePreviews(cleaned, previewUrls)}
           </Markdown>
         </div>
@@ -305,7 +306,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
               <div className="text-sm leading-relaxed break-words text-foreground/85">
                 {cleanContent ? (
                   <div className={`prose prose-invert prose-sm max-w-none ${isStreaming ? "streaming-cursor" : ""}`}>
-                    <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                    <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents as Components}>
                       {renderInlinePreviews(cleanContent, previewUrls)}
                     </Markdown>
                   </div>

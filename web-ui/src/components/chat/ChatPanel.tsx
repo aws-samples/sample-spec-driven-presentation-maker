@@ -41,7 +41,7 @@ interface Message {
   content: string
   toolUses: ToolUse[]
   /** Ordered sequence of text and tool blocks for inline display. */
-  blocks?: { type: "text"; text: string }[] | { type: "tool"; tool: ToolUse }[]
+  blocks?: ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[]
   snippets?: { label: string; text: string }[]
   attachments?: { fileName: string; fileType: string }[]
   mcpStatus?: McpServerStatus[]
@@ -178,16 +178,19 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       if (!sessionId) return
       setHistoryLoading(true)
       try {
-      const history = await getChatHistory(sessionId, idToken, deckId || undefined)
+      const history = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
       if (history.length > 0) {
         // Local mode: .chat.json is already in ChatPanel's internal format
-        if (IS_LOCAL && history[0]?.toolUses !== undefined) {
-          setMessages(history.map((m: Record<string, unknown>) => ({
-            role: (m.role as string) || "assistant",
-            content: (typeof m.content === "string" ? m.content : "") as string,
-            toolUses: (m.toolUses as ToolUse[]) || [],
-            blocks: (m.blocks as ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[]) || undefined,
-          })))
+        if (IS_LOCAL && (history[0] as unknown as Record<string, unknown>)?.toolUses !== undefined) {
+          setMessages(history.map((m) => {
+            const raw = m as unknown as Record<string, unknown>
+            return {
+              role: ((raw.role as string) || "assistant") as "user" | "assistant",
+              content: (typeof raw.content === "string" ? raw.content : "") as string,
+              toolUses: (raw.toolUses as ToolUse[]) || [],
+              blocks: (raw.blocks as ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[]) || undefined,
+            }
+          }))
           return
         }
         const parsed: typeof messages = []
@@ -199,10 +202,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           if (typeof m.content === "string") {
             text = m.content.replace(/<!--sdpm:[^>]*-->\n?/g, "")
           } else if (Array.isArray(m.content)) {
+            const contentBlocks = m.content as unknown as Record<string, unknown>[]
             // toolResult messages: attach result to matching toolUse in previous assistant
-            if (m.role === "user" && m.content.some((b: Record<string, unknown>) => b.toolResult)) {
-              for (const block of m.content) {
-                const b = block as Record<string, unknown>
+            if (m.role === "user" && contentBlocks.some((b) => b.toolResult)) {
+              for (const block of contentBlocks) {
+                const b = block
                 if (b.toolResult) {
                   const tr = b.toolResult as Record<string, unknown>
                   const tuId = tr.toolUseId as string
@@ -217,15 +221,15 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     if (prev.role === "assistant") {
                       const matchedTool = prev.toolUses.find((t) => t.toolUseId === tuId)
                       if (matchedTool) {
-                        matchedTool.status = status
-                        try { matchedTool.result = JSON.parse(resultText) } catch { matchedTool.result = resultText }
+                        matchedTool.status = status as "success" | "error"
+                        try { matchedTool.result = JSON.parse(resultText) } catch { matchedTool.result = resultText as unknown as Record<string, unknown> }
                       }
                       // Update blocks too
                       if (prev.blocks) {
                         for (const bl of prev.blocks) {
                           if (bl.type === "tool" && bl.tool.toolUseId === tuId) {
-                            bl.tool.status = status
-                            try { bl.tool.result = JSON.parse(resultText) } catch { bl.tool.result = resultText }
+                            bl.tool.status = status as "success" | "error"
+                            try { bl.tool.result = JSON.parse(resultText) } catch { bl.tool.result = resultText as unknown as Record<string, unknown> }
                           }
                         }
                       }
@@ -236,8 +240,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               continue
             }
 
-            for (const block of m.content) {
-              const b = block as Record<string, unknown>
+            for (const block of contentBlocks) {
+              const b = block
               if (b.toolUse) {
                 const tu = b.toolUse as Record<string, unknown>
                 toolUses.push({
@@ -671,7 +675,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       fullMessage = `<!--sdpm:include_images=true-->\n${fullMessage}`
     }
 
-    const sentSnippets = snippets.map((s) => ({ label: s.label || "Text snippet", text: s.text }))
+    const sentSnippets = snippets.map((s) => ({ label: "Text snippet", text: s.text }))
     const sentAttachments = uploadedFiles.map((f) => ({ fileName: f.fileName, fileType: f.fileType }))
 
     setMessages((prev) => [
@@ -1168,7 +1172,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
               <div className="flex-1 relative">
                 <MentionPopup
-                  ref={mentionPopupRef}
                   visible={mentionVisible}
                   query={mentionQuery}
                   items={mentionItems}

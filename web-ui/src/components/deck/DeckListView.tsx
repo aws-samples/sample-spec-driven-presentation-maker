@@ -63,13 +63,14 @@ interface DeckListViewProps {
   onToggleVisibility?: (deckId: string, visibility: "public" | "private") => void
   onShare?: (deckId: string) => void
   onDownload?: (deckId: string) => void
+  onOpenFolder?: (deckId: string) => void
   loading: boolean
 }
 
 export function DeckListView({
   decks, activeTab, onTabChange, searchQuery, onSearchChange,
   searchResults, searching, onDeckOpen, onNewDeck, favoriteIds,
-  onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, loading,
+  onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, onOpenFolder, loading,
 }: DeckListViewProps) {
   // Tauri: no server-side slide search; filter decks by name client-side instead.
   const showSearch = !IS_LOCAL && searchQuery.length >= 2
@@ -195,6 +196,7 @@ export function DeckListView({
                   onToggleVisibility={onToggleVisibility}
                   onShare={onShare}
                   onDownload={onDownload}
+                  onOpenFolder={onOpenFolder}
                 />
               ))}
             </div>

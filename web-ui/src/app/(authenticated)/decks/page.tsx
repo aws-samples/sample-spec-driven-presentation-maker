@@ -19,7 +19,7 @@
 
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { AppShell } from "@/components/AppShell"
 import { DeckListView } from "@/components/deck/DeckListView"
@@ -48,6 +48,8 @@ export default function DecksPage() {
   const list = useDeckList(idToken, auth.isAuthenticated, ws.activeDeckId)
 
   /* ── Local UI state ── */
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
   const [fabOpen, setFabOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"chat" | "preview">("chat")
   const [workflowPhase, setWorkflowPhase] = useState<string | null>(null)
@@ -74,8 +76,8 @@ export default function DecksPage() {
       chatOpen={ws.chatOpen}
       onChatToggle={() => ws.setChatOpen((prev) => !prev)}
     >
-      <div className="flex-1 overflow-hidden relative">
-        <main className={`h-full overflow-y-auto transition-[margin] duration-350 ease-[cubic-bezier(.4,0,.6,1)] ${ws.chatOpen ? "sm:mr-[400px]" : ""}`}>
+      <div className="flex-1 overflow-hidden relative sm:flex">
+        <main className="h-full overflow-y-auto flex-1 min-w-0">
           {ws.isWorkspace ? (
             <>
               {/* Mobile tab bar */}
@@ -126,7 +128,7 @@ export default function DecksPage() {
                   // Local: defer SlideCarousel mount until deck data loads so
                   // hadSlidesOnMount captures the real slide count, not the
                   // initial empty-deck state.
-                  IS_LOCAL && ws.isWorkspace && !ws.isNew && !ws.deck ? (
+                  IS_LOCAL && mounted && ws.isWorkspace && !ws.isNew && !ws.deck ? (
                     <div className="w-full h-full" />
                   ) : (
                   <SlideCarousel
@@ -158,7 +160,7 @@ export default function DecksPage() {
                     }}
                     ownerAlias={!ws.isOwner ? ws.deck?.ownerAlias : undefined}
                     headerActions={
-                      ws.activeDeckId && !ws.isNew && typeof window !== "undefined" ? (
+                      ws.activeDeckId && !ws.isNew ? (
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => list.handleToggleFavorite(ws.activeDeckId!, list.favoriteIds.has(ws.activeDeckId!) ? "remove" : "add")}
@@ -215,6 +217,7 @@ export default function DecksPage() {
                 onDelete={list.handleDelete}
                 onToggleVisibility={list.handleToggleVisibility}
                 onDownload={list.handleDownload}
+                onOpenFolder={list.handleOpenFolder}
                 loading={list.loading}
               />
               {list.error && (
@@ -229,7 +232,7 @@ export default function DecksPage() {
         </main>
 
         {/* Chat Panel (persistent, desktop) — hidden on mobile workspace chat tab */}
-        <div className={isMobile && ws.isWorkspace && ws.canChat && activeTab === "chat" ? "hidden" : ""}>
+        {!(isMobile && ws.isWorkspace && ws.canChat && activeTab === "chat") && (
           <ChatPanelShell
             open={ws.chatOpen}
             onClose={() => ws.setChatOpen(false)}
@@ -244,7 +247,7 @@ export default function DecksPage() {
             onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
             onWorkflowPhase={setWorkflowPhase}
           />
-        </div>
+        )}
       </div>
 
       {list.deleteTarget && (

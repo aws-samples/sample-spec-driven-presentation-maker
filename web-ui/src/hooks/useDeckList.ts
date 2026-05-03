@@ -14,6 +14,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react"
+import { IS_LOCAL } from "@/lib/mode"
 import {
   listDecks, DeckSummary,
   listPublicDecks, listSharedDecks, listFavorites,
@@ -132,8 +133,17 @@ export function useDeckList(
   const handleDownload = useCallback((deckId: string) => {
     const target = decks.find((d) => d.deckId === deckId)
     if (!target?.pptxUrl) return
-    window.open(target.pptxUrl, "_blank")
+    if (IS_LOCAL) {
+      fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch(() => {})
+    } else {
+      window.open(target.pptxUrl, "_blank")
+    }
   }, [decks])
+
+  const handleOpenFolder = useCallback((deckId: string) => {
+    if (!IS_LOCAL) return
+    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch(() => {})
+  }, [])
 
   const confirmDelete = useCallback(async () => {
     if (!deleteTarget || !idToken) return
@@ -156,7 +166,7 @@ export function useDeckList(
     decks, tabDecks, favoriteIds, activeListTab, setActiveListTab,
     loading, error, deleteTarget, setDeleteTarget,
     searchQuery, setSearchQuery, searchResults, searching,
-    handleToggleFavorite, handleDelete, handleToggleVisibility, handleDownload, confirmDelete,
+    handleToggleFavorite, handleDelete, handleToggleVisibility, handleDownload, handleOpenFolder, confirmDelete,
     setDecks,
   }
 }

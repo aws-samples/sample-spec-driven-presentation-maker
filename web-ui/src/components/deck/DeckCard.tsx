@@ -39,6 +39,7 @@ interface DeckCardProps {
   onToggleVisibility?: (deckId: string, visibility: "public" | "private") => void
   onShare?: (deckId: string) => void
   onDownload?: (deckId: string) => void
+  onOpenFolder?: (deckId: string) => void
 }
 
 /**
@@ -78,7 +79,7 @@ function meshGradient(id: string): string {
   ].join(", ")
 }
 
-export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOpen, onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload }: DeckCardProps) {
+export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOpen, onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, onOpenFolder }: DeckCardProps) {
   return (
     <div
       role="button"
@@ -134,6 +135,12 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
               <Link className="h-3.5 w-3.5" />
               Copy URL
             </DropdownMenuItem>
+            {onOpenFolder && IS_LOCAL && (
+              <DropdownMenuItem onClick={() => onOpenFolder(deck.deckId)}>
+                <FolderOpen className="h-3.5 w-3.5" />
+                Open Folder
+              </DropdownMenuItem>
+            )}
             {onDownload && (
               <DropdownMenuItem onClick={() => onDownload(deck.deckId)}>
                 {IS_LOCAL ? <FolderOpen className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
