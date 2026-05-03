@@ -18,8 +18,9 @@
 "use client"
 
 import { ReactNode, useState, useRef, useEffect, useCallback } from "react"
+import { usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
-import { Layers, ChevronLeft, MessageSquare, CircleUser, LogOut, Bot, Settings as SettingsIcon } from "lucide-react"
+import { Layers, ChevronLeft, MessageSquare, CircleUser, LogOut, Bot, Settings as SettingsIcon, Palette } from "lucide-react"
 import { AgentSettingsDialog } from "@/components/chat/AgentSettingsDialog"
 import { Settings } from "@/components/Settings"
 import { CloudOnly, LocalOnly } from "@/lib/mode"
@@ -34,6 +35,7 @@ interface AppShellProps {
 
 export function AppShell({ children, deckName, onBack, chatOpen = false, onChatToggle }: AppShellProps) {
   const { user, signOut } = useAuth()
+  const pathname = usePathname()
   const profile = user?.profile as Record<string, unknown> | undefined
   const alias = (profile?.preferred_username as string) || (profile?.email as string)?.split("@")[0] || ""
   const email = (profile?.email as string) || ""
@@ -124,14 +126,31 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
               </span>
             </button>
           ) : (
-            <a href="/decks/" className="flex items-center gap-2.5 no-underline">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center bg-brand-teal-soft">
-                <Layers className="h-3 w-3 text-brand-teal" />
+            <>
+              <a href="/decks/" className="flex items-center gap-2.5 no-underline">
+                <div className="w-6 h-6 rounded-md flex items-center justify-center bg-brand-teal-soft">
+                  <Layers className="h-3 w-3 text-brand-teal" />
+                </div>
+              </a>
+              <div className="flex items-center gap-0.5 ml-1">
+                <a
+                  href="/decks/"
+                  className={`px-2.5 py-1 rounded-md text-sm font-medium no-underline transition-colors ${
+                    pathname?.startsWith("/decks") ? "text-foreground" : "text-foreground/40 hover:text-foreground/70"
+                  }`}
+                >
+                  Decks
+                </a>
+                <a
+                  href="/styles/"
+                  className={`px-2.5 py-1 rounded-md text-sm font-medium no-underline transition-colors ${
+                    pathname?.startsWith("/styles") ? "text-foreground" : "text-foreground/40 hover:text-foreground/70"
+                  }`}
+                >
+                  Styles
+                </a>
               </div>
-              <span className="text-sm font-semibold tracking-[-0.02em] text-foreground">
-                spec-driven-presentation-maker
-              </span>
-            </a>
+            </>
           )}
         </nav>
 
