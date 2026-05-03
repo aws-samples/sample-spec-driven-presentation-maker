@@ -15,8 +15,10 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as ecr_assets from "aws-cdk-lib/aws-ecr-assets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import * as path from "path";
+import { AUTH_SSM_PARAMS } from "./auth-stack";
 
 interface AgentStackProps extends cdk.StackProps {
   /** Amazon DynamoDB table from DataStack. */
@@ -25,10 +27,24 @@ interface AgentStackProps extends cdk.StackProps {
   pptxBucket: s3.Bucket;
   /** MCP Server Runtime ARN. */
   mcpRuntimeArn: string;
-  /** OIDC discovery URL for JWT authorizer. */
-  oidcDiscoveryUrl: string;
-  /** Allowed client IDs for JWT authorizer. */
+  /**
+   * OIDC discovery URL for JWT authorizer.
+   * Used only when useAuthStack=false (external IdP). When useAuthStack=true,
+   * the value is read from SSM instead.
+   */
+  oidcDiscoveryUrl?: string;
+  /**
+   * Allowed client IDs for JWT authorizer.
+   * Used only when useAuthStack=false (external IdP). When useAuthStack=true,
+   * the WebClient ID is read from SSM instead.
+   */
   allowedClients: string[];
+  /**
+   * When true, read the WebClient ID from SSM Parameter Store (published by
+   * AuthStack) and prepend it to allowedClients. Avoids a direct construct
+   * reference to AuthStack that would trigger a cross-stack CFN export.
+   */
+  useAuthStack: boolean;
   /** Bedrock model ID for the chat (conversation/planning) task. */
   chatModelId?: string;
   /** Bedrock model ID for the create (generation) task. */
@@ -174,6 +190,16 @@ export class AgentStack extends cdk.Stack {
     // --- Amazon Bedrock AgentCore Runtime ---
     const defaultPolicy = role.node.findChild("DefaultPolicy") as iam.Policy;
 
+    // When AuthStack is in play, read the WebClient ID from SSM and include it
+    // in the allowedClients list. This avoids direct AuthStack construct
+    // references that would trigger cross-stack CFN exports.
+    const allowedClients = props.useAuthStack
+      ? [ssm.StringParameter.valueForStringParameter(this, AUTH_SSM_PARAMS.webClientId)]
+      : props.allowedClients;
+    const discoveryUrl = props.useAuthStack
+      ? ssm.StringParameter.valueForStringParameter(this, AUTH_SSM_PARAMS.oidcDiscoveryUrl)
+      : props.oidcDiscoveryUrl!;
+
     const runtime = new bedrockagentcore.CfnRuntime(this, "AgentRuntime", {
       agentRuntimeName: "sdpm_agent",
       roleArn: role.roleArn,
@@ -188,8 +214,8 @@ export class AgentStack extends cdk.Stack {
       protocolConfiguration: "HTTP",
       authorizerConfiguration: {
         customJwtAuthorizer: {
-          discoveryUrl: props.oidcDiscoveryUrl,
-          allowedClients: props.allowedClients,
+          discoveryUrl,
+          allowedClients,
         },
       },
       requestHeaderConfiguration: {
