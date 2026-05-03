@@ -54,12 +54,13 @@ export function listStylesFromDir(dir: string): Array<{ name: string; descriptio
       const html = fs.readFileSync(path.join(dir, f), "utf-8")
       const titleMatch = html.match(/<title>(.*?)<\/title>/i)
       const description = titleMatch ? titleMatch[1].trim() : ""
-      // Extract first slide as cover: find first <div class="slide"> to second
-      const marker = '<div class="slide"'
-      const first = html.indexOf(marker)
-      if (first === -1) return { name, description, coverHtml: html }
-      const second = html.indexOf(marker, first + marker.length)
-      const slideHtml = second > 0 ? html.slice(first, second) : html.slice(first, html.indexOf("</body", first) || undefined)
+      // Extract first slide as cover: find first <div class="slide..."> to second
+      const slideRegex = /<div class="slide[\s"]/g
+      const firstMatch = slideRegex.exec(html)
+      if (!firstMatch) return { name, description, coverHtml: html }
+      const first = firstMatch.index
+      const secondMatch = slideRegex.exec(html)
+      const slideHtml = secondMatch ? html.slice(first, secondMatch.index) : html.slice(first, html.indexOf("</body", first) || undefined)
       // Build standalone doc with head styles + body padding reset
       const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i)
       const head = headMatch ? headMatch[1] : ""

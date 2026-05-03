@@ -33,7 +33,7 @@ html,body{margin:0!important;padding:0!important;background:transparent!importan
 }
 
 function countSlides(html: string): number {
-  const matches = html.match(/class="slide"/g)
+  const matches = html.match(/class="slide[\s"]/g)
   return matches ? matches.length : 1
 }
 

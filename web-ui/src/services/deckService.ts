@@ -490,3 +490,36 @@ export async function pinStyle(name: string, pinned: boolean, idToken: string): 
     body: JSON.stringify({ name, pinned }),
   })
 }
+
+
+/**
+ * Save a user style (import).
+ *
+ * @param name - Style name (alphanumeric, hyphens, underscores)
+ * @param html - Full HTML content
+ * @param idToken - Cognito ID token for API Gateway authorization
+ */
+export async function saveUserStyle(name: string, html: string, idToken: string): Promise<{ saved?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}styles/user`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ name, html }),
+  })
+  return res.json()
+}
+
+/**
+ * Delete a user style.
+ *
+ * @param name - Style name
+ * @param idToken - Cognito ID token for API Gateway authorization
+ */
+export async function deleteUserStyle(name: string, idToken: string): Promise<{ deleted?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}styles/user/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  return res.json()
+}

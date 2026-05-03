@@ -12,9 +12,9 @@
 import { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { AppShell } from "@/components/AppShell"
-import { fetchStyles, fetchStyleHtml, pinStyle, type StyleEntry } from "@/services/deckService"
+import { fetchStyles, fetchStyleHtml, pinStyle, saveUserStyle, deleteUserStyle, type StyleEntry } from "@/services/deckService"
 import { StyleSlidePreview } from "@/components/StyleSlidePreview"
-import { Star, Trash2, Palette, Plus } from "lucide-react"
+import { Star, Trash2, Palette, Download, Sparkles } from "lucide-react"
 
 export default function StylesPage() {
   const auth = useAuth()
@@ -23,6 +23,14 @@ export default function StylesPage() {
   const [loading, setLoading] = useState(true)
   const [preview, setPreview] = useState<{ name: string; html: string } | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   useEffect(() => {
     if (!idToken) return
@@ -44,6 +52,44 @@ export default function StylesPage() {
       setPreview({ name, html })
     }
     setPreviewLoading(false)
+  }
+
+  const handleImport = async (file: File) => {
+    if (!idToken) return
+    const html = await file.text()
+    if (!/<title>.*?<\/title>/i.test(html)) {
+      showToast("Invalid style: HTML must contain a <title> tag.", "error")
+      return
+    }
+    const name = file.name.replace(/\.html?$/i, "").replace(/[^a-zA-Z0-9_-]/g, "-")
+    const result = await saveUserStyle(name, html, idToken)
+    if (result.error) { showToast(result.error, "error"); return }
+    const updated = await fetchStyles(idToken)
+    setStyles(updated)
+    showToast(`Imported "${name}"`)
+  }
+
+  const handleDelete = async (name: string) => {
+    if (!idToken) return
+    const result = await deleteUserStyle(name, idToken)
+    if (result.error) { showToast(result.error, "error"); return }
+    setStyles(prev => prev.filter(s => s.name !== name))
+    if (preview?.name === name) setPreview(null)
+    setDeleteConfirm(null)
+    showToast(`Deleted "${name}"`)
+  }
+
+  const handleExport = async (name: string) => {
+    if (!idToken) return
+    const html = await fetchStyleHtml(name, idToken)
+    if (!html) return
+    const blob = new Blob([html], { type: "text/html" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${name}.html`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const userStyles = styles.filter(s => s.source === "user")
@@ -86,6 +132,24 @@ export default function StylesPage() {
               >
                 <Star className="h-3.5 w-3.5" fill={styles.find(s => s.name === preview.name)?.pinned ? "currentColor" : "none"} />
               </button>
+              {styles.find(s => s.name === preview.name)?.source === "user" && (
+                <>
+                  <button
+                    onClick={() => handleExport(preview.name)}
+                    className="p-1 rounded text-foreground-muted hover:text-foreground transition-colors"
+                    aria-label={`Export ${preview.name}`}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm(preview.name)}
+                    className="p-1 rounded text-foreground-muted hover:text-red-400 transition-colors"
+                    aria-label={`Delete ${preview.name}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
             </div>
             <StyleSlidePreview html={preview.html} loading={previewLoading} />
           </div>
@@ -109,19 +173,37 @@ export default function StylesPage() {
                       style={style}
                       onPreview={handlePreview}
                       onPin={handlePin}
-                      showDelete
+                      onDelete={name => setDeleteConfirm(name)}
+                      onExport={handleExport}
                     />
                   ))}
-                  {/* New Style card */}
-                  <button
-                    className="aspect-[16/10] rounded-xl border-2 border-dashed border-white/[0.08] hover:border-white/[0.2] bg-transparent hover:bg-white/[0.02] flex flex-col items-center justify-center gap-2 transition-all duration-200 cursor-pointer group"
-                    onClick={() => {/* Phase 3: navigate to style creator */}}
-                  >
-                    <div className="w-10 h-10 rounded-full border-2 border-dashed border-white/[0.1] group-hover:border-white/[0.25] flex items-center justify-center transition-colors duration-200">
-                      <Plus className="h-5 w-5 text-foreground/20 group-hover:text-foreground/50 transition-colors duration-200" />
-                    </div>
-                    <span className="text-xs text-foreground/30 group-hover:text-foreground/60 font-medium transition-colors duration-200">New Style</span>
-                  </button>
+                  {/* Create with AI card + Import link */}
+                  <div className="flex flex-col">
+                    <button
+                      className="aspect-[16/10] rounded-xl border-2 border-dashed border-white/[0.08] hover:border-brand-teal/30 bg-transparent hover:bg-brand-teal/[0.03] flex flex-col items-center justify-center gap-2 transition-all duration-200 cursor-pointer group"
+                      onClick={() => {/* Phase 3: navigate to style creator */}}
+                    >
+                      <Sparkles className="h-6 w-6 text-brand-teal/30 group-hover:text-brand-teal/60 transition-colors duration-200" />
+                      <span className="text-xs text-foreground/30 group-hover:text-foreground/60 font-medium transition-colors duration-200">Create with AI</span>
+                    </button>
+                    <button
+                      className="mt-2 py-1.5 text-xs text-foreground/25 hover:text-foreground/50 transition-colors text-center"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Import Style
+                    </button>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".html,.htm"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (file) handleImport(file)
+                      e.target.value = ""
+                    }}
+                  />
                 </div>
               </section>
 
@@ -143,16 +225,53 @@ export default function StylesPage() {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation dialog */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeleteConfirm(null)} onKeyDown={e => { if (e.key === "Escape") setDeleteConfirm(null) }}>
+          <div className="bg-surface-secondary border border-white/[0.08] rounded-xl p-6 max-w-sm mx-4 shadow-2xl" role="alertdialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold mb-2">Delete style</h3>
+            <p className="text-sm text-foreground-muted mb-5">
+              Are you sure you want to delete <span className="font-medium text-foreground">{deleteConfirm}</span>? This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-3 py-1.5 text-sm rounded-lg border border-white/[0.08] hover:bg-white/[0.04] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                autoFocus
+                onClick={() => handleDelete(deleteConfirm)}
+                className="px-3 py-1.5 text-sm rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast notification */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg text-sm font-medium shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+          toast.type === "error" ? "bg-red-500/20 text-red-300 border border-red-500/20" : "bg-brand-teal/20 text-brand-teal border border-brand-teal/20"
+        }`}>
+          {toast.message}
+        </div>
+      )}
     </AppShell>
   )
 }
 
 /** Style card for the /styles list page. */
-function StyleListCard({ style, onPreview, onPin, showDelete }: {
+function StyleListCard({ style, onPreview, onPin, onDelete, onExport }: {
   style: StyleEntry
   onPreview: (name: string) => void
   onPin: (name: string) => void
-  showDelete?: boolean
+  onDelete?: (name: string) => void
+  onExport?: (name: string) => void
 }) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.15)
@@ -203,9 +322,18 @@ function StyleListCard({ style, onPreview, onPin, showDelete }: {
             >
               <Star className="h-3.5 w-3.5" fill={style.pinned ? "currentColor" : "none"} />
             </button>
-            {showDelete && (
+            {onExport && (
               <button
-                onClick={e => { e.stopPropagation() }}
+                onClick={e => { e.stopPropagation(); onExport(style.name) }}
+                className="p-1 rounded text-foreground-muted hover:text-foreground transition-colors opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                aria-label={`Export ${style.name}`}
+              >
+                <Download className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={e => { e.stopPropagation(); onDelete(style.name) }}
                 className="p-1 rounded text-foreground-muted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 transition-opacity duration-150"
                 aria-label={`Delete ${style.name}`}
               >
