@@ -432,6 +432,8 @@ export interface StyleEntry {
   name: string
   description: string
   coverHtml: string
+  pinned: boolean
+  source: "builtin" | "user"
 }
 
 /**
@@ -447,7 +449,12 @@ export async function fetchStyles(idToken: string): Promise<StyleEntry[]> {
   })
   if (!res.ok) return []
   const data = await res.json()
-  return data.styles || []
+  // Backfill defaults for APIs that don't yet return pinned/source
+  return (data.styles || []).map((s: Partial<StyleEntry>) => ({
+    ...s,
+    pinned: s.pinned ?? false,
+    source: s.source ?? "builtin",
+  })) as StyleEntry[]
 }
 
 /**

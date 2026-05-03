@@ -16,7 +16,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Layers, FileText, Palette, ArrowLeft, Check } from "lucide-react"
+import { Layers, FileText, Palette, ArrowLeft, Check, Star } from "lucide-react"
 import Markdown from "react-markdown"
 import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -220,6 +220,17 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
   const [previewLoading, setPreviewLoading] = useState(false)
   const galleryScrollRef = useRef(0)
   const galleryContainerRef = useRef<HTMLDivElement>(null)
+  const [allStylesOpen, setAllStylesOpen] = useState(false)
+
+  // Pin toggle — optimistic local state (Phase 1a: local only, API in 1c)
+  // Preserve scroll position across re-renders caused by section layout changes
+  const handlePinToggle = useCallback((name: string) => {
+    const scrollTop = galleryContainerRef.current?.scrollTop ?? 0
+    setStyles(prev => prev.map(s => s.name === name ? { ...s, pinned: !s.pinned } : s))
+    requestAnimationFrame(() => {
+      if (galleryContainerRef.current) galleryContainerRef.current.scrollTop = scrollTop
+    })
+  }, [])
 
   // Sync mode when content appears externally (e.g. polling updates art-direction)
   const userRequestedGallery = useRef(false)
@@ -316,13 +327,17 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
         setPreviewLoading(false)
       }
 
+      const pinnedStyles = styles.filter(s => s.pinned)
+      const hasPins = pinnedStyles.length > 0
+      const unpinnedStyles = styles.filter(s => !s.pinned)
+
       return (
         <div ref={galleryContainerRef} className="flex-1 overflow-y-auto">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
             <div>
               <h2 className="text-[15px] font-semibold">Choose a Style</h2>
-              <p className="text-xs text-foreground-muted mt-0.5">Click a style to preview</p>
+              <p className="text-xs text-foreground-muted mt-0.5">Click to preview · ★ to pin favorites</p>
             </div>
             {content && (
               <button
@@ -342,10 +357,45 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
                   <div key={i} className="aspect-[16/10] rounded-xl bg-white/[0.03] animate-pulse" />
                 ))}
               </div>
+            ) : hasPins ? (
+              /* Sectioned layout: Pinned + All Styles collapsible */
+              <div className="flex flex-col gap-6">
+                {/* Pinned section */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <Star className="h-3.5 w-3.5 text-brand-teal" fill="currentColor" />
+                    <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">Pinned</h3>
+                  </div>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                    {pinnedStyles.map((style, i) => (
+                      <StyleCard key={style.name} style={style} index={i} onClick={handleCardClick} onPin={handlePinToggle} />
+                    ))}
+                  </div>
+                </div>
+                {/* All Styles collapsible */}
+                <div>
+                  <button
+                    onClick={() => setAllStylesOpen(prev => !prev)}
+                    className="flex items-center gap-1.5 mb-3 text-xs font-semibold text-foreground-muted uppercase tracking-wider hover:text-foreground transition-colors"
+                    aria-expanded={allStylesOpen}
+                  >
+                    <span className="transition-transform duration-200" style={{ transform: allStylesOpen ? "rotate(90deg)" : "rotate(0deg)" }}>▸</span>
+                    All Styles ({unpinnedStyles.length})
+                  </button>
+                  {allStylesOpen && (
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                      {unpinnedStyles.map((style, i) => (
+                        <StyleCard key={style.name} style={style} index={i} onClick={handleCardClick} onPin={handlePinToggle} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : (
+              /* Flat layout: no pins */
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 {styles.map((style, i) => (
-                  <StyleCard key={style.name} style={style} index={i} onClick={handleCardClick} />
+                  <StyleCard key={style.name} style={style} index={i} onClick={handleCardClick} onPin={handlePinToggle} />
                 ))}
               </div>
             )}
@@ -356,6 +406,9 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
 
     // PREVIEW state
     if (adMode === "preview" && preview) {
+      const previewStyle = styles.find(s => s.name === preview.name)
+      const previewPinned = previewStyle?.pinned ?? false
+
       const handleSelect = () => {
         if (onStyleSelect) onStyleSelect(preview.name)
         if (content) setAdMode("result")
@@ -374,10 +427,17 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <div>
+              <div className="flex items-center gap-2">
                 <h2 className="text-[15px] font-semibold">{preview.name}</h2>
-                <p className="text-xs text-foreground-muted mt-0.5">Preview all slides — select to apply</p>
+                <button
+                  onClick={() => handlePinToggle(preview.name)}
+                  className={`p-1 rounded transition-colors ${previewPinned ? "text-brand-teal" : "text-foreground-muted hover:text-foreground"}`}
+                  aria-label={previewPinned ? `Unpin ${preview.name}` : `Pin ${preview.name}`}
+                >
+                  <Star className="h-3.5 w-3.5" fill={previewPinned ? "currentColor" : "none"} />
+                </button>
               </div>
+              <p className="text-xs text-foreground-muted">Preview all slides — select to apply</p>
             </div>
             <button
               onClick={handleSelect}
@@ -462,11 +522,12 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
 /* ── Inline style components ── */
 
 /** Individual style card with iframe cover preview. */
-function StyleCard({ style, index, onClick }: { style: StyleEntry; index: number; onClick: (name: string) => void }) {
+function StyleCard({ style, index, onClick, onPin }: { style: StyleEntry; index: number; onClick: (name: string) => void; onPin?: (name: string) => void }) {
   const iframeWidth = 1920
   const iframeHeight = 1080
   const cardRef = useRef<HTMLButtonElement>(null)
   const [scale, setScale] = useState(0.2)
+  const [bouncing, setBouncing] = useState(false)
 
   useEffect(() => {
     const el = cardRef.current
@@ -477,6 +538,13 @@ function StyleCard({ style, index, onClick }: { style: StyleEntry; index: number
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+
+  const handlePin = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setBouncing(true)
+    setTimeout(() => setBouncing(false), 300)
+    onPin?.(style.name)
+  }
 
   return (
     <button
@@ -508,9 +576,29 @@ function StyleCard({ style, index, onClick }: { style: StyleEntry; index: number
           </div>
         )}
         <div className="absolute inset-0 bg-brand-teal/0 group-hover:bg-brand-teal/5 transition-colors duration-300" />
+        {/* Pin button */}
+        {onPin && (
+          <button
+            onClick={handlePin}
+            className={`absolute top-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-150 ${
+              style.pinned
+                ? "opacity-100 bg-black/40 text-brand-teal"
+                : "opacity-0 group-hover:opacity-100 bg-black/40 text-white/30 hover:text-white/60"
+            }`}
+            style={{ transform: bouncing ? "scale(1.3)" : "scale(1)", transition: "transform 300ms ease-out" }}
+            aria-label={style.pinned ? `Unpin ${style.name}` : `Pin ${style.name}`}
+          >
+            <Star className="h-3.5 w-3.5" fill={style.pinned ? "currentColor" : "none"} />
+          </button>
+        )}
       </div>
       <div className="px-3 py-2.5 border-t border-white/[0.04]">
-        <p className="text-sm font-medium text-foreground group-hover:text-brand-teal transition-colors">{style.name}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-medium text-foreground group-hover:text-brand-teal transition-colors truncate">{style.name}</p>
+          {style.source === "user" && (
+            <span className="flex-none text-[11px] px-1.5 py-0.5 rounded-full bg-brand-teal/10 text-brand-teal font-medium">Custom</span>
+          )}
+        </div>
         {style.description && (
           <p className="text-xs text-foreground-muted mt-0.5 line-clamp-1">{style.description}</p>
         )}
