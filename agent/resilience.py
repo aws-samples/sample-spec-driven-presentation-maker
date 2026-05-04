@@ -22,7 +22,7 @@ class LoopGuard:
     """Tracks tool-call fingerprints and enforces hard caps via agent.cancel()."""
 
     max_tool_calls: int = 150
-    fingerprint_repeat_limit: int = 3
+    fingerprint_repeat_limit: int = 5
     tool_calls: int = 0
     fingerprint_counts: dict[str, int] = field(default_factory=dict)
     cancelled: bool = False
@@ -42,6 +42,10 @@ class LoopGuard:
         self.tool_calls += 1
         if self.tool_calls >= self.max_tool_calls:
             self._cancel(event, f"max_tool_calls reached ({self.tool_calls})")
+            return
+        # Only count fingerprints for error results — successful repeated calls are normal
+        is_error = isinstance(event.result, dict) and event.result.get("status") == "error"
+        if not is_error:
             return
         fp = self._fingerprint(event)
         self.fingerprint_counts[fp] = self.fingerprint_counts.get(fp, 0) + 1

@@ -15,7 +15,7 @@ logger = logging.getLogger("sdpm.agent")
 KEEPALIVE_INTERVAL = 5
 
 
-async def stream_agent(agent: Agent, user_query: str, session_id: str, cancel: asyncio.Event) -> AsyncGenerator:
+async def stream_agent(agent: Agent, user_query: str, session_id: str, cancel: asyncio.Event, reconnect_handler=None) -> AsyncGenerator:
     """Stream agent responses as SSE events with keepalive and safe cancellation.
 
     Args:
@@ -23,6 +23,7 @@ async def stream_agent(agent: Agent, user_query: str, session_id: str, cancel: a
         user_query: User's input message.
         session_id: Session ID (for logging).
         cancel: Event that signals cancellation request.
+        reconnect_handler: Optional MCPReconnectHandler for reconnection events.
 
     Yields:
         SSE event dicts.
@@ -62,6 +63,9 @@ async def stream_agent(agent: Agent, user_query: str, session_id: str, cancel: a
 
     stream_iter = agent.stream_async(user_query).__aiter__()
     pending = None
+    keepalive_count = 0
+
+    logger.info("stream_agent started for session %s", session_id[:12])
 
     while True:
         if pending is None:
@@ -117,6 +121,11 @@ async def stream_agent(agent: Agent, user_query: str, session_id: str, cancel: a
                                 }}
                 pending = None
 
+                # Drain reconnect events after processing
+                if reconnect_handler and reconnect_handler.has_pending_events():
+                    for ev in reconnect_handler.drain_events():
+                        yield {"mcp_status": ev}
+
                 if _should_stop():
                     logger.info("Stopping stream for session %s", session_id[:12])
                     break
@@ -124,9 +133,18 @@ async def stream_agent(agent: Agent, user_query: str, session_id: str, cancel: a
             except StopAsyncIteration:
                 if last_tool_use:
                     yield _tool_payload(last_tool_use)
+                logger.info("stream_agent completed for session %s (keepalives=%d)", session_id[:12], keepalive_count)
                 break
         else:
+            # Drain reconnect events during idle
+            if reconnect_handler and reconnect_handler.has_pending_events():
+                for ev in reconnect_handler.drain_events():
+                    yield {"mcp_status": ev}
             yield {"keepalive": True}
+            keepalive_count += 1
+            if keepalive_count % 10 == 0:
+                logger.info("stream_agent keepalive #%d for session %s (in_tool=%s, cancel=%s)",
+                            keepalive_count, session_id[:12], in_tool_execution, cancel.is_set())
             if _should_stop():
                 logger.info("Stopping stream (idle) for session %s", session_id[:12])
                 break

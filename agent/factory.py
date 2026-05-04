@@ -8,7 +8,7 @@ import os
 
 from botocore.config import Config as BotocoreConfig
 from strands import Agent
-from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent
+from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent, BeforeToolCallEvent
 from strands.models import BedrockModel
 
 from cost_logger import log_usage
@@ -23,6 +23,7 @@ from composition import resolve_parts
 from model_profiles import build_model_kwargs, MODEL_PROFILES
 from modes import MODES
 from modes.separated.composer import make_compose_slides
+from mcp_reconnect import MCPReconnectHandler, MCPServerEntry
 from resilience import LoopGuard
 from session import fix_excess_tool_results
 from tools.hearing_tool import hearing
@@ -66,11 +67,11 @@ _MCP_FACTORIES = [
 # Unified factory
 # ---------------------------------------------------------------------------
 
-def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_model_id: str | None = None, create_model_id: str | None = None) -> tuple[Agent, list[dict]]:
+def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_model_id: str | None = None, create_model_id: str | None = None) -> tuple[Agent, list[dict], MCPReconnectHandler | None]:
     """Create a Strands Agent for the given mode.
 
     Returns:
-        Tuple of (Configured Strands Agent, MCP status list).
+        Tuple of (Configured Strands Agent, MCP status list, MCPReconnectHandler or None).
     """
     cfg = MODES[mode]
     memory_id = os.environ.get("MEMORY_ID", "")
@@ -96,7 +97,10 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         requested_agent = chat_model_id
         default_agent = _DEFAULT_CHAT_MODEL_ID
     resolved_agent = _resolve_model_id(requested_agent, default_agent)
-    model = BedrockModel(**build_model_kwargs(resolved_agent))
+    model = BedrockModel(
+        **build_model_kwargs(resolved_agent),
+        boto_client_config=BotocoreConfig(read_timeout=120),
+    )
 
     # MCP servers
     mcp_servers = []
@@ -113,6 +117,19 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
     # Tools
     tools = [*mcp_servers, web_fetch, hearing]
     composer_mcp_factory = None
+
+    # MCPReconnectHandler
+    reconnect_entries = [
+        MCPServerEntry(
+            name=name, required=required, index=i,
+            factory_fn=factory_fn,
+            client=mcp_servers[i] if i < len(mcp_servers) and mcp_status[i]["status"] == "ok" else None,
+            status="ok" if i < len(mcp_servers) and mcp_status[i]["status"] == "ok" else "disabled",
+        )
+        for i, ((name, required), factory_fn) in enumerate(zip(MCP_DEFS, _MCP_FACTORIES))
+    ]
+    reconnect_handler = MCPReconnectHandler(entries=reconnect_entries, jwt_token=jwt_token)
+
     if cfg.use_composer:
         resolved_create = _resolve_model_id(create_model_id, _DEFAULT_CREATE_MODEL_ID)
         profile = MODEL_PROFILES.get(resolved_create)
@@ -127,7 +144,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
                 retries={"max_attempts": 5, "mode": "adaptive"},
             ),
         )
-        composer_mcp_factory = lambda: mcp_agentcore_runtime(jwt_token=jwt_token)  # noqa: E731
+        composer_mcp_factory = lambda: reconnect_handler.create_composer_mcp()  # noqa: E731
         compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory)
         tools.append(compose_slides)
 
@@ -180,6 +197,10 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         agent.messages.extend(initial_messages)
     agent.system_prompt = system_prompt
 
+    # MCPReconnectHandler hooks (before LoopGuard so reconnection happens first)
+    agent.hooks.add_callback(AfterToolCallEvent, reconnect_handler.after_tool_hook)
+    agent.hooks.add_callback(BeforeToolCallEvent, reconnect_handler.before_tool_hook)
+
     # LoopGuard
     guard = LoopGuard(max_tool_calls=int(os.environ.get("SPEC_MAX_TOOL_CALLS", "300")))
     agent.hooks.add_callback(AfterToolCallEvent, guard.after_tool)
@@ -189,4 +210,4 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
 
     fix_excess_tool_results(agent.messages)
 
-    return agent, mcp_status
+    return agent, mcp_status, reconnect_handler

@@ -20,6 +20,7 @@ dev = [
     "pygments>=2.19.2",
     "mcp[cli]",
     "boto3",
+    "hypothesis>=6.152.4",
 ]
 
 [tool.ruff]

@@ -84,7 +84,7 @@ async def agent_stream(payload, context):
         mode = payload.get("mode", "single")
         requested_chat_model_id = payload.get("chatModelId") if isinstance(payload, dict) else None
         requested_create_model_id = payload.get("createModelId") if isinstance(payload, dict) else None
-        agent, mcp_status = create_agent(
+        agent, mcp_status, reconnect_handler = create_agent(
             mode=mode,
             user_id=user_id,
             session_id=session_id,
@@ -95,7 +95,7 @@ async def agent_stream(payload, context):
 
         yield {"mcp_status": mcp_status}
 
-        async for event in stream_agent(agent, user_query, session_id, cancel):
+        async for event in stream_agent(agent, user_query, session_id, cancel, reconnect_handler=reconnect_handler):
             yield event
 
     except Exception as e:

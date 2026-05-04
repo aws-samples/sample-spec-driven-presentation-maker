@@ -609,6 +609,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     setMentionVisible(false)
   }
 
+  const lastSendRef = useRef(0)
+
   /**
    * Upload all pending attachments and send the message.
    *
@@ -616,6 +618,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    */
   const handleSend = async (userMessage: string) => {
     if ((!userMessage.trim() && attachments.length === 0 && snippets.length === 0) || !configLoaded || isLoading) return
+
+    // Debounce: reject sends within 500ms of the last one to prevent duplicate requests
+    const now = Date.now()
+    if (now - lastSendRef.current < 500) return
+    lastSendRef.current = now
 
     const idToken = auth.user?.id_token
     const accessToken = auth.user?.access_token
@@ -743,10 +750,25 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         (toolName: string, toolUseData: ToolUseCallbackData | undefined) => {
           // MCP status event — show on first message, or when status changes
           if (toolName === '__mcp_status__' && toolUseData && 'mcpStatus' in toolUseData) {
-            const incoming = (toolUseData as unknown as { mcpStatus: McpServerStatus[] }).mcpStatus
+            const raw = (toolUseData as unknown as { mcpStatus: McpServerStatus[] | McpServerStatus }).mcpStatus
+            // Reconnect events come as a single object with type field; normalize to array
+            const incoming: McpServerStatus[] = Array.isArray(raw)
+              ? raw
+              : [{ name: (raw as McpServerStatus & { server?: string }).server || (raw as McpServerStatus).name || "", status: (raw as McpServerStatus & { type?: string }).type as McpServerStatus["status"] || "error", message: (raw as McpServerStatus).message }]
             setMessages((prev) => {
               // Find the last mcpStatus in history
               const lastStatus = [...prev].reverse().find((m) => m.mcpStatus)?.mcpStatus
+              // For reconnect events, merge with existing status
+              if (!Array.isArray(raw) && lastStatus) {
+                const merged = lastStatus.map((s) =>
+                  s.name === incoming[0]?.name ? { ...s, ...incoming[0] } : s
+                )
+                if (JSON.stringify(lastStatus) === JSON.stringify(merged)) return prev
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                updated[updated.length - 1] = { ...last, mcpStatus: merged }
+                return updated
+              }
               // Skip if identical to previous
               if (lastStatus && JSON.stringify(lastStatus) === JSON.stringify(incoming)) return prev
               const updated = [...prev]
