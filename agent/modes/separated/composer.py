@@ -438,6 +438,18 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None):
                                     "group": gi + 1, "slugs": slugs_label,
                                     "status": "retrying", "attempt": attempt + 1, "error": str(e),
                                 })
+                                # Reconnect MCP on retry: stop old client, create fresh one
+                                if _group_mcp is not None and composer_mcp_factory:
+                                    try:
+                                        _group_mcp.stop(None, None, None)
+                                    except Exception:
+                                        pass
+                                    try:
+                                        _group_mcp = composer_mcp_factory()
+                                        composer.tool_registry.process_tools([_group_mcp])
+                                    except Exception as mcp_err:
+                                        logger.warning("group MCP reconnect failed for %s: %s", slugs_label, mcp_err)
+                                time.sleep(min(2 ** (attempt + 1), 10))  # backoff before retry
                                 continue
                             raise
                 finally:
