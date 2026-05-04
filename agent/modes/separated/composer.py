@@ -3,6 +3,7 @@
 """Composer agent: compose_slides tool with parallel execution, prefetch, and post-build."""
 
 import json
+import logging
 import os
 import queue
 import time
@@ -16,6 +17,8 @@ from strands.types.tools import ToolContext
 from composition import resolve_parts
 from cost_logger import log_usage
 from modes import MODES  # imported lazily in compose_slides if needed
+
+logger = logging.getLogger("sdpm.agent")
 
 
 # Soft-stop signal: the webui cancel button sends InvokeAgentRuntimeCommand
