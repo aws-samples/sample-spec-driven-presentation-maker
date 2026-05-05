@@ -3,26 +3,29 @@
 /**
  * Styles page — Browse, manage, and create presentation styles.
  *
- * Lists user styles (with delete) and built-in styles.
- * Phase 3 will add style creation via agent chat.
+ * Uses URL hash routing (useStyleWorkspace):
+ * - No hash: style list grid
+ * - #create: new style creation (Phase 3 agent chat)
+ * - #{name}: style preview (user styles get chat panel in Phase 3)
  */
 
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useAuth } from "@/hooks/useAuth"
+import { useStyleWorkspace } from "@/hooks/useStyleWorkspace"
 import { AppShell } from "@/components/AppShell"
 import { fetchStyles, fetchStyleHtml, pinStyle, saveUserStyle, deleteUserStyle, type StyleEntry } from "@/services/deckService"
 import { StyleSlidePreview } from "@/components/StyleSlidePreview"
-import { Star, Trash2, Palette, Download, Sparkles } from "lucide-react"
+import { Star, Trash2, Palette, Download, Sparkles, Copy } from "lucide-react"
 
 export default function StylesPage() {
   const auth = useAuth()
   const idToken = auth.user?.id_token
+  const ws = useStyleWorkspace(idToken)
+
   const [styles, setStyles] = useState<StyleEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [preview, setPreview] = useState<{ name: string; html: string } | null>(null)
-  const [previewLoading, setPreviewLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
@@ -32,26 +35,20 @@ export default function StylesPage() {
     setTimeout(() => setToast(null), 3000)
   }
 
-  useEffect(() => {
+  const refreshStyles = useCallback(async () => {
     if (!idToken) return
-    fetchStyles(idToken).then(s => { setStyles(s); setLoading(false) })
+    const s = await fetchStyles(idToken)
+    setStyles(s)
+    setLoading(false)
   }, [idToken])
+
+  useEffect(() => { refreshStyles() }, [refreshStyles])
 
   const handlePin = async (name: string) => {
     const style = styles.find(s => s.name === name)
     const newPinned = !style?.pinned
     setStyles(prev => prev.map(s => s.name === name ? { ...s, pinned: newPinned } : s))
     if (idToken) pinStyle(name, newPinned, idToken)
-  }
-
-  const handlePreview = async (name: string) => {
-    setPreviewLoading(true)
-    setPreview({ name, html: "" })
-    if (idToken) {
-      const html = await fetchStyleHtml(name, idToken)
-      setPreview({ name, html })
-    }
-    setPreviewLoading(false)
   }
 
   const handleImport = async (file: File) => {
@@ -64,8 +61,7 @@ export default function StylesPage() {
     const name = file.name.replace(/\.html?$/i, "").replace(/[^a-zA-Z0-9_-]/g, "-")
     const result = await saveUserStyle(name, html, idToken)
     if (result.error) { showToast(result.error, "error"); return }
-    const updated = await fetchStyles(idToken)
-    setStyles(updated)
+    await refreshStyles()
     showToast(`Imported "${name}"`)
   }
 
@@ -74,7 +70,7 @@ export default function StylesPage() {
     const result = await deleteUserStyle(name, idToken)
     if (result.error) { showToast(result.error, "error"); return }
     setStyles(prev => prev.filter(s => s.name !== name))
-    if (preview?.name === name) setPreview(null)
+    if (ws.styleName === name) ws.navigateToList()
     setDeleteConfirm(null)
     showToast(`Deleted "${name}"`)
   }
@@ -92,13 +88,35 @@ export default function StylesPage() {
     URL.revokeObjectURL(url)
   }
 
+  const handleCopyToMyStyles = async (name: string) => {
+    if (!idToken) return
+    const html = await fetchStyleHtml(name, idToken)
+    if (!html) return
+    // Replace <title> with "Copy of {original}"
+    const originalTitle = html.match(/<title>(.*?)<\/title>/i)?.[1] || name
+    const newHtml = html.replace(/<title>.*?<\/title>/i, `<title>Copy of ${originalTitle}</title>`)
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, "0")
+    const filename = `style-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
+    const result = await saveUserStyle(filename, newHtml, idToken)
+    if (result.error) { showToast(result.error, "error"); return }
+    await refreshStyles()
+    showToast(`Copied as "Copy of ${originalTitle}"`)
+  }
+
+  const currentStyle = ws.styleName ? styles.find(s => s.name === ws.styleName) : null
+
   const userStyles = styles.filter(s => s.source === "user")
   const builtinStyles = styles.filter(s => s.source === "builtin")
 
   return (
-    <AppShell>
+    <AppShell
+      deckName={ws.isWorkspace && ws.styleName ? ws.styleName : undefined}
+      onBack={ws.isWorkspace ? ws.navigateToList : undefined}
+    >
       <div className="flex-1 overflow-y-auto">
         {loading ? (
+          /* ── Loading skeleton ── */
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
             <div className="flex items-center justify-between mb-8">
               <div>
@@ -112,46 +130,70 @@ export default function StylesPage() {
               ))}
             </div>
           </div>
-        ) : preview ? (
-          /* ── Full-width preview ── */
+        ) : ws.view.mode === "preview" && ws.styleName ? (
+          /* ── Style preview ── */
           <div>
             <div className="flex items-center gap-3 px-5 sm:px-8 py-3">
               <button
-                onClick={() => setPreview(null)}
+                onClick={ws.navigateToList}
                 className="text-sm text-foreground-muted hover:text-foreground transition-colors"
               >
                 ← Back
               </button>
-              <h2 className="text-sm font-semibold">{preview.name}</h2>
+              <h2 className="text-sm font-semibold">{ws.styleName}</h2>
               <button
-                onClick={() => handlePin(preview.name)}
+                onClick={() => handlePin(ws.styleName!)}
                 className={`p-1 rounded transition-colors ${
-                  styles.find(s => s.name === preview.name)?.pinned
+                  currentStyle?.pinned
                     ? "text-brand-teal" : "text-foreground-muted hover:text-foreground"
                 }`}
               >
-                <Star className="h-3.5 w-3.5" fill={styles.find(s => s.name === preview.name)?.pinned ? "currentColor" : "none"} />
+                <Star className="h-3.5 w-3.5" fill={currentStyle?.pinned ? "currentColor" : "none"} />
               </button>
-              {styles.find(s => s.name === preview.name)?.source === "user" && (
+              {currentStyle?.source === "user" && (
                 <>
                   <button
-                    onClick={() => handleExport(preview.name)}
+                    onClick={() => handleExport(ws.styleName!)}
                     className="p-1 rounded text-foreground-muted hover:text-foreground transition-colors"
-                    aria-label={`Export ${preview.name}`}
+                    aria-label={`Export ${ws.styleName}`}
                   >
                     <Download className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    onClick={() => setDeleteConfirm(preview.name)}
+                    onClick={() => setDeleteConfirm(ws.styleName!)}
                     className="p-1 rounded text-foreground-muted hover:text-red-400 transition-colors"
-                    aria-label={`Delete ${preview.name}`}
+                    aria-label={`Delete ${ws.styleName}`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </>
               )}
+              {currentStyle?.source === "builtin" && (
+                <button
+                  onClick={() => handleCopyToMyStyles(ws.styleName!)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-foreground-muted hover:text-foreground border border-white/[0.08] hover:border-white/[0.15] transition-colors"
+                >
+                  <Copy className="h-3 w-3" />
+                  Copy to My Styles
+                </button>
+              )}
             </div>
-            <StyleSlidePreview html={preview.html} loading={previewLoading} />
+            <StyleSlidePreview html={ws.previewHtml} loading={ws.previewLoading} />
+          </div>
+        ) : ws.view.mode === "create" ? (
+          /* ── Create new style (Phase 3: agent chat) ── */
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <Sparkles className="h-12 w-12 text-brand-teal/20 mx-auto mb-4" />
+              <h2 className="text-sm font-semibold mb-1">Create with AI</h2>
+              <p className="text-xs text-foreground-muted">Style creation will be available in Phase 3.</p>
+              <button
+                onClick={ws.navigateToList}
+                className="mt-4 px-3 py-1.5 text-xs rounded-lg border border-white/[0.08] hover:bg-white/[0.04] transition-colors"
+              >
+                ← Back to Styles
+              </button>
+            </div>
           </div>
         ) : (
           /* ── Style grid ── */
@@ -171,7 +213,7 @@ export default function StylesPage() {
                     <StyleListCard
                       key={style.name}
                       style={style}
-                      onPreview={handlePreview}
+                      onPreview={ws.navigateToStyle}
                       onPin={handlePin}
                       onDelete={name => setDeleteConfirm(name)}
                       onExport={handleExport}
@@ -181,7 +223,7 @@ export default function StylesPage() {
                   <div className="flex flex-col">
                     <button
                       className="aspect-[16/10] rounded-xl border-2 border-dashed border-white/[0.08] hover:border-brand-teal/30 bg-transparent hover:bg-brand-teal/[0.03] flex flex-col items-center justify-center gap-2 transition-all duration-200 cursor-pointer group"
-                      onClick={() => {/* Phase 3: navigate to style creator */}}
+                      onClick={ws.navigateToCreate}
                     >
                       <Sparkles className="h-6 w-6 text-brand-teal/30 group-hover:text-brand-teal/60 transition-colors duration-200" />
                       <span className="text-xs text-foreground/30 group-hover:text-foreground/60 font-medium transition-colors duration-200">Create with AI</span>
@@ -215,7 +257,7 @@ export default function StylesPage() {
                     <StyleListCard
                       key={style.name}
                       style={style}
-                      onPreview={handlePreview}
+                      onPreview={ws.navigateToStyle}
                       onPin={handlePin}
                     />
                   ))}

@@ -220,7 +220,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
   const [previewLoading, setPreviewLoading] = useState(false)
   const galleryScrollRef = useRef(0)
   const galleryContainerRef = useRef<HTMLDivElement>(null)
-  const [allStylesOpen, setAllStylesOpen] = useState(false)
+  const [allStylesOpen, setAllStylesOpen] = useState(true)
 
   // Pin toggle — optimistic UI with API persistence
   // Preserve scroll position across re-renders caused by section layout changes

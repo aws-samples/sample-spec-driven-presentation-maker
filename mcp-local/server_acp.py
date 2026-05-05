@@ -329,10 +329,11 @@ def apply_style(deck_id: str, style: str) -> str:
         JSON with status and the copied file path.
     """
     import shutil
-    styles_dir = _SKILL_DIR / "references" / "examples" / "styles"
-    src = styles_dir / f"{style}.html"
-    if not src.exists():
-        return json.dumps({"error": f"Style not found: {style}. Available: {[s.stem for s in styles_dir.glob('*.html')]}"})
+    from sdpm.api import get_styles_dirs, _find_style_in_dirs
+    src = _find_style_in_dirs(style, get_styles_dirs())
+    if src is None:
+        available = [p.stem for d in get_styles_dirs() if d.is_dir() for p in d.glob("*.html")]
+        return json.dumps({"error": f"Style not found: {style}. Available: {sorted(set(available))}"})
     deck_path = Path(deck_id)
     if not deck_path.is_dir():
         return json.dumps({"error": f"Deck directory not found: {deck_id}"})
