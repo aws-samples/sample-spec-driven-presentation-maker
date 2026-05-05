@@ -17,7 +17,7 @@ import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage } from "./ChatMessage"
 import { generateSessionId } from "@/services/agentCoreService"
 import { IS_LOCAL } from "@/lib/mode"
-import { Sparkles } from "lucide-react"
+import { Sparkles, MessageSquare, Image, Palette } from "lucide-react"
 import type { UploadedFile } from "@/services/uploadService"
 
 interface StyleChatPanelProps {
@@ -119,21 +119,20 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-teal-soft mb-5">
               <Sparkles className="h-5 w-5 text-brand-teal" />
             </div>
-            <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-1">Style Creator</h2>
-            <p className="text-sm text-foreground-muted leading-relaxed mb-6">
-              Describe the style you want, or drop a reference file
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {["Dark minimal with gradients", "Corporate blue with charts", "Like Apple keynotes"].map((chip) => (
-                <button
-                  key={chip}
-                  type="button"
-                  onClick={() => { chatInputRef.current?.insertAtCursor(chip); chatInputRef.current?.focus() }}
-                  className="px-3 py-1.5 rounded-full text-xs text-foreground-muted hover:text-foreground border border-white/[0.08] hover:border-white/[0.15] hover:bg-white/[0.04] transition-colors"
-                >
-                  {chip}
-                </button>
-              ))}
+            <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-3">Style Creator</h2>
+            <div className="flex flex-col gap-2 text-sm text-foreground-muted">
+              <div className="flex items-center gap-2.5">
+                <MessageSquare className="h-4 w-4 text-brand-teal/70 shrink-0" />
+                <span>Describe your vision</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Image className="h-4 w-4 text-brand-teal/70 shrink-0" />
+                <span>Drop a reference image</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Palette className="h-4 w-4 text-brand-teal/70 shrink-0" />
+                <span>Customize existing styles</span>
+              </div>
             </div>
           </div>
         ) : (
