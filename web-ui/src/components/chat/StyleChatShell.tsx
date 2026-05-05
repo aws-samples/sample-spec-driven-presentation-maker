@@ -136,13 +136,15 @@ export function StyleChatShell({ open, onClose, styleId, styleName, onStyleHtmlU
           <div className="mx-4 border-t border-white/[0.06]" />
 
           <div className="flex-1 overflow-hidden">
-            <StyleChatPanel
-              styleId={styleId}
-              onStyleHtmlUpdate={onStyleHtmlUpdate}
-              onStyleSaved={onStyleSaved}
-            />
+            <div className="h-full">
+              <StyleChatPanel
+                styleId={styleId}
+                onStyleHtmlUpdate={onStyleHtmlUpdate}
+                onStyleSaved={onStyleSaved}
+              />
+            </div>
           </div>
-        </div>
+        </div>{/* end chat-panel-inner */}
       </aside>
     </>
   )

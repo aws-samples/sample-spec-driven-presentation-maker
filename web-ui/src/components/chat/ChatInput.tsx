@@ -185,7 +185,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const canSend = input.trim() || attachments.length > 0 || snippets.length > 0
 
   return (
-    <FileDropZone onFiles={handleFiles} onLongTextPaste={handleSnippetConfirm} pasteDisabled={snippetOpen} disabled={isLoading}>
+    <FileDropZone onFiles={handleFiles} onLongTextPaste={handleSnippetConfirm} pasteDisabled={snippetOpen} disabled={isLoading} className="relative">
       <SnippetInput
         open={snippetOpen}
         onClose={() => { setSnippetOpen(false); setEditingSnippetId(null) }}
