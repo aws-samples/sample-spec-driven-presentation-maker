@@ -688,6 +688,150 @@ Audience: Developers
 
 
 # ---------------------------------------------------------------------------
+# run_style_python: sandboxed execution for style creation/editing
+# ---------------------------------------------------------------------------
+
+_style_workspaces: dict[str, Path] = {}  # style_id → temp dir (persists across calls)
+
+
+@mcp.tool()
+def run_style_python(code: str, style_id: str = "", save: bool = False, purpose: str = "") -> str:
+    """Execute Python code in a sandboxed environment for style creation.
+
+    Similar to run_python but scoped to style HTML generation.
+    No PPTX/measure/compose post-processing.
+
+    ## Sandbox functions (available when style_id is provided)
+
+        read_text(path)          → str         Read a text file
+        write_text(path, text)   → None        Write a text file
+        read_json(path)          → dict/list   Read a JSON file
+        write_json(path, data)   → None        Write data as JSON
+        list_files(subdir=".")   → list[str]   List filenames in a subdirectory
+        read_style(name)         → str         Read an existing style HTML (read-only)
+
+    All paths are relative to the style workspace (e.g. "style.html").
+    Access outside the workspace is denied (except read_style which is read-only).
+
+    ## Workflow
+
+    1. Write style HTML: write_text("style.html", html_content)
+    2. Read existing styles for reference: read_style("corporate-executive")
+    3. When finished: call with save=True to save as user style
+
+    ## When style_id is NOT provided (general computation)
+
+    Only print and built-in functions are available. Useful for tint/contrast calculations.
+
+    Args:
+        code: Python code to execute (no import statements allowed).
+        style_id: Style workspace ID (reused across calls in same session).
+        save: When True, saves style.html to user styles directory.
+        purpose: Brief description shown in UI.
+
+    Returns:
+        JSON: {"output", "style_html"?, "saved"?}
+    """
+    from sandbox import check_code, make_style_runner, make_runner
+
+    result: dict = {}
+
+    # AST inspection
+    violations = check_code(code)
+    if violations:
+        lines = ["Code rejected by sandbox:"]
+        lines.extend(f"  {v}" for v in violations)
+        if style_id:
+            lines.append("")
+            lines.append("Use sandbox functions instead:")
+            lines.append("  read_text(path) → str     write_text(path, text)")
+            lines.append("  read_style(name) → str    (read existing style HTML)")
+            lines.append('  list_files(subdir=".") → list[str]')
+        else:
+            lines.append("")
+            lines.append("Only print and built-in functions are available (no file I/O).")
+        result["output"] = "\n".join(lines)
+        return json.dumps(result, ensure_ascii=False)
+
+    # General computation mode (no style_id)
+    if not style_id:
+        try:
+            runner = make_runner("")
+            proc = subprocess.run(
+                [sys.executable, "-c", runner],
+                input=code, capture_output=True, text=True, timeout=120,
+            )
+            output = proc.stdout
+            if proc.stderr:
+                output += "\n" + proc.stderr
+            result["output"] = output.strip()
+        except subprocess.TimeoutExpired:
+            result["output"] = "Error: execution timed out (120s)"
+        except Exception as e:
+            result["output"] = f"Error: {e}"
+        return json.dumps(result, ensure_ascii=False)
+
+    # Style workspace mode
+    if style_id not in _style_workspaces:
+        td = tempfile.mkdtemp(prefix=f"sdpm-style-{style_id}-")
+        _style_workspaces[style_id] = Path(td)
+    workspace = _style_workspaces[style_id]
+
+    from sdpm.api import get_styles_dirs
+    styles_dirs_json = json.dumps([str(d) for d in get_styles_dirs()])
+
+    try:
+        runner = make_style_runner()
+        proc = subprocess.run(
+            [sys.executable, "-c", runner, str(workspace), styles_dirs_json],
+            input=code, capture_output=True, text=True, timeout=120,
+            cwd=str(workspace),
+        )
+        output = proc.stdout
+        if proc.stderr:
+            output += "\n" + proc.stderr
+        result["output"] = output.strip()
+    except subprocess.TimeoutExpired:
+        result["output"] = "Error: execution timed out (120s)"
+    except Exception as e:
+        result["output"] = f"Error: {e}"
+
+    # Include current style.html for live preview
+    style_html_path = workspace / "style.html"
+    if style_html_path.exists():
+        result["style_html"] = style_html_path.read_text(encoding="utf-8")
+
+    # Save to user styles directory
+    if save:
+        if not style_html_path.exists():
+            result["save_error"] = "No style.html found in workspace. Write it first with write_text('style.html', html)."
+        else:
+            import re
+            html = style_html_path.read_text(encoding="utf-8")
+            title_match = re.search(r"<title>(.+?)</title>", html, re.IGNORECASE)
+            if not title_match or not title_match.group(1).strip():
+                result["save_error"] = "style.html must have a non-empty <title> tag."
+            else:
+                from sdpm.config import get_user_config_dir
+                from datetime import datetime
+
+                title = title_match.group(1).strip()
+                timestamp = datetime.now().strftime("%Y%m%d-%H%M")
+                filename = f"style-{timestamp}.html"
+                user_styles_dir = get_user_config_dir() / "styles"
+                user_styles_dir.mkdir(parents=True, exist_ok=True)
+                dest = user_styles_dir / filename
+                dest.write_text(html, encoding="utf-8")
+                result["saved"] = {
+                    "title": title,
+                    "filename": filename,
+                    "path": str(dest),
+                }
+
+    return json.dumps(result, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
 # Upload / attachment tools (Local version)
 # ---------------------------------------------------------------------------
 from upload_tools import (  # noqa: E402

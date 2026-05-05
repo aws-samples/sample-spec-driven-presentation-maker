@@ -24,9 +24,11 @@ interface StyleChatPanelProps {
   styleId: string
   /** Called when agent writes style.html — passes HTML content for live preview. */
   onStyleHtmlUpdate?: (html: string) => void
+  /** Called when agent saves the style (run_style_python save=True succeeded). */
+  onStyleSaved?: (saved: { title: string; filename: string }) => void
 }
 
-export function StyleChatPanel({ styleId, onStyleHtmlUpdate }: StyleChatPanelProps) {
+export function StyleChatPanel({ styleId, onStyleHtmlUpdate, onStyleSaved }: StyleChatPanelProps) {
   const auth = useAuth()
   const sessionId = useRef(generateSessionId()).current
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -40,8 +42,12 @@ export function StyleChatPanel({ styleId, onStyleHtmlUpdate }: StyleChatPanelPro
       if (typeof result.style_html === "string") {
         onStyleHtmlUpdate(result.style_html)
       }
+      if (result.saved && onStyleSaved) {
+        const saved = result.saved as { title: string; filename: string }
+        onStyleSaved(saved)
+      }
     }
-  }, [onStyleHtmlUpdate])
+  }, [onStyleHtmlUpdate, onStyleSaved])
 
   const stream = useChatStream({
     sessionId,

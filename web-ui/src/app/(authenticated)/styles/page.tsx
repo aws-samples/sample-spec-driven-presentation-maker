@@ -318,6 +318,10 @@ export default function StylesPage() {
             styleId={ws.styleName!}
             styleName={ws.styleName!}
             onStyleHtmlUpdate={handleStyleHtmlUpdate}
+            onStyleSaved={async (saved) => {
+              showToast(`Style saved: ${saved.title}`, "success")
+              await refreshStyles()
+            }}
           />
         )}
       </div>

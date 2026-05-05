@@ -24,9 +24,10 @@ interface StyleChatShellProps {
   styleId: string
   styleName: string
   onStyleHtmlUpdate?: (html: string) => void
+  onStyleSaved?: (saved: { title: string; filename: string }) => void
 }
 
-export function StyleChatShell({ open, onClose, styleId, styleName, onStyleHtmlUpdate }: StyleChatShellProps) {
+export function StyleChatShell({ open, onClose, styleId, styleName, onStyleHtmlUpdate, onStyleSaved }: StyleChatShellProps) {
   const panelRef = useRef<HTMLElement>(null)
   const [panelWidth, setPanelWidth] = useState(() => {
     if (typeof window === "undefined") return DEFAULT_WIDTH
@@ -138,6 +139,7 @@ export function StyleChatShell({ open, onClose, styleId, styleName, onStyleHtmlU
             <StyleChatPanel
               styleId={styleId}
               onStyleHtmlUpdate={onStyleHtmlUpdate}
+              onStyleSaved={onStyleSaved}
             />
           </div>
         </div>
