@@ -17,7 +17,8 @@ import { useStyleWorkspace } from "@/hooks/useStyleWorkspace"
 import { AppShell } from "@/components/AppShell"
 import { fetchStyles, fetchStyleHtml, pinStyle, saveUserStyle, deleteUserStyle, type StyleEntry } from "@/services/deckService"
 import { StyleSlidePreview } from "@/components/StyleSlidePreview"
-import { Star, Trash2, Palette, Download, Sparkles, Copy } from "lucide-react"
+import { StyleChatShell } from "@/components/chat/StyleChatShell"
+import { Star, Trash2, Palette, Download, Sparkles, Copy, MessageSquare } from "lucide-react"
 
 export default function StylesPage() {
   const auth = useAuth()
@@ -29,6 +30,8 @@ export default function StylesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [livePreviewHtml, setLivePreviewHtml] = useState<string | null>(null)
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type })
@@ -43,6 +46,20 @@ export default function StylesPage() {
   }, [idToken])
 
   useEffect(() => { refreshStyles() }, [refreshStyles])
+
+  // When #create is visited, create Untitled Style and navigate to it
+  useEffect(() => {
+    if (ws.view.mode === "create") handleCreateStyle()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ws.view.mode])
+
+  // Reset chat state when navigating away from preview
+  useEffect(() => {
+    if (ws.view.mode !== "preview") {
+      setChatOpen(false)
+      setLivePreviewHtml(null)
+    }
+  }, [ws.view.mode])
 
   const handlePin = async (name: string) => {
     const style = styles.find(s => s.name === name)
@@ -104,6 +121,23 @@ export default function StylesPage() {
     showToast(`Copied as "Copy of ${originalTitle}"`)
   }
 
+  const handleCreateStyle = async () => {
+    if (!idToken) return
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, "0")
+    const filename = `style-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
+    const html = `<!DOCTYPE html><html><head><title>Untitled Style</title></head><body><div class="slide" style="width:1920px;height:1080px;display:flex;align-items:center;justify-content:center;font-family:sans-serif;background:#1a1a2e;color:#fff;"><h1>Untitled Style</h1></div></body></html>`
+    const result = await saveUserStyle(filename, html, idToken)
+    if (result.error) { showToast(result.error, "error"); return }
+    await refreshStyles()
+    ws.navigateToStyle(filename)
+    setChatOpen(true)
+  }
+
+  const handleStyleHtmlUpdate = useCallback((html: string) => {
+    setLivePreviewHtml(html)
+  }, [])
+
   const currentStyle = ws.styleName ? styles.find(s => s.name === ws.styleName) : null
 
   const userStyles = styles.filter(s => s.source === "user")
@@ -114,7 +148,8 @@ export default function StylesPage() {
       deckName={ws.isWorkspace && ws.styleName ? ws.styleName : undefined}
       onBack={ws.isWorkspace ? ws.navigateToList : undefined}
     >
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 overflow-y-auto">
         {loading ? (
           /* ── Loading skeleton ── */
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
@@ -153,6 +188,13 @@ export default function StylesPage() {
               {currentStyle?.source === "user" && (
                 <>
                   <button
+                    onClick={() => setChatOpen(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-foreground-muted hover:text-foreground border border-white/[0.08] hover:border-white/[0.15] transition-colors"
+                  >
+                    <MessageSquare className="h-3 w-3" />
+                    Edit with AI
+                  </button>
+                  <button
                     onClick={() => handleExport(ws.styleName!)}
                     className="p-1 rounded text-foreground-muted hover:text-foreground transition-colors"
                     aria-label={`Export ${ws.styleName}`}
@@ -178,15 +220,15 @@ export default function StylesPage() {
                 </button>
               )}
             </div>
-            <StyleSlidePreview html={ws.previewHtml} loading={ws.previewLoading} />
+            <StyleSlidePreview html={livePreviewHtml || ws.previewHtml} loading={ws.previewLoading} />
           </div>
         ) : ws.view.mode === "create" ? (
-          /* ── Create new style (Phase 3: agent chat) ── */
+          /* ── Create new style → creates Untitled Style and navigates ── */
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <Sparkles className="h-12 w-12 text-brand-teal/20 mx-auto mb-4" />
               <h2 className="text-sm font-semibold mb-1">Create with AI</h2>
-              <p className="text-xs text-foreground-muted">Style creation will be available in Phase 3.</p>
+              <p className="text-xs text-foreground-muted mb-4">Creating your new style…</p>
               <button
                 onClick={ws.navigateToList}
                 className="mt-4 px-3 py-1.5 text-xs rounded-lg border border-white/[0.08] hover:bg-white/[0.04] transition-colors"
@@ -223,7 +265,7 @@ export default function StylesPage() {
                   <div className="flex flex-col">
                     <button
                       className="aspect-[16/10] rounded-xl border-2 border-dashed border-white/[0.08] hover:border-brand-teal/30 bg-transparent hover:bg-brand-teal/[0.03] flex flex-col items-center justify-center gap-2 transition-all duration-200 cursor-pointer group"
-                      onClick={ws.navigateToCreate}
+                      onClick={handleCreateStyle}
                     >
                       <Sparkles className="h-6 w-6 text-brand-teal/30 group-hover:text-brand-teal/60 transition-colors duration-200" />
                       <span className="text-xs text-foreground/30 group-hover:text-foreground/60 font-medium transition-colors duration-200">Create with AI</span>
@@ -265,6 +307,18 @@ export default function StylesPage() {
               </section>
             </div>
           </div>
+        )}
+        </div>
+
+        {/* Style Chat Panel (side panel) */}
+        {ws.view.mode === "preview" && currentStyle?.source === "user" && (
+          <StyleChatShell
+            open={chatOpen}
+            onClose={() => setChatOpen(false)}
+            styleId={ws.styleName!}
+            styleName={ws.styleName!}
+            onStyleHtmlUpdate={handleStyleHtmlUpdate}
+          />
         )}
       </div>
 
