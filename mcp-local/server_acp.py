@@ -365,8 +365,8 @@ def _rejection_message(violations: list[str], has_deck: bool) -> str:
 
 
 @mcp.tool()
-def run_python(code: str, deck_id: str = "", save: bool = False,
-               measure_slides: list[str] | None = None, purpose: str = "") -> str:
+def run_python(purpose: str, code: str, deck_id: str = "", save: bool = False,
+               measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a sandboxed environment.
 
     Code runs in a restricted subprocess. `import` statements and direct file
@@ -427,11 +427,11 @@ Audience: Developers
     **Always specify measure_slides when editing slides.**
 
     Args:
+        purpose: Brief user-facing description of what this code does. Shown in UI.
         code: Python code to execute (no import statements allowed).
         deck_id: Deck output_dir path. Optional.
         save: When True, triggers PPTX build + preview + SVG compose after execution.
         measure_slides: Slide slugs to measure after execution (e.g. ["title", "feature-a"]).
-        purpose: Brief description shown in UI.
 
     Returns:
         JSON: {"output", "measure"?, "pptx"?, "preview"?, "compose"?}
@@ -688,51 +688,84 @@ Audience: Developers
 
 
 # ---------------------------------------------------------------------------
-# run_style_python: sandboxed execution for style creation/editing
+# grid: compute CSS Grid layout coordinates
 # ---------------------------------------------------------------------------
-
-_style_workspaces: dict[str, Path] = {}  # style_id → temp dir (persists across calls)
 
 
 @mcp.tool()
-def run_style_python(code: str, style_id: str = "", save: bool = False, purpose: str = "") -> str:
-    """Execute Python code in a sandboxed environment for style creation.
-
-    Similar to run_python but scoped to style HTML generation.
-    No PPTX/measure/compose post-processing.
-
-    ## Sandbox functions (available when style_id is provided)
-
-        read_text(path)          → str         Read a text file
-        write_text(path, text)   → None        Write a text file
-        read_json(path)          → dict/list   Read a JSON file
-        write_json(path, data)   → None        Write data as JSON
-        list_files(subdir=".")   → list[str]   List filenames in a subdirectory
-        read_style(name)         → str         Read an existing style HTML (read-only)
-
-    All paths are relative to the style workspace (e.g. "style.html").
-    Access outside the workspace is denied (except read_style which is read-only).
-
-    ## Workflow
-
-    1. Write style HTML: write_text("style.html", html_content)
-    2. Read existing styles for reference: read_style("corporate-executive")
-    3. When finished: call with save=True to save as user style
-
-    ## When style_id is NOT provided (general computation)
-
-    Only print and built-in functions are available. Useful for tint/contrast calculations.
+def grid(purpose: str, spec: str) -> str:
+    """Compute CSS Grid layout coordinates from a grid specification.
+    Use before placing elements to calculate exact positions.
 
     Args:
-        code: Python code to execute (no import statements allowed).
-        style_id: Style workspace ID (reused across calls in same session).
-        save: When True, saves style.html to user styles directory.
-        purpose: Brief description shown in UI.
+        purpose: Brief user-facing description (e.g. '3-column icon layout'). Shown in UI.
+        spec: JSON string with grid spec. Keys:
+            area: {"x", "y", "w", "h"} (required)
+            columns: track-list string, e.g. "1fr 2fr" (default "1fr")
+            rows: track-list string (default "1fr")
+            gap: str or int, e.g. "20" or "20 40" (row-gap col-gap)
+            areas: 2D list of area names (optional)
+            items: dict of item overrides (optional)
 
     Returns:
-        JSON: {"output", "style_html"?, "saved"?}
+        JSON with named rectangles containing x, y, w, h coordinates.
     """
-    from sandbox import check_code, make_style_runner, make_runner
+    from sdpm.layout.grid import compute_grid
+
+    try:
+        grid_spec = json.loads(spec)
+    except (json.JSONDecodeError, TypeError) as e:
+        return json.dumps({"error": f"Invalid grid spec JSON: {e}"})
+    result = compute_grid(grid_spec)
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# run_style_python: sandboxed execution for style creation/editing
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def run_style_python(purpose: str, code: str) -> str:
+    """Execute Python code in a sandboxed environment for style creation.
+
+    ## Sandbox functions
+
+        read_style(name)         → str   Read an existing style HTML (builtin or user)
+        write_style(name, html)  → None  Save HTML to user styles directory
+
+    ## Rules
+
+    - `name` is the file stem without .html (e.g. "corporate-executive", "style-20260505-1430")
+    - `write_style` requires a non-empty `<title>` tag in the HTML
+    - No import statements or direct file access allowed
+    - Use print() for computation output
+
+    ## Examples
+
+        # Read an existing style for reference
+        html = read_style("corporate-executive")
+        print(html[:200])
+
+        # Create a new style
+        html = '''<!DOCTYPE html>
+        <html><head><title>My Custom Style</title></head>
+        <body>...</body></html>'''
+        write_style("style-20260505-1430", html)
+
+        # Edit an existing user style
+        html = read_style("style-20260505-1430")
+        html = html.replace("old color", "new color")
+        write_style("style-20260505-1430", html)
+
+    Args:
+        purpose: Brief user-facing description of what this code does. Shown in UI.
+        code: Python code to execute (no import statements allowed).
+
+    Returns:
+        JSON: {"output", "saved"?}
+    """
+    from sandbox import check_code, make_style_runner
 
     result: dict = {}
 
@@ -741,92 +774,48 @@ def run_style_python(code: str, style_id: str = "", save: bool = False, purpose:
     if violations:
         lines = ["Code rejected by sandbox:"]
         lines.extend(f"  {v}" for v in violations)
-        if style_id:
-            lines.append("")
-            lines.append("Use sandbox functions instead:")
-            lines.append("  read_text(path) → str     write_text(path, text)")
-            lines.append("  read_style(name) → str    (read existing style HTML)")
-            lines.append('  list_files(subdir=".") → list[str]')
-        else:
-            lines.append("")
-            lines.append("Only print and built-in functions are available (no file I/O).")
+        lines.append("")
+        lines.append("Use sandbox functions instead:")
+        lines.append("  read_style(name) → str       (read existing style HTML)")
+        lines.append("  write_style(name, html) → None  (save to user styles)")
         result["output"] = "\n".join(lines)
         return json.dumps(result, ensure_ascii=False)
 
-    # General computation mode (no style_id)
-    if not style_id:
-        try:
-            runner = make_runner("")
-            proc = subprocess.run(
-                [sys.executable, "-c", runner],
-                input=code, capture_output=True, text=True, timeout=120,
-            )
-            output = proc.stdout
-            if proc.stderr:
-                output += "\n" + proc.stderr
-            result["output"] = output.strip()
-        except subprocess.TimeoutExpired:
-            result["output"] = "Error: execution timed out (120s)"
-        except Exception as e:
-            result["output"] = f"Error: {e}"
-        return json.dumps(result, ensure_ascii=False)
-
-    # Style workspace mode
-    if style_id not in _style_workspaces:
-        td = tempfile.mkdtemp(prefix=f"sdpm-style-{style_id}-")
-        _style_workspaces[style_id] = Path(td)
-    workspace = _style_workspaces[style_id]
-
+    from sdpm.config import get_user_config_dir
     from sdpm.api import get_styles_dirs
+
+    user_styles_dir = str(get_user_config_dir() / "styles")
     styles_dirs_json = json.dumps([str(d) for d in get_styles_dirs()])
 
     try:
         runner = make_style_runner()
         proc = subprocess.run(
-            [sys.executable, "-c", runner, str(workspace), styles_dirs_json],
+            [sys.executable, "-c", runner, user_styles_dir, styles_dirs_json],
             input=code, capture_output=True, text=True, timeout=120,
-            cwd=str(workspace),
         )
         output = proc.stdout
-        if proc.stderr:
-            output += "\n" + proc.stderr
+        stderr = proc.stderr or ""
+
+        # Extract save signal from stderr
+        save_lines = []
+        other_stderr = []
+        for line in stderr.splitlines():
+            if line.startswith("__STYLE_SAVED__"):
+                save_lines.append(line[len("__STYLE_SAVED__"):])
+            else:
+                other_stderr.append(line)
+
+        if other_stderr:
+            output += "\n" + "\n".join(other_stderr)
         result["output"] = output.strip()
+
+        if save_lines:
+            result["saved"] = json.loads(save_lines[-1])
+
     except subprocess.TimeoutExpired:
         result["output"] = "Error: execution timed out (120s)"
     except Exception as e:
         result["output"] = f"Error: {e}"
-
-    # Include current style.html for live preview
-    style_html_path = workspace / "style.html"
-    if style_html_path.exists():
-        result["style_html"] = style_html_path.read_text(encoding="utf-8")
-
-    # Save to user styles directory
-    if save:
-        if not style_html_path.exists():
-            result["save_error"] = "No style.html found in workspace. Write it first with write_text('style.html', html)."
-        else:
-            import re
-            html = style_html_path.read_text(encoding="utf-8")
-            title_match = re.search(r"<title>(.+?)</title>", html, re.IGNORECASE)
-            if not title_match or not title_match.group(1).strip():
-                result["save_error"] = "style.html must have a non-empty <title> tag."
-            else:
-                from sdpm.config import get_user_config_dir
-                from datetime import datetime
-
-                title = title_match.group(1).strip()
-                timestamp = datetime.now().strftime("%Y%m%d-%H%M")
-                filename = f"style-{timestamp}.html"
-                user_styles_dir = get_user_config_dir() / "styles"
-                user_styles_dir.mkdir(parents=True, exist_ok=True)
-                dest = user_styles_dir / filename
-                dest.write_text(html, encoding="utf-8")
-                result["saved"] = {
-                    "title": title,
-                    "filename": filename,
-                    "path": str(dest),
-                }
 
     return json.dumps(result, ensure_ascii=False)
 

@@ -118,44 +118,20 @@ def make_runner(deck_id: str) -> str:
 # --- Style runner ---
 
 _RUNNER_STYLE = '''\
-import json, os, sys
+import json, os, sys, re
 from pathlib import Path
 
-style_dir = Path(sys.argv[1]).resolve()
+user_styles_dir = Path(sys.argv[1]).resolve()
 styles_dirs = json.loads(sys.argv[2])
 
-def _resolve(rel_path):
-    resolved = (style_dir / rel_path).resolve()
-    prefix = str(style_dir) + os.sep
-    if not (str(resolved).startswith(prefix) or resolved == style_dir):
-        raise PermissionError(f"Access denied: {rel_path}")
-    return resolved
-
-def read_text(path):
-    return _resolve(path).read_text(encoding="utf-8")
-
-def write_text(path, text):
-    p = _resolve(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(text, encoding="utf-8")
-
-def read_json(path):
-    p = _resolve(path)
-    return json.loads(p.read_text(encoding="utf-8"))
-
-def write_json(path, data):
-    p = _resolve(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
-
-def list_files(subdir="."):
-    d = _resolve(subdir)
-    if not d.is_dir():
-        raise FileNotFoundError(f"Not a directory: {subdir}")
-    return sorted(f.name for f in d.iterdir() if f.is_file())
+def _validate_name(name):
+    if not name or "/" in name or "\\\\" in name or ".." in name:
+        raise PermissionError(f"Invalid style name: {name}")
+    return name
 
 def read_style(name):
-    """Read an existing style HTML by name (read-only, searches all style dirs)."""
+    """Read an existing style HTML by name (searches all style dirs)."""
+    name = _validate_name(name)
     filename = name + ".html" if not name.endswith(".html") else name
     for d in styles_dirs:
         p = Path(d) / filename
@@ -168,6 +144,19 @@ def read_style(name):
             available.extend(f.stem for f in dp.iterdir() if f.suffix == ".html")
     raise FileNotFoundError(f"Style not found: {name}. Available: {sorted(set(available))}")
 
+def write_style(name, html):
+    """Save style HTML to user styles directory. name = file stem (no .html extension)."""
+    name = _validate_name(name)
+    if not re.search(r"<title>.+?</title>", html, re.IGNORECASE):
+        raise ValueError("HTML must contain a non-empty <title> tag.")
+    filename = name + ".html" if not name.endswith(".html") else name
+    user_styles_dir.mkdir(parents=True, exist_ok=True)
+    dest = user_styles_dir / filename
+    dest.write_text(html, encoding="utf-8")
+    title = re.search(r"<title>(.+?)</title>", html, re.IGNORECASE).group(1).strip()
+    # Signal save result to parent process via stderr JSON
+    sys.stderr.write("__STYLE_SAVED__" + json.dumps({"title": title, "filename": filename, "path": str(dest)}) + "\\n")
+
 _safe_builtins = {
     "print": print, "len": len, "range": range, "enumerate": enumerate,
     "sorted": sorted, "isinstance": isinstance, "type": type,
@@ -176,16 +165,16 @@ _safe_builtins = {
     "min": min, "max": max, "sum": sum, "abs": abs, "round": round,
     "any": any, "all": all, "zip": zip, "map": map, "filter": filter,
     "reversed": reversed, "True": True, "False": False, "None": None,
+    "ValueError": ValueError, "PermissionError": PermissionError,
+    "FileNotFoundError": FileNotFoundError, "Exception": Exception,
 }
 
 code = sys.stdin.read()
 exec(code, {"__builtins__": _safe_builtins,
-     "read_text": read_text, "write_text": write_text,
-     "read_json": read_json, "write_json": write_json,
-     "list_files": list_files, "read_style": read_style})
+     "read_style": read_style, "write_style": write_style})
 '''
 
 
 def make_style_runner() -> str:
-    """Return the style runner script. Expects sys.argv[1]=style_dir, sys.argv[2]=styles_dirs JSON."""
+    """Return the style runner script. Expects sys.argv[1]=user_styles_dir, sys.argv[2]=styles_dirs JSON."""
     return _RUNNER_STYLE

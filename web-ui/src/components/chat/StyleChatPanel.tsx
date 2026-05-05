@@ -5,7 +5,7 @@
  *
  * Uses useChatStream + ChatInput (shared components).
  * No @mentions, no Options, no Panel A/B, no reconnect.
- * Extracts style_html from tool results to update live preview.
+ * Detects write_style calls and notifies parent to refresh preview.
  */
 
 "use client"
@@ -22,13 +22,13 @@ import type { UploadedFile } from "@/services/uploadService"
 
 interface StyleChatPanelProps {
   styleId: string
-  /** Called when agent writes style.html — passes HTML content for live preview. */
-  onStyleHtmlUpdate?: (html: string) => void
-  /** Called when agent saves the style (run_style_python save=True succeeded). */
+  /** Called when agent writes a style — parent should refetch preview. */
+  onStyleWritten?: () => void
+  /** Called when agent saves the style (write_style succeeded with saved result). */
   onStyleSaved?: (saved: { title: string; filename: string }) => void
 }
 
-export function StyleChatPanel({ styleId, onStyleHtmlUpdate, onStyleSaved }: StyleChatPanelProps) {
+export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleChatPanelProps) {
   const auth = useAuth()
   const sessionId = useRef(generateSessionId()).current
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -37,17 +37,15 @@ export function StyleChatPanel({ styleId, onStyleHtmlUpdate, onStyleSaved }: Sty
   const chatInputRef = useRef<ChatInputHandle>(null)
 
   const handleToolEvent = useCallback((toolName: string, data: ToolUseCallbackData | undefined) => {
-    if (data?.completed && data?.result && onStyleHtmlUpdate) {
+    if (data?.completed && data?.result) {
       const result = data.result as Record<string, unknown>
-      if (typeof result.style_html === "string") {
-        onStyleHtmlUpdate(result.style_html)
-      }
-      if (result.saved && onStyleSaved) {
+      if (result.saved) {
         const saved = result.saved as { title: string; filename: string }
-        onStyleSaved(saved)
+        onStyleWritten?.()
+        onStyleSaved?.(saved)
       }
     }
-  }, [onStyleHtmlUpdate, onStyleSaved])
+  }, [onStyleWritten, onStyleSaved])
 
   const stream = useChatStream({
     sessionId,
@@ -75,6 +73,8 @@ export function StyleChatPanel({ styleId, onStyleHtmlUpdate, onStyleSaved }: Sty
     }
   }, [stream.messages])
 
+  const hasSentRef = useRef(false)
+
   const handleSend = useCallback(async (
     text: string,
     uploadedFiles: UploadedFile[],
@@ -82,6 +82,11 @@ export function StyleChatPanel({ styleId, onStyleHtmlUpdate, onStyleSaved }: Sty
     attachments: { fileName: string; fileType: string }[],
   ) => {
     let fullMessage = text
+    // First message: inject style context so the agent knows which style to write
+    if (!hasSentRef.current) {
+      hasSentRef.current = true
+      fullMessage = `[Style: ${styleId}]\n\n${fullMessage}`
+    }
     if (uploadedFiles.length > 0) {
       const fileInfo = uploadedFiles.map((f) => `[Attached: ${f.fileName} (uploadId: ${f.uploadId})]`).join("\n")
       fullMessage = `${fileInfo}\n\n${fullMessage}`
@@ -92,7 +97,7 @@ export function StyleChatPanel({ styleId, onStyleHtmlUpdate, onStyleSaved }: Sty
     }
     await stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stream.sendMessage])
+  }, [stream.sendMessage, styleId])
 
   const isInitial = stream.messages.length === 0
 
@@ -133,7 +138,9 @@ export function StyleChatPanel({ styleId, onStyleHtmlUpdate, onStyleSaved }: Sty
           </div>
         ) : (
           <div className="space-y-4">
-            {stream.messages.map((msg, i) => (
+            {(() => {
+              const lastUserIdx = stream.messages.findLastIndex((m) => m.role === "user")
+              return stream.messages.map((msg, i) => (
               <ChatMessage
                 key={i}
                 role={msg.role}
@@ -146,8 +153,11 @@ export function StyleChatPanel({ styleId, onStyleHtmlUpdate, onStyleSaved }: Sty
                 idToken={auth.user?.id_token}
                 accessToken={auth.user?.access_token}
                 sessionId={sessionId}
+                onSend={(text: string) => handleSend(text, [], [], [])}
+                hearingDisabled={i < lastUserIdx}
               />
-            ))}
+            ))
+            })()}
             <div ref={messagesEndRef} />
           </div>
         )}

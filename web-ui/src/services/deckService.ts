@@ -523,3 +523,13 @@ export async function deleteUserStyle(name: string, idToken: string): Promise<{ 
   })
   return res.json()
 }
+
+export async function renameUserStyle(name: string, newName: string, idToken: string): Promise<{ renamed?: { from: string; to: string }; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}styles/user/${encodeURIComponent(name)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ newName }),
+  })
+  return res.json()
+}

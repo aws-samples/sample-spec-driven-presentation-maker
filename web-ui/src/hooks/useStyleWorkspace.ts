@@ -28,6 +28,7 @@ export function useStyleWorkspace(idToken: string | undefined) {
   const [view, setView] = useState<StyleView>(initialHash.current)
   const [previewHtml, setPreviewHtml] = useState("")
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewVersion, setPreviewVersion] = useState(0)
 
   // Sync hash → state
   useEffect(() => {
@@ -36,7 +37,7 @@ export function useStyleWorkspace(idToken: string | undefined) {
     return () => window.removeEventListener("hashchange", onHashChange)
   }, [])
 
-  // Load HTML when entering preview
+  // Load HTML when entering preview or when refreshPreview is called
   useEffect(() => {
     if (view.mode !== "preview" || !idToken) { setPreviewHtml(""); return }
     let cancelled = false
@@ -45,7 +46,11 @@ export function useStyleWorkspace(idToken: string | undefined) {
       if (!cancelled) { setPreviewHtml(html); setPreviewLoading(false) }
     })
     return () => { cancelled = true }
-  }, [view, idToken])
+  }, [view, idToken, previewVersion])
+
+  const refreshPreview = useCallback(() => {
+    setPreviewVersion(v => v + 1)
+  }, [])
 
   const navigateToList = useCallback(() => {
     window.location.hash = ""
@@ -65,6 +70,7 @@ export function useStyleWorkspace(idToken: string | undefined) {
     view,
     previewHtml,
     previewLoading,
+    refreshPreview,
     isWorkspace: view.mode !== "list",
     styleName: view.mode === "preview" ? view.name : null,
     navigateToList,

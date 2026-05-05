@@ -14,7 +14,11 @@
   },
   "prompt": "file://../../acp-agent-prompts/style-creator.md",
   "tools": [
-    "@sdpm",
+    "@sdpm/run_style_python",
+    "@sdpm/list_styles",
+    "@sdpm/analyze_template",
+    "@sdpm/read_uploaded_file",
+    "@sdpm/hearing",
     "read",
     "glob",
     "grep",
@@ -22,7 +26,11 @@
     "web_search"
   ],
   "allowedTools": [
-    "@sdpm/*",
+    "@sdpm/run_style_python",
+    "@sdpm/list_styles",
+    "@sdpm/analyze_template",
+    "@sdpm/read_uploaded_file",
+    "@sdpm/hearing",
     "read",
     "glob",
     "grep",

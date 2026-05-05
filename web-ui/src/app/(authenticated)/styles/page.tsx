@@ -15,10 +15,10 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useStyleWorkspace } from "@/hooks/useStyleWorkspace"
 import { AppShell } from "@/components/AppShell"
-import { fetchStyles, fetchStyleHtml, pinStyle, saveUserStyle, deleteUserStyle, type StyleEntry } from "@/services/deckService"
+import { fetchStyles, fetchStyleHtml, pinStyle, saveUserStyle, deleteUserStyle, renameUserStyle, type StyleEntry } from "@/services/deckService"
 import { StyleSlidePreview } from "@/components/StyleSlidePreview"
 import { StyleChatShell } from "@/components/chat/StyleChatShell"
-import { Star, Trash2, Palette, Download, Sparkles, Copy, MessageSquare } from "lucide-react"
+import { Star, Trash2, Palette, Download, Sparkles, Copy, MessageSquare, Pencil, MoreHorizontal } from "lucide-react"
 
 export default function StylesPage() {
   const auth = useAuth()
@@ -29,9 +29,11 @@ export default function StylesPage() {
   const [loading, setLoading] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [nameDialog, setNameDialog] = useState<{ mode: "create" | "rename"; currentName?: string } | null>(null)
+  const [nameInput, setNameInput] = useState("")
+  const [nameError, setNameError] = useState("")
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
-  const [livePreviewHtml, setLivePreviewHtml] = useState<string | null>(null)
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type })
@@ -47,9 +49,12 @@ export default function StylesPage() {
 
   useEffect(() => { refreshStyles() }, [refreshStyles])
 
-  // When #create is visited, create Untitled Style and navigate to it
+  // When #create is visited, show name dialog and go back to list view
   useEffect(() => {
-    if (ws.view.mode === "create") handleCreateStyle()
+    if (ws.view.mode === "create") {
+      ws.navigateToList()
+      handleCreateStyle()
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws.view.mode])
 
@@ -57,7 +62,6 @@ export default function StylesPage() {
   useEffect(() => {
     if (ws.view.mode !== "preview") {
       setChatOpen(false)
-      setLivePreviewHtml(null)
     }
   }, [ws.view.mode])
 
@@ -123,20 +127,38 @@ export default function StylesPage() {
 
   const handleCreateStyle = async () => {
     if (!idToken) return
-    const now = new Date()
-    const pad = (n: number) => String(n).padStart(2, "0")
-    const filename = `style-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
-    const html = `<!DOCTYPE html><html><head><title>Untitled Style</title></head><body><div class="slide" style="width:1920px;height:1080px;display:flex;align-items:center;justify-content:center;font-family:sans-serif;background:#1a1a2e;color:#fff;"><h1>Untitled Style</h1></div></body></html>`
-    const result = await saveUserStyle(filename, html, idToken)
-    if (result.error) { showToast(result.error, "error"); return }
-    await refreshStyles()
-    ws.navigateToStyle(filename)
-    setChatOpen(true)
+    setNameDialog({ mode: "create" })
+    setNameInput("")
+    setNameError("")
   }
 
-  const handleStyleHtmlUpdate = useCallback((html: string) => {
-    setLivePreviewHtml(html)
-  }, [])
+  const handleNameSubmit = async () => {
+    if (!idToken) return
+    const name = nameInput.trim()
+    if (!name) { setNameError("Name is required"); return }
+    if (!/^[a-zA-Z0-9_-]+$/.test(name)) { setNameError("Only letters, numbers, hyphens, and underscores"); return }
+    if (styles.some(s => s.name === name)) { setNameError("A style with this name already exists"); return }
+
+    if (nameDialog?.mode === "create") {
+      const html = `<!DOCTYPE html><html><head><title>${name}</title></head><body><div class="slide" style="width:1920px;height:1080px;display:flex;align-items:center;justify-content:center;font-family:sans-serif;background:#1a1a2e;color:#fff;"><h1>${name}</h1></div></body></html>`
+      const result = await saveUserStyle(name, html, idToken)
+      if (result.error) { setNameError(result.error); return }
+      setNameDialog(null)
+      await refreshStyles()
+      ws.navigateToStyle(name)
+      setChatOpen(true)
+    } else if (nameDialog?.mode === "rename" && nameDialog.currentName) {
+      const result = await renameUserStyle(nameDialog.currentName, name, idToken)
+      if (result.error) { setNameError(result.error); return }
+      setNameDialog(null)
+      await refreshStyles()
+      // If previewing the renamed style, update hash
+      if (ws.styleName === nameDialog.currentName) {
+        ws.navigateToStyle(name)
+      }
+      showToast(`Renamed to ${name}`, "success")
+    }
+  }
 
   const currentStyle = ws.styleName ? styles.find(s => s.name === ws.styleName) : null
 
@@ -194,20 +216,10 @@ export default function StylesPage() {
                     <Sparkles className="h-3 w-3" />
                     Edit with AI
                   </button>
-                  <button
-                    onClick={() => handleExport(ws.styleName!)}
-                    className="p-1 rounded text-foreground-muted hover:text-foreground transition-colors"
-                    aria-label={`Export ${ws.styleName}`}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setDeleteConfirm(ws.styleName!)}
-                    className="p-1 rounded text-foreground-muted hover:text-red-400 transition-colors"
-                    aria-label={`Delete ${ws.styleName}`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <PreviewMoreMenu
+                    onExport={() => handleExport(ws.styleName!)}
+                    onDelete={() => setDeleteConfirm(ws.styleName!)}
+                  />
                 </>
               )}
               {currentStyle?.source === "builtin" && (
@@ -220,7 +232,7 @@ export default function StylesPage() {
                 </button>
               )}
             </div>
-            <StyleSlidePreview html={livePreviewHtml || ws.previewHtml} loading={ws.previewLoading} />
+            <StyleSlidePreview html={ws.previewHtml} loading={ws.previewLoading} />
           </div>
         ) : ws.view.mode === "create" ? (
           /* ── Create new style → creates Untitled Style and navigates ── */
@@ -259,6 +271,7 @@ export default function StylesPage() {
                       onPin={handlePin}
                       onDelete={name => setDeleteConfirm(name)}
                       onExport={handleExport}
+                      onRename={name => { setNameDialog({ mode: "rename", currentName: name }); setNameInput(name); setNameError("") }}
                     />
                   ))}
                   {/* Create with AI card + Import link */}
@@ -317,7 +330,7 @@ export default function StylesPage() {
             onClose={() => setChatOpen(false)}
             styleId={ws.styleName!}
             styleName={ws.styleName!}
-            onStyleHtmlUpdate={handleStyleHtmlUpdate}
+            onStyleWritten={() => ws.refreshPreview()}
             onStyleSaved={async (saved) => {
               showToast(`Style saved: ${saved.title}`, "success")
               await refreshStyles()
@@ -353,6 +366,40 @@ export default function StylesPage() {
         </div>
       )}
 
+      {/* Name dialog (create / rename) */}
+      {nameDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setNameDialog(null)} onKeyDown={e => { if (e.key === "Escape") setNameDialog(null) }}>
+          <div className="bg-surface-secondary border border-white/[0.08] rounded-xl p-6 max-w-sm mx-4 shadow-2xl w-full" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold mb-4">{nameDialog.mode === "create" ? "New Style" : "Rename Style"}</h3>
+            <input
+              autoFocus
+              type="text"
+              value={nameInput}
+              onChange={e => { setNameInput(e.target.value); setNameError("") }}
+              onKeyDown={e => { if (e.key === "Enter") handleNameSubmit() }}
+              placeholder="my-style-name"
+              className="w-full px-3 py-2 text-sm rounded-lg bg-black/20 border border-white/[0.08] focus:border-brand-teal/40 focus:outline-none transition-colors"
+            />
+            {nameError && <p className="text-xs text-red-400 mt-1.5">{nameError}</p>}
+            <p className="text-xs text-foreground-muted mt-1.5">Letters, numbers, hyphens, and underscores only</p>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => setNameDialog(null)}
+                className="px-3 py-1.5 text-sm rounded-lg border border-white/[0.08] hover:bg-white/[0.04] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleNameSubmit}
+                className="px-3 py-1.5 text-sm rounded-lg bg-brand-teal/20 text-brand-teal hover:bg-brand-teal/30 transition-colors"
+              >
+                {nameDialog.mode === "create" ? "Create" : "Rename"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast notification */}
       {toast && (
         <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg text-sm font-medium shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${
@@ -366,15 +413,19 @@ export default function StylesPage() {
 }
 
 /** Style card for the /styles list page. */
-function StyleListCard({ style, onPreview, onPin, onDelete, onExport }: {
+function StyleListCard({ style, onPreview, onPin, onDelete, onExport, onRename }: {
   style: StyleEntry
   onPreview: (name: string) => void
   onPin: (name: string) => void
   onDelete?: (name: string) => void
   onExport?: (name: string) => void
+  onRename?: (name: string) => void
 }) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.15)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuBtnRef = useRef<HTMLButtonElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
 
   useEffect(() => {
     const el = cardRef.current
@@ -383,6 +434,15 @@ function StyleListCard({ style, onPreview, onPin, onDelete, onExport }: {
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+
+  const hasMenu = onRename || onExport || onDelete
+
+  const openMenu = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const rect = menuBtnRef.current?.getBoundingClientRect()
+    if (rect) setMenuPos({ top: rect.bottom + 4, left: rect.right - 140 })
+    setMenuOpen(true)
+  }
 
   return (
     <div
@@ -422,22 +482,14 @@ function StyleListCard({ style, onPreview, onPin, onDelete, onExport }: {
             >
               <Star className="h-3.5 w-3.5" fill={style.pinned ? "currentColor" : "none"} />
             </button>
-            {onExport && (
+            {hasMenu && (
               <button
-                onClick={e => { e.stopPropagation(); onExport(style.name) }}
+                ref={menuBtnRef}
+                onClick={openMenu}
                 className="p-1 rounded text-foreground-muted hover:text-foreground transition-colors opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-                aria-label={`Export ${style.name}`}
+                aria-label="More actions"
               >
-                <Download className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {onDelete && (
-              <button
-                onClick={e => { e.stopPropagation(); onDelete(style.name) }}
-                className="p-1 rounded text-foreground-muted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-                aria-label={`Delete ${style.name}`}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
+                <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
@@ -446,6 +498,78 @@ function StyleListCard({ style, onPreview, onPin, onDelete, onExport }: {
           <span className="text-[11px] text-brand-teal/70 font-medium mt-0.5 block">Custom</span>
         )}
       </div>
+
+      {/* Dropdown menu — rendered as fixed portal to escape overflow-hidden */}
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); setMenuOpen(false) }} />
+          <div
+            className="fixed z-50 min-w-[140px] py-1 rounded-lg border border-white/[0.08] bg-surface-secondary shadow-xl"
+            style={{ top: menuPos.top, left: menuPos.left }}
+            onClick={e => e.stopPropagation()}
+          >
+            {onRename && (
+              <button
+                onClick={() => { setMenuOpen(false); onRename(style.name) }}
+                className="w-full px-3 py-1.5 text-left text-sm text-foreground-muted hover:text-foreground hover:bg-white/[0.04] transition-colors flex items-center gap-2"
+              >
+                <Pencil className="h-3.5 w-3.5" /> Rename
+              </button>
+            )}
+            {onExport && (
+              <button
+                onClick={() => { setMenuOpen(false); onExport(style.name) }}
+                className="w-full px-3 py-1.5 text-left text-sm text-foreground-muted hover:text-foreground hover:bg-white/[0.04] transition-colors flex items-center gap-2"
+              >
+                <Download className="h-3.5 w-3.5" /> Export
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={() => { setMenuOpen(false); onDelete(style.name) }}
+                className="w-full px-3 py-1.5 text-left text-sm text-foreground-muted hover:text-red-400 hover:bg-white/[0.04] transition-colors flex items-center gap-2"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Delete
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** ⋯ menu for preview header (Export / Delete). */
+function PreviewMoreMenu({ onExport, onDelete }: { onExport: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="p-1 rounded text-foreground-muted hover:text-foreground transition-colors"
+        aria-label="More actions"
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] py-1 rounded-lg border border-white/[0.08] bg-surface-secondary shadow-xl">
+            <button
+              onClick={() => { setOpen(false); onExport() }}
+              className="w-full px-3 py-1.5 text-left text-sm text-foreground-muted hover:text-foreground hover:bg-white/[0.04] transition-colors flex items-center gap-2"
+            >
+              <Download className="h-3.5 w-3.5" /> Export
+            </button>
+            <button
+              onClick={() => { setOpen(false); onDelete() }}
+              className="w-full px-3 py-1.5 text-left text-sm text-foreground-muted hover:text-red-400 hover:bg-white/[0.04] transition-colors flex items-center gap-2"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

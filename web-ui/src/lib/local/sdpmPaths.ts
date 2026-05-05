@@ -22,13 +22,13 @@ export function getUserStylesDir(): string {
 }
 
 /** State file path (~/.config/sdpm/state.json). */
-function getStatePath(): string {
+export function getStateJsonPath(): string {
   return path.join(getUserConfigDir(), "state.json")
 }
 
 /** Read app state. Returns empty object if file missing. */
 export function getState(): Record<string, unknown> {
-  const p = getStatePath()
+  const p = getStateJsonPath()
   if (!fs.existsSync(p)) return {}
   return JSON.parse(fs.readFileSync(p, "utf-8"))
 }
@@ -37,7 +37,7 @@ export function getState(): Record<string, unknown> {
 export function updateState(key: string, value: unknown): void {
   const dir = getUserConfigDir()
   fs.mkdirSync(dir, { recursive: true })
-  const p = getStatePath()
+  const p = getStateJsonPath()
   const state = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf-8")) : {}
   state[key] = value
   fs.writeFileSync(p, JSON.stringify(state, null, 2))

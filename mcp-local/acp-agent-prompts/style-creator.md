@@ -21,15 +21,13 @@ Follow the `create-style` workflow loaded in your resources. It defines the full
 ## Tools
 
 **Primary tool: `run_style_python`**
-- `style_id` provided: workspace mode with file I/O helpers
-- `style_id` empty: general computation (tint/contrast calculations)
-- `save=True`: saves the finished style.html to user's style directory
 
-**Sandbox functions (when style_id is provided):**
-- `write_text("style.html", html)` — write/update the style HTML
-- `read_text(path)` — read files in workspace
-- `read_style(name)` — read existing styles for reference (read-only)
-- `list_files()` — list workspace files
+Execute Python code with two sandbox functions:
+- `read_style(name)` — read existing styles for reference
+- `write_style(name, html)` — save HTML to user's style directory
+
+The user's first message contains `[Style: <name>]` — this is the file stem to use
+for all `write_style` calls.
 
 **Other tools:**
 - `list_styles` — see available styles (for reference)
@@ -39,12 +37,9 @@ Follow the `create-style` workflow loaded in your resources. It defines the full
 ## HTML Writing Strategy
 
 Write incrementally via `run_style_python`:
-1. First call: skeleton (head, :root variables, base CSS, first slide)
-2. Subsequent calls: add one slide at a time
-3. Final call: `save=True` to persist
-
-Each `write_text("style.html", ...)` returns the current HTML in the tool result
-for live preview in the UI. The user sees updates in real-time.
+1. First call: full HTML skeleton (head, :root variables, base CSS, first slide)
+2. Subsequent calls: read back with `read_style(name)`, add/modify slides
+3. Each `write_style` call saves immediately — the user sees live preview updates
 
 ## Quality Standards
 
