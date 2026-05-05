@@ -189,9 +189,9 @@ export default function StylesPage() {
                 <>
                   <button
                     onClick={() => setChatOpen(true)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-foreground-muted hover:text-foreground border border-white/[0.08] hover:border-white/[0.15] transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-brand-teal hover:text-brand-teal-bright border border-brand-teal/25 hover:border-brand-teal/40 bg-brand-teal/[0.06] hover:bg-brand-teal/[0.1] transition-colors"
                   >
-                    <MessageSquare className="h-3 w-3" />
+                    <Sparkles className="h-3 w-3" />
                     Edit with AI
                   </button>
                   <button

@@ -17,7 +17,7 @@ import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage } from "./ChatMessage"
 import { generateSessionId } from "@/services/agentCoreService"
 import { IS_LOCAL } from "@/lib/mode"
-import { Send } from "lucide-react"
+import { Sparkles } from "lucide-react"
 import type { UploadedFile } from "@/services/uploadService"
 
 interface StyleChatPanelProps {
@@ -112,12 +112,24 @@ export function StyleChatPanel({ styleId, onStyleHtmlUpdate, onStyleSaved }: Sty
         {isInitial ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-4">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-teal-soft mb-5">
-              <Send className="h-5 w-5 text-brand-teal" />
+              <Sparkles className="h-5 w-5 text-brand-teal" />
             </div>
             <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-1">Style Creator</h2>
-            <p className="text-sm text-foreground-muted leading-relaxed">
+            <p className="text-sm text-foreground-muted leading-relaxed mb-6">
               Describe the style you want, or drop a reference file
             </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {["Dark minimal with gradients", "Corporate blue with charts", "Like Apple keynotes"].map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => { chatInputRef.current?.insertAtCursor(chip); chatInputRef.current?.focus() }}
+                  className="px-3 py-1.5 rounded-full text-xs text-foreground-muted hover:text-foreground border border-white/[0.08] hover:border-white/[0.15] hover:bg-white/[0.04] transition-colors"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
