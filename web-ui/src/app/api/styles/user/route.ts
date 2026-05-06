@@ -13,10 +13,6 @@ export async function POST(req: Request) {
   if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
     return Response.json({ error: "invalid style name" }, { status: 400 })
   }
-  // Validate <title> tag exists
-  if (!/<title>.*?<\/title>/i.test(html)) {
-    return Response.json({ error: "HTML must contain a <title> tag" }, { status: 400 })
-  }
 
   const dir = getUserStylesDir()
   fs.mkdirSync(dir, { recursive: true })

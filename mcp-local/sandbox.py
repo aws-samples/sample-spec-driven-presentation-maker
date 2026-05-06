@@ -147,13 +147,12 @@ def read_style(name):
 def write_style(name, html):
     """Save style HTML to user styles directory. name = file stem (no .html extension)."""
     name = _validate_name(name)
-    if not re.search(r"<title>.+?</title>", html, re.IGNORECASE):
-        raise ValueError("HTML must contain a non-empty <title> tag.")
     filename = name + ".html" if not name.endswith(".html") else name
     user_styles_dir.mkdir(parents=True, exist_ok=True)
     dest = user_styles_dir / filename
     dest.write_text(html, encoding="utf-8")
-    title = re.search(r"<title>(.+?)</title>", html, re.IGNORECASE).group(1).strip()
+    title_m = re.search(r"<title>(.+?)</title>", html, re.IGNORECASE)
+    title = title_m.group(1).strip() if title_m else name
     # Signal save result to parent process via stderr JSON
     sys.stderr.write("__STYLE_SAVED__" + json.dumps({"title": title, "filename": filename, "path": str(dest)}) + "\\n")
 

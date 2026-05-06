@@ -738,7 +738,6 @@ def run_style_python(purpose: str, code: str) -> str:
     ## Rules
 
     - `name` is the file stem without .html (e.g. "corporate-executive", "style-20260505-1430")
-    - `write_style` requires a non-empty `<title>` tag in the HTML
     - No import statements or direct file access allowed
     - Use print() for computation output
 
