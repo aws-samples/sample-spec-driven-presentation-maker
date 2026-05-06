@@ -123,7 +123,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       setAttachments((prev) => [...prev, { id, file, status: "pending" }])
     }
   }, [attachments.length])
-  handleFilesRef.current = handleFiles
+  useEffect(() => { handleFilesRef.current = handleFiles }, [handleFiles])
 
   const removeAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id))

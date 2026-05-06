@@ -9,7 +9,7 @@
 
 "use client"
 
-import { useEffect, useState, useRef, useCallback } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { fetchStyleHtml } from "@/services/deckService"
 
 export type StyleView = { mode: "list" } | { mode: "preview"; name: string } | { mode: "create" }
@@ -22,10 +22,9 @@ function parseHash(hash: string): StyleView {
 }
 
 export function useStyleWorkspace(idToken: string | undefined) {
-  const initialHash = useRef(
-    typeof window !== "undefined" ? parseHash(window.location.hash) : ({ mode: "list" } as StyleView)
+  const [view, setView] = useState<StyleView>(
+    () => typeof window !== "undefined" ? parseHash(window.location.hash) : { mode: "list" }
   )
-  const [view, setView] = useState<StyleView>(initialHash.current)
   const [previewHtml, setPreviewHtml] = useState("")
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewVersion, setPreviewVersion] = useState(0)
