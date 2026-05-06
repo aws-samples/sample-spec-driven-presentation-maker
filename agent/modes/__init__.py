@@ -48,13 +48,14 @@ _PREFETCH_BRIEFING = Part(
 _DECK_TOOLS = [
     "init_presentation", "analyze_template", "read_uploaded_file",
     "list_styles", "apply_style", "read_examples", "list_workflows",
-    "read_workflows", "list_guides", "read_guides", "search_examples",
+    "read_workflows", "list_guides", "read_guides", "search_assets",
+    "list_asset_sources", "list_templates",
     "run_python", "generate_pptx", "get_preview", "code_to_slide",
-    "grid", "import_attachment", "hearing",
+    "grid", "import_attachment",
 ]
 
 _STYLE_TOOLS = [
-    "run_style_python", "list_styles", "analyze_template", "hearing",
+    "run_style_python", "list_styles", "analyze_template", "read_uploaded_file",
 ]
 
 

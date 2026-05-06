@@ -16,6 +16,35 @@ _MAX_IMAGE_PREVIEWS = 10
 _TEXT_TYPES = {"text/plain", "text/markdown", "application/json"}
 
 
+def _analyze_colors(data: bytes) -> dict | None:
+    """Analyze dominant colors of an image. Returns palette + brightness + saturation."""
+    try:
+        img = PILImage.open(io.BytesIO(data)).convert("RGB")
+        small = img.resize((100, 100))
+        pixels = list(small.getdata())
+
+        lum_sum = sum(r * 0.299 + g * 0.587 + b * 0.114 for r, g, b in pixels)
+        lum_avg = lum_sum / len(pixels)
+        brightness = "dark" if lum_avg < 100 else "light" if lum_avg > 155 else "mixed"
+
+        hsv = small.convert("HSV")
+        s_avg = sum(s for _, s, _ in hsv.getdata()) / (100 * 100)
+        saturation = "monochrome" if s_avg < 30 else "muted" if s_avg < 100 else "vivid"
+
+        quantized = small.quantize(colors=5, method=PILImage.Quantize.MEDIANCUT)
+        palette_data = quantized.getpalette()
+        color_counts = sorted(quantized.getcolors(), reverse=True)
+        total = sum(c for c, _ in color_counts)
+        palette = []
+        for count, idx in color_counts[:5]:
+            r, g, b = palette_data[idx * 3], palette_data[idx * 3 + 1], palette_data[idx * 3 + 2]
+            palette.append({"hex": f"#{r:02X}{g:02X}{b:02X}", "ratio": round(count / total, 2)})
+
+        return {"palette": palette, "brightness": brightness, "saturation": saturation}
+    except Exception:
+        return None
+
+
 def _to_jpeg(data: bytes) -> bytes:
     """Resize image to fit within max edge and convert to JPEG."""
     img = PILImage.open(io.BytesIO(data))
@@ -96,6 +125,9 @@ def read_uploaded_file(
             parts.append(Image(data=jpeg, format="jpeg"))
         except Exception:
             parts.append("(preview unavailable)")
+        colors = _analyze_colors(data)
+        if colors:
+            parts.append(f"Color analysis: {colors}")
         return parts
 
     # --- PPTX (completed, lazy conversion via Engine on MCP Server) ---
