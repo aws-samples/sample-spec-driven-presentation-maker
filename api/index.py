@@ -10,7 +10,7 @@ Unified API Lambda — deck, upload, chat endpoints.
 # Security: AWS manages infrastructure security. You manage access control,
 # data classification, and IAM policies. See SECURITY.md for details.
 
-Single Lambda with Powertools APIGatewayRestResolver.
+Single Lambda with Powertools APIGatewayHttpResolver.
 Ported from spec-driven-presentation-maker-web deck-api, upload-api.
 """
 
@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
+from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConfig
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from authz import authorize
@@ -92,7 +92,7 @@ metrics = Metrics()
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
 s3_client = boto3.client("s3")
-app = APIGatewayRestResolver(cors=cors_config)
+app = APIGatewayHttpResolver(cors=cors_config)
 
 # --- KB (optional) ---
 _kb_sync = None

@@ -18,6 +18,8 @@ from typing import Any
 def get_user_id(event: Any) -> str:
     """Extract user ID (Cognito sub) from API Gateway authorizer claims.
 
+    Supports both REST API (v1) and HTTP API (v2) JWT authorizer formats.
+
     Args:
         event: Powertools current_event with request_context.authorizer.
 
@@ -28,8 +30,14 @@ def get_user_id(event: Any) -> str:
         ValueError: If authorizer claims or sub are missing.
     """
     authorizer = event.request_context.authorizer
-    claims = (authorizer or {}).get("claims", {})
-    sub = claims.get("sub")
+    # HTTP API v2 JWT authorizer
+    if hasattr(authorizer, "jwt"):
+        claims = authorizer.jwt.get("claims", {}) if isinstance(authorizer.jwt, dict) else getattr(authorizer.jwt, "claims", {})
+        sub = claims.get("sub") if isinstance(claims, dict) else getattr(claims, "sub", None)
+    else:
+        # REST API v1 authorizer
+        claims = (authorizer or {}).get("claims", {})
+        sub = claims.get("sub")
     if not sub:
         raise ValueError("Unauthorized: missing user identity")
     return sub
@@ -38,6 +46,8 @@ def get_user_id(event: Any) -> str:
 def get_user_alias(event: Any) -> str:
     """Extract user alias (email prefix) from API Gateway authorizer claims.
 
+    Supports both REST API (v1) and HTTP API (v2) JWT authorizer formats.
+
     Args:
         event: Powertools current_event with request_context.authorizer.
 
@@ -45,8 +55,12 @@ def get_user_alias(event: Any) -> str:
         Alias string (email prefix before @), or empty string if unavailable.
     """
     authorizer = event.request_context.authorizer
-    claims = (authorizer or {}).get("claims", {})
-    email = claims.get("email", "")
+    if hasattr(authorizer, "jwt"):
+        claims = authorizer.jwt.get("claims", {}) if isinstance(authorizer.jwt, dict) else getattr(authorizer.jwt, "claims", {})
+        email = claims.get("email", "") if isinstance(claims, dict) else getattr(claims, "email", "")
+    else:
+        claims = (authorizer or {}).get("claims", {})
+        email = claims.get("email", "")
     return email.split("@")[0] if email else ""
 
 
