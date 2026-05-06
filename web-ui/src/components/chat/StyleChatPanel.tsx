@@ -10,13 +10,13 @@
 
 "use client"
 
-import { useEffect, useRef, useCallback } from "react"
+import { useEffect, useRef, useCallback, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useChatStream, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage } from "./ChatMessage"
 import { FileDropZone } from "./FileDropZone"
-import { generateSessionId } from "@/services/agentCoreService"
+import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
 import { IS_LOCAL } from "@/lib/mode"
 import { Sparkles, MessageSquare, Image, Palette } from "lucide-react"
 import type { UploadedFile } from "@/services/uploadService"
@@ -51,10 +51,27 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
 
   const stream = useChatStream({
     sessionId,
-    mode: "style",
+    mode: "style_creator",
     onToolEvent: handleToolEvent,
     onSendComplete: undefined,
   })
+
+  // Load agent config (cloud only)
+  const [configLoaded, setConfigLoaded] = useState(IS_LOCAL)
+  useEffect(() => {
+    if (IS_LOCAL) return
+    async function loadConfig() {
+      try {
+        const response = await fetch("/aws-exports.json")
+        const config = await response.json()
+        await setAgentConfig(config.agentRuntimeArn, config.awsRegion || "us-east-1")
+        setConfigLoaded(true)
+      } catch (err) {
+        console.error("Failed to load agent config:", err)
+      }
+    }
+    loadConfig()
+  }, [])
 
   // Save chat after each send (Local mode)
   useEffect(() => {
