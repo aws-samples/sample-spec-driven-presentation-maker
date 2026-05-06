@@ -465,31 +465,98 @@ def rename_user_style(style_name: str) -> Dict[str, Any]:
 
 @app.get("/templates")
 def list_templates() -> Dict[str, Any]:
-    """List all templates (builtin + user) with metadata."""
-    user_id = get_user_id(app.current_event)
+    """List all templates (builtin + user) with metadata.
 
+    Builtin: S3 is source of truth for existence. DDB is metadata cache.
+    User: DDB is source of truth.
+    """
+    import tempfile
+    from pathlib import Path
+
+    user_id = get_user_id(app.current_event)
     templates: List[Dict[str, Any]] = []
 
-    # Builtin templates from DDB
-    resp = table.scan(
-        FilterExpression="begins_with(PK, :prefix) AND SK = :sk",
-        ExpressionAttributeValues={":prefix": "TEMPLATE#", ":sk": "META"},
-    )
-    for t in resp.get("Items", []):
-        analysis = {}
-        raw = t.get("analysisJson", "")
-        if raw and raw != "{}":
-            analysis = json.loads(raw) if isinstance(raw, str) else raw
-        templates.append({
-            "name": t.get("name", ""),
-            "source": "builtin",
-            "description": t.get("description", ""),
-            "theme_colors": analysis.get("theme_colors", {}),
-            "fonts": t.get("fonts", {}),
-            "layout_count": len(analysis.get("layouts", [])),
-        })
+    # --- Builtin: S3 source of truth ---
+    s3_templates: Dict[str, str] = {}  # name -> etag
+    if RESOURCE_BUCKET:
+        resp = s3_client.list_objects_v2(Bucket=RESOURCE_BUCKET, Prefix="templates/")
+        for obj in resp.get("Contents", []):
+            key = obj["Key"]
+            if key.endswith(".pptx"):
+                name = key.removeprefix("templates/").removesuffix(".pptx")
+                s3_templates[name] = obj["ETag"]
 
-    # User templates
+    # Batch get DDB cache for builtins
+    ddb_cache: Dict[str, Dict] = {}
+    if s3_templates:
+        keys = [{"PK": f"TEMPLATE#{n}", "SK": "META"} for n in s3_templates]
+        resp = table.meta.client.batch_get_item(
+            RequestItems={table.name: {"Keys": keys}}
+        )
+        for item in resp.get("Responses", {}).get(table.name, []):
+            ddb_cache[item["name"]] = item
+
+    # Build builtin list with lazy analysis
+    to_analyze: List[str] = []
+    for name, etag in s3_templates.items():
+        cached = ddb_cache.get(name)
+        if cached and cached.get("s3ETag") == etag:
+            analysis = {}
+            raw = cached.get("analysisJson", "")
+            if raw and raw != "{}":
+                analysis = json.loads(raw) if isinstance(raw, str) else raw
+            templates.append({
+                "name": name,
+                "source": "builtin",
+                "description": cached.get("description", ""),
+                "theme_colors": analysis.get("theme_colors", {}),
+                "fonts": cached.get("fonts", {}),
+                "layout_count": len(analysis.get("layouts", [])),
+            })
+        else:
+            to_analyze.append(name)
+            templates.append({
+                "name": name,
+                "source": "builtin",
+                "description": "",
+                "theme_colors": {},
+                "fonts": {},
+                "layout_count": 0,
+            })
+
+    # Lazy analyze uncached builtins (async would be better but keep simple)
+    if to_analyze:
+        from sdpm.analyzer import analyze_template as _analyze
+
+        tmp = Path(tempfile.mkdtemp())
+        for name in to_analyze:
+            s3_key = f"templates/{name}.pptx"
+            tpl_path = tmp / f"{name}.pptx"
+            s3_client.download_file(RESOURCE_BUCKET, s3_key, str(tpl_path))
+            analysis = _analyze(tpl_path)
+            etag = s3_templates[name]
+            item = {
+                "PK": f"TEMPLATE#{name}",
+                "SK": "META",
+                "name": name,
+                "s3Key": s3_key,
+                "s3ETag": etag,
+                "fonts": analysis.get("fonts", {}),
+                "analysisJson": json.dumps({
+                    "theme_colors": analysis.get("theme_colors", {}),
+                    "layouts": analysis.get("layouts", []),
+                }),
+            }
+            table.put_item(Item=item)
+            # Update the placeholder in templates list
+            for t in templates:
+                if t["name"] == name and t["source"] == "builtin":
+                    t["theme_colors"] = analysis.get("theme_colors", {})
+                    t["fonts"] = analysis.get("fonts", {})
+                    t["layout_count"] = len(analysis.get("layouts", []))
+                    break
+
+    # --- User templates: DDB source of truth ---
     resp = table.query(
         KeyConditionExpression=Key("PK").eq(f"USER#{user_id}") & Key("SK").begins_with("TEMPLATE#"),
     )
@@ -526,18 +593,16 @@ def download_template(name: str) -> Any:
     except Exception:
         pass
 
-    # Try builtin
-    resp = table.get_item(Key={"PK": f"TEMPLATE#{name}", "SK": "META"})
-    item = resp.get("Item")
-    if not item:
+    # Try builtin (S3 source of truth)
+    builtin_key = f"templates/{name}.pptx"
+    try:
+        s3_client.head_object(Bucket=RESOURCE_BUCKET, Key=builtin_key)
+        url = s3_client.generate_presigned_url(
+            "get_object", Params={"Bucket": RESOURCE_BUCKET, "Key": builtin_key}, ExpiresIn=300
+        )
+        return {"downloadUrl": url}
+    except Exception:
         return {"error": "Template not found"}, 404
-    s3_key = item.get("s3Key", "")
-    if not s3_key:
-        return {"error": "Template file not available"}, 404
-    url = s3_client.generate_presigned_url(
-        "get_object", Params={"Bucket": RESOURCE_BUCKET, "Key": s3_key}, ExpiresIn=300
-    )
-    return {"downloadUrl": url}
 
 
 @app.post("/templates/user")

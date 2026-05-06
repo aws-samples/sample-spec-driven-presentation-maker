@@ -170,12 +170,40 @@ class AwsStorage(Storage):
     # --- Template ---
 
     def list_templates(self) -> list[dict]:
-        """List all templates from DDB."""
-        resp = self._table.scan(
-            FilterExpression="begins_with(PK, :prefix) AND SK = :sk",
-            ExpressionAttributeValues={":prefix": "TEMPLATE#", ":sk": "META"},
+        """List builtin templates. S3 is source of truth for existence, DDB is metadata cache."""
+        # S3: what exists
+        resp = self._s3.list_objects_v2(Bucket=self._resource_bucket, Prefix="templates/")
+        s3_templates = {}
+        for obj in resp.get("Contents", []):
+            key = obj["Key"]
+            if key.endswith(".pptx"):
+                name = key.removeprefix("templates/").removesuffix(".pptx")
+                s3_templates[name] = {"s3Key": key, "s3ETag": obj["ETag"]}
+
+        if not s3_templates:
+            return []
+
+        # DDB: cached metadata
+        keys = [{"PK": f"TEMPLATE#{n}", "SK": "META"} for n in s3_templates]
+        ddb_resp = self._table.meta.client.batch_get_item(
+            RequestItems={self._table.name: {"Keys": keys}}
         )
-        return resp.get("Items", [])
+        ddb_cache = {}
+        for item in ddb_resp.get("Responses", {}).get(self._table.name, []):
+            ddb_cache[item["name"]] = item
+
+        # Merge: S3 existence + DDB metadata
+        results = []
+        for name, s3_info in s3_templates.items():
+            cached = ddb_cache.get(name, {})
+            results.append({
+                "name": name,
+                "s3Key": s3_info["s3Key"],
+                "description": cached.get("description", ""),
+                "fonts": cached.get("fonts", {}),
+                "analysisJson": cached.get("analysisJson", "{}") if cached.get("s3ETag") == s3_info["s3ETag"] else "{}",
+            })
+        return results
 
     # --- File I/O ---
 
