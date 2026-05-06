@@ -16,6 +16,11 @@ export async function POST(req: Request) {
 
   const dir = getUserStylesDir()
   fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(path.join(dir, `${name}.html`), html, "utf-8")
+  const rootDir = fs.realpathSync(dir)
+  const outputPath = path.resolve(rootDir, `${name}.html`)
+  if (!outputPath.startsWith(rootDir + path.sep)) {
+    return Response.json({ error: "invalid style name" }, { status: 400 })
+  }
+  fs.writeFileSync(outputPath, html, "utf-8")
   return Response.json({ saved: name })
 }
