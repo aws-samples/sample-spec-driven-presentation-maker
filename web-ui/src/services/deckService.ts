@@ -533,3 +533,88 @@ export async function renameUserStyle(name: string, newName: string, idToken: st
   })
   return res.json()
 }
+
+// ── Template Management ──
+
+/** Template entry returned by GET /templates. */
+export interface TemplateEntry {
+  name: string
+  source: "builtin" | "user"
+  description: string
+  theme_colors: Record<string, string>
+  fonts: { fullwidth?: string | null; halfwidth?: string | null }
+  layout_count: number
+}
+
+/** Fetch all templates with metadata. */
+export async function fetchTemplates(idToken: string): Promise<TemplateEntry[]> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}templates`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  if (!res.ok) return []
+  const data = await res.json()
+  return (data.templates || []) as TemplateEntry[]
+}
+
+/** Download a template .pptx file. */
+export async function downloadTemplate(name: string, idToken: string): Promise<void> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}templates/${encodeURIComponent(name)}`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  if (!res.ok) return
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${name}.pptx`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** Upload a user template. */
+export async function uploadTemplate(file: File, description: string, idToken: string): Promise<{ uploaded?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const formData = new FormData()
+  formData.append("file", file)
+  formData.append("description", description)
+  const res = await fetch(`${base}templates/user`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${idToken}` },
+    body: formData,
+  })
+  return res.json()
+}
+
+/** Delete a user template. */
+export async function deleteTemplate(name: string, idToken: string): Promise<{ deleted?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}templates/user/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  return res.json()
+}
+
+/** Update a user template's description. */
+export async function updateTemplateDescription(name: string, description: string, idToken: string): Promise<{ updated?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}templates/user/${encodeURIComponent(name)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ description }),
+  })
+  return res.json()
+}
+
+/** Rename a user template. */
+export async function renameTemplate(name: string, newName: string, idToken: string): Promise<{ renamed?: { from: string; to: string }; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}templates/user/${encodeURIComponent(name)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ newName }),
+  })
+  return res.json()
+}

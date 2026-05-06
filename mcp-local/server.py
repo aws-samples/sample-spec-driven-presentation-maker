@@ -214,24 +214,24 @@ def search_assets(
 
 @mcp.tool()
 def list_templates() -> str:
-    """List all available PPTX templates with name.
+    """List all available PPTX templates with metadata.
 
     Includes user-local templates (via $SDPM_TEMPLATES_DIR or ~/.config/sdpm/templates/)
     in addition to the package-bundled ones. User-local templates shadow bundled
     templates with the same stem.
 
     Returns:
-        JSON with list of template names.
+        JSON with list of templates including name, source, description, fonts, layout_count.
     """
-    from sdpm.api import get_templates_dirs
+    from sdpm.api import get_templates_dirs, list_templates_with_metadata
+    from sdpm.config import get_state
 
-    seen: dict[str, str] = {}
-    for d in get_templates_dirs():
-        if not d.exists():
-            continue
-        for t in sorted(d.glob("*.pptx")):
-            seen.setdefault(t.stem, t.stem)
-    return json.dumps({"templates": sorted(seen)})
+    templates_dirs = get_templates_dirs()
+    metadata = get_state().get("template_metadata", {})
+    return json.dumps(
+        {"templates": list_templates_with_metadata(templates_dirs, metadata)},
+        ensure_ascii=False,
+    )
 
 
 @mcp.tool()

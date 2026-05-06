@@ -1,12 +1,13 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 """Template analysis: extract layout info, theme colors, fonts, and color usage."""
+import zipfile
 from pathlib import Path
 
-from sdpm.builder import PPTXBuilder
-from sdpm.utils.io import write_json, read_json
-
+from lxml import etree
 from pptx import Presentation
+
+from sdpm.utils.io import write_json, read_json
 
 
 def analyze_template(template_path: Path):
@@ -130,9 +131,79 @@ def extract_fonts(template_path: Path) -> dict:
     return {"halfwidth": None, "fullwidth": None}
 
 
+def _extract_theme_colors_raw(template_path: Path):
+    """Extract theme colors and dark flag from template's clrScheme + clrMap.
+
+    Returns (colors_dict, is_dark). Standalone — no PPTXBuilder dependency.
+    """
+    ns_a = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    ns_p = "http://schemas.openxmlformats.org/presentationml/2006/main"
+
+    scheme = {}
+    with zipfile.ZipFile(str(template_path)) as z:
+        theme_target = 'ppt/theme/theme1.xml'
+        for name in z.namelist():
+            if 'slideMaster1.xml.rels' in name:
+                rels = etree.fromstring(z.read(name))
+                for rel in rels:
+                    if 'theme' in rel.get('Target', ''):
+                        target = rel.get('Target').replace('..', 'ppt')
+                        if not target.startswith('ppt/'):
+                            target = 'ppt/theme/' + target.split('/')[-1]
+                        theme_target = target
+                        break
+                break
+
+        if theme_target in z.namelist():
+            tree = etree.fromstring(z.read(theme_target))
+        else:
+            tree = None
+            for name in sorted(z.namelist()):
+                if 'theme' in name and name.endswith('.xml'):
+                    tree = etree.fromstring(z.read(name))
+                    break
+
+        if tree is not None:
+            cs = tree.find(f'.//{{{ns_a}}}clrScheme')
+            if cs is not None:
+                for child in cs:
+                    tag = child.tag.split('}')[1]
+                    val_el = child[0] if len(child) > 0 else None
+                    if val_el is not None:
+                        hex_val = val_el.get('lastClr') or val_el.get('val') or '000000'
+                        try:
+                            int(hex_val, 16)
+                        except ValueError:
+                            hex_val = val_el.get('lastClr') or '000000'
+                        scheme[tag] = hex_val
+
+    prs = Presentation(str(template_path))
+    master = prs.slide_masters[0]
+    clr_map = master.element.find(f'.//{{{ns_p}}}clrMap')
+    bg1_ref = clr_map.get('bg1', 'lt1') if clr_map is not None else 'lt1'
+    tx1_ref = clr_map.get('tx1', 'dk1') if clr_map is not None else 'dk1'
+    bg2_ref = clr_map.get('bg2', 'lt2') if clr_map is not None else 'lt2'
+    tx2_ref = clr_map.get('tx2', 'dk2') if clr_map is not None else 'dk2'
+
+    colors = {
+        "text": f"#{scheme.get(tx1_ref, '000000')}",
+        "background": f"#{scheme.get(bg1_ref, 'FFFFFF')}",
+        "text2": f"#{scheme.get(tx2_ref, '000000')}",
+        "background2": f"#{scheme.get(bg2_ref, 'FFFFFF')}",
+    }
+    for i in range(1, 7):
+        colors[f"accent{i}"] = f"#{scheme.get(f'accent{i}', '4A90D9')}"
+
+    tx = colors["text"].lstrip("#")
+    r, g, b = int(tx[:2], 16), int(tx[2:4], 16), int(tx[4:6], 16)
+    is_dark = (0.299 * r + 0.587 * g + 0.114 * b) > 128
+
+    return colors, is_dark
+
+
 def extract_theme_colors(template_path: Path):
     """Extract theme colors from template (clrMap-aware)."""
-    colors, _ = PPTXBuilder._extract_theme_colors(template_path)
+    colors, _ = _extract_theme_colors_raw(template_path)
     result = {}
     role_map = {"text": "text", "background": "background", "text2": "text2", "background2": "background2"}
     for key, role in role_map.items():

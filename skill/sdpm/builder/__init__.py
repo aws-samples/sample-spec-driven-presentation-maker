@@ -116,76 +116,8 @@ class PPTXBuilder(
     @staticmethod
     def _extract_theme_colors(template_path):
         """Extract theme colors from template's clrScheme + clrMap."""
-        import zipfile
-        from lxml import etree
-        ns_a = "http://schemas.openxmlformats.org/drawingml/2006/main"
-        ns_p = "http://schemas.openxmlformats.org/presentationml/2006/main"
-
-        # Find theme XML linked to slide master 1
-        scheme = {}
-        with zipfile.ZipFile(str(template_path)) as z:
-            # Determine which theme file slideMaster1 references
-            theme_target = 'ppt/theme/theme1.xml'  # fallback
-            for name in z.namelist():
-                if 'slideMaster1.xml.rels' in name:
-                    rels = etree.fromstring(z.read(name))
-                    for rel in rels:
-                        if 'theme' in rel.get('Target', ''):
-                            target = rel.get('Target').replace('..', 'ppt')
-                            if not target.startswith('ppt/'):
-                                target = 'ppt/theme/' + target.split('/')[-1]
-                            theme_target = target
-                            break
-                    break
-
-            if theme_target in z.namelist():
-                tree = etree.fromstring(z.read(theme_target))
-            else:
-                # Fallback: first theme file
-                tree = None
-                for name in sorted(z.namelist()):
-                    if 'theme' in name and name.endswith('.xml'):
-                        tree = etree.fromstring(z.read(name))
-                        break
-
-            if tree is not None:
-                cs = tree.find(f'.//{{{ns_a}}}clrScheme')
-                if cs is not None:
-                    for child in cs:
-                        tag = child.tag.split('}')[1]
-                        val_el = child[0] if len(child) > 0 else None
-                        if val_el is not None:
-                            hex_val = val_el.get('lastClr') or val_el.get('val') or '000000'
-                            try:
-                                int(hex_val, 16)
-                            except ValueError:
-                                hex_val = val_el.get('lastClr') or '000000'
-                            scheme[tag] = hex_val
-
-        # Parse clrMap from slide master
-        prs = Presentation(str(template_path))
-        master = prs.slide_masters[0]
-        clr_map = master.element.find(f'.//{{{ns_p}}}clrMap')
-        bg1_ref = clr_map.get('bg1', 'lt1') if clr_map is not None else 'lt1'
-        tx1_ref = clr_map.get('tx1', 'dk1') if clr_map is not None else 'dk1'
-        bg2_ref = clr_map.get('bg2', 'lt2') if clr_map is not None else 'lt2'
-        tx2_ref = clr_map.get('tx2', 'dk2') if clr_map is not None else 'dk2'
-
-        colors = {
-            "text": f"#{scheme.get(tx1_ref, '000000')}",
-            "background": f"#{scheme.get(bg1_ref, 'FFFFFF')}",
-            "text2": f"#{scheme.get(tx2_ref, '000000')}",
-            "background2": f"#{scheme.get(bg2_ref, 'FFFFFF')}",
-        }
-        for i in range(1, 7):
-            colors[f"accent{i}"] = f"#{scheme.get(f'accent{i}', '4A90D9')}"
-
-        # is_dark: text color luminance > 128 means dark background
-        tx = colors["text"].lstrip("#")
-        r, g, b = int(tx[:2], 16), int(tx[2:4], 16), int(tx[4:6], 16)
-        is_dark = (0.299 * r + 0.587 * g + 0.114 * b) > 128
-
-        return colors, is_dark
+        from sdpm.analyzer import _extract_theme_colors_raw
+        return _extract_theme_colors_raw(template_path)
 
     def _build_layout_map(self):
         """Build layout name → index mapping from template's slide layouts."""

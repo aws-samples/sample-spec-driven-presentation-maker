@@ -149,6 +149,14 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                 >
                   Styles
                 </a>
+                <a
+                  href="/templates/"
+                  className={`px-2.5 py-1 rounded-md text-sm font-medium no-underline transition-colors ${
+                    pathname?.startsWith("/templates") ? "text-foreground" : "text-foreground/40 hover:text-foreground/70"
+                  }`}
+                >
+                  Templates
+                </a>
               </div>
             </>
           )}
