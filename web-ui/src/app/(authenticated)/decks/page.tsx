@@ -118,7 +118,6 @@ export default function DecksPage() {
                     deckId={ws.isWorkspace && !ws.isNew ? ws.activeDeckId : null}
                     deckName={ws.deck?.name || null}
                     chatSessionId={ws.deck?.chatSessionId}
-                    slidePreviewUrls={ws.deck?.slides.map(s => s.previewUrl) || []}
                     slideSlugs={ws.deck?.slides.map(s => s.slug || "") || []}
                     onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
                     onWorkflowPhase={setWorkflowPhase}
@@ -144,20 +143,6 @@ export default function DecksPage() {
                     workflowPhase={workflowPhase}
                     onStyleSelect={handleStyleSelect}
                     idToken={idToken}
-                    onSlideClick={(page) => {
-                      const dName = ws.deck?.name || "Deck"
-                      const mention = ws.activeDeckId
-                        ? `@${dName}(#${ws.activeDeckId}):Page ${page} `
-                        : `@Page ${page} `
-                      const insert = () => chatRef.current?.insertAtCursor(mention)
-                      if (ws.chatOpen) {
-                        insert()
-                      } else {
-                        ws.setChatTab("deck")
-                        ws.setChatOpen(true)
-                        setTimeout(insert, 400)
-                      }
-                    }}
                     ownerAlias={!ws.isOwner ? ws.deck?.ownerAlias : undefined}
                     headerActions={
                       ws.activeDeckId && !ws.isNew ? (
@@ -242,7 +227,6 @@ export default function DecksPage() {
             deckId={ws.isWorkspace && !ws.isNew ? ws.activeDeckId : null}
             deckName={ws.deck?.name || null}
             chatSessionId={ws.deck?.chatSessionId}
-            slidePreviewUrls={ws.deck?.slides.map(s => s.previewUrl) || []}
             slideSlugs={ws.deck?.slides.map(s => s.slug || "") || []}
             onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
             onWorkflowPhase={setWorkflowPhase}

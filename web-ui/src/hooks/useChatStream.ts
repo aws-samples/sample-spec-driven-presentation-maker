@@ -55,7 +55,7 @@ export interface UseChatStreamReturn {
   messages: Message[]
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   isLoading: boolean
-  sendMessage: (text: string, uploadedFiles?: UploadedFile[], snippets?: { label: string; text: string }[], sentAttachments?: { fileName: string; fileType: string }[]) => Promise<void>
+  sendMessage: (text: string, uploadedFiles?: UploadedFile[], snippets?: { label: string; text: string }[], sentAttachments?: { fileName: string; fileType: string }[], options?: { displayContent?: string }) => Promise<void>
   stopGeneration: () => void
   /** Ref to current messages for external reads without re-render dependency. */
   messagesRef: React.MutableRefObject<Message[]>
@@ -109,6 +109,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     uploadedFiles?: UploadedFile[],
     snippets?: { label: string; text: string }[],
     sentAttachments?: { fileName: string; fileType: string }[],
+    options?: { displayContent?: string },
   ) => {
     if (!userMessage.trim() && (!uploadedFiles || uploadedFiles.length === 0) && (!snippets || snippets.length === 0)) return
     if (isLoading) return
@@ -117,9 +118,10 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     const userId = auth.user?.profile?.sub
     if (!IS_LOCAL && (!accessToken || !userId)) return
 
+    const display = options?.displayContent ?? userMessage
     setMessages((prev) => [
       ...prev,
-      { role: "user", content: userMessage, toolUses: [], snippets: snippets && snippets.length > 0 ? snippets : undefined, attachments: sentAttachments && sentAttachments.length > 0 ? sentAttachments : undefined },
+      { role: "user", content: display, toolUses: [], snippets: snippets && snippets.length > 0 ? snippets : undefined, attachments: sentAttachments && sentAttachments.length > 0 ? sentAttachments : undefined },
       { role: "assistant", content: "", toolUses: [] },
     ])
     setIsLoading(true)
@@ -259,11 +261,21 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       if (err instanceof DOMException && err.name === "AbortError") {
         // Keep partial response
       } else {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        const isRetryable = errorMessage.includes("ThrottlingException") || errorMessage.includes("throttl")
+          || errorMessage.includes("timed out") || errorMessage.includes("timeout")
+          || errorMessage.includes("not ready") || errorMessage.includes("ServiceUnavailable")
+        const isConversationLimit = errorMessage.includes("Too much media") || errorMessage.includes("too long")
+        const displayMessage = isConversationLimit
+          ? "This conversation is too long for the model to process. Please start a new chat to continue."
+          : isRetryable
+            ? "The service is temporarily busy or timed out. Please wait a moment and try again."
+            : "Sorry, something went wrong. Please try again."
         setMessages((prev) => {
           const updated = [...prev]
           updated[updated.length - 1] = {
             ...updated[updated.length - 1],
-            content: "Sorry, something went wrong. Please try again.",
+            content: displayMessage,
           }
           return updated
         })

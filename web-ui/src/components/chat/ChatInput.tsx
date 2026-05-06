@@ -44,15 +44,23 @@ export interface ChatInputProps {
   children?: ReactNode
   /** Stop button tooltip override. */
   stopTitle?: string
+  /** Called on every input change (e.g., for @mention detection). */
+  onInputChange?: (value: string) => void
+  /** Overlay rendered inside the textarea's relative container (e.g., MentionOverlay). */
+  textareaOverlay?: ReactNode
+  /** Additional className for the textarea element (e.g., text-transparent for overlay mode). */
+  textareaClassName?: string
 }
 
 export interface ChatInputHandle {
   insertAtCursor: (text: string) => void
   focus: () => void
+  /** Ref to the internal textarea element (for MentionOverlay positioning). */
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, deckId, children, stopTitle },
+  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, deckId, children, stopTitle, onInputChange, textareaOverlay, textareaClassName },
   ref,
 ) {
   const [input, setInput] = useState("")
@@ -82,6 +90,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     focus() {
       textareaRef.current?.focus()
     },
+    textareaRef,
   }), [input])
 
   // Auto-resize textarea
@@ -215,16 +224,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               <textarea
                 ref={textareaRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => { setInput(e.target.value); onInputChange?.(e.target.value) }}
                 onKeyDown={handleKeyDown}
                 onCompositionStart={onCompositionStart}
                 onCompositionEnd={onCompositionEnd}
                 placeholder={placeholder ?? (isMobile ? "Ask anything…" : "Ask anything…  ⌘↵ send")}
                 aria-label="Chat message input"
-                className="w-full bg-transparent resize-none text-sm min-h-[24px] max-h-[120px] py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground leading-relaxed font-[inherit] tracking-[inherit]"
+                className={`w-full bg-transparent resize-none text-sm min-h-[24px] max-h-[120px] py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground leading-relaxed font-[inherit] tracking-[inherit] ${textareaClassName ?? ""}`}
                 rows={1}
                 autoFocus
               />
+              {textareaOverlay}
             </div>
 
             {isLoading ? (
