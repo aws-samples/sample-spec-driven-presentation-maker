@@ -11,7 +11,7 @@ const MODE_TO_AGENT: Record<string, string> = {
   spec: "sdpm-spec",
   separated: "sdpm-spec",
   single: "sdpm-single",
-  style: "sdpm-style",
+  style_creator: "sdpm-style",
 }
 
 export const dynamic = 'force-dynamic'
