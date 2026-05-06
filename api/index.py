@@ -219,7 +219,7 @@ def _deck_summary(item: Dict, extras: Dict[str, Dict]) -> Dict[str, Any]:
 
 
 def _extract_cover_html(html: str) -> str:
-    """Extract <head> + first <div class="slide"> from a style HTML.
+    """Extract <head> + first <div class="slide..."> from a style HTML.
 
     Args:
         html: Full style HTML string.
@@ -230,12 +230,13 @@ def _extract_cover_html(html: str) -> str:
     head_end = html.find("</head>")
     if head_end == -1:
         return ""
-    first_slide = html.find('<div class="slide">')
-    if first_slide == -1:
+    # Match <div class="slide"> or <div class="slide ..."> (additional classes)
+    slide_pattern = re.compile(r'<div class="slide[\s"]')
+    matches = list(slide_pattern.finditer(html))
+    if not matches:
         return ""
-    # Find end of first slide: next slide or </body>
-    next_slide = html.find('<div class="slide">', first_slide + 1)
-    end = next_slide if next_slide != -1 else html.find("</body>", first_slide)
+    first_slide = matches[0].start()
+    end = matches[1].start() if len(matches) > 1 else html.find("</body>", first_slide)
     if end == -1:
         end = len(html)
     return (
