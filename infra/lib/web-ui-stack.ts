@@ -228,7 +228,10 @@ function handler(event) {
           command: [
             "bash", "-c",
             "pip install -r /asset-input/api/requirements.txt -t /asset-output/ && " +
-            "cp -r /asset-input/api/* /asset-input/shared /asset-output/",
+            "cp -r /asset-input/api/* /asset-input/shared /asset-output/ && " +
+            "mkdir -p /asset-output/sdpm && cp -r /asset-input/skill/sdpm/analyzer /asset-output/sdpm/ && " +
+            "cp /asset-input/skill/sdpm/__init__.py /asset-output/sdpm/ && " +
+            "mkdir -p /asset-output/sdpm/utils && cp /asset-input/skill/sdpm/utils/__init__.py /asset-input/skill/sdpm/utils/io.py /asset-output/sdpm/utils/",
           ],
           local: {
             tryBundle(outputDir: string): boolean {
@@ -245,6 +248,10 @@ function handler(event) {
               }
               execSync(`cp -r ${root}/api/* ${outputDir}/`, { stdio: "inherit" });
               execSync(`cp -r ${root}/shared ${outputDir}/shared`, { stdio: "inherit" });
+              execSync(`mkdir -p ${outputDir}/sdpm/utils`, { stdio: "inherit" });
+              execSync(`cp -r ${root}/skill/sdpm/analyzer ${outputDir}/sdpm/`, { stdio: "inherit" });
+              execSync(`cp ${root}/skill/sdpm/__init__.py ${outputDir}/sdpm/`, { stdio: "inherit" });
+              execSync(`cp ${root}/skill/sdpm/utils/__init__.py ${root}/skill/sdpm/utils/io.py ${outputDir}/sdpm/utils/`, { stdio: "inherit" });
               return true;
             },
           },
@@ -351,6 +358,16 @@ function handler(event) {
     const stylesUserItem = stylesUser.addResource("{style_name}");
     stylesUserItem.addMethod("DELETE", integration, auth);
     stylesUserItem.addMethod("PATCH", integration, auth);
+
+    // Templates
+    const templates = api.root.addResource("templates");
+    templates.addMethod("GET", integration, auth);
+    templates.addResource("{name}").addMethod("GET", integration, auth);
+    const templatesUser = templates.addResource("user");
+    templatesUser.addMethod("POST", integration, auth);
+    const templatesUserItem = templatesUser.addResource("{name}");
+    templatesUserItem.addMethod("DELETE", integration, auth);
+    templatesUserItem.addMethod("PATCH", integration, auth);
 
     // --- Deploy web-ui static files to S3 ---
     // Bundle the web-ui at synth time so changes are auto-picked up without a

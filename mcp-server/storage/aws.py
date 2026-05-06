@@ -249,6 +249,82 @@ class AwsStorage(Storage):
             "pinned_styles": pins,
         })
 
+    # --- User Templates ---
+
+    def list_user_templates(self, user_id: str) -> list[dict]:
+        """List user templates from DDB."""
+        resp = self._table.query(
+            KeyConditionExpression="PK = :pk AND begins_with(SK, :prefix)",
+            ExpressionAttributeValues={":pk": f"USER#{user_id}", ":prefix": "TEMPLATE#"},
+        )
+        return resp.get("Items", [])
+
+    def get_user_template_metadata(self, user_id: str, name: str) -> dict | None:
+        """Get single user template metadata."""
+        resp = self._table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+        return resp.get("Item")
+
+    def put_user_template(self, user_id: str, name: str, data: bytes, metadata: dict) -> None:
+        """Upload user template to S3 and metadata to DDB."""
+        s3_key = f"user-templates/{user_id}/{name}.pptx"
+        self._s3.put_object(Bucket=self._pptx_bucket, Key=s3_key, Body=data)
+        self._table.put_item(Item={
+            "PK": f"USER#{user_id}",
+            "SK": f"TEMPLATE#{name}",
+            "name": name,
+            "s3Key": s3_key,
+            **metadata,
+        })
+
+    def delete_user_template(self, user_id: str, name: str) -> None:
+        """Delete user template from S3 and DDB."""
+        s3_key = f"user-templates/{user_id}/{name}.pptx"
+        self._s3.delete_object(Bucket=self._pptx_bucket, Key=s3_key)
+        self._table.delete_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+
+    def download_user_template(self, user_id: str, name: str) -> bytes:
+        """Download user template from S3."""
+        s3_key = f"user-templates/{user_id}/{name}.pptx"
+        resp = self._s3.get_object(Bucket=self._pptx_bucket, Key=s3_key)
+        return resp["Body"].read()
+
+    def rename_user_template(self, user_id: str, old_name: str, new_name: str) -> None:
+        """Rename user template (copy S3 + update DDB + delete old)."""
+        old_key = f"user-templates/{user_id}/{old_name}.pptx"
+        new_key = f"user-templates/{user_id}/{new_name}.pptx"
+        # Copy S3 object
+        self._s3.copy_object(
+            Bucket=self._pptx_bucket,
+            CopySource={"Bucket": self._pptx_bucket, "Key": old_key},
+            Key=new_key,
+        )
+        self._s3.delete_object(Bucket=self._pptx_bucket, Key=old_key)
+        # Move DDB item
+        old_item = self._table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{old_name}"}).get("Item", {})
+        self._table.delete_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{old_name}"})
+        old_item["SK"] = f"TEMPLATE#{new_name}"
+        old_item["name"] = new_name
+        old_item["s3Key"] = new_key
+        self._table.put_item(Item=old_item)
+
+    def update_user_template_metadata(self, user_id: str, name: str, updates: dict) -> None:
+        """Update fields in user template DDB item."""
+        expr_parts = []
+        attr_values = {}
+        attr_names = {}
+        for i, (k, v) in enumerate(updates.items()):
+            alias = f"#k{i}"
+            val_alias = f":v{i}"
+            expr_parts.append(f"{alias} = {val_alias}")
+            attr_names[alias] = k
+            attr_values[val_alias] = v
+        self._table.update_item(
+            Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"},
+            UpdateExpression="SET " + ", ".join(expr_parts),
+            ExpressionAttributeNames=attr_names,
+            ExpressionAttributeValues=attr_values,
+        )
+
     # --- Auth ---
     # deck_exists is inherited from Storage base class
 

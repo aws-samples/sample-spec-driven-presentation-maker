@@ -459,6 +459,253 @@ def rename_user_style(style_name: str) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Template endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/templates")
+def list_templates() -> Dict[str, Any]:
+    """List all templates (builtin + user) with metadata."""
+    user_id = get_user_id(app.current_event)
+
+    templates: List[Dict[str, Any]] = []
+
+    # Builtin templates from DDB
+    resp = table.scan(
+        FilterExpression="begins_with(PK, :prefix) AND SK = :sk",
+        ExpressionAttributeValues={":prefix": "TEMPLATE#", ":sk": "META"},
+    )
+    for t in resp.get("Items", []):
+        analysis = {}
+        raw = t.get("analysisJson", "")
+        if raw and raw != "{}":
+            analysis = json.loads(raw) if isinstance(raw, str) else raw
+        templates.append({
+            "name": t.get("name", ""),
+            "source": "builtin",
+            "description": t.get("description", ""),
+            "theme_colors": analysis.get("theme_colors", {}),
+            "fonts": t.get("fonts", {}),
+            "layout_count": len(analysis.get("layouts", [])),
+        })
+
+    # User templates
+    resp = table.query(
+        KeyConditionExpression=Key("PK").eq(f"USER#{user_id}") & Key("SK").begins_with("TEMPLATE#"),
+    )
+    for t in resp.get("Items", []):
+        analysis = {}
+        raw = t.get("analysisJson", "")
+        if raw and raw != "{}":
+            analysis = json.loads(raw) if isinstance(raw, str) else raw
+        templates.append({
+            "name": t.get("name", ""),
+            "source": "user",
+            "description": t.get("description", ""),
+            "theme_colors": analysis.get("theme_colors", {}),
+            "fonts": t.get("fonts", {}),
+            "layout_count": len(analysis.get("layouts", [])),
+        })
+
+    return {"templates": templates}
+
+
+@app.get("/templates/<name>")
+def download_template(name: str) -> Any:
+    """Download a template .pptx file. Searches user templates first, then builtin."""
+    user_id = get_user_id(app.current_event)
+
+    # Try user template
+    user_key = f"user-templates/{user_id}/{name}.pptx"
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=user_key)
+        url = s3_client.generate_presigned_url(
+            "get_object", Params={"Bucket": BUCKET_NAME, "Key": user_key}, ExpiresIn=300
+        )
+        return {"downloadUrl": url}
+    except Exception:
+        pass
+
+    # Try builtin
+    resp = table.get_item(Key={"PK": f"TEMPLATE#{name}", "SK": "META"})
+    item = resp.get("Item")
+    if not item:
+        return {"error": "Template not found"}, 404
+    s3_key = item.get("s3Key", "")
+    if not s3_key:
+        return {"error": "Template file not available"}, 404
+    url = s3_client.generate_presigned_url(
+        "get_object", Params={"Bucket": RESOURCE_BUCKET, "Key": s3_key}, ExpiresIn=300
+    )
+    return {"downloadUrl": url}
+
+
+@app.post("/templates/user")
+def upload_user_template() -> Dict[str, Any]:
+    """Upload a user template (.pptx) with optional description.
+
+    Expects multipart form: file (.pptx) + description (text).
+    Analyzes template and stores metadata in DDB.
+    """
+    import base64
+    import tempfile
+    from pathlib import Path
+
+    user_id = get_user_id(app.current_event)
+    event = app.current_event
+
+    # Parse multipart body
+    content_type = event.get("headers", {}).get("content-type", "")
+    if "multipart/form-data" not in content_type:
+        return {"error": "multipart/form-data required"}, 400
+
+    body = event.get("body", "")
+    if event.get("isBase64Encoded"):
+        body = base64.b64decode(body)
+    else:
+        body = body.encode("utf-8") if isinstance(body, str) else body
+
+    # Simple multipart parsing
+    boundary = content_type.split("boundary=")[-1].strip()
+    parts = body.split(f"--{boundary}".encode())
+
+    file_data = None
+    file_name = ""
+    description = ""
+
+    for part in parts:
+        if b"Content-Disposition" not in part:
+            continue
+        header_end = part.find(b"\r\n\r\n")
+        if header_end < 0:
+            continue
+        headers = part[:header_end].decode("utf-8", errors="ignore")
+        content = part[header_end + 4:]
+        if content.endswith(b"\r\n"):
+            content = content[:-2]
+
+        if 'name="file"' in headers or 'name="file";' in headers:
+            file_data = content
+            fn_match = re.search(r'filename="([^"]+)"', headers)
+            if fn_match:
+                file_name = fn_match.group(1)
+        elif 'name="description"' in headers:
+            description = content.decode("utf-8").strip()
+
+    if not file_data or not file_name.endswith(".pptx"):
+        return {"error": ".pptx file required"}, 400
+
+    name = file_name.removesuffix(".pptx")
+    if not re.fullmatch(r"[a-zA-Z0-9_\-\s.()]+", name):
+        return {"error": "Invalid template name"}, 400
+
+    # Duplicate check
+    existing = table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+    if existing.get("Item"):
+        return {"error": f'Template "{name}" already exists'}, 409
+
+    # Analyze template
+    tmp = Path(tempfile.mkdtemp())
+    tpl_path = tmp / f"{name}.pptx"
+    tpl_path.write_bytes(file_data)
+
+    from sdpm.analyzer import analyze_template as _analyze
+
+    analysis = _analyze(tpl_path)
+    metadata = {
+        "description": description,
+        "fonts": analysis.get("fonts", {}),
+        "analysisJson": json.dumps({
+            "theme_colors": analysis.get("theme_colors", {}),
+            "layouts": analysis.get("layouts", []),
+        }),
+    }
+
+    # Upload to S3 + DDB
+    s3_key = f"user-templates/{user_id}/{name}.pptx"
+    s3_client.put_object(Bucket=BUCKET_NAME, Key=s3_key, Body=file_data)
+    table.put_item(Item={
+        "PK": f"USER#{user_id}",
+        "SK": f"TEMPLATE#{name}",
+        "name": name,
+        "s3Key": s3_key,
+        **metadata,
+    })
+
+    return {"uploaded": name}
+
+
+@app.delete("/templates/user/<name>")
+def delete_user_template(name: str) -> Dict[str, Any]:
+    """Delete a user template."""
+    user_id = get_user_id(app.current_event)
+
+    # Check exists
+    resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+    if not resp.get("Item"):
+        return {"error": "Template not found"}, 404
+
+    s3_key = f"user-templates/{user_id}/{name}.pptx"
+    s3_client.delete_object(Bucket=BUCKET_NAME, Key=s3_key)
+    table.delete_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+
+    return {"deleted": name}
+
+
+@app.patch("/templates/user/<name>")
+def patch_user_template(name: str) -> Dict[str, Any]:
+    """Rename or update description of a user template.
+
+    Body: {"newName": str} or {"description": str}
+    """
+    user_id = get_user_id(app.current_event)
+    body = app.current_event.json_body
+
+    resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+    item = resp.get("Item")
+    if not item:
+        return {"error": "Template not found"}, 404
+
+    # Rename
+    new_name = body.get("newName", "").strip()
+    if new_name:
+        if not re.fullmatch(r"[a-zA-Z0-9_-]+", new_name):
+            return {"error": "Letters, numbers, hyphens, underscores only"}, 400
+        # Check duplicate
+        dup = table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{new_name}"})
+        if dup.get("Item"):
+            return {"error": "Name already exists"}, 409
+        # S3 copy + delete
+        old_key = f"user-templates/{user_id}/{name}.pptx"
+        new_key = f"user-templates/{user_id}/{new_name}.pptx"
+        s3_client.copy_object(
+            Bucket=BUCKET_NAME,
+            CopySource={"Bucket": BUCKET_NAME, "Key": old_key},
+            Key=new_key,
+        )
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=old_key)
+        # DDB: delete old, put new
+        table.delete_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+        item["SK"] = f"TEMPLATE#{new_name}"
+        item["name"] = new_name
+        item["s3Key"] = new_key
+        table.put_item(Item=item)
+        return {"renamed": {"from": name, "to": new_name}}
+
+    # Update description
+    description = body.get("description")
+    if description is not None:
+        table.update_item(
+            Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"},
+            UpdateExpression="SET description = :d",
+            ExpressionAttributeValues={":d": description},
+        )
+        return {"updated": name, "description": description}
+
+    return {"error": "No action specified"}, 400
+
+
+# ---------------------------------------------------------------------------
 # Deck endpoints
 # ---------------------------------------------------------------------------
 

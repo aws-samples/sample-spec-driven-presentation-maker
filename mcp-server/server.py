@@ -220,7 +220,7 @@ def analyze_template(template: str) -> str:
     if not template or not template.strip():
         return json.dumps({"error": "template is required"})
     return json.dumps(
-        template_mod.analyze_template(template_name=template, storage=_storage),
+        template_mod.analyze_template(template_name=template, storage=_storage, user_id=_get_user_id()),
         ensure_ascii=False,
     )
 
@@ -558,13 +558,13 @@ def read_guides(names: list[str]) -> str:
 
 @mcp.tool()
 def list_templates() -> str:
-    """List all available templates with name and description.
+    """List all available templates with name, source, and description.
 
     Returns:
         JSON with list of templates.
     """
     return json.dumps(
-        template_mod.list_templates(storage=_storage),
+        template_mod.list_templates(storage=_storage, user_id=_get_user_id()),
     )
 
 
