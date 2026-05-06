@@ -358,15 +358,21 @@ function handler(event) {
     const stylesUserItem = stylesUser.addResource("{style_name}");
     stylesUserItem.addMethod("ANY", integration, auth);
 
-    // Templates — use ANY to minimize Lambda permissions (policy size limit)
+    // Templates — single greedy proxy handles all sub-paths via Powertools routing.
+    // NOTE: Previous deploy left a {proxy+} in API Gateway state. We must use
+    // the same proxy approach to avoid "sibling variable path" conflicts.
     const templates = api.root.addResource("templates");
     templates.addMethod("ANY", integration, auth);
-    const templatesName = templates.addResource("{name}");
-    templatesName.addMethod("ANY", integration, auth);
-    const templatesUser = templates.addResource("user");
-    templatesUser.addMethod("ANY", integration, auth);
-    const templatesUserName = templatesUser.addResource("{template_name}");
-    templatesUserName.addMethod("ANY", integration, auth);
+    templates.addProxy({
+      defaultIntegration: integration,
+      defaultMethodOptions: auth,
+      anyMethod: true,
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: ["Content-Type", "Authorization"],
+      },
+    });
 
     // --- Deploy web-ui static files to S3 ---
     // Bundle the web-ui at synth time so changes are auto-picked up without a
