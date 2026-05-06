@@ -661,7 +661,20 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       })
     if (uploadedFiles.length > 0) {
       const fileInfo = uploadedFiles
-        .map((f) => `[Attached: ${f.fileName} (uploadId: ${f.uploadId})]`)
+        .map((f) => {
+          if (IS_LOCAL && f.filePath) {
+            const parts = [`path: "${f.filePath}"`]
+            if (f.imagesDir) parts.push(`images: "${f.imagesDir}"`)
+            if (f.colorAnalysis) {
+              const colors = f.colorAnalysis.palette.map((c) => `${c.hex}(${Math.round(c.ratio * 100)}%)`).join(" ")
+              parts.push(`colors: ${colors}`)
+              parts.push(`brightness: ${f.colorAnalysis.brightness}`)
+              parts.push(`saturation: ${f.colorAnalysis.saturation}`)
+            }
+            return `[Attached: ${f.fileName} (${parts.join(", ")})]`
+          }
+          return `[Attached: ${f.fileName} (uploadId: ${f.uploadId})]`
+        })
         .join("\n")
       fullMessage = `${fileInfo}\n\n${fullMessage}`
     }

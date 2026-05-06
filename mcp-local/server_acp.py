@@ -824,30 +824,9 @@ def run_style_python(purpose: str, code: str) -> str:
 # Upload / attachment tools (Local version)
 # ---------------------------------------------------------------------------
 from upload_tools import (  # noqa: E402
-    read_uploaded_file as _read_uploaded_file,
     import_attachment as _import_attachment,
     cleanup_old_sessions as _cleanup_old_sessions,
 )
-
-
-@mcp.tool()
-def read_uploaded_file(upload_id: str, offset: int = 0, limit: int = 2000) -> list:
-    """Read the content of a file uploaded by the user.
-
-    Files are pre-processed at upload time (converted to Markdown/JSON for docs,
-    stored as-is for images/text). Output uses cat -n format (line numbers) for
-    citation and navigation. No deck_id required — works during hearing.
-
-    Args:
-        upload_id: The upload identifier from the [Attached: ...] message
-            (format: "sessionId/shortId_filename").
-        offset: Starting line number (0-indexed). Default 0.
-        limit: Number of lines to read. Default 2000.
-
-    Returns:
-        Text content with line numbers and/or image previews.
-    """
-    return _read_uploaded_file(upload_id=upload_id, offset=offset, limit=limit)
 
 
 @mcp.tool()

@@ -30,6 +30,9 @@ export interface UploadedFile {
   status: "uploading" | "processing" | "completed" | "failed"
   extractedText?: string
   imageUrl?: string
+  filePath?: string
+  imagesDir?: string
+  colorAnalysis?: { palette: { hex: string; ratio: number }[]; brightness: string; saturation: string }
 }
 
 let apiBaseUrl = ""
@@ -115,6 +118,9 @@ export async function uploadFile(
 
     uploaded.uploadId = data.uploadId
     uploaded.status = data.status === "converted" || data.status === "completed" ? "completed" : "failed"
+    if (data.filePath) uploaded.filePath = data.filePath
+    if (data.imagesDir) uploaded.imagesDir = data.imagesDir
+    if (data.colorAnalysis) uploaded.colorAnalysis = data.colorAnalysis
     onProgress?.(uploaded)
     return uploaded
   }
