@@ -411,7 +411,7 @@ function handler(event) {
       ClientId: props.userPoolClient.userPoolClientId,
       SiteUrl: this.siteUrl,
       AgentRuntimeArn: props.agentRuntimeArn,
-      ApiBaseUrl: httpApi.apiEndpoint,
+      ApiBaseUrl: `${httpApi.apiEndpoint}/`,
       McpScope: props.mcpCustomScope ? ` ${props.mcpCustomScope}` : "",
     });
 
