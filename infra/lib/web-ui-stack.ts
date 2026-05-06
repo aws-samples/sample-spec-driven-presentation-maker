@@ -324,6 +324,7 @@ function handler(event) {
         allowOrigins: ["*"],
         allowMethods: [apigatewayv2.CorsHttpMethod.ANY],
         allowHeaders: ["Content-Type", "Authorization"],
+        maxAge: cdk.Duration.hours(1),
       },
     });
 
@@ -339,6 +340,14 @@ function handler(event) {
       methods: [apigatewayv2.HttpMethod.ANY],
       integration: lambdaIntegration,
       authorizer: jwtAuthorizer,
+    });
+
+    // OPTIONS must bypass authorizer for CORS preflight to succeed (HTTP 204)
+    httpApi.addRoutes({
+      path: "/{proxy+}",
+      methods: [apigatewayv2.HttpMethod.OPTIONS],
+      integration: lambdaIntegration,
+      authorizer: new apigatewayv2.HttpNoneAuthorizer(),
     });
 
     // --- Deploy web-ui static files to S3 ---
