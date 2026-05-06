@@ -344,6 +344,13 @@ function handler(event) {
     const styles = api.root.addResource("styles");
     styles.addMethod("GET", integration, auth);
     styles.addResource("{name}").addMethod("GET", integration, auth);
+    const stylesPin = styles.addResource("pin");
+    stylesPin.addMethod("POST", integration, auth);
+    const stylesUser = styles.addResource("user");
+    stylesUser.addMethod("POST", integration, auth);
+    const stylesUserItem = stylesUser.addResource("{style_name}");
+    stylesUserItem.addMethod("DELETE", integration, auth);
+    stylesUserItem.addMethod("PATCH", integration, auth);
 
     // --- Deploy web-ui static files to S3 ---
     // Bundle the web-ui at synth time so changes are auto-picked up without a

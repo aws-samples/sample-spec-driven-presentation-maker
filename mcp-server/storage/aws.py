@@ -231,6 +231,24 @@ class AwsStorage(Storage):
                 keys.append(obj["Key"])
         return sorted(keys)
 
+    # --- Style Pins ---
+
+    def get_style_pins(self, user_id: str) -> list[str]:
+        """Get pinned style names from DDB."""
+        resp = self._table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
+        item = resp.get("Item")
+        if not item:
+            return []
+        return item.get("pinned_styles", [])
+
+    def put_style_pins(self, user_id: str, pins: list[str]) -> None:
+        """Save pinned style names to DDB."""
+        self._table.put_item(Item={
+            "PK": f"USER#{user_id}",
+            "SK": "STYLE_PINS",
+            "pinned_styles": pins,
+        })
+
     # --- Auth ---
     # deck_exists is inherited from Storage base class
 

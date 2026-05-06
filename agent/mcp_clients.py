@@ -19,16 +19,21 @@ MCP_DEFS: list[tuple[str, bool]] = [
 ]
 
 
-def mcp_agentcore_runtime(jwt_token: str) -> MCPClient:
+def mcp_agentcore_runtime(jwt_token: str, tool_filters: dict | None = None) -> MCPClient:
     """Pattern 1: Amazon Bedrock AgentCore Runtime MCP Server with JWT Bearer authentication.
 
     Args:
         jwt_token: JWT access token from the caller (without "Bearer " prefix).
+        tool_filters: Optional tool filter dict (e.g. {"allowed": ["tool1", "tool2"]}).
     """
     region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
     runtime_arn = os.environ["MCP_RUNTIME_ARN"]
     encoded_arn = urllib.parse.quote(runtime_arn, safe="")
     url = f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{encoded_arn}/invocations?qualifier=DEFAULT"
+
+    kwargs: dict = {}
+    if tool_filters:
+        kwargs["tool_filters"] = tool_filters
 
     return MCPClient(
         lambda: streamablehttp_client(
@@ -37,6 +42,7 @@ def mcp_agentcore_runtime(jwt_token: str) -> MCPClient:
             timeout=120,
             terminate_on_close=False,
         ),
+        **kwargs,
     )
 
 

@@ -178,3 +178,25 @@ class Storage(ABC):
             True if deck exists and is owned by user.
         """
         return self.get_deck(deck_id, user_id) is not None
+
+    # --- Style Pins ---
+
+    @abstractmethod
+    def get_style_pins(self, user_id: str) -> list[str]:
+        """Get pinned style names for a user.
+
+        Args:
+            user_id: User identifier.
+
+        Returns:
+            List of pinned style names.
+        """
+
+    @abstractmethod
+    def put_style_pins(self, user_id: str, pins: list[str]) -> None:
+        """Save pinned style names for a user.
+
+        Args:
+            user_id: User identifier.
+            pins: List of style names to pin.
+        """

@@ -250,52 +250,211 @@ def _extract_cover_html(html: str) -> str:
 def list_styles() -> Dict[str, Any]:
     """List available styles with cover slide HTML for preview.
 
+    Includes builtin styles and user styles with pin/source metadata.
+
     Returns:
-        Dict with styles list (name, description, coverHtml).
+        Dict with styles list (name, description, coverHtml, pinned, source).
     """
+    user_id = get_user_id(app.current_event)
+
+    # Builtin styles (cached)
     global _styles_cache  # noqa: PLW0603
-    if _styles_cache is not None:
-        return {"styles": _styles_cache}
+    if _styles_cache is None and RESOURCE_BUCKET:
+        prefix = "references/examples/styles/"
+        resp = s3_client.list_objects_v2(Bucket=RESOURCE_BUCKET, Prefix=prefix)
+        builtin: List[Dict[str, str]] = []
+        for obj in resp.get("Contents", []):
+            key = obj["Key"]
+            if not key.endswith(".html"):
+                continue
+            name = key.removeprefix(prefix).removesuffix(".html")
+            body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=key)["Body"].read().decode("utf-8")
+            description = ""
+            m = re.search(r"<title>(.*?)</title>", body, re.IGNORECASE)
+            if m:
+                description = m.group(1).strip()
+            builtin.append({"name": name, "description": description, "coverHtml": _extract_cover_html(body), "source": "builtin"})
+        _styles_cache = builtin
 
-    if not RESOURCE_BUCKET:
-        return {"styles": []}
+    all_styles: List[Dict[str, Any]] = list(_styles_cache or [])
 
-    prefix = "references/examples/styles/"
-    resp = s3_client.list_objects_v2(Bucket=RESOURCE_BUCKET, Prefix=prefix)
-    styles: List[Dict[str, str]] = []
-    for obj in resp.get("Contents", []):
-        key = obj["Key"]
-        if not key.endswith(".html"):
-            continue
-        name = key.removeprefix(prefix).removesuffix(".html")
-        body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=key)["Body"].read().decode("utf-8")
-        description = ""
-        m = re.search(r"<title>(.*?)</title>", body, re.IGNORECASE)
-        if m:
-            description = m.group(1).strip()
-        styles.append({"name": name, "description": description, "coverHtml": _extract_cover_html(body)})
+    # User styles
+    user_prefix = f"user-styles/{user_id}/"
+    try:
+        resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=user_prefix)
+        for obj in resp.get("Contents", []):
+            key = obj["Key"]
+            if not key.endswith(".html"):
+                continue
+            name = key.removeprefix(user_prefix).removesuffix(".html")
+            body = s3_client.get_object(Bucket=BUCKET_NAME, Key=key)["Body"].read().decode("utf-8")
+            description = ""
+            m = re.search(r"<title>(.*?)</title>", body, re.IGNORECASE)
+            if m:
+                description = m.group(1).strip()
+            all_styles.append({"name": name, "description": description, "coverHtml": _extract_cover_html(body), "source": "user"})
+    except Exception:
+        pass
 
-    _styles_cache = styles
-    return {"styles": styles}
+    # Pins
+    pin_resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
+    pinned_names = set(pin_resp.get("Item", {}).get("pinned_styles", []))
+
+    for s in all_styles:
+        s["pinned"] = s["name"] in pinned_names
+
+    return {"styles": all_styles}
 
 
 @app.get("/styles/<name>")
 def get_style(name: str) -> Dict[str, Any]:
-    """Get full HTML for a single style.
+    """Get full HTML for a single style (user or builtin).
 
     Returns:
         Dict with name and fullHtml.
     """
-    if not RESOURCE_BUCKET:
-        return {"error": f"Style not found: {name}"}, 404
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
         return {"error": "Invalid style name"}, 400
-    key = f"references/examples/styles/{name}.html"
+
+    user_id = get_user_id(app.current_event)
+
+    # Try user style first
+    user_key = f"user-styles/{user_id}/{name}.html"
     try:
-        body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=key)["Body"].read().decode("utf-8")
+        body = s3_client.get_object(Bucket=BUCKET_NAME, Key=user_key)["Body"].read().decode("utf-8")
+        return {"name": name, "fullHtml": body, "source": "user"}
     except Exception:
-        return {"error": f"Style not found: {name}"}, 404
-    return {"name": name, "fullHtml": body}
+        pass
+
+    # Fall back to builtin
+    if RESOURCE_BUCKET:
+        builtin_key = f"references/examples/styles/{name}.html"
+        try:
+            body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=builtin_key)["Body"].read().decode("utf-8")
+            return {"name": name, "fullHtml": body, "source": "builtin"}
+        except Exception:
+            pass
+
+    return {"error": f"Style not found: {name}"}, 404
+
+
+@app.post("/styles/pin")
+def pin_style() -> Dict[str, Any]:
+    """Toggle pin status for a style.
+
+    Body: {"name": str, "pinned": bool}
+    """
+    body = app.current_event.json_body
+    name = body.get("name", "")
+    pinned = body.get("pinned", False)
+
+    if not name or not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
+        return {"error": "Invalid style name"}, 400
+
+    user_id = get_user_id(app.current_event)
+    pin_resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
+    current_pins: List[str] = pin_resp.get("Item", {}).get("pinned_styles", [])
+
+    if pinned and name not in current_pins:
+        current_pins.append(name)
+    elif not pinned and name in current_pins:
+        current_pins.remove(name)
+
+    table.put_item(Item={"PK": f"USER#{user_id}", "SK": "STYLE_PINS", "pinned_styles": current_pins})
+    return {"ok": True, "pinned_styles": current_pins}
+
+
+@app.post("/styles/user")
+def save_user_style() -> Dict[str, Any]:
+    """Save a user style (import or copy).
+
+    Body: {"name": str, "html": str}
+    """
+    body = app.current_event.json_body
+    name = body.get("name", "")
+    html = body.get("html", "")
+
+    if not name or not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
+        return {"error": "Invalid style name"}, 400
+    if not html:
+        return {"error": "html is required"}, 400
+
+    user_id = get_user_id(app.current_event)
+    key = f"user-styles/{user_id}/{name}.html"
+    s3_client.put_object(Bucket=BUCKET_NAME, Key=key, Body=html.encode("utf-8"), ContentType="text/html")
+    return {"saved": name}
+
+
+@app.delete("/styles/user/<style_name>")
+def delete_user_style(style_name: str) -> Dict[str, Any]:
+    """Delete a user style.
+
+    Also removes from pins if pinned.
+    """
+    if not re.fullmatch(r"[a-zA-Z0-9_-]+", style_name):
+        return {"error": "Invalid style name"}, 400
+
+    user_id = get_user_id(app.current_event)
+    key = f"user-styles/{user_id}/{style_name}.html"
+
+    try:
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
+    except Exception:
+        return {"error": f"Style not found: {style_name}"}, 404
+
+    # Remove from pins
+    pin_resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
+    current_pins: List[str] = pin_resp.get("Item", {}).get("pinned_styles", [])
+    if style_name in current_pins:
+        current_pins.remove(style_name)
+        table.put_item(Item={"PK": f"USER#{user_id}", "SK": "STYLE_PINS", "pinned_styles": current_pins})
+
+    return {"deleted": style_name}
+
+
+@app.patch("/styles/user/<style_name>")
+def rename_user_style(style_name: str) -> Dict[str, Any]:
+    """Rename a user style.
+
+    Body: {"newName": str}
+    """
+    body = app.current_event.json_body
+    new_name = body.get("newName", "")
+
+    if not re.fullmatch(r"[a-zA-Z0-9_-]+", style_name):
+        return {"error": "Invalid style name"}, 400
+    if not new_name or not re.fullmatch(r"[a-zA-Z0-9_-]+", new_name):
+        return {"error": "Invalid new name"}, 400
+
+    user_id = get_user_id(app.current_event)
+    old_key = f"user-styles/{user_id}/{style_name}.html"
+    new_key = f"user-styles/{user_id}/{new_name}.html"
+
+    # Check source exists
+    try:
+        body_bytes = s3_client.get_object(Bucket=BUCKET_NAME, Key=old_key)["Body"].read()
+    except Exception:
+        return {"error": f"Style not found: {style_name}"}, 404
+
+    # Check destination doesn't exist
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=new_key)
+        return {"error": f"Style already exists: {new_name}"}, 409
+    except Exception:
+        pass
+
+    # Copy + delete
+    s3_client.put_object(Bucket=BUCKET_NAME, Key=new_key, Body=body_bytes, ContentType="text/html")
+    s3_client.delete_object(Bucket=BUCKET_NAME, Key=old_key)
+
+    # Update pins
+    pin_resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
+    current_pins: List[str] = pin_resp.get("Item", {}).get("pinned_styles", [])
+    if style_name in current_pins:
+        current_pins[current_pins.index(style_name)] = new_name
+        table.put_item(Item={"PK": f"USER#{user_id}", "SK": "STYLE_PINS", "pinned_styles": current_pins})
+
+    return {"renamed": {"from": style_name, "to": new_name}}
 
 
 # ---------------------------------------------------------------------------
