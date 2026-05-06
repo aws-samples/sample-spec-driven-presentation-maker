@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { useChatStream, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage } from "./ChatMessage"
+import { FileDropZone } from "./FileDropZone"
 import { generateSessionId } from "@/services/agentCoreService"
 import { IS_LOCAL } from "@/lib/mode"
 import { Sparkles, MessageSquare, Image, Palette } from "lucide-react"
@@ -102,7 +103,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
   const isInitial = stream.messages.length === 0
 
   return (
-    <div className="flex flex-col h-full">
+    <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={stream.isLoading} className="flex flex-col h-full">
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-4 py-4"
@@ -171,6 +172,6 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
         sessionId={sessionId}
         placeholder="Describe your style…  ⌘↵ send"
       />
-    </div>
+    </FileDropZone>
   )
 }

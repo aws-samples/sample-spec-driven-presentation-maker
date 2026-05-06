@@ -20,6 +20,7 @@ import { useChatStream, type Message, type ToolUseCallbackData } from "@/hooks/u
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage, ToolUse } from "./ChatMessage"
 import { McpStatusBar, McpServerStatus } from "./McpStatusBar"
+import { FileDropZone } from "./FileDropZone"
 import { useIsMobile } from "@/hooks/UseMobile"
 import { Send, ChevronRight } from "lucide-react"
 import { ModeSelector } from "./ModeSelector"
@@ -484,7 +485,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const isInitial = stream.messages.length === 0 && !historyLoading
 
   return (
-    <div className="flex flex-col h-full">
+    <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={stream.isLoading} className="flex flex-col h-full">
       {/* Messages area */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4" role="log" aria-label="Chat messages"
         onScroll={() => {
@@ -625,6 +626,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             )}
           </div>
         </ChatInput>
-    </div>
+    </FileDropZone>
   )
 })

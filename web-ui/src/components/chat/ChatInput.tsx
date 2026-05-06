@@ -57,6 +57,8 @@ export interface ChatInputHandle {
   focus: () => void
   /** Ref to the internal textarea element (for MentionOverlay positioning). */
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
+  /** Programmatically add files (for external drop zones). */
+  addFiles: (files: File[]) => void
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
@@ -71,6 +73,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { onCompositionStart, onCompositionEnd, getIsComposing } = useCompositionSafe()
   const isMobile = useIsMobile()
+
+  const handleFilesRef = useRef<(files: FileList) => void>(() => {})
 
   useImperativeHandle(ref, () => ({
     insertAtCursor(text: string) {
@@ -89,6 +93,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     },
     focus() {
       textareaRef.current?.focus()
+    },
+    addFiles(files: File[]) {
+      const fakeList = { length: files.length, item: (i: number) => files[i], [Symbol.iterator]: files[Symbol.iterator].bind(files) } as unknown as FileList
+      handleFilesRef.current(fakeList)
     },
     textareaRef,
   }), [input])
@@ -115,6 +123,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       setAttachments((prev) => [...prev, { id, file, status: "pending" }])
     }
   }, [attachments.length])
+  handleFilesRef.current = handleFiles
 
   const removeAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id))
