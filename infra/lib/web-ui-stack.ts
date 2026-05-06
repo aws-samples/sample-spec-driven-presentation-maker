@@ -349,20 +349,24 @@ function handler(event) {
     const slides = api.root.addResource("slides");
     slides.addResource("search").addMethod("GET", integration, auth);
     const styles = api.root.addResource("styles");
-    styles.addMethod("GET", integration, auth);
-    styles.addResource("{name}").addMethod("GET", integration, auth);
+    styles.addMethod("ANY", integration, auth);
+    styles.addResource("{name}").addMethod("ANY", integration, auth);
     const stylesPin = styles.addResource("pin");
-    stylesPin.addMethod("POST", integration, auth);
+    stylesPin.addMethod("ANY", integration, auth);
     const stylesUser = styles.addResource("user");
-    stylesUser.addMethod("POST", integration, auth);
+    stylesUser.addMethod("ANY", integration, auth);
     const stylesUserItem = stylesUser.addResource("{style_name}");
-    stylesUserItem.addMethod("DELETE", integration, auth);
-    stylesUserItem.addMethod("PATCH", integration, auth);
+    stylesUserItem.addMethod("ANY", integration, auth);
 
-    // Templates — use proxy to avoid Lambda permission policy size limit
+    // Templates — use ANY to minimize Lambda permissions (policy size limit)
     const templates = api.root.addResource("templates");
     templates.addMethod("ANY", integration, auth);
-    templates.addProxy({ defaultIntegration: integration, defaultMethodOptions: auth, anyMethod: true });
+    const templatesName = templates.addResource("{name}");
+    templatesName.addMethod("ANY", integration, auth);
+    const templatesUser = templates.addResource("user");
+    templatesUser.addMethod("ANY", integration, auth);
+    const templatesUserName = templatesUser.addResource("{template_name}");
+    templatesUserName.addMethod("ANY", integration, auth);
 
     // --- Deploy web-ui static files to S3 ---
     // Bundle the web-ui at synth time so changes are auto-picked up without a
