@@ -334,8 +334,14 @@ export default function StylesPage() {
 
       {/* Delete confirmation dialog */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeleteConfirm(null)} onKeyDown={e => { if (e.key === "Escape") setDeleteConfirm(null) }}>
-          <div className="bg-surface-secondary border border-white/[0.08] rounded-xl p-6 max-w-sm mx-4 shadow-2xl" role="alertdialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} onKeyDown={e => { if (e.key === "Escape") setDeleteConfirm(null) }}>
+          <div
+            className="border border-white/[0.1] rounded-xl p-6 max-w-sm mx-4 shadow-[0_24px_64px_oklch(0_0_0/70%)] animate-in fade-in zoom-in-95 duration-150"
+            style={{ background: "oklch(0.14 0.005 260)" }}
+            role="alertdialog"
+            aria-modal="true"
+            onClick={e => e.stopPropagation()}
+          >
             <h3 className="text-sm font-semibold mb-2">Delete style</h3>
             <p className="text-sm text-foreground-muted mb-5">
               Are you sure you want to delete <span className="font-medium text-foreground">{deleteConfirm}</span>? This cannot be undone.
@@ -477,7 +483,7 @@ function StyleListCard({ style, onPreview, onPin, onDelete, onExport, onRename, 
             )}
           </div>
         </div>
-        {style.source === "user" && (
+        {style.source === "user" && !isRenaming && (
           <span className="text-[11px] text-brand-teal/70 font-medium mt-0.5 block">Custom</span>
         )}
       </div>
@@ -500,16 +506,16 @@ function PreviewMoreMenu({ onExport, onDelete }: { onExport: () => void; onDelet
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] py-1 rounded-lg border border-white/[0.08] bg-surface-secondary shadow-xl">
+          <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] py-1 rounded-lg border border-white/[0.1] shadow-[0_8px_32px_oklch(0_0_0/50%)]" style={{ background: "oklch(0.14 0.005 260 / 98%)", backdropFilter: "blur(12px)" }}>
             <button
               onClick={() => { setOpen(false); onExport() }}
-              className="w-full px-3 py-1.5 text-left text-sm text-foreground-muted hover:text-foreground hover:bg-white/[0.04] transition-colors flex items-center gap-2"
+              className="w-full px-3 py-2 text-left text-sm text-foreground/70 hover:text-foreground hover:bg-white/[0.06] transition-colors flex items-center gap-2"
             >
               <Download className="h-3.5 w-3.5" /> Export
             </button>
             <button
               onClick={() => { setOpen(false); onDelete() }}
-              className="w-full px-3 py-1.5 text-left text-sm text-foreground-muted hover:text-red-400 hover:bg-white/[0.04] transition-colors flex items-center gap-2"
+              className="w-full px-3 py-2 text-left text-sm text-foreground/70 hover:text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
             </button>
