@@ -359,15 +359,10 @@ function handler(event) {
     stylesUserItem.addMethod("DELETE", integration, auth);
     stylesUserItem.addMethod("PATCH", integration, auth);
 
-    // Templates
+    // Templates — use proxy to avoid Lambda permission policy size limit
     const templates = api.root.addResource("templates");
-    templates.addMethod("GET", integration, auth);
-    templates.addResource("{name}").addMethod("GET", integration, auth);
-    const templatesUser = templates.addResource("user");
-    templatesUser.addMethod("POST", integration, auth);
-    const templatesUserItem = templatesUser.addResource("{name}");
-    templatesUserItem.addMethod("DELETE", integration, auth);
-    templatesUserItem.addMethod("PATCH", integration, auth);
+    templates.addMethod("ANY", integration, auth);
+    templates.addProxy({ defaultIntegration: integration, defaultMethodOptions: auth, anyMethod: true });
 
     // --- Deploy web-ui static files to S3 ---
     // Bundle the web-ui at synth time so changes are auto-picked up without a
