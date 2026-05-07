@@ -29,15 +29,13 @@ def get_user_id(event: Any) -> str:
     Raises:
         ValueError: If authorizer claims or sub are missing.
     """
-    authorizer = event.request_context.authorizer
-    # HTTP API v2 JWT authorizer
-    if hasattr(authorizer, "jwt"):
-        claims = authorizer.jwt.get("claims", {}) if isinstance(authorizer.jwt, dict) else getattr(authorizer.jwt, "claims", {})
-        sub = claims.get("sub") if isinstance(claims, dict) else getattr(claims, "sub", None)
+    # HTTP API v2: requestContext.authorizer.jwt.claims
+    # REST API v1: requestContext.authorizer.claims
+    raw = event.raw_event.get("requestContext", {}).get("authorizer", {})
+    if "jwt" in raw:
+        sub = raw["jwt"].get("claims", {}).get("sub")
     else:
-        # REST API v1 authorizer
-        claims = (authorizer or {}).get("claims", {})
-        sub = claims.get("sub")
+        sub = raw.get("claims", {}).get("sub")
     if not sub:
         raise ValueError("Unauthorized: missing user identity")
     return sub
@@ -54,13 +52,11 @@ def get_user_alias(event: Any) -> str:
     Returns:
         Alias string (email prefix before @), or empty string if unavailable.
     """
-    authorizer = event.request_context.authorizer
-    if hasattr(authorizer, "jwt"):
-        claims = authorizer.jwt.get("claims", {}) if isinstance(authorizer.jwt, dict) else getattr(authorizer.jwt, "claims", {})
-        email = claims.get("email", "") if isinstance(claims, dict) else getattr(claims, "email", "")
+    raw = event.raw_event.get("requestContext", {}).get("authorizer", {})
+    if "jwt" in raw:
+        email = raw["jwt"].get("claims", {}).get("email", "")
     else:
-        claims = (authorizer or {}).get("claims", {})
-        email = claims.get("email", "")
+        email = raw.get("claims", {}).get("email", "")
     return email.split("@")[0] if email else ""
 
 
