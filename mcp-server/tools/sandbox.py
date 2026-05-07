@@ -106,13 +106,14 @@ def execute_in_sandbox(
 
         # Save modified workspace files back to S3
         outline_rejected = False
+        lint_diagnostics: list[dict] = []
         if save and deck_id:
-            outline_rejected = _save_deck_workspace(
+            outline_rejected, lint_diagnostics = _save_deck_workspace(
                 client, session_id, storage, deck_id,
             )
             logger.info("Deck workspace saved for deck %s", deck_id)
 
-        return output, outline_rejected
+        return output, outline_rejected, lint_diagnostics
 
     finally:
         client.stop_code_interpreter_session(
@@ -235,6 +236,24 @@ def _save_deck_workspace(
             outline_rejected = True
             logger.warning("outline.md lint failed for deck %s — not saved", deck_id)
 
+    # Lint and sanitize slide JSON before saving
+    lint_diagnostics: list[dict] = []
+    from sdpm.schema.lint import lint_and_sanitize
+
+    for rel_path in list(file_map.keys()):
+        if rel_path.startswith("slides/") and rel_path.endswith(".json"):
+            try:
+                slide_data = json.loads(file_map[rel_path])
+                cleaned, diags = lint_and_sanitize(slide_data)
+                if diags:
+                    slug = rel_path.removeprefix("slides/").removesuffix(".json")
+                    for d in diags:
+                        d["slug"] = slug
+                    lint_diagnostics.extend(diags)
+                    file_map[rel_path] = json.dumps(cleaned, ensure_ascii=False)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
     # Write back to S3
     prefix = f"decks/{deck_id}/"
     for rel_path, text in file_map.items():
@@ -245,7 +264,7 @@ def _save_deck_workspace(
             content_type=_content_type(rel_path),
         )
 
-    return outline_rejected
+    return outline_rejected, lint_diagnostics
 
 
 def _write_files(client: Any, session_id: str, content: list[dict[str, str]]) -> None:

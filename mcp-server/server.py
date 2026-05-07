@@ -662,7 +662,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     if deck_id:
         _check_deck_access(deck_id, action="edit_slide" if save else "read")
 
-    output, outline_rejected = sandbox_mod.execute_in_sandbox(
+    output, outline_rejected, lint_diagnostics = sandbox_mod.execute_in_sandbox(
         code=code,
         storage=_storage,
         region=_region,
@@ -680,7 +680,11 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
             "Read workflow `create-new-1-outline` for the correct format."
         )
 
-    # Post-processing: measure_slides triggers PPTX build → measure/lint/bias
+    if lint_diagnostics:
+        errs = result.setdefault("errors", {})
+        errs["lintDiagnostics"] = lint_diagnostics
+
+    # Post-processing: measure_slides triggers PPTX build → measure/bias
     if deck_id and (measure_slides or save):
         import shutil
         import traceback
@@ -712,17 +716,6 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
                     result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})
             except Exception as e:
                 result["measure"] = json.dumps({"error": str(e)})
-
-            # Lint (filter to measured slugs)
-            try:
-                from sdpm.schema.lint import lint as lint_slides
-                presentation = {"slides": slides}
-                page_set = set(page_numbers)
-                lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in page_set]
-                if lint_diag:
-                    result["errors"] = {"lintDiagnostics": lint_diag}
-            except Exception as e:
-                logger.warning("Lint failed: %s", e)
 
             # Layout bias (filter to measured slides; bias uses 1-based)
             try:

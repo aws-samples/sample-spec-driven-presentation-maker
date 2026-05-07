@@ -487,6 +487,31 @@ Audience: Developers
                 "Read workflow `create-new-1-outline` for the correct format."
             )
 
+    # Lint and sanitize slide JSON (pre-save: before measure/build)
+    from sdpm.schema.lint import lint_and_sanitize
+
+    slides_dir = deck_dir / "slides"
+    if slides_dir.is_dir():
+        lint_diagnostics: list[dict] = []
+        for slide_file in sorted(slides_dir.glob("*.json")):
+            try:
+                slide_data = json.loads(slide_file.read_text(encoding="utf-8"))
+                cleaned, diags = lint_and_sanitize(slide_data)
+                if diags:
+                    slug = slide_file.stem
+                    for d in diags:
+                        d["slug"] = slug
+                    lint_diagnostics.extend(diags)
+                    slide_file.write_text(
+                        json.dumps(cleaned, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8",
+                    )
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if lint_diagnostics:
+            errs = result.setdefault("errors", {})
+            errs["lintDiagnostics"] = lint_diagnostics
+
     # Build slug → page number mapping from outline.md (for slug-based measure_slides)
     def _slug_to_page() -> dict[str, int]:
         from sdpm.api import parse_outline_slugs
