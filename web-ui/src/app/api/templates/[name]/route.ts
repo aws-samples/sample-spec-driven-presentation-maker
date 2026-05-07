@@ -14,9 +14,11 @@ function findTemplate(name: string): string | null {
 
   const userDir = path.join(getUserConfigDir(), "templates")
   if (fs.existsSync(userDir)) {
+    // nosemgrep: path-join-resolve-traversal — basename validated above, startsWith check below
     const userPath = path.resolve(userDir, filename)
     if (userPath.startsWith(fs.realpathSync(userDir) + path.sep) && fs.existsSync(userPath)) return userPath
   }
+  // nosemgrep: path-join-resolve-traversal — basename validated above, startsWith check below
   const bundledPath = path.resolve(BUNDLED_TEMPLATES_DIR, filename)
   if (bundledPath.startsWith(BUNDLED_TEMPLATES_DIR + path.sep) && fs.existsSync(bundledPath)) return bundledPath
   return null
