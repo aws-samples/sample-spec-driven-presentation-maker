@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { AppShell } from "@/components/AppShell"
+import { ConfirmDialog } from "@/components/ConfirmDialog"
 import {
   fetchTemplates,
   downloadTemplate,
@@ -164,36 +165,15 @@ export default function TemplatesPage() {
       )}
 
       {/* Delete confirmation */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)}>
-          <div
-            className="bg-surface-secondary border border-white/[0.08] rounded-xl p-6 max-w-sm mx-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
-            role="alertdialog"
-            aria-modal="true"
-            onClick={e => e.stopPropagation()}
-          >
-            <h3 className="text-sm font-semibold mb-2">Delete template</h3>
-            <p className="text-sm text-foreground-muted mb-5">
-              Are you sure you want to delete <span className="font-medium text-foreground">{deleteConfirm}</span>? This cannot be undone.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="px-3 py-1.5 text-sm rounded-lg border border-white/[0.08] hover:bg-white/[0.04] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                autoFocus
-                onClick={() => handleDelete(deleteConfirm)}
-                className="px-3 py-1.5 text-sm rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onOpenChange={(open) => { if (!open) setDeleteConfirm(null) }}
+        title="Delete template"
+        description={<>Are you sure you want to delete <span className="font-medium text-foreground">{deleteConfirm}</span>? This cannot be undone.</>}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => deleteConfirm && handleDelete(deleteConfirm)}
+      />
 
       {/* Toast */}
       {toast && (

@@ -25,7 +25,7 @@ import { AppShell } from "@/components/AppShell"
 import { DeckListView } from "@/components/deck/DeckListView"
 import { SlideCarousel } from "@/components/deck/SlideCarousel"
 import { DeckActions } from "@/components/deck/DeckActions"
-import { DeleteDeckModal } from "@/components/deck/DeleteDeckModal"
+import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { ChatPanelShell } from "@/components/chat/ChatPanelShell"
 import { ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { updateVisibility, shareDeck } from "@/services/deckService"
@@ -234,13 +234,15 @@ export default function DecksPage() {
         )}
       </div>
 
-      {list.deleteTarget && (
-        <DeleteDeckModal
-          deckName={list.deleteTarget.name}
-          onConfirm={list.confirmDelete}
-          onCancel={() => list.setDeleteTarget(null)}
-        />
-      )}
+      <ConfirmDialog
+        open={!!list.deleteTarget}
+        onOpenChange={(open) => { if (!open) list.setDeleteTarget(null) }}
+        title="Delete this deck?"
+        description={<><span className="font-medium text-foreground">{list.deleteTarget?.name}</span> will be permanently deleted after 30 days. This action cannot be undone.</>}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={list.confirmDelete}
+      />
 
       {isMobile && !ws.isWorkspace && (
         <div className="fixed right-4 z-40" style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}>
