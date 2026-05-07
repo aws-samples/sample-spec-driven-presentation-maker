@@ -605,63 +605,14 @@ def download_template(name: str) -> Any:
         return {"error": "Template not found"}, 404
 
 
-@app.post("/templates/user")
-def upload_user_template() -> Dict[str, Any]:
-    """Upload a user template (.pptx) with optional description.
-
-    Expects multipart form: file (.pptx) + description (text).
-    Analyzes template and stores metadata in DDB.
-    """
-    import base64
-    import tempfile
-    from pathlib import Path
-
+@app.post("/templates/user/upload-url")
+def presign_template_upload() -> Dict[str, Any]:
+    """Generate a presigned PUT URL for template upload to S3."""
     user_id = get_user_id(app.current_event)
-    event = app.current_event
+    body = app.current_event.json_body
 
-    # Parse multipart body
-    content_type = event.get("headers", {}).get("content-type", "")
-    if "multipart/form-data" not in content_type:
-        return {"error": "multipart/form-data required"}, 400
-
-    body = event.get("body", "")
-    if event.get("isBase64Encoded"):
-        body = base64.b64decode(body)
-    else:
-        body = body.encode("utf-8") if isinstance(body, str) else body
-
-    # Simple multipart parsing
-    boundary = content_type.split("boundary=")[-1].strip()
-    parts = body.split(f"--{boundary}".encode())
-
-    file_data = None
-    file_name = ""
-    description = ""
-
-    for part in parts:
-        if b"Content-Disposition" not in part:
-            continue
-        header_end = part.find(b"\r\n\r\n")
-        if header_end < 0:
-            continue
-        headers = part[:header_end].decode("utf-8", errors="ignore")
-        content = part[header_end + 4:]
-        if content.endswith(b"\r\n"):
-            content = content[:-2]
-
-        if 'name="file"' in headers or 'name="file";' in headers:
-            file_data = content
-            fn_match = re.search(r'filename="([^"]+)"', headers)
-            if fn_match:
-                file_name = fn_match.group(1)
-        elif 'name="description"' in headers:
-            description = content.decode("utf-8").strip()
-
-    if not file_data or not file_name.endswith(".pptx"):
-        return {"error": ".pptx file required"}, 400
-
-    name = file_name.removesuffix(".pptx")
-    if not re.fullmatch(r"[a-zA-Z0-9_\-\s.()]+", name):
+    name: str = body.get("name", "").strip()
+    if not name or not re.fullmatch(r"[a-zA-Z0-9_\-\s.()]+", name):
         return {"error": "Invalid template name"}, 400
 
     # Duplicate check
@@ -669,10 +620,50 @@ def upload_user_template() -> Dict[str, Any]:
     if existing.get("Item"):
         return {"error": f'Template "{name}" already exists'}, 409
 
-    # Analyze template
+    s3_key = f"user-templates/{user_id}/{name}.pptx"
+    url = s3_client.generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": BUCKET_NAME,
+            "Key": s3_key,
+            "ContentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        },
+        ExpiresIn=PRESIGNED_URL_EXPIRY,
+    )
+    return {"presignedUrl": url, "s3Key": s3_key}
+
+
+@app.post("/templates/user")
+def upload_user_template() -> Dict[str, Any]:
+    """Register a user template after S3 upload. Analyzes and stores metadata.
+
+    Expects JSON body: {name, description}.
+    The .pptx must already be uploaded to S3 via presigned URL.
+    """
+    import tempfile
+    from pathlib import Path
+
+    user_id = get_user_id(app.current_event)
+    body = app.current_event.json_body
+
+    name: str = body.get("name", "").strip()
+    description: str = body.get("description", "")
+
+    if not name or not re.fullmatch(r"[a-zA-Z0-9_\-\s.()]+", name):
+        return {"error": "Invalid template name"}, 400
+
+    s3_key = f"user-templates/{user_id}/{name}.pptx"
+
+    # Verify file exists in S3
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=s3_key)
+    except Exception:
+        return {"error": "File not found in S3. Upload via presigned URL first."}, 400
+
+    # Download and analyze
     tmp = Path(tempfile.mkdtemp())
     tpl_path = tmp / f"{name}.pptx"
-    tpl_path.write_bytes(file_data)
+    s3_client.download_file(BUCKET_NAME, s3_key, str(tpl_path))
 
     from sdpm.analyzer import analyze_template as _analyze
 
@@ -686,9 +677,7 @@ def upload_user_template() -> Dict[str, Any]:
         }),
     }
 
-    # Upload to S3 + DDB
-    s3_key = f"user-templates/{user_id}/{name}.pptx"
-    s3_client.put_object(Bucket=BUCKET_NAME, Key=s3_key, Body=file_data)
+    # Store in DDB
     table.put_item(Item={
         "PK": f"USER#{user_id}",
         "SK": f"TEMPLATE#{name}",

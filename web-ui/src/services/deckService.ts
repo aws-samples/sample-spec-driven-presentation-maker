@@ -576,13 +576,30 @@ export async function downloadTemplate(name: string, idToken: string): Promise<v
 /** Upload a user template. */
 export async function uploadTemplate(file: File, description: string, idToken: string): Promise<{ uploaded?: string; error?: string }> {
   const base = await getApiBaseUrl()
-  const formData = new FormData()
-  formData.append("file", file)
-  formData.append("description", description)
+  const name = file.name.replace(/\.pptx$/, "")
+
+  // Step 1: Get presigned URL
+  const presignRes = await fetch(`${base}templates/user/upload-url`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  })
+  const presignData = await presignRes.json()
+  if (!presignRes.ok || presignData.error) return { error: presignData.error || "Failed to get upload URL" }
+
+  // Step 2: Upload directly to S3
+  const uploadRes = await fetch(presignData.presignedUrl, {
+    method: "PUT",
+    headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
+    body: file,
+  })
+  if (!uploadRes.ok) return { error: "Failed to upload file to S3" }
+
+  // Step 3: Register and analyze
   const res = await fetch(`${base}templates/user`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${idToken}` },
-    body: formData,
+    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name, description }),
   })
   return res.json()
 }
