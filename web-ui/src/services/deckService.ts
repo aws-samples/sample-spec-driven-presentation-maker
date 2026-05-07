@@ -564,7 +564,11 @@ export async function downloadTemplate(name: string, idToken: string): Promise<v
     headers: { Authorization: `Bearer ${idToken}` },
   })
   if (!res.ok) return
-  const blob = await res.blob()
+  const { downloadUrl } = await res.json()
+  if (!downloadUrl) return
+  const fileRes = await fetch(downloadUrl)
+  if (!fileRes.ok) return
+  const blob = await fileRes.blob()
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
