@@ -361,7 +361,7 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
 
     Raises FileNotFoundError, ValueError on missing template/icons.
     """
-    from sdpm.builder import PPTXBuilder, resolve_override, validate_icons_in_json
+    from sdpm.builder import resolve_override, validate_icons_in_json
     from sdpm.utils.io import read_json
 
     input_path = Path(json_path)

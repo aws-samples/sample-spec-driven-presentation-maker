@@ -22,8 +22,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ name: 
     if (!fs.existsSync(dir)) {
       return Response.json({ error: "Template not found" }, { status: 404 })
     }
-    const oldPath = path.join(dir, `${name}.pptx`)
-    const newPath = path.join(dir, `${newName}.pptx`)
+    const realDir = fs.realpathSync(dir)
+    const oldPath = path.join(realDir, `${name}.pptx`)
+    const newPath = path.join(realDir, `${newName}.pptx`)
+    if (!oldPath.startsWith(realDir + path.sep) || !newPath.startsWith(realDir + path.sep)) {
+      return Response.json({ error: "Invalid template name" }, { status: 400 })
+    }
     if (!fs.existsSync(oldPath)) {
       return Response.json({ error: "Template not found" }, { status: 404 })
     }

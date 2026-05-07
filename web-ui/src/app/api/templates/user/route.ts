@@ -3,7 +3,7 @@
 /** Local User Template Upload API — save .pptx + analyze metadata. */
 import fs from "fs"
 import path from "path"
-import { execSync } from "child_process"
+import { execFileSync } from "child_process"
 import { getUserConfigDir, getState, updateState } from "@/lib/local/sdpmPaths"
 
 function getUserTemplatesDir(): string {
@@ -46,11 +46,11 @@ export async function POST(req: Request) {
   let meta: Record<string, unknown> = { description }
   try {
     const skillDir = path.resolve(process.cwd(), "..", "skill")
-    const escapedDesc = description.replace(/'/g, "\\'").replace(/\\/g, "\\\\")
-    const result = execSync(
-      `python3 -c "import sys; sys.path.insert(0, '${skillDir}'); import json; from sdpm.api import analyze_and_store_template; from pathlib import Path; r=analyze_and_store_template(Path('${outputPath}'), description='${escapedDesc}'); print(json.dumps(r, ensure_ascii=False))"`,
-      { encoding: "utf-8", timeout: 15000 }
-    )
+    const script = `import sys; sys.path.insert(0, sys.argv[1]); import json; from sdpm.api import analyze_and_store_template; from pathlib import Path; r=analyze_and_store_template(Path(sys.argv[2]), description=sys.argv[3]); print(json.dumps(r, ensure_ascii=False))`
+    const result = execFileSync("python3", ["-c", script, skillDir, outputPath, description], {
+      encoding: "utf-8",
+      timeout: 15000,
+    })
     meta = JSON.parse(result.trim())
   } catch { /* fallback: minimal metadata */ }
 

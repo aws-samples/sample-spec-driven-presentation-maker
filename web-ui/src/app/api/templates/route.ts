@@ -3,7 +3,7 @@
 /** Local Templates API — lists templates with metadata from bundled + user-local directories. */
 import fs from "fs"
 import path from "path"
-import { execSync } from "child_process"
+import { execFileSync } from "child_process"
 import { getUserConfigDir, getState, updateState } from "@/lib/local/sdpmPaths"
 
 /** Bundled templates directory. */
@@ -28,10 +28,11 @@ export async function GET() {
 
   function analyzeAndCache(templatePath: string, name: string): Record<string, unknown> {
     try {
-      const result = execSync(
-        `python3 -c "import sys; sys.path.insert(0, '${skillDir}'); import json; from sdpm.analyzer import analyze_template; r=analyze_template(__import__('pathlib').Path('${templatePath}')); print(json.dumps({'theme_colors':r.get('theme_colors',{}),'fonts':r.get('fonts',{}),'layout_count':len(r.get('layouts',[]))}))"`,
-        { encoding: "utf-8", timeout: 10000 }
-      )
+      const script = `import sys; sys.path.insert(0, sys.argv[1]); import json; from sdpm.analyzer import analyze_template; r=analyze_template(__import__('pathlib').Path(sys.argv[2])); print(json.dumps({'theme_colors':r.get('theme_colors',{}),'fonts':r.get('fonts',{}),'layout_count':len(r.get('layouts',[]))}))`
+      const result = execFileSync("python3", ["-c", script, skillDir, templatePath], {
+        encoding: "utf-8",
+        timeout: 10000,
+      })
       const parsed = JSON.parse(result.trim())
       metadata[name] = { ...metadata[name], ...parsed }
       metadataUpdated = true
