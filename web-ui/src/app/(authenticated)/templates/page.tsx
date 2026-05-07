@@ -165,7 +165,7 @@ export default function TemplatesPage() {
 
       {/* Delete confirmation */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeleteConfirm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)}>
           <div
             className="bg-surface-secondary border border-white/[0.08] rounded-xl p-6 max-w-sm mx-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
             role="alertdialog"
