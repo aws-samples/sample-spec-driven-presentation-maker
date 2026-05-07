@@ -9,10 +9,16 @@ const BUNDLED_TEMPLATES_DIR = path.resolve(process.cwd(), "..", "skill", "templa
 
 function findTemplate(name: string): string | null {
   const filename = name.endsWith(".pptx") ? name : `${name}.pptx`
-  const userPath = path.join(getUserConfigDir(), "templates", filename)
-  if (fs.existsSync(userPath)) return userPath
-  const bundledPath = path.join(BUNDLED_TEMPLATES_DIR, filename)
-  if (fs.existsSync(bundledPath)) return bundledPath
+  // Validate filename contains no path separators
+  if (path.basename(filename) !== filename) return null
+
+  const userDir = path.join(getUserConfigDir(), "templates")
+  if (fs.existsSync(userDir)) {
+    const userPath = path.resolve(userDir, filename)
+    if (userPath.startsWith(fs.realpathSync(userDir) + path.sep) && fs.existsSync(userPath)) return userPath
+  }
+  const bundledPath = path.resolve(BUNDLED_TEMPLATES_DIR, filename)
+  if (bundledPath.startsWith(BUNDLED_TEMPLATES_DIR + path.sep) && fs.existsSync(bundledPath)) return bundledPath
   return null
 }
 

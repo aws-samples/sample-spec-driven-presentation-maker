@@ -23,7 +23,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ name: 
       return Response.json({ error: "Template not found" }, { status: 404 })
     }
     const realDir = fs.realpathSync(dir)
+    // nosemgrep: path-join-resolve-traversal — containment check follows
     const oldPath = path.join(realDir, `${name}.pptx`)
+    // nosemgrep: path-join-resolve-traversal — containment check follows
     const newPath = path.join(realDir, `${newName}.pptx`)
     if (!oldPath.startsWith(realDir + path.sep) || !newPath.startsWith(realDir + path.sep)) {
       return Response.json({ error: "Invalid template name" }, { status: 400 })
