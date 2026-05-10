@@ -113,7 +113,7 @@ def cmd_generate(args):
             print("  → MUST FIX unless the layout type is intentionally asymmetric.")
 
         if font_warnings:
-            print(f"⚠️  Font size token discipline violations:")
+            print("⚠️  Font size token discipline violations:")
             for w in font_warnings:
                 print(w if w.startswith("  ") else f"  {w}")
             print("  → Add the missing --fs-* token to specs/art-direction.html, or change the slide to use an existing token.")
