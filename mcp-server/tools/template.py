@@ -48,9 +48,10 @@ def analyze_template(template_name: str, storage: Storage) -> dict[str, Any]:
         ValueError: If template not found or analysis not available.
     """
     templates = storage.list_templates()
+    normalized = template_name.removesuffix(".pptx")
     tmpl = None
     for t in templates:
-        if t.get("name") == template_name:
+        if t.get("name") == normalized:
             tmpl = t
             break
     if not tmpl:

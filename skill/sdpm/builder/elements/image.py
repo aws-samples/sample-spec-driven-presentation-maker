@@ -87,7 +87,7 @@ class ImageMixin:
                 return
         
         is_svg = img_path.suffix.lower() == ".svg"
-        
+
         # Prepare SVG bytes (with optional recolor)
         svg_bytes = None
         if is_svg:

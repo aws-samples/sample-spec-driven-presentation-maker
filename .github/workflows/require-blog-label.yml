@@ -1,4 +1,17 @@
-name: Require blog label
+# ============================================================================
+# ℹ️  Blog label check — maintainer action required, contributors can ignore.
+#
+# This workflow intentionally fails until a maintainer adds a
+# `blog:pending`, `blog:skip`, or `blog:done` label so the team can decide
+# whether to publish a blog post about the change.
+#
+# External contributors cannot add these labels, so if you receive a CI
+# failure email from this workflow you do NOT need to do anything. A
+# maintainer will add the label during review. This check is not a required
+# status check and does not block merge.
+# ============================================================================
+
+name: "Require blog label (maintainer only — contributors can ignore failures)"
 
 on:
   pull_request:
@@ -8,6 +21,7 @@ permissions: {}
 
 jobs:
   check:
+    name: "Blog label (contributors: ignore this if it fails)"
     runs-on: ubuntu-latest
     # Skip for dependabot / renovate
     if: >-
@@ -21,11 +35,12 @@ jobs:
           if echo "$LABELS" | grep -qE '"blog:(pending|skip|done)"'; then
             echo "✅ Blog label found"
           else
-            echo "::error::PR に blog:pending または blog:skip または blog:done ラベルを付けてください"
+            echo "::error title=Contributors can ignore — maintainer action required::This check fails until a maintainer adds a blog:pending / blog:skip / blog:done label. External contributors cannot add these labels and do not need to do anything; a maintainer will add the label during review."
             exit 1
           fi
 
   auto-skip-bots:
+    name: "Blog label (auto-skip for bots)"
     runs-on: ubuntu-latest
     if: >-
       github.actor == 'dependabot[bot]' ||

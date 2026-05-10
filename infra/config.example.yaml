@@ -14,8 +14,7 @@ stacks:
   webUi: false         # Layer 4 — React Web UI (Amplify Hosting)
 
 features:
-  searchSlides: false   # Semantic slide search (requires Bedrock Knowledge Base)
-  observability: false  # Bedrock Model Invocation Logging (account-level, skipped if already configured)
+  enableInvocationLogging: false  # Bedrock Model Invocation Logging (account-level, skipped if already configured)
 
 # Model configuration for the Agent (Layer 4).
 # Use inference profile IDs for cross-region routing.
@@ -25,8 +24,38 @@ features:
 #   global.anthropic.claude-opus-4-6-v1             (all regions, higher cost)
 #   us.anthropic.claude-sonnet-4-5-20250929-v1:0    (US regions only)
 model:
-  modelId: "global.anthropic.claude-sonnet-4-6"
-  # modelId: "global.anthropic.claude-opus-4-6-v1"
+  defaults:
+    chat: "global.anthropic.claude-sonnet-4-6"
+    # chat: "global.anthropic.claude-opus-4-6-v1"
+    create: "global.anthropic.claude-sonnet-4-6"   # omit to inherit from chat
+
+  # Per-user model switching in the Settings Sheet.
+  # All models are enabled by default. To disable a model for end users,
+  # prefix its line with `#`.
+  # Each entry must be registered in infra/lib/model-metadata.ts.
+  # Both defaults.chat and defaults.create must appear in this list.
+  allowedModelIds:
+    - "global.anthropic.claude-sonnet-4-6"           # recommended (matches defaults.chat)
+    - "global.anthropic.claude-opus-4-7"
+    - "global.anthropic.claude-opus-4-6-v1"
+    - "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+    - "us.amazon.nova-2-lite-v1:0"
+
+# OAuth settings for external MCP clients (Layer 3).
+# enableDCR: Allow any MCP client to register dynamically via RFC 7591 (default: true).
+# mcpCallbackUrls: Static OAuth callback URLs for pre-registered MCP clients.
+#
+# Combinations:
+#   enableDCR: true  + no mcpCallbackUrls  → DCR only (default, personal/demo use)
+#   enableDCR: true  + mcpCallbackUrls     → Static client + DCR (flexible)
+#   enableDCR: false + mcpCallbackUrls     → Static client only (enterprise lockdown)
+#   enableDCR: false + no mcpCallbackUrls  → No external MCP access (WebUI only)
+#
+# auth:
+#   enableDCR: true
+#   mcpCallbackUrls:
+#     - https://claude.ai/api/mcp/auth_callback
+#     - https://claude.com/api/mcp/auth_callback
 
 # WAF IP address restriction (optional).
 # When specified, only the listed IP ranges can access CloudFront and API Gateway.

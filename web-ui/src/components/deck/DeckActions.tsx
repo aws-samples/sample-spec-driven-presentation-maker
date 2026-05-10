@@ -142,7 +142,7 @@ export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, 
                         {user.alias[0]?.toUpperCase()}
                       </div>
                       <span className="text-sm">{user.alias}</span>
-                      <span className="text-[10px] text-muted-foreground ml-auto">{user.email}</span>
+                      <span className="text-[11px] text-muted-foreground ml-auto">{user.email}</span>
                     </button>
                   ))}
                 </div>
@@ -152,7 +152,7 @@ export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, 
             {/* Collaborator list */}
             {collabList.length > 0 && (
               <div className="border-t border-border/30 pt-2">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Collaborators</p>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Collaborators</p>
                 <div className="space-y-1 max-h-[120px] overflow-y-auto">
                   {collabList.map((sub) => (
                     <div key={sub} className="flex items-center justify-between px-2 py-1 rounded-md hover:bg-muted/30">

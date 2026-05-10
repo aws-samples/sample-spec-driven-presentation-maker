@@ -19,8 +19,10 @@
 
 import { ReactNode, useState, useRef, useEffect, useCallback } from "react"
 import { useAuth } from "@/hooks/useAuth"
-import { usePreferences } from "@/hooks/usePreferences"
-import { Layers, ChevronLeft, MessageSquare, CircleUser, LogOut } from "lucide-react"
+import { Layers, ChevronLeft, MessageSquare, CircleUser, LogOut, Bot, Settings as SettingsIcon } from "lucide-react"
+import { AgentSettingsDialog } from "@/components/chat/AgentSettingsDialog"
+import { Settings } from "@/components/Settings"
+import { CloudOnly, LocalOnly } from "@/lib/mode"
 
 interface AppShellProps {
   children: ReactNode
@@ -32,14 +34,16 @@ interface AppShellProps {
 
 export function AppShell({ children, deckName, onBack, chatOpen = false, onChatToggle }: AppShellProps) {
   const { user, signOut } = useAuth()
-  const alias = user?.profile?.preferred_username || user?.profile?.email?.split("@")[0] || ""
-  const email = user?.profile?.email || ""
+  const profile = user?.profile as Record<string, unknown> | undefined
+  const alias = (profile?.preferred_username as string) || (profile?.email as string)?.split("@")[0] || ""
+  const email = (profile?.email as string) || ""
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuVisible, setMenuVisible] = useState(false)
+  const [showAgentSettings, setShowAgentSettings] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const itemsRef = useRef<(HTMLButtonElement | null)[]>([])
-  const { sendWithEnter, setSendWithEnter } = usePreferences()
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Chat pulse: show only until first click
   const [chatSeen, setChatSeen] = useState(true)
@@ -104,7 +108,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
     <div className="flex flex-col h-screen relative z-10">
       {/* ── Header ── */}
       <header
-        className="header-glass safe-top flex-none flex items-center justify-between px-5 h-12 border-b border-border"
+        className="header-glass safe-top flex-none flex items-center justify-between px-5 h-12 border-b border-border relative z-[70]"
         role="banner"
       >
         <nav className="flex items-center gap-2.5" aria-label="Main navigation">
@@ -136,7 +140,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
           {onChatToggle && (
             <button
               onClick={handleChatToggle}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
+              className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 ${
                 chatOpen
                   ? "text-brand-teal bg-brand-teal-soft"
                   : `text-foreground-secondary hover:bg-background-hover hover:text-foreground ${!chatSeen ? "chat-toggle-pulse" : ""}`
@@ -153,7 +157,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
             <button
               ref={triggerRef}
               onClick={toggleMenu}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
+              className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 ${
                 menuOpen
                   ? "bg-brand-teal-soft text-brand-teal"
                   : "text-foreground-secondary hover:bg-background-hover hover:text-foreground"
@@ -174,39 +178,55 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
               >
                 {/* User info */}
                 <div className="px-3.5 py-2">
-                  <div className="text-[11px] text-foreground/50 font-medium">{alias}</div>
-                  {email && <div className="text-[10px] text-foreground/30 mt-0.5 truncate">{email}</div>}
+                  <div className="text-xs text-foreground/50 font-medium">{alias}</div>
+                  {email && <div className="text-[11px] text-foreground/30 mt-0.5 truncate">{email}</div>}
                 </div>
 
                 <div className="my-1 border-t border-white/[0.06]" />
 
-                {/* Preferences */}
+                {/* Settings */}
                 <button
                   ref={el => { itemsRef.current[0] = el }}
                   role="menuitem"
-                  onClick={() => setSendWithEnter(!sendWithEnter)}
-                  className="w-full flex items-center justify-between px-3.5 py-2 text-[12px] font-medium text-foreground/70 hover:bg-white/[0.06] transition-colors menu-item-stagger"
+                  onClick={() => { closeMenu(); setSettingsOpen(true) }}
+                  className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-foreground/70 hover:bg-white/[0.06] transition-colors menu-item-stagger"
                   style={{ "--stagger": "0ms" } as React.CSSProperties}
                 >
-                  <span>Send with Enter</span>
-                  <span className={`w-8 h-[18px] rounded-full flex items-center px-0.5 transition-colors ${sendWithEnter ? "bg-brand-teal justify-end" : "bg-white/10 justify-start"}`}>
-                    <span className="w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-all duration-200" />
-                  </span>
+                  <SettingsIcon className="h-3.5 w-3.5" />
+                  <span>Settings</span>
                 </button>
 
                 <div className="my-1 border-t border-white/[0.06]" />
 
-                {/* Sign out */}
-                <button
-                  ref={el => { itemsRef.current[1] = el }}
-                  role="menuitem"
-                  onClick={() => { closeMenu(); signOut() }}
-                  className="w-full flex items-center gap-2 px-3.5 py-2 text-[12px] font-medium text-foreground/70 hover:text-red-400 hover:bg-red-500/10 transition-colors menu-item-stagger"
-                  style={{ "--stagger": "30ms" } as React.CSSProperties}
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  <span>Sign out</span>
-                </button>
+                {/* Agent Settings (local only) */}
+                <LocalOnly>
+                  <>
+                    <button
+                      role="menuitem"
+                      onClick={() => { closeMenu(); setShowAgentSettings(true) }}
+                      className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-foreground/70 hover:bg-white/[0.06] transition-colors menu-item-stagger"
+                      style={{ "--stagger": "15ms" } as React.CSSProperties}
+                    >
+                      <Bot className="h-3.5 w-3.5" />
+                      <span>ACP Agents</span>
+                    </button>
+                    <div className="my-1 border-t border-white/[0.06]" />
+                  </>
+                </LocalOnly>
+
+                {/* Sign out (cloud only) */}
+                <CloudOnly>
+                  <button
+                    ref={el => { itemsRef.current[1] = el }}
+                    role="menuitem"
+                    onClick={() => { closeMenu(); signOut() }}
+                    className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-foreground/70 hover:text-red-400 hover:bg-red-500/10 transition-colors menu-item-stagger"
+                    style={{ "--stagger": "30ms" } as React.CSSProperties}
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    <span>Sign out</span>
+                  </button>
+                </CloudOnly>
               </div>
             )}
           </div>
@@ -215,6 +235,13 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
 
       {/* ── Content area ── */}
       {children}
+
+      {/* Agent settings dialog (local only) */}
+      <LocalOnly>
+        <AgentSettingsDialog open={showAgentSettings} onClose={() => setShowAgentSettings(false)} />
+      </LocalOnly>
+
+      <Settings open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   )
 }

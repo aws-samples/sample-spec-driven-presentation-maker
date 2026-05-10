@@ -52,9 +52,11 @@ def main() -> None:
     local_manifest_path = local_dir / "manifest.json"
     if local_manifest_path.exists():
         manifest = json.loads(local_manifest_path.read_text(encoding="utf-8"))
-        if not isinstance(manifest, list):
-            manifest = manifest.get("assets", manifest.get("icons", []))
-        print(f"Using existing manifest.json ({len(manifest)} entries)")
+        if isinstance(manifest, list):
+            entries = manifest
+        else:
+            entries = manifest.get("assets", manifest.get("icons", []))
+        print(f"Using existing manifest.json ({len(entries)} entries)")
     else:
         # Auto-generate manifest from files
         manifest = _generate_manifest(local_dir)

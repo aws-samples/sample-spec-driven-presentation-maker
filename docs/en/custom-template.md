@@ -1,9 +1,19 @@
 [EN](../en/custom-template.md) | [JA](../ja/custom-template.md)
 
-# Custom Templates and Assets
+# Custom Templates, Styles, and Assets
 
 spec-driven-presentation-maker works with any `.pptx` file as a template.
 It automatically analyzes the template's layouts, colors, fonts, and placeholders — no manual configuration needed.
+
+Beyond templates, three other resource types can be customized per-user:
+
+- **Templates** (`.pptx`) — slide masters
+- **Styles** (`.html`) — design guides used by the agent
+- **Assets** (images such as `.svg`, `.png`) — icons, logos, illustrations
+- **Config** (`config.json`) — output directory, extra asset sources, etc.
+
+All four support user-local placement so your customizations survive
+`pip install --upgrade` or a repository re-clone.
 
 ---
 
@@ -110,11 +120,36 @@ searches the following locations in order and merges the results in
 `list_templates`:
 
 1. Directories listed in `$SDPM_TEMPLATES_DIR` (platform path separator: `:` on Unix, `;` on Windows — same semantics as `PATH`)
-2. `~/.config/sdpm/templates/`
+2. `<user-config>/templates/` — see **User-local directory layout** below
 3. `skill/templates/` (package-bundled)
 
 A user-local template shadows a bundled one with the same file name, which
 makes it easy to override sample templates without editing the repository.
+
+#### User-local directory layout
+
+The user-local base directory is platform-aware:
+
+| Platform | Location |
+|----------|----------|
+| macOS / Linux | `$XDG_CONFIG_HOME/sdpm/` (default: `~/.config/sdpm/`) |
+| Windows | `%APPDATA%/sdpm/` (default: `C:\Users\<you>\AppData\Roaming\sdpm\`) |
+
+Layout:
+
+```
+<user-config>/sdpm/
+├── templates/          # User-local .pptx templates
+├── styles/             # User-local style HTMLs (see "Custom Styles" below)
+├── assets/             # User-local asset sources (see "Custom Assets" below)
+│   └── my-company/
+│       ├── manifest.json
+│       └── logo.svg
+└── config.json         # Per-user config overrides (output_dir, extra_sources, …)
+```
+
+None of these paths exist by default — create only what you need
+(`mkdir -p ~/.config/sdpm/styles` etc.).
 
 ### Layer 3 (Remote MCP)
 
@@ -141,7 +176,38 @@ The script handles S3 upload, template analysis, and Amazon DynamoDB metadata re
 
 ---
 
-## Asset Customization
+## Custom Styles
+
+Styles are HTML files that describe the visual direction (colors, typography,
+components, tone) for a deck. The agent reads `:root` CSS variables and style
+classes to mirror the design in `slides.json`.
+
+### User-local styles
+
+Use the `create-style` workflow (agent-driven) to generate a new style HTML.
+The workflow writes to `<user-config>/styles/{name}.html` — i.e.
+`~/.config/sdpm/styles/` on macOS/Linux or `%APPDATA%/sdpm/styles/` on Windows.
+
+You can also copy an existing style manually:
+
+```bash
+mkdir -p ~/.config/sdpm/styles
+cp skill/references/examples/styles/elegant-dark.html \
+   ~/.config/sdpm/styles/my-style.html
+```
+
+Search order (first match wins on same file name):
+
+1. Directories listed in `$SDPM_STYLES_DIR` (platform path separator, like `PATH`)
+2. `<user-config>/styles/`
+3. `skill/references/examples/styles/` (package-bundled samples)
+
+The styles gallery (opened by `list_styles` or the CLI `examples styles` command)
+scans all three locations and displays them in a single list. User-local styles
+shadow bundled ones of the same name so you can override samples without
+touching the repository.
+
+---
 
 ### Built-in Asset Sources
 
@@ -185,36 +251,95 @@ Reference formats:
 
 ### Adding Custom Asset Sources
 
-Create a directory with your icons and a `manifest.json`:
+There are two ways to add a custom asset source (e.g. your company logos):
+
+#### Option A — Drop-in under `<user-config>/assets/` (auto-discovered)
+
+Place the source directory under the user-local assets path. It is automatically
+scanned at runtime — no config changes required:
+
+```
+~/.config/sdpm/assets/my-company/     # (Windows: %APPDATA%/sdpm/assets/my-company/)
+├── manifest.json
+└── logo.svg
+```
+
+`manifest.json` follows the built-in format:
 
 ```json
 {
+  "source": "my-company",
   "icons": [
-    {"name": "my-logo", "file": "logo.svg", "tags": ["brand", "logo"]},
-    {"name": "product-icon", "file": "product.svg", "tags": ["product"]}
+    {"name": "my-logo", "file": "logo.svg", "tags": ["brand", "logo"], "type": "service"}
   ]
 }
 ```
 
-Register in `skill/assets/config.json` (copy from `config.example.json`):
+Reference in `slides.json`:
+
+```json
+{ "type": "image", "src": "assets:my-company/logo", "x": 100, "y": 200, "width": 64, "height": 64 }
+```
+
+#### Option B — Explicit registration via `config.json`
+
+Use this when the files live anywhere on disk (e.g. a shared network drive),
+or when you want to point at an existing directory without moving it:
+
+```json
+{
+  "extra_sources": [
+    {
+      "source": "mybrand",
+      "manifest": "/path/to/my-icons/manifest.json",
+      "files_dir": "/path/to/my-icons/"
+    }
+  ]
+}
+```
+
+Save as `<user-config>/config.json` (see **User config** below).
+
+### Priority order
+
+When an asset name appears in multiple sources, the earlier source wins:
+
+1. `extra_sources` from `config.json` — explicit override
+2. `<user-config>/assets/` — auto-discovered user-local sources
+3. `skill/assets/` — built-in sources (aws, material)
+4. Legacy `icons/` directory (only if present)
+
+This lets `extra_sources` override user-local sources, which in turn override
+bundled ones. Registering a built-in name in `extra_sources` is an intentional
+way to replace a bundled icon with your own.
+
+---
+
+## User config
+
+Per-user configuration lives in `<user-config>/config.json` (that is,
+`~/.config/sdpm/config.json` on macOS/Linux or `%APPDATA%/sdpm/config.json`
+on Windows). The file is optional; missing keys fall back to defaults.
+
+Full schema with defaults:
 
 ```json
 {
   "output_dir": "~/Documents/SDPM-Presentations",
-  "extra_sources": [
-    {
-      "name": "mybrand",
-      "manifest": "/path/to/my-icons/manifest.json",
-      "files_dir": "/path/to/my-icons/"
-    }
-  ],
-  "preview": {
-    "backend": ""
-  }
+  "extra_sources": []
 }
 ```
 
-Now reference as `assets:mybrand/my-logo`.
+- `output_dir` — Base directory where generated PPTX files are written.
+  Supports `~` expansion. Can also be overridden per-run via
+  `$SDPM_OUTPUT_DIR`.
+- `extra_sources` — Additional asset manifests (see **Option B** above).
+
+The previously-shipped `skill/assets/config.json` is no longer read — it was
+lost on `pip install --upgrade` and is replaced entirely by the user-local
+path above.
+
+---
 
 ### Uploading Assets to S3 (Layer 3)
 

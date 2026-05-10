@@ -19,8 +19,8 @@
 
 "use client"
 
-import { useState, useRef, useCallback } from "react"
-import { useAuth } from "react-oidc-context"
+import { useState, useRef, useCallback, useEffect } from "react"
+import { useAuth } from "@/hooks/useAuth"
 import { AppShell } from "@/components/AppShell"
 import { DeckListView } from "@/components/deck/DeckListView"
 import { SlideCarousel } from "@/components/deck/SlideCarousel"
@@ -34,6 +34,7 @@ import { useSwipe } from "@/hooks/useSwipe"
 import { useDeckList } from "@/hooks/useDeckList"
 import { useWorkspace } from "@/hooks/useWorkspace"
 import { Plus, MessageSquare, Image as ImageIcon, Star } from "lucide-react"
+import { IS_LOCAL } from "@/lib/mode"
 
 export default function DecksPage() {
   const auth = useAuth()
@@ -47,6 +48,8 @@ export default function DecksPage() {
   const list = useDeckList(idToken, auth.isAuthenticated, ws.activeDeckId)
 
   /* ── Local UI state ── */
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
   const [fabOpen, setFabOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"chat" | "preview">("chat")
   const [workflowPhase, setWorkflowPhase] = useState<string | null>(null)
@@ -73,8 +76,8 @@ export default function DecksPage() {
       chatOpen={ws.chatOpen}
       onChatToggle={() => ws.setChatOpen((prev) => !prev)}
     >
-      <div className="flex-1 overflow-hidden relative">
-        <main className={`h-full overflow-y-auto transition-[margin] duration-350 ease-[cubic-bezier(.4,0,.6,1)] ${ws.chatOpen ? "sm:mr-[400px]" : ""}`}>
+      <div className="flex-1 overflow-hidden relative sm:flex">
+        <main className="h-full overflow-y-auto flex-1 min-w-0">
           {ws.isWorkspace ? (
             <>
               {/* Mobile tab bar */}
@@ -116,11 +119,18 @@ export default function DecksPage() {
                     deckName={ws.deck?.name || null}
                     chatSessionId={ws.deck?.chatSessionId}
                     slidePreviewUrls={ws.deck?.slides.map(s => s.previewUrl) || []}
+                    slideSlugs={ws.deck?.slides.map(s => s.slug || "") || []}
                     onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
                     onWorkflowPhase={setWorkflowPhase}
                     inline
                   />
                 ) : (
+                  // Local: defer SlideCarousel mount until deck data loads so
+                  // hadSlidesOnMount captures the real slide count, not the
+                  // initial empty-deck state.
+                  IS_LOCAL && mounted && ws.isWorkspace && !ws.isNew && !ws.deck ? (
+                    <div className="w-full h-full" />
+                  ) : (
                   <SlideCarousel
                     slides={ws.deck?.slides || []}
                     defsUrl={ws.deck?.defsUrl}
@@ -186,6 +196,7 @@ export default function DecksPage() {
                       ) : undefined
                     }
                   />
+                  )
                 )}
               </div>
             </>
@@ -206,6 +217,7 @@ export default function DecksPage() {
                 onDelete={list.handleDelete}
                 onToggleVisibility={list.handleToggleVisibility}
                 onDownload={list.handleDownload}
+                onOpenFolder={list.handleOpenFolder}
                 loading={list.loading}
               />
               {list.error && (
@@ -220,7 +232,7 @@ export default function DecksPage() {
         </main>
 
         {/* Chat Panel (persistent, desktop) — hidden on mobile workspace chat tab */}
-        <div className={isMobile && ws.isWorkspace && ws.canChat && activeTab === "chat" ? "hidden" : ""}>
+        {!(isMobile && ws.isWorkspace && ws.canChat && activeTab === "chat") && (
           <ChatPanelShell
             open={ws.chatOpen}
             onClose={() => ws.setChatOpen(false)}
@@ -231,10 +243,11 @@ export default function DecksPage() {
             deckName={ws.deck?.name || null}
             chatSessionId={ws.deck?.chatSessionId}
             slidePreviewUrls={ws.deck?.slides.map(s => s.previewUrl) || []}
+            slideSlugs={ws.deck?.slides.map(s => s.slug || "") || []}
             onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
             onWorkflowPhase={setWorkflowPhase}
           />
-        </div>
+        )}
       </div>
 
       {list.deleteTarget && (

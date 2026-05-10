@@ -1,49 +1,49 @@
 [EN](../en/deploy-cloudshell.md) | [JA](../ja/deploy-cloudshell.md)
 
-# spec-driven-presentation-maker CloudShell Deploy Guide
+# spec-driven-presentation-maker Recommended Deploy Guide
 
 ## About spec-driven-presentation-maker
 
 spec-driven-presentation-maker is an open-source toolkit that adds presentation generation capabilities to AI agents. Simply connect it as an MCP (Model Context Protocol) tool to your existing AI system, and you can generate slides through conversation. Choose the layer that fits your needs — from a local CLI to a full-stack web app.
 
-Deploy spec-driven-presentation-maker to AWS from CloudShell.
-No local CDK or Docker required. CodeBuild handles all building and deployment.
+This document describes the **recommended way to deploy spec-driven-presentation-maker (SDPM) to AWS**. Because CodeBuild runs the build and deployment, you don't need a local CDK or Docker install, and the same steps work in either of these environments:
+
+- **AWS CloudShell** (fully browser-based)
+- Local **Linux / macOS / WSL** (requires `bash` and the `aws` CLI)
+
+> Windows has no native Bash, so use **CloudShell** or **WSL**.
+
+> **📌 Note:** Deployment settings can be persisted in `infra/config.yaml`, making re-deploys more consistent. Direct local CDK deployment (`npx cdk deploy`) is reserved for development and debugging workflows.
 
 ## Prerequisites
 
 - Signed in to the AWS Management Console
 - **AdministratorAccess** or equivalent permissions in the target account (for first deployment)
-- CloudShell open in the target deployment region
+- One of the following working environments
+    - AWS CloudShell (opened in the target deployment region)
+    - Local Linux / macOS / WSL with `bash`, `git`, the `aws` CLI, and valid AWS credentials
 
-## Steps
+## Deploy
 
-### 1. Clone the Repository in CloudShell
+### Quick Start
 
-Open CloudShell in the AWS Console and clone the repository.
+In CloudShell, open CloudShell from the AWS Console. Locally, use any shell. Copy-paste the block below to deploy **Layer 4 (Agent + Web UI, default)** to `us-east-1`.
 
 ```bash
 cd ~
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
 cd sample-spec-driven-presentation-maker
-```
-
-> **💡 Tip:** CloudShell's home directory (1 GB) persists across sessions. For subsequent deployments, run `cd ~/sample-spec-driven-presentation-maker && git pull` to update.
-
-### 2. Run deploy.sh
-
-```bash
 chmod +x scripts/deploy.sh
+./scripts/deploy.sh --region us-east-1
 ```
-
-Choose options based on your use case.
-
-**Layer 4 (Full Stack: Agent + Web UI) — Default:**
 
 > **🌐 Want to try it in your browser right away?** Layer 4 deploys a chat-based Web UI. After deployment, [create a Cognito user](#creating-a-cognito-user-layer-4) and you can start generating slides from your browser immediately.
 
-```bash
-./scripts/deploy.sh --region us-east-1
-```
+> **💡 Tip:** CloudShell's home directory (1 GB) persists across sessions. For subsequent deployments, run `cd ~/sample-spec-driven-presentation-maker && git pull && ./scripts/deploy.sh --region us-east-1` to update and redeploy.
+
+### Alternative Configurations
+
+For anything other than the default (Layer 4, `us-east-1`), swap the `./scripts/deploy.sh ...` line in the Quick Start with one of the following.
 
 **Layer 3 (MCP Server only):**
 
@@ -54,10 +54,10 @@ Choose options based on your use case.
 **Enable Bedrock Model Invocation Logging:**
 
 ```bash
-./scripts/deploy.sh --region us-east-1 --observability
+./scripts/deploy.sh --region us-east-1 --enable-invocation-logging
 ```
 
-> **Note:** `--observability` configures Bedrock Model Invocation Logging (MIL) at the account/region level. If MIL is already configured, the script will display a warning and automatically skip the MIL setup to preserve the existing configuration.
+> **Note:** `--enable-invocation-logging` configures Bedrock Model Invocation Logging (MIL) at the account/region level. If MIL is already configured, the script will display a warning and automatically skip the MIL setup to preserve the existing configuration.
 
 **With an external IdP:**
 
@@ -97,7 +97,7 @@ cp infra/config.example.yaml infra/config.yaml
 ./scripts/deploy.sh --region us-east-1 --destroy
 ```
 
-### 3. Monitor Deployment Progress
+## Monitor Deployment Progress
 
 The script streams CodeBuild logs in real time.
 Even if your CloudShell session times out, the CodeBuild build continues on the AWS side.
@@ -107,12 +107,12 @@ If your session disconnects, check the results here:
 - **CodeBuild Console**: Build history for project `sdpm-deploy`
 - **CloudFormation Console**: Stack status and Outputs
 
-### 4. Post-Deployment Verification
+## Post-Deployment Verification
 
 When the build shows `SUCCEEDED`, CloudFormation Outputs appear at the end of the CodeBuild logs.
 If you missed them, check the CloudFormation console.
 
-#### Finding Endpoint URLs
+### Finding Endpoint URLs
 
 1. Open the [CloudFormation Console](https://console.aws.amazon.com/cloudformation/)
 2. Select the deployment region
@@ -135,7 +135,7 @@ If you missed them, check the CloudFormation console.
 | `SdpmWebUi` | `SiteUrl` | Web UI CloudFront URL |
 | `SdpmWebUi` | `ApiUrl` | REST API URL |
 
-#### Creating a Cognito User (Layer 4)
+### Creating a Cognito User (Layer 4)
 
 The default Cognito User Pool has no users, so you need to create one manually.
 
@@ -148,14 +148,14 @@ The default Cognito User Pool has no users, so you need to create one manually.
    - Check **Mark email address as verified**
 5. Click **Create user**
 
-#### Signing in to the Web UI
+### Signing in to the Web UI
 
 1. Open the `SiteUrl` from the `SdpmWebUi` stack Outputs in your browser
 2. Sign in with the email and temporary password you created
 3. You'll be prompted to change your password on first login
 4. After signing in, the chat interface appears
 
-#### Creating a User via CLI
+### Creating a User via CLI
 
 You can also create a user directly from CloudShell.
 
@@ -201,8 +201,7 @@ echo "Open the URL above to sign in."
 | `--profile PROFILE` | AWS CLI profile | — |
 | `--layer3` | Layer 3 only (MCP Server) | — |
 | `--layer4` | Layer 4 full stack | Default |
-| `--search` | Enable semantic slide search | Disabled |
-| `--observability` | Enable Bedrock Model Invocation Logging | Disabled |
+| `--enable-invocation-logging` | Enable Bedrock Model Invocation Logging | Disabled |
 | `--oidc-url URL` | External IdP OIDC Discovery URL | — |
 | `--allowed-clients IDS` | Comma-separated JWT allowed client IDs | — |
 | `--waf-ipv4 CIDRS` | Comma-separated IPv4 CIDR ranges for WAF | — |
@@ -228,53 +227,18 @@ CloudShell's home directory is 1 GB. Delete unnecessary files.
 rm -rf ~/sample-spec-driven-presentation-maker
 ```
 
-**--observability warns "already configured"**
+**--enable-invocation-logging warns "already configured"**
 
-Bedrock Model Invocation Logging allows only one configuration per account/region. If an existing configuration is found, `deploy.sh` will display a warning with the existing log group name and automatically skip the MIL setup. The deployment continues with observability disabled to preserve the existing configuration. To use SDPM's observability, first remove the existing MIL configuration manually, then re-run with `--observability`.
+Bedrock Model Invocation Logging allows only one configuration per account/region. If an existing configuration is found, `deploy.sh` will display a warning with the existing log group name and automatically skip the MIL setup. The deployment continues with Invocation Logging disabled to preserve the existing configuration. To use SDPM's Invocation Logging, first remove the existing MIL configuration manually, then re-run with `--enable-invocation-logging`.
 
 ## Estimated Monthly Cost
 
-> **Estimated as of April 2026.** AWS service pricing is subject to change. Always refer to the official pricing pages for the latest rates: [Amazon Bedrock Pricing](https://aws.amazon.com/bedrock/pricing/), [AgentCore Pricing](https://aws.amazon.com/bedrock/agentcore/pricing/), [S3](https://aws.amazon.com/s3/pricing/), [DynamoDB](https://aws.amazon.com/dynamodb/pricing/).
-
-Estimates for Layer 4 full stack (us-east-1). Assumes a team of ~10 users generating ~20 decks per month.
-
-### Fixed Costs (Always Running)
-
-| Resource | Est. Monthly |
-|---|---|
-| CloudFront | ~$1 |
-| Cognito User Pool | $0 |
-| API Gateway REST + Lambda (API) | ~$1 |
-| S3 (3 buckets) | ~$1 |
-| DynamoDB On-Demand | ~$1 |
-| ECR (2 images) | ~$1 |
-| CloudWatch Logs | ~$1 |
-
-### Variable Costs (Usage-Dependent)
-
-| Resource | Est. for 20 Decks/Month |
-|---|---|
-| AgentCore Runtime (MCP Server + Agent) | ~$5-10 |
-| Bedrock Claude Sonnet 4.6 (Agent LLM) | ~$80-130 |
-| AgentCore Code Interpreter | ~$1-3 |
-| AgentCore Memory | ~$1 |
-
-### Total
-
-**~$95–145/month** (varies with usage)
-
-### Cost Reduction Tips
-
-| Method | Savings | Notes |
-|---|---|---|
-| Prompt caching | LLM cost up to 80% reduction | Enabled by default for supported models |
-| Don't use `--search` (default) | No KB + S3 Vectors cost | Skip if semantic search isn't needed |
-| Don't use `--observability` (default) | No CloudWatch Logs cost | Skip if MIL logging isn't needed |
+See [Cost Estimates](cost.md) for a full breakdown and optimization tips.
 
 ## Related Documents
 
 - [Getting Started](getting-started.md) — Setup instructions for Layer 1–4 (including local CDK deployment)
 - [Architecture](architecture.md) — 4-layer design, data flow, auth model, MCP tool reference
 - [Custom Templates](custom-template.md) — Adding templates and assets
-- [Connecting Agents](add-to-gateway.md) — AgentCore Gateway connection
+- [Connecting Agents](add-to-gateway.md) — MCP client connection guide
 - [Teams & Slack Integration](teams-slack-integration.md) — Chat platform integration

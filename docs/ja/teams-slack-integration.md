@@ -292,5 +292,5 @@ Layer 4 Agent は Amazon Bedrock AgentCore Memory によるセッション管理
 ## 関連ドキュメント
 
 - [はじめに](getting-started.md) — Layer 3/4 のセットアップとデプロイ手順
-- [エージェント接続](add-to-gateway.md) — Amazon Bedrock AgentCore Gateway 経由の接続
+- [エージェント接続](add-to-gateway.md) — MCP クライアントの接続方法
 - [アーキテクチャ](architecture.md) — 認証・認可モデルの詳細

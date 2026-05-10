@@ -1,0 +1,48 @@
+{
+  "name": "sdpm-spec",
+  "description": "SPEC agent for spec-driven-presentation-maker. Handles briefing, outline, art-direction through user dialogue, then delegates slide generation to composer sub-agents.",
+  "mcpServers": {
+    "sdpm": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "server_acp.py"
+      ],
+      "timeout": 120000
+    }
+  },
+  "prompt": "file://../../acp-agent-prompts/spec-agent.md",
+  "resources": [
+    "file://../../../skill/references/workflows/create-new-1-briefing.md"
+  ],
+  "tools": [
+    "@sdpm",
+    "use_subagent",
+    "read",
+    "glob",
+    "grep",
+    "web_search",
+    "web_fetch"
+  ],
+  "allowedTools": [
+    "@sdpm/*",
+    "read",
+    "glob",
+    "grep",
+    "web_fetch",
+    "web_search",
+    "use_subagent"
+  ],
+  "toolsSettings": {
+    "subagent": {
+      "availableAgents": [
+        "sdpm-composer"
+      ],
+      "trustedAgents": [
+        "sdpm-composer"
+      ]
+    }
+  },
+  "welcomeMessage": "What presentation would you like to create?"
+}

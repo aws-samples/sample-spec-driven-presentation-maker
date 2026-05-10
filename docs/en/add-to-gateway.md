@@ -2,127 +2,102 @@
 
 # Connecting Agents
 
-spec-driven-presentation-maker is an MCP server — it connects to any AI agent that supports the Model Context Protocol. This guide covers three connection options.
+spec-driven-presentation-maker is an MCP server — it connects to any AI agent that supports the Model Context Protocol. This guide covers the connection options.
 
 ## Option 1: Local MCP Server (Layer 2)
 
 No AWS required. The server runs locally via stdio.
 
-### As an Agent Skill
+See [Getting Started — Layer 2](getting-started.md#layer-2-local-mcp-server) for setup and MCP client configuration.
 
-Copy `skill/` to your agent's skills directory. The SKILL.md file provides workflow instructions directly.
+## Option 2: OAuth 2.1 Discovery Endpoint (Layer 3, recommended)
 
-### As a stdio MCP Server
+Requires Layer 3 deployed via CDK (see [Getting Started — Layer 3](getting-started.md#layer-3-remote-mcp-server-aws)).
 
-Add to your MCP client's configuration:
+Register the **MCP Server URL** (API Gateway HTTP API created during CDK deployment) in your MCP client. Authentication is handled automatically via the OAuth 2.1 Discovery protocol.
+
+### Connection Method A: Dynamic Client Registration (DCR) — Default
+
+All major MCP clients (Claude.ai, Claude Desktop, Cursor, VS Code, Kiro) support DCR (RFC 7591). Simply register the MCP Server URL in your client — the client automatically performs OAuth discovery → DCR → authorization code flow.
+
+#### MCP client configuration
 
 ```json
 {
   "mcpServers": {
     "spec-driven-presentation-maker": {
-      "command": "uv",
-      "args": ["run", "--directory", "/absolute/path/to/mcp-local", "python", "server.py"]
+      "url": "<McpServerUrl>"
     }
   }
 }
 ```
 
-The server command is:
+Get `<McpServerUrl>` from the CDK output `SdpmRuntime.McpServerUrl`.
 
-```bash
-uv run --directory /path/to/mcp-local python server.py
+### Connection Method B: Static Client Registration (`auth.mcpCallbackUrls`)
+
+Use a static OAuth client instead of DCR when either of the following applies:
+
+- **The MCP client does not support DCR**
+- **You want to restrict access to specific clients only** (enterprise security requirements where open DCR registration is not acceptable)
+
+> **Note**: Disabling DCR will prevent connections from clients that use a different `localhost` callback port on each session.
+
+#### Setup
+
+1. Add the allowed client callback URLs to `config.yaml` and optionally disable DCR:
+
+```yaml
+auth:
+  enableDCR: false  # Disable DCR (when allowing only specific clients)
+  mcpCallbackUrls:
+    - https://claude.ai/api/mcp/auth_callback
+    - https://claude.com/api/mcp/auth_callback
 ```
 
-Any MCP client that supports stdio servers can connect. Refer to your client's documentation for the configuration file location.
+2. Redeploy (`cdk deploy --all`)
+3. Configure the MCP client with the `SdpmRuntime.McpOAuthClientId` from CDK outputs
 
-## Option 2: Amazon Bedrock AgentCore Gateway (Layer 3, recommended for teams)
+> **Note**: When `enableDCR: false`, the `registration_endpoint` is omitted from `/.well-known/oauth-authorization-server` metadata and `/register` returns 403. Only clients with callback URLs listed in `mcpCallbackUrls` can connect.
 
-For multi-user deployments, connect through Amazon Bedrock AgentCore Gateway. The Gateway provides OAuth-based authentication, tool aggregation, and Cedar-based authorization.
+#### Deployment patterns
 
-### Prerequisites
+| `mcpCallbackUrls` | `enableDCR` | Behavior |
+|---|---|---|
+| — | `true` (default) | DCR only. Personal/demo use |
+| set | `true` | Static client + DCR. Flexible |
+| set | `false` | Static client only. Enterprise lockdown |
+| — | `false` | No external MCP access. WebUI only |
 
-- Layer 3 deployed via CDK (see [Getting Started — Layer 3](getting-started.md#layer-3-remote-mcp-server-aws))
-- Amazon Bedrock AgentCore Gateway configured in your AWS account
+---
 
-### Register as a Gateway Target
+## Security: protecting the MCP endpoint
 
-Add the spec-driven-presentation-maker Runtime as an MCP Server target on your Amazon Bedrock AgentCore Gateway:
+The Runtime endpoint is exposed on the **public internet**. Authentication (Cognito JWT or IAM) prevents unauthorized access, but the following additional measures are **strongly recommended**.
 
-1. Get the Runtime ARN from CDK outputs (`SdpmRuntime.RuntimeArn`)
-2. Configure the Gateway to route to this Runtime
-3. Set up OAuth credentials for the Gateway → Runtime connection (M2M client credentials from CDK outputs)
+### WAF IP restrictions
 
-MCP clients that connect to the Gateway will automatically discover spec-driven-presentation-maker's tools alongside any other registered MCP servers.
+Set `waf.allowedIpV4AddressRanges` / `allowedIpV6AddressRanges` in `config.yaml` to attach AWS WAF rules to CloudFront and API Gateway. Useful for restricting access to a corporate VPN or specific office networks.
 
-### Authentication Flow
-
-```
-MCP Client → Gateway (OAuth) → Runtime (JWT Bearer) → MCP Server Container
-```
-
-The Gateway handles client authentication. The Runtime validates the JWT and extracts the user identity (`sub` claim) for per-user deck authorization.
-
-## Option 3: Direct Runtime Access (Layer 3)
-
-Connect directly to the Amazon Bedrock AgentCore Runtime endpoint without a Gateway. Useful for testing or single-server deployments.
-
-### Endpoint
-
-```
-POST https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{ENCODED_ARN}/invocations?qualifier=DEFAULT
+```yaml
+waf:
+  allowedIpV4AddressRanges:
+    - "192.0.2.0/24"      # Corporate IPv4 range
+    - "203.0.113.10/32"   # Individual IP
+  allowedIpV6AddressRanges:
+    - "2001:db8::/32"     # Corporate IPv6 range
 ```
 
-Where `ENCODED_ARN` is the URL-encoded Runtime ARN.
+**Note**: The Runtime endpoint itself (`bedrock-agentcore.*.amazonaws.com`) is managed by AWS and cannot have WAF attached directly. The WAF rules above apply to the Web UI (CloudFront) and API (API Gateway). The primary defence for the Runtime is **JWT / IAM authentication**.
 
-### Headers
+### Other recommendations
 
-```
-Content-Type: application/json
-Accept: application/json, text/event-stream
-Authorization: Bearer {JWT_TOKEN}
-```
+- **Pass JWT tokens via environment variables**, not in `mcp.json` as plain text.
+- **Keep `allowedClients` as small as possible** when using Cognito.
+- **Enable CloudTrail** in production to audit Runtime access.
+- **Tighten CORS** to your organisation's domains.
 
-### Example: List tools
-
-```bash
-# Get OAuth token
-TOKEN=$(curl -s -X POST \
-  "https://<CognitoDomain>.auth.<region>.amazoncognito.com/oauth2/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "<M2MClientId>:<M2MClientSecret>" \
-  -d "grant_type=client_credentials&scope=sdpm/invoke" \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-
-# URL-encode the Runtime ARN
-ENCODED_ARN=$(python3 -c "import urllib.parse; print(urllib.parse.quote('<RuntimeArn>', safe=''))")
-
-# Call tools/list
-curl -X POST \
-  "https://bedrock-agentcore.<region>.amazonaws.com/runtimes/${ENCODED_ARN}/invocations?qualifier=DEFAULT" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}'
-```
-
-### Example: Call a tool
-
-```bash
-curl -X POST \
-  "https://bedrock-agentcore.<region>.amazonaws.com/runtimes/${ENCODED_ARN}/invocations?qualifier=DEFAULT" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "list_templates",
-      "arguments": {}
-    },
-    "id": 2
-  }'
-```
+---
 
 ## Authentication Configuration
 
@@ -151,7 +126,7 @@ No additional user registration is needed — any valid JWT with a `sub` claim w
 
 ---
 
-## Option 4: Generative AI Use Cases on AWS (GenU) Integration
+## Option 3: Generative AI Use Cases on AWS (GenU) Integration
 
 > **Note:** [Generative AI Use Cases on AWS (GenU)](https://github.com/aws-samples/generative-ai-use-cases-jp) is a separate open-source project under active development. The steps below are based on GenU v5.x as of April 2026 and may change in future releases.
 

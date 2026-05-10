@@ -1,0 +1,5 @@
+# Runtime agent configs (copied from acp-agents/ at chat time)
+.kiro/agents/
+
+# Local data
+.sdpm/

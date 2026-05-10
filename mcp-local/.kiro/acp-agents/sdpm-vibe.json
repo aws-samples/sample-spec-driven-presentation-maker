@@ -1,0 +1,50 @@
+{
+  "name": "sdpm-vibe",
+  "description": "VIBE agent for spec-driven-presentation-maker. Rapid slide generation from source material with minimal user interaction.",
+  "mcpServers": {
+    "sdpm": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "server_acp.py"
+      ],
+      "timeout": 120000
+    }
+  },
+  "prompt": "file://../../acp-agent-prompts/vibe-agent.md",
+  "tools": [
+    "@sdpm",
+    "use_subagent",
+    "read",
+    "glob",
+    "grep",
+    "web_search",
+    "web_fetch"
+  ],
+  "allowedTools": [
+    "@sdpm/*",
+    "read",
+    "glob",
+    "grep",
+    "web_fetch",
+    "web_search",
+    "use_subagent"
+  ],
+  "toolsSettings": {
+    "subagent": {
+      "availableAgents": [
+        "sdpm-composer"
+      ],
+      "trustedAgents": [
+        "sdpm-composer"
+      ]
+    }
+  },
+  "welcomeMessage": "Drop a URL, paste text, or describe what you want — I'll turn it into slides.",
+  "resources": [
+    "file://../../../skill/references/workflows/create-new-1-briefing.md",
+    "file://../../../skill/references/workflows/create-new-1-outline.md",
+    "file://../../../skill/references/workflows/create-new-1-art-direction.md"
+  ]
+}

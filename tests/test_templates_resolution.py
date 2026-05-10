@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from sdpm.api import _find_template_in_dirs, _get_templates_dirs, _resolve_template
+from sdpm.api import _find_template_in_dirs, _resolve_template, get_templates_dirs
 
 
 @pytest.fixture
@@ -19,14 +19,14 @@ def temp_template_dir(tmp_path: Path) -> Path:
 
 
 def test_templates_dir_includes_bundled() -> None:
-    dirs = _get_templates_dirs()
+    dirs = get_templates_dirs()
     bundled = Path(__file__).resolve().parent.parent / "skill" / "templates"
     assert bundled in dirs
 
 
 def test_templates_dir_respects_env(monkeypatch: pytest.MonkeyPatch, temp_template_dir: Path) -> None:
     monkeypatch.setenv("SDPM_TEMPLATES_DIR", str(temp_template_dir))
-    dirs = _get_templates_dirs()
+    dirs = get_templates_dirs()
     assert dirs[0] == temp_template_dir
 
 
@@ -38,7 +38,7 @@ def test_templates_dir_supports_multiple_env_paths(
     d1.mkdir()
     d2.mkdir()
     monkeypatch.setenv("SDPM_TEMPLATES_DIR", f"{d1}{os.pathsep}{d2}")
-    dirs = _get_templates_dirs()
+    dirs = get_templates_dirs()
     assert dirs[0] == d1
     assert dirs[1] == d2
 

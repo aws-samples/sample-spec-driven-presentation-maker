@@ -16,7 +16,7 @@
 import { DeckDetail } from "@/services/deckService"
 import { Share2, Download, Layers } from "lucide-react"
 import { PreviewImage } from "@/components/ui/PreviewImage"
-import { useAuth } from "react-oidc-context"
+import { useAuth } from "@/hooks/useAuth"
 
 interface WorkspaceViewProps {
   deck: DeckDetail
@@ -49,7 +49,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
     <div className="h-full flex flex-col animate-card-in">
       {/* Toolbar */}
       <div className="flex-none flex items-center justify-between px-5 sm:px-8 py-3 border-b border-border">
-        <div className="text-[12px] text-foreground-muted font-medium">
+        <div className="text-xs text-foreground-muted font-medium">
           {slideCount} {slideCount === 1 ? "slide" : "slides"}
           {deck.updatedAt && (
             <>
@@ -62,7 +62,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
           {onShare && (
             <button
               onClick={onShare}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg border border-border text-foreground-secondary hover:text-foreground hover:border-border-hover hover:bg-background-hover transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-foreground-secondary hover:text-foreground hover:border-border-hover hover:bg-background-hover transition-all"
             >
               <Share2 className="h-3 w-3" />
               Share
@@ -72,7 +72,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
             <a
               href={deck.pptxUrl}
               download
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg border border-border text-foreground-secondary hover:text-foreground hover:border-border-hover hover:bg-background-hover transition-all no-underline"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-foreground-secondary hover:text-foreground hover:border-border-hover hover:bg-background-hover transition-all no-underline"
             >
               <Download className="h-3 w-3" />
               PPTX
@@ -87,7 +87,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 max-w-5xl">
             {deck.slides.map((slide, i) => (
               <div
-                key={slide.slideId}
+                key={slide.slug}
                 className="animate-card-in rounded-xl overflow-hidden border border-border bg-card cursor-pointer group hover:-translate-y-[2px] hover:border-border-hover hover:shadow-[0_6px_24px_oklch(0_0_0/40%)] transition-all duration-300"
                 style={{ "--delay": `${i * 50}ms` } as React.CSSProperties}
               >
@@ -96,7 +96,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
                     <PreviewImage
                       src={slide.previewUrl}
                       deckId={deck.deckId}
-                      slideId={slide.slideId}
+                      slug={slide.slug}
                       idToken={auth.user?.id_token}
                       alt={`Slide ${i + 1}`}
                       className="w-full h-full object-cover"
@@ -106,7 +106,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
                       <Layers className="h-6 w-6 text-foreground-muted/20" />
                     </div>
                   )}
-                  <div className="absolute bottom-2 right-2.5 text-[10px] font-medium text-white/20">
+                  <div className="absolute bottom-2 right-2.5 text-[11px] font-medium text-white/20">
                     {i + 1}
                   </div>
                 </div>
@@ -116,7 +116,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Layers className="h-10 w-10 text-foreground-muted/20 mb-4" />
-            <p className="text-[13px] text-foreground-muted">
+            <p className="text-sm text-foreground-muted">
               No slides yet. Use the chat to create slides.
             </p>
           </div>

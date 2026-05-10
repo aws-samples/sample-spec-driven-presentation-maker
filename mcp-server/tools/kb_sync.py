@@ -187,7 +187,7 @@ class KBSync:
         # Build vectors
         vectors: list[dict] = []
         for i, slide in enumerate(slides):
-            slide_id = f"slide_{i + 1:02d}"
+            slide_id = slide.get("id") or f"slide_{i + 1:02d}"
             layout = slide.get("layout", "")
             metadata = self._build_metadata(
                 deck_id=deck_id,
@@ -251,7 +251,7 @@ class KBSync:
         """
         keys: list[str] = []
         for i, slide in enumerate(slides):
-            slide_id = f"slide_{i + 1:02d}"
+            slide_id = slide.get("id") or f"slide_{i + 1:02d}"
             keys.append(f"{deck_id}/{slide_id}")
             keys.append(f"{deck_id}/{slide_id}_design")
 

@@ -21,6 +21,9 @@ from pathlib import Path
 _SKILL_DIR = Path(__file__).resolve().parent.parent / "skill"
 sys.path.insert(0, str(_SKILL_DIR))
 
+# Add project root to sys.path so shared/ package is importable
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from tools import (  # noqa: E402
@@ -220,10 +223,10 @@ def list_templates() -> str:
     Returns:
         JSON with list of template names.
     """
-    from sdpm.api import _get_templates_dirs
+    from sdpm.api import get_templates_dirs
 
     seen: dict[str, str] = {}
-    for d in _get_templates_dirs():
+    for d in get_templates_dirs():
         if not d.exists():
             continue
         for t in sorted(d.glob("*.pptx")):

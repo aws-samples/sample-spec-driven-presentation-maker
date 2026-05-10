@@ -4,6 +4,17 @@
 
 Step-by-step instructions for setting up spec-driven-presentation-maker, from local usage to AWS deployment.
 
+> **🤖 You don't need to read this page manually.** This repo ships with [`AGENTS.md`](../../AGENTS.md) and [`CLAUDE.md`](../../CLAUDE.md). Just tell your coding agent (Claude Code, Codex CLI, Cursor, Kiro, GitHub Copilot in VS Code, etc.) what you want — for example, "Set up this repo," "Deploy it to AWS," or "Wire it up so I can use it from Claude Desktop as Layer 2." The agent will read AGENTS.md, pick the right layer, and run the right commands for you.
+
+> **🚀 Deploying to AWS only?** Head to the [Recommended Deploy Guide](deploy-cloudshell.md). Running `scripts/deploy.sh` from CloudShell — or any local Linux/macOS environment — deploys Layer 3/4 without requiring a local CDK or Docker install. This page covers Layer 1–2 local usage and the direct-CDK workflow used for development and debugging.
+
+## Which Layer Do I Need?
+
+- **Layer 1** — Use from a SKILL.md-compatible coding agent (Claude Code, Codex CLI, Cursor, Kiro, GitHub Copilot in VS Code, etc.). Python only, no MCP or AWS.
+- **Layer 2** — Use from a local MCP client (Claude Desktop, Claude Cowork, etc.). Local stdio MCP, no AWS.
+- **Layer 3** — Use from a remote-only MCP client (Claude.ai web, etc. — clients that cannot spawn local processes). AWS deployment required.
+- **Layer 4** — Use the included browser Web UI. AWS full-stack deployment.
+
 ## Prerequisites
 
 Common to all layers:
@@ -11,7 +22,7 @@ Common to all layers:
 - Python 3.10+
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) package manager
 
-Additional requirements for Layer 3–4 (AWS deployment):
+Additional requirements for **deploying Layer 3–4 with local CDK directly** (not needed when using the CloudShell deploy path):
 
 - AWS Account ([CDK bootstrapped](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping.html): `cdk bootstrap aws://ACCOUNT_ID/REGION`)
 - Node.js 18+
@@ -86,14 +97,14 @@ For the full tool list, see [Architecture — MCP Tool Reference](architecture.m
 
 Deploy spec-driven-presentation-maker as a remote MCP server on Amazon Bedrock AgentCore Runtime.
 
-> **💡 Easy Deploy:** You can also deploy from CloudShell with a single command — no local CDK or Docker required.
-> See [CloudShell Deploy Guide](deploy-cloudshell.md).
+> **💡 The [Recommended Deploy Guide](deploy-cloudshell.md) is the recommended path for AWS deployments.**
+> `scripts/deploy.sh` runs from CloudShell and from any local Linux/macOS environment, and builds via CodeBuild — so you don't need CDK or Docker installed locally. The instructions below cover the direct local CDK workflow, mainly used for development and debugging.
 
 ### Configuration
 
 ```bash
 cd infra
-npm install
+npm ci
 cp config.example.yaml config.yaml
 ```
 
@@ -109,7 +120,7 @@ stacks:
   webUi: false
 
 features:
-  searchSlides: false   # Semantic slide search (requires Bedrock Knowledge Base)
+  enableInvocationLogging: false  # Bedrock Model Invocation Logging (optional)
 ```
 
 ### Deploy
@@ -188,8 +199,7 @@ A tool list in the response confirms success.
 
 ## Layer 4: Full Stack (AWS)
 
-> **💡 Easy Deploy:** Layer 4 can also be deployed from CloudShell with a single command. Just run `./scripts/deploy.sh --region us-east-1`.
-> See [CloudShell Deploy Guide](deploy-cloudshell.md).
+> **💡 Recommended path:** Deploy Layer 4 via the [Recommended Deploy Guide](deploy-cloudshell.md) (works from CloudShell and any local Linux/macOS). Just run `./scripts/deploy.sh --region us-east-1` — no local CDK/Docker needed.
 
 Enable `agent` and `webUi` in `config.yaml` to add:
 
@@ -207,7 +217,7 @@ stacks:
   webUi: true          # React Web UI (S3 + CloudFront)
 
 features:
-  searchSlides: false
+  enableInvocationLogging: false
 ```
 
 ```bash
@@ -287,9 +297,7 @@ Default action is **Block** — only the listed IP ranges are allowed. When the 
 
 ### Semantic Slide Search
 
-Set `features.searchSlides: true` to create a Amazon Bedrock Knowledge Base for cross-deck semantic search.
-
-As a prerequisite, enable access to the Amazon Titan Text Embeddings V2 model in your deployment region (Amazon Bedrock console → Model access).
+Cross-deck semantic search is provided out of the box, backed by Amazon Bedrock Knowledge Bases and Amazon S3 Vectors. No extra configuration is needed.
 
 ### Custom Templates and Assets
 
@@ -301,9 +309,7 @@ For adding custom .pptx templates and icons, see [Custom Templates and Assets](c
 
 ### Cost
 
-- Amazon Bedrock AgentCore Runtime runs 2 containers (Agent + MCP Server)
-- Enabling `features.searchSlides` creates an additional Amazon Bedrock Knowledge Base
-- Delete resources with `npx cdk destroy --all` when done with development/testing
+See [Cost Estimates](cost.md) for details. Delete resources with `npx cdk destroy --all` when done with development/testing.
 
 ### Data Retention
 
@@ -354,4 +360,4 @@ bash scripts/deploy_webui.sh
 
 - [Architecture](architecture.md) — 4-layer design, data flow, auth model
 - [Custom Templates](custom-template.md) — Adding templates and assets
-- [Connecting Agents](add-to-gateway.md) — Amazon Bedrock AgentCore Gateway connection
+- [Connecting Agents](add-to-gateway.md) — MCP client connection guide

@@ -108,6 +108,7 @@ class PPTXBuilder(
         self.fonts = fonts
         self.keep_empty_placeholders = keep_empty_placeholders
         self.layouts = self._build_layout_map()
+        self.invalid_layouts: list[dict] = []  # {"slug", "attempted", "used", "available"}
         self._base_dir = base_dir if base_dir is not None else Path(".")
         self._list_styles = self._load_list_styles()
         self._clear_slides()
@@ -250,7 +251,19 @@ class PPTXBuilder(
             if layout:
                 break
         if layout is None:
-            raise ValueError(f"Unknown layout: '{layout_name}'. Available layouts: {list(self.layouts.keys())}")
+            # Fallback to keep the build from aborting. Prefer the standard
+            # "Blank" layout; otherwise use the first available one. The
+            # caller can inspect self.invalid_layouts to surface errors to
+            # the responsible composer without breaking the whole run.
+            fallback_name = "Blank" if "Blank" in self.layouts else next(iter(self.layouts))
+            fallback_idx = self.layouts[fallback_name]
+            layout = self.prs.slide_masters[self.master_idx].slide_layouts[fallback_idx]
+            self.invalid_layouts.append({
+                "slug": slide_def.get("id", ""),
+                "attempted": layout_name,
+                "used": fallback_name,
+                "available": list(self.layouts.keys()),
+            })
         slide = self.prs.slides.add_slide(layout)
 
         self._fill_placeholders(slide, slide_def)

@@ -58,15 +58,14 @@ Once selected, run `analyze-template` to check available layouts, theme colors, 
 uv run python3 scripts/pptx_builder.py analyze-template templates/{selected_template}.pptx
 ```
 
-Update `presentation.json` with the template name and fonts from the analyze output.
+Update `deck.json` with the template name and fonts from the analyze output.
 When `specs/art-direction.html` exists, read `:root` CSS variables and use `--color-text` as `defaultTextColor`.
 If the style HTML specifies font-family, ask the user which to use — the style's fonts or the template's fonts.
 ```json
 {
   "template": "{selected_template}.pptx",
   "fonts": {"fullwidth": "(style or template)", "halfwidth": "(style or template)"},
-  "defaultTextColor": "(use --color-text from art-direction.html :root)",
-  "slides": []
+  "defaultTextColor": "(use --color-text from art-direction.html :root)"
 }
 ```
 

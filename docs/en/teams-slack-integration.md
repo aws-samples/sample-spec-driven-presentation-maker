@@ -289,5 +289,5 @@ Calling with the same session ID causes the Agent to respond while retaining the
 ## Related Documents
 
 - [Getting Started](getting-started.md) — Layer 3/4 setup and deployment
-- [Connecting Agents](add-to-gateway.md) — Amazon Bedrock AgentCore Gateway connection
+- [Connecting Agents](add-to-gateway.md) — MCP client connection guide
 - [Architecture](architecture.md) — Authentication and authorization model details

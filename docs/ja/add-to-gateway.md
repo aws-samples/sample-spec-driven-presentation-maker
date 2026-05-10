@@ -3,7 +3,7 @@
 # エージェント接続ガイド
 
 spec-driven-presentation-maker は MCP サーバーです — Model Context Protocol をサポートする任意の AI エージェントに接続できます。
-このガイドでは 3 つの接続オプションを説明します。
+このガイドでは接続オプションを説明します。
 
 ---
 
@@ -13,79 +13,94 @@ AWS 不要。サーバーはローカルで stdio 経由で動作します。
 
 セットアップ手順と MCP クライアント設定は[はじめに — Layer 2](getting-started.md#layer-2-ローカル-mcp-サーバー)を参照してください。
 
-Kiro Skill として使う場合は、`skill/` を Kiro のスキルディレクトリにコピーするだけです。SKILL.md がワークフロー手順を直接提供します。
+---
+
+## オプション 2: OAuth 2.1 Discovery エンドポイント経由（Layer 3、推奨）
+
+Layer 3 のデプロイが必要です（[はじめに — Layer 3](getting-started.md#layer-3-リモート-mcp-サーバーaws)参照）。
+
+CDK デプロイ時に作成される **MCP Server URL**（API Gateway HTTP API）を MCP クライアントに登録するだけで、OAuth 2.1 Discovery プロトコルにより認証が自動的に行われます。
+
+### 接続方法 A: Dynamic Client Registration（DCR）— デフォルト
+
+主要な MCP クライアント（Claude.ai、Claude Desktop、Cursor、VS Code、Kiro）はすべて DCR（RFC 7591）に対応しています。MCP クライアントに MCP Server URL を登録するだけで、クライアントが自動的に OAuth ディスカバリー → DCR → 認証コードフロー を実行します。
+
+#### MCP クライアント設定
+
+```json
+{
+  "mcpServers": {
+    "spec-driven-presentation-maker": {
+      "url": "<McpServerUrl>"
+    }
+  }
+}
+```
+
+`<McpServerUrl>` は CDK 出力の `SdpmRuntime.McpServerUrl` から取得してください。
+
+### 接続方法 B: 静的クライアント登録（`auth.mcpCallbackUrls`）
+
+以下のいずれかに該当する場合は、DCR の代わりに静的な OAuth クライアントを使用します：
+
+- **MCP クライアントが DCR に対応していない場合**
+- **DCR を許可せず、特定のクライアントのみ接続を許可したい場合**（企業環境でのセキュリティ要件）
+
+> **注意**: DCR を無効化すると、`localhost` で毎回異なるポートの callback URL を使用するクライアントは接続できません。
+
+#### 設定手順
+
+1. `config.yaml` に許可するクライアントの callback URL を記載し、必要に応じて DCR を無効化します：
+
+```yaml
+auth:
+  enableDCR: false  # DCR を無効化（特定クライアントのみ許可する場合）
+  mcpCallbackUrls:
+    - https://claude.ai/api/mcp/auth_callback
+    - https://claude.com/api/mcp/auth_callback
+```
+
+2. 再デプロイします（`cdk deploy --all`）
+3. CDK 出力の `SdpmRuntime.McpOAuthClientId` を MCP クライアントに設定します
+
+> **注意**: `enableDCR: false` に設定すると、`/.well-known/oauth-authorization-server` メタデータから `registration_endpoint` が省略され、`/register` は 403 を返します。`mcpCallbackUrls` に登録されていないクライアントは接続できません。
+
+#### デプロイパターン一覧
+
+| `mcpCallbackUrls` | `enableDCR` | 動作 |
+|---|---|---|
+| なし | `true`（デフォルト） | DCR のみ。個人・デモ向け |
+| あり | `true` | 静的クライアント＋DCR 併用 |
+| あり | `false` | 静的クライアントのみ。企業向けロックダウン |
+| なし | `false` | 外部 MCP 接続なし。WebUI 専用 |
 
 ---
 
-## オプション 2: Amazon Bedrock AgentCore Gateway（Layer 3、チーム利用推奨）
+## セキュリティ: MCP エンドポイントの保護
 
-マルチユーザー環境では、Amazon Bedrock AgentCore Gateway 経由で接続します。Gateway は OAuth ベースの認証、ツール集約、Cedar ベースの認可を提供します。
+Runtime エンドポイントは **Public インターネットに公開** されます。認証（Cognito JWT / IAM）により不正アクセスは防止されますが、次の追加対策を **強く推奨** します。
 
-### 前提条件
+### WAF による IP 制限
 
-- Layer 3 が CDK でデプロイ済み（[はじめに — Layer 3](getting-started.md#layer-3-リモート-mcp-サーバーaws)参照）
-- Amazon Bedrock AgentCore Gateway が AWS アカウントに設定済み
+`config.yaml` の `waf.allowedIpV4AddressRanges` / `allowedIpV6AddressRanges` を設定することで、CloudFront と API Gateway に AWS WAF のルールを適用できます。社内 VPN や特定オフィスからのみアクセスさせる場合に有効です。
 
-### Gateway ターゲットとして登録
-
-spec-driven-presentation-maker Runtime を Amazon Bedrock AgentCore Gateway の MCP Server ターゲットとして追加します。
-
-1. CDK 出力から Runtime ARN を取得（`SdpmRuntime.RuntimeArn`）
-2. Gateway からこの Runtime へのルーティングを設定
-3. Gateway → Runtime 接続用の OAuth 認証情報を設定（CDK 出力の M2M クライアント情報）
-
-Gateway に接続する MCP クライアントは、spec-driven-presentation-maker のツールを他の登録済み MCP サーバーと共に自動的に検出します。
-
-### 認証フロー
-
-```
-MCP Client → Gateway (OAuth) → Runtime (JWT Bearer) → MCP Server コンテナ
+```yaml
+waf:
+  allowedIpV4AddressRanges:
+    - "192.0.2.0/24"      # 社内ネットワーク IPv4
+    - "203.0.113.10/32"   # 個別 IP
+  allowedIpV6AddressRanges:
+    - "2001:db8::/32"     # 社内ネットワーク IPv6
 ```
 
-Gateway がクライアント認証を処理します。Runtime は JWT を検証し、ユーザー ID（`sub` クレーム）を抽出してデッキ単位の認可に使用します。
+**重要**: Runtime エンドポイント（`bedrock-agentcore.*.amazonaws.com`）自体は AWS サービスが管理するため WAF を直接アタッチできません。上記設定は Web UI（CloudFront）と API（API Gateway）に適用されます。Runtime への不正アクセスを防ぐ主要な防御層は **JWT / IAM 認証** になります。
 
----
+### その他の推奨事項
 
-## オプション 3: Runtime 直接アクセス（Layer 3）
-
-Gateway を使わず、Amazon Bedrock AgentCore Runtime エンドポイントに直接接続します。テストやシングルサーバー構成に適しています。
-
-### エンドポイント
-
-```
-POST https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{ENCODED_ARN}/invocations?qualifier=DEFAULT
-```
-
-`ENCODED_ARN` は URL エンコードされた Runtime ARN です。
-
-### ヘッダー
-
-```
-Content-Type: application/json
-Accept: application/json, text/event-stream
-Authorization: Bearer {JWT_TOKEN}
-```
-
-JWT トークンの取得方法は[はじめに — OAuth トークンの取得](getting-started.md#oauth-トークンの取得)を参照してください。
-
-### 例: ツールの呼び出し
-
-```bash
-curl -X POST \
-  "https://bedrock-agentcore.<region>.amazonaws.com/runtimes/${ENCODED_ARN}/invocations?qualifier=DEFAULT" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "list_templates",
-      "arguments": {}
-    },
-    "id": 2
-  }'
-```
+- **JWT トークンは環境変数経由で渡し、`mcp.json` に平文で書かない**
+- **Cognito を使う場合、許可クライアント ID (`allowedClients`) を必要最小限にする**
+- **本番利用では CloudTrail を有効化し、Runtime へのアクセスを監査ログに残す**
+- **CORS 設定を自社ドメインに絞る**
 
 ---
 
@@ -144,7 +159,7 @@ requestHeaderConfiguration: {
 
 ---
 
-## オプション 4: Generative AI Use Cases on AWS (GenU) 連携
+## オプション 3: Generative AI Use Cases on AWS (GenU) 連携
 
 > **注意:** [Generative AI Use Cases on AWS (GenU)](https://github.com/aws-samples/generative-ai-use-cases-jp) は活発に開発が行われている別のオープンソースプロジェクトです。以下の手順は 2026 年 4 月時点の GenU v5.x に基づいており、今後のリリースで変更される可能性があります。
 

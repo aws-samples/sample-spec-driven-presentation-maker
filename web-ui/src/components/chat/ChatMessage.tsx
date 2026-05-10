@@ -20,6 +20,7 @@
 
 import { useState, useEffect } from "react"
 import Markdown from "react-markdown"
+import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { ChevronRight, Sparkles, FileText as FileTextIcon, Image as ImageIcon } from "lucide-react"
 import { ToolCard, ToolCardCompact } from "./ToolCard"
@@ -37,21 +38,21 @@ function extractQuestions(input: Record<string, unknown>): HearingQuestion[] {
 }
 
 const MENTION_RE = /(@Page\s\d+|@\[[^\]]+\])/g
-const SLIDE_PREVIEW_RE = /\[slide-preview:([a-f0-9]+):([a-z0-9_]+)\]/g
+const SLIDE_PREVIEW_RE = /\[slide-preview:([a-f0-9]+):([a-z0-9][a-z0-9_-]*)\]/g
 const COLOR_CODE_RE = /(#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3}))\b/g
 
 /**
- * Replace [slide-preview:deckId:slideId] markers with markdown images
+ * Replace [slide-preview:deckId:slug] markers with markdown images
  * when preview URLs are available, or remove them if not yet loaded.
  *
  * @param text - Message content with markers
- * @param urls - Map of "deckId:slideId" to presigned preview URL
+ * @param urls - Map of "deckId:slug" to presigned preview URL
  * @returns Cleaned content with markdown images
  */
 function renderInlinePreviews(text: string, urls: Record<string, string>): string {
-  return text.replace(SLIDE_PREVIEW_RE, (_, deckId, slideId) => {
-    const url = urls[`${deckId}:${slideId}`]
-    if (url) return `\n\n![${slideId}](${url})\n\n`
+  return text.replace(SLIDE_PREVIEW_RE, (_, deckId, slug) => {
+    const url = urls[`${deckId}:${slug}`]
+    if (url) return `\n\n![${slug}](${url})\n\n`
     // Show skeleton placeholder while loading
     return `\n\n![loading...](data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgwIiBoZWlnaHQ9IjI3MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWExYTFhIiByeD0iOCIvPjxyZWN0IHg9IjQwJSIgeT0iNDUlIiB3aWR0aD0iMjAlIiBoZWlnaHQ9IjEwJSIgZmlsbD0iIzMzMyIgcng9IjQiLz48L3N2Zz4=)\n\n`
   })
@@ -82,7 +83,7 @@ function highlightMentions(text: string): (string | React.JSX.Element)[] {
             style={{ backgroundColor: part }}
             aria-label={`Color ${part}`}
           />
-          <code className="text-[12px] px-1 py-0.5 rounded bg-white/5">{part}</code>
+          <code className="text-xs px-1 py-0.5 rounded bg-white/5">{part}</code>
         </span>
       )
     }
@@ -137,6 +138,8 @@ export interface ToolUse {
   input?: Record<string, unknown>
   status?: "success" | "error"
   result?: Record<string, unknown>
+  /** Streaming progress messages from tool (e.g. compose_slides sub-agent progress). */
+  streamMessages?: Record<string, unknown>[]
 }
 
 export type MessageBlock = { type: "text"; text: string } | { type: "tool"; tool: ToolUse }
@@ -152,13 +155,19 @@ interface ChatMessageProps {
   isStreaming?: boolean
   /** Cognito ID token for fetching slide previews. */
   idToken?: string
+  /** Current deck slide IDs — forwarded to ToolCard/ComposeCard for slug existence. */
+  deckSlugs?: string[]
+  /** Session ID — forwarded to ComposeCard for soft-stop calls. */
+  sessionId?: string
+  /** Cognito Access Token — forwarded to ComposeCard for soft-stop (client_id claim lives on the access token). */
+  accessToken?: string
   /** Callback to send a message (used by HearingCard). */
   onSend?: (text: string) => void
   /** Whether hearing cards should be disabled (a new message was sent). */
   hearingDisabled?: boolean
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, onSend, hearingDisabled = false }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, deckSlugs, sessionId, accessToken, onSend, hearingDisabled = false }: ChatMessageProps) {
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
@@ -178,15 +187,15 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
   cleanContent = cleanContent.replace(/\[Attached:\s*[^\]]+\]\n*/g, "").trim()
   const allSnippets = [...inlineSnippets, ...snippets]
 
-  // Fetch preview URLs for [slide-preview:deckId:slideId] markers
+  // Fetch preview URLs for [slide-preview:deckId:slug] markers
   useEffect(() => {
     if (isUser || !content || !idToken) return
 
-    const matches: { deckId: string; slideId: string }[] = []
+    const matches: { deckId: string; slug: string }[] = []
     let m: RegExpExecArray | null
     const re = new RegExp(SLIDE_PREVIEW_RE)
     while ((m = re.exec(content)) !== null) {
-      matches.push({ deckId: m[1], slideId: m[2] })
+      matches.push({ deckId: m[1], slug: m[2] })
     }
     if (matches.length === 0) return
 
@@ -209,9 +218,9 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
     const cleaned = text.replace(/\n*---snippet---\n[\s\S]*?---\/snippet---/g, "").trim()
     if (!cleaned) return null
     return (
-      <div className={`text-[13px] leading-relaxed text-foreground/85 ${isLast && isStreaming ? "streaming-cursor" : ""}`}>
+      <div className={`text-sm leading-relaxed text-foreground/85 ${isLast && isStreaming ? "streaming-cursor" : ""}`}>
         <div className="prose prose-invert prose-sm max-w-none">
-          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents as Components}>
             {renderInlinePreviews(cleaned, previewUrls)}
           </Markdown>
         </div>
@@ -233,7 +242,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
       <div className={isUser ? "max-w-[85%]" : "flex-1 min-w-0"}>
         {isUser ? (
           /* User bubble */
-          <div className="text-[13px] leading-relaxed break-words px-3.5 py-2.5 rounded-2xl rounded-br-md bg-brand-teal-soft border border-brand-teal/15">
+          <div className="text-sm leading-relaxed break-words px-3.5 py-2.5 rounded-2xl rounded-br-md bg-brand-teal-soft border border-brand-teal/15">
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {attachments.map((att, i) => (
@@ -266,16 +275,22 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 <ToolCard
                   key={block.tool.toolUseId}
                   name={block.tool.name}
+                  toolUseId={block.tool.toolUseId}
                   input={block.tool.input}
                   status={block.tool.status}
                   result={block.tool.result}
-                  isActive={isStreaming && !block.tool.status && i === blocks.length - 1 && Object.keys(block.tool.input || {}).length === 0}
+                  isActive={isStreaming && !block.tool.status && (i === blocks.length - 1 || (block.tool.streamMessages?.length ?? 0) > 0)}
+                  streamMessages={block.tool.streamMessages}
+                  deckSlugs={deckSlugs}
+                  sessionId={sessionId}
+                  idToken={idToken}
+                  accessToken={accessToken}
                 />
               )
             )}
             {/* Thinking dots when no content yet */}
             {isStreaming && !cleanContent && toolUses.length === 0 && (
-              <span className="inline-flex items-center gap-1.5 text-foreground/30 text-[12px]">
+              <span className="inline-flex items-center gap-1.5 text-foreground/30 text-sm">
                 <span className="flex gap-0.5">
                   <span className="w-1 h-1 rounded-full bg-brand-teal/60" style={{ animation: "cursor-blink 1.4s ease-in-out infinite" }} />
                   <span className="w-1 h-1 rounded-full bg-brand-teal/60" style={{ animation: "cursor-blink 1.4s ease-in-out 0.2s infinite" }} />
@@ -288,15 +303,15 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
           /* Assistant: fallback layout (history restore, no blocks) */
           <>
             {(cleanContent || (isStreaming && toolUses.length === 0)) && (
-              <div className="text-[13px] leading-relaxed break-words text-foreground/85">
+              <div className="text-sm leading-relaxed break-words text-foreground/85">
                 {cleanContent ? (
                   <div className={`prose prose-invert prose-sm max-w-none ${isStreaming ? "streaming-cursor" : ""}`}>
-                    <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                    <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents as Components}>
                       {renderInlinePreviews(cleanContent, previewUrls)}
                     </Markdown>
                   </div>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 text-foreground/30 text-[12px]">
+                  <span className="inline-flex items-center gap-1.5 text-foreground/30 text-sm">
                     <span className="flex gap-0.5">
                       <span className="w-1 h-1 rounded-full bg-brand-teal/60" style={{ animation: "cursor-blink 1.4s ease-in-out infinite" }} />
                       <span className="w-1 h-1 rounded-full bg-brand-teal/60" style={{ animation: "cursor-blink 1.4s ease-in-out 0.2s infinite" }} />
@@ -313,10 +328,16 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 {latestTool && (
                   <ToolCard
                     name={latestTool.name}
+                    toolUseId={latestTool.toolUseId}
                     input={latestTool.input}
                     status={latestTool.status}
                     result={latestTool.result}
-                    isActive={isStreaming && !latestTool.status && (Object.keys(latestTool.input || {}).length === 0)}
+                    isActive={isStreaming && !latestTool.status}
+                    streamMessages={latestTool.streamMessages}
+                    deckSlugs={deckSlugs}
+                    sessionId={sessionId}
+                    idToken={idToken}
+                    accessToken={accessToken}
                   />
                 )}
                 {olderTools.length > 0 && (

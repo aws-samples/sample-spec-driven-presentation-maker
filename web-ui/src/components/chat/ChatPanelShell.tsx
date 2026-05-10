@@ -26,8 +26,58 @@
 import { useRef, useEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
+import { LocalOnly, IS_LOCAL } from "@/lib/mode"
 
 export type ChatTabKey = "new" | "deck"
+
+const CHAT_WIDTH_KEY = "sdpm-chat-width"
+const DEFAULT_WIDTH = 440
+const MIN_WIDTH = 360
+const MAX_WIDTH_PX = 600
+
+
+/** Model info for local ACP agent */
+interface AcpModel { modelId: string; name: string; description?: string }
+
+function ModelSelector() {
+  const [model, setModelState] = useState<string>("")
+  const [models, setModels] = useState<AcpModel[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    const poll = () => {
+      fetch("/api/agent/models").then(r => r.json()).then(data => {
+        if (cancelled) return
+        const avail = data.available || []
+        if (avail.length > 0) { setModels(avail); setModelState(data.current || "") }
+        else setTimeout(poll, 3000) // retry until a process is spawned
+      }).catch(() => { if (!cancelled) setTimeout(poll, 3000) })
+    }
+    poll()
+    return () => { cancelled = true }
+  }, [])
+
+  if (models.length === 0) return null
+
+  return (
+    <select
+      value={model}
+      onChange={async (e) => {
+        const v = e.target.value
+        setModelState(v)
+        sessionStorage.setItem("sdpm-model", v)
+        fetch("/api/agent/models", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ modelId: v }),
+        }).catch(() => {})
+      }}
+      className="text-[11px] bg-transparent border border-border rounded px-1.5 py-0.5 text-foreground-muted hover:text-foreground focus:outline-none focus:ring-1 focus:ring-brand-teal max-w-[140px]"
+    >
+      {models.map(m => <option key={m.modelId} value={m.modelId}>{m.name}</option>)}
+    </select>
+  )
+}
 
 interface ChatPanelShellProps {
   open: boolean
@@ -38,6 +88,7 @@ interface ChatPanelShellProps {
   deckName: string | null
   chatSessionId?: string
   slidePreviewUrls?: (string | null)[]
+  slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
@@ -47,12 +98,57 @@ interface ChatPanelShellProps {
 
 export function ChatPanelShell({
   open, onClose, chatTab, onChatTabChange,
-  deckId, deckName, chatSessionId, slidePreviewUrls, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, chatRef: externalChatRef,
+  deckId, deckName, chatSessionId, slidePreviewUrls, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, chatRef: externalChatRef,
   inline = false,
 }: ChatPanelShellProps) {
   const internalChatRef = useRef<ChatPanelHandle>(null)
   const chatRef = externalChatRef || internalChatRef
   const panelRef = useRef<HTMLElement>(null)
+
+  // Resize state
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH)
+  const resizingRef = useRef(false)
+
+  /** Restore saved width from localStorage after mount. */
+  useEffect(() => {
+    const saved = localStorage.getItem(CHAT_WIDTH_KEY)
+    if (saved) setPanelWidth(Math.max(MIN_WIDTH, Math.min(Number(saved), MAX_WIDTH_PX)))
+  }, [])
+
+  /** Apply width to panel DOM without React re-render. */
+  const applyWidth = useCallback((w: number) => {
+    const el = panelRef.current
+    if (el) el.style.width = `${w}px`
+  }, [])
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    resizingRef.current = true
+    const startX = e.clientX
+    const startW = panelWidth
+    const maxW = Math.min(MAX_WIDTH_PX, window.innerWidth * 0.5)
+
+    panelRef.current?.classList.add("is-resizing")
+
+    const onMove = (ev: MouseEvent) => {
+      applyWidth(Math.max(MIN_WIDTH, Math.min(startW + (startX - ev.clientX), maxW)))
+    }
+    const onUp = (ev: MouseEvent) => {
+      resizingRef.current = false
+      document.removeEventListener("mousemove", onMove)
+      document.removeEventListener("mouseup", onUp)
+      document.body.style.cursor = ""
+      document.body.style.userSelect = ""
+      panelRef.current?.classList.remove("is-resizing")
+      const finalW = Math.max(MIN_WIDTH, Math.min(startW + (startX - ev.clientX), maxW))
+      localStorage.setItem(CHAT_WIDTH_KEY, String(finalW))
+      setPanelWidth(finalW)
+    }
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+    document.addEventListener("mousemove", onMove)
+    document.addEventListener("mouseup", onUp)
+  }, [panelWidth, applyWidth])
 
   // When Panel A creates a deck, store the deckId so we know Panel A "owns" it
   const [panelADeckId, setPanelADeckId] = useState<string | null>(null)
@@ -92,6 +188,11 @@ export function ChatPanelShell({
 
   /** New chat button: reset Panel A to fresh state. */
   const handleNewChat = () => {
+    if (IS_LOCAL) fetch("/api/agent/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newChat: true }),
+    }).catch(() => {})
     if (chatTab === "new" || panelAOwnsCurrentDeck) {
       setPanelAKey((k) => k + 1)
       setPanelADeckId(null)
@@ -145,6 +246,7 @@ export function ChatPanelShell({
           deckId="new"
           deckName="New Deck"
           slidePreviewUrls={panelAOwnsCurrentDeck ? (slidePreviewUrls || []) : []}
+          slideSlugs={panelAOwnsCurrentDeck ? (slideSlugs || []) : []}
           onDeckCreated={handlePanelADeckCreated}
           onPreviewInvalidated={onPreviewInvalidated}
           onWorkflowPhase={onWorkflowPhase}
@@ -161,6 +263,7 @@ export function ChatPanelShell({
             deckName={deckName || undefined}
             chatSessionId={chatSessionId}
             slidePreviewUrls={slidePreviewUrls || []}
+            slideSlugs={slideSlugs || []}
             onDeckCreated={handlePanelBDeckCreated}
             onPreviewInvalidated={onPreviewInvalidated}
             onWorkflowPhase={onWorkflowPhase}
@@ -186,13 +289,27 @@ export function ChatPanelShell({
       <aside
         ref={panelRef}
         data-open={open}
-        className="chat-panel fixed right-0 top-12 bottom-0 z-50 w-full sm:w-[400px] flex flex-col bg-background-panel pb-4"
-        style={{
-          boxShadow: open
-            ? "-1px 0 0 var(--border), -20px 0 40px oklch(0 0 0 / 30%)"
-            : "none",
-        }}
+        className="chat-panel fixed right-0 top-12 bottom-0 z-50 w-full sm:relative sm:right-auto sm:top-auto sm:bottom-auto sm:z-auto sm:h-full sm:flex-none"
+        style={{ width: open ? panelWidth : 0 }}
       >
+        {/* Resize handle — absolute, left:-6px, outside inner overflow:hidden */}
+        <div
+          className="chat-resize-handle hidden sm:flex"
+          onMouseDown={handleResizeStart}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize chat panel"
+        />
+        {/* Inner — overflow:hidden clips during close, min-width prevents text reflow */}
+        <div
+          className="chat-panel-inner h-full flex flex-col bg-background-panel pb-4"
+          style={{
+            "--chat-panel-inner-w": `${panelWidth}px`,
+            boxShadow: open
+              ? "-1px 0 0 var(--border), -20px 0 40px oklch(0 0 0 / 30%)"
+              : "none",
+          } as React.CSSProperties}
+        >
         {/* Header */}
         <div className="flex-none px-4 pt-3 pb-0">
           <div className="flex items-center justify-between mb-3">
@@ -200,7 +317,8 @@ export function ChatPanelShell({
               <div className="w-5 h-5 rounded-md flex items-center justify-center bg-brand-teal-soft">
                 <MessageSquare className="h-2.5 w-2.5 text-brand-teal" />
               </div>
-              <span className="text-[13px] font-semibold tracking-[-0.01em]">Chat</span>
+              <span className="text-sm font-semibold tracking-[-0.01em]">Chat</span>
+              <LocalOnly><ModelSelector /></LocalOnly>
             </div>
             <div className="flex items-center gap-0.5">
               <button
@@ -226,7 +344,7 @@ export function ChatPanelShell({
             {/* Panel A tab */}
             <button
               onClick={() => onChatTabChange(panelAOwnsCurrentDeck ? "deck" : "new")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg transition-all truncate max-w-[240px] ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all truncate max-w-[240px] ${
                 panelAVisible
                   ? "text-foreground bg-white/[0.07]"
                   : "text-foreground-muted hover:text-foreground-secondary hover:bg-white/[0.03]"
@@ -244,7 +362,7 @@ export function ChatPanelShell({
             {showPanelB && (
               <button
                 onClick={() => onChatTabChange("deck")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg transition-all truncate max-w-[240px] ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all truncate max-w-[240px] ${
                   panelBVisible
                     ? "text-foreground bg-white/[0.07]"
                     : "text-foreground-muted hover:text-foreground-secondary hover:bg-white/[0.03]"
@@ -260,6 +378,7 @@ export function ChatPanelShell({
         <div className="mx-4 mt-3 border-t border-white/[0.06]" />
 
         {chatContent}
+        </div>{/* end chat-panel-inner */}
       </aside>
     </>
   )

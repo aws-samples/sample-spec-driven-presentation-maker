@@ -1,0 +1,33 @@
+{
+  "name": "sdpm-single",
+  "description": "Single agent for spec-driven-presentation-maker. Handles all phases (hearing, composing, reviewing) in one agent without sub-agents.",
+  "mcpServers": {
+    "sdpm": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "server_acp.py"
+      ],
+      "timeout": 120000
+    }
+  },
+  "prompt": "file://../../acp-agent-prompts/single-agent.md",
+  "tools": [
+    "@sdpm",
+    "read",
+    "glob",
+    "grep",
+    "web_search",
+    "web_fetch"
+  ],
+  "allowedTools": [
+    "@sdpm/*",
+    "read",
+    "glob",
+    "grep",
+    "web_fetch",
+    "web_search"
+  ],
+  "welcomeMessage": "What would you like to create?"
+}

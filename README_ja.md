@@ -3,9 +3,12 @@
 # Spec-Driven Presentation Maker
 
 [![License: MIT-0](https://img.shields.io/badge/License-MIT--0-yellow.svg)](LICENSE)
+[![AWS Blog](https://img.shields.io/badge/AWS%20Blog-read-orange?logo=amazonaws)](https://aws.amazon.com/jp/blogs/news/spec-driven-presentation-maker-ja/)
 
 仕様駆動開発のアプローチでプレゼンテーション資料を作成するオープンソースツールキット。
 「何を伝えるか」を先に設計し、「どう見せるか」を AI が構築します。
+
+> 📝 コンセプトと背景は AWS ブログ [Spec-Driven Presentation Maker — 伝えたいことを先に設計し、スライド構築は AI に任せる](https://aws.amazon.com/jp/blogs/news/spec-driven-presentation-maker-ja/) もあわせてご覧ください。
 
 <!-- TODO: デモ GIF/動画を撮影後に差し替え -->
 <!-- ![Demo](docs/images/demo.gif) -->
@@ -35,58 +38,15 @@
 
 ## クイックスタート
 
-> **🚀 まずは試してみたい？** CloudShell から数分でフルスタックデプロイできます。ローカルに CDK や Docker は不要です。
-> [CloudShell デプロイ手順](docs/ja/deploy-cloudshell.md)を参照してください。
+利用環境に応じたセットアップ手順を参照してください:
 
-### Layer 1: Kiro CLI スキル
+| 環境 | セットアップ |
+|---|---|
+| エージェントスキル（Claude Code, Codex CLI, Cursor, Kiro, Copilot） | [はじめに — Layer 1](docs/ja/getting-started.md#layer-1-kiro-cli-スキル) |
+| ローカル MCP クライアント（Claude Desktop, Claude Cowork） | [はじめに — Layer 2](docs/ja/getting-started.md#layer-2-ローカル-mcp-サーバー) |
+| リモート MCP / Web UI（AWS デプロイ） | [推奨デプロイ手順](docs/ja/deploy-cloudshell.md) |
 
-`skill/` を Kiro CLI のスキルディレクトリにコピーするだけで使えます。
-
-エンジンを Python パッケージとしてインストールすることもできます:
-
-```bash
-# 最新版
-pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git#subdirectory=skill
-
-# バージョン指定
-pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git@v0.1.0#subdirectory=skill
-```
-
-インストール済みバージョンの確認:
-
-```python
-import sdpm
-print(sdpm.__version__)
-```
-
-### Layer 2: ローカル MCP サーバー
-
-```bash
-cd mcp-local && uv sync
-```
-
-MCP クライアントの設定に追加:
-
-```json
-{
-  "mcpServers": {
-    "spec-driven-presentation-maker": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/mcp-local", "python", "server.py"]
-    }
-  }
-}
-```
-
-### Layer 3〜4: AWS デプロイ
-
-```bash
-cd infra
-cp config.example.yaml config.yaml   # スタックの有効/無効を設定
-npm install && npx cdk deploy --all
-```
-
-各レイヤーの詳細なセットアップ手順は[はじめに](docs/ja/getting-started.md)を参照してください。
+AWS デプロイは CloudShell や任意のローカルシェルから実行でき、CDK/Docker のローカルインストールは不要です。
 
 ---
 
@@ -103,14 +63,6 @@ npm install && npx cdk deploy --all
 
 詳細は[アーキテクチャ](docs/ja/architecture.md)を参照してください。
 
-### セキュリティアーキテクチャ
-
-- **認証**: Cognito User Pool による JWT トークン認証（Layer 4）
-- **認可**: API・ストレージ層でのリソースレベル RBAC
-- **暗号化**: S3 サーバーサイド暗号化（SSE-S3）、DynamoDB 保存時暗号化
-- **ネットワーク**: CloudFront + OAI による静的アセット配信、API Gateway + Cognito 認可
-- **WAF**: AWS WAF による IP アドレス制限（IPv4/IPv6）を CloudFront・API Gateway にオプション適用
-
 ---
 
 ## ドキュメント
@@ -119,10 +71,13 @@ npm install && npx cdk deploy --all
 |---|---|
 | [アーキテクチャ](docs/ja/architecture.md) | 4 層構成、データフロー、認証モデル、MCP ツール一覧 |
 | [はじめに](docs/ja/getting-started.md) | Layer 1〜4 のセットアップとデプロイ手順 |
-| [CloudShell デプロイ](docs/ja/deploy-cloudshell.md) | CloudShell からワンコマンドデプロイ（CDK/Docker 不要） |
-| [エージェント接続](docs/ja/add-to-gateway.md) | Amazon Bedrock AgentCore Gateway と MCP クライアントの接続方法 |
+| [推奨デプロイ手順](docs/ja/deploy-cloudshell.md) | AWS デプロイの推奨手順（CloudShell・ローカル Linux/macOS/WSL 対応、CDK/Docker 不要） |
+| [エージェント接続](docs/ja/add-to-gateway.md) | MCP クライアントの接続方法 |
 | [Teams・Slack 連携](docs/ja/teams-slack-integration.md) | チャットプラットフォーム連携 |
 | [テンプレート・アセット](docs/ja/custom-template.md) | カスタムテンプレートとアセットの追加 |
+| [コスト試算](docs/ja/cost.md) | 月額コストの内訳と最適化 |
+| [削除手順](docs/ja/uninstall.md) | デプロイ済み AWS リソースの削除 |
+| [Web UI（ローカルモード — 実験的機能）](web-ui/README_ja.md#local-mode) | Kiro CLI ACP をバックエンドにローカル環境で Web UI を動作させる（AWS 不要） |
 
 ---
 
@@ -169,16 +124,11 @@ This project has adopted the [Amazon Open Source Code of Conduct](https://aws.gi
 デプロイ前に、組織のセキュリティ・規制・コンプライアンス要件を満たすよう、
 セキュリティチームおよび法務チームと確認してください。
 
-### データ保護
-- すべてのS3バケットはサーバーサイド暗号化（SSE-S3）を使用
-- DynamoDBテーブルはAWSマネージド暗号化を使用
-- 転送中のすべてのデータはTLSで暗号化
-- すべてのS3バケットでBlock Public Accessが有効
-
 ### 実装済みセキュリティ対策
 
 - **S3 バケット**: パブリックアクセスブロック、サーバーサイド暗号化（SSE-S3）、バージョニング有効
 - **DynamoDB**: 保存時暗号化、ポイントインタイムリカバリ有効
+- **転送中データ**: すべての通信を TLS で暗号化
 - **IAM**: サービスごとにスコープされた最小権限ロール、ワイルドカードリソース権限なし
 - **API Gateway**: 全エンドポイントに Cognito JWT 認可
 - **CloudFront**: Origin Access Identity（OAI）、HTTPS のみ、セキュリティヘッダー
@@ -186,17 +136,21 @@ This project has adopted the [Amazon Open Source Code of Conduct](https://aws.gi
 - **AI/GenAI**: モデル出力は AI 生成として明示、データセットコンプライアンス文書化済み
 - **ログ**: CloudWatch Logs（保持期間設定可能）、Bedrock 呼び出しログ（オプション）
 
-### 本番デプロイ前の推奨事項
+### 環境依存の設定事項（デフォルトでは適用されません）
 
-1. 監査ログ用に AWS CloudTrail を有効化
-2. VPC 内で実行する場合は S3・DynamoDB の VPC エンドポイントを設定
-3. CloudFront と API Gateway に AWS WAF ルールを設定（組み込みサポート: `config.yaml` で `waf.allowedIpV4AddressRanges` / `waf.allowedIpV6AddressRanges` を設定 — 複数 CIDR 範囲指定可、または `deploy.sh` の `--waf-ipv4` / `--waf-ipv6` を使用）
-4. ドメインに合わせて CORS 設定を見直し
-5. 全バケットで S3 アクセスログを有効化
-6. Cognito の高度なセキュリティ機能（MFA、漏洩認証情報検出）を設定
-7. Amazon Bedrock のモデルアクセスとリージョン設定を確認 — データ主権が懸念される場合はクロスリージョン推論プロファイルの使用を避けること
+以下の項目は組織の環境、ネットワーク構成、セキュリティポリシーに依存するため、サンプルスタックとして安全にデフォルト適用できません。本番利用前に個別に評価してください。
 
-See [CONTRIBUTING.md](CONTRIBUTING.md#security-issue-notifications) for more information.
+1. **AWS CloudTrail** — アカウント単位の設定。既存の CloudTrail 設定への影響を避けるため個別に有効化
+2. **S3・DynamoDB の VPC エンドポイント** — VPC 内にデプロイする場合のみ関連（このスタックは VPC を使用しない）
+3. **AWS WAF による IP 制限** — 組み込みサポート済み。IP 範囲は環境依存のため、`config.yaml` の `waf.allowedIpV4AddressRanges` / `waf.allowedIpV6AddressRanges` または `deploy.sh` の `--waf-ipv4` / `--waf-ipv6` で指定
+4. **CORS の限定** — 提供ドメインに依存
+5. **S3 アクセスログ** — 保管先バケットと保持期間は利用者の選択
+6. **Cognito 高度なセキュリティ（MFA、漏洩認証情報検出）** — デモ利用の摩擦を減らすためデフォルト無効
+7. **Bedrock モデル・リージョン選定** — データ主権要件がある場合はクロスリージョン推論プロファイルを避ける
+
+### 脆弱性の報告
+
+潜在的な脆弱性を発見した場合は、GitHub の公開 Issue を作成せず、[CONTRIBUTING.md](CONTRIBUTING.md#security-issue-notifications) の手順に従って報告してください。
 
 ## License
 

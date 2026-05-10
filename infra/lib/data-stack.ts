@@ -21,10 +21,8 @@ import { Construct } from "constructs";
 import * as path from "path";
 
 interface DataStackProps extends cdk.StackProps {
-  /** Enable semantic slide search (Amazon Bedrock KB + S3 Vectors). */
-  searchSlides?: boolean;
-  /** Enable observability (Model Invocation Logging). Opt-in, default false. */
-  observability?: boolean;
+  /** Enable Bedrock Model Invocation Logging. Opt-in, default false. */
+  enableInvocationLogging?: boolean;
 }
 
 export class DataStack extends cdk.Stack {
@@ -209,8 +207,8 @@ export class DataStack extends cdk.Stack {
       });
     }
 
-    // --- Observability (optional, gated by features.observability) ---
-    if (props?.observability) {
+    // --- Invocation Logging (optional, gated by features.enableInvocationLogging) ---
+    if (props?.enableInvocationLogging) {
       // CloudWatch Logs group for Amazon Bedrock model invocation logs
       const bedrockLogGroup = new logs.LogGroup(this, "BedrockInvocationLogs", {
         logGroupName: "/aws/bedrock/model-invocation-logs",
@@ -292,17 +290,16 @@ export class DataStack extends cdk.Stack {
       });
     }
 
-    // --- Knowledge Base (optional, gated by features.searchSlides) ---
-    this.kbSsmParamName = "";
-    this.vectorBucketName = "";
-    this.vectorIndexName = "";
+    // --- Knowledge Base (always enabled for semantic slide search) ---
+    // Previously gated by `features.searchSlides`. Now a core feature since
+    // Bedrock KB + S3 Vectors costs are negligible at typical usage
+    // (under $0.05/month for most deployments).
+    const kbName = `sdpm-slide-kb`;
+    this.vectorBucketName = `sdpm-slide-vectors`;
+    this.vectorIndexName = `${kbName}-index`;
+    this.kbSsmParamName = `/sdpm/kb-id`;
 
-    if (props?.searchSlides) {
-      const kbName = `sdpm-slide-kb`;
-      this.vectorBucketName = `sdpm-slide-vectors`;
-      this.vectorIndexName = `${kbName}-index`;
-      this.kbSsmParamName = `/sdpm/kb-id`;
-
+    {
       // KB execution role (assumed by Amazon Bedrock)
       const kbRole = new iam.Role(this, "KbRole", {
         assumedBy: new iam.ServicePrincipal("bedrock.amazonaws.com"),

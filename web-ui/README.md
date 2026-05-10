@@ -33,13 +33,41 @@ A React-based chat interface for creating presentations through conversational A
 
 ```bash
 cd web-ui
-npm install
+npm ci
 npm run dev     # Starts dev server with Turbopack
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
 > **Note:** Authentication is required by default. See the [Authentication](#authentication) section to configure or disable it.
+
+---
+
+<a id="local-mode"></a>
+
+## Experimental: Local Mode (Kiro ACP backend)
+
+> ⚠️ **Experimental.** APIs, flags, and behavior may change or break without notice.
+
+Run the Web UI entirely on your machine, backed by **[Kiro](https://kiro.dev/) CLI** via [ACP](https://agentclientprotocol.com/) (Agent Client Protocol) instead of the cloud-deployed Agent and Runtime. No AWS deployment needed. Useful for trying the UI without setting up Layer 3/4.
+
+### Prerequisites
+
+- `kiro-cli` installed and on `PATH` — see [Kiro CLI install guide](https://kiro.dev/docs/cli/install/)
+
+### Start
+
+```bash
+cd web-ui
+npm ci
+npm run dev:local
+```
+
+Open [http://localhost:3000](http://localhost:3000) (Next.js picks the next free port if 3000 is taken).
+
+### How it works
+
+Setting `NEXT_PUBLIC_MODE=local` enables the Next.js API Routes under `src/app/api/` and spawns `kiro-cli acp --agent sdpm-spec` per active deck. The agent definitions live under [`mcp-local/.kiro/agents/`](../mcp-local/.kiro/agents/) and share the MCP toolset from [`mcp-local/server_acp.py`](../mcp-local/server_acp.py).
 
 ---
 
@@ -181,7 +209,7 @@ OIDC authentication flow — `AuthProvider` wraps the Cognito OIDC context, `Aut
 |---|---|
 | [Getting Started](../docs/en/getting-started.md) | Full setup guide for all layers |
 | [Architecture](../docs/en/architecture.md) | 4-layer design, data flow, auth model |
-| [CloudShell Deploy](../docs/en/deploy-cloudshell.md) | One-command deploy from CloudShell |
+| [Recommended Deploy](../docs/en/deploy-cloudshell.md) | Recommended path for AWS deployments (CloudShell or local) |
 
 ---
 

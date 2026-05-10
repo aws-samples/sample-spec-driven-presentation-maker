@@ -35,58 +35,15 @@ Spec-driven presentation applies the concept of Spec-Driven Development from sof
 
 ## Quick Start
 
-> **🚀 Want to try it quickly?** Deploy the full stack from CloudShell in minutes — no local CDK or Docker required.
-> See [CloudShell Deploy Guide](docs/en/deploy-cloudshell.md).
+Choose your environment and follow the setup guide:
 
-### Layer 1: Kiro CLI Skill
+| Environment | Setup |
+|---|---|
+| Agent skill (Claude Code, Codex CLI, Cursor, Kiro, Copilot) | [Getting Started — Layer 1](docs/en/getting-started.md#layer-1-kiro-cli-skill) |
+| Local MCP client (Claude Desktop, Claude Cowork) | [Getting Started — Layer 2](docs/en/getting-started.md#layer-2-local-mcp-server) |
+| Remote MCP / Web UI (AWS deployment) | [Recommended Deploy Guide](docs/en/deploy-cloudshell.md) |
 
-Copy `skill/` to your Kiro CLI skills directory. The engine, references, and sample templates are all included.
-
-You can also install the engine as a Python package:
-
-```bash
-# Latest
-pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git#subdirectory=skill
-
-# Specific version
-pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git@v0.1.0#subdirectory=skill
-```
-
-Check the installed version:
-
-```python
-import sdpm
-print(sdpm.__version__)
-```
-
-### Layer 2: Local MCP Server
-
-```bash
-cd mcp-local && uv sync
-```
-
-Add to your MCP client config:
-
-```json
-{
-  "mcpServers": {
-    "spec-driven-presentation-maker": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/mcp-local", "python", "server.py"]
-    }
-  }
-}
-```
-
-### Layer 3–4: AWS Deployment
-
-```bash
-cd infra
-cp config.example.yaml config.yaml   # Enable/disable stacks
-npm install && npx cdk deploy --all
-```
-
-For detailed setup instructions for each layer, see [Getting Started](docs/en/getting-started.md).
+AWS deployment runs from CloudShell or any local shell — no CDK/Docker install required.
 
 ---
 
@@ -103,14 +60,6 @@ Built on a 4-layer architecture. Each layer is a thin wrapper around the previou
 
 See [Architecture](docs/en/architecture.md) for details.
 
-### Security Architecture
-
-- **Authentication**: Cognito User Pool with JWT tokens (Layer 4)
-- **Authorization**: Resource-level RBAC enforced at API and storage layers
-- **Encryption**: S3 server-side encryption (SSE-S3), DynamoDB encryption at rest
-- **Network**: CloudFront with OAI for static assets, API Gateway with Cognito authorizer
-- **WAF**: Optional IP address restriction via AWS WAF (IPv4/IPv6) on CloudFront and API Gateway
-
 ---
 
 ## Documentation
@@ -119,10 +68,13 @@ See [Architecture](docs/en/architecture.md) for details.
 |---|---|
 | [Architecture](docs/en/architecture.md) | 4-layer design, data flow, auth model, MCP tool reference |
 | [Getting Started](docs/en/getting-started.md) | Setup and deployment for Layer 1–4 |
-| [CloudShell Deploy](docs/en/deploy-cloudshell.md) | One-command deploy from CloudShell (no local CDK/Docker) |
-| [Connecting Agents](docs/en/add-to-gateway.md) | Amazon Bedrock AgentCore Gateway and MCP client configuration |
+| [Recommended Deploy](docs/en/deploy-cloudshell.md) | Recommended path for AWS deployments (CloudShell or any local Linux/macOS/WSL, no CDK/Docker required) |
+| [Connecting Agents](docs/en/add-to-gateway.md) | MCP client connection guide |
 | [Teams & Slack Integration](docs/en/teams-slack-integration.md) | Chat platform integration |
 | [Custom Templates & Assets](docs/en/custom-template.md) | Adding custom templates and icons |
+| [Cost Estimates](docs/en/cost.md) | Monthly cost breakdown and optimisation tips |
+| [Uninstall](docs/en/uninstall.md) | Clean up deployed AWS resources |
+| [Web UI (Local Mode — experimental)](web-ui/README.md#local-mode) | Run the Web UI locally against a Kiro CLI ACP backend (no AWS) |
 
 ---
 
@@ -171,16 +123,11 @@ This is sample code for demonstration and educational purposes only, not for pro
 You should work with your security and legal teams to meet your organizational security,
 regulatory and compliance requirements before deployment.
 
-### Data Protection
-- All S3 buckets use server-side encryption (SSE-S3)
-- DynamoDB tables use AWS managed encryption
-- All data in transit is encrypted via TLS
-- Block Public Access is enabled on all S3 buckets
-
 ### Security Measures Implemented
 
 - **S3 Buckets**: Public access blocked, server-side encryption (SSE-S3), versioning enabled
 - **DynamoDB**: Encryption at rest enabled, point-in-time recovery enabled
+- **Data in transit**: All traffic encrypted via TLS
 - **IAM**: Least-privilege roles scoped per service; no wildcard resource permissions
 - **API Gateway**: Cognito JWT authorizer on all endpoints
 - **CloudFront**: Origin Access Identity (OAI), HTTPS-only, security headers
@@ -188,17 +135,21 @@ regulatory and compliance requirements before deployment.
 - **AI/GenAI**: Model outputs labeled as AI-generated; dataset compliance documented
 - **Logging**: CloudWatch Logs with configurable retention; Bedrock invocation logging optional
 
-### Before Production Deployment
+### Environment-Dependent Settings (Not Applied by Default)
 
-1. Enable AWS CloudTrail for audit logging
-2. Configure VPC endpoints for S3 and DynamoDB if running in a VPC
-3. Set up AWS WAF rules on CloudFront and API Gateway (built-in support: set `waf.allowedIpV4AddressRanges` / `waf.allowedIpV6AddressRanges` in `config.yaml` — accepts multiple CIDR ranges, or use `--waf-ipv4` / `--waf-ipv6` with `deploy.sh`)
-4. Review and tighten CORS configuration for your domain
-5. Enable S3 access logging on all buckets
-6. Configure Cognito advanced security features (MFA, compromised credentials)
-7. Review Amazon Bedrock model access and region settings — avoid cross-region inference profiles if data sovereignty is a concern
+The following controls depend on your organization's environment, network topology, or security policy — they cannot be safely defaulted in a sample stack. Evaluate each before production use.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md#security-issue-notifications) for more information.
+1. **AWS CloudTrail** — account-level setting; enable separately to avoid disrupting existing CloudTrail configurations
+2. **VPC endpoints for S3 and DynamoDB** — only relevant if you deploy inside a VPC (this stack does not)
+3. **AWS WAF IP restrictions** — built-in support, but IP ranges are environment-specific: set `waf.allowedIpV4AddressRanges` / `waf.allowedIpV6AddressRanges` in `config.yaml`, or pass `--waf-ipv4` / `--waf-ipv6` to `deploy.sh`
+4. **CORS tightening** — depends on your domain
+5. **S3 access logging** — log destination bucket and retention are your choice
+6. **Cognito advanced security (MFA, compromised-credentials detection)** — omitted by default to keep the demo frictionless
+7. **Bedrock model / region selection** — avoid cross-region inference profiles if data sovereignty is a concern
+
+### Reporting Security Issues
+
+Found a potential vulnerability? Please do not file a public GitHub issue — follow the process in [CONTRIBUTING.md](CONTRIBUTING.md#security-issue-notifications).
 
 ## License
 

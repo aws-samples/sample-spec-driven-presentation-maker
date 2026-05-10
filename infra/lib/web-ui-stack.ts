@@ -57,6 +57,14 @@ interface WebUiStackProps extends cdk.StackProps {
   allowedIpV4AddressRanges?: string[];
   /** Allowed IPv6 CIDR ranges for regional WAF. */
   allowedIpV6AddressRanges?: string[];
+  /** Default model ID for the chat task (for "Recommended" badge in Settings). */
+  defaultChatModelId: string;
+  /** Default model ID for the create task (for "Recommended" badge in Settings). */
+  defaultCreateModelId: string;
+  /** Allowed models with resolved display metadata. */
+  allowedModels: Array<{ modelId: string; displayName: string; description?: string }>;
+  /** Custom OAuth scope for MCP access (e.g. `sdpm-mcp/invoke`). */
+  mcpCustomScope?: string;
 }
 
 export class WebUiStack extends cdk.Stack {
@@ -217,11 +225,24 @@ function handler(event) {
       code: lambda.Code.fromAsset(path.join(__dirname, "../.."), {
         bundling: {
           image: lambda.Runtime.PYTHON_3_13.bundlingImage,
-          command: ["bash", "-c", "cp -r /asset-input/api/* /asset-input/shared /asset-output/"],
+          command: [
+            "bash", "-c",
+            "pip install -r /asset-input/api/requirements.txt -t /asset-output/ && " +
+            "cp -r /asset-input/api/* /asset-input/shared /asset-output/",
+          ],
           local: {
             tryBundle(outputDir: string): boolean {
               const { execSync } = require("child_process");
               const root = path.join(__dirname, "../..");
+              try {
+                execSync(
+                  `pip install -r ${root}/api/requirements.txt -t ${outputDir}/` +
+                  ` --platform manylinux2014_x86_64 --python-version 3.13 --only-binary=:all:`,
+                  { stdio: "inherit" },
+                );
+              } catch {
+                return false;  // fall back to docker bundling
+              }
               execSync(`cp -r ${root}/api/* ${outputDir}/`, { stdio: "inherit" });
               execSync(`cp -r ${root}/shared ${outputDir}/shared`, { stdio: "inherit" });
               return true;
@@ -230,8 +251,8 @@ function handler(event) {
         },
       }),
       layers: [powertoolsLayer],
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 256,
+      timeout: cdk.Duration.seconds(120),
+      memorySize: 512,
       environment: {
         TABLE_NAME: props.table.tableName,
         PPTX_BUCKET: props.pptxBucket.bucketName,
@@ -328,14 +349,22 @@ function handler(event) {
     // Bundle the web-ui at synth time so changes are auto-picked up without a
     // manual `npm run build`. Prefers local Node.js; falls back to Docker.
     const webUiDir = path.join(__dirname, "../../web-ui");
+    const allowedModelsJson = JSON.stringify(props.allowedModels);
+    const defaultChatModelIdStr = props.defaultChatModelId;
+    const defaultCreateModelIdStr = props.defaultCreateModelId;
     const deployment = new s3deploy.BucketDeployment(this, "DeploySite", {
       sources: [
         s3deploy.Source.asset(webUiDir, {
           bundling: {
             image: cdk.DockerImage.fromRegistry("node:20-slim"),
+            environment: {
+              NEXT_PUBLIC_ALLOWED_MODELS: allowedModelsJson,
+              NEXT_PUBLIC_DEFAULT_CHAT_MODEL_ID: defaultChatModelIdStr,
+              NEXT_PUBLIC_DEFAULT_CREATE_MODEL_ID: defaultCreateModelIdStr,
+            },
             command: [
               "bash", "-c",
-              "npm ci && npm run build && cp -r build/. /asset-output/",
+              "npm ci && npm run build:cloud && cp -r build/. /asset-output/",
             ],
             local: {
               tryBundle(outputDir: string): boolean {
@@ -345,8 +374,14 @@ function handler(event) {
                 } catch {
                   return false;
                 }
-                execSync("npm ci", { cwd: webUiDir, stdio: "inherit" });
-                execSync("npm run build", { cwd: webUiDir, stdio: "inherit" });
+                const envForBuild = {
+                  ...process.env,
+                  NEXT_PUBLIC_ALLOWED_MODELS: allowedModelsJson,
+                  NEXT_PUBLIC_DEFAULT_CHAT_MODEL_ID: defaultChatModelIdStr,
+                  NEXT_PUBLIC_DEFAULT_CREATE_MODEL_ID: defaultCreateModelIdStr,
+                };
+                execSync("npm ci", { cwd: webUiDir, stdio: "inherit", env: envForBuild });
+                execSync("npm run build:cloud", { cwd: webUiDir, stdio: "inherit", env: envForBuild });
                 execSync(`cp -r ${webUiDir}/build/. ${outputDir}/`, { stdio: "inherit" });
                 return true;
               },
@@ -370,18 +405,18 @@ function handler(event) {
       redirect_uri: "${SiteUrl}",
       post_logout_redirect_uri: "${SiteUrl}",
       response_type: "code",
-      scope: "openid profile email",
+      scope: "openid profile email${McpScope}",
       automaticSilentRenew: true,
       agentRuntimeArn: "${AgentRuntimeArn}",
       apiBaseUrl: "${ApiBaseUrl}",
       awsRegion: "${AWS::Region}",
-      agentPattern: "strands-single-agent",
     }), {
       UserPoolId: props.userPool.userPoolId,
       ClientId: props.userPoolClient.userPoolClientId,
       SiteUrl: this.siteUrl,
       AgentRuntimeArn: props.agentRuntimeArn,
       ApiBaseUrl: api.url,
+      McpScope: props.mcpCustomScope ? ` ${props.mcpCustomScope}` : "",
     });
 
     const awsExports = new cr.AwsCustomResource(this, "WriteAwsExports", {
@@ -414,6 +449,7 @@ function handler(event) {
     awsExports.node.addDependency(deployment);
 
     // --- Add Amazon CloudFront URL to Amazon Cognito callback/logout URLs ---
+    const oauthScopes = ["openid", "profile", "email", ...(props.mcpCustomScope ? [props.mcpCustomScope] : [])];
     new cr.AwsCustomResource(this, "UpdateCognitoCallbackUrls", {
       onCreate: {
         service: "CognitoIdentityServiceProvider",
@@ -423,7 +459,7 @@ function handler(event) {
           ClientId: props.userPoolClient.userPoolClientId,
           SupportedIdentityProviders: ["COGNITO"],
           AllowedOAuthFlows: ["code"],
-          AllowedOAuthScopes: ["openid", "profile", "email"],
+          AllowedOAuthScopes: oauthScopes,
           AllowedOAuthFlowsUserPoolClient: true,
           CallbackURLs: ["http://localhost:3000", this.siteUrl],
           LogoutURLs: ["http://localhost:3000", this.siteUrl],
@@ -443,7 +479,7 @@ function handler(event) {
           ClientId: props.userPoolClient.userPoolClientId,
           SupportedIdentityProviders: ["COGNITO"],
           AllowedOAuthFlows: ["code"],
-          AllowedOAuthScopes: ["openid", "profile", "email"],
+          AllowedOAuthScopes: oauthScopes,
           AllowedOAuthFlowsUserPoolClient: true,
           CallbackURLs: ["http://localhost:3000", this.siteUrl],
           LogoutURLs: ["http://localhost:3000", this.siteUrl],

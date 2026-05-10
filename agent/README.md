@@ -102,7 +102,7 @@ mcp_servers = [
 ]
 
 agent = Agent(
-    tools=[*mcp_servers, read_uploaded_file, list_uploads, web_fetch],
+    tools=[*mcp_servers, web_fetch],
     ...
 )
 ```
@@ -115,8 +115,6 @@ In addition to MCP tools, the agent includes built-in tools defined locally:
 
 | Tool | Module | Description |
 |---|---|---|
-| `read_uploaded_file(upload_id)` | `tools/upload_tools.py` | Read content of an uploaded file |
-| `list_uploads(session_id)` | `tools/upload_tools.py` | List all uploads in a session |
 | `web_fetch(url)` | `tools/web_tools.py` | Fetch a web page as Markdown |
 
 ---
@@ -144,7 +142,6 @@ In addition to MCP tools, the agent includes built-in tools defined locally:
 agent/
 ├── basic_agent.py          # Main agent (entrypoint)
 ├── tools/
-│   ├── upload_tools.py     # read_uploaded_file, list_uploads
 │   └── web_tools.py        # web_fetch
 ├── requirements.txt
 ├── Dockerfile

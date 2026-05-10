@@ -26,14 +26,14 @@ cd "${SCRIPT_DIR}/.."
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 PROFILE=""
 LAYER="4"
-SEARCH_SLIDES="false"
-OBSERVABILITY="false"
+ENABLE_INVOCATION_LOGGING="false"
 OIDC_URL=""
 ALLOWED_CLIENTS=""
 WAF_IPV4=""
 WAF_IPV6=""
 CDK_COMMAND="deploy"
 PROJECT_NAME="sdpm-deploy"
+STACK=""
 
 # ---- Load defaults from infra/config.yaml if present ----
 # CLI arguments below will override these values.
@@ -44,10 +44,24 @@ if [ -f "${CONFIG_FILE}" ]; then
   if [ "${_agent}" = "false" ] && [ "${_webui}" = "false" ]; then
     LAYER="3"
   fi
+
+  # Deprecation check: features.searchSlides is removed — search is always on
   _search=$(grep -E "^\s*searchSlides:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
-  [ -n "${_search}" ] && SEARCH_SLIDES="${_search}"
+  if [ -n "${_search}" ]; then
+    echo "⚠️  Notice: \`features.searchSlides\` has been removed. Semantic slide search is now always enabled." >&2
+    echo "   Please remove this option from ${CONFIG_FILE}. See docs/ja/cost.md or docs/en/cost.md for cost estimates." >&2
+  fi
+
+  # Read enableInvocationLogging (new key), falling back to legacy `observability`
+  _eil=$(grep -E "^\s*enableInvocationLogging:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
   _obs=$(grep -E "^\s*observability:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
-  [ -n "${_obs}" ] && OBSERVABILITY="${_obs}"
+  if [ -n "${_eil}" ]; then
+    ENABLE_INVOCATION_LOGGING="${_eil}"
+  elif [ -n "${_obs}" ]; then
+    echo "⚠️  Notice: \`features.observability\` is deprecated. Use \`features.enableInvocationLogging\` instead." >&2
+    ENABLE_INVOCATION_LOGGING="${_obs}"
+  fi
+
   # WAF IPv4/IPv6: collect list items under each key
   WAF_IPV4=$(awk '/allowedIpV4AddressRanges:/{f=1;next} f && /^[[:space:]]*-/{gsub(/["]/,"",$2); printf "%s,", $2; next} f && !/^[[:space:]]*-/{f=0}' "${CONFIG_FILE}" | sed 's/,$//')
   WAF_IPV6=$(awk '/allowedIpV6AddressRanges:/{f=1;next} f && /^[[:space:]]*-/{gsub(/["]/,"",$2); printf "%s,", $2; next} f && !/^[[:space:]]*-/{f=0}' "${CONFIG_FILE}" | sed 's/,$//')
@@ -68,8 +82,8 @@ Options:
 
   --layer3                 Layer 3 only — MCP Server (no Agent, no Web UI)
   --layer4                 Layer 4 full stack — Agent + Web UI (default)
-  --search                 Enable semantic slide search (Bedrock KB)
-  --observability          Enable Bedrock Model Invocation Logging
+  --enable-invocation-logging  Enable Bedrock Model Invocation Logging
+  --observability          (Deprecated) Alias for --enable-invocation-logging
 
   --oidc-url URL           External IdP OIDC Discovery URL
   --allowed-clients IDS    Comma-separated JWT allowed client IDs
@@ -78,8 +92,15 @@ Options:
   --waf-ipv6 CIDRS         Comma-separated IPv6 CIDR ranges for WAF
 
   --destroy                Destroy all stacks
+  --stack ARGS             CDK stack selector/flags (e.g. "SdpmRuntime --exclusively")
+                           Default: --all
 
   -h, --help               Show this help
+
+Note:
+  Semantic slide search (Bedrock KB + S3 Vectors) is always enabled.
+  The previous --search flag and features.searchSlides option have been removed.
+  See docs/ja/cost.md or docs/en/cost.md for cost estimates.
 EOF
   exit 0
 }
@@ -90,13 +111,20 @@ while [[ $# -gt 0 ]]; do
     --profile)        PROFILE="$2"; shift 2 ;;
     --layer3)         LAYER="3"; shift ;;
     --layer4)         LAYER="4"; shift ;;
-    --search)         SEARCH_SLIDES="true"; shift ;;
-    --observability)  OBSERVABILITY="true"; shift ;;
+    --search)
+      echo "⚠️  Notice: --search has been removed. Semantic slide search is now always enabled." >&2
+      shift ;;
+    --enable-invocation-logging)
+      ENABLE_INVOCATION_LOGGING="true"; shift ;;
+    --observability)
+      echo "⚠️  Notice: --observability is deprecated. Use --enable-invocation-logging instead." >&2
+      ENABLE_INVOCATION_LOGGING="true"; shift ;;
     --oidc-url)       OIDC_URL="$2"; shift 2 ;;
     --allowed-clients) ALLOWED_CLIENTS="$2"; shift 2 ;;
     --waf-ipv4)       WAF_IPV4="$2"; shift 2 ;;
     --waf-ipv6)       WAF_IPV6="$2"; shift 2 ;;
     --destroy)        CDK_COMMAND="destroy"; shift ;;
+    --stack)          STACK="$2"; shift 2 ;;
     -h|--help)        usage ;;
     *)                echo "Unknown option: $1"; usage ;;
   esac
@@ -122,23 +150,22 @@ ACCOUNT_ID=$(aws sts get-caller-identity ${AWS_OPTS} --query Account --output te
 echo "Account: ${ACCOUNT_ID}"
 echo "Region:  ${REGION}"
 echo "Layer:   ${LAYER}"
-echo "Search:  ${SEARCH_SLIDES}"
-echo "Observ:  ${OBSERVABILITY}"
+echo "InvocationLogging: ${ENABLE_INVOCATION_LOGGING}"
 echo "WAF v4:  ${WAF_IPV4:-(none)}"
 echo "WAF v6:  ${WAF_IPV6:-(none)}"
 echo "Command: ${CDK_COMMAND}"
 echo ""
 
 # ---- Check existing MIL configuration ----
-if [ "${OBSERVABILITY}" = "true" ] && [ "${CDK_COMMAND}" = "deploy" ]; then
+if [ "${ENABLE_INVOCATION_LOGGING}" = "true" ] && [ "${CDK_COMMAND}" = "deploy" ]; then
   EXISTING_MIL=$(aws bedrock get-model-invocation-logging-configuration ${AWS_OPTS} \
     --query 'loggingConfig.cloudWatchConfig.logGroupName' --output text 2>/dev/null || echo "None")
   if [ "${EXISTING_MIL}" != "None" ] && [ -n "${EXISTING_MIL}" ]; then
     echo "⚠️  WARNING: Bedrock Model Invocation Logging is already configured in this account/region."
     echo "   Existing log group: ${EXISTING_MIL}"
-    echo "   Skipping --observability to preserve the existing configuration."
+    echo "   Skipping --enable-invocation-logging to preserve the existing configuration."
     echo ""
-    OBSERVABILITY="false"
+    ENABLE_INVOCATION_LOGGING="false"
   fi
 fi
 
@@ -236,15 +263,15 @@ fi
 # so we write the full JSON to a temp file and use --cli-input-json.
 ENV_VARS_JSON=$(cat <<EOF
 [
-  {"name":"STACK_AGENT",           "value":"${STACK_AGENT}",       "type":"PLAINTEXT"},
-  {"name":"STACK_WEB_UI",          "value":"${STACK_WEB_UI}",      "type":"PLAINTEXT"},
-  {"name":"FEATURE_SEARCH_SLIDES", "value":"${SEARCH_SLIDES}",     "type":"PLAINTEXT"},
-  {"name":"FEATURE_OBSERVABILITY", "value":"${OBSERVABILITY}",     "type":"PLAINTEXT"},
-  {"name":"AUTH_OIDC_URL",         "value":"${OIDC_URL}",          "type":"PLAINTEXT"},
-  {"name":"AUTH_ALLOWED_CLIENTS",  "value":"${ALLOWED_CLIENTS}",   "type":"PLAINTEXT"},
-  {"name":"WAF_IPV4",              "value":"${WAF_IPV4}",          "type":"PLAINTEXT"},
-  {"name":"WAF_IPV6",              "value":"${WAF_IPV6}",          "type":"PLAINTEXT"},
-  {"name":"CDK_COMMAND",           "value":"${CDK_COMMAND}",       "type":"PLAINTEXT"}
+  {"name":"STACK_AGENT",                      "value":"${STACK_AGENT}",                  "type":"PLAINTEXT"},
+  {"name":"STACK_WEB_UI",                     "value":"${STACK_WEB_UI}",                 "type":"PLAINTEXT"},
+  {"name":"FEATURE_ENABLE_INVOCATION_LOGGING","value":"${ENABLE_INVOCATION_LOGGING}",    "type":"PLAINTEXT"},
+  {"name":"AUTH_OIDC_URL",                    "value":"${OIDC_URL}",                     "type":"PLAINTEXT"},
+  {"name":"AUTH_ALLOWED_CLIENTS",             "value":"${ALLOWED_CLIENTS}",              "type":"PLAINTEXT"},
+  {"name":"WAF_IPV4",                         "value":"${WAF_IPV4}",                     "type":"PLAINTEXT"},
+  {"name":"WAF_IPV6",                         "value":"${WAF_IPV6}",                     "type":"PLAINTEXT"},
+  {"name":"CDK_COMMAND",                      "value":"${CDK_COMMAND}",                  "type":"PLAINTEXT"},
+  {"name":"STACK",                            "value":"${STACK}",                        "type":"PLAINTEXT"}
 ]
 EOF
 )
@@ -395,7 +422,29 @@ print(data.get('nextForwardToken', ''))
         echo ""
         echo "1. Open the Cognito User Pool console to create a user"
         echo "2. Open the CloudFront URL to access the Web UI"
-      else
+      fi
+
+      # MCP connection info (available for both Layer 3 and Layer 4)
+      MCP_SERVER_URL=$(aws cloudformation describe-stacks \
+        --stack-name SdpmRuntime ${AWS_OPTS} \
+        --query 'Stacks[0].Outputs[?OutputKey==`McpServerUrl`].OutputValue' \
+        --output text 2>/dev/null || echo "")
+      MCP_CLIENT_ID=$(aws cloudformation describe-stacks \
+        --stack-name SdpmRuntime ${AWS_OPTS} \
+        --query 'Stacks[0].Outputs[?OutputKey==`McpOAuthClientId`].OutputValue' \
+        --output text 2>/dev/null || echo "")
+
+      if [ -n "${MCP_SERVER_URL}" ] && [ "${MCP_SERVER_URL}" != "None" ]; then
+        echo ""
+        echo "========================================="
+        echo "  MCP Server URL      : ${MCP_SERVER_URL}"
+        if [ -n "${MCP_CLIENT_ID}" ] && [ "${MCP_CLIENT_ID}" != "None" ]; then
+          echo "  OAuth Client ID     : ${MCP_CLIENT_ID}"
+        fi
+        echo "========================================="
+      fi
+
+      if [ -z "${SITE_URL}" ] && [ -z "${MCP_SERVER_URL}" ]; then
         echo "Check CloudFormation outputs for endpoints."
       fi
 

@@ -117,7 +117,7 @@ export function MentionOverlay({ text, textareaRef, slidePreviewUrls, deckThumbn
     <>
       <div
         aria-hidden="true"
-        className="absolute inset-0 py-1 pr-2 text-[13px] leading-relaxed whitespace-pre-wrap break-words overflow-hidden pointer-events-none font-[inherit] tracking-[inherit] z-10"
+        className="absolute inset-0 py-1 pr-2 text-sm leading-relaxed whitespace-pre-wrap break-words overflow-hidden pointer-events-none font-[inherit] tracking-[inherit] z-10"
       >
         <div style={{ marginTop: `-${scrollTop}px` }}>
         {segments.map((seg, i) =>

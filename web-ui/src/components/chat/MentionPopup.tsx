@@ -134,7 +134,7 @@ export function MentionPopup({ visible, query, items, onSelect, onClose, positio
       >
         {slides.length > 0 && (
           <>
-            <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="px-3 py-1 text-[11px] uppercase tracking-wider text-muted-foreground">
               Current Deck
             </div>
             {slides.map((item) => {
@@ -161,7 +161,7 @@ export function MentionPopup({ visible, query, items, onSelect, onClose, positio
 
         {decks.length > 0 && (
           <>
-            <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="px-3 py-1 text-[11px] uppercase tracking-wider text-muted-foreground">
               Other Decks
             </div>
             {decks.map((item) => {

@@ -30,6 +30,7 @@ import { EmptyState } from "@/components/deck/EmptyState"
 import { SearchResultsGrid } from "@/components/deck/SearchResultsGrid"
 import { Search, X, Plus, Lock, Star, Users, Building2, Sparkles } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { IS_LOCAL } from "@/lib/mode"
 
 /** Tab definition for the list view. */
 interface Tab {
@@ -39,7 +40,7 @@ interface Tab {
 }
 
 /** Available tabs in the deck list. */
-const TABS: Tab[] = [
+const TABS: Tab[] = IS_LOCAL ? [] : [
   { key: "mine", label: "My Decks", icon: Lock },
   { key: "favorites", label: "Favorites", icon: Star },
   { key: "shared", label: "Shared", icon: Users },
@@ -62,15 +63,20 @@ interface DeckListViewProps {
   onToggleVisibility?: (deckId: string, visibility: "public" | "private") => void
   onShare?: (deckId: string) => void
   onDownload?: (deckId: string) => void
+  onOpenFolder?: (deckId: string) => void
   loading: boolean
 }
 
 export function DeckListView({
   decks, activeTab, onTabChange, searchQuery, onSearchChange,
   searchResults, searching, onDeckOpen, onNewDeck, favoriteIds,
-  onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, loading,
+  onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, onOpenFolder, loading,
 }: DeckListViewProps) {
-  const showSearch = searchQuery.length >= 2
+  // Tauri: no server-side slide search; filter decks by name client-side instead.
+  const showSearch = !IS_LOCAL && searchQuery.length >= 2
+  const filteredDecks = (IS_LOCAL && searchQuery)
+    ? decks.filter(d => (d.name || "").toLowerCase().includes(searchQuery.toLowerCase()))
+    : decks
 
   return (
     <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
@@ -80,14 +86,14 @@ export function DeckListView({
           <h1 className="text-[36px] sm:text-[42px] font-extrabold tracking-[-0.04em] leading-[1]">
             Decks
           </h1>
-          <p className="text-[13px] text-foreground-muted mt-2.5 font-medium tracking-wide uppercase">
+          <p className="text-sm text-foreground-muted mt-2.5 font-medium tracking-wide uppercase">
             {decks.length} {decks.length === 1 ? "presentation" : "presentations"}
           </p>
         </div>
         <div className="hidden sm:flex items-center gap-2">
           <button
             onClick={onNewDeck}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-[12px] font-semibold rounded-lg bg-brand-teal text-primary-foreground transition-all hover:brightness-110"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg bg-brand-teal text-primary-foreground transition-all hover:brightness-110"
           >
             <Plus className="h-3.5 w-3.5" />
             New Deck
@@ -104,7 +110,7 @@ export function DeckListView({
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Escape") onSearchChange("") }}
           placeholder="Search slides across the organization…"
-          className="w-full pl-11 pr-10 py-3 text-[13px] bg-transparent focus:outline-none placeholder:text-foreground-muted tracking-[-0.01em]"
+          className="w-full pl-11 pr-10 py-3 text-sm bg-transparent focus:outline-none placeholder:text-foreground-muted tracking-[-0.01em]"
         />
         {searchQuery && (
           <button
@@ -122,7 +128,7 @@ export function DeckListView({
         <SearchResultsGrid
           results={searchResults || []}
           searching={searching || false}
-          onSlideClick={(deckId, slideId) => onDeckOpen(`${deckId}?slide=${slideId}`)}
+          onSlideClick={(deckId, slug) => onDeckOpen(`${deckId}?slide=${slug}`)}
         />
       ) : (
         <>
@@ -132,7 +138,7 @@ export function DeckListView({
               <button
                 key={tab.key}
                 onClick={() => onTabChange(tab.key)}
-                className={`relative flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-medium transition-colors ${
+                className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors ${
                   activeTab === tab.key
                     ? "text-foreground"
                     : "text-foreground-muted hover:text-foreground-secondary"
@@ -164,7 +170,7 @@ export function DeckListView({
                 </div>
               ))}
             </div>
-          ) : decks.length === 0 ? (
+          ) : filteredDecks.length === 0 ? (
             <EmptyState
               icon={Sparkles}
               title={activeTab === "mine" ? "No decks yet" : `No ${TABS.find(t => t.key === activeTab)?.label.toLowerCase() || "decks"} yet`}
@@ -177,7 +183,7 @@ export function DeckListView({
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {decks.map((deck, i) => (
+              {filteredDecks.map((deck, i) => (
                 <DeckCard
                   key={deck.deckId}
                   deck={deck}
@@ -190,6 +196,7 @@ export function DeckListView({
                   onToggleVisibility={onToggleVisibility}
                   onShare={onShare}
                   onDownload={onDownload}
+                  onOpenFolder={onOpenFolder}
                 />
               ))}
             </div>
