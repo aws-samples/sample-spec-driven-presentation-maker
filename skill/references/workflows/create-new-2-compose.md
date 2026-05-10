@@ -98,6 +98,8 @@ the active style's `:root`. No ad-hoc values.
 - **fontSize** — use only values that appear as `--fs-*` variables (e.g. 14, 20, 24, 28, 36, 48).
   If the design needs a size that doesn't exist, add a new `--fs-*` token to art-direction.html
   first, then use it.
+  - At `generate` time, fontSize values are checked against `--fs-*` tokens in the active style.
+    Out-of-token values produce warnings (build still succeeds). Resolve before delivery.
 - **hex color** — use only values that appear as `--*` color variables. If the design needs a
   color that doesn't exist, add a new token to art-direction.html first, then use it.
 - Colors embedded in inline directives (e.g. `{{#FF9900:text}}`) are subject to the same rule.

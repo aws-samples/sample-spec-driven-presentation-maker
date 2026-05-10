@@ -99,10 +99,27 @@ def cmd_generate(args):
         print(line)
 
     if result["warnings"]:
-        print(f"⚠️  Layout bias detected ({len(result['warnings'])} slides):")
-        for w in result["warnings"]:
+        layout_warnings = [w for w in result["warnings"] if w.startswith("page") and "offset" in w]
+        font_warnings = [w for w in result["warnings"] if w.startswith("fontSize token discipline") or w.startswith("  ")]
+        other_warnings = [
+            w for w in result["warnings"]
+            if w not in layout_warnings and w not in font_warnings
+        ]
+
+        if layout_warnings:
+            print(f"⚠️  Layout bias detected ({len(layout_warnings)} slides):")
+            for w in layout_warnings:
+                print(f"  {w}")
+            print("  → MUST FIX unless the layout type is intentionally asymmetric.")
+
+        if font_warnings:
+            print(f"⚠️  Font size token discipline violations:")
+            for w in font_warnings:
+                print(w if w.startswith("  ") else f"  {w}")
+            print("  → Add the missing --fs-* token to specs/art-direction.html, or change the slide to use an existing token.")
+
+        for w in other_warnings:
             print(f"  {w}")
-        print("  → MUST FIX unless the layout type is intentionally asymmetric.")
 
 
 def cmd_preview(args):
