@@ -131,17 +131,15 @@ class ImageMixin:
                         sw_h = int(width_pct / img_ratio)  # width-based height
                         sh_w = int(height_pct * img_ratio)  # height-based width
                         if fit == "cover":
-                            hint = "(cropping applied; or adjust box to suggested size)"
+                            consequence = "image is being cropped"
                         elif fit == "stretch":
-                            hint = "(distortion applied; or adjust box to suggested size)"
+                            consequence = "image is being distorted"
                         else:
-                            hint = ("(or use fit=\"cover\" to fill with crop, "
-                                    "fit=\"stretch\" to allow distortion)")
-                        print(f"Warning: aspect ratio mismatch (fit={fit}): {src}\n"
+                            consequence = "image has padding within the box"
+                        print(f"Warning: {consequence} (fit={fit}): {src}\n"
                               f"  box {width_pct}×{height_pct} → suggest "
                               f"width={width_pct}, height={sw_h} or "
-                              f"width={sh_w}, height={height_pct}\n"
-                              f"  {hint}",
+                              f"width={sh_w}, height={height_pct}",
                               file=sys.stderr)
                     if fit == "contain":
                         if img_ratio > box_ratio:
