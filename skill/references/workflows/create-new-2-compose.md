@@ -87,10 +87,7 @@ For each slide, think through what to say and how to show it — together.
 
 ### Token Discipline
 
-The **active style** is the Source of Truth for design tokens. Resolution order:
-
-1. `specs/art-direction.html` in the project directory (created by Phase 1) — if present, this is the active style. It is a living document: new tokens can be added during Phase 2 when the design requires values not yet defined (e.g. a new accent color for a diagram, a new font size role). Add the token to `:root` first, then use it in slide JSON.
-2. Global default style from `~/.kiro/local/pptx-assets/styles/` — used as starting point when no project style exists
+The **active style** is `specs/art-direction.html` (created in Phase 1) — the Source of Truth for design tokens. It is a living document: new tokens can be added during Phase 2 when the design requires values not yet defined (e.g. a new accent color for a diagram, a new font size role). Add the token to `:root` first, then use it in slide JSON.
 
 Every `fontSize` and hex color in `presentation.json` **must** come from a token defined in
 the active style's `:root`. No ad-hoc values.
