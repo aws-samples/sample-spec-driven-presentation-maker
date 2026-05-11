@@ -106,11 +106,41 @@ class ImageMixin:
         # Calculate dimensions
         x = self._px_to_emu(x_pct)
         y = self._px_to_emu(y_pct)
+        fit = elem.get("fit", _DEFAULTS["fit"])
+        cover_crop = None
         
         if width_pct:
             width = self._px_to_emu(width_pct)
             if height_pct:
                 height = self._px_to_emu(height_pct)
+                # Apply fit logic when both dimensions specified
+                if is_svg:
+                    img_w, img_h = get_svg_dimensions(img_path)
+                else:
+                    from PIL import Image
+                    try:
+                        with Image.open(img_path) as img:
+                            img_w, img_h = img.size
+                    except Exception:
+                        img_w, img_h = 1, 1
+                if img_w > 0 and img_h > 0 and fit != "stretch":
+                    img_ratio = img_w / img_h
+                    box_ratio = width / height
+                    if fit == "contain":
+                        if img_ratio > box_ratio:
+                            height = int(width / img_ratio)
+                        else:
+                            width = int(height * img_ratio)
+                    elif fit == "cover":
+                        if img_ratio > box_ratio:
+                            crop_pct = (1 - box_ratio / img_ratio) / 2
+                            cover_crop = {"l": crop_pct, "r": crop_pct, "t": 0, "b": 0}
+                        else:
+                            crop_pct = (1 - img_ratio / box_ratio) / 2
+                            cover_crop = {"l": 0, "r": 0, "t": crop_pct, "b": crop_pct}
+                        # Keep width/height as the box size
+                        width = self._px_to_emu(width_pct)
+                        height = self._px_to_emu(height_pct)
             else:
                 # Maintain original aspect ratio
                 if is_svg:
@@ -137,6 +167,27 @@ class ImageMixin:
                 pic = slide.shapes.add_picture(str(img_path), x, y)
                 width = pic.width
                 height = pic.height
+        
+        # Apply cover crop via srcRect
+        if cover_crop and pic is not None:
+            from lxml import etree
+            from pptx.oxml.ns import qn
+            pic_el = pic._element if hasattr(pic, '_element') else pic
+            blip_fill = pic_el.find(qn('p:blipFill'))
+            if blip_fill is None:
+                blip_fill = pic_el.find(qn('pic:blipFill'))
+            if blip_fill is not None:
+                for sr in blip_fill.findall(qn('a:srcRect')):
+                    blip_fill.remove(sr)
+                src_rect = etree.Element(qn('a:srcRect'))
+                for attr, key in [('l', 'l'), ('t', 't'), ('r', 'r'), ('b', 'b')]:
+                    if cover_crop[key]:
+                        src_rect.set(attr, str(int(cover_crop[key] * 100000)))
+                blip = blip_fill.find(qn('a:blip'))
+                if blip is not None:
+                    blip.addnext(src_rect)
+                else:
+                    blip_fill.insert(0, src_rect)
         
         # Apply rotation
         if rotation != 0:
