@@ -99,7 +99,8 @@ def check_font_size_tokens(
     for slide_idx, slide in enumerate(slides, start=1):
         for path, fs in _walk_font_sizes(slide):
             if fs not in allowed:
-                location = f"page{slide_idx:02d}"
+                slug = slide.get("id", "")
+                location = f"page{slide_idx:02d}({slug})" if slug else f"page{slide_idx:02d}"
                 if path:
                     location += " " + ".".join(path)
                 violations.setdefault(fs, []).append(location)
