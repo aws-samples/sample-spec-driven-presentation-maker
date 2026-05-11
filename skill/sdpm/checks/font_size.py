@@ -37,6 +37,10 @@ def _walk_font_sizes(node) -> Iterable[tuple[list[str], int]]:
     """Yield (path, fontSize) tuples found anywhere in a JSON-like structure.
 
     `path` is a list of keys/indices for diagnostic display.
+
+    Known limitation: does not detect fontSize specified via inline
+    directives inside text strings (e.g. ``{{14pt:small text}}``).
+    Those are parsed at render time by ``sdpm.utils.text.parse_styled_text``.
     """
     if isinstance(node, dict):
         if "fontSize" in node and isinstance(node["fontSize"], (int, float)):
