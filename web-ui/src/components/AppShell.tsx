@@ -20,10 +20,9 @@
 import { ReactNode, useState, useRef, useEffect, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
-import { Layers, ChevronLeft, MessageSquare, CircleUser, LogOut, Bot, Settings as SettingsIcon, Palette } from "lucide-react"
-import { AgentSettingsDialog } from "@/components/chat/AgentSettingsDialog"
+import { Layers, ChevronLeft, MessageSquare, CircleUser, LogOut, Settings as SettingsIcon, Palette } from "lucide-react"
 import { Settings } from "@/components/Settings"
-import { CloudOnly, LocalOnly } from "@/lib/mode"
+import { CloudOnly } from "@/lib/mode"
 
 interface AppShellProps {
   children: ReactNode
@@ -41,7 +40,6 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
   const email = (profile?.email as string) || ""
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuVisible, setMenuVisible] = useState(false)
-  const [showAgentSettings, setShowAgentSettings] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const itemsRef = useRef<(HTMLButtonElement | null)[]>([])
@@ -225,22 +223,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
 
                 <div className="my-1 border-t border-white/[0.06]" />
 
-                {/* Agent Settings (local only) */}
-                <LocalOnly>
-                  <>
-                    <button
-                      role="menuitem"
-                      onClick={() => { closeMenu(); setShowAgentSettings(true) }}
-                      className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-foreground/70 hover:bg-white/[0.06] transition-colors menu-item-stagger"
-                      style={{ "--stagger": "15ms" } as React.CSSProperties}
-                    >
-                      <Bot className="h-3.5 w-3.5" />
-                      <span>ACP Agents</span>
-                    </button>
-                    <div className="my-1 border-t border-white/[0.06]" />
-                  </>
-                </LocalOnly>
-
+                {/* Agent Settings — disabled (ACP supports kiro-cli only) */}
                 {/* Sign out (cloud only) */}
                 <CloudOnly>
                   <button
@@ -264,10 +247,6 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
       {children}
 
       {/* Agent settings dialog (local only) */}
-      <LocalOnly>
-        <AgentSettingsDialog open={showAgentSettings} onClose={() => setShowAgentSettings(false)} />
-      </LocalOnly>
-
       <Settings open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   )
