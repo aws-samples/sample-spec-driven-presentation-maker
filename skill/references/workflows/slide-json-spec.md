@@ -300,6 +300,10 @@ Height includes the language label (22px). Code body height is `height - 22`.
 
 - `src`: `assets:SOURCE/NAME`, `icons:NAME` (backward compatible), `qr:URL`, file path, relative path
 - `height`: omit to maintain aspect ratio
+- `fit`: `"contain"` (default) | `"cover"` | `"stretch"` — controls sizing when both width and height are specified
+  - `contain`: maintain aspect ratio, fit within the box (may leave gaps)
+  - `cover`: maintain aspect ratio, fill the box (excess is cropped via PowerPoint trim)
+  - `stretch`: ignore aspect ratio, fill the box exactly
 - `labelSize`: default 11
 - `iconColor`: (optional) change SVG icon color. Single-color SVGs only (multi-color icons are ignored)
 
