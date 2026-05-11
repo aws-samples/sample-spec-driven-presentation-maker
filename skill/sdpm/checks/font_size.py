@@ -53,11 +53,19 @@ def _walk_font_sizes(node) -> Iterable[tuple[list[str], int]]:
 def find_art_direction(json_path: Path) -> Path | None:
     """Locate `specs/art-direction.html` relative to the slide JSON.
 
-    Looks in the JSON's directory and one level up.
+    Handles both input modes supported by ``sdpm.api._resolve_config``:
+
+    - File input (legacy): ``project/presentation.json`` — look in
+      ``project/specs/`` and one level up.
+    - Directory input (current): ``project/`` containing ``deck.json`` +
+      ``slides/`` — look in ``project/specs/`` and one level up.
+
+    Returns the first existing candidate, or None if not found.
     """
+    base = json_path if json_path.is_dir() else json_path.parent
     candidates = [
-        json_path.parent / "specs" / "art-direction.html",
-        json_path.parent.parent / "specs" / "art-direction.html",
+        base / "specs" / "art-direction.html",
+        base.parent / "specs" / "art-direction.html",
     ]
     for c in candidates:
         if c.exists():
@@ -95,10 +103,17 @@ def check_font_size_tokens(
     if not violations:
         return []
 
+    # Display the art-direction path relative to the deck root (file's parent
+    # or the directory itself) so the warning is easy to locate.
+    display_base = json_path if json_path.is_dir() else json_path.parent
+    try:
+        display_path = art_direction.relative_to(display_base)
+    except ValueError:
+        display_path = art_direction.name
     allowed_str = ", ".join(f"{n}pt" for n in sorted(allowed))
     warnings = [
         f"fontSize token discipline: allowed sizes = [{allowed_str}] "
-        f"(from {art_direction.relative_to(json_path.parent) if json_path.parent in art_direction.parents else art_direction.name})"
+        f"(from {display_path})"
     ]
     for fs in sorted(violations):
         locs = violations[fs]
