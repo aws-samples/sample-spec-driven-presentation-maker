@@ -58,7 +58,8 @@ interface StoredConfig {
 function readConfig(): StoredConfig {
   try {
     if (fs.existsSync(CONFIG_PATH)) {
-      return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"))
+      const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"))
+      return { activeAgent: raw.activeAgent || "kiro-cli", agents: raw.agents || PRESETS }
     }
   } catch {}
   return { activeAgent: "kiro-cli", agents: PRESETS }
