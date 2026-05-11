@@ -953,7 +953,7 @@ def main():
     p_prev = subparsers.add_parser("preview", help="Export slides as PNG images")
     p_prev.add_argument("input", help="Input JSON file")
     p_prev.add_argument("-p", "--pages", help="Pages to export (e.g. 1,3,5)")
-    p_prev.add_argument("--no-grid", action="store_true", help="Disable 5% grid overlay")
+    p_prev.add_argument("--no-grid", action="store_true", help="Disable 5%% grid overlay")
 
     p_meas = subparsers.add_parser("measure", help="Measure text bounding boxes from slides JSON")
     p_meas.add_argument("input", help="Input JSON file")
