@@ -18,8 +18,10 @@ import * as ecr_assets from "aws-cdk-lib/aws-ecr-assets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import * as path from "path";
+import { AUTH_SSM_PARAMS } from "./auth-stack";
 
 interface RuntimeStackProps extends cdk.StackProps {
   /** Amazon DynamoDB table from DataStack. */
@@ -28,26 +30,27 @@ interface RuntimeStackProps extends cdk.StackProps {
   pptxBucket: s3.Bucket;
   /** S3 bucket for templates, assets, references. */
   resourceBucket: s3.Bucket;
-  /** OIDC discovery URL for JWT authorizer. */
-  oidcDiscoveryUrl: string;
-  /** Allowed client IDs for JWT authorizer (unused when allowedScopes is set). */
+  /**
+   * OIDC discovery URL for JWT authorizer.
+   * Used only when useAuthStack=false (external IdP). When useAuthStack=true,
+   * the value is read from SSM instead.
+   */
+  oidcDiscoveryUrl?: string;
+  /** Allowed client IDs for JWT authorizer (used only when useAuthStack=false, i.e. external IdP). */
   allowedClients: string[];
-  /** Allowed OAuth scopes for JWT authorizer (preferred over allowedClients for DCR support). */
-  allowedScopes?: string[];
   /** KB SSM parameter name (empty if KB not enabled). */
   kbSsmParamName?: string;
   /** S3 Vector Bucket name (empty if KB not enabled). */
   vectorBucketName?: string;
   /** S3 Vector Index name (empty if KB not enabled). */
   vectorIndexName?: string;
-  /** Cognito User Pool ID (for OAuth discovery metadata). */
-  userPoolId?: string;
-  /** Cognito domain prefix (for OAuth discovery metadata). */
-  cognitoDomainPrefix?: string;
-  /** MCP client ID for external MCP clients (for OAuth discovery metadata). */
-  mcpClientId?: string;
-  /** Fully-qualified custom OAuth scope for MCP access (e.g. `sdpm-mcp/invoke`). */
-  mcpCustomScope?: string;
+  /**
+   * When true, this stack reads Auth values from SSM Parameter Store
+   * (published by AuthStack) and enables the OAuth discovery endpoint for
+   * external MCP clients. When false (external IdP), Auth values are not
+   * available and the discovery endpoint is skipped.
+   */
+  useAuthStack: boolean;
   /** Enable Dynamic Client Registration (RFC 7591) for external MCP clients. Default: true. */
   enableDCR?: boolean;
 }
@@ -201,6 +204,19 @@ export class RuntimeStack extends cdk.Stack {
     // --- Amazon Bedrock AgentCore Runtime (JWT Bearer authorizer) ---
     const defaultPolicy = runtimeRole.node.findChild("DefaultPolicy") as iam.Policy;
 
+    // When AuthStack is in play, prefer scope-based auth (DCR-compatible):
+    // read the MCP custom scope from SSM and use it as allowedScopes.
+    // Otherwise (external IdP), fall back to the static allowedClients list.
+    const mcpCustomScope = props.useAuthStack
+      ? ssm.StringParameter.valueForStringParameter(this, AUTH_SSM_PARAMS.mcpCustomScope)
+      : undefined;
+    const discoveryUrl = props.useAuthStack
+      ? ssm.StringParameter.valueForStringParameter(this, AUTH_SSM_PARAMS.oidcDiscoveryUrl)
+      : props.oidcDiscoveryUrl!;
+    const authorizerConfig = props.useAuthStack
+      ? { discoveryUrl, allowedScopes: [mcpCustomScope!] }
+      : { discoveryUrl, allowedClients: props.allowedClients };
+
     const runtime = new bedrockagentcore.CfnRuntime(this, "SdpmRuntime", {
       agentRuntimeName: "sdpm",
       roleArn: runtimeRole.roleArn,
@@ -214,12 +230,7 @@ export class RuntimeStack extends cdk.Stack {
       },
       protocolConfiguration: "MCP",
       authorizerConfiguration: {
-        customJwtAuthorizer: {
-          discoveryUrl: props.oidcDiscoveryUrl,
-          ...(props.allowedScopes && props.allowedScopes.length > 0
-            ? { allowedScopes: props.allowedScopes }
-            : { allowedClients: props.allowedClients }),
-        },
+        customJwtAuthorizer: authorizerConfig,
       },
       requestHeaderConfiguration: {
         requestHeaderAllowlist: ["Authorization"],
@@ -271,12 +282,26 @@ export class RuntimeStack extends cdk.Stack {
     // --- OAuth 2.1 Discovery for external MCP clients (RFC 9728 / RFC 8414) ---
     // HTTP API + Lambda for OAuth discovery, 401 challenge, and proxy routes.
     // Enables Claude.ai, Kiro, and other MCP clients to auto-discover OAuth config.
-    if (props.userPoolId && props.cognitoDomainPrefix) {
+    // Only enabled when AuthStack is in play (Cognito-backed). External IdP
+    // users (useAuthStack=false) handle discovery at their IdP directly.
+    if (props.useAuthStack) {
+      // Read Auth values from SSM Parameter Store (published by AuthStack).
+      const userPoolId = ssm.StringParameter.valueForStringParameter(
+        this, AUTH_SSM_PARAMS.userPoolId,
+      );
+      const cognitoDomainPrefix = ssm.StringParameter.valueForStringParameter(
+        this, AUTH_SSM_PARAMS.cognitoDomainPrefix,
+      );
+      const mcpClientIdRaw = ssm.StringParameter.valueForStringParameter(
+        this, AUTH_SSM_PARAMS.mcpClientId,
+      );
+      // mcpCustomScope already fetched above for authorizerConfig.
+
       const cognitoDomain = cdk.Fn.join("", [
-        "https://", props.cognitoDomainPrefix!, ".auth.", this.region, ".amazoncognito.com",
+        "https://", cognitoDomainPrefix, ".auth.", this.region, ".amazoncognito.com",
       ]);
       const issuer = cdk.Fn.join("", [
-        "https://cognito-idp.", this.region, ".amazonaws.com/", props.userPoolId!,
+        "https://cognito-idp.", this.region, ".amazonaws.com/", userPoolId,
       ]);
 
       // Lambda handles OAuth discovery, 401 challenge, and MCP proxy to AgentCore
@@ -296,8 +321,9 @@ export class RuntimeStack extends cdk.Stack {
           COGNITO_DOMAIN: cognitoDomain,
           ISSUER: issuer,
           RUNTIME_URL: runtimeInvokeUrl,
-          USER_POOL_ID: props.userPoolId!,
-          MCP_SCOPES: ["openid", "profile", "email", ...(props.mcpCustomScope ? [props.mcpCustomScope] : [])].join(","),
+          USER_POOL_ID: userPoolId,
+          // SSM-backed scope is always present (AuthStack always publishes it).
+          MCP_SCOPES: cdk.Fn.join(",", ["openid", "profile", "email", mcpCustomScope!]),
           ENABLE_DCR: (props.enableDCR !== false) ? "true" : "false",
         },
         timeout: cdk.Duration.seconds(30),
@@ -319,7 +345,7 @@ export class RuntimeStack extends cdk.Stack {
       discoveryFn.addToRolePolicy(new iam.PolicyStatement({
         actions: cognitoActions,
         resources: [cdk.Fn.join("", [
-          "arn:aws:cognito-idp:", this.region, ":", this.account, ":userpool/", props.userPoolId!,
+          "arn:aws:cognito-idp:", this.region, ":", this.account, ":userpool/", userPoolId,
         ])],
       }));
 
@@ -342,12 +368,13 @@ export class RuntimeStack extends cdk.Stack {
         value: httpApi.url!,
         description: "MCP Server URL for external MCP clients",
       });
-      if (props.mcpClientId) {
-        new cdk.CfnOutput(this, "McpOAuthClientId", {
-          value: props.mcpClientId,
-          description: "OAuth Client ID for external MCP clients (static; DCR clients register dynamically)",
-        });
-      }
+      // SSM tokens are not synth-time strings, so we cannot conditionally emit
+      // this Output based on whether mcpClientId is set. AuthStack publishes
+      // the sentinel "-" when no static MCP client exists (DCR-only mode).
+      new cdk.CfnOutput(this, "McpOAuthClientId", {
+        value: mcpClientIdRaw,
+        description: "OAuth Client ID for external MCP clients ('-' means DCR-only; clients register dynamically)",
+      });
     }
   }
 }
