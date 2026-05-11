@@ -137,7 +137,7 @@ class ImageMixin:
                         else:
                             consequence = "image has padding within the box"
                         print(f"Warning: {consequence} (fit={fit}): {src}\n"
-                              f"  box {width_pct}×{height_pct} → suggest "
+                              f"  box {width_pct}×{height_pct} → to preserve aspect ratio: "
                               f"width={width_pct}, height={sw_h} or "
                               f"width={sh_w}, height={height_pct}",
                               file=sys.stderr)
