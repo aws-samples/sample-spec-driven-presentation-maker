@@ -123,9 +123,20 @@ class ImageMixin:
                             img_w, img_h = img.size
                     except Exception:
                         img_w, img_h = 1, 1
-                if img_w > 0 and img_h > 0 and fit != "stretch":
+                if img_w > 0 and img_h > 0:
                     img_ratio = img_w / img_h
                     box_ratio = width / height
+                    # Warn if aspect ratios differ significantly
+                    if abs(img_ratio - box_ratio) / max(img_ratio, box_ratio) > 0.05:
+                        sw_h = int(width_pct / img_ratio)  # width-based height
+                        sh_w = int(height_pct * img_ratio)  # height-based width
+                        print(f"Warning: aspect ratio mismatch (fit={fit}): {src}\n"
+                              f"  box {width_pct}×{height_pct} → suggest "
+                              f"width={width_pct}, height={sw_h} or "
+                              f"width={sh_w}, height={height_pct}\n"
+                              f"  (or use fit=\"cover\" to fill with crop, "
+                              f"fit=\"stretch\" to allow distortion)",
+                              file=sys.stderr)
                     if fit == "contain":
                         if img_ratio > box_ratio:
                             height = int(width / img_ratio)
