@@ -14,7 +14,7 @@ class TextboxMixin:
     """Mixin providing textbox element methods."""
 
     def _add_textbox(self, slide, elem):
-        from pptx.enum.text import MSO_AUTO_SIZE, PP_ALIGN
+        from pptx.enum.text import PP_ALIGN
         
         align = elem.get("align", _DEFAULTS["align"])
         x_pct = elem.get("x", 3)

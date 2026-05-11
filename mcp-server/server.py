@@ -720,7 +720,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
             # Layout bias (filter to measured slides; bias uses 1-based)
             try:
                 from sdpm.preview import check_layout_imbalance_data
-                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in page_set]
+                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in set(page_numbers)]
                 if layout_bias:
                     result["warnings"] = {"layoutBias": layout_bias}
             except Exception as e:
