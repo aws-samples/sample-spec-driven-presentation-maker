@@ -27,6 +27,7 @@ import { useRef, useEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
 import { LocalOnly, IS_LOCAL } from "@/lib/mode"
+import { ModelSelector } from "./ModelSelector"
 
 export type ChatTabKey = "new" | "deck"
 
@@ -36,49 +37,6 @@ const MIN_WIDTH = 360
 const MAX_WIDTH_PX = 600
 
 
-/** Model info for local ACP agent */
-interface AcpModel { modelId: string; name: string; description?: string }
-
-function ModelSelector() {
-  const [model, setModelState] = useState<string>("")
-  const [models, setModels] = useState<AcpModel[]>([])
-
-  useEffect(() => {
-    let cancelled = false
-    const poll = () => {
-      fetch("/api/agent/models").then(r => r.json()).then(data => {
-        if (cancelled) return
-        const avail = data.available || []
-        if (avail.length > 0) { setModels(avail); setModelState(data.current || "") }
-        else setTimeout(poll, 3000) // retry until a process is spawned
-      }).catch(() => { if (!cancelled) setTimeout(poll, 3000) })
-    }
-    poll()
-    return () => { cancelled = true }
-  }, [])
-
-  if (models.length === 0) return null
-
-  return (
-    <select
-      value={model}
-      onChange={async (e) => {
-        const v = e.target.value
-        setModelState(v)
-        sessionStorage.setItem("sdpm-model", v)
-        fetch("/api/agent/models", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ modelId: v }),
-        }).catch(() => {})
-      }}
-      className="text-[11px] bg-transparent border border-border rounded px-1.5 py-0.5 text-foreground-muted hover:text-foreground focus:outline-none focus:ring-1 focus:ring-brand-teal max-w-[140px]"
-    >
-      {models.map(m => <option key={m.modelId} value={m.modelId}>{m.name}</option>)}
-    </select>
-  )
-}
-
 interface ChatPanelShellProps {
   open: boolean
   onClose: () => void
@@ -87,7 +45,6 @@ interface ChatPanelShellProps {
   deckId: string | null
   deckName: string | null
   chatSessionId?: string
-  slidePreviewUrls?: (string | null)[]
   slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
@@ -98,7 +55,7 @@ interface ChatPanelShellProps {
 
 export function ChatPanelShell({
   open, onClose, chatTab, onChatTabChange,
-  deckId, deckName, chatSessionId, slidePreviewUrls, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, chatRef: externalChatRef,
+  deckId, deckName, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, chatRef: externalChatRef,
   inline = false,
 }: ChatPanelShellProps) {
   const internalChatRef = useRef<ChatPanelHandle>(null)
@@ -245,7 +202,6 @@ export function ChatPanelShell({
           ref={panelAVisible ? chatRef : undefined}
           deckId="new"
           deckName="New Deck"
-          slidePreviewUrls={panelAOwnsCurrentDeck ? (slidePreviewUrls || []) : []}
           slideSlugs={panelAOwnsCurrentDeck ? (slideSlugs || []) : []}
           onDeckCreated={handlePanelADeckCreated}
           onPreviewInvalidated={onPreviewInvalidated}
@@ -262,7 +218,6 @@ export function ChatPanelShell({
             deckId={deckId!}
             deckName={deckName || undefined}
             chatSessionId={chatSessionId}
-            slidePreviewUrls={slidePreviewUrls || []}
             slideSlugs={slideSlugs || []}
             onDeckCreated={handlePanelBDeckCreated}
             onPreviewInvalidated={onPreviewInvalidated}

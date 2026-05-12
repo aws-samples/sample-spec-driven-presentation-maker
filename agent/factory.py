@@ -56,9 +56,9 @@ def _resolve_model_id(requested: str | None, default: str) -> str:
 
 
 _MCP_FACTORIES = [
-    lambda jwt_token: mcp_agentcore_runtime(jwt_token=jwt_token),
-    lambda jwt_token: mcp_aws_knowledge(),
-    lambda jwt_token: mcp_aws_pricing(),
+    lambda jwt_token, tool_filters=None: mcp_agentcore_runtime(jwt_token=jwt_token, tool_filters=tool_filters),
+    lambda jwt_token, tool_filters=None: mcp_aws_knowledge(),
+    lambda jwt_token, tool_filters=None: mcp_aws_pricing(),
 ]
 
 
@@ -101,9 +101,11 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
     # MCP servers
     mcp_servers = []
     mcp_status = []
-    for (name, required), factory_fn in zip(MCP_DEFS, _MCP_FACTORIES):
+    for i, ((name, required), factory_fn) in enumerate(zip(MCP_DEFS, _MCP_FACTORIES)):
         try:
-            mcp_servers.append(factory_fn(jwt_token))
+            # Apply tool_filters only to the Presentation Maker server (index 0)
+            filters = {"allowed": cfg.allowed_tools} if (i == 0 and cfg.allowed_tools) else None
+            mcp_servers.append(factory_fn(jwt_token, tool_filters=filters))
             mcp_status.append({"name": name, "status": "ok"})
         except Exception as e:
             mcp_status.append({"name": name, "status": "error", "error": str(e)})
@@ -128,7 +130,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
             ),
         )
         composer_mcp_factory = lambda: mcp_agentcore_runtime(jwt_token=jwt_token)  # noqa: E731
-        compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory)
+        compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch])
         tools.append(compose_slides)
 
     # Agent
@@ -153,7 +155,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         mcp_status = new_status
         tools = [*mcp_servers, web_fetch, hearing]
         if cfg.use_composer:
-            compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory)
+            compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch])
             tools.append(compose_slides)
         agent = Agent(
             name=agent_name, system_prompt="", tools=tools, model=model,

@@ -41,6 +41,104 @@ def get_styles_dirs() -> list[Path]:
     return _get_resource_dirs("SDPM_STYLES_DIR", "styles", BUNDLED_STYLES_DIR)
 
 
+def list_styles_filtered(
+    styles_dirs: list[Path],
+    pinned_names: list[str],
+    include_all: bool = False,
+) -> list[dict]:
+    """List styles with pin/source metadata, optionally filtered.
+
+    Filesystem-based entry point for MCP Local / CLI.
+    Determines source ("user" vs "builtin") by checking whether each style
+    lives in the user-local directory.
+
+    Args:
+        styles_dirs: Ordered directories from get_styles_dirs().
+        pinned_names: Pinned style names from state.json.
+        include_all: Pass through to filter_styles().
+
+    Returns:
+        Filtered list with pinned/source metadata.
+    """
+    from sdpm.config import get_user_config_dir
+    from sdpm.reference import filter_styles, list_styles_merged
+
+    user_dir = get_user_config_dir() / "styles"
+    raw = list_styles_merged(styles_dirs)
+
+    # Tag source based on whether the style file exists in user dir
+    for s in raw:
+        if (user_dir / f"{s['name']}.html").exists():
+            s["source"] = "user"
+        else:
+            s["source"] = "builtin"
+
+    return filter_styles(raw, pinned_names, include_all)
+
+
+def list_templates_with_metadata(
+    templates_dirs: list[Path],
+    metadata: dict[str, dict],
+) -> list[dict]:
+    """List templates with source and metadata.
+
+    Pure function — no I/O beyond filesystem glob.
+
+    Args:
+        templates_dirs: From get_templates_dirs(). Last entry is bundled.
+        metadata: {name: {description, theme_colors, fonts, layout_count}} from state.json or DDB.
+
+    Returns:
+        Sorted list of template dicts with name, source, description, theme_colors, fonts, layout_count.
+    """
+    bundled_dir = templates_dirs[-1] if templates_dirs else None
+    seen: dict[str, dict] = {}
+    for d in templates_dirs:
+        if not d.exists():
+            continue
+        for t in sorted(d.glob("*.pptx")):
+            name = t.stem
+            if name in seen:
+                continue
+            source = "builtin" if d == bundled_dir else "user"
+            meta = metadata.get(name, {})
+            seen[name] = {
+                "name": name,
+                "source": source,
+                "description": meta.get("description", ""),
+                "theme_colors": meta.get("theme_colors", {}),
+                "fonts": meta.get("fonts", {}),
+                "layout_count": meta.get("layout_count", 0),
+            }
+    return sorted(seen.values(), key=lambda x: (x["source"] != "user", x["name"]))
+
+
+def analyze_and_store_template(template_path: Path, description: str = "") -> dict:
+    """Analyze a template and return metadata for storage.
+
+    Calls the existing analyze_template() and reshapes the result.
+    Persistence is the caller's responsibility (state.json or DDB).
+
+    Args:
+        template_path: Path to .pptx file.
+        description: User-provided description.
+
+    Returns:
+        Dict with name, description, theme_colors, fonts, layout_count, layouts.
+    """
+    from sdpm.analyzer import analyze_template as _analyze
+
+    result = _analyze(template_path)
+    return {
+        "name": template_path.stem,
+        "description": description,
+        "theme_colors": result.get("theme_colors", {}),
+        "fonts": result.get("fonts", {}),
+        "layout_count": len(result.get("layouts", [])),
+        "layouts": result.get("layouts", []),
+    }
+
+
 def _find_style_in_dirs(name: str, styles_dirs: list[Path]) -> Path | None:
     """Search for a style HTML by name across the given directories.
 
@@ -263,7 +361,7 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
 
     Raises FileNotFoundError, ValueError on missing template/icons.
     """
-    from sdpm.builder import PPTXBuilder, resolve_override, validate_icons_in_json
+    from sdpm.builder import resolve_override, validate_icons_in_json
     from sdpm.utils.io import read_json
 
     input_path = Path(json_path)
@@ -286,6 +384,7 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
 
     # Auto-fill fonts
     from sdpm.analyzer import extract_fonts as _extract_fonts
+    from sdpm.analyzer import _extract_theme_colors_raw
 
     fonts = data.get("fonts")
     if not fonts or not fonts.get("fullwidth"):
@@ -295,7 +394,7 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
     # Auto-fill defaultTextColor
     dtc = data.get("defaultTextColor")
     if not dtc:
-        _, is_dark = PPTXBuilder._extract_theme_colors(template_file)
+        _, is_dark = _extract_theme_colors_raw(template_file)
         dtc = "#FFFFFF" if is_dark else "#333333"
         warnings.append(f"defaultTextColor auto-set to {dtc}")
 

@@ -113,3 +113,67 @@ exec(code, {"__builtins__": _safe_builtins})
 def make_runner(deck_id: str) -> str:
     """Return the runner script. Static template — code comes via stdin."""
     return _RUNNER_WITH_DECK if deck_id else _RUNNER_NO_DECK
+
+
+# --- Style runner ---
+
+_RUNNER_STYLE = '''\
+import json, os, sys, re
+from pathlib import Path
+
+user_styles_dir = Path(sys.argv[1]).resolve()
+styles_dirs = json.loads(sys.argv[2])
+
+def _validate_name(name):
+    if not name or "/" in name or "\\\\" in name or ".." in name:
+        raise PermissionError(f"Invalid style name: {name}")
+    return name
+
+def read_style(name):
+    """Read an existing style HTML by name (searches all style dirs)."""
+    name = _validate_name(name)
+    filename = name + ".html" if not name.endswith(".html") else name
+    for d in styles_dirs:
+        p = Path(d) / filename
+        if p.exists():
+            return p.read_text(encoding="utf-8")
+    available = []
+    for d in styles_dirs:
+        dp = Path(d)
+        if dp.is_dir():
+            available.extend(f.stem for f in dp.iterdir() if f.suffix == ".html")
+    raise FileNotFoundError(f"Style not found: {name}. Available: {sorted(set(available))}")
+
+def write_style(name, html):
+    """Save style HTML to user styles directory. name = file stem (no .html extension)."""
+    name = _validate_name(name)
+    filename = name + ".html" if not name.endswith(".html") else name
+    user_styles_dir.mkdir(parents=True, exist_ok=True)
+    dest = user_styles_dir / filename
+    dest.write_text(html, encoding="utf-8")
+    title_m = re.search(r"<title>(.+?)</title>", html, re.IGNORECASE)
+    title = title_m.group(1).strip() if title_m else name
+    # Signal save result to parent process via stderr JSON
+    sys.stderr.write("__STYLE_SAVED__" + json.dumps({"title": title, "filename": filename, "path": str(dest)}) + "\\n")
+
+_safe_builtins = {
+    "print": print, "len": len, "range": range, "enumerate": enumerate,
+    "sorted": sorted, "isinstance": isinstance, "type": type,
+    "str": str, "int": int, "float": float, "bool": bool,
+    "list": list, "dict": dict, "tuple": tuple, "set": set,
+    "min": min, "max": max, "sum": sum, "abs": abs, "round": round,
+    "any": any, "all": all, "zip": zip, "map": map, "filter": filter,
+    "reversed": reversed, "True": True, "False": False, "None": None,
+    "ValueError": ValueError, "PermissionError": PermissionError,
+    "FileNotFoundError": FileNotFoundError, "Exception": Exception,
+}
+
+code = sys.stdin.read()
+exec(code, {"__builtins__": _safe_builtins,
+     "read_style": read_style, "write_style": write_style})
+'''
+
+
+def make_style_runner() -> str:
+    """Return the style runner script. Expects sys.argv[1]=user_styles_dir, sys.argv[2]=styles_dirs JSON."""
+    return _RUNNER_STYLE

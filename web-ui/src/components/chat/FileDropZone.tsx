@@ -20,6 +20,8 @@ interface FileDropZoneProps {
   pasteDisabled?: boolean
   /** Whether drop zone is active. */
   disabled?: boolean
+  /** Override wrapper className (default: "relative h-full"). */
+  className?: string
   /** Child elements to wrap. */
   children: ReactNode
 }
@@ -30,7 +32,7 @@ interface FileDropZoneProps {
  *
  * @param props - FileDropZoneProps
  */
-export function FileDropZone({ onFiles, onLongTextPaste, pasteDisabled, disabled, children }: FileDropZoneProps) {
+export function FileDropZone({ onFiles, onLongTextPaste, pasteDisabled, disabled, className, children }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false)
 
   const handleDragOver = useCallback(
@@ -106,7 +108,7 @@ export function FileDropZone({ onFiles, onLongTextPaste, pasteDisabled, disabled
 
   return (
     <div
-      className="relative h-full"
+      className={className ?? "relative h-full"}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

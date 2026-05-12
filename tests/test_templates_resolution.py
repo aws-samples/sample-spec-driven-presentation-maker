@@ -76,3 +76,57 @@ def test_resolve_template_raises_when_not_found(tmp_path: Path) -> None:
     input_path = tmp_path / "presentation.json"
     with pytest.raises(FileNotFoundError, match="No template specified"):
         _resolve_template(data, str(input_path), [tmp_path])
+
+
+# ── list_templates_with_metadata ──
+
+
+from sdpm.api import list_templates_with_metadata, analyze_and_store_template
+
+
+def test_list_templates_with_metadata_source_detection(tmp_path: Path) -> None:
+    user_dir = tmp_path / "user"
+    bundled_dir = tmp_path / "bundled"
+    user_dir.mkdir()
+    bundled_dir.mkdir()
+    (user_dir / "custom.pptx").write_bytes(b"dummy")
+    (bundled_dir / "builtin.pptx").write_bytes(b"dummy")
+
+    metadata = {"custom": {"description": "My template", "theme_colors": {}, "fonts": {}, "layout_count": 3}}
+    result = list_templates_with_metadata([user_dir, bundled_dir], metadata)
+
+    assert len(result) == 2
+    custom = next(r for r in result if r["name"] == "custom")
+    builtin = next(r for r in result if r["name"] == "builtin")
+    assert custom["source"] == "user"
+    assert custom["description"] == "My template"
+    assert custom["layout_count"] == 3
+    assert builtin["source"] == "builtin"
+    assert builtin["description"] == ""
+
+
+def test_list_templates_with_metadata_user_shadows_builtin(tmp_path: Path) -> None:
+    user_dir = tmp_path / "user"
+    bundled_dir = tmp_path / "bundled"
+    user_dir.mkdir()
+    bundled_dir.mkdir()
+    (user_dir / "shared.pptx").write_bytes(b"user-ver")
+    (bundled_dir / "shared.pptx").write_bytes(b"bundled-ver")
+
+    result = list_templates_with_metadata([user_dir, bundled_dir], {})
+    assert len(result) == 1
+    assert result[0]["source"] == "user"
+
+
+def test_analyze_and_store_template() -> None:
+    template_path = Path(__file__).parent.parent / "skill" / "templates" / "blank-dark.pptx"
+    if not template_path.exists():
+        pytest.skip("blank-dark.pptx not available")
+
+    result = analyze_and_store_template(template_path, description="Dark theme")
+    assert result["name"] == "blank-dark"
+    assert result["description"] == "Dark theme"
+    assert isinstance(result["theme_colors"], dict)
+    assert isinstance(result["fonts"], dict)
+    assert result["layout_count"] > 0
+    assert len(result["layouts"]) == result["layout_count"]

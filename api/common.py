@@ -18,6 +18,8 @@ from typing import Any
 def get_user_id(event: Any) -> str:
     """Extract user ID (Cognito sub) from API Gateway authorizer claims.
 
+    Supports both REST API (v1) and HTTP API (v2) JWT authorizer formats.
+
     Args:
         event: Powertools current_event with request_context.authorizer.
 
@@ -27,9 +29,13 @@ def get_user_id(event: Any) -> str:
     Raises:
         ValueError: If authorizer claims or sub are missing.
     """
-    authorizer = event.request_context.authorizer
-    claims = (authorizer or {}).get("claims", {})
-    sub = claims.get("sub")
+    # HTTP API v2: requestContext.authorizer.jwt.claims
+    # REST API v1: requestContext.authorizer.claims
+    raw = event.raw_event.get("requestContext", {}).get("authorizer", {})
+    if "jwt" in raw:
+        sub = raw["jwt"].get("claims", {}).get("sub")
+    else:
+        sub = raw.get("claims", {}).get("sub")
     if not sub:
         raise ValueError("Unauthorized: missing user identity")
     return sub
@@ -38,15 +44,19 @@ def get_user_id(event: Any) -> str:
 def get_user_alias(event: Any) -> str:
     """Extract user alias (email prefix) from API Gateway authorizer claims.
 
+    Supports both REST API (v1) and HTTP API (v2) JWT authorizer formats.
+
     Args:
         event: Powertools current_event with request_context.authorizer.
 
     Returns:
         Alias string (email prefix before @), or empty string if unavailable.
     """
-    authorizer = event.request_context.authorizer
-    claims = (authorizer or {}).get("claims", {})
-    email = claims.get("email", "")
+    raw = event.raw_event.get("requestContext", {}).get("authorizer", {})
+    if "jwt" in raw:
+        email = raw["jwt"].get("claims", {}).get("email", "")
+    else:
+        email = raw.get("claims", {}).get("email", "")
     return email.split("@")[0] if email else ""
 
 

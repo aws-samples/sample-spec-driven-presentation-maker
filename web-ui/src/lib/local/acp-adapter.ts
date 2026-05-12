@@ -33,17 +33,6 @@ const PRESETS: AgentConfig[] = [
     restartOnNewChat: true,
     subagentQueryField: "query",
   },
-  {
-    id: "claude",
-    displayName: "Claude Code",
-    path: "claude",
-    args: ["--acp"],
-    env: {},
-    subagentTool: "Task",
-    subagentInstruction: "Use `Task` tool with `subagent_type: \"sdpm-composer\"`, `description: \"<brief>\"`, `prompt: \"deck_id=... slides: slug1, slug2\"`. Invoke multiple Task calls in parallel (max 4).",
-    restartOnNewChat: false,
-    subagentQueryField: "prompt",
-  },
 ]
 
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
@@ -58,7 +47,8 @@ interface StoredConfig {
 function readConfig(): StoredConfig {
   try {
     if (fs.existsSync(CONFIG_PATH)) {
-      return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"))
+      const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"))
+      return { activeAgent: raw.activeAgent || "kiro-cli", agents: raw.agents || PRESETS }
     }
   } catch {}
   return { activeAgent: "kiro-cli", agents: PRESETS }

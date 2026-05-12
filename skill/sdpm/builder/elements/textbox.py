@@ -14,7 +14,7 @@ class TextboxMixin:
     """Mixin providing textbox element methods."""
 
     def _add_textbox(self, slide, elem):
-        from pptx.enum.text import MSO_AUTO_SIZE, PP_ALIGN
+        from pptx.enum.text import PP_ALIGN
         
         align = elem.get("align", _DEFAULTS["align"])
         x_pct = elem.get("x", 3)
@@ -58,19 +58,16 @@ class TextboxMixin:
         tf = textbox.text_frame
         tf.margin_left = 0
         tf.margin_right = 0
-        if elem.get("_noAutofit"):
-            # Clean bodyPr to match original (no autofit, no wrap override)
-            from pptx.oxml.ns import qn
-            bodyPr = tf._txBody.find(qn('a:bodyPr'))
-            for attr in list(bodyPr.attrib):
-                if 'wrap' in attr:
-                    del bodyPr.attrib[attr]
-            for child in list(bodyPr):
-                tag = child.tag.split('}')[1]
-                if tag in ('spAutoFit', 'noAutofit', 'normAutofit'):
-                    bodyPr.remove(child)
-        else:
-            tf.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
+        # Clean bodyPr: no autofit by default
+        from pptx.oxml.ns import qn
+        bodyPr = tf._txBody.find(qn('a:bodyPr'))
+        for attr in list(bodyPr.attrib):
+            if 'wrap' in attr:
+                del bodyPr.attrib[attr]
+        for child in list(bodyPr):
+            tag = child.tag.split('}')[1]
+            if tag in ('spAutoFit', 'noAutofit', 'normAutofit'):
+                bodyPr.remove(child)
         if not elem.get("_noAutofit"):
             tf.word_wrap = not auto_width
         

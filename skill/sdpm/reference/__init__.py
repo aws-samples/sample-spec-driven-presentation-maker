@@ -394,3 +394,37 @@ def list_styles_merged(styles_dirs: list[Path]) -> list[dict[str, str]]:
                 seen.add(item["name"])
                 result.append(item)
     return result
+
+
+def filter_styles(
+    styles: list[dict],
+    pinned_names: list[str],
+    include_all: bool = False,
+) -> list[dict]:
+    """Add pinned/source metadata and optionally filter styles.
+
+    Pure function — no I/O. Usable by both MCP Local (filesystem) and
+    MCP Server (S3) since style retrieval is the caller's responsibility.
+
+    Args:
+        styles: List of style dicts. Each must have ``name``. May already
+            have ``source``; defaults to ``"builtin"`` if absent.
+        pinned_names: List of pinned style names.
+        include_all: If True, return all styles. If False, return only
+            pinned + user styles (or all if no pins exist).
+
+    Returns:
+        Styles with ``pinned: bool`` and ``source: "builtin"|"user"`` added.
+    """
+    pin_set = set(pinned_names)
+    result = []
+    for s in styles:
+        enriched = {**s, "pinned": s["name"] in pin_set}
+        if "source" not in enriched:
+            enriched["source"] = "builtin"
+        result.append(enriched)
+
+    if include_all or not pin_set:
+        return result
+
+    return [s for s in result if s["pinned"] or s["source"] == "user"]

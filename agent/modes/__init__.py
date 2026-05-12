@@ -17,11 +17,14 @@ class ModeConfig:
         use_composer: Include compose_slides tool.
         agent_model: Which model setting to use for the main agent — "chat" for
             conversations/planning, "create" for modes that also generate artifacts.
+        allowed_tools: If set, only these MCP tool names are loaded from the
+            Presentation Maker server. None = all tools except style-only tools.
     """
 
     parts: list[Part] = field(default_factory=list)
     use_composer: bool = True
     agent_model: Literal["chat", "create"] = "chat"
+    allowed_tools: list[str] | None = None
 
 
 # Shared parts — referenced by multiple modes
@@ -40,6 +43,21 @@ _PREFETCH_BRIEFING = Part(
     prefill_text="Starting the Briefing phase. I'll read the workflow to conduct the hearing properly.",
 )
 
+# Tool allowlists — explicit control over which MCP tools each mode can use.
+# run_style_python is only available to style_creator.
+_DECK_TOOLS = [
+    "init_presentation", "analyze_template", "read_uploaded_file",
+    "list_styles", "apply_style", "read_examples", "list_workflows",
+    "read_workflows", "list_guides", "read_guides", "search_assets",
+    "list_asset_sources", "list_templates",
+    "run_python", "generate_pptx", "get_preview", "code_to_slide",
+    "grid", "import_attachment",
+]
+
+_STYLE_TOOLS = [
+    "run_style_python", "list_styles", "analyze_template", "read_uploaded_file",
+]
+
 
 MODES: dict[str, ModeConfig] = {
     "separated": ModeConfig(parts=[
@@ -51,7 +69,7 @@ MODES: dict[str, ModeConfig] = {
         _WF_SLIDE_GROUPS,
         _NOW,
         _PREFETCH_BRIEFING,
-    ]),
+    ], allowed_tools=_DECK_TOOLS),
     "vibe": ModeConfig(parts=[
         _COMMON_LANGUAGE,
         Part(Source.file("role/vibe_agent"), target="system"),
@@ -61,7 +79,7 @@ MODES: dict[str, ModeConfig] = {
         _WF_POST_COMPOSE,
         _WF_SLIDE_GROUPS,
         _NOW,
-    ]),
+    ], allowed_tools=_DECK_TOOLS),
     "single": ModeConfig(
         parts=[
             _COMMON_LANGUAGE,
@@ -71,6 +89,7 @@ MODES: dict[str, ModeConfig] = {
         ],
         use_composer=False,
         agent_model="create",
+        allowed_tools=_DECK_TOOLS,
     ),
     # Composer is a sub-agent invoked by compose_slides; ModeConfig is used
     # by compose_slides to build its prompt via the same resolve_parts path.
@@ -94,5 +113,22 @@ MODES: dict[str, ModeConfig] = {
                  target="history:tool_result", label="read_examples"),
         ],
         use_composer=False,
+        allowed_tools=_DECK_TOOLS,
+    ),
+    "style_creator": ModeConfig(
+        parts=[
+            _COMMON_LANGUAGE,
+            Part(Source.file("role/style_creator"), target="system"),
+            _NOW,
+            Part(
+                Source.mcp("read_workflows", {"names": ["create-style"]}),
+                target="history:tool_result",
+                label="read_workflows",
+                prefill_text="I'll read the style creation workflow.",
+            ),
+        ],
+        use_composer=False,
+        agent_model="create",
+        allowed_tools=_STYLE_TOOLS,
     ),
 }

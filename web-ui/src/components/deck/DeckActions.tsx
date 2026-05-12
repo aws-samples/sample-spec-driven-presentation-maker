@@ -10,6 +10,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Lock, Share2, X, Trash2, Building2 } from "lucide-react"
 import { searchUsers, UserSearchResult } from "@/services/deckService"
+import { ConfirmDialog } from "@/components/ConfirmDialog"
 
 interface DeckActionsProps {
   visibility?: "public" | "private"
@@ -82,21 +83,15 @@ export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, 
       </button>
 
       {/* Publish confirmation */}
-      {showPublishConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-popover border border-border rounded-xl shadow-xl w-full max-w-sm mx-4 p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 rounded-lg bg-green-500/10"><Building2 className="h-5 w-5 text-green-400" /></div>
-              <h3 className="text-sm font-semibold">Share internally?</h3>
-            </div>
-            <p className="text-xs text-muted-foreground mb-4">This deck will be discoverable by everyone in the organization.</p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setShowPublishConfirm(false)} className="px-3 py-1.5 text-xs rounded-lg hover:bg-muted transition-colors">Cancel</button>
-              <button onClick={() => { onVisibilityChange("public"); setShowPublishConfirm(false) }} className="px-3 py-1.5 text-xs rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors">Share</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={showPublishConfirm}
+        onOpenChange={setShowPublishConfirm}
+        title="Share internally?"
+        description="This deck will be discoverable by everyone in the organization."
+        confirmLabel="Share"
+        variant="default"
+        onConfirm={() => { onVisibilityChange("public"); setShowPublishConfirm(false) }}
+      />
 
       {/* Share dialog */}
       {showShare && (

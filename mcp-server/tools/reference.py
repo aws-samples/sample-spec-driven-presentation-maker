@@ -200,41 +200,75 @@ def _render_pptx_from_bytes(pptx_bytes: bytes, pages: list[int] | None = None) -
         tmp_path.unlink(missing_ok=True)
 
 
-def list_styles(storage: Storage) -> dict[str, Any]:
-    """List available design styles from references/examples/styles/.
+def list_styles(storage: Storage, user_id: str = "", include_all: bool = False) -> dict[str, Any]:
+    """List available design styles with pin/source metadata.
 
-    Extracts name and description from each HTML file's <title> tag.
+    Combines builtin styles (references/examples/styles/) and user styles
+    (user-styles/{user_id}/). Uses Engine filter_styles() for filtering.
 
     Args:
         storage: Storage backend instance.
+        user_id: User ID for fetching user styles and pins. Empty = builtin only.
+        include_all: If True, return all styles. If False, return pinned + user only
+                     (falls back to all if no pins exist).
 
     Returns:
-        Dict with styles list (name + description).
+        Dict with styles list (name, description, pinned, source).
     """
+    from sdpm.reference import filter_styles
+
+    # 1. Builtin styles from resource bucket
     cache_key = "list:styles"
     cached = _cache.get(cache_key)
     if cached and (time.time() - cached[1]) < CACHE_TTL:
-        return {"styles": cached[0]}
+        builtin_styles = cached[0]
+    else:
+        prefix = "references/examples/styles/"
+        files = storage.list_files(prefix=prefix)
+        builtin_styles: list[dict[str, str]] = []
+        for f in files:
+            if not f.endswith(".html"):
+                continue
+            name = f.removeprefix(prefix).removesuffix(".html")
+            description = ""
+            try:
+                content = storage.download_file(key=f).decode("utf-8")
+                m = re.search(r"<title>(.*?)</title>", content, re.IGNORECASE)
+                if m:
+                    description = m.group(1).strip()
+            except Exception:
+                pass
+            builtin_styles.append({"name": name, "description": description, "source": "builtin"})
+        _cache[cache_key] = (builtin_styles, time.time())
 
-    prefix = "references/examples/styles/"
-    files = storage.list_files(prefix=prefix)
-    styles: list[dict[str, str]] = []
-    for f in files:
-        if not f.endswith(".html"):
-            continue
-        name = f.removeprefix(prefix).removesuffix(".html")
-        description = ""
-        try:
-            content = storage.download_file(key=f).decode("utf-8")
-            m = re.search(r"<title>(.*?)</title>", content, re.IGNORECASE)
-            if m:
-                description = m.group(1).strip()
-        except Exception:
-            pass
-        styles.append({"name": name, "description": description})
+    # 2. User styles from pptx bucket
+    user_styles: list[dict[str, str]] = []
+    if user_id:
+        user_prefix = f"user-styles/{user_id}/"
+        user_files = storage.list_files(prefix=user_prefix, bucket=storage.pptx_bucket)
+        for f in user_files:
+            if not f.endswith(".html"):
+                continue
+            name = f.removeprefix(user_prefix).removesuffix(".html")
+            description = ""
+            try:
+                content = storage.download_file_from_pptx_bucket(key=f).decode("utf-8")
+                m = re.search(r"<title>(.*?)</title>", content, re.IGNORECASE)
+                if m:
+                    description = m.group(1).strip()
+            except Exception:
+                pass
+            user_styles.append({"name": name, "description": description, "source": "user"})
 
-    _cache[cache_key] = (styles, time.time())
-    return {"styles": styles}
+    # 3. Get pins
+    pinned_names: list[str] = []
+    if user_id:
+        pinned_names = storage.get_style_pins(user_id)
+
+    # 4. Filter via Engine
+    all_styles = user_styles + builtin_styles
+    filtered = filter_styles(all_styles, pinned_names, include_all)
+    return {"styles": filtered}
 
 
 def read_examples(names: list[str], storage: Storage) -> dict[str, Any]:

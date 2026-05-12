@@ -178,3 +178,102 @@ class Storage(ABC):
             True if deck exists and is owned by user.
         """
         return self.get_deck(deck_id, user_id) is not None
+
+    # --- Style Pins ---
+
+    @abstractmethod
+    def get_style_pins(self, user_id: str) -> list[str]:
+        """Get pinned style names for a user.
+
+        Args:
+            user_id: User identifier.
+
+        Returns:
+            List of pinned style names.
+        """
+
+    @abstractmethod
+    def put_style_pins(self, user_id: str, pins: list[str]) -> None:
+        """Save pinned style names for a user.
+
+        Args:
+            user_id: User identifier.
+            pins: List of style names to pin.
+        """
+
+    # --- User Templates ---
+
+    @abstractmethod
+    def list_user_templates(self, user_id: str) -> list[dict]:
+        """List user-uploaded templates metadata from DDB.
+
+        Args:
+            user_id: User identifier.
+
+        Returns:
+            List of template metadata dicts.
+        """
+
+    @abstractmethod
+    def get_user_template_metadata(self, user_id: str, name: str) -> dict | None:
+        """Get metadata for a single user template.
+
+        Args:
+            user_id: User identifier.
+            name: Template name (stem).
+
+        Returns:
+            Metadata dict or None if not found.
+        """
+
+    @abstractmethod
+    def put_user_template(self, user_id: str, name: str, data: bytes, metadata: dict) -> None:
+        """Upload a user template file and store metadata.
+
+        Args:
+            user_id: User identifier.
+            name: Template name (stem).
+            data: .pptx file bytes.
+            metadata: Analysis metadata (description, theme_colors, fonts, etc.).
+        """
+
+    @abstractmethod
+    def delete_user_template(self, user_id: str, name: str) -> None:
+        """Delete a user template (file + metadata).
+
+        Args:
+            user_id: User identifier.
+            name: Template name (stem).
+        """
+
+    @abstractmethod
+    def download_user_template(self, user_id: str, name: str) -> bytes:
+        """Download a user template .pptx file.
+
+        Args:
+            user_id: User identifier.
+            name: Template name (stem).
+
+        Returns:
+            File content as bytes.
+        """
+
+    @abstractmethod
+    def rename_user_template(self, user_id: str, old_name: str, new_name: str) -> None:
+        """Rename a user template (file + metadata).
+
+        Args:
+            user_id: User identifier.
+            old_name: Current template name.
+            new_name: New template name.
+        """
+
+    @abstractmethod
+    def update_user_template_metadata(self, user_id: str, name: str, updates: dict) -> None:
+        """Update specific fields in user template metadata.
+
+        Args:
+            user_id: User identifier.
+            name: Template name.
+            updates: Fields to update (e.g. {"description": "new desc"}).
+        """

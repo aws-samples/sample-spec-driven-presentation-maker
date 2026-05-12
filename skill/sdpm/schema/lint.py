@@ -31,6 +31,30 @@ def lint(data: list | dict) -> list[dict]:
     return diagnostics
 
 
+def lint_and_sanitize(slide: dict) -> tuple[dict, list[dict]]:
+    """Validate slide JSON and remove deprecated properties.
+
+    Called before persisting slide JSON (S3 write-back or local file save).
+    Text-based only — no PPTX build needed.
+
+    Args:
+        slide: Single slide dict (with "elements" key).
+
+    Returns:
+        (sanitized_slide, diagnostics) — cleaned dict and list of issues found.
+    """
+    import copy
+    cleaned = copy.deepcopy(slide)
+    diagnostics: list[dict] = []
+    for ei, elem in enumerate(cleaned.get("elements") or []):
+        diagnostics.extend(_lint_element(0, ei, elem))
+        if elem.pop("_spAutoFit", None):
+            diagnostics.append(_diag(0, ei, "deprecated-autofit",
+                "_spAutoFit is deprecated and was removed. "
+                "Use measure to detect overflow instead."))
+    return cleaned, diagnostics
+
+
 def _diag(slide: int, element: int, rule: str, message: str) -> dict:
     return {"slide": slide, "element": element, "rule": rule, "message": message}
 

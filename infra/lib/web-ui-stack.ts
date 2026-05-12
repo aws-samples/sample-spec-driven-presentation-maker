@@ -14,7 +14,9 @@
  */
 
 import * as cdk from "aws-cdk-lib";
-import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
+import * as apigatewayv2_authorizers from "aws-cdk-lib/aws-apigatewayv2-authorizers";
+import * as apigatewayv2_integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as cognito from "aws-cdk-lib/aws-cognito";
@@ -228,7 +230,10 @@ function handler(event) {
           command: [
             "bash", "-c",
             "pip install -r /asset-input/api/requirements.txt -t /asset-output/ && " +
-            "cp -r /asset-input/api/* /asset-input/shared /asset-output/",
+            "cp -r /asset-input/api/* /asset-input/shared /asset-output/ && " +
+            "mkdir -p /asset-output/sdpm && cp -r /asset-input/skill/sdpm/analyzer /asset-output/sdpm/ && " +
+            "cp /asset-input/skill/sdpm/__init__.py /asset-output/sdpm/ && " +
+            "mkdir -p /asset-output/sdpm/utils && cp /asset-input/skill/sdpm/utils/__init__.py /asset-input/skill/sdpm/utils/io.py /asset-output/sdpm/utils/",
           ],
           local: {
             tryBundle(outputDir: string): boolean {
@@ -245,6 +250,10 @@ function handler(event) {
               }
               execSync(`cp -r ${root}/api/* ${outputDir}/`, { stdio: "inherit" });
               execSync(`cp -r ${root}/shared ${outputDir}/shared`, { stdio: "inherit" });
+              execSync(`mkdir -p ${outputDir}/sdpm/utils`, { stdio: "inherit" });
+              execSync(`cp -r ${root}/skill/sdpm/analyzer ${outputDir}/sdpm/`, { stdio: "inherit" });
+              execSync(`cp ${root}/skill/sdpm/__init__.py ${outputDir}/sdpm/`, { stdio: "inherit" });
+              execSync(`cp ${root}/skill/sdpm/utils/__init__.py ${root}/skill/sdpm/utils/io.py ${outputDir}/sdpm/utils/`, { stdio: "inherit" });
               return true;
             },
           },
@@ -308,42 +317,38 @@ function handler(event) {
       }
     }
 
-    // --- Amazon API Gateway ---
-    const api = new apigateway.RestApi(this, "SdpmApi", {
-      restApiName: "sdpm-api",
-      defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS,
-        allowMethods: apigateway.Cors.ALL_METHODS,
+    // --- Amazon API Gateway HTTP API ---
+    const httpApi = new apigatewayv2.HttpApi(this, "SdpmHttpApi", {
+      apiName: "sdpm-api",
+      corsPreflight: {
+        allowOrigins: ["*"],
+        allowMethods: [apigatewayv2.CorsHttpMethod.ANY],
         allowHeaders: ["Content-Type", "Authorization"],
+        maxAge: cdk.Duration.hours(1),
       },
     });
-    const authorizer = new apigateway.CognitoUserPoolsAuthorizer(this, "CognitoAuthorizer", {
-      cognitoUserPools: [props.userPool],
-    });
-    const integration = new apigateway.LambdaIntegration(apiLambda);
-    const auth = { authorizer, authorizationType: apigateway.AuthorizationType.COGNITO };
 
-    const decks = api.root.addResource("decks");
-    decks.addMethod("GET", integration, auth);
-    decks.addResource("favorites").addMethod("GET", integration, auth);
-    decks.addResource("shared").addMethod("GET", integration, auth);
-    decks.addResource("public").addMethod("GET", integration, auth);
-    const deck = decks.addResource("{deck_id}");
-    deck.addMethod("GET", integration, auth);
-    deck.addMethod("DELETE", integration, auth);
-    deck.addMethod("PATCH", integration, auth);
-    deck.addResource("favorite").addMethod("POST", integration, auth);
-    const uploads = api.root.addResource("uploads");
-    uploads.addResource("presign").addMethod("POST", integration, auth);
-    const upload = uploads.addResource("{upload_id}");
-    upload.addResource("process").addMethod("POST", integration, auth);
-    upload.addResource("status").addMethod("GET", integration, auth);
-    api.root.addResource("chat").addResource("{session_id}").addMethod("GET", integration, auth);
-    const slides = api.root.addResource("slides");
-    slides.addResource("search").addMethod("GET", integration, auth);
-    const styles = api.root.addResource("styles");
-    styles.addMethod("GET", integration, auth);
-    styles.addResource("{name}").addMethod("GET", integration, auth);
+    const issuerUrl = `https://cognito-idp.${this.region}.amazonaws.com/${props.userPool.userPoolId}`;
+    const jwtAuthorizer = new apigatewayv2_authorizers.HttpJwtAuthorizer("CognitoJwt", issuerUrl, {
+      jwtAudience: [props.userPoolClient.userPoolClientId],
+    });
+
+    const lambdaIntegration = new apigatewayv2_integrations.HttpLambdaIntegration("ApiIntegration", apiLambda);
+
+    httpApi.addRoutes({
+      path: "/{proxy+}",
+      methods: [apigatewayv2.HttpMethod.ANY],
+      integration: lambdaIntegration,
+      authorizer: jwtAuthorizer,
+    });
+
+    // OPTIONS must bypass authorizer for CORS preflight to succeed (HTTP 204)
+    httpApi.addRoutes({
+      path: "/{proxy+}",
+      methods: [apigatewayv2.HttpMethod.OPTIONS],
+      integration: lambdaIntegration,
+      authorizer: new apigatewayv2.HttpNoneAuthorizer(),
+    });
 
     // --- Deploy web-ui static files to S3 ---
     // Bundle the web-ui at synth time so changes are auto-picked up without a
@@ -415,7 +420,7 @@ function handler(event) {
       ClientId: props.userPoolClient.userPoolClientId,
       SiteUrl: this.siteUrl,
       AgentRuntimeArn: props.agentRuntimeArn,
-      ApiBaseUrl: api.url,
+      ApiBaseUrl: `${httpApi.apiEndpoint}/`,
       McpScope: props.mcpCustomScope ? ` ${props.mcpCustomScope}` : "",
     });
 
@@ -512,13 +517,13 @@ function handler(event) {
         allowedIpV6AddressRanges: props.allowedIpV6AddressRanges,
       });
       new CfnWebACLAssociation(this, "ApiWafAssociation", {
-        resourceArn: api.deploymentStage.stageArn,
+        resourceArn: `arn:aws:apigateway:${this.region}::/apis/${httpApi.httpApiId}/stages/$default`,
         webAclArn: regionalWaf.webAclArn,
       });
     }
 
     // --- Outputs ---
     new cdk.CfnOutput(this, "SiteUrl", { value: this.siteUrl });
-    new cdk.CfnOutput(this, "ApiUrl", { value: api.url });
+    new cdk.CfnOutput(this, "ApiUrl", { value: httpApi.apiEndpoint });
   }
 }

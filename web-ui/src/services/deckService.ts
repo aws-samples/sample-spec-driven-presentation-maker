@@ -432,6 +432,8 @@ export interface StyleEntry {
   name: string
   description: string
   coverHtml: string
+  pinned: boolean
+  source: "builtin" | "user"
 }
 
 /**
@@ -447,7 +449,12 @@ export async function fetchStyles(idToken: string): Promise<StyleEntry[]> {
   })
   if (!res.ok) return []
   const data = await res.json()
-  return data.styles || []
+  // Backfill defaults for APIs that don't yet return pinned/source
+  return (data.styles || []).map((s: Partial<StyleEntry>) => ({
+    ...s,
+    pinned: s.pinned ?? false,
+    source: s.source ?? "builtin",
+  })) as StyleEntry[]
 }
 
 /**
@@ -465,4 +472,170 @@ export async function fetchStyleHtml(name: string, idToken: string): Promise<str
   if (!res.ok) return ""
   const data = await res.json()
   return data.fullHtml || ""
+}
+
+
+/**
+ * Toggle pin state for a style.
+ *
+ * @param name - Style name
+ * @param pinned - New pin state
+ * @param idToken - Cognito ID token for API Gateway authorization
+ */
+export async function pinStyle(name: string, pinned: boolean, idToken: string): Promise<void> {
+  const base = await getApiBaseUrl()
+  await fetch(`${base}styles/pin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ name, pinned }),
+  })
+}
+
+
+/**
+ * Save a user style (import).
+ *
+ * @param name - Style name (alphanumeric, hyphens, underscores)
+ * @param html - Full HTML content
+ * @param idToken - Cognito ID token for API Gateway authorization
+ */
+export async function saveUserStyle(name: string, html: string, idToken: string): Promise<{ saved?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}styles/user`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ name, html }),
+  })
+  return res.json()
+}
+
+/**
+ * Delete a user style.
+ *
+ * @param name - Style name
+ * @param idToken - Cognito ID token for API Gateway authorization
+ */
+export async function deleteUserStyle(name: string, idToken: string): Promise<{ deleted?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}styles/user/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  return res.json()
+}
+
+export async function renameUserStyle(name: string, newName: string, idToken: string): Promise<{ renamed?: { from: string; to: string }; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}styles/user/${encodeURIComponent(name)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ newName }),
+  })
+  return res.json()
+}
+
+// ── Template Management ──
+
+/** Template entry returned by GET /templates. */
+export interface TemplateEntry {
+  name: string
+  source: "builtin" | "user"
+  description: string
+  theme_colors: Record<string, string>
+  fonts: { fullwidth?: string | null; halfwidth?: string | null }
+  layout_count: number
+}
+
+/** Fetch all templates with metadata. */
+export async function fetchTemplates(idToken: string): Promise<TemplateEntry[]> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}templates`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  if (!res.ok) return []
+  const data = await res.json()
+  return (data.templates || []) as TemplateEntry[]
+}
+
+/** Download a template .pptx file. */
+export async function downloadTemplate(name: string, idToken: string): Promise<void> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}templates/${encodeURIComponent(name)}`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  if (!res.ok) return
+  const { downloadUrl } = await res.json()
+  if (!downloadUrl) return
+  const fileRes = await fetch(downloadUrl)
+  if (!fileRes.ok) return
+  const blob = await fileRes.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${name}.pptx`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** Upload a user template. */
+export async function uploadTemplate(file: File, description: string, idToken: string): Promise<{ uploaded?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const name = file.name.replace(/\.pptx$/, "")
+
+  // Step 1: Get presigned URL
+  const presignRes = await fetch(`${base}templates/user/upload-url`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  })
+  const presignData = await presignRes.json()
+  if (!presignRes.ok || presignData.error) return { error: presignData.error || "Failed to get upload URL" }
+
+  // Step 2: Upload directly to S3
+  const uploadRes = await fetch(presignData.presignedUrl, {
+    method: "PUT",
+    headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
+    body: file,
+  })
+  if (!uploadRes.ok) return { error: "Failed to upload file to S3" }
+
+  // Step 3: Register and analyze
+  const res = await fetch(`${base}templates/user`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name, description }),
+  })
+  return res.json()
+}
+
+/** Delete a user template. */
+export async function deleteTemplate(name: string, idToken: string): Promise<{ deleted?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}templates/user/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  return res.json()
+}
+
+/** Update a user template's description. */
+export async function updateTemplateDescription(name: string, description: string, idToken: string): Promise<{ updated?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}templates/user/${encodeURIComponent(name)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ description }),
+  })
+  return res.json()
+}
+
+/** Rename a user template. */
+export async function renameTemplate(name: string, newName: string, idToken: string): Promise<{ renamed?: { from: string; to: string }; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}templates/user/${encodeURIComponent(name)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ newName }),
+  })
+  return res.json()
 }

@@ -1,0 +1,42 @@
+{
+  "name": "sdpm-style",
+  "description": "Style creator agent. Creates reusable style guides through dialogue.",
+  "mcpServers": {
+    "sdpm": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "server_acp.py"
+      ],
+      "timeout": 120000
+    }
+  },
+  "prompt": "file://../../acp-agent-prompts/style-creator.md",
+  "tools": [
+    "@sdpm/run_style_python",
+    "@sdpm/list_styles",
+    "@sdpm/analyze_template",
+    "@sdpm/hearing",
+    "read",
+    "glob",
+    "grep",
+    "web_fetch",
+    "web_search"
+  ],
+  "allowedTools": [
+    "@sdpm/run_style_python",
+    "@sdpm/list_styles",
+    "@sdpm/analyze_template",
+    "@sdpm/hearing",
+    "read",
+    "glob",
+    "grep",
+    "web_fetch",
+    "web_search"
+  ],
+  "resources": [
+    "file://../../../skill/references/workflows/create-style.md"
+  ],
+  "welcomeMessage": "What style would you like to create?"
+}

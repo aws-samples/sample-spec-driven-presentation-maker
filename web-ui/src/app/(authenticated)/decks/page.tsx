@@ -25,7 +25,7 @@ import { AppShell } from "@/components/AppShell"
 import { DeckListView } from "@/components/deck/DeckListView"
 import { SlideCarousel } from "@/components/deck/SlideCarousel"
 import { DeckActions } from "@/components/deck/DeckActions"
-import { DeleteDeckModal } from "@/components/deck/DeleteDeckModal"
+import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { ChatPanelShell } from "@/components/chat/ChatPanelShell"
 import { ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { updateVisibility, shareDeck } from "@/services/deckService"
@@ -118,7 +118,6 @@ export default function DecksPage() {
                     deckId={ws.isWorkspace && !ws.isNew ? ws.activeDeckId : null}
                     deckName={ws.deck?.name || null}
                     chatSessionId={ws.deck?.chatSessionId}
-                    slidePreviewUrls={ws.deck?.slides.map(s => s.previewUrl) || []}
                     slideSlugs={ws.deck?.slides.map(s => s.slug || "") || []}
                     onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
                     onWorkflowPhase={setWorkflowPhase}
@@ -144,20 +143,6 @@ export default function DecksPage() {
                     workflowPhase={workflowPhase}
                     onStyleSelect={handleStyleSelect}
                     idToken={idToken}
-                    onSlideClick={(page) => {
-                      const dName = ws.deck?.name || "Deck"
-                      const mention = ws.activeDeckId
-                        ? `@${dName}(#${ws.activeDeckId}):Page ${page} `
-                        : `@Page ${page} `
-                      const insert = () => chatRef.current?.insertAtCursor(mention)
-                      if (ws.chatOpen) {
-                        insert()
-                      } else {
-                        ws.setChatTab("deck")
-                        ws.setChatOpen(true)
-                        setTimeout(insert, 400)
-                      }
-                    }}
                     ownerAlias={!ws.isOwner ? ws.deck?.ownerAlias : undefined}
                     headerActions={
                       ws.activeDeckId && !ws.isNew ? (
@@ -242,7 +227,6 @@ export default function DecksPage() {
             deckId={ws.isWorkspace && !ws.isNew ? ws.activeDeckId : null}
             deckName={ws.deck?.name || null}
             chatSessionId={ws.deck?.chatSessionId}
-            slidePreviewUrls={ws.deck?.slides.map(s => s.previewUrl) || []}
             slideSlugs={ws.deck?.slides.map(s => s.slug || "") || []}
             onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
             onWorkflowPhase={setWorkflowPhase}
@@ -250,13 +234,15 @@ export default function DecksPage() {
         )}
       </div>
 
-      {list.deleteTarget && (
-        <DeleteDeckModal
-          deckName={list.deleteTarget.name}
-          onConfirm={list.confirmDelete}
-          onCancel={() => list.setDeleteTarget(null)}
-        />
-      )}
+      <ConfirmDialog
+        open={!!list.deleteTarget}
+        onOpenChange={(open) => { if (!open) list.setDeleteTarget(null) }}
+        title="Delete this deck?"
+        description={<><span className="font-medium text-foreground">{list.deleteTarget?.name}</span> will be permanently deleted after 30 days. This action cannot be undone.</>}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={list.confirmDelete}
+      />
 
       {isMobile && !ws.isWorkspace && (
         <div className="fixed right-4 z-40" style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}>

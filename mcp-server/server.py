@@ -220,7 +220,7 @@ def analyze_template(template: str) -> str:
     if not template or not template.strip():
         return json.dumps({"error": "template is required"})
     return json.dumps(
-        template_mod.analyze_template(template_name=template, storage=_storage),
+        template_mod.analyze_template(template_name=template, storage=_storage, user_id=_get_user_id()),
         ensure_ascii=False,
     )
 
@@ -433,22 +433,26 @@ def list_asset_sources() -> str:
 
 
 @mcp.tool()
-def list_styles() -> str:
+def list_styles(include_all: bool = False) -> str:
     """List available design styles for presentations.
 
-    Workflow equivalent: ``examples styles``
+    Default returns pinned + user styles only. Pass include_all=True for all.
 
     Returns:
-        JSON with list of styles (name + description).
+        JSON with list of styles (name, description, pinned, source).
     """
-    return json.dumps(reference.list_styles(storage=_storage), ensure_ascii=False)
+    user_id = _get_user_id()
+    return json.dumps(
+        reference.list_styles(storage=_storage, user_id=user_id, include_all=include_all),
+        ensure_ascii=False,
+    )
 
 
 @mcp.tool()
 def apply_style(deck_id: str, style: str) -> str:
     """Copy a style as the deck's art direction. Call during Art Direction phase.
 
-    Copies references/examples/styles/{style}.html → specs/art-direction.html.
+    Searches user styles first, then builtin styles.
 
     Args:
         deck_id: Deck ID.
@@ -460,8 +464,22 @@ def apply_style(deck_id: str, style: str) -> str:
     _check_deck_access(deck_id)
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", style):
         raise ValueError("Invalid style name")
-    html_key = f"references/examples/styles/{style}.html"
-    html_bytes = _storage.download_file(key=html_key)
+
+    user_id = _get_user_id()
+    html_bytes = None
+
+    # Try user style first
+    user_key = f"user-styles/{user_id}/{style}.html"
+    try:
+        html_bytes = _storage.download_file_from_pptx_bucket(key=user_key)
+    except Exception:
+        pass
+
+    # Fall back to builtin
+    if html_bytes is None:
+        builtin_key = f"references/examples/styles/{style}.html"
+        html_bytes = _storage.download_file(key=builtin_key)
+
     dest_key = f"decks/{deck_id}/specs/art-direction.html"
     _storage.upload_file(key=dest_key, data=html_bytes, content_type="text/html")
     return json.dumps({"applied": style, "path": "specs/art-direction.html"})
@@ -540,13 +558,13 @@ def read_guides(names: list[str]) -> str:
 
 @mcp.tool()
 def list_templates() -> str:
-    """List all available templates with name and description.
+    """List all available templates with name, source, and description.
 
     Returns:
         JSON with list of templates.
     """
     return json.dumps(
-        template_mod.list_templates(storage=_storage),
+        template_mod.list_templates(storage=_storage, user_id=_get_user_id()),
     )
 
 
@@ -644,7 +662,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     if deck_id:
         _check_deck_access(deck_id, action="edit_slide" if save else "read")
 
-    output, outline_rejected = sandbox_mod.execute_in_sandbox(
+    output, outline_rejected, lint_diagnostics = sandbox_mod.execute_in_sandbox(
         code=code,
         storage=_storage,
         region=_region,
@@ -662,7 +680,11 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
             "Read workflow `create-new-1-outline` for the correct format."
         )
 
-    # Post-processing: measure_slides triggers PPTX build → measure/lint/bias
+    if lint_diagnostics:
+        errs = result.setdefault("errors", {})
+        errs["lintDiagnostics"] = lint_diagnostics
+
+    # Post-processing: measure_slides triggers PPTX build → measure/bias
     if deck_id and (measure_slides or save):
         import shutil
         import traceback
@@ -695,21 +717,10 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
             except Exception as e:
                 result["measure"] = json.dumps({"error": str(e)})
 
-            # Lint (filter to measured slugs)
-            try:
-                from sdpm.schema.lint import lint as lint_slides
-                presentation = {"slides": slides}
-                page_set = set(page_numbers)
-                lint_diag = [d for d in lint_slides(presentation) if d.get("slide") + 1 in page_set]
-                if lint_diag:
-                    result["errors"] = {"lintDiagnostics": lint_diag}
-            except Exception as e:
-                logger.warning("Lint failed: %s", e)
-
             # Layout bias (filter to measured slides; bias uses 1-based)
             try:
                 from sdpm.preview import check_layout_imbalance_data
-                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in page_set]
+                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in set(page_numbers)]
                 if layout_bias:
                     result["warnings"] = {"layoutBias": layout_bias}
             except Exception as e:
@@ -931,6 +942,145 @@ def grid(spec: str, purpose: str = "") -> str:
         return json.dumps({"error": f"Invalid grid spec JSON: {e}"})
     result = compute_grid(grid_spec)
     return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+# --- Style Execution (Code Interpreter) ---
+
+
+@mcp.tool()
+def run_style_python(purpose: str, code: str, style_name: str | None = None,
+                     save: bool = False, ref_styles: list[str] | None = None) -> str:
+    """Execute Python code in a secure sandbox for style creation/editing.
+
+    If style_name is provided, the style HTML is loaded as style.html.
+    The code can read/write it via normal file I/O (open, read, write).
+    If save=True, style.html is written back to the user's style storage.
+
+    If ref_styles are provided, they are downloaded and available as ref/{name}.html.
+    Use list_styles to discover available style names.
+
+    Import statements are allowed — PIL, colorsys, numpy, etc. are available
+    for color computation, palette extraction, and contrast calculation.
+
+    Workspace layout:
+        style.html          — target style (read/write, saved back when save=True)
+        ref/{name}.html     — reference styles (read-only)
+
+    Examples:
+        Read reference:    run_style_python(code="html = open('ref/corporate-executive.html').read(); print(html[:200])",
+                                           ref_styles=["corporate-executive"])
+        Create new:        run_style_python(code="open('style.html','w').write('<html>...')",
+                                           style_name="style-20260506-1430", save=True)
+        Edit existing:     run_style_python(code="html = open('style.html').read(); html = html.replace('old','new'); open('style.html','w').write(html)",
+                                           style_name="style-20260506-1430", save=True)
+        Compute colors:    run_style_python(code="from colorsys import rgb_to_hls; print(rgb_to_hls(0.2, 0.4, 0.6))")
+
+    Args:
+        purpose: Brief user-facing description of what this code does,
+            written in the user's language. Shown in the UI.
+        code: Python code to execute.
+        style_name: Style name to load as style.html. Optional.
+        save: If True, save style.html back to storage. Requires style_name.
+        ref_styles: Style names to load as ref/{name}.html. Optional.
+
+    Returns:
+        JSON string: {"output", "saved"?}
+    """
+    if save and not style_name:
+        return json.dumps({"error": "save=True requires style_name"})
+
+    user_id = _get_user_id()
+
+    client = boto3.client("bedrock-agentcore", region_name=_region)
+    session = client.start_code_interpreter_session(
+        codeInterpreterIdentifier="aws.codeinterpreter.v1",
+        name=f"style-{user_id[:8]}",
+        sessionTimeoutSeconds=300,
+    )
+    session_id = session["sessionId"]
+
+    try:
+        file_contents: list[dict[str, str]] = []
+
+        # Load target style
+        if style_name:
+            html = _load_style_html(user_id, style_name)
+            if html:
+                file_contents.append({"path": "style.html", "text": html})
+
+        # Load reference styles
+        if ref_styles:
+            for ref_name in ref_styles:
+                ref_html = _load_style_html(user_id, ref_name)
+                if ref_html:
+                    file_contents.append({"path": f"ref/{ref_name}.html", "text": ref_html})
+
+        # Ensure directories exist
+        setup_code = "import os\nos.makedirs('ref', exist_ok=True)\n"
+        client.invoke_code_interpreter(
+            codeInterpreterIdentifier="aws.codeinterpreter.v1",
+            sessionId=session_id, name="executeCode",
+            arguments={"language": "python", "code": setup_code},
+        )
+
+        # Write files into sandbox
+        if file_contents:
+            client.invoke_code_interpreter(
+                codeInterpreterIdentifier="aws.codeinterpreter.v1",
+                sessionId=session_id, name="writeFiles",
+                arguments={"content": file_contents},
+            )
+
+        # Execute user code
+        response = client.invoke_code_interpreter(
+            codeInterpreterIdentifier="aws.codeinterpreter.v1",
+            sessionId=session_id, name="executeCode",
+            arguments={"language": "python", "code": code},
+        )
+        output = sandbox_mod._collect_stream(response)
+
+        result: dict = {"output": output}
+
+        # Save style.html back to S3
+        if save and style_name:
+            read_code = "import sys\ntry:\n    print(open('style.html').read())\nexcept FileNotFoundError:\n    print('__NOT_FOUND__')\n"
+            read_resp = client.invoke_code_interpreter(
+                codeInterpreterIdentifier="aws.codeinterpreter.v1",
+                sessionId=session_id, name="executeCode",
+                arguments={"language": "python", "code": read_code},
+            )
+            style_html = sandbox_mod._collect_stream(read_resp)
+            if style_html and style_html.strip() != "__NOT_FOUND__":
+                key = f"user-styles/{user_id}/{style_name}.html"
+                _storage.upload_file(key=key, data=style_html.encode("utf-8"), content_type="text/html")
+                result["saved"] = {"filename": f"{style_name}.html", "key": key}
+
+        return json.dumps(result, ensure_ascii=False)
+
+    finally:
+        client.stop_code_interpreter_session(
+            codeInterpreterIdentifier="aws.codeinterpreter.v1",
+            sessionId=session_id,
+        )
+
+
+def _load_style_html(user_id: str, name: str) -> str | None:
+    """Load style HTML from S3 (user styles first, then builtin)."""
+    if not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
+        return None
+    # Try user style
+    user_key = f"user-styles/{user_id}/{name}.html"
+    try:
+        return _storage.download_file_from_pptx_bucket(key=user_key).decode("utf-8")
+    except Exception:
+        pass
+    # Try builtin
+    builtin_key = f"references/examples/styles/{name}.html"
+    try:
+        return _storage.download_file(key=builtin_key).decode("utf-8")
+    except Exception:
+        pass
+    return None
 
 
 # --- Search + KB Sync (optional, requires KB) ---

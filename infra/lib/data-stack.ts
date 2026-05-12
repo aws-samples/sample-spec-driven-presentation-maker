@@ -9,7 +9,6 @@
  */
 
 import * as cdk from "aws-cdk-lib";
-import * as cr from "aws-cdk-lib/custom-resources";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
@@ -173,39 +172,8 @@ export class DataStack extends cdk.Stack {
     new cdk.CfnOutput(this, "PptxBucketName", { value: this.pptxBucket.bucketName });
     new cdk.CfnOutput(this, "ResourceBucketName", { value: this.resourceBucket.bucketName });
 
-    // --- Register default templates in Amazon DynamoDB ---
-    const templates = [
-      { id: "blank-dark", name: "blank-dark", isDefault: true },
-      { id: "blank-light", name: "blank-light", isDefault: false },
-    ];
-
-    for (const tmpl of templates) {
-      new cr.AwsCustomResource(this, `RegisterTemplate_${tmpl.id}`, {
-        onCreate: {
-          service: "DynamoDB",
-          action: "putItem",
-          parameters: {
-            TableName: this.table.tableName,
-            Item: {
-              PK: { S: `TEMPLATE#${tmpl.id}` },
-              SK: { S: "META" },
-              name: { S: tmpl.name },
-              s3Key: { S: `templates/${tmpl.name}.pptx` },
-              analysisJson: { S: "{}" },
-              isDefault: { BOOL: tmpl.isDefault },
-              createdAt: { S: new Date().toISOString() },
-              updatedAt: { S: new Date().toISOString() },
-            },
-            ConditionExpression: "attribute_not_exists(PK)",
-          },
-          physicalResourceId: cr.PhysicalResourceId.of(`template-${tmpl.id}`),
-          ignoreErrorCodesMatching: "ConditionalCheckFailedException",
-        },
-        policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
-          resources: [this.table.tableArn],
-        }),
-      });
-    }
+    // Builtin templates: S3 is source of truth (BucketDeployment above).
+    // DDB metadata is populated lazily by API Lambda on first access.
 
     // --- Invocation Logging (optional, gated by features.enableInvocationLogging) ---
     if (props?.enableInvocationLogging) {

@@ -10,7 +10,7 @@ Unified API Lambda — deck, upload, chat endpoints.
 # Security: AWS manages infrastructure security. You manage access control,
 # data classification, and IAM policies. See SECURITY.md for details.
 
-Single Lambda with Powertools APIGatewayRestResolver.
+Single Lambda with Powertools APIGatewayHttpResolver.
 Ported from spec-driven-presentation-maker-web deck-api, upload-api.
 """
 
@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
+from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConfig
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from authz import authorize
@@ -92,7 +92,7 @@ metrics = Metrics()
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
 s3_client = boto3.client("s3")
-app = APIGatewayRestResolver(cors=cors_config)
+app = APIGatewayHttpResolver(cors=cors_config)
 
 # --- KB (optional) ---
 _kb_sync = None
@@ -219,7 +219,7 @@ def _deck_summary(item: Dict, extras: Dict[str, Dict]) -> Dict[str, Any]:
 
 
 def _extract_cover_html(html: str) -> str:
-    """Extract <head> + first <div class="slide"> from a style HTML.
+    """Extract <head> + first <div class="slide..."> from a style HTML.
 
     Args:
         html: Full style HTML string.
@@ -230,12 +230,13 @@ def _extract_cover_html(html: str) -> str:
     head_end = html.find("</head>")
     if head_end == -1:
         return ""
-    first_slide = html.find('<div class="slide">')
-    if first_slide == -1:
+    # Match <div class="slide"> or <div class="slide ..."> (additional classes)
+    slide_pattern = re.compile(r'<div class="slide[\s"]')
+    matches = list(slide_pattern.finditer(html))
+    if not matches:
         return ""
-    # Find end of first slide: next slide or </body>
-    next_slide = html.find('<div class="slide">', first_slide + 1)
-    end = next_slide if next_slide != -1 else html.find("</body>", first_slide)
+    first_slide = matches[0].start()
+    end = matches[1].start() if len(matches) > 1 else html.find("</body>", first_slide)
     if end == -1:
         end = len(html)
     return (
@@ -250,52 +251,512 @@ def _extract_cover_html(html: str) -> str:
 def list_styles() -> Dict[str, Any]:
     """List available styles with cover slide HTML for preview.
 
+    Includes builtin styles and user styles with pin/source metadata.
+
     Returns:
-        Dict with styles list (name, description, coverHtml).
+        Dict with styles list (name, description, coverHtml, pinned, source).
     """
+    user_id = get_user_id(app.current_event)
+
+    # Builtin styles (cached)
     global _styles_cache  # noqa: PLW0603
-    if _styles_cache is not None:
-        return {"styles": _styles_cache}
+    if _styles_cache is None and RESOURCE_BUCKET:
+        prefix = "references/examples/styles/"
+        resp = s3_client.list_objects_v2(Bucket=RESOURCE_BUCKET, Prefix=prefix)
+        builtin: List[Dict[str, str]] = []
+        for obj in resp.get("Contents", []):
+            key = obj["Key"]
+            if not key.endswith(".html"):
+                continue
+            name = key.removeprefix(prefix).removesuffix(".html")
+            body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=key)["Body"].read().decode("utf-8")
+            description = ""
+            m = re.search(r"<title>(.*?)</title>", body, re.IGNORECASE)
+            if m:
+                description = m.group(1).strip()
+            builtin.append({"name": name, "description": description, "coverHtml": _extract_cover_html(body), "source": "builtin"})
+        _styles_cache = builtin
 
-    if not RESOURCE_BUCKET:
-        return {"styles": []}
+    all_styles: List[Dict[str, Any]] = list(_styles_cache or [])
 
-    prefix = "references/examples/styles/"
-    resp = s3_client.list_objects_v2(Bucket=RESOURCE_BUCKET, Prefix=prefix)
-    styles: List[Dict[str, str]] = []
-    for obj in resp.get("Contents", []):
-        key = obj["Key"]
-        if not key.endswith(".html"):
-            continue
-        name = key.removeprefix(prefix).removesuffix(".html")
-        body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=key)["Body"].read().decode("utf-8")
-        description = ""
-        m = re.search(r"<title>(.*?)</title>", body, re.IGNORECASE)
-        if m:
-            description = m.group(1).strip()
-        styles.append({"name": name, "description": description, "coverHtml": _extract_cover_html(body)})
+    # User styles
+    user_prefix = f"user-styles/{user_id}/"
+    try:
+        resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=user_prefix)
+        for obj in resp.get("Contents", []):
+            key = obj["Key"]
+            if not key.endswith(".html"):
+                continue
+            name = key.removeprefix(user_prefix).removesuffix(".html")
+            body = s3_client.get_object(Bucket=BUCKET_NAME, Key=key)["Body"].read().decode("utf-8")
+            description = ""
+            m = re.search(r"<title>(.*?)</title>", body, re.IGNORECASE)
+            if m:
+                description = m.group(1).strip()
+            all_styles.append({"name": name, "description": description, "coverHtml": _extract_cover_html(body), "source": "user"})
+    except Exception:
+        pass
 
-    _styles_cache = styles
-    return {"styles": styles}
+    # Pins
+    pin_resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
+    pinned_names = set(pin_resp.get("Item", {}).get("pinned_styles", []))
+
+    for s in all_styles:
+        s["pinned"] = s["name"] in pinned_names
+
+    return {"styles": all_styles}
 
 
 @app.get("/styles/<name>")
 def get_style(name: str) -> Dict[str, Any]:
-    """Get full HTML for a single style.
+    """Get full HTML for a single style (user or builtin).
 
     Returns:
         Dict with name and fullHtml.
     """
-    if not RESOURCE_BUCKET:
-        return {"error": f"Style not found: {name}"}, 404
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
         return {"error": "Invalid style name"}, 400
-    key = f"references/examples/styles/{name}.html"
+
+    user_id = get_user_id(app.current_event)
+
+    # Try user style first
+    user_key = f"user-styles/{user_id}/{name}.html"
     try:
-        body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=key)["Body"].read().decode("utf-8")
+        body = s3_client.get_object(Bucket=BUCKET_NAME, Key=user_key)["Body"].read().decode("utf-8")
+        return {"name": name, "fullHtml": body, "source": "user"}
     except Exception:
-        return {"error": f"Style not found: {name}"}, 404
-    return {"name": name, "fullHtml": body}
+        pass
+
+    # Fall back to builtin
+    if RESOURCE_BUCKET:
+        builtin_key = f"references/examples/styles/{name}.html"
+        try:
+            body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=builtin_key)["Body"].read().decode("utf-8")
+            return {"name": name, "fullHtml": body, "source": "builtin"}
+        except Exception:
+            pass
+
+    return {"error": f"Style not found: {name}"}, 404
+
+
+@app.post("/styles/pin")
+def pin_style() -> Dict[str, Any]:
+    """Toggle pin status for a style.
+
+    Body: {"name": str, "pinned": bool}
+    """
+    body = app.current_event.json_body
+    name = body.get("name", "")
+    pinned = body.get("pinned", False)
+
+    if not name or not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
+        return {"error": "Invalid style name"}, 400
+
+    user_id = get_user_id(app.current_event)
+    pin_resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
+    current_pins: List[str] = pin_resp.get("Item", {}).get("pinned_styles", [])
+
+    if pinned and name not in current_pins:
+        current_pins.append(name)
+    elif not pinned and name in current_pins:
+        current_pins.remove(name)
+
+    table.put_item(Item={"PK": f"USER#{user_id}", "SK": "STYLE_PINS", "pinned_styles": current_pins})
+    return {"ok": True, "pinned_styles": current_pins}
+
+
+@app.post("/styles/user")
+def save_user_style() -> Dict[str, Any]:
+    """Save a user style (import or copy).
+
+    Body: {"name": str, "html": str}
+    """
+    body = app.current_event.json_body
+    name = body.get("name", "")
+    html = body.get("html", "")
+
+    if not name or not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
+        return {"error": "Invalid style name"}, 400
+    if not html:
+        return {"error": "html is required"}, 400
+
+    user_id = get_user_id(app.current_event)
+    key = f"user-styles/{user_id}/{name}.html"
+    s3_client.put_object(Bucket=BUCKET_NAME, Key=key, Body=html.encode("utf-8"), ContentType="text/html")
+    return {"saved": name}
+
+
+@app.delete("/styles/user/<style_name>")
+def delete_user_style(style_name: str) -> Dict[str, Any]:
+    """Delete a user style.
+
+    Also removes from pins if pinned.
+    """
+    if not re.fullmatch(r"[a-zA-Z0-9_-]+", style_name):
+        return {"error": "Invalid style name"}, 400
+
+    user_id = get_user_id(app.current_event)
+    key = f"user-styles/{user_id}/{style_name}.html"
+
+    try:
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
+    except Exception:
+        return {"error": f"Style not found: {style_name}"}, 404
+
+    # Remove from pins
+    pin_resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
+    current_pins: List[str] = pin_resp.get("Item", {}).get("pinned_styles", [])
+    if style_name in current_pins:
+        current_pins.remove(style_name)
+        table.put_item(Item={"PK": f"USER#{user_id}", "SK": "STYLE_PINS", "pinned_styles": current_pins})
+
+    return {"deleted": style_name}
+
+
+@app.patch("/styles/user/<style_name>")
+def rename_user_style(style_name: str) -> Dict[str, Any]:
+    """Rename a user style.
+
+    Body: {"newName": str}
+    """
+    body = app.current_event.json_body
+    new_name = body.get("newName", "")
+
+    if not re.fullmatch(r"[a-zA-Z0-9_-]+", style_name):
+        return {"error": "Invalid style name"}, 400
+    if not new_name or not re.fullmatch(r"[a-zA-Z0-9_-]+", new_name):
+        return {"error": "Invalid new name"}, 400
+
+    user_id = get_user_id(app.current_event)
+    old_key = f"user-styles/{user_id}/{style_name}.html"
+    new_key = f"user-styles/{user_id}/{new_name}.html"
+
+    # Check source exists
+    try:
+        body_bytes = s3_client.get_object(Bucket=BUCKET_NAME, Key=old_key)["Body"].read()
+    except Exception:
+        return {"error": f"Style not found: {style_name}"}, 404
+
+    # Check destination doesn't exist
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=new_key)
+        return {"error": f"Style already exists: {new_name}"}, 409
+    except Exception:
+        pass
+
+    # Copy + delete
+    s3_client.put_object(Bucket=BUCKET_NAME, Key=new_key, Body=body_bytes, ContentType="text/html")
+    s3_client.delete_object(Bucket=BUCKET_NAME, Key=old_key)
+
+    # Update pins
+    pin_resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
+    current_pins: List[str] = pin_resp.get("Item", {}).get("pinned_styles", [])
+    if style_name in current_pins:
+        current_pins[current_pins.index(style_name)] = new_name
+        table.put_item(Item={"PK": f"USER#{user_id}", "SK": "STYLE_PINS", "pinned_styles": current_pins})
+
+    return {"renamed": {"from": style_name, "to": new_name}}
+
+
+# ---------------------------------------------------------------------------
+# Template endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/templates")
+def list_templates() -> Dict[str, Any]:
+    """List all templates (builtin + user) with metadata.
+
+    Builtin: S3 is source of truth for existence. DDB is metadata cache.
+    User: DDB is source of truth.
+    """
+    import tempfile
+    from pathlib import Path
+
+    user_id = get_user_id(app.current_event)
+    templates: List[Dict[str, Any]] = []
+
+    # --- Builtin: S3 source of truth ---
+    s3_templates: Dict[str, str] = {}  # name -> etag
+    if RESOURCE_BUCKET:
+        resp = s3_client.list_objects_v2(Bucket=RESOURCE_BUCKET, Prefix="templates/")
+        for obj in resp.get("Contents", []):
+            key = obj["Key"]
+            if key.endswith(".pptx"):
+                name = key.removeprefix("templates/").removesuffix(".pptx")
+                s3_templates[name] = obj["ETag"]
+
+    # Batch get DDB cache for builtins
+    ddb_cache: Dict[str, Dict] = {}
+    if s3_templates:
+        keys = [{"PK": f"TEMPLATE#{n}", "SK": "META"} for n in s3_templates]
+        resp = table.meta.client.batch_get_item(
+            RequestItems={table.name: {"Keys": keys}}
+        )
+        for item in resp.get("Responses", {}).get(table.name, []):
+            ddb_cache[item["name"]] = item
+
+    # Build builtin list with lazy analysis
+    to_analyze: List[str] = []
+    for name, etag in s3_templates.items():
+        cached = ddb_cache.get(name)
+        if cached and cached.get("s3ETag") == etag:
+            analysis = {}
+            raw = cached.get("analysisJson", "")
+            if raw and raw != "{}":
+                analysis = json.loads(raw) if isinstance(raw, str) else raw
+            templates.append({
+                "name": name,
+                "source": "builtin",
+                "description": cached.get("description", ""),
+                "theme_colors": analysis.get("theme_colors", {}),
+                "fonts": cached.get("fonts", {}),
+                "layout_count": len(analysis.get("layouts", [])),
+            })
+        else:
+            to_analyze.append(name)
+            templates.append({
+                "name": name,
+                "source": "builtin",
+                "description": "",
+                "theme_colors": {},
+                "fonts": {},
+                "layout_count": 0,
+            })
+
+    # Lazy analyze uncached builtins (async would be better but keep simple)
+    if to_analyze:
+        from sdpm.analyzer import analyze_template as _analyze
+
+        tmp = Path(tempfile.mkdtemp())
+        for name in to_analyze:
+            s3_key = f"templates/{name}.pptx"
+            tpl_path = tmp / f"{name}.pptx"
+            s3_client.download_file(RESOURCE_BUCKET, s3_key, str(tpl_path))
+            analysis = _analyze(tpl_path)
+            etag = s3_templates[name]
+            item = {
+                "PK": f"TEMPLATE#{name}",
+                "SK": "META",
+                "name": name,
+                "s3Key": s3_key,
+                "s3ETag": etag,
+                "fonts": analysis.get("fonts", {}),
+                "analysisJson": json.dumps({
+                    "theme_colors": analysis.get("theme_colors", {}),
+                    "layouts": analysis.get("layouts", []),
+                }),
+            }
+            table.put_item(Item=item)
+            # Update the placeholder in templates list
+            for t in templates:
+                if t["name"] == name and t["source"] == "builtin":
+                    t["theme_colors"] = analysis.get("theme_colors", {})
+                    t["fonts"] = analysis.get("fonts", {})
+                    t["layout_count"] = len(analysis.get("layouts", []))
+                    break
+
+    # --- User templates: DDB source of truth ---
+    resp = table.query(
+        KeyConditionExpression=Key("PK").eq(f"USER#{user_id}") & Key("SK").begins_with("TEMPLATE#"),
+    )
+    for t in resp.get("Items", []):
+        analysis = {}
+        raw = t.get("analysisJson", "")
+        if raw and raw != "{}":
+            analysis = json.loads(raw) if isinstance(raw, str) else raw
+        templates.append({
+            "name": t.get("name", ""),
+            "source": "user",
+            "description": t.get("description", ""),
+            "theme_colors": analysis.get("theme_colors", {}),
+            "fonts": t.get("fonts", {}),
+            "layout_count": len(analysis.get("layouts", [])),
+        })
+
+    return {"templates": templates}
+
+
+@app.get("/templates/<name>")
+def download_template(name: str) -> Any:
+    """Download a template .pptx file. Searches user templates first, then builtin."""
+    user_id = get_user_id(app.current_event)
+
+    # Try user template
+    user_key = f"user-templates/{user_id}/{name}.pptx"
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=user_key)
+        url = s3_client.generate_presigned_url(
+            "get_object", Params={"Bucket": BUCKET_NAME, "Key": user_key}, ExpiresIn=300
+        )
+        return {"downloadUrl": url}
+    except Exception:
+        pass
+
+    # Try builtin (S3 source of truth)
+    builtin_key = f"templates/{name}.pptx"
+    try:
+        s3_client.head_object(Bucket=RESOURCE_BUCKET, Key=builtin_key)
+        url = s3_client.generate_presigned_url(
+            "get_object", Params={"Bucket": RESOURCE_BUCKET, "Key": builtin_key}, ExpiresIn=300
+        )
+        return {"downloadUrl": url}
+    except Exception:
+        return {"error": "Template not found"}, 404
+
+
+@app.post("/templates/user/upload-url")
+def presign_template_upload() -> Dict[str, Any]:
+    """Generate a presigned PUT URL for template upload to S3."""
+    user_id = get_user_id(app.current_event)
+    body = app.current_event.json_body
+
+    name: str = body.get("name", "").strip()
+    if not name or not re.fullmatch(r"[a-zA-Z0-9_\-\s.()]+", name):
+        return {"error": "Invalid template name"}, 400
+
+    # Duplicate check
+    existing = table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+    if existing.get("Item"):
+        return {"error": f'Template "{name}" already exists'}, 409
+
+    s3_key = f"user-templates/{user_id}/{name}.pptx"
+    url = s3_client.generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": BUCKET_NAME,
+            "Key": s3_key,
+            "ContentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        },
+        ExpiresIn=PRESIGNED_URL_EXPIRY,
+    )
+    return {"presignedUrl": url, "s3Key": s3_key}
+
+
+@app.post("/templates/user")
+def upload_user_template() -> Dict[str, Any]:
+    """Register a user template after S3 upload. Analyzes and stores metadata.
+
+    Expects JSON body: {name, description}.
+    The .pptx must already be uploaded to S3 via presigned URL.
+    """
+    import tempfile
+    from pathlib import Path
+
+    user_id = get_user_id(app.current_event)
+    body = app.current_event.json_body
+
+    name: str = body.get("name", "").strip()
+    description: str = body.get("description", "")
+
+    if not name or not re.fullmatch(r"[a-zA-Z0-9_\-\s.()]+", name):
+        return {"error": "Invalid template name"}, 400
+
+    s3_key = f"user-templates/{user_id}/{name}.pptx"
+
+    # Verify file exists in S3
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=s3_key)
+    except Exception:
+        return {"error": "File not found in S3. Upload via presigned URL first."}, 400
+
+    # Download and analyze
+    tmp = Path(tempfile.mkdtemp())
+    tpl_path = tmp / f"{name}.pptx"
+    s3_client.download_file(BUCKET_NAME, s3_key, str(tpl_path))
+
+    from sdpm.analyzer import analyze_template as _analyze
+
+    analysis = _analyze(tpl_path)
+    metadata = {
+        "description": description,
+        "fonts": analysis.get("fonts", {}),
+        "analysisJson": json.dumps({
+            "theme_colors": analysis.get("theme_colors", {}),
+            "layouts": analysis.get("layouts", []),
+        }),
+    }
+
+    # Store in DDB
+    table.put_item(Item={
+        "PK": f"USER#{user_id}",
+        "SK": f"TEMPLATE#{name}",
+        "name": name,
+        "s3Key": s3_key,
+        **metadata,
+    })
+
+    return {"uploaded": name}
+
+
+@app.delete("/templates/user/<name>")
+def delete_user_template(name: str) -> Dict[str, Any]:
+    """Delete a user template."""
+    user_id = get_user_id(app.current_event)
+
+    # Check exists
+    resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+    if not resp.get("Item"):
+        return {"error": "Template not found"}, 404
+
+    s3_key = f"user-templates/{user_id}/{name}.pptx"
+    s3_client.delete_object(Bucket=BUCKET_NAME, Key=s3_key)
+    table.delete_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+
+    return {"deleted": name}
+
+
+@app.patch("/templates/user/<name>")
+def patch_user_template(name: str) -> Dict[str, Any]:
+    """Rename or update description of a user template.
+
+    Body: {"newName": str} or {"description": str}
+    """
+    user_id = get_user_id(app.current_event)
+    body = app.current_event.json_body
+
+    resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+    item = resp.get("Item")
+    if not item:
+        return {"error": "Template not found"}, 404
+
+    # Rename
+    new_name = body.get("newName", "").strip()
+    if new_name:
+        if not re.fullmatch(r"[a-zA-Z0-9_-]+", new_name):
+            return {"error": "Letters, numbers, hyphens, underscores only"}, 400
+        # Check duplicate
+        dup = table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{new_name}"})
+        if dup.get("Item"):
+            return {"error": "Name already exists"}, 409
+        # S3 copy + delete
+        old_key = f"user-templates/{user_id}/{name}.pptx"
+        new_key = f"user-templates/{user_id}/{new_name}.pptx"
+        s3_client.copy_object(
+            Bucket=BUCKET_NAME,
+            CopySource={"Bucket": BUCKET_NAME, "Key": old_key},
+            Key=new_key,
+        )
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=old_key)
+        # DDB: delete old, put new
+        table.delete_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+        item["SK"] = f"TEMPLATE#{new_name}"
+        item["name"] = new_name
+        item["s3Key"] = new_key
+        table.put_item(Item=item)
+        return {"renamed": {"from": name, "to": new_name}}
+
+    # Update description
+    description = body.get("description")
+    if description is not None:
+        table.update_item(
+            Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"},
+            UpdateExpression="SET description = :d",
+            ExpressionAttributeValues={":d": description},
+        )
+        return {"updated": name, "description": description}
+
+    return {"error": "No action specified"}, 400
 
 
 # ---------------------------------------------------------------------------

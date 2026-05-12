@@ -100,18 +100,21 @@ def list_asset_sources(skill_dir: Path) -> dict[str, Any]:
     return {"sources": list_sources()}
 
 
-def list_styles(skill_dir: Path) -> dict[str, Any]:
-    """List available design styles and open gallery in browser.
+def list_styles(skill_dir: Path, include_all: bool = False) -> dict[str, Any]:
+    """List available design styles with pin/source metadata.
 
     Searches user-local styles directory (``~/.config/sdpm/styles/``) in
     addition to the package-bundled styles. User-local entries shadow
     bundled ones with the same name.
+
+    Default returns pinned + user styles only (or all if no pins).
+    Pass include_all=True to return everything.
     """
-    from sdpm.api import get_styles_dirs
-    from sdpm.reference import list_styles_merged, open_styles_gallery
+    from sdpm.api import get_styles_dirs, list_styles_filtered
+    from sdpm.config import get_state
     styles_dirs = get_styles_dirs()
-    open_styles_gallery(styles_dirs)
-    return {"styles": list_styles_merged(styles_dirs)}
+    pinned = get_state().get("pinned_styles", [])
+    return {"styles": list_styles_filtered(styles_dirs, pinned, include_all)}
 
 
 def read_examples(names: list[str], skill_dir: Path) -> dict[str, Any]:

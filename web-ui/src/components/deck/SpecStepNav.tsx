@@ -16,12 +16,13 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Layers, FileText, Palette, ArrowLeft, Check } from "lucide-react"
+import { Layers, FileText, Palette, ArrowLeft, Check, Star } from "lucide-react"
 import Markdown from "react-markdown"
 import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { fetchStyles, fetchStyleHtml, type StyleEntry, type SpecFiles } from "@/services/deckService"
+import { fetchStyles, fetchStyleHtml, pinStyle, type StyleEntry, type SpecFiles } from "@/services/deckService"
 import { OutlineView } from "./OutlineView"
+import { StyleSlidePreview } from "@/components/StyleSlidePreview"
 
 /** Tab key union type for spec viewer navigation. */
 export type SpecTab = "brief" | "outline" | "artDirection" | "slides"
@@ -208,7 +209,6 @@ const specComponents = {
  */
 export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, idToken }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; idToken?: string }) {
   // Hooks must be called unconditionally — before any early returns.
-  const [containerWidth, setContainerWidth] = useState(0)
 
   // Art Direction inline gallery state
   type ArtDirectionMode = "gallery" | "preview" | "result"
@@ -220,6 +220,22 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
   const [previewLoading, setPreviewLoading] = useState(false)
   const galleryScrollRef = useRef(0)
   const galleryContainerRef = useRef<HTMLDivElement>(null)
+  const [allStylesOpen, setAllStylesOpen] = useState(true)
+
+  // Pin toggle — optimistic UI with API persistence
+  // Preserve scroll position across re-renders caused by section layout changes
+  const handlePinToggle = useCallback((name: string) => {
+    const scrollTop = galleryContainerRef.current?.scrollTop ?? 0
+    setStyles(prev => {
+      const style = prev.find(s => s.name === name)
+      const newPinned = !style?.pinned
+      if (idToken) pinStyle(name, newPinned, idToken)
+      return prev.map(s => s.name === name ? { ...s, pinned: newPinned } : s)
+    })
+    requestAnimationFrame(() => {
+      if (galleryContainerRef.current) galleryContainerRef.current.scrollTop = scrollTop
+    })
+  }, [idToken])
 
   // Sync mode when content appears externally (e.g. polling updates art-direction)
   const userRequestedGallery = useRef(false)
@@ -261,23 +277,6 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [handleKeyDown])
 
-  // Art Direction result iframe: callback ref for ResizeObserver (handles mount/unmount across states)
-  const resultRoRef = useRef<ResizeObserver | null>(null)
-  const resultMeasuredRef = useCallback((node: HTMLDivElement | null) => {
-    if (resultRoRef.current) {
-      resultRoRef.current.disconnect()
-      resultRoRef.current = null
-    }
-    if (node) {
-      const w = node.getBoundingClientRect().width
-      if (w > 0) setContainerWidth(w)
-      resultRoRef.current = new ResizeObserver(([entry]) => {
-        setContainerWidth(entry.contentRect.width)
-      })
-      resultRoRef.current.observe(node)
-    }
-  }, [])
-
   // Outline tab: show waiting animation when no content, timeline when content exists.
   if (specKey === "outline" && !content) {
     return (
@@ -316,13 +315,17 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
         setPreviewLoading(false)
       }
 
+      const pinnedStyles = styles.filter(s => s.pinned)
+      const hasPins = pinnedStyles.length > 0
+      const unpinnedStyles = styles.filter(s => !s.pinned)
+
       return (
         <div ref={galleryContainerRef} className="flex-1 overflow-y-auto">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
             <div>
               <h2 className="text-[15px] font-semibold">Choose a Style</h2>
-              <p className="text-xs text-foreground-muted mt-0.5">Click a style to preview</p>
+              <p className="text-xs text-foreground-muted mt-0.5">Click to preview · ★ to pin favorites</p>
             </div>
             {content && (
               <button
@@ -342,10 +345,45 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
                   <div key={i} className="aspect-[16/10] rounded-xl bg-white/[0.03] animate-pulse" />
                 ))}
               </div>
+            ) : hasPins ? (
+              /* Sectioned layout: Pinned + All Styles collapsible */
+              <div className="flex flex-col gap-6">
+                {/* Pinned section */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <Star className="h-3.5 w-3.5 text-brand-teal" fill="currentColor" />
+                    <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">Pinned</h3>
+                  </div>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                    {pinnedStyles.map((style, i) => (
+                      <StyleCard key={style.name} style={style} index={i} onClick={handleCardClick} onPin={handlePinToggle} />
+                    ))}
+                  </div>
+                </div>
+                {/* All Styles collapsible */}
+                <div>
+                  <button
+                    onClick={() => setAllStylesOpen(prev => !prev)}
+                    className="flex items-center gap-1.5 mb-3 text-xs font-semibold text-foreground-muted uppercase tracking-wider hover:text-foreground transition-colors"
+                    aria-expanded={allStylesOpen}
+                  >
+                    <span className="transition-transform duration-200" style={{ transform: allStylesOpen ? "rotate(90deg)" : "rotate(0deg)" }}>▸</span>
+                    All Styles ({unpinnedStyles.length})
+                  </button>
+                  {allStylesOpen && (
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                      {unpinnedStyles.map((style, i) => (
+                        <StyleCard key={style.name} style={style} index={i} onClick={handleCardClick} onPin={handlePinToggle} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : (
+              /* Flat layout: no pins */
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 {styles.map((style, i) => (
-                  <StyleCard key={style.name} style={style} index={i} onClick={handleCardClick} />
+                  <StyleCard key={style.name} style={style} index={i} onClick={handleCardClick} onPin={handlePinToggle} />
                 ))}
               </div>
             )}
@@ -356,6 +394,9 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
 
     // PREVIEW state
     if (adMode === "preview" && preview) {
+      const previewStyle = styles.find(s => s.name === preview.name)
+      const previewPinned = previewStyle?.pinned ?? false
+
       const handleSelect = () => {
         if (onStyleSelect) onStyleSelect(preview.name)
         if (content) setAdMode("result")
@@ -374,10 +415,17 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <div>
+              <div className="flex items-center gap-2">
                 <h2 className="text-[15px] font-semibold">{preview.name}</h2>
-                <p className="text-xs text-foreground-muted mt-0.5">Preview all slides — select to apply</p>
+                <button
+                  onClick={() => handlePinToggle(preview.name)}
+                  className={`p-1 rounded transition-colors ${previewPinned ? "text-brand-teal" : "text-foreground-muted hover:text-foreground"}`}
+                  aria-label={previewPinned ? `Unpin ${preview.name}` : `Pin ${preview.name}`}
+                >
+                  <Star className="h-3.5 w-3.5" fill={previewPinned ? "currentColor" : "none"} />
+                </button>
               </div>
+              <p className="text-xs text-foreground-muted">Preview all slides — select to apply</p>
             </div>
             <button
               onClick={handleSelect}
@@ -389,16 +437,15 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
           </div>
           {/* Preview content */}
           <div className="p-6">
-            <StylePreviewInline html={preview.html} loading={previewLoading} />
+            <StyleSlidePreview html={preview.html} loading={previewLoading} />
           </div>
         </div>
       )
     }
 
     // RESULT state (default when content exists)
-    const ratio = containerWidth > 0 ? containerWidth / 1920 : 1
     return (
-      <div ref={resultMeasuredRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {onStyleSelect && (
           <div className="flex justify-end px-4 py-2">
             <button
@@ -410,20 +457,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
             </button>
           </div>
         )}
-        <div style={{ width: containerWidth, height: 1080 * ratio * 10, overflow: "hidden" }}>
-          <iframe
-            srcDoc={content!}
-            sandbox="allow-same-origin"
-            title="Art Direction"
-            style={{
-              width: 1920,
-              height: 10800,
-              border: "none",
-              transformOrigin: "top left",
-              transform: `scale(${ratio})`,
-            }}
-          />
-        </div>
+        <StyleSlidePreview html={content!} loading={false} />
       </div>
     )
   }
@@ -462,11 +496,12 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
 /* ── Inline style components ── */
 
 /** Individual style card with iframe cover preview. */
-function StyleCard({ style, index, onClick }: { style: StyleEntry; index: number; onClick: (name: string) => void }) {
+function StyleCard({ style, index, onClick, onPin }: { style: StyleEntry; index: number; onClick: (name: string) => void; onPin?: (name: string) => void }) {
   const iframeWidth = 1920
   const iframeHeight = 1080
-  const cardRef = useRef<HTMLButtonElement>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.2)
+  const [bouncing, setBouncing] = useState(false)
 
   useEffect(() => {
     const el = cardRef.current
@@ -478,11 +513,21 @@ function StyleCard({ style, index, onClick }: { style: StyleEntry; index: number
     return () => ro.disconnect()
   }, [])
 
+  const handlePin = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setBouncing(true)
+    setTimeout(() => setBouncing(false), 300)
+    onPin?.(style.name)
+  }
+
   return (
-    <button
+    <div
       ref={cardRef}
+      role="button"
+      tabIndex={0}
       onClick={() => onClick(style.name)}
-      className="group text-left rounded-xl border border-white/[0.06] overflow-hidden transition-all duration-300 hover:border-brand-teal/30 hover:shadow-[0_0_24px_oklch(0.75_0.14_185/10%)] focus:outline-none focus:ring-2 focus:ring-brand-teal/40 animate-[card-in_0.5s_ease_both]"
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(style.name) } }}
+      className="group text-left rounded-xl border border-white/[0.06] overflow-hidden transition-all duration-300 hover:border-brand-teal/30 hover:shadow-[0_0_24px_oklch(0.75_0.14_185/10%)] focus:outline-none focus:ring-2 focus:ring-brand-teal/40 animate-[card-in_0.5s_ease_both] cursor-pointer"
       style={{ animationDelay: `${index * 60}ms` }}
       aria-label={`Preview ${style.name} style`}
     >
@@ -508,76 +553,39 @@ function StyleCard({ style, index, onClick }: { style: StyleEntry; index: number
           </div>
         )}
         <div className="absolute inset-0 bg-brand-teal/0 group-hover:bg-brand-teal/5 transition-colors duration-300" />
-      </div>
-      <div className="px-3 py-2.5 border-t border-white/[0.04]">
-        <p className="text-sm font-medium text-foreground group-hover:text-brand-teal transition-colors">{style.name}</p>
-        {style.description && (
-          <p className="text-xs text-foreground-muted mt-0.5 line-clamp-1">{style.description}</p>
+        {/* Pin button */}
+        {onPin && (
+          <button
+            onClick={handlePin}
+            className={`absolute top-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-150 ${
+              style.pinned
+                ? "opacity-100 bg-black/40 text-brand-teal"
+                : "opacity-0 group-hover:opacity-100 bg-black/40 text-white/30 hover:text-white/60"
+            }`}
+            style={{ transform: bouncing ? "scale(1.3)" : "scale(1)", transition: "transform 300ms ease-out" }}
+            aria-label={style.pinned ? `Unpin ${style.name}` : `Pin ${style.name}`}
+          >
+            <Star className="h-3.5 w-3.5" fill={style.pinned ? "currentColor" : "none"} />
+          </button>
         )}
       </div>
-    </button>
-  )
-}
-
-/** Full style preview rendered via scaled iframe. */
-function StylePreviewInline({ html, loading }: { html: string; loading: boolean }) {
-  const [containerWidth, setContainerWidth] = useState(0)
-
-  // Callback ref to handle DOM element changes (e.g. after loading→content transition)
-  const roRef = useRef<ResizeObserver | null>(null)
-  const measuredRef = useCallback((node: HTMLDivElement | null) => {
-    if (roRef.current) {
-      roRef.current.disconnect()
-      roRef.current = null
-    }
-    if (node) {
-      const w = node.getBoundingClientRect().width
-      if (w > 0) setContainerWidth(w)
-      roRef.current = new ResizeObserver(([entry]) => {
-        setContainerWidth(entry.contentRect.width)
-      })
-      roRef.current.observe(node)
-    }
-  }, [])
-
-  if (loading || !html) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-6 h-6 border-2 border-brand-teal/30 border-t-brand-teal rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  const ratio = containerWidth > 0 ? containerWidth / 1920 : 0
-  const slideCount = (html.match(/class="slide"/g) || []).length || 5
-
-  return (
-    <div ref={measuredRef} className="w-full overflow-x-hidden">
-      <div style={{ width: "100%", height: ratio > 0 ? 1080 * ratio * slideCount : 400, overflow: "hidden" }}>
-        {ratio > 0 ? (
-          <iframe
-            srcDoc={html}
-            sandbox="allow-same-origin"
-            title="Style Preview"
-            style={{
-              width: 1920,
-              height: 1080 * slideCount,
-              border: "none",
-              transformOrigin: "top left",
-              transform: `scale(${ratio})`,
-            }}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="w-6 h-6 border-2 border-brand-teal/30 border-t-brand-teal rounded-full animate-spin" />
-          </div>
+      <div className="px-3 py-2.5 border-t border-white/[0.04]">
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-medium text-foreground group-hover:text-brand-teal transition-colors truncate">{style.name}</p>
+          {style.source === "user" && (
+            <span className="flex-none text-[11px] px-1.5 py-0.5 rounded-full bg-brand-teal/10 text-brand-teal font-medium">Custom</span>
+          )}
+        </div>
+        {style.description && (
+          <p className="text-xs text-foreground-muted mt-0.5 line-clamp-1">{style.description}</p>
         )}
       </div>
     </div>
   )
 }
 
-/* ── Spec waiting animations ── */
+/** Full style preview rendered via scaled iframe. */
+export /* ── Spec waiting animations ── */
 
 const WAIT_COLORS = [
   { css: "var(--wait-teal)", raw: "oklch(0.75 0.14 185)" },

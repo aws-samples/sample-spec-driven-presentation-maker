@@ -71,6 +71,11 @@ def web_fetch(
         return _handle_pdf(url, response.content, page_start=page_start)
 
     # --- HTML (default) ---
+    # Fix encoding: requests defaults to Latin-1 when charset is not in Content-Type header,
+    # causing mojibake for UTF-8 sites. Use apparent_encoding (charset-normalizer) as fallback.
+    if response.encoding is None or response.encoding.lower().replace("-", "") == "iso88591":
+        response.encoding = response.apparent_encoding
+
     h = html2text.HTML2Text()
     h.ignore_links = False
     h.ignore_images = not include_images
