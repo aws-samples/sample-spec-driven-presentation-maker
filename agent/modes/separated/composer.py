@@ -123,7 +123,7 @@ def _build_deck_context(sections: list[str]) -> str:
     return "# Deck-Specific References\n\n" + "\n\n---\n\n".join(sections)
 
 
-def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None):
+def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, extra_tools=None):
     """Create compose_slides tool with closed-over MCP servers and model.
 
     Args:
@@ -132,10 +132,12 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None):
         composer_mcp_factory: Optional callable returning a fresh MCPClient for
             prefetch/per-group isolation. If None, falls back to mcp_servers[0]
             (legacy shared-client behavior).
+        extra_tools: Optional list of additional tools (e.g. web_fetch) to give composers.
 
     Returns:
         A @tool-decorated async generator function.
     """
+    _extra_tools = extra_tools or []
     mcp_client = mcp_servers[0] if mcp_servers else None
     max_concurrency = int(os.environ.get("COMPOSER_MAX_CONCURRENCY", "10"))
 
@@ -381,6 +383,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None):
                 _group_tools = list(mcp_servers)
                 if _group_mcp is not None:
                     _group_tools[0] = _group_mcp  # replace Presentation Maker MCP
+                _group_tools.extend(_extra_tools)
 
                 composer = Agent(
                     system_prompt=[
