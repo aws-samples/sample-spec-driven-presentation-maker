@@ -309,6 +309,12 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
     if missing:
         raise ValueError(f"Missing assets ({len(missing)}): {', '.join(sorted(missing)[:10])}")
 
+    # Token discipline: fontSize must come from --fs-* tokens in active style
+    from sdpm.checks import check_font_size_tokens
+
+    fs_warnings = check_font_size_tokens(data, input_path)
+    warnings.extend(fs_warnings)
+
     # Resolve overrides
     slides = data.get("slides", [])
     id_map = {}

@@ -14,6 +14,17 @@ _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 _ALLOWED_URL_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"}
 
 
+def _convert_webp_to_png(data: bytes) -> bytes:
+    """Convert webp image bytes to PNG for PPTX compatibility."""
+    import io
+    from PIL import Image
+    img = Image.open(io.BytesIO(data))
+    img = img.convert("RGBA")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 def import_attachment(
     source: str,
     deck_id: str,
@@ -96,6 +107,10 @@ def _import_from_upload(
         data = storage.download_file_from_pptx_bucket(s3_key)
 
         if file_type.startswith("image/"):
+            # Convert webp to PNG for PPTX compatibility
+            if file_name.lower().endswith(".webp"):
+                data = _convert_webp_to_png(data)
+                file_name = file_name.rsplit(".", 1)[0] + ".png"
             dest_name = f"{short_id}_{file_name}"
             dest_key = f"decks/{deck_id}/images/{dest_name}"
             ct = mimetypes.guess_type(file_name)[0] or file_type
@@ -143,6 +158,12 @@ def _import_from_url(url: str, deck_id: str, storage: Storage, filename: str) ->
         filename = basename
 
     dest_name = f"{short_id}_{filename}"
+    # Convert webp to PNG for PPTX compatibility
+    if ct == "image/webp" or filename.lower().endswith(".webp"):
+        data = _convert_webp_to_png(data)
+        filename = filename.rsplit(".", 1)[0] + ".png" if "." in filename else filename + ".png"
+        dest_name = f"{short_id}_{filename}"
+        ct = "image/png"
     dest_key = f"decks/{deck_id}/images/{dest_name}"
     storage.upload_file(key=dest_key, data=data, content_type=ct)
 

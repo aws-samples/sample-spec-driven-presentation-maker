@@ -39,6 +39,15 @@ _ALLOWED_URL_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "ima
 _SESSION_TTL_DAYS = 7
 
 
+def _convert_webp_to_png(data: bytes) -> bytes:
+    """Convert webp image bytes to PNG for PPTX compatibility."""
+    img = PILImage.open(io.BytesIO(data))
+    img = img.convert("RGBA")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 def _deck_root() -> Path:
     return Path(os.environ.get("SDPM_DECK_ROOT", "")) or Path.home() / "Documents" / "SDPM-Presentations"
 
@@ -324,7 +333,13 @@ def _import_from_upload(upload_id: str, deck_id: str, filename: str) -> str:
         dest_name = f"{short_id}_{file_name}"
         if file_type.startswith("image/"):
             images_dir.mkdir(exist_ok=True)
-            shutil.copy2(src_path, images_dir / dest_name)
+            # Convert webp to PNG for PPTX compatibility
+            if src_path.suffix.lower() == ".webp":
+                png_data = _convert_webp_to_png(src_path.read_bytes())
+                dest_name = f"{short_id}_{Path(file_name).stem}.png"
+                (images_dir / dest_name).write_bytes(png_data)
+            else:
+                shutil.copy2(src_path, images_dir / dest_name)
             result["files"].append(f"images/{dest_name}")
             result["image_mapping"][file_name] = f"images/{dest_name}"
         else:
@@ -365,6 +380,11 @@ def _import_from_url(url: str, deck_id: str, filename: str) -> str:
     dest_name = f"{short_id}_{filename}"
     images_dir = deck_dir / "images"
     images_dir.mkdir(exist_ok=True)
+    # Convert webp to PNG for PPTX compatibility
+    if ct == "image/webp" or filename.lower().endswith(".webp"):
+        data = _convert_webp_to_png(data)
+        filename = Path(filename).stem + ".png"
+        dest_name = f"{short_id}_{filename}"
     (images_dir / dest_name).write_bytes(data)
     return json.dumps({
         "source": url,

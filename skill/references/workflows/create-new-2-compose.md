@@ -85,6 +85,23 @@ For each slide, think through what to say and how to show it — together.
 5. No repetition without intent. Same layout on consecutive slides feels monotonous — the audience sees the shape before reading the words. Same component reused across the deck feels cheap — especially containers. Don't default to lining up cards. Explore different components, add supporting elements (icons, dividers, accent shapes), or rethink the layout entirely. Vary unless repetition serves a clear purpose (e.g. comparison).
 6. Check: does this layout fit the message's logical structure? If not, rethink before building.
 
+### Token Discipline
+
+The **active style** is `specs/art-direction.html` (created in Phase 1) — the Source of Truth for design tokens. It is a living document: new tokens can be added during Phase 2 when the design requires values not yet defined (e.g. a new accent color for a diagram, a new font size role). Add the token to `:root` first, then use it in slide JSON.
+
+Every `fontSize` and hex color in the slide JSON **must** come from a token defined in
+the active style's `:root`. No ad-hoc values.
+
+- **fontSize** — use only values that appear as `--fs-*` variables (e.g. 14, 20, 24, 28, 36, 48).
+  If the design needs a size that doesn't exist, add a new `--fs-*` token to art-direction.html
+  first, then use it.
+  - At `generate` time, fontSize values are checked against `--fs-*` tokens in the active style.
+    Out-of-token values produce warnings (build still succeeds). Resolve before delivery.
+- **hex color** — use only values that appear as `--*` color variables. If the design needs a
+  color that doesn't exist, add a new token to art-direction.html first, then use it.
+  Colors embedded in inline directives (e.g. `{{#FF9900:text}}`) are subject to the same rule.
+  - Not automatically validated at build time — self-check before delivery.
+
 ## Build
 
 Build is not a single pass — it is a loop of place, measure, adjust.

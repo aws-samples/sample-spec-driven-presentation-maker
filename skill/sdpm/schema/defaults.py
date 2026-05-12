@@ -58,6 +58,7 @@ ELEMENT_DEFAULTS = {
         "rotation": 0,
         "flipH": False,
         "flipV": False,
+        "fit": "contain",
     },
     "table": {
         "rotation": 0,

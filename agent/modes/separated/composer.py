@@ -212,6 +212,57 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None):
             slide_groups = json.loads(slide_groups)
         parent_tool_use_id = tool_context.tool_use["toolUseId"]
 
+        # Pre-check: verify required spec files exist before launching composers.
+        # Missing files indicate an incomplete Phase 1 — return the earliest
+        # workflow instruction so the SPEC agent resumes from the right sub-phase.
+        if mcp_client:
+            check_code = (
+                "import os, json\n"
+                "files = ['specs/brief.md', 'specs/outline.md', 'deck.json']\n"
+                "art = 'specs/art-direction.html' if os.path.exists('specs/art-direction.html') "
+                "else ('specs/art-direction.md' if os.path.exists('specs/art-direction.md') else None)\n"
+                "missing = [f for f in files if not os.path.exists(f)]\n"
+                "if art is None:\n"
+                "    missing.append('specs/art-direction')\n"
+                "print(json.dumps(missing))\n"
+            )
+            check_result = mcp_client.call_tool_sync(
+                tool_use_id=f"precheck-{uuid.uuid4().hex[:8]}",
+                name="run_python",
+                arguments={"code": check_code, "deck_id": deck_id, "purpose": "spec file existence check"},
+            )
+            missing_files: list[str] = []
+            for item in check_result.get("content", []):
+                if isinstance(item, dict) and "text" in item:
+                    try:
+                        out = json.loads(item["text"])
+                        if isinstance(out, dict) and "output" in out:
+                            missing_files = json.loads(out["output"])
+                        elif isinstance(out, list):
+                            missing_files = out
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
+            if missing_files:
+                # Map missing files to their workflow (phase order)
+                workflow_map = {
+                    "specs/brief.md": "create-new-1-briefing",
+                    "specs/outline.md": "create-new-1-outline",
+                    "specs/art-direction": "create-new-1-art-direction",
+                    "deck.json": "create-new-1-art-direction",
+                }
+                workflows_needed = dict.fromkeys(
+                    workflow_map[f] for f in missing_files if f in workflow_map
+                )
+                steps = " → ".join(f"`{w}`" for w in workflows_needed)
+                instruction = (
+                    f"Cannot compose: missing {missing_files}. "
+                    f"Complete these workflows in order: {steps}. "
+                    "Do NOT call compose_slides again until ALL spec files exist."
+                )
+                yield json.dumps({"status": "error", "missing_files": missing_files, "instruction": instruction})
+                return
+
         generated = []
         errors = []
         summaries = {}
