@@ -49,6 +49,12 @@ class ConversionResult:
     images: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     error: str | None = None
+    # Deck-structure metadata (populated only when output_dir contains
+    # deck.json + slides/, i.e. for PPTX after pptx-import-edit).
+    deck_structure: bool = False
+    slide_count: int = 0
+    theme_hints: dict | None = None
+    suggested_name: str | None = None
 
 
 def convert_file(file_path: Path, output_dir: Path) -> ConversionResult:
@@ -390,12 +396,105 @@ def _convert_xlsx(file_path: Path, output_dir: Path, images_dir: Path) -> Conver
 
 
 # ---------------------------------------------------------------------------
-# PPTX: pptx_to_json Engine
+# PPTX: pptx_to_json Engine + deck-structure metadata extraction
 # ---------------------------------------------------------------------------
 
 
+def _extract_theme_hints(pptx_path: Path, deck_json_path: Path, slides_dir: Path) -> dict:
+    """Extract theme hints (backgroundLuminance, accentColors, fonts) from a converted deck.
+
+    Keys are stable across Local / Cloud / DynamoDB: ``backgroundLuminance``,
+    ``accentColors``, ``fonts``.
+
+    Background luminance strategy (prioritised):
+      1. If a slide declares an explicit ``background`` (hex), use that slide's color.
+      2. Else, fall back to the template's light theme color (lt1 if available,
+         otherwise dk1).
+      3. Compute per-slide luminance (0.299 R + 0.587 G + 0.114 B, 0-1) and
+         return the median across all slides.
+    """
+    import json as _json
+    import statistics
+
+    from sdpm.converter.color import extract_theme_colors_and_mapping
+
+    # Theme colors from the first slide master (most PPTX have just one).
+    try:
+        theme_colors, _color_mapping, _ = extract_theme_colors_and_mapping(pptx_path, 0)
+    except Exception:
+        theme_colors = {}
+
+    lt1 = theme_colors.get("lt1", "#FFFFFF")
+    dk1 = theme_colors.get("dk1", "#000000")
+    # Fallback chain: slide bg > lt1 > dk1 inverted
+    default_bg = lt1 if lt1 else _invert_hex(dk1)
+
+    def _hex_to_luminance(hex_color: str) -> float:
+        h = hex_color.lstrip("#")
+        try:
+            r = int(h[0:2], 16)
+            g = int(h[2:4], 16)
+            b = int(h[4:6], 16)
+        except (ValueError, IndexError):
+            return 0.5
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+
+    luminances: list[float] = []
+    if slides_dir.is_dir():
+        for slide_file in sorted(slides_dir.glob("slide-*.json")):
+            try:
+                data = _json.loads(slide_file.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            bg = data.get("background") or default_bg
+            luminances.append(_hex_to_luminance(bg))
+    if not luminances:
+        luminances = [_hex_to_luminance(default_bg)]
+
+    background_luminance = statistics.median(luminances)
+
+    accent_colors: list[str] = []
+    for name in ("accent1", "accent2", "accent3"):
+        c = theme_colors.get(name)
+        if isinstance(c, str) and c.startswith("#"):
+            accent_colors.append(c.upper())
+    accent_colors = accent_colors[:3]
+
+    fonts: dict = {}
+    if deck_json_path.exists():
+        try:
+            deck = _json.loads(deck_json_path.read_text(encoding="utf-8"))
+            f = deck.get("fonts")
+            if isinstance(f, dict):
+                fonts = f
+        except Exception:
+            pass
+
+    return {
+        "backgroundLuminance": round(background_luminance, 4),
+        "accentColors": accent_colors,
+        "fonts": fonts,
+    }
+
+
+def _invert_hex(hex_color: str) -> str:
+    """Invert a #RRGGBB color (for the dk1-inverted fallback)."""
+    h = hex_color.lstrip("#")
+    try:
+        r = 255 - int(h[0:2], 16)
+        g = 255 - int(h[2:4], 16)
+        b = 255 - int(h[4:6], 16)
+    except (ValueError, IndexError):
+        return "#FFFFFF"
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
 def _convert_pptx(file_path: Path, output_dir: Path) -> ConversionResult:
-    """Convert PPTX to JSON via Engine's pptx_to_json."""
+    """Convert PPTX to deck structure via Engine's pptx_to_json.
+
+    Populates deck_structure, slide_count, theme_hints, suggested_name when
+    the output directory contains the new deck layout (deck.json + slides/).
+    """
     import json
 
     try:
@@ -405,7 +504,6 @@ def _convert_pptx(file_path: Path, output_dir: Path) -> ConversionResult:
 
     try:
         result = pptx_to_json(file_path, output_dir=output_dir)
-        # pptx_to_json writes slides.json + images/ to output_dir
         json_str = json.dumps(result, ensure_ascii=False)
 
         # Collect extracted images
@@ -414,8 +512,29 @@ def _convert_pptx(file_path: Path, output_dir: Path) -> ConversionResult:
         if img_dir.exists():
             images = [f.name for f in img_dir.iterdir() if f.is_file()]
 
+        deck_json_path = output_dir / "deck.json"
+        slides_dir = output_dir / "slides"
+        deck_structure = deck_json_path.exists() and slides_dir.is_dir()
+
+        slide_count = 0
+        theme_hints: dict | None = None
+        suggested_name: str | None = None
+        if deck_structure:
+            slide_count = len(list(slides_dir.glob("slide-*.json")))
+            try:
+                theme_hints = _extract_theme_hints(file_path, deck_json_path, slides_dir)
+            except Exception as e:
+                logger.warning("theme_hints extraction failed: %s", e)
+            suggested_name = file_path.stem
+
         return ConversionResult(
-            status="success", json_data=json_str, images=images,
+            status="success",
+            json_data=json_str,
+            images=images,
+            deck_structure=deck_structure,
+            slide_count=slide_count,
+            theme_hints=theme_hints,
+            suggested_name=suggested_name,
         )
     except Exception as e:
         return ConversionResult(status="error", error=f"PPTX conversion failed: {e}")

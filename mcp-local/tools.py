@@ -50,10 +50,6 @@ def generate_pptx(
 ) -> dict[str, Any]:
     """Generate PPTX from a JSON file."""
     from sdpm.api import generate
-    from sdpm.assets import invalidate_manifest_cache
-    # Invalidate caches so user-local asset/config changes are picked up
-    # in this long-lived MCP Local process.
-    invalidate_manifest_cache()
     return generate(
         json_path=slides_json_path,
         output_path=output_path or None,
@@ -80,8 +76,7 @@ def search_assets(
     source_filter: str = "", type_filter: str = "", theme_filter: str = "",
 ) -> dict[str, Any]:
     """Search assets by keyword."""
-    from sdpm.assets import invalidate_manifest_cache, search_assets as _search
-    invalidate_manifest_cache()
+    from sdpm.assets import search_assets as _search
     return {
         "query": query,
         "results": _search(
@@ -95,26 +90,16 @@ def search_assets(
 
 def list_asset_sources(skill_dir: Path) -> dict[str, Any]:
     """List available asset sources."""
-    from sdpm.assets import invalidate_manifest_cache, list_sources
-    invalidate_manifest_cache()
+    from sdpm.assets import list_sources
     return {"sources": list_sources()}
 
 
-def list_styles(skill_dir: Path, include_all: bool = False) -> dict[str, Any]:
-    """List available design styles with pin/source metadata.
-
-    Searches user-local styles directory (``~/.config/sdpm/styles/``) in
-    addition to the package-bundled styles. User-local entries shadow
-    bundled ones with the same name.
-
-    Default returns pinned + user styles only (or all if no pins).
-    Pass include_all=True to return everything.
-    """
-    from sdpm.api import get_styles_dirs, list_styles_filtered
-    from sdpm.config import get_state
-    styles_dirs = get_styles_dirs()
-    pinned = get_state().get("pinned_styles", [])
-    return {"styles": list_styles_filtered(styles_dirs, pinned, include_all)}
+def list_styles(skill_dir: Path) -> dict[str, Any]:
+    """List available design styles and open gallery in browser."""
+    from sdpm.reference import list_styles as _list_styles, open_styles_gallery
+    styles_dir = skill_dir / "references" / "examples" / "styles"
+    open_styles_gallery(styles_dir)
+    return {"styles": _list_styles(styles_dir)}
 
 
 def read_examples(names: list[str], skill_dir: Path) -> dict[str, Any]:
@@ -157,9 +142,28 @@ def code_block(
 
 
 def pptx_to_json(pptx_path: str) -> dict[str, Any]:
-    """Convert PPTX to JSON representation."""
+    """Convert PPTX to JSON representation.
+
+    Writes a deck-structure directory (``deck.json`` + ``slides/slide-NN.json``
+    + ``images/``) alongside the input PPTX (``{stem}/`` sibling directory).
+    The returned dict still contains ``{slides, fonts, defaultTextColor}`` for
+    in-memory use.
+
+    Note: the on-disk output is deck-structure (since pptx-import-edit);
+    no single ``slides.json`` file is produced. Callers that need an
+    editable deck should prefer the upload → import_attachment flow.
+
+    Returns:
+        Dict with slides list plus deck metadata (fonts, defaultTextColor),
+        plus ``deck_dir`` (string path to the written directory) for
+        downstream tooling.
+    """
     from sdpm.converter import pptx_to_json as _convert
     path = Path(pptx_path)
     if not path.exists():
         raise FileNotFoundError(f"PPTX not found: {pptx_path}")
-    return _convert(str(path))
+    result = _convert(path)
+    deck_dir = path.with_suffix("")
+    if isinstance(result, dict):
+        result = {**result, "deck_dir": str(deck_dir)}
+    return result
