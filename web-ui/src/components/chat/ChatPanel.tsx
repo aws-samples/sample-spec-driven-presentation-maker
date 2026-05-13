@@ -311,6 +311,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // --- Reconnect to running background session (Local mode) ---
   useEffect(() => {
     if (!IS_LOCAL || !deckId || deckId === "new") return
+    // Skip reconnect when this ChatPanel is already streaming via
+    // /api/agent/invoke. Without this guard, the deckId prop swap from
+    // "new" → real deckId after init_presentation triggers a second SSE
+    // consumer (EventSource), which reads the same stream alongside the
+    // in-flight fetch — every chunk lands in setMessages twice and the
+    // tool cards / text either get clobbered or duplicated mid-stream.
+    if (isLoadingRef.current) return
     let es: EventSource | null = null
     let completion = ""
     const toolPositions = new Map<string, number>()
