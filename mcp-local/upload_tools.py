@@ -49,8 +49,10 @@ def _convert_webp_to_png(data: bytes) -> bytes:
 
 
 def _deck_root() -> Path:
-    root = os.environ.get("SDPM_DECK_ROOT", "")
-    return Path(root) if root else Path.home() / "Documents" / "SDPM-Presentations"
+    env_value = os.environ.get("SDPM_DECK_ROOT", "").strip()
+    if env_value:
+        return Path(env_value)
+    return Path.home() / "Documents" / "SDPM-Presentations"
 
 
 def _session_dir(session_id: str) -> Path:

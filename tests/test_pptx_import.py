@@ -315,6 +315,49 @@ class TestPptxBuilderCliAcceptsDeckDir:
 # ---------------------------------------------------------------------------
 
 
+class TestDeckRootEnvHandling:
+    """Protect against Path('') being truthy — a silent fallback bug.
+
+    Prior to pptx-import-edit hardening, `Path(os.environ.get("SDPM_DECK_ROOT", ""))`
+    evaluated to `Path('.')` when the env var was unset, silently writing
+    sessions to the process cwd instead of the user's home directory.
+    """
+
+    def test_deck_root_falls_back_to_home_when_env_empty(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv("SDPM_DECK_ROOT", raising=False)
+        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        from upload_tools import _deck_root
+
+        root = _deck_root()
+        assert root == Path.home() / "Documents" / "SDPM-Presentations", \
+            f"expected home fallback, got {root}"
+
+    def test_deck_root_respects_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "custom"))
+        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        from upload_tools import _deck_root
+
+        assert _deck_root() == tmp_path / "custom"
+
+    def test_deck_root_ignores_whitespace_only_env(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("SDPM_DECK_ROOT", "   ")
+        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        from upload_tools import _deck_root
+
+        assert _deck_root() == Path.home() / "Documents" / "SDPM-Presentations"
+
+
+# ---------------------------------------------------------------------------
+# Non-regression: PDF/DOCX/XLSX conversion still works (old flow)
+# ---------------------------------------------------------------------------
+
+
 class TestNonRegression:
     """PDF/DOCX/XLSX conversion paths must not be affected by the PPTX deck-structure change."""
 

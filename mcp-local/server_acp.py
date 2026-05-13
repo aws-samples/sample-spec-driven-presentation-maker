@@ -234,8 +234,8 @@ def init_presentation(name: str, template: str = "") -> str:
     from datetime import datetime
     from sdpm.analyzer import extract_fonts
 
-    root = os.environ.get("SDPM_DECK_ROOT", "")
-    base_dir = Path(root) if root else Path.home() / "Documents" / "SDPM-Presentations"
+    base_dir_env = os.environ.get("SDPM_DECK_ROOT", "").strip()
+    base_dir = Path(base_dir_env) if base_dir_env else Path.home() / "Documents" / "SDPM-Presentations"
     ts = datetime.now().strftime("%Y%m%d-%H%M")
     dir_name = f"{ts}-{name}" if name else ts
     out_dir = base_dir / dir_name
