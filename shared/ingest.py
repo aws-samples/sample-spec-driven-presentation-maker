@@ -55,6 +55,9 @@ class ConversionResult:
     slide_count: int = 0
     theme_hints: dict | None = None
     suggested_name: str | None = None
+    # Path (relative to output_dir) of the placeholder-only template extracted
+    # from the source PPTX. Populated only when deck_structure is True.
+    template_path: str | None = None
 
 
 def convert_file(file_path: Path, output_dir: Path) -> ConversionResult:
@@ -519,6 +522,8 @@ def _convert_pptx(file_path: Path, output_dir: Path) -> ConversionResult:
         slide_count = 0
         theme_hints: dict | None = None
         suggested_name: str | None = None
+        template_path: str | None = None
+        warnings: list[str] = []
         if deck_structure:
             slide_count = len(list(slides_dir.glob("slide-*.json")))
             try:
@@ -526,15 +531,26 @@ def _convert_pptx(file_path: Path, output_dir: Path) -> ConversionResult:
             except Exception as e:
                 logger.warning("theme_hints extraction failed: %s", e)
             suggested_name = file_path.stem
+            try:
+                from sdpm.converter.template import extract_placeholder_template
+
+                template_out = output_dir / "template.pptx"
+                extract_placeholder_template(file_path, template_out)
+                template_path = "template.pptx"
+            except Exception as e:
+                logger.warning("placeholder template extraction failed: %s", e)
+                warnings.append(f"placeholder template extraction failed: {e}")
 
         return ConversionResult(
             status="success",
             json_data=json_str,
             images=images,
+            warnings=warnings,
             deck_structure=deck_structure,
             slide_count=slide_count,
             theme_hints=theme_hints,
             suggested_name=suggested_name,
+            template_path=template_path,
         )
     except Exception as e:
         return ConversionResult(status="error", error=f"PPTX conversion failed: {e}")

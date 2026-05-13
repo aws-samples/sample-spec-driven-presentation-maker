@@ -514,6 +514,13 @@ def _import_from_upload(upload_id: str, deck_id: str, filename: str) -> str:
                             f"attachments/{short_id}/{src_file.name}/{child.name}"
                         )
             elif src_file.is_file():
+                # PPTX-derived placeholder template lives at deck/template.pptx
+                # so pptx_builder can resolve it via the deck-local relative path.
+                if src_file.name == "template.pptx":
+                    shutil.copy2(src_file, deck_dir / "template.pptx")
+                    result["files"].append("template.pptx")
+                    result["templatePath"] = "template.pptx"
+                    continue
                 attachments_dir.mkdir(exist_ok=True)
                 dest_name = f"{short_id}_{src_file.name}"
                 shutil.copy2(src_file, attachments_dir / dest_name)

@@ -213,6 +213,16 @@ def _import_converted(
             )
             result["files"].append(f"attachments/{dest_name}")
             result["deckJson"] = f"attachments/{dest_name}"
+        elif rel == "template.pptx":
+            # PPTX-derived placeholder template lives at deck/template.pptx
+            # so pptx_builder can resolve it via the deck-local relative path.
+            dest_key = f"decks/{deck_id}/template.pptx"
+            storage.upload_file(
+                key=dest_key, data=src_data,
+                content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            )
+            result["files"].append("template.pptx")
+            result["templatePath"] = "template.pptx"
         else:
             dest_name = f"{short_id}_{rel}"
             dest_key = f"decks/{deck_id}/attachments/{dest_name}"

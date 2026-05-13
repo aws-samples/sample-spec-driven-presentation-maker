@@ -20,25 +20,29 @@ access content when writing `specs/brief.md`).
 ## Overview
 
 This guide is the complete workflow for the edit branch. The user already
-provided the PPTX itself — that *is* the brief. Steps 1 → 6 generate
-brief / outline / art-direction from the PPTX content automatically; the
-only user-facing question is template selection in Step 1.
+provided the PPTX itself — that *is* the brief. The PPTX-derived
+**placeholder template** (extracted automatically during upload and
+copied into the deck as `deck/template.pptx`) means there is no template
+selection step: the deck builds against the source PPTX's own layouts.
+
+Steps 1 → 5 generate brief / outline / art-direction from the PPTX
+content automatically; the only user-facing question is the final
+review at Step 5.
 
 User-facing `hearing` calls in this guide:
 
-- **Step 1** — template selection (`single_select`).
-- **Step 6** — final review and hand-off to the edit loop.
+- **Step 5** — final review and hand-off to the edit loop.
 
-Between Step 1 and Step 6, do not call `hearing`. Generate everything
+Between Step 1 and Step 5, do not call `hearing`. Generate everything
 from the PPTX content already in your context.
 
 ## State you must carry through the guide
 
 The triggering `upload_file` response contains fields you reuse later:
 
-- `uploadId` — Step 3 (`import_attachment(source=uploadId, ...)`)
-- `suggestedName` — Step 2 (`init_presentation(name=suggestedName)`)
-- `slideCount`, `themeHints` — Step 1 ranking and Step 5 validation
+- `uploadId` — Step 2 (`import_attachment(source=uploadId, ...)`)
+- `suggestedName` — Step 1 (`init_presentation(name=suggestedName)`)
+- `slideCount`, `themeHints` — Step 4 validation and style selection
 
 These values stay in your conversation context. If you cannot locate
 them, scroll back through the prior tool responses — do not ask the
@@ -46,72 +50,48 @@ user to re-upload.
 
 ---
 
-## Step 1 — Template selection
-
-Goal: pick the sdpm template that best matches the source PPTX's visual tone.
-
-1. Read `themeHints` from the `upload_file` response (`backgroundLuminance`,
-   `accentColors`, `fonts`).
-2. Call `read_uploaded_file(uploadId)` to see the full slide text content.
-3. Call `list_templates()` to see available sdpm templates (do NOT
-   hardcode template names — always use runtime values).
-4. Rank 2–3 candidates using these priorities:
-   - `backgroundLuminance < 0.35` → prefer dark templates (names often
-     contain "dark").
-   - `backgroundLuminance > 0.65` → prefer light templates.
-   - Otherwise → offer both and recommend the one whose luminance is
-     closer to the PPTX.
-5. Use the `hearing` tool with:
-   - `inference`: brief explanation of why you picked these candidates
-     (dark/light luminance, dominant accent color, tone).
-   - A single `single_select` question with 2–3 template names from
-     `list_templates()`; mark the top candidate as `recommended`.
-
-After the user answers, proceed to Step 2.
-
----
-
-## Step 2 — Initialize the deck
+## Step 1 — Initialize the deck
 
 Call `init_presentation(name=<suggestedName>)` — **do NOT pass a template
 argument**.
 
 - Cloud `init_presentation` has no template parameter, and Local's
-  template parameter would pre-populate fonts that Step 5 immediately
+  template parameter would pre-populate fonts that Step 4 immediately
   overwrites with PPTX-derived fonts. Skipping the argument keeps Local
   and Cloud symmetric.
-- Template, fonts, and `defaultTextColor` are written to `deck.json` in
-  Step 5.
+- Template (`"template.pptx"` — deck-local), fonts, and
+  `defaultTextColor` are written to `deck.json` in Step 4.
 - Returns the new `deck_id` (directory path in Local, deckId in Cloud).
 
 ---
 
-## Step 3 — Import converted files
+## Step 2 — Import converted files
 
 Call `import_attachment(source=<uploadId>, deck_id=<deck_id>)`.
 
 The helper copies session files into the deck:
 
+- `template.pptx` — PPTX-derived placeholder template (deck root)
 - `attachments/{shortId}_deck.json` — PPTX-derived fonts / defaultTextColor
 - `attachments/{shortId}/slides/slide-NN.json` — per-slide JSON
 - `images/{shortId}_*` — extracted images (flattened into deck/images/)
 
-The returned JSON includes `shortId`, `deckJson`, and `files[]`. Keep
-`shortId` — Step 4 and Step 5 need it to locate the imported per-slide
-files.
+The returned JSON includes `shortId`, `templatePath`, `deckJson`, and
+`files[]`. Keep `shortId` — Step 3 and Step 4 need it to locate the
+imported per-slide files.
 
 ---
 
-## Step 4 — Prepare specs (brief / outline / art-direction)
+## Step 3 — Prepare specs (brief / outline / art-direction)
 
 Populate `specs/brief.md`, `specs/outline.md`, and
-`specs/art-direction.html` **before** Step 5 places slides. Each sub-step
+`specs/art-direction.html` **before** Step 4 places slides. Each sub-step
 uses `run_python(save=True)` so the intermediate state is persisted —
 Cloud discards the sandbox VM between calls, so `save=False` would lose
 the write.
 
-You generate these specs from the PPTX content you imported in Step 3.
-Do not call `hearing` in Step 4 — if a particular field is thin, leave
+You generate these specs from the PPTX content you imported in Step 2.
+Do not call `hearing` in Step 3 — if a particular field is thin, leave
 it succinct rather than asking the user.
 
 Sandbox helpers (`read_json / write_json / read_text / write_text /
@@ -119,12 +99,12 @@ list_files`) are available on both Local and Cloud. Do NOT use `open()`
 or `import` inside the sandbox code — Local forbids both and the Cloud
 import is already prepended.
 
-### 4-1. brief.md (Source Material from PPTX)
+### 3-1. brief.md (Source Material from PPTX)
 
 First, explore the imported slides to extract titles and text (no save):
 
 ```python
-short_id = "<result['shortId'] from Step 3>"
+short_id = "<result['shortId'] from Step 2>"
 files = list_files(f"attachments/{short_id}/slides")
 for name in sorted(files):
     data = read_json(f"attachments/{short_id}/slides/{name}")
@@ -160,14 +140,14 @@ print("brief.md written")
 Call as `run_python(code=<above>, deck_id=deck_id, save=True)`
 (Cloud: prepend `purpose="Write brief.md from PPTX content"`).
 
-### 4-2. outline.md (LLM summarization)
+### 3-2. outline.md (LLM summarization)
 
 Summarise each slide in one line (you, the agent, produce the summary —
 the sandbox does NOT call LLMs). Pass the `(slug, message)` pairs as a
 Python literal:
 
 ```python
-# Agent fills this list from slide content seen in Step 1 / 4-1.
+# Agent fills this list from slide content seen in Step 3-1.
 pairs = [
     ("slide-01", "Introduction to the system"),
     ("slide-02", "Storage classes overview"),
@@ -188,42 +168,167 @@ Requirements (outline lint will otherwise reject the write on Cloud):
 - Messages MUST be non-empty.
 - One line per slide, no sub-items.
 
-### 4-3. art-direction.html (style selection)
+### 3-3. art-direction.html (deck-specific style)
 
-1. Call `list_styles()` to see available styles.
-2. Pick a style using these priorities:
-   1. **Background luminance match** — dark style for dark PPTX, light
-      for light.
-   2. **Accent hue proximity** — if `themeHints.accentColors` is
-      populated, prefer a style with a similar palette.
-   3. **Format / tone match** — proposal vs report vs marketing based on
-      slide content.
-3. Call `apply_style(deck_id, <style>)` (MCP tool — not via `run_python`).
+Goal: produce a `specs/art-direction.html` that **describes the source
+PPTX's visual identity**, written from scratch, expressed in the same
+authoring conventions the built-in sdpm styles use.
+
+The output is **the source PPTX's own style sheet**. It is not a
+modified scaffold. The composer reads this file as the single source
+of truth for colors, typography, decoration motifs, and component
+patterns when regenerating slides.
+
+#### 3-3a. Read a reference scaffold
+
+`apply_style` copies one of the built-in styles to
+`specs/art-direction.html` for you to **reference how art-direction
+files are written** (CSS-variable conventions, slide dimensions,
+class naming, the structure of the `<style>` block, the demonstration
+slide layout in `<body>`). Treat its colors / fonts / decorations as
+**examples of how to write tokens, not as values to keep**.
+
+1. Call `list_styles()`.
+2. Pick any scaffold — choose whichever you can read most easily.
+   The selection has no effect on the final output.
+3. Call `apply_style(deck_id, <scaffold>)` (MCP tool — not via
+   `run_python`).
+4. Read the copied file once with `read_text("specs/art-direction.html")`
+   to refresh the authoring conventions in your context.
+
+#### 3-3b. Rewrite the file as the source PPTX's own style
+
+Now write a fresh `specs/art-direction.html` that captures the source
+PPTX's visual system. Use only signals you can ground in the source:
+
+- `themeHints.backgroundLuminance / accentColors / fonts` from the
+  original `upload_file` response.
+- Slide JSON in `attachments/{shortId}/slides/` — sample text colors,
+  bullet styles, divider lines, banner shapes, card backgrounds, font
+  weights, spacing patterns that recur across the deck.
+- The slide image thumbnails you have already seen in the conversation
+  — use them to confirm decoration motifs (line styles, shadows,
+  corner shapes, accent bars, icon framing) before encoding them.
+
+Compose the new document in your context, then write it in a single
+`run_python(save=True)` call:
+
+```python
+new_art = """<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title><name of the source-PPTX visual system></title>
+<style>
+  :root {
+    /* Colors — every value below must be source-derived */
+    --color-primary: <text color seen in source titles>;
+    --color-accent:  <themeHints.accentColors[0]>;
+    --color-bg:      <source background, light or dark per backgroundLuminance>;
+    /* ...add as many tokens as the source needs, name them after the
+       role they play in the source (e.g. --color-banner, --color-divider).
+       Don't carry over scaffold-specific tokens (gold-frame, diamond,
+       etc.) unless the source uses an analogous element. */
+
+    /* Typography — pulled from themeHints.fonts */
+    --font-heading: <themeHints.fonts.fullwidth or sans-serif equivalent>;
+    --font-body:    <themeHints.fonts.halfwidth or sans-serif equivalent>;
+
+    /* Sizes / spacing / decoration tokens */
+    --size-cover-title: <pt seen in source cover>;
+    /* ... */
+  }
+
+  body { margin: 0; padding: 40px; background: #E5E5E5; zoom: 0.7; }
+  .slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; background: var(--color-bg); overflow: hidden; }
+  .el { position: absolute; }
+
+  /* Text styles — keep the t-* class naming the scaffolds use so the
+     composer's reference points still resolve. Define each to match
+     the source: font-family, size, weight, color, line-height, etc. */
+  .t-cover-title { /* ... */ }
+  .t-slide-title { /* ... */ }
+  .t-section-header { /* ... */ }
+  .t-body { /* ... */ }
+  .t-caption { /* ... */ }
+
+  /* Components — define ONLY the decoration motifs the source PPTX
+     actually uses. Drop the scaffold's gold-frame / diamond / etc.
+     and add what's really there: e.g. orange accent bar, soft shadow
+     card, square bullet list, subtle 1px divider. */
+  .accent-bar { /* ... */ }
+  .card        { /* ... */ }
+  .divider     { /* ... */ }
+</style>
+</head>
+<body>
+
+<!-- Demonstration slides — show the composer how the system applies.
+     Mirror the demo-slide structure of the scaffolds (cover slide +
+     palette slide + a few content variants), but every value must be
+     source-derived. -->
+
+<div class="slide">
+  <!-- Cover slide rendered with the source's palette and motifs -->
+</div>
+
+<div class="slide">
+  <!-- Color palette swatches with the source's actual hex values -->
+</div>
+
+<!-- ... -->
+
+</body>
+</html>
+"""
+write_text("specs/art-direction.html", new_art)
+print("art-direction.html written for source PPTX")
+```
+
+(Cloud: prepend `purpose="Author art-direction.html from source PPTX"`.)
+
+Guidelines:
+
+- **The scaffold is reference-only.** Look at it to learn the
+  authoring conventions, then write fresh content. Do not preserve
+  scaffold-specific colors, fonts, or decoration classes that don't
+  match the source.
+- **Every token must be source-grounded.** If you don't have evidence
+  (themeHints, slide JSON, slide image), don't invent — leave that
+  token out. Defining fewer tokens is better than fabricating them.
+- **Keep the structural conventions.** 1920×1080 `.slide`, absolute
+  `.el` placement, `t-*` text class names, `:root` token block,
+  demonstration slides at the bottom of `<body>`. These are what the
+  composer expects.
+- **One `run_python(save=True)` call** so Step 4 picks it up.
 
 ---
 
-## Step 5 — Place slides + build + preview + compose (single `run_python`)
+## Step 4 — Place slides + build + preview + compose (single `run_python`)
 
 Copy the PPTX-derived slide JSON into `slides/`, merge deck metadata
-into `deck.json`, and build the deck in a **single** `run_python` call
-with `save=True`.
+into `deck.json` (using the deck-local `template.pptx`), and build the
+deck in a **single** `run_python` call with `save=True`.
 
-**Do not split Step 5 into multiple calls.** Each Cloud `run_python`
+**Do not split Step 4 into multiple calls.** Each Cloud `run_python`
 runs in a fresh sandbox VM that is discarded afterward, so intermediate
-`save=False` writes are lost. Keeping Step 5 in one call ensures the
+`save=False` writes are lost. Keeping Step 4 in one call ensures the
 copy, S3 writeback, build, preview, and compose all share a single VM.
 
-Assemble the slug list from Step 4-2 as a Python literal:
+Assemble the slug list from Step 3-2 as a Python literal:
 
 ```python
 short_id = "<result['shortId']>"
-selected_template = "<template name chosen in Step 1>"
-slugs = ["slide-01", "slide-02", "slide-03"]  # agent fills from Step 4-2
+slugs = ["slide-01", "slide-02", "slide-03"]  # agent fills from Step 3-2
+# image_mapping is in the import_attachment result. It maps the original
+# converter-emitted filename (e.g. "slide1_image1.png") to its
+# deck-relative path after rename (e.g. "images/<shortId>_slide1_image1.png").
+image_mapping = {<paste image_mapping dict from Step 2 result here>}
 
-# 1. Merge PPTX-derived metadata into deck.json
+# 1. Merge PPTX-derived metadata into deck.json (deck-local placeholder template)
 deck = read_json("deck.json")
 imported = read_json(f"attachments/{short_id}_deck.json")
-deck["template"] = selected_template
+deck["template"] = "template.pptx"  # deck-local; copied by import_attachment
 deck["fonts"] = imported.get("fonts", {})
 deck["defaultTextColor"] = imported.get("defaultTextColor")
 write_json("deck.json", deck)
@@ -238,9 +343,29 @@ for slug in slugs:
 if missing:
     print("ERROR missing:", missing)
 else:
-    # 3. Copy each slide JSON from attachments/ into slides/
+    # 3. Copy each slide JSON from attachments/ into slides/, rewriting
+    #    image src refs through image_mapping. import_attachment renames
+    #    extracted images (e.g. "slide1_image1.png" → deck/images/<shortId>_slide1_image1.png),
+    #    so the converter-emitted src strings ("images/slide1_image1.png")
+    #    no longer resolve and the build silently drops the picture.
+    def _rewrite_image_refs(node):
+        if isinstance(node, dict):
+            if node.get("type") == "image" and isinstance(node.get("src"), str):
+                src = node["src"]
+                # src looks like "images/<original_name>"
+                base = src.split("/", 1)[1] if src.startswith("images/") else src
+                mapped = image_mapping.get(base)
+                if mapped:
+                    node["src"] = mapped
+            for v in node.values():
+                _rewrite_image_refs(v)
+        elif isinstance(node, list):
+            for item in node:
+                _rewrite_image_refs(item)
+
     for slug in slugs:
         data = read_json(f"attachments/{short_id}/slides/{slug}.json")
+        _rewrite_image_refs(data)
         write_json(f"slides/{slug}.json", data)
     print("placed:", slugs)
 ```
@@ -258,20 +383,28 @@ run_python(
 
 Cloud: prepend `purpose="Import PPTX slides into deck and build"`.
 
-Because `specs/outline.md` was populated in Step 4-2, `save=True`
+Because `specs/outline.md` was populated in Step 3-2, `save=True`
 triggers a full build that includes every slide, followed by preview
-and SVG compose.
+and SVG compose. The PPTX-derived placeholder template means **layout
+mismatch is impossible** — the build should succeed in one shot.
+
+After the `run_python` call returns successfully, call
+`generate_pptx(deck_id=deck_id)` once. This persists `output.pptx`
+to the deck workspace and updates the deck record's `pptxS3Key`, so
+the Web UI can offer a "Download PPTX" button immediately. Without
+this call the UI sees no PPTX yet and hides the download action,
+even though the slides have rendered.
 
 ---
 
-## Step 6 — Present to the user
+## Step 5 — Present to the user
 
 Call `get_preview` to surface visuals:
 
 - Local: `get_preview(slides_json_path=deck_id, pages="")`
 - Cloud: `get_preview(deck_id, slugs=[...])`
 
-Then use a single `hearing` (the second and final hearing of this
+Then use a single `hearing` (the only user-facing hearing of this
 guide) to wrap up: surface what was auto-generated and let the user
 direct the next edits. Suggested `inference`:
 
