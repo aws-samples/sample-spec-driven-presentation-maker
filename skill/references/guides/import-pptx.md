@@ -196,19 +196,101 @@ slide layout in `<body>`). Treat its colors / fonts / decorations as
 4. Read the copied file once with `read_text("specs/art-direction.html")`
    to refresh the authoring conventions in your context.
 
-#### 3-3b. Rewrite the file as the source PPTX's own style
+#### 3-3b. Extract the source PPTX's actual design tokens
+
+`themeHints` from `upload_file` is a coarse summary (a single
+background luminance, three accent colors, two font families). The
+source PPTX's master/theme XML and slide images carry far more
+precise data — layout positions, every theme color slot, true
+background fills, and the actual color frequencies on each slide.
+Pull those signals **before** writing tokens so the rewritten
+art-direction.html reflects the original deck instead of an
+approximation.
+
+**Theme XML / layouts via `analyze_template`:**
+
+Call the MCP tool on the deck-local template (`template.pptx` was
+copied here in Step 2 by `import_attachment`). It returns the full
+theme color map (lt1 / dk1 / accent1-6 / hlink / folHlink), font
+pairs (latin/eastAsian/complex), and per-layout placeholder
+positions.
+
+```python
+result = analyze_template(template="template.pptx")  # MCP tool
+# Cloud: this is an MCP tool, not a run_python call
+```
+
+Capture from the result:
+- `theme_colors` — the canonical 12 theme slots. Use these as the
+  primary source for `--color-*` tokens. accent1-6 names map to
+  whatever the source PPTX intends (corporate primary, secondary,
+  highlight, etc.). Read every accent — `themeHints.accentColors`
+  truncates to 3.
+- `fonts.latin / fonts.eastAsian / fonts.complex` — carry these
+  through verbatim. Don't substitute with system fonts unless the
+  source explicitly uses one.
+- `layouts[]` — placeholder positions per layout. Use these to size
+  cover title, slide title, content area in `--size-*` and the
+  body x/y/width/height in your demonstration slides.
+
+**Per-slide actual colors via PIL:**
+
+Theme XML tells you what colors are *defined*; the rendered slide
+images tell you what's actually *used* and in what proportion.
+Extract dominant hex values from the slide image previews (the
+images that were attached when you read `read_uploaded_file` in
+Step 2 — they live in the upload's `images/` folder):
+
+```python
+from collections import Counter
+from PIL import Image
+import os
+
+upload_images_dir = f"<upload_dir>/images"  # from upload meta or attachments/{shortId}
+sample_files = sorted(os.listdir(upload_images_dir))[:6]  # cover + a few content slides
+all_pixels = []
+for f in sample_files:
+    img = Image.open(os.path.join(upload_images_dir, f)).convert("RGB").resize((150, 150))
+    all_pixels.extend(img.getdata())
+common = Counter(all_pixels).most_common(20)
+# Convert RGB tuples to #RRGGBB hex
+swatches = ["#{:02X}{:02X}{:02X}".format(r, g, b) for (r, g, b), _ in common]
+print("Top 20 hex by pixel frequency:", swatches)
+```
+
+Cross-reference these swatches with `theme_colors`:
+- Frequencies near `theme_colors.lt1 / dk1` confirm the **actual
+  background** (which may differ from `themeHints.backgroundLuminance`
+  if the deck uses a non-default master).
+- Frequencies near `theme_colors.accent1` confirm which accent is
+  the deck's hero color (the most-used one is rarely accent1 — pick
+  the most-frequent accent that isn't bg/text).
+- Outliers (high frequency but no match) are deck-specific brand
+  colors not declared in the theme — capture them as their own
+  tokens (`--color-brand-orange`, etc.).
+
+#### 3-3c. Rewrite the file as the source PPTX's own style
 
 Now write a fresh `specs/art-direction.html` that captures the source
-PPTX's visual system. Use only signals you can ground in the source:
+PPTX's visual system. Use only signals you can ground in the source,
+in this order of authority:
 
-- `themeHints.backgroundLuminance / accentColors / fonts` from the
-  original `upload_file` response.
-- Slide JSON in `attachments/{shortId}/slides/` — sample text colors,
-  bullet styles, divider lines, banner shapes, card backgrounds, font
-  weights, spacing patterns that recur across the deck.
-- The slide image thumbnails you have already seen in the conversation
-  — use them to confirm decoration motifs (line styles, shadows,
-  corner shapes, accent bars, icon framing) before encoding them.
+1. **`analyze_template` output** — theme XML colors, fonts, layout
+   positions. These are the original PPTX's authoring values, not
+   guesses.
+2. **PIL pixel-frequency swatches** — confirms which theme entries
+   are actually on screen, and surfaces brand colors not in the
+   theme.
+3. **`themeHints` from `upload_file`** — fall back to this only when
+   `analyze_template` and PIL agree it's representative; treat it as
+   a sanity check rather than a primary source.
+4. **Slide JSON in `attachments/{shortId}/slides/`** — sample text
+   colors, bullet styles, divider lines, banner shapes, card
+   backgrounds, font weights, spacing patterns that recur across
+   the deck.
+5. **Slide image thumbnails seen in the conversation** — use them to
+   confirm decoration motifs (line styles, shadows, corner shapes,
+   accent bars, icon framing) before encoding them.
 
 Compose the new document in your context, then write it in a single
 `run_python(save=True)` call:
