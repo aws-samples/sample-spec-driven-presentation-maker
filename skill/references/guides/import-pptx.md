@@ -275,24 +275,59 @@ even though the slides have rendered.
 ## Step 5 — art-direction.html (deck-specific style)
 
 Goal: produce a `specs/art-direction.html` that **describes the source
-PPTX's visual identity**, written from scratch, expressed in the same
-authoring conventions the built-in sdpm styles use.
+PPTX's visual identity as a style specification** — design tokens
+plus 5-6 demonstration slides that show *how the design rules apply*,
+not what the source deck contained.
 
-The output is **the source PPTX's own style sheet**. The composer
-reads this file as the single source of truth for colors, typography,
-decoration motifs, and component patterns when the user later asks
-to **edit** slides. The initial reproduction in Step 4 does not
-consume art-direction.html — running it after build means you can
-read the actual rendered slide previews as the most reliable input.
+The output follows the same conventions as every other sdpm style:
 
-### 5-1. Read a reference scaffold
+- `:root` block with all design tokens as CSS variables (the style's
+  *machine-readable specification* — composer reads `var()`
+  references, not pixel values).
+- 5-6 demonstration slides (cover, palette / type ramp / component
+  swatches / ...). Each slide demonstrates the design while
+  explaining the reasoning. This is **NOT** a re-render of the
+  source deck's content slides.
+- 1920×1080 absolute positioning, pt units, `.t-*` text classes,
+  `.el` for absolute elements. (See `create-style` workflow for the
+  full rule list.)
 
-`apply_style` copies one of the built-in styles to
-`specs/art-direction.html` for you to **reference how art-direction
-files are written** (CSS-variable conventions, slide dimensions,
-class naming, the structure of the `<style>` block, the demonstration
-slide layout in `<body>`). Treat its colors / fonts / decorations as
-**examples of how to write tokens, not as values to keep**.
+The composer reads this file when the user later asks to **edit**
+slides — it consumes the tokens, not the demonstration markup.
+
+> **Critical reframe:** art-direction.html is a *style guide*, not a
+> reproduction. If your demonstration slides contain the source
+> deck's headlines, bullet points, charts, or specific data, you've
+> written the wrong artifact. Demonstration slides should contain
+> placeholder text like "Cover Title" / "Section header" / "Body
+> sample with **bold** and accent" that exists purely to show how
+> the design rules render.
+
+### 5-1. Load the style-authoring workflow + scaffold
+
+`create-style.md` is the canonical workflow for authoring sdpm
+styles. **Read it first** so you understand what tokens to define,
+the demonstration slide pattern, and the critical CSS rules. The
+authoring conventions there apply unchanged to art-direction.html;
+this guide only adds the import-pptx-specific signal extraction in
+Step 5-2.
+
+```
+read_workflows(["create-style"])
+```
+
+Key conventions you must follow (full list in the workflow):
+- All design tokens in `:root` as CSS variables.
+- All colors via `var()` references — never hardcoded in elements.
+- Text style classes (`.t-cover-title`, `.t-slide-title`, `.t-body`,
+  ...) reference CSS variables. Use class names consistently.
+- Component classes (`.card`, `.accent-bar`, `.divider`, ...) also
+  via CSS variables.
+- Inline `style="..."` only for `left / top / width / height`.
+- 5-6 demonstration slides (cover + design areas) — NOT the source
+  deck's slides.
+
+Then pull a built-in style as a structural reference:
 
 1. Call `list_styles()`.
 2. Pick any scaffold — choose whichever you can read most easily.
@@ -300,7 +335,10 @@ slide layout in `<body>`). Treat its colors / fonts / decorations as
 3. Call `apply_style(deck_id, <scaffold>)` (MCP tool — not via
    `run_python`).
 4. Read the copied file once with `read_text("specs/art-direction.html")`
-   to refresh the authoring conventions in your context.
+   to confirm the demonstration-slide pattern (cover slide first,
+   palette swatches, type ramp, then a couple of component-only
+   variants). Treat its colors / fonts / decorations as
+   **structural examples**, not values to keep.
 
 ### 5-2. Extract the source PPTX's actual design tokens
 
@@ -422,129 +460,97 @@ your visual notes (Lens A):
   slide), still encode it — Lens A gives the meaning, Lens C only
   the prevalence.
 
-### 5-3. Rewrite the file as the source PPTX's own style
+### 5-3. Author art-direction.html following the create-style workflow
 
-Now write a fresh `specs/art-direction.html` that captures the source
-PPTX's visual system. Use only signals you can ground in the source.
-Different token kinds come from different lenses:
+You are now writing a style — follow the **`create-style` workflow**
+you loaded in 5-1. The HTML skeleton, `:root` token conventions,
+text-class naming (`.t-cover-title` / `.t-body` / ...), demonstration
+slide pattern (cover + palette + type ramp + component variants,
+total 5-6 slides), absolute-positioning rules, font-size unit, and
+violation examples are all defined there. Do not re-invent any of
+those conventions in this guide.
 
-- **Color tokens** — primary source: Lens B (`analyze_template`
-  theme_colors). Confirmation: Lens C (PIL swatches from
-  `previews/`). Lens A flags any deck-specific brand color the
-  theme doesn't declare.
-- **Font tokens** — Lens B (`fonts.latin / eastAsian / complex`),
-  verbatim. Don't substitute system fonts.
-- **Layout / size tokens** (`--size-*`, body x/y/width/height) —
-  Lens B (`layouts[]` placeholder positions) cross-checked against
-  Lens A (you saw the same positions in the rendered preview).
-- **Decoration / motif tokens** (`--shadow-*`, `--radius-*`,
-  `--accent-bar-*`, divider weights, card styles, bullet markers) —
-  primary source: Lens A (visual inspection notes from `get_preview`).
-  Theme XML and PIL cannot tell you these. If Lens A didn't see a
-  motif in the deck, do not invent it.
-- **Slide JSON in `slides/`** (now placed by Step 4) — final
-  sanity check for text colors, paragraph spacing, bullet styles
-  encoded directly on shapes.
-- **`themeHints` from `upload_file`** — coarse fall-back only;
-  treat it as a sanity check rather than a primary source.
+This Step contributes only the **import-pptx-specific token
+sourcing**: where each token value comes from. Map each token kind
+to the lens that produced it in 5-2:
 
-Compose the new document in your context, then write it in a single
-`run_python(save=True)` call:
+| Token kind                                 | Source                               |
+|--------------------------------------------|--------------------------------------|
+| `--color-bg`                               | Lens B `theme_colors.lt1` (light deck) or `dk1` (dark deck), confirmed by Lens C frequency. **Do not** use a guessed neutral or the scaffold's bg. |
+| `--color-fg` / text                        | Lens B `theme_colors.dk1` (light deck) or `lt1` (dark deck) |
+| `--color-accent-N` (1 per accent in use)   | Lens B `theme_colors.accent1..6`. Hero is the most-used accent per Lens C, not necessarily accent1. |
+| Brand color outside the theme              | Lens C outliers (high frequency, not in theme_colors). Encode as `--color-brand-<name>`. Lens A confirms semantic role. |
+| `--font-heading` / `--font-body`           | Lens B `fonts.latin / eastAsian / complex`, verbatim. No system-font substitution. |
+| `--size-cover-title` / `--size-slide-title` / `--size-body` | Lens B `layouts[]` text-frame heights → derive pt sizes; cross-check with Lens A visual hierarchy. |
+| `--radius-*` / `--shadow-*` / `--border-*` / decoration motifs | Lens A only. If Lens A did not see it, do not declare it. |
+| Margin / grid (where title sits, body x/y) | Lens B `layouts[]` placeholder x/y/width/height. |
+
+After populating tokens, write the demonstration slides. **The
+demonstration slides are NOT a re-render of the source deck.** Read
+the create-style workflow's "Plan slide composition" section: each
+slide demonstrates one design rule with placeholder content like
+"Cover Title" / "Section header" / "Body sample paragraph" /
+"Component swatches". Do not paste source-deck headlines, bullet
+lists, charts, or specific data into the demonstration slides — that
+content lives in `slides/` (placed by Step 4), not in the style
+specification.
+
+Write incrementally via `run_python(save=True)` — one call for the
+skeleton + `:root` + first slide, then one or two more for the
+remaining slides (per the create-style workflow's incremental writing
+guidance):
 
 ```python
-new_art = """<!DOCTYPE html>
+# Cloud: prepend purpose="Author art-direction.html — skeleton + tokens"
+header = """<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title><name of the source-PPTX visual system></title>
+<title><source-PPTX visual system name></title>
 <style>
   :root {
-    /* Colors — every value below must be source-derived */
-    --color-primary: <text color seen in source titles>;
-    --color-accent:  <theme_colors.accent1 or PIL hero accent>;
-    --color-bg:      <theme_colors.lt1 or PIL dominant bg hex>;
-    /* ...add as many tokens as the source needs, name them after the
-       role they play in the source (e.g. --color-banner, --color-divider).
-       Don't carry over scaffold-specific tokens (gold-frame, diamond,
-       etc.) unless the source uses an analogous element. */
-
-    /* Typography — pulled from analyze_template fonts */
-    --font-heading: <fonts.latin or eastAsian primary>;
-    --font-body:    <same family as heading unless source uses a pair>;
-
-    /* Sizes / spacing / decoration tokens */
-    --size-cover-title: <pt seen in source cover>;
-    /* ... */
+    /* ...design tokens populated from the table above... */
   }
-
   body { margin: 0; padding: 40px; background: #E5E5E5; zoom: 0.7; }
   .slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; background: var(--color-bg); overflow: hidden; }
   .el { position: absolute; }
-
-  /* Text styles — keep the t-* class naming the scaffolds use so the
-     composer's reference points still resolve. Define each to match
-     the source: font-family, size, weight, color, line-height, etc. */
-  .t-cover-title { /* ... */ }
-  .t-slide-title { /* ... */ }
-  .t-section-header { /* ... */ }
-  .t-body { /* ... */ }
-  .t-caption { /* ... */ }
-
-  /* Components — define ONLY the decoration motifs the source PPTX
-     actually uses. Drop the scaffold's gold-frame / diamond / etc.
-     and add what's really there: e.g. orange accent bar, soft shadow
-     card, square bullet list, subtle 1px divider. */
-  .accent-bar { /* ... */ }
-  .card        { /* ... */ }
-  .divider     { /* ... */ }
+  /* .t-cover-title / .t-slide-title / .t-body / ... — each maps to
+     CSS variables defined in :root. */
+  /* Component classes (.card, .accent-bar, .divider) — only those
+     Lens A actually saw in the source. */
 </style>
 </head>
 <body>
-
-<!-- Demonstration slides — show the composer how the system applies.
-     Mirror the demo-slide structure of the scaffolds (cover slide +
-     palette slide + a few content variants), but every value must be
-     source-derived. -->
-
-<div class="slide">
-  <!-- Cover slide rendered with the source's palette and motifs -->
-</div>
-
-<div class="slide">
-  <!-- Color palette swatches with the source's actual hex values -->
-</div>
-
-<!-- ... -->
-
-</body>
-</html>
 """
-write_text("specs/art-direction.html", new_art)
-print("art-direction.html written for source PPTX")
+cover_slide = """  <div class="slide">
+    <!-- Cover demonstration: title + style name. Placeholder text only. -->
+  </div>
+"""
+write_text("specs/art-direction.html", header + cover_slide)
 ```
 
-(Cloud: prepend `purpose="Author art-direction.html from rendered previews"`.)
+Subsequent calls append palette swatches, type ramp, and
+component-only demonstration slides — see the create-style workflow
+for the standard demonstration-slide set.
 
-Guidelines:
+Quality bar before considering this Step done:
 
-- **The scaffold is reference-only.** Look at it to learn the
-  authoring conventions, then write fresh content. Do not preserve
-  scaffold-specific colors, fonts, or decoration classes that don't
-  match the source.
-- **Every token must be source-grounded.** If you don't have evidence
-  (theme_colors, PIL swatches, slide JSON, preview), don't invent —
-  leave that token out. Defining fewer tokens is better than
-  fabricating them.
-- **Keep the structural conventions.** 1920×1080 `.slide`, absolute
-  `.el` placement, `t-*` text class names, `:root` token block,
-  demonstration slides at the bottom of `<body>`. These are what the
-  composer expects.
+- `:root` declares every color, font, and size the slides reference.
+  No hardcoded hex / pt anywhere outside `:root`.
+- Demonstration slides use `.t-*` text classes and `var(--*)`
+  references exclusively (verify with a `grep` for `style="font-size`
+  or `style="color`).
+- Demonstration slide *content* is placeholder copy — not the
+  source deck's content.
+- `--color-bg` matches what Lens A and Lens C agree the source
+  background actually is (dark theme decks have `--color-bg` set
+  to dark, not white).
+- Total demonstration slides: 5-6 (cover counted).
 - **No re-build is needed after writing art-direction.html.** Step 4
-  already produced an as-is reproduction the user can review. The
+  already produced the as-is reproduction the user can review. The
   file you write here is consumed by the composer the next time the
-  user asks to edit slides — at that point compose_slides reads it
-  and applies it to whatever slides change. Until then, the deck
-  stays at its Step 4 state.
+  user asks to edit slides; until then the deck stays at its Step 4
+  state.
 
 ---
 
