@@ -311,7 +311,51 @@ generated in Step 4** carry far more precise data — layout positions,
 every theme color slot, true background fills, and the actual color
 frequencies on each slide.
 
-**Theme XML / layouts via `analyze_template`:**
+Combine three lenses on the same source — each catches what the
+others miss.
+
+**Lens A — Visual inspection of rendered previews via `get_preview`:**
+
+Pull the actual rendered slides into your context as images so you
+can see them. PIL pixel statistics (Lens C below) give you frequency
+of colors but not *meaning* — they cannot tell you that the orange
+bar is a "section divider" or that the rounded box is a "card with
+shadow". You have to look.
+
+```
+get_preview(deck_id, slugs=["slide-01", "slide-03", "slide-05",
+                            "<a section-header slug>",
+                            "<a content slug with cards / lists>"],
+            quality="high")
+```
+
+Pick 4-6 slugs that span the deck's variety: cover, a section
+header, a typical content slide, any slide with charts/tables, the
+closing slide. `quality="high"` (1280px) is worth the extra tokens
+because decoration motifs (shadows, line weights, corner radii) are
+hard to see at low quality.
+
+While inspecting each preview, write down:
+- **Background** — solid? gradient? bitmap? if solid, the rough hex
+  (Lens C will pin it down).
+- **Title vs body color** — is the title color the same as body, or
+  a separate accent? Is one of the accents used only in the title
+  band?
+- **Decoration motifs** — accent bars (length / weight / position),
+  shadows (soft? hard? colored?), corner radii (sharp? rounded?
+  pill?), divider lines (1px? thicker? colored?), card backgrounds
+  (filled? bordered? shadowed?), bullet markers (round? square?
+  arrow?).
+- **Layout grid** — left/right margin, where the title sits, where
+  body content starts, vertical rhythm. Cross-check with
+  `analyze_template().layouts[]`.
+- **Typography hierarchy** — relative size of cover title vs slide
+  title vs body, weights, italics, font pair contrast.
+
+These are the qualitative tokens (`--decoration-*`, `--shadow-*`,
+`--radius-*`, `--size-*`) that Lens B and C cannot give you.
+
+**Lens B — Theme XML / layouts via `analyze_template`:**
 
 Call the MCP tool on the deck-local template (`template.pptx` was
 copied here in Step 2 by `import_attachment`). It returns the full
@@ -337,13 +381,13 @@ Capture from the result:
   cover title, slide title, content area in `--size-*` and the
   body x/y/width/height in your demonstration slides.
 
-**Per-slide actual colors via PIL on rendered previews:**
+**Lens C — Pixel-frequency sampling via PIL on `previews/`:**
 
 Theme XML tells you what colors are *defined*; the rendered slide
 previews tell you what's actually *used* and in what proportion.
 Step 4's build produced PNG previews under `previews/` — these are
-the slides as they'll actually appear. Sample dominant hex values
-from a few representative previews:
+the same images you saw via Lens A. Quantify the dominant hex values
+across all of them so the visual impression is grounded in numbers:
 
 ```python
 from collections import Counter
@@ -363,7 +407,8 @@ swatches = ["#{:02X}{:02X}{:02X}".format(r, g, b) for (r, g, b), _ in common]
 print("Top 20 hex by pixel frequency:", swatches)
 ```
 
-Cross-reference these swatches with `theme_colors`:
+Cross-reference these swatches with `theme_colors` (Lens B) and
+your visual notes (Lens A):
 - Frequencies near `theme_colors.lt1 / dk1` confirm the **actual
   background** (which may differ from `themeHints.backgroundLuminance`
   if the deck uses a non-default master).
@@ -373,29 +418,35 @@ Cross-reference these swatches with `theme_colors`:
 - Outliers (high frequency but no match) are deck-specific brand
   colors not declared in the theme — capture them as their own
   tokens (`--color-brand-orange`, etc.).
+- If Lens A noticed a color that PIL ranks low (e.g. only on one
+  slide), still encode it — Lens A gives the meaning, Lens C only
+  the prevalence.
 
 ### 5-3. Rewrite the file as the source PPTX's own style
 
 Now write a fresh `specs/art-direction.html` that captures the source
-PPTX's visual system. Use only signals you can ground in the source,
-in this order of authority:
+PPTX's visual system. Use only signals you can ground in the source.
+Different token kinds come from different lenses:
 
-1. **`analyze_template` output** — theme XML colors, fonts, layout
-   positions. These are the original PPTX's authoring values, not
-   guesses.
-2. **PIL pixel-frequency swatches from `previews/`** — confirms which
-   theme entries are actually on screen, and surfaces brand colors
-   not in the theme.
-3. **`themeHints` from `upload_file`** — fall back to this only when
-   `analyze_template` and PIL agree it's representative; treat it as
-   a sanity check rather than a primary source.
-4. **Slide JSON in `slides/`** (now placed by Step 4) — sample text
-   colors, bullet styles, divider lines, banner shapes, card
-   backgrounds, font weights, spacing patterns that recur across
-   the deck.
-5. **Slide preview thumbnails** — use them to confirm decoration
-   motifs (line styles, shadows, corner shapes, accent bars, icon
-   framing) before encoding them.
+- **Color tokens** — primary source: Lens B (`analyze_template`
+  theme_colors). Confirmation: Lens C (PIL swatches from
+  `previews/`). Lens A flags any deck-specific brand color the
+  theme doesn't declare.
+- **Font tokens** — Lens B (`fonts.latin / eastAsian / complex`),
+  verbatim. Don't substitute system fonts.
+- **Layout / size tokens** (`--size-*`, body x/y/width/height) —
+  Lens B (`layouts[]` placeholder positions) cross-checked against
+  Lens A (you saw the same positions in the rendered preview).
+- **Decoration / motif tokens** (`--shadow-*`, `--radius-*`,
+  `--accent-bar-*`, divider weights, card styles, bullet markers) —
+  primary source: Lens A (visual inspection notes from `get_preview`).
+  Theme XML and PIL cannot tell you these. If Lens A didn't see a
+  motif in the deck, do not invent it.
+- **Slide JSON in `slides/`** (now placed by Step 4) — final
+  sanity check for text colors, paragraph spacing, bullet styles
+  encoded directly on shapes.
+- **`themeHints` from `upload_file`** — coarse fall-back only;
+  treat it as a sanity check rather than a primary source.
 
 Compose the new document in your context, then write it in a single
 `run_python(save=True)` call:
