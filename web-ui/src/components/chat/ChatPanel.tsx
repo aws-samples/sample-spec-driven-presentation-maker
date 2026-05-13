@@ -48,7 +48,23 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (deckId === "new") return generateSessionId()
     return deckId.padEnd(36, "0")
   })
-  useEffect(() => { if (chatSessionId && chatSessionId !== sessionId) setSessionId(chatSessionId) }, [chatSessionId])
+  // Mid-stream guard: when a deck is created while the agent is still
+  // streaming (init_presentation in the import-pptx guide), the parent
+  // re-renders with a fresh chatSessionId. Swapping sessionId here would
+  // re-trigger history loading and clobber the in-flight messages
+  // (toolUses disappear from the UI). Defer the swap until streaming
+  // finishes, then apply it once isLoading flips back to false.
+  const pendingChatSessionIdRef = useRef<string | null>(null)
+  const isLoadingRef = useRef(false)
+  useEffect(() => {
+    if (chatSessionId && chatSessionId !== sessionId) {
+      if (isLoadingRef.current) {
+        pendingChatSessionIdRef.current = chatSessionId
+      } else {
+        setSessionId(chatSessionId)
+      }
+    }
+  }, [chatSessionId])
 
   // --- Config ---
   const [configLoaded, setConfigLoaded] = useState(false)
@@ -482,6 +498,19 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [stream.isLoading, stream.messages])
 
   const isLoading = stream.isLoading || reconnectLoading
+
+  // Sync streaming flag and flush any deferred sessionId swap once
+  // streaming finishes — at that point loadHistory can safely re-fetch
+  // (the .chat.json server-side state is already complete).
+  useEffect(() => {
+    isLoadingRef.current = stream.isLoading
+    if (!stream.isLoading && pendingChatSessionIdRef.current) {
+      const next = pendingChatSessionIdRef.current
+      pendingChatSessionIdRef.current = null
+      setSessionId(next)
+    }
+  }, [stream.isLoading])
+
   const isInitial = stream.messages.length === 0 && !historyLoading
 
   return (

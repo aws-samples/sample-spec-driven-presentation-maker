@@ -89,6 +89,13 @@ function rebuildBlocks(
 export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComplete }: UseChatStreamOptions): UseChatStreamReturn {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  // Synchronous re-entry guard: setIsLoading(true) below is React state
+  // and does not flip until the next render, so two near-simultaneous
+  // triggers (Enter key repeat, double click, fast tap) both pass the
+  // isLoading check above and end up firing /api/agent/invoke twice in
+  // parallel, producing duplicate user bubbles and parallel streams.
+  // Updated synchronously at function entry and reset in finally.
+  const isLoadingRef = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const messagesRef = useRef(messages)
   messagesRef.current = messages
@@ -113,10 +120,15 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   ) => {
     if (!userMessage.trim() && (!uploadedFiles || uploadedFiles.length === 0) && (!snippets || snippets.length === 0)) return
     if (isLoading) return
+    if (isLoadingRef.current) return
+    isLoadingRef.current = true
 
     const accessToken = auth.user?.access_token
     const userId = auth.user?.profile?.sub
-    if (!IS_LOCAL && (!accessToken || !userId)) return
+    if (!IS_LOCAL && (!accessToken || !userId)) {
+      isLoadingRef.current = false
+      return
+    }
 
     const display = options?.displayContent ?? userMessage
     setMessages((prev) => [
@@ -282,6 +294,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       }
     } finally {
       abortControllerRef.current = null
+      isLoadingRef.current = false
       setIsLoading(false)
       onSendComplete?.()
     }

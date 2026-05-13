@@ -115,7 +115,7 @@ export default function DecksPage() {
                     chatTab={ws.chatTab}
                     onChatTabChange={ws.setChatTab}
                     chatRef={chatRef}
-                    deckId={ws.isWorkspace && !ws.isNew ? ws.activeDeckId : null}
+                    deckId={ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null}
                     deckName={ws.deck?.name || null}
                     chatSessionId={ws.deck?.chatSessionId}
                     slideSlugs={ws.deck?.slides.map(s => s.slug || "") || []}
@@ -224,7 +224,7 @@ export default function DecksPage() {
             chatTab={ws.chatTab}
             onChatTabChange={ws.setChatTab}
             chatRef={chatRef}
-            deckId={ws.isWorkspace && !ws.isNew ? ws.activeDeckId : null}
+            deckId={ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null}
             deckName={ws.deck?.name || null}
             chatSessionId={ws.deck?.chatSessionId}
             slideSlugs={ws.deck?.slides.map(s => s.slug || "") || []}
