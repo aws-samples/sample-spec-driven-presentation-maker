@@ -54,11 +54,11 @@ _INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generat
 → Read `read_workflows(["create-new-1-briefing"])` to start. Follow each file's Next Step from there.
 """
 
-# TODO: Add these workflows when web UI supports them
-# ## Workflow B: Edit Existing PPTX
-# When an existing PPTX is provided.
-# → Read `read_workflows(["edit-existing"])` to start.
+# Edit-existing-PPTX flow on Cloud is driven by upload_file returning
+# guideInstruction: "read_guides([\"import-pptx\"])" — the spec agent
+# follows that pointer instead of a hard-coded workflow name here.
 #
+# TODO: Add these workflows when web UI supports them
 # ## Workflow C: Hand-Edit Sync
 # When the user hand-edits the generated PPTX in PowerPoint and then asks for further changes.
 # → Read `read_workflows(["create-new-4-hand-edit-sync"])` to start.

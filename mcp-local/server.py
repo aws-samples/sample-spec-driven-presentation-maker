@@ -65,8 +65,11 @@ When no existing PPTX is provided.
 
 ## Workflow B: Edit Existing PPTX
 
-When an existing PPTX is provided.
-→ Read `read_workflows(["edit-existing"])` to start.
+When an existing PPTX is provided. The Web UI / API path is the
+preferred entrypoint: `upload_file` returns
+`guideInstruction: "read_guides([\"import-pptx\"])"` automatically,
+so just follow that instruction. For CLI-only flows, call
+`read_guides(["import-pptx"])` directly.
 
 ## Workflow C: Hand-Edit Sync
 
