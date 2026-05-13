@@ -6,13 +6,60 @@ import re
 from pathlib import Path
 
 
+# CSS Color Module Level 3 named colors (https://www.w3.org/TR/css-color-3/#svg-color).
+# Used to distinguish real color values from paint-server keywords (none, currentColor,
+# url(...), inherit, ...) when scanning fill/stroke attributes.
+_CSS_NAMED_COLORS = frozenset({
+    "aliceblue", "antiquewhite", "aqua", "aquamarine", "azure",
+    "beige", "bisque", "black", "blanchedalmond", "blue", "blueviolet", "brown", "burlywood",
+    "cadetblue", "chartreuse", "chocolate", "coral", "cornflowerblue", "cornsilk", "crimson", "cyan",
+    "darkblue", "darkcyan", "darkgoldenrod", "darkgray", "darkgreen", "darkgrey", "darkkhaki",
+    "darkmagenta", "darkolivegreen", "darkorange", "darkorchid", "darkred", "darksalmon",
+    "darkseagreen", "darkslateblue", "darkslategray", "darkslategrey", "darkturquoise", "darkviolet",
+    "deeppink", "deepskyblue", "dimgray", "dimgrey", "dodgerblue",
+    "firebrick", "floralwhite", "forestgreen", "fuchsia",
+    "gainsboro", "ghostwhite", "gold", "goldenrod", "gray", "green", "greenyellow", "grey",
+    "honeydew", "hotpink",
+    "indianred", "indigo", "ivory",
+    "khaki",
+    "lavender", "lavenderblush", "lawngreen", "lemonchiffon", "lightblue", "lightcoral", "lightcyan",
+    "lightgoldenrodyellow", "lightgray", "lightgreen", "lightgrey", "lightpink", "lightsalmon",
+    "lightseagreen", "lightskyblue", "lightslategray", "lightslategrey", "lightsteelblue", "lightyellow",
+    "lime", "limegreen", "linen",
+    "magenta", "maroon", "mediumaquamarine", "mediumblue", "mediumorchid", "mediumpurple",
+    "mediumseagreen", "mediumslateblue", "mediumspringgreen", "mediumturquoise", "mediumvioletred",
+    "midnightblue", "mintcream", "mistyrose", "moccasin",
+    "navajowhite", "navy",
+    "oldlace", "olive", "olivedrab", "orange", "orangered", "orchid",
+    "palegoldenrod", "palegreen", "paleturquoise", "palevioletred", "papayawhip", "peachpuff",
+    "peru", "pink", "plum", "powderblue", "purple",
+    "rebeccapurple", "red", "rosybrown", "royalblue",
+    "saddlebrown", "salmon", "sandybrown", "seagreen", "seashell", "sienna", "silver", "skyblue",
+    "slateblue", "slategray", "slategrey", "snow", "springgreen", "steelblue",
+    "tan", "teal", "thistle", "tomato", "turquoise",
+    "violet",
+    "wheat", "white", "whitesmoke",
+    "yellow", "yellowgreen",
+})
+
+
 def _recolor_svg(svg_bytes: bytes, color: str) -> bytes | None:
     """Recolor single-color SVG. Returns None if multi-color (skip)."""
     import sys
     text = svg_bytes.decode("utf-8")
 
-    attr_colors = re.findall(r'(?:fill|stroke)\s*[=:]\s*["\']?\s*(#[0-9a-fA-F]{3,8}|rgb[^)]*\))', text)
-    unique = set(c.lower().strip() for c in attr_colors)
+    # Capture hex, rgb(...), or any alphabetic token after fill=/stroke= (or fill:/stroke:).
+    # The alphabetic branch lets us see CSS named colors (white, black, ...) as well as
+    # paint-server keywords (none, currentColor, url, inherit) that we then filter out below.
+    raw_colors = re.findall(
+        r'(?:fill|stroke)\s*[=:]\s*["\']?\s*(#[0-9a-fA-F]{3,8}|rgb[^)]*\)|[a-zA-Z]+)',
+        text,
+    )
+    unique = set()
+    for c in raw_colors:
+        c_norm = c.lower().strip()
+        if c_norm.startswith("#") or c_norm.startswith("rgb") or c_norm in _CSS_NAMED_COLORS:
+            unique.add(c_norm)
 
     if len(unique) == 0:
         # No explicit fill/stroke — add fill to <svg> root element (e.g. Material Symbols)
@@ -28,13 +75,17 @@ def _recolor_svg(svg_bytes: bytes, color: str) -> bytes | None:
     if original.lower() == color.lower():
         return None
 
-    has_fill = bool(re.search(r'fill\s*[=:]\s*["\']?\s*' + re.escape(original), text, re.IGNORECASE))
-    has_stroke = bool(re.search(r'stroke\s*[=:]\s*["\']?\s*' + re.escape(original), text, re.IGNORECASE))
+    # For named colors, anchor with \b so e.g. `white` doesn't replace inside `whitesmoke`.
+    suffix = r'\b' if original.isalpha() else r''
+    needle = re.escape(original) + suffix
+
+    has_fill = bool(re.search(r'fill\s*[=:]\s*["\']?\s*' + needle, text, re.IGNORECASE))
+    has_stroke = bool(re.search(r'stroke\s*[=:]\s*["\']?\s*' + needle, text, re.IGNORECASE))
 
     if has_fill:
-        text = re.sub(r'(fill\s*[=:]\s*["\']?\s*)' + re.escape(original), lambda m: m.group(1) + color, text, flags=re.IGNORECASE)
+        text = re.sub(r'(fill\s*[=:]\s*["\']?\s*)' + needle, lambda m: m.group(1) + color, text, flags=re.IGNORECASE)
     if has_stroke:
-        text = re.sub(r'(stroke\s*[=:]\s*["\']?\s*)' + re.escape(original), lambda m: m.group(1) + color, text, flags=re.IGNORECASE)
+        text = re.sub(r'(stroke\s*[=:]\s*["\']?\s*)' + needle, lambda m: m.group(1) + color, text, flags=re.IGNORECASE)
 
     return text.encode("utf-8")
 
