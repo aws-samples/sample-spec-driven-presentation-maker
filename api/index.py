@@ -1426,6 +1426,14 @@ def _pptx_guide_fields(item_or_values: Dict[str, Any]) -> Dict[str, Any]:
     )
     if theme is None and slide_count is None and suggested is None:
         return {}
+    if theme is not None:
+        # DDB returns numeric values as Decimal; JSON serializer on the
+        # response can't handle Decimal, so coerce backgroundLuminance back
+        # to a float.
+        from decimal import Decimal
+        bg_lum = theme.get("backgroundLuminance") if isinstance(theme, dict) else None
+        if isinstance(bg_lum, Decimal):
+            theme = {**theme, "backgroundLuminance": float(bg_lum)}
     return {
         "guide": "import-pptx",
         "guideInstruction": _PPTX_GUIDE_INSTRUCTION,
@@ -1519,9 +1527,12 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
                     # PPTX deck-structure metadata — stored for the edit guide
                     # and returned by process_upload / get_upload_status.
                     if result.deck_structure:
+                        from decimal import Decimal
+                        bg_lum = result.theme_hints.get("backgroundLuminance")
                         update_expr_parts.append("themeHints = :th")
                         expr_values[":th"] = {
-                            "backgroundLuminance": result.theme_hints.get("backgroundLuminance"),
+                            # DynamoDB rejects native floats; round-trip via str(Decimal).
+                            "backgroundLuminance": Decimal(str(bg_lum)) if bg_lum is not None else None,
                             "accentColors": result.theme_hints.get("accentColors", []),
                             "fonts": result.theme_hints.get("fonts", {}),
                         }
