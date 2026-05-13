@@ -207,6 +207,87 @@ def _format_cat_n(text: str, file_name: str, offset: int, limit: int) -> str:
     return f"{header}\n\n{body}{footer}"
 
 
+def _format_deck_summary_from_s3(
+    storage: Storage, prefix: str, file_name: str, offset: int, limit: int,
+) -> str | None:
+    """Return a markdown-style slide summary when the S3 prefix contains deck structure.
+
+    Output shape mirrors the Local `_format_deck_text_summary` helper so agents
+    receive identical content from both modes.
+    """
+    import json as _json
+
+    # Cheap check: is there a deck.json + at least one slides/slide-*.json?
+    try:
+        deck_bytes = storage.download_file_from_pptx_bucket(f"{prefix}/deck.json")
+        _ = deck_bytes  # only used to confirm existence
+    except Exception:
+        return None
+
+    slide_keys = [
+        k for k in storage.list_files(f"{prefix}/slides/", bucket=storage.pptx_bucket)
+        if k.endswith(".json")
+    ]
+    if not slide_keys:
+        return None
+
+    def _extract_title(data: dict) -> str:
+        t = data.get("title")
+        if isinstance(t, str):
+            return t
+        if isinstance(t, dict):
+            return t.get("text", "") or ""
+        return ""
+
+    def _collect_text(node, out: list[str]) -> None:
+        if isinstance(node, dict):
+            for key in ("text", "subtitle", "label", "date", "notes"):
+                v = node.get(key)
+                if isinstance(v, str) and v.strip():
+                    out.append(v)
+            for p in node.get("paragraphs", []) or []:
+                if isinstance(p, dict):
+                    t = p.get("text")
+                    if isinstance(t, str) and t.strip():
+                        out.append(t)
+            for item in node.get("items", []) or []:
+                if isinstance(item, str) and item.strip():
+                    out.append(item)
+            headers = node.get("headers")
+            if isinstance(headers, list):
+                out.extend(str(c) for c in headers if c)
+            rows = node.get("rows")
+            if isinstance(rows, list):
+                for row in rows:
+                    if isinstance(row, list):
+                        out.extend(str(c) for c in row if c)
+            for child in node.get("elements", []) or []:
+                _collect_text(child, out)
+
+    sections: list[str] = []
+    for i, key in enumerate(sorted(slide_keys), start=1):
+        try:
+            data = _json.loads(
+                storage.download_file_from_pptx_bucket(key).decode("utf-8"),
+            )
+        except Exception:
+            continue
+        title = _extract_title(data)
+        header = f"--- Slide {i}: {title} ---" if title else f"--- Slide {i} ---"
+        body_parts: list[str] = []
+        for el in data.get("elements", []) or []:
+            _collect_text(el, body_parts)
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for p in body_parts:
+            if p not in seen:
+                seen.add(p)
+                deduped.append(p)
+        sections.append(f"{header}\n{chr(10).join(deduped)}".rstrip())
+
+    return _format_cat_n("\n\n".join(sections), file_name, offset, limit)
+
+
 def _read_converted(
     storage: Storage, prefix: str, file_name: str, warning_text: str,
     offset: int, limit: int,
@@ -214,25 +295,18 @@ def _read_converted(
     """Read converted files from S3 prefix (cat -n format)."""
     result: list = []
 
-    # Try Markdown (.md)
-    md_found = False
-    stem = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
-    candidate = f"{prefix}/{stem}.md"
-    try:
-        md_data = storage.download_file_from_pptx_bucket(candidate)
-        result.append(_format_cat_n(md_data.decode("utf-8"), file_name, offset, limit))
-        md_found = True
-    except Exception:
-        pass
+    # Deck structure (PPTX): full slide text summary
+    deck_summary = _format_deck_summary_from_s3(storage, prefix, file_name, offset, limit)
+    if deck_summary is not None:
+        result.append(deck_summary)
 
-    # Try JSON (slides.json for PPTX)
-    if not md_found:
+    # Try Markdown (.md) — PDF/DOCX/XLSX path
+    if not result:
+        stem = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
+        candidate = f"{prefix}/{stem}.md"
         try:
-            json_data = storage.download_file_from_pptx_bucket(f"{prefix}/slides.json")
-            # JSON is usually compact; format with line numbers too
-            import json as _json
-            pretty = _json.dumps(_json.loads(json_data), ensure_ascii=False, indent=2)
-            result.append(_format_cat_n(pretty, file_name, offset, limit))
+            md_data = storage.download_file_from_pptx_bucket(candidate)
+            result.append(_format_cat_n(md_data.decode("utf-8"), file_name, offset, limit))
         except Exception:
             pass
 

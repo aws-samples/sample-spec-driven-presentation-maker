@@ -613,8 +613,8 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
 
     If deck_id is provided, the entire deck workspace is loaded as files:
         deck.json           — deck metadata (template, fonts, defaultTextColor)
-        slides/{slug}.json  — per-slide data (read/write via json.load/json.dump)
-        specs/brief.md     — briefing document
+        slides/{slug}.json  — per-slide data
+        specs/brief.md      — briefing document
         specs/art-direction.html — design direction (HTML)
         specs/outline.md    — slide outline (1 line = 1 slide = 1 message)
         includes/           — code block JSON files (created by code_to_slide)
@@ -622,7 +622,22 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
 
     Legacy decks with presentation.json are also supported (read-only compat).
 
-    All files are accessible via normal file I/O (open, read, write).
+    ## Sandbox helpers (preferred — identical API on Local and Cloud)
+
+        read_json(path)          → dict/list   Read a JSON file
+        write_json(path, data)   → None        Write data as JSON
+        read_text(path)          → str         Read a text file
+        write_text(path, text)   → None        Write a text file
+        list_files(subdir=".")   → list[str]   List filenames in a subdirectory
+
+    All paths are relative to the deck root. The helpers are injected
+    automatically — do NOT write `from _sdpm_helpers import ...` yourself;
+    the import is prepended by the sandbox. Using the helpers keeps the
+    same code portable between Local (AST-restricted) and Cloud.
+
+    Raw `open()` / `json.load` still work on Cloud for backward compat,
+    but new code should prefer the helpers.
+
     If save=True, all modified/new workspace files are written back to S3.
 
     **Always specify measure_slides when editing slides.** Runs validation after
@@ -637,12 +652,25 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     Example: files=["uploads/tmp/user/abc/data.csv"] → accessible as "data.csv" in code.
 
     Examples:
-        Edit slides:   run_python(code="...", deck_id="abc", save=True, measure_slides=["title", "feature-a"])
-        Edit specs:    run_python(code="open('specs/brief.md','w').write('...')", deck_id="abc", save=True)
-        Measure only:  run_python(code="print('ok')", deck_id="abc", measure_slides=["title"])
-        Compute:       run_python(code="print(2**100)")
-        CSV:           run_python(code="import pandas as pd; print(pd.read_csv('data.csv'))",
-                                  files=["uploads/tmp/user/x/data.csv"])
+        Edit slide:
+            data = read_json("slides/title.json")
+            data["elements"][0]["text"] = "New Title"
+            write_json("slides/title.json", data)
+            # run_python(code=<above>, deck_id="abc", save=True, measure_slides=["title"])
+
+        Edit spec:
+            write_text("specs/brief.md", "# Brief\\n\\nContents...")
+            # run_python(code=<above>, deck_id="abc", save=True)
+
+        Read deck metadata:
+            deck = read_json("deck.json")
+            print(deck.get("template"))
+
+        List slide files:
+            print(list_files("slides"))
+
+        General computation (no deck_id):
+            print(2 ** 100)
 
     Args:
         code: Python code to execute.

@@ -61,7 +61,7 @@ def _import_from_upload(
     file_type = item.get("fileType", "")
     s3_key = item.get("s3KeyRaw", "")
 
-    result = {"source": upload_id, "files": [], "image_mapping": {}}
+    result = {"source": upload_id, "files": [], "image_mapping": {}, "shortId": short_id}
 
     # --- Converted files (PDF/DOCX/XLSX/PPTX) ---
     if status == "converted":
@@ -181,6 +181,8 @@ def _import_converted(
 ) -> str:
     """Copy converted files from S3 upload prefix to deck workspace."""
     keys = storage.list_files(converted_prefix, bucket=storage.pptx_bucket)
+    # Ensure shortId is surfaced even when the branch above did not set it.
+    result.setdefault("shortId", short_id)
 
     for key in keys:
         rel = key[len(converted_prefix) + 1:]  # strip prefix + /
@@ -194,12 +196,23 @@ def _import_converted(
             storage.upload_file(key=dest_key, data=src_data, content_type=ct)
             result["files"].append(f"images/{dest_name}")
             result["image_mapping"][img_name] = f"images/{dest_name}"
-        elif rel == "slides.json":
-            dest_name = f"{short_id}_{file_name.rsplit('.', 1)[0]}.json"
+        elif rel.startswith("slides/"):
+            # Preserve deck-structure slides under attachments/{shortId}/slides/
+            # so the agent can walk them during guide Step 5.
+            slide_name = rel.split("/", 1)[1]
+            dest_key = f"decks/{deck_id}/attachments/{short_id}/slides/{slide_name}"
+            storage.upload_file(
+                key=dest_key, data=src_data, content_type="application/json",
+            )
+            result["files"].append(f"attachments/{short_id}/slides/{slide_name}")
+        elif rel == "deck.json":
+            dest_name = f"{short_id}_deck.json"
             dest_key = f"decks/{deck_id}/attachments/{dest_name}"
-            storage.upload_file(key=dest_key, data=src_data, content_type="application/json")
+            storage.upload_file(
+                key=dest_key, data=src_data, content_type="application/json",
+            )
             result["files"].append(f"attachments/{dest_name}")
-            result["json"] = f"attachments/{dest_name}"
+            result["deckJson"] = f"attachments/{dest_name}"
         else:
             dest_name = f"{short_id}_{rel}"
             dest_key = f"decks/{deck_id}/attachments/{dest_name}"
