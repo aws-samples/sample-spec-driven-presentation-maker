@@ -34,7 +34,7 @@ class LibreOfficeBackend:
                 env["HOME"] = tmp_dir
             cmd.append(str(pptx_path))
             subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                cmd, env=env, capture_output=True, text=True, timeout=120, check=True,
+                cmd, env=env, capture_output=True, text=True, timeout=120, check=True, stdin=subprocess.DEVNULL,
             )
             tmp_pdf = Path(tmp_dir) / (pptx_path.stem + ".pdf")
             if tmp_pdf.exists():
@@ -61,7 +61,7 @@ class LibreOfficeBackend:
                 env["HOME"] = tmp_dir
             cmd.append(str(pptx_path))
             subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                cmd, env=env, capture_output=True, text=True, timeout=120, check=True,
+                cmd, env=env, capture_output=True, text=True, timeout=120, check=True, stdin=subprocess.DEVNULL,
             )
             tmp_svg = Path(tmp_dir) / (pptx_path.stem + ".svg")
             if tmp_svg.exists():

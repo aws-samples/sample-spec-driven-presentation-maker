@@ -609,7 +609,7 @@ def preview(
         raise RuntimeError("PDF export failed. Is LibreOffice (soffice) installed?")
 
     cmd = ["pdftoppm", "-png", "-scale-to", "1280", str(pdf), str(out_dir / "page")]
-    result = subprocess.run(cmd, capture_output=True, text=True)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+    result = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
     if result.returncode != 0:
         raise RuntimeError(f"PNG conversion failed. Is poppler (pdftoppm) installed? {result.stderr}")
 
