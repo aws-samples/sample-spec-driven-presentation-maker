@@ -74,6 +74,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   const scrollTargetRef = useRef<string | null | undefined>(undefined)
   const [hadSlidesOnMount] = useState(slides.length > 0)
   const [firstComposeSeen, setFirstComposeSeen] = useState(false)
+  const [knownComposeUrls, setKnownComposeUrls] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
     let anyChanged = false
@@ -93,6 +94,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
       setFirstComposeSeen(true)
     }
     if (anyChanged) scrollTargetRef.current = null // arm scroll for next onAnimate
+    setKnownComposeUrls(new Map(prevComposeKeys.current))
   }, [slides])
 
   const handleAnimate = useCallback((slug: string) => {
@@ -352,7 +354,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 composeUrl={slide.composeUrl}
                 slug={slide.slug}
                 skipAnimation={!settled}
-                knownUrl={prevComposeKeys.current.get(slide.slug) || null}
+                knownUrl={knownComposeUrls.get(slide.slug) || null}
                 onAnimate={() => handleAnimate(slide.slug)}
                 fallback={
                   <SlideThumbnail
