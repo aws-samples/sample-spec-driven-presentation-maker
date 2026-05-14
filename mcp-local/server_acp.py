@@ -540,13 +540,13 @@ Audience: Developers
             result["pptx_error"] = str(e)
 
         # SVG output (single invocation) — used by both compose and measure
+        import shutil
         svg_path: Path | None = None
         _svg_tmpdir: str | None = None
         pptx_slugs: list[str] = []
         try:
-            import shutil as _sh
             from sdpm.preview import get_work_dir
-            lo = _sh.which("soffice")
+            lo = shutil.which("soffice")
             if not lo:
                 _lo_candidates = [
                     Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"),
@@ -624,7 +624,7 @@ Audience: Developers
                         continue
                     try:
                         comp_data = split_slide_components(svg_path, sn)
-                        print(f"[compose] svg slide {sn} → slug {slug}", file=__import__('sys').stderr)
+                        print(f"[compose] svg slide {sn} → slug {slug}", file=sys.stderr)
                         prev_file = prev_by_slug.get(slug)
                         if prev_file and prev_file.exists():
                             try:
@@ -686,24 +686,22 @@ Audience: Developers
 
         # Cleanup SVG temp dir
         if _svg_tmpdir:
-            import shutil as _shutil2
-            _shutil2.rmtree(_svg_tmpdir, ignore_errors=True)
+            shutil.rmtree(_svg_tmpdir, ignore_errors=True)
 
         # Preview: PDF → PNG (separate LibreOffice call, different format)
         try:
-            import shutil as _shutil
             preview_result = _preview(slides_json_path=deck_input, pages="", output_path=str(deck_dir / "output.pptx"))
             if isinstance(preview_result, dict) and preview_result.get("files"):
                 preview_dir = deck_dir / "preview"
                 if preview_dir.exists():
-                    _shutil.rmtree(preview_dir)
+                    shutil.rmtree(preview_dir)
                 preview_dir.mkdir(exist_ok=True)
                 for png_path in preview_result["files"]:
                     src = Path(png_path)
                     if src.exists():
-                        _shutil.copy2(src, preview_dir / src.name)
+                        shutil.copy2(src, preview_dir / src.name)
                 result["preview"] = f"{len(preview_result['files'])} PNGs"
-                _shutil.rmtree(preview_result["preview_dir"], ignore_errors=True)
+                shutil.rmtree(preview_result["preview_dir"], ignore_errors=True)
         except Exception as e:
             result["preview_error"] = str(e)
 
