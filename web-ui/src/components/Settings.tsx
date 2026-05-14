@@ -32,15 +32,21 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
 
   // ── Local: agent definition selection ──
   interface AgentDef { fileName: string; name: string; description: string }
-  interface AgentSelection { spec: string; vibe: string; composer: string; single: string }
+  interface AgentSelection { spec: string; vibe: string; composer: string; single: string; model?: string }
   const [agentDefs, setAgentDefs] = useState<AgentDef[]>([])
   const [agentSelection, setAgentSelection] = useState<AgentSelection>({ spec: "", vibe: "", composer: "", single: "" })
+  const [localModels, setLocalModels] = useState<{ modelId: string; displayName: string; description?: string }[]>([])
 
   useEffect(() => {
     if (!IS_LOCAL || !open) return
     fetch("/api/agent/definitions").then((r) => r.json()).then((d) => {
       setAgentDefs(d.agents || [])
       setAgentSelection(d.selection || {})
+    }).catch(() => {})
+    fetch("/api/agent/models").then((r) => r.json()).then((d) => {
+      setLocalModels((d.available || []).map((m: { modelId: string; name: string; description?: string }) => ({
+        modelId: m.modelId, displayName: m.name, description: m.description,
+      })))
     }).catch(() => {})
   }, [open])
 
@@ -63,6 +69,26 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
       toast.error(`Failed to update ${role} agent`)
     })
   }, [agentSelection, agentDefs])
+
+  const onLocalModelChange = useCallback((modelId: string | undefined) => {
+    const prev = { ...agentSelection }
+    const next = { ...agentSelection, model: modelId }
+    setAgentSelection(next)
+    fetch("/api/agent/definitions", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: modelId || null }),
+    }).then((r) => {
+      if (!r.ok) throw new Error()
+      const m = localModels.find((a) => a.modelId === modelId)
+      toast.success(m ? `Model: ${m.displayName}` : "Model: default", {
+        description: "Takes effect on next chat.",
+      })
+    }).catch(() => {
+      setAgentSelection(prev)
+      toast.error("Failed to update model")
+    })
+  }, [agentSelection, localModels])
 
   // Silently drop stale selections (admin may have removed the model from config).
   useEffect(() => {
@@ -140,6 +166,24 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                     </div>
                   )
                 })}
+                {localModels.length > 0 && (
+                  <div>
+                    <label
+                      htmlFor="agent-model"
+                      className="mb-1.5 block text-xs font-medium text-foreground"
+                    >
+                      Model
+                    </label>
+                    <ModelPicker
+                      models={localModels}
+                      value={agentSelection.model || undefined}
+                      onChange={onLocalModelChange}
+                      inheritLabel="Default"
+                      triggerId="agent-model"
+                      ariaLabel="Select agent model"
+                    />
+                  </div>
+                )}
               </div>
             </section>
           )}

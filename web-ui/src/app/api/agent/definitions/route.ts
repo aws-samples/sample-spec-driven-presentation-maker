@@ -24,6 +24,7 @@ interface AgentSelection {
   vibe: string
   composer: string
   single: string
+  model?: string
 }
 
 const DEFAULTS: AgentSelection = {
@@ -65,10 +66,16 @@ function syncToAgentsDir(sel: AgentSelection): void {
   fs.mkdirSync(dest, { recursive: true })
   for (const [role, fixedName] of Object.entries(ROLE_TO_FIXED)) {
     const fileName = sel[role as keyof AgentSelection] || DEFAULTS[role as keyof AgentSelection]
-    if (!isSafeFileName(fileName)) continue
+    if (!fileName || !isSafeFileName(fileName)) continue
     const srcFile = path.join(ACP_AGENTS_DIR, fileName) // nosemgrep: path-join-resolve-traversal
     if (fs.existsSync(srcFile)) {
-      fs.copyFileSync(srcFile, path.join(dest, fixedName))
+      const agent = JSON.parse(fs.readFileSync(srcFile, "utf-8"))
+      if (sel.model) {
+        agent.model = sel.model
+      } else {
+        delete agent.model
+      }
+      fs.writeFileSync(path.join(dest, fixedName), JSON.stringify(agent, null, 2) + "\n")
     }
   }
 }
@@ -100,8 +107,9 @@ export async function GET() {
 /** PUT: update selection and sync to agents/ */
 export async function PUT(req: Request) {
   const body = await req.json()
-  // Validate all values are safe filenames
-  for (const v of Object.values(body)) {
+  // Validate role values are safe filenames (model is a free-form model ID)
+  for (const [k, v] of Object.entries(body)) {
+    if (k === "model") continue
     if (typeof v === "string" && !isSafeFileName(v)) {
       return Response.json({ error: "Invalid filename" }, { status: 400 })
     }

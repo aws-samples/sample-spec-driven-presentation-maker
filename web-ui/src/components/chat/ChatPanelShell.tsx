@@ -26,8 +26,7 @@
 import { useRef, useEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
-import { LocalOnly, IS_LOCAL } from "@/lib/mode"
-import { ModelSelector } from "./ModelSelector"
+import { IS_LOCAL } from "@/lib/mode"
 
 export type ChatTabKey = "new" | "deck"
 
@@ -273,7 +272,6 @@ export function ChatPanelShell({
                 <MessageSquare className="h-2.5 w-2.5 text-brand-teal" />
               </div>
               <span className="text-sm font-semibold tracking-[-0.01em]">Chat</span>
-              <LocalOnly><ModelSelector /></LocalOnly>
             </div>
             <div className="flex items-center gap-0.5">
               <button

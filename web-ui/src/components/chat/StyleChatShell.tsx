@@ -12,8 +12,6 @@
 import { useRef, useEffect, useState, useCallback } from "react"
 import { StyleChatPanel } from "./StyleChatPanel"
 import { MessageSquare, PanelRightClose } from "lucide-react"
-import { LocalOnly } from "@/lib/mode"
-import { ModelSelector } from "./ModelSelector"
 
 const CHAT_WIDTH_KEY = "sdpm-chat-width"
 const DEFAULT_WIDTH = 440
@@ -124,7 +122,6 @@ export function StyleChatShell({ open, onClose, styleId, styleName, onStyleWritt
                 <span className="text-sm font-semibold tracking-[-0.01em] truncate max-w-[200px]">
                   {styleName || "Style Chat"}
                 </span>
-                <LocalOnly><ModelSelector /></LocalOnly>
               </div>
               <button
                 onClick={onClose}

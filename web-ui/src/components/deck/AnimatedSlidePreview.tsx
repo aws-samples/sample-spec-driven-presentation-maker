@@ -138,6 +138,10 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           if (!container || cancelled) return
 
           cleanup()
+          setError(false)
+          // Immediately hide fallback (React re-render is async)
+          const fb = container.parentElement?.querySelector("[data-fallback]") as HTMLElement | null
+          if (fb) fb.style.display = "none"
 
           const animTargets = new Set<number>()
           if (!skipThisUpdate) {
@@ -294,7 +298,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   return (
     <div data-slide-id={slug} className="aspect-[16/9] relative overflow-hidden rounded-lg bg-black">
       <div ref={containerRef} className="absolute inset-0" data-slide-id={slug} />
-      {error && fallback && <div className="absolute inset-0">{fallback}</div>}
+      {error && fallback && <div data-fallback className="absolute inset-0">{fallback}</div>}
     </div>
   )
 }
