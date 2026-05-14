@@ -54,6 +54,7 @@ interface AnimatedSlidePreviewProps {
   composeUrl: string
   slug?: string
   skipAnimation?: boolean
+  knownUrl?: string | null
   onAnimate?: () => void
   onComplete?: () => void
   fallback?: React.ReactNode
@@ -68,7 +69,7 @@ function assignAgent(comp: ComposeComponent) {
   return AGENTS[4]
 }
 
-export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, onAnimate, onComplete, fallback }: AnimatedSlidePreviewProps) {
+export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, knownUrl, onAnimate, onComplete, fallback }: AnimatedSlidePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const intervalsRef = useRef<number[]>([])
@@ -92,6 +93,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   const composeUrlRef = useRef(composeUrl)
   const defsUrlRef = useRef(defsUrl)
   const skipRef = useRef(skipAnimation)
+  const knownUrlRef = useRef(knownUrl?.split("?")[0] || null)
   composeUrlRef.current = composeUrl
   defsUrlRef.current = defsUrl
   skipRef.current = skipAnimation
@@ -107,7 +109,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       if (!compUrlBase) return
       if (compUrlBase === lastComposeUrlRef.current) return
       if (animatingRef.current) return  // defer until animation completes
-      const skipThisUpdate = skipRef.current
+      const skipThisUpdate = skipRef.current || compUrlBase === knownUrlRef.current
       lastComposeUrlRef.current = compUrlBase
       setError(false)
 
