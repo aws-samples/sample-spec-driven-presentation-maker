@@ -107,10 +107,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       if (!compUrlBase) return
       if (compUrlBase === lastComposeUrlRef.current) return
       if (animatingRef.current) return  // defer until animation completes
-      // Skip only on the first URL seen after mount (initial load for existing
-      // deck). Subsequent URL changes (user edits) always animate.
-      const isFirstUrl = !lastComposeUrlRef.current
-      const skipThisUpdate = skipRef.current && isFirstUrl
+      const skipThisUpdate = skipRef.current
       lastComposeUrlRef.current = compUrlBase
       setError(false)
 
