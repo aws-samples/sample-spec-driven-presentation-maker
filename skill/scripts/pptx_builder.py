@@ -744,16 +744,12 @@ def cmd_analyze_template(args):
 
     # Generate color usage and cache preview PNGs if not cached
     if not result["color_usage"]:
-        import shutil
         import subprocess
 
         from sdpm.analyzer import cache_color_usage, cache_preview_pngs, extract_color_usage_from_pngs
         from sdpm.preview import export_pdf
         import tempfile as _tf
-        preview_dir = Path(_tf.gettempdir()) / "pptx-preview"
-        if preview_dir.exists():
-            shutil.rmtree(preview_dir)
-        preview_dir.mkdir(parents=True, exist_ok=True)
+        preview_dir = Path(_tf.mkdtemp())
         try:
             pdf_path = preview_dir / "slides.pdf"
             if export_pdf(template_path, pdf_path):

@@ -7,6 +7,7 @@ mcp-local and other consumers should call these instead of assembling low-level 
 """
 
 import os
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -520,7 +521,7 @@ def measure(
     """
     import tempfile
 
-    from sdpm.preview.backend import LibreOfficeBackend
+    from sdpm.preview.backend import LibreOfficeBackend, get_work_dir
     from sdpm.preview.measure import format_measure_report, measure_from_svg
 
     config = _resolve_config(json_path)
@@ -540,12 +541,15 @@ def measure(
     else:
         slide_indices = slides
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    input_path = Path(json_path)
+    work_dir = get_work_dir(input_path.parent if input_path.is_dir() else input_path.resolve().parent)
+
+    with tempfile.TemporaryDirectory(dir=work_dir) as tmp_dir:
         tmp_pptx = Path(tmp_dir) / "measure.pptx"
         _build(config, tmp_pptx)
 
         backend = LibreOfficeBackend()
-        svg_path = backend.export_svg(tmp_pptx)
+        svg_path = backend.export_svg(tmp_pptx, work_dir=work_dir)
         if svg_path is None:
             raise RuntimeError("SVG export failed. Is LibreOffice (soffice) installed?")
 
@@ -596,16 +600,16 @@ def preview(
 
     _build(config, out)
 
-    # Preview dir
-    import tempfile as _tf
-    out_dir = Path(_tf.gettempdir()) / "pptx-preview"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    # Preview dir — use project-local _work/ to avoid macOS EDR/DLP blocking system temp
+    from sdpm.preview import get_work_dir
+    work_dir = get_work_dir(input_path.parent if input_path.is_dir() else input_path.resolve().parent)
+    out_dir = Path(tempfile.mkdtemp(dir=work_dir))
 
     pages_set = set(pages) if pages else None
 
     # PDF + pdftoppm pipeline
     pdf = out_dir / "slides.pdf"
-    if not export_pdf(out, pdf):
+    if not export_pdf(out, pdf, work_dir=work_dir):
         raise RuntimeError("PDF export failed. Is LibreOffice (soffice) installed?")
 
     cmd = ["pdftoppm", "-png", "-scale-to", "1280", str(pdf), str(out_dir / "page")]

@@ -558,10 +558,6 @@ Audience: Developers
 
         try:
             import shutil as _shutil
-            import tempfile as _tf
-            _tmp_preview = Path(_tf.gettempdir()) / "pptx-preview"
-            if _tmp_preview.exists():
-                _shutil.rmtree(_tmp_preview, ignore_errors=True)
             preview_result = _preview(slides_json_path=deck_input, pages="", output_path=str(deck_dir / "output.pptx"))
             if isinstance(preview_result, dict) and preview_result.get("files"):
                 preview_dir = deck_dir / "preview"
@@ -573,6 +569,8 @@ Audience: Developers
                     if src.exists():
                         _shutil.copy2(src, preview_dir / src.name)
                 result["preview"] = f"{len(preview_result['files'])} PNGs"
+                # Clean up temp preview dir
+                _shutil.rmtree(preview_result["preview_dir"], ignore_errors=True)
         except Exception as e:
             result["preview_error"] = str(e)
 
@@ -591,7 +589,8 @@ Audience: Developers
                         break
             pptx_out = result.get("pptx", "")
             if lo and pptx_out:
-                with tempfile.TemporaryDirectory() as tmpdir:
+                from sdpm.preview import get_work_dir
+                with tempfile.TemporaryDirectory(dir=get_work_dir(deck_dir)) as tmpdir:
                     env = dict(os.environ)
                     cmd = [lo, "--headless", "--convert-to", "svg", "--outdir", tmpdir]
                     if sys.platform == "win32":

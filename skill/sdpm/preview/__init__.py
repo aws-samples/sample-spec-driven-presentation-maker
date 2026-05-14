@@ -3,21 +3,20 @@
 """Preview: PNG generation, layout imbalance check."""
 
 import sys
-import tempfile
 from pathlib import Path
 
 from pptx import Presentation
 
-from .backend import detect_backend
+from .backend import detect_backend, get_work_dir  # noqa: F401
 
 
-def export_pdf(pptx_path, pdf_path):
+def export_pdf(pptx_path, pdf_path, work_dir=None):
     """Export PPTX to PDF via detected presentation backend."""
     backend = detect_backend()
     if backend is None:
         print("Warning: PDF export skipped (no presentation app available)", file=sys.stderr)
         return False
-    return backend.export_pdf(Path(pptx_path), Path(pdf_path))
+    return backend.export_pdf(Path(pptx_path), Path(pdf_path), work_dir=work_dir)
 
 
 def check_layout_imbalance(pptx_path, slide_defs=None):
@@ -72,10 +71,3 @@ def check_layout_imbalance_data(pptx_path, slide_defs=None):
     return alerts
 
 
-def get_tmp_project_dir(input_json_path):
-    """Derive temp sdpm/{project_name}/ from input JSON path."""
-    p = Path(input_json_path).resolve().parent
-    project_name = p.name
-    tmp_dir = Path(tempfile.gettempdir()) / "sdpm" / project_name
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    return tmp_dir
