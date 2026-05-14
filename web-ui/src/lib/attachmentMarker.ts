@@ -14,7 +14,7 @@ export function buildAttachedMarker(file: UploadedFile): string {
     const parts = [
       `uploadId: ${file.uploadId}`,
       `guide: ${file.guide}`,
-      `guideInstruction: "${file.guideInstruction.replace(/"/g, '\\"')}"`,
+      `guideInstruction: ${JSON.stringify(file.guideInstruction)}`,
     ]
     if (file.suggestedName) parts.push(`suggestedName: "${file.suggestedName}"`)
     if (typeof file.slideCount === "number") parts.push(`slideCount: ${file.slideCount}`)
