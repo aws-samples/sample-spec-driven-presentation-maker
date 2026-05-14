@@ -51,7 +51,7 @@ export async function POST(req: Request) {
 
   const platform = process.platform
   if (platform === "win32") {
-    execFile("cmd.exe", ["/c", "start", "", target])
+    execFile("explorer.exe", [target])
   } else {
     execFile(platform === "linux" ? "xdg-open" : "open", [target])
   }
