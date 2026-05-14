@@ -67,19 +67,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const slides: Record<string, unknown>[] = []
   let slugList = outlineSlugs.length > 0 ? outlineSlugs
     : (fs.existsSync(slidesDir) ? fs.readdirSync(slidesDir).filter(f => f.endsWith(".json")).map(f => f.replace(".json", "")) : [])
-  const anyCompose = composeBySlug.size > 0
   let pageNum = 0
-  if (anyCompose && fs.existsSync(slidesDir)) {
+  if (fs.existsSync(slidesDir)) {
     for (const slug of slugList) {
       if (!fs.existsSync(path.join(slidesDir, `${slug}.json`))) continue
       pageNum++
       const composeFile = composeBySlug.get(slug)
-      if (!composeFile) continue
       const previewFile = previewByPage.get(pageNum)
       slides.push({
         slug,
         previewUrl: previewFile ? `/api/preview/${deckId}/preview/${previewFile}` : null,
-        composeUrl: `/api/preview/${deckId}/compose/${composeFile}`,
+        composeUrl: composeFile ? `/api/preview/${deckId}/compose/${composeFile}` : null,
         updatedAt: new Date().toISOString(),
       })
     }

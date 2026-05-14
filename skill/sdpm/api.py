@@ -597,7 +597,8 @@ def preview(
     _build(config, out)
 
     # Preview dir
-    out_dir = Path("/tmp/pptx-preview")
+    import tempfile as _tf
+    out_dir = Path(_tf.gettempdir()) / "pptx-preview"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     pages_set = set(pages) if pages else None

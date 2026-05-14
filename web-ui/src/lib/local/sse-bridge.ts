@@ -7,6 +7,8 @@
  * Returns a ReadableStream that the API route can return as a Response.
  */
 
+import { basename } from "./pathUtils"
+
 interface BridgeOptions {
   sessionId: string
   subscribe: (fn: (msg: Record<string, unknown>) => void) => () => void
@@ -167,7 +169,7 @@ export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, replay
               }
             } catch {}
             if (result.output_dir && !result.deckId) {
-              result.deckId = (result.output_dir as string).split("/").pop() || ""
+              result.deckId = basename(result.output_dir as string)
             }
             if (result.deckId && onDeckId) onDeckId(result.deckId as string)
             send({ toolResult: { toolUseId: toolCallId, name: toolName, status: "success", content: JSON.stringify(result) } })

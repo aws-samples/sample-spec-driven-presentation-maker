@@ -749,7 +749,8 @@ def cmd_analyze_template(args):
 
         from sdpm.analyzer import cache_color_usage, cache_preview_pngs, extract_color_usage_from_pngs
         from sdpm.preview import export_pdf
-        preview_dir = Path("/tmp/pptx-preview")
+        import tempfile as _tf
+        preview_dir = Path(_tf.gettempdir()) / "pptx-preview"
         if preview_dir.exists():
             shutil.rmtree(preview_dir)
         preview_dir.mkdir(parents=True, exist_ok=True)

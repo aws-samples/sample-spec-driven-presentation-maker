@@ -16,6 +16,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path
 
 # Import the base server — registers all standard tools on `mcp`
@@ -25,6 +26,8 @@ from tools import (  # noqa: E402
     preview as _preview,
 )
 
+# Serialize LibreOffice calls — Windows cannot run multiple soffice instances concurrently.
+_lo_lock = threading.Lock()
 # ---------------------------------------------------------------------------
 # Override instructions for ACP (desktop app) usage
 # ---------------------------------------------------------------------------
@@ -533,11 +536,18 @@ Audience: Developers
     if save:
         # File lock per deck — prevents concurrent saves from corrupting PPTX
         # (parallel subagents composing different slugs).
-        import fcntl
-        lock_path = deck_dir / ".save.lock"
-        lock_path.touch(exist_ok=True)
-        _lock_fp = open(lock_path, "r")
-        fcntl.flock(_lock_fp.fileno(), fcntl.LOCK_EX)
+        # On Windows local mode, skip locking (single-agent, no concurrency).
+        if sys.platform != "win32":
+            try:
+                import fcntl
+                lock_path = deck_dir / ".save.lock"
+                lock_path.touch(exist_ok=True)
+                _lock_fp = open(lock_path, "r+b")
+                fcntl.flock(_lock_fp.fileno(), fcntl.LOCK_EX)
+            except Exception:
+                if _lock_fp:
+                    _lock_fp.close()
+                    _lock_fp = None
 
     if save:
         try:
@@ -551,13 +561,15 @@ Audience: Developers
             result["pptx_error"] = str(e)
 
         try:
-            # preview API writes PNGs to /tmp/pptx-preview (fixed path).
+            # preview API writes PNGs to tempdir/pptx-preview (fixed path).
             # Clear first to avoid stale files from other decks.
             import shutil as _shutil
-            _tmp_preview = Path("/tmp/pptx-preview")
+            import tempfile as _tf
+            _tmp_preview = Path(_tf.gettempdir()) / "pptx-preview"
             if _tmp_preview.exists():
                 _shutil.rmtree(_tmp_preview, ignore_errors=True)
-            preview_result = _preview(slides_json_path=deck_input, pages="", output_path=str(deck_dir / "output.pptx"))
+            with _lo_lock:
+                preview_result = _preview(slides_json_path=deck_input, pages="", output_path=str(deck_dir / "output.pptx"))
             if isinstance(preview_result, dict) and preview_result.get("files"):
                 preview_dir = deck_dir / "preview"
                 # Clear deck's preview dir so page count always matches current build
@@ -575,20 +587,28 @@ Audience: Developers
         # SVG compose for WebUI animation (requires LibreOffice 25.8.6+)
         try:
             import shutil as _sh
-            lo = _sh.which("soffice") or (
-                "/Applications/LibreOffice.app/Contents/MacOS/soffice"
-                if Path("/Applications/LibreOffice.app/Contents/MacOS/soffice").exists()
-                else None
-            )
+            lo = _sh.which("soffice")
+            if not lo:
+                _lo_candidates = [
+                    Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"),
+                    Path(r"C:\Program Files\LibreOffice\program\soffice.exe"),
+                ]
+                for _c in _lo_candidates:
+                    if _c.exists():
+                        lo = str(_c)
+                        break
             pptx_out = result.get("pptx", "")
             if lo and pptx_out:
                 with tempfile.TemporaryDirectory() as tmpdir:
                     env = dict(os.environ)
-                    env["HOME"] = tmpdir
-                    subprocess.run(
-                        [lo, "--headless", "--convert-to", "svg", "--outdir", tmpdir, pptx_out],
-                        capture_output=True, timeout=120, env=env,
-                    )
+                    cmd = [lo, "--headless", "--convert-to", "svg", "--outdir", tmpdir]
+                    if sys.platform == "win32":
+                        cmd.append(f"-env:UserInstallation=file:///{tmpdir.replace(os.sep, '/')}")
+                    else:
+                        env["HOME"] = tmpdir
+                    cmd.append(pptx_out)
+                    with _lo_lock:
+                        subprocess.run(cmd, capture_output=True, timeout=120, env=env)
                     svg_files = list(Path(tmpdir).glob("*.svg"))
                     if svg_files:
                         from compose import extract_optimized_defs, split_slide_components, count_slides
@@ -709,6 +729,11 @@ Audience: Developers
             _lock_fp.close()
         except Exception:
             pass
+
+    # Debug: dump save-related keys to stderr for troubleshooting
+    if save:
+        _dbg = {k: v for k, v in result.items() if k in ("pptx", "pptx_error", "preview", "preview_error", "compose", "compose_error")}
+        print(f"[run_python save] {json.dumps(_dbg, default=str)}", file=sys.stderr)
 
     return json.dumps(result, ensure_ascii=False)
 

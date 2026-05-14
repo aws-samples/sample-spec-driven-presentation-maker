@@ -33,6 +33,7 @@ import {
 import type { LucideIcon } from "lucide-react"
 import { ComposeCard } from "./compose/ComposeCard"
 import { CAT, type ToolCategory } from "./toolPalette"
+import { basename } from "@/lib/local/pathUtils"
 
 interface ToolMeta {
   Icon: LucideIcon
@@ -128,7 +129,7 @@ function getDetail(name: string, input?: Record<string, unknown>): string {
   }
   if ((name === "measure_slides" || name.endsWith("_measure_slides")) && !input.slide_numbers) return "All slides"
   if (input.purpose) { const p = String(input.purpose); return p.length > 40 ? p.slice(0, 40) + "…" : p }
-  if (input.path) { const p = String(input.path); return p.split("/").pop() || p }
+  if (input.path) { const p = String(input.path); return basename(p) }
   if (input.template) return String(input.template)
   if (input.style) return String(input.style)
   if (input.keyword) return `"${input.keyword}"`

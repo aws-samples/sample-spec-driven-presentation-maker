@@ -49,8 +49,12 @@ export async function POST(req: Request) {
   if (!fs.existsSync(target))
     return Response.json({ error: "file not found" }, { status: 404 })
 
-  const cmd = process.platform === "win32" ? "start" : process.platform === "linux" ? "xdg-open" : "open"
-  execFile(cmd, [target])
+  const platform = process.platform
+  if (platform === "win32") {
+    execFile("cmd.exe", ["/c", "start", "", target])
+  } else {
+    execFile(platform === "linux" ? "xdg-open" : "open", [target])
+  }
 
   return Response.json({ ok: true })
 }
