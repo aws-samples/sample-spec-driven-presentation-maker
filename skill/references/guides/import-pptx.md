@@ -401,10 +401,15 @@ theme color map (lt1 / dk1 / accent1-6 / hlink / folHlink), font
 pairs (latin/eastAsian/complex), and per-layout placeholder
 positions.
 
-```python
-result = analyze_template(template="template.pptx")  # MCP tool
-# Cloud: this is an MCP tool, not a run_python call
 ```
+# Cloud (deck-local placeholder template requires deck_id):
+analyze_template(template="template.pptx", deck_id=<deck_id>)
+
+# Local (file path is fine; deck_id ignored):
+analyze_template(template="template.pptx")
+```
+
+This is an MCP tool — do not wrap in `run_python`.
 
 Capture from the result:
 - `theme_colors` — the canonical 12 theme slots. Use these as the

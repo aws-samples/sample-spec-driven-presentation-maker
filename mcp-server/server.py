@@ -207,18 +207,45 @@ def init_presentation(name: str) -> str:
 
 
 @mcp.tool()
-def analyze_template(template: str) -> str:
+def analyze_template(template: str, deck_id: str = "") -> str:
     """Get pre-analyzed template information — layouts, theme colors, fonts.
     Call this to understand what layouts are available before building slides.
 
     Args:
-        template: Template name from list_templates. Required.
+        template: Template name from list_templates, OR "template.pptx" to
+            analyze the deck-local placeholder template (set by import_attachment
+            during the import-pptx flow). When passing "template.pptx", deck_id
+            must also be supplied.
+        deck_id: Required only when template == "template.pptx" — identifies
+            the deck whose deck-local template.pptx should be analyzed.
 
     Returns:
         JSON with layouts, theme colors, and font information.
     """
     if not template or not template.strip():
         return json.dumps({"error": "template is required"})
+
+    # Deck-local placeholder template (PPTX-derived; copied by import_attachment
+    # during the import-pptx guide). Download from the deck workspace bucket
+    # and analyze on the fly so import-pptx Step 5 can extract theme colors
+    # and layouts without first registering the source PPTX as a sdpm template.
+    if template == "template.pptx":
+        if not deck_id:
+            return json.dumps({"error": "deck_id is required when template == 'template.pptx'"})
+        try:
+            import tempfile
+            from pathlib import Path
+            from sdpm.analyzer import analyze_template as _analyze
+            data = _storage.download_file_from_pptx_bucket(f"decks/{deck_id}/template.pptx")
+            tmp = Path(tempfile.mkdtemp())
+            tpl_path = tmp / "template.pptx"
+            tpl_path.write_bytes(data)
+            analysis = _analyze(tpl_path)
+            analysis["templateName"] = "template.pptx"
+            return json.dumps(analysis, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"error": f"Failed to analyze deck-local template: {e}"})
+
     return json.dumps(
         template_mod.analyze_template(template_name=template, storage=_storage, user_id=_get_user_id()),
         ensure_ascii=False,
