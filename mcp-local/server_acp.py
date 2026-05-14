@@ -511,12 +511,6 @@ Audience: Developers
             errs = result.setdefault("errors", {})
             errs["lintDiagnostics"] = lint_diagnostics
 
-    # Build slug → page number mapping from outline.md (for slug-based measure_slides)
-    def _slug_to_page() -> dict[str, int]:
-        from sdpm.api import parse_outline_slugs
-        slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
-        return {slug: i + 1 for i, slug in enumerate(slugs)}
-
     # Post-processing: build PPTX + SVG (compose/measure) + preview (PDF→PNG)
     _lock_fp = None
     if save:
@@ -547,6 +541,7 @@ Audience: Developers
 
         # SVG output (single invocation) — used by both compose and measure
         svg_path: Path | None = None
+        _svg_tmpdir: str | None = None
         pptx_slugs: list[str] = []
         try:
             import shutil as _sh
@@ -690,9 +685,9 @@ Audience: Developers
                 result["measure"] = f"Measure error: {e}"
 
         # Cleanup SVG temp dir
-        if svg_path:
+        if _svg_tmpdir:
             import shutil as _shutil2
-            _shutil2.rmtree(svg_path.parent, ignore_errors=True)
+            _shutil2.rmtree(_svg_tmpdir, ignore_errors=True)
 
         # Preview: PDF → PNG (separate LibreOffice call, different format)
         try:
