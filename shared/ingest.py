@@ -17,6 +17,7 @@ Conversion matrix:
 from __future__ import annotations
 
 import logging
+import re
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -421,16 +422,80 @@ def _extract_theme_hints(pptx_path: Path, deck_json_path: Path, slides_dir: Path
 
     from sdpm.converter.color import extract_theme_colors_and_mapping
 
-    # Theme colors from the first slide master (most PPTX have just one).
+    # Theme colors. PowerPoint can ship multiple slideMasters with
+    # different clrMaps; corporate decks frequently flip bg1=dk1 (dark
+    # deck) on a secondary master while keeping master 0 light. Walk all
+    # masters and pick the one whose clrMap most slides actually use, so
+    # backgroundLuminance reflects the rendered deck rather than master 0.
+    theme_colors: dict = {}
+    color_mapping: dict = {}
     try:
-        theme_colors, _color_mapping, _ = extract_theme_colors_and_mapping(pptx_path, 0)
+        # Default to master 0.
+        theme_colors, color_mapping, _ = extract_theme_colors_and_mapping(pptx_path, 0)
     except Exception:
-        theme_colors = {}
+        pass
 
+    # Discover all slideMasters and pick the one used by the most slides.
+    try:
+        with zipfile.ZipFile(pptx_path) as zf:
+            names = zf.namelist()
+            masters = sorted(
+                n for n in names
+                if n.startswith("ppt/slideMasters/slideMaster") and n.endswith(".xml")
+            )
+            # layout → master index (0-based per master ordering above)
+            layout_to_master: dict[str, int] = {}
+            for idx, master in enumerate(masters):
+                rels_name = master.replace("slideMasters/", "slideMasters/_rels/") + ".rels"
+                if rels_name not in names:
+                    continue
+                rels_xml = zf.read(rels_name).decode("utf-8", errors="ignore")
+                for layout_match in re.finditer(r'Target="\.\./slideLayouts/(slideLayout\d+\.xml)"', rels_xml):
+                    layout_to_master[layout_match.group(1)] = idx
+
+            # slide → layout → master
+            master_usage: dict[int, int] = {}
+            slide_files = sorted(
+                n for n in names
+                if re.match(r"ppt/slides/slide\d+\.xml$", n)
+            )
+            for slide in slide_files:
+                rels_name = slide.replace("slides/", "slides/_rels/") + ".rels"
+                if rels_name not in names:
+                    continue
+                rels_xml = zf.read(rels_name).decode("utf-8", errors="ignore")
+                m = re.search(r'Target="\.\./slideLayouts/(slideLayout\d+\.xml)"', rels_xml)
+                if m:
+                    layout = m.group(1)
+                    master_idx = layout_to_master.get(layout)
+                    if master_idx is not None:
+                        master_usage[master_idx] = master_usage.get(master_idx, 0) + 1
+
+            if master_usage:
+                dominant_master = max(master_usage.items(), key=lambda kv: kv[1])[0]
+                if dominant_master != 0:
+                    try:
+                        theme_colors, color_mapping, _ = extract_theme_colors_and_mapping(
+                            pptx_path, dominant_master
+                        )
+                    except Exception:
+                        pass
+    except Exception:
+        # Multi-master discovery is best-effort; fall through to master 0
+        # values that were already loaded above.
+        pass
+
+    # Resolve bg1 through clrMap. PowerPoint's default mapping is
+    # bg1=lt1 / tx1=dk1, but corporate decks frequently flip it
+    # (bg1=dk1 / tx1=lt1) to declare a dark theme without changing the
+    # theme XML. The dominant slideMaster's clrMap is the authoritative
+    # answer.
+    bg1_target = color_mapping.get("bg1", "lt1") if color_mapping else "lt1"
+    resolved_bg = theme_colors.get(bg1_target)
     lt1 = theme_colors.get("lt1", "#FFFFFF")
     dk1 = theme_colors.get("dk1", "#000000")
-    # Fallback chain: slide bg > lt1 > dk1 inverted
-    default_bg = lt1 if lt1 else _invert_hex(dk1)
+    # Fallback chain: slide bg > clrMap-resolved bg1 > lt1 > dk1 inverted
+    default_bg = resolved_bg if resolved_bg else (lt1 if lt1 else _invert_hex(dk1))
 
     def _hex_to_luminance(hex_color: str) -> float:
         h = hex_color.lstrip("#")
