@@ -204,6 +204,7 @@ _SHAPE_NAMES = {
     "callout_rectangle", "callout_rounded_rectangle", "callout_oval",
     "flowchart_process", "flowchart_decision", "flowchart_terminator",
     "left_brace", "right_brace", "left_bracket", "right_bracket",
+    "folded_corner",
 }
 
 

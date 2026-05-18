@@ -87,6 +87,7 @@ class ShapeMixin:
             "right_bracket": MSO_SHAPE.RIGHT_BRACKET,
             "cylinder": MSO_SHAPE.CAN,
             "math_not_equal": MSO_SHAPE.MATH_NOT_EQUAL,
+            "folded_corner": MSO_SHAPE.FOLDED_CORNER,
         }
         
         mso_shape = shape_map.get(shape_type)
