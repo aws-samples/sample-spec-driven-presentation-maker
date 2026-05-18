@@ -94,6 +94,19 @@ def _classify_type(filename: str, zip_path: str) -> str:
     return "general"
 
 
+def _should_extract(zip_path: str) -> bool:
+    """Decide whether a SVG entry in the icon ZIP should be extracted.
+
+    Service / Resource / Category icons use the 48px size; Architecture
+    Group icons (e.g. AWS-Cloud-logo, Region, VPC) use 32px.
+    """
+    if not zip_path.endswith(".svg"):
+        return False
+    if "Architecture-Group-Icons" in zip_path:
+        return "_32" in zip_path
+    return "_48" in zip_path
+
+
 def _name_from_filename(filename: str) -> str:
     """Extract human-readable name from icon filename.
 
@@ -159,10 +172,7 @@ def main() -> None:
         for info in zf.infolist():
             if info.is_dir():
                 continue
-            # Only extract 48px SVGs (standard size)
-            if not info.filename.endswith(".svg"):
-                continue
-            if "_48" not in info.filename:
+            if not _should_extract(info.filename):
                 continue
 
             filename = Path(info.filename).name
