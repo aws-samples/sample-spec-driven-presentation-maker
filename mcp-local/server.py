@@ -257,6 +257,32 @@ def list_styles(include_all: bool = False) -> str:
 
 
 @mcp.tool()
+def apply_style(deck_id: str, style: str) -> str:
+    """Copy a style HTML file to the deck's specs/art-direction.html.
+
+    Args:
+        deck_id: Deck output_dir path.
+        style: Style name (e.g. "elegant-dark").
+
+    Returns:
+        JSON with status and the copied file path.
+    """
+    import shutil
+    from sdpm.api import _find_style_in_dirs, get_styles_dirs
+    src = _find_style_in_dirs(style, get_styles_dirs())
+    if src is None:
+        available = [p.stem for d in get_styles_dirs() if d.is_dir() for p in d.glob("*.html")]
+        return json.dumps({"error": f"Style not found: {style}. Available: {sorted(set(available))}"})
+    deck_path = Path(deck_id)
+    if not deck_path.is_dir():
+        return json.dumps({"error": f"Deck directory not found: {deck_id}"})
+    dest = deck_path / "specs" / "art-direction.html"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
+    return json.dumps({"status": "ok", "path": str(dest), "style": style})
+
+
+@mcp.tool()
 def read_examples(names: list[str]) -> str:
     """Read design examples (components/patterns).
     Without page specifier returns a listing of slide descriptions.
