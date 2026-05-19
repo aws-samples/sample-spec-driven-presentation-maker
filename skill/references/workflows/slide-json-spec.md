@@ -221,7 +221,7 @@ uv run python3 scripts/pptx_builder.py code-block main.py -l python --x 480 --y 
 echo 'const client = new S3Client();' | uv run python3 scripts/pptx_builder.py code-block - -l typescript --x 480 --y 100 --width 500 --height 200 -o code.json
 ```
 
-Include in presentation.json:
+Include in slide JSON:
 ```json
 {
   "elements": [
