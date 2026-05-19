@@ -129,11 +129,13 @@ def generate_pptx(
     slides_json_path: str,
     output_path: str = "",
 ) -> str:
-    """Generate PPTX from a JSON file or deck directory. Call after building all slides.
-    Template is auto-detected from deck.json if init_presentation was used — no need to specify again.
+    """Generate PPTX from a deck directory or legacy JSON file.
+
+    For deck directories (recommended): pass the deck directory path containing
+    deck.json + specs/outline.md + slides/*.json. Slide order is determined by outline.md.
 
     Args:
-        slides_json_path: Path to the slides JSON file.
+        slides_json_path: Path to the deck directory or legacy JSON file.
         output_path: Optional output path. Auto-generated if empty.
 
     Returns:
