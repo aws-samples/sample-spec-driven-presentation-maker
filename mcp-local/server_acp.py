@@ -243,12 +243,12 @@ def init_presentation(name: str, template: str = "") -> str:
 
     deck_data: dict = {}
     if template:
-        templates_dir = _SKILL_DIR / "templates"
+        from sdpm.api import _find_template_in_dirs, get_templates_dirs
         template_src = Path(template).expanduser()
         if not template_src.exists():
-            candidate = templates_dir / (template if template.endswith(".pptx") else f"{template}.pptx")
-            if candidate.exists():
-                template_src = candidate
+            found = _find_template_in_dirs(template, get_templates_dirs())
+            if found is not None:
+                template_src = found
         if template_src.exists():
             deck_data["template"] = template_src.name
             try:

@@ -233,7 +233,7 @@ def init(
 ) -> dict[str, Any]:
     """Initialize a presentation workspace.
 
-    Creates output directory with presentation.json and specs/.
+    Creates output directory with deck.json, slides/, and specs/.
 
     Args:
         name: Presentation name (used in directory name).
@@ -241,7 +241,7 @@ def init(
         output_dir: Explicit output directory. Auto-generated if None.
 
     Returns:
-        Dict with output_dir, json_path, template, fonts, workspace.
+        Dict with output_dir, deck_json, template, fonts, workspace.
     """
     from sdpm.analyzer import extract_fonts
     from sdpm.utils.io import write_json
@@ -254,7 +254,7 @@ def init(
         out_dir = _get_output_base_dir() / dir_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    pres_data: dict[str, Any] = {"fonts": {"fullwidth": None, "halfwidth": None}, "slides": []}
+    deck_data: dict[str, Any] = {}
 
     if template:
         template_src = Path(template).expanduser()
@@ -264,12 +264,16 @@ def init(
                 template_src = found
         if template_src.exists():
             template_src = template_src.resolve()
-            pres_data["template"] = template_src.name
-            pres_data["fonts"] = extract_fonts(template_src)
+            deck_data["template"] = template_src.name
+            try:
+                deck_data["fonts"] = extract_fonts(template_src)
+            except Exception:
+                pass
 
-    json_path = out_dir / "presentation.json"
-    write_json(json_path, pres_data, suffix="\n")
+    deck_json = out_dir / "deck.json"
+    write_json(deck_json, deck_data, suffix="\n")
 
+    (out_dir / "slides").mkdir(exist_ok=True)
     specs_dir = out_dir / "specs"
     specs_dir.mkdir(exist_ok=True)
     spec_files = ("brief.md", "outline.md")
@@ -278,10 +282,10 @@ def init(
 
     return {
         "output_dir": str(out_dir),
-        "json_path": str(json_path),
-        "template": pres_data.get("template", ""),
-        "fonts": pres_data.get("fonts", {}),
-        "workspace": ["presentation.json"] + [f"specs/{s}" for s in spec_files],
+        "deck_json": str(deck_json),
+        "template": deck_data.get("template", ""),
+        "fonts": deck_data.get("fonts", {}),
+        "workspace": ["deck.json", "slides/"] + [f"specs/{s}" for s in spec_files],
     }
 
 

@@ -88,7 +88,7 @@ mcp = FastMCP(
 @mcp.tool()
 def init_presentation(name: str) -> str:
     """Initialize a presentation workspace. Call after Phase 1 hearing, before building slides.
-    Creates output directory with empty presentation.json and specs/.
+    Creates output directory with deck.json, slides/, and specs/.
 
     Workflow equivalent: ``init {name}``
 
@@ -96,7 +96,7 @@ def init_presentation(name: str) -> str:
         name: Presentation name (e.g. "lambda-overview").
 
     Returns:
-        JSON with output_dir, json_path, and workspace file list.
+        JSON with output_dir, deck_json, and workspace file list.
     """
     return json.dumps(
         _init_presentation(name=name, template="", skill_dir=_SKILL_DIR),
@@ -129,8 +129,8 @@ def generate_pptx(
     slides_json_path: str,
     output_path: str = "",
 ) -> str:
-    """Generate PPTX from a JSON file. Call after building all slides.
-    Template is auto-detected from presentation.json if init_presentation was used — no need to specify again.
+    """Generate PPTX from a JSON file or deck directory. Call after building all slides.
+    Template is auto-detected from deck.json if init_presentation was used — no need to specify again.
 
     Args:
         slides_json_path: Path to the slides JSON file.
