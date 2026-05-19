@@ -22,15 +22,17 @@ def init_presentation(name: str, template: str, skill_dir: Path) -> dict[str, An
 def analyze_template(template_path: str, skill_dir: Path, layout: str = "") -> dict[str, Any]:
     """Analyze a PPTX template to extract layouts, colors, fonts."""
     from sdpm.analyzer import analyze_template as _analyze, get_layout_placeholders
+    from sdpm.api import _find_template_in_dirs, get_templates_dirs
 
     if not template_path:
         raise FileNotFoundError("template_path is required.")
 
     path = Path(template_path)
     if not path.exists():
-        path = skill_dir / "templates" / f"{template_path}.pptx"
-    if not path.exists():
-        raise FileNotFoundError(f"Template not found: {template_path}")
+        found = _find_template_in_dirs(template_path, get_templates_dirs())
+        if found is None:
+            raise FileNotFoundError(f"Template not found: {template_path}")
+        path = found
 
     result = _analyze(path)
 
