@@ -254,7 +254,11 @@ def init(
         out_dir = _get_output_base_dir() / dir_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    deck_data: dict[str, Any] = {}
+    deck_data: dict[str, Any] = {
+        "template": "",
+        "fonts": {"fullwidth": "", "halfwidth": ""},
+        "defaultTextColor": "",
+    }
 
     if template:
         template_src = Path(template).expanduser()
