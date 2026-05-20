@@ -164,6 +164,17 @@ export class RuntimeStack extends cdk.Stack {
       })
     );
 
+    // --- AWS Marketplace permissions (required for Bedrock model subscriptions) ---
+    runtimeRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "aws-marketplace:ViewSubscriptions",
+          "aws-marketplace:Subscribe",
+        ],
+        resources: ["*"],
+      })
+    );
+
     // --- KB permissions (Amazon Titan Embed + S3 Vectors + Amazon Bedrock Retrieve) ---
     if (props.vectorBucketName) {
       runtimeRole.addToPolicy(
