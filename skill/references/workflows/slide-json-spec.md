@@ -1,24 +1,72 @@
 # JSON Schema Reference
 
-## Top-level
+## Deck Structure
+
+A deck is a directory with the following structure:
+
+```
+my-presentation/
+├── deck.json              ← metadata (template, fonts, defaultTextColor)
+├── slides/                ← one JSON file per slide
+│   ├── intro.json
+│   ├── problem.json
+│   └── solution.json
+└── specs/
+    ├── outline.md         ← slide order (slug list)
+    ├── brief.md
+    └── art-direction.html
+```
+
+### deck.json
+
+Metadata only. Do NOT put slides here.
 
 ```json
 {
+  "template": "blank-dark.pptx",
   "fonts": {
     "fullwidth": "メイリオ",
     "halfwidth": "Calibri"
   },
-  "defaultTextColor": "#000000",
-  "slides": [...]
+  "defaultTextColor": "#FFFFFF"
 }
 ```
 
+- `"template"`: Template filename. Resolved from templates directories.
 - `"fonts"`: **Required**. Font configuration for text rendering.
   - `"fullwidth"`: Font for fullwidth characters (e.g. Japanese, Chinese)
   - `"halfwidth"`: Font for halfwidth characters (e.g. English, numbers)
   - Run `analyze-template` to detect fonts from your template.
 - `"defaultTextColor"`: **Required**. Default color for text and icons (e.g. `"#FFFFFF"` for dark backgrounds, `"#000000"` for light). Overridden per element by `fontColor` / `iconColor`.
-- Line color, table color, and chart color are auto-resolved from the template's theme colors
+- Line color, table color, and chart color are auto-resolved from the template's theme colors.
+
+### slides/{slug}.json
+
+Each slide is a separate file. The filename (without `.json`) is the slug.
+
+```json
+{
+  "layout": "Title Only with Left Line",
+  "placeholders": {"0": "Introduction"},
+  "notes": "Welcome everyone...",
+  "elements": [...]
+}
+```
+
+### specs/outline.md
+
+Controls slide order. Format: `- [slug] message`
+
+Each line = 1 slide = 1 message (what it changes in the audience).
+`[slug]` becomes the filename `slides/{slug}.json`.
+
+```markdown
+- [slug] What this slide changes in the audience
+```
+
+### Generation
+
+Pass the deck **directory** path to `generate_pptx`. Slides are assembled in outline.md order.
 
 ## Comments
 
@@ -40,8 +88,8 @@ JSON has no comment syntax, so use the `_comment` key. Can be used inside elemen
 ```
 
 - `"background"`: Solid fill color for the slide background. Overrides the template's default background for this slide only.
-- `"defaultTextColor"`: Override the top-level `defaultTextColor` for this slide. Affects text, icons, lines, and table auto-colors.
-- Omit either to use the top-level / template default.
+- `"defaultTextColor"`: Override the deck.json `defaultTextColor` for this slide. Affects text, icons, lines, and table auto-colors.
+- Omit either to use the deck.json / template default.
 - When `background` is set, table auto-colors and icon theme (dark/light) also adapt automatically.
 - Per-element `fontColor` / `iconColor` still takes highest priority.
 
@@ -221,7 +269,7 @@ uv run python3 scripts/pptx_builder.py code-block main.py -l python --x 480 --y 
 echo 'const client = new S3Client();' | uv run python3 scripts/pptx_builder.py code-block - -l typescript --x 480 --y 100 --width 500 --height 200 -o code.json
 ```
 
-Include in presentation.json:
+Include in slide JSON:
 ```json
 {
   "elements": [

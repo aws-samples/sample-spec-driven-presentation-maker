@@ -348,7 +348,8 @@ def cmd_init(args):
         name=args.name or "",
         output_dir=args.output if hasattr(args, 'output') and args.output else None,
     )
-    print(f"output_json: {result['json_path']}")
+    print(f"output_dir:  {result['output_dir']}")
+    print(f"deck_json:   {result['deck_json']}")
     for f in result["workspace"]:
         if f.startswith("specs/"):
             print(f"specs:       {Path(result['output_dir']) / f}")
