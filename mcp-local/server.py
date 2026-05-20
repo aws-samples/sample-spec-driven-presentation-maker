@@ -99,16 +99,6 @@ mcp.tool()(tools.pptx_to_json)
 
 
 @mcp.tool()
-def start_presentation() -> str:
-    """REQUIRED FIRST STEP for creating any PowerPoint/presentation/slide deck.
-    Call this before using any other tool when the user wants to create, edit, or modify slides.
-
-    Returns the complete workflow options and step-by-step instructions.
-    """
-    return _INSTRUCTIONS
-
-
-@mcp.tool()
 def list_styles(include_all: bool = False) -> dict:
     """List available design styles for presentations.
 
