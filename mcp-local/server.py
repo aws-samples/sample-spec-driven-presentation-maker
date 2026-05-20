@@ -35,6 +35,7 @@ from tools import (  # noqa: E402
     search_assets as _search_assets,
     list_asset_sources as _list_asset_sources,
     list_styles as _list_styles,
+    apply_style as _apply_style,
     read_examples as _read_examples,
     list_workflows as _list_workflows,
     read_workflows as _read_workflows,
@@ -274,19 +275,7 @@ def apply_style(deck_id: str, style: str) -> str:
     Returns:
         JSON with status and the copied file path.
     """
-    import shutil
-    from sdpm.api import _find_style_in_dirs, get_styles_dirs
-    src = _find_style_in_dirs(style, get_styles_dirs())
-    if src is None:
-        available = [p.stem for d in get_styles_dirs() if d.is_dir() for p in d.glob("*.html")]
-        return json.dumps({"error": f"Style not found: {style}. Available: {sorted(set(available))}"})
-    deck_path = Path(deck_id)
-    if not deck_path.is_dir():
-        return json.dumps({"error": f"Deck directory not found: {deck_id}"})
-    dest = deck_path / "specs" / "art-direction.html"
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dest)
-    return json.dumps({"status": "ok", "path": str(dest), "style": style})
+    return json.dumps(_apply_style(deck_id=deck_id, style=style), ensure_ascii=False)
 
 
 @mcp.tool()
@@ -405,11 +394,12 @@ def pptx_to_json(pptx_path: str) -> str:
 
 
 @mcp.tool()
-def grid(spec: str, purpose: str = "") -> str:
+def grid(purpose: str, spec: str) -> str:
     """Compute CSS Grid layout coordinates from a grid specification.
     Use before placing elements to calculate exact positions.
 
     Args:
+        purpose: Brief user-facing description (e.g. '3-column icon layout'). Shown in UI.
         spec: JSON string with grid spec. Keys:
             area: {"x", "y", "w", "h"} (required)
             columns: track-list string, e.g. "1fr 2fr" (default "1fr")
@@ -417,8 +407,6 @@ def grid(spec: str, purpose: str = "") -> str:
             gap: str or int, e.g. "20" or "20 40" (row-gap col-gap)
             areas: 2D list of area names (optional)
             items: dict of item overrides (optional)
-        purpose: Brief user-facing description (e.g. '3-column icon layout').
-            Shown in the UI.
 
     Returns:
         JSON with named rectangles containing x, y, w, h coordinates.

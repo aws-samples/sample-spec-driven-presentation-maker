@@ -318,32 +318,6 @@ def hearing(
     return "Questions displayed to user. Wait for their response."
 
 
-@mcp.tool()
-def apply_style(deck_id: str, style: str) -> str:
-    """Copy a style HTML file to the deck's specs/art-direction.html.
-
-    Args:
-        deck_id: Deck output_dir path.
-        style: Style name (e.g. "elegant-dark").
-
-    Returns:
-        JSON with status and the copied file path.
-    """
-    import shutil
-    from sdpm.api import get_styles_dirs, _find_style_in_dirs
-    src = _find_style_in_dirs(style, get_styles_dirs())
-    if src is None:
-        available = [p.stem for d in get_styles_dirs() if d.is_dir() for p in d.glob("*.html")]
-        return json.dumps({"error": f"Style not found: {style}. Available: {sorted(set(available))}"})
-    deck_path = Path(deck_id)
-    if not deck_path.is_dir():
-        return json.dumps({"error": f"Deck directory not found: {deck_id}"})
-    dest = deck_path / "specs" / "art-direction.html"
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dest)
-    return json.dumps({"status": "ok", "path": str(dest), "style": style})
-
-
 def _rejection_message(violations: list[str], has_deck: bool) -> str:
     """Build an error message that helps the LLM rewrite rejected code."""
     lines = ["Code rejected by sandbox:"]
@@ -722,39 +696,6 @@ Audience: Developers
             pass
 
     return json.dumps(result, ensure_ascii=False)
-
-
-# ---------------------------------------------------------------------------
-# grid: compute CSS Grid layout coordinates
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def grid(purpose: str, spec: str) -> str:
-    """Compute CSS Grid layout coordinates from a grid specification.
-    Use before placing elements to calculate exact positions.
-
-    Args:
-        purpose: Brief user-facing description (e.g. '3-column icon layout'). Shown in UI.
-        spec: JSON string with grid spec. Keys:
-            area: {"x", "y", "w", "h"} (required)
-            columns: track-list string, e.g. "1fr 2fr" (default "1fr")
-            rows: track-list string (default "1fr")
-            gap: str or int, e.g. "20" or "20 40" (row-gap col-gap)
-            areas: 2D list of area names (optional)
-            items: dict of item overrides (optional)
-
-    Returns:
-        JSON with named rectangles containing x, y, w, h coordinates.
-    """
-    from sdpm.layout.grid import compute_grid
-
-    try:
-        grid_spec = json.loads(spec)
-    except (json.JSONDecodeError, TypeError) as e:
-        return json.dumps({"error": f"Invalid grid spec JSON: {e}"})
-    result = compute_grid(grid_spec)
-    return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 # ---------------------------------------------------------------------------

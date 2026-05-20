@@ -119,6 +119,12 @@ def list_styles(skill_dir: Path, include_all: bool = False) -> dict[str, Any]:
     return {"styles": list_styles_filtered(styles_dirs, pinned, include_all)}
 
 
+def apply_style(deck_id: str, style: str) -> dict[str, Any]:
+    """Apply a style to a deck."""
+    from sdpm.api import apply_style as _apply_style
+    return _apply_style(deck_dir=deck_id, style=style)
+
+
 def read_examples(names: list[str], skill_dir: Path) -> dict[str, Any]:
     """Read design examples."""
     from sdpm.reference import read_docs

@@ -140,6 +140,34 @@ def analyze_and_store_template(template_path: Path, description: str = "") -> di
     }
 
 
+def apply_style(deck_dir: str | Path, style: str) -> dict[str, Any]:
+    """Apply a named style to a deck's art-direction.
+
+    Copies the style HTML to {deck_dir}/specs/art-direction.html.
+
+    Args:
+        deck_dir: Deck output directory path.
+        style: Style name (e.g. "elegant-dark").
+
+    Returns:
+        Dict with status, path, style. Or error key if not found.
+    """
+    import shutil
+
+    styles_dirs = get_styles_dirs()
+    src = _find_style_in_dirs(style, styles_dirs)
+    if src is None:
+        available = [p.stem for d in styles_dirs if d.is_dir() for p in d.glob("*.html")]
+        return {"error": f"Style not found: {style}. Available: {sorted(set(available))}"}
+    deck_path = Path(deck_dir)
+    if not deck_path.is_dir():
+        return {"error": f"Deck directory not found: {deck_dir}"}
+    dest = deck_path / "specs" / "art-direction.html"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
+    return {"status": "ok", "path": str(dest), "style": style}
+
+
 def _find_style_in_dirs(name: str, styles_dirs: list[Path]) -> Path | None:
     """Search for a style HTML by name across the given directories.
 
