@@ -140,6 +140,34 @@ def analyze_and_store_template(template_path: Path, description: str = "") -> di
     }
 
 
+def apply_style(deck_dir: str | Path, style: str) -> dict[str, Any]:
+    """Apply a named style to a deck's art-direction.
+
+    Copies the style HTML to {deck_dir}/specs/art-direction.html.
+
+    Args:
+        deck_dir: Deck output directory path.
+        style: Style name (e.g. "elegant-dark").
+
+    Returns:
+        Dict with status, path, style. Or error key if not found.
+    """
+    import shutil
+
+    styles_dirs = get_styles_dirs()
+    src = _find_style_in_dirs(style, styles_dirs)
+    if src is None:
+        available = [p.stem for d in styles_dirs if d.is_dir() for p in d.glob("*.html")]
+        return {"error": f"Style not found: {style}. Available: {sorted(set(available))}"}
+    deck_path = Path(deck_dir)
+    if not deck_path.is_dir():
+        return {"error": f"Deck directory not found: {deck_dir}"}
+    dest = deck_path / "specs" / "art-direction.html"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
+    return {"status": "ok", "path": str(dest), "style": style}
+
+
 def _find_style_in_dirs(name: str, styles_dirs: list[Path]) -> Path | None:
     """Search for a style HTML by name across the given directories.
 
@@ -233,7 +261,7 @@ def init(
 ) -> dict[str, Any]:
     """Initialize a presentation workspace.
 
-    Creates output directory with presentation.json and specs/.
+    Creates output directory with deck.json, slides/, and specs/.
 
     Args:
         name: Presentation name (used in directory name).
@@ -241,7 +269,7 @@ def init(
         output_dir: Explicit output directory. Auto-generated if None.
 
     Returns:
-        Dict with output_dir, json_path, template, fonts, workspace.
+        Dict with output_dir, deck_json, template, fonts, workspace.
     """
     from sdpm.analyzer import extract_fonts
     from sdpm.utils.io import write_json
@@ -254,7 +282,11 @@ def init(
         out_dir = _get_output_base_dir() / dir_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    pres_data: dict[str, Any] = {"fonts": {"fullwidth": None, "halfwidth": None}, "slides": []}
+    deck_data: dict[str, Any] = {
+        "template": "",
+        "fonts": {"fullwidth": "", "halfwidth": ""},
+        "defaultTextColor": "",
+    }
 
     if template:
         template_src = Path(template).expanduser()
@@ -264,12 +296,16 @@ def init(
                 template_src = found
         if template_src.exists():
             template_src = template_src.resolve()
-            pres_data["template"] = template_src.name
-            pres_data["fonts"] = extract_fonts(template_src)
+            deck_data["template"] = template_src.name
+            try:
+                deck_data["fonts"] = extract_fonts(template_src)
+            except Exception:
+                pass
 
-    json_path = out_dir / "presentation.json"
-    write_json(json_path, pres_data, suffix="\n")
+    deck_json = out_dir / "deck.json"
+    write_json(deck_json, deck_data, suffix="\n")
 
+    (out_dir / "slides").mkdir(exist_ok=True)
     specs_dir = out_dir / "specs"
     specs_dir.mkdir(exist_ok=True)
     spec_files = ("brief.md", "outline.md")
@@ -278,10 +314,10 @@ def init(
 
     return {
         "output_dir": str(out_dir),
-        "json_path": str(json_path),
-        "template": pres_data.get("template", ""),
-        "fonts": pres_data.get("fonts", {}),
-        "workspace": ["presentation.json"] + [f"specs/{s}" for s in spec_files],
+        "deck_json": str(deck_json),
+        "template": deck_data.get("template", ""),
+        "fonts": deck_data.get("fonts", {}),
+        "workspace": ["deck.json", "slides/"] + [f"specs/{s}" for s in spec_files],
     }
 
 
