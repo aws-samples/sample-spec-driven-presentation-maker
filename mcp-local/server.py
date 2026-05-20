@@ -23,8 +23,10 @@ sys.path.insert(0, str(_SKILL_DIR))
 # Add project root to sys.path so shared/ package is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import sandbox_tools  # noqa: E402
 import tools  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
+from upload_tools import import_attachment as _import_attachment  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Instructions
@@ -93,9 +95,33 @@ mcp.tool()(tools.code_to_slide)
 mcp.tool()(tools.grid)
 mcp.tool()(tools.pptx_to_json)
 
+# Sandbox tools (shared)
+mcp.tool()(sandbox_tools.run_python)
+mcp.tool()(sandbox_tools.run_style_python)
+
+
 # ---------------------------------------------------------------------------
 # MCP-specific tools (overrides or additions)
 # ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
+    """Import a file into the deck workspace for use in slides.
+
+    source is either an uploadId or an HTTP(S) URL.
+    - uploadId: copies pre-converted files from session storage to deck.
+    - URL: downloads image and saves to deck.
+
+    Args:
+        source: Upload ID from [Attached: ...] message, or an HTTP(S) URL.
+        deck_id: The deck directory path (must be initialized via init_presentation).
+        filename: Optional output filename.
+
+    Returns:
+        JSON with saved file paths and image_mapping.
+    """
+    return _import_attachment(source=source, deck_id=deck_id, filename=filename)
 
 
 @mcp.tool()

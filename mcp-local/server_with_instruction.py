@@ -16,9 +16,11 @@ _SKILL_DIR = Path(__file__).resolve().parent.parent / "skill"
 sys.path.insert(0, str(_SKILL_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import sandbox_tools  # noqa: E402
 import tools  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 from server import _INSTRUCTIONS  # noqa: E402
+from upload_tools import import_attachment as _import_attachment  # noqa: E402
 
 mcp = FastMCP("spec-driven-presentation-maker")
 
@@ -40,6 +42,26 @@ mcp.tool()(tools.read_guides)
 mcp.tool()(tools.code_to_slide)
 mcp.tool()(tools.grid)
 mcp.tool()(tools.pptx_to_json)
+
+# Sandbox tools (shared)
+mcp.tool()(sandbox_tools.run_python)
+mcp.tool()(sandbox_tools.run_style_python)
+
+
+# MCP-specific: import_attachment
+@mcp.tool()
+def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
+    """Import a file into the deck workspace for use in slides.
+
+    Args:
+        source: Upload ID from [Attached: ...] message, or an HTTP(S) URL.
+        deck_id: The deck directory path.
+        filename: Optional output filename.
+
+    Returns:
+        JSON with saved file paths and image_mapping.
+    """
+    return _import_attachment(source=source, deck_id=deck_id, filename=filename)
 
 
 # MCP-specific: browser-opening list_styles
