@@ -263,7 +263,12 @@ def cmd_examples(args):
                 if not args.no_browse:
                     open_styles_gallery(styles_dirs)
             else:
-                print("# Copy a style to your project: cp references/examples/styles/{name}.html specs/art-direction.html", file=sys.stderr)
+                from sdpm.api import _find_style_in_dirs
+                src = _find_style_in_dirs(sub, styles_dirs)
+                if src is None:
+                    print(f"# Style not found: {sub}", file=sys.stderr)
+                else:
+                    print(f"# cp {src} specs/art-direction.html")
             continue
 
         # pptx files (components, patterns)
