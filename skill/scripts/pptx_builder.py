@@ -218,7 +218,7 @@ def cmd_list_templates(args):
         print("No templates found.", file=sys.stderr)
         return
     for stem in sorted(seen):
-        print(f"  {stem}")
+        print(f"  {stem}  {seen[stem]}")
 
 
 def cmd_search_patterns(args):
