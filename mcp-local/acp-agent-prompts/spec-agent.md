@@ -107,8 +107,8 @@ verification, then parallel per-slide fixes if defects remain.
    ALL slugs in the deck and instruction: "Consistency review."
    The composer reviews cross-slide inconsistencies (labeling, decorative
    elements, typography, writing style, hierarchy).
-2. **Verification**: call `get_preview(deck_id, slugs=[...])` to see the
-   post-review state. Look for individual-slide defects that remain:
+2. **Verification**: check the `preview_files` returned from the consistency review's
+   `run_python(save=True)` calls. Look for individual-slide defects that remain:
    text overflow, element overlap, broken layout, alignment issues.
 3. **Per-slide fix pass** (only if defects found in Step 2): invoke
    subagents again with **parallel groups, one per affected slide**.

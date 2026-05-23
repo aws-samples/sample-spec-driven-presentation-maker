@@ -199,8 +199,13 @@ Audience: Developers
             pptx_out = str(deck_dir / "output.pptx")
             build_result = generate(json_path=deck_input, output_path=pptx_out)
             result["pptx"] = build_result.get("output_path", pptx_out)
+            # Store for later filtering by measure_slides
+            _build_warnings = build_result.get("warnings", [])
+            _build_lint = build_result.get("errors", {}).get("lintDiagnostics", [])
         except Exception as e:
             result["pptx_error"] = str(e)
+            _build_warnings = []
+            _build_lint = []
 
         import shutil
         svg_path: Path | None = None
@@ -360,8 +365,38 @@ Audience: Developers
                     src = Path(png_path)
                     if src.exists():
                         _sh.copy2(src, preview_dir / src.name)
-                result["preview"] = f"{len(preview_result['files'])} PNGs"
                 _sh.rmtree(preview_result["preview_dir"], ignore_errors=True)
+
+                # Return filtered preview paths + warnings for measure_slides slugs
+                import re as _re2
+                if measure_slides and pptx_slugs:
+                    slug_to_page_num = {s: i + 1 for i, s in enumerate(pptx_slugs)}
+                    target_pages = {slug_to_page_num[s] for s in measure_slides if s in slug_to_page_num}
+                else:
+                    target_pages = None  # return all
+
+                # Filter preview files
+                all_previews = sorted(preview_dir.iterdir())
+                filtered_previews = []
+                for f in all_previews:
+                    if not f.name.endswith(".png"):
+                        continue
+                    m = _re2.match(r"^page(\d+)[-.]", f.name)
+                    if m:
+                        if target_pages is None or int(m.group(1)) in target_pages:
+                            filtered_previews.append(str(f))
+                result["preview_files"] = filtered_previews
+
+                # Filter warnings
+                if target_pages is not None:
+                    page_pats = {f"page{p:02d}" for p in target_pages}
+                    result["warnings"] = [w for w in _build_warnings if any(p in w for p in page_pats)]
+                    result["lint_diagnostics"] = [d for d in _build_lint if any(p in str(d) for p in page_pats)]
+                else:
+                    if _build_warnings:
+                        result["warnings"] = _build_warnings
+                    if _build_lint:
+                        result["lint_diagnostics"] = _build_lint
         except Exception as e:
             result["preview_error"] = str(e)
 
