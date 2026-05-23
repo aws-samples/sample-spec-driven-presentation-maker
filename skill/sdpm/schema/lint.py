@@ -64,6 +64,8 @@ def _diag(slide: int, element: int, rule: str, message: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def _lint_element(si: int, ei: int, elem: dict) -> list[dict]:
+    if "_comment" in elem:
+        return []
     etype = elem.get("type")
     if etype is None:
         return [_diag(si, ei, "missing-type", "element has no 'type' field")]
