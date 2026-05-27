@@ -1,12 +1,62 @@
 [EN](../en/deploy-cloudshell.md) | [JA](../ja/deploy-cloudshell.md)
 
-# spec-driven-presentation-maker 推奨デプロイ手順
+# spec-driven-presentation-maker デプロイ手順
 
 ## spec-driven-presentation-maker について
 
 spec-driven-presentation-maker は、AI エージェントにプレゼンテーション生成能力を追加するオープンソースツールキットです。MCP（Model Context Protocol）ツールとして既存の AI システムに接続するだけで、対話によるスライド生成が可能になります。ローカル CLI からフルスタック Web アプリまで、ニーズに合ったレイヤーを選んで段階的に採用できます。
 
-本ドキュメントでは、spec-driven-presentation-maker（以下 SDPM）を AWS にデプロイする際の **推奨手順** を説明します。この手順では CodeBuild がビルドとデプロイを実行するため、ローカル環境に CDK や Docker をインストールする必要はありません。また、以下のいずれの環境でも同じ手順でデプロイできます。
+---
+
+## ワンクリックデプロイ（推奨）
+
+ワンクリックで SDPM を AWS アカウントにデプロイできます。ローカル環境や CLI のセットアップは一切不要です。AWS コンソールにログインし、ボタンをクリックして、パラメータを入力するだけで完了します。
+
+### 前提条件
+
+- [AWS マネジメントコンソール](https://console.aws.amazon.com/) にログイン済み
+- デプロイ先アカウントで **AdministratorAccess** 相当の権限があること
+
+### ステップ 1: Launch Stack ボタンをクリック
+
+最寄りのリージョンを選択してください：
+
+| リージョン | デプロイ |
+|-----------|---------|
+| 東京 (ap-northeast-1) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://ap-northeast-1.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+| バージニア北部 (us-east-1) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-east-1.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+| オレゴン (us-west-2) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-west-2.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+
+### ステップ 2: パラメータを入力
+
+CloudFormation コンソールにパラメータ入力画面が表示されます。以下を設定してください：
+
+| パラメータ | 説明 | デフォルト |
+|-----------|------|-----------|
+| **NotificationEmailAddress** | デプロイの開始・完了を通知するメールアドレス | *（必須）* |
+| **DeploymentLayer** | `layer3` = MCP Server のみ、`layer4` = フルスタック（Agent + Web UI） | `layer4` |
+| **ModelId** | Agent が使用する Bedrock モデル ID（例: `global.anthropic.claude-sonnet-4-6`） | `global.anthropic.claude-sonnet-4-6` |
+| **EnableInvocationLogging** | Bedrock Model Invocation Logging の有効/無効（`true` / `false`） | `false` |
+| **AllowedIpV4AddressRanges** | WAF IP 制限用の IPv4 CIDR 範囲（カンマ区切り、空欄で制限なし） | *（空欄）* |
+| **AllowedIpV6AddressRanges** | WAF IP 制限用の IPv6 CIDR 範囲（カンマ区切り、空欄で制限なし） | *（空欄）* |
+
+> **💡 ヒント:** `AllowedIpV4AddressRanges` を指定してアクセスを制限することを推奨します。現在のパブリック IP は [https://checkip.amazonaws.com/](https://checkip.amazonaws.com/) で確認できます。IP 制限を設定しない場合でも、ログインには Cognito 認証が必要です。
+
+### ステップ 3: デプロイ実行
+
+1. **「AWS CloudFormation によって IAM リソースがカスタム名で作成される場合があることを承認します。」** にチェック
+2. **スタックの作成** をクリック
+3. スタックの完了を待ちます（約 30〜40 分）。完了するとメールで通知されます。
+
+> **🌐 ブラウザだけですぐに試したい方はこちら！** Layer 4 をデプロイすると、チャット形式の Web UI が立ち上がります。デプロイ後に [Cognito ユーザーを作成](#cognito-ユーザーの作成layer-4)すれば、ブラウザからすぐにスライド生成を体験できます。
+
+---
+
+## CloudShell を使ったデプロイ
+
+ワンクリックデプロイのパラメータ以上に**カスタマイズしたい場合**（外部 IdP 連携、config.yaml による設定、deploy.sh の各種フラグ活用など）は、こちらの方法を使います。
+
+CodeBuild がビルドとデプロイを実行するため、ローカル環境に CDK や Docker をインストールする必要はありません。以下のいずれの環境でも同じ手順でデプロイできます。
 
 - **AWS CloudShell**（ブラウザだけで完結）
 - ローカル **Linux / macOS / WSL**（`bash` と `aws` CLI があれば OK）
@@ -15,15 +65,13 @@ spec-driven-presentation-maker は、AI エージェントにプレゼンテー�
 
 > **📌 補足:** デプロイ設定は `infra/config.yaml` に保持できるため、再デプロイ時の一貫性を保ちやすくなります。ローカル CDK による直接デプロイ（`npx cdk deploy`）は開発・デバッグ用途に位置付けています。
 
-## 前提条件
+### 前提条件
 
 - AWS マネジメントコンソールにログイン済み
 - デプロイ先アカウントで **AdministratorAccess** 相当の権限があること（初回デプロイ時）
 - 以下いずれかの作業環境
     - AWS CloudShell（デプロイ先リージョンで開く）
     - ローカル Linux / macOS / WSL（`bash`、`git`、`aws` CLI、適切な AWS 認証情報）
-
-## デプロイ
 
 ### クイックスタート
 
@@ -36,8 +84,6 @@ cd sample-spec-driven-presentation-maker
 chmod +x scripts/deploy.sh
 ./scripts/deploy.sh --region us-east-1
 ```
-
-> **🌐 ブラウザだけですぐに試したい方はこちら！** Layer 4 をデプロイすると、チャット形式の Web UI が立ち上がります。デプロイ後に [Cognito ユーザーを作成](#cognito-ユーザーの作成layer-4)すれば、ブラウザからすぐにスライド生成を体験できます。
 
 > **💡 ヒント:** CloudShell のホームディレクトリ（1 GB）はセッション間で永続化されます。2 回目以降は `cd ~/sample-spec-driven-presentation-maker && git pull && ./scripts/deploy.sh --region us-east-1` で最新化＋再デプロイできます。
 
