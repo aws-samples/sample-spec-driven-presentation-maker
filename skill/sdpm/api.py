@@ -446,10 +446,14 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
         raise ValueError(f"Missing assets ({len(missing)}): {', '.join(sorted(missing)[:10])}")
 
     # Token discipline: fontSize must come from --fs-* tokens in active style
-    from sdpm.checks import check_font_size_tokens
+    from sdpm.checks import check_font_size_tokens, check_overlay_textbox
 
     fs_warnings = check_font_size_tokens(data, input_path)
     warnings.extend(fs_warnings)
+
+    # Overlay textbox: textbox stacked on a shape with the same bounding box
+    overlay_warnings = check_overlay_textbox(data)
+    warnings.extend(overlay_warnings)
 
     # Resolve overrides
     slides = data.get("slides", [])
