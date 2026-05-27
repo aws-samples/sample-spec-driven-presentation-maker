@@ -48,7 +48,9 @@ CloudFormation コンソールにパラメータ入力画面が表示されま�
 2. **スタックの作成** をクリック
 3. スタックの完了を待ちます（約 30〜40 分）。完了するとメールで通知されます。
 
-> **🌐 ブラウザだけですぐに試したい方はこちら！** Layer 4 をデプロイすると、チャット形式の Web UI が立ち上がります。デプロイ後に [Cognito ユーザーを作成](#cognito-ユーザーの作成layer-4)すれば、ブラウザからすぐにスライド生成を体験できます。
+### ステップ 4: ログイン
+
+デプロイ完了後、指定した **NotificationEmailAddress** 宛に仮パスワードが送信されます。通知メールに記載の Web UI URL（または CloudFormation Outputs の `SdpmWebUi` → `SiteUrl`）を開き、メールアドレスと仮パスワードでログインし、初回ログイン時にパスワードを変更すれば完了です。すぐにスライド生成を体験できます。
 
 ---
 
@@ -86,6 +88,8 @@ chmod +x scripts/deploy.sh
 ```
 
 > **💡 ヒント:** CloudShell のホームディレクトリ（1 GB）はセッション間で永続化されます。2 回目以降は `cd ~/sample-spec-driven-presentation-maker && git pull && ./scripts/deploy.sh --region us-east-1` で最新化＋再デプロイできます。
+
+> **📝 補足:** ワンクリックデプロイとは異なり、この方法では Cognito ユーザーが自動作成されません。デプロイ後に [Cognito ユーザーを手動で作成](#cognito-ユーザーの作成layer-4) して Web UI にログインしてください。
 
 ### 別の構成でデプロイする
 

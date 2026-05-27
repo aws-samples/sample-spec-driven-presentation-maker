@@ -48,7 +48,9 @@ The CloudFormation console will display a parameter form. Fill in the following:
 2. Click **Create stack**
 3. Wait for the stack to complete (approximately 30–40 minutes). You'll receive an email notification when done.
 
-> **🌐 Want to try it in your browser right away?** Layer 4 deploys a chat-based Web UI. After deployment, [create a Cognito user](#creating-a-cognito-user-layer-4) and you can start generating slides from your browser immediately.
+### Step 4: Sign in
+
+When deployment completes, a temporary password is sent to the **NotificationEmailAddress** you specified. Open the Web UI URL (included in the notification email or found in CloudFormation Outputs `SdpmWebUi` → `SiteUrl`), sign in with that email and temporary password, and set a new password on first login. That's it — you can start generating slides immediately.
 
 ---
 
@@ -86,6 +88,8 @@ chmod +x scripts/deploy.sh
 ```
 
 > **💡 Tip:** CloudShell's home directory (1 GB) persists across sessions. For subsequent deployments, run `cd ~/sample-spec-driven-presentation-maker && git pull && ./scripts/deploy.sh --region us-east-1` to update and redeploy.
+
+> **📝 Note:** Unlike One-Click Deploy, this method does not automatically create a Cognito user. After deployment, [create a Cognito user manually](#creating-a-cognito-user-layer-4) to sign in to the Web UI.
 
 ### Alternative Configurations
 
