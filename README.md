@@ -43,7 +43,7 @@ Choose your environment and follow the setup guide:
 | Local MCP client (Claude Desktop, Claude Cowork) | [Getting Started — Layer 2](docs/en/getting-started.md#layer-2-local-mcp-server) |
 | Remote MCP / Web UI (AWS deployment) | [Deploy Guide](docs/en/deploy-cloudshell.md) |
 
-### One-Click Deploy to AWS
+### 🚀 One-Click Deploy — Just an AWS Account to Get Started
 
 | Region | Launch |
 |--------|--------|

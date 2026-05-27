@@ -46,7 +46,7 @@
 | ローカル MCP クライアント（Claude Desktop, Claude Cowork） | [はじめに — Layer 2](docs/ja/getting-started.md#layer-2-ローカル-mcp-サーバー) |
 | リモート MCP / Web UI（AWS デプロイ） | [デプロイ手順](docs/ja/deploy-cloudshell.md) |
 
-### ワンクリックデプロイ
+### 🚀 AWS アカウントだけですぐに開始！ ワンクリックデプロイ
 
 | リージョン | デプロイ |
 |-----------|---------|
