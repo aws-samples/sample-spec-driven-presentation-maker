@@ -77,7 +77,7 @@ CodeBuild がビルドとデプロイを実行するため、ローカル環境�
 
 ### クイックスタート
 
-CloudShell の場合は AWS コンソールから CloudShell を開き、ローカルの場合は任意のシェルで以下をコピペ実行します。**Layer 4（Agent + Web UI、デフォルト）** が `us-east-1` にデプロイされます。
+CloudShell の場合は AWS コンソールから CloudShell を開き、ローカルの場合は任意のシェルで以下のコマンドを実行します。**Layer 4（Agent + Web UI、デフォルト）** が `us-east-1` にデプロイされます。
 
 ```bash
 cd ~
