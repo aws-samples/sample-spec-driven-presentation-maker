@@ -55,6 +55,14 @@ See the [Deploy Guide](docs/en/deploy-cloudshell.md) for parameter details and a
 
 ---
 
+## Workshop
+
+A hands-on workshop is available with sample data for various real-world scenarios. Practice generating slides from URLs, PDFs, CSVs, meeting minutes, and more — with industry-specific scenarios for manufacturing, financial services, healthcare, IT, and others.
+
+📖 **[Workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/a275330a-0ae0-40b2-ad35-264e263c3882/en-US)**
+
+---
+
 ## Architecture
 
 Built on a 4-layer architecture. Each layer is a thin wrapper around the previous one. Use only the layers you need.
