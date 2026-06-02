@@ -6,6 +6,9 @@ import path from "path"
 import { execFileSync } from "child_process"
 import { getUserConfigDir, getState, updateState } from "@/lib/local/sdpmPaths"
 
+/** mcp-local directory (uv-managed venv with sdpm deps). */
+const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
+
 function getUserTemplatesDir(): string {
   return path.join(getUserConfigDir(), "templates")
 }
@@ -47,9 +50,10 @@ export async function POST(req: Request) {
   try {
     const skillDir = path.resolve(process.cwd(), "..", "skill")
     const script = `import sys; sys.path.insert(0, sys.argv[1]); import json; from sdpm.api import analyze_and_store_template; from pathlib import Path; r=analyze_and_store_template(Path(sys.argv[2]), description=sys.argv[3]); print(json.dumps(r, ensure_ascii=False))`
-    const result = execFileSync("python3", ["-c", script, skillDir, outputPath, description], {
+    const result = execFileSync("uv", ["run", "--directory", MCP_LOCAL_DIR, "python", "-c", script, skillDir, outputPath, description], {
       encoding: "utf-8",
       timeout: 15000,
+      cwd: MCP_LOCAL_DIR,
     })
     meta = JSON.parse(result.trim())
   } catch { /* fallback: minimal metadata */ }
