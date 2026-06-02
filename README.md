@@ -41,9 +41,25 @@ Choose your environment and follow the setup guide:
 |---|---|
 | Agent skill (Claude Code, Codex CLI, Cursor, Kiro, Copilot) | [Getting Started — Layer 1](docs/en/getting-started.md#layer-1-kiro-cli-skill) |
 | Local MCP client (Claude Desktop, Claude Cowork) | [Getting Started — Layer 2](docs/en/getting-started.md#layer-2-local-mcp-server) |
-| Remote MCP / Web UI (AWS deployment) | [Recommended Deploy Guide](docs/en/deploy-cloudshell.md) |
+| Remote MCP / Web UI (AWS deployment) | [Deploy Guide](docs/en/deploy-cloudshell.md) |
 
-AWS deployment runs from CloudShell or any local shell — no CDK/Docker install required.
+### 🚀 One-Click Deploy — Just an AWS Account to Get Started
+
+| Region | Launch |
+|--------|--------|
+| Tokyo (ap-northeast-1) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://ap-northeast-1.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+| N. Virginia (us-east-1) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-east-1.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+| Oregon (us-west-2) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-west-2.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+
+See the [Deploy Guide](docs/en/deploy-cloudshell.md) for parameter details and alternative deployment methods.
+
+---
+
+## Workshop
+
+A hands-on workshop is available with sample data for various real-world scenarios. Practice generating slides from URLs, PDFs, CSVs, meeting minutes, and more — with industry-specific scenarios for manufacturing, financial services, healthcare, IT, and others.
+
+📖 **[Workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/a275330a-0ae0-40b2-ad35-264e263c3882/en-US)**
 
 ---
 

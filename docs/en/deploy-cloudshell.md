@@ -1,12 +1,64 @@
 [EN](../en/deploy-cloudshell.md) | [JA](../ja/deploy-cloudshell.md)
 
-# spec-driven-presentation-maker Recommended Deploy Guide
+# spec-driven-presentation-maker Deploy Guide
 
 ## About spec-driven-presentation-maker
 
 spec-driven-presentation-maker is an open-source toolkit that adds presentation generation capabilities to AI agents. Simply connect it as an MCP (Model Context Protocol) tool to your existing AI system, and you can generate slides through conversation. Choose the layer that fits your needs — from a local CLI to a full-stack web app.
 
-This document describes the **recommended way to deploy spec-driven-presentation-maker (SDPM) to AWS**. Because CodeBuild runs the build and deployment, you don't need a local CDK or Docker install, and the same steps work in either of these environments:
+---
+
+## One-Click Deploy (Recommended)
+
+Deploy SDPM to your AWS account with a single click. No local tools or CLI setup required — just sign in to the AWS Console, click the button, fill in the parameters, and wait for completion.
+
+### Prerequisites
+
+- Signed in to the [AWS Management Console](https://console.aws.amazon.com/)
+- **AdministratorAccess** or equivalent permissions in the target account
+
+### Step 1: Click the Launch Stack button
+
+Choose the region closest to you:
+
+| Region | Launch |
+|--------|--------|
+| Tokyo (ap-northeast-1) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://ap-northeast-1.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+| N. Virginia (us-east-1) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-east-1.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+| Oregon (us-west-2) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-west-2.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+
+### Step 2: Fill in parameters
+
+The CloudFormation console will display a parameter form. Fill in the following:
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| **NotificationEmailAddress** | Email address to receive deployment start/completion notifications | *(required)* |
+| **DeploymentLayer** | `layer3` = MCP Server only, `layer4` = Full stack (Agent + Web UI) | `layer4` |
+| **ModelId** | Bedrock model ID for the Agent (e.g. `global.anthropic.claude-sonnet-4-6`) | `global.anthropic.claude-sonnet-4-6` |
+| **EnableInvocationLogging** | Enable Bedrock Model Invocation Logging (`true` / `false`) | `false` |
+| **AllowedIpV4AddressRanges** | Comma-separated IPv4 CIDR ranges for WAF IP restriction (leave empty for no restriction) | *(empty)* |
+| **AllowedIpV6AddressRanges** | Comma-separated IPv6 CIDR ranges for WAF IP restriction (leave empty for no restriction) | *(empty)* |
+
+> **💡 Tip:** We recommend specifying `AllowedIpV4AddressRanges` to restrict access. You can check your current public IP at [https://checkip.amazonaws.com/](https://checkip.amazonaws.com/). If you don't restrict IPs, the app is publicly accessible but login (Cognito) is still required.
+
+### Step 3: Deploy
+
+1. Check **"I acknowledge that AWS CloudFormation might create IAM resources with custom names."**
+2. Click **Create stack**
+3. Wait for the stack to complete (approximately 30–40 minutes). You'll receive an email notification when done.
+
+### Step 4: Sign in
+
+When deployment completes, a temporary password is sent to the **NotificationEmailAddress** you specified. Open the Web UI URL (included in the notification email or found in CloudFormation Outputs `SdpmWebUi` → `SiteUrl`), sign in with that email and temporary password, and set a new password on first login. That's it — you can start generating slides immediately.
+
+---
+
+## Deploy using CloudShell
+
+Use this method if you need to **customize deployment options** beyond the one-click parameters (e.g., external IdP, config.yaml overrides, or specific deploy.sh flags).
+
+Because CodeBuild runs the build and deployment, you don't need a local CDK or Docker install, and the same steps work in either of these environments:
 
 - **AWS CloudShell** (fully browser-based)
 - Local **Linux / macOS / WSL** (requires `bash` and the `aws` CLI)
@@ -15,15 +67,13 @@ This document describes the **recommended way to deploy spec-driven-presentation
 
 > **📌 Note:** Deployment settings can be persisted in `infra/config.yaml`, making re-deploys more consistent. Direct local CDK deployment (`npx cdk deploy`) is reserved for development and debugging workflows.
 
-## Prerequisites
+### Prerequisites
 
 - Signed in to the AWS Management Console
 - **AdministratorAccess** or equivalent permissions in the target account (for first deployment)
 - One of the following working environments
     - AWS CloudShell (opened in the target deployment region)
     - Local Linux / macOS / WSL with `bash`, `git`, the `aws` CLI, and valid AWS credentials
-
-## Deploy
 
 ### Quick Start
 
@@ -37,9 +87,9 @@ chmod +x scripts/deploy.sh
 ./scripts/deploy.sh --region us-east-1
 ```
 
-> **🌐 Want to try it in your browser right away?** Layer 4 deploys a chat-based Web UI. After deployment, [create a Cognito user](#creating-a-cognito-user-layer-4) and you can start generating slides from your browser immediately.
-
 > **💡 Tip:** CloudShell's home directory (1 GB) persists across sessions. For subsequent deployments, run `cd ~/sample-spec-driven-presentation-maker && git pull && ./scripts/deploy.sh --region us-east-1` to update and redeploy.
+
+> **📝 Note:** Unlike One-Click Deploy, this method does not automatically create a Cognito user. After deployment, [create a Cognito user manually](#creating-a-cognito-user-layer-4) to sign in to the Web UI.
 
 ### Alternative Configurations
 

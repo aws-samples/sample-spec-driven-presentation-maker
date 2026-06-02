@@ -44,9 +44,25 @@
 |---|---|
 | エージェントスキル（Claude Code, Codex CLI, Cursor, Kiro, Copilot） | [はじめに — Layer 1](docs/ja/getting-started.md#layer-1-kiro-cli-スキル) |
 | ローカル MCP クライアント（Claude Desktop, Claude Cowork） | [はじめに — Layer 2](docs/ja/getting-started.md#layer-2-ローカル-mcp-サーバー) |
-| リモート MCP / Web UI（AWS デプロイ） | [推奨デプロイ手順](docs/ja/deploy-cloudshell.md) |
+| リモート MCP / Web UI（AWS デプロイ） | [デプロイ手順](docs/ja/deploy-cloudshell.md) |
 
-AWS デプロイは CloudShell や任意のローカルシェルから実行でき、CDK/Docker のローカルインストールは不要です。
+### 🚀 AWS アカウントだけですぐに開始！ ワンクリックデプロイ
+
+| リージョン | デプロイ |
+|-----------|---------|
+| 東京 (ap-northeast-1) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://ap-northeast-1.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+| バージニア北部 (us-east-1) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-east-1.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+| オレゴン (us-west-2) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-west-2.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+
+パラメータの詳細や別のデプロイ方法については [デプロイ手順](docs/ja/deploy-cloudshell.md) を参照してください。
+
+---
+
+## ワークショップ
+
+様々なシチュエーションでスライドを作成するためのサンプルデータを用意したハンズオンワークショップです。URL・PDF・CSV・議事録などからのスライド生成を実践できます。製造業、金融、ヘルスケア、IT など業界別シナリオも収録しています。
+
+📖 **[ワークショップ](https://catalog.us-east-1.prod.workshops.aws/workshops/a275330a-0ae0-40b2-ad35-264e263c3882/ja-JP)**
 
 ---
 
