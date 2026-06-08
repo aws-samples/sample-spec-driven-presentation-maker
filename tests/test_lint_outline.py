@@ -13,11 +13,20 @@ class TestBasicOutline:
         )
         assert lint_outline(text) == []
 
-    def test_invalid_format(self):
-        text = "not a valid line\n"
+    def test_no_slides(self):
+        text = "Just some free text without any slide entries\n"
         diags = lint_outline(text)
         assert len(diags) == 1
-        assert diags[0]["rule"] == "format"
+        assert diags[0]["rule"] == "no-slides"
+
+    def test_free_text_with_slides(self):
+        text = (
+            "Some intro text\n"
+            "- [title] First slide\n"
+            "Random notes here\n"
+            "- [closing] Last slide\n"
+        )
+        assert lint_outline(text) == []
 
     def test_duplicate_slug(self):
         text = (
@@ -72,10 +81,3 @@ class TestDetailedOutline:
             "\t- what_to_say: Key point\n"
         )
         assert lint_outline(text) == []
-
-    def test_non_indented_sub_item_rejected(self):
-        """A sub-item format at column 0 is not valid — must be indented."""
-        text = "- what_to_say: This is not a slug line\n"
-        diags = lint_outline(text)
-        assert len(diags) == 1
-        assert diags[0]["rule"] == "format"
