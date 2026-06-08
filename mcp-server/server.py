@@ -704,7 +704,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
                 sid = s.get("id", "")
                 if sid:
                     slug_to_page[sid] = i + 1
-            page_numbers = [slug_to_page[slug] for slug in measure_slides if slug in slug_to_page]
+            page_numbers = [slug_to_page[slug] for slug in (measure_slides or []) if slug in slug_to_page]
             page_to_slug = {v: k for k, v in slug_to_page.items()}
 
             # Measure
