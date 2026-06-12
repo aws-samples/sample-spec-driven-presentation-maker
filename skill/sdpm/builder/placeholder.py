@@ -131,6 +131,9 @@ class PlaceholderMixin:
         if style.get('indent'):
             pPr.set('indent', style['indent'])
         
+        bu_font = style.get('buFont', 'Arial')
+        font_elem = etree.SubElement(pPr, qn('a:buFont'))
+        font_elem.set('typeface', bu_font)
         buAutoNum = etree.SubElement(pPr, qn('a:buAutoNum'))
         buAutoNum.set('type', numbering_type)
     
