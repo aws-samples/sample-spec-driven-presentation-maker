@@ -1,0 +1,154 @@
+---
+name: sdpm
+description: >-
+  スライド / プレゼン資料 / PowerPoint を spec 駆動で作成・編集するときに使う。
+  「スライド作って」「提案資料を作りたい」「パワポ」「pptx」「デッキ」などで起動。
+  Create, compose, or edit slide decks / presentations / PowerPoint (.pptx) from a spec.
+---
+
+# sdpm — Spec-Driven Presentation Maker (Claude Code orchestrator)
+
+You orchestrate slide-deck creation through the **sdpm local MCP server** (its tools are
+exposed as `mcp__sdpm__*`). This file is the **behavior layer**: which MCP tools to call,
+in what order, and how to delegate Phase 2 to parallel composer sub-agents. The detailed
+procedures live in the shared workflow docs you read via `read_workflows(...)`; this file
+tells you how to drive them from Claude Code.
+
+> Only Claude Code reads this file. The shared workflows under `skill/references/` are
+> unchanged and shared with the CLI / MCP / ACP entry points — do not edit them.
+
+## Prerequisites
+
+- The `sdpm` MCP server is connected (you can call `mcp__sdpm__*` tools). If not, tell the
+  user to run `/plugin install sdpm@sdpm` and that `uv` must be on PATH.
+- Work is per **deck directory**: `deck.json` + `specs/` + `slides/`. The deck path is the
+  `deck_id` used by most tools.
+
+## CLI → MCP translation table (READ THIS — the shared workflows are written for the CLI)
+
+The shared workflows say `uv run python3 scripts/pptx_builder.py <command> …`. You are on
+MCP, so translate every such command:
+
+| Workflow CLI command | Call this MCP tool instead |
+|---|---|
+| `pptx_builder.py init {name}` | `init_presentation(name=...)` |
+| `pptx_builder.py workflows {name}` | `read_workflows(["{name}"])` |
+| `pptx_builder.py guides {name}` | `read_guides(["{name}"])` |
+| `pptx_builder.py examples {name}` | `read_examples(["{name}"])` |
+| `pptx_builder.py list-templates` | `list_templates()` |
+| `pptx_builder.py analyze-template {pptx}` | `analyze_template(...)` |
+| (choose a style) `apply_style` | `list_styles()` (opens gallery) then `apply_style(deck_id, style)` |
+| `pptx_builder.py measure {json} -p {n}` | `run_python(purpose=..., deck_id=<path>, save=True, measure_slides=["{slug}"])` |
+| `pptx_builder.py preview {json}` | same `run_python(save=True, measure_slides=[...])` — it returns `preview_files` (PNG) |
+| `pptx_builder.py generate {json} -o output.pptx` | `generate_pptx(...)` |
+| `pptx_builder.py code-block …` | `code_to_slide(...)` |
+| `pptx_builder.py image-size {path} --width {px}` | **no MCP tool** — compute proportional size in `run_python` (`new_h = round(orig_h * target_w / orig_w)`) |
+| `pptx_to_json.py {pptx}` | `pptx_to_json(...)` |
+| reading local deck files (`read_text` / `read_json`) | `run_python(purpose=..., code="...", deck_id=<path>)` sandbox functions |
+| fetching a URL the user gave | CC-native **WebFetch** (the MCP has no `web_fetch`) |
+
+`run_python`'s **first argument `purpose` is required**. Inside the sandbox use
+`read_json` / `write_json` / `read_text` / `write_text` / `list_files` (paths relative to
+the deck); `open()`, `import`, and network are blocked.
+
+## Starting point
+
+When the user wants slides, follow the server instructions' menu (A new / B edit existing /
+C hand-edit sync / D create style). For a **new presentation**:
+→ `read_workflows(["create-new-1-briefing"])` and follow each workflow's **Next Step** link.
+Do not decide structure/content/design before loading the workflow.
+
+For B / C / D, load the matching workflow (`edit-existing`, `create-new-4-hand-edit-sync`,
+`create-style`) and follow it with the same CLI→MCP translation. The delegation flow below
+is for the new-presentation path (Phase 2 compose).
+
+## Phase 1 — Briefing → Outline → Art Direction (you drive this directly)
+
+Three sequential sub-phases, each with a workflow doc. Read the workflow **only when you
+enter that sub-phase** (reading later phases early makes you act prematurely). The user must
+**explicitly approve** each deliverable before you move on.
+
+| Sub-phase | Workflow to read | Deliverable |
+|---|---|---|
+| 1. Briefing | `create-new-1-briefing` | `specs/brief.md` |
+| 2. Outline | `create-new-1-outline` | `specs/outline.md` |
+| 3. Art Direction | `create-new-1-art-direction` | `specs/art-direction.html` + `deck.json` |
+
+**Hearing — use CC-native `AskUserQuestion`.** The shared `spec-agent.md` says "always use
+the `hearing` tool," but `hearing` is **not registered on the Claude Code MCP server** — it
+is ACP-only. So in Claude Code, conduct the hearing with the **`AskUserQuestion`** tool: it
+shows selectable options + free text, the same role `hearing` plays. Apply Q-SPEC style —
+present an inference/hypothesis alongside each question so the user has something to react
+to, never a blank open question. Go beyond the workflow's minimum questions: dig for the
+concrete facts, numbers, quotes, and examples that will become the brief's **Source
+Material** — that is the composer's only source of truth (it cannot see this conversation).
+
+`specs/brief.md` must contain: Presentation Goal / Audience / Format / Tone & Style /
+Constraints & Requests / Materials / Source Material — every fact with a source citation.
+
+Write spec files via `run_python` (`write_text` / `write_json`), or `init_presentation`
+where the workflow calls `init`. When art direction is approved, Phase 1 ends.
+
+## Phase 2 — Compose (DELEGATE to parallel composer sub-agents)
+
+Once art direction is approved, **`specs/art-direction.html` and `deck.json` are FROZEN.**
+
+**You do NOT write slide JSON yourself, and you do NOT read the Phase 2/3 workflows** — the
+composer loads those. Your only job here is to split the slides into groups and dispatch
+`sdpm:sdpm-composer` sub-agents in parallel.
+
+### Group assignment (group by design relationship — NOT by outline order)
+
+**Step 1 — core groups (slides that MUST share one design):**
+- Override-inherited slides (same slug prefix, e.g. `demo-1`, `demo-2`) → **same group (required)**
+- Structurally identical roles (all intro / all demo slides) → same group (strongly recommended)
+- Slides the user explicitly asked to unify → same group
+
+**Step 2 — distribute the rest for load balance:**
+- Assign independent slides (title, closing, …) to existing groups so each group has roughly
+  equal work.
+- **Never create a 1-slide group** (nothing to unify). **Never split by outline order**
+  (first N, next N). **Max ~4 parallel groups.** More groups = faster, within that cap.
+
+### Dispatch (parallel = multiple Task calls in ONE message)
+
+Invoke one `sdpm:sdpm-composer` per group, **all in a single message** so they run in
+parallel. Per-group prompt template:
+
+```
+deck_id=<ABSOLUTE deck path>.
+Your assigned slugs: <slug-a>, <slug-b>, <slug-c>.
+First load references (read_workflows(["create-new-2-compose","slide-json-spec"]),
+read_guides(["grid"]), read_examples(["components/all","patterns"])), then read
+specs/brief.md, specs/outline.md, specs/art-direction.html for context.
+Compose ONLY your assigned slugs, one at a time, via run_python's write_json, and use the
+preview_files (PNG) returned by run_python(save=True, measure_slides=[slug]) as the source
+of truth. Do NOT touch other slides, deck.json, or specs/. art-direction is FROZEN. Do NOT
+advance to Phase 3. Return a summary plus any warnings.
+```
+
+Keep prompts ASCII-clean. Each prompt MUST include: `deck_id` (absolute path), the exact
+assigned slugs, and the pointer to `specs/`.
+
+### On failure
+
+If a composer fails or is cancelled, **do not retry automatically.** Relay the error/status
+to the user in plain text and ask how to proceed (resume / adjust scope / abandon). Skip any
+post-compose work when a composer did not complete successfully.
+
+## Phase 3 — Review
+
+After all composers complete successfully, `read_workflows(["create-new-3-review"])` and
+follow it (generate the final PPTX via `generate_pptx`, render previews via
+`run_python(save=True, measure_slides=[...])`, present results). Apply the CLI→MCP table the
+same way.
+
+> Consistency Review (a single composer reviewing the whole deck for cross-slide
+> consistency, then per-slide fix passes) is a **later phase** — not part of this skill yet.
+
+## Notes
+
+- Reading specs and preview PNGs: CC-native **Read** is fine. Writing deck files: go through
+  `run_python` so `save=True`'s `lint_and_sanitize` stays the single writer (no Write/Edit).
+- The composer owns disjoint slugs to avoid parallel data races — never assign the same slug
+  to two groups.
