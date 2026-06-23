@@ -112,9 +112,13 @@ is the source of truth for how a slide actually renders:
 - **Measure** (`warnings` / `lint_diagnostics`) catches structural issues: text overflow
   (declared vs actual height), lint, layout bias.
 
-They are complementary — use both. Never fix from imagination: `measure_slides` alone
-returns only dimension text and cannot detect visual breakage. If `preview_files` is
-empty or missing, surface that as a warning — do not silently rely on measure only.
+They are complementary — use both. A measure warning is only a hint about a structural
+*symptom* (overflow, lint); the real problem is often visual — layout imbalance, spacing,
+alignment, readability. Fixing only what measure reports can miss (or even worsen) the
+actual problem, so judge from the preview, not from the warning list alone. Never fix from
+imagination: `measure_slides` alone returns only dimension text and cannot detect visual
+breakage. If `preview_files` is empty or missing, surface that as a warning — do not
+silently rely on measure only.
 
 Work in two passes: **Phase A** draft every assigned slide (one at a time, measuring as
 you go), then **Phase B** refine using the previews. If you were given a modification
