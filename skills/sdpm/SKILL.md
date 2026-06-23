@@ -74,14 +74,15 @@ enter that sub-phase** (reading later phases early makes you act prematurely). T
 | 2. Outline | `create-new-1-outline` | `specs/outline.md` |
 | 3. Art Direction | `create-new-1-art-direction` | `specs/art-direction.html` + `deck.json` |
 
-**Hearing — use CC-native `AskUserQuestion`.** The shared `spec-agent.md` says "always use
-the `hearing` tool," but `hearing` is **not registered on the Claude Code MCP server** — it
-is ACP-only. So in Claude Code, conduct the hearing with the **`AskUserQuestion`** tool: it
-shows selectable options + free text, the same role `hearing` plays. Apply Q-SPEC style —
-present an inference/hypothesis alongside each question so the user has something to react
-to, never a blank open question. Go beyond the workflow's minimum questions: dig for the
-concrete facts, numbers, quotes, and examples that will become the brief's **Source
-Material** — that is the composer's only source of truth (it cannot see this conversation).
+**Hearing.** The shared `spec-agent.md` says "always use the `hearing` tool," but `hearing`
+is ACP-only and **not registered on the Claude Code MCP server** — do not call it. In Claude
+Code, just conduct the hearing through normal conversation (whichever question style the user
+or their environment prefers — this skill does not mandate a specific question tool). Apply
+Q-SPEC style: present an inference/hypothesis alongside each question so the user has
+something to react to, rather than a blank open question. Go beyond the workflow's minimum
+questions: dig for the concrete facts, numbers, quotes, and examples that will become the
+brief's **Source Material** — that is the composer's only source of truth (it cannot see this
+conversation).
 
 `specs/brief.md` must contain: Presentation Goal / Audience / Format / Tone & Style /
 Constraints & Requests / Materials / Source Material — every fact with a source citation.
@@ -97,27 +98,36 @@ Once art direction is approved, **`specs/art-direction.html` and `deck.json` are
 composer loads those. Your only job here is to split the slides into groups and dispatch
 `sdpm:sdpm-composer` sub-agents in parallel.
 
-### Group assignment (group by design relationship — NOT by outline order)
+### Group assignment (small groups, but keep design-coupled slides together)
 
-**Step 1 — core groups (slides that MUST share one design):**
-- Override-inherited slides (same slug prefix, e.g. `demo-1`, `demo-2`) → **same group (required)**
-- Structurally identical roles (all intro / all demo slides) → same group (strongly recommended)
-- Slides the user explicitly asked to unify → same group
+Goal: maximize parallelism with **small, focused groups (target 1–2 slides per agent)** while
+never separating slides that must share a design.
 
-**Step 2 — distribute the rest for load balance:**
-- Assign independent slides (title, closing, …) to existing groups so each group has roughly
-  equal work.
-- **Never create a 1-slide group** (nothing to unify). **Never split by outline order**
-  (first N, next N). **Max ~4 parallel groups.** More groups = faster, within that cap.
+**Step 1 — keep design-coupled slides in ONE group (overrides the 1–2 target):**
+- Override-inherited slides (same slug prefix, e.g. `demo-1`, `demo-2`, `demo-3`) → **same
+  group (required)**, even if that makes the group larger than 2 — they share a visual base
+  and splitting them across agents breaks consistency.
+- Slides the user explicitly asked to unify → same group.
+
+**Step 2 — split everything else as finely as possible:**
+- Each remaining (design-independent) slide goes to its own group of **1, or pair two related
+  ones into a group of 2**. A 1-slide group is fine here — the priority is small context per
+  agent and speed, not forced unification.
+- Do NOT lump unrelated slides together just to fill a group.
+
+**Parallelism cap: up to 10 agents in parallel** (Claude Code handles 10 concurrent Tasks
+safely). If the deck produces more than 10 groups, dispatch in **successive waves of ≤10**
+(send one batch of Task calls, wait for them to return, then send the next batch) rather than
+exceeding 10 at once.
 
 ### Dispatch (parallel = multiple Task calls in ONE message)
 
-Invoke one `sdpm:sdpm-composer` per group, **all in a single message** so they run in
-parallel. Per-group prompt template:
+Invoke one `sdpm:sdpm-composer` per group, **all in a single message** (up to 10 per message)
+so they run in parallel. Per-group prompt template:
 
 ```
 deck_id=<ABSOLUTE deck path>.
-Your assigned slugs: <slug-a>, <slug-b>, <slug-c>.
+Your assigned slugs: <slug-a>[, <slug-b>].
 First load references (read_workflows(["create-new-2-compose","slide-json-spec"]),
 read_guides(["grid"]), read_examples(["components/all","patterns"])), then read
 specs/brief.md, specs/outline.md, specs/art-direction.html for context.
@@ -128,7 +138,7 @@ advance to Phase 3. Return a summary plus any warnings.
 ```
 
 Keep prompts ASCII-clean. Each prompt MUST include: `deck_id` (absolute path), the exact
-assigned slugs, and the pointer to `specs/`.
+assigned slugs (usually 1–2), and the pointer to `specs/`.
 
 ### On failure
 
