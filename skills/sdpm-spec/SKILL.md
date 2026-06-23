@@ -1,21 +1,39 @@
 ---
-name: sdpm
+name: sdpm-spec
 description: >-
-  スライド / プレゼン資料 / PowerPoint を spec 駆動で作成・編集するときに使う。
+  スライド / プレゼン資料 / PowerPoint を spec 駆動で、丁寧なヒアリングを通じて作成・編集するとき。
+  要件を詰めて構成・デザインを設計したいとき、各段階の確認を挟みたいとき。
   「スライド作って」「提案資料を作りたい」「パワポ」「pptx」「デッキ」などで起動。
-  Create, compose, or edit slide decks / presentations / PowerPoint (.pptx) from a spec.
+  Spec-driven slide/deck/PowerPoint creation with a thorough hearing and per-step approval.
 ---
 
-# sdpm — Spec-Driven Presentation Maker (Claude Code orchestrator)
+# sdpm-spec — Spec-Driven Presentation Maker / SPEC mode (Claude Code orchestrator)
 
 You orchestrate slide-deck creation through the **sdpm local MCP server** (its tools are
-exposed as `mcp__sdpm__*`). This file is the **behavior layer**: which MCP tools to call,
-in what order, and how to delegate Phase 2 to parallel composer sub-agents. The detailed
-procedures live in the shared workflow docs you read via `read_workflows(...)`; this file
-tells you how to drive them from Claude Code.
+exposed as `mcp__sdpm__*`). This file is the **behavior layer** for **SPEC mode**: a careful,
+dialogue-driven flow where you conduct a real hearing, get the user's explicit approval at
+each step, then delegate Phase 2 to parallel composer sub-agents. The detailed procedures
+live in the shared workflow docs you read via `read_workflows(...)`; this file tells you how
+to drive them from Claude Code.
 
-> Only Claude Code reads this file. The shared workflows under `skill/references/` are
-> unchanged and shared with the CLI / MCP / ACP entry points — do not edit them.
+> Ported from the ACP `spec-agent.md`. Only Claude Code reads this file. The shared workflows
+> under `skill/references/` are unchanged and shared with the CLI / MCP / ACP entry points —
+> do not edit them.
+
+## SPEC mode vs VIBE mode (pick the right entry)
+
+There are two sdpm skills. Choose based on how much hearing the user wants:
+
+- **SPEC mode (this skill)** — the user wants to *think through* the deck: requirements,
+  message, structure, design decisions, with approval at each step. Best when the content
+  isn't fully decided yet, or quality/precision matters.
+- **VIBE mode (`sdpm-vibe`)** — the user already has **source material** (a URL, paper,
+  transcript, uploaded file, or pasted text) and wants slides **fast**, with minimal
+  interaction and no per-step approval.
+
+If the user opens with ready-made source material and signals they want it turned into slides
+quickly, prefer **VIBE mode** — tell them you can switch, or just proceed there. If they want
+to shape the deck collaboratively, stay in SPEC mode.
 
 ## Prerequisites
 
@@ -51,18 +69,22 @@ MCP, so translate every such command:
 `read_json` / `write_json` / `read_text` / `write_text` / `list_files` (paths relative to
 the deck); `open()`, `import`, and network are blocked.
 
+> There is no `start_presentation` tool on the Claude Code MCP server — that exists only in
+> the non-Instructions server variant. Claude Code loads the server instructions automatically;
+> you do not need to call any "start" tool.
+
 ## Starting point
 
-When the user wants slides, follow the server instructions' menu (A new / B edit existing /
-C hand-edit sync / D create style). For a **new presentation**:
+The server instructions present a menu (A new / B edit existing / C hand-edit sync /
+D create style). For a **new presentation** (A):
 → `read_workflows(["create-new-1-briefing"])` and follow each workflow's **Next Step** link.
 Do not decide structure/content/design before loading the workflow.
 
 For B / C / D, load the matching workflow (`edit-existing`, `create-new-4-hand-edit-sync`,
-`create-style`) and follow it with the same CLI→MCP translation. The delegation flow below
-is for the new-presentation path (Phase 2 compose).
+`create-style`) and follow it with the same CLI→MCP translation. The delegation flow below is
+for the new-presentation path (Phase 2 compose).
 
-## Phase 1 — Briefing → Outline → Art Direction (you drive this directly)
+## Phase 1 — Briefing → Outline → Art Direction (you drive this directly, with hearing)
 
 Three sequential sub-phases, each with a workflow doc. Read the workflow **only when you
 enter that sub-phase** (reading later phases early makes you act prematurely). The user must
@@ -74,21 +96,26 @@ enter that sub-phase** (reading later phases early makes you act prematurely). T
 | 2. Outline | `create-new-1-outline` | `specs/outline.md` |
 | 3. Art Direction | `create-new-1-art-direction` | `specs/art-direction.html` + `deck.json` |
 
-**Hearing.** The shared `spec-agent.md` says "always use the `hearing` tool," but `hearing`
-is ACP-only and **not registered on the Claude Code MCP server** — do not call it. In Claude
-Code, just conduct the hearing through normal conversation (whichever question style the user
-or their environment prefers — this skill does not mandate a specific question tool). Apply
-Q-SPEC style: present an inference/hypothesis alongside each question so the user has
-something to react to, rather than a blank open question. Go beyond the workflow's minimum
-questions: dig for the concrete facts, numbers, quotes, and examples that will become the
-brief's **Source Material** — that is the composer's only source of truth (it cannot see this
-conversation).
+**Hearing is the heart of SPEC mode.** Do not rush to output. Go beyond the workflow's
+prerequisite questions — dig into the substance: the specific facts, data, numbers, quotes,
+examples, and stories that should appear on the slides. The richer the hearing, the richer the
+**Source Material**, and the better the composer's output.
 
-`specs/brief.md` must contain: Presentation Goal / Audience / Format / Tone & Style /
-Constraints & Requests / Materials / Source Material — every fact with a source citation.
+The shared `spec-agent.md` says "always use the `hearing` tool," but `hearing` is ACP-only and
+**not registered on the Claude Code MCP server** — do not call it. In Claude Code, conduct the
+hearing through normal conversation (whichever question style the user or their environment
+prefers — this skill does not mandate a specific question tool). Apply Q-SPEC style: present an
+inference/hypothesis alongside each question so the user has something to react to, rather than
+a blank open question. Simple yes/no confirmations are fine in plain text.
 
-Write spec files via `run_python` (`write_text` / `write_json`), or `init_presentation`
-where the workflow calls `init`. When art direction is approved, Phase 1 ends.
+The composer can only see `specs/` files — it has no access to this conversation. `specs/brief.md`
+must contain: Presentation Goal / Audience / Format / Tone & Style / Constraints & Requests /
+Materials / Source Material — and **every fact must have a source citation** (URL or filename).
+If it is not in the brief, it does not exist for the composer.
+
+Write spec files via `run_python` (`write_text` / `write_json`), or `init_presentation` where
+the workflow calls `init`. Present each deliverable and **wait for explicit approval** before
+the next sub-phase. When art direction is approved, Phase 1 ends.
 
 ## Phase 2 — Compose (DELEGATE to parallel composer sub-agents)
 
