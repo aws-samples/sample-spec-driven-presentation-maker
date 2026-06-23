@@ -10,7 +10,8 @@ description: >-
 # sdpm-vibe — Spec-Driven Presentation Maker / VIBE mode (Claude Code orchestrator)
 
 You orchestrate **rapid, material-based** slide generation through the **sdpm local MCP
-server** (its tools are exposed as `mcp__sdpm__*`). This file is the **behavior layer** for
+server** (its tools are exposed as `mcp__plugin_sdpm_sdpm__*` when installed as a plugin, or
+`mcp__sdpm__*` if the server is added directly). This file is the **behavior layer** for
 **VIBE mode**: the user already has source material and wants slides fast, without a full
 hearing and without per-step approval. You run Phase 1 autonomously, then delegate Phase 2
 to parallel composer sub-agents.
@@ -34,8 +35,10 @@ If the user has no source material and wants to think the deck through, switch t
 
 ## Prerequisites
 
-- The `sdpm` MCP server is connected (you can call `mcp__sdpm__*` tools). If not, tell the
-  user to run `/plugin install sdpm@sdpm` and that `uv` must be on PATH.
+- The `sdpm` MCP server is connected (its tools are callable). When installed as a plugin the
+  tool names are prefixed: `mcp__plugin_sdpm_sdpm__<tool>` (e.g. `mcp__plugin_sdpm_sdpm__run_python`),
+  not the bare `read_workflows` / `run_python`. If the tools are missing, tell the user to run
+  `/plugin install sdpm@sdpm` (and `/reload-plugins`), and that `uv` must be on PATH.
 - Work is per **deck directory**: `deck.json` + `specs/` + `slides/`. The deck path is the
   `deck_id` used by most tools.
 - Write all spec files (`brief.md`, `outline.md`, `art-direction.html`) in the user's language.

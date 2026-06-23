@@ -10,7 +10,8 @@ description: >-
 # sdpm-spec — Spec-Driven Presentation Maker / SPEC mode (Claude Code orchestrator)
 
 You orchestrate slide-deck creation through the **sdpm local MCP server** (its tools are
-exposed as `mcp__sdpm__*`). This file is the **behavior layer** for **SPEC mode**: a careful,
+exposed as `mcp__plugin_sdpm_sdpm__*` when installed as a plugin, or `mcp__sdpm__*` if the
+server is added directly). This file is the **behavior layer** for **SPEC mode**: a careful,
 dialogue-driven flow where you conduct a real hearing, get the user's explicit approval at
 each step, then delegate Phase 2 to parallel composer sub-agents. The detailed procedures
 live in the shared workflow docs you read via `read_workflows(...)`; this file tells you how
@@ -37,8 +38,10 @@ to shape the deck collaboratively, stay in SPEC mode.
 
 ## Prerequisites
 
-- The `sdpm` MCP server is connected (you can call `mcp__sdpm__*` tools). If not, tell the
-  user to run `/plugin install sdpm@sdpm` and that `uv` must be on PATH.
+- The `sdpm` MCP server is connected (its tools are callable). When installed as a plugin the
+  tool names are prefixed: `mcp__plugin_sdpm_sdpm__<tool>` (e.g. `mcp__plugin_sdpm_sdpm__run_python`),
+  not the bare `read_workflows` / `run_python`. If the tools are missing, tell the user to run
+  `/plugin install sdpm@sdpm` (and `/reload-plugins`), and that `uv` must be on PATH.
 - Work is per **deck directory**: `deck.json` + `specs/` + `slides/`. The deck path is the
   `deck_id` used by most tools.
 
