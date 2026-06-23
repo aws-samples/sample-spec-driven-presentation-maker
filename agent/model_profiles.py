@@ -89,9 +89,22 @@ QWEN_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="none", compose_capa
 # Moonshot Kimi — prompt caching not supported on Bedrock at time of writing.
 KIMI_DEFAULT = ModelProfile(temperature=0.6, cache_strategy="none", compose_capable=False)
 
+# Z.AI GLM — prompt caching not supported on Bedrock.
+GLM_DEFAULT = ModelProfile(temperature=0.6, cache_strategy="none")
+
+# Google Gemma 4 — bedrock-mantle only (OpenAI-compatible endpoint).
+GEMMA_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="none")
+
 
 # Fallback profile when a model id is not explicitly registered.
 _DEFAULT = CLAUDE_STANDARD
+
+# Models served via bedrock-mantle (OpenAI-compatible endpoint, not Converse API).
+MANTLE_MODELS: dict[str, str] = {
+    # model_id → mantle region
+    "google.gemma-4-31b": "us-east-1",
+    "xai.grok-4.3": "us-east-1",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +122,10 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     "global.anthropic.claude-haiku-4-5-20251001-v1:0": CLAUDE_HAIKU,
     # Amazon Nova
     "us.amazon.nova-2-lite-v1:0": NOVA_2_DEFAULT,
+    # Google Gemma
+    "google.gemma-4-31b": GEMMA_DEFAULT,
+    # xAI Grok
+    "xai.grok-4.3": ModelProfile(temperature=0.7, cache_strategy="none"),
 }
 
 

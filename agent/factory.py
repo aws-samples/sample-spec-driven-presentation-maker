@@ -20,7 +20,7 @@ from mcp_clients import (
     mcp_aws_pricing,
 )
 from composition import resolve_parts
-from model_profiles import build_model_kwargs, MODEL_PROFILES
+from model_profiles import build_model_kwargs, MODEL_PROFILES, MANTLE_MODELS
 from modes import MODES
 from modes.separated.composer import make_compose_slides
 from resilience import LoopGuard
@@ -96,7 +96,11 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         requested_agent = chat_model_id
         default_agent = _DEFAULT_CHAT_MODEL_ID
     resolved_agent = _resolve_model_id(requested_agent, default_agent)
-    model = BedrockModel(**build_model_kwargs(resolved_agent))
+    if resolved_agent in MANTLE_MODELS:
+        from mantle_client import mantle_model
+        model = mantle_model(resolved_agent, region=MANTLE_MODELS[resolved_agent])
+    else:
+        model = BedrockModel(**build_model_kwargs(resolved_agent))
 
     # MCP servers
     mcp_servers = []
@@ -121,14 +125,18 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         if profile and not profile.compose_capable:
             logger.warning("Model %r is not compose_capable; falling back to %r for create", resolved_create, _DEFAULT_CREATE_MODEL_ID)
             resolved_create = _DEFAULT_CREATE_MODEL_ID
-        composer_model = BedrockModel(
-            **build_model_kwargs(resolved_create),
-            boto_client_config=BotocoreConfig(
-                user_agent_extra="strands-agents",
-                read_timeout=120,
-                retries={"max_attempts": 5, "mode": "adaptive"},
-            ),
-        )
+        if resolved_create in MANTLE_MODELS:
+            from mantle_client import mantle_model
+            composer_model = mantle_model(resolved_create, region=MANTLE_MODELS[resolved_create])
+        else:
+            composer_model = BedrockModel(
+                **build_model_kwargs(resolved_create),
+                boto_client_config=BotocoreConfig(
+                    user_agent_extra="strands-agents",
+                    read_timeout=120,
+                    retries={"max_attempts": 5, "mode": "adaptive"},
+                ),
+            )
         composer_mcp_factory = lambda: mcp_agentcore_runtime(jwt_token=jwt_token)  # noqa: E731
         compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch])
         tools.append(compose_slides)
@@ -167,10 +175,13 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
     context = {"mcp_instructions": collect_mcp_instructions(mcp_servers)}
 
     try:
+        profile = MODEL_PROFILES.get(resolved_agent)
+        enable_cache = (profile.cache_strategy == "auto") if profile else True
         system_prompt, initial_messages = resolve_parts(
             cfg.parts,
             mcp_client=mcp_servers[0] if mcp_servers else None,
             context=context,
+            enable_cache=enable_cache,
         )
     except Exception as e:
         logger.warning("Prompt resolve failed: %s", e)

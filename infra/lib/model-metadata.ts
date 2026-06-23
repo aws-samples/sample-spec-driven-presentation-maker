@@ -41,4 +41,9 @@ export const MODEL_METADATA: Record<string, ModelMetadata> = {
     description: "Amazon's 2nd gen, fast and economical",
     composable: false,
   },
+  // --- Google Gemma ---
+  "google.gemma-4-31b": {
+    displayName: "Gemma 4 31B",
+    description: "Vision + tools, ultra low cost (Google)",
+  },
 };

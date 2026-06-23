@@ -134,6 +134,7 @@ def resolve_parts(
     parts: list[Part],
     mcp_client: Any = None,
     context: dict | None = None,
+    enable_cache: bool = True,
 ) -> tuple[str | list[dict], list[dict]]:
     """Resolve parts into (system_prompt, messages).
 
@@ -168,7 +169,7 @@ def resolve_parts(
         else:
             raise ValueError(f"Unknown target: {part.target}")
 
-    has_cache_point = any(cp for _, cp in system_chunks)
+    has_cache_point = enable_cache and any(cp for _, cp in system_chunks)
 
     if has_cache_point:
         # Build Bedrock content blocks, grouping consecutive chunks between cache points

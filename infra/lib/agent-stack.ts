@@ -65,6 +65,13 @@ export class AgentStack extends cdk.Stack {
         resources: ["*"],
       })
     );
+    // bedrock-mantle (OpenAI-compatible endpoint) for models like Gemma 4
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["bedrock-mantle:CreateInference"],
+        resources: ["*"],
+      })
+    );
 
     props.table.grantReadWriteData(role);
     props.pptxBucket.grantReadWrite(role);
