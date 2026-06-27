@@ -782,91 +782,150 @@ def _align_fan_bends(edges, conn_sides, connections):
         _rewrite_fan(edges, conn_sides, indices, mode="fan_in")
 
 
-_BEND_OVERLAP_THRESHOLD = 15
-_BEND_SPREAD_STEP = 20
+_MAX_RESOLVE_ITERATIONS = 30
+_BEND_CANDIDATES = [-50, -40, -30, -20, -15, -10, 10, 15, 20, 30, 40, 50]
 
 
 def _spread_overlapping_bends(edges, conn_sides, connections):
-    """Detect and spread elbow bends that overlap from the same source node.
+    """Iteratively resolve edge crossings by searching for optimal bend shifts.
 
-    When multiple elbows from the same source have bend segments at nearly
-    the same X (or Y), space them apart to avoid visual overlap.
+    For each crossing found, tries all candidate shifts on both involved edges,
+    evaluates by (crossing_count, displacement), and applies the best fix.
+    Repeats until zero crossings or max iterations.
     """
-    # Group edges by source node
-    src_edge_groups = {}
-    for i, (src, dst, src_side, dst_side) in enumerate(conn_sides):
-        if src is None:
-            continue
-        pts = edges[i]["points"]
-        if len(pts) < 4:
-            continue
-        k = connections[i]["from"]
-        src_edge_groups.setdefault(k, []).append(i)
+    import copy
 
-    for indices in src_edge_groups.values():
-        if len(indices) < 2:
-            continue
-        # Check if bends are on vertical segments (H-V-H pattern)
-        # For H-V-H: bend is at pts[1][0] (= pts[2][0])
-        bend_xs = []
-        for idx in indices:
-            pts = edges[idx]["points"]
-            if len(pts) >= 4:
-                # H-V-H: first segment is horizontal, bend is vertical
-                if abs(pts[0][1] - pts[1][1]) < 5:
-                    bend_xs.append((idx, pts[1][0]))
-        if len(bend_xs) < 2:
-            continue
+    for _iteration in range(_MAX_RESOLVE_ITERATIONS):
+        crossing = _find_first_crossing(edges)
+        if crossing is None:
+            break
+        i, si, j, sj = crossing
+        _resolve_crossing_search(edges, i, si, j, sj)
 
-        # Sort by bend X position
-        bend_xs.sort(key=lambda t: t[1])
 
-        # Check for overlaps and spread
-        for j in range(1, len(bend_xs)):
-            prev_idx, prev_x = bend_xs[j - 1]
-            curr_idx, curr_x = bend_xs[j]
-            if abs(curr_x - prev_x) < _BEND_OVERLAP_THRESHOLD:
-                # Spread apart
-                new_prev_x = prev_x - _BEND_SPREAD_STEP // 2
-                new_curr_x = curr_x + _BEND_SPREAD_STEP // 2
-                _update_bend_x(edges[prev_idx]["points"], prev_x, new_prev_x)
-                _update_bend_x(edges[curr_idx]["points"], curr_x, new_curr_x)
-                bend_xs[j - 1] = (prev_idx, new_prev_x)
-                bend_xs[j] = (curr_idx, new_curr_x)
+def _find_first_crossing(edges):
+    """Find the first pair of crossing segments across all edges."""
+    for i in range(len(edges)):
+        pts_i = edges[i]["points"]
+        if len(pts_i) < 2:
+            continue
+        for j in range(i + 1, len(edges)):
+            pts_j = edges[j]["points"]
+            if len(pts_j) < 2:
+                continue
+            for si in range(len(pts_i) - 1):
+                for sj in range(len(pts_j) - 1):
+                    if _segments_intersect(pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]):
+                        return (i, si, j, sj)
+    return None
 
-    # Same for destination node (fan-in)
-    dst_edge_groups = {}
-    for i, (src, dst, src_side, dst_side) in enumerate(conn_sides):
-        if src is None:
-            continue
-        pts = edges[i]["points"]
-        if len(pts) < 4:
-            continue
-        k = connections[i]["to"]
-        dst_edge_groups.setdefault(k, []).append(i)
 
-    for indices in dst_edge_groups.values():
-        if len(indices) < 2:
+def _count_all_crossings(edges):
+    """Count total crossing pairs across all edges."""
+    count = 0
+    for i in range(len(edges)):
+        pts_i = edges[i]["points"]
+        if len(pts_i) < 2:
             continue
-        bend_xs = []
-        for idx in indices:
-            pts = edges[idx]["points"]
-            if len(pts) >= 4:
-                if abs(pts[-1][1] - pts[-2][1]) < 5:
-                    bend_xs.append((idx, pts[-2][0]))
-        if len(bend_xs) < 2:
-            continue
-        bend_xs.sort(key=lambda t: t[1])
-        for j in range(1, len(bend_xs)):
-            prev_idx, prev_x = bend_xs[j - 1]
-            curr_idx, curr_x = bend_xs[j]
-            if abs(curr_x - prev_x) < _BEND_OVERLAP_THRESHOLD:
-                new_prev_x = prev_x - _BEND_SPREAD_STEP // 2
-                new_curr_x = curr_x + _BEND_SPREAD_STEP // 2
-                _update_bend_x(edges[prev_idx]["points"], prev_x, new_prev_x)
-                _update_bend_x(edges[curr_idx]["points"], curr_x, new_curr_x)
-                bend_xs[j - 1] = (prev_idx, new_prev_x)
-                bend_xs[j] = (curr_idx, new_curr_x)
+        for j in range(i + 1, len(edges)):
+            pts_j = edges[j]["points"]
+            if len(pts_j) < 2:
+                continue
+            for si in range(len(pts_i) - 1):
+                for sj in range(len(pts_j) - 1):
+                    if _segments_intersect(pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]):
+                        count += 1
+    return count
+
+
+def _resolve_crossing_search(edges, i, si, j, sj):
+    """Try all candidate shifts for both crossing edges and pick the best.
+
+    For each candidate: apply shift, count total crossings, score by
+    (crossings, displacement). Pick minimum.
+    """
+    import copy
+
+    pts_i = edges[i]["points"]
+    pts_j = edges[j]["points"]
+    a1, a2 = pts_i[si], pts_i[si + 1]
+    b1, b2 = pts_j[sj], pts_j[sj + 1]
+
+    current_crossings = _count_all_crossings(edges)
+    best_score = (current_crossings, 0)
+    best_patch = None
+
+    # Generate candidates based on segment orientation
+    candidates = []
+    for edge_idx, seg_idx, pt1, pt2 in [(i, si, a1, a2), (j, sj, b1, b2)]:
+        is_vert = pt1[0] == pt2[0]
+        is_horiz = pt1[1] == pt2[1]
+        if is_vert:
+            for delta in _BEND_CANDIDATES:
+                candidates.append((edge_idx, "x", seg_idx, delta))
+        if is_horiz:
+            for delta in _BEND_CANDIDATES:
+                candidates.append((edge_idx, "y", seg_idx, delta))
+
+    for edge_idx, axis, seg, delta in candidates:
+        test_edges = copy.deepcopy(edges)
+        pts = test_edges[edge_idx]["points"]
+
+        if axis == "x":
+            _apply_bend_shift_x(pts, seg, delta)
+        else:
+            _apply_bend_shift_y(pts, seg, delta)
+
+        crossings = _count_all_crossings(test_edges)
+        score = (crossings, abs(delta))
+
+        if score < best_score:
+            best_score = score
+            best_patch = (edge_idx, copy.deepcopy(test_edges[edge_idx]["points"]))
+
+    if best_patch is not None:
+        edge_idx, new_pts = best_patch
+        edges[edge_idx]["points"] = new_pts
+
+
+def _apply_bend_shift_x(points, seg_idx, delta):
+    """Shift the vertical bend at seg_idx by delta on the X axis.
+
+    Identifies the shared X value of the vertical segment and shifts all
+    points on that bend column.
+    """
+    if len(points) < 3:
+        return
+    p1 = points[seg_idx]
+    p2 = points[min(seg_idx + 1, len(points) - 1)]
+    if p1[0] == p2[0]:
+        target_x = p1[0]
+    elif seg_idx > 0 and points[seg_idx - 1][0] == p1[0]:
+        target_x = p1[0]
+    else:
+        target_x = p1[0]
+
+    for pt in points:
+        if pt[0] == target_x:
+            pt[0] += delta
+
+
+def _apply_bend_shift_y(points, seg_idx, delta):
+    """Shift the horizontal bend at seg_idx by delta on the Y axis."""
+    if len(points) < 3:
+        return
+    p1 = points[seg_idx]
+    p2 = points[min(seg_idx + 1, len(points) - 1)]
+    if p1[1] == p2[1]:
+        target_y = p1[1]
+    elif seg_idx > 0 and points[seg_idx - 1][1] == p1[1]:
+        target_y = p1[1]
+    else:
+        target_y = p1[1]
+
+    for pt in points:
+        if pt[1] == target_y:
+            pt[1] += delta
 
 
 def _update_bend_x(points, old_x, new_x):
