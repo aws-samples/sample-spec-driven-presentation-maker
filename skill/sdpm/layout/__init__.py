@@ -45,9 +45,17 @@ def _optimize_group_order(node, connections):
     if not relevant:
         return
 
+    # Identify internal connections (both src and dst within this group)
+    # Their src must appear before dst in any valid permutation.
+    internal_order_constraints = []
+    for conn in connections:
+        src, dst = conn["from"], conn["to"]
+        if src in leaf_ids and dst in leaf_ids:
+            internal_order_constraints.append((src, dst))
+
     # For brute-force: try all permutations if ≤7 leaves
     if len(children) <= 7:
-        best_order = _find_min_crossing_order(children, relevant, connections)
+        best_order = _find_min_crossing_order(children, relevant, connections, internal_order_constraints)
         if best_order is not None:
             node["children"] = best_order
             return
@@ -59,7 +67,7 @@ def _optimize_group_order(node, connections):
     node["children"] = sorted(children, key=lambda c: _heuristic_sort_key(c["id"], connections, id_position))
 
 
-def _find_min_crossing_order(children, relevant, all_connections):
+def _find_min_crossing_order(children, relevant, all_connections, internal_order_constraints=None):
     """Try all permutations and return the one with fewest crossings."""
     from itertools import permutations
 
@@ -71,6 +79,18 @@ def _find_min_crossing_order(children, relevant, all_connections):
 
     for perm in permutations(children):
         perm_ids = [c["id"] for c in perm]
+
+        # Skip permutations that violate internal order constraints
+        if internal_order_constraints:
+            valid = True
+            for src, dst in internal_order_constraints:
+                if src in perm_ids and dst in perm_ids:
+                    if perm_ids.index(src) > perm_ids.index(dst):
+                        valid = False
+                        break
+            if not valid:
+                continue
+
         crossings = _count_crossings_for_order(perm_ids, relevant, peer_positions)
         if best_crossings is None or crossings < best_crossings:
             best_crossings = crossings
@@ -533,12 +553,21 @@ def _layout_route_connections(connections, nodes, groups=None):
     port_indices = {}
 
     # First pass: identify reverse-flow connections (they use bottom ports, not side ports)
+    # Skip if explicit side hints are provided (graph layout mode).
+    # Only treat as reverse if the horizontal displacement is dominant (not a vertical connection).
     reverse_set = set()
     for i, conn in enumerate(connections):
+        if conn.get("srcSide") or conn.get("dstSide"):
+            continue
         src = _find_node(nodes, conn["from"])
         dst = _find_node(nodes, conn["to"])
         if src and dst and dst["x"] + dst["width"] < src["x"]:
-            reverse_set.add(i)
+            src_cy = src["y"] + src.get("height", 60) / 2
+            dst_cy = dst["y"] + dst.get("height", 60) / 2
+            dx = src["x"] - (dst["x"] + dst["width"])
+            dy = abs(dst_cy - src_cy)
+            if dx > dy * 0.5:
+                reverse_set.add(i)
 
     # Track decided sides per source node to ensure consistency for fan-out
     decided_src_side = {}
@@ -553,6 +582,11 @@ def _layout_route_connections(connections, nodes, groups=None):
         if i in reverse_set:
             conn_sides.append((src, dst, "bottom", "bottom"))
             continue
+
+        # Allow explicit side hints from connection spec
+        explicit_src = conn.get("srcSide")
+        explicit_dst = conn.get("dstSide")
+
         group_dir = None
         src_gid = _find_group_for(conn["from"], node_group)
         dst_gid = _find_group_for(conn["to"], node_group)
@@ -560,22 +594,28 @@ def _layout_route_connections(connections, nodes, groups=None):
             group_dir = groups[src_gid].get("direction", "horizontal")
         src_side, dst_side = _auto_sides(src, dst, group_dir)
 
+        if explicit_src:
+            src_side = explicit_src
+        if explicit_dst:
+            dst_side = explicit_dst
+
         # Consistency: if this source already has a decided side for forward connections,
-        # reuse it to prevent some arrows exiting from a different side (e.g. bottom)
+        # reuse it to prevent some arrows exiting from a different side (e.g. bottom).
+        # Skip this override when explicit sides are provided.
         src_id = conn["from"]
-        if src_id in decided_src_side:
-            src_side = decided_src_side[src_id]
-            # Also fix dst_side: if src is "right", dst should be "left" (not "top")
-            if src_side == "right" and dst_side == "top":
-                dst_side = "left"
-            elif src_side == "left" and dst_side == "bottom":
-                dst_side = "right"
-            elif src_side == "bottom" and dst_side == "right":
-                dst_side = "top"
-            elif src_side == "top" and dst_side == "left":
-                dst_side = "bottom"
-        else:
-            decided_src_side[src_id] = src_side
+        if not explicit_src and not explicit_dst:
+            if src_id in decided_src_side:
+                src_side = decided_src_side[src_id]
+                if src_side == "right" and dst_side == "top":
+                    dst_side = "left"
+                elif src_side == "left" and dst_side == "bottom":
+                    dst_side = "right"
+                elif src_side == "bottom" and dst_side == "right":
+                    dst_side = "top"
+                elif src_side == "top" and dst_side == "left":
+                    dst_side = "bottom"
+            else:
+                decided_src_side[src_id] = src_side
 
         conn_sides.append((src, dst, src_side, dst_side))
         sk = (conn["from"], src_side)

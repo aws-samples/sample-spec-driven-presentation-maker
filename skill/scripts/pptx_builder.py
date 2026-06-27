@@ -788,7 +788,7 @@ def cmd_layout(args):
         content_area = max(content_w, 1) * max(content_h, 1)
         child_area = sum(c["width"] * c["height"] for _, c in child_bboxes)
         eff = round(child_area / content_area * 100)
-        warnings.append(f"Group \"{g['label']}\" children {axis} imbalance: \"{max_label}\"={max_s}px vs \"{min_label}\"={min_s}px (ratio {ratio:.1f}:1, packing {eff}%). Consider redistributing children or changing direction. Note: restructuring may affect arrow routing.")
+        warnings.append(f"Group \"{g.get('label', g.get('id', '?'))}\" children {axis} imbalance: \"{max_label}\"={max_s}px vs \"{min_label}\"={min_s}px (ratio {ratio:.1f}:1, packing {eff}%). Consider redistributing children or changing direction. Note: restructuring may affect arrow routing.")
 
     if warnings:
         output["warnings"] = warnings
