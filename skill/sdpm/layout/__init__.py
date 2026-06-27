@@ -557,15 +557,18 @@ def _layout_route_connections(connections, nodes, groups=None):
         port_counts[sk] = port_counts.get(sk, 0) + 1
         port_counts[dk] = port_counts.get(dk, 0) + 1
 
-    port_cursors = {}
+    # Optimize port assignment order to minimize crossings.
+    # Group connections by (node, side), then try permutations of port order.
+    port_groups = {}
     for i, (src, dst, src_side, dst_side) in enumerate(conn_sides):
         if src is None:
             continue
-        for nid, side in [(connections[i]["from"], src_side), (connections[i]["to"], dst_side)]:
-            k = (nid, side)
-            port_cursors[k] = port_cursors.get(k, 0)
-            port_indices[(i, nid)] = port_cursors[k]
-            port_cursors[k] += 1
+        sk = (connections[i]["from"], src_side)
+        dk = (connections[i]["to"], dst_side)
+        port_groups.setdefault(sk, []).append(i)
+        port_groups.setdefault(dk, []).append(i)
+
+    port_indices = _optimize_port_order(port_groups, conn_sides, connections, nodes, port_counts, obstacles)
 
     edges = []
     for i, conn in enumerate(connections):
@@ -586,6 +589,156 @@ def _layout_route_connections(connections, nodes, groups=None):
     _spread_overlapping_bends(edges, conn_sides, connections)
 
     return edges
+
+
+def _optimize_port_order(port_groups, conn_sides, connections, nodes, port_counts, obstacles):
+    """Find the port index assignment that minimizes edge crossings.
+
+    For each (node, side) with multiple ports, try all permutations (≤6)
+    and pick the one with fewest crossings. For larger groups, use a
+    heuristic: sort ports by the Y (or X) coordinate of the peer endpoint.
+    """
+    from itertools import permutations
+
+    # Start with sequential assignment
+    port_indices = {}
+    port_cursors = {}
+    for i, (src, dst, src_side, dst_side) in enumerate(conn_sides):
+        if src is None:
+            continue
+        for nid, side in [(connections[i]["from"], src_side), (connections[i]["to"], dst_side)]:
+            k = (nid, side)
+            port_cursors[k] = port_cursors.get(k, 0)
+            port_indices[(i, nid)] = port_cursors[k]
+            port_cursors[k] += 1
+
+    # For each port group with ≥2 connections, optimize the order
+    for (nid, side), conn_indices in port_groups.items():
+        if len(conn_indices) < 2:
+            continue
+
+        count = port_counts[(nid, side)]
+        node = _find_node(nodes, nid)
+        if not node:
+            continue
+
+        if len(conn_indices) <= 6:
+            # Brute force: try all permutations
+            best_crossings = None
+            best_assignment = None
+
+            for perm in permutations(range(count)):
+                # Assign port indices according to this permutation
+                test_indices = dict(port_indices)
+                for slot, ci in enumerate(conn_indices):
+                    test_indices[(ci, nid)] = perm[slot]
+
+                crossings = _count_port_crossings(conn_indices, test_indices, conn_sides, connections, nodes, port_counts, obstacles)
+                if best_crossings is None or crossings < best_crossings:
+                    best_crossings = crossings
+                    best_assignment = perm
+                    if crossings == 0:
+                        break
+
+            if best_assignment is not None:
+                for slot, ci in enumerate(conn_indices):
+                    port_indices[(ci, nid)] = best_assignment[slot]
+        else:
+            # Heuristic: sort by peer endpoint coordinate
+            _heuristic_port_sort(conn_indices, nid, side, port_indices, conn_sides, connections, nodes)
+
+    return port_indices
+
+
+def _count_port_crossings(conn_indices, port_indices, conn_sides, connections, nodes, port_counts, obstacles):
+    """Count crossings among a set of edges sharing a port group."""
+    # Generate paths for the relevant connections
+    paths = []
+    for ci in conn_indices:
+        src, dst, src_side, dst_side = conn_sides[ci]
+        if src is None:
+            continue
+        label_h = 30 if src.get("label") else 0
+        sp = _port_point(src, src_side, port_indices[(ci, connections[ci]["from"])], port_counts[(connections[ci]["from"], src_side)], label_h)
+        tp = _port_point(dst, dst_side, port_indices[(ci, connections[ci]["to"])], port_counts[(connections[ci]["to"], dst_side)], label_h)
+        path = _elbow_path(sp, tp, src_side, dst_side, obstacles)
+        paths.append(path)
+
+    # Count pairwise segment crossings
+    crossings = 0
+    for i in range(len(paths)):
+        for j in range(i + 1, len(paths)):
+            for si in range(len(paths[i]) - 1):
+                for sj in range(len(paths[j]) - 1):
+                    if _segments_intersect(paths[i][si], paths[i][si + 1], paths[j][sj], paths[j][sj + 1]):
+                        crossings += 1
+    return crossings
+
+
+def _segments_intersect(a1, a2, b1, b2):
+    """Test if two axis-aligned segments cross or overlap (for port optimization)."""
+    ax1, ay1 = a1
+    ax2, ay2 = a2
+    bx1, by1 = b1
+    bx2, by2 = b2
+
+    a_horiz = ay1 == ay2
+    a_vert = ax1 == ax2
+    b_horiz = by1 == by2
+    b_vert = bx1 == bx2
+
+    if a_horiz and b_vert:
+        h_y = ay1
+        h_x_min, h_x_max = min(ax1, ax2), max(ax1, ax2)
+        v_x = bx1
+        v_y_min, v_y_max = min(by1, by2), max(by1, by2)
+        return h_x_min < v_x < h_x_max and v_y_min < h_y < v_y_max
+    if a_vert and b_horiz:
+        v_x = ax1
+        v_y_min, v_y_max = min(ay1, ay2), max(ay1, ay2)
+        h_y = by1
+        h_x_min, h_x_max = min(bx1, bx2), max(bx1, bx2)
+        return h_x_min < v_x < h_x_max and v_y_min < h_y < v_y_max
+    if a_horiz and b_horiz and ay1 == by1:
+        a_min, a_max = min(ax1, ax2), max(ax1, ax2)
+        b_min, b_max = min(bx1, bx2), max(bx1, bx2)
+        return min(a_max, b_max) - max(a_min, b_min) > 5
+    if a_vert and b_vert and ax1 == bx1:
+        a_min, a_max = min(ay1, ay2), max(ay1, ay2)
+        b_min, b_max = min(by1, by2), max(by1, by2)
+        return min(a_max, b_max) - max(a_min, b_min) > 5
+    return False
+
+
+def _heuristic_port_sort(conn_indices, nid, side, port_indices, conn_sides, connections, nodes):
+    """Sort ports by peer endpoint coordinate when brute force is too expensive."""
+    peer_coords = []
+    for ci in conn_indices:
+        src, dst, src_side, dst_side = conn_sides[ci]
+        if connections[ci]["from"] == nid:
+            peer = _find_node(nodes, connections[ci]["to"])
+            coord = (peer["y"] + peer["height"] // 2) if peer else 0
+        else:
+            peer = _find_node(nodes, connections[ci]["from"])
+            coord = (peer["y"] + peer["height"] // 2) if peer else 0
+        peer_coords.append((coord, ci))
+
+    # Sort by peer Y coordinate (or X for vertical sides)
+    if side in ("top", "bottom"):
+        for ci in conn_indices:
+            src, dst, src_side, dst_side = conn_sides[ci]
+            if connections[ci]["from"] == nid:
+                peer = _find_node(nodes, connections[ci]["to"])
+                coord = (peer["x"] + peer["width"] // 2) if peer else 0
+            else:
+                peer = _find_node(nodes, connections[ci]["from"])
+                coord = (peer["x"] + peer["width"] // 2) if peer else 0
+            peer_coords.append((coord, ci))
+        peer_coords = peer_coords[len(conn_indices):]
+
+    peer_coords.sort(key=lambda t: t[0])
+    for slot, (_, ci) in enumerate(peer_coords):
+        port_indices[(ci, nid)] = slot
 
 
 # Max spread between dst (or src) centers to allow grouping
