@@ -657,16 +657,39 @@ def _layout_route_connections(connections, nodes, groups=None):
                 apply_decided = (src_id in fanout_sources) or (natural_axis == decided_axis)
                 if apply_decided:
                     src_side = decided
-                    # Fix dst_side to be the opposite receiving side
+                    # Fix dst_side for fan-out: use opposite side, but if dst
+                    # is directly above/below src (not to the side), keep natural dst_side
                     if src_id in fanout_sources:
-                        if src_side == "right":
-                            dst_side = "left"
-                        elif src_side == "left":
-                            dst_side = "right"
-                        elif src_side == "bottom":
-                            dst_side = "top"
-                        elif src_side == "top":
-                            dst_side = "bottom"
+                        if src and dst:
+                            src_cx = src["x"] + src.get("width", 60) / 2
+                            dst_cx = dst["x"] + dst.get("width", 60) / 2
+                            src_cy = src["y"] + src.get("height", 60) / 2
+                            dst_cy = dst["y"] + dst.get("height", 60) / 2
+                            adx = abs(dst_cx - src_cx)
+                            ady = abs(dst_cy - src_cy)
+                            if ady > adx * 2:
+                                # Target is mostly above/below — use natural dst_side
+                                _, natural_dst = _auto_sides(src, dst, None)
+                                dst_side = natural_dst
+                            else:
+                                # Target is to the side — use opposite
+                                if src_side == "right":
+                                    dst_side = "left"
+                                elif src_side == "left":
+                                    dst_side = "right"
+                                elif src_side == "bottom":
+                                    dst_side = "top"
+                                elif src_side == "top":
+                                    dst_side = "bottom"
+                        else:
+                            if src_side == "right":
+                                dst_side = "left"
+                            elif src_side == "left":
+                                dst_side = "right"
+                            elif src_side == "bottom":
+                                dst_side = "top"
+                            elif src_side == "top":
+                                dst_side = "bottom"
                     else:
                         if src_side == "right" and dst_side == "top":
                             dst_side = "left"
@@ -756,7 +779,7 @@ def _layout_route_connections(connections, nodes, groups=None):
             # Skip if already a straight line (same Y)
             src_id = conn["from"]
             is_fanout_edge = False
-            if src_id in fanout_bend_x and src_side == "right" and abs(sp[1] - tp[1]) > 5:
+            if src_id in fanout_bend_x and src_side == "right" and abs(sp[1] - tp[1]) > 5 and dst_side == "left":
                 bend_x = round(fanout_bend_x[src_id])
                 points = [sp, [bend_x, sp[1]], [bend_x, tp[1]], tp]
                 is_fanout_edge = True
