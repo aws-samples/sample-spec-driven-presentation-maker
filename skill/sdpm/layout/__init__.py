@@ -601,19 +601,28 @@ def _layout_route_connections(connections, nodes, groups=None):
 
         # Consistency: if this source already has a decided side for forward connections,
         # reuse it to prevent some arrows exiting from a different side (e.g. bottom).
-        # Skip this override when explicit sides are provided.
+        # Skip this override when explicit sides are provided, or when the decided side
+        # is perpendicular to the natural direction (would create a bad route).
         src_id = conn["from"]
         if not explicit_src and not explicit_dst:
             if src_id in decided_src_side:
-                src_side = decided_src_side[src_id]
-                if src_side == "right" and dst_side == "top":
-                    dst_side = "left"
-                elif src_side == "left" and dst_side == "bottom":
-                    dst_side = "right"
-                elif src_side == "bottom" and dst_side == "right":
-                    dst_side = "top"
-                elif src_side == "top" and dst_side == "left":
-                    dst_side = "bottom"
+                decided = decided_src_side[src_id]
+                # Only apply if decided side is compatible with natural direction
+                # (same axis: both horizontal or both vertical)
+                h_sides = {"left", "right"}
+                v_sides = {"top", "bottom"}
+                natural_axis = "h" if src_side in h_sides else "v"
+                decided_axis = "h" if decided in h_sides else "v"
+                if natural_axis == decided_axis:
+                    src_side = decided
+                    if src_side == "right" and dst_side == "top":
+                        dst_side = "left"
+                    elif src_side == "left" and dst_side == "bottom":
+                        dst_side = "right"
+                    elif src_side == "bottom" and dst_side == "right":
+                        dst_side = "top"
+                    elif src_side == "top" and dst_side == "left":
+                        dst_side = "bottom"
             else:
                 decided_src_side[src_id] = src_side
 

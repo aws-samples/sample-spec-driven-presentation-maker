@@ -577,8 +577,11 @@ def cmd_layout(args):
                         # H-V-H → bentConnector4
                         adj1 = (pts[1][0] - sx) / dx if dx != 0 else 0.5
                         adj2 = (pts[2][1] - sy) / dy if dy != 0 else 0.5
+                        # Clamp adj1: must go forward from start (min 0.15 = short horizontal stub)
+                        adj1_min = 0.15 if dx > 0 else -1.0
+                        adj1_max = 2.0 if dx > 0 else -0.15
                         el["preset"] = "bentConnector4"
-                        el["adjustments"] = [max(-1.0, min(2.0, adj1)), max(-1.0, min(2.0, adj2))]
+                        el["adjustments"] = [max(adj1_min, min(adj1_max, adj1)), max(-1.0, min(2.0, adj2))]
                 elif dy != 0 or dx != 0:
                     el["adjustments"] = [0.5]
             elements.append(el)
