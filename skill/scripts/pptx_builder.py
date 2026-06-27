@@ -449,6 +449,18 @@ def cmd_layout(args):
     align = tree.get("align", "center")
     reverse = tree.get("reverse", False)
 
+    # Allow targetArea in JSON to override CLI args
+    target_area = tree.get("targetArea", {})
+    if target_area:
+        if "x" in target_area and not args.x:
+            args.x = target_area["x"]
+        if "y" in target_area and not args.y:
+            args.y = target_area["y"]
+        if "width" in target_area and not args.width:
+            args.width = target_area["width"]
+        if "height" in target_area and not args.height:
+            args.height = target_area["height"]
+
     # Pre-process: optimize node order within groups to minimize edge crossings
     optimize_order(tree)
 
