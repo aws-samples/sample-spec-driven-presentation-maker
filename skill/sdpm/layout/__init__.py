@@ -88,6 +88,21 @@ def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_
                     nx = pb[0] + (pb[2] - cb[2]) // 2
                 _layout_translate(child, nx - cb[0], ny - cb[1])
 
+    # Post-process 1: align corresponding leaves across sibling vertical groups
+    # so that e.g. Lambda(row1) in group A has the same Y as DynamoDB(row1) in group B.
+    if direction == "horizontal":
+        _align_corresponding_leaves_y(ordered)
+    elif direction == "vertical":
+        _align_corresponding_leaves_x(ordered)
+
+    # Post-process 2: align leaf nodes to the median leaf center of sibling groups.
+    # This ensures single icons sit at the visual center of adjacent vertical groups
+    # rather than at the center of the group's bounding box (which includes padding).
+    if align == "center" and direction == "horizontal":
+        _align_leaves_to_sibling_centers(ordered)
+    elif align == "center" and direction == "vertical":
+        _align_leaves_to_sibling_centers_h(ordered)
+
     min_x = min(c["_bindings"][0] - c["_margin"]["left"] for c in children)
     min_y = min(c["_bindings"][1] - c["_margin"]["top"] for c in children)
     max_x = max(c["_bindings"][0] + c["_bindings"][2] + c["_margin"]["right"] for c in children)
@@ -103,12 +118,216 @@ def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_
     node["_padding"] = padding
 
 
+def _align_corresponding_leaves_y(ordered):
+    """Align Y of corresponding leaves across all vertical groups in the subtree.
+
+    Collects all vertical groups (at any depth) with the same leaf count and
+    aligns their Nth leaves to the same Y center.
+    """
+    vertical_groups = []
+    for child in ordered:
+        _collect_vertical_groups(child, vertical_groups)
+
+    if len(vertical_groups) < 2:
+        return
+
+    by_count = {}
+    for group, leaves in vertical_groups:
+        n = len(leaves)
+        by_count.setdefault(n, []).append((group, leaves))
+
+    for groups_with_same_count in by_count.values():
+        if len(groups_with_same_count) < 2:
+            continue
+        leaf_count = len(groups_with_same_count[0][1])
+        for row_idx in range(leaf_count):
+            row_leaves = [leaves[row_idx] for _, leaves in groups_with_same_count]
+            centers = [leaf["_bindings"][1] + leaf["_bindings"][3] // 2 for leaf in row_leaves]
+            target_cy = max(centers)
+            for leaf in row_leaves:
+                b = leaf["_bindings"]
+                current_cy = b[1] + b[3] // 2
+                dy = target_cy - current_cy
+                if dy != 0:
+                    _layout_translate(leaf, 0, dy)
+
+
+def _align_corresponding_leaves_x(ordered):
+    """Align X of corresponding leaves across all horizontal groups in the subtree."""
+    horizontal_groups = []
+    for child in ordered:
+        _collect_horizontal_groups(child, horizontal_groups)
+
+    if len(horizontal_groups) < 2:
+        return
+
+    by_count = {}
+    for group, leaves in horizontal_groups:
+        n = len(leaves)
+        by_count.setdefault(n, []).append((group, leaves))
+
+    for groups_with_same_count in by_count.values():
+        if len(groups_with_same_count) < 2:
+            continue
+        leaf_count = len(groups_with_same_count[0][1])
+        for col_idx in range(leaf_count):
+            col_leaves = [leaves[col_idx] for _, leaves in groups_with_same_count]
+            centers = [leaf["_bindings"][0] + leaf["_bindings"][2] // 2 for leaf in col_leaves]
+            target_cx = max(centers)
+            for leaf in col_leaves:
+                b = leaf["_bindings"]
+                current_cx = b[0] + b[2] // 2
+                dx = target_cx - current_cx
+                if dx != 0:
+                    _layout_translate(leaf, dx, 0)
+
+
+def _collect_vertical_groups(node, out):
+    """Recursively collect vertical groups with their direct leaves."""
+    if not node.get("children"):
+        return
+    if node.get("direction", "horizontal") == "vertical":
+        leaves = [c for c in node["children"] if not c.get("children")]
+        if leaves:
+            out.append((node, leaves))
+    for child in node.get("children", []):
+        _collect_vertical_groups(child, out)
+
+
+def _collect_horizontal_groups(node, out):
+    """Recursively collect horizontal groups with their direct leaves."""
+    if not node.get("children"):
+        return
+    if node.get("direction", "horizontal") == "horizontal":
+        leaves = [c for c in node["children"] if not c.get("children")]
+        if leaves:
+            out.append((node, leaves))
+    for child in node.get("children", []):
+        _collect_horizontal_groups(child, out)
+
+
+def _get_direct_leaves(node):
+    """Get direct leaf children (non-recursively) of a node."""
+    leaves = []
+    for child in node.get("children", []):
+        if not child.get("children"):
+            leaves.append(child)
+    return leaves
+
+
 def _layout_translate(node, dx, dy):
     """Translate node and all descendants by (dx, dy)."""
     b = node["_bindings"]
     node["_bindings"] = [b[0] + dx, b[1] + dy, b[2], b[3]]
     for child in node.get("children", []):
         _layout_translate(child, dx, dy)
+
+
+def _find_leaf_centers_y(node):
+    """Collect Y-centers of all leaf nodes in a subtree."""
+    if not node.get("children"):
+        b = node["_bindings"]
+        return [b[1] + b[3] // 2]
+    centers = []
+    for child in node["children"]:
+        centers.extend(_find_leaf_centers_y(child))
+    return centers
+
+
+def _find_leaf_centers_x(node):
+    """Collect X-centers of all leaf nodes in a subtree."""
+    if not node.get("children"):
+        b = node["_bindings"]
+        return [b[0] + b[2] // 2]
+    centers = []
+    for child in node["children"]:
+        centers.extend(_find_leaf_centers_x(child))
+    return centers
+
+
+def _align_leaves_to_sibling_centers(ordered):
+    """For horizontal layout: align leaf Y-center to sibling groups' direct-child leaf Y-center.
+
+    Prioritizes leaves from groups with the same direction (horizontal),
+    since those represent the main flow continuation.
+    """
+    # Collect cy of direct-child leaves from sibling groups with same direction
+    same_dir_leaf_centers = []
+    for child in ordered:
+        if child.get("children") and child.get("direction", "horizontal") == "horizontal":
+            for grandchild in child["children"]:
+                if not grandchild.get("children"):
+                    b = grandchild["_bindings"]
+                    same_dir_leaf_centers.append(b[1] + b[3] // 2)
+
+    # Fallback: direct-child leaves from any group
+    if not same_dir_leaf_centers:
+        for child in ordered:
+            if child.get("children"):
+                for grandchild in child["children"]:
+                    if not grandchild.get("children"):
+                        b = grandchild["_bindings"]
+                        same_dir_leaf_centers.append(b[1] + b[3] // 2)
+
+    # Final fallback: all leaf centers
+    if not same_dir_leaf_centers:
+        for child in ordered:
+            if child.get("children"):
+                centers = _find_leaf_centers_y(child)
+                if centers:
+                    same_dir_leaf_centers.extend(centers)
+
+    if not same_dir_leaf_centers:
+        return
+
+    target_cy = (min(same_dir_leaf_centers) + max(same_dir_leaf_centers)) // 2
+
+    for child in ordered:
+        if not child.get("children"):
+            b = child["_bindings"]
+            current_cy = b[1] + b[3] // 2
+            dy = target_cy - current_cy
+            if dy != 0:
+                _layout_translate(child, 0, dy)
+
+
+def _align_leaves_to_sibling_centers_h(ordered):
+    """For vertical layout: align leaf X-center to sibling groups' direct-child leaf X-center."""
+    same_dir_leaf_centers = []
+    for child in ordered:
+        if child.get("children") and child.get("direction", "horizontal") == "vertical":
+            for grandchild in child["children"]:
+                if not grandchild.get("children"):
+                    b = grandchild["_bindings"]
+                    same_dir_leaf_centers.append(b[0] + b[2] // 2)
+
+    if not same_dir_leaf_centers:
+        for child in ordered:
+            if child.get("children"):
+                for grandchild in child["children"]:
+                    if not grandchild.get("children"):
+                        b = grandchild["_bindings"]
+                        same_dir_leaf_centers.append(b[0] + b[2] // 2)
+
+    if not same_dir_leaf_centers:
+        for child in ordered:
+            if child.get("children"):
+                centers = _find_leaf_centers_x(child)
+                if centers:
+                    same_dir_leaf_centers.extend(centers)
+
+    if not same_dir_leaf_centers:
+        return
+
+    target_cx = (min(same_dir_leaf_centers) + max(same_dir_leaf_centers)) // 2
+
+    for child in ordered:
+        if not child.get("children"):
+            b = child["_bindings"]
+            current_cx = b[0] + b[2] // 2
+            dx = target_cx - current_cx
+            if dx != 0:
+                _layout_translate(child, dx, 0)
 
 
 def _layout_collect(node, nodes_out, groups_out, prefix=""):
@@ -193,7 +412,7 @@ def _layout_route_connections(connections, nodes, groups=None):
         points = _elbow_path(sp, tp, src_side, dst_side, obstacles)
         edges.append({"from": conn["from"], "to": conn["to"], "label": conn.get("label", ""), "points": points})
 
-    # T8: Align bend positions for fan-out (same src+side) and fan-in (same dst+side)
+    # T8: Align bend positions for fan-out/fan-in only when "fan": "merge" is set
     _align_fan_bends(edges, conn_sides, connections)
 
     return edges
@@ -204,11 +423,17 @@ _FAN_SPREAD_LIMIT = 600
 
 
 def _align_fan_bends(edges, conn_sides, connections):
-    """Align bend positions and merge ports for fan-out and fan-in groups."""
-    # Fan-out: same src + same src_side
+    """Align bend positions and merge ports for fan-out and fan-in groups.
+
+    Only activates when connections have "fan": "merge" set.
+    Default behavior keeps ports separate (split).
+    """
+    # Fan-out: same src + same src_side, only if all connections in the group have fan=merge
     src_groups = {}
     for i, (src, dst, src_side, dst_side) in enumerate(conn_sides):
         if src is None or len(edges[i]["points"]) <= 2:
+            continue
+        if connections[i].get("fan") != "merge":
             continue
         k = (connections[i]["from"], src_side)
         src_groups.setdefault(k, []).append(i)
@@ -218,10 +443,12 @@ def _align_fan_bends(edges, conn_sides, connections):
             continue
         _rewrite_fan(edges, conn_sides, indices, mode="fan_out")
 
-    # Fan-in: same dst + same dst_side
+    # Fan-in: same dst + same dst_side, only if all connections in the group have fan=merge
     dst_groups = {}
     for i, (src, dst, src_side, dst_side) in enumerate(conn_sides):
         if src is None or len(edges[i]["points"]) <= 2:
+            continue
+        if connections[i].get("fan") != "merge":
             continue
         k = (connections[i]["to"], dst_side)
         dst_groups.setdefault(k, []).append(i)
@@ -350,7 +577,7 @@ def _port_point(node, side, index, count, label_h):
         return [round(x + w * t), y]
 
 
-SNAP_THRESHOLD = 15
+SNAP_THRESHOLD = 5
 MIN_BEND_MARGIN = 20
 OBSTACLE_MARGIN = 10
 
@@ -377,14 +604,12 @@ def _elbow_path(sp, tp, src_side, dst_side, obstacles=None):
     tx, ty = tp
     if src_side in ("left", "right") and dst_side in ("left", "right"):
         if abs(sy - ty) <= SNAP_THRESHOLD:
-            mid_y = (sy + ty) // 2
-            return [[sx, mid_y], [tx, mid_y]]
+            return [[sx, sy], [tx, sy]]
         mx = _calc_bend((sx + tx) // 2, min(sx, tx), max(sx, tx), obstacles, "x")
         return [[sx, sy], [mx, sy], [mx, ty], [tx, ty]]
     if src_side in ("top", "bottom") and dst_side in ("top", "bottom"):
         if abs(sx - tx) <= SNAP_THRESHOLD:
-            mid_x = (sx + tx) // 2
-            return [[mid_x, sy], [mid_x, ty]]
+            return [[sx, sy], [sx, ty]]
         my = _calc_bend((sy + ty) // 2, min(sy, ty), max(sy, ty), obstacles, "y")
         return [[sx, sy], [sx, my], [tx, my], [tx, ty]]
     if src_side in ("left", "right"):
