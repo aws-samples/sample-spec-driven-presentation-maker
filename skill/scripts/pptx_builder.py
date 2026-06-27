@@ -388,6 +388,54 @@ def cmd_code_block(args):
         print(out_str)
 
 
+def _segments_cross(a1, a2, b1, b2):
+    """Test if two axis-aligned line segments (a1-a2) and (b1-b2) cross or overlap.
+
+    Detects:
+    1. Perpendicular crossings (one horizontal, one vertical)
+    2. Collinear overlap (parallel segments sharing the same axis with overlapping range)
+    """
+    ax1, ay1 = a1
+    ax2, ay2 = a2
+    bx1, by1 = b1
+    bx2, by2 = b2
+
+    a_horiz = ay1 == ay2
+    a_vert = ax1 == ax2
+    b_horiz = by1 == by2
+    b_vert = bx1 == bx2
+
+    # Perpendicular crossings
+    if a_horiz and b_vert:
+        h_y = ay1
+        h_x_min, h_x_max = min(ax1, ax2), max(ax1, ax2)
+        v_x = bx1
+        v_y_min, v_y_max = min(by1, by2), max(by1, by2)
+        return h_x_min < v_x < h_x_max and v_y_min < h_y < v_y_max
+    if a_vert and b_horiz:
+        v_x = ax1
+        v_y_min, v_y_max = min(ay1, ay2), max(ay1, ay2)
+        h_y = by1
+        h_x_min, h_x_max = min(bx1, bx2), max(bx1, bx2)
+        return h_x_min < v_x < h_x_max and v_y_min < h_y < v_y_max
+
+    # Collinear overlap: both horizontal on same Y
+    if a_horiz and b_horiz and ay1 == by1:
+        a_min, a_max = min(ax1, ax2), max(ax1, ax2)
+        b_min, b_max = min(bx1, bx2), max(bx1, bx2)
+        overlap = min(a_max, b_max) - max(a_min, b_min)
+        return overlap > 5
+
+    # Collinear overlap: both vertical on same X
+    if a_vert and b_vert and ax1 == bx1:
+        a_min, a_max = min(ay1, ay2), max(ay1, ay2)
+        b_min, b_max = min(by1, by2), max(by1, by2)
+        overlap = min(a_max, b_max) - max(a_min, b_min)
+        return overlap > 5
+
+    return False
+
+
 def cmd_layout(args):
     """Layout engine: compute coordinates from logical structure JSON."""
     if args.input == "-":
@@ -598,10 +646,11 @@ def cmd_layout(args):
     for gid, g in groups_out.items():
         children = g.get("children", [])
         if len(children) >= 3:
+            glabel = g.get("label", gid.rsplit(".", 1)[-1])
             if target_h and g["height"] > (target_h * 0.6):
-                warnings.append(f"Group \"{g['label']}\" is tall ({g['height']}px). Consider direction: horizontal for its children.")
+                warnings.append(f"Group \"{glabel}\" is tall ({g['height']}px). Consider direction: horizontal for its children.")
             if target_w and g["width"] > (target_w * 0.8):
-                warnings.append(f"Group \"{g['label']}\" is wide ({g['width']}px). Consider direction: vertical for its children.")
+                warnings.append(f"Group \"{glabel}\" is wide ({g['width']}px). Consider direction: vertical for its children.")
 
     # Check label overlaps
     label_rects = []
@@ -654,6 +703,31 @@ def cmd_layout(args):
                             suggest = f' Suggest: place "{src_node.get("label", src_id)}" {direction} in its group, adjacent to "{dst_node.get("label", dst_id)}".'
                     warnings.append(f'Edge {edge_key} crosses node "{n.get("label", nid)}". Reorder nodes so connected elements are adjacent, or group branch targets in the perpendicular direction. Also consider reverse: true on the target group if connections flow opposite to layout direction.{suggest}')
                     crossing_reported.add(report_key)
+
+    # Check edge-edge crossings (segment intersection)
+    edge_crossing_reported = set()
+    for i in range(len(edges_out)):
+        pts_i = edges_out[i]["points"]
+        if len(pts_i) < 2:
+            continue
+        for j in range(i + 1, len(edges_out)):
+            pts_j = edges_out[j]["points"]
+            if len(pts_j) < 2:
+                continue
+            crossed = False
+            for si in range(len(pts_i) - 1):
+                if crossed:
+                    break
+                for sj in range(len(pts_j) - 1):
+                    if _segments_cross(pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]):
+                        key_ij = (min(i, j), max(i, j))
+                        if key_ij not in edge_crossing_reported:
+                            e_i = f"{edges_out[i]['from']}→{edges_out[i]['to']}"
+                            e_j = f"{edges_out[j]['from']}→{edges_out[j]['to']}"
+                            warnings.append(f"Edges {e_i} and {e_j} cross each other. Consider reordering nodes or restructuring groups to eliminate the crossing.")
+                            edge_crossing_reported.add(key_ij)
+                        crossed = True
+                        break
 
     # Structure suggestions: sibling size imbalance
     all_items = {}
