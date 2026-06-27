@@ -3,6 +3,79 @@
 """Layout engine: compute coordinates from logical structure JSON."""
 
 
+def optimize_order(tree):
+    """Pre-process: reorder children in vertical/horizontal groups to minimize
+    edge crossings based on connection source/target positions.
+
+    Mutates tree in-place. Call before _layout_scale.
+    """
+    connections = tree.get("connections", [])
+    if not connections:
+        return
+
+    # Build index: node_id -> position in source list (approximation of Y/X order)
+    # We use the order of appearance in the flattened tree as positional proxy.
+    flat_order = []
+    _flatten_ids(tree, flat_order)
+    id_position = {nid: i for i, nid in enumerate(flat_order)}
+
+    # For each group, sort leaf children by the average position of their connected peers
+    _optimize_group_order(tree, connections, id_position)
+
+
+def _flatten_ids(node, out):
+    """Collect all node ids in DFS order."""
+    if "id" in node:
+        out.append(node["id"])
+    for child in node.get("children", []):
+        _flatten_ids(child, out)
+
+
+def _optimize_group_order(node, connections, id_position):
+    """Recursively optimize child order within groups to reduce crossings."""
+    children = node.get("children", [])
+    if not children:
+        return
+
+    # Recurse first (bottom-up)
+    for child in children:
+        _optimize_group_order(child, connections, id_position)
+
+    # Only reorder if all children are leaves (no nested groups)
+    # to avoid breaking intentional group structure
+    leaf_children = [c for c in children if not c.get("children")]
+    if len(leaf_children) < 2 or len(leaf_children) != len(children):
+        return
+
+    # For each leaf child, compute a "connection weight" based on
+    # the positions of nodes it connects to/from
+    def connection_weight(child_id):
+        weights = []
+        for conn in connections:
+            if conn["from"] == child_id and conn["to"] in id_position:
+                weights.append(id_position[conn["to"]])
+            if conn["to"] == child_id and conn["from"] in id_position:
+                weights.append(id_position[conn["from"]])
+        if not weights:
+            return id_position.get(child_id, 0)
+        return sum(weights) / len(weights)
+
+    # Sort by the average position of connected source nodes
+    # This ensures nodes connected to earlier sources appear first
+    def sort_key(child):
+        cid = child.get("id", "")
+        src_positions = []
+        for conn in connections:
+            if conn["to"] == cid and conn["from"] in id_position:
+                src_positions.append(id_position[conn["from"]])
+        if src_positions:
+            return sum(src_positions) / len(src_positions)
+        # Fallback: position of targets
+        return connection_weight(cid)
+
+    node["children"] = sorted(children, key=sort_key)
+
+
 def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_scale_h=1.0, spacing_scale_v=1.0):
     """Recursive layout engine. Calculates bindings (x, y, width, height) for each node bottom-up."""
     children = node.get("children", [])
@@ -415,6 +488,9 @@ def _layout_route_connections(connections, nodes, groups=None):
     # T8: Align bend positions for fan-out/fan-in only when "fan": "merge" is set
     _align_fan_bends(edges, conn_sides, connections)
 
+    # T9: Spread overlapping elbow bends from the same source
+    _spread_overlapping_bends(edges, conn_sides, connections)
+
     return edges
 
 
@@ -457,6 +533,100 @@ def _align_fan_bends(edges, conn_sides, connections):
         if len(indices) < 2:
             continue
         _rewrite_fan(edges, conn_sides, indices, mode="fan_in")
+
+
+_BEND_OVERLAP_THRESHOLD = 15
+_BEND_SPREAD_STEP = 20
+
+
+def _spread_overlapping_bends(edges, conn_sides, connections):
+    """Detect and spread elbow bends that overlap from the same source node.
+
+    When multiple elbows from the same source have bend segments at nearly
+    the same X (or Y), space them apart to avoid visual overlap.
+    """
+    # Group edges by source node
+    src_edge_groups = {}
+    for i, (src, dst, src_side, dst_side) in enumerate(conn_sides):
+        if src is None:
+            continue
+        pts = edges[i]["points"]
+        if len(pts) < 4:
+            continue
+        k = connections[i]["from"]
+        src_edge_groups.setdefault(k, []).append(i)
+
+    for indices in src_edge_groups.values():
+        if len(indices) < 2:
+            continue
+        # Check if bends are on vertical segments (H-V-H pattern)
+        # For H-V-H: bend is at pts[1][0] (= pts[2][0])
+        bend_xs = []
+        for idx in indices:
+            pts = edges[idx]["points"]
+            if len(pts) >= 4:
+                # H-V-H: first segment is horizontal, bend is vertical
+                if abs(pts[0][1] - pts[1][1]) < 5:
+                    bend_xs.append((idx, pts[1][0]))
+        if len(bend_xs) < 2:
+            continue
+
+        # Sort by bend X position
+        bend_xs.sort(key=lambda t: t[1])
+
+        # Check for overlaps and spread
+        for j in range(1, len(bend_xs)):
+            prev_idx, prev_x = bend_xs[j - 1]
+            curr_idx, curr_x = bend_xs[j]
+            if abs(curr_x - prev_x) < _BEND_OVERLAP_THRESHOLD:
+                # Spread apart
+                new_prev_x = prev_x - _BEND_SPREAD_STEP // 2
+                new_curr_x = curr_x + _BEND_SPREAD_STEP // 2
+                _update_bend_x(edges[prev_idx]["points"], prev_x, new_prev_x)
+                _update_bend_x(edges[curr_idx]["points"], curr_x, new_curr_x)
+                bend_xs[j - 1] = (prev_idx, new_prev_x)
+                bend_xs[j] = (curr_idx, new_curr_x)
+
+    # Same for destination node (fan-in)
+    dst_edge_groups = {}
+    for i, (src, dst, src_side, dst_side) in enumerate(conn_sides):
+        if src is None:
+            continue
+        pts = edges[i]["points"]
+        if len(pts) < 4:
+            continue
+        k = connections[i]["to"]
+        dst_edge_groups.setdefault(k, []).append(i)
+
+    for indices in dst_edge_groups.values():
+        if len(indices) < 2:
+            continue
+        bend_xs = []
+        for idx in indices:
+            pts = edges[idx]["points"]
+            if len(pts) >= 4:
+                if abs(pts[-1][1] - pts[-2][1]) < 5:
+                    bend_xs.append((idx, pts[-2][0]))
+        if len(bend_xs) < 2:
+            continue
+        bend_xs.sort(key=lambda t: t[1])
+        for j in range(1, len(bend_xs)):
+            prev_idx, prev_x = bend_xs[j - 1]
+            curr_idx, curr_x = bend_xs[j]
+            if abs(curr_x - prev_x) < _BEND_OVERLAP_THRESHOLD:
+                new_prev_x = prev_x - _BEND_SPREAD_STEP // 2
+                new_curr_x = curr_x + _BEND_SPREAD_STEP // 2
+                _update_bend_x(edges[prev_idx]["points"], prev_x, new_prev_x)
+                _update_bend_x(edges[curr_idx]["points"], curr_x, new_curr_x)
+                bend_xs[j - 1] = (prev_idx, new_prev_x)
+                bend_xs[j] = (curr_idx, new_curr_x)
+
+
+def _update_bend_x(points, old_x, new_x):
+    """Update bend X coordinate in a 4-point elbow path."""
+    for pt in points:
+        if abs(pt[0] - old_x) < 3:
+            pt[0] = new_x
 
 
 _FAN_BEND_MARGIN = 30

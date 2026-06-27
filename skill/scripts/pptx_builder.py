@@ -40,6 +40,7 @@ from sdpm.layout import (
     _layout_scale,
     _layout_translate,
     box_to_elements,
+    optimize_order,
 )
 from sdpm.preview.backend import _is_wsl
 from sdpm.utils.effects import apply_effects  # noqa: F401
@@ -399,6 +400,9 @@ def cmd_layout(args):
     direction = tree.get("direction", "horizontal")
     align = tree.get("align", "center")
     reverse = tree.get("reverse", False)
+
+    # Pre-process: optimize node order within groups to minimize edge crossings
+    optimize_order(tree)
 
     def build_root():
         import copy
