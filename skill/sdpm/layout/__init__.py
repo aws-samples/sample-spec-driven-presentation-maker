@@ -781,6 +781,27 @@ def _layout_route_connections(connections, nodes, groups=None):
     # Post-process: fix bends that ended up inside node icons after spread
     _fix_bends_inside_nodes(edges, nodes, connections)
 
+    # Final pass: eliminate any diagonal segments by snapping to axis-aligned
+    for e in edges:
+        pts = e["points"]
+        for k in range(1, len(pts)):
+            dx = abs(pts[k][0] - pts[k-1][0])
+            dy = abs(pts[k][1] - pts[k-1][1])
+            if dx > 3 and dy > 3:
+                # Diagonal — snap to match previous point's axis
+                if k == 1:
+                    # First segment: keep start X, snap pts[1] X to match
+                    pts[k] = [pts[k-1][0], pts[k][1]]
+                elif k == len(pts) - 1:
+                    # Last segment: keep end Y, snap pts[-2] Y to match
+                    pts[k-1] = [pts[k-1][0], pts[k][1]]
+                else:
+                    # Middle: snap to nearest axis
+                    if dx < dy:
+                        pts[k] = [pts[k-1][0], pts[k][1]]
+                    else:
+                        pts[k] = [pts[k][0], pts[k-1][1]]
+
     return edges
 
 
@@ -1595,8 +1616,13 @@ def _fix_bends_inside_nodes(edges, nodes, connections):
             nx, ny = n["x"], n["y"]
             nw = n.get("width", 60)
             nh = n.get("height", 60)
-            # Check intermediate segments only (skip first and last which touch src/dst)
+            # Check intermediate segments only (skip segments touching start/end points)
             for k in range(1, len(pts) - 2):
+                # Skip if this point is adjacent to start/end and shares an axis
+                if k == 1 and (pts[0][0] == pts[1][0] or pts[0][1] == pts[1][1]):
+                    continue
+                if k == len(pts) - 3 and (pts[-1][0] == pts[-2][0] or pts[-1][1] == pts[-2][1]):
+                    continue
                 p1 = pts[k]
                 p2 = pts[k + 1]
                 # Vertical segment: same X, check if it passes through node
