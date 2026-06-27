@@ -692,6 +692,26 @@ def _layout_route_connections(connections, nodes, groups=None):
         all_y.append(n["y"] + n["height"])
     global_bottom = max(all_y) + 60 if all_y else 500
 
+    # Compute fan-out shared bend X for right-side fan-outs.
+    # All connections from a fan-out source share the same bend X (midpoint to nearest target).
+    fanout_bend_x = {}
+    for sid in fanout_sources:
+        if decided_src_side.get(sid) == "right":
+            src_node = _find_node(nodes, sid)
+            if not src_node:
+                continue
+            src_right = src_node["x"] + src_node["width"]
+            # Find nearest target left edge
+            target_lefts = []
+            for idx, conn in enumerate(connections):
+                if conn["from"] == sid and idx not in reverse_set:
+                    dst_node = _find_node(nodes, conn["to"])
+                    if dst_node:
+                        target_lefts.append(dst_node["x"])
+            if target_lefts:
+                nearest_left = min(target_lefts)
+                fanout_bend_x[sid] = src_right + (nearest_left - src_right) * 0.45
+
     edges = []
     for i, conn in enumerate(connections):
         src, dst, src_side, dst_side = conn_sides[i]
@@ -699,6 +719,7 @@ def _layout_route_connections(connections, nodes, groups=None):
             edges.append({"from": conn["from"], "to": conn["to"], "label": conn.get("label", ""), "points": []})
             continue
 
+        is_fanout_edge = False
         if i in reverse_set:
             src_node = _find_node(nodes, conn["from"])
             dst_node = _find_node(nodes, conn["to"])
@@ -711,14 +732,35 @@ def _layout_route_connections(connections, nodes, groups=None):
             label_h = 30 if src.get("label") else 0
             sp = _port_point(src, src_side, port_indices[(i, conn["from"])], port_counts[(conn["from"], src_side)], label_h)
             tp = _port_point(dst, dst_side, port_indices[(i, conn["to"])], port_counts[(conn["to"], dst_side)], label_h)
-            points = _elbow_path(sp, tp, src_side, dst_side, obstacles)
-        edges.append({"from": conn["from"], "to": conn["to"], "label": conn.get("label", ""), "points": points})
+
+            # Fan-out right-side: use shared bend X for H-V-H pattern
+            # Skip if already a straight line (same Y)
+            src_id = conn["from"]
+            is_fanout_edge = False
+            if src_id in fanout_bend_x and src_side == "right" and abs(sp[1] - tp[1]) > 5:
+                bend_x = round(fanout_bend_x[src_id])
+                points = [sp, [bend_x, sp[1]], [bend_x, tp[1]], tp]
+                is_fanout_edge = True
+            else:
+                points = _elbow_path(sp, tp, src_side, dst_side, obstacles)
+        edge_entry = {"from": conn["from"], "to": conn["to"], "label": conn.get("label", ""), "points": points}
+        if is_fanout_edge:
+            edge_entry["_fanout"] = True
+        edges.append(edge_entry)
 
     # T8: Align bend positions for fan-out/fan-in only when "fan": "merge" is set
     _align_fan_bends(edges, conn_sides, connections)
 
+    # Save fan-out edge points (they should not be modified by spread/crossing logic)
+    import copy
+    fanout_saved = {i: copy.deepcopy(e["points"]) for i, e in enumerate(edges) if e.get("_fanout")}
+
     # T9: Spread overlapping elbow bends from the same source
     _spread_overlapping_bends(edges, conn_sides, connections)
+
+    # Restore fan-out edge points
+    for i, pts in fanout_saved.items():
+        edges[i]["points"] = pts
 
     return edges
 
@@ -942,11 +984,11 @@ def _find_first_crossing(edges):
     """Find the first pair of crossing segments across all edges."""
     for i in range(len(edges)):
         pts_i = edges[i]["points"]
-        if len(pts_i) < 2:
+        if len(pts_i) < 2 or edges[i].get("_fanout"):
             continue
         for j in range(i + 1, len(edges)):
             pts_j = edges[j]["points"]
-            if len(pts_j) < 2:
+            if len(pts_j) < 2 or edges[j].get("_fanout"):
                 continue
             for si in range(len(pts_i) - 1):
                 for sj in range(len(pts_j) - 1):
@@ -1090,6 +1132,8 @@ def _separate_close_bends(edges):
     # Collect all vertical bend segments: (edge_idx, seg_idx, x, y_min, y_max)
     v_bends = []
     for ei, e in enumerate(edges):
+        if e.get("_fanout"):
+            continue
         pts = e["points"]
         for k in range(len(pts) - 1):
             if pts[k][0] == pts[k + 1][0] and abs(pts[k][1] - pts[k + 1][1]) > 10:
