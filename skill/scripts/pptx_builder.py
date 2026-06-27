@@ -552,9 +552,10 @@ def cmd_layout(args):
         sx, sy = pts[0]
         ex, ey = pts[-1]
 
-        # Detour paths (4+ points, U-shape) or complex routes: emit as polyline
+        # Detour paths (4+ points, U-shape), fan-out paths, or complex routes: emit as polyline
         is_detour = len(pts) >= 4 and pts[0][1] == pts[-1][1] and any(p[1] != pts[0][1] for p in pts[1:-1])
-        if is_detour or len(pts) >= 6:
+        is_fanout = e.get("_fanout", False)
+        if is_detour or is_fanout or len(pts) >= 6:
             el = {"type": "line", "arrowEnd": "arrow",
                   "points": [[p[0], p[1]] for p in pts]}
             elements.append(el)

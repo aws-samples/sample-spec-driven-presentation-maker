@@ -654,14 +654,25 @@ def _layout_route_connections(connections, nodes, groups=None):
                 apply_decided = (src_id in fanout_sources) or (natural_axis == decided_axis)
                 if apply_decided:
                     src_side = decided
-                    if src_side == "right" and dst_side == "top":
-                        dst_side = "left"
-                    elif src_side == "left" and dst_side == "bottom":
-                        dst_side = "right"
-                    elif src_side == "bottom" and dst_side == "right":
-                        dst_side = "top"
-                    elif src_side == "top" and dst_side == "left":
-                        dst_side = "bottom"
+                    # Fix dst_side to be the opposite receiving side
+                    if src_id in fanout_sources:
+                        if src_side == "right":
+                            dst_side = "left"
+                        elif src_side == "left":
+                            dst_side = "right"
+                        elif src_side == "bottom":
+                            dst_side = "top"
+                        elif src_side == "top":
+                            dst_side = "bottom"
+                    else:
+                        if src_side == "right" and dst_side == "top":
+                            dst_side = "left"
+                        elif src_side == "left" and dst_side == "bottom":
+                            dst_side = "right"
+                        elif src_side == "bottom" and dst_side == "right":
+                            dst_side = "top"
+                        elif src_side == "top" and dst_side == "left":
+                            dst_side = "bottom"
             else:
                 decided_src_side[src_id] = src_side
 
