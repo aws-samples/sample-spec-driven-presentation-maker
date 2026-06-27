@@ -545,6 +545,9 @@ def _layout_route_connections(connections, nodes, groups=None):
         if src and dst and dst["x"] + dst["width"] < src["x"]:
             reverse_set.add(i)
 
+    # Track decided sides per source node to ensure consistency for fan-out
+    decided_src_side = {}
+
     conn_sides = []
     for i, conn in enumerate(connections):
         src = _find_node(nodes, conn["from"])
@@ -553,7 +556,6 @@ def _layout_route_connections(connections, nodes, groups=None):
             conn_sides.append((None, None, None, None))
             continue
         if i in reverse_set:
-            # Reverse connections use bottom ports — don't affect side port counts
             conn_sides.append((src, dst, "bottom", "bottom"))
             continue
         group_dir = None
@@ -562,6 +564,24 @@ def _layout_route_connections(connections, nodes, groups=None):
         if src_gid and src_gid == dst_gid:
             group_dir = groups[src_gid].get("direction", "horizontal")
         src_side, dst_side = _auto_sides(src, dst, group_dir)
+
+        # Consistency: if this source already has a decided side for forward connections,
+        # reuse it to prevent some arrows exiting from a different side (e.g. bottom)
+        src_id = conn["from"]
+        if src_id in decided_src_side:
+            src_side = decided_src_side[src_id]
+            # Also fix dst_side: if src is "right", dst should be "left" (not "top")
+            if src_side == "right" and dst_side == "top":
+                dst_side = "left"
+            elif src_side == "left" and dst_side == "bottom":
+                dst_side = "right"
+            elif src_side == "bottom" and dst_side == "right":
+                dst_side = "top"
+            elif src_side == "top" and dst_side == "left":
+                dst_side = "bottom"
+        else:
+            decided_src_side[src_id] = src_side
+
         conn_sides.append((src, dst, src_side, dst_side))
         sk = (conn["from"], src_side)
         dk = (conn["to"], dst_side)
@@ -1076,6 +1096,11 @@ def _align_same_source_bends(edges):
 
     for src, edge_indices in src_groups.items():
         if len(edge_indices) < 2:
+            continue
+
+        # Skip alignment if start Y positions differ (fan-out with distributed ports)
+        start_ys = [edges[ei]["points"][0][1] for ei in edge_indices]
+        if max(start_ys) - min(start_ys) > 10:
             continue
 
         # Collect vertical bend X positions for these edges
