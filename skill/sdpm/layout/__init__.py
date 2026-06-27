@@ -577,6 +577,19 @@ def _layout_route_connections(connections, nodes, groups=None):
     # Track decided sides per source node to ensure consistency for fan-out
     decided_src_side = {}
 
+    # Identify fan-out sources (nodes with multiple forward targets).
+    # For fan-out nodes, all arrows must exit from the same side regardless of
+    # axis mismatch, so we skip the axis compatibility check for them.
+    _src_target_count: dict = {}
+    for idx, conn in enumerate(connections):
+        if idx in reverse_set:
+            continue
+        if conn.get("srcSide") or conn.get("dstSide"):
+            continue
+        sid = conn["from"]
+        _src_target_count[sid] = _src_target_count.get(sid, 0) + 1
+    fanout_sources = {sid for sid, cnt in _src_target_count.items() if cnt >= 2}
+
     conn_sides = []
     for i, conn in enumerate(connections):
         src = _find_node(nodes, conn["from"])
@@ -608,17 +621,21 @@ def _layout_route_connections(connections, nodes, groups=None):
         # reuse it to prevent some arrows exiting from a different side (e.g. bottom).
         # Skip this override when explicit sides are provided, or when the decided side
         # is perpendicular to the natural direction (would create a bad route).
+        # Exception: for fan-out sources (1 source → N targets), ALWAYS apply the
+        # decided side to keep all arrows exiting from the same edge.
         src_id = conn["from"]
         if not explicit_src and not explicit_dst:
             if src_id in decided_src_side:
                 decided = decided_src_side[src_id]
-                # Only apply if decided side is compatible with natural direction
-                # (same axis: both horizontal or both vertical)
+                # For fan-out sources, always use the decided side.
+                # For non-fan-out, only apply if same axis (horizontal↔horizontal
+                # or vertical↔vertical) to avoid bad routes.
                 h_sides = {"left", "right"}
                 v_sides = {"top", "bottom"}
                 natural_axis = "h" if src_side in h_sides else "v"
                 decided_axis = "h" if decided in h_sides else "v"
-                if natural_axis == decided_axis:
+                apply_decided = (src_id in fanout_sources) or (natural_axis == decided_axis)
+                if apply_decided:
                     src_side = decided
                     if src_side == "right" and dst_side == "top":
                         dst_side = "left"
