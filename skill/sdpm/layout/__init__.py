@@ -204,8 +204,13 @@ def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_
         return max(10, round(v * spacing_scale_v))
 
     if is_group:
-        margin = node.get("margin", {"top": sv(20), "right": sh(20), "bottom": sv(20), "left": sh(20)})
-        padding = node.get("padding", {"top": sv(70), "right": sh(30), "bottom": sv(30), "left": sh(30)})
+        has_visual_group = node.get("groupType") or node.get("label")
+        if has_visual_group:
+            margin = node.get("margin", {"top": sv(20), "right": sh(20), "bottom": sv(20), "left": sh(20)})
+            padding = node.get("padding", {"top": sv(70), "right": sh(30), "bottom": sv(30), "left": sh(30)})
+        else:
+            margin = node.get("margin", {"top": sv(5), "right": sh(5), "bottom": sv(5), "left": sh(5)})
+            padding = node.get("padding", {"top": sv(5), "right": sh(5), "bottom": sv(5), "left": sh(5)})
     else:
         box = node.get("box")
         if box:
