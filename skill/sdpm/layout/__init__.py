@@ -4,11 +4,12 @@
 
 
 def optimize_order(tree):
-    """Pre-process: reorder children in leaf-only groups to minimize edge crossings.
+    """Pre-process: reorder children in groups to minimize edge crossings.
 
-    Uses brute-force permutation search for small groups (≤7 leaves) and
-    heuristic sorting for larger ones. Counts actual crossing pairs to find
-    the optimal order.
+    Handles both leaf-only AND mixed groups (groups containing sub-groups).
+    Uses brute-force permutation search for small groups (≤7 children) and
+    heuristic sorting for larger ones. Counts actual crossing pairs using a
+    two-layer position model (internal positions + external peer positions).
 
     Mutates tree in-place. Call before _layout_scale.
     """
@@ -18,53 +19,251 @@ def optimize_order(tree):
     _optimize_group_order(tree, connections)
 
 
-def _optimize_group_order(node, connections):
-    """Recursively optimize child order within leaf-only groups."""
+def _optimize_group_order(node, connections, root=None):
+    """Recursively optimize child order within groups (leaf-only AND mixed)."""
+    if root is None:
+        root = node
     children = node.get("children", [])
     if not children:
         return
 
+    # Recurse depth-first so inner groups are optimized before outer ones
     for child in children:
-        _optimize_group_order(child, connections)
+        _optimize_group_order(child, connections, root)
 
-    leaf_children = [c for c in children if not c.get("children")]
-    if len(leaf_children) < 2 or len(leaf_children) != len(children):
+    if len(children) < 2:
         return
 
-    leaf_ids = [c["id"] for c in children]
+    # Collect ALL leaf ids reachable from each child (for mixed groups)
+    child_leaf_ids = {}
+    for c in children:
+        ids = []
+        _collect_leaf_ids(c, ids)
+        child_leaf_ids[c["id"]] = ids
 
-    # Collect connections relevant to this group's leaves
+    # All leaf ids in this group (union of children's leaves)
+    all_leaf_ids = set()
+    for ids in child_leaf_ids.values():
+        all_leaf_ids.update(ids)
+
+    if not all_leaf_ids:
+        return
+
+    # Collect connections relevant to any leaf in this group
     relevant = []
     for conn in connections:
         src, dst = conn["from"], conn["to"]
-        src_in = src in leaf_ids
-        dst_in = dst in leaf_ids
-        if src_in or dst_in:
+        if src in all_leaf_ids or dst in all_leaf_ids:
             relevant.append(conn)
 
     if not relevant:
         return
 
-    # Identify internal connections (both src and dst within this group)
-    # Their src must appear before dst in any valid permutation.
+    # Identify internal order constraints:
+    # If a connection goes from a leaf in child A to a leaf in child B,
+    # child A must come before child B.
+    leaf_to_child_id = {}
+    for cid, leaf_ids in child_leaf_ids.items():
+        for lid in leaf_ids:
+            leaf_to_child_id[lid] = cid
+
     internal_order_constraints = []
     for conn in connections:
         src, dst = conn["from"], conn["to"]
-        if src in leaf_ids and dst in leaf_ids:
-            internal_order_constraints.append((src, dst))
+        if src in leaf_to_child_id and dst in leaf_to_child_id:
+            src_child = leaf_to_child_id[src]
+            dst_child = leaf_to_child_id[dst]
+            if src_child != dst_child:
+                internal_order_constraints.append((src_child, dst_child))
 
-    # For brute-force: try all permutations if ≤7 leaves
+    # For brute-force: try all permutations if ≤7 children
     if len(children) <= 7:
-        best_order = _find_min_crossing_order(children, relevant, connections, internal_order_constraints)
+        best_order = _find_min_crossing_order_mixed(
+            children, relevant, connections, internal_order_constraints,
+            child_leaf_ids, root
+        )
         if best_order is not None:
             node["children"] = best_order
             return
 
     # Fallback heuristic for larger groups: sort by connected peer position
     flat_order = []
-    _flatten_ids_from_root(node, flat_order)
+    _flatten_ids_from_root(root, flat_order)
     id_position = {nid: i for i, nid in enumerate(flat_order)}
-    node["children"] = sorted(children, key=lambda c: _heuristic_sort_key(c["id"], connections, id_position))
+    node["children"] = sorted(children, key=lambda c: _heuristic_sort_key_mixed(c, connections, id_position, child_leaf_ids))
+
+
+def _collect_leaf_ids(node, out):
+    """Collect all leaf node ids reachable from a node."""
+    children = node.get("children", [])
+    if not children:
+        if "id" in node:
+            out.append(node["id"])
+        return
+    for child in children:
+        _collect_leaf_ids(child, out)
+
+
+def _find_min_crossing_order_mixed(children, relevant, all_connections, internal_order_constraints, child_leaf_ids, root):
+    """Try all permutations of children (mixed groups) and return the one with fewest crossings.
+
+    For mixed groups, each child may be a leaf OR a sub-group containing multiple leaves.
+    The crossing count uses ALL leaves within each child's subtree.
+    """
+    from itertools import permutations
+
+    best_crossings = None
+    best_perm = None
+
+    # Build a global position map from the full tree (excluding this group's leaves)
+    global_positions = _compute_global_peer_positions(children, all_connections, child_leaf_ids, root)
+
+    for perm in permutations(children):
+        perm_ids = [c["id"] for c in perm]
+
+        # Skip permutations that violate internal order constraints
+        if internal_order_constraints:
+            valid = True
+            for src, dst in internal_order_constraints:
+                if src in perm_ids and dst in perm_ids:
+                    if perm_ids.index(src) > perm_ids.index(dst):
+                        valid = False
+                        break
+            if not valid:
+                continue
+
+        crossings = _count_crossings_for_mixed_order(perm, relevant, global_positions, child_leaf_ids)
+        if best_crossings is None or crossings < best_crossings:
+            best_crossings = crossings
+            best_perm = list(perm)
+            if crossings == 0:
+                break
+
+    return best_perm
+
+
+def _compute_global_peer_positions(children, all_connections, child_leaf_ids, root):
+    """Compute normalized positions for external peers.
+
+    External peers are nodes NOT contained in any of the children being permuted.
+    Their position is based on DFS order of leaf nodes in the root tree,
+    normalized to a [0, N] range where N is the number of internal leaf slots.
+    """
+    # All leaves within this group
+    all_internal = set()
+    for ids in child_leaf_ids.values():
+        all_internal.update(ids)
+
+    # Get global DFS order of ALL leaf nodes only
+    global_leaves = []
+    _collect_leaf_ids(root, global_leaves)
+
+    # Only external leaves get positions
+    external_leaves = [lid for lid in global_leaves if lid not in all_internal]
+    if not external_leaves:
+        return {}
+
+    # Assign sequential positions to external leaves
+    return {lid: i for i, lid in enumerate(external_leaves)}
+
+
+def _count_crossings_for_mixed_order(perm, relevant, global_positions, child_leaf_ids):
+    """Count edge crossings for a specific permutation of children in a mixed group.
+
+    Two edges cross if their internal endpoints are in one order but their
+    external endpoints are in the opposite order. For edges where BOTH endpoints
+    are internal, they cross if one child's position inverts relative to another.
+
+    Uses a two-layer approach:
+    - Internal positions: assigned based on permutation order (sequential ints)
+    - External positions: from global_positions (sequential ints, different namespace)
+
+    For crossing detection, only edges sharing the same "side" (both internal-to-external
+    or both internal-to-internal) can cross each other.
+    """
+    # Assign positions to all internal leaves based on the permutation order
+    internal_positions = {}
+    pos_counter = 0
+    for child in perm:
+        cid = child["id"]
+        leaves = child_leaf_ids.get(cid, [])
+        if not leaves:
+            internal_positions[cid] = pos_counter
+            pos_counter += 1
+        else:
+            for lid in leaves:
+                internal_positions[lid] = pos_counter
+                pos_counter += 1
+
+    # Categorize edges:
+    # Type A: internal→external (src is internal, dst is external)
+    # Type B: external→internal (src is external, dst is internal)
+    # Type C: internal→internal (both endpoints internal)
+    edges_a = []  # (internal_pos, external_pos)
+    edges_b = []  # (external_pos, internal_pos)
+    edges_c = []  # (internal_pos_src, internal_pos_dst)
+
+    for conn in relevant:
+        src, dst = conn["from"], conn["to"]
+        src_int = internal_positions.get(src)
+        dst_int = internal_positions.get(dst)
+        src_ext = global_positions.get(src)
+        dst_ext = global_positions.get(dst)
+
+        if src_int is not None and dst_int is not None:
+            edges_c.append((src_int, dst_int))
+        elif src_int is not None and dst_ext is not None:
+            edges_a.append((src_int, dst_ext))
+        elif src_ext is not None and dst_int is not None:
+            edges_b.append((src_ext, dst_int))
+
+    # Count crossings within each category
+    crossings = 0
+
+    # Type A crossings: two edges from internal to external cross if
+    # internal order and external order are inverted
+    for i in range(len(edges_a)):
+        for j in range(i + 1, len(edges_a)):
+            a1, b1 = edges_a[i]
+            a2, b2 = edges_a[j]
+            if (a1 - a2) * (b1 - b2) < 0:
+                crossings += 1
+
+    # Type B crossings: two edges from external to internal cross if
+    # external order and internal order are inverted
+    for i in range(len(edges_b)):
+        for j in range(i + 1, len(edges_b)):
+            a1, b1 = edges_b[i]
+            a2, b2 = edges_b[j]
+            if (a1 - a2) * (b1 - b2) < 0:
+                crossings += 1
+
+    # Type C crossings: internal-to-internal edges
+    for i in range(len(edges_c)):
+        for j in range(i + 1, len(edges_c)):
+            a1, b1 = edges_c[i]
+            a2, b2 = edges_c[j]
+            if (a1 - a2) * (b1 - b2) < 0:
+                crossings += 1
+
+    return crossings
+
+
+def _heuristic_sort_key_mixed(child, connections, id_position, child_leaf_ids):
+    """Heuristic sort key for a child (leaf or sub-group) in a mixed group."""
+    cid = child["id"]
+    leaf_ids = child_leaf_ids.get(cid, [cid])
+
+    weights = []
+    for lid in leaf_ids:
+        for conn in connections:
+            if conn["from"] == lid and conn["to"] in id_position:
+                weights.append(id_position[conn["to"]])
+            if conn["to"] == lid and conn["from"] in id_position:
+                weights.append(id_position[conn["from"]])
+    if weights:
+        return sum(weights) / len(weights)
+    return id_position.get(cid, 0)
 
 
 def _find_min_crossing_order(children, relevant, all_connections, internal_order_constraints=None):
