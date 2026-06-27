@@ -537,14 +537,25 @@ def _layout_route_connections(connections, nodes, groups=None):
     port_counts = {}
     port_indices = {}
 
+    # First pass: identify reverse-flow connections (they use bottom ports, not side ports)
+    reverse_set = set()
+    for i, conn in enumerate(connections):
+        src = _find_node(nodes, conn["from"])
+        dst = _find_node(nodes, conn["to"])
+        if src and dst and dst["x"] + dst["width"] < src["x"]:
+            reverse_set.add(i)
+
     conn_sides = []
-    for conn in connections:
+    for i, conn in enumerate(connections):
         src = _find_node(nodes, conn["from"])
         dst = _find_node(nodes, conn["to"])
         if not src or not dst:
             conn_sides.append((None, None, None, None))
             continue
-        # Determine group direction if both nodes share a parent group
+        if i in reverse_set:
+            # Reverse connections use bottom ports — don't affect side port counts
+            conn_sides.append((src, dst, "bottom", "bottom"))
+            continue
         group_dir = None
         src_gid = _find_group_for(conn["from"], node_group)
         dst_gid = _find_group_for(conn["to"], node_group)
@@ -559,9 +570,10 @@ def _layout_route_connections(connections, nodes, groups=None):
 
     # Optimize port assignment order to minimize crossings.
     # Group connections by (node, side), then try permutations of port order.
+    # Exclude reverse connections (they use dedicated bottom ports).
     port_groups = {}
     for i, (src, dst, src_side, dst_side) in enumerate(conn_sides):
-        if src is None:
+        if src is None or i in reverse_set:
             continue
         sk = (connections[i]["from"], src_side)
         dk = (connections[i]["to"], dst_side)
@@ -570,16 +582,33 @@ def _layout_route_connections(connections, nodes, groups=None):
 
     port_indices = _optimize_port_order(port_groups, conn_sides, connections, nodes, port_counts, obstacles)
 
+    # Compute global bounding box for detour routing
+    all_y = []
+    for n in nodes.values():
+        all_y.append(n["y"])
+        all_y.append(n["y"] + n["height"])
+    global_bottom = max(all_y) + 60 if all_y else 500
+
     edges = []
     for i, conn in enumerate(connections):
         src, dst, src_side, dst_side = conn_sides[i]
         if src is None:
             edges.append({"from": conn["from"], "to": conn["to"], "label": conn.get("label", ""), "points": []})
             continue
-        label_h = 30 if src.get("label") else 0
-        sp = _port_point(src, src_side, port_indices[(i, conn["from"])], port_counts[(conn["from"], src_side)], label_h)
-        tp = _port_point(dst, dst_side, port_indices[(i, conn["to"])], port_counts[(conn["to"], dst_side)], label_h)
-        points = _elbow_path(sp, tp, src_side, dst_side, obstacles)
+
+        if i in reverse_set:
+            src_node = _find_node(nodes, conn["from"])
+            dst_node = _find_node(nodes, conn["to"])
+            label_h_src = 30 if src_node.get("label") else 0
+            label_h_dst = 30 if dst_node.get("label") else 0
+            sp = _port_point(src_node, "bottom", 0, 1, label_h_src)
+            tp = _port_point(dst_node, "bottom", 0, 1, label_h_dst)
+            points = _detour_path(sp, tp, "bottom", "bottom", global_bottom)
+        else:
+            label_h = 30 if src.get("label") else 0
+            sp = _port_point(src, src_side, port_indices[(i, conn["from"])], port_counts[(conn["from"], src_side)], label_h)
+            tp = _port_point(dst, dst_side, port_indices[(i, conn["to"])], port_counts[(conn["to"], dst_side)], label_h)
+            points = _elbow_path(sp, tp, src_side, dst_side, obstacles)
         edges.append({"from": conn["from"], "to": conn["to"], "label": conn.get("label", ""), "points": points})
 
     # T8: Align bend positions for fan-out/fan-in only when "fan": "merge" is set
@@ -783,24 +812,27 @@ def _align_fan_bends(edges, conn_sides, connections):
 
 
 _MAX_RESOLVE_ITERATIONS = 30
-_BEND_CANDIDATES = [-50, -40, -30, -20, -15, -10, 10, 15, 20, 30, 40, 50]
+_BEND_CANDIDATES = [-120, -100, -80, -60, -50, -40, -30, -20, -10, 10, 20, 30, 40, 50, 60, 80, 100, 120]
 
 
 def _spread_overlapping_bends(edges, conn_sides, connections):
-    """Iteratively resolve edge crossings by searching for optimal bend shifts.
+    """Iteratively resolve edge crossings and separate close bends.
 
-    For each crossing found, tries all candidate shifts on both involved edges,
-    evaluates by (crossing_count, displacement), and applies the best fix.
-    Repeats until zero crossings or max iterations.
+    Phase 1: Resolve all crossings by searching for optimal bend shifts.
+    Phase 2: Separate bends that are too close (even if not crossing).
     """
     import copy
 
+    # Phase 1: resolve crossings
     for _iteration in range(_MAX_RESOLVE_ITERATIONS):
         crossing = _find_first_crossing(edges)
         if crossing is None:
             break
         i, si, j, sj = crossing
         _resolve_crossing_search(edges, i, si, j, sj)
+
+    # Phase 2: separate close parallel bends
+    _separate_close_bends(edges)
 
 
 def _find_first_crossing(edges):
@@ -838,11 +870,16 @@ def _count_all_crossings(edges):
     return count
 
 
+_MIN_BEND_SEPARATION = 40
+
+
 def _resolve_crossing_search(edges, i, si, j, sj):
     """Try all candidate shifts for both crossing edges and pick the best.
 
-    For each candidate: apply shift, count total crossings, score by
-    (crossings, displacement). Pick minimum.
+    Scoring: (crossings, -min_bend_separation, displacement)
+    1. Minimize total crossings (most important)
+    2. Maximize minimum distance between parallel bends (visual clarity)
+    3. Minimize displacement from original position (stability)
     """
     import copy
 
@@ -852,10 +889,10 @@ def _resolve_crossing_search(edges, i, si, j, sj):
     b1, b2 = pts_j[sj], pts_j[sj + 1]
 
     current_crossings = _count_all_crossings(edges)
-    best_score = (current_crossings, 0)
+    current_separation = _min_bend_separation(edges)
+    best_score = (current_crossings, -current_separation, 0)
     best_patch = None
 
-    # Generate candidates based on segment orientation
     candidates = []
     for edge_idx, seg_idx, pt1, pt2 in [(i, si, a1, a2), (j, sj, b1, b2)]:
         is_vert = pt1[0] == pt2[0]
@@ -877,7 +914,8 @@ def _resolve_crossing_search(edges, i, si, j, sj):
             _apply_bend_shift_y(pts, seg, delta)
 
         crossings = _count_all_crossings(test_edges)
-        score = (crossings, abs(delta))
+        separation = _min_bend_separation(test_edges)
+        score = (crossings, -separation, abs(delta))
 
         if score < best_score:
             best_score = score
@@ -886,6 +924,307 @@ def _resolve_crossing_search(edges, i, si, j, sj):
     if best_patch is not None:
         edge_idx, new_pts = best_patch
         edges[edge_idx]["points"] = new_pts
+
+
+def _min_bend_separation(edges):
+    """Calculate the minimum distance between parallel bend segments.
+
+    Checks all pairs of vertical bends (same-ish Y range) for X separation,
+    and all pairs of horizontal bends (same-ish X range) for Y separation.
+    Returns the minimum separation found (larger = better visual clarity).
+    """
+    vertical_bends = []
+    horizontal_bends = []
+
+    for e in edges:
+        pts = e["points"]
+        if len(pts) < 4:
+            continue
+        for k in range(len(pts) - 1):
+            p1, p2 = pts[k], pts[k + 1]
+            if p1[0] == p2[0] and abs(p1[1] - p2[1]) > 10:
+                y_min, y_max = min(p1[1], p2[1]), max(p1[1], p2[1])
+                vertical_bends.append((p1[0], y_min, y_max))
+            elif p1[1] == p2[1] and abs(p1[0] - p2[0]) > 10:
+                x_min, x_max = min(p1[0], p2[0]), max(p1[0], p2[0])
+                horizontal_bends.append((p1[1], x_min, x_max))
+
+    min_sep = 9999
+
+    for a in range(len(vertical_bends)):
+        for b in range(a + 1, len(vertical_bends)):
+            ax, ay_min, ay_max = vertical_bends[a]
+            bx, by_min, by_max = vertical_bends[b]
+            overlap_y = min(ay_max, by_max) - max(ay_min, by_min)
+            if overlap_y > 10:
+                sep = abs(ax - bx)
+                if sep < min_sep:
+                    min_sep = sep
+
+    for a in range(len(horizontal_bends)):
+        for b in range(a + 1, len(horizontal_bends)):
+            ay, ax_min, ax_max = horizontal_bends[a]
+            by, bx_min, bx_max = horizontal_bends[b]
+            overlap_x = min(ax_max, bx_max) - max(ax_min, bx_min)
+            if overlap_x > 10:
+                sep = abs(ay - by)
+                if sep < min_sep:
+                    min_sep = sep
+
+    return min_sep
+
+
+def _separate_close_bends(edges):
+    """Spread parallel bends that are too close, distributing them evenly.
+
+    Groups vertical bends that share a similar X position (within _MIN_BEND_SEPARATION)
+    AND whose Y ranges are adjacent or overlapping. Spreads their X positions evenly
+    with _MIN_BEND_SEPARATION between each.
+    Does not introduce new crossings.
+    """
+    import copy
+
+    # Collect all vertical bend segments: (edge_idx, seg_idx, x, y_min, y_max)
+    v_bends = []
+    for ei, e in enumerate(edges):
+        pts = e["points"]
+        for k in range(len(pts) - 1):
+            if pts[k][0] == pts[k + 1][0] and abs(pts[k][1] - pts[k + 1][1]) > 10:
+                y_min = min(pts[k][1], pts[k + 1][1])
+                y_max = max(pts[k][1], pts[k + 1][1])
+                v_bends.append((ei, k, pts[k][0], y_min, y_max))
+
+    # Group bends that are close in X AND adjacent/overlapping in Y
+    # BUT: only group bends from DIFFERENT source nodes.
+    # Bends from the same source should be aligned (not separated).
+    used = set()
+    groups = []
+    for a in range(len(v_bends)):
+        if a in used:
+            continue
+        group = [a]
+        group_y_min = v_bends[a][3]
+        group_y_max = v_bends[a][4]
+        src_a = edges[v_bends[a][0]]["from"]
+        for b in range(a + 1, len(v_bends)):
+            if b in used:
+                continue
+            ei_b = v_bends[b][0]
+            src_b = edges[ei_b]["from"]
+            # Skip if same source — those should stay aligned
+            if src_b == src_a:
+                continue
+            _, _, bx, by_min, by_max = v_bends[b]
+            group_x_avg = sum(v_bends[idx][2] for idx in group) // len(group)
+            if abs(bx - group_x_avg) >= _MIN_BEND_SEPARATION:
+                continue
+            gap = max(by_min - group_y_max, group_y_min - by_max)
+            if gap < 50:
+                group.append(b)
+                group_y_min = min(group_y_min, by_min)
+                group_y_max = max(group_y_max, by_max)
+        if len(group) < 2:
+            continue
+        used.update(group)
+        groups.append(group)
+
+    # Spread each group evenly
+    for group in groups:
+        group_bends = [(v_bends[idx], idx) for idx in group]
+        group_bends.sort(key=lambda t: (t[0][3] + t[0][4]) / 2)
+        center_x = sum(v[0][2] for v in group_bends) // len(group_bends)
+        spread_total = _MIN_BEND_SEPARATION * (len(group_bends) - 1)
+        start_x = center_x - spread_total // 2
+
+        current_crossings = _count_all_crossings(edges)
+        for slot, (bend_info, _) in enumerate(group_bends):
+            ei, seg_k, old_x, _, _ = bend_info
+            new_x = start_x + slot * _MIN_BEND_SEPARATION
+            if new_x == old_x:
+                continue
+            test_edges = copy.deepcopy(edges)
+            delta = new_x - old_x
+            _apply_bend_shift_x(test_edges[ei]["points"], seg_k, delta)
+            if _count_all_crossings(test_edges) <= current_crossings:
+                _apply_bend_shift_x(edges[ei]["points"], seg_k, delta)
+
+    # Align bends from the same source to a single X position
+    _align_same_source_bends(edges)
+
+    # Also spread close horizontal segments
+    _separate_close_horizontal_segments(edges)
+
+
+def _align_same_source_bends(edges):
+    """Align bends from the same source node to a single X (or Y) position.
+
+    When multiple edges fan out from the same node, their vertical bends
+    should share the same X so they look like a clean tree branch.
+    Only aligns if it doesn't introduce new crossings.
+    """
+    import copy
+
+    # Group edges by source
+    src_groups = {}
+    for ei, e in enumerate(edges):
+        pts = e["points"]
+        if len(pts) < 4:
+            continue
+        src_groups.setdefault(e["from"], []).append(ei)
+
+    current_crossings = _count_all_crossings(edges)
+
+    for src, edge_indices in src_groups.items():
+        if len(edge_indices) < 2:
+            continue
+
+        # Collect vertical bend X positions for these edges
+        bend_xs = []
+        for ei in edge_indices:
+            pts = edges[ei]["points"]
+            for k in range(len(pts) - 1):
+                if pts[k][0] == pts[k + 1][0] and abs(pts[k][1] - pts[k + 1][1]) > 5:
+                    bend_xs.append((ei, k, pts[k][0]))
+                    break
+
+        if len(bend_xs) < 2:
+            continue
+
+        # All already aligned?
+        xs = [x for _, _, x in bend_xs]
+        if max(xs) - min(xs) <= 5:
+            continue
+
+        # Try aligning to the median X
+        target_x = sorted(xs)[len(xs) // 2]
+
+        # Test: align all to target_x
+        test_edges = copy.deepcopy(edges)
+        for ei, k, old_x in bend_xs:
+            if old_x != target_x:
+                delta = target_x - old_x
+                _apply_bend_shift_x(test_edges[ei]["points"], k, delta)
+
+        if _count_all_crossings(test_edges) <= current_crossings:
+            for ei, k, old_x in bend_xs:
+                if old_x != target_x:
+                    delta = target_x - old_x
+                    _apply_bend_shift_x(edges[ei]["points"], k, delta)
+
+    # Same for destination (fan-in): align bends going to the same target
+    dst_groups = {}
+    for ei, e in enumerate(edges):
+        pts = e["points"]
+        if len(pts) < 4:
+            continue
+        dst_groups.setdefault(e["to"], []).append(ei)
+
+    current_crossings = _count_all_crossings(edges)
+
+    for dst, edge_indices in dst_groups.items():
+        if len(edge_indices) < 2:
+            continue
+
+        bend_xs = []
+        for ei in edge_indices:
+            pts = edges[ei]["points"]
+            for k in range(len(pts) - 1):
+                if pts[k][0] == pts[k + 1][0] and abs(pts[k][1] - pts[k + 1][1]) > 5:
+                    bend_xs.append((ei, k, pts[k][0]))
+                    break
+
+        if len(bend_xs) < 2:
+            continue
+
+        xs = [x for _, _, x in bend_xs]
+        if max(xs) - min(xs) <= 5:
+            continue
+
+        target_x = sorted(xs)[len(xs) // 2]
+
+        test_edges = copy.deepcopy(edges)
+        for ei, k, old_x in bend_xs:
+            if old_x != target_x:
+                delta = target_x - old_x
+                _apply_bend_shift_x(test_edges[ei]["points"], k, delta)
+
+        if _count_all_crossings(test_edges) <= current_crossings:
+            for ei, k, old_x in bend_xs:
+                if old_x != target_x:
+                    delta = target_x - old_x
+                    _apply_bend_shift_x(edges[ei]["points"], k, delta)
+
+
+def _separate_close_horizontal_segments(edges):
+    """Detect horizontal segments at nearly the same Y with overlapping X range.
+
+    When two horizontal segments from different edges are within
+    _MIN_BEND_SEPARATION/2 in Y and overlap in X, shift one edge's bend
+    to create visual separation.
+    """
+    import copy
+
+    # Collect all horizontal segments: (edge_idx, seg_idx, y, x_min, x_max)
+    h_segs = []
+    for ei, e in enumerate(edges):
+        pts = e["points"]
+        for k in range(len(pts) - 1):
+            if pts[k][1] == pts[k + 1][1] and abs(pts[k][0] - pts[k + 1][0]) > 20:
+                x_min = min(pts[k][0], pts[k + 1][0])
+                x_max = max(pts[k][0], pts[k + 1][0])
+                h_segs.append((ei, k, pts[k][1], x_min, x_max))
+
+    current_crossings = _count_all_crossings(edges)
+    adjusted = set()
+    for a in range(len(h_segs)):
+        for b in range(a + 1, len(h_segs)):
+            ei_a, k_a, y_a, xmin_a, xmax_a = h_segs[a]
+            ei_b, k_b, y_b, xmin_b, xmax_b = h_segs[b]
+            if ei_a == ei_b:
+                continue
+            y_diff = abs(y_a - y_b)
+            if y_diff >= _MIN_BEND_SEPARATION // 2:
+                continue
+            overlap = min(xmax_a, xmax_b) - max(xmin_a, xmin_b)
+            if overlap <= 20:
+                continue
+
+            # Try shifting either edge's vertical bend X to shorten/lengthen
+            # the horizontal segment so they no longer overlap in X.
+            resolved = False
+            for ei, k in [(ei_a, k_a), (ei_b, k_b)]:
+                if ei in adjusted or resolved:
+                    continue
+                pts = edges[ei]["points"]
+                # Find the vertical bend in this edge
+                for vk in range(len(pts) - 1):
+                    if pts[vk][0] == pts[vk + 1][0] and abs(pts[vk][1] - pts[vk + 1][1]) > 5:
+                        # Try shifting this bend X to reduce horizontal overlap
+                        other_xmin = xmin_b if ei == ei_a else xmin_a
+                        other_xmax = xmax_b if ei == ei_a else xmax_a
+                        # Shift bend to just before or after the other segment
+                        for delta in [-60, -40, 60, 40, -80, 80, -100, 100]:
+                            test_edges = copy.deepcopy(edges)
+                            _apply_bend_shift_x(test_edges[ei]["points"], vk, delta)
+                            # Check: overlap reduced AND no new crossings
+                            new_crossings = _count_all_crossings(test_edges)
+                            # Recalculate overlap
+                            new_pts = test_edges[ei]["points"]
+                            new_h_y = None
+                            for nk in range(len(new_pts) - 1):
+                                if new_pts[nk][1] == new_pts[nk + 1][1] and abs(new_pts[nk][0] - new_pts[nk + 1][0]) > 20:
+                                    new_xmin = min(new_pts[nk][0], new_pts[nk + 1][0])
+                                    new_xmax = max(new_pts[nk][0], new_pts[nk + 1][0])
+                                    if abs(new_pts[nk][1] - (y_b if ei == ei_a else y_a)) < _MIN_BEND_SEPARATION // 2:
+                                        new_overlap = min(new_xmax, other_xmax) - max(new_xmin, other_xmin)
+                                        if new_overlap <= 20 and new_crossings <= current_crossings:
+                                            _apply_bend_shift_x(edges[ei]["points"], vk, delta)
+                                            adjusted.add(ei)
+                                            resolved = True
+                                            break
+                            if resolved:
+                                break
+                        break
 
 
 def _apply_bend_shift_x(points, seg_idx, delta):
@@ -1072,6 +1411,24 @@ def _calc_bend(val, lo, hi, obstacles, axis):
         elif abs(val - edge_hi) <= OBSTACLE_MARGIN:
             val = edge_hi + OBSTACLE_MARGIN + 5
     return val
+
+
+_DETOUR_MARGIN = 40
+
+
+def _detour_path(sp, tp, src_side, dst_side, global_bottom):
+    """Generate a U-shaped detour path for reverse-flow connections.
+
+    Routes below all nodes: src → down → across → up → dst
+    Always produces a 4-point path (コの字):
+      [src] → [src_x, bottom] → [dst_x, bottom] → [dst]
+    """
+    sx, sy = sp
+    tx, ty = tp
+    bottom_y = global_bottom + _DETOUR_MARGIN
+
+    # Always route: straight down from src, horizontal across bottom, straight up to dst
+    return [[sx, sy], [sx, bottom_y], [tx, bottom_y], [tx, ty]]
 
 
 def _elbow_path(sp, tp, src_side, dst_side, obstacles=None):

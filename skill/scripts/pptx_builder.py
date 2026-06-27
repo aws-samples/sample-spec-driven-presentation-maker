@@ -539,29 +539,49 @@ def cmd_layout(args):
             continue
         sx, sy = pts[0]
         ex, ey = pts[-1]
-        el = {"type": "line", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "arrowEnd": "arrow"}
-        if len(pts) > 2:
-            el["connectorType"] = "elbow"
-            dx = ex - sx
-            dy = ey - sy
-            if len(pts) >= 4 and abs(dx) > 0 and abs(dy) > 0:
-                # 4 points: [start, bend1, bend2, end]
-                seg1_vertical = abs(pts[0][0] - pts[1][0]) <= abs(pts[0][1] - pts[1][1])
-                if seg1_vertical:
-                    # V-H-V → elbowStart vertical
-                    adj = (pts[1][1] - sy) / dy if dy != 0 else 0.5
-                    el["preset"] = "bentConnector3"
-                    el["elbowStart"] = "vertical"
-                    el["adjustments"] = [max(0.0, min(1.0, adj))]
-                else:
-                    # H-V-H → bentConnector4 (no flip)
-                    adj1 = (pts[1][0] - sx) / dx if dx != 0 else 0.5
-                    adj2 = (pts[2][1] - sy) / dy if dy != 0 else 0.5
-                    el["preset"] = "bentConnector4"
-                    el["adjustments"] = [max(-1.0, min(2.0, adj1)), max(-1.0, min(2.0, adj2))]
-            elif dy != 0 or dx != 0:
-                el["adjustments"] = [0.5]
-        elements.append(el)
+
+        # Detour paths (4+ points, U-shape) or complex routes: emit as polyline
+        is_detour = len(pts) >= 4 and pts[0][1] == pts[-1][1] and any(p[1] != pts[0][1] for p in pts[1:-1])
+        if is_detour or len(pts) >= 6:
+            el = {"type": "line", "arrowEnd": "arrow",
+                  "points": [[p[0], p[1]] for p in pts]}
+            elements.append(el)
+        else:
+            el = {"type": "line", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "arrowEnd": "arrow"}
+            if len(pts) > 2:
+                el["connectorType"] = "elbow"
+                dx = ex - sx
+                dy = ey - sy
+                if len(pts) >= 4 and (abs(dx) > 0 or abs(dy) > 0):
+                    # 4 points: [start, bend1, bend2, end]
+                    seg1_vertical = abs(pts[0][0] - pts[1][0]) <= abs(pts[0][1] - pts[1][1])
+                    if seg1_vertical:
+                        # V-H-V → elbowStart vertical
+                        # For U-shaped detour (sy==ty), use the bend Y relative to path height
+                        if dy != 0:
+                            adj = (pts[1][1] - sy) / dy
+                        else:
+                            # sy == ty: use max extent as reference
+                            path_max_y = max(p[1] for p in pts)
+                            path_min_y = min(p[1] for p in pts)
+                            path_dy = path_max_y - sy if path_max_y > sy else path_min_y - sy
+                            adj = (pts[1][1] - sy) / path_dy if path_dy != 0 else 0.5
+                            # Override: place end at same Y as start by using full extent
+                            dy = path_dy
+                            ey = sy + dy
+                            el["y2"] = ey
+                        el["preset"] = "bentConnector3"
+                        el["elbowStart"] = "vertical"
+                        el["adjustments"] = [max(-2.0, min(3.0, adj))]
+                    else:
+                        # H-V-H → bentConnector4
+                        adj1 = (pts[1][0] - sx) / dx if dx != 0 else 0.5
+                        adj2 = (pts[2][1] - sy) / dy if dy != 0 else 0.5
+                        el["preset"] = "bentConnector4"
+                        el["adjustments"] = [max(-1.0, min(2.0, adj1)), max(-1.0, min(2.0, adj2))]
+                elif dy != 0 or dx != 0:
+                    el["adjustments"] = [0.5]
+            elements.append(el)
 
         label = e.get("label", "")
         if not label:
