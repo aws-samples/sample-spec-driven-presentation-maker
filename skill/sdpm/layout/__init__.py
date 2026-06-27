@@ -427,22 +427,17 @@ def _align_leaves_to_sibling_centers(ordered):
                     b = grandchild["_bindings"]
                     same_dir_leaf_centers.append(b[1] + b[3] // 2)
 
-    # Fallback: direct-child leaves from any group
+    # Fallback: for each leaf, find the adjacent group and use its leaf median
     if not same_dir_leaf_centers:
-        for child in ordered:
-            if child.get("children"):
-                for grandchild in child["children"]:
-                    if not grandchild.get("children"):
-                        b = grandchild["_bindings"]
-                        same_dir_leaf_centers.append(b[1] + b[3] // 2)
-
-    # Final fallback: all leaf centers
-    if not same_dir_leaf_centers:
-        for child in ordered:
-            if child.get("children"):
-                centers = _find_leaf_centers_y(child)
-                if centers:
-                    same_dir_leaf_centers.extend(centers)
+        leaf_indices = [i for i, c in enumerate(ordered) if not c.get("children")]
+        group_indices = [i for i, c in enumerate(ordered) if c.get("children")]
+        if leaf_indices and group_indices:
+            # Use the group nearest to the first leaf
+            first_leaf_idx = leaf_indices[0]
+            nearest_group_idx = min(group_indices, key=lambda g: abs(g - first_leaf_idx))
+            centers = _find_leaf_centers_y(ordered[nearest_group_idx])
+            if centers:
+                same_dir_leaf_centers.append((min(centers) + max(centers)) // 2)
 
     if not same_dir_leaf_centers:
         return
