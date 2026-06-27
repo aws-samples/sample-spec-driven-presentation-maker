@@ -1250,8 +1250,7 @@ def _separate_close_horizontal_segments(edges):
 def _apply_bend_shift_x(points, seg_idx, delta):
     """Shift the vertical bend at seg_idx by delta on the X axis.
 
-    Identifies the shared X value of the vertical segment and shifts all
-    points on that bend column.
+    Never moves the first or last point (port-anchored endpoints).
     """
     if len(points) < 3:
         return
@@ -1264,14 +1263,21 @@ def _apply_bend_shift_x(points, seg_idx, delta):
     else:
         target_x = p1[0]
 
-    for pt in points:
+    for i, pt in enumerate(points):
+        if i == 0 or i == len(points) - 1:
+            continue
         if pt[0] == target_x:
             pt[0] += delta
 
 
 def _apply_bend_shift_y(points, seg_idx, delta):
-    """Shift the horizontal bend at seg_idx by delta on the Y axis."""
-    if len(points) < 3:
+    """Shift the horizontal bend at seg_idx by delta on the Y axis.
+
+    Never moves the first or last point (port-anchored endpoints).
+    Only shifts points that are part of an internal horizontal segment
+    (not adjacent to the start/end points).
+    """
+    if len(points) < 4:
         return
     p1 = points[seg_idx]
     p2 = points[min(seg_idx + 1, len(points) - 1)]
@@ -1282,7 +1288,13 @@ def _apply_bend_shift_y(points, seg_idx, delta):
     else:
         target_y = p1[1]
 
-    for pt in points:
+    # Don't shift if target_y matches start or end Y (would break port alignment)
+    if target_y == points[0][1] or target_y == points[-1][1]:
+        return
+
+    for i, pt in enumerate(points):
+        if i == 0 or i == len(points) - 1:
+            continue
         if pt[1] == target_y:
             pt[1] += delta
 
