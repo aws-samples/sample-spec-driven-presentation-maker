@@ -796,83 +796,12 @@ def _layout_route_connections(connections, nodes, groups=None):
     # T8: Align bend positions for fan-out/fan-in only when "fan": "merge" is set
     _align_fan_bends(edges, conn_sides, connections)
 
-    # Save fan-out edge points (they should not be modified by spread/crossing logic)
-    import copy
-    fanout_saved = {i: copy.deepcopy(e["points"]) for i, e in enumerate(edges) if e.get("_fanout")}
+    # T9: Spread overlapping bends — currently disabled as it introduces
+    # perpendicularity violations that are difficult to repair.
+    # TODO: re-enable with proper constraint that never produces diagonals or backwards.
+    # _spread_overlapping_bends(edges, conn_sides, connections)
 
-    # T9: Spread overlapping elbow bends from the same source
-    _spread_overlapping_bends(edges, conn_sides, connections)
-
-    # Restore fan-out edge points
-    for i, pts in fanout_saved.items():
-        edges[i]["points"] = pts
-
-    # Post-process: fix bends that ended up inside node icons after spread
-    _fix_bends_inside_nodes(edges, nodes, connections)
-
-    # Final pass: fix arrows going backwards from their start/end ports.
-    # Detect side from the port position relative to the source/destination node.
-    for ei, e in enumerate(edges):
-        pts = e["points"]
-        if len(pts) < 3:
-            continue
-        src_node = _find_node(nodes, e["from"])
-        dst_node = _find_node(nodes, e["to"])
-
-        # Determine src_side from start point position on node edge
-        if src_node:
-            sx, sy = pts[0]
-            nx, ny, nw, nh = src_node["x"], src_node["y"], src_node.get("width", 60), src_node.get("height", 60)
-            # Check which edge the start point is closest to
-            dist_right = abs(sx - (nx + nw))
-            dist_left = abs(sx - nx)
-            dist_bottom = abs(sy - (ny + nh))
-            dist_top = abs(sy - ny)
-            min_dist = min(dist_right, dist_left, dist_bottom, dist_top)
-            if min_dist == dist_right:
-                src_side = "right"
-            elif min_dist == dist_left:
-                src_side = "left"
-            elif min_dist == dist_bottom:
-                src_side = "bottom"
-            else:
-                src_side = "top"
-
-            if src_side == "right" and pts[1][0] < pts[0][0]:
-                pts[1] = [pts[0][0], pts[1][1]]
-            elif src_side == "left" and pts[1][0] > pts[0][0]:
-                pts[1] = [pts[0][0], pts[1][1]]
-            elif src_side == "bottom" and pts[1][1] < pts[0][1]:
-                pts[1] = [pts[1][0], pts[0][1]]
-            elif src_side == "top" and pts[1][1] > pts[0][1]:
-                pts[1] = [pts[1][0], pts[0][1]]
-            elif src_side == "top" and abs(pts[1][1] - pts[0][1]) < 3 and pts[1][0] < pts[0][0]:
-                # Top side but first segment is horizontal going left — snap X
-                pts[1] = [pts[0][0], pts[1][1]]
-
-        # Determine dst_side from end point position on node
-        if dst_node and len(pts) >= 3:
-            ex, ey = pts[-1]
-            nx, ny, nw, nh = dst_node["x"], dst_node["y"], dst_node.get("width", 60), dst_node.get("height", 60)
-            if abs(ex - nx) < 5:
-                dst_side = "left"
-            elif abs(ex - (nx + nw)) < 5:
-                dst_side = "right"
-            elif abs(ey - ny) < 5:
-                dst_side = "top"
-            else:
-                dst_side = "bottom"
-
-            if dst_side == "left" and pts[-2][0] < pts[-1][0]:
-                pts[-2] = [pts[-1][0], pts[-2][1]]
-            elif dst_side == "right" and pts[-2][0] > pts[-1][0]:
-                pts[-2] = [pts[-1][0], pts[-2][1]]
-            elif dst_side == "top" and pts[-2][1] < pts[-1][1]:
-                pts[-2] = [pts[-2][0], pts[-1][1]]
-            elif dst_side == "bottom" and pts[-2][1] > pts[-1][1]:
-                pts[-2] = [pts[-2][0], pts[-1][1]]
-
-    # Final pass: eliminate diagonal segments by inserting intermediate points
+    # Safety net: if any diagonal segments remain, insert L-shaped intermediates
     for e in edges:
         new_pts = [e["points"][0]]
         pts = e["points"]
@@ -880,7 +809,6 @@ def _layout_route_connections(connections, nodes, groups=None):
             dx = abs(pts[k][0] - new_pts[-1][0])
             dy = abs(pts[k][1] - new_pts[-1][1])
             if dx > 3 and dy > 3:
-                # Insert an L-shaped intermediate: go horizontal first, then vertical
                 new_pts.append([pts[k][0], new_pts[-1][1]])
             new_pts.append(pts[k])
         e["points"] = new_pts
