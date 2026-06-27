@@ -553,6 +553,9 @@ def _layout_route_connections(connections, nodes, groups=None):
         for cid in g.get("children", []):
             node_group[cid] = gid
     obstacles = [{"x": g["x"], "y": g["y"], "width": g["width"], "height": g["height"]} for g in groups.values()]
+    # Also add all nodes as obstacles so arrows avoid passing through icons
+    for nid, n in nodes.items():
+        obstacles.append({"x": n["x"], "y": n["y"], "width": n.get("width", 60), "height": n.get("height", 60), "_node": nid})
 
     port_counts = {}
     port_indices = {}
@@ -753,7 +756,9 @@ def _layout_route_connections(connections, nodes, groups=None):
                 points = [sp, [bend_x, sp[1]], [bend_x, tp[1]], tp]
                 is_fanout_edge = True
             else:
-                points = _elbow_path(sp, tp, src_side, dst_side, obstacles)
+                # Exclude src/dst nodes from obstacles to avoid self-avoidance
+                conn_obs = [o for o in obstacles if o.get("_node") not in (conn["from"], conn["to"])]
+                points = _elbow_path(sp, tp, src_side, dst_side, conn_obs)
         edge_entry = {"from": conn["from"], "to": conn["to"], "label": conn.get("label", ""), "points": points}
         if is_fanout_edge:
             edge_entry["_fanout"] = True
@@ -1573,18 +1578,24 @@ OBSTACLE_MARGIN = 10
 
 
 def _calc_bend(val, lo, hi, obstacles, axis):
-    """Calculate bend position avoiding obstacle boundaries."""
+    """Calculate bend position avoiding obstacle boundaries and interiors."""
     val = max(val, lo + MIN_BEND_MARGIN)
     val = min(val, hi - MIN_BEND_MARGIN)
     for obs in obstacles:
         if axis == "x":
-            edge_lo, edge_hi = obs["x"], obs["x"] + obs["width"]
+            edge_lo, edge_hi = obs["x"] - OBSTACLE_MARGIN, obs["x"] + obs["width"] + OBSTACLE_MARGIN
         else:
-            edge_lo, edge_hi = obs["y"], obs["y"] + obs["height"]
-        if abs(val - edge_lo) <= OBSTACLE_MARGIN:
-            val = edge_lo - OBSTACLE_MARGIN - 5
-        elif abs(val - edge_hi) <= OBSTACLE_MARGIN:
-            val = edge_hi + OBSTACLE_MARGIN + 5
+            edge_lo, edge_hi = obs["y"] - OBSTACLE_MARGIN, obs["y"] + obs["height"] + OBSTACLE_MARGIN
+        if edge_lo < val < edge_hi:
+            # Bend is inside obstacle — move to nearest edge outside
+            dist_to_lo = val - edge_lo
+            dist_to_hi = edge_hi - val
+            if dist_to_lo <= dist_to_hi:
+                val = edge_lo - 5
+            else:
+                val = edge_hi + 5
+    val = max(val, lo + MIN_BEND_MARGIN)
+    val = min(val, hi - MIN_BEND_MARGIN)
     return val
 
 
