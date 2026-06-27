@@ -4,76 +4,170 @@
 
 
 def optimize_order(tree):
-    """Pre-process: reorder children in vertical/horizontal groups to minimize
-    edge crossings based on connection source/target positions.
+    """Pre-process: reorder children in leaf-only groups to minimize edge crossings.
+
+    Uses brute-force permutation search for small groups (≤7 leaves) and
+    heuristic sorting for larger ones. Counts actual crossing pairs to find
+    the optimal order.
 
     Mutates tree in-place. Call before _layout_scale.
     """
     connections = tree.get("connections", [])
     if not connections:
         return
-
-    # Build index: node_id -> position in source list (approximation of Y/X order)
-    # We use the order of appearance in the flattened tree as positional proxy.
-    flat_order = []
-    _flatten_ids(tree, flat_order)
-    id_position = {nid: i for i, nid in enumerate(flat_order)}
-
-    # For each group, sort leaf children by the average position of their connected peers
-    _optimize_group_order(tree, connections, id_position)
+    _optimize_group_order(tree, connections)
 
 
-def _flatten_ids(node, out):
-    """Collect all node ids in DFS order."""
-    if "id" in node:
-        out.append(node["id"])
-    for child in node.get("children", []):
-        _flatten_ids(child, out)
-
-
-def _optimize_group_order(node, connections, id_position):
-    """Recursively optimize child order within groups to reduce crossings."""
+def _optimize_group_order(node, connections):
+    """Recursively optimize child order within leaf-only groups."""
     children = node.get("children", [])
     if not children:
         return
 
-    # Recurse first (bottom-up)
     for child in children:
-        _optimize_group_order(child, connections, id_position)
+        _optimize_group_order(child, connections)
 
-    # Only reorder if all children are leaves (no nested groups)
-    # to avoid breaking intentional group structure
     leaf_children = [c for c in children if not c.get("children")]
     if len(leaf_children) < 2 or len(leaf_children) != len(children):
         return
 
-    # For each leaf child, compute a "connection weight" based on
-    # the positions of nodes it connects to/from
-    def connection_weight(child_id):
-        weights = []
-        for conn in connections:
-            if conn["from"] == child_id and conn["to"] in id_position:
-                weights.append(id_position[conn["to"]])
-            if conn["to"] == child_id and conn["from"] in id_position:
-                weights.append(id_position[conn["from"]])
-        if not weights:
-            return id_position.get(child_id, 0)
+    leaf_ids = [c["id"] for c in children]
+
+    # Collect connections relevant to this group's leaves
+    relevant = []
+    for conn in connections:
+        src, dst = conn["from"], conn["to"]
+        src_in = src in leaf_ids
+        dst_in = dst in leaf_ids
+        if src_in or dst_in:
+            relevant.append(conn)
+
+    if not relevant:
+        return
+
+    # For brute-force: try all permutations if ≤7 leaves
+    if len(children) <= 7:
+        best_order = _find_min_crossing_order(children, relevant, connections)
+        if best_order is not None:
+            node["children"] = best_order
+            return
+
+    # Fallback heuristic for larger groups: sort by connected peer position
+    flat_order = []
+    _flatten_ids_from_root(node, flat_order)
+    id_position = {nid: i for i, nid in enumerate(flat_order)}
+    node["children"] = sorted(children, key=lambda c: _heuristic_sort_key(c["id"], connections, id_position))
+
+
+def _find_min_crossing_order(children, relevant, all_connections):
+    """Try all permutations and return the one with fewest crossings."""
+    from itertools import permutations
+
+    best_crossings = None
+    best_perm = None
+
+    # Determine fixed external peer positions from the tree structure
+    peer_positions = _compute_peer_positions(children, all_connections)
+
+    for perm in permutations(children):
+        perm_ids = [c["id"] for c in perm]
+        crossings = _count_crossings_for_order(perm_ids, relevant, peer_positions)
+        if best_crossings is None or crossings < best_crossings:
+            best_crossings = crossings
+            best_perm = list(perm)
+            if crossings == 0:
+                break
+
+    return best_perm
+
+
+def _compute_peer_positions(children, all_connections):
+    """Compute fixed positions for external peers (nodes outside this group).
+
+    External peers are assigned positions based on their relative order among
+    each other — determined by their index in the sibling group they belong to.
+    This position is independent of the permutation being tested.
+    """
+    leaf_ids = set(c["id"] for c in children)
+    # Collect all external peers connected to this group
+    peers = set()
+    for conn in all_connections:
+        if conn["from"] in leaf_ids and conn["to"] not in leaf_ids:
+            peers.add(conn["to"])
+        if conn["to"] in leaf_ids and conn["from"] not in leaf_ids:
+            peers.add(conn["from"])
+
+    # Group external peers by which group-internal nodes they connect to.
+    # Peers connecting to the same set of internal nodes should have the same position.
+    # Peers are ordered by their first appearance in connections list.
+    peer_order = []
+    seen = set()
+    for conn in all_connections:
+        for p in [conn["from"], conn["to"]]:
+            if p in peers and p not in seen:
+                peer_order.append(p)
+                seen.add(p)
+
+    # Assign a simple sequential position based on order of appearance
+    return {p: i for i, p in enumerate(peer_order)}
+
+
+def _count_crossings_for_order(ordered_ids, relevant, peer_positions):
+    """Count edge crossings given a specific ordering of nodes in a group.
+
+    Uses fixed peer_positions for external nodes and the permutation positions
+    for internal nodes. Two edges cross if their endpoint orders are inverted.
+    """
+    pos = {nid: i for i, nid in enumerate(ordered_ids)}
+    id_set = set(ordered_ids)
+
+    edges = []
+    for conn in relevant:
+        src, dst = conn["from"], conn["to"]
+        if src in id_set and dst in id_set:
+            edges.append((pos[src], pos[dst]))
+        elif src in id_set:
+            ext_pos = peer_positions.get(dst, len(ordered_ids) / 2)
+            edges.append((pos[src], ext_pos))
+        elif dst in id_set:
+            ext_pos = peer_positions.get(src, len(ordered_ids) / 2)
+            edges.append((ext_pos, pos[dst]))
+
+    crossings = 0
+    for i in range(len(edges)):
+        for j in range(i + 1, len(edges)):
+            a1, b1 = edges[i]
+            a2, b2 = edges[j]
+            if (a1 - a2) * (b1 - b2) < 0:
+                crossings += 1
+    return crossings
+
+
+def _flatten_ids_from_root(node, out):
+    """Collect all node ids in DFS order from a subtree root."""
+    if "id" in node:
+        out.append(node["id"])
+    for child in node.get("children", []):
+        _flatten_ids_from_root(child, out)
+
+
+def _heuristic_sort_key(child_id, connections, id_position):
+    """Fallback heuristic: sort by average position of connected source nodes."""
+    src_positions = []
+    for conn in connections:
+        if conn["to"] == child_id and conn["from"] in id_position:
+            src_positions.append(id_position[conn["from"]])
+    if src_positions:
+        return sum(src_positions) / len(src_positions)
+    weights = []
+    for conn in connections:
+        if conn["from"] == child_id and conn["to"] in id_position:
+            weights.append(id_position[conn["to"]])
+        if conn["to"] == child_id and conn["from"] in id_position:
+            weights.append(id_position[conn["from"]])
+    if weights:
         return sum(weights) / len(weights)
-
-    # Sort by the average position of connected source nodes
-    # This ensures nodes connected to earlier sources appear first
-    def sort_key(child):
-        cid = child.get("id", "")
-        src_positions = []
-        for conn in connections:
-            if conn["to"] == cid and conn["from"] in id_position:
-                src_positions.append(id_position[conn["from"]])
-        if src_positions:
-            return sum(src_positions) / len(src_positions)
-        # Fallback: position of targets
-        return connection_weight(cid)
-
-    node["children"] = sorted(children, key=sort_key)
+    return id_position.get(child_id, 0)
 
 
 def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_scale_h=1.0, spacing_scale_v=1.0):
