@@ -668,8 +668,9 @@ def _layout_route_connections(connections, nodes, groups=None):
                             adx = abs(dst_cx - src_cx)
                             ady = abs(dst_cy - src_cy)
                             if ady > adx * 2:
-                                # Target is mostly above/below — use natural dst_side
-                                _, natural_dst = _auto_sides(src, dst, None)
+                                # Target is mostly above/below — use natural sides
+                                natural_src, natural_dst = _auto_sides(src, dst, None)
+                                src_side = natural_src
                                 dst_side = natural_dst
                             else:
                                 # Target is to the side — use opposite
