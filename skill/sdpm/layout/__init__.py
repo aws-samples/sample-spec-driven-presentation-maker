@@ -578,9 +578,10 @@ def _layout_route_connections(connections, nodes, groups=None):
     decided_src_side = {}
 
     # Identify fan-out sources (nodes with multiple forward targets).
-    # For fan-out nodes, all arrows must exit from the same side regardless of
-    # axis mismatch, so we skip the axis compatibility check for them.
+    # For fan-out nodes, pre-compute the best exit side by majority vote
+    # of what _auto_sides would choose, preferring horizontal ("right"/"left").
     _src_target_count: dict = {}
+    _src_side_votes: dict = {}  # {src_id: {"right": n, "left": n, ...}}
     for idx, conn in enumerate(connections):
         if idx in reverse_set:
             continue
@@ -588,7 +589,23 @@ def _layout_route_connections(connections, nodes, groups=None):
             continue
         sid = conn["from"]
         _src_target_count[sid] = _src_target_count.get(sid, 0) + 1
+        src = _find_node(nodes, conn["from"])
+        dst = _find_node(nodes, conn["to"])
+        if src and dst:
+            s_side, _ = _auto_sides(src, dst, None)
+            _src_side_votes.setdefault(sid, {})
+            _src_side_votes[sid][s_side] = _src_side_votes[sid].get(s_side, 0) + 1
     fanout_sources = {sid for sid, cnt in _src_target_count.items() if cnt >= 2}
+
+    # Pre-decide side for fan-out sources: prefer "right" > "left" > majority
+    for sid in fanout_sources:
+        votes = _src_side_votes.get(sid, {})
+        if "right" in votes:
+            decided_src_side[sid] = "right"
+        elif "left" in votes:
+            decided_src_side[sid] = "left"
+        else:
+            decided_src_side[sid] = max(votes, key=votes.get) if votes else "right"
 
     conn_sides = []
     for i, conn in enumerate(connections):
