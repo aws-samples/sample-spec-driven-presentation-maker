@@ -554,7 +554,12 @@ def cmd_layout(args):
                 dy = ey - sy
                 if len(pts) >= 4 and (abs(dx) > 0 or abs(dy) > 0):
                     # 4 points: [start, bend1, bend2, end]
+                    # Determine if first segment is vertical based on points.
+                    # If points have been shifted (non-axis-aligned), fall back to
+                    # overall direction: if |dy| > |dx|, prefer V-H-V (bentConnector3)
                     seg1_vertical = abs(pts[0][0] - pts[1][0]) <= abs(pts[0][1] - pts[1][1])
+                    if abs(pts[0][0] - pts[1][0]) > 5 and abs(pts[0][1] - pts[1][1]) > 5:
+                        seg1_vertical = abs(dy) > abs(dx)
                     if seg1_vertical:
                         # V-H-V → elbowStart vertical
                         # For U-shaped detour (sy==ty), use the bend Y relative to path height
