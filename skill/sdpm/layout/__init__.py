@@ -837,28 +837,18 @@ def _layout_route_connections(connections, nodes, groups=None):
         elif dst_side == "bottom" and len(pts) >= 3 and pts[-2][1] < pts[-1][1]:
             pts[-2] = [pts[-2][0], pts[-1][1]]
 
-    # Final pass: eliminate any diagonal segments by snapping to axis-aligned
-    # Run multiple iterations since fixing one segment may create another
-    for _pass in range(5):
-        any_fixed = False
-        for e in edges:
-            pts = e["points"]
-            for k in range(1, len(pts)):
-                dx = abs(pts[k][0] - pts[k-1][0])
-                dy = abs(pts[k][1] - pts[k-1][1])
-                if dx > 3 and dy > 3:
-                    any_fixed = True
-                    if k == 1:
-                        pts[k] = [pts[k-1][0], pts[k][1]]
-                    elif k == len(pts) - 1:
-                        pts[k-1] = [pts[k-1][0], pts[k][1]]
-                    else:
-                        if dx < dy:
-                            pts[k] = [pts[k-1][0], pts[k][1]]
-                        else:
-                            pts[k] = [pts[k][0], pts[k-1][1]]
-        if not any_fixed:
-            break
+    # Final pass: eliminate diagonal segments by inserting intermediate points
+    for e in edges:
+        new_pts = [e["points"][0]]
+        pts = e["points"]
+        for k in range(1, len(pts)):
+            dx = abs(pts[k][0] - new_pts[-1][0])
+            dy = abs(pts[k][1] - new_pts[-1][1])
+            if dx > 3 and dy > 3:
+                # Insert an L-shaped intermediate: go horizontal first, then vertical
+                new_pts.append([pts[k][0], new_pts[-1][1]])
+            new_pts.append(pts[k])
+        e["points"] = new_pts
 
     return edges
 
@@ -1674,13 +1664,8 @@ def _fix_bends_inside_nodes(edges, nodes, connections):
             nx, ny = n["x"], n["y"]
             nw = n.get("width", 60)
             nh = n.get("height", 60)
-            # Check intermediate segments only (skip segments touching start/end points)
+            # Check intermediate segments (between first and last segments)
             for k in range(1, len(pts) - 2):
-                # Skip if this point is adjacent to start/end and shares an axis
-                if k == 1 and (pts[0][0] == pts[1][0] or pts[0][1] == pts[1][1]):
-                    continue
-                if k == len(pts) - 3 and (pts[-1][0] == pts[-2][0] or pts[-1][1] == pts[-2][1]):
-                    continue
                 p1 = pts[k]
                 p2 = pts[k + 1]
                 # Vertical segment: same X, check if it passes through node
@@ -1690,12 +1675,15 @@ def _fix_bends_inside_nodes(edges, nodes, connections):
                     seg_y_hi = max(p1[1], p2[1])
                     if (nx - margin < seg_x < nx + nw + margin and
                             seg_y_lo < ny + nh + margin and seg_y_hi > ny - margin):
-                        # Vertical segment passes through node
                         new_x = nx - margin - 5
-                        if k > 0 and pts[k][0] == seg_x:
-                            pts[k] = [new_x, pts[k][1]]
-                        if k + 1 < len(pts) - 1 and pts[k+1][0] == seg_x:
-                            pts[k+1] = [new_x, pts[k+1][1]]
+                        # Shift both points of this vertical segment
+                        pts[k] = [new_x, pts[k][1]]
+                        pts[k+1] = [new_x, pts[k+1][1]]
+                        # Also fix the adjacent horizontal segments to stay connected
+                        if k > 0 and abs(pts[k-1][1] - pts[k][1]) < 3:
+                            pts[k-1] = [pts[k-1][0], pts[k][1]]
+                        if k + 2 < len(pts) and abs(pts[k+1][1] - pts[k+2][1]) < 3:
+                            pts[k+2] = [pts[k+2][0], pts[k+1][1]]
                         break
                 # Horizontal segment: same Y, check if it passes through node
                 elif abs(p1[1] - p2[1]) < 3:
@@ -1704,12 +1692,14 @@ def _fix_bends_inside_nodes(edges, nodes, connections):
                     seg_x_hi = max(p1[0], p2[0])
                     if (ny - margin < seg_y < ny + nh + margin and
                             seg_x_lo < nx + nw + margin and seg_x_hi > nx - margin):
-                        # Horizontal segment passes through node
                         new_y = ny - margin - 5
-                        if k > 0 and pts[k][1] == seg_y:
-                            pts[k] = [pts[k][0], new_y]
-                        if k + 1 < len(pts) - 1 and pts[k+1][1] == seg_y:
-                            pts[k+1] = [pts[k+1][0], new_y]
+                        pts[k] = [pts[k][0], new_y]
+                        pts[k+1] = [pts[k+1][0], new_y]
+                        # Fix adjacent vertical segments
+                        if k > 0 and abs(pts[k-1][0] - pts[k][0]) < 3:
+                            pts[k-1] = [pts[k][0], pts[k-1][1]]
+                        if k + 2 < len(pts) and abs(pts[k+1][0] - pts[k+2][0]) < 3:
+                            pts[k+2] = [pts[k+1][0], pts[k+2][1]]
                         break
 
 
