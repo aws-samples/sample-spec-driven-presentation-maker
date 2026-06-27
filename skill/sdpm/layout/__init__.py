@@ -781,6 +781,34 @@ def _layout_route_connections(connections, nodes, groups=None):
     # Post-process: fix bends that ended up inside node icons after spread
     _fix_bends_inside_nodes(edges, nodes, connections)
 
+    # Final pass: fix arrows going backwards from their start/end ports
+    for ei, e in enumerate(edges):
+        pts = e["points"]
+        if len(pts) < 3:
+            continue
+        i_conn = ei if ei < len(conn_sides) else 0
+        _, _, src_side, dst_side = conn_sides[i_conn] if i_conn < len(conn_sides) else (None, None, None, None)
+
+        # If src_side is "right" but pts[1].x < pts[0].x, snap pts[1].x to pts[0].x
+        if src_side == "right" and pts[1][0] < pts[0][0]:
+            pts[1] = [pts[0][0], pts[1][1]]
+        elif src_side == "left" and pts[1][0] > pts[0][0]:
+            pts[1] = [pts[0][0], pts[1][1]]
+        elif src_side == "bottom" and pts[1][1] < pts[0][1]:
+            pts[1] = [pts[1][0], pts[0][1]]
+        elif src_side == "top" and pts[1][1] > pts[0][1]:
+            pts[1] = [pts[1][0], pts[0][1]]
+
+        # If dst_side is "left" but pts[-2].x > pts[-1].x, snap
+        if dst_side == "left" and len(pts) >= 3 and pts[-2][0] > pts[-1][0]:
+            pts[-2] = [pts[-1][0], pts[-2][1]]
+        elif dst_side == "right" and len(pts) >= 3 and pts[-2][0] < pts[-1][0]:
+            pts[-2] = [pts[-1][0], pts[-2][1]]
+        elif dst_side == "top" and len(pts) >= 3 and pts[-2][1] > pts[-1][1]:
+            pts[-2] = [pts[-2][0], pts[-1][1]]
+        elif dst_side == "bottom" and len(pts) >= 3 and pts[-2][1] < pts[-1][1]:
+            pts[-2] = [pts[-2][0], pts[-1][1]]
+
     # Final pass: eliminate any diagonal segments by snapping to axis-aligned
     for e in edges:
         pts = e["points"]
@@ -788,15 +816,11 @@ def _layout_route_connections(connections, nodes, groups=None):
             dx = abs(pts[k][0] - pts[k-1][0])
             dy = abs(pts[k][1] - pts[k-1][1])
             if dx > 3 and dy > 3:
-                # Diagonal — snap to match previous point's axis
                 if k == 1:
-                    # First segment: keep start X, snap pts[1] X to match
                     pts[k] = [pts[k-1][0], pts[k][1]]
                 elif k == len(pts) - 1:
-                    # Last segment: keep end Y, snap pts[-2] Y to match
                     pts[k-1] = [pts[k-1][0], pts[k][1]]
                 else:
-                    # Middle: snap to nearest axis
                     if dx < dy:
                         pts[k] = [pts[k-1][0], pts[k][1]]
                     else:
