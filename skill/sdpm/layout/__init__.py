@@ -722,9 +722,14 @@ def _layout_route_connections(connections, nodes, groups=None):
                     dst_node = _find_node(nodes, conn["to"])
                     if dst_node:
                         target_lefts.append(dst_node["x"])
-            if target_lefts:
-                nearest_left = min(target_lefts)
+            # Only consider targets to the right of source
+            right_targets = [x for x in target_lefts if x > src_right]
+            if right_targets:
+                nearest_left = min(right_targets)
                 fanout_bend_x[sid] = src_right + (nearest_left - src_right) * 0.45
+            elif target_lefts:
+                # All targets are to the left or same X — use a fixed offset
+                fanout_bend_x[sid] = src_right + 30
 
     edges = []
     for i, conn in enumerate(connections):
