@@ -796,10 +796,87 @@ def _layout_route_connections(connections, nodes, groups=None):
     # T8: Align bend positions for fan-out/fan-in only when "fan": "merge" is set
     _align_fan_bends(edges, conn_sides, connections)
 
-    # T9: Spread overlapping bends — currently disabled as it introduces
-    # perpendicularity violations that are difficult to repair.
-    # TODO: re-enable with proper constraint that never produces diagonals or backwards.
-    # _spread_overlapping_bends(edges, conn_sides, connections)
+    # T9: Safe bend separation — shift overlapping vertical bends apart
+    # while preserving axis-alignment (only move X of vertical segments,
+    # never touch start/end points).
+    _safe_separate_bends(edges)
+
+    return edges
+
+
+def _safe_separate_bends(edges):
+    """Separate overlapping vertical bends by shifting their X position.
+
+    Rules:
+    - Only shifts X of vertical segments (never Y of horizontal segments)
+    - Never moves pts[0] or pts[-1] (port-anchored)
+    - When shifting a vertical segment's X, also updates the adjacent horizontal
+      segments' endpoints to maintain connectivity
+    - Minimum separation: 30px between parallel vertical bends
+    """
+    MIN_SEP = 30
+
+    # Collect vertical segments: (edge_idx, seg_start_idx, x, y_lo, y_hi)
+    v_segs = []
+    for ei, e in enumerate(edges):
+        pts = e["points"]
+        if e.get("_fanout"):
+            continue
+        for k in range(len(pts) - 1):
+            if abs(pts[k][0] - pts[k+1][0]) <= 3 and abs(pts[k][1] - pts[k+1][1]) > 10:
+                # Vertical segment, not touching start/end
+                if k == 0 or k == len(pts) - 2:
+                    continue
+                x = pts[k][0]
+                y_lo = min(pts[k][1], pts[k+1][1])
+                y_hi = max(pts[k][1], pts[k+1][1])
+                v_segs.append((ei, k, x, y_lo, y_hi))
+
+    # Group vertical segments by similar X (within MIN_SEP)
+    v_segs.sort(key=lambda s: s[2])
+    groups = []
+    current_group = []
+    for seg in v_segs:
+        if current_group and abs(seg[2] - current_group[0][2]) > MIN_SEP:
+            if len(current_group) >= 2:
+                groups.append(current_group)
+            current_group = [seg]
+        else:
+            current_group.append(seg)
+    if len(current_group) >= 2:
+        groups.append(current_group)
+
+    # For each group, check if Y ranges overlap and spread X positions
+    for group in groups:
+        # Filter to segments with overlapping Y ranges
+        overlapping = []
+        for i, seg in enumerate(group):
+            for other in group[i+1:]:
+                if seg[3] < other[4] and seg[4] > other[3]:
+                    if seg not in overlapping:
+                        overlapping.append(seg)
+                    if other not in overlapping:
+                        overlapping.append(other)
+
+        if len(overlapping) < 2:
+            continue
+
+        # Spread evenly around the center X
+        center_x = sum(s[2] for s in overlapping) / len(overlapping)
+        n = len(overlapping)
+        for i, (ei, k, old_x, y_lo, y_hi) in enumerate(sorted(overlapping, key=lambda s: s[3])):
+            new_x = round(center_x + (i - (n-1)/2) * MIN_SEP)
+            if new_x == old_x:
+                continue
+            pts = edges[ei]["points"]
+            # Shift the vertical segment
+            pts[k] = [new_x, pts[k][1]]
+            pts[k+1] = [new_x, pts[k+1][1]]
+            # Fix adjacent horizontal segments
+            if k > 0 and abs(pts[k-1][1] - pts[k][1]) <= 3:
+                pts[k-1] = [pts[k-1][0], pts[k-1][1]]  # keep, connectivity maintained by polyline
+            if k+2 < len(pts) and abs(pts[k+1][1] - pts[k+2][1]) <= 3:
+                pass  # horizontal after — connectivity OK since pts[k+1] x changed
 
     # Safety net: if any diagonal segments remain, insert L-shaped intermediates
     for e in edges:
