@@ -778,6 +778,9 @@ def _layout_route_connections(connections, nodes, groups=None):
     for i, pts in fanout_saved.items():
         edges[i]["points"] = pts
 
+    # Post-process: fix bends that ended up inside node icons after spread
+    _fix_bends_inside_nodes(edges, nodes, connections)
+
     return edges
 
 
@@ -1570,6 +1573,60 @@ def _port_point(node, side, index, count, label_h):
         return [round(x + w * t), y + h + label_h]
     else:
         return [round(x + w * t), y]
+
+
+def _fix_bends_inside_nodes(edges, nodes, connections):
+    """Post-process: fix bends that pass through or graze node icons.
+
+    Checks intermediate points AND segments between them. If a vertical
+    segment at x=N would pass through a node's x-range and y-range,
+    shift the bend X to avoid it.
+    """
+    margin = 15
+    for ei, e in enumerate(edges):
+        pts = e["points"]
+        if len(pts) < 3:
+            continue
+        src_id = e.get("from", "")
+        dst_id = e.get("to", "")
+        for nid, n in nodes.items():
+            if nid == src_id or nid == dst_id:
+                continue
+            nx, ny = n["x"], n["y"]
+            nw = n.get("width", 60)
+            nh = n.get("height", 60)
+            # Check intermediate segments only (skip first and last which touch src/dst)
+            for k in range(1, len(pts) - 2):
+                p1 = pts[k]
+                p2 = pts[k + 1]
+                # Vertical segment: same X, check if it passes through node
+                if abs(p1[0] - p2[0]) < 3:
+                    seg_x = p1[0]
+                    seg_y_lo = min(p1[1], p2[1])
+                    seg_y_hi = max(p1[1], p2[1])
+                    if (nx - margin < seg_x < nx + nw + margin and
+                            seg_y_lo < ny + nh + margin and seg_y_hi > ny - margin):
+                        # Vertical segment passes through node
+                        new_x = nx - margin - 5
+                        if k > 0 and pts[k][0] == seg_x:
+                            pts[k] = [new_x, pts[k][1]]
+                        if k + 1 < len(pts) - 1 and pts[k+1][0] == seg_x:
+                            pts[k+1] = [new_x, pts[k+1][1]]
+                        break
+                # Horizontal segment: same Y, check if it passes through node
+                elif abs(p1[1] - p2[1]) < 3:
+                    seg_y = p1[1]
+                    seg_x_lo = min(p1[0], p2[0])
+                    seg_x_hi = max(p1[0], p2[0])
+                    if (ny - margin < seg_y < ny + nh + margin and
+                            seg_x_lo < nx + nw + margin and seg_x_hi > nx - margin):
+                        # Horizontal segment passes through node
+                        new_y = ny - margin - 5
+                        if k > 0 and pts[k][1] == seg_y:
+                            pts[k] = [pts[k][0], new_y]
+                        if k + 1 < len(pts) - 1 and pts[k+1][1] == seg_y:
+                            pts[k+1] = [pts[k+1][0], new_y]
+                        break
 
 
 SNAP_THRESHOLD = 5
