@@ -838,21 +838,27 @@ def _layout_route_connections(connections, nodes, groups=None):
             pts[-2] = [pts[-2][0], pts[-1][1]]
 
     # Final pass: eliminate any diagonal segments by snapping to axis-aligned
-    for e in edges:
-        pts = e["points"]
-        for k in range(1, len(pts)):
-            dx = abs(pts[k][0] - pts[k-1][0])
-            dy = abs(pts[k][1] - pts[k-1][1])
-            if dx > 3 and dy > 3:
-                if k == 1:
-                    pts[k] = [pts[k-1][0], pts[k][1]]
-                elif k == len(pts) - 1:
-                    pts[k-1] = [pts[k-1][0], pts[k][1]]
-                else:
-                    if dx < dy:
+    # Run multiple iterations since fixing one segment may create another
+    for _pass in range(5):
+        any_fixed = False
+        for e in edges:
+            pts = e["points"]
+            for k in range(1, len(pts)):
+                dx = abs(pts[k][0] - pts[k-1][0])
+                dy = abs(pts[k][1] - pts[k-1][1])
+                if dx > 3 and dy > 3:
+                    any_fixed = True
+                    if k == 1:
                         pts[k] = [pts[k-1][0], pts[k][1]]
+                    elif k == len(pts) - 1:
+                        pts[k-1] = [pts[k-1][0], pts[k][1]]
                     else:
-                        pts[k] = [pts[k][0], pts[k-1][1]]
+                        if dx < dy:
+                            pts[k] = [pts[k-1][0], pts[k][1]]
+                        else:
+                            pts[k] = [pts[k][0], pts[k-1][1]]
+        if not any_fixed:
+            break
 
     return edges
 
