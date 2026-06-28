@@ -1395,7 +1395,7 @@ def _count_all_crossings(edges):
 # just outside an icon's edge reads visually as touching/piercing it, so we
 # count it as a pierce and push it away. Kept small so legitimate adjacent
 # perpendicular stubs are not over-constrained.
-_PIERCE_INSET = -6
+_PIERCE_INSET = -9
 _PIERCE_WEIGHT = 4
 
 
