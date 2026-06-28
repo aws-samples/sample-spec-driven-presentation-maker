@@ -799,15 +799,22 @@ def _layout_route_connections(connections, nodes, groups=None):
             _src_side_votes[sid][s_side] = _src_side_votes[sid].get(s_side, 0) + 1
     fanout_sources = {sid for sid, cnt in _src_target_count.items() if cnt >= 2}
 
-    # Pre-decide side for fan-out sources: prefer "right" > "left" > majority
+    # Pre-decide a shared exit side for a fan-out source ONLY when a strict
+    # majority of its targets naturally want the same side. Forcing one side
+    # when targets are scattered (e.g. one to the right, one below-left) makes
+    # the minority arrows exit backwards through the source icon. When there is
+    # no majority, leave the source un-decided so each edge keeps its natural
+    # side. Among ties, prefer horizontal ("right" > "left") for left→right flow.
     for sid in fanout_sources:
         votes = _src_side_votes.get(sid, {})
-        if "right" in votes:
-            decided_src_side[sid] = "right"
-        elif "left" in votes:
-            decided_src_side[sid] = "left"
-        else:
-            decided_src_side[sid] = max(votes, key=votes.get) if votes else "right"
+        if not votes:
+            continue
+        total = sum(votes.values())
+        # candidate = the side with the most votes (horizontal preferred on tie)
+        ordered = sorted(votes.items(), key=lambda kv: (-kv[1], {"right": 0, "left": 1, "bottom": 2, "top": 3}.get(kv[0], 9)))
+        best_side, best_n = ordered[0]
+        if best_n > total / 2:
+            decided_src_side[sid] = best_side
 
     conn_sides = []
     for i, conn in enumerate(connections):
@@ -853,7 +860,27 @@ def _layout_route_connections(connections, nodes, groups=None):
                 v_sides = {"top", "bottom"}
                 natural_axis = "h" if src_side in h_sides else "v"
                 decided_axis = "h" if decided in h_sides else "v"
-                apply_decided = (src_id in fanout_sources) or (natural_axis == decided_axis)
+                # Never apply the decided side if the target lies on the OPPOSITE
+                # side, which would make the arrow exit backwards through the
+                # source icon (e.g. forcing "right" when the target is to the
+                # left). Check the target's actual direction relative to source.
+                decided_is_backwards = False
+                if src and dst:
+                    s_cx = src["x"] + src.get("width", 60) / 2
+                    s_cy = src["y"] + src.get("height", 60) / 2
+                    d_cx = dst["x"] + dst.get("width", 60) / 2
+                    d_cy = dst["y"] + dst.get("height", 60) / 2
+                    if decided == "right" and d_cx < s_cx:
+                        decided_is_backwards = True
+                    elif decided == "left" and d_cx > s_cx:
+                        decided_is_backwards = True
+                    elif decided == "bottom" and d_cy < s_cy:
+                        decided_is_backwards = True
+                    elif decided == "top" and d_cy > s_cy:
+                        decided_is_backwards = True
+                apply_decided = (not decided_is_backwards) and (
+                    (src_id in fanout_sources) or (natural_axis == decided_axis)
+                )
                 if apply_decided:
                     src_side = decided
                     # Fix dst_side for fan-out: use opposite side, but if dst
@@ -999,6 +1026,34 @@ def _layout_route_connections(connections, nodes, groups=None):
     # while preserving axis-alignment (only move X of vertical segments,
     # never touch start/end points).
     _safe_separate_bends(edges)
+
+    # T10: Bend optimization — slide each free (middle) bend of an elbow path
+    # along its axis to minimize a global cost (crossings + weighted icon
+    # pierces). The free bend of a 4-point VHV/HVH path can move without
+    # touching the port-anchored endpoints, so axis-alignment and
+    # perpendicularity are preserved. This is the primary crossing/pierce
+    # reducer; it never introduces diagonals or backwards segments.
+    _optimize_bends(edges, nodes)
+
+    # T11: Side/port reselection — a remaining pierce is usually a poor choice
+    # of which icon edge the arrow attaches to. Re-route each still-piercing
+    # edge through the elbow router with an alternative (src_side, dst_side),
+    # keeping it only if it lowers pierces without raising crossings. Adds no
+    # segments (unlike a detour), so it cannot cause a crossing blow-up, and
+    # endpoints stay perpendicular because every port comes from _port_point.
+    obstacles_re = [o for o in obstacles if o.get("_node")]
+    _reselect_sides(edges, nodes, obstacles_re)
+    _optimize_bends(edges, nodes)
+
+    # T12: Obstacle detour — for pierces that no side/port choice can clear
+    # (e.g. an icon stacked directly between source and target in the same
+    # column), splice an axis-aligned jog around the obstacle. Each candidate
+    # is judged against the full live edge set with a lexicographic
+    # (crossings, pierces) gate: a jog is committed only if it does not raise
+    # the global crossing count and strictly lowers pierces. The jog is
+    # spliced into the interior of a segment, so endpoints never move and no
+    # diagonal is ever produced.
+    _detour_around_pierces(edges, nodes)
 
     return edges
 
@@ -1340,6 +1395,392 @@ def _count_all_crossings(edges):
                     if _segments_intersect(pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]):
                         count += 1
     return count
+
+
+_PIERCE_INSET = 4
+_PIERCE_WEIGHT = 4
+
+
+def _seg_pierces_node(p1, p2, n):
+    """True if axis-aligned segment p1-p2 passes through node n's interior."""
+    rx, ry = n["x"], n["y"]
+    rw, rh = n.get("width", 60), n.get("height", n.get("width", 60))
+    x0, y0 = rx + _PIERCE_INSET, ry + _PIERCE_INSET
+    x1, y1 = rx + rw - _PIERCE_INSET, ry + rh - _PIERCE_INSET
+    ax, ay = p1
+    bx, by = p2
+    if ax == bx:  # vertical
+        return x0 < ax < x1 and min(ay, by) < y1 and max(ay, by) > y0
+    if ay == by:  # horizontal
+        return y0 < ay < y1 and min(ax, bx) < x1 and max(ax, bx) > x0
+    return False
+
+
+def _count_node_pierces(edges, nodes):
+    """Count (edge, node) pairs where an edge passes through a non-endpoint icon."""
+    count = 0
+    for e in edges:
+        pts = e["points"]
+        if len(pts) < 2:
+            continue
+        ignore = {e["from"], e["to"]}
+        for nid, n in nodes.items():
+            short = nid.rsplit(".", 1)[-1]
+            if nid in ignore or short in ignore:
+                continue
+            for k in range(len(pts) - 1):
+                if _seg_pierces_node(pts[k], pts[k + 1], n):
+                    count += 1
+                    break
+    return count
+
+
+def _edge_free_bend(pts):
+    """Return ('x'|'y', lo, hi) for the movable middle bend of a 4-point elbow.
+
+    A VHV/HVH path's two middle points share one coordinate (the trunk
+    position) that can slide between the two endpoints without moving the
+    port-anchored endpoints or creating diagonals. Returns None for paths
+    that have no such free bend (straight lines, detours, fan-outs).
+    """
+    if len(pts) != 4:
+        return None
+    # HVH: horiz, vert, horiz → middle two points share X (vertical trunk)
+    if pts[0][1] == pts[1][1] and pts[1][0] == pts[2][0] and pts[2][1] == pts[3][1]:
+        return ("x", pts[0][0], pts[3][0])
+    # VHV: vert, horiz, vert → middle two points share Y (horizontal trunk)
+    if pts[0][0] == pts[1][0] and pts[1][1] == pts[2][1] and pts[2][0] == pts[3][0]:
+        return ("y", pts[0][1], pts[3][1])
+    return None
+
+
+_BEND_OPT_PASSES = 40
+_BEND_OPT_STEP = 4
+_BEND_OPT_INSET = 6
+
+
+def _optimize_bends(edges, nodes):
+    """Slide free elbow bends to minimize global crossings + weighted pierces.
+
+    Coordinate descent: repeatedly try shifting each edge's free middle bend
+    to a range of candidate positions between its endpoints, keep the best.
+    Only the two middle points of a 4-point VHV/HVH path move, and only along
+    the trunk axis, so endpoints stay port-anchored and no diagonals appear.
+    Skips fan-out edges (they share a deliberate trunk) and detours.
+    """
+    if not edges:
+        return edges
+
+    def cost(es):
+        return _count_all_crossings(es) + _PIERCE_WEIGHT * _count_node_pierces(es, nodes)
+
+    cur_cost = cost(edges)
+    for _ in range(_BEND_OPT_PASSES):
+        improved = False
+        for e in edges:
+            # Fan-out edges start on a shared trunk but are still free to be
+            # refined individually; optimizing them too reduces crossings
+            # without breaking axis-alignment (their middle bend is free).
+            fv = _edge_free_bend(e["points"])
+            if not fv:
+                continue
+            axis, lo, hi = fv
+            lo, hi = min(lo, hi), max(lo, hi)
+            if hi - lo < 2 * _BEND_OPT_INSET:
+                continue
+            idx = 0 if axis == "x" else 1
+            orig = e["points"][1][idx]
+            best_val = orig
+            best_cost = cur_cost
+            cand = int(lo) + _BEND_OPT_INSET
+            while cand < int(hi) - _BEND_OPT_INSET:
+                if cand != orig:
+                    saved1, saved2 = e["points"][1][idx], e["points"][2][idx]
+                    e["points"][1][idx] = cand
+                    e["points"][2][idx] = cand
+                    c = cost(edges)
+                    if c < best_cost:
+                        best_cost = c
+                        best_val = cand
+                    e["points"][1][idx] = saved1
+                    e["points"][2][idx] = saved2
+                cand += _BEND_OPT_STEP
+            if best_val != orig:
+                e["points"][1][idx] = best_val
+                e["points"][2][idx] = best_val
+                cur_cost = best_cost
+                improved = True
+        if not improved:
+            break
+    return edges
+
+
+_SIDE_RESELECT_PASSES = 6
+# (port_index, port_count): center, then 1/4, 1/2, 3/4 along the edge.
+_PORT_TRIALS = [(0, 1), (0, 3), (1, 3), (2, 3)]
+
+
+def _candidate_side_pairs(src, dst):
+    """Geometrically sane (src_side, dst_side) pairs; natural pair first.
+
+    A "sane" side points toward the target — never away from it (which would
+    force a backwards U-turn). For a target down-and-right of the source this
+    yields src in {right, bottom} and dst in {left, top}.
+    """
+    s_cx = src["x"] + src.get("width", 60) / 2
+    s_cy = src["y"] + src.get("height", 60) / 2
+    d_cx = dst["x"] + dst.get("width", 60) / 2
+    d_cy = dst["y"] + dst.get("height", 60) / 2
+    src_sides, dst_sides = [], []
+    if d_cx >= s_cx:
+        src_sides.append("right")
+        dst_sides.append("left")
+    if d_cx <= s_cx:
+        src_sides.append("left")
+        dst_sides.append("right")
+    if d_cy >= s_cy:
+        src_sides.append("bottom")
+        dst_sides.append("top")
+    if d_cy <= s_cy:
+        src_sides.append("top")
+        dst_sides.append("bottom")
+    pairs = []
+    nat = _auto_sides(src, dst, None)
+    pairs.append(nat)
+    for s in dict.fromkeys(src_sides):
+        for d in dict.fromkeys(dst_sides):
+            if (s, d) not in pairs:
+                pairs.append((s, d))
+    return pairs
+
+
+def _is_axis_aligned(pts):
+    return all(
+        pts[k][0] == pts[k + 1][0] or pts[k][1] == pts[k + 1][1]
+        for k in range(len(pts) - 1)
+    )
+
+
+def _entry_exit_ok(pts, src_side, dst_side):
+    """First segment perpendicular to src edge, last to dst edge (no backwards).
+
+    Rejects degenerate zero-length leading/trailing segments, which would
+    otherwise read as both horizontal and vertical and let a parallel
+    (non-perpendicular) run slip through.
+    """
+    if len(pts) < 2:
+        return False
+    if pts[0] == pts[1] or pts[-1] == pts[-2]:
+        return False
+    first_h = pts[0][1] == pts[1][1]
+    last_h = pts[-1][1] == pts[-2][1]
+    src_h = src_side in ("left", "right")
+    dst_h = dst_side in ("left", "right")
+    return (first_h == src_h) and (last_h == dst_h)
+
+
+def _edge_pierces(e, nodes):
+    """True if edge e passes through any non-endpoint icon interior."""
+    pts = e["points"]
+    if len(pts) < 2:
+        return False
+    ignore = {e["from"], e["to"]}
+    for nid, n in nodes.items():
+        short = nid.rsplit(".", 1)[-1]
+        if nid in ignore or short in ignore:
+            continue
+        if any(_seg_pierces_node(pts[k], pts[k + 1], n) for k in range(len(pts) - 1)):
+            return True
+    return False
+
+
+def _path_stability(pts):
+    """Tie-break key: prefer fewer, shorter segments."""
+    length = sum(
+        abs(pts[k + 1][0] - pts[k][0]) + abs(pts[k + 1][1] - pts[k][1])
+        for k in range(len(pts) - 1)
+    )
+    return (len(pts), length)
+
+
+def _reselect_sides(edges, nodes, obstacles):
+    """Remove pierces by re-choosing icon side/port, never by adding segments.
+
+    For each still-piercing edge, re-route via the elbow router using
+    alternative (src_side, dst_side) pairs and port positions. Accept the
+    alternative only if it does not raise the global crossing count and
+    strictly lowers the global (crossings, pierces) tuple. Because crossings
+    is a hard ceiling, structural pierces (where every alternative raises
+    crossings) are correctly left untouched. Endpoints stay perpendicular
+    because they come from _port_point; no diagonals because _elbow_path only
+    emits H/V segments.
+    """
+    for _ in range(_SIDE_RESELECT_PASSES):
+        piercing = [
+            ei for ei, e in enumerate(edges)
+            if not e.get("_fanout") and len(e["points"]) >= 2 and _edge_pierces(e, nodes)
+        ]
+        piercing.sort(key=lambda ei: (edges[ei]["from"], edges[ei]["to"]))
+        committed = False
+
+        for ei in piercing:
+            e = edges[ei]
+            src = _find_node(nodes, e["from"])
+            dst = _find_node(nodes, e["to"])
+            if not src or not dst:
+                continue
+            obs_excl = [o for o in obstacles if o.get("_node") not in (e["from"], e["to"])]
+            label_h = 30 if src.get("label") else 0
+
+            base = (_count_all_crossings(edges), _count_node_pierces(edges, nodes))
+            orig_pts = e["points"]
+            best_pts = None
+            best_score = base
+
+            for (s_side, d_side) in _candidate_side_pairs(src, dst):
+                for (si, sc) in _PORT_TRIALS:
+                    for (qi, qc) in _PORT_TRIALS:
+                        sp = _port_point(src, s_side, si, sc, label_h)
+                        tp = _port_point(dst, d_side, qi, qc, label_h)
+                        cand = _elbow_path(sp, tp, s_side, d_side, obs_excl)
+                        if not _is_axis_aligned(cand):
+                            continue
+                        if not _entry_exit_ok(cand, s_side, d_side):
+                            continue
+                        e["points"] = cand
+                        score = (_count_all_crossings(edges), _count_node_pierces(edges, nodes))
+                        e["points"] = orig_pts
+                        # Hard ceiling on crossings; lexicographic improvement;
+                        # tie-break on stability ONLY among equal-score candidates.
+                        if score[0] > base[0]:
+                            continue
+                        better = (
+                            score < best_score
+                            or (best_pts is not None and score == best_score
+                                and _path_stability(cand) < _path_stability(best_pts))
+                        )
+                        if better:
+                            best_score = score
+                            best_pts = cand
+
+            if best_pts is not None and best_score < base and best_score[0] <= base[0]:
+                e["points"] = best_pts
+                committed = True
+
+        if not committed:
+            break
+    return edges
+
+
+_DETOUR_FACE_MARGIN = 18
+_DETOUR_PASSES = 6
+
+
+def _jog_candidates(seg_a, seg_b, n):
+    """Axis-aligned bracket detours around node n for piercing segment a->b.
+
+    Returns replacement point-lists that splice into the segment interior:
+    a -> (parallel run past one face of n) -> b. Every introduced segment is
+    horizontal or vertical, and seg_a/seg_b are preserved verbatim, so true
+    endpoints (when a/b are pts[0]/pts[-1]) never move. A candidate is
+    discarded when the obstacle extends past the segment's own span (the jog
+    would need to move an endpoint), guaranteeing the splice stays interior.
+    """
+    nx0, ny0 = n["x"], n["y"]
+    nx1 = nx0 + n.get("width", 60)
+    ny1 = ny0 + n.get("height", n.get("width", 60))
+    m = _DETOUR_FACE_MARGIN
+    out = []
+    if seg_a[0] == seg_b[0]:  # vertical segment at x=X -> jog left/right
+        x = seg_a[0]
+        y_lo, y_hi = min(seg_a[1], seg_b[1]), max(seg_a[1], seg_b[1])
+        # Bracket arms run parallel just past the obstacle's vertical extent,
+        # clamped to stay strictly inside the segment span so the splice never
+        # moves an endpoint. If the obstacle protrudes past an end, clamp the
+        # arm to that endpoint (collapsing the stub to zero length there).
+        b_lo = max(y_lo, ny0 - m)
+        b_hi = min(y_hi, ny1 + m)
+        if b_lo >= b_hi:
+            return out  # no overlap to bracket
+        for cx in (nx0 - m, nx1 + m):
+            out.append([list(seg_a), [x, b_lo], [cx, b_lo], [cx, b_hi], [x, b_hi], list(seg_b)])
+    elif seg_a[1] == seg_b[1]:  # horizontal segment at y=Y -> jog up/down
+        y = seg_a[1]
+        x_lo, x_hi = min(seg_a[0], seg_b[0]), max(seg_a[0], seg_b[0])
+        b_lo = max(x_lo, nx0 - m)
+        b_hi = min(x_hi, nx1 + m)
+        if b_lo >= b_hi:
+            return out
+        for cy in (ny0 - m, ny1 + m):
+            out.append([list(seg_a), [b_lo, y], [b_lo, cy], [b_hi, cy], [b_hi, y], list(seg_b)])
+    return out
+
+
+def _detour_around_pierces(edges, nodes):
+    """Splice obstacle jogs to clear pierces no side/port choice can fix.
+
+    Greedy, one commit at a time, re-measuring the full live edge set after
+    every tentative change. A jog is committed only if the global
+    (crossings, pierces) tuple strictly improves AND crossings does not rise.
+    This makes crossings monotone non-increasing — the separate-pass blow-up
+    (where locally-accepted jogs interacted to raise global crossings) cannot
+    recur. Structural pierces, whose every jog raises crossings, are left.
+    """
+    if not edges:
+        return edges
+
+    def cost(es):
+        return (_count_all_crossings(es), _count_node_pierces(es, nodes))
+
+    for _ in range(_DETOUR_PASSES):
+        cur = cost(edges)
+        if cur[1] == 0:
+            break
+        improved = False
+
+        for e in edges:
+            # Fan-out edges are eligible: a jog around an obstacle does not
+            # break the shared-trunk concept, and the global gate below only
+            # commits it when it strictly helps.
+            pts = e["points"]
+            if len(pts) < 2:
+                continue
+            ignore = {e["from"], e["to"]}
+            base = cost(edges)
+            best_pts = None
+            best_score = base
+            # Scan each segment for a pierced obstacle; build jog candidates.
+            for k in range(len(pts) - 1):
+                seg_a, seg_b = pts[k], pts[k + 1]
+                for nid, n in nodes.items():
+                    short = nid.rsplit(".", 1)[-1]
+                    if nid in ignore or short in ignore:
+                        continue
+                    if not _seg_pierces_node(seg_a, seg_b, n):
+                        continue
+                    for repl in _jog_candidates(seg_a, seg_b, n):
+                        cand = pts[:k + 1] + repl[1:-1] + pts[k + 1:]
+                        if not _is_axis_aligned(cand):
+                            continue
+                        saved = e["points"]
+                        e["points"] = cand
+                        score = cost(edges)
+                        e["points"] = saved
+                        if score[0] > base[0]:
+                            continue
+                        if score < best_score or (
+                            best_pts is not None and score == best_score
+                            and _path_stability(cand) < _path_stability(best_pts)
+                        ):
+                            best_score = score
+                            best_pts = cand
+            if best_pts is not None and best_score < base and best_score[0] <= base[0]:
+                e["points"] = best_pts
+                improved = True
+
+        if not improved:
+            break
+    return edges
 
 
 _MIN_BEND_SEPARATION = 40
