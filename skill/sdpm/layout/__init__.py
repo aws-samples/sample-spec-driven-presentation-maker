@@ -876,8 +876,8 @@ def _layout_route_connections(connections, nodes, groups=None):
 
     conn_sides = []
     for i, conn in enumerate(connections):
-        src = _find_node(nodes, conn["from"])
-        dst = _find_node(nodes, conn["to"])
+        src, _src_is_grp = _find_endpoint(nodes, groups, conn["from"])
+        dst, _dst_is_grp = _find_endpoint(nodes, groups, conn["to"])
         if not src or not dst:
             conn_sides.append((None, None, None, None))
             continue
@@ -1058,6 +1058,12 @@ def _layout_route_connections(connections, nodes, groups=None):
             edges.append({"from": conn["from"], "to": conn["to"], "label": conn.get("label", ""), "points": []})
             continue
 
+        # Group endpoints: the port sits on the group's box edge (no label
+        # offset), and the line is allowed to enter the box — so the group's
+        # own member icons are excluded from this edge's obstacles.
+        src_is_grp = _find_node(nodes, conn["from"]) is None
+        dst_is_grp = _find_node(nodes, conn["to"]) is None
+
         is_fanout_edge = False
         if i in reverse_set:
             src_node = _find_node(nodes, conn["from"])
@@ -1068,9 +1074,12 @@ def _layout_route_connections(connections, nodes, groups=None):
             tp = _port_point(dst_node, "bottom", 0, 1, label_h_dst)
             points = _detour_path(sp, tp, "bottom", "bottom", global_bottom)
         else:
-            label_h = 30 if src.get("label") else 0
-            sp = _port_point(src, src_side, port_indices[(i, conn["from"])], port_counts[(conn["from"], src_side)], label_h)
-            tp = _port_point(dst, dst_side, port_indices[(i, conn["to"])], port_counts[(conn["to"], dst_side)], label_h)
+            # A group port uses no label height; a node port offsets the bottom
+            # edge by the label band.
+            src_label_h = 0 if src_is_grp else (30 if src.get("label") else 0)
+            dst_label_h = 0 if dst_is_grp else (30 if dst.get("label") else 0)
+            sp = _port_point(src, src_side, port_indices[(i, conn["from"])], port_counts[(conn["from"], src_side)], src_label_h)
+            tp = _port_point(dst, dst_side, port_indices[(i, conn["to"])], port_counts[(conn["to"], dst_side)], dst_label_h)
 
             # Route every edge with the standard elbow path. The downstream
             # bend optimizer, side reselection, and detour passes shape each
@@ -1078,9 +1087,21 @@ def _layout_route_connections(connections, nodes, groups=None):
             # no longer special-cased because, when targets sit on a row with
             # an obstacle between them, a fixed trunk grazes that obstacle and
             # no trunk position can avoid it (only a detour can).
-            conn_obs = [o for o in obstacles if o.get("_node") not in (conn["from"], conn["to"])]
+            excl = {conn["from"], conn["to"]}
+            # Connecting to/from a group means the line may pass into that
+            # group's box — exclude the group's member icons (and the group
+            # box itself) from this edge's obstacles.
+            if src_is_grp:
+                excl |= _group_member_ids(nodes, groups, conn["from"])
+            if dst_is_grp:
+                excl |= _group_member_ids(nodes, groups, conn["to"])
+            conn_obs = [o for o in obstacles if o.get("_node") not in excl]
             points = _elbow_path(sp, tp, src_side, dst_side, conn_obs)
         edge_entry = {"from": conn["from"], "to": conn["to"], "label": conn.get("label", ""), "points": points}
+        if src_is_grp:
+            edge_entry["_src_group"] = conn["from"]
+        if dst_is_grp:
+            edge_entry["_dst_group"] = conn["to"]
         edges.append(edge_entry)
 
     # T8: Merge fan-out/fan-in groups onto a unified port + shared trunk when
@@ -2796,6 +2817,65 @@ def _find_node(nodes, node_id):
         if nid.endswith("." + node_id):
             return n
     return None
+
+
+def _find_group(groups, gid):
+    """Resolve a group by id (qualified or short), if groups is provided."""
+    if not groups:
+        return None
+    if gid in groups:
+        return groups[gid]
+    for g_id, g in groups.items():
+        if g_id.endswith("." + gid):
+            return g
+    return None
+
+
+def _find_endpoint(nodes, groups, eid):
+    """Resolve a connection endpoint that may be a node OR a group.
+
+    Returns (geom, is_group): geom is a dict with x/y/width/height (both nodes
+    and laid-out groups carry these), is_group flags a group target so callers
+    can treat the box edge as the port and skip the group's own children as
+    obstacles. A node takes precedence over a group with the same id.
+    """
+    n = _find_node(nodes, eid)
+    if n is not None:
+        return n, False
+    g = _find_group(groups, eid)
+    if g is not None:
+        return g, True
+    return None, False
+
+
+def _group_qualified_id(groups, gid):
+    """Return the fully-qualified key of group gid in the flat groups dict."""
+    if not groups:
+        return None
+    if gid in groups:
+        return gid
+    for g_id in groups:
+        if g_id.endswith("." + gid):
+            return g_id
+    return None
+
+
+def _group_member_ids(nodes, groups, gid):
+    """Short ids of all leaf nodes inside group gid (for obstacle exclusion).
+
+    The collected `groups` dict stores children as qualified id strings, and
+    every leaf node inside the group is a key in `nodes` prefixed by the
+    group's qualified id. We match on that prefix.
+    """
+    qid = _group_qualified_id(groups, gid)
+    if not qid:
+        return set()
+    prefix = qid + "."
+    out = set()
+    for nid in nodes:
+        if nid == qid or nid.startswith(prefix):
+            out.add(nid.rsplit(".", 1)[-1])
+    return out
 
 
 def _auto_sides(src, dst, group_direction=None):
