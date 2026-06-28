@@ -773,7 +773,11 @@ def _layout_route_connections(connections, nodes, groups=None):
             dst_cy = dst["y"] + dst.get("height", 60) / 2
             dx = src["x"] - (dst["x"] + dst["width"])
             dy = abs(dst_cy - src_cy)
-            if dx > dy * 0.5:
+            # Only treat as a reverse-flow (U-shaped detour) when the target is
+            # to the left AND roughly on the same row — a genuine feedback loop.
+            # If the target is also well above/below, a normal elbow routes it
+            # cleanly; the U-detour would wrap awkwardly into the wrong edge.
+            if dx > dy * 2:
                 reverse_set.add(i)
 
     # Track decided sides per source node to ensure consistency for fan-out
@@ -865,6 +869,12 @@ def _layout_route_connections(connections, nodes, groups=None):
                 # source icon (e.g. forcing "right" when the target is to the
                 # left). Check the target's actual direction relative to source.
                 decided_is_backwards = False
+                # Whether the decided side's axis matches the target's DOMINANT
+                # direction. Forcing a vertical (top/bottom) exit toward a target
+                # that is primarily to the side (or vice-versa) makes the arrow
+                # wrap awkwardly around the target — so only force when the axes
+                # agree, even for fan-out sources.
+                decided_axis_matches_target = True
                 if src and dst:
                     s_cx = src["x"] + src.get("width", 60) / 2
                     s_cy = src["y"] + src.get("height", 60) / 2
@@ -878,8 +888,14 @@ def _layout_route_connections(connections, nodes, groups=None):
                         decided_is_backwards = True
                     elif decided == "top" and d_cy > s_cy:
                         decided_is_backwards = True
-                apply_decided = (not decided_is_backwards) and (
-                    (src_id in fanout_sources) or (natural_axis == decided_axis)
+                    adx = abs(d_cx - s_cx)
+                    ady = abs(d_cy - s_cy)
+                    target_axis = "h" if adx >= ady else "v"
+                    decided_axis_matches_target = (target_axis == decided_axis)
+                apply_decided = (
+                    (not decided_is_backwards)
+                    and decided_axis_matches_target
+                    and ((src_id in fanout_sources) or (natural_axis == decided_axis))
                 )
                 if apply_decided:
                     src_side = decided
