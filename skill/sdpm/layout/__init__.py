@@ -1110,7 +1110,7 @@ def _layout_route_connections(connections, nodes, groups=None):
     # trunks untouched. Crossing avoidance for merged fans comes from placement
     # (the order/direction search) and from routing the OTHER edges around the
     # fixed trunks — not from un-merging them.
-    _align_fan_bends(edges, conn_sides, connections, nodes)
+    _align_fan_bends(edges, conn_sides, connections, nodes, groups)
 
     # T9: Safe bend separation — shift overlapping vertical bends apart
     # while preserving axis-alignment (only move X of vertical segments,
@@ -1213,6 +1213,10 @@ def _align_group_bus(edges, nodes, groups):
     bundles = {}
     for e in edges:
         if len(e["points"]) < 2:
+            continue
+        # A fan-merged group edge is already a deliberate single-trunk bundle;
+        # leave it to the fan layout, don't re-bundle it here.
+        if e.get("_fan_locked"):
             continue
         if e.get("_dst_group"):
             bundles.setdefault((e["_dst_group"], "dst"), []).append(e)
@@ -1624,7 +1628,7 @@ def _heuristic_port_sort(conn_indices, nid, side, port_indices, conn_sides, conn
 _FAN_SPREAD_LIMIT = 600
 
 
-def _align_fan_bends(edges, conn_sides, connections, nodes=None):
+def _align_fan_bends(edges, conn_sides, connections, nodes=None, groups=None):
     """Align bend positions and merge ports for fan-out and fan-in groups.
 
     Only activates when connections have "fan": "merge" set. A merged group is
@@ -1638,6 +1642,23 @@ def _align_fan_bends(edges, conn_sides, connections, nodes=None):
     optimizers (bend slide, side reselect, detour) leave its trunk alone — the
     merge is the spec, and crossing reduction must work AROUND it, not undo it.
     """
+    def _apply_fan_guarded(indices, mode):
+        # Apply the merge, but ROLL BACK if it makes the bundle's own edges
+        # pierce icons (e.g. sources stacked in line with the hub — forcing them
+        # onto one trunk drives the upper source's stub through the lower one)
+        # or raises total crossings. The merge is desirable only when the spokes
+        # are spread perpendicular to the hub; otherwise individual routing wins.
+        snap = {j: list(map(list, edges[j]["points"])) for j in indices}
+        before_p = _count_node_pierces([edges[j] for j in indices], nodes)
+        before_c = _count_all_crossings(edges)
+        _rewrite_fan(edges, conn_sides, indices, mode=mode, nodes=nodes, groups=groups)
+        after_p = _count_node_pierces([edges[j] for j in indices], nodes)
+        after_c = _count_all_crossings(edges)
+        if after_p > before_p or after_c > before_c:
+            for j in indices:
+                edges[j]["points"] = snap[j]
+                edges[j].pop("_fan_locked", None)
+
     # Fan-out: group purely by source node (side decided later by vote).
     src_groups = {}
     for i, (src, dst, src_side, dst_side) in enumerate(conn_sides):
@@ -1650,7 +1671,7 @@ def _align_fan_bends(edges, conn_sides, connections, nodes=None):
     for indices in src_groups.values():
         if len(indices) < 2:
             continue
-        _rewrite_fan(edges, conn_sides, indices, mode="fan_out", nodes=nodes)
+        _apply_fan_guarded(indices, "fan_out")
 
     # Fan-in: group purely by target node.
     dst_groups = {}
@@ -1664,7 +1685,7 @@ def _align_fan_bends(edges, conn_sides, connections, nodes=None):
     for indices in dst_groups.values():
         if len(indices) < 2:
             continue
-        _rewrite_fan(edges, conn_sides, indices, mode="fan_in", nodes=nodes)
+        _apply_fan_guarded(indices, "fan_in")
 
 
 _MAX_RESOLVE_ITERATIONS = 30
@@ -2775,7 +2796,7 @@ def _fan_side_vote(edges, conn_sides, indices, mode):
     return sorted(votes.items(), key=lambda kv: (-kv[1], pref.get(kv[0], 9)))[0][0]
 
 
-def _rewrite_fan(edges, conn_sides, indices, mode, nodes=None):
+def _rewrite_fan(edges, conn_sides, indices, mode, nodes=None, groups=None):
     """Force a fan-out/fan-in group onto a unified port and a shared trunk.
 
     The merge is a hard constraint (the LLM asked for it), so we rebuild every
@@ -2783,23 +2804,25 @@ def _rewrite_fan(edges, conn_sides, indices, mode, nodes=None):
       - one shared port on the hub node (computed from node geometry, centered),
       - a shared trunk coordinate (all edges bend at the same line),
       - the spoke then peels off to each individual target/source.
-    Edges that had become detours (len>4) are rebuilt too. Each edge is tagged
-    `_fan_locked` with the trunk axis/value so downstream optimizers don't undo
-    the alignment.
+    The hub may be a NODE or a GROUP (box) — both expose x/y/width/height, so a
+    group hub gets a single shared port on its box edge just like a node. Edges
+    that had become detours (len>4) are rebuilt too. Each edge is tagged
+    `_fan_locked` so downstream optimizers don't undo the alignment.
     """
     if not indices:
         return
     side = _fan_side_vote(edges, conn_sides, indices, mode)
     vertical = side in ("top", "bottom")
 
-    # Resolve the hub node (shared end) and its geometry for an exact port.
+    # Resolve the hub (shared end) — node OR group — and its geometry.
     hub_id = edges[indices[0]]["from"] if mode == "fan_out" else edges[indices[0]]["to"]
-    hub = _find_node(nodes, hub_id) if nodes else None
+    hub, hub_is_group = _find_endpoint(nodes or {}, groups or {}, hub_id)
 
     # Unified port point on the hub edge, centered along that edge.
     if hub is not None:
         hx, hy, hw, hh = hub["x"], hub["y"], hub["width"], hub["height"]
-        label_h = 30 if hub.get("label") else 0
+        # A group port sits on the box edge (no label band offset).
+        label_h = 0 if hub_is_group else (30 if hub.get("label") else 0)
         if side == "right":
             port = [hx + hw, hy + hh // 2]
         elif side == "left":
@@ -2843,9 +2866,9 @@ def _rewrite_fan(edges, conn_sides, indices, mode, nodes=None):
     # router first picked, which left planner exiting "right" and coder "left").
     # The spoke side is the side facing the trunk: opposite the hub side for the
     # spoke's own port normal.
-    def spoke_port(node, sside):
+    def spoke_port(node, sside, is_group):
         nx, ny, nw, nh = node["x"], node["y"], node["width"], node["height"]
-        nlabel_h = 30 if node.get("label") else 0
+        nlabel_h = 0 if is_group else (30 if node.get("label") else 0)
         if sside == "bottom":
             return [nx + nw // 2, ny + nh + nlabel_h]
         if sside == "top":
@@ -2855,9 +2878,10 @@ def _rewrite_fan(edges, conn_sides, indices, mode, nodes=None):
         return [nx, ny + nh // 2]  # left
 
     for i in indices:
-        # spoke node = the per-edge individual end (target for fan-out, source for fan-in)
+        # spoke end = the per-edge individual end (target for fan-out, source for
+        # fan-in); it may itself be a node OR a group.
         spoke_id = edges[i]["to"] if mode == "fan_out" else edges[i]["from"]
-        spoke_node = _find_node(nodes, spoke_id) if nodes else None
+        spoke_node, spoke_is_group = _find_endpoint(nodes or {}, groups or {}, spoke_id)
         pts = edges[i]["points"]
 
         # Decide which spoke edge faces the trunk. The trunk is a line on the
@@ -2872,7 +2896,7 @@ def _rewrite_fan(edges, conn_sides, indices, mode, nodes=None):
             s_side = "right" if trunk_v >= ref else "left"
 
         if spoke_node is not None:
-            spoke_pt = spoke_port(spoke_node, s_side)
+            spoke_pt = spoke_port(spoke_node, s_side, spoke_is_group)
         else:
             spoke_pt = list(pts[-1] if mode == "fan_out" else pts[0])
 
