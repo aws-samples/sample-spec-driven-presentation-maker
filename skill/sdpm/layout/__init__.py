@@ -1643,18 +1643,21 @@ def _align_fan_bends(edges, conn_sides, connections, nodes=None, groups=None):
     merge is the spec, and crossing reduction must work AROUND it, not undo it.
     """
     def _apply_fan_guarded(indices, mode):
-        # Apply the merge, but ROLL BACK if it makes the bundle's own edges
-        # pierce icons (e.g. sources stacked in line with the hub — forcing them
-        # onto one trunk drives the upper source's stub through the lower one)
-        # or raises total crossings. The merge is desirable only when the spokes
-        # are spread perpendicular to the hub; otherwise individual routing wins.
+        # The user wants same-purpose edges merged, so a merge that adds only a
+        # MODEST number of crossings is kept (a tidy trunk reads better than a
+        # few crossings). Roll back when:
+        #   - the bundle's own edges PIERCE icons (genuinely broken, e.g. sources
+        #     stacked in line with the hub), or
+        #   - the merge adds MORE crossings than the bundle size — a sign the
+        #     trunk is fighting another structure (e.g. a hub that is both a
+        #     fan-in and fan-out target), where separate routing is cleaner.
         snap = {j: list(map(list, edges[j]["points"])) for j in indices}
         before_p = _count_node_pierces([edges[j] for j in indices], nodes)
         before_c = _count_all_crossings(edges)
         _rewrite_fan(edges, conn_sides, indices, mode=mode, nodes=nodes, groups=groups)
         after_p = _count_node_pierces([edges[j] for j in indices], nodes)
         after_c = _count_all_crossings(edges)
-        if after_p > before_p or after_c > before_c:
+        if after_p > before_p or (after_c - before_c) > len(indices):
             for j in indices:
                 edges[j]["points"] = snap[j]
                 edges[j].pop("_fan_locked", None)
@@ -1729,20 +1732,55 @@ def _find_first_crossing(edges):
     return None
 
 
+def _segments_overlap_collinear(a1, a2, b1, b2):
+    """True if the two axis-aligned segments lie on the same line and overlap
+    (as opposed to crossing perpendicularly)."""
+    if a1[1] == a2[1] and b1[1] == b2[1] and a1[1] == b1[1]:  # both horizontal, same Y
+        a_min, a_max = min(a1[0], a2[0]), max(a1[0], a2[0])
+        b_min, b_max = min(b1[0], b2[0]), max(b1[0], b2[0])
+        return min(a_max, b_max) - max(a_min, b_min) > 5
+    if a1[0] == a2[0] and b1[0] == b2[0] and a1[0] == b1[0]:  # both vertical, same X
+        a_min, a_max = min(a1[1], a2[1]), max(a1[1], a2[1])
+        b_min, b_max = min(b1[1], b2[1]), max(b1[1], b2[1])
+        return min(a_max, b_max) - max(a_min, b_min) > 5
+    return False
+
+
 def _count_all_crossings(edges):
-    """Count total crossing pairs across all edges."""
+    """Count crossing pairs across all edges.
+
+    Two edges that SHARE an endpoint node (a fan-out from the same source or a
+    fan-in to the same target) are allowed to run on top of each other on their
+    shared trunk — that overlap IS the merged bundle, not a crossing. So for
+    such pairs we ignore collinear overlaps and only count a genuine
+    perpendicular crossing. Unrelated edges still count overlaps (two separate
+    arrows drawn on the same line read as a defect)."""
     count = 0
     for i in range(len(edges)):
         pts_i = edges[i]["points"]
         if len(pts_i) < 2:
             continue
+        ei = edges[i]
         for j in range(i + 1, len(edges)):
             pts_j = edges[j]["points"]
             if len(pts_j) < 2:
                 continue
+            ej = edges[j]
+            shares_endpoint = (
+                ei.get("from") == ej.get("from")
+                or ei.get("to") == ej.get("to")
+                or ei.get("from") == ej.get("to")
+                or ei.get("to") == ej.get("from")
+            )
             for si in range(len(pts_i) - 1):
                 for sj in range(len(pts_j) - 1):
                     if _segments_intersect(pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]):
+                        # A shared-endpoint bundle's collinear overlap is the
+                        # intended trunk, not a crossing.
+                        if shares_endpoint and _segments_overlap_collinear(
+                            pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]
+                        ):
+                            continue
                         count += 1
     return count
 
