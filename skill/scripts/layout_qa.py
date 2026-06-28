@@ -122,11 +122,17 @@ def measure(tree, target_w=1720, target_h=800):
     diagonals = []
     bad_ports = []
     backwards = []
+    wirelength = 0.0
 
     for e in edges:
         pts = e["points"]
         if len(pts) < 2:
             continue
+
+        # total wire length (paths are axis-aligned, so Manhattan == polyline
+        # length). Minimizing this clusters connected icons together.
+        for k in range(len(pts) - 1):
+            wirelength += abs(pts[k][0] - pts[k + 1][0]) + abs(pts[k][1] - pts[k + 1][1])
         ig = {e["from"], e["to"]}
         src = _find_node(nodes, e["from"])
         dst = _find_node(nodes, e["to"])
@@ -180,13 +186,36 @@ def measure(tree, target_w=1720, target_h=800):
             if (not exp_horiz) and not vert:
                 bad_ports.append((f"dst {e['to'].rsplit('.',1)[-1]}", ds, "not-vertical"))
 
-    return {
+    w, h = rb[2], rb[3]
+    diag = (w * w + h * h) ** 0.5 or 1.0
+    # normalize wirelength by the canvas diagonal so the soft term is
+    # comparable across differently-sized candidate layouts.
+    wire_norm = wirelength / diag
+    aspect = (w / h) if h else 0.0
+
+    # Overflow: how far the laid-out bounds exceed the slide frame after
+    # scale-to-fit. A tall (vertical-root) layout can stop shrinking once its
+    # icons+labels hit their minimum size, leaving height > target_h — those
+    # icons render off-slide. This is unusable regardless of crossing count,
+    # so it ranks ABOVE crossings in the score. Expressed as a fraction of
+    # the target dimension (0 == fits).
+    overflow = 0.0
+    if target_w and w > target_w:
+        overflow += (w - target_w) / target_w
+    if target_h and h > target_h:
+        overflow += (h - target_h) / target_h
+
+    result = {
         "crossings": crossings,
         "pierces": len(pierces),
         "diagonals": len(diagonals),
         "bad_ports": len(bad_ports),
         "backwards": len(backwards),
-        "size": [round(rb[2]), round(rb[3])],
+        "overflow": round(overflow, 3),
+        "wirelength": round(wirelength),
+        "wire_norm": round(wire_norm, 3),
+        "aspect": round(aspect, 3),
+        "size": [round(w), round(h)],
         "detail": {
             "pierces": pierces,
             "diagonals": diagonals,
@@ -194,6 +223,63 @@ def measure(tree, target_w=1720, target_h=800):
             "backwards": backwards,
         },
     }
+    result["score"] = score(result)
+    return result
+
+
+# Aspect ratio considered visually comfortable for a 16:9 slide body.
+_ASPECT_LO, _ASPECT_HI = 1.4, 3.2
+
+# Geometric-defect weights, combined into ONE additive layer so the search
+# can't trade one defect class for a worse total of another (e.g. drive
+# crossings to 0 by introducing 12 pierces). A pierce (arrow through a
+# non-endpoint icon) reads worse than a crossing, so it is weighted heavier;
+# a backwards segment is a softer wrongness than either.
+_W_CROSS = 1.0
+_W_PIERCE = 1.5
+_W_BACK = 0.7
+_W_BADPORT = 0.5
+
+
+def score(m):
+    """Multi-objective score; lower is better.
+
+    Two layers, compared lexicographically:
+      1. overflow  — does the layout spill off the slide frame? Off-slide
+                     icons are unusable regardless of routing quality, so any
+                     real overflow outranks everything below.
+      2. defects   — a single WEIGHTED SUM of geometric defects (crossings,
+                     pierces, backwards, bad ports/diagonals). Combining them
+                     additively (rather than as separate lexicographic tiers)
+                     prevents the degenerate trade where the search zeroes one
+                     defect class by inflating another.
+    Soft aesthetic terms (wire length, aspect penalty) break ties within the
+    defect layer. This is the "judge" that picks which position-shifted
+    candidate is actually good.
+    """
+    aspect = m["aspect"]
+    if aspect < _ASPECT_LO:
+        aspect_pen = _ASPECT_LO - aspect
+    elif aspect > _ASPECT_HI:
+        aspect_pen = aspect - _ASPECT_HI
+    else:
+        aspect_pen = 0.0
+    soft = m["wire_norm"] + 2.0 * aspect_pen
+    # Overflow bucketed to 0.1 (10% of a slide dimension) so small rounding
+    # jitter doesn't reorder otherwise-equal layouts, but any real off-slide
+    # spill outranks every geometric defect below it.
+    overflow_bucket = round(m.get("overflow", 0.0) * 10)
+    defects = (
+        _W_CROSS * m["crossings"]
+        + _W_PIERCE * m["pierces"]
+        + _W_BACK * m["backwards"]
+        + _W_BADPORT * (m["bad_ports"] + m["diagonals"])
+    )
+    return (
+        overflow_bucket,
+        round(defects, 2),
+        round(soft, 3),
+    )
 
 
 def main():
@@ -214,6 +300,9 @@ def main():
     print(f"crossings={result['crossings']} pierces={result['pierces']} "
           f"diagonals={result['diagonals']} bad_ports={result['bad_ports']} "
           f"backwards={result['backwards']} size={result['size']}")
+    print(f"overflow={result['overflow']} wirelength={result['wirelength']} "
+          f"wire_norm={result['wire_norm']} aspect={result['aspect']} "
+          f"score={result['score']}")
     for cat in ("pierces", "diagonals", "bad_ports", "backwards"):
         for d in result["detail"][cat]:
             print(f"  {cat}: {d}")

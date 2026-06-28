@@ -509,11 +509,54 @@ def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_
     node["_padding"] = padding
 
 
-def _align_corresponding_leaves_y(ordered):
-    """Align Y of corresponding leaves across all vertical groups in the subtree.
+def _ranges_overlap(lo1, hi1, lo2, hi2):
+    """True if the 1-D intervals [lo1,hi1] and [lo2,hi2] overlap."""
+    return lo1 < hi2 and lo2 < hi1
 
-    Collects all vertical groups (at any depth) with the same leaf count and
-    aligns their Nth leaves to the same Y center.
+
+def _cluster_groups_by_axis_overlap(groups_with_leaves, axis):
+    """Partition same-count groups into clusters that genuinely share a row
+    (axis="x", i.e. their X spans overlap → stacked vertically) or a column
+    (axis="y", i.e. their Y spans overlap → placed side by side).
+
+    Leaf alignment only makes sense WITHIN such a cluster. Aligning the Nth
+    leaf across groups that are laid out along the same axis we're aligning
+    (e.g. forcing the 1st leaf of four side-by-side horizontal groups to one X)
+    collapses them onto each other — the bug this guards against.
+    """
+    # bindings: [x, y, w, h]. axis "x" → position x(0), size w(2);
+    # axis "y" → position y(1), size h(3).
+    pos_idx = 0 if axis == "x" else 1
+    size_idx = 2 if axis == "x" else 3
+    items = []
+    for group, leaves in groups_with_leaves:
+        b = group["_bindings"]
+        lo = b[pos_idx]
+        hi = b[pos_idx] + b[size_idx]
+        items.append((lo, hi, group, leaves))
+    items.sort(key=lambda it: it[0])
+
+    clusters = []
+    for lo, hi, group, leaves in items:
+        placed = False
+        for cluster in clusters:
+            # cluster shares the span if it overlaps ANY member
+            if any(_ranges_overlap(lo, hi, c_lo, c_hi) for c_lo, c_hi, _, _ in cluster):
+                cluster.append((lo, hi, group, leaves))
+                placed = True
+                break
+        if not placed:
+            clusters.append([(lo, hi, group, leaves)])
+    return [[(g, lv) for _, _, g, lv in cluster] for cluster in clusters]
+
+
+def _align_corresponding_leaves_y(ordered):
+    """Align Y of corresponding leaves across vertical groups that sit SIDE BY
+    SIDE (their Y spans overlap). Groups stacked vertically must NOT be aligned
+    to each other — that would collapse them onto one row.
+
+    Collects all vertical groups (at any depth) with the same leaf count, then
+    aligns Nth leaves to the same Y center only within each side-by-side cluster.
     """
     vertical_groups = []
     for child in ordered:
@@ -530,21 +573,28 @@ def _align_corresponding_leaves_y(ordered):
     for groups_with_same_count in by_count.values():
         if len(groups_with_same_count) < 2:
             continue
-        leaf_count = len(groups_with_same_count[0][1])
-        for row_idx in range(leaf_count):
-            row_leaves = [leaves[row_idx] for _, leaves in groups_with_same_count]
-            centers = [leaf["_bindings"][1] + leaf["_bindings"][3] // 2 for leaf in row_leaves]
-            target_cy = max(centers)
-            for leaf in row_leaves:
-                b = leaf["_bindings"]
-                current_cy = b[1] + b[3] // 2
-                dy = target_cy - current_cy
-                if dy != 0:
-                    _layout_translate(leaf, 0, dy)
+        # Only align groups whose Y spans overlap (truly side by side).
+        for cluster in _cluster_groups_by_axis_overlap(groups_with_same_count, "y"):
+            if len(cluster) < 2:
+                continue
+            leaf_count = len(cluster[0][1])
+            for row_idx in range(leaf_count):
+                row_leaves = [leaves[row_idx] for _, leaves in cluster]
+                centers = [leaf["_bindings"][1] + leaf["_bindings"][3] // 2 for leaf in row_leaves]
+                target_cy = max(centers)
+                for leaf in row_leaves:
+                    b = leaf["_bindings"]
+                    current_cy = b[1] + b[3] // 2
+                    dy = target_cy - current_cy
+                    if dy != 0:
+                        _layout_translate(leaf, 0, dy)
 
 
 def _align_corresponding_leaves_x(ordered):
-    """Align X of corresponding leaves across all horizontal groups in the subtree."""
+    """Align X of corresponding leaves across horizontal groups that are STACKED
+    VERTICALLY (their X spans overlap). Groups placed side by side must NOT be
+    aligned to each other — that would collapse them onto one column.
+    """
     horizontal_groups = []
     for child in ordered:
         _collect_horizontal_groups(child, horizontal_groups)
@@ -560,17 +610,21 @@ def _align_corresponding_leaves_x(ordered):
     for groups_with_same_count in by_count.values():
         if len(groups_with_same_count) < 2:
             continue
-        leaf_count = len(groups_with_same_count[0][1])
-        for col_idx in range(leaf_count):
-            col_leaves = [leaves[col_idx] for _, leaves in groups_with_same_count]
-            centers = [leaf["_bindings"][0] + leaf["_bindings"][2] // 2 for leaf in col_leaves]
-            target_cx = max(centers)
-            for leaf in col_leaves:
-                b = leaf["_bindings"]
-                current_cx = b[0] + b[2] // 2
-                dx = target_cx - current_cx
-                if dx != 0:
-                    _layout_translate(leaf, dx, 0)
+        # Only align groups whose X spans overlap (truly stacked vertically).
+        for cluster in _cluster_groups_by_axis_overlap(groups_with_same_count, "x"):
+            if len(cluster) < 2:
+                continue
+            leaf_count = len(cluster[0][1])
+            for col_idx in range(leaf_count):
+                col_leaves = [leaves[col_idx] for _, leaves in cluster]
+                centers = [leaf["_bindings"][0] + leaf["_bindings"][2] // 2 for leaf in col_leaves]
+                target_cx = max(centers)
+                for leaf in col_leaves:
+                    b = leaf["_bindings"]
+                    current_cx = b[0] + b[2] // 2
+                    dx = target_cx - current_cx
+                    if dx != 0:
+                        _layout_translate(leaf, dx, 0)
 
 
 def _collect_vertical_groups(node, out):
@@ -1029,12 +1083,17 @@ def _layout_route_connections(connections, nodes, groups=None):
         edge_entry = {"from": conn["from"], "to": conn["to"], "label": conn.get("label", ""), "points": points}
         edges.append(edge_entry)
 
-    # T8: Align bend positions for fan-out/fan-in only when "fan": "merge" is set
-    _align_fan_bends(edges, conn_sides, connections)
+    # T8: Merge fan-out/fan-in groups onto a unified port + shared trunk when
+    # "fan": "merge" is set. This is treated as a HARD CONSTRAINT: the merged
+    # edges are tagged `_fan_locked` and every downstream pass leaves their
+    # trunks untouched. Crossing avoidance for merged fans comes from placement
+    # (the order/direction search) and from routing the OTHER edges around the
+    # fixed trunks — not from un-merging them.
+    _align_fan_bends(edges, conn_sides, connections, nodes)
 
     # T9: Safe bend separation — shift overlapping vertical bends apart
     # while preserving axis-alignment (only move X of vertical segments,
-    # never touch start/end points).
+    # never touch start/end points). Skips locked fan trunks.
     _safe_separate_bends(edges)
 
     # T10: Bend optimization — slide each free (middle) bend of an elbow path
@@ -1052,20 +1111,154 @@ def _layout_route_connections(connections, nodes, groups=None):
     # segments (unlike a detour), so it cannot cause a crossing blow-up, and
     # endpoints stay perpendicular because every port comes from _port_point.
     obstacles_re = [o for o in obstacles if o.get("_node")]
+    # Guard the whole reselect pass on the global weighted defect score: the
+    # per-edge slack (allowing +1 crossing to clear a pierce) is locally sound
+    # but can accumulate across edges into a net-worse layout. Roll back if the
+    # weighted total (crossings + 1.5*pierces + 0.7*backwards) regresses.
+    _resel_before = _defect_weight((_count_all_crossings(edges),
+                                    _count_node_pierces(edges, nodes),
+                                    _count_backwards(edges, nodes)))
+    _resel_snapshot = [list(map(list, e["points"])) for e in edges]
     _reselect_sides(edges, nodes, obstacles_re)
+    _resel_after = _defect_weight((_count_all_crossings(edges),
+                                   _count_node_pierces(edges, nodes),
+                                   _count_backwards(edges, nodes)))
+    if _resel_after > _resel_before:
+        for e, pts in zip(edges, _resel_snapshot):
+            e["points"] = pts
     _optimize_bends(edges, nodes)
 
     # T12: Obstacle detour — for pierces that no side/port choice can clear
     # (e.g. an icon stacked directly between source and target in the same
     # column), splice an axis-aligned jog around the obstacle. Each candidate
-    # is judged against the full live edge set with a lexicographic
-    # (crossings, pierces) gate: a jog is committed only if it does not raise
-    # the global crossing count and strictly lowers pierces. The jog is
+    # is judged by the weighted defect score (pierce 1.5 > cross 1.0), so a jog
+    # may add a crossing to lift a line off an icon it cuts through. The jog is
     # spliced into the interior of a segment, so endpoints never move and no
-    # diagonal is ever produced.
+    # diagonal is ever produced. Guarded on the global weighted total so the
+    # per-edge slack can't accumulate into a net-worse layout.
+    _det_before = _defect_weight((_count_all_crossings(edges),
+                                  _count_node_pierces(edges, nodes),
+                                  _count_backwards(edges, nodes)))
+    _det_snapshot = [list(map(list, e["points"])) for e in edges]
     _detour_around_pierces(edges, nodes)
+    _det_after = _defect_weight((_count_all_crossings(edges),
+                                 _count_node_pierces(edges, nodes),
+                                 _count_backwards(edges, nodes)))
+    if _det_after > _det_before:
+        for e, pts in zip(edges, _det_snapshot):
+            e["points"] = pts
+
+    # T13: Port recentering — by now each edge's actual entry/exit side may
+    # differ from the side that seeded port_counts (fan merge, side reselect,
+    # and elbow re-picks all move endpoints). That stale count left, e.g., a
+    # lone right-side edge sharing a "2 ports" slot and sitting off-center.
+    # Recompute the real per-(node, side) usage from geometry and redistribute
+    # the ports evenly along each edge, snapping the adjacent bend so the stub
+    # stays perpendicular. Fan-locked endpoints are fixed and excluded.
+    # Guarded per (node, side) group: each redistribution is kept only if it
+    # does not increase global crossings — centering a port can occasionally
+    # re-introduce a crossing that bend-opt had removed.
+    _recenter_ports(edges, nodes)
 
     return edges
+
+
+_PORT_EPS = 4
+
+
+def _recenter_ports(edges, nodes):
+    """Evenly redistribute each node-edge's ports using the ACTUAL drawn sides.
+
+    Endpoints are the only points moved (plus the immediately adjacent bend, to
+    keep the first/last stub axis-aligned). A single edge on a side lands dead
+    center; N edges split the side into N+1 even slots, ordered by the position
+    of their opposite end so they don't cross at the port. This corrects the
+    off-center stubs left by stale port_counts after fan/side changes.
+    """
+    def side_of(node, pt):
+        x, y = pt
+        nx, ny = node["x"], node["y"]
+        w = node.get("width", 60)
+        h = node.get("height", w)
+        if nx - _PORT_EPS <= x <= nx + w + _PORT_EPS:
+            if y >= ny + h - _PORT_EPS:
+                return "bottom"
+            if y <= ny + _PORT_EPS:
+                return "top"
+        if ny - _PORT_EPS <= y <= ny + h + _PORT_EPS:
+            if x <= nx + _PORT_EPS:
+                return "left"
+            if x >= nx + w - _PORT_EPS:
+                return "right"
+        return None
+
+    # Gather endpoints to move: (node, side) -> list of (edge, end_index, opp_pt)
+    groups = {}
+    for e in edges:
+        pts = e["points"]
+        if len(pts) < 2 or e.get("_fanout"):
+            continue
+        for end_idx, nid in ((0, e["from"]), (-1, e["to"])):
+            # Skip the locked end of a fan edge (its port is the shared trunk port).
+            if e.get("_fan_locked"):
+                lock = e["_fan_locked"]
+                # fan_out: shared port at start; fan_in: shared port at end.
+                if (lock["mode"] == "fan_out" and end_idx == 0) or \
+                   (lock["mode"] == "fan_in" and end_idx == -1):
+                    continue
+            node = _find_node(nodes, nid)
+            if node is None:
+                continue
+            s = side_of(node, pts[end_idx])
+            if s is None:
+                continue
+            opp = pts[-1] if end_idx == 0 else pts[0]
+            groups.setdefault((nid, s), []).append((e, end_idx, opp, node))
+
+    for (nid, side), members in groups.items():
+        node = members[0][3]
+        nx, ny = node["x"], node["y"]
+        w = node.get("width", 60)
+        h = node.get("height", w)
+        label_h = 30 if node.get("label") else 0
+        n = len(members)
+        # Order members along the edge by the coordinate of their opposite end,
+        # so adjacent ports connect to adjacent targets (minimizes self-cross).
+        if side in ("left", "right"):
+            members.sort(key=lambda m: m[2][1])  # by opposite Y
+        else:
+            members.sort(key=lambda m: m[2][0])  # by opposite X
+
+        # Snapshot the edges this group touches so we can roll back if centering
+        # the ports happens to add a crossing the optimizer had removed.
+        touched = {id(e): list(map(list, e["points"])) for e, _, _, _ in members}
+        before = _count_all_crossings(edges)
+
+        for slot, (e, end_idx, opp, _node) in enumerate(members):
+            t = (slot + 1) / (n + 1)
+            pts = e["points"]
+            if side == "right":
+                newp = [nx + w, round(ny + h * t)]
+            elif side == "left":
+                newp = [nx, round(ny + h * t)]
+            elif side == "bottom":
+                newp = [round(nx + w * t), ny + h + label_h]
+            else:  # top
+                newp = [round(nx + w * t), ny]
+            # Move the endpoint and snap the adjacent bend to keep the stub
+            # perpendicular: for a left/right port the stub is horizontal, so
+            # the neighbor shares the new Y; for top/bottom it shares the new X.
+            adj_idx = 1 if end_idx == 0 else len(pts) - 2
+            if 0 <= adj_idx < len(pts):
+                if side in ("left", "right"):
+                    pts[adj_idx] = [pts[adj_idx][0], newp[1]]
+                else:
+                    pts[adj_idx] = [newp[0], pts[adj_idx][1]]
+            pts[end_idx] = newp
+
+        if _count_all_crossings(edges) > before:
+            for e, _, _, _ in members:
+                e["points"] = touched[id(e)]
 
 
 def _safe_separate_bends(edges):
@@ -1084,7 +1277,7 @@ def _safe_separate_bends(edges):
     v_segs = []
     for ei, e in enumerate(edges):
         pts = e["points"]
-        if e.get("_fanout"):
+        if e.get("_fanout") or e.get("_fan_locked"):
             continue
         for k in range(len(pts) - 1):
             if abs(pts[k][0] - pts[k+1][0]) <= 3 and abs(pts[k][1] - pts[k+1][1]) > 10:
@@ -1311,41 +1504,47 @@ def _heuristic_port_sort(conn_indices, nid, side, port_indices, conn_sides, conn
 _FAN_SPREAD_LIMIT = 600
 
 
-def _align_fan_bends(edges, conn_sides, connections):
+def _align_fan_bends(edges, conn_sides, connections, nodes=None):
     """Align bend positions and merge ports for fan-out and fan-in groups.
 
-    Only activates when connections have "fan": "merge" set.
-    Default behavior keeps ports separate (split).
+    Only activates when connections have "fan": "merge" set. A merged group is
+    a hard constraint: all edges sharing the same source (fan-out) or the same
+    target (fan-in) are forced onto ONE unified port and a shared trunk bend,
+    regardless of which icon edge the router originally chose. The side is
+    decided by majority vote across the group's edges so a single odd-side edge
+    no longer splinters the group (the previous (from, src_side) keying did).
+
+    After this runs, each rewritten edge carries `_fan_locked` so downstream
+    optimizers (bend slide, side reselect, detour) leave its trunk alone — the
+    merge is the spec, and crossing reduction must work AROUND it, not undo it.
     """
-    # Fan-out: same src + same src_side, only if all connections in the group have fan=merge
+    # Fan-out: group purely by source node (side decided later by vote).
     src_groups = {}
     for i, (src, dst, src_side, dst_side) in enumerate(conn_sides):
-        if src is None or len(edges[i]["points"]) <= 2:
+        if src is None or len(edges[i]["points"]) < 2:
             continue
         if connections[i].get("fan") != "merge":
             continue
-        k = (connections[i]["from"], src_side)
-        src_groups.setdefault(k, []).append(i)
+        src_groups.setdefault(connections[i]["from"], []).append(i)
 
     for indices in src_groups.values():
         if len(indices) < 2:
             continue
-        _rewrite_fan(edges, conn_sides, indices, mode="fan_out")
+        _rewrite_fan(edges, conn_sides, indices, mode="fan_out", nodes=nodes)
 
-    # Fan-in: same dst + same dst_side, only if all connections in the group have fan=merge
+    # Fan-in: group purely by target node.
     dst_groups = {}
     for i, (src, dst, src_side, dst_side) in enumerate(conn_sides):
-        if src is None or len(edges[i]["points"]) <= 2:
+        if src is None or len(edges[i]["points"]) < 2:
             continue
         if connections[i].get("fan") != "merge":
             continue
-        k = (connections[i]["to"], dst_side)
-        dst_groups.setdefault(k, []).append(i)
+        dst_groups.setdefault(connections[i]["to"], []).append(i)
 
     for indices in dst_groups.values():
         if len(indices) < 2:
             continue
-        _rewrite_fan(edges, conn_sides, indices, mode="fan_in")
+        _rewrite_fan(edges, conn_sides, indices, mode="fan_in", nodes=nodes)
 
 
 _MAX_RESOLVE_ITERATIONS = 30
@@ -1553,6 +1752,11 @@ def _optimize_bends(edges, nodes):
     for _ in range(_BEND_OPT_PASSES):
         improved = False
         for e in edges:
+            # A locked fan trunk must not move — sliding its free bend is what
+            # shifts the shared trunk line, which would break the merge the
+            # user explicitly requested. Leave it fixed.
+            if e.get("_fan_locked"):
+                continue
             # Fan-out edges start on a shared trunk but are still free to be
             # refined individually; optimizing them too reduces crossings
             # without breaking axis-alignment (their middle bend is free).
@@ -1590,9 +1794,61 @@ def _optimize_bends(edges, nodes):
     return edges
 
 
+def _optimize_single_bend(cand_pts, edge, edges, nodes):
+    """Return cand_pts with its single free elbow bend slid to lowest weighted
+    cost, evaluated against the live edge set (edge temporarily holds cand_pts).
+
+    Used when judging a reselect candidate so we compare its BEST shape, not the
+    arbitrary mid-bend the router emits. Only the two middle points of a 4-point
+    VHV/HVH path move, along the trunk axis, so endpoints stay port-anchored.
+    """
+    fv = _edge_free_bend(cand_pts)
+    if not fv:
+        return cand_pts
+    axis, lo, hi = fv
+    lo, hi = min(lo, hi), max(lo, hi)
+    if hi - lo < 2 * _BEND_OPT_INSET:
+        return cand_pts
+    idx = 0 if axis == "x" else 1
+    saved = edge["points"]
+    best = [list(p) for p in cand_pts]
+    edge["points"] = best
+    best_w = _defect_weight((_count_all_crossings(edges),
+                             _count_node_pierces(edges, nodes),
+                             _count_backwards(edges, nodes)))
+    v = int(lo) + _BEND_OPT_INSET
+    while v < int(hi) - _BEND_OPT_INSET:
+        trial = [list(p) for p in cand_pts]
+        trial[1][idx] = v
+        trial[2][idx] = v
+        edge["points"] = trial
+        w = _defect_weight((_count_all_crossings(edges),
+                            _count_node_pierces(edges, nodes),
+                            _count_backwards(edges, nodes)))
+        if w < best_w:
+            best_w = w
+            best = trial
+        v += _BEND_OPT_STEP
+    edge["points"] = saved
+    return best
+
+
 _SIDE_RESELECT_PASSES = 6
 # (port_index, port_count): center, then 1/4, 1/2, 3/4 along the edge.
 _PORT_TRIALS = [(0, 1), (0, 3), (1, 3), (2, 3)]
+
+# Weights for comparing routing defects when reselecting sides. A pierce is the
+# most visually damaging (a line cutting through an icon), so it outweighs a
+# crossing; a backwards stub is the mildest. These mirror layout_qa.score().
+_DEFECT_W = (1.0, 1.5, 0.7)  # (crossings, pierces, backwards)
+# How many extra crossings a side change may introduce to clear a pierce. One
+# crossing is an acceptable price to stop a line cutting through an icon.
+_RESELECT_CROSS_SLACK = 1
+
+
+def _defect_weight(score):
+    """Weighted scalar of a (crossings, pierces, backwards) tuple; lower better."""
+    return sum(w * s for w, s in zip(_DEFECT_W, score))
 
 
 def _candidate_side_pairs(src, dst):
@@ -1698,7 +1954,8 @@ def _reselect_sides(edges, nodes, obstacles):
     for _ in range(_SIDE_RESELECT_PASSES):
         piercing = [
             ei for ei, e in enumerate(edges)
-            if not e.get("_fanout") and len(e["points"]) >= 2
+            if not e.get("_fanout") and not e.get("_fan_locked")
+            and len(e["points"]) >= 2
             and (_edge_pierces(e, nodes) or _edge_backwards(e, nodes))
         ]
         piercing.sort(key=lambda ei: (edges[ei]["from"], edges[ei]["to"]))
@@ -1729,24 +1986,38 @@ def _reselect_sides(edges, nodes, obstacles):
                             continue
                         if not _entry_exit_ok(cand, s_side, d_side):
                             continue
+                        # Judge the candidate by its BEST achievable shape: slide
+                        # its free trunk bend to the lowest-cost position before
+                        # scoring. A bottom→top reroute past a row of icons looks
+                        # bad at the default mid-bend but clears everything once
+                        # the trunk is nudged into the gap — evaluate THAT.
+                        cand = _optimize_single_bend(cand, e, edges, nodes)
                         e["points"] = cand
                         score = (_count_all_crossings(edges), _count_node_pierces(edges, nodes),
                                  _count_backwards(edges, nodes))
                         e["points"] = orig_pts
-                        # Hard ceiling on crossings; lexicographic improvement;
-                        # tie-break on stability ONLY among equal-score candidates.
-                        if score[0] > base[0]:
+                        # A pierce (line through a non-endpoint icon) reads worse
+                        # than a crossing, so judge candidates by a WEIGHTED total
+                        # (pierce 1.5 > cross 1.0 > backwards 0.7) rather than a
+                        # strict crossings-first ceiling. This lets a still-piercing
+                        # edge clear the icon even when doing so adds one crossing,
+                        # matching the layout_qa objective. A guard still rejects
+                        # trades that pile on crossings (more than +_RESELECT_CROSS_SLACK).
+                        if score[0] > base[0] + _RESELECT_CROSS_SLACK:
                             continue
                         better = (
-                            score < best_score
-                            or (best_pts is not None and score == best_score
+                            _defect_weight(score) < _defect_weight(best_score)
+                            or (best_pts is not None
+                                and _defect_weight(score) == _defect_weight(best_score)
                                 and _path_stability(cand) < _path_stability(best_pts))
                         )
                         if better:
                             best_score = score
                             best_pts = cand
 
-            if best_pts is not None and best_score < base and best_score[0] <= base[0]:
+            if (best_pts is not None
+                    and _defect_weight(best_score) < _defect_weight(base)
+                    and best_score[0] <= base[0] + _RESELECT_CROSS_SLACK):
                 e["points"] = best_pts
                 committed = True
 
@@ -1757,6 +2028,60 @@ def _reselect_sides(edges, nodes, obstacles):
 
 _DETOUR_FACE_MARGIN = 18
 _DETOUR_PASSES = 6
+_JOG_ARM_STEP = 12
+
+
+def _optimize_jog_arm(cand, k, edge, edges, nodes):
+    """Slide a freshly-spliced jog arm to its lowest-cost parallel position.
+
+    A jog splices 4 points at index k+1: [arm_a, corner_a, corner_b, arm_b].
+    The two corners share one free coordinate (the arm's offset from the
+    pierced segment) — x for a jog off a vertical segment, y for a horizontal
+    one. The raw candidate hugs the obstacle face; sliding the arm outward can
+    clear other edges it would otherwise cross. We scan a range of offsets and
+    keep the one with the lowest weighted defect, evaluated against the live
+    edge set. Endpoints (arm_a, arm_b) stay put, so the splice remains interior
+    and axis-aligned.
+    """
+    if len(cand) < k + 5:
+        return cand
+    ca, cb = cand[k + 2], cand[k + 3]
+    # Determine the free axis: corners share x (vertical-seg jog) or y (horiz).
+    if ca[0] == cb[0]:
+        axis = 0  # corners share X — slide X
+    elif ca[1] == cb[1]:
+        axis = 1  # corners share Y — slide Y
+    else:
+        return cand  # not a clean bracket
+
+    def weighted(pts_override):
+        saved = edge["points"]
+        edge["points"] = pts_override
+        s = (_count_all_crossings(edges), _count_node_pierces(edges, nodes),
+             _count_backwards(edges, nodes))
+        edge["points"] = saved
+        return _defect_weight(s)
+
+    base_val = ca[axis]
+    best = cand
+    best_w = weighted(cand)
+    # Search outward on both sides of the current arm offset.
+    for delta in range(-120, 121, _JOG_ARM_STEP):
+        if delta == 0:
+            continue
+        v = base_val + delta
+        trial = [list(p) for p in cand]
+        trial[k + 2][axis] = v
+        trial[k + 3][axis] = v
+        if not _is_axis_aligned(trial):
+            continue
+        # The arm must not now pierce the very obstacle it was meant to clear,
+        # nor any other — that is captured by the pierce term in the weight.
+        w = weighted(trial)
+        if w < best_w:
+            best_w = w
+            best = trial
+    return best
 
 
 def _jog_candidates(seg_a, seg_b, n):
@@ -1823,6 +2148,11 @@ def _detour_around_pierces(edges, nodes):
         improved = False
 
         for e in edges:
+            # A locked fan trunk must keep its shape — splicing a jog into it
+            # would bend the shared trunk and break the merge. Skip it; other
+            # edges detour around it instead.
+            if e.get("_fan_locked"):
+                continue
             # Fan-out edges are eligible: a jog around an obstacle does not
             # break the shared-trunk concept, and the global gate below only
             # commits it when it strictly helps.
@@ -1846,19 +2176,31 @@ def _detour_around_pierces(edges, nodes):
                         cand = pts[:k + 1] + repl[1:-1] + pts[k + 1:]
                         if not _is_axis_aligned(cand):
                             continue
+                        # The raw jog hugs the obstacle's face; that arm position
+                        # may cross other edges. Slide the jog arm to its best
+                        # position FIRST, then judge — mirrors evaluating a config
+                        # by its post-bend-optimization quality, not its raw form.
+                        cand = _optimize_jog_arm(cand, k, e, edges, nodes)
                         saved = e["points"]
                         e["points"] = cand
                         score = cost(edges)
                         e["points"] = saved
-                        if score[0] > base[0]:
+                        # Judge by weighted defect (pierce 1.5 > cross 1.0): a jog
+                        # may add up to _RESELECT_CROSS_SLACK crossings to lift a
+                        # line off an icon it cuts through, which reads far worse
+                        # than a crossing. Mirrors _reselect_sides.
+                        if score[0] > base[0] + _RESELECT_CROSS_SLACK:
                             continue
-                        if score < best_score or (
-                            best_pts is not None and score == best_score
+                        if _defect_weight(score) < _defect_weight(best_score) or (
+                            best_pts is not None
+                            and _defect_weight(score) == _defect_weight(best_score)
                             and _path_stability(cand) < _path_stability(best_pts)
                         ):
                             best_score = score
                             best_pts = cand
-            if best_pts is not None and best_score < base and best_score[0] <= base[0]:
+            if (best_pts is not None
+                    and _defect_weight(best_score) < _defect_weight(base)
+                    and best_score[0] <= base[0] + _RESELECT_CROSS_SLACK):
                 e["points"] = best_pts
                 improved = True
 
@@ -2293,63 +2635,148 @@ def _update_bend_x(points, old_x, new_x):
 _FAN_BEND_MARGIN = 30
 
 
-def _rewrite_fan(edges, conn_sides, indices, mode):
-    """Rewrite fan-out/fan-in elbows: unified trunk port + bend near targets."""
-    _, _, src_side, dst_side = conn_sides[indices[0]]
-    vertical = (src_side if mode == "fan_out" else dst_side) in ("top", "bottom")
+def _fan_side_vote(edges, conn_sides, indices, mode):
+    """Pick the single shared side for a fan group by majority vote.
 
-    # Check spread limit
-    if mode == "fan_out":
-        targets = [edges[i]["points"][-1] for i in indices]
-    else:
-        targets = [edges[i]["points"][0] for i in indices]
-    coords = [t[0 if vertical else 1] for t in targets]
-    if max(coords) - min(coords) > _FAN_SPREAD_LIMIT:
+    The hub end (src for fan-out, dst for fan-in) must agree on ONE side so
+    all edges leave/enter through one unified port. The router may have chosen
+    different sides per edge; we take the most common, tie-broken by a stable
+    preference order.
+    """
+    pref = {"right": 0, "left": 1, "bottom": 2, "top": 3}
+    votes = {}
+    for i in indices:
+        _, _, src_side, dst_side = conn_sides[i]
+        side = src_side if mode == "fan_out" else dst_side
+        if side:
+            votes[side] = votes.get(side, 0) + 1
+    if not votes:
+        return "right"
+    return sorted(votes.items(), key=lambda kv: (-kv[1], pref.get(kv[0], 9)))[0][0]
+
+
+def _rewrite_fan(edges, conn_sides, indices, mode, nodes=None):
+    """Force a fan-out/fan-in group onto a unified port and a shared trunk.
+
+    The merge is a hard constraint (the LLM asked for it), so we rebuild every
+    edge in the group from scratch as a clean 4-point elbow:
+      - one shared port on the hub node (computed from node geometry, centered),
+      - a shared trunk coordinate (all edges bend at the same line),
+      - the spoke then peels off to each individual target/source.
+    Edges that had become detours (len>4) are rebuilt too. Each edge is tagged
+    `_fan_locked` with the trunk axis/value so downstream optimizers don't undo
+    the alignment.
+    """
+    if not indices:
         return
+    side = _fan_side_vote(edges, conn_sides, indices, mode)
+    vertical = side in ("top", "bottom")
 
-    # Pre-compute unified port center
-    if mode == "fan_out":
-        all_ports = [edges[j]["points"][0] for j in indices]
+    # Resolve the hub node (shared end) and its geometry for an exact port.
+    hub_id = edges[indices[0]]["from"] if mode == "fan_out" else edges[indices[0]]["to"]
+    hub = _find_node(nodes, hub_id) if nodes else None
+
+    # Unified port point on the hub edge, centered along that edge.
+    if hub is not None:
+        hx, hy, hw, hh = hub["x"], hub["y"], hub["width"], hub["height"]
+        label_h = 30 if hub.get("label") else 0
+        if side == "right":
+            port = [hx + hw, hy + hh // 2]
+        elif side == "left":
+            port = [hx, hy + hh // 2]
+        elif side == "bottom":
+            port = [hx + hw // 2, hy + hh + label_h]
+        else:  # top
+            port = [hx + hw // 2, hy]
     else:
-        all_ports = [edges[j]["points"][-1] for j in indices]
+        # Fall back to averaging the existing ports if geometry is unavailable.
+        ends = [edges[j]["points"][0] if mode == "fan_out" else edges[j]["points"][-1]
+                for j in indices]
+        port = [sum(p[0] for p in ends) // len(ends), sum(p[1] for p in ends) // len(ends)]
+
+    # Shared trunk coordinate: a line just outside the hub port, on the spoke
+    # side, where all edges turn toward their individual targets.
+    spoke_ends = [edges[j]["points"][-1] if mode == "fan_out" else edges[j]["points"][0]
+                  for j in indices]
     if vertical:
-        port_center = sum(p[0] for p in all_ports) // len(all_ports)
+        # trunk is a horizontal line at y = trunk_v; pick it between the hub
+        # port and the nearest spoke end so the trunk sits in the gap.
+        spoke_vs = [p[1] for p in spoke_ends]
+        if side == "bottom":
+            nearest = min(spoke_vs)
+            trunk_v = max(port[1] + _FAN_BEND_MARGIN, (port[1] + nearest) // 2)
+        else:  # top
+            nearest = max(spoke_vs)
+            trunk_v = min(port[1] - _FAN_BEND_MARGIN, (port[1] + nearest) // 2)
     else:
-        port_center = sum(p[1] for p in all_ports) // len(all_ports)
+        spoke_hs = [p[0] for p in spoke_ends]
+        if side == "right":
+            nearest = min(spoke_hs)
+            trunk_v = max(port[0] + _FAN_BEND_MARGIN, (port[0] + nearest) // 2)
+        else:  # left
+            nearest = max(spoke_hs)
+            trunk_v = min(port[0] - _FAN_BEND_MARGIN, (port[0] + nearest) // 2)
+
+    # The spoke nodes (the N individual ends) must ALSO leave/enter through a
+    # consistent edge — the one facing the trunk. A fan-in to a trunk BELOW the
+    # agents means every agent exits its BOTTOM edge (not whichever side the
+    # router first picked, which left planner exiting "right" and coder "left").
+    # The spoke side is the side facing the trunk: opposite the hub side for the
+    # spoke's own port normal.
+    def spoke_port(node, sside):
+        nx, ny, nw, nh = node["x"], node["y"], node["width"], node["height"]
+        nlabel_h = 30 if node.get("label") else 0
+        if sside == "bottom":
+            return [nx + nw // 2, ny + nh + nlabel_h]
+        if sside == "top":
+            return [nx + nw // 2, ny]
+        if sside == "right":
+            return [nx + nw, ny + nh // 2]
+        return [nx, ny + nh // 2]  # left
 
     for i in indices:
+        # spoke node = the per-edge individual end (target for fan-out, source for fan-in)
+        spoke_id = edges[i]["to"] if mode == "fan_out" else edges[i]["from"]
+        spoke_node = _find_node(nodes, spoke_id) if nodes else None
         pts = edges[i]["points"]
-        if len(pts) < 4:
-            continue
-        src_pt = list(pts[0])
-        dst_pt = list(pts[-1])
+
+        # Decide which spoke edge faces the trunk. The trunk is a line on the
+        # `side` axis relative to the hub; the spoke must exit toward it.
+        if vertical:
+            # trunk is a horizontal line at y=trunk_v; spoke exits bottom if it
+            # sits above the trunk, else top.
+            ref = (spoke_node["y"] + spoke_node["height"] // 2) if spoke_node else pts[0][1]
+            s_side = "bottom" if trunk_v >= ref else "top"
+        else:
+            ref = (spoke_node["x"] + spoke_node["width"] // 2) if spoke_node else pts[0][0]
+            s_side = "right" if trunk_v >= ref else "left"
+
+        if spoke_node is not None:
+            spoke_pt = spoke_port(spoke_node, s_side)
+        else:
+            spoke_pt = list(pts[-1] if mode == "fan_out" else pts[0])
 
         if mode == "fan_out":
+            tgt = spoke_pt
             if vertical:
-                bend_y = dst_pt[1] - _FAN_BEND_MARGIN
-                pts[0] = [port_center, src_pt[1]]
-                pts[1] = [port_center, bend_y]
-                pts[2] = [dst_pt[0], bend_y]
-                pts[3] = [dst_pt[0], dst_pt[1]]
+                edges[i]["points"] = [list(port), [port[0], trunk_v], [tgt[0], trunk_v], tgt]
             else:
-                bend_x = dst_pt[0] - _FAN_BEND_MARGIN
-                pts[0] = [src_pt[0], port_center]
-                pts[1] = [bend_x, port_center]
-                pts[2] = [bend_x, dst_pt[1]]
-                pts[3] = [dst_pt[0], dst_pt[1]]
-        else:
+                edges[i]["points"] = [list(port), [trunk_v, port[1]], [trunk_v, tgt[1]], tgt]
+        else:  # fan_in
+            srcp = spoke_pt
             if vertical:
-                bend_y = src_pt[1] + _FAN_BEND_MARGIN
-                pts[0] = [src_pt[0], src_pt[1]]
-                pts[1] = [src_pt[0], bend_y]
-                pts[2] = [port_center, bend_y]
-                pts[3] = [port_center, dst_pt[1]]
+                edges[i]["points"] = [srcp, [srcp[0], trunk_v], [port[0], trunk_v], list(port)]
             else:
-                bend_x = src_pt[0] + _FAN_BEND_MARGIN
-                pts[0] = [src_pt[0], src_pt[1]]
-                pts[1] = [bend_x, src_pt[1]]
-                pts[2] = [bend_x, port_center]
-                pts[3] = [dst_pt[0], port_center]
+                edges[i]["points"] = [srcp, [trunk_v, srcp[1]], [trunk_v, port[1]], list(port)]
+        # Lock the trunk: downstream optimizers must not move the shared
+        # coordinate. The spoke (3rd point toward the individual end) stays
+        # free to be nudged if needed.
+        edges[i]["_fan_locked"] = {
+            "mode": mode,
+            "axis": "y" if vertical else "x",
+            "trunk": trunk_v,
+            "port": list(port),
+        }
 
 
 def _find_group_for(node_id, node_group):
