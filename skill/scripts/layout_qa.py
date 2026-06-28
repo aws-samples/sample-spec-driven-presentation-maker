@@ -29,6 +29,7 @@ from sdpm.layout import (  # noqa: E402
     _layout_collect,
     _layout_route_connections,
     _count_all_crossings,
+    _seg_pierces_node,
     _find_node,
 )
 
@@ -73,18 +74,10 @@ def _build_layout(tree, target_w=None, target_h=None):
     return nodes, groups, edges, root["_bindings"]
 
 
-def _seg_pierces_rect(p1, p2, n, inset=4):
-    rx, ry = n["x"], n["y"]
-    rw, rh = n.get("width", 60), n.get("height", n.get("width", 60))
-    x0, y0, x1, y1 = rx + inset, ry + inset, rx + rw - inset, ry + rh - inset
-    ax, ay = p1
-    bx, by = p2
-    if ax == bx:  # vertical
-        return x0 < ax < x1 and min(ay, by) < y1 and max(ay, by) > y0
-    if ay == by:  # horizontal
-        return y0 < ay < y1 and min(ax, bx) < x1 and max(ax, bx) > x0
-    # diagonal: bounding-box overlap as a coarse test
-    return min(ax, bx) < x1 and max(ax, bx) > x0 and min(ay, by) < y1 and max(ay, by) > y0
+def _seg_pierces_rect(p1, p2, n):
+    # Use the engine's own pierce definition so the QA metric and the
+    # optimizer's cost function agree on what counts as a pierce/graze.
+    return _seg_pierces_node(p1, p2, n)
 
 
 def _side_of(node, pt):

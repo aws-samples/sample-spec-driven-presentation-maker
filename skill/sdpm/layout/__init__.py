@@ -1002,21 +1002,15 @@ def _layout_route_connections(connections, nodes, groups=None):
             sp = _port_point(src, src_side, port_indices[(i, conn["from"])], port_counts[(conn["from"], src_side)], label_h)
             tp = _port_point(dst, dst_side, port_indices[(i, conn["to"])], port_counts[(conn["to"], dst_side)], label_h)
 
-            # Fan-out right-side: use shared bend X for H-V-H pattern
-            # Skip if already a straight line (same Y)
-            src_id = conn["from"]
-            is_fanout_edge = False
-            if src_id in fanout_bend_x and src_side == "right" and abs(sp[1] - tp[1]) > 5 and dst_side == "left":
-                bend_x = round(fanout_bend_x[src_id])
-                points = [sp, [bend_x, sp[1]], [bend_x, tp[1]], tp]
-                is_fanout_edge = True
-            else:
-                # Exclude src/dst nodes from obstacles to avoid self-avoidance
-                conn_obs = [o for o in obstacles if o.get("_node") not in (conn["from"], conn["to"])]
-                points = _elbow_path(sp, tp, src_side, dst_side, conn_obs)
+            # Route every edge with the standard elbow path. The downstream
+            # bend optimizer, side reselection, and detour passes shape each
+            # edge to minimize crossings/pierces — a shared fan-out trunk is
+            # no longer special-cased because, when targets sit on a row with
+            # an obstacle between them, a fixed trunk grazes that obstacle and
+            # no trunk position can avoid it (only a detour can).
+            conn_obs = [o for o in obstacles if o.get("_node") not in (conn["from"], conn["to"])]
+            points = _elbow_path(sp, tp, src_side, dst_side, conn_obs)
         edge_entry = {"from": conn["from"], "to": conn["to"], "label": conn.get("label", ""), "points": points}
-        if is_fanout_edge:
-            edge_entry["_fanout"] = True
         edges.append(edge_entry)
 
     # T8: Align bend positions for fan-out/fan-in only when "fan": "merge" is set
@@ -1397,12 +1391,21 @@ def _count_all_crossings(edges):
     return count
 
 
-_PIERCE_INSET = 4
+# Negative inset = a keep-out margin AROUND each icon. A line running along or
+# just outside an icon's edge reads visually as touching/piercing it, so we
+# count it as a pierce and push it away. Kept small so legitimate adjacent
+# perpendicular stubs are not over-constrained.
+_PIERCE_INSET = -6
 _PIERCE_WEIGHT = 4
 
 
 def _seg_pierces_node(p1, p2, n):
-    """True if axis-aligned segment p1-p2 passes through node n's interior."""
+    """True if axis-aligned segment p1-p2 passes through (or grazes) node n.
+
+    A negative _PIERCE_INSET expands the test rectangle beyond the icon so
+    segments running flush against an edge are flagged, matching what reads
+    visually as touching the icon.
+    """
     rx, ry = n["x"], n["y"]
     rw, rh = n.get("width", 60), n.get("height", n.get("width", 60))
     x0, y0 = rx + _PIERCE_INSET, ry + _PIERCE_INSET
@@ -1433,6 +1436,62 @@ def _count_node_pierces(edges, nodes):
                     count += 1
                     break
     return count
+
+
+def _count_backwards(edges, nodes):
+    """Count edges whose first/last segment heads opposite to its port normal.
+
+    A "backwards" segment leaves (or enters) an icon edge pointing back across
+    the icon — e.g. a bottom port whose first move is upward. The port side is
+    inferred from the endpoint's position on the node so this works regardless
+    of label offset (a bottom port sits below the icon's x-span).
+    """
+    count = 0
+    for e in edges:
+        pts = e["points"]
+        if len(pts) < 2:
+            continue
+        src = _find_node(nodes, e["from"])
+        dst = _find_node(nodes, e["to"])
+        for node, p_port, p_next, leaving in (
+            (src, pts[0], pts[1], True),
+            (dst, pts[-1], pts[-2], False),
+        ):
+            if node is None:
+                continue
+            side = _port_side(node, p_port)
+            if side is None:
+                continue
+            # Outward normal for the port; the adjacent point must lie on the
+            # outward side (for a source) — i.e. not back across the icon.
+            if side == "right" and p_next[0] < p_port[0] - 2:
+                count += 1
+            elif side == "left" and p_next[0] > p_port[0] + 2:
+                count += 1
+            elif side == "bottom" and p_next[1] < p_port[1] - 2:
+                count += 1
+            elif side == "top" and p_next[1] > p_port[1] + 2:
+                count += 1
+    return count
+
+
+def _port_side(node, pt):
+    """Infer which icon edge a port point sits on (label-offset aware)."""
+    x, y = pt
+    cx, cy = node["x"], node["y"]
+    w = node.get("width", 60)
+    h = node.get("height", w)
+    if cx - 2 <= x <= cx + w + 2:
+        if y >= cy + h - 2:
+            return "bottom"
+        if y <= cy + 2:
+            return "top"
+    if cy - 2 <= y <= cy + h + 2:
+        if x <= cx + 2:
+            return "left"
+        if x >= cx + w - 2:
+            return "right"
+    return None
 
 
 def _edge_free_bend(pts):
@@ -1594,6 +1653,11 @@ def _edge_pierces(e, nodes):
     return False
 
 
+def _edge_backwards(e, nodes):
+    """True if edge e has a first/last segment heading against its port normal."""
+    return _count_backwards([e], nodes) > 0
+
+
 def _path_stability(pts):
     """Tie-break key: prefer fewer, shorter segments."""
     length = sum(
@@ -1618,7 +1682,8 @@ def _reselect_sides(edges, nodes, obstacles):
     for _ in range(_SIDE_RESELECT_PASSES):
         piercing = [
             ei for ei, e in enumerate(edges)
-            if not e.get("_fanout") and len(e["points"]) >= 2 and _edge_pierces(e, nodes)
+            if not e.get("_fanout") and len(e["points"]) >= 2
+            and (_edge_pierces(e, nodes) or _edge_backwards(e, nodes))
         ]
         piercing.sort(key=lambda ei: (edges[ei]["from"], edges[ei]["to"]))
         committed = False
@@ -1632,7 +1697,8 @@ def _reselect_sides(edges, nodes, obstacles):
             obs_excl = [o for o in obstacles if o.get("_node") not in (e["from"], e["to"])]
             label_h = 30 if src.get("label") else 0
 
-            base = (_count_all_crossings(edges), _count_node_pierces(edges, nodes))
+            base = (_count_all_crossings(edges), _count_node_pierces(edges, nodes),
+                    _count_backwards(edges, nodes))
             orig_pts = e["points"]
             best_pts = None
             best_score = base
@@ -1648,7 +1714,8 @@ def _reselect_sides(edges, nodes, obstacles):
                         if not _entry_exit_ok(cand, s_side, d_side):
                             continue
                         e["points"] = cand
-                        score = (_count_all_crossings(edges), _count_node_pierces(edges, nodes))
+                        score = (_count_all_crossings(edges), _count_node_pierces(edges, nodes),
+                                 _count_backwards(edges, nodes))
                         e["points"] = orig_pts
                         # Hard ceiling on crossings; lexicographic improvement;
                         # tie-break on stability ONLY among equal-score candidates.
@@ -1730,7 +1797,8 @@ def _detour_around_pierces(edges, nodes):
         return edges
 
     def cost(es):
-        return (_count_all_crossings(es), _count_node_pierces(es, nodes))
+        return (_count_all_crossings(es), _count_node_pierces(es, nodes),
+                _count_backwards(es, nodes))
 
     for _ in range(_DETOUR_PASSES):
         cur = cost(edges)
