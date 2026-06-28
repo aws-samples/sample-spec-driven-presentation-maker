@@ -1181,10 +1181,109 @@ def _layout_route_connections(connections, nodes, groups=None):
     # re-introduce a crossing that bend-opt had removed.
     _recenter_ports(edges, nodes)
 
+    # T14: Group bus bundling — when several edges share a GROUP endpoint
+    # (many-to-one to a box), bundle them so they enter/leave the box edge as a
+    # tidy parallel bus instead of fanning to scattered points. Nested lanes
+    # ordered by the opposite end keep the bundle crossing-free. Guarded on the
+    # global crossing count.
+    _align_group_bus(edges, nodes, groups)
+
     return edges
 
 
 _PORT_EPS = 4
+_GROUP_BUS_PORT_GAP = 26
+_GROUP_BUS_LANE_GAP = 14
+
+
+def _align_group_bus(edges, nodes, groups):
+    """Bundle edges that share a group endpoint into a parallel bus on the box.
+
+    For each group that is the target (or source) of 2+ edges, route those
+    edges so their final (or first) approach runs as nested parallel lanes into
+    adjacent ports centered on the box edge facing the other ends. Ordering the
+    lanes by the opposite end's position keeps the bundle free of self-cross.
+    Kept only if it does not raise the global crossing count.
+    """
+    if not groups:
+        return edges
+
+    # Collect bundles: (group_id, role) -> list of edges, where role is 'dst'
+    # (edges ending at the group) or 'src' (edges starting at the group).
+    bundles = {}
+    for e in edges:
+        if len(e["points"]) < 2:
+            continue
+        if e.get("_dst_group"):
+            bundles.setdefault((e["_dst_group"], "dst"), []).append(e)
+        if e.get("_src_group"):
+            bundles.setdefault((e["_src_group"], "src"), []).append(e)
+
+    for (gid, role), grp_edges in bundles.items():
+        if len(grp_edges) < 2:
+            continue
+        g = _find_group(groups, gid)
+        if not g:
+            continue
+        gx, gy, gw, gh = g["x"], g["y"], g["width"], g["height"]
+
+        # The "free end" of each edge is the non-group end.
+        def free_pt(e):
+            return e["points"][0] if role == "dst" else e["points"][-1]
+
+        # Decide which box side faces the bundle: compare the free ends'
+        # centroid to the box center.
+        fxs = [free_pt(e)[0] for e in grp_edges]
+        fys = [free_pt(e)[1] for e in grp_edges]
+        cfx, cfy = sum(fxs) / len(fxs), sum(fys) / len(fys)
+        bcx, bcy = gx + gw / 2, gy + gh / 2
+        dx, dy = cfx - bcx, cfy - bcy
+        if abs(dx) >= abs(dy):
+            side = "left" if dx < 0 else "right"
+        else:
+            side = "top" if dy < 0 else "bottom"
+        vertical_ports = side in ("left", "right")  # ports vary along Y
+
+        snapshot = [list(map(list, e["points"])) for e in edges]
+        before = _count_all_crossings(edges)
+
+        # Order edges by their free end's coordinate along the port axis so
+        # adjacent ports connect to adjacent sources (no self-cross).
+        grp_edges.sort(key=lambda e: free_pt(e)[1] if vertical_ports else free_pt(e)[0])
+        n = len(grp_edges)
+        # Box-edge anchor coordinates (the fixed coordinate of the port line).
+        bx = gx if side == "left" else (gx + gw)        # used when vertical_ports
+        by = gy if side == "top" else (gy + gh)          # used otherwise
+
+        for rank, e in enumerate(grp_edges):
+            off = (rank - (n - 1) / 2) * _GROUP_BUS_PORT_GAP
+            fp = free_pt(e)
+            # Nested lane: outer (farther from center) edges turn earlier so the
+            # bundle telescopes without crossing.
+            lane_depth = (n - rank) * _GROUP_BUS_LANE_GAP if role == "dst" else (rank + 1) * _GROUP_BUS_LANE_GAP
+            if vertical_ports:
+                py = round(bcy + off)
+                # Outer lanes turn farther from the box so the bundle telescopes.
+                lane = (gx - 20 - lane_depth) if side == "left" else (gx + gw + 20 + lane_depth)
+                port = [bx, py]
+                if role == "dst":
+                    e["points"] = [fp, [lane, fp[1]], [lane, py], port]
+                else:
+                    e["points"] = [port, [lane, py], [lane, fp[1]], fp]
+            else:
+                px = round(bcx + off)
+                lane = (gy - 20 - lane_depth) if side == "top" else (gy + gh + 20 + lane_depth)
+                port = [px, by]
+                if role == "dst":
+                    e["points"] = [fp, [fp[0], lane], [px, lane], port]
+                else:
+                    e["points"] = [port, [px, lane], [fp[0], lane], fp]
+
+        if _count_all_crossings(edges) > before:
+            for e, pts in zip(edges, snapshot):
+                e["points"] = pts
+
+    return edges
 
 
 def _recenter_ports(edges, nodes):
