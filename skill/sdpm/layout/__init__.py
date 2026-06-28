@@ -2776,14 +2776,35 @@ def _update_bend_x(points, old_x, new_x):
 _FAN_BEND_MARGIN = 30
 
 
-def _fan_side_vote(edges, conn_sides, indices, mode):
-    """Pick the single shared side for a fan group by majority vote.
+def _fan_side_vote(edges, conn_sides, indices, mode, nodes=None, groups=None):
+    """Pick the single shared hub side for a fan group from GEOMETRY.
 
-    The hub end (src for fan-out, dst for fan-in) must agree on ONE side so
-    all edges leave/enter through one unified port. The router may have chosen
-    different sides per edge; we take the most common, tie-broken by a stable
-    preference order.
+    The hub end (src for fan-out, dst for fan-in) must agree on ONE side so all
+    edges leave/enter through one unified port. We choose the box edge that
+    faces the spokes' centroid: e.g. a hub directly BELOW a row of spokes is
+    entered through its TOP. This is far more robust than the old majority vote
+    over per-edge router sides, which picked "right" for a hub sitting squarely
+    below its sources (each spoke saw a different diagonal direction).
     """
+    hub_id = edges[indices[0]]["from"] if mode == "fan_out" else edges[indices[0]]["to"]
+    hub, _ = _find_endpoint(nodes or {}, groups or {}, hub_id)
+    spokes = []
+    for i in indices:
+        sid = edges[i]["to"] if mode == "fan_out" else edges[i]["from"]
+        s, _ = _find_endpoint(nodes or {}, groups or {}, sid)
+        if s is not None:
+            spokes.append(s)
+    if hub is not None and spokes:
+        hcx = hub["x"] + hub["width"] / 2
+        hcy = hub["y"] + hub["height"] / 2
+        scx = sum(s["x"] + s["width"] / 2 for s in spokes) / len(spokes)
+        scy = sum(s["y"] + s["height"] / 2 for s in spokes) / len(spokes)
+        dx, dy = scx - hcx, scy - hcy  # direction from hub toward spokes
+        if abs(dx) >= abs(dy):
+            return "right" if dx > 0 else "left"
+        return "bottom" if dy > 0 else "top"
+
+    # Fallback: majority vote over router-chosen sides.
     pref = {"right": 0, "left": 1, "bottom": 2, "top": 3}
     votes = {}
     for i in indices:
@@ -2811,7 +2832,7 @@ def _rewrite_fan(edges, conn_sides, indices, mode, nodes=None, groups=None):
     """
     if not indices:
         return
-    side = _fan_side_vote(edges, conn_sides, indices, mode)
+    side = _fan_side_vote(edges, conn_sides, indices, mode, nodes, groups)
     vertical = side in ("top", "bottom")
 
     # Resolve the hub (shared end) — node OR group — and its geometry.
@@ -2837,28 +2858,31 @@ def _rewrite_fan(edges, conn_sides, indices, mode, nodes=None, groups=None):
                 for j in indices]
         port = [sum(p[0] for p in ends) // len(ends), sum(p[1] for p in ends) // len(ends)]
 
-    # Shared trunk coordinate: a line just outside the hub port, on the spoke
-    # side, where all edges turn toward their individual targets.
+    # Shared trunk coordinate: a line in the GAP between the hub port and the
+    # nearest spoke. It must stay strictly between the two — if the gap is
+    # narrower than the preferred margin, fall back to the midpoint rather than
+    # overshooting the spoke (which would drive the trunk into the spoke icons,
+    # the bug that made stacked fan-outs pierce their targets).
     spoke_ends = [edges[j]["points"][-1] if mode == "fan_out" else edges[j]["points"][0]
                   for j in indices]
+
+    def _gap_trunk(p0, nearest):
+        # p0 = hub port coordinate, nearest = closest spoke coordinate.
+        lo, hi = (p0, nearest) if p0 <= nearest else (nearest, p0)
+        mid = (p0 + nearest) // 2
+        if hi - lo <= 2 * _FAN_BEND_MARGIN:
+            return mid  # gap too tight for the margin → sit in the middle
+        # otherwise sit _FAN_BEND_MARGIN away from the hub, toward the spoke
+        return p0 + _FAN_BEND_MARGIN if p0 < nearest else p0 - _FAN_BEND_MARGIN
+
     if vertical:
-        # trunk is a horizontal line at y = trunk_v; pick it between the hub
-        # port and the nearest spoke end so the trunk sits in the gap.
         spoke_vs = [p[1] for p in spoke_ends]
-        if side == "bottom":
-            nearest = min(spoke_vs)
-            trunk_v = max(port[1] + _FAN_BEND_MARGIN, (port[1] + nearest) // 2)
-        else:  # top
-            nearest = max(spoke_vs)
-            trunk_v = min(port[1] - _FAN_BEND_MARGIN, (port[1] + nearest) // 2)
+        nearest = min(spoke_vs) if side == "bottom" else max(spoke_vs)
+        trunk_v = _gap_trunk(port[1], nearest)
     else:
         spoke_hs = [p[0] for p in spoke_ends]
-        if side == "right":
-            nearest = min(spoke_hs)
-            trunk_v = max(port[0] + _FAN_BEND_MARGIN, (port[0] + nearest) // 2)
-        else:  # left
-            nearest = max(spoke_hs)
-            trunk_v = min(port[0] - _FAN_BEND_MARGIN, (port[0] + nearest) // 2)
+        nearest = min(spoke_hs) if side == "right" else max(spoke_hs)
+        trunk_v = _gap_trunk(port[0], nearest)
 
     # The spoke nodes (the N individual ends) must ALSO leave/enter through a
     # consistent edge — the one facing the trunk. A fan-in to a trunk BELOW the
