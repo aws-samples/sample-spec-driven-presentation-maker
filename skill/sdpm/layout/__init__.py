@@ -689,6 +689,12 @@ def _recompute_group_bbox(node):
     frame would otherwise stay where it was before the shift and no longer wrap
     its icons. Recurses so deep nesting is corrected from the leaves up. Reuses
     the group's stored `_padding` so the frame keeps its label band and margins.
+
+    A grown sub-group can also start OVERLAPPING a sibling that was placed
+    against its old (smaller) bounds — e.g. a Data Tier that stretched to match
+    a tall sibling column now collides with the Observability group stacked
+    below it. After re-deriving child boxes we re-flow this node's children
+    along its own axis to restore the margin gaps, then derive this node's box.
     """
     children = node.get("children")
     if not children:
@@ -696,6 +702,7 @@ def _recompute_group_bbox(node):
     for c in children:
         if c.get("children"):
             _recompute_group_bbox(c)
+    _reflow_children_along_axis(node, children)
     padding = node.get("_padding", {"top": 0, "right": 0, "bottom": 0, "left": 0})
     min_x = min(c["_bindings"][0] - c["_margin"]["left"] for c in children)
     min_y = min(c["_bindings"][1] - c["_margin"]["top"] for c in children)
@@ -707,6 +714,37 @@ def _recompute_group_bbox(node):
         (max_x - min_x) + padding["left"] + padding["right"],
         (max_y - min_y) + padding["top"] + padding["bottom"],
     ]
+
+
+def _reflow_children_along_axis(node, children):
+    """Push apart consecutive children that overlap on the group's main axis.
+
+    Only moves along the layout axis (vertical group → shift Y, horizontal →
+    shift X) and only ever forward (never pulls a child back), so the cross-axis
+    alignment the leaf passes just established is preserved. A no-op when the
+    children already clear each other — the common case — so it cannot disturb
+    a layout that didn't grow.
+    """
+    direction = node.get("direction", "horizontal")
+    if len(children) < 2:
+        return
+    reverse = node.get("reverse", False)
+    ordered = list(reversed(children)) if reverse else children
+    for i in range(1, len(ordered)):
+        prev = ordered[i - 1]["_bindings"]
+        pm = ordered[i - 1]["_margin"]
+        cur = ordered[i]["_bindings"]
+        cm = ordered[i]["_margin"]
+        if direction == "vertical":
+            need_top = prev[1] + prev[3] + pm["bottom"] + cm["top"]
+            delta = need_top - cur[1]
+            if delta > 0:
+                _layout_translate(ordered[i], 0, delta)
+        else:
+            need_left = prev[0] + prev[2] + pm["right"] + cm["left"]
+            delta = need_left - cur[0]
+            if delta > 0:
+                _layout_translate(ordered[i], delta, 0)
 
 
 def _ranges_overlap(lo1, hi1, lo2, hi2):
