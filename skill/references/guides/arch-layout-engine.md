@@ -1,0 +1,261 @@
+---
+description: "Nested-JSON architecture layout engine (auto-routing) — read when building an AWS/system architecture diagram from logical structure instead of hand-placing coordinates"
+---
+
+# Architecture Layout Engine (nested-JSON auto-router)
+
+The layout engine turns a **logical structure** (groups, icons, connections) into
+fully-placed elements with auto-routed orthogonal arrows. You describe *what
+connects to what*; the engine computes coordinates, clusters related icons,
+chooses arrow ports/bends, and minimizes crossings and icon pierces.
+
+Prefer this over hand-placing coordinates (the manual style in
+[arch-elements.md](arch-elements.md)) for any diagram with more than a few
+connections. Hand-placement is for fine-tuning or non-flow art.
+
+> Companion: [arch-elements.md](arch-elements.md) covers group colors,
+> groupType catalog, boundary/logo, box nodes, and manual arrows.
+
+---
+
+## How to run it
+
+```bash
+python3 scripts/pptx_builder.py layout input.json \
+  --x 100 --y 180 --width 1720 --height 800 -o elements.json
+```
+
+- Input: one logical-structure JSON (see below).
+- Output: `{ "elements": [...], "bbox": {...}, "warnings": [...] }`.
+- Drop the `elements` array straight into a slide, or reference the whole file
+  with `{"type": "include", "src": "elements.json"}`.
+- `targetArea` in the JSON (`{x, y, width, height}`) overrides the CLI flags.
+- The engine scales the whole diagram to fit the target box, so author at any
+  scale — relationships matter, absolute sizes don't.
+
+---
+
+## Logical structure JSON
+
+```json
+{
+  "direction": "horizontal",
+  "iconSize": 56,
+  "children": [
+    {"id": "client", "icon": "assets:aws-internal/user_dark", "label": "Client"},
+    {"id": "apigw",  "icon": "icons:Arch_Amazon-API-Gateway_48", "label": "API Gateway"},
+    {"id": "models", "direction": "vertical", "groupType": "generic-dashed", "label": "Model Serving",
+      "children": [
+        {"id": "vision",  "icon": "icons:Arch_Amazon-SageMaker_48", "label": "Vision"},
+        {"id": "nlp",     "icon": "icons:Arch_Amazon-SageMaker_48", "label": "NLP"},
+        {"id": "tabular", "icon": "icons:Arch_Amazon-SageMaker_48", "label": "Tabular"}
+      ]}
+  ],
+  "connections": [
+    {"from": "client", "to": "apigw"},
+    {"from": "apigw",  "to": "models", "label": "route"}
+  ]
+}
+```
+
+### Node / group fields
+
+| Field | Where | Meaning |
+|-------|-------|---------|
+| `id` | every node | Unique id, referenced by `connections`. |
+| `icon` | leaf | Icon source (`icons:...` / `assets:...`). |
+| `box` | leaf | Text box instead of an icon (see arch-elements.md). |
+| `label` | leaf / group | Caption. On a **group** it also forces the visible frame (see "Hiding group frames"). |
+| `children` | group | Nested nodes (groups can nest groups). |
+| `direction` | group | `"horizontal"` or `"vertical"` — main axis of this group. |
+| `groupType` | group | Draws a frame (`generic-dashed`, `generic-solid`, `vpc`, …). Omit → no frame. |
+| `iconSize` | root | Base icon size in px (engine scales to fit). |
+| `align` | group | Cross-axis alignment: `center` (default) / `top` / `bottom` / `left` / `right`. |
+| `reverse` | group | Reverse child order (flip flow direction). |
+
+### Connection fields
+
+| Field | Meaning |
+|-------|---------|
+| `from` / `to` | Endpoint ids. **May be a leaf id OR a group id** (see "Connect to a group"). |
+| `label` | Optional arrow caption. |
+| `fan` | `"merge"` to bundle this edge with its siblings onto one trunk (see "Fan merge"). |
+
+---
+
+## The engine decides position — you decide relationships
+
+You set the group structure and the direction. **Within those constraints the
+engine is free** to reorder children, pick arrow ports, and shift icons to:
+
+- cluster connected icons close together (shorter total wire length),
+- minimize edge **crossings** and icon **pierces** (an arrow cutting through a
+  non-endpoint icon),
+- keep the layout on-slide (overflow is ranked worse than any crossing).
+
+A multi-objective "judge" scores candidate layouts lexicographically:
+`(off-slide overflow) → (weighted defects: pierce 1.5 > crossing 1.0 > backwards
+0.7) → (soft: wire length + aspect)`. You don't invoke it; it runs inside the
+engine. The practical consequence: **express the right structure and the
+routing usually takes care of itself.**
+
+---
+
+## Three techniques that make complex diagrams clean
+
+These are the levers to reach 0 crossings / 0 pierces on dense diagrams. Reach
+for them in this order.
+
+### 1. Connect to a GROUP, not to every icon (many-to-many → many-to-one)
+
+Dense many-to-many wiring is the #1 source of crossings. Example: 3 compute
+services each writing to 4 backend resources = 12 arrows that *must* cross.
+
+Instead of wiring every compute icon to every resource icon, **point one arrow
+at the resource GROUP's box**. `from`/`to` accept a group id:
+
+```json
+{"from": "web",    "to": "data"},
+{"from": "api",    "to": "data"},
+{"from": "worker", "to": "data"}
+```
+
+Here `data` is a group `{aurora, cache}`. Three arrows land on the group's edge
+instead of nine landing on scattered icons. The engine excludes the group's own
+member icons from that edge's obstacle set, so the arrow enters the box cleanly.
+
+This single change took the three-tier observed diagram from **21 crossings to
+0**. Use it whenever a set of sources all talk to "the data tier" / "the
+observability stack" / "the services layer" as a unit.
+
+### 2. Fan merge — bundle same-purpose arrows onto one trunk
+
+When several edges share a source (fan-out) or a target (fan-in) and represent
+the *same purpose*, set `"fan": "merge"` on each. They unify onto one port and a
+shared trunk, then split near the spokes:
+
+```json
+{"from": "stepfn", "to": "lambda1", "fan": "merge"},
+{"from": "stepfn", "to": "lambda2", "fan": "merge"},
+{"from": "stepfn", "to": "lambda3", "fan": "merge"}
+```
+
+- Apply `fan: "merge"` to **every** edge in the bundle (≥2 needed).
+- A merged bundle is a **hard constraint**: the engine locks the trunk and
+  routes everything else around it.
+- **Self-protecting**: if the merged trunk would pierce any icon, the engine
+  silently rolls that bundle back to individual routing (a locked trunk can't be
+  cleaned up later, so it refuses to create one that cuts through an icon).
+  → You can safely mark a bundle `merge`; a geometrically-impossible merge just
+  won't happen. It is NOT a way to force a bad trunk.
+- Don't blanket-apply `merge` to everything. Mark bundles that are genuinely "the
+  same flow" (a fan-out to workers, a fan-in to a queue). Unrelated edges sharing
+  an endpoint shouldn't merge.
+
+### 3. Branch nodes go perpendicular (keep the main line straight)
+
+A **degree-1 auxiliary node** sitting *on* the main flow line gets pierced by
+the through-arrow. Humans place such a node perpendicular to the flow (a
+fallback LLM below the router, an auth service above the load balancer). The
+engine does this automatically **when you express the stack**:
+
+Put the auxiliary node in a small **invisible group** (no `groupType`, no
+`label`) together with its anchor, oriented along the flow's main axis:
+
+```json
+{"id": "router_col", "direction": "vertical", "children": [
+  {"id": "router",  "icon": "icons:Arch_AWS-Lambda_48", "label": "Router"},
+  {"id": "bedrock", "icon": "icons:Arch_Amazon-Bedrock_48", "label": "Fallback LLM"}
+]}
+```
+
+The engine recognizes that `router` is the flow node (it connects outside the
+group) and `bedrock` is the branch, and keeps **router on the straight main
+line** while bedrock hangs below. `API GW → Router → models` stays a straight
+horizontal line; the fallback drops down.
+
+The engine also auto-detects and fixes this even without the wrapper group when
+a clear branch sits between two flow nodes, but writing the invisible group is
+the explicit, reliable way to control which side the branch lands on.
+
+---
+
+## Hiding group frames
+
+`groupType` controls the frame:
+
+| JSON | Result |
+|------|--------|
+| `"groupType": "generic-dashed"` | dashed frame + label |
+| `"groupType": "generic-solid"`  | solid frame + label |
+| *(no `groupType`)* | **no frame** — grouping still works for layout |
+
+Omitting `groupType` gives an **invisible group**: icons still cluster and you
+can still aim a connection at the group, but no box is drawn. Use this for the
+branch-node wrapper above, or to get a clean icons-and-arrows-only diagram.
+
+⚠️ A frameless group also drops its **label** (label renders on the frame
+element). If you need the cluster named, keep a `groupType`.
+
+---
+
+## Recipe: take a dense AWS diagram to 0 crossings
+
+1. **Lay out the main flow left→right (or top→bottom)** as the root `direction`.
+   Data pipelines and request flows read best horizontally; don't stack 5 tiers
+   vertically (it overflows and compresses).
+2. **Group by tier/role**: services, data, observability each become a group.
+3. **Replace many-to-many with many-to-one to the group box** (technique 1).
+4. **Mark genuine bundles `fan: "merge"`** (technique 2).
+5. **Wrap degree-1 auxiliaries (fallback, auth, cache-aside) in an invisible
+   perpendicular group** with their anchor (technique 3).
+6. Run `layout`, read `warnings`, and check crossings/pierces. Iterate on
+   structure — not coordinates — if defects remain.
+
+### Worked examples (all reach 0 crossings / 0 pierces)
+
+- **3-tier web**: ECS group → Data group, ECS group → Observability group
+  (many-to-one); `alb → web/api/worker` as a `fan: "merge"` fan-out. 12 → 0.
+- **Microservices + events**: `apigw → services` group, `bus → services` group,
+  `services → queue` group. Per-service `{Lambda, DB}` vertical stacks. 10
+  pierces → 0.
+- **ML inference**: `{router, bedrock}` invisible vertical column; `router →
+  models` group, `models → shared` group. Router stays on the straight flow,
+  Bedrock drops below.
+- **Data pipeline**: horizontal flow `sources → kinesis → stepfn → lambdas →
+  s3 → analytics`; producers fan-in to Kinesis, stepfn fans-out to Lambdas,
+  Lambdas fan-in to S3 — all `fan: "merge"`.
+
+---
+
+## Anti-patterns
+
+- **Wiring every icon to every icon** across two groups → use a group endpoint.
+- **`fan: "merge"` on unrelated edges** that merely share an endpoint → only
+  bundle same-purpose flows.
+- **Forcing a merge the engine rolled back** → the trunk pierced an icon;
+  restructure (split the bundle, reorder, or route to a group) instead.
+- **Deep vertical nesting** (5+ stacked tiers) → overflows height and compresses
+  spacing; flip the root to horizontal.
+- **Putting a degree-1 helper inline on the flow** and expecting no pierce →
+  wrap it perpendicular.
+
+---
+
+## Reading the output
+
+- `warnings`: human-readable hints (tall/wide group, label overlap, residual
+  crossings). The builder's crossing warning is conservative and may flag a
+  shared fan trunk that is *not* a real crossing — trust the diagram and the QA
+  metric over that one warning.
+- `bbox`: final bounding box after scale-to-fit.
+
+For an objective check, the QA harness reports crossings / pierces / overflow /
+score:
+
+```bash
+python3 scripts/layout_qa.py input.json --width 1720 --height 800
+```
+
+---
+**Updated**: 2026-06-29
