@@ -35,10 +35,12 @@ from sdpm.diff import (
     match_elements,
 )
 from sdpm.layout import (
+    _group_member_ids,
     _layout_collect,
     _layout_route_connections,
     _layout_scale,
     _layout_translate,
+    _seg_crosses_box,
     box_to_elements,
     optimize_order,
 )
@@ -770,6 +772,43 @@ def cmd_layout(args):
                             edge_crossing_reported.add(key_ij)
                         crossed = True
                         break
+
+    # Group-frame pierce: an edge slices through a framed group's box without
+    # connecting to that group or any icon inside it. The engine auto-detours
+    # only when it can FULLY clear the box; a residual pierce here is a
+    # structural problem the author must fix (the line has nowhere clean to go
+    # because an unrelated container sits across its path).
+    gframe_reported = set()
+    for e in edges_out:
+        pts = e["points"]
+        if len(pts) < 2:
+            continue
+        efrom = e["from"].rsplit(".", 1)[-1]
+        eto = e["to"].rsplit(".", 1)[-1]
+        for gid, g in groups_out.items():
+            if not g.get("groupType"):
+                continue
+            gshort = gid.rsplit(".", 1)[-1]
+            if efrom == gshort or eto == gshort:
+                continue
+            members = _group_member_ids(nodes_out, groups_out, gid)
+            if efrom in members or eto in members:
+                continue
+            key = (e["from"], e["to"], gid)
+            if key in gframe_reported:
+                continue
+            if any(_seg_crosses_box(pts[k], pts[k + 1], g["x"], g["y"],
+                                    g["width"], g["height"], 2)
+                   for k in range(len(pts) - 1)):
+                glabel = g.get("label", gshort)
+                warnings.append(
+                    f'Edge {e["from"]}→{e["to"]} cuts through group "{glabel}" '
+                    f'without connecting to it. Restructure so the line does not '
+                    f'cross an unrelated container: reorder groups so the endpoints '
+                    f'are adjacent (no group between them), move "{glabel}" off the '
+                    f'path, or connect to the group box itself (many-to-one) if the '
+                    f'flow really does enter it.')
+                gframe_reported.add(key)
 
     # Structure suggestions: sibling size imbalance
     all_items = {}

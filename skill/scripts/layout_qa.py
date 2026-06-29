@@ -29,6 +29,7 @@ from sdpm.layout import (  # noqa: E402
     _layout_collect,
     _layout_route_connections,
     _count_all_crossings,
+    _count_group_pierces,
     _seg_pierces_node,
     _find_node,
 )
@@ -117,6 +118,7 @@ def measure(tree, target_w=1720, target_h=800):
     nodes, groups, edges, rb = _build_layout(tree, target_w, target_h)
 
     crossings = _count_all_crossings(edges)
+    group_pierces = _count_group_pierces(edges, groups, nodes)
 
     pierces = []
     diagonals = []
@@ -208,6 +210,7 @@ def measure(tree, target_w=1720, target_h=800):
     result = {
         "crossings": crossings,
         "pierces": len(pierces),
+        "group_pierces": group_pierces,
         "diagonals": len(diagonals),
         "bad_ports": len(bad_ports),
         "backwards": len(backwards),
@@ -237,6 +240,7 @@ _ASPECT_LO, _ASPECT_HI = 1.4, 3.2
 # a backwards segment is a softer wrongness than either.
 _W_CROSS = 1.0
 _W_PIERCE = 1.5
+_W_GROUP_PIERCE = 1.0
 _W_BACK = 0.7
 _W_BADPORT = 0.5
 
@@ -272,6 +276,7 @@ def score(m):
     defects = (
         _W_CROSS * m["crossings"]
         + _W_PIERCE * m["pierces"]
+        + _W_GROUP_PIERCE * m.get("group_pierces", 0)
         + _W_BACK * m["backwards"]
         + _W_BADPORT * (m["bad_ports"] + m["diagonals"])
     )
@@ -298,6 +303,7 @@ def main():
         return
 
     print(f"crossings={result['crossings']} pierces={result['pierces']} "
+          f"group_pierces={result['group_pierces']} "
           f"diagonals={result['diagonals']} bad_ports={result['bad_ports']} "
           f"backwards={result['backwards']} size={result['size']}")
     print(f"overflow={result['overflow']} wirelength={result['wirelength']} "

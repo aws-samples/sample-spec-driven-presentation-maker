@@ -215,7 +215,10 @@ element). If you need the cluster named, keep a `groupType`.
 ### Worked examples (all reach 0 crossings / 0 pierces)
 
 - **3-tier web**: ECS group → Data group, ECS group → Observability group
-  (many-to-one); `alb → web/api/worker` as a `fan: "merge"` fan-out. 12 → 0.
+  (many-to-one); `alb → web/api/worker` as a `fan: "merge"` fan-out. 12 → 0
+  crossings. ⚠️ Place Observability so `ECS→Obs` does not have to cross the
+  Data box (e.g. Obs as its own row below, not on the far side of Data) — laying
+  Data *between* ECS and Obs causes a group-frame pierce.
 - **Microservices + events**: `apigw → services` group, `bus → services` group,
   `services → queue` group. Per-service `{Lambda, DB}` vertical stacks. 10
   pierces → 0.
@@ -239,23 +242,56 @@ element). If you need the cluster named, keep a `groupType`.
   spacing; flip the root to horizontal.
 - **Putting a degree-1 helper inline on the flow** and expecting no pierce →
   wrap it perpendicular.
+- **Routing a line past a framed group that sits across its path** → the line
+  cuts through an unrelated container's box (a *group-frame pierce*). See below.
+
+---
+
+## Group-frame pierces (a line crossing an unrelated container)
+
+A line that slices through a **framed** group's box without connecting to that
+group or any icon inside it reads as broken — it looks like it belongs to the
+container but doesn't. The engine reports this as `group_pierces` and tries to
+**auto-detour around the box, but ONLY when it can clear it completely**. If a
+group sits squarely across the line's path (so no detour escapes without going
+off-slide or through something else), the engine leaves the line straight and
+emits a warning — because this is a **structural** problem you must fix, not a
+routing one.
+
+When you see `Edge X→Y cuts through group "Z"`:
+
+1. **Reorder the groups** so X and Y are adjacent with no group between them.
+   (Three-tier: putting Observability *between* ECS and Data — or below — instead
+   of on the far side of Data, so `ECS→Obs` doesn't cross the Data box.)
+2. **Move the offending group off the path** (different row/column).
+3. **Connect to the group box itself** (many-to-one) if the flow genuinely
+   enters it — then it's no longer an unrelated container.
+
+Invisible groups (no `groupType`) have no box and never trigger this — only
+framed groups do.
 
 ---
 
 ## Reading the output
 
 - `warnings`: human-readable hints (tall/wide group, label overlap, residual
-  crossings). The builder's crossing warning is conservative and may flag a
-  shared fan trunk that is *not* a real crossing — trust the diagram and the QA
-  metric over that one warning.
+  crossings, **group-frame pierces** with restructuring suggestions). The
+  builder's edge-crossing warning is conservative and may flag a shared fan
+  trunk that is *not* a real crossing — trust the diagram and the QA metric over
+  that one warning.
 - `bbox`: final bounding box after scale-to-fit.
 
-For an objective check, the QA harness reports crossings / pierces / overflow /
-score:
+For an objective check, the QA harness reports crossings / pierces /
+group_pierces / overflow / score:
 
 ```bash
 python3 scripts/layout_qa.py input.json --width 1720 --height 800
 ```
+
+- `crossings` — edge segments that intersect.
+- `pierces` — a line through a non-endpoint **icon**.
+- `group_pierces` — a line through an unrelated **framed group box** (above).
+- A clean diagram has all three at 0.
 
 ---
 **Updated**: 2026-06-29

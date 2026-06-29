@@ -1352,12 +1352,14 @@ def _layout_route_connections(connections, nodes, groups=None):
     # diagonal is ever produced. Guarded on the global weighted total so the
     # per-edge slack can't accumulate into a net-worse layout.
     _det_before = _defect_weight((_count_all_crossings(edges),
-                                  _count_node_pierces(edges, nodes),
+                                  _count_node_pierces(edges, nodes)
+                                  + _count_group_pierces(edges, groups, nodes),
                                   _count_backwards(edges, nodes)))
     _det_snapshot = [list(map(list, e["points"])) for e in edges]
-    _detour_around_pierces(edges, nodes)
+    _detour_around_pierces(edges, nodes, groups)
     _det_after = _defect_weight((_count_all_crossings(edges),
-                                 _count_node_pierces(edges, nodes),
+                                 _count_node_pierces(edges, nodes)
+                                 + _count_group_pierces(edges, groups, nodes),
                                  _count_backwards(edges, nodes)))
     if _det_after > _det_before:
         for e, pts in zip(edges, _det_snapshot):
@@ -2033,6 +2035,62 @@ def _count_node_pierces(edges, nodes):
     return count
 
 
+_GROUP_FRAME_INSET = 2
+
+
+def _seg_crosses_box(p1, p2, bx, by, bw, bh, inset=0):
+    """True if axis-aligned segment p1-p2 passes through rectangle (bx,by,bw,bh).
+
+    `inset` shrinks the rectangle so a segment merely running along the frame
+    edge (or a port landing exactly on it) is not counted as crossing through.
+    """
+    x0, y0 = bx + inset, by + inset
+    x1, y1 = bx + bw - inset, by + bh - inset
+    ax, ay = p1
+    bx2, by2 = p2
+    if ax == bx2:  # vertical segment
+        return x0 < ax < x1 and min(ay, by2) < y1 and max(ay, by2) > y0
+    if ay == by2:  # horizontal segment
+        return y0 < ay < y1 and min(ax, bx2) < x1 and max(ax, bx2) > x0
+    return False
+
+
+def _count_group_pierces(edges, groups, nodes):
+    """Count (edge, framed-group) pairs where an edge cuts through a group's
+    drawn frame without connecting to that group or any icon inside it.
+
+    Only groups with a visible frame (``groupType``) are considered — an
+    invisible grouping has no box to violate. An edge is exempt for a group if
+    it starts/ends at that group OR at any of its member icons (those edges are
+    SUPPOSED to enter the box). Everything else slicing through the frame reads
+    as a stray line crossing an unrelated container, which looks broken.
+    """
+    if not groups:
+        return 0
+    framed = [(gid, g) for gid, g in groups.items() if g.get("groupType")]
+    if not framed:
+        return 0
+    count = 0
+    for e in edges:
+        pts = e["points"]
+        if len(pts) < 2:
+            continue
+        efrom = e["from"].rsplit(".", 1)[-1]
+        eto = e["to"].rsplit(".", 1)[-1]
+        for gid, g in framed:
+            gshort = gid.rsplit(".", 1)[-1]
+            if efrom == gshort or eto == gshort:
+                continue  # edge connects to the group box itself
+            members = _group_member_ids(nodes, groups, gid)
+            if efrom in members or eto in members:
+                continue  # edge connects to an icon inside this group
+            if any(_seg_crosses_box(pts[k], pts[k + 1], g["x"], g["y"],
+                                    g["width"], g["height"], _GROUP_FRAME_INSET)
+                   for k in range(len(pts) - 1)):
+                count += 1
+    return count
+
+
 def _count_backwards(edges, nodes):
     """Count edges whose first/last segment heads opposite to its port normal.
 
@@ -2221,6 +2279,11 @@ _PORT_TRIALS = [(0, 1), (0, 3), (1, 3), (2, 3)]
 # most visually damaging (a line cutting through an icon), so it outweighs a
 # crossing; a backwards stub is the mildest. These mirror layout_qa.score().
 _DEFECT_W = (1.0, 1.5, 0.7)  # (crossings, pierces, backwards)
+# A line cutting through a framed group's box (without connecting to it or any
+# icon inside) reads as broken. Weighted like a crossing — bad, but lighter
+# than an icon pierce — and only steers the detour pass (it cannot un-pierce a
+# box by changing port sides, only by routing around it).
+_W_GROUP_PIERCE_ENGINE = 1.0
 # How many extra crossings a side change may introduce to clear a pierce. One
 # crossing is an acceptable price to stop a line cutting through an icon.
 _RESELECT_CROSS_SLACK = 1
@@ -2504,8 +2567,14 @@ def _jog_candidates(seg_a, seg_b, n):
     return out
 
 
-def _detour_around_pierces(edges, nodes):
+def _detour_around_pierces(edges, nodes, groups=None):
     """Splice obstacle jogs to clear pierces no side/port choice can fix.
+
+    Obstacles are both non-endpoint ICONS and framed GROUP boxes that an edge
+    cuts through without connecting to (group-frame pierce). The same bracket
+    jog clears either — a box is just a wider obstacle. Group pierces feed the
+    weighted cost so a detour around a frame is taken when it does not cost more
+    crossings/icon-pierces than it saves.
 
     Greedy, one commit at a time, re-measuring the full live edge set after
     every tentative change. A jog is committed only if the global
@@ -2517,8 +2586,13 @@ def _detour_around_pierces(edges, nodes):
     if not edges:
         return edges
 
+    # Framed groups an edge may need to detour around (box obstacles).
+    framed = [(gid, g) for gid, g in (groups or {}).items() if g.get("groupType")]
+
     def cost(es):
-        return (_count_all_crossings(es), _count_node_pierces(es, nodes),
+        gp = _count_group_pierces(es, groups, nodes) if framed else 0
+        return (_count_all_crossings(es),
+                _count_node_pierces(es, nodes) + _W_GROUP_PIERCE_ENGINE * gp,
                 _count_backwards(es, nodes))
 
     for _ in range(_DETOUR_PASSES):
@@ -2540,18 +2614,44 @@ def _detour_around_pierces(edges, nodes):
             if len(pts) < 2:
                 continue
             ignore = {e["from"], e["to"]}
+            # Box obstacles this edge must avoid: framed groups it neither
+            # connects to nor has a member endpoint in.
+            efrom = e["from"].rsplit(".", 1)[-1]
+            eto = e["to"].rsplit(".", 1)[-1]
+            box_obstacles = []
+            for gid, g in framed:
+                gshort = gid.rsplit(".", 1)[-1]
+                if efrom == gshort or eto == gshort:
+                    continue
+                members = _group_member_ids(nodes, groups, gid)
+                if efrom in members or eto in members:
+                    continue
+                box_obstacles.append(g)
+            # A box detour is only worth taking if it removes ALL frame pierces
+            # this edge causes — a partial detour that still clips a box just
+            # adds wire/bends for a still-broken look (the microservices
+            # bus-through-services case). Icon-pierce jogs keep their original
+            # partial-improvement behaviour.
             base = cost(edges)
             best_pts = None
             best_score = base
             # Scan each segment for a pierced obstacle; build jog candidates.
             for k in range(len(pts) - 1):
                 seg_a, seg_b = pts[k], pts[k + 1]
+                # Obstacles for this segment: non-endpoint icons it pierces, plus
+                # framed group boxes it cuts through.
+                hit_obs = []
                 for nid, n in nodes.items():
                     short = nid.rsplit(".", 1)[-1]
                     if nid in ignore or short in ignore:
                         continue
-                    if not _seg_pierces_node(seg_a, seg_b, n):
-                        continue
+                    if _seg_pierces_node(seg_a, seg_b, n):
+                        hit_obs.append((n, False))
+                for g in box_obstacles:
+                    if _seg_crosses_box(seg_a, seg_b, g["x"], g["y"],
+                                        g["width"], g["height"], _GROUP_FRAME_INSET):
+                        hit_obs.append((g, True))
+                for n, is_box in hit_obs:
                     for repl in _jog_candidates(seg_a, seg_b, n):
                         cand = pts[:k + 1] + repl[1:-1] + pts[k + 1:]
                         if not _is_axis_aligned(cand):
@@ -2564,7 +2664,19 @@ def _detour_around_pierces(edges, nodes):
                         saved = e["points"]
                         e["points"] = cand
                         score = cost(edges)
+                        # A box detour must fully clear this edge's frame
+                        # pierces; a partial escape is rejected so we never
+                        # commit a longer, still-piercing route.
+                        box_pierce_after = (_count_group_pierces([e], groups, nodes)
+                                            if box_obstacles else 0)
                         e["points"] = saved
+                        # Box detour: accept ONLY when it fully clears this
+                        # edge of every frame it cut through. A still-clipping
+                        # detour (after > 0) is the structural case the user
+                        # must fix by restructuring — leave it untouched and let
+                        # the warning flag it.
+                        if is_box and box_pierce_after != 0:
+                            continue
                         # Judge by weighted defect (pierce 1.5 > cross 1.0): a jog
                         # may add up to _RESELECT_CROSS_SLACK crossings to lift a
                         # line off an icon it cuts through, which reads far worse
