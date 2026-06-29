@@ -656,6 +656,16 @@ def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_
     elif align == "center" and direction == "vertical":
         _align_leaves_to_sibling_centers_h(ordered)
 
+    # The alignment passes above translate LEAVES (including ones nested inside
+    # child sub-groups) without touching the sub-group's own box. Re-derive each
+    # child group's bbox bottom-up so its frame still wraps its (now-moved)
+    # icons — otherwise the box stays at the pre-alignment position and the
+    # shifted icons spill outside the frame (e.g. a Data Tier whose ElastiCache
+    # dropped below the solid border).
+    for c in children:
+        if c.get("children"):
+            _recompute_group_bbox(c)
+
     min_x = min(c["_bindings"][0] - c["_margin"]["left"] for c in children)
     min_y = min(c["_bindings"][1] - c["_margin"]["top"] for c in children)
     max_x = max(c["_bindings"][0] + c["_bindings"][2] + c["_margin"]["right"] for c in children)
@@ -669,6 +679,34 @@ def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_
     node["_bindings"] = [gx, gy, gw, gh]
     node["_margin"] = margin
     node["_padding"] = padding
+
+
+def _recompute_group_bbox(node):
+    """Re-derive a group's bbox from its children, bottom-up, in place.
+
+    Used after the leaf-alignment passes move icons that live inside nested
+    sub-groups: those moves don't update the sub-group's own `_bindings`, so its
+    frame would otherwise stay where it was before the shift and no longer wrap
+    its icons. Recurses so deep nesting is corrected from the leaves up. Reuses
+    the group's stored `_padding` so the frame keeps its label band and margins.
+    """
+    children = node.get("children")
+    if not children:
+        return
+    for c in children:
+        if c.get("children"):
+            _recompute_group_bbox(c)
+    padding = node.get("_padding", {"top": 0, "right": 0, "bottom": 0, "left": 0})
+    min_x = min(c["_bindings"][0] - c["_margin"]["left"] for c in children)
+    min_y = min(c["_bindings"][1] - c["_margin"]["top"] for c in children)
+    max_x = max(c["_bindings"][0] + c["_bindings"][2] + c["_margin"]["right"] for c in children)
+    max_y = max(c["_bindings"][1] + c["_bindings"][3] + c["_margin"]["bottom"] for c in children)
+    node["_bindings"] = [
+        min_x - padding["left"],
+        min_y - padding["top"],
+        (max_x - min_x) + padding["left"] + padding["right"],
+        (max_y - min_y) + padding["top"] + padding["bottom"],
+    ]
 
 
 def _ranges_overlap(lo1, hi1, lo2, hi2):
