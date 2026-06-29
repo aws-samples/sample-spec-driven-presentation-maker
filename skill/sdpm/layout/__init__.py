@@ -16,7 +16,107 @@ def optimize_order(tree):
     connections = tree.get("connections", [])
     if not connections:
         return
+    # Shape-first pre-pass: pull degree-1 auxiliary nodes that sit ON the main
+    # flow line out into a perpendicular lane so the straight through-edge does
+    # not pierce them (e.g. a Bedrock fallback wedged between Router and the
+    # model group). Runs before ordering so the new sub-groups get ordered too.
+    _promote_branch_nodes(tree, connections)
     _optimize_group_order(tree, connections)
+
+
+def _promote_branch_nodes(node, connections, root=None):
+    """Move degree-1 'branch' leaves off the main flow into a perpendicular lane.
+
+    Detects the human-layout pattern: in a linear (horizontal/vertical) group,
+    a leaf ``b`` with exactly one connection whose anchor ``a`` is a sibling in
+    the same group, where another edge from ``a`` runs straight past ``b``'s
+    slot to a node on the far side. Drawn linearly, that through-edge pierces
+    ``b``. The fix (Shape-First / bend-minimisation philosophy: keep the main
+    line straight, displace the auxiliary node) wraps ``{a, b}`` into an
+    invisible sub-group oriented PERPENDICULAR to the parent, so ``a`` stays on
+    the flow line and ``b`` is offset to the side. Mutates ``node`` in place.
+    """
+    if root is None:
+        root = node
+    children = node.get("children", [])
+    # Depth-first so inner groups are handled before we look at this level.
+    for child in children:
+        _promote_branch_nodes(child, connections, root)
+    children = node.get("children", [])
+    direction = node.get("direction")
+    if len(children) < 3 or direction not in ("horizontal", "vertical"):
+        return
+
+    # Map each direct child -> the leaf ids it contains; and each leaf -> the
+    # index of the direct child that owns it (a sub-group counts as one slot).
+    leaf_to_idx = {}
+    for i, c in enumerate(children):
+        ids = []
+        _collect_leaf_ids(c, ids)
+        for lid in ids:
+            leaf_to_idx[lid] = i
+
+    # Global degree + neighbour list over all connections.
+    deg = {}
+    nbr = {}
+    for conn in connections:
+        for a, b in ((conn["from"], conn["to"]), (conn["to"], conn["from"])):
+            deg[a] = deg.get(a, 0) + 1
+            nbr.setdefault(a, []).append(b)
+
+    # Collect qualifying branch leaves, grouped by their anchor.
+    branches_by_anchor = {}
+    for i, c in enumerate(children):
+        if c.get("children"):
+            continue  # only bare leaves can be branch nodes
+        bid = c.get("id")
+        if bid is None or deg.get(bid, 0) != 1:
+            continue
+        aid = nbr[bid][0]
+        ia = leaf_to_idx.get(aid)
+        if ia is None or children[ia].get("children"):
+            continue  # anchor must be a direct-child leaf of this same group
+        # Is there a through-edge from the anchor that crosses b's slot?
+        ib = i
+        through = False
+        for other in nbr.get(aid, []):
+            if other == bid:
+                continue
+            ic = leaf_to_idx.get(other)
+            if ic is not None and (ia - ib) * (ic - ib) < 0:
+                through = True
+                break
+        if through:
+            branches_by_anchor.setdefault(aid, (ia, []))[1].append((ib, c))
+
+    if not branches_by_anchor:
+        return
+
+    perp = "vertical" if direction == "horizontal" else "horizontal"
+    remove = set()
+    inserts = {}  # insertion index -> new sub-group node
+    for aid, (ia, brs) in branches_by_anchor.items():
+        anchor = children[ia]
+        slot = min([ia] + [ib for ib, _ in brs])
+        # anchor first so it keeps the centred slot on the flow line; branches
+        # follow in their original order.
+        members = [anchor] + [c for _, c in sorted(brs)]
+        inserts[slot] = {
+            "id": "_branchlane_" + (aid or "x"),
+            "direction": perp,
+            "children": members,
+        }
+        remove.add(ia)
+        remove.update(ib for ib, _ in brs)
+
+    rebuilt = []
+    for i, c in enumerate(children):
+        if i in inserts:
+            rebuilt.append(inserts[i])
+        if i in remove:
+            continue
+        rebuilt.append(c)
+    node["children"] = rebuilt
 
 
 def _optimize_group_order(node, connections, root=None):
