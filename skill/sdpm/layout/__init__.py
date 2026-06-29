@@ -105,6 +105,10 @@ def _promote_branch_nodes(node, connections, root=None):
             "id": "_branchlane_" + (aid or "x"),
             "direction": perp,
             "children": members,
+            # Remember which member is the flow anchor so the layout pass can
+            # keep IT (not the lane's centroid) on the main flow line, letting
+            # the branch hang off to the side.
+            "_branch_anchor": aid,
         }
         remove.add(ia)
         remove.update(ib for ib, _ in brs)
@@ -829,6 +833,7 @@ def _align_leaves_to_sibling_centers(ordered):
             dy = target_cy - current_cy
             if dy != 0:
                 _layout_translate(child, 0, dy)
+    _align_branch_lane_anchors(ordered, target_cy, axis="y")
 
 
 def _align_leaves_to_sibling_centers_h(ordered):
@@ -868,6 +873,37 @@ def _align_leaves_to_sibling_centers_h(ordered):
             dx = target_cx - current_cx
             if dx != 0:
                 _layout_translate(child, dx, 0)
+    _align_branch_lane_anchors(ordered, target_cx, axis="x")
+
+
+def _align_branch_lane_anchors(ordered, target, axis):
+    """Shift each promoted branch lane so its ANCHOR (not the lane centroid)
+    sits on the main flow line.
+
+    A branch lane (created by _promote_branch_nodes) stacks {anchor, branch}
+    perpendicular to the flow. Block-placement centres the lane's bounding box,
+    which pushes the anchor off the flow axis. We translate the whole lane so
+    the anchor's center returns to ``target`` and the branch hangs off to the
+    side, keeping the through-flow edge straight. axis "y" → vertical flow
+    offset (horizontal parent); axis "x" → horizontal offset (vertical parent).
+    """
+    pos_idx = 1 if axis == "y" else 0
+    size_idx = 3 if axis == "y" else 2
+    for child in ordered:
+        aid = child.get("_branch_anchor")
+        if not aid or not child.get("children"):
+            continue
+        anchor = next((m for m in child["children"] if m.get("id") == aid), None)
+        if anchor is None:
+            continue
+        ab = anchor["_bindings"]
+        anchor_center = ab[pos_idx] + ab[size_idx] // 2
+        delta = target - anchor_center
+        if delta != 0:
+            if axis == "y":
+                _layout_translate(child, 0, delta)
+            else:
+                _layout_translate(child, delta, 0)
 
 
 def _layout_collect(node, nodes_out, groups_out, prefix=""):
