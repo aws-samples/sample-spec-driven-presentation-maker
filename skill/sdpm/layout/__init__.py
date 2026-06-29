@@ -21,7 +21,65 @@ def optimize_order(tree):
     # not pierce them (e.g. a Bedrock fallback wedged between Router and the
     # model group). Runs before ordering so the new sub-groups get ordered too.
     _promote_branch_nodes(tree, connections)
+    # Also tag hand-authored invisible lanes (e.g. a {router, bedrock} vertical
+    # column the LLM wrote directly) with their flow anchor, so the same
+    # anchor-on-flow alignment applies as for engine-promoted lanes.
+    _tag_manual_branch_anchors(tree, connections)
     _optimize_group_order(tree, connections)
+
+
+def _tag_manual_branch_anchors(node, connections, root=None):
+    """Tag hand-authored invisible linear sub-groups with their flow anchor.
+
+    The engine's own _promote_branch_nodes tags the lanes IT creates, but an
+    author may hand-write the same shape — an invisible (no groupType/label)
+    horizontal/vertical group stacking a flow node with an auxiliary one, e.g.
+    ``{router, bedrock}`` so Bedrock sits beside Router. Block-placement then
+    centres that group by its bounding box, pushing the flow node off the main
+    line. We detect such a group and tag it with ``_branch_anchor`` = the sole
+    member that connects OUTSIDE the group (the flow node); the layout pass then
+    keeps that member on the flow line and lets the rest hang off to the side.
+    Mutates in place. Skips groups that already carry the tag.
+    """
+    if root is None:
+        root = node
+    for child in node.get("children", []):
+        _tag_manual_branch_anchors(child, connections, root)
+
+    children = node.get("children", [])
+    if len(children) < 2 or node.get("_branch_anchor"):
+        return
+    # Only invisible linear groups qualify (a visible box is a deliberate
+    # cluster, not a flow node + offset branch).
+    if node.get("direction") not in ("horizontal", "vertical"):
+        return
+    if node.get("groupType") or node.get("label"):
+        return
+    # Every direct child must be a bare leaf (the {anchor, branch} pattern).
+    member_ids = []
+    for c in children:
+        if c.get("children") or "id" not in c:
+            return
+        member_ids.append(c["id"])
+    member_set = set(member_ids)
+
+    # An "anchor" is a member that connects to something OUTSIDE this group.
+    outward = []
+    for c in children:
+        cid = c["id"]
+        for conn in connections:
+            other = None
+            if conn["from"] == cid:
+                other = conn["to"]
+            elif conn["to"] == cid:
+                other = conn["from"]
+            if other is not None and other not in member_set:
+                outward.append(cid)
+                break
+    # Tag only when exactly ONE member reaches outside — that is unambiguously
+    # the flow node; the rest are branches hanging off it.
+    if len(outward) == 1:
+        node["_branch_anchor"] = outward[0]
 
 
 def _promote_branch_nodes(node, connections, root=None):
@@ -1782,18 +1840,25 @@ def _align_fan_bends(edges, conn_sides, connections, nodes=None, groups=None):
         # The user wants same-purpose edges merged, so a merge that adds only a
         # MODEST number of crossings is kept (a tidy trunk reads better than a
         # few crossings). Roll back when:
-        #   - the bundle's own edges PIERCE icons (genuinely broken, e.g. sources
-        #     stacked in line with the hub), or
+        #   - the merged trunk PIERCES any icon. A fan bundle is `_fan_locked`,
+        #     so the downstream pierce-resolution passes (side reselect, detour)
+        #     CANNOT clear it later — whatever the locked trunk cuts through is
+        #     permanent. Individually-routed edges, by contrast, get cleaned up
+        #     by those passes, so an unmerged fan whose members pierce here may
+        #     still reach 0 pierces in the final layout. Hence the test is
+        #     "trunk pierces anything at all" (after_p > 0), not the weaker
+        #     "merge ADDED pierces" — the latter compares two pre-optimization
+        #     snapshots and wrongly keeps a doomed locked trunk (e.g. four
+        #     agents fanning into a Bedrock hub through the icons below them).
         #   - the merge adds MORE crossings than the bundle size — a sign the
         #     trunk is fighting another structure (e.g. a hub that is both a
         #     fan-in and fan-out target), where separate routing is cleaner.
         snap = {j: list(map(list, edges[j]["points"])) for j in indices}
-        before_p = _count_node_pierces([edges[j] for j in indices], nodes)
         before_c = _count_all_crossings(edges)
         _rewrite_fan(edges, conn_sides, indices, mode=mode, nodes=nodes, groups=groups)
         after_p = _count_node_pierces([edges[j] for j in indices], nodes)
         after_c = _count_all_crossings(edges)
-        if after_p > before_p or (after_c - before_c) > len(indices):
+        if after_p > 0 or (after_c - before_c) > len(indices):
             for j in indices:
                 edges[j]["points"] = snap[j]
                 edges[j].pop("_fan_locked", None)
