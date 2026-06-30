@@ -1557,6 +1557,112 @@ def _layout_route_connections(connections, nodes, groups=None):
     # by the group bus (T14) are left alone.
     _straighten_group_edges(edges, nodes, groups)
 
+    # T16: U-turn a group-endpoint monitor edge around framed boxes. An edge
+    # from a GROUP box to a far node with framed groups in between (e.g. the ETL
+    # group → CloudWatch across the Consumers frame) defaults to a right-exit
+    # that the detour pass can only hack past, leaving a staircase that still
+    # grazes the frame. This one-shot pass tries a single clean U: exit the
+    # group's BOTTOM (or TOP), run a trunk just past the obstacle boxes, and
+    # enter the far node on the matching face. Committed only if it lowers the
+    # weighted defect total. Cheap: one candidate per qualifying edge.
+    _uturn_group_endpoint_edges(edges, nodes, groups)
+
+    return edges
+
+
+_UTURN_CLEAR = 20
+
+
+def _uturn_group_endpoint_edges(edges, nodes, groups):
+    """Reroute a solo group-endpoint edge that cuts framed boxes into a clean U.
+
+    Targets an edge with a GROUP endpoint that still pierces one or more framed
+    group boxes (a monitor/aggregator line crossing the diagram). Builds ONE
+    candidate per vertical direction: leave the group box's bottom (or top) edge,
+    run a horizontal trunk just beyond ALL the boxes it would otherwise cross,
+    then rise/drop into the far endpoint on that same vertical face. Keeps the
+    candidate only if the global weighted defect total strictly improves and
+    crossings do not rise. O(edges × groups) — no port/side search.
+    """
+    if not groups:
+        return edges
+    framed = [g for g in groups.values() if g.get("groupType")]
+    if not framed:
+        return edges
+
+    def weighted():
+        return _defect_weight((_count_all_crossings(edges),
+                               _count_node_pierces(edges, nodes)
+                               + _W_GROUP_PIERCE_ENGINE * _count_group_pierces(edges, groups, nodes),
+                               _count_backwards(edges, nodes)))
+
+    for e in edges:
+        if e.get("_fan_locked") or e.get("_fanout"):
+            continue
+        if len(e["points"]) < 2:
+            continue
+        # Must involve a group endpoint and still have a routing defect (a
+        # framed-box cut OR a non-endpoint icon pierce) the prior passes left —
+        # the staircase the detour produced still grazes icons/frames.
+        if not (e.get("_src_group") or e.get("_dst_group")):
+            continue
+        if (_count_group_pierces([e], groups, nodes) == 0
+                and not _edge_pierces(e, nodes)):
+            continue
+        src, src_is_grp = _find_endpoint(nodes, groups, e["from"])
+        dst, dst_is_grp = _find_endpoint(nodes, groups, e["to"])
+        if not src or not dst:
+            continue
+
+        # Boxes this edge must clear (framed, not its own endpoints/members).
+        efrom, eto = e["from"].rsplit(".", 1)[-1], e["to"].rsplit(".", 1)[-1]
+        boxes = []
+        for gid, g in groups.items():
+            if not g.get("groupType"):
+                continue
+            gshort = gid.rsplit(".", 1)[-1]
+            if gshort in (efrom, eto):
+                continue
+            members = _group_member_ids(nodes, groups, gid)
+            if efrom in members or eto in members:
+                continue
+            boxes.append(g)
+        if not boxes:
+            continue
+
+        s_label = 0 if src_is_grp else (30 if src.get("label") else 0)
+        d_label = 0 if dst_is_grp else (30 if dst.get("label") else 0)
+        sx_c = src["x"] + src["width"] // 2
+        dx_c = dst["x"] + dst["width"] // 2
+        snap = [list(map(list, ee["points"])) for ee in edges]
+        before = weighted()
+        before_cross = _count_all_crossings(edges)
+
+        best = None
+        for vside in ("bottom", "top"):
+            # Trunk Y just past every box on the chosen vertical side, and past
+            # both endpoints' own extents so the stubs don't clip their boxes.
+            if vside == "bottom":
+                trunk_y = max([g["y"] + g["height"] for g in boxes]
+                              + [src["y"] + src["height"], dst["y"] + dst["height"]]) + _UTURN_CLEAR
+                sp = [sx_c, src["y"] + src["height"] + s_label]
+                tp = [dx_c, dst["y"] + dst["height"] + d_label]
+            else:
+                trunk_y = min([g["y"] for g in boxes]
+                              + [src["y"], dst["y"]]) - _UTURN_CLEAR
+                sp = [sx_c, src["y"]]
+                tp = [dx_c, dst["y"]]
+            cand = [sp, [sp[0], trunk_y], [tp[0], trunk_y], tp]
+            e["points"] = cand
+            w = weighted()
+            if (w < before and _count_all_crossings(edges) <= before_cross
+                    and (best is None or w < best[0])):
+                best = (w, [list(p) for p in cand])
+            for ee, pts in zip(edges, snap):
+                ee["points"] = pts
+
+        if best is not None:
+            e["points"] = best[1]
     return edges
 
 
