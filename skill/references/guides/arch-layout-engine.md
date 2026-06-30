@@ -91,7 +91,12 @@ engine is free** to reorder children, pick arrow ports, and shift icons to:
 - cluster connected icons close together (shorter total wire length),
 - minimize edge **crossings** and icon **pierces** (an arrow cutting through a
   non-endpoint icon),
-- keep the layout on-slide (overflow is ranked worse than any crossing).
+- keep the layout on-slide (overflow is ranked worse than any crossing),
+- **straighten arrows where a straight run fits** — a solo arrow between two
+  side-by-side endpoints (icon↔icon, icon↔group box, or two group boxes of
+  unequal height) is drawn as one straight line, not an L-bend, by attaching it
+  at the smaller endpoint's center. Many-to-one arrows into a group box stay
+  bundled as a parallel bus instead (so they don't all pile onto one point).
 
 A multi-objective "judge" scores candidate layouts lexicographically:
 `(off-slide overflow) → (weighted defects: pierce 1.5 > crossing 1.0 > backwards
@@ -294,4 +299,4 @@ python3 scripts/layout_qa.py input.json --width 1720 --height 800
 - A clean diagram has all three at 0.
 
 ---
-**Updated**: 2026-06-29
+**Updated**: 2026-06-30

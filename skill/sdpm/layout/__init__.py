@@ -930,25 +930,41 @@ def _align_corresponding_leaves_x(ordered):
 
 
 def _collect_vertical_groups(node, out):
-    """Recursively collect vertical groups with their direct leaves."""
+    """Collect the OUTERMOST vertical groups with their direct leaves.
+
+    Descends through horizontal groups (their vertical children may be genuine
+    side-by-side peers) but STOPS at a vertical group: a vertical sub-group
+    nested inside another vertical column is that column's internal structure
+    (e.g. an {Inference, Bedrock} branch deep inside a Processing column), NOT a
+    peer of the column's top-level siblings. Collecting it would let row
+    alignment drag an unrelated top-level group down to match a deeply-nested
+    one — the bug that bent group-to-group arrows into L shapes.
+    """
     if not node.get("children"):
         return
     if node.get("direction", "horizontal") == "vertical":
         leaves = [c for c in node["children"] if not c.get("children")]
         if leaves:
             out.append((node, leaves))
+        return  # internals of a vertical column are not peers of its siblings
     for child in node.get("children", []):
         _collect_vertical_groups(child, out)
 
 
 def _collect_horizontal_groups(node, out):
-    """Recursively collect horizontal groups with their direct leaves."""
+    """Collect the OUTERMOST horizontal groups with their direct leaves.
+
+    Mirror of _collect_vertical_groups: descends through vertical groups but
+    stops at a horizontal group, so a horizontal sub-row nested inside another
+    horizontal row is not column-aligned with that row's top-level siblings.
+    """
     if not node.get("children"):
         return
     if node.get("direction", "horizontal") == "horizontal":
         leaves = [c for c in node["children"] if not c.get("children")]
         if leaves:
             out.append((node, leaves))
+        return  # internals of a horizontal row are not peers of its siblings
     for child in node.get("children", []):
         _collect_horizontal_groups(child, out)
 
@@ -1524,6 +1540,108 @@ def _layout_route_connections(connections, nodes, groups=None):
     # global crossing count.
     _align_group_bus(edges, nodes, groups)
 
+    # T15: Straighten solo group-endpoint edges. A connection to a GROUP box
+    # defaults its port to the box center, so a node→tall-group (or small-group→
+    # tall-group) edge bends into an L even when a straight run fits inside both
+    # facing edges — the "Step Functions → Processing" / "Processing → Shared"
+    # L-bends. Slide the port that has the larger box to the smaller endpoint's
+    # center so the arrow becomes a clean straight line. Guarded; bundles owned
+    # by the group bus (T14) are left alone.
+    _straighten_group_edges(edges, nodes, groups)
+
+    return edges
+
+
+def _straighten_group_edges(edges, nodes, groups):
+    """Make a solo group-endpoint edge a straight line when one fits.
+
+    A connection whose endpoint is a GROUP box gets its port at the box center,
+    so when the two endpoints differ in cross-axis extent (a 60px icon vs a
+    765px column, or two columns of unequal height) the elbow router bends the
+    edge even though a single straight segment would fit inside both facing
+    edges. For each such edge whose two ports sit on facing horizontal (or
+    facing vertical) sides, we choose a common cross-axis coordinate that lies
+    inside BOTH endpoints' spans — preferring the SMALLER endpoint's center, so
+    single icons and small boxes attach at their visual middle and the larger
+    box absorbs the offset — and re-emit a straight 2-point edge.
+
+    Left untouched: fan trunks (the merge is a hard constraint) and any edge
+    sharing a group endpoint with another edge (a many-to-one bundle owned by
+    the group-bus pass, T14). Guarded on the global weighted defect total so
+    straightening can never add a crossing, icon pierce, or frame pierce.
+    """
+    if not edges:
+        return edges
+
+    # Count edges per group endpoint so many-to-one bundles stay with the bus.
+    grp_use = {}
+    for e in edges:
+        if e.get("_src_group"):
+            grp_use[("src", e["_src_group"])] = grp_use.get(("src", e["_src_group"]), 0) + 1
+        if e.get("_dst_group"):
+            grp_use[("dst", e["_dst_group"])] = grp_use.get(("dst", e["_dst_group"]), 0) + 1
+
+    def weighted(es):
+        return _defect_weight((_count_all_crossings(es),
+                               _count_node_pierces(es, nodes)
+                               + _count_group_pierces(es, groups, nodes),
+                               _count_backwards(es, nodes)))
+
+    for e in edges:
+        if e.get("_fan_locked") or e.get("_fanout"):
+            continue
+        pts = e["points"]
+        if len(pts) < 2:
+            continue
+        # Only group-endpoint edges suffer the box-center kink; node→node edges
+        # are already snapped straight by the elbow router when they line up.
+        if not (e.get("_src_group") or e.get("_dst_group")):
+            continue
+        if e.get("_src_group") and grp_use.get(("src", e["_src_group"]), 0) >= 2:
+            continue
+        if e.get("_dst_group") and grp_use.get(("dst", e["_dst_group"]), 0) >= 2:
+            continue
+        s_geom, _ = _find_endpoint(nodes, groups, e["from"])
+        d_geom, _ = _find_endpoint(nodes, groups, e["to"])
+        if not s_geom or not d_geom:
+            continue
+        first_h = abs(pts[0][1] - pts[1][1]) <= 2
+        first_v = abs(pts[0][0] - pts[1][0]) <= 2
+        last_h = abs(pts[-1][1] - pts[-2][1]) <= 2
+        last_v = abs(pts[-1][0] - pts[-2][0]) <= 2
+
+        new_pts = None
+        if first_h and last_h and abs(pts[0][1] - pts[-1][1]) > 2:
+            # Both ports on left/right edges → straighten on a common Y.
+            lo = max(s_geom["y"], d_geom["y"])
+            hi = min(s_geom["y"] + s_geom["height"], d_geom["y"] + d_geom["height"])
+            if hi - lo > 2:
+                if s_geom["height"] <= d_geom["height"]:
+                    c = s_geom["y"] + s_geom["height"] / 2
+                else:
+                    c = d_geom["y"] + d_geom["height"] / 2
+                y = round(min(max(c, lo + 1), hi - 1))
+                new_pts = [[pts[0][0], y], [pts[-1][0], y]]
+        elif first_v and last_v and abs(pts[0][0] - pts[-1][0]) > 2:
+            # Both ports on top/bottom edges → straighten on a common X.
+            lo = max(s_geom["x"], d_geom["x"])
+            hi = min(s_geom["x"] + s_geom["width"], d_geom["x"] + d_geom["width"])
+            if hi - lo > 2:
+                if s_geom["width"] <= d_geom["width"]:
+                    c = s_geom["x"] + s_geom["width"] / 2
+                else:
+                    c = d_geom["x"] + d_geom["width"] / 2
+                x = round(min(max(c, lo + 1), hi - 1))
+                new_pts = [[x, pts[0][1]], [x, pts[-1][1]]]
+        if new_pts is None:
+            continue
+
+        snap = [list(map(list, ee["points"])) for ee in edges]
+        before = weighted(edges)
+        e["points"] = new_pts
+        if weighted(edges) > before:
+            for ee, p in zip(edges, snap):
+                ee["points"] = p
     return edges
 
 
