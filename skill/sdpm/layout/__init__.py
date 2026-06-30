@@ -3391,6 +3391,60 @@ def _update_bend_x(points, old_x, new_x):
 
 
 _FAN_BEND_MARGIN = 30
+# How far past a framed group's edge the fan trunk is pushed so the split/merge
+# happens clearly outside the box, not flush against the frame.
+_FAN_GROUP_CLEARANCE = 22
+
+
+def _enclosing_framed_group(groups, nodes, node_id):
+    """Return the geometry of the framed group that directly encloses node_id.
+
+    A fan hub that lives inside a drawn box should split/merge OUTSIDE that box.
+    We find the framed (groupType) group whose member set contains node_id and,
+    if several nest, pick the SMALLEST (innermost) by area — that is the frame
+    the trunk must clear first. Returns the group dict or None.
+    """
+    if not groups:
+        return None
+    short = node_id.rsplit(".", 1)[-1]
+    best = None
+    for gid, g in groups.items():
+        if not g.get("groupType"):
+            continue
+        members = _group_member_ids(nodes, groups, gid)
+        if short in members:
+            area = g["width"] * g["height"]
+            if best is None or area < best[0]:
+                best = (area, g)
+    return best[1] if best else None
+
+
+def _push_trunk_outside_group(trunk_v, side, vertical, nearest, hbox):
+    """Shift a fan trunk coordinate to just past the hub's enclosing frame.
+
+    The trunk is the shared line where the bundle splits (fan-out) or merges
+    (fan-in). When the hub sits inside a framed box, a trunk flush against the
+    icon still bends inside the frame. Push it past the frame edge it exits
+    through (by _FAN_GROUP_CLEARANCE), but clamp so it never reaches/over­shoots
+    the nearest spoke — leaving the spoke side of the gap for the actual fan.
+    No-op when there is no enclosing frame or the push would cross the spoke.
+    """
+    if hbox is None:
+        return trunk_v
+    if vertical:
+        edge = hbox["y"] + hbox["height"] if side == "bottom" else hbox["y"]
+    else:
+        edge = hbox["x"] + hbox["width"] if side == "right" else hbox["x"]
+    if side in ("right", "bottom"):
+        target = edge + _FAN_GROUP_CLEARANCE
+        # only push outward, and stay short of the nearest spoke
+        if target > trunk_v and target < nearest:
+            return target
+    else:  # left / top — frame edge is on the smaller-coordinate side
+        target = edge - _FAN_GROUP_CLEARANCE
+        if target < trunk_v and target > nearest:
+            return target
+    return trunk_v
 
 
 def _fan_side_vote(edges, conn_sides, indices, mode, nodes=None, groups=None):
@@ -3500,6 +3554,19 @@ def _rewrite_fan(edges, conn_sides, indices, mode, nodes=None, groups=None):
         spoke_hs = [p[0] for p in spoke_ends]
         nearest = min(spoke_hs) if side == "right" else max(spoke_hs)
         trunk_v = _gap_trunk(port[0], nearest)
+
+    # Keep the split/merge OUTSIDE the hub's framed group. When the hub icon
+    # lives inside a drawn box (e.g. EventBridge inside "Orchestration"), a
+    # trunk sitting just past the icon still bends WHILE inside the frame, so
+    # the fan visibly branches within an unrelated container. Push the trunk
+    # past the frame edge it exits through (plus a margin) so the bundle leaves
+    # the box as one line and only fans out beyond it — but never past the
+    # nearest spoke (that would drive the trunk into the targets). Only applies
+    # when the hub is a NODE enclosed by a framed group on the exit side.
+    if not hub_is_group and groups:
+        trunk_v = _push_trunk_outside_group(
+            trunk_v, side, vertical, nearest,
+            _enclosing_framed_group(groups, nodes, hub_id))
 
     # The spoke nodes (the N individual ends) must ALSO leave/enter through a
     # consistent edge — the one facing the trunk. A fan-in to a trunk BELOW the
