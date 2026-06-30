@@ -41,8 +41,9 @@ from sdpm.layout import (
     _layout_scale,
     _layout_translate,
     _seg_crosses_box,
-    assign_cross_axis_fit,
     box_to_elements,
+    cancel_cross_axis_squash,
+    measure_natural_child_sizes,
     optimize_order,
 )
 from sdpm.preview.backend import _is_wsl
@@ -484,12 +485,9 @@ def cmd_layout(args):
     target_w = args.width
     target_h = args.height
 
-    # Per-group cross-axis fit: compress ONLY the sibling groups that overflow
-    # the cross axis (a single tall group in a horizontal row), so short
-    # siblings aren't crushed by a global squash. Re-run scale to apply.
-    if assign_cross_axis_fit(tree, root, target_w, target_h):
-        root = build_root()
-        _layout_scale(root, direction, align)
+    # Record each top-level group's NATURAL cross-axis size so we can later tell
+    # which groups fit on their own (before any global squash).
+    natural_sizes = measure_natural_child_sizes(tree, root)
 
     cumulative_sh = 1.0
     cumulative_sv = 1.0
@@ -502,6 +500,14 @@ def cmd_layout(args):
                 break
             cumulative_sh *= sx
             cumulative_sv *= sy
+            root = build_root()
+            _layout_scale(root, direction, align, cumulative_sh, cumulative_sv)
+        # A single oversized group forces a global cross-axis squash that would
+        # crush short siblings. Cancel that squash on the groups that already
+        # fit (the slide may overflow — that's the oversized group's problem,
+        # flagged by a warning — but the groups that fit stay readable).
+        if cancel_cross_axis_squash(tree, natural_sizes, cumulative_sh,
+                                    cumulative_sv, target_w, target_h):
             root = build_root()
             _layout_scale(root, direction, align, cumulative_sh, cumulative_sv)
         args._cumulative_scale = min(cumulative_sh, cumulative_sv)

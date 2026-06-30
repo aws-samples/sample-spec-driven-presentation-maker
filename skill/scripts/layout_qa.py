@@ -32,7 +32,8 @@ from sdpm.layout import (  # noqa: E402
     _count_group_pierces,
     _seg_pierces_node,
     _find_node,
-    assign_cross_axis_fit,
+    cancel_cross_axis_squash,
+    measure_natural_child_sizes,
 )
 
 _TOL = 2
@@ -54,11 +55,7 @@ def _build_layout(tree, target_w=None, target_h=None):
 
     root = build_root()
     _layout_scale(root, direction, align)
-    # Per-group cross-axis fit (mirror cmd_layout): compress only the sibling
-    # groups that overflow the cross axis, before the global fit loop.
-    if assign_cross_axis_fit(tree, root, target_w, target_h):
-        root = build_root()
-        _layout_scale(root, direction, align)
+    natural_sizes = measure_natural_child_sizes(tree, root)
     cum_h = cum_v = 1.0
     if target_w or target_h:
         for _ in range(10):
@@ -69,6 +66,11 @@ def _build_layout(tree, target_w=None, target_h=None):
                 break
             cum_h *= sx
             cum_v *= sy
+            root = build_root()
+            _layout_scale(root, direction, align, cum_h, cum_v)
+        # Cancel cross-axis squash on groups that fit (mirror cmd_layout).
+        if cancel_cross_axis_squash(tree, natural_sizes, cum_h, cum_v,
+                                    target_w, target_h):
             root = build_root()
             _layout_scale(root, direction, align, cum_h, cum_v)
 

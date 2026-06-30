@@ -687,51 +687,62 @@ def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_
     node["_padding"] = padding
 
 
-def assign_cross_axis_fit(tree, root, target_w, target_h):
-    """Compress only the sibling groups that overflow the cross axis.
+def cancel_cross_axis_squash(tree, natural_sizes, cum_h, cum_v, target_w, target_h):
+    """Undo the global cross-axis squash on sibling groups that already fit.
 
-    For a horizontal root the children sit side by side: total WIDTH is their
-    sum (handled by the global fit) but total HEIGHT is just the tallest child.
-    A single tall group (e.g. a 4x2 agent grid at 900px) would otherwise force a
-    global vertical squash that crushes every short sibling (Entry, Orchestration)
-    to an unreadable 11%. Instead we set a per-group `_vscale` ONLY on the
-    children that exceed the target height, sized so each just fits, and leave
-    the rest at 1.0. Symmetric for a vertical root overflowing in width.
+    The global fit applies ONE scale per axis. On the CROSS axis (height for a
+    horizontal root, width for a vertical one) sibling groups don't sum — the
+    total is just the largest. So when one tall group (e.g. a 4-team agent tower)
+    forces the whole slide to squash vertically, short siblings (Entry,
+    Orchestration) get dragged down with it and turn unreadable.
 
-    Writes `_vscale`/`_hscale` onto the matching nodes in `tree` (the source the
-    caller rebuilds the root from) and returns True if anything was assigned, so
-    the caller knows to re-run `_layout_scale`.
+    The cross axis can't be made to fit by scaling alone if the tall group is
+    genuinely too big (its icons, not just gaps, fill the height) — the layout
+    WILL overflow, and that's acceptable; the overflow warning tells the author
+    to restructure the tall group. What we refuse to accept is crushing the
+    groups that DID fit. So for each top-level group whose NATURAL cross-axis
+    size already fit the target, we cancel the global cross-axis squash by
+    giving it a compensating `_vscale`/`_hscale` ( = 1/cum ), restoring its
+    natural size; the oversized group keeps the squash. Mutates `tree`; returns
+    True if any compensation was assigned (caller re-runs `_layout_scale`).
     """
     direction = tree.get("direction", "horizontal")
     src_children = tree.get("children", tree.get("nodes", []))
-    laid = root.get("children", [])
-    if len(laid) != len(src_children):
-        return False
     changed = False
-    if direction == "horizontal" and target_h:
-        # cross axis = height; compress children taller than the target band.
-        for src, node in zip(src_children, laid):
-            if not node.get("children"):
-                continue  # a bare icon can't be compressed
-            h = node["_bindings"][3]
-            if h > target_h:
-                # scale the group's spacing so its laid-out height meets target.
-                # bias slightly under 1.0 of target to leave a margin.
-                cur = src.get("_vscale", 1.0)
-                factor = (target_h / h) * 0.98
-                src["_vscale"] = cur * factor
-                changed = True
-    elif direction == "vertical" and target_w:
-        for src, node in zip(src_children, laid):
-            if not node.get("children"):
+    # Only meaningful when the cross axis was actually compressed (<1).
+    if direction == "horizontal" and target_h and cum_v and cum_v < 0.97:
+        for src in src_children:
+            if not src.get("children"):
                 continue
-            w = node["_bindings"][2]
-            if w > target_w:
-                cur = src.get("_hscale", 1.0)
-                factor = (target_w / w) * 0.98
-                src["_hscale"] = cur * factor
+            if natural_sizes.get(id(src), (0, 0))[1] <= target_h:
+                src["_vscale"] = src.get("_vscale", 1.0) * (1.0 / cum_v)
+                changed = True
+    elif direction == "vertical" and target_w and cum_h and cum_h < 0.97:
+        for src in src_children:
+            if not src.get("children"):
+                continue
+            if natural_sizes.get(id(src), (0, 0))[0] <= target_w:
+                src["_hscale"] = src.get("_hscale", 1.0) * (1.0 / cum_h)
                 changed = True
     return changed
+
+
+def measure_natural_child_sizes(tree, root):
+    """Map each top-level source child -> its natural (w, h) before global fit.
+
+    Keyed by id() of the source-child dict so it survives the deepcopy/rebuild
+    cycle as long as the caller passes the SAME tree dicts. Used by
+    cancel_cross_axis_squash to tell which groups fit on their own.
+    """
+    out = {}
+    src_children = tree.get("children", tree.get("nodes", []))
+    laid = root.get("children", [])
+    if len(laid) != len(src_children):
+        return out
+    for src, node in zip(src_children, laid):
+        b = node["_bindings"]
+        out[id(src)] = (b[2], b[3])
+    return out
 
 
 def _recompute_group_bbox(node):
