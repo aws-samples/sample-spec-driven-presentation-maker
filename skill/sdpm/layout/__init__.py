@@ -2020,6 +2020,26 @@ def _count_port_crossings(conn_indices, port_indices, conn_sides, connections, n
     return crossings
 
 
+def _perp_touch(v_x, h_y, h_x_min, h_x_max, v_y_min, v_y_max):
+    """True if a vertical seg (x=v_x, y in [v_y_min,v_y_max]) and a horizontal
+    seg (y=h_y, x in [h_x_min,h_x_max]) meet — counting T-junctions.
+
+    The meeting point is (v_x, h_y). It must lie within BOTH segments' spans
+    (endpoints included), and be interior to AT LEAST ONE of them. The latter
+    excludes only a pure endpoint-to-endpoint touch (two stubs meeting at a
+    shared corner/port), which is not a visual crossing. A T-junction — where
+    one segment's endpoint lands in the middle of the other (e.g. an arrow
+    ending on a line another arrow runs along) — DOES count: the previous
+    strict-interior test silently dropped these, so two arrows sharing a y and
+    overlapping in x read as uncrossed when they visibly overlap.
+    """
+    if not (h_x_min <= v_x <= h_x_max and v_y_min <= h_y <= v_y_max):
+        return False
+    v_interior = v_y_min < h_y < v_y_max
+    h_interior = h_x_min < v_x < h_x_max
+    return v_interior or h_interior
+
+
 def _segments_intersect(a1, a2, b1, b2):
     """Test if two axis-aligned segments cross or overlap (for port optimization)."""
     ax1, ay1 = a1
@@ -2037,13 +2057,13 @@ def _segments_intersect(a1, a2, b1, b2):
         h_x_min, h_x_max = min(ax1, ax2), max(ax1, ax2)
         v_x = bx1
         v_y_min, v_y_max = min(by1, by2), max(by1, by2)
-        return h_x_min < v_x < h_x_max and v_y_min < h_y < v_y_max
+        return _perp_touch(v_x, h_y, h_x_min, h_x_max, v_y_min, v_y_max)
     if a_vert and b_horiz:
         v_x = ax1
         v_y_min, v_y_max = min(ay1, ay2), max(ay1, ay2)
         h_y = by1
         h_x_min, h_x_max = min(bx1, bx2), max(bx1, bx2)
-        return h_x_min < v_x < h_x_max and v_y_min < h_y < v_y_max
+        return _perp_touch(v_x, h_y, h_x_min, h_x_max, v_y_min, v_y_max)
     if a_horiz and b_horiz and ay1 == by1:
         a_min, a_max = min(ax1, ax2), max(ax1, ax2)
         b_min, b_max = min(bx1, bx2), max(bx1, bx2)
@@ -2223,7 +2243,14 @@ def _count_all_crossings(edges):
     shared trunk — that overlap IS the merged bundle, not a crossing. So for
     such pairs we ignore collinear overlaps and only count a genuine
     perpendicular crossing. Unrelated edges still count overlaps (two separate
-    arrows drawn on the same line read as a defect)."""
+    arrows drawn on the same line read as a defect).
+
+    Shared-endpoint pairs also produce a perpendicular T-junction where each
+    spoke peels off the shared trunk at its own port — the meeting point sits at
+    the spoke's true endpoint (pts[0] / pts[-1]). That T is the bundle's
+    intended structure, not a crossing, so it is skipped. A meeting that is
+    interior to BOTH polylines (a genuine 4-way X, e.g. two spokes crossing
+    mid-span) is always counted, even for a shared-endpoint pair."""
     count = 0
     for i in range(len(edges)):
         pts_i = edges[i]["points"]
@@ -2244,14 +2271,69 @@ def _count_all_crossings(edges):
             for si in range(len(pts_i) - 1):
                 for sj in range(len(pts_j) - 1):
                     if _segments_intersect(pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]):
-                        # A shared-endpoint bundle's collinear overlap is the
-                        # intended trunk, not a crossing.
-                        if shares_endpoint and _segments_overlap_collinear(
-                            pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]
-                        ):
-                            continue
+                        if shares_endpoint:
+                            # A shared-endpoint bundle's collinear overlap is the
+                            # intended trunk, not a crossing.
+                            if _segments_overlap_collinear(
+                                pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]
+                            ):
+                                continue
+                            # Two edges of the SAME fan bundle (same shared trunk)
+                            # meet where each spoke peels off that trunk — a
+                            # structural T-junction, not a crossing. Skip it, but
+                            # only for the trunk-peel T: a genuine interior×
+                            # interior X (two spokes truly crossing mid-span) is
+                            # still counted.
+                            if _is_fan_trunk_t_junction(
+                                ei, ej, pts_i, si, pts_j, sj
+                            ):
+                                continue
                         count += 1
     return count
+
+
+def _is_fan_trunk_t_junction(ei, ej, pts_i, si, pts_j, sj):
+    """True if two same-bundle fan edges meet at the shared trunk as a peel-off
+    T (structural), as opposed to a genuine 4-way crossing.
+
+    Both edges must be `_fan_locked` onto the SAME bundle (same mode, axis,
+    trunk coordinate, and shared port). In that bundle the trunk is the line at
+    ``trunk`` on the bundle's axis; each spoke leaves the trunk perpendicular.
+    Their segments meet on the trunk line. That meeting is the intended shape,
+    UNLESS the meeting point is strictly interior to BOTH segments (two spokes
+    crossing away from the trunk), which is a real defect and returns False.
+    """
+    la, lb = ei.get("_fan_locked"), ej.get("_fan_locked")
+    if not la or not lb:
+        return False
+    if (la["mode"] != lb["mode"] or la["axis"] != lb["axis"]
+            or la["trunk"] != lb["trunk"] or la["port"] != lb["port"]):
+        return False  # different bundles → treat as unrelated, count normally
+    a1, a2 = pts_i[si], pts_i[si + 1]
+    b1, b2 = pts_j[sj], pts_j[sj + 1]
+    a_h, a_v = a1[1] == a2[1], a1[0] == a2[0]
+    b_h, b_v = b1[1] == b2[1], b1[0] == b2[0]
+    if a_h and b_v:
+        mx, my = b1[0], a1[1]
+    elif a_v and b_h:
+        mx, my = a1[0], b1[1]
+    else:
+        return False
+    # The meeting must lie on the bundle's trunk line; otherwise it is two
+    # spokes meeting away from the trunk (count it).
+    trunk = la["trunk"]
+    on_trunk = (mx == trunk) if la["axis"] == "x" else (my == trunk)
+    if not on_trunk:
+        return False
+    # A real 4-way X (interior to both segments) is a defect even on the trunk;
+    # only an endpoint-on-trunk peel-off is structural.
+    a_lo_x, a_hi_x = min(a1[0], a2[0]), max(a1[0], a2[0])
+    a_lo_y, a_hi_y = min(a1[1], a2[1]), max(a1[1], a2[1])
+    b_lo_x, b_hi_x = min(b1[0], b2[0]), max(b1[0], b2[0])
+    b_lo_y, b_hi_y = min(b1[1], b2[1]), max(b1[1], b2[1])
+    interior_a = a_lo_x < mx < a_hi_x or a_lo_y < my < a_hi_y
+    interior_b = b_lo_x < mx < b_hi_x or b_lo_y < my < b_hi_y
+    return not (interior_a and interior_b)
 
 
 # Negative inset = a keep-out margin AROUND each icon. A line running along or
@@ -2601,6 +2683,40 @@ def _is_axis_aligned(pts):
     )
 
 
+def _normalize_path(pts):
+    """Collapse a polyline's degenerate artifacts in place-safe form.
+
+    Splicing jogs (and stacking several) can leave a path with:
+      - zero-length segments (consecutive identical points), and
+      - redundant collinear vertices (three points in a row on one axis),
+    which both read as a kink at a point that isn't really a corner and which
+    inflate the crossing count when a stray zero-length stub coincides with
+    another edge. This removes both without moving any real corner, so the
+    drawn shape is identical but minimal. Endpoints (pts[0], pts[-1]) are
+    preserved. Returns a new list; never shortens below 2 points.
+    """
+    if len(pts) < 2:
+        return [list(p) for p in pts]
+    # 1) drop consecutive duplicates (zero-length segments)
+    dedup = [list(pts[0])]
+    for p in pts[1:]:
+        if p[0] != dedup[-1][0] or p[1] != dedup[-1][1]:
+            dedup.append(list(p))
+    # 2) drop the middle of any three collinear points (same X or same Y run)
+    if len(dedup) <= 2:
+        return dedup
+    out = [dedup[0]]
+    for i in range(1, len(dedup) - 1):
+        a, b, c = out[-1], dedup[i], dedup[i + 1]
+        collinear_x = a[0] == b[0] == c[0]
+        collinear_y = a[1] == b[1] == c[1]
+        if collinear_x or collinear_y:
+            continue  # b lies on the straight run a→c; skip it
+        out.append(b)
+    out.append(dedup[-1])
+    return out
+
+
 def _entry_exit_ok(pts, src_side, dst_side):
     """First segment perpendicular to src edge, last to dst edge (no backwards).
 
@@ -2927,6 +3043,11 @@ def _detour_around_pierces(edges, nodes, groups=None):
                         # position FIRST, then judge — mirrors evaluating a config
                         # by its post-bend-optimization quality, not its raw form.
                         cand = _optimize_jog_arm(cand, k, e, edges, nodes)
+                        # Strip zero-length / collinear artifacts the splice (or
+                        # a previously-committed jog stacked on this segment) may
+                        # have left, so a stray stub can't fake a crossing and the
+                        # committed shape is minimal.
+                        cand = _normalize_path(cand)
                         saved = e["points"]
                         e["points"] = cand
                         score = cost(edges)
