@@ -944,7 +944,13 @@ def _collect_vertical_groups(node, out):
         return
     if node.get("direction", "horizontal") == "vertical":
         leaves = [c for c in node["children"] if not c.get("children")]
-        if leaves:
+        # Only a CLEAN column (every direct child is a bare leaf) can be
+        # row-aligned: row N must mean the same thing in every column. A column
+        # that also holds a sub-group (e.g. Processing = three Lambdas + an
+        # {Inference, Bedrock} branch) has its leaves bunched at the top while a
+        # peer column spreads them over its full height — aligning row-by-row
+        # then drags the mixed column's box center off the flow line. Skip it.
+        if leaves and len(leaves) == len(node["children"]):
             out.append((node, leaves))
         return  # internals of a vertical column are not peers of its siblings
     for child in node.get("children", []):
@@ -962,7 +968,9 @@ def _collect_horizontal_groups(node, out):
         return
     if node.get("direction", "horizontal") == "horizontal":
         leaves = [c for c in node["children"] if not c.get("children")]
-        if leaves:
+        # Only a CLEAN row (every direct child is a bare leaf) can be
+        # column-aligned — see _collect_vertical_groups for the rationale.
+        if leaves and len(leaves) == len(node["children"]):
             out.append((node, leaves))
         return  # internals of a horizontal row are not peers of its siblings
     for child in node.get("children", []):
