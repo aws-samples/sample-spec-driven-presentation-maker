@@ -559,6 +559,12 @@ def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_
     is_group = len(children) > 0
     icon_size = node.get("iconSize", 60)
 
+    # A per-node spacing scale lets the fit pass compress ONE overflowing group
+    # (and its descendants) without touching sibling groups that already fit.
+    # Multiplies into the inherited factor so nested overrides compose.
+    spacing_scale_h *= node.get("_hscale", 1.0)
+    spacing_scale_v *= node.get("_vscale", 1.0)
+
     def sh(v):
         return max(10, round(v * spacing_scale_h))
     def sv(v):
@@ -679,6 +685,53 @@ def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_
     node["_bindings"] = [gx, gy, gw, gh]
     node["_margin"] = margin
     node["_padding"] = padding
+
+
+def assign_cross_axis_fit(tree, root, target_w, target_h):
+    """Compress only the sibling groups that overflow the cross axis.
+
+    For a horizontal root the children sit side by side: total WIDTH is their
+    sum (handled by the global fit) but total HEIGHT is just the tallest child.
+    A single tall group (e.g. a 4x2 agent grid at 900px) would otherwise force a
+    global vertical squash that crushes every short sibling (Entry, Orchestration)
+    to an unreadable 11%. Instead we set a per-group `_vscale` ONLY on the
+    children that exceed the target height, sized so each just fits, and leave
+    the rest at 1.0. Symmetric for a vertical root overflowing in width.
+
+    Writes `_vscale`/`_hscale` onto the matching nodes in `tree` (the source the
+    caller rebuilds the root from) and returns True if anything was assigned, so
+    the caller knows to re-run `_layout_scale`.
+    """
+    direction = tree.get("direction", "horizontal")
+    src_children = tree.get("children", tree.get("nodes", []))
+    laid = root.get("children", [])
+    if len(laid) != len(src_children):
+        return False
+    changed = False
+    if direction == "horizontal" and target_h:
+        # cross axis = height; compress children taller than the target band.
+        for src, node in zip(src_children, laid):
+            if not node.get("children"):
+                continue  # a bare icon can't be compressed
+            h = node["_bindings"][3]
+            if h > target_h:
+                # scale the group's spacing so its laid-out height meets target.
+                # bias slightly under 1.0 of target to leave a margin.
+                cur = src.get("_vscale", 1.0)
+                factor = (target_h / h) * 0.98
+                src["_vscale"] = cur * factor
+                changed = True
+    elif direction == "vertical" and target_w:
+        for src, node in zip(src_children, laid):
+            if not node.get("children"):
+                continue
+            w = node["_bindings"][2]
+            if w > target_w:
+                cur = src.get("_hscale", 1.0)
+                factor = (target_w / w) * 0.98
+                src["_hscale"] = cur * factor
+                changed = True
+    return changed
 
 
 def _recompute_group_bbox(node):

@@ -41,6 +41,7 @@ from sdpm.layout import (
     _layout_scale,
     _layout_translate,
     _seg_crosses_box,
+    assign_cross_axis_fit,
     box_to_elements,
     optimize_order,
 )
@@ -482,6 +483,13 @@ def cmd_layout(args):
 
     target_w = args.width
     target_h = args.height
+
+    # Per-group cross-axis fit: compress ONLY the sibling groups that overflow
+    # the cross axis (a single tall group in a horizontal row), so short
+    # siblings aren't crushed by a global squash. Re-run scale to apply.
+    if assign_cross_axis_fit(tree, root, target_w, target_h):
+        root = build_root()
+        _layout_scale(root, direction, align)
 
     cumulative_sh = 1.0
     cumulative_sv = 1.0
