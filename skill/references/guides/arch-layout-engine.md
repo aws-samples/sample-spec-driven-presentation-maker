@@ -247,6 +247,12 @@ element). If you need the cluster named, keep a `groupType`.
   spacing; flip the root to horizontal.
 - **Putting a degree-1 helper inline on the flow** and expecting no pierce →
   wrap it perpendicular.
+- **One source set fanning into TWO separate targets** (e.g. three workers each
+  writing to both a *feature store* and a *prediction stream*) → the two
+  fan-in bundles overlap on one shared trunk and every spoke crosses the other
+  bundle. Don't aim a many-source fan at two scattered targets. Instead put the
+  two targets in ONE group and fan into that group box (technique 1), or give
+  each target its own row so the two bundles don't share a trunk lane.
 - **Routing a line past a framed group that sits across its path** → the line
   cuts through an unrelated container's box (a *group-frame pierce*). See below.
 
