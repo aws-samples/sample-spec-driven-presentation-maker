@@ -279,11 +279,16 @@ framed groups do.
 
 ## Reading the output
 
-- `warnings`: human-readable hints (tall/wide group, label overlap, residual
-  crossings, **group-frame pierces** with restructuring suggestions). The
-  builder's edge-crossing warning is conservative and may flag a shared fan
-  trunk that is *not* a real crossing — trust the diagram and the QA metric over
-  that one warning.
+- `warnings`: human-readable facts about what's wrong, NOT prescriptions.
+  Routing warnings state only the defect — `Edges A→B and C→D cross.`,
+  `Edge X→Y passes through node "Z".`, `Edge X→Y passes through group "Z"
+  without connecting to it.` — they deliberately do **not** tell you how to
+  fix it. You have the JSON and the rendered image; decide the structural fix
+  yourself (connect to a group box, `fan: "merge"`, reorder, change
+  `direction`, …) using the techniques above. Size warnings (tall/wide group,
+  overflow, compressed spacing) still carry a short hint. The builder's
+  edge-crossing warning is conservative and may flag a shared fan trunk that is
+  *not* a real crossing — trust the diagram and the QA metric over that one.
 - `bbox`: final bounding box after scale-to-fit.
 
 For an objective check, the QA harness reports crossings / pierces /

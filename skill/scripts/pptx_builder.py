@@ -750,16 +750,7 @@ def cmd_layout(args):
                     continue
                 nx, ny, nw, nh = n["x"], n["y"], n["width"], n["height"]
                 if seg_max_x > nx + margin and seg_min_x < nx + nw - margin and seg_max_y > ny + margin and seg_min_y < ny + nh - margin:
-                    # Suggest reordering based on connection direction
-                    suggest = ""
-                    dst_node = nodes_out.get(dst_id) or next((v for k, v in nodes_out.items() if k.endswith(dst_id)), None)
-                    if dst_node:
-                        src_node = nodes_out.get(src_id) or next((v for k, v in nodes_out.items() if k.endswith(src_id)), None)
-                        if src_node:
-                            dx = dst_node["x"] - src_node["x"]
-                            direction = "rightmost" if dx > 0 else "leftmost"
-                            suggest = f' Suggest: place "{src_node.get("label", src_id)}" {direction} in its group, adjacent to "{dst_node.get("label", dst_id)}".'
-                    warnings.append(f'Edge {edge_key} crosses node "{n.get("label", nid)}". Reorder nodes so connected elements are adjacent, or group branch targets in the perpendicular direction. Also consider reverse: true on the target group if connections flow opposite to layout direction.{suggest}')
+                    warnings.append(f'Edge {edge_key} passes through node "{n.get("label", nid)}".')
                     crossing_reported.add(report_key)
 
     # Check edge-edge crossings (segment intersection)
@@ -782,7 +773,7 @@ def cmd_layout(args):
                         if key_ij not in edge_crossing_reported:
                             e_i = f"{edges_out[i]['from']}→{edges_out[i]['to']}"
                             e_j = f"{edges_out[j]['from']}→{edges_out[j]['to']}"
-                            warnings.append(f"Edges {e_i} and {e_j} cross each other. Consider reordering nodes or restructuring groups to eliminate the crossing.")
+                            warnings.append(f"Edges {e_i} and {e_j} cross.")
                             edge_crossing_reported.add(key_ij)
                         crossed = True
                         break
@@ -816,12 +807,8 @@ def cmd_layout(args):
                    for k in range(len(pts) - 1)):
                 glabel = g.get("label", gshort)
                 warnings.append(
-                    f'Edge {e["from"]}→{e["to"]} cuts through group "{glabel}" '
-                    f'without connecting to it. Restructure so the line does not '
-                    f'cross an unrelated container: reorder groups so the endpoints '
-                    f'are adjacent (no group between them), move "{glabel}" off the '
-                    f'path, or connect to the group box itself (many-to-one) if the '
-                    f'flow really does enter it.')
+                    f'Edge {e["from"]}→{e["to"]} passes through group '
+                    f'"{glabel}" without connecting to it.')
                 gframe_reported.add(key)
 
     # Structure suggestions: sibling size imbalance
