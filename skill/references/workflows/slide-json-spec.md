@@ -451,6 +451,36 @@ Height includes the language label (22px). Code body height is `height - 22`.
 - `callout_*`: callout shapes
 - `flowchart_*`: flowchart shapes
 
+#### Labeled shapes — use `text`, never overlay a textbox
+
+When a shape needs a label, put the label in the shape's own `text` (or
+`paragraphs` / `items`) property. **Do NOT** add a separate `textbox` element
+on top of the shape with the same bounding box.
+
+**Wrong** — two elements stacked at the same coordinates:
+```json
+{"type": "shape", "shape": "rounded_rectangle",
+ "x": 100, "y": 200, "width": 200, "height": 100, "fill": "#0066CC"}
+{"type": "textbox",
+ "x": 100, "y": 200, "width": 200, "height": 100,
+ "text": "Service A", "fontSize": 20,
+ "align": "center", "verticalAlign": "middle"}
+```
+
+**Right** — single shape with `text`:
+```json
+{"type": "shape", "shape": "rounded_rectangle",
+ "x": 100, "y": 200, "width": 200, "height": 100, "fill": "#0066CC",
+ "text": "Service A", "fontSize": 20,
+ "align": "center", "verticalAlign": "middle"}
+```
+
+Why: the two elements wrap independently — if widths drift the textbox
+collides with the shape edge; both must be moved together for any layout
+change; and the shape's `measure` overflow check does not see the textbox.
+Build emits an "Overlay textbox detected" warning when this anti-pattern
+is found, but you should not produce it in the first place.
+
 ## Visual Effects
 
 Effects applicable to shape, textbox, and image.
