@@ -39,7 +39,7 @@ def mantle_model(model_id: str, region: str = "us-east-1"):
 
     Usage:
         from mantle_client import mantle_model
-        model = mantle_model("google.gemma-4-31b", region="us-east-1")
+        model = mantle_model("openai.gpt-5.4", region="us-east-1")
     """
     from strands.models.openai import OpenAIModel
 

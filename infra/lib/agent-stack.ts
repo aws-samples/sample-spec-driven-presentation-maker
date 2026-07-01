@@ -65,7 +65,7 @@ export class AgentStack extends cdk.Stack {
         resources: ["*"],
       })
     );
-    // bedrock-mantle (OpenAI-compatible endpoint) for models like Gemma 4
+    // bedrock-mantle (OpenAI-compatible endpoint) for models like GPT-5.4/5.5
     role.addToPolicy(
       new iam.PolicyStatement({
         actions: ["bedrock-mantle:CreateInference"],

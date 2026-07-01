@@ -35,11 +35,15 @@ model:
   # Each entry must be registered in infra/lib/model-metadata.ts.
   # Both defaults.chat and defaults.create must appear in this list.
   allowedModelIds:
-    - "global.anthropic.claude-sonnet-4-6"           # recommended (matches defaults.chat)
+    - "global.anthropic.claude-sonnet-5"             # latest Sonnet (default chat/create)
+    - "global.anthropic.claude-opus-4-8"             # latest Opus, deep reasoning
+    - "global.anthropic.claude-sonnet-4-6"           # previous Sonnet
     - "global.anthropic.claude-opus-4-7"
     - "global.anthropic.claude-opus-4-6-v1"
     - "global.anthropic.claude-haiku-4-5-20251001-v1:0"
     - "us.amazon.nova-2-lite-v1:0"
+    - "openai.gpt-5.5"                               # bedrock-mantle (us-east-1, us-east-2)
+    - "openai.gpt-5.4"                               # bedrock-mantle (us-east-1, us-east-2, us-west-2)
 
 # OAuth settings for external MCP clients (Layer 3).
 # enableDCR: Allow any MCP client to register dynamically via RFC 7591 (default: true).

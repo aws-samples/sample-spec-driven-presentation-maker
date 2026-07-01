@@ -20,7 +20,7 @@ from mcp_clients import (
     mcp_aws_pricing,
 )
 from composition import resolve_parts
-from model_profiles import build_model_kwargs, MODEL_PROFILES, MANTLE_MODELS
+from model_profiles import build_model_kwargs, MODEL_PROFILES, MANTLE_MODELS, resolve_mantle_region
 from modes import MODES
 from modes.separated.composer import make_compose_slides
 from resilience import LoopGuard
@@ -31,7 +31,7 @@ from tools.web_tools import web_fetch
 logger = logging.getLogger("sdpm.agent")
 
 _ALLOWED_MODEL_IDS: set[str] = set(json.loads(os.environ.get("ALLOWED_MODEL_IDS", "[]")))
-_DEFAULT_CHAT_MODEL_ID: str = os.environ.get("CHAT_MODEL_ID", "global.anthropic.claude-sonnet-4-6")
+_DEFAULT_CHAT_MODEL_ID: str = os.environ.get("CHAT_MODEL_ID", "global.anthropic.claude-sonnet-5")
 _DEFAULT_CREATE_MODEL_ID: str = os.environ.get("CREATE_MODEL_ID", _DEFAULT_CHAT_MODEL_ID)
 
 
@@ -98,7 +98,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
     resolved_agent = _resolve_model_id(requested_agent, default_agent)
     if resolved_agent in MANTLE_MODELS:
         from mantle_client import mantle_model
-        model = mantle_model(resolved_agent, region=MANTLE_MODELS[resolved_agent])
+        model = mantle_model(resolved_agent, region=resolve_mantle_region(resolved_agent, region))
     else:
         model = BedrockModel(**build_model_kwargs(resolved_agent))
 
@@ -127,7 +127,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
             resolved_create = _DEFAULT_CREATE_MODEL_ID
         if resolved_create in MANTLE_MODELS:
             from mantle_client import mantle_model
-            composer_model = mantle_model(resolved_create, region=MANTLE_MODELS[resolved_create])
+            composer_model = mantle_model(resolved_create, region=resolve_mantle_region(resolved_create, region))
         else:
             composer_model = BedrockModel(
                 **build_model_kwargs(resolved_create),
