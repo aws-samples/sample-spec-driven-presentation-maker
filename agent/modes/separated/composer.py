@@ -123,7 +123,7 @@ def _build_deck_context(sections: list[str]) -> str:
     return "# Deck-Specific References\n\n" + "\n\n---\n\n".join(sections)
 
 
-def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, extra_tools=None):
+def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, extra_tools=None, model_id: str = ""):
     """Create compose_slides tool with closed-over MCP servers and model.
 
     Args:
@@ -280,6 +280,11 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
             )
             static_prompt = composer_system
 
+            # Determine if the composer model supports prompt caching
+            from model_profiles import MODEL_PROFILES
+            _profile = MODEL_PROFILES.get(model_id)
+            _cache_enabled = (_profile.cache_strategy == "auto") if _profile else True
+
             progress_q: queue.Queue = queue.Queue()
 
             # Prefetch template analysis once (shared across all groups)
@@ -388,7 +393,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 composer = Agent(
                     system_prompt=[
                         {"text": static_prompt},
-                        {"cachePoint": {"type": "default"}},
+                        *([ {"cachePoint": {"type": "default"}} ] if _cache_enabled else []),
                     ],
                     messages=list(composer_history),
                     tools=_group_tools,

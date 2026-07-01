@@ -18,6 +18,14 @@ export interface ModelMetadata {
 
 export const MODEL_METADATA: Record<string, ModelMetadata> = {
   // --- Anthropic Claude ---
+  "global.anthropic.claude-sonnet-5": {
+    displayName: "Claude Sonnet 5",
+    description: "Latest Sonnet, near-Opus intelligence for coding and agents",
+  },
+  "global.anthropic.claude-opus-4-8": {
+    displayName: "Claude Opus 4.8",
+    description: "Latest Opus, agentic coding and deep reasoning",
+  },
   "global.anthropic.claude-opus-4-7": {
     displayName: "Claude Opus 4.7",
     description: "Highest quality, complex tasks",
@@ -40,5 +48,14 @@ export const MODEL_METADATA: Record<string, ModelMetadata> = {
     displayName: "Nova 2 Lite",
     description: "Amazon's 2nd gen, fast and economical",
     composable: false,
+  },
+  // --- OpenAI GPT ---
+  "openai.gpt-5.5": {
+    displayName: "GPT-5.5",
+    description: "OpenAI's most capable model, advanced coding and agentic tasks",
+  },
+  "openai.gpt-5.4": {
+    displayName: "GPT-5.4",
+    description: "Frontier reasoning, coding, and tool use",
   },
 };

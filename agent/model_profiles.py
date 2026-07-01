@@ -89,9 +89,33 @@ QWEN_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="none", compose_capa
 # Moonshot Kimi — prompt caching not supported on Bedrock at time of writing.
 KIMI_DEFAULT = ModelProfile(temperature=0.6, cache_strategy="none", compose_capable=False)
 
+# OpenAI GPT — bedrock-mantle only (Responses API endpoint).
+GPT_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="none")
+
 
 # Fallback profile when a model id is not explicitly registered.
 _DEFAULT = CLAUDE_STANDARD
+
+# Models served via bedrock-mantle (OpenAI-compatible endpoint, not Converse API).
+# model_id → list of supported regions (first entry is the fallback).
+MANTLE_MODELS: dict[str, list[str]] = {
+    "openai.gpt-5.5": ["us-east-1", "us-east-2"],
+    "openai.gpt-5.4": ["us-east-1", "us-east-2", "us-west-2"],
+}
+
+
+def resolve_mantle_region(model_id: str, deploy_region: str | None = None) -> str:
+    """Resolve the best mantle region for a model.
+
+    If the deploy region is in the model's supported list, use it (lowest latency).
+    Otherwise fall back to the first region in the list.
+    """
+    regions = MANTLE_MODELS.get(model_id, [])
+    if not regions:
+        return deploy_region or "us-east-1"
+    if deploy_region and deploy_region in regions:
+        return deploy_region
+    return regions[0]
 
 
 # ---------------------------------------------------------------------------
@@ -103,12 +127,17 @@ _DEFAULT = CLAUDE_STANDARD
 
 MODEL_PROFILES: dict[str, ModelProfile] = {
     # Anthropic Claude
+    "global.anthropic.claude-sonnet-5": CLAUDE_ADAPTIVE_THINKING,
+    "global.anthropic.claude-opus-4-8": CLAUDE_EXTENDED_THINKING,
     "global.anthropic.claude-opus-4-7": CLAUDE_EXTENDED_THINKING,
     "global.anthropic.claude-opus-4-6-v1": CLAUDE_ADAPTIVE_THINKING,
     "global.anthropic.claude-sonnet-4-6": CLAUDE_STANDARD,
     "global.anthropic.claude-haiku-4-5-20251001-v1:0": CLAUDE_HAIKU,
     # Amazon Nova
     "us.amazon.nova-2-lite-v1:0": NOVA_2_DEFAULT,
+    # OpenAI GPT (bedrock-mantle)
+    "openai.gpt-5.5": GPT_DEFAULT,
+    "openai.gpt-5.4": GPT_DEFAULT,
 }
 
 
