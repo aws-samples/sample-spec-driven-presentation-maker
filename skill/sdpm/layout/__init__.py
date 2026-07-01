@@ -25,6 +25,10 @@ def optimize_order(tree):
     # column the LLM wrote directly) with their flow anchor, so the same
     # anchor-on-flow alignment applies as for engine-promoted lanes.
     _tag_manual_branch_anchors(tree, connections)
+    # Order children within each group to minimize crossings. Uses a routed-
+    # quality model that accounts not just for leaf-vs-leaf crossings but also
+    # for an edge to a sibling GROUP box having to detour around a nearer child
+    # (see _count_crossings_for_mixed_order's peer-adjacency term).
     _optimize_group_order(tree, connections)
 
 
@@ -274,11 +278,18 @@ def _find_min_crossing_order_mixed(children, relevant, all_connections, internal
     """
     from itertools import permutations
 
-    best_crossings = None
+    best_key = None
     best_perm = None
 
-    # Build a global position map from the full tree (excluding this group's leaves)
-    global_positions = _compute_global_peer_positions(children, all_connections, child_leaf_ids, root)
+    # Two position maps from the full tree:
+    #  - leaf-only, for the crossing count (unchanged legacy behaviour — adding
+    #    group ids here would reclassify group-endpoint edges and shuffle orders
+    #    on unrelated diagrams like omnichannel).
+    #  - group-inclusive, for the detour tie-break ONLY, so a many-to-one edge
+    #    to a sibling GROUP box is visible when seating its single connected
+    #    child (the DR diagram's API → Data tier).
+    leaf_positions = _compute_global_peer_positions(children, all_connections, child_leaf_ids, root)
+    group_positions = _compute_global_peer_positions(children, all_connections, child_leaf_ids, root, include_groups=True)
 
     for perm in permutations(children):
         perm_ids = [c["id"] for c in perm]
@@ -294,22 +305,98 @@ def _find_min_crossing_order_mixed(children, relevant, all_connections, internal
             if not valid:
                 continue
 
-        crossings = _count_crossings_for_mixed_order(perm, relevant, global_positions, child_leaf_ids)
-        if best_crossings is None or crossings < best_crossings:
-            best_crossings = crossings
+        crossings = _count_crossings_for_mixed_order(perm, relevant, leaf_positions, child_leaf_ids)
+        # Tie-break: among equal-crossing orders prefer the one where each child
+        # that connects to an OUTSIDE peer sits at the end of the row facing that
+        # peer. Otherwise a lone edge to a sibling group (e.g. an API container →
+        # the Data tier) leaves author order and detours around the outer
+        # sibling. This is a pure secondary key — it can never pick an order with
+        # more crossings — so it can't regress a diagram that ordering already
+        # solved; it only breaks ties the crossing count leaves open.
+        detour = _peer_detour_cost(perm, relevant, group_positions, child_leaf_ids)
+        key = (crossings, detour)
+        if best_key is None or key < best_key:
+            best_key = key
             best_perm = list(perm)
-            if crossings == 0:
+            if crossings == 0 and detour == 0:
                 break
 
     return best_perm
 
 
-def _compute_global_peer_positions(children, all_connections, child_leaf_ids, root):
+def _peer_detour_cost(perm, relevant, global_positions, child_leaf_ids):
+    """Secondary ordering key: how far each externally-connected child sits from
+    the row end facing its outside peer.
+
+    For every edge between an internal leaf and an external peer (leaf OR group
+    box), the internal endpoint ideally sits at the row end nearest that peer —
+    the right end if the peer is to the right (higher global position than this
+    row's own centre), the left end if to the left. The cost sums the slot
+    distance from that ideal end; 0 when every connected child already hugs the
+    correct end. The datum is THIS row's mean peer-space position (not a global
+    average), so left/right is judged relative to the row itself — the fix for
+    the earlier version that flipped sides between otherwise-identical rows.
+    """
+    n = len(perm)
+    # Slot of each internal leaf under this permutation, and per-child leaf sets.
+    leaf_slot = {}
+    internal = set()
+    child_leaf_sets = []
+    for slot, child in enumerate(perm):
+        cl = set(child_leaf_ids.get(child["id"], [child["id"]]))
+        child_leaf_sets.append(cl)
+        for lid in cl:
+            leaf_slot[lid] = slot
+            internal.add(lid)
+
+    # Only apply this tie-break when EXACTLY ONE direct child connects outside
+    # the group. That is the unambiguous "seat the one connected child at the
+    # peer-facing end" case (the DR diagram's API container). When several
+    # children connect outside, where each should sit is a multi-way trade the
+    # crossing model already handles; forcing one toward a peer end there just
+    # shuffles the row and can push another edge through a frame (the
+    # omnichannel services regression). Return 0 = no tie-break preference.
+    connected_children = 0
+    for cl in child_leaf_sets:
+        if any((cn["from"] in cl and cn["to"] not in internal)
+               or (cn["to"] in cl and cn["from"] not in internal)
+               for cn in relevant):
+            connected_children += 1
+    if connected_children != 1:
+        return 0
+
+    # This row's own centre in global peer-space: mean global position of the
+    # external peers it connects to (so "left/right" is relative to the row).
+    peer_positions = []
+    for conn in relevant:
+        for a, b in ((conn["from"], conn["to"]), (conn["to"], conn["from"])):
+            if a in internal and b in global_positions and b not in internal:
+                peer_positions.append(global_positions[b])
+    if not peer_positions:
+        return 0
+    datum = sum(peer_positions) / len(peer_positions)
+    cost = 0
+    for conn in relevant:
+        for a, b in ((conn["from"], conn["to"]), (conn["to"], conn["from"])):
+            if a in leaf_slot and b in global_positions and b not in internal:
+                ideal = (n - 1) if global_positions[b] >= datum else 0
+                cost += abs(leaf_slot[a] - ideal)
+    return cost
+
+
+def _compute_global_peer_positions(children, all_connections, child_leaf_ids, root, include_groups=False):
     """Compute normalized positions for external peers.
 
     External peers are nodes NOT contained in any of the children being permuted.
     Their position is based on DFS order of leaf nodes in the root tree,
     normalized to a [0, N] range where N is the number of internal leaf slots.
+
+    ``include_groups`` also registers GROUP ids at the mean position of their
+    member leaves. This is used ONLY by the detour tie-break (so a many-to-one
+    edge to a sibling group box is visible when seating the single connected
+    child). The crossing count deliberately uses the leaf-only map — adding
+    groups there reclassifies group-endpoint edges and shuffles unrelated
+    diagrams' orders.
     """
     # All leaves within this group
     all_internal = set()
@@ -326,7 +413,24 @@ def _compute_global_peer_positions(children, all_connections, child_leaf_ids, ro
         return {}
 
     # Assign sequential positions to external leaves
-    return {lid: i for i, lid in enumerate(external_leaves)}
+    pos = {lid: i for i, lid in enumerate(external_leaves)}
+
+    if include_groups:
+        # Position external GROUP ids at the mean position of their members so a
+        # connection targeting a group BOX (e.g. an API container → the Data
+        # tier) is visible to the detour tie-break.
+        def _register(node):
+            ml = []
+            _collect_leaf_ids(node, ml)
+            gid = node.get("id")
+            if gid is not None and node.get("children"):
+                ext = [pos[m] for m in ml if m in pos]
+                if ext and not any(m in all_internal for m in ml):
+                    pos[gid] = sum(ext) / len(ext)
+            for ch in node.get("children", []):
+                _register(ch)
+        _register(root)
+    return pos
 
 
 def _count_crossings_for_mixed_order(perm, relevant, global_positions, child_leaf_ids):
@@ -2357,15 +2461,34 @@ def _count_all_crossings(edges):
     intended structure, not a crossing, so it is skipped. A meeting that is
     interior to BOTH polylines (a genuine 4-way X, e.g. two spokes crossing
     mid-span) is always counted, even for a shared-endpoint pair."""
+    # Pre-compute each edge's bounding box once; two edges whose boxes don't
+    # overlap can't cross, so we skip the O(segments²) inner test entirely.
+    # This is the hot path (called thousands of times by the bend/side/detour
+    # optimizers), so the cheap box reject saves the bulk of the work.
+    boxes = []
+    for e in edges:
+        pts = e["points"]
+        if len(pts) < 2:
+            boxes.append(None)
+            continue
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        boxes.append((min(xs), min(ys), max(xs), max(ys)))
+
     count = 0
     for i in range(len(edges)):
         pts_i = edges[i]["points"]
         if len(pts_i) < 2:
             continue
         ei = edges[i]
+        bi = boxes[i]
         for j in range(i + 1, len(edges)):
             pts_j = edges[j]["points"]
             if len(pts_j) < 2:
+                continue
+            bj = boxes[j]
+            # Bounding-box reject: no overlap → no crossing.
+            if bi[0] > bj[2] or bj[0] > bi[2] or bi[1] > bj[3] or bj[1] > bi[3]:
                 continue
             ej = edges[j]
             shares_endpoint = (
@@ -2472,15 +2595,35 @@ def _seg_pierces_node(p1, p2, n):
 
 def _count_node_pierces(edges, nodes):
     """Count (edge, node) pairs where an edge passes through a non-endpoint icon."""
+    # Pre-compute each node's short id and its expanded pierce box ONCE (this is
+    # a hot path called thousands of times by the optimizers). The old code
+    # recomputed nid.rsplit and the box for every (edge, node) pair — millions
+    # of times on a dense diagram.
+    node_info = []
+    for nid, n in nodes.items():
+        short = nid.rsplit(".", 1)[-1]
+        rx, ry = n["x"], n["y"]
+        rw = n.get("width", 60)
+        rh = n.get("height", rw)
+        x0, y0 = rx + _PIERCE_INSET, ry + _PIERCE_INSET
+        x1, y1 = rx + rw - _PIERCE_INSET, ry + rh - _PIERCE_INSET
+        node_info.append((nid, short, n, x0, y0, x1, y1))
+
     count = 0
     for e in edges:
         pts = e["points"]
         if len(pts) < 2:
             continue
         ignore = {e["from"], e["to"]}
-        for nid, n in nodes.items():
-            short = nid.rsplit(".", 1)[-1]
+        # Edge bounding box for a cheap reject against each node's pierce box.
+        exs = [p[0] for p in pts]
+        eys = [p[1] for p in pts]
+        emnx, emny, emxx, emxy = min(exs), min(eys), max(exs), max(eys)
+        for nid, short, n, x0, y0, x1, y1 in node_info:
             if nid in ignore or short in ignore:
+                continue
+            # Box reject: edge bbox vs node's expanded pierce box.
+            if emnx > x1 or x0 > emxx or emny > y1 or y0 > emxy:
                 continue
             for k in range(len(pts) - 1):
                 if _seg_pierces_node(pts[k], pts[k + 1], n):
