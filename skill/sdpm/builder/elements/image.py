@@ -3,7 +3,8 @@
 """Image element."""
 import sys
 from pathlib import Path
-from pptx.util import Emu
+from pptx.dml.color import RGBColor
+from pptx.util import Emu, Pt
 from sdpm.schema.defaults import ELEMENT_DEFAULTS
 from sdpm.utils.image import resolve_image_path, apply_image_effects
 from sdpm.utils.effects import apply_effects
@@ -204,6 +205,19 @@ class ImageMixin:
                 else:
                     blip_fill.insert(0, src_rect)
         
+        # Apply line (border) — raster pictures only
+        if not is_svg and pic is not None:
+            line_color = elem.get("line")
+            if line_color and line_color != "none":
+                pic.line.fill.solid()
+                hex_color = line_color.lstrip("#")
+                pic.line.color.rgb = RGBColor(
+                    int(hex_color[0:2], 16),
+                    int(hex_color[2:4], 16),
+                    int(hex_color[4:6], 16),
+                )
+                pic.line.width = Pt(elem.get("lineWidth", 1))
+
         # Apply rotation
         if rotation != 0:
             if is_svg:

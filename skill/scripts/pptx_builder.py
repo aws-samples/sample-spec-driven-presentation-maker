@@ -99,12 +99,28 @@ def cmd_generate(args):
         print(line)
 
     if result["warnings"]:
-        layout_warnings = [w for w in result["warnings"] if w.startswith("page") and "offset" in w]
-        font_warnings = [w for w in result["warnings"] if w.startswith("fontSize token discipline") or w.startswith("  ")]
-        other_warnings = [
-            w for w in result["warnings"]
-            if w not in layout_warnings and w not in font_warnings
-        ]
+        # Section-aware grouping: each multi-line check returns a header followed
+        # by bullet lines (indented with two leading spaces). Walk the list and
+        # collect each header with its bullets.
+        layout_warnings: list[str] = []
+        font_warnings: list[str] = []
+        overlay_warnings: list[str] = []
+        other_warnings: list[str] = []
+
+        current_section: list[str] | None = None
+        for w in result["warnings"]:
+            if w.startswith("page") and "offset" in w:
+                layout_warnings.append(w)
+                current_section = None
+            elif w.startswith("fontSize token discipline"):
+                current_section = font_warnings
+            elif w.startswith("overlay textbox detected"):
+                current_section = overlay_warnings
+            elif w.startswith("  ") and current_section is not None:
+                current_section.append(w)
+            else:
+                other_warnings.append(w)
+                current_section = None
 
         if layout_warnings:
             print(f"⚠️  Layout bias detected ({len(layout_warnings)} slides):")
@@ -117,6 +133,12 @@ def cmd_generate(args):
             for w in font_warnings:
                 print(w if w.startswith("  ") else f"  {w}")
             print("  → Add the missing --fs-* token to specs/art-direction.html, or change the slide to use an existing token.")
+
+        if overlay_warnings:
+            print("⚠️  Overlay textbox detected:")
+            for w in overlay_warnings:
+                print(w if w.startswith("  ") else f"  {w}")
+            print("  → Move the label into the shape's `text` property and delete the overlaying textbox.")
 
         for w in other_warnings:
             print(f"  {w}")
