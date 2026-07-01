@@ -662,7 +662,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     if deck_id:
         _check_deck_access(deck_id, action="edit_slide" if save else "read")
 
-    output, outline_rejected, lint_diagnostics = sandbox_mod.execute_in_sandbox(
+    output, outline_warnings, lint_diagnostics = sandbox_mod.execute_in_sandbox(
         code=code,
         storage=_storage,
         region=_region,
@@ -673,9 +673,8 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
 
     result: dict = {"output": output}
 
-    if outline_rejected:
-        errs = result.setdefault("errors", {})
-        errs["outline"] = (
+    if outline_warnings:
+        result.setdefault("warnings", {})["outline"] = (
             "outline.md format violation. "
             "Read workflow `create-new-1-outline` for the correct format."
         )
@@ -704,7 +703,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
                 sid = s.get("id", "")
                 if sid:
                     slug_to_page[sid] = i + 1
-            page_numbers = [slug_to_page[slug] for slug in measure_slides if slug in slug_to_page]
+            page_numbers = [slug_to_page[slug] for slug in (measure_slides or []) if slug in slug_to_page]
             page_to_slug = {v: k for k, v in slug_to_page.items()}
 
             # Measure

@@ -380,10 +380,15 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
   const handleSubmit = async () => {
     if (!file) return
     setUploading(true)
-    const result = await uploadTemplate(file, description, idToken)
-    setUploading(false)
-    if (result.error) { onError(result.error); return }
-    onComplete()
+    try {
+      const result = await uploadTemplate(file, description, idToken)
+      if (result.error) { onError(result.error); return }
+      onComplete()
+    } catch {
+      onError("Failed to upload template")
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (

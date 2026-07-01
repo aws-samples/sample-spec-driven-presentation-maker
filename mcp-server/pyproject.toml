@@ -15,6 +15,9 @@ dependencies = [
     "openpyxl>=3.1.0",
 ]
 
+[tool.uv.sources]
+sdpm-skill = { path = "../skill", editable = true }
+
 [tool.setuptools.packages.find]
 include = ["tools*", "storage*"]
 

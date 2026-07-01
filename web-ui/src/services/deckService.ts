@@ -179,6 +179,7 @@ export interface SlideSearchResult {
  * @returns Array of matching slides with preview URLs
  */
 export async function searchSlides(query: string, idToken: string): Promise<SlideSearchResult[]> {
+  if (IS_LOCAL) return []
   const base = await getApiBaseUrl()
   const resp = await fetch(`${base}slides/search?q=${encodeURIComponent(query)}`, {
     headers: { Authorization: `Bearer ${idToken}` },
@@ -581,6 +582,15 @@ export async function downloadTemplate(name: string, idToken: string): Promise<v
 export async function uploadTemplate(file: File, description: string, idToken: string): Promise<{ uploaded?: string; error?: string }> {
   const base = await getApiBaseUrl()
   const name = file.name.replace(/\.pptx$/, "")
+
+  // Local mode: no S3/presigned URL — POST the file directly as multipart form-data.
+  if (IS_LOCAL) {
+    const form = new FormData()
+    form.append("file", file)
+    form.append("description", description)
+    const res = await fetch(`${base}templates/user`, { method: "POST", body: form })
+    return res.json()
+  }
 
   // Step 1: Get presigned URL
   const presignRes = await fetch(`${base}templates/user/upload-url`, {

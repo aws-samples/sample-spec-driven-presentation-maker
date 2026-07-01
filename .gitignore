@@ -65,6 +65,7 @@ skill/assets/config.json
 .ash/
 ?/
 skill/sdpm/.cache/
+skill/.cache/
 
 # Temporary workspace
 tmp/
