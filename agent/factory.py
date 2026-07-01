@@ -138,7 +138,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
                 ),
             )
         composer_mcp_factory = lambda: mcp_agentcore_runtime(jwt_token=jwt_token)  # noqa: E731
-        compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch])
+        compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create)
         tools.append(compose_slides)
 
     # Agent
@@ -163,7 +163,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         mcp_status = new_status
         tools = [*mcp_servers, web_fetch, hearing]
         if cfg.use_composer:
-            compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch])
+            compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create)
             tools.append(compose_slides)
         agent = Agent(
             name=agent_name, system_prompt="", tools=tools, model=model,

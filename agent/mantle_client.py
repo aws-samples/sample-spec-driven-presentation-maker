@@ -1,4 +1,9 @@
-"""Bedrock Mantle client adapter — SigV4-signed httpx for OpenAI-compatible API."""
+"""Bedrock Mantle client adapter — SigV4-signed httpx for OpenAI-compatible API.
+
+Note: _MantleOpenAIModel overrides _get_client (internal to strands-agents OpenAIModel).
+Tested with strands-agents>=1.30.0. If the SDK restructures OpenAIModel internals,
+this module may need updating.
+"""
 
 import contextlib
 

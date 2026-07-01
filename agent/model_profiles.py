@@ -89,9 +89,6 @@ QWEN_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="none", compose_capa
 # Moonshot Kimi — prompt caching not supported on Bedrock at time of writing.
 KIMI_DEFAULT = ModelProfile(temperature=0.6, cache_strategy="none", compose_capable=False)
 
-# Z.AI GLM — prompt caching not supported on Bedrock.
-GLM_DEFAULT = ModelProfile(temperature=0.6, cache_strategy="none")
-
 # OpenAI GPT — bedrock-mantle only (Responses API endpoint).
 GPT_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="none")
 
