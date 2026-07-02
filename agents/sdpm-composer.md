@@ -127,6 +127,27 @@ single call (risks output truncation). Per slug:
 **write → `compose_slide(slug="{slug}")` → inspect returned `preview_files` + `warnings`
 → fix (via `compose_slide` again) → next slug.** Never use `run_python(save=True)` here.
 
+### Fixing a slide — PATCH the JSON, do NOT re-emit it whole
+
+The `code` you pass to `compose_slide` runs in the same sandbox as `run_python`, so it can
+**read the existing slide and change only what needs changing**. When you refine a slide you
+already drafted, do NOT regenerate the entire `data = {...}` — that wastes output tokens and
+is slow. Instead read it, mutate the specific fields, and write it back:
+
+```
+data = read_json("slides/{slug}.json")
+data["elements"][2]["fontSize"] = 24        # change one value
+data["elements"][2]["y"] = 520              # nudge one position
+write_json("slides/{slug}.json", data)
+```
+
+- **First draft of a slug:** write the full `data = {...}` (there is nothing to read yet).
+- **Every subsequent fix:** `read_json` → mutate the few fields the preview/warnings flagged
+  → `write_json`. Emit only the patch lines, not the whole slide.
+
+This keeps each fix call small and fast. `compose_slide` still rebuilds and re-previews the
+whole slug after your patch, so you always get an up-to-date `preview_files` PNG back.
+
 ### Validation — the preview PNG is the source of truth
 
 Open each returned `preview_files` PNG with the **Read** tool and look at it. The preview

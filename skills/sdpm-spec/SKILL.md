@@ -163,8 +163,10 @@ read_guides(["grid"]), read_examples(["components/all","patterns"])), then read
 specs/brief.md, specs/outline.md, specs/art-direction.html for context.
 Compose ONLY your assigned slugs, one at a time, via write_json inside compose_slide(slug=...),
 and use the preview_files (PNG) it returns as the source of truth. In Phase 2 you MUST use
-compose_slide and MUST NOT call run_python(save=True). Do NOT touch other slides, deck.json,
-or specs/. art-direction is FROZEN. Do NOT advance to Phase 3. Return a summary plus any warnings.
+compose_slide and MUST NOT call run_python(save=True). When fixing a slide you already drafted,
+PATCH it (read_json -> change only the flagged fields -> write_json), do NOT re-emit the whole
+data={...}. Do NOT touch other slides, deck.json, or specs/. art-direction is FROZEN. Do NOT
+advance to Phase 3. Return a summary plus any warnings.
 ```
 
 Composers run in parallel, so each MUST use `compose_slide` — it isolates the per-slug build
