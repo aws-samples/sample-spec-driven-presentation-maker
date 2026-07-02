@@ -13,6 +13,7 @@ import shutil
 import sys
 from pathlib import Path
 
+import anyio
 import pytest
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -58,8 +59,12 @@ def _make_deck(tmp_path: Path, *, with_image: bool = False, fs_tokens: str | Non
 
 
 def _compose(deck: Path, slug: str, code: str, measure: bool = False) -> dict:
-    out = sandbox_tools.compose_slide(
-        purpose="test", code=code, deck_id=str(deck), slug=slug, measure=measure
+    # compose_slide is async (offloads blocking work to a thread); drive it
+    # from the sync test via anyio.run.
+    out = anyio.run(
+        lambda: sandbox_tools.compose_slide(
+            purpose="test", code=code, deck_id=str(deck), slug=slug, measure=measure
+        )
     )
     return json.loads(out)
 
@@ -72,8 +77,10 @@ def _compose(deck: Path, slug: str, code: str, measure: bool = False) -> dict:
 def test_rejects_missing_deck(tmp_path):
     """Non-directory deck_id returns an error, not a crash."""
     result = json.loads(
-        sandbox_tools.compose_slide(
-            purpose="x", code="pass", deck_id=str(tmp_path / "nope"), slug="title"
+        anyio.run(
+            lambda: sandbox_tools.compose_slide(
+                purpose="x", code="pass", deck_id=str(tmp_path / "nope"), slug="title"
+            )
         )
     )
     assert "Error" in result["output"]

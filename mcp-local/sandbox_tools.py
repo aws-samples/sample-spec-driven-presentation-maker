@@ -14,6 +14,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import anyio
+
 import perf_log
 
 
@@ -493,64 +495,17 @@ def _link_or_copy(src: Path, dst: Path) -> None:
             shutil.copy2(src, dst)
 
 
-@perf_log.timed("compose_slide")
-def compose_slide(purpose: str, code: str, deck_id: str, slug: str,
-                  measure: bool = True) -> str:
-    """[INTERNAL — do not use unless explicitly instructed]
+def _compose_slide_blocking(code: str, deck_id: str, slug: str, measure: bool) -> dict[str, Any]:
+    """Synchronous body of compose_slide — all blocking work lives here.
 
-    Do NOT choose this tool for normal work. Normal slide creation and editing
-    MUST use run_python(save=True). This tool exists ONLY for Claude Code's
-    Phase 2, where parallel composer sub-agents each process their own assigned
-    slug in isolation so they never wait on one another. Use it ONLY when you
-    were explicitly told to.
-
-    It builds and renders exactly ONE slug in a private temp directory. It does
-    NOT touch the shared output.pptx, does NOT wipe/rebuild preview/, and does
-    NOT take the deck-wide .save.lock — so N composers run without serializing.
-    It also does NOT generate compose/defs_ (build-animation data), which only
-    the Web UI consumes and which Claude Code does not read.
-
-    ## What it does (per call = one slug)
-
-    1. Runs your `code` in the sandbox (same as run_python) — your code MUST
-       write the slide via `write_json("slides/{slug}.json", data)`.
-    2. Lints + sanitizes that one slide JSON in place (the single writer).
-    3. Assembles a throwaway one-slide deck directory (deck.json + specs +
-       art-direction + the slug + asset symlinks) and builds it — so relative
-       images and fontSize token discipline resolve exactly as in a full build.
-    4. Renders that slide to a PNG under {deck}/preview/{slug}.png and (when
-       measure=True) measures its text bboxes.
-
-    ## Sandbox functions (same as run_python)
-
-        read_json / write_json / read_text / write_text / list_files
-    All paths are relative to the deck directory.
-
-    Args:
-        purpose: Brief user-facing description of what this code does. Shown in UI.
-        code: Python code that writes slides/{slug}.json (no import statements).
-        deck_id: Deck directory path (absolute). Must contain deck.json + specs/.
-        slug: The single slide slug this call owns.
-        measure: When True, also return text bbox measurements for the slug.
-
-    Returns:
-        JSON: {"output", "preview_files", "warnings", "lint_diagnostics", "measure"?}
+    Runs user code, lints, assembles the iso one-slide deck, builds, previews,
+    and measures. Called via anyio.to_thread.run_sync so N concurrent composers
+    (even sharing one MCP process) run their soffice/subprocess work in parallel
+    threads instead of serializing on a single event loop.
     """
     import shutil
 
-    from sandbox import check_code
-
     result: dict[str, Any] = {}
-
-    if not deck_id or not Path(deck_id).is_dir():
-        result["output"] = f"Error: deck_id is not a directory: {deck_id}"
-        return json.dumps(result, ensure_ascii=False)
-
-    violations = check_code(code)
-    if violations:
-        result["output"] = _rejection_message(violations, has_deck=True)
-        return json.dumps(result, ensure_ascii=False)
-
     deck_dir = Path(deck_id)
 
     # 1. Run user code (writes deck_dir/slides/{slug}.json). Real deck is the
@@ -568,7 +523,7 @@ def compose_slide(purpose: str, code: str, deck_id: str, slug: str,
             f"slides/{slug}.json was not written. Your code must call "
             f'write_json("slides/{slug}.json", data).'
         )
-        return json.dumps(result, ensure_ascii=False)
+        return result
 
     # 3. Build a throwaway one-slide deck directory (method A'). Directory input
     #    keeps base_dir at the deck root so relative images and art-direction
@@ -621,7 +576,7 @@ def compose_slide(purpose: str, code: str, deck_id: str, slug: str,
                 result.setdefault("lint_diagnostics", []).extend(build_lint)
         except Exception as e:
             result["pptx_error"] = str(e)
-            return json.dumps(result, ensure_ascii=False)
+            return result
 
         # 5. Preview: PDF → PNG for the single slide, copied to preview/{slug}.png
         #    (slug-unique name; never rmtree the shared preview/ dir).
@@ -656,6 +611,76 @@ def compose_slide(purpose: str, code: str, deck_id: str, slug: str,
     finally:
         shutil.rmtree(iso, ignore_errors=True)
 
+    return result
+
+
+@perf_log.timed("compose_slide")
+async def compose_slide(purpose: str, code: str, deck_id: str, slug: str,
+                        measure: bool = True) -> str:
+    """[INTERNAL — do not use unless explicitly instructed]
+
+    Do NOT choose this tool for normal work. Normal slide creation and editing
+    MUST use run_python(save=True). This tool exists ONLY for Claude Code's
+    Phase 2, where parallel composer sub-agents each process their own assigned
+    slug in isolation so they never wait on one another. Use it ONLY when you
+    were explicitly told to.
+
+    It builds and renders exactly ONE slug in a private temp directory. It does
+    NOT touch the shared output.pptx, does NOT wipe/rebuild preview/, and does
+    NOT take the deck-wide .save.lock — so N composers run without serializing.
+    It also does NOT generate compose/defs_ (build-animation data), which only
+    the Web UI consumes and which Claude Code does not read.
+
+    This tool is async and offloads its blocking work (soffice, subprocess) to a
+    worker thread, so concurrent composers run in parallel even when Claude Code
+    routes them through a single shared stdio MCP process (measured: parallel
+    stdio subagents share one server process, so a synchronous body would
+    serialize on the event loop).
+
+    ## What it does (per call = one slug)
+
+    1. Runs your `code` in the sandbox (same as run_python) — your code MUST
+       write the slide via `write_json("slides/{slug}.json", data)`.
+    2. Lints + sanitizes that one slide JSON in place (the single writer).
+    3. Assembles a throwaway one-slide deck directory (deck.json + specs +
+       art-direction + the slug + asset symlinks) and builds it — so relative
+       images and fontSize token discipline resolve exactly as in a full build.
+    4. Renders that slide to a PNG under {deck}/preview/{slug}.png and (when
+       measure=True) measures its text bboxes.
+
+    ## Sandbox functions (same as run_python)
+
+        read_json / write_json / read_text / write_text / list_files
+    All paths are relative to the deck directory.
+
+    Args:
+        purpose: Brief user-facing description of what this code does. Shown in UI.
+        code: Python code that writes slides/{slug}.json (no import statements).
+        deck_id: Deck directory path (absolute). Must contain deck.json + specs/.
+        slug: The single slide slug this call owns.
+        measure: When True, also return text bbox measurements for the slug.
+
+    Returns:
+        JSON: {"output", "preview_files", "warnings", "lint_diagnostics", "measure"?}
+    """
+    from sandbox import check_code
+
+    result: dict[str, Any] = {}
+
+    if not deck_id or not Path(deck_id).is_dir():
+        result["output"] = f"Error: deck_id is not a directory: {deck_id}"
+        return json.dumps(result, ensure_ascii=False)
+
+    violations = check_code(code)
+    if violations:
+        result["output"] = _rejection_message(violations, has_deck=True)
+        return json.dumps(result, ensure_ascii=False)
+
+    # Offload the blocking body so concurrent composers don't serialize on the
+    # shared event loop (see docstring).
+    result = await anyio.to_thread.run_sync(
+        _compose_slide_blocking, code, deck_id, slug, measure
+    )
     return json.dumps(result, ensure_ascii=False)
 
 
