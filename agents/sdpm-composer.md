@@ -68,21 +68,25 @@ translate every CLI command to its MCP equivalent:
 | `pptx_builder.py workflows <name>` | `read_workflows(["<name>"])` |
 | `pptx_builder.py guides <name>` | `read_guides(["<name>"])` |
 | `pptx_builder.py examples <name>` | `read_examples(["<name>"])` |
-| `pptx_builder.py measure {json} -p {n}` | `compose_slide(...)` (preferred) — else `run_python(..., save=True, measure_slides=["{slug}"])` |
-| `pptx_builder.py preview {json}` | (covered by the same `compose_slide(...)` / `run_python(save=True, ...)` call — it returns `preview_files`) |
+| `pptx_builder.py measure {json} -p {n}` | `compose_slide(...)` — the per-slide build+measure+preview call (see below) |
+| `pptx_builder.py preview {json}` | (covered by the same `compose_slide(...)` call — it returns `preview_files`) |
 | `pptx_builder.py image-size {path} --width {px}` | **no MCP tool** — compute the proportional height in `run_python` (e.g. `new_h = round(orig_h * target_w / orig_w)`) |
 | `pptx_builder.py code-block …` | `code_to_slide(...)` MCP tool |
 | `search-assets` | `search_assets(...)` MCP tool |
 
-### Writing slides — `compose_slide` (preferred) / `run_python` (NOT Write/Edit)
+### Writing slides — `compose_slide` ONLY (NOT run_python(save=True), NOT Write/Edit)
 
 You have no Write/Edit tools. Write every slide via a sandbox function `write_json`,
-called through an MCP tool. The **first argument `purpose` is required**.
+called through `compose_slide`. The **first argument `purpose` is required**.
 
-**Prefer `compose_slide` when it is available in your tool list.** It is the CC Phase 2
-per-slide isolation tool: it builds and renders ONLY your assigned slug in a private temp
-directory, so parallel composers never wait on one another (no shared `output.pptx`, no
-deck-wide `.save.lock`). One call per slug — it writes the slide, lints it, renders the
+**In Phase 2 you MUST use `compose_slide` for every write+preview, and you MUST NOT call
+`run_python(save=True)`.** `compose_slide` is the per-slide isolation tool: it builds and
+renders ONLY your assigned slug in a private temp dir and offloads the heavy LibreOffice
+work to a worker thread, so parallel composers run concurrently even when Claude Code
+routes them through one shared MCP process. `run_python(save=True)` instead rebuilds the
+WHOLE deck and takes the deck-wide `.save.lock` — measured to serialize parallel composers
+(each save=True call = ~55–80s of blocking soffice), which is exactly what this tool
+replaces. One `compose_slide` call per slug — it writes the slide, lints it, renders the
 preview PNG, and measures it:
 
 ```
@@ -106,26 +110,11 @@ It does NOT touch other slugs, the shared `output.pptx`, or `preview/` beyond wr
 own `preview/{slug}.png`. The final deck-wide PPTX and full previews are produced later in
 Phase 3 — not your job.
 
-**If `compose_slide` is not in your tool list, fall back to `run_python`.** Bundle write +
-measure + preview into ONE call per slide:
-
-```
-run_python(
-  purpose="write and measure slide '{slug}'",
-  code='''
-data = { "elements": [ ... ] }
-write_json("slides/{slug}.json", data)
-''',
-  deck_id="<absolute deck path>",
-  save=True,
-  measure_slides=["{slug}"],
-)
-```
-
-`save=True` triggers `lint_and_sanitize` (it rewrites `slides/{slug}.json`), the PPTX
-build, SVG→PNG render, and returns `preview_files` (PNG paths), `warnings`, and
-`lint_diagnostics` — all filtered to the slugs you measured. Either way, do not mix in
-CC-native Write/Edit (it would double-manage the file the tool already rewrites).
+`run_python` (WITHOUT `save=True`) is still fine for pure computation or reading deck files
+via its sandbox functions (`read_json` / `read_text` / `list_files`). Only the `save=True`
+build path is forbidden in Phase 2. If `compose_slide` is genuinely absent from your tool
+list, stop and report it rather than falling back to `save=True`. Do not mix in CC-native
+Write/Edit (it would double-manage the file `compose_slide` already rewrites).
 
 For reading deck files inside the sandbox use `read_json` / `read_text` / `list_files`
 (NOT `open()` — it is blocked).
@@ -135,8 +124,8 @@ For reading deck files inside the sandbox use `read_json` / `read_text` / `list_
 Write and save **one slide at a time** — never batch-write multiple `slides/*.json` in a
 single call (risks output truncation). Per slug:
 
-**write → `compose_slide(slug="{slug}")` (or `run_python(save=True, measure_slides=["{slug}"])`
-if unavailable) → inspect returned `preview_files` + `warnings` → fix → next slug.**
+**write → `compose_slide(slug="{slug}")` → inspect returned `preview_files` + `warnings`
+→ fix (via `compose_slide` again) → next slug.** Never use `run_python(save=True)` here.
 
 ### Validation — the preview PNG is the source of truth
 
@@ -177,11 +166,12 @@ rather than inventing an ad-hoc value.
 ## Consistency review mode
 
 If your instruction is `"Consistency review."`, you own **every** slide in the deck for
-this call. Read all `slides/*.json` directly via `run_python` (`read_json`) — not via
-preview — and fix only **cross-slide** inconsistencies (labeling/numbering, component
-choice for matching roles, typography values, decorative elements, writing style).
-Individual-slide visual defects are OUT OF SCOPE here. Apply fixes via
-`run_python(save=True, measure_slides=[...])`. If already consistent, return a brief summary.
+this call. Read all `slides/*.json` directly via `run_python` (`read_json`, no `save=True`)
+— not via preview — and fix only **cross-slide** inconsistencies (labeling/numbering,
+component choice for matching roles, typography values, decorative elements, writing style).
+Individual-slide visual defects are OUT OF SCOPE here. Apply each fix per-slug via
+`compose_slide(slug=...)` (one call per changed slug) — not `run_python(save=True)`. If
+already consistent, return a brief summary.
 
 ## Return
 

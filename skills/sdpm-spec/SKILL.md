@@ -161,16 +161,17 @@ Your assigned slugs: <slug-a>[, <slug-b>].
 First load references (read_workflows(["create-new-2-compose","slide-json-spec"]),
 read_guides(["grid"]), read_examples(["components/all","patterns"])), then read
 specs/brief.md, specs/outline.md, specs/art-direction.html for context.
-Compose ONLY your assigned slugs, one at a time, via write_json, and use the preview_files
-(PNG) returned by compose_slide(slug=...) (the per-slide isolation tool, preferred for
-parallel work; fall back to run_python(save=True, measure_slides=[slug]) if it is not in
-your tool list) as the source of truth. Do NOT touch other slides, deck.json, or specs/.
-art-direction is FROZEN. Do NOT advance to Phase 3. Return a summary plus any warnings.
+Compose ONLY your assigned slugs, one at a time, via write_json inside compose_slide(slug=...),
+and use the preview_files (PNG) it returns as the source of truth. In Phase 2 you MUST use
+compose_slide and MUST NOT call run_python(save=True). Do NOT touch other slides, deck.json,
+or specs/. art-direction is FROZEN. Do NOT advance to Phase 3. Return a summary plus any warnings.
 ```
 
-Composers run in parallel, so each should use `compose_slide` (it isolates per-slug build
-+ preview so agents never wait on a shared lock) when it is available. Phase 3 below still
-uses `run_python(save=True)` — a single pass that produces the deck-wide PPTX and previews.
+Composers run in parallel, so each MUST use `compose_slide` — it isolates the per-slug build
+and offloads LibreOffice to a worker thread, so agents run concurrently even when Claude Code
+routes them through one shared MCP process. `run_python(save=True)` rebuilds the whole deck and
+serializes on the deck-wide lock (~55–80s each), so it is forbidden for composers in Phase 2.
+Phase 3 below still uses `run_python(save=True)` once — a single pass, no parallelism to lose.
 
 Keep prompts ASCII-clean. Each prompt MUST include: `deck_id` (absolute path), the exact
 assigned slugs (usually 1–2), and the pointer to `specs/`.
