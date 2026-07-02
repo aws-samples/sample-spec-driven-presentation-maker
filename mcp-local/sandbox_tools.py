@@ -16,8 +16,6 @@ from typing import Any
 
 import anyio
 
-import perf_log
-
 
 def _rejection_message(violations: list[str], has_deck: bool) -> str:
     """Build an error message that helps the LLM rewrite rejected code."""
@@ -133,7 +131,6 @@ def _render_preview_png(pptx_path: Path, out_dir: Path, work_dir: Path) -> list[
     return sorted(_glob.glob(str(out_dir / "page-*.png")))
 
 
-@perf_log.timed("run_python")
 def run_python(purpose: str, code: str, deck_id: str = "", save: bool = False,
                measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a sandboxed environment.
@@ -614,7 +611,6 @@ def _compose_slide_blocking(code: str, deck_id: str, slug: str, measure: bool) -
     return result
 
 
-@perf_log.timed("compose_slide")
 async def compose_slide(purpose: str, code: str, deck_id: str, slug: str,
                         measure: bool = True) -> str:
     """[INTERNAL — do not use unless explicitly instructed]
