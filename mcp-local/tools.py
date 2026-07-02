@@ -13,6 +13,8 @@ No AWS dependencies. No deck management (that's Layer 3).
 from pathlib import Path
 from typing import Any
 
+import perf_log
+
 _SKILL_DIR = Path(__file__).resolve().parent.parent / "skill"
 _REFERENCES_DIR = _SKILL_DIR / "references"
 
@@ -294,6 +296,7 @@ def code_to_slide(
     }
 
 
+@perf_log.timed("grid")
 def grid(purpose: str, spec: str) -> dict[str, Any]:
     """Compute CSS Grid layout coordinates from a grid specification.
 
