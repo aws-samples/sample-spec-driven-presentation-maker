@@ -477,6 +477,184 @@ Audience: Developers
     return json.dumps(result, ensure_ascii=False)
 
 
+def _link_or_copy(src: Path, dst: Path) -> None:
+    """Symlink *src* → *dst*; fall back to a copy when symlinks are unavailable."""
+    import shutil
+
+    try:
+        os.symlink(src, dst, target_is_directory=src.is_dir())
+    except (OSError, NotImplementedError):
+        if src.is_dir():
+            shutil.copytree(src, dst)
+        else:
+            shutil.copy2(src, dst)
+
+
+def compose_slide(purpose: str, code: str, deck_id: str, slug: str,
+                  measure: bool = True) -> str:
+    """[INTERNAL — do not use unless explicitly instructed]
+
+    Do NOT choose this tool for normal work. Normal slide creation and editing
+    MUST use run_python(save=True). This tool exists ONLY for Claude Code's
+    Phase 2, where parallel composer sub-agents each process their own assigned
+    slug in isolation so they never wait on one another. Use it ONLY when you
+    were explicitly told to.
+
+    It builds and renders exactly ONE slug in a private temp directory. It does
+    NOT touch the shared output.pptx, does NOT wipe/rebuild preview/, and does
+    NOT take the deck-wide .save.lock — so N composers run without serializing.
+    It also does NOT generate compose/defs_ (build-animation data), which only
+    the Web UI consumes and which Claude Code does not read.
+
+    ## What it does (per call = one slug)
+
+    1. Runs your `code` in the sandbox (same as run_python) — your code MUST
+       write the slide via `write_json("slides/{slug}.json", data)`.
+    2. Lints + sanitizes that one slide JSON in place (the single writer).
+    3. Assembles a throwaway one-slide deck directory (deck.json + specs +
+       art-direction + the slug + asset symlinks) and builds it — so relative
+       images and fontSize token discipline resolve exactly as in a full build.
+    4. Renders that slide to a PNG under {deck}/preview/{slug}.png and (when
+       measure=True) measures its text bboxes.
+
+    ## Sandbox functions (same as run_python)
+
+        read_json / write_json / read_text / write_text / list_files
+    All paths are relative to the deck directory.
+
+    Args:
+        purpose: Brief user-facing description of what this code does. Shown in UI.
+        code: Python code that writes slides/{slug}.json (no import statements).
+        deck_id: Deck directory path (absolute). Must contain deck.json + specs/.
+        slug: The single slide slug this call owns.
+        measure: When True, also return text bbox measurements for the slug.
+
+    Returns:
+        JSON: {"output", "preview_files", "warnings", "lint_diagnostics", "measure"?}
+    """
+    import shutil
+
+    from sandbox import check_code
+
+    result: dict[str, Any] = {}
+
+    if not deck_id or not Path(deck_id).is_dir():
+        result["output"] = f"Error: deck_id is not a directory: {deck_id}"
+        return json.dumps(result, ensure_ascii=False)
+
+    violations = check_code(code)
+    if violations:
+        result["output"] = _rejection_message(violations, has_deck=True)
+        return json.dumps(result, ensure_ascii=False)
+
+    deck_dir = Path(deck_id)
+
+    # 1. Run user code (writes deck_dir/slides/{slug}.json). Real deck is the
+    #    only writer of slides/*.json — same as run_python.
+    result["output"] = _run_sandbox(code, deck_id, deck_id)
+
+    # 2. Lint + sanitize just this slug.
+    lint_diagnostics = _lint_sanitize_slides(deck_dir, [slug])
+    if lint_diagnostics:
+        result["lint_diagnostics"] = lint_diagnostics
+
+    slide_json = deck_dir / "slides" / f"{slug}.json"
+    if not slide_json.exists():
+        result["compose_error"] = (
+            f"slides/{slug}.json was not written. Your code must call "
+            f'write_json("slides/{slug}.json", data).'
+        )
+        return json.dumps(result, ensure_ascii=False)
+
+    # 3. Build a throwaway one-slide deck directory (method A'). Directory input
+    #    keeps base_dir at the deck root so relative images and art-direction
+    #    resolve correctly (see spec: method A was rejected for base_dir breakage).
+    from sdpm.preview import get_work_dir
+
+    work_root = get_work_dir(deck_dir)
+    iso = Path(tempfile.mkdtemp(prefix=f"compose-{slug}-", dir=work_root))
+    try:
+        # deck.json — copy verbatim (template/fonts/defaultTextColor).
+        deck_meta_src = deck_dir / "deck.json"
+        if deck_meta_src.exists():
+            shutil.copy2(deck_meta_src, iso / "deck.json")
+
+        # specs/ — one-line outline (build order) + art-direction (font tokens).
+        (iso / "specs").mkdir()
+        (iso / "specs" / "outline.md").write_text(f"- [{slug}] slide\n", encoding="utf-8")
+        art_src = deck_dir / "specs" / "art-direction.html"
+        if art_src.exists():
+            shutil.copy2(art_src, iso / "specs" / "art-direction.html")
+
+        # slides/ — just this slug.
+        (iso / "slides").mkdir()
+        shutil.copy2(slide_json, iso / "slides" / f"{slug}.json")
+
+        # Asset bases — symlink everything else so relative "images/…" etc.
+        # resolve against the deck root without copying large trees.
+        _reserved = {
+            "deck.json", "slides", "specs", "_work", "compose", "preview",
+            "output.pptx", ".save.lock", ".DS_Store",
+        }
+        for entry in deck_dir.iterdir():
+            if entry.name in _reserved or entry.name.startswith("."):
+                continue
+            _link_or_copy(entry, iso / entry.name)
+
+        # 4. Build the one-slide deck. Directory input → base_dir = iso.
+        pptx_out = iso / "one.pptx"
+        try:
+            from sdpm.api import generate
+            from sdpm.assets import invalidate_manifest_cache
+
+            invalidate_manifest_cache()
+            build_result = generate(json_path=str(iso), output_path=str(pptx_out))
+            build_warnings = build_result.get("warnings", [])
+            build_lint = build_result.get("errors", {}).get("lintDiagnostics", [])
+            if build_warnings:
+                result["warnings"] = build_warnings
+            if build_lint:
+                result.setdefault("lint_diagnostics", []).extend(build_lint)
+        except Exception as e:
+            result["pptx_error"] = str(e)
+            return json.dumps(result, ensure_ascii=False)
+
+        # 5. Preview: PDF → PNG for the single slide, copied to preview/{slug}.png
+        #    (slug-unique name; never rmtree the shared preview/ dir).
+        try:
+            preview_out = iso / "_preview"
+            pngs = _render_preview_png(pptx_out, preview_out, work_dir=iso)
+            if pngs:
+                preview_dir = deck_dir / "preview"
+                preview_dir.mkdir(exist_ok=True)
+                dest = preview_dir / f"{slug}.png"
+                shutil.copy2(pngs[0], dest)
+                result["preview_files"] = [str(dest)]
+        except Exception as e:
+            result["preview_error"] = str(e)
+
+        # 6. Measure the single slide from its SVG.
+        if measure:
+            try:
+                from sdpm.preview.backend import LibreOfficeBackend
+                from sdpm.preview.measure import format_measure_report, measure_from_svg
+
+                backend = LibreOfficeBackend()
+                svg_path = backend.export_svg(pptx_out, work_dir=iso)
+                if svg_path is not None:
+                    try:
+                        results = measure_from_svg(svg_path, [1])
+                        result["measure"] = format_measure_report(results, page_to_slug={1: slug})
+                    finally:
+                        shutil.rmtree(svg_path.parent, ignore_errors=True)
+            except Exception as e:
+                result["measure"] = f"Measure error: {e}"
+    finally:
+        shutil.rmtree(iso, ignore_errors=True)
+
+    return json.dumps(result, ensure_ascii=False)
+
+
 def run_style_python(purpose: str, code: str) -> str:
     """Execute Python code in a sandboxed environment for style creation.
 
