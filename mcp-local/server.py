@@ -98,6 +98,11 @@ mcp.tool()(tools.pptx_to_json)
 mcp.tool()(sandbox_tools.run_python)
 mcp.tool()(sandbox_tools.run_style_python)
 
+# CC Phase 2 per-slide isolation tool (this standard server only — NOT registered
+# in server_acp.py / server_with_instruction.py). Guarded by its docstring so only
+# explicitly-instructed parallel composers select it.
+mcp.tool()(sandbox_tools.compose_slide)
+
 
 # ---------------------------------------------------------------------------
 # MCP-specific tools (overrides or additions)
