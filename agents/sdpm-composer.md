@@ -68,25 +68,52 @@ translate every CLI command to its MCP equivalent:
 | `pptx_builder.py workflows <name>` | `read_workflows(["<name>"])` |
 | `pptx_builder.py guides <name>` | `read_guides(["<name>"])` |
 | `pptx_builder.py examples <name>` | `read_examples(["<name>"])` |
-| `pptx_builder.py measure {json} -p {n}` | `run_python(..., save=True, measure_slides=["{slug}"])` |
-| `pptx_builder.py preview {json}` | (covered by the same `run_python(save=True, measure_slides=[...])` — it returns `preview_files`) |
+| `pptx_builder.py measure {json} -p {n}` | `compose_slide(...)` (preferred) — else `run_python(..., save=True, measure_slides=["{slug}"])` |
+| `pptx_builder.py preview {json}` | (covered by the same `compose_slide(...)` / `run_python(save=True, ...)` call — it returns `preview_files`) |
 | `pptx_builder.py image-size {path} --width {px}` | **no MCP tool** — compute the proportional height in `run_python` (e.g. `new_h = round(orig_h * target_w / orig_w)`) |
 | `pptx_builder.py code-block …` | `code_to_slide(...)` MCP tool |
 | `search-assets` | `search_assets(...)` MCP tool |
 
-### Writing slides — `run_python` only (NOT Write/Edit)
+### Writing slides — `compose_slide` (preferred) / `run_python` (NOT Write/Edit)
 
-You have no Write/Edit tools. Write every slide via the `run_python` sandbox function
-`write_json`. The **first argument `purpose` is required**. Bundle write + measure +
-preview into ONE call per slide so the PPTX build, measure, and PNG preview all run:
+You have no Write/Edit tools. Write every slide via a sandbox function `write_json`,
+called through an MCP tool. The **first argument `purpose` is required**.
+
+**Prefer `compose_slide` when it is available in your tool list.** It is the CC Phase 2
+per-slide isolation tool: it builds and renders ONLY your assigned slug in a private temp
+directory, so parallel composers never wait on one another (no shared `output.pptx`, no
+deck-wide `.save.lock`). One call per slug — it writes the slide, lints it, renders the
+preview PNG, and measures it:
+
+```
+compose_slide(
+  purpose="compose slide '{slug}'",
+  code='''
+data = {
+  "elements": [ ... ]   # per slide-json-spec
+}
+write_json("slides/{slug}.json", data)
+''',
+  deck_id="<absolute deck path>",
+  slug="{slug}",
+  measure=True,
+)
+```
+
+`compose_slide` returns `preview_files` (the PNG path for your slug), `warnings`,
+`lint_diagnostics`, and `measure` — exactly what you need for the inspect/fix loop below.
+It does NOT touch other slugs, the shared `output.pptx`, or `preview/` beyond writing your
+own `preview/{slug}.png`. The final deck-wide PPTX and full previews are produced later in
+Phase 3 — not your job.
+
+**If `compose_slide` is not in your tool list, fall back to `run_python`.** Bundle write +
+measure + preview into ONE call per slide:
 
 ```
 run_python(
   purpose="write and measure slide '{slug}'",
   code='''
-data = {
-  "elements": [ ... ]   # per slide-json-spec
-}
+data = { "elements": [ ... ] }
 write_json("slides/{slug}.json", data)
 ''',
   deck_id="<absolute deck path>",
@@ -97,9 +124,8 @@ write_json("slides/{slug}.json", data)
 
 `save=True` triggers `lint_and_sanitize` (it rewrites `slides/{slug}.json`), the PPTX
 build, SVG→PNG render, and returns `preview_files` (PNG paths), `warnings`, and
-`lint_diagnostics` — all filtered to the slugs you measured. This is exactly the ACP
-composer's data path; do not mix in CC-native Write/Edit (it would double-manage the
-file `save=True` already rewrites).
+`lint_diagnostics` — all filtered to the slugs you measured. Either way, do not mix in
+CC-native Write/Edit (it would double-manage the file the tool already rewrites).
 
 For reading deck files inside the sandbox use `read_json` / `read_text` / `list_files`
 (NOT `open()` — it is blocked).
@@ -109,8 +135,8 @@ For reading deck files inside the sandbox use `read_json` / `read_text` / `list_
 Write and save **one slide at a time** — never batch-write multiple `slides/*.json` in a
 single call (risks output truncation). Per slug:
 
-**write → `run_python(save=True, measure_slides=["{slug}"])` → inspect returned
-`preview_files` + `warnings` → fix → next slug.**
+**write → `compose_slide(slug="{slug}")` (or `run_python(save=True, measure_slides=["{slug}"])`
+if unavailable) → inspect returned `preview_files` + `warnings` → fix → next slug.**
 
 ### Validation — the preview PNG is the source of truth
 

@@ -161,11 +161,16 @@ Your assigned slugs: <slug-a>[, <slug-b>].
 First load references (read_workflows(["create-new-2-compose","slide-json-spec"]),
 read_guides(["grid"]), read_examples(["components/all","patterns"])), then read
 specs/brief.md, specs/outline.md, specs/art-direction.html for context.
-Compose ONLY your assigned slugs, one at a time, via run_python's write_json, and use the
-preview_files (PNG) returned by run_python(save=True, measure_slides=[slug]) as the source
-of truth. Do NOT touch other slides, deck.json, or specs/. art-direction is FROZEN. Do NOT
-advance to Phase 3. Return a summary plus any warnings.
+Compose ONLY your assigned slugs, one at a time, via write_json, and use the preview_files
+(PNG) returned by compose_slide(slug=...) (the per-slide isolation tool, preferred for
+parallel work; fall back to run_python(save=True, measure_slides=[slug]) if it is not in
+your tool list) as the source of truth. Do NOT touch other slides, deck.json, or specs/.
+art-direction is FROZEN. Do NOT advance to Phase 3. Return a summary plus any warnings.
 ```
+
+Composers run in parallel, so each should use `compose_slide` (it isolates per-slug build
++ preview so agents never wait on a shared lock) when it is available. Phase 3 below still
+uses `run_python(save=True)` — a single pass that produces the deck-wide PPTX and previews.
 
 Keep prompts ASCII-clean. Each prompt MUST include: `deck_id` (absolute path), the exact
 assigned slugs (usually 1–2), and the pointer to `specs/`.
