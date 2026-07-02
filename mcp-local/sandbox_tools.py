@@ -36,6 +36,99 @@ def _rejection_message(violations: list[str], has_deck: bool) -> str:
     return "\n".join(lines)
 
 
+def _run_sandbox(code: str, deck_id: str, cwd: str | None) -> str:
+    """Run user *code* in the restricted subprocess and return its output.
+
+    Shared by run_python and compose_slide. Mirrors run_python's original
+    inline logic (check_code is the caller's responsibility). *cwd* is the deck
+    directory when file I/O is allowed, else None.
+    """
+    from sandbox import make_runner
+
+    try:
+        runner = make_runner(deck_id if cwd else "")
+        args = [sys.executable, "-c", runner]
+        if cwd:
+            args.append(deck_id)
+        proc = subprocess.run(
+            args, input=code,
+            capture_output=True, text=True, timeout=120, cwd=cwd,
+        )
+        output = proc.stdout
+        if proc.stderr:
+            output += "\n" + proc.stderr
+        return output.strip()
+    except subprocess.TimeoutExpired:
+        return "Error: execution timed out (120s)"
+    except Exception as e:
+        return f"Error: {e}"
+
+
+def _lint_sanitize_slides(deck_dir: Path, slugs: list[str] | None = None) -> list[dict]:
+    """Lint and sanitize slide JSON files, rewriting them in place.
+
+    This is the single writer for slides/*.json after user code runs. When
+    *slugs* is given, only those slugs are processed (compose_slide's per-slide
+    path); when None, every slides/*.json is processed (run_python's behavior).
+
+    Returns a flat list of diagnostics, each tagged with its slug.
+    """
+    from sdpm.schema.lint import lint_and_sanitize
+
+    slides_dir = deck_dir / "slides"
+    if not slides_dir.is_dir():
+        return []
+
+    if slugs is None:
+        slide_files = sorted(slides_dir.glob("*.json"))
+    else:
+        slide_files = [slides_dir / f"{s}.json" for s in slugs]
+
+    lint_diagnostics: list[dict] = []
+    for slide_file in slide_files:
+        if not slide_file.exists():
+            continue
+        try:
+            slide_data = json.loads(slide_file.read_text(encoding="utf-8"))
+            cleaned, diags = lint_and_sanitize(slide_data)
+            if diags:
+                slug = slide_file.stem
+                for d in diags:
+                    d["slug"] = slug
+                lint_diagnostics.extend(diags)
+                slide_file.write_text(
+                    json.dumps(cleaned, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return lint_diagnostics
+
+
+def _render_preview_png(pptx_path: Path, out_dir: Path, work_dir: Path) -> list[str]:
+    """Render *pptx_path* to per-page PNGs in *out_dir* (PDF → pdftoppm).
+
+    Returns the list of generated ``page-{N}.png`` paths (unrenamed). Raises
+    RuntimeError if PDF or PNG conversion fails. *work_dir* is the deck-local
+    _work/ dir used for LibreOffice temp isolation.
+    """
+    import glob as _glob
+
+    from sdpm.preview import export_pdf
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pdf = out_dir / "slides.pdf"
+    if not export_pdf(pptx_path, pdf, work_dir=work_dir):
+        raise RuntimeError("PDF export failed. Is LibreOffice (soffice) installed?")
+
+    cmd = ["pdftoppm", "-png", "-scale-to", "1280", str(pdf), str(out_dir / "page")]
+    proc = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    if proc.returncode != 0:
+        raise RuntimeError(f"PNG conversion failed. Is poppler (pdftoppm) installed? {proc.stderr}")
+    pdf.unlink(missing_ok=True)
+    return sorted(_glob.glob(str(out_dir / "page-*.png")))
+
+
 def run_python(purpose: str, code: str, deck_id: str = "", save: bool = False,
                measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a sandboxed environment.
@@ -110,30 +203,14 @@ Audience: Developers
     result: dict[str, Any] = {}
     cwd = deck_id if deck_id and Path(deck_id).is_dir() else None
 
-    from sandbox import check_code, make_runner
+    from sandbox import check_code
 
     violations = check_code(code)
     if violations:
         result["output"] = _rejection_message(violations, has_deck=bool(cwd))
         return json.dumps(result, ensure_ascii=False)
 
-    try:
-        runner = make_runner(deck_id if cwd else "")
-        args = [sys.executable, "-c", runner]
-        if cwd:
-            args.append(deck_id)
-        proc = subprocess.run(
-            args, input=code,
-            capture_output=True, text=True, timeout=120, cwd=cwd,
-        )
-        output = proc.stdout
-        if proc.stderr:
-            output += "\n" + proc.stderr
-        result["output"] = output.strip()
-    except subprocess.TimeoutExpired:
-        result["output"] = "Error: execution timed out (120s)"
-    except Exception as e:
-        result["output"] = f"Error: {e}"
+    result["output"] = _run_sandbox(code, deck_id, cwd)
 
     if not cwd:
         return json.dumps(result, ensure_ascii=False)
@@ -153,28 +230,10 @@ Audience: Developers
             )
 
     # Lint and sanitize slide JSON
-    from sdpm.schema.lint import lint_and_sanitize
-    slides_dir = deck_dir / "slides"
-    if slides_dir.is_dir():
-        lint_diagnostics: list[dict] = []
-        for slide_file in sorted(slides_dir.glob("*.json")):
-            try:
-                slide_data = json.loads(slide_file.read_text(encoding="utf-8"))
-                cleaned, diags = lint_and_sanitize(slide_data)
-                if diags:
-                    slug = slide_file.stem
-                    for d in diags:
-                        d["slug"] = slug
-                    lint_diagnostics.extend(diags)
-                    slide_file.write_text(
-                        json.dumps(cleaned, ensure_ascii=False, indent=2) + "\n",
-                        encoding="utf-8",
-                    )
-            except (json.JSONDecodeError, TypeError):
-                pass
-        if lint_diagnostics:
-            errs = result.setdefault("errors", {})
-            errs["lintDiagnostics"] = lint_diagnostics
+    lint_diagnostics = _lint_sanitize_slides(deck_dir)
+    if lint_diagnostics:
+        errs = result.setdefault("errors", {})
+        errs["lintDiagnostics"] = lint_diagnostics
 
     # Post-processing: build PPTX + SVG (compose/measure) + preview
     _lock_fp = None
