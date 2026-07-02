@@ -18,6 +18,7 @@ branch and removed cleanly afterwards.
 from __future__ import annotations
 
 import functools
+import inspect
 import json
 import os
 import time
@@ -46,14 +47,41 @@ def record(event: dict[str, Any]) -> None:
         pass  # measurement must never break the tool
 
 
+def _build_event(tool_name: str, t0: float, kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Assemble the perf event from timing + common context kwargs."""
+    event: dict[str, Any] = {
+        "tool": tool_name,
+        "t_total_ms": round((time.perf_counter() - t0) * 1000.0, 1),
+    }
+    for key in ("deck_id", "slug"):
+        if key in kwargs:
+            event[key] = kwargs[key]
+    return event
+
+
 def timed(tool_name: str) -> Callable:
     """Decorator: record {tool, pid, t_total_ms, ts, deck_id?, slug?} per call.
 
-    When SDPM_PERF_LOG is unset the wrapper adds only a perf_counter pair and an
-    env lookup (sub-microsecond) — negligible relative to any real tool body.
+    Works on both sync and async tools. When SDPM_PERF_LOG is unset the wrapper
+    adds only a perf_counter pair and an env lookup (sub-microsecond) —
+    negligible relative to any real tool body.
     """
 
     def deco(fn: Callable) -> Callable:
+        if inspect.iscoroutinefunction(fn):
+
+            @functools.wraps(fn)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                if not _perf_path():
+                    return await fn(*args, **kwargs)
+                t0 = time.perf_counter()
+                try:
+                    return await fn(*args, **kwargs)
+                finally:
+                    record(_build_event(tool_name, t0, kwargs))
+
+            return async_wrapper
+
         @functools.wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             if not _perf_path():
@@ -62,16 +90,7 @@ def timed(tool_name: str) -> Callable:
             try:
                 return fn(*args, **kwargs)
             finally:
-                dt = (time.perf_counter() - t0) * 1000.0
-                event: dict[str, Any] = {
-                    "tool": tool_name,
-                    "t_total_ms": round(dt, 1),
-                }
-                # Best-effort context from common kwargs (never raises).
-                for key in ("deck_id", "slug"):
-                    if key in kwargs:
-                        event[key] = kwargs[key]
-                record(event)
+                record(_build_event(tool_name, t0, kwargs))
 
         return wrapper
 
