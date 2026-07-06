@@ -73,6 +73,14 @@ export function ChatPanelShell({
     if (saved) setPanelWidth(Math.max(MIN_WIDTH, Math.min(Number(saved), MAX_WIDTH_PX)))
   }, [])
 
+  /** Close the panel on Escape (matches dialog conventions on mobile overlay). */
+  useEffect(() => {
+    if (!open || inline) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [open, inline, onClose])
+
   /** Apply width to panel DOM without React re-render. */
   const applyWidth = useCallback((w: number) => {
     const el = panelRef.current

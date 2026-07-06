@@ -72,6 +72,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
               : "text-white/30 sm:opacity-0 sm:group-hover:opacity-100 hover:text-brand-amber/70"
           }`}
           aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+          aria-pressed={isFavorite}
         >
           <Star className={`h-3.5 w-3.5 ${isFavorite ? "fill-current" : ""}`} strokeWidth={isFavorite ? 0 : 1.5} />
         </button>
