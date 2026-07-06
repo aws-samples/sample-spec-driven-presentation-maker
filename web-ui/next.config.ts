@@ -7,9 +7,6 @@ const isLocal = process.env.NEXT_PUBLIC_MODE === "local"
 const nextConfig: NextConfig = {
   distDir: "build",
   ...(isLocal ? {} : { output: "export" as const, trailingSlash: true }),
-  typescript: {
-    ignoreBuildErrors: true,
-  },
 }
 
 export default nextConfig
