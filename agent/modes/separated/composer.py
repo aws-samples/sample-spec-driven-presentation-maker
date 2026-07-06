@@ -402,6 +402,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                     trace_attributes={
                         "group.index": gi,
                         "group.slugs": ",".join(group["slugs"]),
+                        "model.id": model_id,
+                        "purpose": "compose",
                     },
                 )
                 composer.hooks.add_callback(AfterInvocationEvent, log_usage)

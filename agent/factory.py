@@ -143,11 +143,15 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
 
     # Agent
     agent_name = f"Sdpm{mode.capitalize()}Agent"
+    agent_trace_attributes = {
+        "user.id": user_id, "session.id": session_id,
+        "model.id": resolved_agent, "purpose": cfg.agent_model,
+    }
     try:
         agent = Agent(
             name=agent_name, system_prompt="", tools=tools, model=model,
             session_manager=session_manager,
-            trace_attributes={"user.id": user_id, "session.id": session_id},
+            trace_attributes=agent_trace_attributes,
         )
     except Exception:
         logger.warning("Agent init failed with all MCP servers, retrying with required-only")
@@ -168,7 +172,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         agent = Agent(
             name=agent_name, system_prompt="", tools=tools, model=model,
             session_manager=session_manager,
-            trace_attributes={"user.id": user_id, "session.id": session_id},
+            trace_attributes=agent_trace_attributes,
         )
 
     # Prompts + history (parts-based)
