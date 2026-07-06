@@ -27,6 +27,8 @@ import { useRef, useEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
 import { IS_LOCAL } from "@/lib/mode"
+import { notifyError } from "@/lib/errors"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 
 export type ChatTabKey = "new" | "deck"
 
@@ -148,7 +150,7 @@ export function ChatPanelShell({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ newChat: true }),
-    }).catch(() => {})
+    }).catch((err) => notifyError("Failed to reset agent session", err))
     if (chatTab === "new" || panelAOwnsCurrentDeck) {
       setPanelAKey((k) => k + 1)
       setPanelADeckId(null)
@@ -193,6 +195,7 @@ export function ChatPanelShell({
   const panelALabel = panelAOwnsCurrentDeck ? (deckName || "Deck") : "New"
 
   const chatContent = (
+    <ErrorBoundary label="Chat">
     <div className="flex-1 overflow-hidden relative">
       {/* Panel A: New / deck-created-from-new */}
       <div className={`h-full ${panelAVisible ? "" : "hidden"}`}>
@@ -225,6 +228,7 @@ export function ChatPanelShell({
         </div>
       )}
     </div>
+    </ErrorBoundary>
   )
 
   if (inline) {

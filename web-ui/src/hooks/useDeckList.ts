@@ -22,6 +22,7 @@ import {
   searchSlides, SlideSearchResult,
 } from "@/services/deckService"
 import { toast } from "sonner"
+import { notifyError } from "@/lib/errors"
 
 export function useDeckList(
   idToken: string | undefined,
@@ -134,7 +135,7 @@ export function useDeckList(
     const target = decks.find((d) => d.deckId === deckId)
     if (!target?.pptxUrl) return
     if (IS_LOCAL) {
-      fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch(() => {})
+      fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch((err) => notifyError("Failed to open PPTX", err))
     } else {
       window.open(target.pptxUrl, "_blank")
     }
@@ -142,7 +143,7 @@ export function useDeckList(
 
   const handleOpenFolder = useCallback((deckId: string) => {
     if (!IS_LOCAL) return
-    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch(() => {})
+    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch((err) => notifyError("Failed to open deck folder", err))
   }, [])
 
   const confirmDelete = useCallback(async () => {

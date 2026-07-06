@@ -25,6 +25,7 @@ import { useIsMobile } from "@/hooks/UseMobile"
 import { Send, ChevronRight } from "lucide-react"
 import { ModeSelector } from "./ModeSelector"
 import { usePreferences } from "@/hooks/usePreferences"
+import { notifyError } from "@/lib/errors"
 
 interface ChatPanelProps {
   deckId: string
@@ -79,7 +80,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deckId: did, messages: stream.messagesRef.current }),
-    }).catch(() => {})
+    }).catch((err) => notifyError("Failed to save chat history", err))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -90,7 +91,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     // Deck created
     if (toolUseData?.completed && toolUseData?.result?.deckId && onDeckCreated) {
       const resultDeckId = String(toolUseData.result.deckId)
-      if (idToken) patchDeck(resultDeckId, { chatSessionId: sessionId }, idToken).catch(() => {})
+      // intentional: best-effort — chat session linkage is a convenience; deck creation already succeeded
+      if (idToken) patchDeck(resultDeckId, { chatSessionId: sessionId }, idToken).catch((err) => console.error("patchDeck failed", err))
       onDeckCreated(resultDeckId)
       saveLocalChat(resultDeckId)
     }

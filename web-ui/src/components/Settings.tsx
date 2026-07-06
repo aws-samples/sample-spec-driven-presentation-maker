@@ -9,6 +9,7 @@ import { usePreferences } from "@/hooks/usePreferences"
 import { getAllowedModels, getDefaultChatModelId, getDefaultCreateModelId } from "@/lib/allowedModels"
 import { IS_LOCAL } from "@/lib/mode"
 import { toast } from "sonner"
+import { notifyError } from "@/lib/errors"
 import { useEffect, useMemo, useState, useCallback } from "react"
 
 interface SettingsProps {
@@ -42,12 +43,12 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
     fetch("/api/agent/definitions").then((r) => r.json()).then((d) => {
       setAgentDefs(d.agents || [])
       setAgentSelection(d.selection || {})
-    }).catch(() => {})
+    }).catch((err) => notifyError("Failed to load agent definitions", err))
     fetch("/api/agent/models").then((r) => r.json()).then((d) => {
       setLocalModels((d.available || []).map((m: { modelId: string; name: string; description?: string }) => ({
         modelId: m.modelId, displayName: m.name, description: m.description,
       })))
-    }).catch(() => {})
+    }).catch((err) => notifyError("Failed to load model list", err))
   }, [open])
 
   const onAgentChange = useCallback((role: keyof AgentSelection, fileName: string) => {

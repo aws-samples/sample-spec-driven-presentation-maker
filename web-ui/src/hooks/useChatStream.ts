@@ -19,6 +19,7 @@ import { invokeAgentCore, stopRuntimeSession } from "@/services/agentCoreService
 import type { ToolUse } from "@/components/chat/ChatMessage"
 import type { McpServerStatus } from "@/components/chat/McpStatusBar"
 import type { UploadedFile } from "@/services/uploadService"
+import { notifyError } from "@/lib/errors"
 
 export interface Message {
   role: "user" | "assistant"
@@ -97,7 +98,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   const stopGeneration = useCallback(() => {
     abortControllerRef.current?.abort()
     if (IS_LOCAL) {
-      fetch("/api/agent/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId }) }).catch(() => {})
+      fetch("/api/agent/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId }) }).catch((err) => notifyError("Failed to stop generation", err))
     } else {
       const token = auth.user?.access_token
       if (token) stopRuntimeSession(sessionId, token)
