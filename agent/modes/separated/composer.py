@@ -532,7 +532,12 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                                 summaries[slugs_label] = result["response"]
                                 yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
                             except Exception as e:
-                                errors.append({"slugs": group["slugs"], "error": str(e)})
+                                errors.append({
+                                    "group_index": gi + 1,
+                                    "slugs": group["slugs"],
+                                    "instruction": group.get("instruction", ""),
+                                    "error": str(e),
+                                })
                                 yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(e)}
 
                         if futures:
@@ -545,26 +550,44 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                     break
 
         except Exception as e:
-            failed_slugs = [s for g in slide_groups for s in g["slugs"] if s not in generated]
-            errors.append({
-                "slugs": failed_slugs,
-                "error": str(e),
-                "phase": "prefetch" if not generated else "compose",
-            })
+            # Infrastructure failure (prefetch etc.) — record each unfinished
+            # group separately so they stay individually retryable.
+            phase = "prefetch" if not generated else "compose"
+            for gi, g in enumerate(slide_groups):
+                remaining = [s for s in g["slugs"] if s not in generated]
+                if remaining:
+                    errors.append({
+                        "group_index": gi + 1,
+                        "slugs": remaining,
+                        "instruction": g.get("instruction", ""),
+                        "error": str(e),
+                        "phase": phase,
+                    })
 
         # Post-compose: build PPTX + assemble report
         yield {"status": "building", "message": "Building final PPTX..."}
         cancelled = _is_compose_stopped(parent_tool_use_id)
+        partial = bool(errors) and bool(generated)
         report = {
-            "status": "cancelled" if cancelled else "completed",
+            "status": "cancelled" if cancelled else ("partial" if partial else ("failed" if errors else "completed")),
             "generated_slides": generated,
-            "errors": errors,
+            "failed_groups": errors,
+            "partial": partial,
             "summaries": summaries,
         }
         if cancelled:
             report["notice"] = (
                 "Stopped by user cancellation. Do NOT retry automatically — "
                 "ask the user how to proceed (resume, adjust scope, or abandon)."
+            )
+        elif errors:
+            failed_slugs = sorted({s for e in errors for s in e["slugs"]})
+            report["notice"] = (
+                f"{len(generated)}/{total} slides were generated; groups covering "
+                f"{failed_slugs} failed. Successfully generated slides do NOT need "
+                "regeneration. Tell the user which slides failed and why, and offer "
+                "to retry — on retry, call compose_slides again with ONLY the failed "
+                "groups (reuse each group's slugs and instruction from failed_groups)."
             )
 
         if generated and mcp_client:
