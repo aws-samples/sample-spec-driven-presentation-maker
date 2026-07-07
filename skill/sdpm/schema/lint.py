@@ -411,12 +411,14 @@ _LARGE_TEXT_PT = 18
 _CONTRAST_MIN_NORMAL = 4.5
 _CONTRAST_MIN_LARGE = 3.0
 
-# Estimated height per line (px). slide-json-spec.md gives two guides:
-# "1 line = fontSize x 3.5 / multi = fontSize x 2.7" and a measured table
-# (~fontSize x 2.5 per line). Use the low estimate so boxes sized from the
-# measured table never trigger a false warning.
+# Text metrics calibrated against actual LibreOffice rendering (SVG export,
+# 1920x1080 px space where 1pt = 2px), stable across fonts:
+#   char width: halfwidth ~= fontSize x 1.0 px, fullwidth ~= fontSize x 2.0 px
+#   line height: ~fontSize x 2.35 px (multi-line; single line ~2.1)
+# _LINE_HEIGHT_FACTOR / _OVERFLOW_MARGIN = 2.35, so the warning fires right
+# at the measured overflow boundary. The margin absorbs word-wrap slack and
+# the ~15px top/bottom text insets we don't model.
 _LINE_HEIGHT_FACTOR = 2.7
-# Heuristic estimate — only warn when clearly over, to avoid false positives.
 _OVERFLOW_MARGIN = 1.15
 
 # Strips {{attrs:...}} styling directives down to their text content.
