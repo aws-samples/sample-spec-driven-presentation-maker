@@ -511,9 +511,25 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               <Send className="h-5 w-5 text-brand-teal" />
             </div>
             <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-1">Let&apos;s present</h2>
-            <p className="text-sm text-foreground-muted leading-relaxed mb-8">
+            <p className="text-sm text-foreground-muted leading-relaxed mb-6">
               Drop a URL, paste notes, or describe your idea
             </p>
+            <div className="flex flex-col gap-2 w-full max-w-[320px] mb-8">
+              {[
+                "Create a product pitch for our new feature",
+                "Turn my meeting notes into a status update deck",
+                "Make a 5-minute tech talk about a topic I'll describe",
+              ].map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  onClick={() => chatInputRef.current?.insertAtCursor(example)}
+                  className="text-left text-sm text-foreground-muted px-3.5 py-2.5 rounded-xl border border-border hover:border-border-hover hover:text-foreground transition-colors"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
             {parallelAgents && <ModeSelector value={agentMode} onChange={setAgentMode} />}
           </div>
         ) : (
