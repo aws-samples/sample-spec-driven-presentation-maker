@@ -204,38 +204,38 @@ export function ChatPanelShell({
 
   const chatContent = (
     <ErrorBoundary label="Chat">
-    <div className="flex-1 overflow-hidden relative">
-      {/* Panel A: New / deck-created-from-new */}
-      <div className={`h-full ${panelAVisible ? "" : "hidden"}`}>
-        <ChatPanel
-          key={`a-${panelAKey}`}
-          ref={panelAVisible ? chatRef : undefined}
-          deckId="new"
-          deckName="New Deck"
-          slideSlugs={panelAOwnsCurrentDeck ? (slideSlugs || []) : []}
-          onDeckCreated={handlePanelADeckCreated}
-          onPreviewInvalidated={onPreviewInvalidated}
-          onWorkflowPhase={onWorkflowPhase}
-        />
-      </div>
-
-      {/* Panel B: existing deck chat — key is stable, only bumped on external navigation */}
-      {showPanelB && (
-        <div className={`h-full ${panelBVisible ? "" : "hidden"}`}>
+      <div className="flex-1 overflow-hidden relative">
+        {/* Panel A: New / deck-created-from-new */}
+        <div className={`h-full ${panelAVisible ? "" : "hidden"}`}>
           <ChatPanel
-            key={`b-${panelBKey}`}
-            ref={panelBVisible ? chatRef : undefined}
-            deckId={deckId!}
-            deckName={deckName || undefined}
-            chatSessionId={chatSessionId}
-            slideSlugs={slideSlugs || []}
-            onDeckCreated={handlePanelBDeckCreated}
+            key={`a-${panelAKey}`}
+            ref={panelAVisible ? chatRef : undefined}
+            deckId="new"
+            deckName="New Deck"
+            slideSlugs={panelAOwnsCurrentDeck ? (slideSlugs || []) : []}
+            onDeckCreated={handlePanelADeckCreated}
             onPreviewInvalidated={onPreviewInvalidated}
             onWorkflowPhase={onWorkflowPhase}
           />
         </div>
-      )}
-    </div>
+
+        {/* Panel B: existing deck chat — key is stable, only bumped on external navigation */}
+        {showPanelB && (
+          <div className={`h-full ${panelBVisible ? "" : "hidden"}`}>
+            <ChatPanel
+              key={`b-${panelBKey}`}
+              ref={panelBVisible ? chatRef : undefined}
+              deckId={deckId!}
+              deckName={deckName || undefined}
+              chatSessionId={chatSessionId}
+              slideSlugs={slideSlugs || []}
+              onDeckCreated={handlePanelBDeckCreated}
+              onPreviewInvalidated={onPreviewInvalidated}
+              onWorkflowPhase={onWorkflowPhase}
+            />
+          </div>
+        )}
+      </div>
     </ErrorBoundary>
   )
 

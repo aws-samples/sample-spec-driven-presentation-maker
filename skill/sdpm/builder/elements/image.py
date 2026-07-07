@@ -35,8 +35,9 @@ class ImageMixin:
         link = elem.get("link")
         rotation = elem.get("rotation", _DEFAULTS["rotation"])
         icon_color = elem.get("iconColor")
-        
+
         if not src:
+            print("Warning: image element without 'src' skipped — element dropped from PPTX", file=sys.stderr)
             return
         
         # QR code generation
@@ -279,6 +280,7 @@ class ImageMixin:
         src = elem.get("src", "")
         poster = elem.get("poster", "")
         if not src:
+            print("Warning: video element without 'src' skipped — element dropped from PPTX", file=sys.stderr)
             return
         
         video_path = self._base_dir / src

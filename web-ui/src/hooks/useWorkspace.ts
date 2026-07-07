@@ -160,6 +160,9 @@ export function useWorkspace(
         // Skip the state update when nothing changed — URLs are stabilised
         // above, so an identical snapshot means an identical render. Polling
         // runs every 1-6s; without this every poll re-renders the carousel.
+        // Note: string comparison assumes the API returns keys in a stable
+        // order (same endpoint, same serializer). A key-order change would
+        // only cause an extra render, never a missed update.
         const snapshot = JSON.stringify(data)
         if (snapshot !== prevDeckSnapshotRef.current) {
           prevDeckSnapshotRef.current = snapshot

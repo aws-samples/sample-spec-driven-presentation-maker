@@ -27,6 +27,8 @@ def call_tool_with_retry(mcp_client, *, tool_use_id: str, name: str, arguments: 
     A result with status="error" is a tool-level failure the caller must
     handle — retrying it would repeat the same deterministic error.
     """
+    if max_attempts < 1:
+        raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
     for attempt in range(max_attempts):
         try:
             return mcp_client.call_tool_sync(tool_use_id=tool_use_id, name=name, arguments=arguments)

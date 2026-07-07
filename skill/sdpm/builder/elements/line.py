@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 """Line and polyline elements."""
+import sys
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE, MSO_CONNECTOR
 from pptx.util import Pt
@@ -106,7 +107,8 @@ class LineMixin:
 
         # Require x1/y1/x2/y2 format (x/y/width/height is not supported — use linter to catch)
         if "x1" not in elem:
-            return  # No coordinates — skip silently
+            print("Warning: line element without coordinates (x1/y1/x2/y2 or points) skipped — element dropped from PPTX", file=sys.stderr)
+            return
         x1_emu = self._px_to_emu(elem["x1"])
         y1_emu = self._px_to_emu(elem["y1"])
         x2_emu = self._px_to_emu(elem["x2"])
