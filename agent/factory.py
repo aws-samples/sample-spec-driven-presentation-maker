@@ -204,6 +204,17 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
     # Cost logger
     agent.hooks.add_callback(AfterInvocationEvent, log_usage)
 
+    # Tool filter validation: an allowlist entry that matches no loaded tool
+    # silently disappears (e.g. after a server-side rename). Surface it.
+    if cfg.allowed_tools:
+        try:
+            loaded = set(agent.tool_names)
+            stale = [t for t in cfg.allowed_tools if t not in loaded]
+            if stale:
+                logger.warning("allowed_tools entries not found on MCP server (renamed or removed?): %s", stale)
+        except Exception as e:
+            logger.warning("tool filter validation skipped: %s", e)
+
     fix_excess_tool_results(agent.messages)
 
     return agent, mcp_status

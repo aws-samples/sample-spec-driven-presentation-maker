@@ -16,6 +16,7 @@ from strands.types.tools import ToolContext
 from composition import resolve_parts
 from cost_logger import log_usage
 from modes import MODES  # imported lazily in compose_slides if needed
+from resilience import call_tool_with_retry
 
 
 # Soft-stop signal: the webui cancel button sends InvokeAgentRuntimeCommand
@@ -92,7 +93,8 @@ def _prefetch_deck_specs(mcp_client, deck_id: str, assigned_slugs: list[str]) ->
         "        specs['slides/ (other, read via run_python if needed)'] = ', '.join(_others)\n"
         "print(json.dumps(specs, ensure_ascii=False))\n"
     )
-    result = mcp_client.call_tool_sync(
+    result = call_tool_with_retry(
+        mcp_client,
         tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
         name="run_python",
         arguments={"code": code, "deck_id": deck_id, "purpose": "prefetch deck specs"},
@@ -228,7 +230,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 "    missing.append('specs/art-direction')\n"
                 "print(json.dumps(missing))\n"
             )
-            check_result = mcp_client.call_tool_sync(
+            check_result = call_tool_with_retry(
+                mcp_client,
                 tool_use_id=f"precheck-{uuid.uuid4().hex[:8]}",
                 name="run_python",
                 arguments={"code": check_code, "deck_id": deck_id, "purpose": "spec file existence check"},
@@ -593,7 +596,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         if generated and mcp_client:
             # Generate PPTX
             try:
-                build_result = mcp_client.call_tool_sync(
+                build_result = call_tool_with_retry(
+                    mcp_client,
                     tool_use_id=f"build-{uuid.uuid4().hex[:8]}",
                     name="generate_pptx",
                     arguments={"deck_id": deck_id},
