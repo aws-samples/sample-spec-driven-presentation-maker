@@ -212,7 +212,13 @@ _SHAPE_NAMES = {
 def _lint_shape(si: int, ei: int, elem: dict) -> list[dict]:
     results: list[dict] = []
     shape = elem.get("shape")
-    if shape is not None and shape not in _SHAPE_NAMES:
+    if shape is None:
+        # The builder silently skips shape elements without a 'shape' key,
+        # so the element would vanish from the PPTX with no trace.
+        results.append(_diag(si, ei, "shape-missing-name",
+                             "shape element requires 'shape' (e.g. 'rectangle'). "
+                             "Without it the element is silently dropped from the PPTX."))
+    elif shape not in _SHAPE_NAMES:
         results.append(_diag(si, ei, "shape-unknown-name",
                              f"shape name '{shape}' is not recognized."))
     results.extend(_lint_bbox_required(si, ei, elem, "shape"))
