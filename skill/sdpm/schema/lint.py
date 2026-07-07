@@ -75,9 +75,6 @@ def _lint_element(si: int, ei: int, elem: dict) -> list[dict]:
         results.extend(checker(si, ei, elem))
     # Common checks for all element types
     results.extend(_lint_common(si, ei, elem))
-    # Layout quality checks (readability) — warnings, not blockers
-    if etype == "textbox":
-        results.extend(_lint_textbox_overflow(si, ei, elem))
     return results
 
 
@@ -387,111 +384,22 @@ def _lint_video(si: int, ei: int, elem: dict) -> list[dict]:
 
 
 # ===================================================================
-# Layout quality checks (readability warnings)
+# Scope note: syntax and value-domain checks only
 # ===================================================================
-# Deliberately minimal. Rules considered and rejected:
+# This linter validates declared values (missing keys, invalid enums/colors,
+# count mismatches, silent-drop hazards). Layout QUALITY rules were tried
+# here and removed — judging rendering outcomes from declared values is the
+# wrong layer. Rejected, with reasons:
+# - text overflow estimation: real overflow is measured from LibreOffice SVG
+#   (measure / run_python's measure_slides), which the compose workflow
+#   already runs on every save. A heuristic duplicate sat right at the
+#   measured boundary (fontSize x 2.35/line) and added noise, not safety.
 # - minimum font size: no universal threshold exists — chart legends use 10,
 #   diagram annotations 11 (both per official guides). Per-deck minimums are
 #   the Token Discipline check's job (checks/font_size.py).
 # - declared-color contrast: the declared fill/background rarely matches what
 #   actually renders behind text (template backgrounds, overlays, gradients).
 #   Contrast belongs in rendering-based measurement (SVG), not here.
-
-# Text metrics calibrated against actual LibreOffice rendering (SVG export,
-# 1920x1080 px space where 1pt = 2px), stable across fonts:
-#   char width: halfwidth ~= fontSize x 1.0 px, fullwidth ~= fontSize x 2.0 px
-#   line height: ~fontSize x 2.35 px (multi-line; single line ~2.1)
-# _LINE_HEIGHT_FACTOR / _OVERFLOW_MARGIN = 2.35, so the warning fires right
-# at the measured overflow boundary. The margin absorbs word-wrap slack and
-# the ~15px top/bottom text insets we don't model.
-_LINE_HEIGHT_FACTOR = 2.7
-_OVERFLOW_MARGIN = 1.15
-
-# Strips {{attrs:...}} styling directives down to their text content.
-_STYLED_DIRECTIVE_RE = re.compile(r'\{\{[^:}]*:([^}]*)\}\}')
-
-
-def _valid_font_size(val) -> bool:
-    return isinstance(val, (int, float)) and not isinstance(val, bool) and val > 0
-
-
-def _estimate_line_width_px(text: str, font_size: float) -> float:
-    """Width guide from slide-json-spec.md: fullwidth = pt*2, halfwidth = pt*1."""
-    from sdpm.utils.text import is_fullwidth
-    return sum(font_size * (2 if is_fullwidth(ch) else 1) for ch in text)
-
-
-def _estimate_text_lines(text: str, font_size: float, usable_width: float) -> int:
-    """Estimate rendered line count of text (with \\n) wrapped to usable_width."""
-    total = 0
-    for raw_line in text.split("\n"):
-        if not raw_line:
-            total += 1
-            continue
-        line_w = _estimate_line_width_px(raw_line, font_size)
-        total += max(1, -(-int(line_w) // max(1, int(usable_width))))
-    return total
-
-
-def _estimate_height_px(lines: int, font_size: float) -> float:
-    return max(1, lines) * font_size * _LINE_HEIGHT_FACTOR
-
-
-def _lint_textbox_overflow(si: int, ei: int, elem: dict) -> list[dict]:
-    if elem.get("autoWidth"):
-        return []
-    width = elem.get("width")
-    height = elem.get("height")
-    if not isinstance(width, (int, float)) or not isinstance(height, (int, float)):
-        return []
-    if width <= 0 or height <= 0:
-        return []
-    margin_lr = 0.0
-    for k in ("marginLeft", "marginRight"):
-        m = elem.get(k)
-        if isinstance(m, (int, float)):
-            margin_lr += m
-    usable_width = width - margin_lr
-    if usable_width <= 0:
-        return []
-
-    default_fs = elem.get("fontSize")
-    est = 0.0
-    paragraphs = elem.get("paragraphs")
-    if isinstance(paragraphs, list) and paragraphs:
-        for para in paragraphs:
-            if not isinstance(para, dict):
-                return []
-            text = para.get("text")
-            fs = para.get("fontSize", default_fs)
-            if not isinstance(text, str) or not _valid_font_size(fs):
-                return []  # any unmeasurable paragraph -> skip whole element
-            clean = _STYLED_DIRECTIVE_RE.sub(r'\1', text)
-            lines = _estimate_text_lines(clean, fs, usable_width)
-            est += _estimate_height_px(lines, fs)
-    else:
-        text = elem.get("text")
-        if not isinstance(text, str) or not text or not _valid_font_size(default_fs):
-            return []
-        clean = _STYLED_DIRECTIVE_RE.sub(r'\1', text)
-        lines = _estimate_text_lines(clean, default_fs, usable_width)
-        est = _estimate_height_px(lines, default_fs)
-
-    margin_tb = 0.0
-    for k in ("marginTop", "marginBottom"):
-        m = elem.get(k)
-        if isinstance(m, (int, float)):
-            margin_tb += m
-    est += margin_tb
-
-    if est > height * _OVERFLOW_MARGIN:
-        return [_diag(
-            si, ei, "textbox-overflow-risk",
-            f"estimated text height ~{est:.0f}px exceeds declared height {height}px. "
-            f"Text likely overflows — shorten text, widen the box, or increase height. "
-            f"Verify with measure (this estimate is heuristic).")]
-    return []
-
 
 # ===================================================================
 # Helpers
