@@ -41,6 +41,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
         working-directory: web-ui
+      - name: Test
+        run: npm test
+        working-directory: web-ui
       - name: Build
         run: npm run build:cloud
         working-directory: web-ui
