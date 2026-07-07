@@ -399,3 +399,201 @@ class TestLintCommon:
     def test_empty(self):
         assert lint([]) == []
         assert lint({"slides": []}) == []
+
+
+# ===================================================================
+# font-too-small
+# ===================================================================
+
+class TestLintMinFont:
+    def test_small_font_flagged(self):
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 100,
+             "text": "hi", "fontSize": 11}
+        ]}])
+        assert any(d["rule"] == "font-too-small" for d in diags)
+
+    def test_minimum_ok(self):
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 100,
+             "text": "hi", "fontSize": 12}
+        ]}])
+        assert not any(d["rule"] == "font-too-small" for d in diags)
+
+    def test_10_5_exempt(self):
+        # 10.5 is the explicitly sanctioned non-integer size — exempt from
+        # the readability warning to match the syntax check.
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 100,
+             "text": "hi", "fontSize": 10.5}
+        ]}])
+        assert not any(d["rule"] == "font-too-small" for d in diags)
+        assert not any(d["rule"] == "invalid-fontSize" for d in diags)
+
+    def test_paragraph_font_flagged(self):
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 200,
+             "paragraphs": [{"text": "a", "fontSize": 20}, {"text": "b", "fontSize": 8}]}
+        ]}])
+        assert any(d["rule"] == "font-too-small" and "paragraphs[1]" in d["message"]
+                   for d in diags)
+
+    def test_invalid_font_not_double_reported(self):
+        # Negative fontSize is a syntax error (invalid-fontSize), not a
+        # readability warning.
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 100,
+             "text": "hi", "fontSize": -5}
+        ]}])
+        assert any(d["rule"] == "invalid-fontSize" for d in diags)
+        assert not any(d["rule"] == "font-too-small" for d in diags)
+
+
+# ===================================================================
+# low-contrast
+# ===================================================================
+
+class TestLintContrast:
+    def test_dark_on_dark_flagged(self):
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 100,
+             "text": "hi", "fontSize": 14, "fontColor": "#333333", "fill": "#232F3E"}
+        ]}])
+        assert any(d["rule"] == "low-contrast" for d in diags)
+
+    def test_black_on_white_ok(self):
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 100,
+             "text": "hi", "fontSize": 14, "fontColor": "#000000", "fill": "#FFFFFF"}
+        ]}])
+        assert not any(d["rule"] == "low-contrast" for d in diags)
+
+    def test_large_text_lower_threshold(self):
+        # #767676 on #FFFFFF is ~4.54:1 — passes both. #949494 on #FFFFFF is
+        # ~3.4:1 — fails normal (4.5) but passes large (3.0).
+        elem = {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 100,
+                "text": "hi", "fontColor": "#949494", "fill": "#FFFFFF"}
+        small = lint([{"elements": [{**elem, "fontSize": 14}]}])
+        large = lint([{"elements": [{**elem, "fontSize": 24, "height": 200}]}])
+        assert any(d["rule"] == "low-contrast" for d in small)
+        assert not any(d["rule"] == "low-contrast" for d in large)
+
+    def test_unknown_background_skipped(self):
+        # fill "none" and no slide background — cannot judge, no warning.
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 100,
+             "text": "hi", "fontSize": 14, "fontColor": "#333333", "fill": "none"}
+        ]}])
+        assert not any(d["rule"] == "low-contrast" for d in diags)
+
+    def test_slide_background_fallback(self):
+        diags = lint([{"background": "#1A1A2E", "elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 100,
+             "text": "hi", "fontSize": 14, "fontColor": "#2B2B40"}
+        ]}])
+        assert any(d["rule"] == "low-contrast" for d in diags)
+
+    def test_default_text_color_fallback(self):
+        diags = lint({"defaultTextColor": "#111111", "slides": [
+            {"background": "#000000", "elements": [
+                {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 100,
+                 "text": "hi", "fontSize": 14}
+            ]}
+        ]})
+        assert any(d["rule"] == "low-contrast" for d in diags)
+
+    def test_shape_with_text(self):
+        diags = lint([{"elements": [
+            {"type": "shape", "shape": "rectangle", "x": 0, "y": 0,
+             "width": 200, "height": 100,
+             "text": "label", "fontSize": 14, "fontColor": "#0A0A0A", "fill": "#101010"}
+        ]}])
+        assert any(d["rule"] == "low-contrast" for d in diags)
+
+    def test_no_text_skipped(self):
+        diags = lint([{"background": "#000000", "elements": [
+            {"type": "shape", "shape": "rectangle", "x": 0, "y": 0,
+             "width": 200, "height": 100, "fill": "#111111"}
+        ]}])
+        assert not any(d["rule"] == "low-contrast" for d in diags)
+
+
+# ===================================================================
+# textbox-overflow-risk
+# ===================================================================
+
+class TestLintOverflow:
+    def test_overflow_flagged(self):
+        # 100 halfwidth chars at 20pt = 2000px line width in a 400px box
+        # -> 5 lines * 20 * 2.7 = 270px, declared height 60px.
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 60,
+             "fontSize": 20, "text": "x" * 100}
+        ]}])
+        assert any(d["rule"] == "textbox-overflow-risk" for d in diags)
+
+    def test_fits_ok(self):
+        # 10 chars at 20pt = 200px in a 400px box -> 1 line = 54px estimate.
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 80,
+             "fontSize": 20, "text": "x" * 10}
+        ]}])
+        assert not any(d["rule"] == "textbox-overflow-risk" for d in diags)
+
+    def test_fullwidth_counted_double(self):
+        # 30 fullwidth chars at 20pt = 1200px in a 400px box -> 3 lines
+        # = 162px estimate vs height 70 -> flagged. Same count of halfwidth
+        # chars (600px -> 2 lines = 108px) also flagged at 70, so compare at
+        # height 120: fullwidth flagged, halfwidth not.
+        full = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 120,
+             "fontSize": 20, "text": "あ" * 30}
+        ]}])
+        half = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 120,
+             "fontSize": 20, "text": "a" * 30}
+        ]}])
+        assert any(d["rule"] == "textbox-overflow-risk" for d in full)
+        assert not any(d["rule"] == "textbox-overflow-risk" for d in half)
+
+    def test_autowidth_skipped(self):
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 100, "height": 30,
+             "fontSize": 20, "autoWidth": True, "text": "x" * 100}
+        ]}])
+        assert not any(d["rule"] == "textbox-overflow-risk" for d in diags)
+
+    def test_no_fontsize_skipped(self):
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 100, "height": 30,
+             "text": "x" * 100}
+        ]}])
+        assert not any(d["rule"] == "textbox-overflow-risk" for d in diags)
+
+    def test_newlines_counted(self):
+        # 5 explicit lines at 20pt = 5 * 20 * 2.7 = 270px vs height 100.
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 100,
+             "fontSize": 20, "text": "a\nb\nc\nd\ne"}
+        ]}])
+        assert any(d["rule"] == "textbox-overflow-risk" for d in diags)
+
+    def test_paragraphs_summed(self):
+        # Two paragraphs, each 1 line: 24*2.7 + 16*2.7 = 108px vs height 60.
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 800, "height": 60,
+             "paragraphs": [
+                 {"text": "Title", "fontSize": 24},
+                 {"text": "Subtitle", "fontSize": 16},
+             ]}
+        ]}])
+        assert any(d["rule"] == "textbox-overflow-risk" for d in diags)
+
+    def test_styled_directives_stripped(self):
+        # {{bold:...}} attrs must not count toward text width.
+        # Content is 10 chars at 20pt = 200px in 400px -> 1 line, fits in 80.
+        diags = lint([{"elements": [
+            {"type": "textbox", "x": 0, "y": 0, "width": 400, "height": 80,
+             "fontSize": 20, "text": "{{bold,#FF9900:" + "x" * 10 + "}}"}
+        ]}])
+        assert not any(d["rule"] == "textbox-overflow-risk" for d in diags)

@@ -24,10 +24,15 @@ def lint(data: list | dict) -> list[dict]:
     slides = data.get("slides", data) if isinstance(data, dict) else data
     if not isinstance(slides, list):
         return []
+    default_text_color = data.get("defaultTextColor") if isinstance(data, dict) else None
     diagnostics: list[dict] = []
     for si, slide in enumerate(slides):
+        ctx = {
+            "defaultTextColor": default_text_color,
+            "background": slide.get("background") if isinstance(slide, dict) else None,
+        }
         for ei, elem in enumerate(slide.get("elements") or []):
-            diagnostics.extend(_lint_element(si, ei, elem))
+            diagnostics.extend(_lint_element(si, ei, elem, ctx))
     return diagnostics
 
 
@@ -46,8 +51,11 @@ def lint_and_sanitize(slide: dict) -> tuple[dict, list[dict]]:
     import copy
     cleaned = copy.deepcopy(slide)
     diagnostics: list[dict] = []
+    # Single-slide entry point: deck-level defaultTextColor is unknown here,
+    # so contrast is only checked for elements with an explicit fontColor.
+    ctx = {"defaultTextColor": None, "background": cleaned.get("background")}
     for ei, elem in enumerate(cleaned.get("elements") or []):
-        diagnostics.extend(_lint_element(0, ei, elem))
+        diagnostics.extend(_lint_element(0, ei, elem, ctx))
         if elem.pop("_spAutoFit", None):
             diagnostics.append(_diag(0, ei, "deprecated-autofit",
                 "_spAutoFit is deprecated and was removed. "
@@ -63,7 +71,7 @@ def _diag(slide: int, element: int, rule: str, message: str) -> dict:
 # Dispatch
 # ---------------------------------------------------------------------------
 
-def _lint_element(si: int, ei: int, elem: dict) -> list[dict]:
+def _lint_element(si: int, ei: int, elem: dict, ctx: dict | None = None) -> list[dict]:
     if "_comment" in elem:
         return []
     etype = elem.get("type")
@@ -75,6 +83,11 @@ def _lint_element(si: int, ei: int, elem: dict) -> list[dict]:
         results.extend(checker(si, ei, elem))
     # Common checks for all element types
     results.extend(_lint_common(si, ei, elem))
+    # Layout quality checks (readability) — warnings, not blockers
+    results.extend(_lint_font_too_small(si, ei, elem))
+    results.extend(_lint_contrast(si, ei, elem, ctx or {}))
+    if etype == "textbox":
+        results.extend(_lint_textbox_overflow(si, ei, elem))
     return results
 
 
@@ -381,6 +394,191 @@ def _lint_video(si: int, ei: int, elem: dict) -> list[dict]:
                              "video element requires 'src'."))
     results.extend(_lint_bbox_required(si, ei, elem, "video"))
     return results
+
+
+# ===================================================================
+# Layout quality checks (readability warnings)
+# ===================================================================
+
+# Minimum practical slide font size per slide-json-spec.md (12pt = Annotation).
+_MIN_FONT_SIZE = 12
+
+# Element types whose text sits on a fill/background we can reason about.
+_TEXT_BEARING_TYPES = {"textbox", "shape", "freeform"}
+
+# WCAG 2.x AA thresholds. fontSize here is pt; >= 18pt counts as large text.
+_LARGE_TEXT_PT = 18
+_CONTRAST_MIN_NORMAL = 4.5
+_CONTRAST_MIN_LARGE = 3.0
+
+# Estimated height per line (px). slide-json-spec.md gives two guides:
+# "1 line = fontSize x 3.5 / multi = fontSize x 2.7" and a measured table
+# (~fontSize x 2.5 per line). Use the low estimate so boxes sized from the
+# measured table never trigger a false warning.
+_LINE_HEIGHT_FACTOR = 2.7
+# Heuristic estimate — only warn when clearly over, to avoid false positives.
+_OVERFLOW_MARGIN = 1.15
+
+# Strips {{attrs:...}} styling directives down to their text content.
+_STYLED_DIRECTIVE_RE = re.compile(r'\{\{[^:}]*:([^}]*)\}\}')
+
+
+def _valid_font_size(val) -> bool:
+    return isinstance(val, (int, float)) and not isinstance(val, bool) and val > 0
+
+
+def _lint_font_too_small(si: int, ei: int, elem: dict) -> list[dict]:
+    results: list[dict] = []
+    sizes = []
+    if _valid_font_size(elem.get("fontSize")):
+        sizes.append(("fontSize", elem["fontSize"]))
+    paragraphs = elem.get("paragraphs")
+    if isinstance(paragraphs, list):
+        for pi, para in enumerate(paragraphs):
+            if isinstance(para, dict) and _valid_font_size(para.get("fontSize")):
+                sizes.append((f"paragraphs[{pi}].fontSize", para["fontSize"]))
+    for label, fs in sizes:
+        # 10.5 is the explicitly sanctioned non-integer size (see the
+        # invalid-fontSize check) — templates converted from Japanese
+        # documents use it, so warning on it would be constant noise.
+        if fs < _MIN_FONT_SIZE and fs != 10.5:
+            results.append(_diag(
+                si, ei, "font-too-small",
+                f"{label} {fs} is below the practical slide minimum {_MIN_FONT_SIZE}pt. "
+                f"Text this small is unreadable when projected."))
+    return results
+
+
+def _relative_luminance(hex_color: str) -> float:
+    """WCAG 2.x relative luminance of a #RRGGBB color."""
+    channels = []
+    for i in (1, 3, 5):
+        c = int(hex_color[i:i + 2], 16) / 255.0
+        channels.append(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4)
+    r, g, b = channels
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _contrast_ratio(c1: str, c2: str) -> float:
+    l1 = _relative_luminance(c1)
+    l2 = _relative_luminance(c2)
+    lighter, darker = max(l1, l2), min(l1, l2)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _resolve_hex(*candidates) -> str | None:
+    """First candidate that is a valid #RRGGBB string, else None."""
+    for c in candidates:
+        if isinstance(c, str) and _COLOR_RE.match(c):
+            return c
+    return None
+
+
+def _lint_contrast(si: int, ei: int, elem: dict, ctx: dict) -> list[dict]:
+    if elem.get("type") not in _TEXT_BEARING_TYPES:
+        return []
+    if not elem.get("text") and not elem.get("paragraphs"):
+        return []
+    text_color = _resolve_hex(elem.get("fontColor"), ctx.get("defaultTextColor"))
+    if text_color is None:
+        return []
+    # fill "none"/missing: assume the slide background shows through. This can
+    # misjudge text stacked on another shape, but that layout is already
+    # discouraged by the overlay-textbox check.
+    fill = elem.get("fill")
+    bg_color = _resolve_hex(fill if fill not in (None, "none", "") else None,
+                            ctx.get("background"))
+    if bg_color is None:
+        return []
+    ratio = _contrast_ratio(text_color, bg_color)
+    fs = elem.get("fontSize")
+    is_large = _valid_font_size(fs) and fs >= _LARGE_TEXT_PT
+    threshold = _CONTRAST_MIN_LARGE if is_large else _CONTRAST_MIN_NORMAL
+    if ratio < threshold:
+        return [_diag(
+            si, ei, "low-contrast",
+            f"text {text_color} on {bg_color} has contrast ratio {ratio:.1f}, "
+            f"below WCAG AA {threshold} "
+            f"({'large' if is_large else 'normal'} text). Adjust fontColor or fill.")]
+    return []
+
+
+def _estimate_line_width_px(text: str, font_size: float) -> float:
+    """Width guide from slide-json-spec.md: fullwidth = pt*2, halfwidth = pt*1."""
+    from sdpm.utils.text import is_fullwidth
+    return sum(font_size * (2 if is_fullwidth(ch) else 1) for ch in text)
+
+
+def _estimate_text_lines(text: str, font_size: float, usable_width: float) -> int:
+    """Estimate rendered line count of text (with \\n) wrapped to usable_width."""
+    total = 0
+    for raw_line in text.split("\n"):
+        if not raw_line:
+            total += 1
+            continue
+        line_w = _estimate_line_width_px(raw_line, font_size)
+        total += max(1, -(-int(line_w) // max(1, int(usable_width))))
+    return total
+
+
+def _estimate_height_px(lines: int, font_size: float) -> float:
+    return max(1, lines) * font_size * _LINE_HEIGHT_FACTOR
+
+
+def _lint_textbox_overflow(si: int, ei: int, elem: dict) -> list[dict]:
+    if elem.get("autoWidth"):
+        return []
+    width = elem.get("width")
+    height = elem.get("height")
+    if not isinstance(width, (int, float)) or not isinstance(height, (int, float)):
+        return []
+    if width <= 0 or height <= 0:
+        return []
+    margin_lr = 0.0
+    for k in ("marginLeft", "marginRight"):
+        m = elem.get(k)
+        if isinstance(m, (int, float)):
+            margin_lr += m
+    usable_width = width - margin_lr
+    if usable_width <= 0:
+        return []
+
+    default_fs = elem.get("fontSize")
+    est = 0.0
+    paragraphs = elem.get("paragraphs")
+    if isinstance(paragraphs, list) and paragraphs:
+        for para in paragraphs:
+            if not isinstance(para, dict):
+                return []
+            text = para.get("text")
+            fs = para.get("fontSize", default_fs)
+            if not isinstance(text, str) or not _valid_font_size(fs):
+                return []  # any unmeasurable paragraph -> skip whole element
+            clean = _STYLED_DIRECTIVE_RE.sub(r'\1', text)
+            lines = _estimate_text_lines(clean, fs, usable_width)
+            est += _estimate_height_px(lines, fs)
+    else:
+        text = elem.get("text")
+        if not isinstance(text, str) or not text or not _valid_font_size(default_fs):
+            return []
+        clean = _STYLED_DIRECTIVE_RE.sub(r'\1', text)
+        lines = _estimate_text_lines(clean, default_fs, usable_width)
+        est = _estimate_height_px(lines, default_fs)
+
+    margin_tb = 0.0
+    for k in ("marginTop", "marginBottom"):
+        m = elem.get(k)
+        if isinstance(m, (int, float)):
+            margin_tb += m
+    est += margin_tb
+
+    if est > height * _OVERFLOW_MARGIN:
+        return [_diag(
+            si, ei, "textbox-overflow-risk",
+            f"estimated text height ~{est:.0f}px exceeds declared height {height}px. "
+            f"Text likely overflows — shorten text, widen the box, or increase height. "
+            f"Verify with measure (this estimate is heuristic).")]
+    return []
 
 
 # ===================================================================
