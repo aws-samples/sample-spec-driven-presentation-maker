@@ -19,6 +19,8 @@ import { invokeAgentCore, stopRuntimeSession } from "@/services/agentCoreService
 import type { ToolUse } from "@/components/chat/ChatMessage"
 import type { McpServerStatus } from "@/components/chat/McpStatusBar"
 import type { UploadedFile } from "@/services/uploadService"
+import { notifyError } from "@/lib/errors"
+import { agentErrorMessage, classifyAgentError } from "@/lib/agentErrors"
 
 export interface Message {
   role: "user" | "assistant"
@@ -97,7 +99,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   const stopGeneration = useCallback(() => {
     abortControllerRef.current?.abort()
     if (IS_LOCAL) {
-      fetch("/api/agent/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId }) }).catch(() => {})
+      fetch("/api/agent/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId }) }).catch((err) => notifyError("Failed to stop generation", err))
     } else {
       const token = auth.user?.access_token
       if (token) stopRuntimeSession(sessionId, token)
@@ -262,15 +264,12 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
         // Keep partial response
       } else {
         const errorMessage = err instanceof Error ? err.message : String(err)
-        const isRetryable = errorMessage.includes("ThrottlingException") || errorMessage.includes("throttl")
-          || errorMessage.includes("timed out") || errorMessage.includes("timeout")
-          || errorMessage.includes("not ready") || errorMessage.includes("ServiceUnavailable")
-        const isConversationLimit = errorMessage.includes("Too much media") || errorMessage.includes("too long")
-        const displayMessage = isConversationLimit
-          ? "This conversation is too long for the model to process. Please start a new chat to continue."
-          : isRetryable
-            ? "The service is temporarily busy or timed out. Please wait a moment and try again."
-            : "Sorry, something went wrong. Please try again."
+        const code = classifyAgentError(errorMessage)
+        // Transport-level failures don't carry raw model errors worth showing —
+        // always use the friendly classified message here.
+        const displayMessage = code === "internal"
+          ? "Sorry, something went wrong. Please try again."
+          : agentErrorMessage(errorMessage, code)
         setMessages((prev) => {
           const updated = [...prev]
           updated[updated.length - 1] = {

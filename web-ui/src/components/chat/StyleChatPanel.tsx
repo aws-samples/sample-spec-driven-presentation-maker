@@ -21,6 +21,7 @@ import { IS_LOCAL } from "@/lib/mode"
 import { Sparkles, MessageSquare, Image, Palette } from "lucide-react"
 import type { UploadedFile } from "@/services/uploadService"
 import { buildAttachedMarkers } from "@/lib/attachmentMarker"
+import { notifyError } from "@/lib/errors"
 
 interface StyleChatPanelProps {
   styleId: string
@@ -80,7 +81,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deckId: styleId, messages: stream.messages }),
-      }).catch(() => {})
+      }).catch((err) => notifyError("Failed to save chat history", err))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.isLoading])

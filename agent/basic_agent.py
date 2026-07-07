@@ -19,6 +19,7 @@ import os
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
+from errors import BAD_INPUT, AUTH, error_event
 from factory import create_agent
 from streaming import stream_agent
 
@@ -45,7 +46,7 @@ async def agent_stream(payload, context):
     session_id = payload.get("runtimeSessionId")
 
     if not all([user_query, session_id]):
-        yield {"status": "error", "error": "Missing required fields: prompt or runtimeSessionId"}
+        yield error_event("Missing required fields: prompt or runtimeSessionId", code=BAD_INPUT)
         return
 
     # Extract JWT from Authorization header
@@ -55,7 +56,7 @@ async def agent_stream(payload, context):
     jwt_token = auth_header.removeprefix("Bearer ").removeprefix("bearer ").strip()
 
     if not jwt_token:
-        yield {"status": "error", "error": "No JWT token found in Authorization header"}
+        yield error_event("No JWT token found in Authorization header", code=AUTH)
         return
 
     # Extract user_id from JWT sub
@@ -67,7 +68,7 @@ async def agent_stream(payload, context):
     except (IndexError, ValueError, json.JSONDecodeError):
         user_id = ""
     if not user_id:
-        yield {"status": "error", "error": "Could not extract user_id from JWT sub claim"}
+        yield error_event("Could not extract user_id from JWT sub claim", code=AUTH)
         return
 
     # Cancel previous request for the same session
@@ -100,7 +101,7 @@ async def agent_stream(payload, context):
 
     except Exception as e:
         logger.exception("Agent stream error for session %s", session_id[:12])
-        yield {"status": "error", "error": str(e)}
+        yield error_event(e)
     finally:
         if _cancel_events.get(session_id) is cancel:
             del _cancel_events[session_id]

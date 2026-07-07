@@ -20,6 +20,7 @@ import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
 import { CloudOnly, LocalOnly, IS_LOCAL } from "@/lib/mode"
+import { notifyError } from "@/lib/errors"
 
 
 interface SlideCarouselProps {
@@ -193,13 +194,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /** Local: open deck directory in Finder/Explorer */
   async function handleFolderOpen() {
     if (!deckId || !IS_LOCAL) return
-    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch(() => {})
+    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch((err) => notifyError("Failed to open deck folder", err, { retry: handleFolderOpen }))
   }
 
   /** Local: open output.pptx with default app */
   async function handlePptxOpen() {
     if (!deckId || !IS_LOCAL) return
-    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch(() => {})
+    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch((err) => notifyError("Failed to open PPTX", err, { retry: handlePptxOpen }))
   }
 
   /**

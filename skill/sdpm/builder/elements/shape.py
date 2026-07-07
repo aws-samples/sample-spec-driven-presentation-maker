@@ -36,6 +36,7 @@ class ShapeMixin:
         """
         shape_type = elem.get("shape")
         if not shape_type:
+            print("Warning: shape element without 'shape' key skipped — element dropped from PPTX", file=sys.stderr)
             return
         
         # Map shape names to MSO_SHAPE constants
