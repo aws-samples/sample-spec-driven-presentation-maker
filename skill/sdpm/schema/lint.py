@@ -384,6 +384,24 @@ def _lint_video(si: int, ei: int, elem: dict) -> list[dict]:
 
 
 # ===================================================================
+# Scope note: syntax and value-domain checks only
+# ===================================================================
+# This linter validates declared values (missing keys, invalid enums/colors,
+# count mismatches, silent-drop hazards). Layout QUALITY rules were tried
+# here and removed — judging rendering outcomes from declared values is the
+# wrong layer. Rejected, with reasons:
+# - text overflow estimation: real overflow is measured from LibreOffice SVG
+#   (measure / run_python's measure_slides), which the compose workflow
+#   already runs on every save. A heuristic duplicate sat right at the
+#   measured boundary (fontSize x 2.35/line) and added noise, not safety.
+# - minimum font size: no universal threshold exists — chart legends use 10,
+#   diagram annotations 11 (both per official guides). Per-deck minimums are
+#   the Token Discipline check's job (checks/font_size.py).
+# - declared-color contrast: the declared fill/background rarely matches what
+#   actually renders behind text (template backgrounds, overlays, gradients).
+#   Contrast belongs in rendering-based measurement (SVG), not here.
+
+# ===================================================================
 # Helpers
 # ===================================================================
 
