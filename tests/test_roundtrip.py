@@ -93,6 +93,18 @@ class TestShapeRoundTrip:
         shapes = [e for e in slide["elements"] if e["type"] == "shape"]
         assert "In Shape" in _plain_text(json.dumps(shapes[0], ensure_ascii=False))
 
+    def test_shape_font_color_survives(self, tmp_path):
+        # The converter has always emitted fontColor for shapes; the builder
+        # used to silently drop it (text rendered in theme color instead).
+        slide = _roundtrip(tmp_path, [
+            {"type": "shape", "shape": "rectangle", "x": 100, "y": 100,
+             "width": 300, "height": 120, "fill": "#EEEEEE",
+             "text": "Colored", "fontSize": 20, "fontColor": "#B22222"},
+        ])
+        shapes = [e for e in slide["elements"] if e["type"] == "shape"]
+        flat = json.dumps(shapes[0], ensure_ascii=False).upper()
+        assert "#B22222" in flat
+
 
 class TestLineRoundTrip:
     def test_line_survives(self, tmp_path):

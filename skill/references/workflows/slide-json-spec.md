@@ -419,6 +419,7 @@ Height includes the language label (22px). Code body height is `height - 22`.
   "text": "Label",
   "paragraphs": [{"text": "Title", "fontSize": 24, "align": "center"}, {"text": "Body", "list": {"type": "disc"}}],
   "fontSize": 14,
+  "fontColor": "#FFFFFF",
   "align": "left|center|right",
   "verticalAlign": "top|middle|bottom",
   "textDirection": "vert270",
