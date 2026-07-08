@@ -338,7 +338,14 @@ Audience: Developers
                         slide_indices = [slug_to_page[s] for s in measure_slides if s in slug_to_page]
                         if slide_indices:
                             results = measure_from_svg(svg_path, slide_indices)
-                            result["measure"] = format_measure_report(results, page_to_slug=page_to_slug)
+                            try:
+                                from sdpm.preview.judge import judge_from_svg
+                                judgments = judge_from_svg(svg_path, slide_indices)
+                            except Exception:
+                                judgments = None  # best-effort: never break measure
+                            result["measure"] = format_measure_report(
+                                results, page_to_slug=page_to_slug, judgments=judgments
+                            )
                     except Exception as e:
                         result["measure"] = f"Measure error: {e}"
                 elif not svg_path:
