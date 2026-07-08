@@ -28,20 +28,18 @@ Do NOT work inside this repo for everyday slide generation.
 
 The skill entry point is `skill/SKILL.md` — agents read it to discover workflows.
 
-**Install as pip package (recommended for end users):**
-
-```bash
-pip install git+https://github.com/aws-samples/sample-spec-driven-presentation-maker.git#subdirectory=skill
-```
-
-**Install into an agent's skill directory** (e.g. `~/.kiro/skills/sdpm/`):
-copy or symlink `skill/` into the agent's configured skill path. Consult your agent's docs for the exact location.
-
-**Work from source (developers only):**
+**Install into an agent's skill directory (recommended)** (e.g. `~/.kiro/skills/sdpm/`):
+copy or symlink `skill/` into the agent's configured skill path, then install dependencies:
 
 ```bash
 cd skill && uv sync
 ```
+
+Consult your agent's docs for the exact skill path. See [Getting Started](docs/en/getting-started.md#layer-1-kiro-cli-skill).
+
+**Claude Code users:** install the plugin instead (`/plugin install sdpm@sdpm`) — it registers the local MCP server, skill, and compose sub-agent automatically. See the README.
+
+Note: installing `skill/` as a pip package (`pip install git+...#subdirectory=skill`) only installs the `sdpm` Python engine — the SKILL.md, templates, and references are not bundled. It is intended for embedding the engine (e.g. the L3 Docker image), not for end-user skill installs.
 
 Optional: download icons (AWS / Material):
 

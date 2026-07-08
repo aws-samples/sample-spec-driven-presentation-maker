@@ -161,12 +161,15 @@ def split_svg_per_slide(svg_text: str) -> list[str]:
 def format_measure_report(
     results: dict[int, list[ElementBBox]],
     page_to_slug: dict[int, str] | None = None,
+    judgments: dict[int, list] | None = None,
 ) -> str:
     """Format measurement results as human-readable text.
 
     Args:
         results: Mapping of 1-based page number to element bboxes.
         page_to_slug: Optional mapping of page number to slug for slug-based labels.
+        judgments: Optional mapping of page number to JudgeIssue lists
+            (from sdpm.preview.judge). Appended only when issues exist.
     """
     lines: list[str] = []
     lines.append("📐 Text measurement (actual rendered size):")
@@ -178,4 +181,11 @@ def format_measure_report(
     lines.append("Compare each h with your declared height. Large difference means text doesn't fit — adjust text content or width first.")
     lines.append("fontSize is a last resort — it carries semantic weight and affects readability.")
     lines.append("Use actual sizes to calibrate subsequent layout.")
+    if judgments:
+        lines.append("")
+        lines.append("⚠ Layout issues (detected in actual rendering — fix these):")
+        for slide_num in sorted(judgments.keys()):
+            label = page_to_slug.get(slide_num, str(slide_num)) if page_to_slug else str(slide_num)
+            for issue in judgments[slide_num]:
+                lines.append(f"  Slide {label} [{issue.kind}]: {issue.message}")
     return "\n".join(lines)
