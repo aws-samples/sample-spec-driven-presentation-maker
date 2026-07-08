@@ -46,6 +46,37 @@
 | ローカル MCP クライアント（Claude Desktop, Claude Cowork） | [はじめに — Layer 2](docs/ja/getting-started.md#layer-2-ローカル-mcp-サーバー) |
 | リモート MCP / Web UI（AWS デプロイ） | [デプロイ手順](docs/ja/deploy-cloudshell.md) |
 
+### 🧩 Claude Code プラグイン（ワンコマンド導入）
+
+Claude Code ユーザーはプラグインで一括導入できます（手動の MCP 設定は不要）。プラグインは
+**ローカル MCP サーバー**・**オーケストレーター skill**・スライドを並列生成する
+**compose サブエージェント** をまとめて登録します。
+
+**事前インストール（プラグインには同梱できません。初回のみ各自で導入）:**
+
+- [`uv`](https://docs.astral.sh/uv/) を `PATH` に — ローカル MCP サーバーを起動し、初回起動時に
+  Python 依存を透過解決します（コールドスタートは数十秒）。
+- **LibreOffice** と **poppler** — スライドプレビュー（HTML/SVG → PNG）の描画に必要です。
+
+**導入（自動 — リポジトリDL・MCP/skill/サブエージェント登録まで完了）:**
+
+```bash
+# Claude Code 内で実行:
+/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker
+/plugin install sdpm@sdpm
+```
+
+`/plugin install` でリポジトリがクローンされ（`mcp-local/`・`skill/` も同梱DL）、`uv` 経由で
+`sdpm` MCP サーバーが自動起動し、`sdpm` skill と `sdpm:sdpm-composer` サブエージェントが登録
+されます。`/plugin list`・`/mcp`（`sdpm` 接続）・`/agents`（`sdpm:sdpm-composer` 表示）で確認
+してください。あとは「〇〇のスライドを作って」と頼むだけで、skill が briefing → outline →
+art direction を進め、Phase 2（compose）を複数の composer サブエージェントへ並列委譲し、
+review まで実施します。
+
+> **どの入口を使う？** **Kiro CLI** → Layer 1 の skill。**Claude Desktop / その他 MCP
+> クライアント** → Layer 2 のローカル MCP サーバー。**Claude Code** → このプラグイン（同じ
+> Layer 2 MCP サーバーを CC ネイティブの skill + 並列 compose サブエージェントで包んだもの）。
+
 ### 🚀 AWS アカウントだけですぐに開始！ ワンクリックデプロイ
 
 | リージョン | デプロイ |

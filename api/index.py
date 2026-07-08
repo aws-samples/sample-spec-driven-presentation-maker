@@ -26,6 +26,11 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConf
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from authz import authorize
+from chat_history import (
+    cap_messages_size,
+    strip_tool_result_content,
+    truncate_tool_inputs,
+)
 from common import get_user_id, now_iso, presigned_url
 from shared.schema import (
     deck_pk, deck_sk, shared_pk, fav_sk, upload_sk,
@@ -1253,14 +1258,18 @@ def get_chat(session_id: str) -> Dict[str, Any]:
         # Strands stores events in reverse chronological order
         messages.reverse()
 
-        # Strip toolResult content — frontend only needs status for ToolCard display.
-        # Agent reads from Amazon Bedrock AgentCore Memory directly, not via this API.
-        # This prevents Lambda 6MB response limit errors on long conversations.
-        for msg in messages:
-            if msg.get("role") == "user" and isinstance(msg.get("content"), list):
-                for block in msg["content"]:
-                    if isinstance(block, dict) and "toolResult" in block:
-                        block["toolResult"]["content"] = []
+        # Keep the response under Lambda's 6MB limit (see chat_history.py):
+        # toolResult bodies and giant toolUse inputs are UI-irrelevant; the
+        # agent reads AgentCore Memory directly, not via this API.
+        strip_tool_result_content(messages)
+        truncate_tool_inputs(messages)
+        messages, truncated = cap_messages_size(messages)
+        if truncated:
+            logger.warning(
+                "Chat history for session %s exceeded size budget — oldest messages dropped",
+                session_id,
+            )
+            return {"messages": messages, "truncated": True}
     except Exception as e:
         logger.warning("Failed to read chat history from AgentCore Memory: %s", e)
 

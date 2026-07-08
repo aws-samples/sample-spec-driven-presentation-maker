@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: MIT-0
 """Placeholder handling: title, content, section fills."""
 from pptx.dml.color import RGBColor
-from sdpm.utils.text import normalize_spacing
 
 
 class PlaceholderMixin:
@@ -20,7 +19,7 @@ class PlaceholderMixin:
         from pptx.enum.text import PP_ALIGN
         tf = placeholder.text_frame
         p = tf.paragraphs[0]
-        self._apply_styled_text(p, normalize_spacing(text),
+        self._apply_styled_text(p, text,
                                 no_default_color=not style.get("fontColor"),
                                 no_default_font=True)
         # Apply bold/italic/fontColor on all runs
@@ -131,6 +130,9 @@ class PlaceholderMixin:
         if style.get('indent'):
             pPr.set('indent', style['indent'])
         
+        bu_font = style.get('buFont', 'Arial')
+        font_elem = etree.SubElement(pPr, qn('a:buFont'))
+        font_elem.set('typeface', bu_font)
         buAutoNum = etree.SubElement(pPr, qn('a:buAutoNum'))
         buAutoNum.set('type', numbering_type)
     

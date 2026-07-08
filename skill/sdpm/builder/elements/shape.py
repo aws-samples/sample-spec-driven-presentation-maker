@@ -36,6 +36,7 @@ class ShapeMixin:
         """
         shape_type = elem.get("shape")
         if not shape_type:
+            print("Warning: shape element without 'shape' key skipped — element dropped from PPTX", file=sys.stderr)
             return
         
         # Map shape names to MSO_SHAPE constants
@@ -259,7 +260,9 @@ class ShapeMixin:
                         bodyPr.set('wrap', 'none')
             
             font_size = elem.get("fontSize", 14)
-            
+            fc = elem.get("fontColor")
+            default_color = RGBColor.from_string(fc.lstrip('#')) if fc else None
+
             if items:
                 # Add bullet points
                 for i, item in enumerate(items):
@@ -270,7 +273,7 @@ class ShapeMixin:
                     p.level = 0
                     self._set_bullet(p)
                     item_text = item.get("text", item) if isinstance(item, dict) else item
-                    self._apply_styled_text(p, item_text, default_font_size=font_size)
+                    self._apply_styled_text(p, item_text, default_color=default_color, default_font_size=font_size)
                     
                     if isinstance(item, dict) and item.get("spaceAfter") is not None:
                         p.space_after = Pt(item["spaceAfter"] / 100)
@@ -301,7 +304,7 @@ class ShapeMixin:
                         self._set_bullet(p, char=bu if isinstance(bu, str) else None)
                     # Text
                     if para_text:
-                        self._apply_styled_text(p, para_text, default_font_size=para_fs)
+                        self._apply_styled_text(p, para_text, default_color=default_color, default_font_size=para_fs)
                     # endParaRPr font size
                     end_fs = para_def.get("endFontSize", para_fs if not para_text else None)
                     if end_fs:
@@ -322,7 +325,7 @@ class ShapeMixin:
                 lines = text.split("\n")
                 for i, line in enumerate(lines):
                     p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-                    self._apply_styled_text(p, line, default_font_size=font_size)
+                    self._apply_styled_text(p, line, default_color=default_color, default_font_size=font_size)
                     # Set endParaRPr font size for empty paragraphs
                     if not line.strip():
                         from lxml import etree
@@ -669,19 +672,21 @@ class ShapeMixin:
                 _va_map = {"top": 1, "middle": 3, "bottom": 4}
                 tf.vertical_anchor = _va_map.get(va, 3)
             font_size = elem.get("fontSize", 14)
+            fc = elem.get("fontColor")
+            default_color = RGBColor.from_string(fc.lstrip('#')) if fc else None
             if items:
                 for i, item in enumerate(items):
                     p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
                     p.level = 0
                     self._set_bullet(p)
                     item_text = item.get("text", item) if isinstance(item, dict) else item
-                    self._apply_styled_text(p, item_text, default_font_size=font_size)
+                    self._apply_styled_text(p, item_text, default_color=default_color, default_font_size=font_size)
             else:
                 text = text.replace("\\n", "\n")
                 text = _expand_styled_newlines(text)
                 for i, line in enumerate(text.split("\n")):
                     p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-                    self._apply_styled_text(p, line, default_font_size=font_size)
+                    self._apply_styled_text(p, line, default_color=default_color, default_font_size=font_size)
                     if not line.strip():
                         from lxml import etree
                         from pptx.oxml.ns import qn as _qn

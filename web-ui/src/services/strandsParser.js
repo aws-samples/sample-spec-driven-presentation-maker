@@ -18,6 +18,8 @@
  * NOT inserted into the completion text.
  */
 
+import { agentErrorMessage } from "@/lib/agentErrors";
+
 // Track last seen tool use ID to deduplicate
 let _lastToolUseId = null;
 
@@ -52,22 +54,7 @@ export const parseStreamingChunk = (line, currentCompletion, updateCallback, too
 
     // Agent-level error (e.g. Bedrock ValidationException, image/token limit exceeded)
     if (json.status === 'error' && json.error) {
-      const msg = json.error;
-      let errorMessage;
-      if (msg.includes("Too much media") || msg.includes("too long")) {
-        errorMessage = "⚠️ This conversation is too long for the model to process. Please start a new chat to continue.";
-      } else if (msg.includes("ThrottlingException") || msg.includes("throttl")) {
-        errorMessage = "⚠️ The service is temporarily busy. Please wait a moment and try again.";
-      } else if (msg.includes("ModelTimeoutException") || msg.includes("timed out") || msg.includes("timeout")) {
-        errorMessage = "⚠️ The model took too long to respond. Please try again.";
-      } else if (msg.includes("ModelNotReadyException") || msg.includes("not ready")) {
-        errorMessage = "⚠️ The model is not ready yet. Please wait a moment and try again.";
-      } else if (msg.includes("ServiceUnavailable")) {
-        errorMessage = "⚠️ The service is temporarily unavailable. Please try again later.";
-      } else {
-        errorMessage = `⚠️ ${msg}`;
-      }
-      const newCompletion = currentCompletion + errorMessage;
+      const newCompletion = currentCompletion + `⚠️ ${agentErrorMessage(json.error, json.code)}`;
       updateCallback(newCompletion);
       return newCompletion;
     }

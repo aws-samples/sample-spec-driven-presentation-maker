@@ -102,6 +102,38 @@ the active style's `:root`. No ad-hoc values.
   Colors embedded in inline directives (e.g. `{{#FF9900:text}}`) are subject to the same rule.
   - Not automatically validated at build time — self-check before delivery.
 
+### Shape Text Discipline
+
+When a shape needs a label, write the label in the shape's `text` (or
+`paragraphs` / `items`) property. **Never** layer a separate `textbox` on top
+of a shape with the same bounding box to add a label. This anti-pattern is
+the single most common cause of label/shape collision in generated decks.
+
+```json
+// Wrong — two elements stacked at identical coordinates
+{"type": "shape",   "x": 100, "y": 200, "width": 200, "height": 100, ...}
+{"type": "textbox", "x": 100, "y": 200, "width": 200, "height": 100,
+ "text": "Label", ...}
+
+// Right — single shape with its own text
+{"type": "shape", "x": 100, "y": 200, "width": 200, "height": 100,
+ "text": "Label", "fontSize": 20,
+ "align": "center", "verticalAlign": "middle", ...}
+```
+
+When deciding whether the next element should be a `textbox`: if its
+position or size would match an existing `shape`, it must NOT be a textbox —
+move the text into the shape and stop. A textbox is only the right element
+when it stands alone, OR when it occupies a region distinct from any shape
+on the slide.
+
+Build emits an "Overlay textbox detected" warning when this anti-pattern
+is found in the produced JSON, but the goal is to never write it — by the
+time the warning fires, the slide JSON is already wrong.
+
+See `slide-json-spec.md` (shape section, "Labeled shapes — use `text`,
+never overlay a textbox") for the full rule and examples.
+
 ## Build
 
 Build is not a single pass — it is a loop of place, measure, adjust.

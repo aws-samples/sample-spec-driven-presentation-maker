@@ -27,7 +27,7 @@ interface SearchResultsGridProps {
 export function SearchResultsGrid({ results, searching, onSlideClick }: SearchResultsGridProps) {
   return (
     <>
-      <p className="text-xs text-foreground-muted font-medium mb-4">
+      <p role="status" aria-live="polite" className="text-xs text-foreground-muted font-medium mb-4">
         {searching ? "Searching slides across the organization…" : `${results.length} result${results.length !== 1 ? "s" : ""} found`}
       </p>
 

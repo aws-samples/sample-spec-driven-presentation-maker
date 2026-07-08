@@ -16,19 +16,21 @@ import { buildAttachedMarkers } from "@/lib/attachmentMarker"
 import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
 import { getChatHistory, patchDeck } from "@/services/deckService"
 import type { UploadedFile } from "@/services/uploadService"
-import { useChatStream, type Message, type ToolUseCallbackData } from "@/hooks/useChatStream"
+import { useChatStream, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage, ToolUse } from "./ChatMessage"
-import { McpStatusBar, McpServerStatus } from "./McpStatusBar"
+import { McpStatusBar } from "./McpStatusBar"
 import { FileDropZone } from "./FileDropZone"
 import { useIsMobile } from "@/hooks/UseMobile"
 import { Send, ChevronRight } from "lucide-react"
 import { ModeSelector } from "./ModeSelector"
 import { usePreferences } from "@/hooks/usePreferences"
+import { notifyError } from "@/lib/errors"
+import { toast } from "sonner"
+import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
 
 interface ChatPanelProps {
   deckId: string
-  deckName?: string
   chatSessionId?: string
   slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
@@ -41,14 +43,14 @@ export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
   // --- Session ---
   const [sessionId, setSessionId] = useState(() => {
     if (chatSessionId) return chatSessionId
     if (deckId === "new") return generateSessionId()
     return deckId.padEnd(36, "0")
   })
-  useEffect(() => { if (chatSessionId && chatSessionId !== sessionId) setSessionId(chatSessionId) }, [chatSessionId])
+  useEffect(() => { if (chatSessionId) setSessionId((prev) => (chatSessionId !== prev ? chatSessionId : prev)) }, [chatSessionId])
 
   // --- Config ---
   const [configLoaded, setConfigLoaded] = useState(false)
@@ -79,7 +81,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deckId: did, messages: stream.messagesRef.current }),
-    }).catch(() => {})
+    }).catch((err) => notifyError("Failed to save chat history", err))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -90,7 +92,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     // Deck created
     if (toolUseData?.completed && toolUseData?.result?.deckId && onDeckCreated) {
       const resultDeckId = String(toolUseData.result.deckId)
-      if (idToken) patchDeck(resultDeckId, { chatSessionId: sessionId }, idToken).catch(() => {})
+      // intentional: best-effort — chat session linkage is a convenience; deck creation already succeeded
+      if (idToken) patchDeck(resultDeckId, { chatSessionId: sessionId }, idToken).catch((err) => console.error("patchDeck failed", err))
       onDeckCreated(resultDeckId)
       saveLocalChat(resultDeckId)
     }
@@ -171,117 +174,17 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       if (!sessionId) return
       setHistoryLoading(true)
       try {
-        const history = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
+        const { messages: history, truncated } = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
+        if (truncated) {
+          toast.info("Older messages in this conversation were omitted to keep loading fast.")
+        }
         if (history.length > 0) {
           // Local mode: .chat.json is already in ChatPanel's internal format
-          if (IS_LOCAL && (history[0] as unknown as Record<string, unknown>)?.toolUses !== undefined) {
-            stream.setMessages(history.map((m) => {
-              const raw = m as unknown as Record<string, unknown>
-              return {
-                role: ((raw.role as string) || "assistant") as "user" | "assistant",
-                content: (typeof raw.content === "string" ? raw.content : "") as string,
-                toolUses: (raw.toolUses as ToolUse[]) || [],
-                blocks: (raw.blocks as ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[]) || undefined,
-              }
-            }))
+          if (IS_LOCAL && isLocalHistoryFormat(history)) {
+            stream.setMessages(parseLocalHistory(history))
             return
           }
-          const parsed: Message[] = []
-          for (const m of history) {
-            let text = ""
-            const toolUses: ToolUse[] = []
-            const snippets: { label: string; text: string }[] = []
-
-            if (typeof m.content === "string") {
-              text = m.content.replace(/<!--sdpm:[^>]*-->\n?/g, "")
-            } else if (Array.isArray(m.content)) {
-              const contentBlocks = m.content as unknown as Record<string, unknown>[]
-              if (m.role === "user" && contentBlocks.some((b) => b.toolResult)) {
-                for (const block of contentBlocks) {
-                  const b = block
-                  if (b.toolResult) {
-                    const tr = b.toolResult as Record<string, unknown>
-                    const tuId = tr.toolUseId as string
-                    const status = (tr.status as string) || "success"
-                    let resultText = ""
-                    for (const c of (tr.content as Record<string, unknown>[]) || []) {
-                      if (c.text) resultText += c.text as string
-                    }
-                    if (parsed.length > 0) {
-                      const prev = parsed[parsed.length - 1]
-                      if (prev.role === "assistant") {
-                        const matchedTool = prev.toolUses.find((t) => t.toolUseId === tuId)
-                        if (matchedTool) {
-                          matchedTool.status = status as "success" | "error"
-                          try { matchedTool.result = JSON.parse(resultText) } catch { matchedTool.result = resultText as unknown as Record<string, unknown> }
-                        }
-                        if (prev.blocks) {
-                          for (const bl of prev.blocks) {
-                            if (bl.type === "tool" && bl.tool.toolUseId === tuId) {
-                              bl.tool.status = status as "success" | "error"
-                              try { bl.tool.result = JSON.parse(resultText) } catch { bl.tool.result = resultText as unknown as Record<string, unknown> }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                continue
-              }
-
-              for (const block of contentBlocks) {
-                const b = block
-                if (b.toolUse) {
-                  const tu = b.toolUse as Record<string, unknown>
-                  toolUses.push({
-                    toolUseId: (tu.toolUseId as string) || "",
-                    name: (tu.name as string) || "",
-                    input: (tu.input as Record<string, unknown>) || {},
-                  })
-                } else if (b.text && toolUses.length === 0) {
-                  const cleaned = (b.text as string).replace(/<!--sdpm:[^>]*-->\n?/g, "")
-                  if (cleaned) text += (text ? "\n" : "") + cleaned
-                }
-              }
-            }
-            if (!text.trim() && toolUses.length === 0) continue
-            const blocks: ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[] = []
-            if (m.role === "assistant" && Array.isArray(m.content)) {
-              for (const block of m.content) {
-                const b = block as Record<string, unknown>
-                if (b.text) {
-                  blocks.push({ type: "text", text: b.text as string })
-                } else if (b.toolUse) {
-                  const tu = b.toolUse as Record<string, unknown>
-                  blocks.push({ type: "tool", tool: {
-                    toolUseId: (tu.toolUseId as string) || "",
-                    name: (tu.name as string) || "",
-                    input: (tu.input as Record<string, unknown>) || {},
-                  }})
-                }
-              }
-            }
-            parsed.push({
-              role: m.role as "user" | "assistant",
-              content: text,
-              toolUses,
-              blocks: blocks.length > 0 ? blocks : undefined,
-              snippets: snippets.length > 0 ? snippets : undefined,
-              ...((m.role === "user") && (() => {
-                const attRe = /\[Attached:\s*(.+?)\s*\(uploadId:\s*[^)]+\)\]/g
-                const atts: { fileName: string; fileType: string }[] = []
-                let am: RegExpExecArray | null
-                while ((am = attRe.exec(text)) !== null) {
-                  const fn = am[1]
-                  const ext = fn.split(".").pop()?.toLowerCase() || ""
-                  const mimeMap: Record<string, string> = { pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", pdf: "application/pdf", png: "image/png", json: "application/json", md: "text/markdown", txt: "text/plain" }
-                  atts.push({ fileName: fn, fileType: mimeMap[ext] || "application/octet-stream" })
-                }
-                return atts.length > 0 ? { attachments: atts } : {}
-              })()),
-            })
-          }
+          const parsed = parseCloudHistory(history)
           if (parsed.length > 0) stream.setMessages(parsed)
         }
       } finally {
@@ -509,9 +412,25 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               <Send className="h-5 w-5 text-brand-teal" />
             </div>
             <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-1">Let&apos;s present</h2>
-            <p className="text-sm text-foreground-muted leading-relaxed mb-8">
+            <p className="text-sm text-foreground-muted leading-relaxed mb-6">
               Drop a URL, paste notes, or describe your idea
             </p>
+            <div className="flex flex-col gap-2 w-full max-w-[320px] mb-8">
+              {[
+                "Create a product pitch for our new feature",
+                "Turn my meeting notes into a status update deck",
+                "Make a 5-minute tech talk about a topic I'll describe",
+              ].map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  onClick={() => chatInputRef.current?.insertAtCursor(example)}
+                  className="text-left text-sm text-foreground-muted px-3.5 py-2.5 rounded-xl border border-border hover:border-border-hover hover:text-foreground transition-colors"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
             {parallelAgents && <ModeSelector value={agentMode} onChange={setAgentMode} />}
           </div>
         ) : (

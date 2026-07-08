@@ -20,6 +20,13 @@ Respond in the same language as the user.
 - After compose_slides returns, review the report and relay results to the user
 - For user modification requests, translate them into instructions and call compose_slides again
 
+## Handling Partial Failures
+If the compose_slides report has `partial: true` or `status: "failed"`, some groups failed:
+- `generated_slides` are done — do NOT regenerate them
+- `failed_groups` lists each failed group with its `slugs`, original `instruction`, and `error`
+- Tell the user which slides failed and why (in plain language), then offer to retry
+- On retry, call compose_slides with ONLY the failed groups, reusing each group's slugs and instruction
+
 ## Post-Compose Review
 After compose_slides returns, perform a cross-slide consistency review:
 1. Check `outline_check` in the report — if `missing` is non-empty, decide whether to retry or inform the user

@@ -176,229 +176,234 @@ Audience: Developers
             errs = result.setdefault("errors", {})
             errs["lintDiagnostics"] = lint_diagnostics
 
-    # Post-processing: build PPTX + SVG (compose/measure) + preview
-    _lock_fp = None
+    # Post-processing: build PPTX + iso measure/compose/preview (lockless)
     if save:
-        if sys.platform != "win32":
-            try:
-                import fcntl
-                lock_path = deck_dir / ".save.lock"
-                lock_path.touch(exist_ok=True)
-                _lock_fp = open(lock_path, "r+b")
-                fcntl.flock(_lock_fp.fileno(), fcntl.LOCK_EX)
-            except Exception:
-                if _lock_fp:
-                    _lock_fp.close()
-                    _lock_fp = None
+        import shutil
 
-    if save:
+        from sdpm.api import generate, parse_outline_slugs
+        from sdpm.assets import invalidate_manifest_cache
+        from sdpm.preview import get_work_dir
+
+        invalidate_manifest_cache()
+        _build_warnings: list[str] = []
+        _build_lint: list[dict] = []
+
+        # 1) Full-deck output.pptx — no lock needed (python-pptx write is ~0.2s)
         try:
-            from sdpm.api import generate
-            from sdpm.assets import invalidate_manifest_cache
-            invalidate_manifest_cache()
             pptx_out = str(deck_dir / "output.pptx")
             build_result = generate(json_path=deck_input, output_path=pptx_out)
             result["pptx"] = build_result.get("output_path", pptx_out)
-            # Store for later filtering by measure_slides
             _build_warnings = build_result.get("warnings", [])
             _build_lint = build_result.get("errors", {}).get("lintDiagnostics", [])
         except Exception as e:
             result["pptx_error"] = str(e)
-            _build_warnings = []
-            _build_lint = []
 
-        import shutil
-        svg_path: Path | None = None
-        _svg_tmpdir: str | None = None
-        pptx_slugs: list[str] = []
-        try:
-            from sdpm.preview import get_work_dir
-            lo = shutil.which("soffice")
-            if not lo:
-                _lo_candidates = [
-                    Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"),
-                    Path(r"C:\Program Files\LibreOffice\program\soffice.exe"),
-                ]
-                for _c in _lo_candidates:
-                    if _c.exists():
-                        lo = str(_c)
-                        break
-            pptx_out = result.get("pptx", "")
-            if lo and pptx_out:
-                _svg_tmpdir = tempfile.mkdtemp(dir=get_work_dir(deck_dir))
-                env = dict(os.environ)
-                cmd = [lo, "--headless", "--convert-to", "svg", "--outdir", _svg_tmpdir]
-                if sys.platform == "win32":
-                    cmd.append(f"-env:UserInstallation=file:///{_svg_tmpdir.replace(os.sep, '/')}")
-                else:
-                    env["HOME"] = _svg_tmpdir
-                cmd.append(pptx_out)
-                subprocess.run(cmd, capture_output=True, timeout=120, env=env, stdin=subprocess.DEVNULL)
-                svg_files = list(Path(_svg_tmpdir).glob("*.svg"))
-                if svg_files:
-                    svg_path = svg_files[0]
-        except Exception as e:
-            result["compose_error"] = str(e)
+        # 2) iso.pptx path: compose + measure + preview for measure_slides only
+        if measure_slides:
+            outline_slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
+            measure_set = set(measure_slides)
+            pptx_slugs = [
+                s for s in outline_slugs
+                if s in measure_set and (deck_dir / "slides" / f"{s}.json").exists()
+            ]
 
-        # Compose: SVG → optimized JSON
-        if svg_path:
+            work_root = get_work_dir(deck_dir)
+            iso_dir = Path(tempfile.mkdtemp(prefix="measure-", dir=work_root))
             try:
-                from compose import extract_optimized_defs, split_slide_components, count_slides
-                from sdpm.api import parse_outline_slugs
-                import time as _t
-                import re as _re
-                n = count_slides(svg_path)
-                compose_dir = deck_dir / "compose"
-                compose_dir.mkdir(exist_ok=True)
-                epoch = int(_t.time())
-
-                prev_by_slug: dict[str, Path] = {}
-                for f in compose_dir.iterdir():
-                    m = _re.match(r"^(.+)_(\d+)\.json$", f.name)
-                    if m and not f.name.startswith("defs_"):
-                        slug, ep = m.group(1), int(m.group(2))
-                        cur = prev_by_slug.get(slug)
-                        if not cur or int(_re.search(r"_(\d+)\.json$", cur.name).group(1)) < ep:
-                            prev_by_slug[slug] = f
-
-                def _mk(c: dict) -> str:
-                    b = c.get("bbox")
-                    return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
-
-                def _fp(c: dict) -> str:
-                    return f"{c['class']}|{c.get('text', '')}"
-
-                (compose_dir / f"defs_{epoch}.json").write_text(
-                    json.dumps(extract_optimized_defs(svg_path), ensure_ascii=False),
-                    encoding="utf-8",
+                # Build iso.pptx containing only the target slugs
+                iso_pptx = iso_dir / "iso.pptx"
+                generate(
+                    json_path=deck_input,
+                    output_path=str(iso_pptx),
+                    only_slugs=set(measure_slides),
                 )
 
-                slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
-                pptx_slugs = [s for s in slugs if (deck_dir / "slides" / f"{s}.json").exists()]
-                if not prev_by_slug:
-                    target_slugs: set[str] = set(pptx_slugs)
-                else:
-                    target_slugs = set(measure_slides or [])
+                # Export SVG from iso.pptx
+                svg_path: Path | None = None
+                lo = shutil.which("soffice")
+                if not lo:
+                    _lo_candidates = [
+                        Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"),
+                        Path(r"C:\Program Files\LibreOffice\program\soffice.exe"),
+                    ]
+                    for _c in _lo_candidates:
+                        if _c.exists():
+                            lo = str(_c)
+                            break
 
-                composed = 0
-                for sn in range(1, n):
-                    idx = sn - 1
-                    if idx >= len(pptx_slugs):
-                        break
-                    slug = pptx_slugs[idx]
-                    if slug not in target_slugs:
-                        continue
+                if lo:
+                    env = dict(os.environ)
+                    svg_outdir = str(iso_dir / "svg")
+                    Path(svg_outdir).mkdir()
+                    cmd = [lo, "--headless", "--convert-to", "svg", "--outdir", svg_outdir]
+                    if sys.platform == "win32":
+                        cmd.append(f"-env:UserInstallation=file:///{svg_outdir.replace(os.sep, '/')}")
+                    else:
+                        env["HOME"] = svg_outdir
+                    cmd.append(str(iso_pptx))
+                    subprocess.run(cmd, capture_output=True, timeout=120, env=env, stdin=subprocess.DEVNULL)
+                    svg_files = list(Path(svg_outdir).glob("*.svg"))
+                    if svg_files:
+                        svg_path = svg_files[0]
+
+                # --- Compose: SVG → optimized JSON ---
+                if svg_path:
                     try:
-                        comp_data = split_slide_components(svg_path, sn)
-                        print(f"[compose] svg slide {sn} → slug {slug}", file=sys.stderr)
-                        prev_file = prev_by_slug.get(slug)
-                        if prev_file and prev_file.exists():
-                            try:
-                                prev_comps = json.loads(prev_file.read_text(encoding="utf-8")).get("components", [])
-                                prev_map = {_mk(c): _fp(c) for c in prev_comps}
-                                for c in comp_data["components"]:
-                                    k = _mk(c)
-                                    c["changed"] = k not in prev_map or prev_map[k] != _fp(c)
-                            except Exception:
-                                for c in comp_data["components"]:
-                                    c["changed"] = True
-                        else:
-                            for c in comp_data["components"]:
-                                c["changed"] = True
-                        (compose_dir / f"{slug}_{epoch}.json").write_text(
-                            json.dumps(comp_data, ensure_ascii=False), encoding="utf-8"
+                        from compose import extract_optimized_defs, split_slide_components, count_slides
+                        import time as _t
+                        import re as _re
+
+                        n = count_slides(svg_path)
+                        compose_dir = deck_dir / "compose"
+                        compose_dir.mkdir(exist_ok=True)
+                        epoch = int(_t.time())
+
+                        prev_by_slug: dict[str, Path] = {}
+                        for f in compose_dir.iterdir():
+                            m = _re.match(r"^(.+)_(\d+)\.json$", f.name)
+                            if m and not f.name.startswith("defs_"):
+                                slug_name, ep = m.group(1), int(m.group(2))
+                                cur = prev_by_slug.get(slug_name)
+                                if not cur or int(_re.search(r"_(\d+)\.json$", cur.name).group(1)) < ep:
+                                    prev_by_slug[slug_name] = f
+
+                        def _mk(c: dict) -> str:
+                            b = c.get("bbox")
+                            return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
+
+                        def _fp(c: dict) -> str:
+                            return f"{c['class']}|{c.get('text', '')}"
+
+                        (compose_dir / f"defs_{epoch}.json").write_text(
+                            json.dumps(extract_optimized_defs(svg_path), ensure_ascii=False),
+                            encoding="utf-8",
                         )
-                        composed += 1
-                    except Exception:
-                        pass
 
-                for f in compose_dir.iterdir():
-                    m = _re.match(r"^defs_(\d+)\.json$", f.name)
-                    if m and int(m.group(1)) < epoch:
-                        try:
-                            f.unlink()
-                        except Exception:
-                            pass
+                        target_slugs = set(measure_slides)
+                        composed = 0
+                        for sn in range(1, n):
+                            idx = sn - 1
+                            if idx >= len(pptx_slugs):
+                                break
+                            slug = pptx_slugs[idx]
+                            if slug not in target_slugs:
+                                continue
+                            try:
+                                comp_data = split_slide_components(svg_path, sn)
+                                print(f"[compose] svg slide {sn} → slug {slug}", file=sys.stderr)
+                                prev_file = prev_by_slug.get(slug)
+                                if prev_file and prev_file.exists():
+                                    try:
+                                        prev_comps = json.loads(prev_file.read_text(encoding="utf-8")).get("components", [])
+                                        prev_map = {_mk(c): _fp(c) for c in prev_comps}
+                                        for c in comp_data["components"]:
+                                            k = _mk(c)
+                                            c["changed"] = k not in prev_map or prev_map[k] != _fp(c)
+                                    except Exception:
+                                        for c in comp_data["components"]:
+                                            c["changed"] = True
+                                else:
+                                    for c in comp_data["components"]:
+                                        c["changed"] = True
+                                (compose_dir / f"{slug}_{epoch}.json").write_text(
+                                    json.dumps(comp_data, ensure_ascii=False), encoding="utf-8"
+                                )
+                                composed += 1
+                            except Exception:
+                                pass
 
-                result["compose"] = f"{composed} slides composed"
-                if n <= 2 and len(slugs) > 1:
-                    result["compose_error"] = (
-                        f"LibreOffice exported only {n - 1} slide(s) to SVG but outline has "
-                        f"{len(slugs)} slides. Upgrade LibreOffice to 25.8.6+ (macOS multi-slide SVG fix)."
-                    )
-            except Exception as e:
-                result["compose_error"] = str(e)
+                        for f in compose_dir.iterdir():
+                            m = _re.match(r"^defs_(\d+)\.json$", f.name)
+                            if m and int(m.group(1)) < epoch:
+                                try:
+                                    f.unlink()
+                                except Exception:
+                                    pass
 
-        # Measure
-        if measure_slides and svg_path and pptx_slugs:
-            try:
-                from sdpm.preview.measure import measure_from_svg, format_measure_report
-                slug_to_page = {s: i + 1 for i, s in enumerate(pptx_slugs)}
-                page_to_slug = {v: k for k, v in slug_to_page.items()}
-                slide_indices = [slug_to_page[s] for s in measure_slides if s in slug_to_page]
-                if slide_indices:
-                    results = measure_from_svg(svg_path, slide_indices)
-                    result["measure"] = format_measure_report(results, page_to_slug=page_to_slug)
-            except Exception as e:
-                result["measure"] = f"Measure error: {e}"
-        elif measure_slides and not svg_path:
-            try:
-                from sdpm.api import measure as _sdpm_measure
-                result["measure"] = _sdpm_measure(json_path=deck_input, slides=list(measure_slides))
-            except Exception as e:
-                result["measure"] = f"Measure error: {e}"
+                        result["compose"] = f"{composed} slides composed"
+                        if n <= 2 and len(outline_slugs) > 1:
+                            result["compose_error"] = (
+                                f"LibreOffice exported only {n - 1} slide(s) to SVG but outline has "
+                                f"{len(outline_slugs)} slides. Upgrade LibreOffice to 25.8.6+ (macOS multi-slide SVG fix)."
+                            )
+                    except Exception as e:
+                        result["compose_error"] = str(e)
 
-        if _svg_tmpdir:
-            shutil.rmtree(_svg_tmpdir, ignore_errors=True)
+                # --- Measure ---
+                if svg_path and pptx_slugs:
+                    try:
+                        from sdpm.preview.measure import measure_from_svg, format_measure_report
+                        slug_to_page = {s: i + 1 for i, s in enumerate(pptx_slugs)}
+                        page_to_slug = {v: k for k, v in slug_to_page.items()}
+                        slide_indices = [slug_to_page[s] for s in measure_slides if s in slug_to_page]
+                        if slide_indices:
+                            results = measure_from_svg(svg_path, slide_indices)
+                            try:
+                                from sdpm.preview.judge import judge_from_svg
+                                judgments = judge_from_svg(svg_path, slide_indices)
+                            except Exception:
+                                judgments = None  # best-effort: never break measure
+                            result["measure"] = format_measure_report(
+                                results, page_to_slug=page_to_slug, judgments=judgments
+                            )
+                    except Exception as e:
+                        result["measure"] = f"Measure error: {e}"
+                elif not svg_path:
+                    try:
+                        from sdpm.api import measure as _sdpm_measure
+                        result["measure"] = _sdpm_measure(json_path=deck_input, slides=list(measure_slides))
+                    except Exception as e:
+                        result["measure"] = f"Measure error: {e}"
 
-        # Preview: PDF → PNG
-        try:
-            from sdpm.api import preview as _preview
-            preview_result = _preview(json_path=deck_input, output_path=str(deck_dir / "output.pptx"))
-            if isinstance(preview_result, dict) and preview_result.get("files"):
-                import shutil as _sh
-                preview_dir = deck_dir / "preview"
-                if preview_dir.exists():
-                    _sh.rmtree(preview_dir)
-                preview_dir.mkdir(exist_ok=True)
-                for png_path in preview_result["files"]:
-                    src = Path(png_path)
-                    if src.exists():
-                        _sh.copy2(src, preview_dir / src.name)
-                _sh.rmtree(preview_result["preview_dir"], ignore_errors=True)
+                # --- Preview: PDF → PNG (slug-named) ---
+                if iso_pptx.exists():
+                    try:
+                        from sdpm.preview import export_pdf
+                        preview_dir = deck_dir / "preview"
+                        preview_dir.mkdir(exist_ok=True)
 
-                # Return filtered preview paths + warnings for measure_slides slugs
-                import re as _re2
-                if measure_slides and pptx_slugs:
-                    slug_to_page_num = {s: i + 1 for i, s in enumerate(pptx_slugs)}
-                    target_pages = {slug_to_page_num[s] for s in measure_slides if s in slug_to_page_num}
-                else:
-                    target_pages = None  # return all
+                        pdf_path = iso_dir / "slides.pdf"
+                        if export_pdf(iso_pptx, pdf_path, work_dir=iso_dir):
+                            png_outdir = iso_dir / "pngs"
+                            png_outdir.mkdir()
+                            cmd_png = ["pdftoppm", "-png", "-scale-to", "1280", str(pdf_path), str(png_outdir / "page")]
+                            subprocess.run(cmd_png, capture_output=True, text=True, stdin=subprocess.DEVNULL)
 
-                # Filter preview files
-                all_previews = sorted(preview_dir.iterdir())
-                filtered_previews = []
-                for f in all_previews:
-                    if not f.name.endswith(".png"):
-                        continue
-                    m = _re2.match(r"^page(\d+)[-.]", f.name)
-                    if m:
-                        if target_pages is None or int(m.group(1)) in target_pages:
-                            filtered_previews.append(str(f))
-                result["preview_files"] = filtered_previews
+                            filtered_previews = []
+                            for idx_p, slug in enumerate(pptx_slugs):
+                                src_png = png_outdir / f"page-{idx_p + 1:06d}.png"
+                                if not src_png.exists():
+                                    src_png = png_outdir / f"page-{idx_p + 1:02d}.png"
+                                if not src_png.exists():
+                                    src_png = png_outdir / f"page-{idx_p + 1:03d}.png"
+                                if src_png.exists():
+                                    dst = preview_dir / f"{slug}.png"
+                                    shutil.copy2(src_png, dst)
+                                    filtered_previews.append(str(dst))
+                            result["preview_files"] = filtered_previews
+                    except Exception as e:
+                        result["preview_error"] = str(e)
 
-                # Filter warnings
-                if target_pages is not None:
+                # Filter warnings/lint to measured slugs
+                if _build_warnings or _build_lint:
+                    slug_to_page_full = {}
+                    all_slugs = [s for s in outline_slugs if (deck_dir / "slides" / f"{s}.json").exists()]
+                    for i, s in enumerate(all_slugs):
+                        slug_to_page_full[s] = i + 1
+                    target_pages = {slug_to_page_full[s] for s in measure_slides if s in slug_to_page_full}
                     page_pats = {f"page{p:02d}" for p in target_pages}
                     result["warnings"] = [w for w in _build_warnings if any(p in w for p in page_pats)]
                     result["lint_diagnostics"] = [d for d in _build_lint if any(p in str(d) for p in page_pats)]
-                else:
-                    if _build_warnings:
-                        result["warnings"] = _build_warnings
-                    if _build_lint:
-                        result["lint_diagnostics"] = _build_lint
-        except Exception as e:
-            result["preview_error"] = str(e)
+
+            finally:
+                shutil.rmtree(iso_dir, ignore_errors=True)
+
+        else:
+            # save=True without measure_slides: output.pptx only, skip compose/measure/preview
+            if _build_warnings:
+                result["warnings"] = _build_warnings
+            if _build_lint:
+                result["lint_diagnostics"] = _build_lint
 
     elif measure_slides:
         try:
@@ -406,14 +411,6 @@ Audience: Developers
             result["measure"] = _sdpm_measure(json_path=deck_input, slides=list(measure_slides))
         except Exception as e:
             result["measure"] = f"Measure error: {e}"
-
-    if _lock_fp is not None:
-        try:
-            import fcntl as _fc
-            _fc.flock(_lock_fp.fileno(), _fc.LOCK_UN)
-            _lock_fp.close()
-        except Exception:
-            pass
 
     return json.dumps(result, ensure_ascii=False)
 

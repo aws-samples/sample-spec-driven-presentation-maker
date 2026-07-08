@@ -212,7 +212,13 @@ _SHAPE_NAMES = {
 def _lint_shape(si: int, ei: int, elem: dict) -> list[dict]:
     results: list[dict] = []
     shape = elem.get("shape")
-    if shape is not None and shape not in _SHAPE_NAMES:
+    if shape is None:
+        # The builder silently skips shape elements without a 'shape' key,
+        # so the element would vanish from the PPTX with no trace.
+        results.append(_diag(si, ei, "shape-missing-name",
+                             "shape element requires 'shape' (e.g. 'rectangle'). "
+                             "Without it the element is silently dropped from the PPTX."))
+    elif shape not in _SHAPE_NAMES:
         results.append(_diag(si, ei, "shape-unknown-name",
                              f"shape name '{shape}' is not recognized."))
     results.extend(_lint_bbox_required(si, ei, elem, "shape"))
@@ -376,6 +382,24 @@ def _lint_video(si: int, ei: int, elem: dict) -> list[dict]:
     results.extend(_lint_bbox_required(si, ei, elem, "video"))
     return results
 
+
+# ===================================================================
+# Scope note: syntax and value-domain checks only
+# ===================================================================
+# This linter validates declared values (missing keys, invalid enums/colors,
+# count mismatches, silent-drop hazards). Layout QUALITY rules were tried
+# here and removed — judging rendering outcomes from declared values is the
+# wrong layer. Rejected, with reasons:
+# - text overflow estimation: real overflow is measured from LibreOffice SVG
+#   (measure / run_python's measure_slides), which the compose workflow
+#   already runs on every save. A heuristic duplicate sat right at the
+#   measured boundary (fontSize x 2.35/line) and added noise, not safety.
+# - minimum font size: no universal threshold exists — chart legends use 10,
+#   diagram annotations 11 (both per official guides). Per-deck minimums are
+#   the Token Discipline check's job (checks/font_size.py).
+# - declared-color contrast: the declared fill/background rarely matches what
+#   actually renders behind text (template backgrounds, overlays, gradients).
+#   Contrast belongs in rendering-based measurement (SVG), not here.
 
 # ===================================================================
 # Helpers

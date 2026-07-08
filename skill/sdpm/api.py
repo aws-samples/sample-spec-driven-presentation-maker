@@ -335,11 +335,16 @@ class BuildConfig:
     lint_diagnostics: list = field(default_factory=list)
 
 
-def _assemble_slides_from_dir(deck_dir: Path) -> tuple[dict, list[dict]]:
+def _assemble_slides_from_dir(
+    deck_dir: Path,
+    only_slugs: set[str] | None = None,
+) -> tuple[dict, list[dict]]:
     """Assemble presentation dict from deck.json + outline.md + slides/*.json.
 
     Args:
         deck_dir: Directory containing deck.json, specs/outline.md, slides/*.
+        only_slugs: When set, include only the specified slugs (preserving
+            outline order). None means include all.
 
     Returns:
         (deck_meta, slides) where deck_meta has template/fonts/defaultTextColor
@@ -353,6 +358,8 @@ def _assemble_slides_from_dir(deck_dir: Path) -> tuple[dict, list[dict]]:
     deck_meta = read_json(deck_json)
 
     slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
+    if only_slugs is not None:
+        slugs = [s for s in slugs if s in only_slugs]
 
     slides: list[dict] = []
     for slug in slugs:
@@ -390,11 +397,18 @@ def parse_outline_slugs(outline_path: Path) -> list[str]:
     return slugs
 
 
-def _resolve_config(json_path: str | Path) -> BuildConfig:
+def _resolve_config(
+    json_path: str | Path,
+    only_slugs: set[str] | None = None,
+) -> BuildConfig:
     """Resolve template, fonts, icons, overrides from JSON or directory.
 
     Accepts either a presentation.json file path (legacy) or a directory
     containing deck.json + specs/outline.md + slides/*.json (new format).
+
+    Args:
+        json_path: Path to presentation.json or deck directory.
+        only_slugs: When set, include only the specified slugs in the build.
 
     Raises FileNotFoundError, ValueError on missing template/icons.
     """
@@ -407,7 +421,7 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
 
     # Directory input: deck.json + slides/*.json
     if input_path.is_dir():
-        deck_meta, slides = _assemble_slides_from_dir(input_path)
+        deck_meta, slides = _assemble_slides_from_dir(input_path, only_slugs=only_slugs)
         data = {**deck_meta, "slides": slides}
         base_dir = input_path
     else:
@@ -446,10 +460,14 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
         raise ValueError(f"Missing assets ({len(missing)}): {', '.join(sorted(missing)[:10])}")
 
     # Token discipline: fontSize must come from --fs-* tokens in active style
-    from sdpm.checks import check_font_size_tokens
+    from sdpm.checks import check_font_size_tokens, check_overlay_textbox
 
     fs_warnings = check_font_size_tokens(data, input_path)
     warnings.extend(fs_warnings)
+
+    # Overlay textbox: textbox stacked on a shape with the same bounding box
+    overlay_warnings = check_overlay_textbox(data)
+    warnings.extend(overlay_warnings)
 
     # Resolve overrides
     slides = data.get("slides", [])
@@ -458,6 +476,10 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
         if "id" in s:
             id_map[s["id"]] = s
     resolved_slides = [resolve_override(s, id_map) for s in slides]
+
+    # Filter by only_slugs for legacy JSON path (directory path already filtered)
+    if only_slugs is not None and not input_path.is_dir():
+        resolved_slides = [s for s in resolved_slides if s.get("id") in only_slugs]
 
     return BuildConfig(
         template_path=template_file,
@@ -491,6 +513,7 @@ def _build(config: BuildConfig, output_path: Path) -> Path:
 def generate(
     json_path: str | Path,
     output_path: str | Path | None = None,
+    only_slugs: set[str] | None = None,
 ) -> dict[str, Any]:
     """Generate PPTX from JSON.
 
@@ -499,13 +522,14 @@ def generate(
     Args:
         json_path: Path to the slides JSON file.
         output_path: Output .pptx path. Auto-generated if None.
+        only_slugs: When set, build only the specified slugs (for iso.pptx).
 
     Returns:
         Dict with output_path, slide_count, slides summary, warnings.
     """
     from sdpm.preview import check_layout_imbalance_data
 
-    config = _resolve_config(json_path)
+    config = _resolve_config(json_path, only_slugs=only_slugs)
 
     # Output path
     input_path = Path(json_path)

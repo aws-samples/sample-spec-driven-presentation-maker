@@ -27,6 +27,8 @@ import { useRef, useEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
 import { IS_LOCAL } from "@/lib/mode"
+import { notifyError } from "@/lib/errors"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 
 export type ChatTabKey = "new" | "deck"
 
@@ -70,6 +72,14 @@ export function ChatPanelShell({
     const saved = localStorage.getItem(CHAT_WIDTH_KEY)
     if (saved) setPanelWidth(Math.max(MIN_WIDTH, Math.min(Number(saved), MAX_WIDTH_PX)))
   }, [])
+
+  /** Close the panel on Escape (matches dialog conventions on mobile overlay). */
+  useEffect(() => {
+    if (!open || inline) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [open, inline, onClose])
 
   /** Apply width to panel DOM without React re-render. */
   const applyWidth = useCallback((w: number) => {
@@ -148,7 +158,7 @@ export function ChatPanelShell({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ newChat: true }),
-    }).catch(() => {})
+    }).catch((err) => notifyError("Failed to reset agent session", err))
     if (chatTab === "new" || panelAOwnsCurrentDeck) {
       setPanelAKey((k) => k + 1)
       setPanelADeckId(null)
@@ -193,38 +203,38 @@ export function ChatPanelShell({
   const panelALabel = panelAOwnsCurrentDeck ? (deckName || "Deck") : "New"
 
   const chatContent = (
-    <div className="flex-1 overflow-hidden relative">
-      {/* Panel A: New / deck-created-from-new */}
-      <div className={`h-full ${panelAVisible ? "" : "hidden"}`}>
-        <ChatPanel
-          key={`a-${panelAKey}`}
-          ref={panelAVisible ? chatRef : undefined}
-          deckId="new"
-          deckName="New Deck"
-          slideSlugs={panelAOwnsCurrentDeck ? (slideSlugs || []) : []}
-          onDeckCreated={handlePanelADeckCreated}
-          onPreviewInvalidated={onPreviewInvalidated}
-          onWorkflowPhase={onWorkflowPhase}
-        />
-      </div>
-
-      {/* Panel B: existing deck chat — key is stable, only bumped on external navigation */}
-      {showPanelB && (
-        <div className={`h-full ${panelBVisible ? "" : "hidden"}`}>
+    <ErrorBoundary label="Chat">
+      <div className="flex-1 overflow-hidden relative">
+        {/* Panel A: New / deck-created-from-new */}
+        <div className={`h-full ${panelAVisible ? "" : "hidden"}`}>
           <ChatPanel
-            key={`b-${panelBKey}`}
-            ref={panelBVisible ? chatRef : undefined}
-            deckId={deckId!}
-            deckName={deckName || undefined}
-            chatSessionId={chatSessionId}
-            slideSlugs={slideSlugs || []}
-            onDeckCreated={handlePanelBDeckCreated}
+            key={`a-${panelAKey}`}
+            ref={panelAVisible ? chatRef : undefined}
+            deckId="new"
+            slideSlugs={panelAOwnsCurrentDeck ? (slideSlugs || []) : []}
+            onDeckCreated={handlePanelADeckCreated}
             onPreviewInvalidated={onPreviewInvalidated}
             onWorkflowPhase={onWorkflowPhase}
           />
         </div>
-      )}
-    </div>
+
+        {/* Panel B: existing deck chat — key is stable, only bumped on external navigation */}
+        {showPanelB && (
+          <div className={`h-full ${panelBVisible ? "" : "hidden"}`}>
+            <ChatPanel
+              key={`b-${panelBKey}`}
+              ref={panelBVisible ? chatRef : undefined}
+              deckId={deckId!}
+              chatSessionId={chatSessionId}
+              slideSlugs={slideSlugs || []}
+              onDeckCreated={handlePanelBDeckCreated}
+              onPreviewInvalidated={onPreviewInvalidated}
+              onWorkflowPhase={onWorkflowPhase}
+            />
+          </div>
+        )}
+      </div>
+    </ErrorBoundary>
   )
 
   if (inline) {

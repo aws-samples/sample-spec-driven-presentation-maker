@@ -320,3 +320,53 @@ global_settings:
         PR selection. Inputs are used only via env: variables to prevent
         shell injection. Not a supply chain concern.
       expiration: "2027-03-29"
+
+    # --- detect-secrets: dummy API key for bedrock-mantle SigV4 adapter ---
+
+    - rule_id: "SECRET-SECRET-KEYWORD"
+      path: "agent/mantle_client.py"
+      reason: >
+        api_key="unused" is a dummy value required by the openai SDK constructor.
+        Bedrock-mantle uses SigV4 authentication, not API keys. The value is
+        never sent to any endpoint (SigV4Transport replaces auth headers).
+      expiration: "2027-03-29"
+
+    # --- GitHub Actions mutable action tags ---
+    # Using version tags (@v6, @v7, @v5) for well-known actions (actions/checkout,
+    # actions/setup-python, actions/setup-node, actions/upload-artifact,
+    # actions/github-script, astral-sh/setup-uv). These are official GitHub
+    # first-party actions or widely-used community actions with signed tags.
+    # Pinning to SHA is a hardening option but not required for this sample project.
+
+    - rule_id: "yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag"
+      path: ".github/workflows/ci.yml"
+      reason: >
+        Official GitHub Actions (checkout, setup-python, setup-node) and
+        astral-sh/setup-uv with version tags. Sample project, not production CI.
+      expiration: "2027-03-29"
+
+    - rule_id: "yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag"
+      path: ".github/workflows/ash.yml"
+      reason: >
+        Official GitHub Actions (checkout, setup-python, upload-artifact)
+        with version tags. Sample project.
+      expiration: "2027-03-29"
+
+    - rule_id: "yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag"
+      path: ".github/workflows/blog-draft.yml"
+      reason: >
+        Official GitHub Actions (checkout) with version tag. Sample project.
+      expiration: "2027-03-29"
+
+    - rule_id: "yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag"
+      path: ".github/workflows/require-blog-label.yml"
+      reason: >
+        Official GitHub Actions (github-script) with version tag. Sample project.
+      expiration: "2027-03-29"
+
+    - rule_id: "yaml.github-actions.security.gha-curl-pipe-shell.gha-curl-pipe-shell"
+      path: ".github/workflows/blog-draft.yml"
+      reason: >
+        curl | bash installs kiro-cli from the official endpoint (cli.kiro.dev).
+        This is the documented install method. CI-only workflow, not production.
+      expiration: "2027-03-29"

@@ -1,6 +1,8 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 """Table element with CSS-style cascade styling."""
+import sys
+
 from pptx.dml.color import RGBColor
 from pptx.util import Emu, Pt
 
@@ -73,6 +75,7 @@ class TableMixin:
         row_count = len(rows) + (1 if headers else 0)
 
         if cols == 0 or row_count == 0:
+            print("Warning: table element without headers/rows skipped — element dropped from PPTX", file=sys.stderr)
             return
 
         x = self._px_to_emu(elem.get("x", 77))

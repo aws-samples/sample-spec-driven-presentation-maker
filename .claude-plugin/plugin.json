@@ -1,0 +1,16 @@
+{
+  "name": "sdpm",
+  "version": "0.1.0",
+  "description": "Spec-driven PowerPoint generation with a compose sub-agent (Claude Code).",
+  "author": {
+    "name": "aws-samples",
+    "url": "https://github.com/aws-samples/sample-spec-driven-presentation-maker"
+  },
+  "skills": ["./skills/"],
+  "mcpServers": {
+    "sdpm": {
+      "command": "uv",
+      "args": ["run", "--directory", "${CLAUDE_PLUGIN_ROOT}/mcp-local", "python", "server.py"]
+    }
+  }
+}

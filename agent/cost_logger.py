@@ -24,6 +24,8 @@ def log_usage(event: AfterInvocationEvent) -> None:
     logger.info(json.dumps({
         "kind": "bedrock_usage",
         "agent": event.agent.name,
+        "model_id": attrs.get("model.id"),
+        "purpose": attrs.get("purpose"),
         "group_index": attrs.get("group.index"),
         "group_slugs": attrs.get("group.slugs"),
         "input": usage.get("inputTokens", 0),

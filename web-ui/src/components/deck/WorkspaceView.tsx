@@ -17,28 +17,12 @@ import { DeckDetail } from "@/services/deckService"
 import { Share2, Download, Layers } from "lucide-react"
 import { PreviewImage } from "@/components/ui/PreviewImage"
 import { useAuth } from "@/hooks/useAuth"
+import { formatDate } from "@/lib/utils"
 
 interface WorkspaceViewProps {
   deck: DeckDetail
   onShare?: () => void
   onDownload?: () => void
-}
-
-/**
- * Format an ISO timestamp as a relative date string.
- *
- * @param iso - ISO 8601 timestamp
- * @returns Human-readable relative date
- */
-function formatDate(iso: string): string {
-  if (!iso) return ""
-  const d = new Date(iso)
-  const now = new Date()
-  const diff = Math.floor((now.getTime() - d.getTime()) / 86400000)
-  if (diff === 0) return "Today"
-  if (diff === 1) return "Yesterday"
-  if (diff < 7) return `${diff}d ago`
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
 export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps) {

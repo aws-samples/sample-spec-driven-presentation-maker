@@ -43,6 +43,37 @@ Choose your environment and follow the setup guide:
 | Local MCP client (Claude Desktop, Claude Cowork) | [Getting Started — Layer 2](docs/en/getting-started.md#layer-2-local-mcp-server) |
 | Remote MCP / Web UI (AWS deployment) | [Deploy Guide](docs/en/deploy-cloudshell.md) |
 
+### 🧩 Claude Code Plugin (one-command install)
+
+Claude Code users can install everything with a plugin — no manual MCP config. The plugin
+registers the **local MCP server**, an **orchestrator skill**, and a **compose sub-agent**
+that builds slides in parallel.
+
+**Prerequisites (install once, not bundled with the plugin):**
+
+- [`uv`](https://docs.astral.sh/uv/) on your `PATH` — runs the local MCP server and resolves
+  its Python dependencies on first launch (cold start takes a few tens of seconds).
+- **LibreOffice** and **poppler** — required to render slide previews (HTML/SVG → PNG).
+
+**Install (automatic — downloads this repo, registers MCP + skill + sub-agent):**
+
+```bash
+# In Claude Code:
+/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker
+/plugin install sdpm@sdpm
+```
+
+`/plugin install` clones the repo (so `mcp-local/` and `skill/` come with it), auto-starts
+the `sdpm` MCP server via `uv`, and registers the `sdpm` skill and the `sdpm:sdpm-composer`
+sub-agent. Verify with `/plugin list`, `/mcp` (expect `sdpm` connected), and `/agents`
+(expect `sdpm:sdpm-composer`). Then just ask Claude Code to "make slides about ..." — the
+skill drives briefing → outline → art direction, then delegates Phase 2 (compose) to parallel
+composer sub-agents, and finishes with review.
+
+> **Which entry point?** **Kiro CLI** → use the Layer 1 skill. **Claude Desktop / other MCP
+> clients** → use the Layer 2 local MCP server. **Claude Code** → use this plugin (it wraps the
+> same Layer 2 MCP server with a CC-native skill + parallel compose sub-agent).
+
 ### 🚀 One-Click Deploy — Just an AWS Account to Get Started
 
 | Region | Launch |
