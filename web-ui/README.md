@@ -152,6 +152,20 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
 
 ---
 
+## Testing
+
+```bash
+npm test          # Unit tests (Vitest + Testing Library)
+npm run test:e2e  # E2E test (Playwright — first run: npx playwright install chromium)
+```
+
+The E2E test starts the Web UI in Local mode against a stub ACP agent
+(`e2e/stub-agent.mjs`), so it needs no AWS and no `kiro-cli`. Decks and agent
+config are sandboxed under `e2e/.tmp/` — your real `~/Documents/SDPM-Presentations`
+and `mcp-local/.sdpm/` are never touched.
+
+---
+
 ## Project Structure
 
 ```
