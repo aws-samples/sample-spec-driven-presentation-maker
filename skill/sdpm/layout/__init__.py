@@ -2445,6 +2445,59 @@ def _segments_overlap_collinear(a1, a2, b1, b2):
     return False
 
 
+def _segments_cross(a1, a2, b1, b2):
+    """Test if two axis-aligned line segments (a1-a2) and (b1-b2) cross or overlap.
+
+    Detects:
+    1. Perpendicular crossings (one horizontal, one vertical)
+    2. Collinear overlap (parallel segments sharing the same axis with overlapping range)
+
+    Used by the builder's conservative edge-crossing warning. Distinct from
+    ``_segments_intersect`` (which counts T-junctions via ``_perp_touch``): this
+    one uses strict interior ``<`` on both segments so a shared endpoint does not
+    read as a crossing.
+    """
+    ax1, ay1 = a1
+    ax2, ay2 = a2
+    bx1, by1 = b1
+    bx2, by2 = b2
+
+    a_horiz = ay1 == ay2
+    a_vert = ax1 == ax2
+    b_horiz = by1 == by2
+    b_vert = bx1 == bx2
+
+    # Perpendicular crossings
+    if a_horiz and b_vert:
+        h_y = ay1
+        h_x_min, h_x_max = min(ax1, ax2), max(ax1, ax2)
+        v_x = bx1
+        v_y_min, v_y_max = min(by1, by2), max(by1, by2)
+        return h_x_min < v_x < h_x_max and v_y_min < h_y < v_y_max
+    if a_vert and b_horiz:
+        v_x = ax1
+        v_y_min, v_y_max = min(ay1, ay2), max(ay1, ay2)
+        h_y = by1
+        h_x_min, h_x_max = min(bx1, bx2), max(bx1, bx2)
+        return h_x_min < v_x < h_x_max and v_y_min < h_y < v_y_max
+
+    # Collinear overlap: both horizontal on same Y
+    if a_horiz and b_horiz and ay1 == by1:
+        a_min, a_max = min(ax1, ax2), max(ax1, ax2)
+        b_min, b_max = min(bx1, bx2), max(bx1, bx2)
+        overlap = min(a_max, b_max) - max(a_min, b_min)
+        return overlap > 5
+
+    # Collinear overlap: both vertical on same X
+    if a_vert and b_vert and ax1 == bx1:
+        a_min, a_max = min(ay1, ay2), max(ay1, ay2)
+        b_min, b_max = min(by1, by2), max(by1, by2)
+        overlap = min(a_max, b_max) - max(a_min, b_min)
+        return overlap > 5
+
+    return False
+
+
 def _count_all_crossings(edges):
     """Count crossing pairs across all edges.
 
