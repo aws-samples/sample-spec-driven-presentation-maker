@@ -211,7 +211,6 @@ export function ChatPanelShell({
             key={`a-${panelAKey}`}
             ref={panelAVisible ? chatRef : undefined}
             deckId="new"
-            deckName="New Deck"
             slideSlugs={panelAOwnsCurrentDeck ? (slideSlugs || []) : []}
             onDeckCreated={handlePanelADeckCreated}
             onPreviewInvalidated={onPreviewInvalidated}
@@ -226,7 +225,6 @@ export function ChatPanelShell({
               key={`b-${panelBKey}`}
               ref={panelBVisible ? chatRef : undefined}
               deckId={deckId!}
-              deckName={deckName || undefined}
               chatSessionId={chatSessionId}
               slideSlugs={slideSlugs || []}
               onDeckCreated={handlePanelBDeckCreated}

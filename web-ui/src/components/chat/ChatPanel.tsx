@@ -16,21 +16,21 @@ import { buildAttachedMarkers } from "@/lib/attachmentMarker"
 import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
 import { getChatHistory, patchDeck } from "@/services/deckService"
 import type { UploadedFile } from "@/services/uploadService"
-import { useChatStream, type Message, type ToolUseCallbackData } from "@/hooks/useChatStream"
+import { useChatStream, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage, ToolUse } from "./ChatMessage"
-import { McpStatusBar, McpServerStatus } from "./McpStatusBar"
+import { McpStatusBar } from "./McpStatusBar"
 import { FileDropZone } from "./FileDropZone"
 import { useIsMobile } from "@/hooks/UseMobile"
 import { Send, ChevronRight } from "lucide-react"
 import { ModeSelector } from "./ModeSelector"
 import { usePreferences } from "@/hooks/usePreferences"
 import { notifyError } from "@/lib/errors"
+import { toast } from "sonner"
 import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
 
 interface ChatPanelProps {
   deckId: string
-  deckName?: string
   chatSessionId?: string
   slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
@@ -43,14 +43,14 @@ export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
   // --- Session ---
   const [sessionId, setSessionId] = useState(() => {
     if (chatSessionId) return chatSessionId
     if (deckId === "new") return generateSessionId()
     return deckId.padEnd(36, "0")
   })
-  useEffect(() => { if (chatSessionId && chatSessionId !== sessionId) setSessionId(chatSessionId) }, [chatSessionId])
+  useEffect(() => { if (chatSessionId) setSessionId((prev) => (chatSessionId !== prev ? chatSessionId : prev)) }, [chatSessionId])
 
   // --- Config ---
   const [configLoaded, setConfigLoaded] = useState(false)
@@ -174,7 +174,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       if (!sessionId) return
       setHistoryLoading(true)
       try {
-        const history = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
+        const { messages: history, truncated } = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
+        if (truncated) {
+          toast.info("Older messages in this conversation were omitted to keep loading fast.")
+        }
         if (history.length > 0) {
           // Local mode: .chat.json is already in ChatPanel's internal format
           if (IS_LOCAL && isLocalHistoryFormat(history)) {
