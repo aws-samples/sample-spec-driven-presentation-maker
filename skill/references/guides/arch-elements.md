@@ -296,7 +296,7 @@ Minimal (label only):
 
 ### Rendering
 
-The layout engine expands box nodes into existing element types (colors switch with `--theme`):
+The layout engine expands box nodes into existing element types (colors switch with the `theme` arg / `--theme` flag):
 
 - `rounded_rectangle`: semi-transparent background (opacity 0.18) + border + shadow "sm" + corner radius (0.07)
 - `textbox`: sublabel (muted) → label (bold) → description (muted), with autofit

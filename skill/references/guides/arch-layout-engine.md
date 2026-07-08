@@ -20,16 +20,33 @@ connections. Hand-placement is for fine-tuning or non-flow art.
 
 ## How to run it
 
+Two equivalent front-ends call the same engine. Use whichever your host offers.
+
+**MCP tool (`arch_diagram`)** — preferred when available. Returns the routed
+layout AND the QA metrics in one call, so you can render, read the numbers, and
+fix the structure without a second command:
+
+```
+arch_diagram(spec="<logical-structure JSON string>",
+             x=100, y=180, width=1720, height=800, theme="dark")
+```
+
+**CLI** — same engine, for SKILL.md/script hosts:
+
 ```bash
 python3 scripts/pptx_builder.py layout input.json \
   --x 100 --y 180 --width 1720 --height 800 -o elements.json
 ```
 
 - Input: one logical-structure JSON (see below).
-- Output: `{ "elements": [...], "bbox": {...}, "warnings": [...] }`.
+- Output: `{ "elements": [...], "bbox": {...}, "warnings": [...] }`. The MCP tool
+  additionally returns `"metrics"` (crossings / pierces / group_pierces /
+  overflow / score — see "Reading the output"); the CLI omits it (run
+  `layout_qa.py` for the CLI path).
 - Drop the `elements` array straight into a slide, or reference the whole file
   with `{"type": "include", "src": "elements.json"}`.
-- `targetArea` in the JSON (`{x, y, width, height}`) overrides the CLI flags.
+- `targetArea` in the JSON (`{x, y, width, height}`) overrides the x/y/width/
+  height args (both front-ends).
 - The engine scales the whole diagram to fit the target box, so author at any
   scale — relationships matter, absolute sizes don't.
 
@@ -296,18 +313,24 @@ framed groups do.
   edge-crossing warning is conservative and may flag a shared fan trunk that is
   *not* a real crossing — trust the diagram and the QA metric over that one.
 - `bbox`: final bounding box after scale-to-fit.
+- `metrics`: objective QA numbers, returned inline by the `arch_diagram` MCP
+  tool. For the CLI, get the same numbers from the QA harness:
 
-For an objective check, the QA harness reports crossings / pierces /
-group_pierces / overflow / score:
+  ```bash
+  python3 scripts/layout_qa.py input.json --width 1720 --height 800
+  ```
 
-```bash
-python3 scripts/layout_qa.py input.json --width 1720 --height 800
-```
+  - `crossings` — edge segments that intersect.
+  - `pierces` — a line through a non-endpoint **icon**.
+  - `group_pierces` — a line through an unrelated **framed group box** (above).
+  - `overflow` — fraction the layout spills off the target box (0 == fits;
+    ranks worse than any crossing).
+  - `score` — the judge's lexicographic tuple `(overflow, weighted defects,
+    soft)`, lower is better.
+  - A clean diagram has crossings / pierces / group_pierces all at 0.
 
-- `crossings` — edge segments that intersect.
-- `pierces` — a line through a non-endpoint **icon**.
-- `group_pierces` — a line through an unrelated **framed group box** (above).
-- A clean diagram has all three at 0.
+  Loop on this: render → read `metrics` → change **structure** (not
+  coordinates) → re-render, until the three defect counts are 0.
 
 ---
-**Updated**: 2026-06-30
+**Updated**: 2026-07-08
