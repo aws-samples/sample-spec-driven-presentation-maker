@@ -16,10 +16,10 @@ import { buildAttachedMarkers } from "@/lib/attachmentMarker"
 import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
 import { getChatHistory, patchDeck } from "@/services/deckService"
 import type { UploadedFile } from "@/services/uploadService"
-import { useChatStream, type Message, type ToolUseCallbackData } from "@/hooks/useChatStream"
+import { useChatStream, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage, ToolUse } from "./ChatMessage"
-import { McpStatusBar, McpServerStatus } from "./McpStatusBar"
+import { McpStatusBar } from "./McpStatusBar"
 import { FileDropZone } from "./FileDropZone"
 import { useIsMobile } from "@/hooks/UseMobile"
 import { Send, ChevronRight } from "lucide-react"
@@ -31,7 +31,6 @@ import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./ch
 
 interface ChatPanelProps {
   deckId: string
-  deckName?: string
   chatSessionId?: string
   slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
@@ -44,14 +43,14 @@ export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
   // --- Session ---
   const [sessionId, setSessionId] = useState(() => {
     if (chatSessionId) return chatSessionId
     if (deckId === "new") return generateSessionId()
     return deckId.padEnd(36, "0")
   })
-  useEffect(() => { if (chatSessionId && chatSessionId !== sessionId) setSessionId(chatSessionId) }, [chatSessionId])
+  useEffect(() => { if (chatSessionId) setSessionId((prev) => (chatSessionId !== prev ? chatSessionId : prev)) }, [chatSessionId])
 
   // --- Config ---
   const [configLoaded, setConfigLoaded] = useState(false)
