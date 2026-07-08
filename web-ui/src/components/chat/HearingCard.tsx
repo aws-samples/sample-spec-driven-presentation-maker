@@ -5,6 +5,7 @@
 import { useState } from "react"
 import { Lightbulb, Send } from "lucide-react"
 import { CAT } from "./toolPalette"
+import { useTranslations } from "next-intl"
 
 const P = CAT.hearing
 
@@ -50,6 +51,7 @@ function formatAnswers(questions: Question[], answers: Answers): string {
 }
 
 export function HearingCard({ inference, questions, disabled = false, onSubmit }: HearingCardProps) {
+  const t = useTranslations("hearing")
   const [answers, setAnswers] = useState<Answers>({ selections: {}, notes: {} })
   const [submitted, setSubmitted] = useState(false)
 
@@ -93,7 +95,7 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit }
   return (
     <div
       role="form"
-      aria-label="Agent questions"
+      aria-label={t("agentQuestions")}
       aria-disabled={isDisabled}
       className={`rounded-xl transition-all duration-300 ${isDisabled ? "opacity-50 pointer-events-none" : ""}`}
       style={{
@@ -153,7 +155,7 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit }
                           <span
                             className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
                             style={{ background: P.accent }}
-                            title="Recommended"
+                            title={t("recommended")}
                           />
                         )}
                       </button>
@@ -164,8 +166,8 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit }
                   type="text"
                   value={answers.notes[q.id] || ""}
                   onChange={(e) => setNote(q.id, e.target.value)}
-                  placeholder="Additional notes..."
-                  aria-label={`${q.text} — additional notes`}
+                  placeholder={t("additionalNotes")}
+                  aria-label={`${q.text} — ${t("additionalNotesLabel")}`}
                   className="w-full px-3 py-1.5 rounded-lg text-xs text-foreground/70 placeholder:text-foreground/30 focus:outline-none transition-colors duration-150"
                   style={{
                     background: "oklch(1 0 0 / 2%)",
@@ -215,7 +217,7 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit }
             onMouseLeave={(e) => { e.currentTarget.style.background = P.bg }}
           >
             <Send className="h-3 w-3" />
-            Submit
+            {t("submit")}
           </button>
         </div>
       )}

@@ -21,6 +21,7 @@ import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
 import { CloudOnly, LocalOnly, IS_LOCAL } from "@/lib/mode"
 import { notifyError } from "@/lib/errors"
+import { useTranslations } from "next-intl"
 
 
 interface SlideCarouselProps {
@@ -50,6 +51,7 @@ interface SlideCarouselProps {
 }
 
 export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, idToken }: SlideCarouselProps) {
+  const t = useTranslations("carousel")
   const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
   // eslint-disable-next-line no-console
   const slugs = slides.map(s => s.slug)
@@ -194,13 +196,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /** Local: open deck directory in Finder/Explorer */
   async function handleFolderOpen() {
     if (!deckId || !IS_LOCAL) return
-    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch((err) => notifyError("Failed to open deck folder", err, { retry: handleFolderOpen }))
+    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch((err) => notifyError(t("errorOpenFolder"), err, { retry: handleFolderOpen }))
   }
 
   /** Local: open output.pptx with default app */
   async function handlePptxOpen() {
     if (!deckId || !IS_LOCAL) return
-    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch((err) => notifyError("Failed to open PPTX", err, { retry: handlePptxOpen }))
+    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch((err) => notifyError(t("errorOpenPptx"), err, { retry: handlePptxOpen }))
   }
 
   /**
@@ -245,8 +247,8 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
               ))}
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground">Building your slides</p>
-              <p className="text-xs text-foreground-secondary mt-1">This usually takes a few seconds…</p>
+              <p className="text-sm font-medium text-foreground">{t("buildingSlides")}</p>
+              <p className="text-xs text-foreground-secondary mt-1">{t("buildingHint")}</p>
             </div>
             <div className="w-48 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
               <div
@@ -302,14 +304,14 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 )
               })}
             </div>
-            <p className="text-sm text-muted-foreground">Composing slides…</p>
+            <p className="text-sm text-muted-foreground">{t("composing")}</p>
           </div>
         ) : (
           <>
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4 text-muted-foreground/40">
               <Layers className="h-7 w-7" />
             </div>
-            <p className="text-sm text-muted-foreground">Slide previews will appear here after generating a PPTX.</p>
+            <p className="text-sm text-muted-foreground">{t("previewsPlaceholder")}</p>
           </>
         )}
       </div>
@@ -332,7 +334,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
               <SlideThumbnail
                 key={slide.slug}
                 src={slide.previewUrl}
-                alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
+                alt={t("slideAltFull", { number: i + 1, total: slidesWithPreview.length }) + (deckName ? `: ${deckName}` : "")}
                 index={i}
                 slug={slide.slug}
                 onClick={() => onSlideClick?.(i + 1)}
@@ -360,7 +362,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 fallback={
                   <SlideThumbnail
                     src={slide.previewUrl}
-                    alt={`Slide ${i + 1}`}
+                    alt={t("slideAlt", { number: i + 1 })}
                     index={i}
                     slug={slide.slug}
                     onClick={() => onSlideClick?.(i + 1)}
@@ -372,7 +374,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
               <SlideThumbnail
                 key={slide.slug}
                 src={slide.previewUrl}
-                alt={`Slide ${i + 1} of ${slidesWithPreview.length}${deckName ? `: ${deckName}` : ""}`}
+                alt={t("slideAltFull", { number: i + 1, total: slidesWithPreview.length }) + (deckName ? `: ${deckName}` : "")}
                 index={i}
                 slug={slide.slug}
                 onClick={() => onSlideClick?.(i + 1)}
@@ -402,7 +404,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
           <div className="flex items-center gap-3">
             <div>
               <h2 className="text-sm font-medium truncate max-w-[200px]">
-                {deckName || "Preview"}
+                {deckName || t("preview")}
               </h2>
               <p className="text-xs text-muted-foreground">
                 {slidesWithPreview.length} {slidesWithPreview.length === 1 ? "slide" : "slides"}
@@ -417,14 +419,14 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
               <button
                 onClick={() => setViewMode("full")}
                 className={`p-1.5 rounded-md transition-colors ${viewMode === "full" ? "bg-background-hover text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                aria-label="Full size view"
+                aria-label={t("fullSizeView")}
               >
                 <Rows3 className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => setViewMode("grid")}
                 className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-background-hover text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                aria-label="Grid view"
+                aria-label={t("gridView")}
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
               </button>
@@ -433,7 +435,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
               <button
                 onClick={handleFolderOpen}
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
-                aria-label="Open folder"
+                aria-label={t("openFolder")}
               >
                 <FolderOpen className="h-3.5 w-3.5" />
                 Folder
@@ -444,7 +446,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 <button
                   onClick={handlePptxOpen}
                   className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
-                  aria-label="Open PPTX"
+                  aria-label={t("openPptx")}
                 >
                   <FolderOpen className="h-3.5 w-3.5" />
                   PPTX
@@ -454,7 +456,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                   href={pptxUrl}
                   download
                   className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground no-underline px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
-                  aria-label="Download PPTX"
+                  aria-label={t("downloadPptx")}
                 >
                   <Download className="h-3.5 w-3.5" />
                   PPTX

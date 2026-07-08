@@ -1,0 +1,257 @@
+{
+  "common": {
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "close": "閉じる",
+    "save": "保存",
+    "retry": "再試行",
+    "loading": "読み込み中…",
+    "today": "今日",
+    "yesterday": "昨日",
+    "daysAgo": "{days}日前"
+  },
+  "appShell": {
+    "mainNavigation": "メインナビゲーション",
+    "backToDecks": "デッキ一覧に戻る",
+    "decks": "デッキ",
+    "styles": "スタイル",
+    "templates": "テンプレート",
+    "openChat": "チャットを開く",
+    "closeChat": "チャットを閉じる",
+    "userMenu": "ユーザーメニュー",
+    "settings": "設定",
+    "signOut": "サインアウト"
+  },
+  "deckList": {
+    "title": "デッキ",
+    "presentationCount": "{count, plural, other {# 件のプレゼンテーション}}",
+    "newDeck": "新規デッキ",
+    "searchPlaceholder": "組織全体のスライドを検索…",
+    "clearSearch": "検索をクリア",
+    "tabs": {
+      "mine": "マイデッキ",
+      "favorites": "お気に入り",
+      "shared": "共有",
+      "public": "社内公開"
+    },
+    "emptyMineTitle": "デッキはまだありません",
+    "emptyMineDescription": "AI の支援で最初のプレゼンテーションを作りましょう。",
+    "emptyMineAction": "最初のデッキを作成",
+    "emptyOtherTitle": "{tab}はまだありません",
+    "emptyOtherDescription": "デッキが追加されるとこのタブに表示されます。"
+  },
+  "settings": {
+    "title": "設定",
+    "language": "言語",
+    "languageDescription": "インターフェースの表示言語"
+  },
+  "deckCard": {
+    "addToFavorites": "お気に入りに追加",
+    "removeFromFavorites": "お気に入りから削除",
+    "deckActions": "デッキ操作",
+    "copyUrl": "URL をコピー",
+    "openFolder": "フォルダを開く",
+    "openPptx": "PPTX を開く",
+    "downloadPptx": "PPTX をダウンロード",
+    "makePrivate": "非公開にする",
+    "makeInternal": "社内公開にする",
+    "share": "共有",
+    "delete": "削除",
+    "previewAlt": "{name} のプレビュー",
+    "internal": "社内公開",
+    "private": "非公開"
+  },
+  "workspace": {
+    "slideCount": "{count, plural, other {# 枚のスライド}}",
+    "lastEdited": "最終編集 {date}",
+    "share": "共有",
+    "slideAlt": "スライド {number}",
+    "noSlides": "スライドはまだありません。チャットから作成できます。"
+  },
+  "deckActions": {
+    "internal": "社内公開",
+    "private": "非公開",
+    "share": "共有",
+    "shareInternallyTitle": "社内に公開しますか?",
+    "shareInternallyDescription": "このデッキは組織内の全員が検索・閲覧できるようになります。",
+    "shareThisDeck": "このデッキを共有",
+    "searchByAlias": "エイリアスで検索…",
+    "collaborators": "共同編集者",
+    "removeCollaborator": "{name} を削除",
+    "noCollaborators": "共同編集者はまだいません"
+  },
+  "search": {
+    "searching": "組織全体のスライドを検索中…",
+    "resultsFound": "{count, plural, other {# 件見つかりました}}",
+    "resultAlt": "{deck} {page} ページ",
+    "untitled": "無題",
+    "page": "{number} ページ",
+    "noMatches": "一致するスライドがありません",
+    "noMatchesHint": "別のキーワードやより広い検索語を試してください。"
+  },
+  "carousel": {
+    "errorOpenFolder": "デッキフォルダを開けませんでした",
+    "errorOpenPptx": "PPTX を開けませんでした",
+    "buildingSlides": "スライドを生成しています",
+    "buildingHint": "通常は数秒で完了します…",
+    "composing": "スライドを作成中…",
+    "previewsPlaceholder": "PPTX を生成するとスライドプレビューがここに表示されます。",
+    "preview": "プレビュー",
+    "fullSizeView": "全画面表示",
+    "gridView": "グリッド表示",
+    "openFolder": "フォルダを開く",
+    "openPptx": "PPTX を開く",
+    "downloadPptx": "PPTX をダウンロード",
+    "slideAlt": "スライド {number}",
+    "slideAltFull": "スライド {number} / {total}"
+  },
+  "outline": {
+    "evidence": "根拠",
+    "visual": "ビジュアル",
+    "notes": "メモ",
+    "emptyState": "エージェントがアウトラインを書くとここに表示されます。"
+  },
+  "chatInput": {
+    "maxFilesError": "一度に添付できるファイルは 5 つまでです。",
+    "uploadFailed": "アップロード失敗",
+    "textSnippet": "テキストスニペット",
+    "placeholderMobile": "なんでも聞いてください…",
+    "placeholderDesktop": "なんでも聞いてください…  ⌘↵ で送信",
+    "inputLabel": "Chat message input",
+    "stopGeneration": "生成を停止",
+    "sendMessage": "メッセージを送信"
+  },
+  "chatShell": {
+    "errorResetSession": "エージェントセッションをリセットできませんでした",
+    "resizePanel": "チャットパネルの幅を変更",
+    "chat": "チャット",
+    "newChat": "新しいチャット",
+    "startNewChat": "新しいチャットを開始",
+    "closePanel": "チャットパネルを閉じる",
+    "new": "新規",
+    "deck": "デッキ"
+  },
+  "chat": {
+    "errorSaveHistory": "チャット履歴を保存できませんでした",
+    "historyTruncated": "読み込みを速く保つため、古いメッセージを省略しました。",
+    "letsPresent": "プレゼンを作ろう",
+    "emptyHint": "URL やメモの貼り付け、アイデアの説明から始められます",
+    "example1": "新機能のプロダクトピッチを作って",
+    "example2": "会議メモを進捗報告のデッキにして",
+    "example3": "これから説明するテーマで 5 分の技術トークを作って",
+    "chatMessages": "Chat messages",
+    "placeholderMobile": "なんでも聞いてください…",
+    "placeholderDesktop": "なんでも聞いてください…  ⌘↵ で送信",
+    "forceStop": "強制停止 — 進行中のレポートが失われる可能性があります",
+    "mentionSuggestions": "メンション候補",
+    "errorSwitchModel": "モデルを切り替えられませんでした"
+  },
+  "snippet": {
+    "title": "テキストスニペット",
+    "placeholder": "テキストを貼り付けまたは入力…",
+    "characterCount": "{count, plural, other {# 文字}}",
+    "cancel": "キャンセル",
+    "attach": "添付",
+    "textSnippet": "テキストスニペット",
+    "charCount": "{count} 文字"
+  },
+  "plusMenu": {
+    "attachLabel": "ファイルまたはスニペットを添付",
+    "attachFile": "ファイルを添付",
+    "textSnippet": "テキストスニペット"
+  },
+  "attachments": {
+    "removeFile": "{name} を削除",
+    "removeSnippet": "スニペットを削除"
+  },
+  "hearing": {
+    "agentQuestions": "エージェントからの質問",
+    "recommended": "おすすめ",
+    "additionalNotes": "補足があれば入力…",
+    "additionalNotesLabel": "補足メモ",
+    "submit": "送信"
+  },
+  "modeSelector": {
+    "vibeDescription": "資料を渡すだけでスライドに。最小限の対話で素早く変換します。",
+    "specDescription": "まず計画、それから構築。対話で要件を固めてから作成します。",
+    "greatFor": "こんな用途に",
+    "vibeFor1": "URL・記事 → スライド",
+    "vibeFor2": "論文・ドキュメント → 要約デッキ",
+    "vibeFor3": "会議メモ → プレゼン資料",
+    "specFor1": "提案書・ピッチ資料",
+    "specFor2": "構成が重要なプロジェクト",
+    "specFor3": "磨き込まれた正確なプレゼン"
+  },
+  "tools": {
+    "running": "実行中",
+    "completed": "完了",
+    "failed": "失敗",
+    "create_deck": "デッキを作成中",
+    "write_slide": "スライドを作成中",
+    "remove_slide": "スライドを削除中",
+    "reorder_slides": "スライドを並べ替え中",
+    "clone_deck": "デッキを複製中",
+    "clone_slide": "スライドを複製中",
+    "read_reference": "リファレンスを読込中",
+    "list_references": "パターン一覧を取得中",
+    "search_icons": "アイコンを検索中",
+    "search_slides": "スライドを検索中",
+    "get_deck": "デッキを読込中",
+    "web_search": "Web 検索中",
+    "web_fetch": "ページを取得中",
+    "read_uploaded_file": "ファイルを読込中",
+    "import_attachment": "ファイルを取込中",
+    "generate_pptx": "PPTX を生成中",
+    "generate_preview": "プレビューを生成中",
+    "measure_slides": "スライドを計測中",
+    "init_presentation": "デッキを初期化中",
+    "analyze_template": "テンプレートを分析中",
+    "start_presentation": "ワークフローを開始中",
+    "list_templates": "テンプレート一覧を取得中",
+    "list_styles": "スタイル一覧を取得中",
+    "apply_style": "スタイルを適用中",
+    "read_examples": "サンプルを読込中",
+    "list_workflows": "ワークフロー一覧を取得中",
+    "read_workflows": "ワークフローを読込中",
+    "list_guides": "ガイド一覧を取得中",
+    "read_guides": "ガイドを読込中",
+    "search_assets": "アセットを検索中",
+    "list_asset_sources": "アセットソース一覧を取得中",
+    "get_preview": "プレビューを取得中",
+    "run_python": "コードを実行中",
+    "run_style_python": "スタイルを構築中",
+    "grid": "レイアウトを計算中",
+    "code_to_slide": "コードをスライド化中",
+    "pptx_to_json": "PPTX を変換中",
+    "hearing": "質問を作成中",
+    "compose_slides": "スライドを構成中"
+  },
+  "errorBoundary": {
+    "problem": "{label}で問題が発生しました。",
+    "thisSection": "このセクション",
+    "tryAgain": "再試行"
+  },
+  "specNav": {
+    "specPhases": "スペックの段階",
+    "brief": "ブリーフ",
+    "outline": "アウトライン",
+    "artDirection": "アートディレクション",
+    "slides": "スライド"
+  },
+  "specWaiting": {
+    "draftingBrief": "ブリーフを作成中…",
+    "structuringOutline": "アウトラインを構成中…",
+    "composingArtDirection": "アートディレクションを構成中…"
+  },
+  "decksPage": {
+    "removeFromFavorites": "お気に入りから削除",
+    "addToFavorites": "お気に入りに追加",
+    "deleteTitle": "このデッキを削除しますか?",
+    "deleteDescription": "<name>{name}</name> は 30 日後に完全に削除されます。この操作は元に戻せません。",
+    "delete": "削除",
+    "newDeck": "新規デッキ",
+    "createNewDeck": "新しいデッキを作成",
+    "chat": "チャット",
+    "preview": "プレビュー"
+  }
+}

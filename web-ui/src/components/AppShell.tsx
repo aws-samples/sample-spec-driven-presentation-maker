@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { Layers, ChevronLeft, MessageSquare, CircleUser, LogOut, Settings as SettingsIcon, Palette } from "lucide-react"
 import { Settings } from "@/components/Settings"
 import { CloudOnly } from "@/lib/mode"
+import { useTranslations } from "next-intl"
 
 interface AppShellProps {
   children: ReactNode
@@ -33,6 +34,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, deckName, onBack, chatOpen = false, onChatToggle }: AppShellProps) {
+  const t = useTranslations("appShell")
   const { user, signOut } = useAuth()
   const pathname = usePathname()
   const profile = user?.profile as Record<string, unknown> | undefined
@@ -111,12 +113,12 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
         className="header-glass safe-top flex-none flex items-center justify-between px-5 h-12 border-b border-border relative z-[70]"
         role="banner"
       >
-        <nav className="flex items-center gap-2.5" aria-label="Main navigation">
+        <nav className="flex items-center gap-2.5" aria-label={t("mainNavigation")}>
           {deckName && onBack ? (
             <button
               onClick={onBack}
               className="flex items-center gap-2 text-foreground-secondary hover:text-foreground transition-colors"
-              aria-label="Back to decks"
+              aria-label={t("backToDecks")}
             >
               <ChevronLeft className="h-4 w-4" />
               <span className="text-sm font-semibold tracking-[-0.02em] truncate max-w-[200px]">
@@ -137,7 +139,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                     pathname?.startsWith("/decks") ? "text-foreground" : "text-foreground/40 hover:text-foreground/70"
                   }`}
                 >
-                  Decks
+                  {t("decks")}
                 </a>
                 <a
                   href="/styles/"
@@ -145,7 +147,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                     pathname?.startsWith("/styles") ? "text-foreground" : "text-foreground/40 hover:text-foreground/70"
                   }`}
                 >
-                  Styles
+                  {t("styles")}
                 </a>
                 <a
                   href="/templates/"
@@ -153,7 +155,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                     pathname?.startsWith("/templates") ? "text-foreground" : "text-foreground/40 hover:text-foreground/70"
                   }`}
                 >
-                  Templates
+                  {t("templates")}
                 </a>
               </div>
             </>
@@ -170,7 +172,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                   ? "text-brand-teal bg-brand-teal-soft"
                   : `text-foreground-secondary hover:bg-background-hover hover:text-foreground ${!chatSeen ? "chat-toggle-pulse" : ""}`
               }`}
-              aria-label={chatOpen ? "Close chat" : "Open chat"}
+              aria-label={chatOpen ? t("closeChat") : t("openChat")}
               aria-expanded={chatOpen}
             >
               <MessageSquare className="h-4 w-4" />
@@ -187,7 +189,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                   ? "bg-brand-teal-soft text-brand-teal"
                   : "text-foreground-secondary hover:bg-background-hover hover:text-foreground"
               }`}
-              aria-label="User menu"
+              aria-label={t("userMenu")}
               aria-expanded={menuOpen}
               aria-haspopup="true"
             >
@@ -197,7 +199,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
             {menuOpen && (
               <div
                 role="menu"
-                aria-label="User menu"
+                aria-label={t("userMenu")}
                 className={`absolute right-0 top-full mt-1.5 w-56 rounded-xl py-1.5 z-[60] border border-white/[0.08] shadow-[0_8px_32px_oklch(0_0_0/50%)] user-menu-enter ${menuVisible ? "user-menu-visible" : ""}`}
                 style={{ background: "oklch(0.14 0.005 260 / 95%)", backdropFilter: "blur(16px)" }}
               >
@@ -218,7 +220,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                   style={{ "--stagger": "0ms" } as React.CSSProperties}
                 >
                   <SettingsIcon className="h-3.5 w-3.5" />
-                  <span>Settings</span>
+                  <span>{t("settings")}</span>
                 </button>
 
                 <div className="my-1 border-t border-white/[0.06]" />
@@ -234,7 +236,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                     style={{ "--stagger": "30ms" } as React.CSSProperties}
                   >
                     <LogOut className="h-3.5 w-3.5" />
-                    <span>Sign out</span>
+                    <span>{t("signOut")}</span>
                   </button>
                 </CloudOnly>
               </div>

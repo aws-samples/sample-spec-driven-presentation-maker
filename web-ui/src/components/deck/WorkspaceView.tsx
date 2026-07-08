@@ -18,6 +18,8 @@ import { Share2, Download, Layers } from "lucide-react"
 import { PreviewImage } from "@/components/ui/PreviewImage"
 import { useAuth } from "@/hooks/useAuth"
 import { formatDate } from "@/lib/utils"
+import { useTranslations } from "next-intl"
+import { useLocale } from "@/i18n/LocaleProvider"
 
 interface WorkspaceViewProps {
   deck: DeckDetail
@@ -28,17 +30,19 @@ interface WorkspaceViewProps {
 export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps) {
   const slideCount = deck.slides?.length || 0
   const auth = useAuth()
+  const t = useTranslations("workspace")
+  const { locale } = useLocale()
 
   return (
     <div className="h-full flex flex-col animate-card-in">
       {/* Toolbar */}
       <div className="flex-none flex items-center justify-between px-5 sm:px-8 py-3 border-b border-border">
         <div className="text-xs text-foreground-muted font-medium">
-          {slideCount} {slideCount === 1 ? "slide" : "slides"}
+          {t("slideCount", { count: slideCount })}
           {deck.updatedAt && (
             <>
               <span className="mx-1.5 opacity-40">·</span>
-              Last edited {formatDate(deck.updatedAt)}
+              {t("lastEdited", { date: formatDate(deck.updatedAt, locale) })}
             </>
           )}
         </div>
@@ -49,7 +53,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-foreground-secondary hover:text-foreground hover:border-border-hover hover:bg-background-hover transition-all"
             >
               <Share2 className="h-3 w-3" />
-              Share
+              {t("share")}
             </button>
           )}
           {onDownload && deck.pptxUrl && (
@@ -82,7 +86,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
                       deckId={deck.deckId}
                       slug={slide.slug}
                       idToken={auth.user?.id_token}
-                      alt={`Slide ${i + 1}`}
+                      alt={t("slideAlt", { number: i + 1 })}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -101,7 +105,7 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Layers className="h-10 w-10 text-foreground-muted/20 mb-4" />
             <p className="text-sm text-foreground-muted">
-              No slides yet. Use the chat to create slides.
+              {t("noSlides")}
             </p>
           </div>
         )}

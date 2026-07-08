@@ -10,6 +10,8 @@ import { getAllowedModels, getDefaultChatModelId, getDefaultCreateModelId } from
 import { IS_LOCAL } from "@/lib/mode"
 import { toast } from "sonner"
 import { notifyError } from "@/lib/errors"
+import { useLocale, type Locale } from "@/i18n/LocaleProvider"
+import { useTranslations } from "next-intl"
 import { useEffect, useMemo, useState, useCallback } from "react"
 
 interface SettingsProps {
@@ -18,6 +20,8 @@ interface SettingsProps {
 }
 
 export function Settings({ open, onOpenChange }: SettingsProps) {
+  const t = useTranslations("settings")
+  const { locale, setLocale } = useLocale()
   const {
     sendWithEnter,
     setSendWithEnter,
@@ -121,7 +125,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[400px] sm:w-[460px] p-0 flex flex-col">
         <SheetHeader className="px-5 pt-5 pb-3 shrink-0">
-          <SheetTitle className="text-lg">Settings</SheetTitle>
+          <SheetTitle className="text-lg">{t("title")}</SheetTitle>
         </SheetHeader>
 
         <div className="flex flex-col gap-4 px-5 pb-6 overflow-y-auto flex-1 min-h-0">
@@ -252,6 +256,42 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
               </div>
             </section>
           )}
+
+          {/* ── Language ── */}
+          <section
+            aria-labelledby="language-heading"
+            className="rounded-xl border border-white/[0.06] bg-card/40 p-4"
+          >
+            <div className="mb-3">
+              <h3
+                id="language-heading"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                {t("language")}
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t("languageDescription")}
+              </p>
+            </div>
+            <div role="radiogroup" aria-labelledby="language-heading" className="flex gap-2">
+              {([["en", "English"], ["ja", "日本語"]] as [Locale, string][]).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={locale === value}
+                  onClick={() => setLocale(value)}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                    locale === value
+                      ? "border-primary/50 bg-primary/10 text-foreground"
+                      : "border-white/[0.06] bg-card/40 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </section>
 
           {/* ── Chat ── */}
           <section

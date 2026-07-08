@@ -1,7 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, fireEvent, cleanup } from "@testing-library/react"
+import { screen, fireEvent, cleanup } from "@testing-library/react"
+import { renderWithIntl as render } from "@/test/renderWithIntl"
 import { useState } from "react"
 import { ErrorBoundary } from "./ErrorBoundary"
 

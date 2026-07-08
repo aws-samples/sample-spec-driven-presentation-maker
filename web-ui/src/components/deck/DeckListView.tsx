@@ -31,20 +31,21 @@ import { SearchResultsGrid } from "@/components/deck/SearchResultsGrid"
 import { Search, X, Plus, Lock, Star, Users, Building2, Sparkles } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { IS_LOCAL } from "@/lib/mode"
+import { useTranslations } from "next-intl"
 
-/** Tab definition for the list view. */
+/** Tab definition for the list view. labelKey resolves via deckList.tabs.* */
 interface Tab {
   key: string
-  label: string
+  labelKey: "mine" | "favorites" | "shared" | "public"
   icon: typeof Lock
 }
 
 /** Available tabs in the deck list. */
 const TABS: Tab[] = IS_LOCAL ? [] : [
-  { key: "mine", label: "My Decks", icon: Lock },
-  { key: "favorites", label: "Favorites", icon: Star },
-  { key: "shared", label: "Shared", icon: Users },
-  { key: "public", label: "Internal", icon: Building2 },
+  { key: "mine", labelKey: "mine", icon: Lock },
+  { key: "favorites", labelKey: "favorites", icon: Star },
+  { key: "shared", labelKey: "shared", icon: Users },
+  { key: "public", labelKey: "public", icon: Building2 },
 ]
 
 interface DeckListViewProps {
@@ -72,6 +73,7 @@ export function DeckListView({
   searchResults, searching, onDeckOpen, onNewDeck, favoriteIds,
   onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, onOpenFolder, loading,
 }: DeckListViewProps) {
+  const t = useTranslations("deckList")
   // Tauri: no server-side slide search; filter decks by name client-side instead.
   const showSearch = !IS_LOCAL && searchQuery.length >= 2
   const filteredDecks = (IS_LOCAL && searchQuery)
@@ -84,10 +86,10 @@ export function DeckListView({
       <div className="animate-card-in flex items-end justify-between mb-10">
         <div>
           <h1 className="text-[36px] sm:text-[42px] font-extrabold tracking-[-0.04em] leading-[1]">
-            Decks
+            {t("title")}
           </h1>
           <p className="text-sm text-foreground-muted mt-2.5 font-medium tracking-wide uppercase">
-            {decks.length} {decks.length === 1 ? "presentation" : "presentations"}
+            {t("presentationCount", { count: decks.length })}
           </p>
         </div>
         <div className="hidden sm:flex items-center gap-2">
@@ -96,7 +98,7 @@ export function DeckListView({
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg bg-brand-teal text-primary-foreground transition-all hover:brightness-110"
           >
             <Plus className="h-3.5 w-3.5" />
-            New Deck
+            {t("newDeck")}
           </button>
         </div>
       </div>
@@ -109,14 +111,14 @@ export function DeckListView({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Escape") onSearchChange("") }}
-          placeholder="Search slides across the organization…"
+          placeholder={t("searchPlaceholder")}
           className="w-full pl-11 pr-10 py-3 text-sm bg-transparent focus:outline-none placeholder:text-foreground-muted tracking-[-0.01em]"
         />
         {searchQuery && (
           <button
             onClick={() => onSearchChange("")}
             className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-background-hover text-foreground-muted transition-all"
-            aria-label="Clear search"
+            aria-label={t("clearSearch")}
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -145,7 +147,7 @@ export function DeckListView({
                 }`}
               >
                 <tab.icon className="h-3 w-3" />
-                {tab.label}
+                {t(`tabs.${tab.labelKey}`)}
                 <span
                   className="absolute bottom-0 left-0 right-0 h-[2px] transition-transform duration-300 origin-left"
                   style={{
@@ -173,12 +175,9 @@ export function DeckListView({
           ) : filteredDecks.length === 0 ? (
             <EmptyState
               icon={Sparkles}
-              title={activeTab === "mine" ? "No decks yet" : `No ${TABS.find(t => t.key === activeTab)?.label.toLowerCase() || "decks"} yet`}
-              description={activeTab === "mine"
-                ? "Create your first presentation with AI assistance."
-                : "When decks appear here, you'll see them in this tab."
-              }
-              actionLabel={activeTab === "mine" ? "Create your first deck" : undefined}
+              title={activeTab === "mine" ? t("emptyMineTitle") : t("emptyOtherTitle", { tab: t(`tabs.${TABS.find(tb => tb.key === activeTab)?.labelKey || "mine"}`) })}
+              description={activeTab === "mine" ? t("emptyMineDescription") : t("emptyOtherDescription")}
+              actionLabel={activeTab === "mine" ? t("emptyMineAction") : undefined}
               onAction={activeTab === "mine" ? onNewDeck : undefined}
             />
           ) : (

@@ -8,40 +8,41 @@
 "use client"
 
 import { MessageCircle, ClipboardList, Link, FileText, Mic, Target, LayoutTemplate, Sparkles } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 interface ModeSelectorProps {
   value: "spec" | "vibe"
   onChange: (mode: "spec" | "vibe") => void
 }
 
+// Labels ("Vibe"/"Spec") are product names, not translated; descriptions resolve via modeSelector.*
 const modes = [
   {
     key: "vibe" as const,
     label: "Vibe",
     icon: MessageCircle,
-    description: "Drop materials, get slides. Minimal interaction for quick conversions.",
     greatFor: [
-      { icon: Link, text: "URLs & articles → slides" },
-      { icon: FileText, text: "Papers & docs → summary deck" },
-      { icon: Mic, text: "Meeting notes → presentation" },
-    ],
+      { icon: Link, textKey: "vibeFor1" },
+      { icon: FileText, textKey: "vibeFor2" },
+      { icon: Mic, textKey: "vibeFor3" },
+    ] as const,
     accentSide: "left" as const,
   },
   {
     key: "spec" as const,
     label: "Spec",
     icon: ClipboardList,
-    description: "Plan first, then build. Refine requirements through dialogue before composing.",
     greatFor: [
-      { icon: Target, text: "Proposals & pitch decks" },
-      { icon: LayoutTemplate, text: "Projects needing structure" },
-      { icon: Sparkles, text: "Polished, precise presentations" },
-    ],
+      { icon: Target, textKey: "specFor1" },
+      { icon: LayoutTemplate, textKey: "specFor2" },
+      { icon: Sparkles, textKey: "specFor3" },
+    ] as const,
     accentSide: "right" as const,
   },
 ] as const
 
 export function ModeSelector({ value, onChange }: ModeSelectorProps) {
+  const t = useTranslations("modeSelector")
   const selected = modes.find((m) => m.key === value)!
 
   return (
@@ -66,7 +67,7 @@ export function ModeSelector({ value, onChange }: ModeSelectorProps) {
                 </span>
               </div>
               <p className={`text-xs leading-relaxed ${active ? "text-foreground-secondary" : "text-foreground-muted"}`}>
-                {m.description}
+                {t(`${m.key}Description`)}
               </p>
             </button>
           )
@@ -79,11 +80,11 @@ export function ModeSelector({ value, onChange }: ModeSelectorProps) {
           ? "border-l-2 border-brand-teal/40"
           : "border-r-2 border-brand-teal/40"
       }`}>
-        <p className="text-xs font-medium text-foreground-muted tracking-wide uppercase mb-2">Great for</p>
+        <p className="text-xs font-medium text-foreground-muted tracking-wide uppercase mb-2">{t("greatFor")}</p>
         {selected.greatFor.map((item, i) => (
           <div key={i} className="flex items-center gap-2">
             <item.icon className="h-3 w-3 text-brand-teal flex-none" />
-            <span className="text-xs text-foreground-secondary">{item.text}</span>
+            <span className="text-xs text-foreground-secondary">{t(item.textKey)}</span>
           </div>
         ))}
       </div>

@@ -7,21 +7,28 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+const DATE_LABELS = {
+  en: { today: "Today", yesterday: "Yesterday", daysAgo: (n: number) => `${n}d ago`, locale: "en-US" },
+  ja: { today: "今日", yesterday: "昨日", daysAgo: (n: number) => `${n}日前`, locale: "ja-JP" },
+} as const
+
 /**
  * Format an ISO timestamp as a relative date string.
  *
  * @param iso - ISO 8601 timestamp
+ * @param locale - Display locale (default "en")
  * @returns Human-readable relative date (e.g. "Today", "3d ago", "Feb 14")
  */
-export function formatDate(iso: string): string {
+export function formatDate(iso: string, locale: "en" | "ja" = "en"): string {
   if (!iso) return ""
+  const l = DATE_LABELS[locale]
   const d = new Date(iso)
   const now = new Date()
   const diff = Math.floor((now.getTime() - d.getTime()) / 86400000)
-  if (diff === 0) return "Today"
-  if (diff === 1) return "Yesterday"
-  if (diff < 7) return `${diff}d ago`
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  if (diff === 0) return l.today
+  if (diff === 1) return l.yesterday
+  if (diff < 7) return l.daysAgo(diff)
+  return d.toLocaleDateString(l.locale, { month: "short", day: "numeric" })
 }
 
 /**

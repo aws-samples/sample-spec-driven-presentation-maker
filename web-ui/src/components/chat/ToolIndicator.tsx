@@ -15,6 +15,7 @@ import {
   FileText, Download, Play, Code, Palette, LayoutTemplate, Package,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 /** Icon component and base label per tool name. */
 const TOOL_META: Record<string, { Icon: LucideIcon; label: string }> = {
@@ -79,22 +80,25 @@ interface ToolIndicatorProps {
 }
 
 export function ToolIndicator({ name, input, isActive = false }: ToolIndicatorProps) {
+  const t = useTranslations("tools")
   const meta = TOOL_META[name] || { Icon: Wrench, label: name.replace(/_/g, " ") }
   const { Icon } = meta
+  // Known tools resolve via messages; unknown tools fall back to the derived label
+  const label = t.has(name) ? t(name) : meta.label
   const detail = getDetail(name, input)
 
   return (
     <span
       className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5"
       role="status"
-      aria-label={`${isActive ? "Running" : "Completed"}: ${meta.label}${detail ? ` — ${detail}` : ""}`}
+      aria-label={`${isActive ? t("running") : t("completed")}: ${label}${detail ? ` — ${detail}` : ""}`}
     >
       {isActive ? (
         <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/60" />
       ) : (
         <Icon className="h-3 w-3 text-muted-foreground/60" />
       )}
-      <span>{meta.label}</span>
+      <span>{label}</span>
       {detail && <span className="text-muted-foreground/50 truncate max-w-[200px]">{detail}</span>}
     </span>
   )

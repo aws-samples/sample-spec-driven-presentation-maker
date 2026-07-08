@@ -26,6 +26,7 @@ import { FileDropZone } from "./FileDropZone"
 import { SnippetInput } from "./SnippetInput"
 import { Send, Square } from "lucide-react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 
 export interface ChatInputProps {
   /** Called with the final message text, uploaded files, snippets, and attachment metadata. */
@@ -65,6 +66,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, deckId, children, stopTitle, onInputChange, textareaOverlay, textareaClassName },
   ref,
 ) {
+  const t = useTranslations("chatInput")
   const [input, setInput] = useState("")
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [snippetOpen, setSnippetOpen] = useState(false)
@@ -114,7 +116,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     const currentCount = attachments.length
     for (const file of Array.from(files)) {
       if (!canAddMoreFiles(currentCount + attachments.length)) {
-        toast.error("Maximum 5 files can be attached at once.")
+        toast.error(t("maxFilesError"))
         break
       }
       const error = validateFile(file)
@@ -162,12 +164,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           uploadedFiles.push(result)
           setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "completed" as const, uploadId: result.uploadId } : a)))
         } catch {
-          setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "failed" as const, error: "Upload failed" } : a)))
+          setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "failed" as const, error: t("uploadFailed") } : a)))
         }
       }
     }
 
-    const sentSnippets = snippets.map((s) => ({ label: "Text snippet", text: s.text }))
+    const sentSnippets = snippets.map((s) => ({ label: t("textSnippet"), text: s.text }))
     const sentAttachments = uploadedFiles.map((f) => ({ fileName: f.fileName, fileType: f.fileType }))
 
     onSend(input, uploadedFiles, sentSnippets, sentAttachments)
@@ -237,8 +239,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 onKeyDown={handleKeyDown}
                 onCompositionStart={onCompositionStart}
                 onCompositionEnd={onCompositionEnd}
-                placeholder={placeholder ?? (isMobile ? "Ask anything…" : "Ask anything…  ⌘↵ send")}
-                aria-label="Chat message input"
+                placeholder={placeholder ?? (isMobile ? t("placeholderMobile") : t("placeholderDesktop"))}
+                aria-label={t("inputLabel")}
                 className={`w-full bg-transparent resize-none text-sm min-h-[24px] max-h-[120px] py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground leading-relaxed font-[inherit] tracking-[inherit] ${textareaClassName ?? ""}`}
                 rows={1}
                 autoFocus
@@ -250,9 +252,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               <button
                 type="button"
                 onClick={onStop}
-                title={stopTitle ?? "Stop generation"}
+                title={stopTitle ?? t("stopGeneration")}
                 className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-white/10 hover:bg-white/20"
-                aria-label={stopTitle ?? "Stop generation"}
+                aria-label={stopTitle ?? t("stopGeneration")}
               >
                 <Square className="h-3 w-3 fill-current" />
               </button>
@@ -265,7 +267,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                   background: !canSend ? "transparent" : "var(--color-brand-teal)",
                   color: !canSend ? "var(--foreground-muted)" : "var(--background)",
                 }}
-                aria-label="Send message"
+                aria-label={t("sendMessage")}
               >
                 <Send className="h-3.5 w-3.5" />
               </button>

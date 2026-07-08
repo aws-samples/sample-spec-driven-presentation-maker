@@ -11,6 +11,7 @@
 "use client"
 
 import { useCallback, useRef } from "react"
+import { useTranslations } from "next-intl"
 
 export const WAIT_COLORS = [
   { css: "var(--wait-teal)", raw: "oklch(0.75 0.14 185)" },
@@ -21,6 +22,7 @@ export const WAIT_COLORS = [
 
 /** Brief: page being written with colorful lines and glowing cursor. */
 export function BriefWaiting() {
+  const t = useTranslations("specWaiting")
   const lines = [
     { w: 85, color: 0 }, { w: 65, color: 1 }, { w: 90, color: 2 },
     { w: 50, color: 3 }, { w: 75, color: 0 }, { w: 60, color: 1 },
@@ -59,13 +61,14 @@ export function BriefWaiting() {
           />
         </div>
       </div>
-      <p className="text-sm text-foreground-muted">Drafting the brief…</p>
+      <p className="text-sm text-foreground-muted">{t("draftingBrief")}</p>
     </div>
   )
 }
 
 /** Outline: tree growing with trunk, branches, and colorful nodes. */
 export function OutlineWaiting() {
+  const t = useTranslations("specWaiting")
   const nodes = [
     { level: 0, color: 0 }, { level: 1, color: 2 }, { level: 1, color: 3 },
     { level: 0, color: 1 }, { level: 1, color: 0 }, { level: 1, color: 2 },
@@ -139,13 +142,14 @@ export function OutlineWaiting() {
           )
         })}
       </div>
-      <p className="text-sm text-foreground-muted">Structuring the outline…</p>
+      <p className="text-sm text-foreground-muted">{t("structuringOutline")}</p>
     </div>
   )
 }
 
 /** Art Direction: orbiting color dots with glow trails and pointer interaction. */
 export function ArtDirectionWaiting() {
+  const t = useTranslations("specWaiting")
   const containerRef = useRef<HTMLDivElement>(null)
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
@@ -200,7 +204,7 @@ export function ArtDirectionWaiting() {
           }} />
         </div>
       </div>
-      <p className="text-sm text-foreground-muted">Composing art direction…</p>
+      <p className="text-sm text-foreground-muted">{t("composingArtDirection")}</p>
     </div>
   )
 }

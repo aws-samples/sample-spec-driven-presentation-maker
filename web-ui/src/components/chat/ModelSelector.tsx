@@ -4,10 +4,12 @@
 
 import { useState, useEffect } from "react"
 import { notifyError } from "@/lib/errors"
+import { useTranslations } from "next-intl"
 
 interface AcpModel { modelId: string; name: string; description?: string }
 
 export function ModelSelector() {
+  const t = useTranslations("chat")
   const [model, setModelState] = useState<string>("")
   const [models, setModels] = useState<AcpModel[]>([])
 
@@ -39,7 +41,7 @@ export function ModelSelector() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ modelId: v }),
-        }).catch((err) => notifyError("Failed to switch model", err))
+        }).catch((err) => notifyError(t("errorSwitchModel"), err))
       }}
       className="text-[11px] bg-transparent border border-border rounded px-1.5 py-0.5 text-foreground-muted hover:text-foreground focus:outline-none focus:ring-1 focus:ring-brand-teal max-w-[140px]"
     >

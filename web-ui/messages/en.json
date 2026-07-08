@@ -1,0 +1,257 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "close": "Close",
+    "save": "Save",
+    "retry": "Retry",
+    "loading": "Loading…",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "daysAgo": "{days}d ago"
+  },
+  "appShell": {
+    "mainNavigation": "Main navigation",
+    "backToDecks": "Back to decks",
+    "decks": "Decks",
+    "styles": "Styles",
+    "templates": "Templates",
+    "openChat": "Open chat",
+    "closeChat": "Close chat",
+    "userMenu": "User menu",
+    "settings": "Settings",
+    "signOut": "Sign out"
+  },
+  "deckList": {
+    "title": "Decks",
+    "presentationCount": "{count, plural, one {# presentation} other {# presentations}}",
+    "newDeck": "New Deck",
+    "searchPlaceholder": "Search slides across the organization…",
+    "clearSearch": "Clear search",
+    "tabs": {
+      "mine": "My Decks",
+      "favorites": "Favorites",
+      "shared": "Shared",
+      "public": "Internal"
+    },
+    "emptyMineTitle": "No decks yet",
+    "emptyMineDescription": "Create your first presentation with AI assistance.",
+    "emptyMineAction": "Create your first deck",
+    "emptyOtherTitle": "No {tab} yet",
+    "emptyOtherDescription": "When decks appear here, you'll see them in this tab."
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageDescription": "Display language for the interface"
+  },
+  "deckCard": {
+    "addToFavorites": "Add to favorites",
+    "removeFromFavorites": "Remove from favorites",
+    "deckActions": "Deck actions",
+    "copyUrl": "Copy URL",
+    "openFolder": "Open Folder",
+    "openPptx": "Open PPTX",
+    "downloadPptx": "Download PPTX",
+    "makePrivate": "Make Private",
+    "makeInternal": "Make Internal",
+    "share": "Share",
+    "delete": "Delete",
+    "previewAlt": "Preview of {name}",
+    "internal": "Internal",
+    "private": "Private"
+  },
+  "workspace": {
+    "slideCount": "{count, plural, one {# slide} other {# slides}}",
+    "lastEdited": "Last edited {date}",
+    "share": "Share",
+    "slideAlt": "Slide {number}",
+    "noSlides": "No slides yet. Use the chat to create slides."
+  },
+  "deckActions": {
+    "internal": "Internal",
+    "private": "Private",
+    "share": "Share",
+    "shareInternallyTitle": "Share internally?",
+    "shareInternallyDescription": "This deck will be discoverable by everyone in the organization.",
+    "shareThisDeck": "Share this deck",
+    "searchByAlias": "Search by alias…",
+    "collaborators": "Collaborators",
+    "removeCollaborator": "Remove {name}",
+    "noCollaborators": "No collaborators yet"
+  },
+  "search": {
+    "searching": "Searching slides across the organization…",
+    "resultsFound": "{count, plural, one {# result found} other {# results found}}",
+    "resultAlt": "{deck} page {page}",
+    "untitled": "Untitled",
+    "page": "Page {number}",
+    "noMatches": "No matching slides",
+    "noMatchesHint": "Try different keywords or a broader search term."
+  },
+  "carousel": {
+    "errorOpenFolder": "Failed to open deck folder",
+    "errorOpenPptx": "Failed to open PPTX",
+    "buildingSlides": "Building your slides",
+    "buildingHint": "This usually takes a few seconds…",
+    "composing": "Composing slides…",
+    "previewsPlaceholder": "Slide previews will appear here after generating a PPTX.",
+    "preview": "Preview",
+    "fullSizeView": "Full size view",
+    "gridView": "Grid view",
+    "openFolder": "Open folder",
+    "openPptx": "Open PPTX",
+    "downloadPptx": "Download PPTX",
+    "slideAlt": "Slide {number}",
+    "slideAltFull": "Slide {number} of {total}"
+  },
+  "outline": {
+    "evidence": "Evidence",
+    "visual": "Visual",
+    "notes": "Notes",
+    "emptyState": "Outline will appear here when the agent writes it."
+  },
+  "chatInput": {
+    "maxFilesError": "Maximum 5 files can be attached at once.",
+    "uploadFailed": "Upload failed",
+    "textSnippet": "Text snippet",
+    "placeholderMobile": "Ask anything…",
+    "placeholderDesktop": "Ask anything…  ⌘↵ send",
+    "inputLabel": "Chat message input",
+    "stopGeneration": "Stop generation",
+    "sendMessage": "Send message"
+  },
+  "chatShell": {
+    "errorResetSession": "Failed to reset agent session",
+    "resizePanel": "Resize chat panel",
+    "chat": "Chat",
+    "newChat": "New chat",
+    "startNewChat": "Start new chat",
+    "closePanel": "Close chat panel",
+    "new": "New",
+    "deck": "Deck"
+  },
+  "chat": {
+    "errorSaveHistory": "Failed to save chat history",
+    "historyTruncated": "Older messages in this conversation were omitted to keep loading fast.",
+    "letsPresent": "Let's present",
+    "emptyHint": "Drop a URL, paste notes, or describe your idea",
+    "example1": "Create a product pitch for our new feature",
+    "example2": "Turn my meeting notes into a status update deck",
+    "example3": "Make a 5-minute tech talk about a topic I'll describe",
+    "chatMessages": "Chat messages",
+    "placeholderMobile": "Ask anything…",
+    "placeholderDesktop": "Ask anything…  ⌘↵ send",
+    "forceStop": "Force stop — partial report may be lost",
+    "mentionSuggestions": "Mention suggestions",
+    "errorSwitchModel": "Failed to switch model"
+  },
+  "snippet": {
+    "title": "Text Snippet",
+    "placeholder": "Paste or type your text here…",
+    "characterCount": "{count, plural, one {# character} other {# characters}}",
+    "cancel": "Cancel",
+    "attach": "Attach",
+    "textSnippet": "Text snippet",
+    "charCount": "{count} chars"
+  },
+  "plusMenu": {
+    "attachLabel": "Attach file or snippet",
+    "attachFile": "Attach file",
+    "textSnippet": "Text snippet"
+  },
+  "attachments": {
+    "removeFile": "Remove {name}",
+    "removeSnippet": "Remove snippet"
+  },
+  "hearing": {
+    "agentQuestions": "Agent questions",
+    "recommended": "Recommended",
+    "additionalNotes": "Additional notes...",
+    "additionalNotesLabel": "additional notes",
+    "submit": "Submit"
+  },
+  "modeSelector": {
+    "vibeDescription": "Drop materials, get slides. Minimal interaction for quick conversions.",
+    "specDescription": "Plan first, then build. Refine requirements through dialogue before composing.",
+    "greatFor": "Great for",
+    "vibeFor1": "URLs & articles → slides",
+    "vibeFor2": "Papers & docs → summary deck",
+    "vibeFor3": "Meeting notes → presentation",
+    "specFor1": "Proposals & pitch decks",
+    "specFor2": "Projects needing structure",
+    "specFor3": "Polished, precise presentations"
+  },
+  "tools": {
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
+    "create_deck": "Creating deck",
+    "write_slide": "Writing slide",
+    "remove_slide": "Removing slide",
+    "reorder_slides": "Reordering slides",
+    "clone_deck": "Cloning deck",
+    "clone_slide": "Cloning slide",
+    "read_reference": "Reading reference",
+    "list_references": "Listing patterns",
+    "search_icons": "Searching icons",
+    "search_slides": "Searching slides",
+    "get_deck": "Loading deck",
+    "web_search": "Web search",
+    "web_fetch": "Fetching page",
+    "read_uploaded_file": "Reading file",
+    "import_attachment": "Importing file",
+    "generate_pptx": "Generating PPTX",
+    "generate_preview": "Generating preview",
+    "measure_slides": "Measuring slides",
+    "init_presentation": "Initializing deck",
+    "analyze_template": "Analyzing template",
+    "start_presentation": "Starting workflow",
+    "list_templates": "Listing templates",
+    "list_styles": "Listing styles",
+    "apply_style": "Applying style",
+    "read_examples": "Reading example",
+    "list_workflows": "Listing workflows",
+    "read_workflows": "Reading workflow",
+    "list_guides": "Listing guides",
+    "read_guides": "Reading guide",
+    "search_assets": "Searching assets",
+    "list_asset_sources": "Listing asset sources",
+    "get_preview": "Getting preview",
+    "run_python": "Running code",
+    "run_style_python": "Building style",
+    "grid": "Computing layout",
+    "code_to_slide": "Code to slide",
+    "pptx_to_json": "Converting PPTX",
+    "hearing": "Asking questions",
+    "compose_slides": "Composing slides"
+  },
+  "errorBoundary": {
+    "problem": "{label} ran into a problem.",
+    "thisSection": "This section",
+    "tryAgain": "Try again"
+  },
+  "specNav": {
+    "specPhases": "Spec phases",
+    "brief": "Brief",
+    "outline": "Outline",
+    "artDirection": "Art Direction",
+    "slides": "Slides"
+  },
+  "specWaiting": {
+    "draftingBrief": "Drafting the brief…",
+    "structuringOutline": "Structuring the outline…",
+    "composingArtDirection": "Composing art direction…"
+  },
+  "decksPage": {
+    "removeFromFavorites": "Remove from favorites",
+    "addToFavorites": "Add to favorites",
+    "deleteTitle": "Delete this deck?",
+    "deleteDescription": "<name>{name}</name> will be permanently deleted after 30 days. This action cannot be undone.",
+    "delete": "Delete",
+    "newDeck": "New Deck",
+    "createNewDeck": "Create new deck",
+    "chat": "Chat",
+    "preview": "Preview"
+  }
+}
