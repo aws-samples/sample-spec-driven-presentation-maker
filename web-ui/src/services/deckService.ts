@@ -195,35 +195,41 @@ export interface ChatMessage {
   timestamp: number
 }
 
+export interface ChatHistoryResult {
+  messages: ChatMessage[]
+  /** True when the backend dropped oldest messages to fit the response size limit. */
+  truncated: boolean
+}
+
 /**
  * Fetch chat history for a session.
  *
  * @param sessionId - Conversation session ID
  * @param idToken - Cognito ID token
- * @returns Array of chat messages sorted by timestamp
+ * @returns Messages sorted by timestamp, plus a truncation flag
  */
-export async function getChatHistory(sessionId: string, idToken: string, deckId?: string): Promise<ChatMessage[]> {
+export async function getChatHistory(sessionId: string, idToken: string, deckId?: string): Promise<ChatHistoryResult> {
   if (IS_LOCAL) {
-    if (!deckId || deckId === "new") return []
+    if (!deckId || deckId === "new") return { messages: [], truncated: false }
     // Load session context + saved messages
     const res = await fetch("/api/agent/load", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId, deckId }),
     })
-    if (!res.ok) return []
+    if (!res.ok) return { messages: [], truncated: false }
     const data = await res.json()
-    return data.messages || []
+    return { messages: data.messages || [], truncated: false }
   }
   const base = await getApiBaseUrl()
   const response = await fetch(`${base}chat/${sessionId}`, {
     headers: { Authorization: `Bearer ${idToken}` },
   })
 
-  if (!response.ok) return []
+  if (!response.ok) return { messages: [], truncated: false }
 
   const data = await response.json()
-  return data.messages || []
+  return { messages: data.messages || [], truncated: data.truncated === true }
 }
 
 /**

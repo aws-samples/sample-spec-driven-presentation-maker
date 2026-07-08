@@ -26,6 +26,7 @@ import { Send, ChevronRight } from "lucide-react"
 import { ModeSelector } from "./ModeSelector"
 import { usePreferences } from "@/hooks/usePreferences"
 import { notifyError } from "@/lib/errors"
+import { toast } from "sonner"
 import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
 
 interface ChatPanelProps {
@@ -174,7 +175,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       if (!sessionId) return
       setHistoryLoading(true)
       try {
-        const history = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
+        const { messages: history, truncated } = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
+        if (truncated) {
+          toast.info("Older messages in this conversation were omitted to keep loading fast.")
+        }
         if (history.length > 0) {
           // Local mode: .chat.json is already in ChatPanel's internal format
           if (IS_LOCAL && isLocalHistoryFormat(history)) {
