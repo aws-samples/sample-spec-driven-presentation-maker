@@ -44,6 +44,9 @@ admin-ui/dist/
 web-ui/node_modules/
 web-ui/.next/
 web-ui/public/aws-exports.json
+web-ui/e2e/.tmp/
+web-ui/test-results/
+web-ui/playwright-report/
 
 # Kiro / Q-SPEC (local steering, specs, settings)
 .kiro/*
