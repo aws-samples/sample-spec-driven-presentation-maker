@@ -36,7 +36,7 @@ from . import (
 _FIT_ITERATIONS = 8
 
 
-def build_layout(tree, x=None, y=None, width=None, height=None):
+def build_layout(tree, x=None, y=None, width=None, height=None, optimize=True):
     """Run the placement pipeline on a logical-structure ``tree``.
 
     Returns ``(nodes, groups, edges, root_bindings, cum_h, cum_v)`` where
@@ -45,6 +45,10 @@ def build_layout(tree, x=None, y=None, width=None, height=None):
 
     ``tree`` is deep-copied, so the caller's dict is not mutated (aside from the
     order-optimization pass, which operates on the copy).
+
+    ``optimize=False`` skips the order-optimization pre-pass. The tile-pool
+    reflow inside ``optimize_order`` uses this to score candidate arrangements
+    by real routing without recursing back into itself.
     """
     tree = copy.deepcopy(tree)
     direction = tree.get("direction", "horizontal")
@@ -52,7 +56,8 @@ def build_layout(tree, x=None, y=None, width=None, height=None):
     reverse = tree.get("reverse", False)
 
     # Optimize node order within groups to minimize edge crossings.
-    optimize_order(tree)
+    if optimize:
+        optimize_order(tree)
 
     def build_root():
         root = {"id": "_root",

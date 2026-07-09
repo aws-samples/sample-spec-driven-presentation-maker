@@ -3,13 +3,17 @@
 """Layout engine: compute coordinates from logical structure JSON."""
 
 
-def optimize_order(tree):
+def optimize_order(tree, enable_reflow=True):
     """Pre-process: reorder children in groups to minimize edge crossings.
 
     Handles both leaf-only AND mixed groups (groups containing sub-groups).
     Uses brute-force permutation search for small groups (≤7 children) and
     heuristic sorting for larger ones. Counts actual crossing pairs using a
     two-layer position model (internal positions + external peer positions).
+
+    ``enable_reflow`` runs the tile-pool reflow pass at the end. It is set
+    False when the reflow pass itself re-lays-out candidate arrangements, so
+    the real-routing evaluation does not recurse back into reflow.
 
     Mutates tree in-place. Call before _layout_scale.
     """
@@ -30,6 +34,13 @@ def optimize_order(tree):
     # for an edge to a sibling GROUP box having to detour around a nearer child
     # (see _count_crossings_for_mixed_order's peer-adjacency term).
     _optimize_group_order(tree, connections)
+    # Reflow tile pools: a group whose children are all anonymous, frameless,
+    # leaf-only sub-columns of one orientation (pure tiling with no semantic
+    # sub-grouping) can have its leaves reassigned across columns to shorten
+    # wiring — seating externally-connected leaves at the peer-facing end.
+    # Ordering alone can't do this (it never moves a leaf between sub-columns).
+    if enable_reflow:
+        _reflow_tile_pools(tree)
 
 
 def _tag_manual_branch_anchors(node, connections, root=None):
@@ -257,6 +268,149 @@ def _optimize_group_order(node, connections, root=None):
     _flatten_ids_from_root(root, flat_order)
     id_position = {nid: i for i, nid in enumerate(flat_order)}
     node["children"] = sorted(children, key=lambda c: _heuristic_sort_key_mixed(c, connections, id_position, child_leaf_ids))
+
+
+# Max leaves in a tile pool we will exhaustively reflow (n! candidate arrangements
+# each re-routed; 6 → 720 is the practical ceiling for the local pass).
+_REFLOW_MAX_LEAVES = 6
+
+
+def _is_tile_column(node):
+    """A tile is an anonymous, frameless, leaf-only sub-group (pure spacing,
+    no semantic meaning): no groupType, no label, no branch-anchor tag, and all
+    of its own children are leaves."""
+    kids = node.get("children")
+    if not kids:
+        return False
+    if node.get("groupType") or node.get("label") or node.get("_branch_anchor"):
+        return False
+    return all(not k.get("children") for k in kids)
+
+
+def _find_tile_pools(node, out):
+    """Collect groups that are pure tile pools.
+
+    A tile pool is a group whose children are ALL anonymous frameless leaf-only
+    sub-columns (tiles) of the SAME orientation, with ≥2 tiles. Such a group is
+    a grid with no semantic sub-grouping, so its leaves are interchangeable
+    across tiles — safe to reassign to shorten wiring.
+    """
+    kids = node.get("children", [])
+    if kids:
+        tiles = [k for k in kids if _is_tile_column(k)]
+        if len(tiles) >= 2 and len(tiles) == len(kids):
+            dirs = {t.get("direction") for t in tiles}
+            total = sum(len(t["children"]) for t in tiles)
+            if len(dirs) == 1 and 2 <= total <= _REFLOW_MAX_LEAVES:
+                out.append(node)
+        for k in kids:
+            _find_tile_pools(k, out)
+
+
+def _defect_tuple(tree, width, height):
+    """Optimize child order (WITHOUT reflow), route the tree, and return the
+    lexicographic quality key used to compare tile arrangements: hard defects
+    first, then wire length as the soft tie-break.
+
+    The intra-column order of each candidate is decided by the normal order
+    optimizer (reflow disabled so it can't recurse), so the reflow search only
+    has to explore how leaves are *partitioned* across columns — not their order
+    within a column."""
+    import copy
+    from .render import build_layout
+    from .metrics import measure_layout
+    t = copy.deepcopy(tree)
+    optimize_order(t, enable_reflow=False)
+    nodes, groups, edges, rb, _ch, _cv = build_layout(
+        t, None, None, width, height, optimize=False)
+    m = measure_layout(nodes, groups, edges, rb, width, height)
+    return (round(m["overflow"], 3), m["crossings"], m["pierces"],
+            m["group_pierces"], m["backwards"], m["wire_norm"])
+
+
+def _column_partitions(leaf_ids, col_sizes):
+    """Yield every way to partition ``leaf_ids`` into ordered columns of the
+    given sizes, as a tuple of frozensets (membership only — intra-column order
+    is decided later by the order optimizer). Deduplicates equal-size columns so
+    (A|B) and (B|A) are not both tried."""
+    from itertools import combinations
+
+    def rec(remaining, sizes):
+        if not sizes:
+            yield ()
+            return
+        size = sizes[0]
+        for combo in combinations(sorted(remaining), size):
+            rest = remaining - set(combo)
+            for tail in rec(rest, sizes[1:]):
+                yield (frozenset(combo),) + tail
+
+    seen = set()
+    for parts in rec(set(leaf_ids), col_sizes):
+        # Canonicalize columns of equal size to dedupe symmetric partitions.
+        key = tuple(sorted(parts, key=lambda s: sorted(s)))
+        if key in seen:
+            continue
+        seen.add(key)
+        yield parts
+
+
+def _reflow_tile_pools(tree, width=1720, height=800):
+    """Repartition leaves across the columns of each tile pool to shorten wiring.
+
+    A tile pool is a group whose children are all anonymous, frameless, leaf-only
+    sub-columns of one orientation — pure tiling with no semantic sub-grouping.
+    Ordering alone never moves a leaf between sub-columns, so an author's column
+    split (e.g. Orders+Payments in one column, Catalog+Cart in the other) is
+    frozen even when regrouping would shorten wiring.
+
+    For each pool we enumerate the ways to split its leaves across the columns
+    (membership only — each candidate's intra-column order is then set by the
+    normal order optimizer), re-route each with the REAL engine, and keep the
+    best. A candidate is kept only if it does not worsen any hard defect
+    (overflow/crossings/pierces/group_pierces/backwards) versus the author's
+    arrangement; wire length breaks ties. Because hard defects rank ahead of
+    wire, reflow can never trade a crossing for shorter wire — it is a pure
+    quality-preserving cleanup.
+    """
+    pools = []
+    _find_tile_pools(tree, pools)
+    if not pools:
+        return
+
+    for pool in pools:
+        tiles = pool["children"]
+        col_sizes = [len(t["children"]) for t in tiles]
+        leaves = [leaf for t in tiles for leaf in t["children"]]
+        by_id = {leaf["id"]: leaf for leaf in leaves}
+        leaf_ids = [leaf["id"] for leaf in leaves]
+
+        def apply_partition(parts):
+            """Fill each tile column with the members of the corresponding
+            partition set (intra-column order is refined later by the optimizer,
+            so any stable order is fine here)."""
+            for ci, members in enumerate(parts):
+                tiles[ci]["children"] = [by_id[i] for i in leaf_ids if i in members]
+
+        # Baseline: the author's arrangement, order-optimized.
+        author_parts = tuple(
+            frozenset(leaf["id"] for leaf in tile["children"]) for tile in tiles)
+        best_parts = author_parts
+        best_key = _defect_tuple(tree, width, height)
+
+        for parts in _column_partitions(leaf_ids, col_sizes):
+            if parts == author_parts:
+                continue
+            apply_partition(parts)
+            key = _defect_tuple(tree, width, height)
+            if key < best_key:
+                best_key = key
+                best_parts = parts
+
+        apply_partition(best_parts)
+        # Let the order optimizer set the final intra-column order for the chosen
+        # partition (reflow disabled to avoid recursing into this pass).
+        optimize_order(tree, enable_reflow=False)
 
 
 def _collect_leaf_ids(node, out):
