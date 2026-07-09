@@ -17,13 +17,13 @@ matches what the CLI actually draws.
 import copy
 
 from . import (
+    _find_crossing_pairs,
     _group_member_ids,
     _layout_collect,
     _layout_route_connections,
     _layout_scale,
     _layout_translate,
     _seg_crosses_box,
-    _segments_cross,
     box_to_elements,
     cancel_cross_axis_squash,
     measure_natural_child_sizes,
@@ -345,29 +345,14 @@ def _build_warnings(nodes_out, groups_out, edges_out, rb,
                     crossing_reported.add(report_key)
 
     # Check edge-edge crossings (segment intersection).
-    edge_crossing_reported = set()
-    for i in range(len(edges_out)):
-        pts_i = edges_out[i]["points"]
-        if len(pts_i) < 2:
-            continue
-        for j in range(i + 1, len(edges_out)):
-            pts_j = edges_out[j]["points"]
-            if len(pts_j) < 2:
-                continue
-            crossed = False
-            for si in range(len(pts_i) - 1):
-                if crossed:
-                    break
-                for sj in range(len(pts_j) - 1):
-                    if _segments_cross(pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]):
-                        key_ij = (min(i, j), max(i, j))
-                        if key_ij not in edge_crossing_reported:
-                            e_i = f"{edges_out[i]['from']}→{edges_out[i]['to']}"
-                            e_j = f"{edges_out[j]['from']}→{edges_out[j]['to']}"
-                            warnings.append(f"Edges {e_i} and {e_j} cross.")
-                            edge_crossing_reported.add(key_ij)
-                        crossed = True
-                        break
+    # Use the SAME crossing detector the QA metric uses, so a fan-merge trunk's
+    # structural T-junction (spokes peeling off a shared trunk) is not reported
+    # as a crossing. Previously the builder used a naive segment-intersection
+    # test that flagged every shared trunk, contradicting the QA "crossings=0".
+    for i, j in sorted(_find_crossing_pairs(edges_out)):
+        e_i = f"{edges_out[i]['from']}→{edges_out[i]['to']}"
+        e_j = f"{edges_out[j]['from']}→{edges_out[j]['to']}"
+        warnings.append(f"Edges {e_i} and {e_j} cross.")
 
     # Group-frame pierce: an edge slices through a framed group's box without
     # connecting to that group or any icon inside it. The engine auto-detours

@@ -2662,8 +2662,12 @@ def _segments_cross(a1, a2, b1, b2):
     return False
 
 
-def _count_all_crossings(edges):
-    """Count crossing pairs across all edges.
+def _find_crossing_pairs(edges):
+    """Return the set of edge-index pairs (i, j) that genuinely cross.
+
+    This is the single source of truth for "do two edges cross"; both the QA
+    metric (:func:`_count_all_crossings`, which just takes ``len``) and the
+    builder's human-readable warning consume it, so the two can never disagree.
 
     Two edges that SHARE an endpoint node (a fan-out from the same source or a
     fan-in to the same target) are allowed to run on top of each other on their
@@ -2692,7 +2696,7 @@ def _count_all_crossings(edges):
         ys = [p[1] for p in pts]
         boxes.append((min(xs), min(ys), max(xs), max(ys)))
 
-    count = 0
+    pairs = set()
     for i in range(len(edges)):
         pts_i = edges[i]["points"]
         if len(pts_i) < 2:
@@ -2714,7 +2718,10 @@ def _count_all_crossings(edges):
                 or ei.get("from") == ej.get("to")
                 or ei.get("to") == ej.get("from")
             )
+            found = False
             for si in range(len(pts_i) - 1):
+                if found:
+                    break
                 for sj in range(len(pts_j) - 1):
                     if _segments_intersect(pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]):
                         if shares_endpoint:
@@ -2730,6 +2737,65 @@ def _count_all_crossings(edges):
                             # only for the trunk-peel T: a genuine interior×
                             # interior X (two spokes truly crossing mid-span) is
                             # still counted.
+                            if _is_fan_trunk_t_junction(
+                                ei, ej, pts_i, si, pts_j, sj
+                            ):
+                                continue
+                        pairs.add((i, j))
+                        found = True
+                        break
+    return pairs
+
+
+def _count_all_crossings(edges):
+    """Count crossing SEGMENT-pairs across all edges.
+
+    NOTE: this counts every crossing segment-pair, so two edges that cross at
+    several segments contribute more than one. That is deliberate — the whole
+    order/reflow/bend search was tuned against this magnitude, so it must stay a
+    segment count, NOT a distinct-edge-pair count. For the human-readable "which
+    edges cross" warning use :func:`_find_crossing_pairs` (distinct edge pairs);
+    both share the same per-segment skip rules so they never disagree on
+    *whether* a pair crosses, only on how the total is tallied."""
+    boxes = []
+    for e in edges:
+        pts = e["points"]
+        if len(pts) < 2:
+            boxes.append(None)
+            continue
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        boxes.append((min(xs), min(ys), max(xs), max(ys)))
+
+    count = 0
+    for i in range(len(edges)):
+        pts_i = edges[i]["points"]
+        if len(pts_i) < 2:
+            continue
+        ei = edges[i]
+        bi = boxes[i]
+        for j in range(i + 1, len(edges)):
+            pts_j = edges[j]["points"]
+            if len(pts_j) < 2:
+                continue
+            bj = boxes[j]
+            if bi[0] > bj[2] or bj[0] > bi[2] or bi[1] > bj[3] or bj[1] > bi[3]:
+                continue
+            ej = edges[j]
+            shares_endpoint = (
+                ei.get("from") == ej.get("from")
+                or ei.get("to") == ej.get("to")
+                or ei.get("from") == ej.get("to")
+                or ei.get("to") == ej.get("from")
+            )
+            for si in range(len(pts_i) - 1):
+                for sj in range(len(pts_j) - 1):
+                    if _segments_intersect(pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]):
+                        if shares_endpoint:
+                            if _segments_overlap_collinear(
+                                pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]
+                            ):
+                                continue
                             if _is_fan_trunk_t_junction(
                                 ei, ej, pts_i, si, pts_j, sj
                             ):
