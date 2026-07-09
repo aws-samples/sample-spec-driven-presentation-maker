@@ -9,10 +9,19 @@ from sdpm.schema.defaults import ELEMENT_DEFAULTS
 from sdpm.utils.image import resolve_image_path, apply_image_effects
 from sdpm.utils.effects import apply_effects
 from sdpm.utils.svg import _recolor_svg, get_svg_dimensions, generate_qr_svg, add_svg_to_slide
-from sdpm.utils.text import _expand_styled_newlines
+from sdpm.utils.text import _expand_styled_newlines, parse_styled_text
 from sdpm.assets import is_recolor_protected
 
 _DEFAULTS = ELEMENT_DEFAULTS["image"]
+
+
+def _plain_label_text(line: str) -> str:
+    """Return a label line's visible text with any {{...:text}} style markup
+    stripped, for width estimation."""
+    try:
+        return "".join(seg.get("text", "") for seg in parse_styled_text(line))
+    except Exception:
+        return line
 
 class ImageMixin:
     """Mixin providing image element methods."""
@@ -241,9 +250,25 @@ class ImageMixin:
             # Scale margin proportionally to icon size (base: 4% of height)
             label_margin = int(height * 0.04)
             if label_pos == "bottom":
-                lbl_x = x
+                # The label box must be WIDER than the icon, or a caption like
+                # "Cognito" wraps one glyph per line ("Co / gni / to") inside a
+                # 60px icon-width box even with word_wrap off. Size the box to the
+                # longest label line and center it on the icon, so the caption
+                # stays a single readable line that overhangs the icon evenly.
+                _lbl_lines = _expand_styled_newlines(label.replace("\\n", "\n")).split("\n")
+                _max_chars = max(
+                    (len(_plain_label_text(ln)) for ln in _lbl_lines), default=0)
+                # Width per char at the label font size. PowerPoint renders wider
+                # than a naive em estimate (kerning + internal box margins), so
+                # use ~0.85em and pad generously — a box even slightly too narrow
+                # wraps mid-word. Overhang past the icon is harmless (labels are
+                # centered and the engine leaves margin); a too-narrow box is not.
+                _text_w_px = int(_max_chars * label_size * 0.85) + 16
+                _icon_w_px = width_pct or 60
+                lbl_w_px = max(_icon_w_px, _text_w_px)
+                lbl_w = self._px_to_emu(lbl_w_px)
+                lbl_x = x + width // 2 - lbl_w // 2
                 lbl_y = y + height + label_margin
-                lbl_w = width
             elif label_pos == "right":
                 lbl_x = x + width + label_margin * 2
                 lbl_y = y + height // 3
