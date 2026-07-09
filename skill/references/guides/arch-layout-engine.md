@@ -49,16 +49,11 @@ python3 scripts/pptx_builder.py layout input.json \
   height args (both front-ends).
 - The engine scales the whole diagram to fit the target box, so author at any
   scale — relationships matter, absolute sizes don't.
-- **Preview the rendered image** (the metrics catch geometry, but only your eyes
-  catch a wrong-looking label or an awkward bend). Write the elements to a file,
-  reference them from a one-slide deck, and render it:
-
-  ```bash
-  # includes/diagram.json = the engine's elements output
-  # slides/diagram.json   = {"layout":"Title Only","elements":[{"type":"include","src":"includes/diagram.json"}]}
-  # deck.json             = {"template":"blank-dark.pptx", "fonts":{...}, "defaultTextColor":"#FFFFFF"}
-  uv run python3 scripts/pptx_builder.py preview <deck-dir>
-  ```
+- The `metrics`/`warnings` catch geometry, but a wrong-looking label or awkward
+  bend only shows in the render. In the normal slide flow the review step
+  (`create-new-3-review`) previews every slide as a PNG, so the diagram gets
+  eyeballed there — no separate preview needed. Outside that flow, drop the
+  elements into a one-slide deck and run `pptx_builder.py preview <deck-dir>`.
 
 ---
 
