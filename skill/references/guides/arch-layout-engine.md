@@ -155,11 +155,11 @@ This single change took the three-tier observed diagram from **21 crossings to
 0**. Use it whenever a set of sources all talk to "the data tier" / "the
 observability stack" / "the services layer" as a unit.
 
-### 2. Fan merge — bundle same-purpose arrows onto one trunk
+### 2. Fan merge — bundle arrows that share a hub onto one trunk
 
-When several edges share a source (fan-out) or a target (fan-in) and represent
-the *same purpose*, set `"fan": "merge"` on each. They unify onto one port and a
-shared trunk, then split near the spokes:
+When several edges share a source (fan-out) or a target (fan-in) — whether or
+not they carry the same purpose — set `"fan": "merge"` on each. They unify onto
+one port and a shared trunk, then split near the spokes:
 
 ```json
 {"from": "stepfn", "to": "lambda1", "fan": "merge"},
@@ -175,9 +175,17 @@ shared trunk, then split near the spokes:
   cleaned up later, so it refuses to create one that cuts through an icon).
   → You can safely mark a bundle `merge`; a geometrically-impossible merge just
   won't happen. It is NOT a way to force a bad trunk.
-- Don't blanket-apply `merge` to everything. Mark bundles that are genuinely "the
-  same flow" (a fan-out to workers, a fan-in to a queue). Unrelated edges sharing
-  an endpoint shouldn't merge.
+- Don't blanket-apply `merge` to everything. The clearest case is a genuine
+  "same flow" bundle (a fan-out to workers, a fan-in to a queue). But `merge`
+  also **tidies any group of edges that share one hub** — a single node that
+  fans out to several services, or several sources that all converge on one
+  node — even when the edges carry *different* labels/purposes. If N arrows
+  leave or enter the same icon and read as a loose spray, merging them makes
+  that icon emit/receive **one clean trunk** that only splits near the far
+  ends. Prefer merging such a hub bundle; the per-edge labels still render on
+  each spoke, so the distinct purposes stay legible.
+  - The exception is edges that merely *cross paths* without sharing an
+    endpoint — those aren't a bundle and shouldn't be merged.
 
 ### 3. Branch nodes go perpendicular (keep the main line straight)
 
@@ -261,8 +269,9 @@ element). If you need the cluster named, keep a `groupType`.
 ## Anti-patterns
 
 - **Wiring every icon to every icon** across two groups → use a group endpoint.
-- **`fan: "merge"` on unrelated edges** that merely share an endpoint → only
-  bundle same-purpose flows.
+- **`fan: "merge"` on edges that DON'T share an endpoint** (two arrows that
+  merely cross paths) → merge only bundles edges sharing one hub node. Edges
+  sharing a hub but carrying different purposes CAN merge (see technique 2).
 - **Forcing a merge the engine rolled back** → the trunk pierced an icon;
   restructure (split the bundle, reorder, or route to a group) instead.
 - **Deep vertical nesting** (5+ stacked tiers) → overflows height and compresses
