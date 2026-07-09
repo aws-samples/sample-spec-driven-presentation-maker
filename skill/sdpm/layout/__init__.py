@@ -2049,69 +2049,79 @@ def _align_group_bus(edges, nodes, groups):
         if e.get("_src_group"):
             bundles.setdefault((e["_src_group"], "src"), []).append(e)
 
-    for (gid, role), grp_edges in bundles.items():
-        if len(grp_edges) < 2:
+    for (gid, role), all_grp_edges in bundles.items():
+        if len(all_grp_edges) < 2:
             continue
         g = _find_group(groups, gid)
         if not g:
             continue
         gx, gy, gw, gh = g["x"], g["y"], g["width"], g["height"]
+        bcx, bcy = gx + gw / 2, gy + gh / 2
 
         # The "free end" of each edge is the non-group end.
         def free_pt(e):
             return e["points"][0] if role == "dst" else e["points"][-1]
 
-        # Decide which box side faces the bundle: compare the free ends'
-        # centroid to the box center.
-        fxs = [free_pt(e)[0] for e in grp_edges]
-        fys = [free_pt(e)[1] for e in grp_edges]
-        cfx, cfy = sum(fxs) / len(fxs), sum(fys) / len(fys)
-        bcx, bcy = gx + gw / 2, gy + gh / 2
-        dx, dy = cfx - bcx, cfy - bcy
-        if abs(dx) >= abs(dy):
-            side = "left" if dx < 0 else "right"
-        else:
-            side = "top" if dy < 0 else "bottom"
-        vertical_ports = side in ("left", "right")  # ports vary along Y
-
-        snapshot = [list(map(list, e["points"])) for e in edges]
-        before = _count_all_crossings(edges)
-
-        # Order edges by their free end's coordinate along the port axis so
-        # adjacent ports connect to adjacent sources (no self-cross).
-        grp_edges.sort(key=lambda e: free_pt(e)[1] if vertical_ports else free_pt(e)[0])
-        n = len(grp_edges)
-        # Box-edge anchor coordinates (the fixed coordinate of the port line).
-        bx = gx if side == "left" else (gx + gw)        # used when vertical_ports
-        by = gy if side == "top" else (gy + gh)          # used otherwise
-
-        for rank, e in enumerate(grp_edges):
-            off = (rank - (n - 1) / 2) * _GROUP_BUS_PORT_GAP
+        # Assign each edge to the box side its OWN free end faces (not the
+        # bundle centroid). A group can radiate in several directions at once —
+        # e.g. Stream Processing → Firehose (right), → OpenSearch (above),
+        # → CloudWatch (below). Bundling all three onto one centroid side drags
+        # the up/down edges out the right face and makes them detour. Only edges
+        # that genuinely share a side should share a bus.
+        by_side = {}
+        for e in all_grp_edges:
             fp = free_pt(e)
-            # Nested lane: outer (farther from center) edges turn earlier so the
-            # bundle telescopes without crossing.
-            lane_depth = (n - rank) * _GROUP_BUS_LANE_GAP if role == "dst" else (rank + 1) * _GROUP_BUS_LANE_GAP
-            if vertical_ports:
-                py = round(bcy + off)
-                # Outer lanes turn farther from the box so the bundle telescopes.
-                lane = (gx - 20 - lane_depth) if side == "left" else (gx + gw + 20 + lane_depth)
-                port = [bx, py]
-                if role == "dst":
-                    e["points"] = [fp, [lane, fp[1]], [lane, py], port]
-                else:
-                    e["points"] = [port, [lane, py], [lane, fp[1]], fp]
+            dx, dy = fp[0] - bcx, fp[1] - bcy
+            if abs(dx) >= abs(dy):
+                e_side = "left" if dx < 0 else "right"
             else:
-                px = round(bcx + off)
-                lane = (gy - 20 - lane_depth) if side == "top" else (gy + gh + 20 + lane_depth)
-                port = [px, by]
-                if role == "dst":
-                    e["points"] = [fp, [fp[0], lane], [px, lane], port]
-                else:
-                    e["points"] = [port, [px, lane], [fp[0], lane], fp]
+                e_side = "top" if dy < 0 else "bottom"
+            by_side.setdefault(e_side, []).append(e)
 
-        if _count_all_crossings(edges) > before:
-            for e, pts in zip(edges, snapshot):
-                e["points"] = pts
+        for side, grp_edges in by_side.items():
+            # A single edge on a side keeps its natural port — nothing to bundle.
+            if len(grp_edges) < 2:
+                continue
+            vertical_ports = side in ("left", "right")  # ports vary along Y
+
+            snapshot = [list(map(list, e["points"])) for e in edges]
+            before = _count_all_crossings(edges)
+
+            # Order edges by their free end's coordinate along the port axis so
+            # adjacent ports connect to adjacent sources (no self-cross).
+            grp_edges.sort(key=lambda e: free_pt(e)[1] if vertical_ports else free_pt(e)[0])
+            n = len(grp_edges)
+            # Box-edge anchor coordinates (the fixed coordinate of the port line).
+            bx = gx if side == "left" else (gx + gw)        # used when vertical_ports
+            by = gy if side == "top" else (gy + gh)          # used otherwise
+
+            for rank, e in enumerate(grp_edges):
+                off = (rank - (n - 1) / 2) * _GROUP_BUS_PORT_GAP
+                fp = free_pt(e)
+                # Nested lane: outer (farther from center) edges turn earlier so
+                # the bundle telescopes without crossing.
+                lane_depth = (n - rank) * _GROUP_BUS_LANE_GAP if role == "dst" else (rank + 1) * _GROUP_BUS_LANE_GAP
+                if vertical_ports:
+                    py = round(bcy + off)
+                    # Outer lanes turn farther from the box so it telescopes.
+                    lane = (gx - 20 - lane_depth) if side == "left" else (gx + gw + 20 + lane_depth)
+                    port = [bx, py]
+                    if role == "dst":
+                        e["points"] = [fp, [lane, fp[1]], [lane, py], port]
+                    else:
+                        e["points"] = [port, [lane, py], [lane, fp[1]], fp]
+                else:
+                    px = round(bcx + off)
+                    lane = (gy - 20 - lane_depth) if side == "top" else (gy + gh + 20 + lane_depth)
+                    port = [px, by]
+                    if role == "dst":
+                        e["points"] = [fp, [fp[0], lane], [px, lane], port]
+                    else:
+                        e["points"] = [port, [px, lane], [fp[0], lane], fp]
+
+            if _count_all_crossings(edges) > before:
+                for e, pts in zip(edges, snapshot):
+                    e["points"] = pts
 
     return edges
 
