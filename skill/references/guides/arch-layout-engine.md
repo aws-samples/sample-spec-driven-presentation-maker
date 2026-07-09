@@ -49,6 +49,16 @@ python3 scripts/pptx_builder.py layout input.json \
   height args (both front-ends).
 - The engine scales the whole diagram to fit the target box, so author at any
   scale — relationships matter, absolute sizes don't.
+- **Preview the rendered image** (the metrics catch geometry, but only your eyes
+  catch a wrong-looking label or an awkward bend). Write the elements to a file,
+  reference them from a one-slide deck, and render it:
+
+  ```bash
+  # includes/diagram.json = the engine's elements output
+  # slides/diagram.json   = {"layout":"Title Only","elements":[{"type":"include","src":"includes/diagram.json"}]}
+  # deck.json             = {"template":"blank-dark.pptx", "fonts":{...}, "defaultTextColor":"#FFFFFF"}
+  uv run python3 scripts/pptx_builder.py preview <deck-dir>
+  ```
 
 ---
 
@@ -309,9 +319,12 @@ framed groups do.
   fix it. You have the JSON and the rendered image; decide the structural fix
   yourself (connect to a group box, `fan: "merge"`, reorder, change
   `direction`, …) using the techniques above. Size warnings (tall/wide group,
-  overflow, compressed spacing) still carry a short hint. The builder's
-  edge-crossing warning is conservative and may flag a shared fan trunk that is
-  *not* a real crossing — trust the diagram and the QA metric over that one.
+  overflow, compressed spacing) still carry a short hint. The edge-crossing
+  warning uses the **same** detector as the QA `crossings` metric, so a
+  `fan: "merge"` trunk's structural T-junction is NOT reported — if `warnings`
+  lists an `Edges … cross`, the QA metric will show `crossings > 0` too. A
+  "tall/wide group" hint is advisory only: if `overflow` is 0 the layout fits,
+  so don't restructure just to silence it.
 - `bbox`: final bounding box after scale-to-fit.
 - `metrics`: objective QA numbers, returned inline by the `arch_diagram` MCP
   tool. For the CLI, get the same numbers from the QA harness:
@@ -333,4 +346,4 @@ framed groups do.
   coordinates) → re-render, until the three defect counts are 0.
 
 ---
-**Updated**: 2026-07-08
+**Updated**: 2026-07-09
