@@ -246,7 +246,6 @@ def _shift_node_x(pos, nid, new_x, x_locked, list_groups):
     """Move a node's X. If it's in an h_list, shift the whole list."""
     if nid in x_locked:
         # Find the list group and shift all members
-        lid = x_locked[nid]
         delta = new_x - pos[nid][0]
         for axis, nodes, gap in list_groups:
             if axis == "x" and nid in nodes:

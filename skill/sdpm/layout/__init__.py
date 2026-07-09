@@ -1531,7 +1531,6 @@ def _layout_route_connections(connections, nodes, groups=None):
                 # For non-fan-out, only apply if same axis (horizontal↔horizontal
                 # or vertical↔vertical) to avoid bad routes.
                 h_sides = {"left", "right"}
-                v_sides = {"top", "bottom"}
                 natural_axis = "h" if src_side in h_sides else "v"
                 decided_axis = "h" if decided in h_sides else "v"
                 # Never apply the decided side if the target lies on the OPPOSITE
@@ -1680,7 +1679,6 @@ def _layout_route_connections(connections, nodes, groups=None):
         src_is_grp = _find_node(nodes, conn["from"]) is None
         dst_is_grp = _find_node(nodes, conn["to"]) is None
 
-        is_fanout_edge = False
         if i in reverse_set:
             src_node = _find_node(nodes, conn["from"])
             dst_node = _find_node(nodes, conn["to"])
@@ -2564,8 +2562,6 @@ def _spread_overlapping_bends(edges, conn_sides, connections):
     Phase 1: Resolve all crossings by searching for optimal bend shifts.
     Phase 2: Separate bends that are too close (even if not crossing).
     """
-    import copy
-
     # Phase 1: resolve crossings
     for _iteration in range(_MAX_RESOLVE_ITERATIONS):
         crossing = _find_first_crossing(edges)
@@ -3967,7 +3963,6 @@ def _separate_close_horizontal_segments(edges):
                             new_crossings = _count_all_crossings(test_edges)
                             # Recalculate overlap
                             new_pts = test_edges[ei]["points"]
-                            new_h_y = None
                             for nk in range(len(new_pts) - 1):
                                 if new_pts[nk][1] == new_pts[nk + 1][1] and abs(new_pts[nk][0] - new_pts[nk + 1][0]) > 20:
                                     new_xmin = min(new_pts[nk][0], new_pts[nk + 1][0])

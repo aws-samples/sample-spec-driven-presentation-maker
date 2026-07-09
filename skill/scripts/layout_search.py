@@ -27,7 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from layout_qa import measure, score  # noqa: E402
+from layout_qa import measure  # noqa: E402
 
 _DIRECTIONS = ("horizontal", "vertical")
 _ALIGNS = ("start", "center", "end")
@@ -162,7 +162,6 @@ def main():
             cg = _collect_groups(cand)
             for g, d in zip(cg, dirs):
                 gid = g.get("id", "_root")
-                orig = base_m and g.get("direction")
                 print(f"     {gid}: {d}")
 
     best = top[0]
