@@ -23,6 +23,21 @@ def _plain_label_text(line: str) -> str:
     except Exception:
         return line
 
+
+def _label_line_em(line: str) -> float:
+    """Return a label line's estimated display width in em at the label font
+    size. Latin/half-width glyphs count as 0.85em (calibrated against
+    PowerPoint's rendering, see the call site); East Asian wide/fullwidth
+    glyphs (CJK) are square, so they count as 1.05em — a plain character
+    count would under-size Japanese labels and re-introduce the one-glyph-
+    per-line wrapping this box is sized to prevent. Style markup
+    ({{...:text}}) is stripped first."""
+    import unicodedata
+
+    text = _plain_label_text(line)
+    return sum(1.05 if unicodedata.east_asian_width(ch) in ("W", "F") else 0.85
+               for ch in text)
+
 class ImageMixin:
     """Mixin providing image element methods."""
 
@@ -256,14 +271,16 @@ class ImageMixin:
                 # longest label line and center it on the icon, so the caption
                 # stays a single readable line that overhangs the icon evenly.
                 _lbl_lines = _expand_styled_newlines(label.replace("\\n", "\n")).split("\n")
-                _max_chars = max(
-                    (len(_plain_label_text(ln)) for ln in _lbl_lines), default=0)
-                # Width per char at the label font size. PowerPoint renders wider
-                # than a naive em estimate (kerning + internal box margins), so
-                # use ~0.85em and pad generously — a box even slightly too narrow
-                # wraps mid-word. Overhang past the icon is harmless (labels are
-                # centered and the engine leaves margin); a too-narrow box is not.
-                _text_w_px = int(_max_chars * label_size * 0.85) + 16
+                _max_em = max(
+                    (_label_line_em(ln) for ln in _lbl_lines), default=0.0)
+                # Width per glyph at the label font size. PowerPoint renders
+                # wider than a naive em estimate (kerning + internal box
+                # margins), so _label_line_em uses ~0.85em for Latin and
+                # ~1.05em for CJK fullwidth glyphs, plus generous padding —
+                # a box even slightly too narrow wraps mid-word. Overhang past
+                # the icon is harmless (labels are centered and the engine
+                # leaves margin); a too-narrow box is not.
+                _text_w_px = int(_max_em * label_size) + 16
                 _icon_w_px = width_pct or 60
                 lbl_w_px = max(_icon_w_px, _text_w_px)
                 lbl_w = self._px_to_emu(lbl_w_px)
