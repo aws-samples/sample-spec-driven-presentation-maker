@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
 """Graph layout engine: constraint-based placement for non-tree diagrams.
 
 Input format:
