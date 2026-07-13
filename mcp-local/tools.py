@@ -322,6 +322,61 @@ def grid(purpose: str, spec: str) -> dict[str, Any]:
     return compute_grid(grid_spec)
 
 
+def arch_diagram(
+    spec: str,
+    x: int = 100, y: int = 180, width: int = 1720, height: int = 800,
+    theme: str = "dark",
+) -> dict[str, Any]:
+    """Auto-layout an architecture/flow diagram from a logical-structure JSON.
+
+    Turns a nested structure of groups, icons and connections into fully-placed
+    slide elements with auto-routed orthogonal arrows. You describe *what
+    connects to what*; the engine computes coordinates, clusters related icons,
+    picks arrow ports/bends, and minimizes crossings and icon pierces. Prefer
+    this over hand-placing coordinates for any diagram with more than a few
+    connections.
+
+    Read the guide `arch-layout-engine` (via read_guides) for the JSON schema
+    and the techniques that reach 0 crossings (connect to a GROUP not every
+    icon; `fan: "merge"` bundles; perpendicular branch wrappers).
+
+    Args:
+        spec: JSON string. Top-level keys: `direction` ("horizontal"/"vertical"),
+            `iconSize`, `children` (nested nodes/groups), `connections`
+            (`{from, to, label?, fan?}`). A `targetArea` object inside the JSON
+            overrides x/y/width/height.
+        x: Target area X offset in px.
+        y: Target area Y offset in px.
+        width: Target area width in px (engine scales the diagram to fit).
+        height: Target area height in px.
+        theme: "dark" or "light" — affects box-node text colors.
+
+    Returns:
+        Dict with:
+          - `elements`: sdpm element array — drop into a slide, or write to a
+            file and reference with `{"type": "include", "src": "..."}`.
+          - `bbox`: final bounding box after scale-to-fit.
+          - `warnings`: human-readable facts about layout defects (facts, not
+            prescriptions) — may be absent when clean.
+          - `metrics`: objective QA numbers. `crossings` / `pierces` /
+            `group_pierces` are 0 for a clean diagram; `overflow` > 0 means the
+            layout spills off the target box; `score` is the internal judge's
+            lexicographic tuple (lower is better). Inspect these and iterate on
+            STRUCTURE (not coordinates) when defects remain.
+    """
+    import json
+    from sdpm.layout.render import render_architecture
+
+    try:
+        tree = json.loads(spec)
+    except (json.JSONDecodeError, TypeError) as e:
+        return {"error": f"Invalid diagram spec JSON: {e}"}
+    return render_architecture(
+        tree, x=x, y=y, width=width, height=height, theme=theme,
+        include_metrics=True,
+    )
+
+
 def pptx_to_json(pptx_path: str) -> dict[str, Any]:
     """Convert an existing PPTX file to JSON representation.
 

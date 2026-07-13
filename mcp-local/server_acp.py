@@ -52,6 +52,7 @@ mcp.tool()(tools.list_guides)
 mcp.tool()(tools.read_guides)
 mcp.tool()(tools.code_to_slide)
 mcp.tool()(tools.grid)
+mcp.tool()(tools.arch_diagram)
 mcp.tool()(tools.pptx_to_json)
 
 # Sandbox tools (shared)
