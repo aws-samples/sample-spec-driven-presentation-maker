@@ -40,12 +40,28 @@ class _SigV4Transport(httpx.AsyncBaseTransport):
 
 
 def mantle_model(model_id: str, region: str = "us-east-1"):
-    """Create a Strands OpenAIModel pointing at bedrock-mantle with SigV4 auth.
+    """Create a Strands model pointing at bedrock-mantle with AWS-native auth.
+
+    Models that only support the Responses API (see
+    ``model_profiles.MANTLE_RESPONSES_MODELS``, e.g. GPT-5.6 Terra/Luna) use
+    Strands' native ``OpenAIResponsesModel`` with ``bedrock_mantle_config``
+    (bearer token minted per request). All other models use the legacy
+    Chat Completions path with a SigV4-signed httpx transport.
 
     Usage:
         from mantle_client import mantle_model
         model = mantle_model("openai.gpt-5.4", region="us-east-1")
     """
+    from model_profiles import MANTLE_RESPONSES_MODELS
+
+    if model_id in MANTLE_RESPONSES_MODELS:
+        from strands.models.openai_responses import OpenAIResponsesModel
+
+        return OpenAIResponsesModel(
+            bedrock_mantle_config={"region": region},
+            model_id=model_id,
+        )
+
     from strands.models.openai import OpenAIModel
 
     class _MantleOpenAIModel(OpenAIModel):

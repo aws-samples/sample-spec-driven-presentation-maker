@@ -109,6 +109,14 @@ MANTLE_MODELS: dict[str, list[str]] = {
     "openai.gpt-5.4": ["us-east-1", "us-east-2", "us-west-2"],
 }
 
+# Mantle models that only support the Responses API (no Chat Completions).
+# GPT-5.6 model cards: Responses ✅ / Chat Completions ❌ — calling
+# /chat/completions returns 400 Bad Request.
+MANTLE_RESPONSES_MODELS: set[str] = {
+    "openai.gpt-5.6-terra",
+    "openai.gpt-5.6-luna",
+}
+
 
 def resolve_mantle_region(model_id: str, deploy_region: str | None = None) -> str:
     """Resolve the best mantle region for a model.
