@@ -65,10 +65,12 @@ export class AgentStack extends cdk.Stack {
         resources: ["*"],
       })
     );
-    // bedrock-mantle (OpenAI-compatible endpoint) for models like GPT-5.4/5.5
+    // bedrock-mantle (OpenAI-compatible endpoint) for models like GPT-5.4/5.5/5.6.
+    // CreateInference: legacy SigV4 path (Chat Completions).
+    // CallWithBearerToken: Responses API path (bearer token, e.g. GPT-5.6 Terra/Luna).
     role.addToPolicy(
       new iam.PolicyStatement({
-        actions: ["bedrock-mantle:CreateInference"],
+        actions: ["bedrock-mantle:CreateInference", "bedrock-mantle:CallWithBearerToken"],
         resources: ["*"],
       })
     );
