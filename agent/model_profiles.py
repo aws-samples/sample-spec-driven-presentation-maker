@@ -154,7 +154,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     "us.amazon.nova-2-lite-v1:0": NOVA_2_DEFAULT,
     # OpenAI GPT (bedrock-mantle)
     "openai.gpt-5.6-terra": GPT_DEFAULT,
-    "openai.gpt-5.6-luna": GPT_DEFAULT,  # compose enabled for feasibility testing
+    "openai.gpt-5.6-luna": GPT_FAST,  # feasibility-tested 2026-07-14: insufficient for compose
     "openai.gpt-5.5": GPT_DEFAULT,
     "openai.gpt-5.4": GPT_DEFAULT,
 }
