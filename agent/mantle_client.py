@@ -43,7 +43,7 @@ def mantle_model(model_id: str, region: str = "us-east-1"):
     """Create a Strands model pointing at bedrock-mantle with AWS-native auth.
 
     Models that only support the Responses API (see
-    ``model_profiles.MANTLE_RESPONSES_MODELS``, e.g. GPT-5.6 Terra/Luna) use
+    ``model_profiles.MANTLE_RESPONSES_MODELS``, e.g. GPT-5.6 Terra) use
     Strands' native ``OpenAIResponsesModel`` with ``bedrock_mantle_config``
     (bearer token minted per request). All other models use the legacy
     Chat Completions path with a SigV4-signed httpx transport.

@@ -43,7 +43,6 @@ model:
     - "global.anthropic.claude-haiku-4-5-20251001-v1:0"
     - "us.amazon.nova-2-lite-v1:0"
     - "openai.gpt-5.6-terra"                         # bedrock-mantle (us-east-1, us-east-2, us-west-2)
-    - "openai.gpt-5.6-luna"                          # bedrock-mantle (us-east-1, us-east-2, us-west-2), chat only
     - "openai.gpt-5.5"                               # bedrock-mantle (us-east-1, us-east-2)
     - "openai.gpt-5.4"                               # bedrock-mantle (us-east-1, us-east-2, us-west-2)
 
