@@ -12,14 +12,13 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { SlidePreview } from "@/services/deckService"
 import type { SpecFiles } from "@/services/deckService"
-import { Download, Layers, Loader2, LayoutGrid, Rows3, FolderOpen } from "lucide-react"
-import { useAuth } from "@/hooks/useAuth"
+import { Download, Layers, LayoutGrid, Rows3, FolderOpen } from "lucide-react"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
-import { CloudOnly, LocalOnly, IS_LOCAL } from "@/lib/mode"
+import { IS_LOCAL } from "@/lib/mode"
 import { notifyError } from "@/lib/errors"
 import { useTranslations } from "next-intl"
 
@@ -57,12 +56,9 @@ interface SlideCarouselProps {
 export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken }: SlideCarouselProps) {
   const t = useTranslations("carousel")
   const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
-  // eslint-disable-next-line no-console
   const slugs = slides.map(s => s.slug)
-  // eslint-disable-next-line no-console
   if (new Set(slugs).size !== slugs.length) console.warn("[SlideCarousel] duplicate slugs:", slugs)
   // Check compose URL duplicates across different slugs
-  // eslint-disable-next-line no-console
   const urlBySlug: Record<string,string> = {}
   const dupUrls: string[] = []
   for (const s of slidesWithPreview) {
@@ -70,9 +66,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     if (u && Object.values(urlBySlug).includes(u)) dupUrls.push(`${s.slug}→${u}`)
     if (u) urlBySlug[s.slug] = u
   }
-  // eslint-disable-next-line no-console
   if (dupUrls.length) console.warn("[SlideCarousel] same composeUrl used for multiple slides:", dupUrls, urlBySlug)
-  const auth = useAuth()
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
 
