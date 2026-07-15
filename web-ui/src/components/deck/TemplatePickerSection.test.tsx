@@ -78,7 +78,7 @@ describe("TemplatePickerSection", () => {
     ])
   })
 
-  it("marks the confirmed template with data-current and orders it first", async () => {
+  it("marks the confirmed template with data-current without reordering", async () => {
     renderWithIntl(
       <TemplatePickerSection idToken="tok" currentTemplate="corporate.pptx" onTemplateSelect={() => {}} />
     )
@@ -87,8 +87,13 @@ describe("TemplatePickerSection", () => {
       const card = screen.getByRole("button", { name: "Use the corporate template" })
       expect(card.getAttribute("data-current")).toBe("true")
     })
+    // Order stays user → builtin — the current card does NOT jump to the front
     const names = screen.getAllByRole("button").map((c) => c.getAttribute("aria-label"))
-    expect(names[0]).toBe("Use the corporate template")
+    expect(names).toEqual([
+      "Use the my-brand template",
+      "Use the builtin-a template",
+      "Use the corporate template",
+    ])
     // Header shows the labelled current template name
     expect(screen.getByText("In use: corporate")).toBeTruthy()
   })

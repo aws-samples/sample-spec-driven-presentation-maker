@@ -63,10 +63,11 @@ export function TemplatePickerSection({ idToken, currentTemplate, onTemplateSele
     pulseTimerRef.current = setTimeout(() => setPulsing(null), PULSE_MS)
   }
 
-  // Order: current → user (custom) → builtin. Sort is stable, so the
-  // original API order is preserved within each group.
-  const rank = (tpl: TemplateEntry) =>
-    tpl.name === current ? 0 : tpl.source === "user" ? 1 : 2
+  // Order: user (custom) → builtin. Stable sort preserves the API order
+  // within each group. Deliberately NOT current-first: reordering on
+  // confirmation breaks spatial memory — the check icon, accent border,
+  // and header label are the current-template indicators instead.
+  const rank = (tpl: TemplateEntry) => (tpl.source === "user" ? 0 : 1)
   const sorted = [...templates].sort((a, b) => rank(a) - rank(b))
 
   return (
