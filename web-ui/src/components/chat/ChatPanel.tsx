@@ -486,7 +486,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               className="flex items-center gap-1 text-[11px] text-foreground-muted hover:text-foreground transition-colors py-1"
             >
               <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${optionsOpen ? "rotate-90" : ""}`} />
-              Options
+              {t("options")}
             </button>
             {optionsOpen && (
               <div className="flex flex-col gap-2 pb-2 pl-1">
@@ -494,8 +494,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
                   bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
                   <div className="flex flex-col gap-0.5 min-w-0">
-                    <span className="text-xs text-foreground-secondary font-medium select-none">Fetch web images</span>
-                    <span className="text-[11px] text-foreground-muted select-none leading-snug">Include images from websites in presentations</span>
+                    <span className="text-xs text-foreground-secondary font-medium select-none">{t("fetchWebImages")}</span>
+                    <span className="text-[11px] text-foreground-muted select-none leading-snug">{t("fetchWebImagesDescription")}</span>
                   </div>
                   <button
                     type="button"
@@ -517,13 +517,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
                   <div className="flex flex-col gap-0.5 min-w-0">
                     <span className="text-xs text-foreground-secondary font-medium select-none flex items-center gap-2">
-                      Parallel agents
+                      {t("parallelAgents")}
                       <span className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-semibold tracking-wide
                         bg-brand-amber-soft text-brand-amber border border-brand-amber/25">
-                        🧪 Experimental
+                        {t("experimental")}
                       </span>
                     </span>
-                    <span className="text-[11px] text-foreground-muted select-none leading-snug">Multiple composer agents generate slides in parallel</span>
+                    <span className="text-[11px] text-foreground-muted select-none leading-snug">{t("parallelAgentsDescription")}</span>
                   </div>
                   <button
                     type="button"

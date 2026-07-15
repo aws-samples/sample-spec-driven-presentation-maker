@@ -146,7 +146,13 @@
     "forceStop": "強制停止 — 進行中のレポートが失われる可能性があります",
     "mentionSuggestions": "メンション候補",
     "errorSwitchModel": "モデルを切り替えられませんでした",
-    "slidePreview": "スライドプレビュー"
+    "slidePreview": "スライドプレビュー",
+    "options": "オプション",
+    "fetchWebImages": "Web 画像を取得",
+    "fetchWebImagesDescription": "Web サイトの画像をプレゼンテーションに取り込みます",
+    "parallelAgents": "エージェント並列実行",
+    "experimental": "🧪 実験的機能",
+    "parallelAgentsDescription": "複数のコンポーザーエージェントがスライドを並列生成します"
   },
   "snippet": {
     "title": "テキストスニペット",

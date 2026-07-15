@@ -146,7 +146,13 @@
     "forceStop": "Force stop — partial report may be lost",
     "mentionSuggestions": "Mention suggestions",
     "errorSwitchModel": "Failed to switch model",
-    "slidePreview": "Slide preview"
+    "slidePreview": "Slide preview",
+    "options": "Options",
+    "fetchWebImages": "Fetch web images",
+    "fetchWebImagesDescription": "Include images from websites in presentations",
+    "parallelAgents": "Parallel agents",
+    "experimental": "🧪 Experimental",
+    "parallelAgentsDescription": "Multiple composer agents generate slides in parallel"
   },
   "snippet": {
     "title": "Text Snippet",
