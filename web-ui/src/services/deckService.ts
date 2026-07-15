@@ -38,6 +38,8 @@ export interface DeckDetail {
   name: string
   slideOrder: string[]
   slides: SlidePreview[]
+  /** Confirmed template from deck.json (e.g. "corporate.pptx"), null when unconfirmed. */
+  template?: string | null
   defsUrl?: string | null
   pptxUrl: string | null
   specs?: SpecFiles | null

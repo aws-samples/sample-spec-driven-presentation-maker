@@ -4,8 +4,10 @@
  * SpecMarkdownPreview — Renders spec markdown content with editorial styling.
  * Outline uses the dedicated OutlineView timeline component.
  * Brief uses react-markdown with HEX color swatches.
- * Art Direction renders HTML via sandboxed iframe with an inline
- * style gallery (gallery → preview → result states).
+ * Art Direction renders a persistent template picker section (header-like,
+ * non-sticky) above an inline style gallery (gallery → preview → result
+ * states). Both sections share one scroll container but keep independent
+ * display states.
  *
  * @param props.content - Markdown or HTML string to render
  * @param props.specName - Name of the spec (for empty state)
@@ -23,6 +25,7 @@ import { fetchStyles, fetchStyleHtml, pinStyle, type StyleEntry } from "@/servic
 import { OutlineView } from "./OutlineView"
 import { StyleSlidePreview } from "@/components/StyleSlidePreview"
 import { StyleCard } from "./StyleCard"
+import { TemplatePickerSection } from "./TemplatePickerSection"
 import { BriefWaiting, OutlineWaiting, ArtDirectionWaiting } from "./SpecWaiting"
 import { useTranslations } from "next-intl"
 
@@ -86,7 +89,7 @@ const specComponents = {
   },
 }
 
-export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, idToken }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; idToken?: string }) {
+export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, onTemplateSelect, currentTemplate, idToken }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; onTemplateSelect?: (name: string, isChange: boolean) => void; currentTemplate?: string | null; idToken?: string }) {
   const t = useTranslations("stylePicker")
   // Hooks must be called unconditionally — before any early returns.
 
@@ -169,11 +172,22 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     return <div className="content-enter flex-1"><OutlineView content={content} /></div>
   }
 
-  // Art Direction: 3-state inline view
+  // Art Direction: template section (persistent) + style section (3-state)
+  // sharing one scroll container. The template picker is header-like and
+  // independent of the style state machine — it stays visible in all states.
   if (specKey === "artDirection") {
+    const wrap = (body: React.ReactNode) => (
+      <div ref={galleryContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
+        {onTemplateSelect && (
+          <TemplatePickerSection idToken={idToken} currentTemplate={currentTemplate} onTemplateSelect={onTemplateSelect} />
+        )}
+        <div className="flex-1 flex flex-col min-h-0">{body}</div>
+      </div>
+    )
+
     // Waiting state (no content, not browsing styles)
     if (!content && adMode === "result") {
-      return (
+      return wrap(
         <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
           <ArtDirectionWaiting />
         </div>
@@ -199,8 +213,8 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
       const hasPins = pinnedStyles.length > 0
       const unpinnedStyles = styles.filter(s => !s.pinned)
 
-      return (
-        <div ref={galleryContainerRef} className="flex-1 overflow-y-auto">
+      return wrap(
+        <div>
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
             <div>
@@ -283,8 +297,8 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
         else { setPreview(null); setAdMode("gallery") }
       }
 
-      return (
-        <div className="flex-1 overflow-y-auto">
+      return wrap(
+        <div>
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
             <div className="flex items-center gap-3">
@@ -324,8 +338,8 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     }
 
     // RESULT state (default when content exists)
-    return (
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+    return wrap(
+      <div>
         {onStyleSelect && (
           <div className="flex justify-end px-4 py-2">
             <button
