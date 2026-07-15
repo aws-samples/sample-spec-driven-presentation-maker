@@ -193,6 +193,7 @@ export function stripPrefix(n: string): string {
 }
 
 export function ToolCard({ name, input, status, result, isActive = false, streamMessages, deckSlugs, toolUseId, sessionId, idToken, accessToken }: ToolCardProps) {
+  const t = useTranslations("tools")
   // Dispatch: compose_slides has a dedicated rich card.
   if (name === "compose_slides" || name.endsWith("_compose_slides")) {
     return (
@@ -210,7 +211,6 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
     )
   }
 
-  const t = useTranslations("tools")
   const meta = TOOL_META[stripPrefix(name)] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
   const label = t.has(stripPrefix(name)) ? t(stripPrefix(name)) : meta.label
   const isError = status === "error"
