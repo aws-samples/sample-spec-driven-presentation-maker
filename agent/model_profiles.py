@@ -99,8 +99,16 @@ _DEFAULT = CLAUDE_STANDARD
 # Models served via bedrock-mantle (OpenAI-compatible endpoint, not Converse API).
 # model_id → list of supported regions (first entry is the fallback).
 MANTLE_MODELS: dict[str, list[str]] = {
+    "openai.gpt-5.6-terra": ["us-east-1", "us-east-2", "us-west-2"],
     "openai.gpt-5.5": ["us-east-1", "us-east-2"],
     "openai.gpt-5.4": ["us-east-1", "us-east-2", "us-west-2"],
+}
+
+# Mantle models that only support the Responses API (no Chat Completions).
+# GPT-5.6 model cards: Responses ✅ / Chat Completions ❌ — calling
+# /chat/completions returns 400 Bad Request.
+MANTLE_RESPONSES_MODELS: set[str] = {
+    "openai.gpt-5.6-terra",
 }
 
 
@@ -136,6 +144,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     # Amazon Nova
     "us.amazon.nova-2-lite-v1:0": NOVA_2_DEFAULT,
     # OpenAI GPT (bedrock-mantle)
+    "openai.gpt-5.6-terra": GPT_DEFAULT,
     "openai.gpt-5.5": GPT_DEFAULT,
     "openai.gpt-5.4": GPT_DEFAULT,
 }

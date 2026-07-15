@@ -34,7 +34,7 @@ uv run python3 scripts/pptx_builder.py examples components/all
 uv run python3 scripts/pptx_builder.py examples patterns
 ```
 
-**Reminder:** Read relevant guides as needed. When a slide contains a chart, read the corresponding guide (`guides chart-bar`, `guides chart-line`, or `guides chart-pie`) before building elements.
+**Reminder:** Read relevant guides as needed before building elements. When a slide contains a chart, read the corresponding guide (`guides chart-bar`, `guides chart-line`, or `guides chart-pie`). When a slide is an **architecture / system / flow diagram** (anything you'd describe as "what connects to what"), read `guides arch-layout-engine` and build it with the layout engine (the `arch_diagram` MCP tool, or `pptx_builder.py layout`) — it auto-routes the arrows and minimizes crossings, so you never hand-place icon/arrow coordinates. Only fall back to hand-placement (`guides arch-elements`) for fine-tuning or non-flow art.
 
 Slides that share a label prefix in the outline share a visual base — use override (inheritance) to build them. The base slide carries the common elements; each derived slide adds or highlights its part. Slide transitions between them create animation effects.
 

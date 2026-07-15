@@ -50,6 +50,10 @@ export const MODEL_METADATA: Record<string, ModelMetadata> = {
     composable: false,
   },
   // --- OpenAI GPT ---
+  "openai.gpt-5.6-terra": {
+    displayName: "GPT-5.6 Terra",
+    description: "Balanced performance competitive with GPT-5.5 at half the cost",
+  },
   "openai.gpt-5.5": {
     displayName: "GPT-5.5",
     description: "OpenAI's most capable model, advanced coding and agentic tasks",

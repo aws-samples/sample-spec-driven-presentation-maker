@@ -369,18 +369,36 @@ Audience: Developers
                             cmd_png = ["pdftoppm", "-png", "-scale-to", "1280", str(pdf_path), str(png_outdir / "page")]
                             subprocess.run(cmd_png, capture_output=True, text=True, stdin=subprocess.DEVNULL)
 
+                            # pdftoppm zero-pads the page number to the width of
+                            # the largest page index, so a 1-9 page export is
+                            # "page-1.png" (no padding), 10-99 is "page-01.png",
+                            # etc. Try every plausible width instead of assuming
+                            # one — the old code only tried 6/2/3 and silently
+                            # produced an empty preview list for <10-page decks.
                             filtered_previews = []
+                            missing = []
                             for idx_p, slug in enumerate(pptx_slugs):
-                                src_png = png_outdir / f"page-{idx_p + 1:06d}.png"
-                                if not src_png.exists():
-                                    src_png = png_outdir / f"page-{idx_p + 1:02d}.png"
-                                if not src_png.exists():
-                                    src_png = png_outdir / f"page-{idx_p + 1:03d}.png"
-                                if src_png.exists():
+                                n_p = idx_p + 1
+                                src_png = None
+                                for width in (1, 2, 3, 4, 6):
+                                    cand = png_outdir / f"page-{n_p:0{width}d}.png"
+                                    if cand.exists():
+                                        src_png = cand
+                                        break
+                                if src_png:
                                     dst = preview_dir / f"{slug}.png"
                                     shutil.copy2(src_png, dst)
                                     filtered_previews.append(str(dst))
+                                else:
+                                    missing.append(slug)
                             result["preview_files"] = filtered_previews
+                            if missing:
+                                # Surface the silent gap instead of returning [].
+                                produced = sorted(p.name for p in png_outdir.glob("*.png"))
+                                result["preview_error"] = (
+                                    f"No PNG matched slugs {missing}; "
+                                    f"pdftoppm produced {produced}"
+                                )
                     except Exception as e:
                         result["preview_error"] = str(e)
 

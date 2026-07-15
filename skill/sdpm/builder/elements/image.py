@@ -9,10 +9,34 @@ from sdpm.schema.defaults import ELEMENT_DEFAULTS
 from sdpm.utils.image import resolve_image_path, apply_image_effects
 from sdpm.utils.effects import apply_effects
 from sdpm.utils.svg import _recolor_svg, get_svg_dimensions, generate_qr_svg, add_svg_to_slide
-from sdpm.utils.text import _expand_styled_newlines
+from sdpm.utils.text import _expand_styled_newlines, parse_styled_text
 from sdpm.assets import is_recolor_protected
 
 _DEFAULTS = ELEMENT_DEFAULTS["image"]
+
+
+def _plain_label_text(line: str) -> str:
+    """Return a label line's visible text with any {{...:text}} style markup
+    stripped, for width estimation."""
+    try:
+        return "".join(seg.get("text", "") for seg in parse_styled_text(line))
+    except Exception:
+        return line
+
+
+def _label_line_em(line: str) -> float:
+    """Return a label line's estimated display width in em at the label font
+    size. Latin/half-width glyphs count as 0.85em (calibrated against
+    PowerPoint's rendering, see the call site); East Asian wide/fullwidth
+    glyphs (CJK) are square, so they count as 1.05em — a plain character
+    count would under-size Japanese labels and re-introduce the one-glyph-
+    per-line wrapping this box is sized to prevent. Style markup
+    ({{...:text}}) is stripped first."""
+    import unicodedata
+
+    text = _plain_label_text(line)
+    return sum(1.05 if unicodedata.east_asian_width(ch) in ("W", "F") else 0.85
+               for ch in text)
 
 class ImageMixin:
     """Mixin providing image element methods."""
@@ -241,9 +265,27 @@ class ImageMixin:
             # Scale margin proportionally to icon size (base: 4% of height)
             label_margin = int(height * 0.04)
             if label_pos == "bottom":
-                lbl_x = x
+                # The label box must be WIDER than the icon, or a caption like
+                # "Cognito" wraps one glyph per line ("Co / gni / to") inside a
+                # 60px icon-width box even with word_wrap off. Size the box to the
+                # longest label line and center it on the icon, so the caption
+                # stays a single readable line that overhangs the icon evenly.
+                _lbl_lines = _expand_styled_newlines(label.replace("\\n", "\n")).split("\n")
+                _max_em = max(
+                    (_label_line_em(ln) for ln in _lbl_lines), default=0.0)
+                # Width per glyph at the label font size. PowerPoint renders
+                # wider than a naive em estimate (kerning + internal box
+                # margins), so _label_line_em uses ~0.85em for Latin and
+                # ~1.05em for CJK fullwidth glyphs, plus generous padding —
+                # a box even slightly too narrow wraps mid-word. Overhang past
+                # the icon is harmless (labels are centered and the engine
+                # leaves margin); a too-narrow box is not.
+                _text_w_px = int(_max_em * label_size) + 16
+                _icon_w_px = width_pct or 60
+                lbl_w_px = max(_icon_w_px, _text_w_px)
+                lbl_w = self._px_to_emu(lbl_w_px)
+                lbl_x = x + width // 2 - lbl_w // 2
                 lbl_y = y + height + label_margin
-                lbl_w = width
             elif label_pos == "right":
                 lbl_x = x + width + label_margin * 2
                 lbl_y = y + height // 3
