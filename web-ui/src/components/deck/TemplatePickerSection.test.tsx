@@ -99,8 +99,8 @@ describe("TemplatePickerSection", () => {
     })
     const names = screen.getAllByRole("button").map((c) => c.getAttribute("aria-label"))
     expect(names[0]).toBe("Use the corporate template")
-    // Header shows the current template name (in addition to the card name)
-    expect(screen.getAllByText("corporate")).toHaveLength(2)
+    // Header shows the labelled current template name
+    expect(screen.getByText("In use: corporate")).toBeTruthy()
   })
 
   it("calls onTemplateSelect with isChange=false when unconfirmed", async () => {

@@ -15,7 +15,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Plus } from "lucide-react"
+import { Plus, Check } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { fetchTemplates, type TemplateEntry } from "@/services/deckService"
 import { useCurrentTemplate } from "@/hooks/useCurrentTemplate"
@@ -66,7 +66,12 @@ export function TemplatePickerSection({ idToken, defsUrl, onTemplateSelect }: {
     <section className="px-6 pt-4 pb-4 border-b border-white/[0.06]">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">{t("sectionTitle")}</h3>
-        {current && <span className="text-xs text-foreground-muted">{current}</span>}
+        {current && (
+          <span className="inline-flex items-center gap-1 text-xs text-brand-teal/90">
+            <Check className="h-3 w-3" aria-hidden="true" />
+            {t("currentLabel", { name: current })}
+          </span>
+        )}
       </div>
       {loading ? (
         <div className="flex gap-3">
@@ -113,8 +118,10 @@ function TemplatePickCard({ template, isCurrent, pulsing, onClick }: {
       title={tooltip}
       aria-label={t("useTemplateAria", { name: template.name })}
       data-current={isCurrent || undefined}
-      className={`group relative w-[180px] shrink-0 rounded-xl border text-left overflow-hidden bg-white/[0.02] transition-all duration-200 cursor-pointer ${
-        isCurrent ? "border-brand-teal/60" : "border-white/[0.06] hover:border-white/[0.16]"
+      className={`group relative w-[180px] shrink-0 rounded-xl border text-left overflow-hidden transition-all duration-200 cursor-pointer ${
+        isCurrent
+          ? "border-brand-teal ring-1 ring-brand-teal/50 bg-brand-teal/[0.06]"
+          : "border-white/[0.06] hover:border-white/[0.16] bg-white/[0.02]"
       } ${pulsing ? "ring-2 ring-brand-teal/50" : ""}`}
     >
       {/* Theme strip — background + text color identity + palette */}
@@ -135,7 +142,8 @@ function TemplatePickCard({ template, isCurrent, pulsing, onClick }: {
       </div>
       {/* Name row */}
       <div className="px-2.5 py-2 flex items-center gap-1.5">
-        <span className="text-xs font-medium truncate">{template.name}</span>
+        {isCurrent && <Check className="h-3 w-3 text-brand-teal shrink-0" aria-hidden="true" />}
+        <span className={`text-xs font-medium truncate ${isCurrent ? "text-brand-teal" : ""}`}>{template.name}</span>
         {template.source === "user" && (
           <span className="text-[11px] text-brand-teal/70 font-medium shrink-0">{t("custom")}</span>
         )}

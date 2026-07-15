@@ -412,6 +412,7 @@
     "sectionTitle": "テンプレート",
     "useTemplate": "このテンプレートを使う",
     "useTemplateAria": "テンプレート {name} を使う",
+    "currentLabel": "使用中: {name}",
     "custom": "カスタム"
   }
 }

@@ -412,6 +412,7 @@
     "sectionTitle": "Template",
     "useTemplate": "Use this template",
     "useTemplateAria": "Use the {name} template",
+    "currentLabel": "In use: {name}",
     "custom": "Custom"
   }
 }
