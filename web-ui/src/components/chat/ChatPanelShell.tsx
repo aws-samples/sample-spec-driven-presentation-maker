@@ -29,6 +29,7 @@ import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
 import { IS_LOCAL } from "@/lib/mode"
 import { notifyError } from "@/lib/errors"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
+import { useTranslations } from "next-intl"
 
 export type ChatTabKey = "new" | "deck"
 
@@ -59,6 +60,7 @@ export function ChatPanelShell({
   deckId, deckName, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, chatRef: externalChatRef,
   inline = false,
 }: ChatPanelShellProps) {
+  const t = useTranslations("chatShell")
   const internalChatRef = useRef<ChatPanelHandle>(null)
   const chatRef = externalChatRef || internalChatRef
   const panelRef = useRef<HTMLElement>(null)
@@ -158,7 +160,7 @@ export function ChatPanelShell({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ newChat: true }),
-    }).catch((err) => notifyError("Failed to reset agent session", err))
+    }).catch((err) => notifyError(t("errorResetSession"), err))
     if (chatTab === "new" || panelAOwnsCurrentDeck) {
       setPanelAKey((k) => k + 1)
       setPanelADeckId(null)
@@ -200,7 +202,7 @@ export function ChatPanelShell({
   const panelBVisible = chatTab === "deck" && showPanelB
 
   // Tab label for Panel A
-  const panelALabel = panelAOwnsCurrentDeck ? (deckName || "Deck") : "New"
+  const panelALabel = panelAOwnsCurrentDeck ? (deckName || t("deck")) : t("new")
 
   const chatContent = (
     <ErrorBoundary label="Chat">
@@ -262,7 +264,7 @@ export function ChatPanelShell({
           onMouseDown={handleResizeStart}
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize chat panel"
+          aria-label={t("resizePanel")}
         />
         {/* Inner — overflow:hidden clips during close, min-width prevents text reflow */}
         <div
@@ -281,21 +283,21 @@ export function ChatPanelShell({
               <div className="w-5 h-5 rounded-md flex items-center justify-center bg-brand-teal-soft">
                 <MessageSquare className="h-2.5 w-2.5 text-brand-teal" />
               </div>
-              <span className="text-sm font-semibold tracking-[-0.01em]">Chat</span>
+              <span className="text-sm font-semibold tracking-[-0.01em]">{t("chat")}</span>
             </div>
             <div className="flex items-center gap-0.5">
               <button
                 onClick={handleNewChat}
-                title="New chat"
+                title={t("newChat")}
                 className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-background-hover transition-all"
-                aria-label="Start new chat"
+                aria-label={t("startNewChat")}
               >
                 <SquarePen className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-background-hover transition-all"
-                aria-label="Close chat panel"
+                aria-label={t("closePanel")}
               >
                 <PanelRightClose className="h-4 w-4" />
               </button>
@@ -332,7 +334,7 @@ export function ChatPanelShell({
                 }`}
               >
                 <Layers className="h-3 w-3 flex-none" />
-                <span className="truncate">{deckName || "Deck"}</span>
+                <span className="truncate">{deckName || t("deck")}</span>
               </button>
             )}
           </div>

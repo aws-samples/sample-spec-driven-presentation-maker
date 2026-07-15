@@ -13,6 +13,7 @@
 "use client"
 
 import { Check, AlertCircle } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 export interface McpServerStatus {
   name: string
@@ -37,6 +38,7 @@ const ERR_COLOR = {
 }
 
 export function McpStatusBar({ servers }: McpStatusBarProps) {
+  const t = useTranslations("mcp")
   if (!servers || servers.length === 0) return null
 
   const okServers = servers.filter((s) => s.status === "ok")
@@ -53,7 +55,7 @@ export function McpStatusBar({ servers }: McpStatusBarProps) {
             boxShadow: `inset 0 0 0 1px ${OK_COLOR.border}`,
           }}
           role="status"
-          aria-label={`Connected: ${okServers.map((s) => s.name).join(", ")}`}
+          aria-label={t("connected", { names: okServers.map((s) => s.name).join(", ") })}
         >
           <div
             className="flex-none w-5 h-5 rounded-md flex items-center justify-center"
@@ -77,7 +79,7 @@ export function McpStatusBar({ servers }: McpStatusBarProps) {
             boxShadow: `inset 0 0 0 1px ${ERR_COLOR.border}`,
           }}
           role="alert"
-          aria-label={`Unavailable: ${server.name}`}
+          aria-label={t("unavailable", { name: server.name })}
         >
           <div
             className="flex-none w-5 h-5 rounded-md flex items-center justify-center"

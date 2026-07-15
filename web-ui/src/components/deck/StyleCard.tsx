@@ -12,8 +12,10 @@
 import { useEffect, useRef, useState } from "react"
 import { Star } from "lucide-react"
 import type { StyleEntry } from "@/services/deckService"
+import { useTranslations } from "next-intl"
 
 export function StyleCard({ style, index, onClick, onPin }: { style: StyleEntry; index: number; onClick: (name: string) => void; onPin?: (name: string) => void }) {
+  const t = useTranslations("stylePicker")
   const iframeWidth = 1920
   const iframeHeight = 1080
   const cardRef = useRef<HTMLDivElement>(null)
@@ -46,7 +48,7 @@ export function StyleCard({ style, index, onClick, onPin }: { style: StyleEntry;
       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(style.name) } }}
       className="group text-left rounded-xl border border-white/[0.06] overflow-hidden transition-all duration-300 hover:border-brand-teal/30 hover:shadow-[0_0_24px_oklch(0.75_0.14_185/10%)] focus:outline-none focus:ring-2 focus:ring-brand-teal/40 animate-[card-in_0.5s_ease_both] cursor-pointer"
       style={{ animationDelay: `${index * 60}ms` }}
-      aria-label={`Preview ${style.name} style`}
+      aria-label={t("previewStyleAria", { name: style.name })}
     >
       <div className="relative overflow-hidden bg-black/20" style={{ height: iframeHeight * scale }}>
         {style.coverHtml ? (
@@ -80,7 +82,7 @@ export function StyleCard({ style, index, onClick, onPin }: { style: StyleEntry;
                 : "opacity-0 group-hover:opacity-100 bg-black/40 text-white/30 hover:text-white/60"
             }`}
             style={{ transform: bouncing ? "scale(1.3)" : "scale(1)", transition: "transform 300ms ease-out" }}
-            aria-label={style.pinned ? `Unpin ${style.name}` : `Pin ${style.name}`}
+            aria-label={style.pinned ? t("unpinAria", { name: style.name }) : t("pinAria", { name: style.name })}
           >
             <Star className="h-3.5 w-3.5" fill={style.pinned ? "currentColor" : "none"} />
           </button>
@@ -90,7 +92,7 @@ export function StyleCard({ style, index, onClick, onPin }: { style: StyleEntry;
         <div className="flex items-center gap-1.5">
           <p className="text-sm font-medium text-foreground group-hover:text-brand-teal transition-colors truncate">{style.name}</p>
           {style.source === "user" && (
-            <span className="flex-none text-[11px] px-1.5 py-0.5 rounded-full bg-brand-teal/10 text-brand-teal font-medium">Custom</span>
+            <span className="flex-none text-[11px] px-1.5 py-0.5 rounded-full bg-brand-teal/10 text-brand-teal font-medium">{t("custom")}</span>
           )}
         </div>
         {style.description && (

@@ -7,7 +7,7 @@
  * Output: overall + per-agent state for ComposeCard rendering.
  */
 
-import { activityLabel, activityCategory, type ActivityCategory } from "./activityLabel"
+import { activityLabel, activityCategory, type ActivityCategory, type ActivityTranslator } from "./activityLabel"
 
 export interface ComposeActivity {
   toolUseId: string
@@ -46,6 +46,7 @@ interface SlideGroup {
 export function parseComposeState(
   streamMessages: Record<string, unknown>[],
   input?: Record<string, unknown>,
+  t?: ActivityTranslator,
 ): ComposeState {
   const rawGroups = input?.slide_groups
   const slideGroups: SlideGroup[] = Array.isArray(rawGroups)
@@ -138,7 +139,7 @@ export function parseComposeState(
         agent.activity.push({
           toolUseId,
           tool: toolName,
-          label: activityLabel(toolName, inp),
+          label: activityLabel(toolName, inp, t),
           category: activityCategory(toolName),
           status: evStatus === "error" ? "error" : evStatus === "success" ? "success" : "active",
         })
@@ -149,7 +150,7 @@ export function parseComposeState(
         }
         if (inp) {
           // Input arrived after toolStart — refine label from generic placeholder.
-          existing.label = activityLabel(toolName, inp)
+          existing.label = activityLabel(toolName, inp, t)
         }
       }
       // Recover from any non-terminal state on new activity (starting/retrying/error).

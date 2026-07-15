@@ -9,6 +9,7 @@
 "use client"
 
 import { X, FileText, Image as ImageIcon, File, AlignLeft } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 export interface Attachment {
   id: string
@@ -70,6 +71,7 @@ function FileIcon({ type }: { type: string }) {
  * @param props - AttachmentPreviewProps
  */
 export function AttachmentPreview({ attachments, snippets, onRemove, onRemoveSnippet, onEditSnippet }: AttachmentPreviewProps) {
+  const t = useTranslations("attachments")
   const hasItems = attachments.length > 0 || (snippets && snippets.length > 0)
   if (!hasItems) return null
 
@@ -93,7 +95,7 @@ export function AttachmentPreview({ attachments, snippets, onRemove, onRemoveSni
             type="button"
             onClick={() => onRemove(att.id)}
             className="ml-0.5 p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
-            aria-label={`Remove ${att.file.name}`}
+            aria-label={t("removeFile", { name: att.file.name })}
           >
             <X className="h-3 w-3" />
           </button>
@@ -115,7 +117,7 @@ export function AttachmentPreview({ attachments, snippets, onRemove, onRemoveSni
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemoveSnippet?.(snip.id) }}
             className="ml-0.5 p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
-            aria-label="Remove snippet"
+            aria-label={t("removeSnippet")}
           >
             <X className="h-3 w-3" />
           </button>

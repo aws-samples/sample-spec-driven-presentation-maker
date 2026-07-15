@@ -31,6 +31,7 @@ import {
   LayoutTemplate, Package, AlertCircle, Ruler, RefreshCw,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { ComposeCard } from "./compose/ComposeCard"
 import { CAT, type ToolCategory } from "./toolPalette"
 import { basename } from "@/lib/local/pathUtils"
@@ -192,6 +193,7 @@ export function stripPrefix(n: string): string {
 }
 
 export function ToolCard({ name, input, status, result, isActive = false, streamMessages, deckSlugs, toolUseId, sessionId, idToken, accessToken }: ToolCardProps) {
+  const t = useTranslations("tools")
   // Dispatch: compose_slides has a dedicated rich card.
   if (name === "compose_slides" || name.endsWith("_compose_slides")) {
     return (
@@ -210,6 +212,7 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
   }
 
   const meta = TOOL_META[stripPrefix(name)] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
+  const label = t.has(stripPrefix(name)) ? t(stripPrefix(name)) : meta.label
   const isError = status === "error"
   const isComplete = !!status
   const colors = isError ? { ...CAT.other, accent: ERR.accent, bg: ERR.bg, border: ERR.border } : CAT[meta.category]
@@ -225,7 +228,7 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
         boxShadow: isActive ? `0 0 20px ${colors.glow}, inset 0 0 0 1px ${colors.border}` : isComplete ? `inset 0 0 0 1px ${colors.border}` : "inset 0 0 0 1px oklch(1 0 0 / 4%)",
       }}
       role="status"
-      aria-label={`${isActive ? "Running" : isError ? "Failed" : "Completed"}: ${meta.label}${detail ? ` — ${detail}` : ""}${summary ? ` — ${summary}` : ""}`}
+      aria-label={`${isActive ? t("running") : isError ? t("failed") : t("completed")}: ${label}${detail ? ` — ${detail}` : ""}${summary ? ` — ${summary}` : ""}`}
       aria-live={isComplete ? "polite" : undefined}
     >
       {/* Animated gradient border for active state */}
@@ -301,7 +304,7 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
             className="text-xs font-medium tracking-[-0.01em] transition-colors duration-300"
             style={{ color: isActive ? colors.accent : isComplete ? colors.accent : "oklch(0.50 0 0)" }}
           >
-            {meta.label}
+            {label}
           </span>
         </div>
         {/* Detail line: input params or result summary */}
@@ -445,14 +448,16 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
  * @param props.input - Tool input parameters
  */
 export function ToolCardCompact({ name, input }: { name: string; input?: Record<string, unknown> }) {
+  const t = useTranslations("tools")
   const meta = TOOL_META[stripPrefix(name)] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
+  const label = t.has(stripPrefix(name)) ? t(stripPrefix(name)) : meta.label
   const colors = CAT[meta.category]
   const detail = getDetail(name, input)
 
   return (
     <span className="inline-flex items-center gap-1 text-[11px] text-foreground/30 py-0.5">
       <meta.Icon className="h-2.5 w-2.5" style={{ color: `${colors.accent}80` }} />
-      <span>{meta.label}</span>
+      <span>{label}</span>
       {detail && <span className="opacity-60 truncate max-w-[150px]">{detail}</span>}
     </span>
   )

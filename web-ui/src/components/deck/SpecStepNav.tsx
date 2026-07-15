@@ -17,6 +17,7 @@
 
 import { Layers } from "lucide-react"
 import type { SpecFiles } from "@/services/deckService"
+import { useTranslations } from "next-intl"
 
 // Re-exported for existing consumers (SlideCarousel imports both from here).
 export { SpecMarkdownPreview, renderColorSwatches } from "./SpecMarkdownPreview"
@@ -31,6 +32,7 @@ interface StepDef {
   step?: number
 }
 
+// label is the en fallback; display text resolves via specNav.<key>
 const STEPS: StepDef[] = [
   { key: "brief", label: "Brief", step: 1 },
   { key: "outline", label: "Outline", step: 2 },
@@ -46,6 +48,7 @@ interface SpecStepNavProps {
 }
 
 export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecStepNavProps) {
+  const t = useTranslations("specNav")
   /**
    * Check whether a spec tab has content.
    *
@@ -57,7 +60,7 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
   }
 
   return (
-    <nav className="flex items-center gap-1 px-5 py-2 border-b border-border/40" role="tablist" aria-label="Spec phases">
+    <nav className="flex items-center gap-1 px-5 py-2 border-b border-border/40" role="tablist" aria-label={t("specPhases")}>
       {STEPS.map((s, i) => {
         const isSlides = s.key === "slides"
         const active = activeTab === s.key
@@ -111,7 +114,7 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
                 </span>
               )}
 
-              {s.label}
+              {t(s.key)}
 
               {/* Slide count badge */}
               {isSlides && slideCount > 0 && (

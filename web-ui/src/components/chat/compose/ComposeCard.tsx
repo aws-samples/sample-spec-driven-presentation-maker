@@ -14,6 +14,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { useTranslations } from "next-intl"
 import { Package, Check, AlertCircle, RefreshCw, X } from "lucide-react"
 import { parseComposeState, type ComposeState } from "./parseComposeState"
 import { CAT } from "../toolPalette"
@@ -38,10 +39,11 @@ interface ComposeCardProps {
 }
 
 export function ComposeCard({ input, status, result, isActive, streamMessages = [], deckSlugs = [], toolUseId, sessionId, accessToken }: ComposeCardProps) {
+  const t = useTranslations("compose")
   const [stopping, setStopping] = useState(false)
   const state: ComposeState = useMemo(
-    () => parseComposeState(streamMessages, input),
-    [streamMessages, input],
+    () => parseComposeState(streamMessages, input, t),
+    [streamMessages, input, t],
   )
 
   // Parse the final report (the tool's last yield = JSON string). Gives us
@@ -83,7 +85,7 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
 
   return (
     <section
-      aria-label="Composing slides"
+      aria-label={t("composingAria")}
       className="tool-card-enter relative rounded-xl"
       style={{
         background: shellBg,
@@ -124,7 +126,7 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
         <StopSummary notice={report.notice} summaries={report.summaries} />
       )}
       <span className="sr-only" aria-live="polite">
-        {state.doneGroupCount} of {state.totalGroups} agents completed
+        {t("srProgress", { done: state.doneGroupCount, total: state.totalGroups })}
       </span>
     </section>
   )
@@ -148,24 +150,25 @@ function Header({
   onCancel: () => void
   stopping: boolean
 }) {
+  const t = useTranslations("compose")
   const hasAgents = state.totalGroups > 0
   const isFinished = isDone || (hasError && !isActive) || isStopped
   const isStopping = stopping && isActive
   const label = isStopping
-    ? "Stopping — finalizing partial results…"
+    ? t("stopping")
     : isStopped
     ? doneSlides > 0
-      ? `Stopped · ${doneSlides} of ${totalSlides} slides composed`
-      : "Stopped"
+      ? t("stoppedPartial", { done: doneSlides, total: totalSlides })
+      : t("stopped")
     : hasError && !isActive
     ? doneSlides > 0
-      ? `Composed ${doneSlides} of ${totalSlides} slides — some failed`
-      : "Failed to compose slides"
+      ? t("composedPartialFailed", { done: doneSlides, total: totalSlides })
+      : t("failed")
     : isDone
-    ? `Composed ${totalSlides || state.totalGroups} slides`
+    ? t("composed", { count: totalSlides || state.totalGroups })
     : hasAgents
-    ? `Composing ${totalSlides} slides · ${state.totalGroups} agents in parallel`
-    : state.statusMessage || "Preparing…"
+    ? t("composing", { slides: totalSlides, agents: state.totalGroups })
+    : state.statusMessage || t("preparing")
 
   const accent = hasError
     ? STATE.error
@@ -210,32 +213,32 @@ function Header({
         <span
           className="flex-none inline-flex items-center rounded-md px-1.5 py-0.5 text-[10.5px] font-medium"
           style={{ color: STATE.retry, background: `${STATE.retry}14`, fontFamily: MONO }}
-          title={`${rushedCount} composer${rushedCount > 1 ? "s" : ""} hit the time budget — rough drafts may need another pass`}
+          title={t("rushedBadgeTitle", { count: rushedCount })}
         >
-          {rushedCount} rushed
+          {t("rushedBadge", { count: rushedCount })}
         </span>
       )}
       {isStopping ? (
         <span
           className="flex-none inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium"
           style={{ color: accent, background: `${accent}14` }}
-          aria-label="Cancel requested, stopping"
+          aria-label={t("cancelRequestedAria")}
         >
           <RefreshCw
             className="h-3 w-3"
             style={{ animation: "tool-spinner 1.2s linear infinite" }}
           />
-          Stopping…
+          {t("stoppingShort")}
         </span>
       ) : canCancel ? (
         <button
           type="button"
           onClick={onCancel}
           className="flex-none inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-foreground/70 hover:text-foreground/95 hover:bg-white/5 transition-colors"
-          aria-label="Cancel compose slides"
+          aria-label={t("cancelAria")}
         >
           <X className="h-3 w-3" />
-          Cancel
+          {t("cancel")}
         </button>
       ) : null}
     </header>

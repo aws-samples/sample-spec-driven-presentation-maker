@@ -10,6 +10,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { ChevronRight, Check, AlertCircle, RefreshCw, Sparkles } from "lucide-react"
 import type { AgentState } from "./parseComposeState"
 import { CAT } from "../toolPalette"
@@ -25,6 +26,7 @@ interface AgentCardProps {
 }
 
 export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, parentStopped, parentStopping }: AgentCardProps) {
+  const t = useTranslations("compose")
   const [userToggled, setUserToggled] = useState<boolean | null>(null)
   // Default expansion: expand only when the parent compose is finished AND this
   // agent ended in error. Mid-run transient errors (the agent recovers and keeps
@@ -125,7 +127,7 @@ export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, pare
               fontFamily: MONO,
             }}
           >
-            retry {agent.retryAttempt}
+            {t("retryBadge", { count: agent.retryAttempt })}
           </span>
         )}
 
@@ -140,9 +142,9 @@ export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, pare
               background: `${STATE.retry}14`,
               fontFamily: MONO,
             }}
-            title="Time budget reached — this composer wrote a rough draft to finish on time. Consider re-running for these slides."
+            title={t("rushedAgentTitle")}
           >
-            rushed
+            {t("rushedAgent")}
           </span>
         )}
 
@@ -152,7 +154,7 @@ export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, pare
           onClick={() => setUserToggled(!expanded)}
           aria-expanded={expanded}
           aria-controls={detailId}
-          aria-label={expanded ? "Collapse details" : "Expand details"}
+          aria-label={expanded ? t("collapseDetails") : t("expandDetails")}
           className="flex-none w-5 h-5 flex items-center justify-center rounded hover:bg-white/5 transition-colors"
         >
           <ChevronRight
@@ -179,7 +181,7 @@ export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, pare
       <div
         id={detailId}
         role="region"
-        aria-label="Agent details"
+        aria-label={t("agentDetails")}
         className="overflow-hidden transition-all ease-out"
         style={{
           maxHeight: expanded ? "1200px" : "0",
@@ -192,7 +194,7 @@ export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, pare
           style={{ background: C.detailZone }}
         >
           {agent.instruction && (
-            <Section label="Instruction">
+            <Section label={t("instruction")}>
               <div
                 className="text-xs leading-relaxed whitespace-pre-wrap break-words"
                 style={{ color: C.fgLabel }}
@@ -204,7 +206,7 @@ export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, pare
 
           {agent.activity.length > 0 && (
             <Section
-              label={`Activity · ${agent.activity.length} step${agent.activity.length === 1 ? "" : "s"}`}
+              label={t("activitySteps", { count: agent.activity.length })}
             >
               <ActivityTimeline
                 activity={agent.activity}
@@ -244,13 +246,14 @@ function LatestActivityRow({
   isStopped: boolean
   isStoppingInFlight: boolean
 }) {
+  const t = useTranslations("compose")
   // Stopped by user: show static "Stopped" label, no spinner
   if (isStopped) {
     return (
       <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
         <span className="flex-none w-2 h-2 rounded-full" style={{ background: C.fgMuted }} />
         <span className="text-[11.5px] truncate tracking-[-0.005em]" style={{ color: C.fgMuted }}>
-          Stopped
+          {t("stopped")}
         </span>
       </div>
     )
@@ -269,7 +272,7 @@ function LatestActivityRow({
           className="text-[11.5px] truncate tracking-[-0.005em]"
           style={{ color: STATE.retry }}
         >
-          Stopping<span className="thinking-dots" aria-hidden="true" />
+          {t("stoppingBare")}<span className="thinking-dots" aria-hidden="true" />
         </span>
       </div>
     )
@@ -284,7 +287,7 @@ function LatestActivityRow({
           className="text-[11.5px] truncate tracking-[-0.005em]"
           style={{ color: STATE.error }}
         >
-          {agent.errorMsg || "Failed"}
+          {agent.errorMsg || t("agentFailed")}
         </span>
       </div>
     )
@@ -302,7 +305,7 @@ function LatestActivityRow({
           className="text-[11.5px] truncate tracking-[-0.005em]"
           style={{ color: STATE.retry }}
         >
-          {agent.errorMsg || `Retrying (${agent.retryAttempt})`}
+          {agent.errorMsg || t("retrying", { count: agent.retryAttempt })}
         </span>
       </div>
     )
@@ -334,7 +337,7 @@ function LatestActivityRow({
       <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
         <Sparkles className="flex-none h-3 w-3" style={{ color: C.fgDim }} />
         <span className="text-[11.5px] truncate tracking-[-0.005em]" style={{ color: C.fgDim }}>
-          Thinking<span className="thinking-dots" aria-hidden="true" />
+          {t("thinking")}<span className="thinking-dots" aria-hidden="true" />
         </span>
       </div>
     )
@@ -386,6 +389,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 // --- ActivityTimeline ------------------------------------------------------
 
 function ActivityTimeline({ activity, showThinking }: { activity: AgentState["activity"]; showThinking: boolean }) {
+  const t = useTranslations("compose")
   return (
     <ol className="flex flex-col gap-1">
       {activity.map((a) => {
@@ -420,7 +424,7 @@ function ActivityTimeline({ activity, showThinking }: { activity: AgentState["ac
         <li className="flex items-center gap-2">
           <Sparkles className="flex-none h-3 w-3" style={{ color: C.fgDim }} />
           <span className="text-[11.5px] truncate tracking-[-0.005em]" style={{ color: C.fgDim }}>
-            Thinking<span className="thinking-dots" aria-hidden="true" />
+            {t("thinking")}<span className="thinking-dots" aria-hidden="true" />
           </span>
         </li>
       )}

@@ -10,6 +10,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import { useAuth } from "@/hooks/useAuth"
 import { AppShell } from "@/components/AppShell"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
@@ -25,6 +26,8 @@ import {
 import { Download, Trash2, Upload, FileText, Type, LayoutGrid, X } from "lucide-react"
 
 export default function TemplatesPage() {
+  const t = useTranslations("templatesPage")
+  const tCommon = useTranslations("common")
   const auth = useAuth()
   const idToken = auth.user?.id_token
   const [templates, setTemplates] = useState<TemplateEntry[]>([])
@@ -60,9 +63,9 @@ export default function TemplatesPage() {
   }
 
   const handleRename = async (oldName: string, newName: string): Promise<string | null> => {
-    if (!idToken) return "Not authenticated"
-    if (!/^[a-zA-Z0-9_-]+$/.test(newName)) return "Letters, numbers, hyphens, underscores only"
-    if (templates.some(t => t.name === newName)) return "Name already exists"
+    if (!idToken) return t("notAuthenticated")
+    if (!/^[a-zA-Z0-9_-]+$/.test(newName)) return t("renameCharsError")
+    if (templates.some(t => t.name === newName)) return t("nameExists")
     const result = await renameTemplate(oldName, newName, idToken)
     if (result.error) return result.error
     setTemplates(prev => prev.map(t => t.name === oldName ? { ...t, name: newName } : t))
@@ -75,7 +78,7 @@ export default function TemplatesPage() {
     if (result.error) { showToast(result.error, "error"); return }
     setTemplates(prev => prev.filter(t => t.name !== name))
     setDeleteConfirm(null)
-    showToast(`Deleted "${name}"`)
+    showToast(t("deleted", { name }))
   }
 
   const handleUploadComplete = async () => {
@@ -92,8 +95,8 @@ export default function TemplatesPage() {
         {loading ? (
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
             <div className="mb-8">
-              <h1 className="text-xl font-semibold tracking-[-0.02em]">Templates</h1>
-              <p className="text-sm text-foreground-muted mt-1">Manage your PPTX presentation templates</p>
+              <h1 className="text-xl font-semibold tracking-[-0.02em]">{t("title")}</h1>
+              <p className="text-sm text-foreground-muted mt-1">{t("subtitle")}</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[...Array(4)].map((_, i) => (
@@ -105,15 +108,15 @@ export default function TemplatesPage() {
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-xl font-semibold tracking-[-0.02em]">Templates</h1>
-                <p className="text-sm text-foreground-muted mt-1">Manage your PPTX presentation templates</p>
+                <h1 className="text-xl font-semibold tracking-[-0.02em]">{t("title")}</h1>
+                <p className="text-sm text-foreground-muted mt-1">{t("subtitle")}</p>
               </div>
             </div>
 
             <div className="flex flex-col gap-10">
               {/* My Templates */}
               <section>
-                <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-4">My Templates</h2>
+                <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-4">{t("myTemplates")}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {userTemplates.map(t => (
                     <TemplateCard
@@ -131,14 +134,14 @@ export default function TemplatesPage() {
                     onClick={() => setUploadOpen(true)}
                   >
                     <Upload className="h-6 w-6 text-brand-teal/30 group-hover:text-brand-teal/60 transition-colors duration-200" />
-                    <span className="text-xs text-foreground/30 group-hover:text-foreground/60 font-medium transition-colors duration-200">Upload Template</span>
+                    <span className="text-xs text-foreground/30 group-hover:text-foreground/60 font-medium transition-colors duration-200">{t("uploadTemplate")}</span>
                   </button>
                 </div>
               </section>
 
               {/* Built-in Templates */}
               <section>
-                <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-4">Built-in Templates</h2>
+                <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-4">{t("builtinTemplates")}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {builtinTemplates.map(t => (
                     <TemplateCard
@@ -168,9 +171,9 @@ export default function TemplatesPage() {
       <ConfirmDialog
         open={!!deleteConfirm}
         onOpenChange={(open) => { if (!open) setDeleteConfirm(null) }}
-        title="Delete template"
-        description={<>Are you sure you want to delete <span className="font-medium text-foreground">{deleteConfirm}</span>? This cannot be undone.</>}
-        confirmLabel="Delete"
+        title={t("deleteTemplateTitle")}
+        description={<>{t.rich("deleteDescription", { name: () => <span className="font-medium text-foreground">{deleteConfirm}</span> })}</>}
+        confirmLabel={tCommon("delete")}
         variant="destructive"
         onConfirm={() => deleteConfirm && handleDelete(deleteConfirm)}
       />
@@ -196,6 +199,7 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
   onEditDescription?: (name: string, description: string) => void
   onRename?: (oldName: string, newName: string) => Promise<string | null>
 }) {
+  const t = useTranslations("templatesPage")
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(template.description || "")
   const [renaming, setRenaming] = useState(false)
@@ -223,7 +227,7 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
   const handleRenameSubmit = async () => {
     const trimmed = renameValue.trim()
     if (!trimmed || trimmed === template.name) { setRenaming(false); setRenameError(""); return }
-    if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) { setRenameError("a-z, 0-9, hyphens, underscores"); return }
+    if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) { setRenameError(t("renameCharsShort")); return }
     const err = await onRename?.(template.name, trimmed)
     if (err) { setRenameError(err); return }
     setRenaming(false)
@@ -283,7 +287,7 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
                 </h3>
               )}
               {template.source === "user" && !renaming && (
-                <span className="text-[11px] text-brand-teal/70 font-medium shrink-0">Custom</span>
+                <span className="text-[11px] text-brand-teal/70 font-medium shrink-0">{t("custom")}</span>
               )}
             </div>
             {/* Description — click to edit for user templates */}
@@ -296,14 +300,14 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleDescSubmit() } if (e.key === "Escape") { setEditValue(template.description || ""); setEditing(false) } }}
                 rows={2}
                 className="w-full mt-1 rounded-md bg-white/[0.04] border border-brand-teal/30 focus:border-brand-teal/50 px-2 py-1 text-xs text-foreground placeholder:text-foreground/25 resize-none outline-none transition-colors"
-                placeholder="When should this template be used?"
+                placeholder={t("descPlaceholder")}
               />
             ) : onEditDescription ? (
               <p
                 className="text-xs text-foreground-muted mt-1 line-clamp-2 leading-relaxed cursor-text rounded px-1 -mx-1 hover:bg-white/[0.04] transition-colors"
                 onClick={e => { e.stopPropagation(); setEditing(true) }}
               >
-                {template.description || <span className="text-foreground/20 italic">Add description…</span>}
+                {template.description || <span className="text-foreground/20 italic">{t("addDescription")}</span>}
               </p>
             ) : template.description ? (
               <p className="text-xs text-foreground-muted mt-1 line-clamp-2 leading-relaxed">{template.description}</p>
@@ -315,7 +319,7 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
             <button
               onClick={() => onDownload(template.name)}
               className="p-1.5 rounded-md text-foreground-muted hover:text-foreground hover:bg-white/[0.06] transition-colors"
-              aria-label={`Download ${template.name}`}
+              aria-label={t("downloadAria", { name: template.name })}
             >
               <Download className="h-3.5 w-3.5" />
             </button>
@@ -323,7 +327,7 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
               <button
                 onClick={() => onDelete(template.name)}
                 className="p-1.5 rounded-md text-foreground-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                aria-label={`Delete ${template.name}`}
+                aria-label={t("deleteAria", { name: template.name })}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -364,6 +368,8 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
   onComplete: () => void
   onError: (msg: string) => void
 }) {
+  const t = useTranslations("templatesPage")
+  const tCommon = useTranslations("common")
   const [file, setFile] = useState<File | null>(null)
   const [description, setDescription] = useState("")
   const [uploading, setUploading] = useState(false)
@@ -385,7 +391,7 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
       if (result.error) { onError(result.error); return }
       onComplete()
     } catch {
-      onError("Failed to upload template")
+      onError(t("uploadFailed"))
     } finally {
       setUploading(false)
     }
@@ -403,11 +409,11 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
-          <h2 id="upload-title" className="text-sm font-semibold">Upload Template</h2>
+          <h2 id="upload-title" className="text-sm font-semibold">{t("uploadTemplate")}</h2>
           <button
             onClick={onClose}
             className="p-1 rounded-md text-foreground-muted hover:text-foreground transition-colors"
-            aria-label="Close"
+            aria-label={tCommon("close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -444,7 +450,7 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
               <>
                 <Upload className="h-8 w-8 text-foreground/15 mx-auto mb-2" />
                 <p className="text-sm text-foreground/40">
-                  Drop <span className="text-foreground/60 font-medium">.pptx</span> here or click to browse
+                  {t.rich("dropHint", { ext: (chunks) => <span className="text-foreground/60 font-medium">{chunks}</span> })}
                 </p>
               </>
             )}
@@ -464,13 +470,13 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
           {/* Description */}
           <div>
             <label htmlFor="template-desc" className="block text-xs font-medium text-foreground-muted mb-1.5">
-              Description <span className="text-foreground/30">(optional)</span>
+              {t("descriptionLabel")} <span className="text-foreground/30">{t("optional")}</span>
             </label>
             <textarea
               id="template-desc"
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="When should this template be used?"
+              placeholder={t("descPlaceholder")}
               rows={2}
               className="w-full rounded-lg bg-white/[0.04] border border-white/[0.08] focus:border-brand-teal/40 focus:ring-1 focus:ring-brand-teal/20 px-3 py-2 text-sm text-foreground placeholder:text-foreground/25 resize-none outline-none transition-colors"
             />
@@ -483,7 +489,7 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
             onClick={onClose}
             className="px-3 py-1.5 text-sm rounded-lg border border-white/[0.08] hover:bg-white/[0.04] transition-colors"
           >
-            Cancel
+            {tCommon("cancel")}
           </button>
           <button
             onClick={handleSubmit}
@@ -493,10 +499,10 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
             {uploading ? (
               <>
                 <span className="h-3 w-3 border-2 border-brand-teal/30 border-t-brand-teal rounded-full animate-spin" />
-                Analyzing…
+                {t("analyzing")}
               </>
             ) : (
-              "Upload"
+              t("upload")
             )}
           </button>
         </div>

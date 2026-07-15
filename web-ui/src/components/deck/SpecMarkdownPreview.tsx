@@ -24,6 +24,7 @@ import { OutlineView } from "./OutlineView"
 import { StyleSlidePreview } from "@/components/StyleSlidePreview"
 import { StyleCard } from "./StyleCard"
 import { BriefWaiting, OutlineWaiting, ArtDirectionWaiting } from "./SpecWaiting"
+import { useTranslations } from "next-intl"
 
 /** Regex matching HEX color codes in text. */
 const HEX_RE = /(#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3}))\b/g
@@ -86,6 +87,7 @@ const specComponents = {
 }
 
 export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, idToken }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; idToken?: string }) {
+  const t = useTranslations("stylePicker")
   // Hooks must be called unconditionally — before any early returns.
 
   // Art Direction inline gallery state
@@ -202,8 +204,8 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
             <div>
-              <h2 className="text-[15px] font-semibold">Choose a Style</h2>
-              <p className="text-xs text-foreground-muted mt-0.5">Click to preview · ★ to pin favorites</p>
+              <h2 className="text-[15px] font-semibold">{t("chooseStyle")}</h2>
+              <p className="text-xs text-foreground-muted mt-0.5">{t("clickToPreview")}</p>
             </div>
             {content && (
               <button
@@ -211,7 +213,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
                 className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.06] transition-colors"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
-                Back to Art Direction
+                {t("backToArtDirection")}
               </button>
             )}
           </div>
@@ -230,7 +232,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
                 <div>
                   <div className="flex items-center gap-1.5 mb-3">
                     <Star className="h-3.5 w-3.5 text-brand-teal" fill="currentColor" />
-                    <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">Pinned</h3>
+                    <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">{t("pinned")}</h3>
                   </div>
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                     {pinnedStyles.map((style, i) => (
@@ -246,7 +248,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
                     aria-expanded={allStylesOpen}
                   >
                     <span className="transition-transform duration-200" style={{ transform: allStylesOpen ? "rotate(90deg)" : "rotate(0deg)" }}>▸</span>
-                    All Styles ({unpinnedStyles.length})
+                    {t("allStyles", { count: unpinnedStyles.length })}
                   </button>
                   {allStylesOpen && (
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -289,7 +291,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
               <button
                 onClick={() => { setPreview(null); setAdMode("gallery"); }}
                 className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-white/[0.06] transition-colors"
-                aria-label="Back to styles"
+                aria-label={t("backToStylesAria")}
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
@@ -298,19 +300,19 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
                 <button
                   onClick={() => handlePinToggle(preview.name)}
                   className={`p-1 rounded transition-colors ${previewPinned ? "text-brand-teal" : "text-foreground-muted hover:text-foreground"}`}
-                  aria-label={previewPinned ? `Unpin ${preview.name}` : `Pin ${preview.name}`}
+                  aria-label={previewPinned ? t("unpinAria", { name: preview.name }) : t("pinAria", { name: preview.name })}
                 >
                   <Star className="h-3.5 w-3.5" fill={previewPinned ? "currentColor" : "none"} />
                 </button>
               </div>
-              <p className="text-xs text-foreground-muted">Preview all slides — select to apply</p>
+              <p className="text-xs text-foreground-muted">{t("previewHint")}</p>
             </div>
             <button
               onClick={handleSelect}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-teal text-primary-foreground hover:bg-brand-teal/90 transition-colors"
             >
               <Check className="h-3.5 w-3.5" />
-              Select
+              {t("select")}
             </button>
           </div>
           {/* Preview content */}
@@ -331,7 +333,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
               className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.06] transition-colors"
             >
               <Palette className="h-3.5 w-3.5" />
-              Change Style
+              {t("changeStyle")}
             </button>
           </div>
         )}

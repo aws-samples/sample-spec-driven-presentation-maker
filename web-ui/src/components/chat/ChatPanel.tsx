@@ -28,6 +28,7 @@ import { usePreferences } from "@/hooks/usePreferences"
 import { notifyError } from "@/lib/errors"
 import { toast } from "sonner"
 import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
+import { useTranslations } from "next-intl"
 
 interface ChatPanelProps {
   deckId: string
@@ -44,6 +45,7 @@ export interface ChatPanelHandle {
 }
 
 export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
+  const t = useTranslations("chat")
   // --- Session ---
   const [sessionId, setSessionId] = useState(() => {
     if (chatSessionId) return chatSessionId
@@ -81,7 +83,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deckId: did, messages: stream.messagesRef.current }),
-    }).catch((err) => notifyError("Failed to save chat history", err))
+    }).catch((err) => notifyError(t("errorSaveHistory"), err))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -176,7 +178,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       try {
         const { messages: history, truncated } = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
         if (truncated) {
-          toast.info("Older messages in this conversation were omitted to keep loading fast.")
+          toast.info(t("historyTruncated"))
         }
         if (history.length > 0) {
           // Local mode: .chat.json is already in ChatPanel's internal format
@@ -390,7 +392,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   return (
     <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={stream.isLoading} className="flex flex-col h-full">
       {/* Messages area */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4" role="log" aria-label="Chat messages"
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4" role="log" aria-label={t("chatMessages")}
         onScroll={() => {
           const el = scrollContainerRef.current
           if (!el) return
@@ -411,16 +413,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-teal-soft mb-5">
               <Send className="h-5 w-5 text-brand-teal" />
             </div>
-            <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-1">Let&apos;s present</h2>
+            <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-1">{t("letsPresent")}</h2>
             <p className="text-sm text-foreground-muted leading-relaxed mb-6">
-              Drop a URL, paste notes, or describe your idea
+              {t("emptyHint")}
             </p>
             <div className="flex flex-col gap-2 w-full max-w-[320px] mb-8">
-              {[
-                "Create a product pitch for our new feature",
-                "Turn my meeting notes into a status update deck",
-                "Make a 5-minute tech talk about a topic I'll describe",
-              ].map((example) => (
+              {[t("example1"), t("example2"), t("example3")].map((example) => (
                 <button
                   key={example}
                   type="button"
@@ -474,11 +472,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           isLoading={isLoading}
           onStop={stream.stopGeneration}
           disabled={!configLoaded || reconnectLoading}
-          placeholder={isMobile ? "Ask anything…" : "Ask anything…  ⌘↵ send"}
+          placeholder={isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
           idToken={auth.user?.id_token}
           sessionId={sessionId}
           deckId={deckId}
-          stopTitle={composeInFlight ? "Force stop — partial report may be lost" : undefined}
+          stopTitle={composeInFlight ? t("forceStop") : undefined}
         >
           {/* Options expander */}
           <div className="px-2">
@@ -488,7 +486,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               className="flex items-center gap-1 text-[11px] text-foreground-muted hover:text-foreground transition-colors py-1"
             >
               <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${optionsOpen ? "rotate-90" : ""}`} />
-              Options
+              {t("options")}
             </button>
             {optionsOpen && (
               <div className="flex flex-col gap-2 pb-2 pl-1">
@@ -496,8 +494,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
                   bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
                   <div className="flex flex-col gap-0.5 min-w-0">
-                    <span className="text-xs text-foreground-secondary font-medium select-none">Fetch web images</span>
-                    <span className="text-[11px] text-foreground-muted select-none leading-snug">Include images from websites in presentations</span>
+                    <span className="text-xs text-foreground-secondary font-medium select-none">{t("fetchWebImages")}</span>
+                    <span className="text-[11px] text-foreground-muted select-none leading-snug">{t("fetchWebImagesDescription")}</span>
                   </div>
                   <button
                     type="button"
@@ -519,13 +517,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
                   <div className="flex flex-col gap-0.5 min-w-0">
                     <span className="text-xs text-foreground-secondary font-medium select-none flex items-center gap-2">
-                      Parallel agents
+                      {t("parallelAgents")}
                       <span className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-semibold tracking-wide
                         bg-brand-amber-soft text-brand-amber border border-brand-amber/25">
-                        🧪 Experimental
+                        {t("experimental")}
                       </span>
                     </span>
-                    <span className="text-[11px] text-foreground-muted select-none leading-snug">Multiple composer agents generate slides in parallel</span>
+                    <span className="text-[11px] text-foreground-muted select-none leading-snug">{t("parallelAgentsDescription")}</span>
                   </div>
                   <button
                     type="button"

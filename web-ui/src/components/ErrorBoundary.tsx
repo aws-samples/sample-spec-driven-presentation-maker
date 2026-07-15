@@ -15,6 +15,7 @@
 
 import { Component, type ReactNode } from "react"
 import { RefreshCw, AlertTriangle } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -23,6 +24,26 @@ interface ErrorBoundaryProps {
 
 interface ErrorBoundaryState {
   error: Error | null
+}
+
+/** Fallback UI — functional so it can use the translation hook (the boundary itself is a class). */
+function ErrorFallback({ label, message, onRetry }: { label?: string; message: string; onRetry: () => void }) {
+  const t = useTranslations("errorBoundary")
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 h-full min-h-[200px] p-6 text-center">
+      <AlertTriangle className="w-8 h-8 text-brand-amber" aria-hidden="true" />
+      <p className="text-sm text-foreground">{t("problem", { label: label || t("thisSection") })}</p>
+      <p className="text-xs text-foreground-muted max-w-md break-words">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="touch-target inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-border text-foreground hover:border-border-hover transition-colors"
+      >
+        <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+        {t("tryAgain")}
+      </button>
+    </div>
+  )
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -38,21 +59,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   render() {
     if (!this.state.error) return this.props.children
-    const label = this.props.label || "This section"
     return (
-      <div className="flex flex-col items-center justify-center gap-3 h-full min-h-[200px] p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-brand-amber" aria-hidden="true" />
-        <p className="text-sm text-foreground">{label} ran into a problem.</p>
-        <p className="text-xs text-foreground-muted max-w-md break-words">{this.state.error.message}</p>
-        <button
-          type="button"
-          onClick={() => this.setState({ error: null })}
-          className="touch-target inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-border text-foreground hover:border-border-hover transition-colors"
-        >
-          <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
-          Try again
-        </button>
-      </div>
+      <ErrorFallback
+        label={this.props.label}
+        message={this.state.error.message}
+        onRetry={() => this.setState({ error: null })}
+      />
     )
   }
 }
