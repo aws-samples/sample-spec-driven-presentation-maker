@@ -8,7 +8,8 @@
     "loading": "読み込み中…",
     "today": "今日",
     "yesterday": "昨日",
-    "daysAgo": "{days}日前"
+    "daysAgo": "{days}日前",
+    "confirm": "確認"
   },
   "appShell": {
     "mainNavigation": "メインナビゲーション",
@@ -144,7 +145,8 @@
     "placeholderDesktop": "なんでも聞いてください…  ⌘↵ で送信",
     "forceStop": "強制停止 — 進行中のレポートが失われる可能性があります",
     "mentionSuggestions": "メンション候補",
-    "errorSwitchModel": "モデルを切り替えられませんでした"
+    "errorSwitchModel": "モデルを切り替えられませんでした",
+    "slidePreview": "スライドプレビュー"
   },
   "snippet": {
     "title": "テキストスニペット",
@@ -253,5 +255,70 @@
     "createNewDeck": "新しいデッキを作成",
     "chat": "チャット",
     "preview": "プレビュー"
+  },
+  "mcp": {
+    "connected": "接続済み: {names}",
+    "unavailable": "利用不可: {name}"
+  },
+  "modelPicker": {
+    "selectModel": "モデルを選択",
+    "recommended": "おすすめ",
+    "searchModels": "モデルを検索...",
+    "noModelFound": "モデルが見つかりません。"
+  },
+  "compose": {
+    "composingAria": "スライドを作成中",
+    "preparing": "準備中…",
+    "composing": "{slides}枚のスライドを作成中 · {agents}エージェントが並列実行",
+    "composed": "{count}枚のスライドを作成しました",
+    "composedPartialFailed": "{total}枚中{done}枚のスライドを作成 — 一部失敗",
+    "failed": "スライドの作成に失敗しました",
+    "stopping": "停止中 — 途中結果をまとめています…",
+    "stoppingShort": "停止中…",
+    "stopped": "停止しました",
+    "stoppedPartial": "停止 · {total}枚中{done}枚のスライドを作成済み",
+    "cancel": "キャンセル",
+    "cancelAria": "スライド作成をキャンセル",
+    "cancelRequestedAria": "キャンセルをリクエスト済み、停止中",
+    "rushedBadge": "{count} 駆け込み",
+    "rushedBadgeTitle": "{count, plural, other {#個のコンポーザー}}が時間制限に達しました — 粗い下書きは再実行が必要な場合があります",
+    "rushedAgent": "駆け込み",
+    "rushedAgentTitle": "時間制限に達したため、このコンポーザーは時間内に終えるよう粗い下書きを作成しました。該当スライドの再実行を検討してください。",
+    "retryBadge": "リトライ {count}",
+    "retrying": "リトライ中 ({count})",
+    "thinking": "思考中",
+    "agentFailed": "失敗",
+    "instruction": "指示",
+    "activitySteps": "アクティビティ · {count, plural, other {#ステップ}}",
+    "expandDetails": "詳細を開く",
+    "collapseDetails": "詳細を閉じる",
+    "agentDetails": "エージェントの詳細",
+    "srProgress": "{total}エージェント中{done}完了",
+    "whatComposersDid": "コンポーザーの作業内容 · {count, plural, other {#グループ}}",
+    "activity": {
+      "working": "作業中",
+      "editing": "{slugs} を編集中",
+      "searchingIcons": "アイコンを検索中",
+      "searchingIconsQuery": "アイコンを検索中: 「{query}」",
+      "planningLayout": "レイアウトを設計中",
+      "reviewingExamples": "例を確認中",
+      "consultingGuide": "ガイドを参照中",
+      "consultingWorkflow": "ワークフローを参照中",
+      "applyingStyle": "スタイルを適用中",
+      "previewingSlides": "スライドをプレビュー中",
+      "assemblingDeck": "デッキを組み立て中",
+      "formattingCode": "コードを整形中",
+      "importingFile": "ファイルを取り込み中",
+      "analyzingTemplate": "テンプレートを解析中",
+      "browsingStyles": "スタイルを閲覧中",
+      "listingGuides": "ガイドを一覧表示中",
+      "listingWorkflows": "ワークフローを一覧表示中",
+      "listingTemplates": "テンプレートを一覧表示中",
+      "listingAssetSources": "アセットソースを一覧表示中",
+      "readingUpload": "アップロードを読み取り中",
+      "initializingDeck": "デッキを初期化中",
+      "thinking": "思考中"
+    },
+    "stoppingBare": "停止中"
   }
 }

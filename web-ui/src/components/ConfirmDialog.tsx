@@ -10,6 +10,7 @@
  */
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog"
 import { cn } from "@/lib/utils"
 
@@ -30,12 +31,15 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   variant = "default",
   onConfirm,
   loading = false,
 }: ConfirmDialogProps) {
+  const t = useTranslations("common")
+  const confirmText = confirmLabel ?? t("confirm")
+  const cancelText = cancelLabel ?? t("cancel")
   return (
     <AlertDialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialogPrimitive.Portal>
@@ -73,7 +77,7 @@ export function ConfirmDialog({
                 "hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
               )}
             >
-              {cancelLabel}
+              {cancelText}
             </AlertDialogPrimitive.Cancel>
             <AlertDialogPrimitive.Action
               onClick={onConfirm}
@@ -97,9 +101,9 @@ export function ConfirmDialog({
               {loading ? (
                 <span className="flex items-center gap-1.5">
                   <span className="h-3 w-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-                  {confirmLabel}
+                  {confirmText}
                 </span>
-              ) : confirmLabel}
+              ) : confirmText}
             </AlertDialogPrimitive.Action>
           </div>
         </AlertDialogPrimitive.Content>

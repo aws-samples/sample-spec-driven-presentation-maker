@@ -10,10 +10,12 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { ChevronRight, Info } from "lucide-react"
 import { STATE, C } from "./composeTokens"
 
 export function StopSummary({ notice, summaries }: { notice?: string; summaries?: Record<string, string> }) {
+  const t = useTranslations("compose")
   const [open, setOpen] = useState(false)
   const entries = summaries ? Object.entries(summaries) : []
 
@@ -43,7 +45,7 @@ export function StopSummary({ notice, summaries }: { notice?: string; summaries?
               className="h-3 w-3 transition-transform duration-200"
               style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
             />
-            What the composers did · {entries.length} group{entries.length === 1 ? "" : "s"}
+            {t("whatComposersDid", { count: entries.length })}
           </button>
           {open && (
             <ol className="mt-2 flex flex-col gap-2">

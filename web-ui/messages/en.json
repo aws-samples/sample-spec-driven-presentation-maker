@@ -8,7 +8,8 @@
     "loading": "Loading…",
     "today": "Today",
     "yesterday": "Yesterday",
-    "daysAgo": "{days}d ago"
+    "daysAgo": "{days}d ago",
+    "confirm": "Confirm"
   },
   "appShell": {
     "mainNavigation": "Main navigation",
@@ -144,7 +145,8 @@
     "placeholderDesktop": "Ask anything…  ⌘↵ send",
     "forceStop": "Force stop — partial report may be lost",
     "mentionSuggestions": "Mention suggestions",
-    "errorSwitchModel": "Failed to switch model"
+    "errorSwitchModel": "Failed to switch model",
+    "slidePreview": "Slide preview"
   },
   "snippet": {
     "title": "Text Snippet",
@@ -253,5 +255,70 @@
     "createNewDeck": "Create new deck",
     "chat": "Chat",
     "preview": "Preview"
+  },
+  "mcp": {
+    "connected": "Connected: {names}",
+    "unavailable": "Unavailable: {name}"
+  },
+  "modelPicker": {
+    "selectModel": "Select model",
+    "recommended": "Recommended",
+    "searchModels": "Search models...",
+    "noModelFound": "No model found."
+  },
+  "compose": {
+    "composingAria": "Composing slides",
+    "preparing": "Preparing…",
+    "composing": "Composing {slides} slides · {agents} agents in parallel",
+    "composed": "Composed {count} slides",
+    "composedPartialFailed": "Composed {done} of {total} slides — some failed",
+    "failed": "Failed to compose slides",
+    "stopping": "Stopping — finalizing partial results…",
+    "stoppingShort": "Stopping…",
+    "stopped": "Stopped",
+    "stoppedPartial": "Stopped · {done} of {total} slides composed",
+    "cancel": "Cancel",
+    "cancelAria": "Cancel compose slides",
+    "cancelRequestedAria": "Cancel requested, stopping",
+    "rushedBadge": "{count} rushed",
+    "rushedBadgeTitle": "{count, plural, one {# composer} other {# composers}} hit the time budget — rough drafts may need another pass",
+    "rushedAgent": "rushed",
+    "rushedAgentTitle": "Time budget reached — this composer wrote a rough draft to finish on time. Consider re-running for these slides.",
+    "retryBadge": "retry {count}",
+    "retrying": "Retrying ({count})",
+    "thinking": "Thinking",
+    "agentFailed": "Failed",
+    "instruction": "Instruction",
+    "activitySteps": "Activity · {count, plural, one {# step} other {# steps}}",
+    "expandDetails": "Expand details",
+    "collapseDetails": "Collapse details",
+    "agentDetails": "Agent details",
+    "srProgress": "{done} of {total} agents completed",
+    "whatComposersDid": "What the composers did · {count, plural, one {# group} other {# groups}}",
+    "activity": {
+      "working": "Working",
+      "editing": "Editing {slugs}",
+      "searchingIcons": "Searching icons",
+      "searchingIconsQuery": "Searching icons: \"{query}\"",
+      "planningLayout": "Planning layout",
+      "reviewingExamples": "Reviewing examples",
+      "consultingGuide": "Consulting guide",
+      "consultingWorkflow": "Consulting workflow",
+      "applyingStyle": "Applying style",
+      "previewingSlides": "Previewing slides",
+      "assemblingDeck": "Assembling deck",
+      "formattingCode": "Formatting code",
+      "importingFile": "Importing file",
+      "analyzingTemplate": "Analyzing template",
+      "browsingStyles": "Browsing styles",
+      "listingGuides": "Listing guides",
+      "listingWorkflows": "Listing workflows",
+      "listingTemplates": "Listing templates",
+      "listingAssetSources": "Listing asset sources",
+      "readingUpload": "Reading upload",
+      "initializingDeck": "Initializing deck",
+      "thinking": "Thinking"
+    },
+    "stoppingBare": "Stopping"
   }
 }

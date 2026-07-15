@@ -47,38 +47,48 @@ export function activityCategory(tool: string): ActivityCategory {
   }
 }
 
-export function activityLabel(tool: string, input?: Record<string, unknown>): string {
+/** Minimal translator shape (subset of next-intl's useTranslations return). */
+export type ActivityTranslator = (key: string, values?: Record<string, string | number>) => string
+
+export function activityLabel(tool: string, input?: Record<string, unknown>, t?: ActivityTranslator): string {
   const name = stripPrefix(tool)
 
   const purpose = input?.purpose
   if (typeof purpose === "string" && purpose.trim()) return purpose.trim()
 
+  // Message keys live under compose.activity.* — fall back to English when no translator.
+  const tr = (key: string, en: string, values?: Record<string, string | number>) => (t ? t(`activity.${key}`, values) : en)
+
   switch (name) {
     case "run_python": {
       const slugs = input?.measure_slides
-      return Array.isArray(slugs) && slugs.length ? `Editing ${slugs.join(", ")}` : "Working"
+      return Array.isArray(slugs) && slugs.length
+        ? tr("editing", `Editing ${slugs.join(", ")}`, { slugs: slugs.join(", ") })
+        : tr("working", "Working")
     }
-    case "grid": return "Planning layout"
+    case "grid": return tr("planningLayout", "Planning layout")
     case "search_assets": {
       const q = input?.query
-      return typeof q === "string" && q ? `Searching icons: "${q}"` : "Searching icons"
+      return typeof q === "string" && q
+        ? tr("searchingIconsQuery", `Searching icons: "${q}"`, { query: q })
+        : tr("searchingIcons", "Searching icons")
     }
-    case "read_examples": return "Reviewing examples"
-    case "read_guides": return "Consulting guide"
-    case "read_workflows": return "Consulting workflow"
-    case "apply_style": return "Applying style"
-    case "get_preview": return "Previewing slides"
-    case "generate_pptx": return "Assembling deck"
-    case "code_to_slide": return "Formatting code"
-    case "import_attachment": return "Importing file"
-    case "analyze_template": return "Analyzing template"
-    case "list_styles": return "Browsing styles"
-    case "list_guides": return "Listing guides"
-    case "list_workflows": return "Listing workflows"
-    case "list_templates": return "Listing templates"
-    case "list_asset_sources": return "Listing asset sources"
-    case "read_uploaded_file": return "Reading upload"
-    case "init_presentation": return "Initializing deck"
-    default: return "Thinking"
+    case "read_examples": return tr("reviewingExamples", "Reviewing examples")
+    case "read_guides": return tr("consultingGuide", "Consulting guide")
+    case "read_workflows": return tr("consultingWorkflow", "Consulting workflow")
+    case "apply_style": return tr("applyingStyle", "Applying style")
+    case "get_preview": return tr("previewingSlides", "Previewing slides")
+    case "generate_pptx": return tr("assemblingDeck", "Assembling deck")
+    case "code_to_slide": return tr("formattingCode", "Formatting code")
+    case "import_attachment": return tr("importingFile", "Importing file")
+    case "analyze_template": return tr("analyzingTemplate", "Analyzing template")
+    case "list_styles": return tr("browsingStyles", "Browsing styles")
+    case "list_guides": return tr("listingGuides", "Listing guides")
+    case "list_workflows": return tr("listingWorkflows", "Listing workflows")
+    case "list_templates": return tr("listingTemplates", "Listing templates")
+    case "list_asset_sources": return tr("listingAssetSources", "Listing asset sources")
+    case "read_uploaded_file": return tr("readingUpload", "Reading upload")
+    case "init_presentation": return tr("initializingDeck", "Initializing deck")
+    default: return tr("thinking", "Thinking")
   }
 }

@@ -3,6 +3,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { Check, ChevronsUpDown, Sparkles } from "lucide-react"
 import {
   Command,
@@ -41,6 +42,7 @@ export function ModelPicker({
   triggerId,
   ariaLabel,
 }: ModelPickerProps) {
+  const t = useTranslations("modelPicker")
   const [open, setOpen] = React.useState(false)
   const listRef = React.useRef<HTMLDivElement>(null)
 
@@ -51,8 +53,8 @@ export function ModelPicker({
     ? inheritLabel
     : selected?.displayName ??
       (defaultId
-        ? models.find((m) => m.modelId === defaultId)?.displayName ?? "Select model"
-        : "Select model")
+        ? models.find((m) => m.modelId === defaultId)?.displayName ?? t("selectModel")
+        : t("selectModel"))
 
   // Scroll the expanded list into view after opening
   React.useEffect(() => {
@@ -96,11 +98,11 @@ export function ModelPicker({
           </span>
           {selected && selected.modelId === defaultId && (
             <span
-              aria-label="Recommended"
+              aria-label={t("recommended")}
               className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-brand-teal/15 px-1.5 py-px text-[11px] font-semibold text-brand-teal"
             >
               <Sparkles className="h-2.5 w-2.5" />
-              Recommended
+              {t("recommended")}
             </span>
           )}
         </span>
@@ -119,9 +121,9 @@ export function ModelPicker({
           className="mt-1.5 rounded-lg border border-white/[0.1] bg-popover overflow-hidden"
         >
           <Command>
-            <CommandInput placeholder="Search models..." />
+            <CommandInput placeholder={t("searchModels")} />
             <CommandList id={listId} className="max-h-[280px] overflow-y-auto">
-              <CommandEmpty>No model found.</CommandEmpty>
+              <CommandEmpty>{t("noModelFound")}</CommandEmpty>
               <CommandGroup>
                 {inheritLabel !== undefined && (
                   <CommandItem
@@ -173,11 +175,11 @@ export function ModelPicker({
                           </span>
                           {isDefault && (
                             <span
-                              aria-label="Recommended"
+                              aria-label={t("recommended")}
                               className="inline-flex items-center gap-0.5 rounded-full bg-brand-teal/15 px-1.5 py-px text-[11px] font-semibold text-brand-teal"
                             >
                               <Sparkles className="h-2.5 w-2.5" />
-                              Recommended
+                              {t("recommended")}
                             </span>
                           )}
                         </div>
