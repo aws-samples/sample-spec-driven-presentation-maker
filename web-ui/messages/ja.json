@@ -407,5 +407,11 @@
     "pinAria": "{name} をピン留め",
     "unpinAria": "{name} のピン留めを解除",
     "custom": "カスタム"
+  },
+  "templatePicker": {
+    "sectionTitle": "テンプレート",
+    "useTemplate": "このテンプレートを使う",
+    "useTemplateAria": "テンプレート {name} を使う",
+    "custom": "カスタム"
   }
 }

@@ -70,6 +70,15 @@ export default function DecksPage() {
     chatRef.current?.insertAtCursor(msg)
   }, [ws.deck?.specs?.artDirection])
 
+  /** Handle inline template selection — insert message into chat input.
+   *  isChange is true when deck.json already has a confirmed template. */
+  const handleTemplateSelect = useCallback((name: string, isChange: boolean) => {
+    const msg = isChange
+      ? `I want to change the template to "${name}". `
+      : `I'll use the "${name}" template. `
+    chatRef.current?.insertAtCursor(msg)
+  }, [])
+
   /* ── Render ── */
   return (
     <AppShell
@@ -144,6 +153,7 @@ export default function DecksPage() {
                     specs={ws.deck?.specs}
                     workflowPhase={workflowPhase}
                     onStyleSelect={handleStyleSelect}
+                    onTemplateSelect={handleTemplateSelect}
                     idToken={idToken}
                     ownerAlias={!ws.isOwner ? ws.deck?.ownerAlias : undefined}
                     headerActions={

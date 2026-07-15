@@ -1,0 +1,140 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: MIT-0
+/**
+ * TemplatePickerSection tests — rendering, ordering, current-template
+ * indication, and selection callback arguments.
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { screen, waitFor, fireEvent, cleanup } from "@testing-library/react"
+import { renderWithIntl } from "@/test/renderWithIntl"
+import { TemplatePickerSection } from "./TemplatePickerSection"
+import type { TemplateEntry } from "@/services/deckService"
+
+vi.mock("@/services/deckService", () => ({
+  fetchTemplates: vi.fn(),
+}))
+
+import { fetchTemplates } from "@/services/deckService"
+
+const TEMPLATES: TemplateEntry[] = [
+  {
+    name: "builtin-a",
+    source: "builtin",
+    description: "Builtin A",
+    theme_colors: { background: "#ffffff", text: "#111111", accent1: "#ff0000" },
+    fonts: { halfwidth: "Arial", fullwidth: null },
+    layout_count: 10,
+  },
+  {
+    name: "my-brand",
+    source: "user",
+    description: "Company brand",
+    theme_colors: { background: "#001122", text: "#eeeeee" },
+    fonts: {},
+    layout_count: 5,
+  },
+  {
+    name: "corporate",
+    source: "builtin",
+    description: "",
+    theme_colors: {},
+    fonts: {},
+    layout_count: 8,
+  },
+]
+
+/** Mock global fetch for the defsUrl (deck.json) request. */
+function mockDefsFetch(template: string | null) {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => (template ? { template } : {}),
+  }))
+}
+
+describe("TemplatePickerSection", () => {
+  beforeEach(() => {
+    vi.mocked(fetchTemplates).mockResolvedValue(TEMPLATES)
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+    vi.clearAllMocks()
+  })
+
+  it("renders all templates after loading", async () => {
+    renderWithIntl(
+      <TemplatePickerSection idToken="tok" defsUrl={null} onTemplateSelect={() => {}} />
+    )
+    expect(await screen.findByText("my-brand")).toBeTruthy()
+    expect(screen.getByText("builtin-a")).toBeTruthy()
+    expect(screen.getByText("corporate")).toBeTruthy()
+    expect(screen.getByText("Template")).toBeTruthy()
+  })
+
+  it("orders user templates before builtin when nothing is confirmed", async () => {
+    renderWithIntl(
+      <TemplatePickerSection idToken="tok" defsUrl={null} onTemplateSelect={() => {}} />
+    )
+    await screen.findByText("my-brand")
+    const cards = screen.getAllByRole("button")
+    const names = cards.map((c) => c.getAttribute("aria-label"))
+    expect(names).toEqual([
+      "Use the my-brand template",
+      "Use the builtin-a template",
+      "Use the corporate template",
+    ])
+  })
+
+  it("marks the confirmed template with data-current and orders it first", async () => {
+    mockDefsFetch("corporate.pptx")
+    renderWithIntl(
+      <TemplatePickerSection idToken="tok" defsUrl="/defs.json" onTemplateSelect={() => {}} />
+    )
+    await screen.findByText("my-brand")
+    await waitFor(() => {
+      const card = screen.getByRole("button", { name: "Use the corporate template" })
+      expect(card.getAttribute("data-current")).toBe("true")
+    })
+    const names = screen.getAllByRole("button").map((c) => c.getAttribute("aria-label"))
+    expect(names[0]).toBe("Use the corporate template")
+    // Header shows the current template name (in addition to the card name)
+    expect(screen.getAllByText("corporate")).toHaveLength(2)
+  })
+
+  it("calls onTemplateSelect with isChange=false when unconfirmed", async () => {
+    const onSelect = vi.fn()
+    renderWithIntl(
+      <TemplatePickerSection idToken="tok" defsUrl={null} onTemplateSelect={onSelect} />
+    )
+    await screen.findByText("my-brand")
+    fireEvent.click(screen.getByRole("button", { name: "Use the my-brand template" }))
+    expect(onSelect).toHaveBeenCalledWith("my-brand", false)
+  })
+
+  it("calls onTemplateSelect with isChange=true when a template is confirmed", async () => {
+    mockDefsFetch("corporate.pptx")
+    const onSelect = vi.fn()
+    renderWithIntl(
+      <TemplatePickerSection idToken="tok" defsUrl="/defs.json" onTemplateSelect={onSelect} />
+    )
+    await screen.findByText("my-brand")
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Use the corporate template" }).getAttribute("data-current")
+      ).toBe("true")
+    })
+    // The current card is NOT disabled — re-asserting the same template is allowed
+    fireEvent.click(screen.getByRole("button", { name: "Use the corporate template" }))
+    expect(onSelect).toHaveBeenCalledWith("corporate", true)
+  })
+
+  it("shows the custom badge only for user templates", async () => {
+    renderWithIntl(
+      <TemplatePickerSection idToken="tok" defsUrl={null} onTemplateSelect={() => {}} />
+    )
+    await screen.findByText("my-brand")
+    expect(screen.getAllByText("Custom")).toHaveLength(1)
+  })
+})
