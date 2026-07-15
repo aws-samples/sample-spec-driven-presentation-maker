@@ -11,6 +11,7 @@
 "use client"
 
 import { useEffect, useRef, useCallback, useState } from "react"
+import { useTranslations } from "next-intl"
 import { useAuth } from "@/hooks/useAuth"
 import { useChatStream, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
@@ -32,6 +33,7 @@ interface StyleChatPanelProps {
 }
 
 export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleChatPanelProps) {
+  const t = useTranslations("styleChat")
   const auth = useAuth()
   const sessionId = useRef(generateSessionId()).current
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -81,7 +83,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deckId: styleId, messages: stream.messages }),
-      }).catch((err) => notifyError("Failed to save chat history", err))
+      }).catch((err) => notifyError(t("saveChatFailed"), err))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.isLoading])
@@ -126,7 +128,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-4 py-4"
         role="log"
-        aria-label="Style chat messages"
+        aria-label={t("chatMessagesAria")}
         onScroll={() => {
           const el = scrollContainerRef.current
           if (!el) return
@@ -138,19 +140,19 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-teal-soft mb-5">
               <Sparkles className="h-5 w-5 text-brand-teal" />
             </div>
-            <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-3">Style Creator</h2>
+            <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-3">{t("styleCreator")}</h2>
             <div className="flex flex-col gap-2 text-sm text-foreground-muted">
               <div className="flex items-center gap-2.5">
                 <MessageSquare className="h-4 w-4 text-brand-teal/70 shrink-0" />
-                <span>Describe your vision</span>
+                <span>{t("describeVision")}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Image className="h-4 w-4 text-brand-teal/70 shrink-0" />
-                <span>Drop a reference image</span>
+                <span>{t("dropReference")}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Palette className="h-4 w-4 text-brand-teal/70 shrink-0" />
-                <span>Customize existing styles</span>
+                <span>{t("customizeExisting")}</span>
               </div>
             </div>
           </div>
@@ -188,7 +190,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
         onStop={stream.stopGeneration}
         idToken={auth.user?.id_token}
         sessionId={sessionId}
-        placeholder="Describe your style…  ⌘↵ send"
+        placeholder={t("placeholder")}
       />
     </FileDropZone>
   )

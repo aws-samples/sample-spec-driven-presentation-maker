@@ -12,6 +12,7 @@
 import { useRef, useEffect, useState, useCallback } from "react"
 import { StyleChatPanel } from "./StyleChatPanel"
 import { MessageSquare, PanelRightClose } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 const CHAT_WIDTH_KEY = "sdpm-chat-width"
 const DEFAULT_WIDTH = 440
@@ -28,6 +29,7 @@ interface StyleChatShellProps {
 }
 
 export function StyleChatShell({ open, onClose, styleId, styleName, onStyleWritten, onStyleSaved }: StyleChatShellProps) {
+  const t = useTranslations("styleChat")
   const panelRef = useRef<HTMLElement>(null)
   const [panelWidth, setPanelWidth] = useState(() => {
     if (typeof window === "undefined") return DEFAULT_WIDTH
@@ -101,7 +103,7 @@ export function StyleChatShell({ open, onClose, styleId, styleName, onStyleWritt
           onMouseDown={handleResizeStart}
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize chat panel"
+          aria-label={t("resizeAria")}
         />
         <div
           className="chat-panel-inner h-full flex flex-col bg-background-panel pb-4"
@@ -120,13 +122,13 @@ export function StyleChatShell({ open, onClose, styleId, styleName, onStyleWritt
                   <MessageSquare className="h-2.5 w-2.5 text-brand-teal" />
                 </div>
                 <span className="text-sm font-semibold tracking-[-0.01em] truncate max-w-[200px]">
-                  {styleName || "Style Chat"}
+                  {styleName || t("fallbackTitle")}
                 </span>
               </div>
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-background-hover transition-all"
-                aria-label="Close chat panel"
+                aria-label={t("closeAria")}
               >
                 <PanelRightClose className="h-4 w-4" />
               </button>
