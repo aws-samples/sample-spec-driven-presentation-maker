@@ -154,6 +154,7 @@ export default function DecksPage() {
                     workflowPhase={workflowPhase}
                     onStyleSelect={handleStyleSelect}
                     onTemplateSelect={handleTemplateSelect}
+                    currentTemplate={ws.deck?.template}
                     idToken={idToken}
                     ownerAlias={!ws.isOwner ? ws.deck?.ownerAlias : undefined}
                     headerActions={

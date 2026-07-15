@@ -99,6 +99,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     name: deckJson.name || deckId,
     slideOrder: deckJson.slideOrder || [],
     slides,
+    template: deckJson.template || null,
     defsUrl: defsFilename ? `/api/preview/${deckId}/compose/${defsFilename}` : null,
     pptxUrl: fs.existsSync(pptxPath) ? `/api/preview/${deckId}/output.pptx` : null,
     specs,

@@ -979,12 +979,21 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
             pass
     specs["artDirection"] = art_direction_content
 
+    # Confirmed template name from deck.json (written by the agent at Art Direction)
+    template = None
+    try:
+        dj_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/deck.json")
+        template = json.loads(dj_resp["Body"].read()).get("template") or None
+    except Exception:
+        pass
+
     return {
         "deckId": deck_id,
         "name": deck.get("name", "Untitled"),
         "slideCount": len(slides),
         "slides": slides,
         "specs": specs,
+        "template": template,
         "defsUrl": preview_url(defs_key) if has_defs else None,
         "pptxUrl": (_cf_signed_url(pptx_key) or presigned_url(s3_client, BUCKET_NAME, pptx_key)) if pptx_key else None,
         "updatedAt": deck.get("updatedAt", ""),

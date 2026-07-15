@@ -48,11 +48,13 @@ interface SlideCarouselProps {
   onStyleSelect?: (name: string) => void
   /** Callback when user selects a template inline (isChange = template already confirmed). */
   onTemplateSelect?: (name: string, isChange: boolean) => void
+  /** Confirmed template from deck.json (raw value, e.g. "corporate.pptx"). */
+  currentTemplate?: string | null
   /** Cognito ID token for style API calls. */
   idToken?: string
 }
 
-export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, idToken }: SlideCarouselProps) {
+export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken }: SlideCarouselProps) {
   const t = useTranslations("carousel")
   const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
   // eslint-disable-next-line no-console
@@ -479,7 +481,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
           specKey={specTab}
           onStyleSelect={specTab === "artDirection" ? onStyleSelect : undefined}
           onTemplateSelect={specTab === "artDirection" ? onTemplateSelect : undefined}
-          defsUrl={specTab === "artDirection" ? defsUrl : undefined}
+          currentTemplate={specTab === "artDirection" ? currentTemplate : undefined}
           idToken={specTab === "artDirection" ? idToken : undefined}
         />
       )}

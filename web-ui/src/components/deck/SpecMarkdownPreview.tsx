@@ -89,7 +89,7 @@ const specComponents = {
   },
 }
 
-export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, onTemplateSelect, defsUrl, idToken }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; onTemplateSelect?: (name: string, isChange: boolean) => void; defsUrl?: string | null; idToken?: string }) {
+export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, onTemplateSelect, currentTemplate, idToken }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; onTemplateSelect?: (name: string, isChange: boolean) => void; currentTemplate?: string | null; idToken?: string }) {
   const t = useTranslations("stylePicker")
   // Hooks must be called unconditionally — before any early returns.
 
@@ -179,7 +179,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     const wrap = (body: React.ReactNode) => (
       <div ref={galleryContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
         {onTemplateSelect && (
-          <TemplatePickerSection idToken={idToken} defsUrl={defsUrl} onTemplateSelect={onTemplateSelect} />
+          <TemplatePickerSection idToken={idToken} currentTemplate={currentTemplate} onTemplateSelect={onTemplateSelect} />
         )}
         <div className="flex-1 flex flex-col min-h-0">{body}</div>
       </div>

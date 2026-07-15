@@ -18,13 +18,20 @@ import { useEffect, useRef, useState } from "react"
 import { Plus, Check } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { fetchTemplates, type TemplateEntry } from "@/services/deckService"
-import { useCurrentTemplate } from "@/hooks/useCurrentTemplate"
 
 const PULSE_MS = 600
 
-export function TemplatePickerSection({ idToken, defsUrl, onTemplateSelect }: {
+/** Normalize a deck.json template value: "templates/corporate.pptx" → "corporate". */
+function normalizeTemplateName(raw?: string | null): string | null {
+  if (!raw) return null
+  const name = raw.replace(/\.pptx$/, "").split("/").pop() || ""
+  return name || null
+}
+
+export function TemplatePickerSection({ idToken, currentTemplate, onTemplateSelect }: {
   idToken?: string
-  defsUrl?: string | null
+  /** Raw template value from deck.json (e.g. "corporate.pptx"), null when unconfirmed. */
+  currentTemplate?: string | null
   onTemplateSelect: (name: string, isChange: boolean) => void
 }) {
   const t = useTranslations("templatePicker")
@@ -33,7 +40,7 @@ export function TemplatePickerSection({ idToken, defsUrl, onTemplateSelect }: {
   const loadedRef = useRef(false)
   const [pulsing, setPulsing] = useState<string | null>(null)
   const pulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const current = useCurrentTemplate(defsUrl)
+  const current = normalizeTemplateName(currentTemplate)
 
   useEffect(() => {
     if (!idToken || loadedRef.current) return

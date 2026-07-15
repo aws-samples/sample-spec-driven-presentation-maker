@@ -44,14 +44,6 @@ const TEMPLATES: TemplateEntry[] = [
   },
 ]
 
-/** Mock global fetch for the defsUrl (deck.json) request. */
-function mockDefsFetch(template: string | null) {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => (template ? { template } : {}),
-  }))
-}
-
 describe("TemplatePickerSection", () => {
   beforeEach(() => {
     vi.mocked(fetchTemplates).mockResolvedValue(TEMPLATES)
@@ -59,13 +51,12 @@ describe("TemplatePickerSection", () => {
 
   afterEach(() => {
     cleanup()
-    vi.unstubAllGlobals()
     vi.clearAllMocks()
   })
 
   it("renders all templates after loading", async () => {
     renderWithIntl(
-      <TemplatePickerSection idToken="tok" defsUrl={null} onTemplateSelect={() => {}} />
+      <TemplatePickerSection idToken="tok" currentTemplate={null} onTemplateSelect={() => {}} />
     )
     expect(await screen.findByText("my-brand")).toBeTruthy()
     expect(screen.getByText("builtin-a")).toBeTruthy()
@@ -75,7 +66,7 @@ describe("TemplatePickerSection", () => {
 
   it("orders user templates before builtin when nothing is confirmed", async () => {
     renderWithIntl(
-      <TemplatePickerSection idToken="tok" defsUrl={null} onTemplateSelect={() => {}} />
+      <TemplatePickerSection idToken="tok" currentTemplate={null} onTemplateSelect={() => {}} />
     )
     await screen.findByText("my-brand")
     const cards = screen.getAllByRole("button")
@@ -88,9 +79,8 @@ describe("TemplatePickerSection", () => {
   })
 
   it("marks the confirmed template with data-current and orders it first", async () => {
-    mockDefsFetch("corporate.pptx")
     renderWithIntl(
-      <TemplatePickerSection idToken="tok" defsUrl="/defs.json" onTemplateSelect={() => {}} />
+      <TemplatePickerSection idToken="tok" currentTemplate="corporate.pptx" onTemplateSelect={() => {}} />
     )
     await screen.findByText("my-brand")
     await waitFor(() => {
@@ -103,10 +93,21 @@ describe("TemplatePickerSection", () => {
     expect(screen.getByText("In use: corporate")).toBeTruthy()
   })
 
+  it("normalizes template values with directory prefixes", async () => {
+    renderWithIntl(
+      <TemplatePickerSection idToken="tok" currentTemplate="templates/my-brand.pptx" onTemplateSelect={() => {}} />
+    )
+    await screen.findByText("builtin-a")
+    expect(
+      screen.getByRole("button", { name: "Use the my-brand template" }).getAttribute("data-current")
+    ).toBe("true")
+    expect(screen.getByText("In use: my-brand")).toBeTruthy()
+  })
+
   it("calls onTemplateSelect with isChange=false when unconfirmed", async () => {
     const onSelect = vi.fn()
     renderWithIntl(
-      <TemplatePickerSection idToken="tok" defsUrl={null} onTemplateSelect={onSelect} />
+      <TemplatePickerSection idToken="tok" currentTemplate={null} onTemplateSelect={onSelect} />
     )
     await screen.findByText("my-brand")
     fireEvent.click(screen.getByRole("button", { name: "Use the my-brand template" }))
@@ -114,17 +115,11 @@ describe("TemplatePickerSection", () => {
   })
 
   it("calls onTemplateSelect with isChange=true when a template is confirmed", async () => {
-    mockDefsFetch("corporate.pptx")
     const onSelect = vi.fn()
     renderWithIntl(
-      <TemplatePickerSection idToken="tok" defsUrl="/defs.json" onTemplateSelect={onSelect} />
+      <TemplatePickerSection idToken="tok" currentTemplate="corporate.pptx" onTemplateSelect={onSelect} />
     )
     await screen.findByText("my-brand")
-    await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: "Use the corporate template" }).getAttribute("data-current")
-      ).toBe("true")
-    })
     // The current card is NOT disabled — re-asserting the same template is allowed
     fireEvent.click(screen.getByRole("button", { name: "Use the corporate template" }))
     expect(onSelect).toHaveBeenCalledWith("corporate", true)
@@ -132,7 +127,7 @@ describe("TemplatePickerSection", () => {
 
   it("shows the custom badge only for user templates", async () => {
     renderWithIntl(
-      <TemplatePickerSection idToken="tok" defsUrl={null} onTemplateSelect={() => {}} />
+      <TemplatePickerSection idToken="tok" currentTemplate={null} onTemplateSelect={() => {}} />
     )
     await screen.findByText("my-brand")
     expect(screen.getAllByText("Custom")).toHaveLength(1)
