@@ -20,10 +20,13 @@ import {
   uploadTemplate,
   deleteTemplate,
   updateTemplateDescription,
+  updateBuiltinTemplateNote,
   renameTemplate,
   type TemplateEntry,
 } from "@/services/deckService"
 import { Download, Trash2, Upload, FileText, Type, LayoutGrid, X } from "lucide-react"
+
+const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === "local"
 
 export default function TemplatesPage() {
   const t = useTranslations("templatesPage")
@@ -60,6 +63,13 @@ export default function TemplatesPage() {
     const result = await updateTemplateDescription(name, description, idToken)
     if (result.error) { showToast(result.error, "error"); return }
     setTemplates(prev => prev.map(t => t.name === name ? { ...t, description } : t))
+  }
+
+  const handleUpdateBuiltinNote = async (name: string, description: string) => {
+    if (!idToken) return
+    const result = await updateBuiltinTemplateNote(name, description, idToken)
+    if (result.error) { showToast(result.error, "error"); return }
+    setTemplates(prev => prev.map(t => t.name === name && t.source === "builtin" ? { ...t, description } : t))
   }
 
   const handleRename = async (oldName: string, newName: string): Promise<string | null> => {
@@ -148,6 +158,7 @@ export default function TemplatesPage() {
                       key={t.name}
                       template={t}
                       onDownload={handleDownload}
+                      onEditDescription={IS_LOCAL ? undefined : handleUpdateBuiltinNote}
                     />
                   ))}
                 </div>
@@ -290,7 +301,7 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
                 <span className="text-[11px] text-brand-teal/70 font-medium shrink-0">{t("custom")}</span>
               )}
             </div>
-            {/* Description — click to edit for user templates */}
+            {/* Description — editable when an update handler is available. */}
             {editing ? (
               <textarea
                 autoFocus

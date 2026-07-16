@@ -647,6 +647,17 @@ export async function updateTemplateDescription(name: string, description: strin
   return res.json()
 }
 
+/** Update the current user's note for a builtin template. */
+export async function updateBuiltinTemplateNote(name: string, description: string, idToken: string): Promise<{ updated?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}templates/builtin/${encodeURIComponent(name)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ description }),
+  })
+  return res.json()
+}
+
 /** Rename a user template. */
 export async function renameTemplate(name: string, newName: string, idToken: string): Promise<{ renamed?: { from: string; to: string }; error?: string }> {
   const base = await getApiBaseUrl()

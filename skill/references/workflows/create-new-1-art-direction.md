@@ -47,6 +47,7 @@ Internalize the design tokens and visual language now — Phase 2 will not re-re
 ### 1. Select and analyze template
 
 List available templates and ask the user to select one.
+Template descriptions may contain user notes such as intended use cases, preferences, or a request to use one by default. Read these notes and take them into account when proposing or selecting a template.
 
 ```bash
 uv run python3 scripts/pptx_builder.py list-templates
