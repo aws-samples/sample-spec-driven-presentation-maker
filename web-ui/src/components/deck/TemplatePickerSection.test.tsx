@@ -64,6 +64,19 @@ describe("TemplatePickerSection", () => {
     expect(screen.getByText("Template")).toBeTruthy()
   })
 
+  it("shows descriptions on cards without requiring hover", async () => {
+    renderWithIntl(
+      <TemplatePickerSection idToken="tok" currentTemplate={null} onTemplateSelect={() => {}} />
+    )
+    await screen.findByText("my-brand")
+    // Descriptions (including per-user builtin notes) are rendered as visible text
+    expect(screen.getByText("Builtin A")).toBeTruthy()
+    expect(screen.getByText("Company brand")).toBeTruthy()
+    // Templates without a description render no empty paragraph
+    const corporateCard = screen.getByRole("button", { name: "Use the corporate template" })
+    expect(corporateCard.querySelector("p")).toBeNull()
+  })
+
   it("orders user templates before builtin when nothing is confirmed", async () => {
     renderWithIntl(
       <TemplatePickerSection idToken="tok" currentTemplate={null} onTemplateSelect={() => {}} />

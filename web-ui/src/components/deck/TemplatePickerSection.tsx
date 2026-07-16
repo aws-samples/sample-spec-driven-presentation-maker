@@ -149,13 +149,19 @@ function TemplatePickCard({ template, isCurrent, pulsing, onClick }: {
         )}
       </div>
       {/* Name row */}
-      <div className="px-2.5 py-2 flex items-center gap-1.5">
+      <div className={`px-2.5 pt-2 flex items-center gap-1.5 ${template.description ? "pb-0.5" : "pb-2"}`}>
         {isCurrent && <Check className="h-3 w-3 text-brand-teal shrink-0" aria-hidden="true" />}
         <span className={`text-xs font-medium truncate ${isCurrent ? "text-brand-teal" : ""}`}>{template.name}</span>
         {template.source === "user" && (
           <span className="text-[11px] text-brand-teal/70 font-medium shrink-0">{t("custom")}</span>
         )}
       </div>
+      {/* Description — user notes influence template choice, so keep them visible */}
+      {template.description && (
+        <p className="px-2.5 pb-2 text-xs text-foreground-muted line-clamp-2 leading-snug">
+          {template.description}
+        </p>
+      )}
       {/* Hover overlay — previews the click's meaning (insert into chat) */}
       <span className="absolute inset-0 flex items-center justify-center gap-1 rounded-xl bg-black/60 text-xs font-medium text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-150">
         <Plus className="h-3.5 w-3.5" />
