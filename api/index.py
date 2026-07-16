@@ -501,6 +501,18 @@ def list_templates() -> Dict[str, Any]:
         for item in resp.get("Responses", {}).get(table.name, []):
             ddb_cache[item["name"]] = item
 
+    # Per-user notes overlay builtin metadata without modifying shared cache rows.
+    builtin_notes: Dict[str, str] = {}
+    if s3_templates:
+        resp = table.query(
+            KeyConditionExpression=Key("PK").eq(f"USER#{user_id}")
+            & Key("SK").begins_with("BUILTIN_NOTE#"),
+        )
+        builtin_notes = {
+            item["SK"].removeprefix("BUILTIN_NOTE#"): item.get("description", "")
+            for item in resp.get("Items", [])
+        }
+
     # Build builtin list with lazy analysis
     to_analyze: List[str] = []
     for name, etag in s3_templates.items():
@@ -513,7 +525,7 @@ def list_templates() -> Dict[str, Any]:
             templates.append({
                 "name": name,
                 "source": "builtin",
-                "description": cached.get("description", ""),
+                "description": builtin_notes.get(name, cached.get("description", "")),
                 "theme_colors": analysis.get("theme_colors", {}),
                 "fonts": cached.get("fonts", {}),
                 "layout_count": len(analysis.get("layouts", [])),
@@ -523,7 +535,7 @@ def list_templates() -> Dict[str, Any]:
             templates.append({
                 "name": name,
                 "source": "builtin",
-                "description": "",
+                "description": builtin_notes.get(name, ""),
                 "theme_colors": {},
                 "fonts": {},
                 "layout_count": 0,
@@ -608,6 +620,40 @@ def download_template(name: str) -> Any:
         return {"downloadUrl": url}
     except Exception:
         return {"error": "Template not found"}, 404
+
+
+@app.patch("/templates/builtin/<name>")
+def patch_builtin_template_note(name: str) -> Dict[str, Any]:
+    """Create, update, or clear the current user's note for a builtin template.
+
+    Body: {"description": str}. Blank descriptions clear the user overlay.
+    """
+    user_id = get_user_id(app.current_event)
+    body = app.current_event.json_body or {}
+    description_raw = body.get("description")
+    if not isinstance(description_raw, str):
+        return {"error": "Description must be a string"}, 400
+    if not name or not re.fullmatch(r"[a-zA-Z0-9_\-\s.()]+", name):
+        return {"error": "Invalid template name"}, 400
+
+    # Notes can only target builtin templates that currently exist in S3.
+    try:
+        s3_client.head_object(Bucket=RESOURCE_BUCKET, Key=f"templates/{name}.pptx")
+    except Exception:
+        return {"error": "Template not found"}, 404
+
+    key = {"PK": f"USER#{user_id}", "SK": f"BUILTIN_NOTE#{name}"}
+    description = description_raw.strip()
+    if not description:
+        table.delete_item(Key=key)
+    else:
+        table.put_item(Item={
+            **key,
+            "name": name,
+            "description": description,
+            "updatedAt": now_iso(),
+        })
+    return {"updated": name, "description": description}
 
 
 @app.post("/templates/user/upload-url")

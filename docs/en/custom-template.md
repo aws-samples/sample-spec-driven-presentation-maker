@@ -160,8 +160,7 @@ uv run python scripts/upload_template.py \
   --file my-template.pptx \
   --name "Corporate 2026" \
   --bucket <ResourceBucketName> \
-  --table <TableName> \
-  --default
+  --table <TableName>
 ```
 
 | Parameter | Required | Description |
@@ -170,9 +169,10 @@ uv run python scripts/upload_template.py \
 | `--name` | ✅ | Display name for the template |
 | `--bucket` | ✅ | S3 bucket name (CDK output `ResourceBucketName`) |
 | `--table` | ✅ | Amazon DynamoDB table name (CDK output `TableName`) |
-| `--default` | | Set as the default template |
 
 The script handles S3 upload, template analysis, and Amazon DynamoDB metadata registration automatically.
+
+In the cloud Web UI, each user can add a private note to builtin and user templates from the Templates page. The agent considers these notes—including intended use cases, preferences, and default-use requests—when proposing or selecting a template.
 
 ---
 

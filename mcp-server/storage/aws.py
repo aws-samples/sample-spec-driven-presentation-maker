@@ -279,6 +279,20 @@ class AwsStorage(Storage):
 
     # --- User Templates ---
 
+    def get_builtin_template_notes(self, user_id: str) -> dict[str, str]:
+        """Get per-user notes for builtin templates from DDB."""
+        resp = self._table.query(
+            KeyConditionExpression="PK = :pk AND begins_with(SK, :prefix)",
+            ExpressionAttributeValues={
+                ":pk": f"USER#{user_id}",
+                ":prefix": "BUILTIN_NOTE#",
+            },
+        )
+        return {
+            item["SK"].removeprefix("BUILTIN_NOTE#"): item.get("description", "")
+            for item in resp.get("Items", [])
+        }
+
     def list_user_templates(self, user_id: str) -> list[dict]:
         """List user templates from DDB."""
         resp = self._table.query(

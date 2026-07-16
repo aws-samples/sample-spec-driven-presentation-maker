@@ -17,7 +17,6 @@ Usage:
         --name "Corporate 2026" \
         --bucket my-sdpm-bucket \
         --table my-sdpm-table \
-        [--default] \
         [--region us-east-1]
 """
 
@@ -36,7 +35,6 @@ def main() -> None:
     parser.add_argument("--name", required=True, help="Display name for the template")
     parser.add_argument("--bucket", required=True, help="S3 bucket name")
     parser.add_argument("--table", required=True, help="DynamoDB table name")
-    parser.add_argument("--default", action="store_true", help="Set as default template")
     parser.add_argument("--region", default="us-east-1", help="AWS region")
     args = parser.parse_args()
 
@@ -73,15 +71,11 @@ def main() -> None:
         "s3Key": s3_key,
         "analysisJson": analysis_json,
         "fonts": fonts,
-        "isDefault": args.default,
         "createdAt": now,
         "updatedAt": now,
     }
     table.put_item(Item=item)
     print(f"Template registered: {template_id} ({args.name})")
-
-    if args.default:
-        print("Set as default template")
 
 
 if __name__ == "__main__":

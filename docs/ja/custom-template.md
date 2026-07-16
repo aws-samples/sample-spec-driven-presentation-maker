@@ -158,8 +158,7 @@ uv run python scripts/upload_template.py \
   --file my-template.pptx \
   --name "Corporate 2026" \
   --bucket <ResourceBucketName> \
-  --table <TableName> \
-  --default
+  --table <TableName>
 ```
 
 | パラメータ | 必須 | 説明 |
@@ -168,9 +167,10 @@ uv run python scripts/upload_template.py \
 | `--name` | ✅ | テンプレートの表示名 |
 | `--bucket` | ✅ | S3 バケット名（CDK 出力の `ResourceBucketName`） |
 | `--table` | ✅ | Amazon DynamoDB テーブル名（CDK 出力の `TableName`） |
-| `--default` | | デフォルトテンプレートに設定 |
 
 スクリプトは S3 へのアップロード、テンプレート解析、Amazon DynamoDB へのメタデータ登録を自動で行います。
+
+クラウド Web UI では、テンプレート画面からビルトインおよびユーザーテンプレートにユーザー専用のメモを追加できます。エージェントは、用途、好み、デフォルト利用の希望などのメモをテンプレートの提案・選択時に考慮します。
 
 ---
 
