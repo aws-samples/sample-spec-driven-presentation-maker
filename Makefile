@@ -1,4 +1,4 @@
-.PHONY: all lint test format check
+.PHONY: all lint test format check install-kiro
 
 all: lint test
 
@@ -13,3 +13,6 @@ test:
 
 check: lint test
 	@echo "All checks passed"
+
+install-kiro:
+	uv run python3 clients/kiro/install.py

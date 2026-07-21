@@ -73,9 +73,32 @@ Claude Code ユーザーはプラグインで一括導入できます（手動�
 art direction を進め、Phase 2（compose）を複数の composer サブエージェントへ並列委譲し、
 review まで実施します。
 
-> **どの入口を使う？** **Kiro CLI** → Layer 1 の skill。**Claude Desktop / その他 MCP
-> クライアント** → Layer 2 のローカル MCP サーバー。**Claude Code** → このプラグイン（同じ
+> **どの入口を使う？** **Kiro CLI** → `make install-kiro`（次節）。**Claude Desktop / その他
+> MCP クライアント** → Layer 2 のローカル MCP サーバー。**Claude Code** → このプラグイン（同じ
 > Layer 2 MCP サーバーを CC ネイティブの skill + 並列 compose サブエージェントで包んだもの）。
+
+### 🛠 Kiro CLI セットアップ（skill + 並列 compose サブエージェント）
+
+Kiro CLI ユーザーも同じフロー — `sdpm-vibe` skill が Phase 1 を進め、Phase 2 を
+`sdpm-composer` サブエージェントへ並列委譲 — を make ターゲット 1 つで導入できます。
+事前インストールは同じく [`uv`](https://docs.astral.sh/uv/)（`PATH` に）、および
+スライドプレビュー用の **LibreOffice** と **poppler** です。
+
+```bash
+git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
+cd sample-spec-driven-presentation-maker
+make install-kiro
+kiro-cli chat   # あとは「〇〇のスライドを作って」と頼むだけ
+```
+
+`make install-kiro` は skill を `~/.kiro/skills/` へ symlink し、composer エージェント設定
+`~/.kiro/agents/sdpm-composer.json` を生成し、`sdpm` ローカル MCP サーバーをグローバル
+`~/.kiro/settings/mcp.json` に登録します（特定のエージェント設定に追加したい場合は
+`clients/kiro/install.py --agent NAME` を直接実行）。再実行しても安全です。
+
+**更新:** チェックアウトで `git pull` するだけで反映されます — skill は symlink、composer
+プロンプトはチェックアウトへの `file://` 参照のため再インストール不要です。チェックアウトを
+別パスへ移動した場合のみ `make install-kiro` を再実行してください。
 
 ### 🚀 AWS アカウントだけですぐに開始！ ワンクリックデプロイ
 
