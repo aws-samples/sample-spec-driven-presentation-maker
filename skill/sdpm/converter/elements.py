@@ -825,20 +825,6 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
             elem["_spc"] = spc_values.pop()
     
     return elem
-    """Extract SVG bytes from asvg:svgBlip if present. Returns bytes or None."""
-    ASVG_NS = 'http://schemas.microsoft.com/office/drawing/2016/SVG/main'
-    svg_blip = shape._element.find(f'.//{{{ASVG_NS}}}svgBlip')
-    if svg_blip is None:
-        return None
-    r_ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
-    r_embed = svg_blip.get(f'{{{r_ns}}}embed')
-    if not r_embed:
-        return None
-    try:
-        part = shape.part.rels[r_embed].target_part
-        return part.blob
-    except (KeyError, Exception):
-        return None
 
 def extract_video_element(shape, output_dir=None, slide_idx=0, img_idx=0):
     """Extract video as element dict, saving video file and poster image."""
@@ -886,6 +872,45 @@ def extract_video_element(shape, output_dir=None, slide_idx=0, img_idx=0):
     except Exception as e:
         print(f"Warning: Failed to extract video: {e}", file=sys.stderr)
     return elem
+
+
+def _image_ext(part):
+    """File extension for an image part, derived from its content type."""
+    return part.content_type.split('/')[-1].replace('jpeg', 'jpg').replace('svg+xml', 'svg')
+
+
+def _save_image_part(part, output_dir, filename):
+    """Write an image part's blob under {output_dir}/images/. Returns deck-relative path."""
+    images_dir = Path(output_dir) / "images"
+    images_dir.mkdir(exist_ok=True)
+    (images_dir / filename).write_bytes(part.blob)
+    return f"images/{filename}"
+
+
+def _save_referenced_images(shape, output_dir, slide_idx, img_counter, prefix):
+    """Save every image part referenced (r:embed / r:link) inside a shape's XML.
+
+    Used when raw XML is re-injected on rebuild (rawShape _shapeXml / group
+    _groupXml): without the returned rId → deck-relative-path mapping the
+    injected XML carries dangling r:embed ids and its pictures vanish.
+
+    Returns (rid_map, img_counter).
+    """
+    rid_map = {}
+    if output_dir is None:
+        return rid_map, img_counter
+    for el_ref in shape._element.iter():
+        rid = el_ref.get(f'{{{_NS["r"]}}}embed') or el_ref.get(f'{{{_NS["r"]}}}link')
+        if not rid or rid in rid_map:
+            continue
+        try:
+            part = shape.part.rels[rid].target_part
+            fname = f"slide{slide_idx + 1}_{prefix}{img_counter + 1}_{rid}.{_image_ext(part)}"
+            rid_map[rid] = _save_image_part(part, output_dir, fname)
+            img_counter += 1
+        except Exception:
+            continue
+    return rid_map, img_counter
 
 
 def _extract_svg_blob(shape):
@@ -1054,13 +1079,10 @@ def _extract_blipfill_image(shape, output_dir, slide_idx, img_counter):
         if rid is None or output_dir is None:
             return None
         part = shape.part.rels[rid].target_part
-        ext = 'svg' if is_svg else part.content_type.split('/')[-1].replace('jpeg', 'jpg').replace('svg+xml', 'svg')
-        images_dir = Path(output_dir) / "images"
-        images_dir.mkdir(exist_ok=True)
+        ext = 'svg' if is_svg else _image_ext(part)
         filename = f"slide{slide_idx + 1}_image{img_counter + 1}.{ext}"
-        (images_dir / filename).write_bytes(part.blob)
         elem = _base_element(shape, "image")
-        elem["src"] = f"images/{filename}"
+        elem["src"] = _save_image_part(part, output_dir, filename)
         elem["fit"] = "cover"
         if ext == 'svg':
             elem["iconColor"] = "none"
@@ -1097,26 +1119,9 @@ def _extract_raw_shape(shape, output_dir, slide_idx, img_counter):
     from lxml import etree as _et
     elem = _base_element(shape, "rawShape")
     elem["_shapeXml"] = _et.tostring(shape._element, encoding='unicode')
-    if output_dir:
-        r_ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
-        rid_map = {}
-        for el_ref in shape._element.iter():
-            rid = el_ref.get(f'{{{r_ns}}}embed') or el_ref.get(f'{{{r_ns}}}link')
-            if not rid or rid in rid_map:
-                continue
-            try:
-                part = shape.part.rels[rid].target_part
-                ext = part.content_type.split('/')[-1].replace('jpeg', 'jpg').replace('svg+xml', 'svg')
-                images_dir = Path(output_dir) / "images"
-                images_dir.mkdir(exist_ok=True)
-                fname = f"slide{slide_idx + 1}_raw{img_counter + 1}_{rid}.{ext}"
-                (images_dir / fname).write_bytes(part.blob)
-                rid_map[rid] = f"images/{fname}"
-                img_counter += 1
-            except Exception:
-                continue
-        if rid_map:
-            elem["_shapeImages"] = rid_map
+    rid_map, img_counter = _save_referenced_images(shape, output_dir, slide_idx, img_counter, "raw")
+    if rid_map:
+        elem["_shapeImages"] = rid_map
     return elem, img_counter
 
 
@@ -1192,30 +1197,11 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
         try:
             from lxml import etree as _et
             elem["_groupXml"] = _et.tostring(shape._element, encoding='unicode')
-            # Save any images referenced from inside the group XML and record
-            # a rId → deck-relative-path mapping. Without this the injected
-            # XML carries dangling r:embed ids and pictures/picture-fills
-            # inside the group vanish on rebuild.
-            if output_dir:
-                r_ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
-                rid_map = {}
-                for el_ref in shape._element.iter():
-                    rid = el_ref.get(f'{{{r_ns}}}embed') or el_ref.get(f'{{{r_ns}}}link')
-                    if not rid or rid in rid_map:
-                        continue
-                    try:
-                        part = shape.part.rels[rid].target_part
-                        ext = part.content_type.split('/')[-1].replace('jpeg', 'jpg').replace('svg+xml', 'svg')
-                        images_dir = Path(output_dir) / "images"
-                        images_dir.mkdir(exist_ok=True)
-                        fname = f"slide{slide_idx + 1}_grp{img_counter + 1}_{rid}.{ext}"
-                        (images_dir / fname).write_bytes(part.blob)
-                        rid_map[rid] = f"images/{fname}"
-                        img_counter += 1
-                    except Exception:
-                        continue
-                if rid_map:
-                    elem["_groupImages"] = rid_map
+            # Save any images referenced from inside the group XML — see
+            # _save_referenced_images for why the rId mapping is required.
+            rid_map, img_counter = _save_referenced_images(shape, output_dir, slide_idx, img_counter, "grp")
+            if rid_map:
+                elem["_groupImages"] = rid_map
         except Exception:
             pass
     
