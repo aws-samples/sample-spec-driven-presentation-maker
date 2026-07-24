@@ -43,6 +43,7 @@ mcp.tool()(tools.code_to_slide)
 mcp.tool()(tools.grid)
 mcp.tool()(tools.arch_diagram)
 mcp.tool()(tools.pptx_to_json)
+mcp.tool()(tools.diff_pptx)
 
 # Sandbox tools (shared)
 mcp.tool()(sandbox_tools.run_python)

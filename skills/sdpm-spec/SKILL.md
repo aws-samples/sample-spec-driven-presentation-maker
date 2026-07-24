@@ -65,6 +65,7 @@ MCP, so translate every such command:
 | `pptx_builder.py code-block …` | `code_to_slide(...)` |
 | `pptx_builder.py image-size {path} --width {px}` | **no MCP tool** — compute proportional size in `run_python` (`new_h = round(orig_h * target_w / orig_w)`) |
 | `pptx_to_json.py {pptx}` | `pptx_to_json(...)` |
+| `pptx_builder.py diff {deck_dir} {edited_pptx}` | `diff_pptx(baseline=..., edited=...)` |
 | (import an existing PPTX / user file) | `upload_file(file_path)` → follow `guideInstruction`, then `import_attachment(source=uploadId, deck_id=...)` |
 | reading local deck files (`read_text` / `read_json`) | `run_python(purpose=..., code="...", deck_id=<path>)` sandbox functions |
 | fetching a URL the user gave | CC-native **WebFetch** (the MCP has no `web_fetch`) |
