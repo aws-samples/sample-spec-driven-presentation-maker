@@ -17,6 +17,7 @@ Conversion matrix:
 from __future__ import annotations
 
 import logging
+import re
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -49,6 +50,15 @@ class ConversionResult:
     images: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     error: str | None = None
+    # Deck-structure metadata (populated only when output_dir contains
+    # deck.json + slides/, i.e. for PPTX after pptx-import-edit).
+    deck_structure: bool = False
+    slide_count: int = 0
+    theme_hints: dict | None = None
+    suggested_name: str | None = None
+    # Path (relative to output_dir) of the placeholder-only template extracted
+    # from the source PPTX. Populated only when deck_structure is True.
+    template_path: str | None = None
 
 
 def convert_file(file_path: Path, output_dir: Path) -> ConversionResult:
@@ -390,12 +400,169 @@ def _convert_xlsx(file_path: Path, output_dir: Path, images_dir: Path) -> Conver
 
 
 # ---------------------------------------------------------------------------
-# PPTX: pptx_to_json Engine
+# PPTX: pptx_to_json Engine + deck-structure metadata extraction
 # ---------------------------------------------------------------------------
 
 
+def _extract_theme_hints(pptx_path: Path, deck_json_path: Path, slides_dir: Path) -> dict:
+    """Extract theme hints (backgroundLuminance, accentColors, fonts) from a converted deck.
+
+    Keys are stable across Local / Cloud / DynamoDB: ``backgroundLuminance``,
+    ``accentColors``, ``fonts``.
+
+    Background luminance strategy (prioritised):
+      1. If a slide declares an explicit ``background`` (hex), use that slide's color.
+      2. Else, fall back to the template's light theme color (lt1 if available,
+         otherwise dk1).
+      3. Compute per-slide luminance (0.299 R + 0.587 G + 0.114 B, 0-1) and
+         return the median across all slides.
+    """
+    import json as _json
+    import statistics
+
+    from sdpm.converter.color import extract_theme_colors_and_mapping
+
+    # Theme colors. PowerPoint can ship multiple slideMasters with
+    # different clrMaps; corporate decks frequently flip bg1=dk1 (dark
+    # deck) on a secondary master while keeping master 0 light. Walk all
+    # masters and pick the one whose clrMap most slides actually use, so
+    # backgroundLuminance reflects the rendered deck rather than master 0.
+    theme_colors: dict = {}
+    color_mapping: dict = {}
+    try:
+        # Default to master 0.
+        theme_colors, color_mapping, _ = extract_theme_colors_and_mapping(pptx_path, 0)
+    except Exception:
+        pass
+
+    # Discover all slideMasters and pick the one used by the most slides.
+    try:
+        with zipfile.ZipFile(pptx_path) as zf:
+            names = zf.namelist()
+            masters = sorted(
+                n for n in names
+                if n.startswith("ppt/slideMasters/slideMaster") and n.endswith(".xml")
+            )
+            # layout → master index (0-based per master ordering above)
+            layout_to_master: dict[str, int] = {}
+            for idx, master in enumerate(masters):
+                rels_name = master.replace("slideMasters/", "slideMasters/_rels/") + ".rels"
+                if rels_name not in names:
+                    continue
+                rels_xml = zf.read(rels_name).decode("utf-8", errors="ignore")
+                for layout_match in re.finditer(r'Target="\.\./slideLayouts/(slideLayout\d+\.xml)"', rels_xml):
+                    layout_to_master[layout_match.group(1)] = idx
+
+            # slide → layout → master
+            master_usage: dict[int, int] = {}
+            slide_files = sorted(
+                n for n in names
+                if re.match(r"ppt/slides/slide\d+\.xml$", n)
+            )
+            for slide in slide_files:
+                rels_name = slide.replace("slides/", "slides/_rels/") + ".rels"
+                if rels_name not in names:
+                    continue
+                rels_xml = zf.read(rels_name).decode("utf-8", errors="ignore")
+                m = re.search(r'Target="\.\./slideLayouts/(slideLayout\d+\.xml)"', rels_xml)
+                if m:
+                    layout = m.group(1)
+                    master_idx = layout_to_master.get(layout)
+                    if master_idx is not None:
+                        master_usage[master_idx] = master_usage.get(master_idx, 0) + 1
+
+            if master_usage:
+                dominant_master = max(master_usage.items(), key=lambda kv: kv[1])[0]
+                if dominant_master != 0:
+                    try:
+                        theme_colors, color_mapping, _ = extract_theme_colors_and_mapping(
+                            pptx_path, dominant_master
+                        )
+                    except Exception:
+                        pass
+    except Exception:
+        # Multi-master discovery is best-effort; fall through to master 0
+        # values that were already loaded above.
+        pass
+
+    # Resolve bg1 through clrMap. PowerPoint's default mapping is
+    # bg1=lt1 / tx1=dk1, but corporate decks frequently flip it
+    # (bg1=dk1 / tx1=lt1) to declare a dark theme without changing the
+    # theme XML. The dominant slideMaster's clrMap is the authoritative
+    # answer.
+    bg1_target = color_mapping.get("bg1", "lt1") if color_mapping else "lt1"
+    resolved_bg = theme_colors.get(bg1_target)
+    lt1 = theme_colors.get("lt1", "#FFFFFF")
+    dk1 = theme_colors.get("dk1", "#000000")
+    # Fallback chain: slide bg > clrMap-resolved bg1 > lt1 > dk1 inverted
+    default_bg = resolved_bg if resolved_bg else (lt1 if lt1 else _invert_hex(dk1))
+
+    def _hex_to_luminance(hex_color: str) -> float:
+        h = hex_color.lstrip("#")
+        try:
+            r = int(h[0:2], 16)
+            g = int(h[2:4], 16)
+            b = int(h[4:6], 16)
+        except (ValueError, IndexError):
+            return 0.5
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+
+    luminances: list[float] = []
+    if slides_dir.is_dir():
+        for slide_file in sorted(slides_dir.glob("slide-*.json")):
+            try:
+                data = _json.loads(slide_file.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            bg = data.get("background") or default_bg
+            luminances.append(_hex_to_luminance(bg))
+    if not luminances:
+        luminances = [_hex_to_luminance(default_bg)]
+
+    background_luminance = statistics.median(luminances)
+
+    accent_colors: list[str] = []
+    for name in ("accent1", "accent2", "accent3"):
+        c = theme_colors.get(name)
+        if isinstance(c, str) and c.startswith("#"):
+            accent_colors.append(c.upper())
+    accent_colors = accent_colors[:3]
+
+    fonts: dict = {}
+    if deck_json_path.exists():
+        try:
+            deck = _json.loads(deck_json_path.read_text(encoding="utf-8"))
+            f = deck.get("fonts")
+            if isinstance(f, dict):
+                fonts = f
+        except Exception:
+            pass
+
+    return {
+        "backgroundLuminance": round(background_luminance, 4),
+        "accentColors": accent_colors,
+        "fonts": fonts,
+    }
+
+
+def _invert_hex(hex_color: str) -> str:
+    """Invert a #RRGGBB color (for the dk1-inverted fallback)."""
+    h = hex_color.lstrip("#")
+    try:
+        r = 255 - int(h[0:2], 16)
+        g = 255 - int(h[2:4], 16)
+        b = 255 - int(h[4:6], 16)
+    except (ValueError, IndexError):
+        return "#FFFFFF"
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
 def _convert_pptx(file_path: Path, output_dir: Path) -> ConversionResult:
-    """Convert PPTX to JSON via Engine's pptx_to_json."""
+    """Convert PPTX to deck structure via Engine's pptx_to_json.
+
+    Populates deck_structure, slide_count, theme_hints, suggested_name when
+    the output directory contains the new deck layout (deck.json + slides/).
+    """
     import json
 
     try:
@@ -405,7 +572,6 @@ def _convert_pptx(file_path: Path, output_dir: Path) -> ConversionResult:
 
     try:
         result = pptx_to_json(file_path, output_dir=output_dir)
-        # pptx_to_json writes slides.json + images/ to output_dir
         json_str = json.dumps(result, ensure_ascii=False)
 
         # Collect extracted images
@@ -414,8 +580,42 @@ def _convert_pptx(file_path: Path, output_dir: Path) -> ConversionResult:
         if img_dir.exists():
             images = [f.name for f in img_dir.iterdir() if f.is_file()]
 
+        deck_json_path = output_dir / "deck.json"
+        slides_dir = output_dir / "slides"
+        deck_structure = deck_json_path.exists() and slides_dir.is_dir()
+
+        slide_count = 0
+        theme_hints: dict | None = None
+        suggested_name: str | None = None
+        template_path: str | None = None
+        warnings: list[str] = []
+        if deck_structure:
+            slide_count = len(list(slides_dir.glob("slide-*.json")))
+            try:
+                theme_hints = _extract_theme_hints(file_path, deck_json_path, slides_dir)
+            except Exception as e:
+                logger.warning("theme_hints extraction failed: %s", e)
+            suggested_name = file_path.stem
+            try:
+                from sdpm.converter.template import extract_placeholder_template
+
+                template_out = output_dir / "template.pptx"
+                extract_placeholder_template(file_path, template_out)
+                template_path = "template.pptx"
+            except Exception as e:
+                logger.warning("placeholder template extraction failed: %s", e)
+                warnings.append(f"placeholder template extraction failed: {e}")
+
         return ConversionResult(
-            status="success", json_data=json_str, images=images,
+            status="success",
+            json_data=json_str,
+            images=images,
+            warnings=warnings,
+            deck_structure=deck_structure,
+            slide_count=slide_count,
+            theme_hints=theme_hints,
+            suggested_name=suggested_name,
+            template_path=template_path,
         )
     except Exception as e:
         return ConversionResult(status="error", error=f"PPTX conversion failed: {e}")

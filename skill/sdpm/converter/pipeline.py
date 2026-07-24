@@ -1,6 +1,20 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""PPTX to JSON conversion pipeline."""
+"""PPTX to JSON conversion pipeline.
+
+Output structure (deck format — stable since pptx-import-edit):
+    {output_dir}/
+        ├── deck.json              # {fonts, defaultTextColor}  (template set by caller)
+        ├── slides/
+        │   ├── slide-01.json
+        │   ├── slide-02.json
+        │   └── ...
+        └── images/                # extracted slide images
+
+The in-memory ``result`` dict still contains ``{slides: [...], fonts, defaultTextColor}``
+for callers that prefer the all-in-one structure (e.g. sdpm.diff). Only the on-disk
+layout changed — the legacy single ``slides.json`` is no longer written.
+"""
 import argparse
 import sys
 from pathlib import Path
@@ -12,32 +26,49 @@ from .slide import extract_slide
 from sdpm.utils.io import write_json
 from sdpm.schema.defaults import sort_element_keys
 
+
 def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: bool = True, minimal: bool = False):
-    """Convert PPTX to JSON. Output is a project folder with slides.json + images/."""
+    """Convert PPTX to JSON. Output is a deck-structure directory.
+
+    Args:
+        pptx_path: Input PPTX file.
+        output_dir: Output directory (auto-derived from pptx_path stem if None).
+        use_layout_names: Use layout names verbatim (else heuristic detection).
+        minimal: Strip defaults for clean output.
+
+    Returns:
+        Dict with {slides, fonts, defaultTextColor} for in-memory consumers.
+
+    On-disk output:
+        deck.json  (fonts + defaultTextColor; template left unset)
+        slides/slide-{NN}.json  (one per slide; NN is 2-digit 1-based)
+        images/   (unchanged — populated by extract_slide)
+    """
     actual_path = pptx_path
     prs = Presentation(str(actual_path))
 
     # Set EMU_PER_PX based on actual slide size
     from .constants import set_emu_per_px
     set_emu_per_px(int(prs.slide_width))
-    
+
     # Create output directory
     if output_dir is None:
         output_dir = pptx_path.with_suffix('')
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    
-    result = {
-        "slides": []
-    }
-    
+
+    slides_dir = output_dir / "slides"
+    slides_dir.mkdir(parents=True, exist_ok=True)
+
+    result: dict = {"slides": []}
+
     # Extract fonts from template
     try:
         from sdpm.analyzer import extract_fonts
         result["fonts"] = extract_fonts(actual_path)
     except Exception:
         pass
-    
+
     # Compute builder's default text color (from slide_masters[0])
     builder_text_color = None
     try:
@@ -47,49 +78,68 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: boo
     except Exception:
         pass
 
+    if builder_text_color:
+        result["defaultTextColor"] = builder_text_color
+
     for slide_idx, slide in enumerate(prs.slides):
         # Get slide master index
         slide_master = slide.slide_layout.slide_master
         master_idx = list(prs.slide_masters).index(slide_master)
-        
+
         # Extract theme colors and mapping for this master
         theme_colors, color_mapping, theme_styles = extract_theme_colors_and_mapping(actual_path, master_idx)
-        
-        slide_dict = extract_slide(slide, theme_colors, color_mapping, theme_styles, master_idx, output_dir, slide_idx, pptx_path=actual_path, use_layout_names=use_layout_names, builder_text_color=builder_text_color)
+
+        slide_dict = extract_slide(
+            slide, theme_colors, color_mapping, theme_styles, master_idx, output_dir, slide_idx,
+            pptx_path=actual_path, use_layout_names=use_layout_names, builder_text_color=builder_text_color,
+        )
         slide_dict["elements"] = [sort_element_keys(e) for e in slide_dict.get("elements", [])]
         if minimal:
             from sdpm.schema.minimal import minimize
             slide_dict["elements"] = minimize(slide_dict["elements"])
         result["slides"].append(slide_dict)
-    
-    # Output
-    json_path = output_dir / "slides.json"
-    write_json(json_path, result)
-    
-    # Cleanup
+
+    # Write deck.json (fonts + defaultTextColor; template is caller's responsibility)
+    deck_meta: dict = {}
+    if "fonts" in result:
+        deck_meta["fonts"] = result["fonts"]
+    if "defaultTextColor" in result:
+        deck_meta["defaultTextColor"] = result["defaultTextColor"]
+    write_json(output_dir / "deck.json", deck_meta)
+
+    # Write slides/slide-{NN}.json (1-based, zero-padded, hyphen separator to match parse_outline_slugs)
+    for idx, slide_dict in enumerate(result["slides"], start=1):
+        slug = f"slide-{idx:02d}"
+        slide_path = slides_dir / f"{slug}.json"
+        write_json(slide_path, slide_dict)
+
+    # Status output
     print(f"Converted: {output_dir}/")
-    print(f"  {json_path}")
+    print("  deck.json")
+    print(f"  slides/ ({len(result['slides'])} files)")
     images_dir = output_dir / "images"
     if images_dir.exists():
         count = len(list(images_dir.iterdir()))
-        print(f"  {images_dir}/ ({count} files)")
-    
+        print(f"  images/ ({count} files)")
+
     return result
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Convert PPTX to JSON")
+    parser = argparse.ArgumentParser(description="Convert PPTX to JSON (deck structure)")
     parser.add_argument("input", help="Input PPTX file")
     parser.add_argument("-o", "--output", help="Output directory (default: input filename without extension)")
     parser.add_argument("--minimal", action="store_true", help="Strip defaults, internal keys, and font tags for clean output")
     args = parser.parse_args()
-    
+
     input_path = Path(args.input)
     if not input_path.exists():
         print(f"Error: File not found: {input_path}", file=sys.stderr)
         sys.exit(1)
-    
+
     output_dir = Path(args.output) if args.output else None
     pptx_to_json(input_path, output_dir, minimal=args.minimal)
+
 
 if __name__ == "__main__":
     main()

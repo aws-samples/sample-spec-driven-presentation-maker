@@ -41,10 +41,14 @@ def _roundtrip(tmp_path: Path, elements: list[dict], notes: str | None = None) -
     out_pptx = tmp_path / "out.pptx"
     result = generate(deck, output_path=out_pptx)
     assert result["slide_count"] == 1
-    pptx_to_json(out_pptx, tmp_path / "extracted")
-    data = json.loads((tmp_path / "extracted" / "slides.json").read_text())
-    assert len(data["slides"]) == 1
-    return data["slides"][0]
+    extracted = pptx_to_json(out_pptx, tmp_path / "extracted")
+    # On-disk output is deck-structure (deck.json + slides/slide-NN.json)
+    assert (tmp_path / "extracted" / "deck.json").exists()
+    slide_files = sorted((tmp_path / "extracted" / "slides").glob("slide-*.json"))
+    assert len(slide_files) == 1
+    # In-memory return keeps the all-in-one {slides: [...]} shape
+    assert len(extracted["slides"]) == 1
+    return extracted["slides"][0]
 
 
 def _plain_text(extracted_text: str) -> str:

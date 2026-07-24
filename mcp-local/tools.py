@@ -378,16 +378,28 @@ def arch_diagram(
 
 
 def pptx_to_json(pptx_path: str) -> dict[str, Any]:
-    """Convert an existing PPTX file to JSON representation.
+    """Convert PPTX to JSON representation.
 
-    Args:
-        pptx_path: Path to the PPTX file.
+    Writes a deck-structure directory (``deck.json`` + ``slides/slide-NN.json``
+    + ``images/``) alongside the input PPTX (``{stem}/`` sibling directory).
+    The returned dict still contains ``{slides, fonts, defaultTextColor}`` for
+    in-memory use.
+
+    Note: the on-disk output is deck-structure (since pptx-import-edit);
+    no single ``slides.json`` file is produced. Callers that need an
+    editable deck should prefer the upload → import_attachment flow.
 
     Returns:
-        Dict with slide data in JSON format.
+        Dict with slides list plus deck metadata (fonts, defaultTextColor),
+        plus ``deck_dir`` (string path to the written directory) for
+        downstream tooling.
     """
     from sdpm.converter import pptx_to_json as _convert
     path = Path(pptx_path)
     if not path.exists():
         raise FileNotFoundError(f"PPTX not found: {pptx_path}")
-    return _convert(str(path))
+    result = _convert(path)
+    deck_dir = path.with_suffix("")
+    if isinstance(result, dict):
+        result = {**result, "deck_dir": str(deck_dir)}
+    return result

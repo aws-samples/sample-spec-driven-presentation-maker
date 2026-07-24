@@ -1,147 +1,134 @@
 ---
 name: translate-pptx
-description: "Translate existing PPTX (e.g. EN→JA, JA→EN)"
+description: "Translate an existing deck into another language as a derived deck"
 category: workflow
 ---
 
-# PPTX Translation
+# Translate Existing Deck
 
-Translate an existing PPTX into another language. A variant of Workflow B.
+Translate a deck to another language by creating a **derived deck**. The
+original deck is untouched — translation is written to a sibling directory
+(``{deck_dir}-{lang}/``) so the source language remains available.
+
+## Prerequisites
+
+- A deck in the new format: ``{deck_dir}/deck.json`` + ``slides/*.json``
+  + ``specs/`` + ``images/``. If you only have the source PPTX, first
+  import it via the edit flow (see ``guides/import-pptx.md``).
+- ``{deck_dir}/deck.json`` has ``template`` set to the original PPTX so
+  the derived deck's PPTX build finds the same layouts.
 
 ---
 
-### 0. Review available guides
-
-Run `guides` to review available guides. Read any that are relevant to the translation.
-
----
-
-### 1. Reverse-convert
+## Step 1 — Create the derived deck + extract translatable text
 
 ```bash
-uv run python3 scripts/pptx_builder.py init {name}
-# {project_dir} = the directory created by init (printed in output)
-uv run python3 scripts/pptx_to_json.py {input_pptx} -o {project_dir}
+uv run python3 scripts/translate_extract.py {deck_dir} --target-lang ja
 ```
 
-- Do NOT use `--minimal` — translation requires a full roundtrip
-- The reverse-convert writes `"template"` into the JSON, so `generate` uses the original PPTX automatically
+Creates::
+
+    {deck_dir}-ja/
+        deck.json                        (copy)
+        slides/*.json                    (copy)
+        specs/                           (copy — NOT translated by the script)
+        attachments/                     (copy)
+        images/                          (copy)
+        translate/translation_map.json   (empty-value dictionary template)
+        translate/texts.tsv              (review copy of translatable strings)
+
+``output.pptx``, ``preview/``, and ``compose/`` are intentionally not
+copied — the derived deck regenerates them from scratch.
+
+Useful options:
+
+- ``--skip-short 3`` — exclude text of 3 characters or fewer (VPC, TAG,
+  BGP, numbers, etc.).
+- ``--output-dir <path>`` — pick an explicit path for the derived deck
+  instead of the default ``{deck_dir}-{target-lang}`` naming.
+
+The script fails if the derived-deck path already exists, so you can
+re-run safely without accidentally overwriting in-progress work.
 
 ---
 
-### 2. Extract text + generate dictionary template
+## Step 2 — Fill the translation dictionary
+
+Edit ``{deck_dir}-ja/translate/translation_map.json``:
+
+- Each value is an empty string by default. Replace it with the
+  translation. Keys must NOT be edited — ``\x0b`` and other control
+  characters are encoded correctly only when the script generates them.
+- An empty string ``""`` means **skip this key** — the apply script
+  leaves the original text in place.
+- Preserve styled-text tags. Tag positions may need to move to match the
+  translated word boundaries:
+  ``"{{bold,#00D6C7:Contextual Planning}}{{16pt:- Builds...}}"`` →
+  ``"{{bold,#00D6C7:コンテキスト対応の計画}}{{16pt:- 設計、コード...}}"``.
+
+For 100+ entries, fill in batches of 50–80 and ``--dry-run`` after each
+batch to catch copy-paste mistakes early.
+
+---
+
+## Step 3 — Apply the translation
 
 ```bash
-# Extract as TSV for review
-uv run python3 scripts/translate_extract.py {project_dir}/slides.json -o {project_dir}/texts.tsv
+# Dry run first — prints the diff without touching files.
+uv run python3 scripts/translate_apply.py {deck_dir}-ja --dry-run
 
-# Generate empty dictionary template (recommended — keys with \x0b and other control characters are generated accurately)
-uv run python3 scripts/translate_extract.py {project_dir}/slides.json --generate-map -o {project_dir}/translation_map.json
-
-# Exclude short text (technical abbreviations, numbers, etc.)
-uv run python3 scripts/translate_extract.py {project_dir}/slides.json --generate-map --skip-short 3 -o {project_dir}/translation_map.json
+# Apply when the dry-run output looks correct.
+uv run python3 scripts/translate_apply.py {deck_dir}-ja
 ```
 
-- `--generate-map` generates an empty dictionary template. Keys match the original text in slides.json exactly, preventing `\x0b` mismatches from manual copy-paste
-- `--skip-short N` excludes text of N characters or fewer (VPC, TAG, BGP, etc.)
-- `\x0b` (vertical tab) is invisible in TSV but exists in slides.json. Always generate dictionary keys with `--generate-map` or copy directly from slides.json
+The apply script rewrites ``{deck_dir}-ja/slides/*.json`` in place.
+
+What the script handles automatically:
+
+- ``\x0b`` (vertical tab) preservation — JSON round-trips encode it.
+- Styled-text tag preservation — the replacement is key-exact, so the
+  tag syntax you put in the dictionary value comes through verbatim.
+- ``_textGradientRuns[].text`` sync when the runs originally spanned the
+  entire paragraph (single-run case). Partial-paragraph gradients are
+  left alone — adjust them manually in slides JSON.
+
+What the script does NOT handle (keep in mind):
+
+- ``specs/brief.md`` / ``specs/outline.md`` / ``specs/art-direction.html``
+  are copied as-is. If you need translated specs, edit them separately
+  (LLM-assisted or by hand).
+- Text rendered inside images. Swap the image or add speaker notes if
+  the image has critical translated content.
 
 ---
 
-### 3. Build translation dictionary + batch apply
-
-Create a translation mapping dictionary in `translation_map.json` based on the extracted text.
-
-**Dictionary creation procedure:**
-1. Fill in the values of the template generated by `--generate-map` (NEVER write keys manually — `\x0b` and special quote mismatches will occur)
-2. Leave value as empty string `""` for entries that should not be translated (skipped during apply)
-3. For 100+ entries, split into batches of 50-80
-4. Run `--dry-run` after each batch to verify match status, then apply
+## Step 4 — Build the derived deck
 
 ```bash
-# Dry run to verify key matching (no file changes)
-uv run python3 scripts/translate_apply.py {project_dir}/slides.json {project_dir}/translation_map.json --dry-run
-
-# Apply
-uv run python3 scripts/translate_apply.py {project_dir}/slides.json {project_dir}/translation_map.json
-```
-
-**Translating styled text:**
-- Preserve tag types (bold, italic, color, font, size) as-is
-- Adjust tag positions to match the translated text — word boundaries shift across languages
-- Example: `"{{bold,#00D6C7:Contextual Planning }}{{16pt:- Builds...}}"` → `"{{bold,#00D6C7:コンテキスト対応の計画 }}{{16pt:- 設計、コード...}}"`
-- Dictionary keys must be exact matches of the original. The apply script handles replacement, so the agent adjusts tag positions when building the dictionary
-
-**Translating partial styles (text gradients, bold, etc.):**
-- Bold / color / font changes → expressed as styled text tags (`{{bold:...}}`). Agent adjusts tag positions in the dictionary
-- All runs share the same gradient → automatically promoted to `textGradient` (element level). No action needed
-- Entire heading paragraph has gradient → `translate_apply.py` auto-syncs `_textGradientRuns[].text`. No action needed
-- Only some runs within a paragraph have gradient → agent manually updates `_textGradientRuns[].text` in slides.json to match the translated text
-
-**Translation target keys:**
-- `text`, `paragraphs[].text`, `items[]`, `title`, `subtitle`, `date`, `label`, `notes`
-- `elements` inside `group` elements (recursively nested)
-- Table `headers` and `rows`
-
-**Constraints:**
-- You MUST NOT translate key names, layout names, or structural values (`layout`, `type`, `shape`, `preset`, `connectorType`, `src`, `masterIndex`, etc.)
-- You MUST NOT translate values of `fontFamily`, `fontColor`, `fill`, `color`, `fontSize`, `opacity`, `align`, `verticalAlign`
-- You MUST NOT translate copyright notices, legal text, company names, product names, or person names
-- You MUST NOT translate URLs
-- You MUST preserve `\x0b` (vertical tab) positions — used as line breaks
-- You MUST match the original text exactly in the dictionary key (strip() fallback is handled by the script)
-
-**Skip criteria (do not include in dictionary):**
-- Technical abbreviations only (VPC, TAG, BGP, GRE, TGW, etc.)
-- Numbers only (36, 114, 700+, etc.)
-- Code blocks, JSON, or other structured text
-- Text inside images (cannot be translated)
-- Use `--skip-short 3` to auto-exclude text of 3 characters or fewer
-
----
-
-### 4. Check for untranslated text
-
-Run extract again on the translated slides.json to find remaining text.
-
-```bash
-uv run python3 scripts/translate_extract.py {project_dir}/slides.json
-```
-
-Person names, company names, technical abbreviations, and numbers remaining is expected. If other source-language text remains, add it to the dictionary and re-apply.
-
----
-
-### 5. Generate + measure + preview
-
-```bash
-uv run python3 scripts/pptx_builder.py generate {project_dir}/slides.json -o {project_dir}/output.pptx
-uv run python3 scripts/pptx_builder.py measure {project_dir}/slides.json
-uv run python3 scripts/pptx_builder.py preview {project_dir}/slides.json
+uv run python3 scripts/pptx_builder.py generate {deck_dir}-ja -o {deck_dir}-ja/output.pptx
+uv run python3 scripts/pptx_builder.py measure {deck_dir}-ja
+uv run python3 scripts/pptx_builder.py preview {deck_dir}-ja
 # Check specific slides
-uv run python3 scripts/pptx_builder.py preview {project_dir}/slides.json -p 1,3,5
+uv run python3 scripts/pptx_builder.py preview {deck_dir}-ja -p 1,3,5
 ```
 
-**Layout breakage checks:**
-- Japanese text is wider than English, so text may overflow or clip
-- Prioritize slides where measure shows significant size discrepancies
-- Review measure output and preview PNGs, fix slides.json for any broken slides, then regenerate
-- Common fixes:
-  - Reduce `fontSize`
-  - Shorten text or increase element `width`/`height`
-  - Adjust line breaks — Japanese word-wrap breaks at different positions than English. Use `\n` to set explicit break points
+Common post-translation fixes (layout breakage is typical when
+translating EN → JA because Japanese characters are wider):
 
-**Constraints:**
-- You MUST use the original PPTX as template because the default template causes layout name mismatch errors — ensure `"template"` in the JSON points to the original PPTX
-- Japanese text is typically wider than English — measure discrepancies are expected. Focus on slides where text significantly exceeds the declared height
+- Reduce ``fontSize`` on overflowing elements.
+- Widen the containing element (``width`` / ``height``).
+- Insert explicit line breaks (``\n``) where auto-wrap produces awkward
+  splits.
+- Re-run measure after each fix; iterate until the overflow warnings
+  clear.
 
 ---
 
-### 6. Final checklist
+## Notes
 
-- [ ] All slides with significant measure discrepancies reviewed
-- [ ] Cover and section slide titles checked for overflow
-- [ ] Table cell text checked for overflow
-- [ ] Speaker notes added for text inside images (cannot be translated)
-
-**Output file naming:** `{original_filename}-JA.pptx` (or target language code)
+- Re-run ``translate_extract.py`` from the same source deck with a
+  different ``--target-lang`` to create additional language variants
+  without touching the existing ones.
+- To translate ``specs/`` as well, do so separately. A reasonable path
+  is to run the spec files through an LLM with the translation_map
+  entries as glossary context so terminology stays consistent.

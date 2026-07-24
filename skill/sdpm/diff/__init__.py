@@ -134,6 +134,27 @@ def align_slides(base_slides, edit_slides, threshold=0.1):
     return result
 
 
+def _load_deck_as_roundtrip(deck_dir: Path) -> dict:
+    """Load deck-structure output (deck.json + slides/*.json) as a single roundtrip dict.
+
+    Restores the legacy {slides: [...], fonts, defaultTextColor} shape that the diff
+    algorithms expect. Slides are ordered by filename (slide-01, slide-02, ...).
+    """
+    deck_json = deck_dir / "deck.json"
+    slides_dir = deck_dir / "slides"
+    data: dict = {}
+    if deck_json.exists():
+        with open(deck_json) as f:
+            data = json.load(f)
+    slides: list = []
+    if slides_dir.is_dir():
+        for slide_file in sorted(slides_dir.glob("slide-*.json")):
+            with open(slide_file) as f:
+                slides.append(json.load(f))
+    data["slides"] = slides
+    return data
+
+
 def load_slides_json_or_pptx(path):
     """Load roundtrip slides JSON from .json or .pptx."""
     if path.endswith('.pptx'):
@@ -142,8 +163,8 @@ def load_slides_json_or_pptx(path):
                 [sys.executable, str(Path(__file__).resolve().parent.parent.parent / 'scripts' / 'pptx_to_json.py'), path, '-o', tmpdir],
                 capture_output=True, text=True, check=True
             )
-            with open(Path(tmpdir) / 'slides.json') as f:
-                return json.load(f)
+            # New deck-structure output: deck.json + slides/slide-NN.json
+            return _load_deck_as_roundtrip(Path(tmpdir))
     with open(path) as f:
         data = json.load(f)
     # Check if this is a source JSON (not already a roundtrip JSON) by looking
@@ -164,14 +185,14 @@ def load_slides_json_or_pptx(path):
     if is_source:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_pptx = Path(tmpdir) / "tmp.pptx"
-            from sdpm.api import _find_template_in_dirs, get_templates_dirs
+            from sdpm.api import _find_template_in_dirs, _get_templates_dirs
             from sdpm.builder import PPTXBuilder, resolve_override
             tpl_name = data.get("template")
             if not tpl_name:
                 raise ValueError("No \"template\" specified in JSON. Cannot build for diff.")
             template = Path(path).parent / tpl_name
             if not template.exists():
-                named = _find_template_in_dirs(tpl_name, get_templates_dirs())
+                named = _find_template_in_dirs(tpl_name, _get_templates_dirs())
                 if named is not None:
                     template = named
                 else:
@@ -186,6 +207,5 @@ def load_slides_json_or_pptx(path):
                 [sys.executable, str(Path(__file__).resolve().parent.parent.parent / 'scripts' / 'pptx_to_json.py'), str(tmp_pptx), '-o', tmpdir],
                 capture_output=True, text=True, check=True
             )
-            with open(Path(tmpdir) / 'slides.json') as f:
-                return json.load(f)
+            return _load_deck_as_roundtrip(Path(tmpdir))
     return data
