@@ -136,3 +136,92 @@ class TestMultiParagraphTitle:
         dumped = json.dumps(result["slides"], ensure_ascii=False)
         assert "line one" in dumped
         assert "line two" in dumped, "second title paragraph was dropped"
+
+
+class TestHiddenSlides:
+    def test_hidden_flag_roundtrips(self, tmp_path):
+        prs = Presentation(str(_template()))
+        s1 = prs.slides.add_slide(prs.slide_layouts[0])
+        s2 = prs.slides.add_slide(prs.slide_layouts[0])
+        s2._element.set("show", "0")  # PowerPoint: Hide Slide
+        del s1  # only to silence linters
+        pptx_path = tmp_path / "hidden.pptx"
+        prs.save(str(pptx_path))
+
+        result = pptx_to_json(pptx_path, tmp_path / "out")
+        # template may ship with its own slides — check the last two we added
+        hidden_flags = [sl.get("hidden") for sl in result["slides"]]
+        assert hidden_flags[-1] is True, f"hidden flag not extracted: {hidden_flags}"
+        assert hidden_flags[-2] is not True
+
+        # Builder restores the flag
+        from sdpm.builder import PPTXBuilder
+        builder = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
+        builder.add_slide({"layout": builder_first_layout(builder)})
+        builder.add_slide({"layout": builder_first_layout(builder), "hidden": True})
+        out = tmp_path / "rebuilt.pptx"
+        builder.save(str(out))
+        prs2 = Presentation(str(out))
+        slides = list(prs2.slides)
+        assert slides[0]._element.get("show") != "0"
+        assert slides[1]._element.get("show") == "0", "hidden flag not rebuilt"
+
+
+def builder_first_layout(builder) -> str:
+    return next(iter(builder.layouts))
+
+
+class TestDiffDetectsPlaceholderEdits:
+    def test_title_placeholder_edit_is_reported(self, tmp_path):
+        from sdpm.diff import diff_report
+
+        base = {"slides": [{"layout": "L", "placeholders": {"0": "original title"}, "elements": []}]}
+        edit = {"slides": [{"layout": "L", "placeholders": {"0": "edited title"}, "elements": []}]}
+        bp = tmp_path / "base.json"
+        ep = tmp_path / "edit.json"
+        bp.write_text(json.dumps(base))
+        ep.write_text(json.dumps(edit))
+
+        rep = diff_report(bp, ep)
+        assert rep["has_diff"], "placeholder edit went undetected"
+        assert "placeholder[0]" in rep["report"]
+
+
+class TestExplicitCropKeepsFrame:
+    def test_cropped_image_fills_declared_box(self, tmp_path):
+        """With an explicit crop, the frame must NOT shrink to the uncropped
+        image's aspect ratio (PowerPoint srcRect semantics: crop fills frame)."""
+        from PIL import Image as PILImage
+
+        img = tmp_path / "tall.png"
+        PILImage.new("RGB", (400, 800), "red").save(img)  # tall image
+
+        deck = tmp_path / "deck"
+        (deck / "slides").mkdir(parents=True)
+        (deck / "specs").mkdir()
+        (deck / "deck.json").write_text(json.dumps({
+            "template": str(_template()),
+            "fonts": {"fullwidth": "Meiryo", "halfwidth": "Arial"},
+        }))
+        (deck / "specs" / "outline.md").write_text("- [s1] test\n")
+        (deck / "slides" / "s1.json").write_text(json.dumps({
+            "layout": "Blank",
+            "elements": [{
+                "type": "image", "src": str(img),
+                "x": 0, "y": 0, "width": 800, "height": 200,   # wide box
+                "crop": {"top": 40.0, "bottom": 35.0},          # crops to wide region
+            }],
+        }))
+        from sdpm.api import generate
+        out = tmp_path / "out.pptx"
+        generate(deck, output_path=out)
+
+        prs = Presentation(str(out))
+        pics = [sh for sh in prs.slides[0].shapes if sh.shape_type == 13]
+        assert pics, "picture not built"
+        pic = pics[0]
+        # Frame keeps the declared 800px-wide box (compare as a fraction of
+        # slide width to stay independent of the builder's px scale). The old
+        # fit=contain behaviour shrank width to height*aspect = 100px (~5%).
+        ratio = pic.width / prs.slide_width
+        assert ratio > 0.35, f"frame shrank despite explicit crop: width ratio={ratio:.2f}"

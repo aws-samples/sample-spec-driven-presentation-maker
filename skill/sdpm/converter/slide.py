@@ -128,6 +128,9 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
         "layout": layout_name,
         "masterIndex": master_idx
     }
+    # Hidden slide (right-click → Hide Slide in PowerPoint)
+    if slide._element.get("show") == "0":
+        slide_dict["hidden"] = True
     
     # Extract slide background (if different from layout)
     try:

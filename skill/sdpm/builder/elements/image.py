@@ -149,7 +149,9 @@ class ImageMixin:
                             img_w, img_h = img.size
                     except Exception:
                         img_w, img_h = 1, 1
-                if img_w > 0 and img_h > 0:
+                if img_w > 0 and img_h > 0 and not elem.get("crop"):
+                    # With an explicit crop, srcRect fills the frame
+                    # (PowerPoint semantics) — no contain/cover adjustment.
                     img_ratio = img_w / img_h
                     box_ratio = width / height
                     # Warn if aspect ratios differ significantly

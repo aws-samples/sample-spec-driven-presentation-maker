@@ -198,6 +198,10 @@ class PPTXBuilder(
             })
         slide = self.prs.slides.add_slide(layout)
 
+        # Hidden slide (round-trips PowerPoint's Hide Slide flag)
+        if slide_def.get("hidden"):
+            slide._element.set("show", "0")
+
         self._fill_placeholders(slide, slide_def)
 
         # Per-slide theme override (save/restore around element processing)
