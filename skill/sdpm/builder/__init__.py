@@ -315,6 +315,10 @@ class PPTXBuilder(
                 self._add_chart(slide, elem)
             elif elem_type == "video":
                 self._add_video(slide, elem)
+            else:
+                import sys as _sys
+                print(f"Warning: unknown element type {elem_type!r} skipped "
+                      f"(slide {slide_def.get('id', '?')})", file=_sys.stderr)
 
         if "notes" in slide_def:
             notes_frame = slide.notes_slide.notes_text_frame

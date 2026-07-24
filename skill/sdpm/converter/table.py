@@ -174,18 +174,27 @@ def _parse_table_style(pptx_path, style_id, theme_colors, color_mapping):
                     return base
             return None
 
-        def resolve_border_color(tc_bdr):
+        def resolve_border(tc_bdr):
+            """Return {'color': hex, 'width': pt} from the first solid border side."""
             if tc_bdr is None:
                 return None
-            for tag in ['a:left', 'a:right', 'a:top', 'a:bottom', 'a:insideH', 'a:insideV']:
-                ln = tc_bdr.find(f'{tag}/a:ln/a:solidFill', _NS)
-                if ln is not None:
-                    scheme = ln.find('a:schemeClr', _NS)
-                    if scheme is not None:
-                        return _resolve_scheme_color(scheme.get('val'), theme_colors, color_mapping)
-                    srgb = ln.find('a:srgbClr', _NS)
-                    if srgb is not None:
-                        return _hex(srgb)
+            for tag in ['a:insideH', 'a:insideV', 'a:left', 'a:right', 'a:top', 'a:bottom']:
+                ln_el = tc_bdr.find(f'{tag}/a:ln', _NS)
+                if ln_el is None:
+                    continue
+                fill = ln_el.find('a:solidFill', _NS)
+                if fill is None:
+                    continue
+                color = None
+                scheme = fill.find('a:schemeClr', _NS)
+                if scheme is not None:
+                    color = _resolve_scheme_color(scheme.get('val'), theme_colors, color_mapping)
+                srgb = fill.find('a:srgbClr', _NS)
+                if srgb is not None:
+                    color = _hex(srgb)
+                if color:
+                    w = ln_el.get('w')
+                    return {"color": color, "width": round(int(w) / 12700, 1) if w else 1}
             return None
 
         def resolve_text_color(tc_txt):
@@ -207,9 +216,9 @@ def _parse_table_style(pptx_path, style_id, theme_colors, color_mapping):
                 f = resolve_fill(tc_style)
                 if f:
                     info['background'] = f
-                bc = resolve_border_color(tc_style.find('a:tcBdr', _NS))
-                if bc:
-                    info['borderColor'] = bc
+                bd = resolve_border(tc_style.find('a:tcBdr', _NS))
+                if bd:
+                    info['border'] = bd
             tc_txt = part.find('a:tcTxStyle', _NS)
             if tc_txt is not None:
                 tc = resolve_text_color(tc_txt)
@@ -288,6 +297,21 @@ def extract_table_element(shape, theme_colors=None, color_mapping=None, pptx_pat
                 for ri, row in enumerate(elem["rows"]):
                     style = band1 if ri % 2 == 0 else band2
                     elem["rows"][ri] = [_apply_style_to_cell(c, style) for c in row]
+
+                # Emit a table-level style so the builder reproduces the theme
+                # table style instead of applying its own default banding.
+                style_out = {}
+                body = {"background": band1.get("background", "none")}
+                header = {"background": first_row.get("background", body["background"])}
+                if first_row.get("font-weight"):
+                    header["font-weight"] = first_row["font-weight"]
+                if has_band_row:
+                    style_out["altRow"] = {"background": band2.get("background", "none")}
+                style_out["body"] = body
+                style_out["header"] = header
+                if whole.get("border"):
+                    style_out["border"] = dict(whole["border"])
+                elem["style"] = style_out
 
         return elem
     except Exception as e:

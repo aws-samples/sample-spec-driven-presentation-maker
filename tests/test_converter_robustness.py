@@ -225,3 +225,119 @@ class TestExplicitCropKeepsFrame:
         # fit=contain behaviour shrank width to height*aspect = 100px (~5%).
         ratio = pic.width / prs.slide_width
         assert ratio > 0.35, f"frame shrank despite explicit crop: width ratio={ratio:.2f}"
+
+
+class TestTableThemeStyle:
+    def test_table_style_id_resolves_to_style_dict(self, tmp_path):
+        """Tables styled via tableStyleId (theme table styles) must emit a
+        table-level style dict; otherwise the builder overwrites the look
+        with its own default banding (white rows on dark decks)."""
+        import zipfile
+
+        from pptx.util import Inches
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        gf = slide.shapes.add_table(3, 2, Inches(1), Inches(1), Inches(6), Inches(2))
+        tbl = gf.table
+        for r in range(3):
+            for c in range(2):
+                tbl.cell(r, c).text = f"r{r}c{c}"
+        # style id python-pptx stamped on the table
+        ns_a = "http://schemas.openxmlformats.org/drawingml/2006/main"
+        sid = tbl._tbl.find(f"{{{ns_a}}}tblPr/{{{ns_a}}}tableStyleId").text
+        raw_path = tmp_path / "raw.pptx"
+        prs.save(str(raw_path))
+
+        # Inject a tableStyles.xml defining that style (fill + border)
+        table_styles = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a:tblStyleLst xmlns:a="{ns_a}" def="{sid}">
+ <a:tblStyle styleId="{sid}" styleName="Test Style">
+  <a:wholeTbl>
+   <a:tcStyle>
+    <a:tcBdr><a:insideH><a:ln w="12700"><a:solidFill><a:srgbClr val="AD5CFF"/></a:solidFill></a:ln></a:insideH></a:tcBdr>
+    <a:fill><a:solidFill><a:srgbClr val="112233"/></a:solidFill></a:fill>
+   </a:tcStyle>
+  </a:wholeTbl>
+ </a:tblStyle>
+</a:tblStyleLst>'''
+        pptx_path = tmp_path / "styled_table.pptx"
+        with zipfile.ZipFile(raw_path) as zin, zipfile.ZipFile(pptx_path, "w") as zout:
+            for item in zin.namelist():
+                if item == "ppt/tableStyles.xml":
+                    zout.writestr(item, table_styles)
+                else:
+                    zout.writestr(item, zin.read(item))
+
+        result = pptx_to_json(pptx_path, tmp_path / "out")
+        tables = [el for s in result["slides"] for el in s.get("elements", []) if el.get("type") == "table"]
+        assert tables, "table element not extracted"
+        style = tables[0].get("style")
+        assert style is not None, "tableStyleId did not resolve to a style dict"
+        assert style["body"]["background"] == "#112233"
+        assert style["border"]["color"] == "#AD5CFF"
+
+
+class TestBackgroundFills:
+    def test_gradient_background_becomes_fullslide_rect(self, tmp_path):
+        """Slides with a gradient background must not silently lose it —
+        the converter emits a full-slide gradient rectangle."""
+        from lxml import etree
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        ns_a = "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ns_p = "http://schemas.openxmlformats.org/presentationml/2006/main"
+        bg = etree.SubElement(slide._element.find(f"{{{ns_p}}}cSld"), f"{{{ns_p}}}bg")
+        bgpr = etree.SubElement(bg, f"{{{ns_p}}}bgPr")
+        grad = etree.fromstring(
+            f'<a:gradFill xmlns:a="{ns_a}"><a:gsLst>'
+            f'<a:gs pos="0"><a:srgbClr val="00FFCC"/></a:gs>'
+            f'<a:gs pos="100000"><a:srgbClr val="0066FF"/></a:gs>'
+            f'</a:gsLst><a:lin ang="0" scaled="1"/></a:gradFill>')
+        bgpr.append(grad)
+        etree.SubElement(bgpr, f"{{{ns_a}}}effectLst")
+        # move bg before spTree (schema order)
+        csld = slide._element.find(f"{{{ns_p}}}cSld")
+        csld.remove(bg)
+        csld.insert(0, bg)
+        pptx_path = tmp_path / "gradbg.pptx"
+        prs.save(str(pptx_path))
+
+        result = pptx_to_json(pptx_path, tmp_path / "out")
+        last = result["slides"][-1]
+        els = last.get("elements", [])
+        assert els and els[0].get("type") == "shape" and els[0].get("shape") == "rectangle" \
+            and els[0].get("gradient"), f"gradient background not extracted: {els[:1]}"
+
+    def test_image_background_becomes_fullslide_image(self, tmp_path):
+        """Slides with a picture-fill background keep it as a cover image."""
+        from lxml import etree
+        from PIL import Image as PILImage
+
+        img_file = tmp_path / "bg.png"
+        PILImage.new("RGB", (32, 18), "blue").save(img_file)
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        # add picture to obtain an image part + rId, then reference it from bg
+        pic = slide.shapes.add_picture(str(img_file), 0, 0)
+        ns_a = "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ns_p = "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ns_r = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        rid = pic._element.find(f".//{{{ns_a}}}blip").get(f"{{{ns_r}}}embed")
+        slide.shapes._spTree.remove(pic._element)  # picture itself not needed
+        csld = slide._element.find(f"{{{ns_p}}}cSld")
+        bg = etree.fromstring(
+            f'<p:bg xmlns:p="{ns_p}" xmlns:a="{ns_a}" xmlns:r="{ns_r}"><p:bgPr>'
+            f'<a:blipFill><a:blip r:embed="{rid}"/><a:stretch><a:fillRect/></a:stretch></a:blipFill>'
+            f'<a:effectLst/></p:bgPr></p:bg>')
+        csld.insert(0, bg)
+        pptx_path = tmp_path / "imgbg.pptx"
+        prs.save(str(pptx_path))
+
+        result = pptx_to_json(pptx_path, tmp_path / "out")
+        last = result["slides"][-1]
+        els = last.get("elements", [])
+        assert els and els[0].get("type") == "image" and "_bg" in els[0].get("src", ""), \
+            f"image background not extracted: {els[:1]}"

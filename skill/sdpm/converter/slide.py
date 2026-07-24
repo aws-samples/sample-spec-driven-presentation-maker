@@ -133,6 +133,7 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
         slide_dict["hidden"] = True
     
     # Extract slide background (if different from layout)
+    bg_extra_element = None
     try:
         bg = slide.background._element.find(f'{{{_NS["p"]}}}bg')
         if bg is not None:
@@ -149,6 +150,45 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                         resolved = _resolve_color_with_transforms(scheme, theme_colors, color_mapping)
                         if resolved:
                             slide_dict["background"] = resolved
+                else:
+                    # Gradient / image backgrounds: the builder only supports a
+                    # solid slide background, so emit a full-slide element at
+                    # the bottom of the z-order instead of dropping the fill.
+                    try:
+                        prs_obj = slide.part.package.presentation_part.presentation
+                        slide_w = round(prs_obj.slide_width / EMU_PER_PX)
+                        slide_h = round(prs_obj.slide_height / EMU_PER_PX)
+                    except Exception:
+                        slide_w, slide_h = 1920, 1080
+                    grad = bgPr.find(f'{{{_NS["a"]}}}gradFill')
+                    blip_fill = bgPr.find(f'{{{_NS["a"]}}}blipFill')
+                    if grad is not None:
+                        from .xml_helpers import _extract_fill_from_xml
+                        fill_info = _extract_fill_from_xml(bgPr, theme_colors, color_mapping)
+                        if fill_info.get("gradient"):
+                            bg_extra_element = {
+                                "type": "shape",
+                                "shape": "rectangle",
+                                "x": 0, "y": 0, "width": slide_w, "height": slide_h,
+                                "gradient": fill_info["gradient"],
+                                "line": "none",
+                            }
+                    elif blip_fill is not None and output_dir:
+                        blip = blip_fill.find(f'{{{_NS["a"]}}}blip')
+                        rid = blip.get(f'{{{_NS["r"]}}}embed') if blip is not None else None
+                        if rid:
+                            img_part = slide.part.related_part(rid)
+                            ext = img_part.content_type.split('/')[-1].replace('jpeg', 'jpg')
+                            img_name = f"slide{slide_idx+1}_bg.{ext}"
+                            img_dir = output_dir / "images"
+                            img_dir.mkdir(parents=True, exist_ok=True)
+                            (img_dir / img_name).write_bytes(img_part.blob)
+                            bg_extra_element = {
+                                "type": "image",
+                                "src": f"images/{img_name}",
+                                "x": 0, "y": 0, "width": slide_w, "height": slide_h,
+                                "fit": "cover",
+                            }
     except Exception:
         pass
     
@@ -236,6 +276,8 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
     
     # Extract content from placeholders as textboxes (to preserve position)
     elements = []
+    if bg_extra_element is not None:
+        elements.append(bg_extra_element)
     
     for shape in slide.shapes:
         if shape.is_placeholder and shape.placeholder_format.type in (2, 7, 13):
