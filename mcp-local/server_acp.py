@@ -113,7 +113,32 @@ def hearing(
 from upload_tools import (  # noqa: E402
     import_attachment as _import_attachment,
     cleanup_old_sessions as _cleanup_old_sessions,
+    upload_file as _upload_file,
 )
+
+
+@mcp.tool()
+def upload_file(file_path: str, filename: str = "") -> str:
+    """Convert and stage a local file for deck import.
+
+    Use when the user gives a local file path in chat (Web UI uploads are
+    staged automatically and arrive as [Attached: ...] markers instead).
+
+    For PPTX: converts the file into a deck structure and returns an
+    `uploadId` plus `guideInstruction` — follow that instruction
+    (typically `read_guides(["import-pptx"])`), then import into a deck
+    via `import_attachment(source=uploadId, deck_id=...)`.
+
+    Args:
+        file_path: Absolute path to the source file.
+        filename: Original filename (defaults to basename of file_path).
+
+    Returns:
+        JSON with {uploadId, fileName, fileType, status, warnings?} and,
+        for PPTX converted to deck structure, additionally
+        {guide, guideInstruction, suggestedName, slideCount, themeHints}.
+    """
+    return _upload_file(session_id="mcp-local", file_path=file_path, filename=filename)
 
 
 @mcp.tool()
