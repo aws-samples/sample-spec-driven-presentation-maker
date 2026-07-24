@@ -151,6 +151,7 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
     
     # Extract placeholders by idx
     placeholders = {}
+    dup_placeholder_ids = set()  # extras when one slide reuses a placeholder idx
     for shape in slide.shapes:
         if not shape.is_placeholder or not shape.has_text_frame or not shape.text_frame.text.strip():
             continue
@@ -161,6 +162,10 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
             continue
         str_idx = str(idx)
         if str_idx in placeholders:
+            # Duplicate placeholder idx on one slide (Google Slides exports do
+            # this — e.g. two TITLE/idx=0 shapes). The dict can hold only one,
+            # so rescue the extras as positioned textbox elements below.
+            dup_placeholder_ids.add(shape.shape_id)
             continue
         text = shape.text
         # Styled text for title
@@ -170,7 +175,16 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                 tx1 = color_mapping.get('tx1', 'dk1')
                 if theme_colors and tx1 in theme_colors:
                     default_tc = theme_colors[tx1]
-            styled = _extract_styled_text(shape.text_frame.paragraphs[0].runs, theme_colors, color_mapping, default_text_color=default_tc, paragraph=shape.text_frame.paragraphs[0]) if shape.text_frame.paragraphs else text
+            paras = [p for p in shape.text_frame.paragraphs]
+            if paras:
+                # Style every paragraph, not just the first — multi-paragraph
+                # titles (common in Google Slides exports) lost lines 2+.
+                styled = "\n".join(
+                    _extract_styled_text(p.runs, theme_colors, color_mapping, default_text_color=default_tc, paragraph=p)
+                    for p in paras
+                )
+            else:
+                styled = text
             text = styled if styled != shape.text else shape.text
         val = text
         # Check for explicit font size (all runs same size)
@@ -301,6 +315,22 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                             pass
                     elements.append(elem)
     
+    # Rescue duplicate-idx placeholders (recorded above) as positioned
+    # textboxes — their text would otherwise be silently dropped.
+    for shape in slide.shapes:
+        if shape.shape_id not in dup_placeholder_ids:
+            continue
+        try:
+            elem = extract_textbox_element(shape, theme_colors, color_mapping, theme_styles, is_placeholder=True, builder_text_color=builder_text_color)
+            if elem and (elem.get("text", "").strip() or elem.get("paragraphs")):
+                elem["x"] = round(shape.left / EMU_PER_PX)
+                elem["y"] = round(shape.top / EMU_PER_PX)
+                elem["width"] = round(shape.width / EMU_PER_PX)
+                elem["height"] = round(shape.height / EMU_PER_PX)
+                elements.append(elem)
+        except Exception:
+            pass
+
     # Extract placeholder images (PICTURE type or pic element)
     img_counter = 0
     for shape in slide.shapes:
