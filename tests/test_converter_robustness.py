@@ -341,3 +341,27 @@ class TestBackgroundFills:
         els = last.get("elements", [])
         assert els and els[0].get("type") == "image" and "_bg" in els[0].get("src", ""), \
             f"image background not extracted: {els[:1]}"
+
+
+class TestHideMasterShapes:
+    def test_show_master_sp_roundtrips(self, tmp_path):
+        """showMasterSp="0" (Hide Background Graphics) must roundtrip;
+        losing it lets master decoration cover the slide's own background."""
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        slide._element.set("showMasterSp", "0")
+        pptx_path = tmp_path / "hidemaster.pptx"
+        prs.save(str(pptx_path))
+
+        result = pptx_to_json(pptx_path, tmp_path / "out")
+        assert result["slides"][-1].get("hideMasterShapes") is True, \
+            "showMasterSp=0 not extracted"
+
+        from sdpm.builder import PPTXBuilder
+        builder = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
+        builder.add_slide({"layout": builder_first_layout(builder), "hideMasterShapes": True})
+        out = tmp_path / "rebuilt.pptx"
+        builder.save(str(out))
+        prs2 = Presentation(str(out))
+        assert list(prs2.slides)[-1]._element.get("showMasterSp") == "0", \
+            "showMasterSp=0 not rebuilt"

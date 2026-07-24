@@ -131,6 +131,11 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
     # Hidden slide (right-click → Hide Slide in PowerPoint)
     if slide._element.get("show") == "0":
         slide_dict["hidden"] = True
+    # Hide Background Graphics (master shapes suppressed on this slide).
+    # Losing this made master decoration (e.g. a white cover shape) reappear
+    # over the slide's own background fill.
+    if slide._element.get("showMasterSp") == "0":
+        slide_dict["hideMasterShapes"] = True
     
     # Extract slide background (if different from layout)
     bg_extra_element = None

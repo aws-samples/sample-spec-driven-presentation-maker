@@ -202,6 +202,10 @@ class PPTXBuilder(
         if slide_def.get("hidden"):
             slide._element.set("show", "0")
 
+        # Hide Background Graphics (round-trips showMasterSp="0")
+        if slide_def.get("hideMasterShapes"):
+            slide._element.set("showMasterSp", "0")
+
         self._fill_placeholders(slide, slide_def)
 
         # Per-slide theme override (save/restore around element processing)
