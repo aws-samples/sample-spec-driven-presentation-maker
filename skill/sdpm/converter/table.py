@@ -30,9 +30,11 @@ def _extract_cell(cell, theme_colors=None, color_mapping=None):
             srgb = solid.find('a:srgbClr', _NS)
             scheme = solid.find('a:schemeClr', _NS)
             if srgb is not None:
-                props["background"] = _hex(srgb)
+                from .color import apply_element_transforms
+                props["background"] = apply_element_transforms(_hex(srgb), srgb)
             elif scheme is not None:
-                resolved = _resolve_scheme_color(scheme.get('val'), theme_colors, color_mapping)
+                from .color import _resolve_color_with_transforms
+                resolved = _resolve_color_with_transforms(scheme, theme_colors, color_mapping)
                 if resolved:
                     props["background"] = resolved
         elif grad is not None:
@@ -77,6 +79,10 @@ def _extract_cell(cell, theme_colors=None, color_mapping=None):
             va = _va_reverse.get(anchor)
             if va:
                 props["vertical-align"] = va
+        else:
+            # OOXML default anchor is top, but the builder's documented
+            # default is middle — emit explicitly to keep source fidelity.
+            props["vertical-align"] = "top"
 
         # Padding (cell inset)
         padding = {}

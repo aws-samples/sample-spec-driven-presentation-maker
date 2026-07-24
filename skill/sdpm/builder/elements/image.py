@@ -118,7 +118,11 @@ class ImageMixin:
         svg_bytes = None
         if is_svg:
             svg_bytes = img_path.read_bytes()
-            if src and is_recolor_protected(src):
+            if icon_color == "none":
+                # Explicit opt-out: keep the SVG's own colors (used for
+                # artwork imported from existing decks, not theme icons).
+                pass
+            elif src and is_recolor_protected(src):
                 if icon_color:
                     print(f"Warning: iconColor ignored (recolor-protected asset): {src}", file=sys.stderr)
             else:

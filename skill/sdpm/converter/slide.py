@@ -148,13 +148,30 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                 if solid is not None:
                     srgb = solid.find(f'{{{_NS["a"]}}}srgbClr')
                     scheme = solid.find(f'{{{_NS["a"]}}}schemeClr')
+                    resolved = None
+                    color_el = None
                     if srgb is not None:
-                        slide_dict["background"] = f"#{srgb.get('val')}"
+                        resolved = f"#{srgb.get('val')}"
+                        color_el = srgb
                     elif scheme is not None:
                         from .color import _resolve_color_with_transforms
                         resolved = _resolve_color_with_transforms(scheme, theme_colors, color_mapping)
-                        if resolved:
-                            slide_dict["background"] = resolved
+                        color_el = scheme
+                    if resolved:
+                        # Semi-transparent background: approximate by blending
+                        # toward white (the typical master background).
+                        alpha_el = color_el.find(f'{{{_NS["a"]}}}alpha') if color_el is not None else None
+                        if alpha_el is not None:
+                            try:
+                                a = int(alpha_el.get('val')) / 100000
+                                rr = int(resolved[1:3], 16)
+                                gg = int(resolved[3:5], 16)
+                                bb = int(resolved[5:7], 16)
+                                blend = lambda c: round(c * a + 255 * (1 - a))  # noqa: E731
+                                resolved = f"#{blend(rr):02X}{blend(gg):02X}{blend(bb):02X}"
+                            except Exception:
+                                pass
+                        slide_dict["background"] = resolved
                 else:
                     # Gradient / image backgrounds: the builder only supports a
                     # solid slide background, so emit a full-slide element at
@@ -181,9 +198,16 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                     elif blip_fill is not None and output_dir:
                         blip = blip_fill.find(f'{{{_NS["a"]}}}blip')
                         rid = blip.get(f'{{{_NS["r"]}}}embed') if blip is not None else None
+                        if rid is None and blip is not None:
+                            # SVG-only background: the raster embed is absent and
+                            # the reference lives on the svgBlip extension.
+                            svg_blip = blip.find(
+                                './/{http://schemas.microsoft.com/office/drawing/2016/SVG/main}svgBlip')
+                            if svg_blip is not None:
+                                rid = svg_blip.get(f'{{{_NS["r"]}}}embed')
                         if rid:
                             img_part = slide.part.related_part(rid)
-                            ext = img_part.content_type.split('/')[-1].replace('jpeg', 'jpg')
+                            ext = img_part.content_type.split('/')[-1].replace('jpeg', 'jpg').replace('svg+xml', 'svg')
                             img_name = f"slide{slide_idx+1}_bg.{ext}"
                             img_dir = output_dir / "images"
                             img_dir.mkdir(parents=True, exist_ok=True)
@@ -193,6 +217,9 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                                 "src": f"images/{img_name}",
                                 "x": 0, "y": 0, "width": slide_w, "height": slide_h,
                                 "fit": "cover",
+                                # keep artwork colors (SVG bg would otherwise be
+                                # recolored to the theme text color)
+                                "iconColor": "none",
                             }
     except Exception:
         pass

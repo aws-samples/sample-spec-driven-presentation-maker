@@ -241,6 +241,21 @@ class FormattingMixin:
                     run = paragraph.add_run()
                     run.text = line
                     run.font.name = seg.get("fontName") or (None if no_default_font else font_name) or None
+                    # python-pptx only writes a:latin; CJK glyphs render with
+                    # a:ea, so an explicit font tag must set both or Japanese
+                    # text silently keeps the theme font.
+                    if seg.get("fontName"):
+                        from lxml import etree as _et_ea
+                        from pptx.oxml.ns import qn as _qn_ea
+                        rPr = run._r.get_or_add_rPr()
+                        ea = rPr.find(_qn_ea('a:ea'))
+                        if ea is None:
+                            ea = _et_ea.SubElement(rPr, _qn_ea('a:ea'))
+                            latin = rPr.find(_qn_ea('a:latin'))
+                            if latin is not None:
+                                rPr.remove(ea)
+                                rPr.insert(list(rPr).index(latin) + 1, ea)
+                        ea.set('typeface', seg["fontName"])
                     # Set sym font for symbol fonts (Wingdings etc)
                     actual_font = run.font.name
                     if actual_font and actual_font.startswith(('Wingdings', 'Symbol', 'Webdings')):

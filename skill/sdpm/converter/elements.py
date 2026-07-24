@@ -573,7 +573,32 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
                 elem["_textGradientRuns"] = grad_runs
     except Exception:
         pass
-    
+
+    # Extract run-level text effects (glow/shadow on the characters). All
+    # runs sharing one effectLst is the common case (decorated headline);
+    # store the raw XML for lossless rebuild.
+    try:
+        from lxml import etree as _et_eff
+        effect_xmls = set()
+        has_run = False
+        for para in shape.text_frame.paragraphs:
+            for run in para.runs:
+                if not run.text.strip():
+                    continue
+                has_run = True
+                rpr = run._r.find(f'{{{_NS["a"]}}}rPr')
+                eff = rpr.find(f'{{{_NS["a"]}}}effectLst') if rpr is not None else None
+                if eff is not None and len(eff) > 0:
+                    effect_xmls.add(_et_eff.tostring(eff, encoding='unicode'))
+                else:
+                    effect_xmls.add("")
+        if has_run and len(effect_xmls) == 1:
+            xml = effect_xmls.pop()
+            if xml:
+                elem["_textEffects"] = xml
+    except Exception:
+        pass
+
     # Detect cap=none and bold=off overrides (when lstStyle has cap=all / b=1)
     try:
         _all_runs = [r for p in shape.text_frame.paragraphs for r in p.runs]
@@ -893,6 +918,9 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
             filename = f"slide{slide_idx + 1}_image{img_idx + 1}.svg"
             (images_dir / filename).write_bytes(svg_bytes)
             elem["src"] = f"images/{filename}"
+        # Imported artwork keeps its own colors — opt out of the builder's
+        # theme-icon recolor (which repainted e.g. green wave shapes black).
+        elem["iconColor"] = "none"
         return elem
     
     # Save image to file
@@ -996,13 +1024,116 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
     
     return elem
 
+def _extract_blipfill_image(shape, output_dir, slide_idx, img_counter):
+    """Picture-filled shape/textbox (spPr>blipFill) → image element.
+
+    PowerPoint allows any shape to be filled with a picture. The builder has
+    no image-fill support, so a text-less picture-filled shape is best
+    reproduced as a plain image element with the same geometry. Returns the
+    element or None (has text / no blipFill / extraction failed).
+    """
+    try:
+        if shape.has_text_frame and shape.text_frame.text.strip():
+            return None
+        sp_pr = shape._element.spPr
+        blip_fill = sp_pr.find(f'{{{_NS["a"]}}}blipFill') if sp_pr is not None else None
+        if blip_fill is None:
+            return None
+        blip = blip_fill.find(f'{{{_NS["a"]}}}blip')
+        if blip is None:
+            return None
+        r_ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+        rid = blip.get(f'{{{r_ns}}}embed')
+        is_svg = False
+        if rid is None:
+            svg_blip = blip.find(
+                './/{http://schemas.microsoft.com/office/drawing/2016/SVG/main}svgBlip')
+            if svg_blip is not None:
+                rid = svg_blip.get(f'{{{r_ns}}}embed')
+                is_svg = True
+        if rid is None or output_dir is None:
+            return None
+        part = shape.part.rels[rid].target_part
+        ext = 'svg' if is_svg else part.content_type.split('/')[-1].replace('jpeg', 'jpg').replace('svg+xml', 'svg')
+        images_dir = Path(output_dir) / "images"
+        images_dir.mkdir(exist_ok=True)
+        filename = f"slide{slide_idx + 1}_image{img_counter + 1}.{ext}"
+        (images_dir / filename).write_bytes(part.blob)
+        elem = _base_element(shape, "image")
+        elem["src"] = f"images/{filename}"
+        elem["fit"] = "cover"
+        if ext == 'svg':
+            elem["iconColor"] = "none"
+        elem.pop("fill", None)
+        elem.pop("line", None)
+        return elem
+    except Exception:
+        return None
+
+
+def _shape_needs_raw_passthrough(shape):
+    """WordArt-class decoration the JSON schema can't express.
+
+    - prstTxWarp: warped text (arch / circle / wave WordArt)
+    - run-level blipFill: characters painted with a picture
+    """
+    try:
+        x_el = shape._element
+        warp = x_el.find(f'.//{{{_NS["a"]}}}prstTxWarp')
+        if warp is not None and warp.get('prst') not in (None, 'textNoShape'):
+            return True
+        tx_body = x_el.find(f'.//{{{_NS["p"]}}}txBody')
+        if tx_body is not None:
+            for rpr in tx_body.iter(f'{{{_NS["a"]}}}rPr'):
+                if rpr.find(f'{{{_NS["a"]}}}blipFill') is not None:
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+def _extract_raw_shape(shape, output_dir, slide_idx, img_counter):
+    """Save shape XML verbatim (plus referenced images) for lossless rebuild."""
+    from lxml import etree as _et
+    elem = _base_element(shape, "rawShape")
+    elem["_shapeXml"] = _et.tostring(shape._element, encoding='unicode')
+    if output_dir:
+        r_ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+        rid_map = {}
+        for el_ref in shape._element.iter():
+            rid = el_ref.get(f'{{{r_ns}}}embed') or el_ref.get(f'{{{r_ns}}}link')
+            if not rid or rid in rid_map:
+                continue
+            try:
+                part = shape.part.rels[rid].target_part
+                ext = part.content_type.split('/')[-1].replace('jpeg', 'jpg').replace('svg+xml', 'svg')
+                images_dir = Path(output_dir) / "images"
+                images_dir.mkdir(exist_ok=True)
+                fname = f"slide{slide_idx + 1}_raw{img_counter + 1}_{rid}.{ext}"
+                (images_dir / fname).write_bytes(part.blob)
+                rid_map[rid] = f"images/{fname}"
+                img_counter += 1
+            except Exception:
+                continue
+        if rid_map:
+            elem["_shapeImages"] = rid_map
+    return elem, img_counter
+
+
 def _dispatch_shape(shape, theme_colors=None, color_mapping=None, theme_styles=None, output_dir=None, slide_idx=0, img_counter=0, builder_text_color=None, pptx_path=None):
     """Dispatch shape extraction by type. Returns (elem, img_counter)."""
     elem = None
+    if shape.shape_type in (MSO_SHAPE_TYPE.TEXT_BOX, MSO_SHAPE_TYPE.AUTO_SHAPE,
+                            MSO_SHAPE_TYPE.FREEFORM) and _shape_needs_raw_passthrough(shape):
+        return _extract_raw_shape(shape, output_dir, slide_idx, img_counter)
     if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
         elem, img_counter = extract_group_element(shape, theme_colors, color_mapping, theme_styles, output_dir, slide_idx, img_counter, builder_text_color=builder_text_color)
     elif shape.shape_type == MSO_SHAPE_TYPE.TEXT_BOX:
-        elem = extract_textbox_element(shape, theme_colors, color_mapping, theme_styles, builder_text_color=builder_text_color)
+        elem = _extract_blipfill_image(shape, output_dir, slide_idx, img_counter)
+        if elem:
+            img_counter += 1
+        else:
+            elem = extract_textbox_element(shape, theme_colors, color_mapping, theme_styles, builder_text_color=builder_text_color)
     elif shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
         elem = extract_picture_element(shape, output_dir, slide_idx, img_counter, theme_colors, color_mapping)
         if elem:
@@ -1024,6 +1155,10 @@ def _dispatch_shape(shape, theme_colors=None, color_mapping=None, theme_styles=N
         if elem:
             img_counter += 1
     elif shape.shape_type in (MSO_SHAPE_TYPE.AUTO_SHAPE, MSO_SHAPE_TYPE.FREEFORM):
+        elem = _extract_blipfill_image(shape, output_dir, slide_idx, img_counter)
+        if elem:
+            img_counter += 1
+            return elem, img_counter
         if shape.shape_type == MSO_SHAPE_TYPE.FREEFORM:
             elem = extract_freeform_element(shape, theme_colors, color_mapping, builder_text_color=builder_text_color)
         if not elem:
@@ -1057,6 +1192,30 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
         try:
             from lxml import etree as _et
             elem["_groupXml"] = _et.tostring(shape._element, encoding='unicode')
+            # Save any images referenced from inside the group XML and record
+            # a rId → deck-relative-path mapping. Without this the injected
+            # XML carries dangling r:embed ids and pictures/picture-fills
+            # inside the group vanish on rebuild.
+            if output_dir:
+                r_ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+                rid_map = {}
+                for el_ref in shape._element.iter():
+                    rid = el_ref.get(f'{{{r_ns}}}embed') or el_ref.get(f'{{{r_ns}}}link')
+                    if not rid or rid in rid_map:
+                        continue
+                    try:
+                        part = shape.part.rels[rid].target_part
+                        ext = part.content_type.split('/')[-1].replace('jpeg', 'jpg').replace('svg+xml', 'svg')
+                        images_dir = Path(output_dir) / "images"
+                        images_dir.mkdir(exist_ok=True)
+                        fname = f"slide{slide_idx + 1}_grp{img_counter + 1}_{rid}.{ext}"
+                        (images_dir / fname).write_bytes(part.blob)
+                        rid_map[rid] = f"images/{fname}"
+                        img_counter += 1
+                    except Exception:
+                        continue
+                if rid_map:
+                    elem["_groupImages"] = rid_map
         except Exception:
             pass
     

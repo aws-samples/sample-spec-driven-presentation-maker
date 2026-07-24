@@ -365,3 +365,131 @@ class TestHideMasterShapes:
         prs2 = Presentation(str(out))
         assert list(prs2.slides)[-1]._element.get("showMasterSp") == "0", \
             "showMasterSp=0 not rebuilt"
+
+
+class TestSrgbColorTransforms:
+    def test_lummod_on_srgb_cell_fill(self):
+        """<a:srgbClr val="4F81BD"><a:lumMod val="75000"/> must darken the
+        color — dropping the transform rendered strong blue instead of the
+        original muted tone."""
+        from lxml import etree
+        from sdpm.converter.color import apply_element_transforms
+
+        ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
+        el = etree.fromstring(
+            f'<a:srgbClr xmlns:a="{ns}" val="4F81BD"><a:lumMod val="75000"/></a:srgbClr>')
+        out = apply_element_transforms("#4F81BD", el)
+        assert out != "#4F81BD"
+        # darker than the base
+        assert int(out[1:3], 16) < 0x4F
+
+
+class TestPresetColor:
+    def test_prstclr_white_extracted(self, tmp_path):
+        from lxml import etree
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        from pptx.util import Emu
+        tb = slide.shapes.add_textbox(Emu(0), Emu(0), Emu(2000000), Emu(500000))
+        tb.text_frame.text = "PresetRed"
+        run = tb.text_frame.paragraphs[0].runs[0]
+        rPr = run._r.get_or_add_rPr()
+        ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
+        fill = etree.SubElement(rPr, f"{{{ns}}}solidFill")
+        etree.SubElement(fill, f"{{{ns}}}prstClr").set("val", "red")
+        rPr.insert(0, fill)
+        pptx_path = tmp_path / "prst.pptx"
+        prs.save(str(pptx_path))
+
+        result = pptx_to_json(pptx_path, tmp_path / "out")
+        dumped = json.dumps(result["slides"], ensure_ascii=False)
+        assert "#FF0000" in dumped and "PresetRed" in dumped
+
+
+class TestCellVerticalAlignDefault:
+    def test_missing_anchor_becomes_top(self, tmp_path):
+        """OOXML default cell anchor is top; the builder's default is middle,
+        so the converter must emit vertical-align explicitly."""
+        from pptx.util import Inches
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        gf = slide.shapes.add_table(2, 1, Inches(1), Inches(1), Inches(4), Inches(2))
+        gf.table.cell(0, 0).text = "a"
+        gf.table.cell(1, 0).text = "b"
+        # remove anchor attribute if python-pptx set one
+        ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
+        for tc in gf.table._tbl.iter(f"{{{ns}}}tcPr"):
+            tc.attrib.pop("anchor", None)
+        pptx_path = tmp_path / "table_anchor.pptx"
+        prs.save(str(pptx_path))
+
+        result = pptx_to_json(pptx_path, tmp_path / "out")
+        tables = [el for s in result["slides"] for el in s.get("elements", []) if el.get("type") == "table"]
+        cell = tables[0]["rows"][0][0]
+        assert isinstance(cell, dict) and cell.get("vertical-align") == "top"
+
+
+class TestRawShapePassthrough:
+    def test_wordart_text_warp_roundtrips(self, tmp_path):
+        """prstTxWarp (WordArt arch/circle text) can't be expressed in the
+        JSON schema — the shape must roundtrip as rawShape XML."""
+        from lxml import etree
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        from pptx.util import Emu
+        tb = slide.shapes.add_textbox(Emu(0), Emu(0), Emu(3000000), Emu(3000000))
+        tb.text_frame.text = "ARCHED"
+        ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
+        bodyPr = tb.text_frame._txBody.find(f"{{{ns}}}bodyPr")
+        warp = etree.SubElement(bodyPr, f"{{{ns}}}prstTxWarp")
+        warp.set("prst", "textArchUp")
+        pptx_path = tmp_path / "wordart.pptx"
+        prs.save(str(pptx_path))
+
+        result = pptx_to_json(pptx_path, tmp_path / "out")
+        raws = [el for s in result["slides"] for el in s.get("elements", []) if el.get("type") == "rawShape"]
+        assert raws and "textArchUp" in raws[0].get("_shapeXml", ""), "WordArt not captured as rawShape"
+
+        # builder injects it back
+        from sdpm.builder import PPTXBuilder
+        builder = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
+        builder.add_slide({"layout": builder_first_layout(builder), "elements": [raws[0]]})
+        out = tmp_path / "rebuilt.pptx"
+        builder.save(str(out))
+        import zipfile
+        z = zipfile.ZipFile(str(out))
+        slides_xml = "".join(z.read(n).decode() for n in z.namelist() if n.startswith("ppt/slides/slide"))
+        assert "textArchUp" in slides_xml, "rawShape not injected on rebuild"
+
+
+class TestGroupImageReattach:
+    def test_group_with_picture_keeps_image(self, tmp_path):
+        """Images inside raw-XML groups must be re-attached on rebuild (the
+        source rIds dangle in the new package otherwise)."""
+        from PIL import Image as PILImage
+        from pptx.util import Emu
+
+        img = tmp_path / "photo.png"
+        PILImage.new("RGB", (60, 40), "magenta").save(img)
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        pic = slide.shapes.add_picture(str(img), Emu(0), Emu(0))
+        tb = slide.shapes.add_textbox(Emu(0), Emu(500000), Emu(1000000), Emu(300000))
+        tb.text_frame.text = "label"
+        # freeform member forces _groupXml passthrough; use a real group
+        grp = slide.shapes.add_group_shape([pic, tb])
+        # inject a fake freeform marker: easier — rotate group to force rawXml path
+        grp.rotation = 15.0
+        pptx_path = tmp_path / "grouped.pptx"
+        prs.save(str(pptx_path))
+
+        result = pptx_to_json(pptx_path, tmp_path / "out")
+        groups = [el for s in result["slides"] for el in s.get("elements", []) if el.get("type") == "group"]
+        assert groups and groups[0].get("_groupXml")
+        assert groups[0].get("_groupImages"), "group-referenced image not saved"
+        rel = list(groups[0]["_groupImages"].values())[0]
+        assert (tmp_path / "out" / rel).exists()

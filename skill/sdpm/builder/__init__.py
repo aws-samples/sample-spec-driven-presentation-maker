@@ -319,6 +319,8 @@ class PPTXBuilder(
                 self._add_chart(slide, elem)
             elif elem_type == "video":
                 self._add_video(slide, elem)
+            elif elem_type == "rawShape":
+                self._add_raw_shape(slide, elem)
             else:
                 import sys as _sys
                 print(f"Warning: unknown element type {elem_type!r} skipped "

@@ -15,6 +15,10 @@ class GroupMixin:
             from lxml import etree
             from pptx.oxml.ns import qn
             grp_el = etree.fromstring(group_xml)
+            # Re-attach images referenced from inside the group: the source
+            # rIds are meaningless in this package, so add each saved image
+            # as a part of the new slide and rewrite r:embed/r:link.
+            self._reattach_xml_images(slide, grp_el, elem.get("_groupImages"))
             spTree = slide._element.find(qn('p:cSld')).find(qn('p:spTree'))
             spTree.append(grp_el)
             return
@@ -37,6 +41,39 @@ class GroupMixin:
             elif sub_type == "chart":
                 self._add_chart(slide, sub_elem)
     
+    def _reattach_xml_images(self, slide, xml_el, images_map):
+        """Rewrite r:embed/r:link ids in injected XML to freshly added parts."""
+        if not images_map:
+            return
+        r_ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+        new_rids = {}
+        for old_rid, rel_path in images_map.items():
+            try:
+                img_path = self._base_dir / rel_path
+                if not img_path.exists():
+                    continue
+                image_part, rid = slide.part.get_or_add_image_part(str(img_path))
+                new_rids[old_rid] = rid
+            except Exception:
+                continue
+        for el_ref in xml_el.iter():
+            for attr in (f'{{{r_ns}}}embed', f'{{{r_ns}}}link'):
+                old = el_ref.get(attr)
+                if old and old in new_rids:
+                    el_ref.set(attr, new_rids[old])
+
+    def _add_raw_shape(self, slide, elem):
+        """Inject a verbatim shape XML (WordArt-class passthrough)."""
+        shape_xml = elem.get("_shapeXml")
+        if not shape_xml:
+            return
+        from lxml import etree
+        from pptx.oxml.ns import qn
+        sp_el = etree.fromstring(shape_xml)
+        self._reattach_xml_images(slide, sp_el, elem.get("_shapeImages"))
+        spTree = slide._element.find(qn('p:cSld')).find(qn('p:spTree'))
+        spTree.append(sp_el)
+
     def _add_arch_group(self, slide, elem):
         """Add AWS architecture group with predefined styling."""
         group_type = elem.get("groupType", "generic")

@@ -302,6 +302,29 @@ class TextboxMixin:
         grad_runs = elem.get("_textGradientRuns")
         if grad_runs:
             self._apply_text_gradient_runs(textbox, grad_runs)
+
+        # Re-apply run-level text effects (glow/shadow) saved by the converter
+        text_effects = elem.get("_textEffects")
+        if text_effects:
+            try:
+                from lxml import etree as _et
+                from pptx.oxml.ns import qn as _qn
+                for r in textbox._element.findall('.//' + _qn('a:r')):
+                    rPr = r.find(_qn('a:rPr'))
+                    if rPr is None:
+                        rPr = r.makeelement(_qn('a:rPr'), {})
+                        r.insert(0, rPr)
+                    for old_eff in rPr.findall(_qn('a:effectLst')):
+                        rPr.remove(old_eff)
+                    eff = _et.fromstring(text_effects)
+                    # schema order: effectLst goes before latin/ea/cs fonts
+                    font_el = rPr.find(_qn('a:latin'))
+                    if font_el is not None:
+                        rPr.insert(list(rPr).index(font_el), eff)
+                    else:
+                        rPr.append(eff)
+            except Exception:
+                pass
         
         # Override cap=all and bold from lstStyle
         if elem.get("_capNone") or elem.get("_boldOff"):
