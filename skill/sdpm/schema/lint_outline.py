@@ -8,7 +8,6 @@ import re
 
 _SLUG_RE = re.compile(r"^[a-z0-9-]+$")
 _LINE_RE = re.compile(r"^-\s+\[([^\]]+)\]\s+.+")
-_SUB_ITEM_RE = re.compile(r"^-\s+\w[\w_]*:\s")
 
 
 def lint_outline(text: str) -> list[dict]:
@@ -23,12 +22,8 @@ def lint_outline(text: str) -> list[dict]:
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        # Sub-items (indented `- key: value`) are valid in detailed outlines
-        if line[0] in (" ", "\t") and _SUB_ITEM_RE.match(stripped):
-            continue
         m = _LINE_RE.match(stripped)
         if not m:
-            diagnostics.append({"line": i, "rule": "format"})
             continue
         slug = m.group(1)
         if not _SLUG_RE.match(slug):
@@ -37,5 +32,8 @@ def lint_outline(text: str) -> list[dict]:
             diagnostics.append({"line": i, "rule": "slug-duplicate"})
         else:
             seen_slugs.add(slug)
+
+    if not seen_slugs and not diagnostics:
+        diagnostics.append({"line": 0, "rule": "no-slides"})
 
     return diagnostics

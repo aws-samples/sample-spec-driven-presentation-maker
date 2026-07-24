@@ -20,7 +20,7 @@ interface Prefs {
   createModelId?: string
 }
 
-const DEFAULTS: Prefs = { sendWithEnter: false, viewMode: "full", fetchWebImages: false, parallelAgents: false, agentMode: "spec" }
+const DEFAULTS: Prefs = { sendWithEnter: false, viewMode: "full", fetchWebImages: false, parallelAgents: true, agentMode: "spec" }
 
 /**
  * Read preferences from localStorage, falling back to defaults.

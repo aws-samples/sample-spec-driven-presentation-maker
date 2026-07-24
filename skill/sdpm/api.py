@@ -140,6 +140,34 @@ def analyze_and_store_template(template_path: Path, description: str = "") -> di
     }
 
 
+def apply_style(deck_dir: str | Path, style: str) -> dict[str, Any]:
+    """Apply a named style to a deck's art-direction.
+
+    Copies the style HTML to {deck_dir}/specs/art-direction.html.
+
+    Args:
+        deck_dir: Deck output directory path.
+        style: Style name (e.g. "elegant-dark").
+
+    Returns:
+        Dict with status, path, style. Or error key if not found.
+    """
+    import shutil
+
+    styles_dirs = get_styles_dirs()
+    src = _find_style_in_dirs(style, styles_dirs)
+    if src is None:
+        available = [p.stem for d in styles_dirs if d.is_dir() for p in d.glob("*.html")]
+        return {"error": f"Style not found: {style}. Available: {sorted(set(available))}"}
+    deck_path = Path(deck_dir)
+    if not deck_path.is_dir():
+        return {"error": f"Deck directory not found: {deck_dir}"}
+    dest = deck_path / "specs" / "art-direction.html"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
+    return {"status": "ok", "path": str(dest), "style": style}
+
+
 def _find_style_in_dirs(name: str, styles_dirs: list[Path]) -> Path | None:
     """Search for a style HTML by name across the given directories.
 
@@ -233,7 +261,7 @@ def init(
 ) -> dict[str, Any]:
     """Initialize a presentation workspace.
 
-    Creates output directory with presentation.json and specs/.
+    Creates output directory with deck.json, slides/, and specs/.
 
     Args:
         name: Presentation name (used in directory name).
@@ -241,7 +269,7 @@ def init(
         output_dir: Explicit output directory. Auto-generated if None.
 
     Returns:
-        Dict with output_dir, json_path, template, fonts, workspace.
+        Dict with output_dir, deck_json, template, fonts, workspace.
     """
     from sdpm.analyzer import extract_fonts
     from sdpm.utils.io import write_json
@@ -254,7 +282,11 @@ def init(
         out_dir = _get_output_base_dir() / dir_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    pres_data: dict[str, Any] = {"fonts": {"fullwidth": None, "halfwidth": None}, "slides": []}
+    deck_data: dict[str, Any] = {
+        "template": "",
+        "fonts": {"fullwidth": "", "halfwidth": ""},
+        "defaultTextColor": "",
+    }
 
     if template:
         template_src = Path(template).expanduser()
@@ -264,12 +296,16 @@ def init(
                 template_src = found
         if template_src.exists():
             template_src = template_src.resolve()
-            pres_data["template"] = template_src.name
-            pres_data["fonts"] = extract_fonts(template_src)
+            deck_data["template"] = template_src.name
+            try:
+                deck_data["fonts"] = extract_fonts(template_src)
+            except Exception:
+                pass
 
-    json_path = out_dir / "presentation.json"
-    write_json(json_path, pres_data, suffix="\n")
+    deck_json = out_dir / "deck.json"
+    write_json(deck_json, deck_data, suffix="\n")
 
+    (out_dir / "slides").mkdir(exist_ok=True)
     specs_dir = out_dir / "specs"
     specs_dir.mkdir(exist_ok=True)
     spec_files = ("brief.md", "outline.md")
@@ -278,10 +314,10 @@ def init(
 
     return {
         "output_dir": str(out_dir),
-        "json_path": str(json_path),
-        "template": pres_data.get("template", ""),
-        "fonts": pres_data.get("fonts", {}),
-        "workspace": ["presentation.json"] + [f"specs/{s}" for s in spec_files],
+        "deck_json": str(deck_json),
+        "template": deck_data.get("template", ""),
+        "fonts": deck_data.get("fonts", {}),
+        "workspace": ["deck.json", "slides/"] + [f"specs/{s}" for s in spec_files],
     }
 
 
@@ -299,11 +335,16 @@ class BuildConfig:
     lint_diagnostics: list = field(default_factory=list)
 
 
-def _assemble_slides_from_dir(deck_dir: Path) -> tuple[dict, list[dict]]:
+def _assemble_slides_from_dir(
+    deck_dir: Path,
+    only_slugs: set[str] | None = None,
+) -> tuple[dict, list[dict]]:
     """Assemble presentation dict from deck.json + outline.md + slides/*.json.
 
     Args:
         deck_dir: Directory containing deck.json, specs/outline.md, slides/*.
+        only_slugs: When set, include only the specified slugs (preserving
+            outline order). None means include all.
 
     Returns:
         (deck_meta, slides) where deck_meta has template/fonts/defaultTextColor
@@ -317,6 +358,8 @@ def _assemble_slides_from_dir(deck_dir: Path) -> tuple[dict, list[dict]]:
     deck_meta = read_json(deck_json)
 
     slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
+    if only_slugs is not None:
+        slugs = [s for s in slugs if s in only_slugs]
 
     slides: list[dict] = []
     for slug in slugs:
@@ -354,11 +397,18 @@ def parse_outline_slugs(outline_path: Path) -> list[str]:
     return slugs
 
 
-def _resolve_config(json_path: str | Path) -> BuildConfig:
+def _resolve_config(
+    json_path: str | Path,
+    only_slugs: set[str] | None = None,
+) -> BuildConfig:
     """Resolve template, fonts, icons, overrides from JSON or directory.
 
     Accepts either a presentation.json file path (legacy) or a directory
     containing deck.json + specs/outline.md + slides/*.json (new format).
+
+    Args:
+        json_path: Path to presentation.json or deck directory.
+        only_slugs: When set, include only the specified slugs in the build.
 
     Raises FileNotFoundError, ValueError on missing template/icons.
     """
@@ -371,7 +421,7 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
 
     # Directory input: deck.json + slides/*.json
     if input_path.is_dir():
-        deck_meta, slides = _assemble_slides_from_dir(input_path)
+        deck_meta, slides = _assemble_slides_from_dir(input_path, only_slugs=only_slugs)
         data = {**deck_meta, "slides": slides}
         base_dir = input_path
     else:
@@ -410,10 +460,18 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
         raise ValueError(f"Missing assets ({len(missing)}): {', '.join(sorted(missing)[:10])}")
 
     # Token discipline: fontSize must come from --fs-* tokens in active style
-    from sdpm.checks import check_font_size_tokens
+    from sdpm.checks import check_font_size_tokens, check_includes, check_overlay_textbox
 
     fs_warnings = check_font_size_tokens(data, input_path)
     warnings.extend(fs_warnings)
+
+    # Overlay textbox: textbox stacked on a shape with the same bounding box
+    overlay_warnings = check_overlay_textbox(data)
+    warnings.extend(overlay_warnings)
+
+    # Include references: a missing/empty include silently drops its content.
+    include_warnings = check_includes(data, base_dir)
+    warnings.extend(include_warnings)
 
     # Resolve overrides
     slides = data.get("slides", [])
@@ -422,6 +480,10 @@ def _resolve_config(json_path: str | Path) -> BuildConfig:
         if "id" in s:
             id_map[s["id"]] = s
     resolved_slides = [resolve_override(s, id_map) for s in slides]
+
+    # Filter by only_slugs for legacy JSON path (directory path already filtered)
+    if only_slugs is not None and not input_path.is_dir():
+        resolved_slides = [s for s in resolved_slides if s.get("id") in only_slugs]
 
     return BuildConfig(
         template_path=template_file,
@@ -455,6 +517,7 @@ def _build(config: BuildConfig, output_path: Path) -> Path:
 def generate(
     json_path: str | Path,
     output_path: str | Path | None = None,
+    only_slugs: set[str] | None = None,
 ) -> dict[str, Any]:
     """Generate PPTX from JSON.
 
@@ -463,13 +526,14 @@ def generate(
     Args:
         json_path: Path to the slides JSON file.
         output_path: Output .pptx path. Auto-generated if None.
+        only_slugs: When set, build only the specified slugs (for iso.pptx).
 
     Returns:
         Dict with output_path, slide_count, slides summary, warnings.
     """
     from sdpm.preview import check_layout_imbalance_data
 
-    config = _resolve_config(json_path)
+    config = _resolve_config(json_path, only_slugs=only_slugs)
 
     # Output path
     input_path = Path(json_path)

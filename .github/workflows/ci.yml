@@ -38,20 +38,41 @@ jobs:
       - name: Lint
         run: npm run lint
         working-directory: web-ui
-      - name: Check for undefined references
-        run: |
-          # Catch "Cannot find name" errors that cause runtime crashes
-          # Full tsc --noEmit is not yet clean; this targets the most critical class
-          ERRORS=$(npx tsc --noEmit 2>&1 | grep "Cannot find name" || true)
-          if [ -n "$ERRORS" ]; then
-            echo "$ERRORS"
-            echo "::error::Undefined references found — these will crash at runtime"
-            exit 1
-          fi
+      - name: Type check
+        run: npx tsc --noEmit
+        working-directory: web-ui
+      - name: Test
+        run: npm test
         working-directory: web-ui
       - name: Build
         run: npm run build:cloud
         working-directory: web-ui
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web-ui/package-lock.json
+      - name: Install
+        run: npm ci
+        working-directory: web-ui
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+        working-directory: web-ui
+      - name: E2E test
+        run: npm run test:e2e
+        working-directory: web-ui
+      - name: Upload trace on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: web-ui/test-results/
+          retention-days: 7
 
   infra:
     runs-on: ubuntu-latest

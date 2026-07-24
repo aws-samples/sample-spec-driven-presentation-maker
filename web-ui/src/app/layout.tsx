@@ -4,6 +4,7 @@ import type { Metadata } from "next"
 import { Geist } from "next/font/google"
 import Script from "next/script"
 import { Toaster } from "@/components/ui/sonner"
+import { LocaleProvider } from "@/i18n/LocaleProvider"
 import "./globals.css"
 
 const geist = Geist({
@@ -58,8 +59,10 @@ export default function RootLayout({
             background: "radial-gradient(ellipse, oklch(0.75 0.14 185 / 3%) 0%, transparent 60%)",
           }}
         />
-        {children}
-        <Toaster position="bottom-right" />
+        <LocaleProvider>
+          {children}
+          <Toaster position="bottom-right" />
+        </LocaleProvider>
         <Script
           id="sw-register"
           strategy="afterInteractive"

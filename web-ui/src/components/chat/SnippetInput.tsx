@@ -7,6 +7,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useTranslations } from "next-intl"
 
 interface SnippetInputProps {
   /** Whether the dialog is open. */
@@ -25,6 +26,7 @@ interface SnippetInputProps {
  * @param props - SnippetInputProps
  */
 export function SnippetInput({ open, onClose, onConfirm, initialText }: SnippetInputProps) {
+  const t = useTranslations("snippet")
   const [text, setText] = useState(initialText || "")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -48,17 +50,17 @@ export function SnippetInput({ open, onClose, onConfirm, initialText }: SnippetI
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-popover border border-border rounded-xl shadow-xl w-full max-w-lg mx-4 p-4">
-        <h3 className="text-sm font-medium mb-2">Text Snippet</h3>
+        <h3 className="text-sm font-medium mb-2">{t("title")}</h3>
         <textarea
           ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Paste or type your text here…"
+          placeholder={t("placeholder")}
           className="w-full h-48 bg-muted/50 border border-border/40 rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary"
         />
         <div className="flex justify-between items-center mt-3">
           <span className="text-xs text-muted-foreground">
-            {text.length.toLocaleString()} characters
+            {t("characterCount", { count: text.length })}
           </span>
           <div className="flex gap-2">
             <button
@@ -66,7 +68,7 @@ export function SnippetInput({ open, onClose, onConfirm, initialText }: SnippetI
               onClick={onClose}
               className="px-3 py-1.5 text-sm rounded-lg hover:bg-muted transition-colors"
             >
-              Cancel
+              {t("cancel")}
             </button>
             <button
               type="button"
@@ -74,7 +76,7 @@ export function SnippetInput({ open, onClose, onConfirm, initialText }: SnippetI
               disabled={!text.trim()}
               className="px-3 py-1.5 text-sm rounded-lg bg-primary text-primary-foreground disabled:opacity-30 hover:bg-primary/90 transition-colors"
             >
-              Attach
+              {t("attach")}
             </button>
           </div>
         </div>

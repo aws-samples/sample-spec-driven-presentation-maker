@@ -27,6 +27,9 @@ import { useRef, useEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
 import { IS_LOCAL } from "@/lib/mode"
+import { notifyError } from "@/lib/errors"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
+import { useTranslations } from "next-intl"
 
 export type ChatTabKey = "new" | "deck"
 
@@ -57,6 +60,7 @@ export function ChatPanelShell({
   deckId, deckName, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, chatRef: externalChatRef,
   inline = false,
 }: ChatPanelShellProps) {
+  const t = useTranslations("chatShell")
   const internalChatRef = useRef<ChatPanelHandle>(null)
   const chatRef = externalChatRef || internalChatRef
   const panelRef = useRef<HTMLElement>(null)
@@ -70,6 +74,14 @@ export function ChatPanelShell({
     const saved = localStorage.getItem(CHAT_WIDTH_KEY)
     if (saved) setPanelWidth(Math.max(MIN_WIDTH, Math.min(Number(saved), MAX_WIDTH_PX)))
   }, [])
+
+  /** Close the panel on Escape (matches dialog conventions on mobile overlay). */
+  useEffect(() => {
+    if (!open || inline) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [open, inline, onClose])
 
   /** Apply width to panel DOM without React re-render. */
   const applyWidth = useCallback((w: number) => {
@@ -148,7 +160,7 @@ export function ChatPanelShell({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ newChat: true }),
-    }).catch(() => {})
+    }).catch((err) => notifyError(t("errorResetSession"), err))
     if (chatTab === "new" || panelAOwnsCurrentDeck) {
       setPanelAKey((k) => k + 1)
       setPanelADeckId(null)
@@ -190,41 +202,41 @@ export function ChatPanelShell({
   const panelBVisible = chatTab === "deck" && showPanelB
 
   // Tab label for Panel A
-  const panelALabel = panelAOwnsCurrentDeck ? (deckName || "Deck") : "New"
+  const panelALabel = panelAOwnsCurrentDeck ? (deckName || t("deck")) : t("new")
 
   const chatContent = (
-    <div className="flex-1 overflow-hidden relative">
-      {/* Panel A: New / deck-created-from-new */}
-      <div className={`h-full ${panelAVisible ? "" : "hidden"}`}>
-        <ChatPanel
-          key={`a-${panelAKey}`}
-          ref={panelAVisible ? chatRef : undefined}
-          deckId={panelADeckId ?? "new"}
-          deckName={panelADeckId ? (deckName || "Deck") : "New Deck"}
-          slideSlugs={panelAOwnsCurrentDeck ? (slideSlugs || []) : []}
-          onDeckCreated={handlePanelADeckCreated}
-          onPreviewInvalidated={onPreviewInvalidated}
-          onWorkflowPhase={onWorkflowPhase}
-        />
-      </div>
-
-      {/* Panel B: existing deck chat — key is stable, only bumped on external navigation */}
-      {showPanelB && (
-        <div className={`h-full ${panelBVisible ? "" : "hidden"}`}>
+    <ErrorBoundary label="Chat">
+      <div className="flex-1 overflow-hidden relative">
+        {/* Panel A: New / deck-created-from-new */}
+        <div className={`h-full ${panelAVisible ? "" : "hidden"}`}>
           <ChatPanel
-            key={`b-${panelBKey}`}
-            ref={panelBVisible ? chatRef : undefined}
-            deckId={deckId!}
-            deckName={deckName || undefined}
-            chatSessionId={chatSessionId}
-            slideSlugs={slideSlugs || []}
-            onDeckCreated={handlePanelBDeckCreated}
+            key={`a-${panelAKey}`}
+            ref={panelAVisible ? chatRef : undefined}
+            deckId={panelADeckId ?? "new"}
+            slideSlugs={panelAOwnsCurrentDeck ? (slideSlugs || []) : []}
+            onDeckCreated={handlePanelADeckCreated}
             onPreviewInvalidated={onPreviewInvalidated}
             onWorkflowPhase={onWorkflowPhase}
           />
         </div>
-      )}
-    </div>
+
+        {/* Panel B: existing deck chat — key is stable, only bumped on external navigation */}
+        {showPanelB && (
+          <div className={`h-full ${panelBVisible ? "" : "hidden"}`}>
+            <ChatPanel
+              key={`b-${panelBKey}`}
+              ref={panelBVisible ? chatRef : undefined}
+              deckId={deckId!}
+              chatSessionId={chatSessionId}
+              slideSlugs={slideSlugs || []}
+              onDeckCreated={handlePanelBDeckCreated}
+              onPreviewInvalidated={onPreviewInvalidated}
+              onWorkflowPhase={onWorkflowPhase}
+            />
+          </div>
+        )}
+      </div>
+    </ErrorBoundary>
   )
 
   if (inline) {
@@ -252,7 +264,7 @@ export function ChatPanelShell({
           onMouseDown={handleResizeStart}
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize chat panel"
+          aria-label={t("resizePanel")}
         />
         {/* Inner — overflow:hidden clips during close, min-width prevents text reflow */}
         <div
@@ -271,21 +283,21 @@ export function ChatPanelShell({
               <div className="w-5 h-5 rounded-md flex items-center justify-center bg-brand-teal-soft">
                 <MessageSquare className="h-2.5 w-2.5 text-brand-teal" />
               </div>
-              <span className="text-sm font-semibold tracking-[-0.01em]">Chat</span>
+              <span className="text-sm font-semibold tracking-[-0.01em]">{t("chat")}</span>
             </div>
             <div className="flex items-center gap-0.5">
               <button
                 onClick={handleNewChat}
-                title="New chat"
+                title={t("newChat")}
                 className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-background-hover transition-all"
-                aria-label="Start new chat"
+                aria-label={t("startNewChat")}
               >
                 <SquarePen className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-background-hover transition-all"
-                aria-label="Close chat panel"
+                aria-label={t("closePanel")}
               >
                 <PanelRightClose className="h-4 w-4" />
               </button>
@@ -322,7 +334,7 @@ export function ChatPanelShell({
                 }`}
               >
                 <Layers className="h-3 w-3 flex-none" />
-                <span className="truncate">{deckName || "Deck"}</span>
+                <span className="truncate">{deckName || t("deck")}</span>
               </button>
             )}
           </div>

@@ -156,8 +156,24 @@ def _load_deck_as_roundtrip(deck_dir: Path) -> dict:
 
 
 def load_slides_json_or_pptx(path):
-    """Load roundtrip slides JSON from .json or .pptx."""
-    if path.endswith('.pptx'):
+    """Load roundtrip slides JSON from a deck directory, .json, or .pptx."""
+    path_obj = Path(path)
+    if path_obj.is_dir():
+        # Deck-structure directory (deck.json + slides/*.json + specs/outline.md):
+        # build via the canonical pipeline (outline.md ordering, includes,
+        # overrides), then roundtrip the built PPTX so both sides of the diff
+        # compare in roundtrip shape.
+        from sdpm.api import generate
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_pptx = Path(tmpdir) / "baseline.pptx"
+            generate(path_obj, output_path=tmp_pptx)
+            rt_dir = Path(tmpdir) / "rt"
+            subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+                [sys.executable, str(Path(__file__).resolve().parent.parent.parent / 'scripts' / 'pptx_to_json.py'), str(tmp_pptx), '-o', str(rt_dir)],
+                capture_output=True, text=True, check=True
+            )
+            return _load_deck_as_roundtrip(rt_dir)
+    if str(path).endswith('.pptx'):
         with tempfile.TemporaryDirectory() as tmpdir:
             subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
                 [sys.executable, str(Path(__file__).resolve().parent.parent.parent / 'scripts' / 'pptx_to_json.py'), path, '-o', tmpdir],
@@ -209,3 +225,106 @@ def load_slides_json_or_pptx(path):
             )
             return _load_deck_as_roundtrip(Path(tmpdir))
     return data
+
+
+def diff_report(baseline, edited) -> dict:
+    """Compare two decks/JSONs/PPTXs and return a hand-edit diff report.
+
+    The canonical implementation behind ``pptx_builder.py diff`` and the
+    MCP ``diff_pptx`` tool.
+
+    Args:
+        baseline: Deck directory, slides JSON, or PPTX (the original).
+        edited: Deck directory, slides JSON, or PPTX (the hand-edited one).
+
+    Returns:
+        Dict with ``has_diff`` (bool) and ``report`` (human-readable text,
+        one section per changed/added/removed slide).
+    """
+    base = load_slides_json_or_pptx(str(baseline))
+    edit = load_slides_json_or_pptx(str(edited))
+
+    base_slides = base.get("slides", [])
+    edit_slides = edit.get("slides", [])
+    skip_keys = {"masterIndex", "_comment"}
+    lines: list[str] = []
+
+    alignment = align_slides(base_slides, edit_slides)
+
+    for bi, ei in alignment:
+        if bi is None:
+            es = edit_slides[ei]
+            title = es.get("title", "")
+            if isinstance(title, dict):
+                title = title.get("text", "")
+            lines.append(f'\n=== ADDED slide (edited #{ei + 1}) "{title[:40]}" ===')
+            lines.append(f"  layout: {es.get('layout')}, elements: {len(es.get('elements', []))}")
+            continue
+        if ei is None:
+            bs = base_slides[bi]
+            title = bs.get("title", "")
+            if isinstance(title, dict):
+                title = title.get("text", "")
+            lines.append(f'\n=== REMOVED slide (baseline #{bi + 1}) "{title[:40]}" ===')
+            continue
+
+        bs, es = base_slides[bi], edit_slides[ei]
+        slide_diffs = []
+
+        for key in ("layout", "title", "notes"):
+            bv, ev = bs.get(key), es.get(key)
+            if bv != ev and (bv or ev):
+                slide_diffs.append(_diff_value(key, bv, ev))
+
+        b_elems = [e for e in bs.get("elements", []) if "_comment" not in e]
+        e_elems = [e for e in es.get("elements", []) if "_comment" not in e]
+
+        pairs, added = match_elements(b_elems, e_elems)
+        elem_diffs = []
+
+        for bj, ej in pairs:
+            be = b_elems[bj]
+            if ej is None:
+                elem_diffs.append(f"  REMOVED [{bj}] {_elem_id(be)}")
+                continue
+            ee = e_elems[ej]
+            all_keys = sorted(set(list(be.keys()) + list(ee.keys())) - skip_keys)
+            changes = []
+            for key in all_keys:
+                bv, ev = be.get(key), ee.get(key)
+                if bv == ev:
+                    continue
+                if bv is None:
+                    changes.append(f"+{key}={json.dumps(ev, ensure_ascii=False)[:40]}")
+                elif ev is None:
+                    changes.append(f"-{key}")
+                else:
+                    if isinstance(bv, (int, float)) and isinstance(ev, (int, float)) and abs(bv - ev) <= 2:
+                        continue
+                    changes.append(_diff_value(key, bv, ev))
+            if changes:
+                elem_diffs.append(f"  [{bj}] {_elem_id(be)}:")
+                for c in changes:
+                    elem_diffs.append(f"    {c}")
+
+        for ej in added:
+            ee = e_elems[ej]
+            elem_diffs.append(f"  ADDED {_elem_id(ee)}:")
+            elem_diffs.append(f"    {json.dumps(ee, ensure_ascii=False)[:300]}")
+
+        moved = bi != ei
+        if slide_diffs or elem_diffs or moved:
+            title = bs.get("title", es.get("title", ""))
+            if isinstance(title, dict):
+                title = title.get("text", "")
+            moved_str = f" (moved: #{bi + 1}→#{ei + 1})" if moved else ""
+            lines.append(f'\n=== Slide (baseline #{bi + 1} ↔ edited #{ei + 1}) "{title[:40]}"{moved_str} ===')
+            for d in slide_diffs:
+                lines.append(f"  {d}")
+            for d in elem_diffs:
+                lines.append(d)
+
+    has_diff = bool(lines)
+    if not has_diff:
+        lines.append("No differences found.")
+    return {"has_diff": has_diff, "report": "\n".join(lines).lstrip("\n")}

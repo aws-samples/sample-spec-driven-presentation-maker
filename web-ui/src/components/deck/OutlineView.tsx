@@ -21,12 +21,13 @@ import { FileText, BarChart3, Palette, StickyNote } from "lucide-react"
 import { parseOutline, resolveStates } from "./outlineParser"
 import type { OutlineSlide, OutlineSubItem, SlideState, SubItemKey } from "./outlineParser"
 import { renderColorSwatches } from "./SpecStepNav"
+import { useTranslations } from "next-intl"
 
-/** Icon and display label for each sub-item key (excluding what_to_say which has no label). */
-const SUB_ITEM_META: Record<Exclude<SubItemKey, "what_to_say">, { Icon: typeof BarChart3; label: string }> = {
-  evidence: { Icon: BarChart3, label: "Evidence" },
-  what_to_show: { Icon: Palette, label: "Visual" },
-  notes: { Icon: StickyNote, label: "Notes" },
+/** Icon and label key for each sub-item key (excluding what_to_say which has no label). */
+const SUB_ITEM_META: Record<Exclude<SubItemKey, "what_to_say">, { Icon: typeof BarChart3; labelKey: "evidence" | "visual" | "notes" }> = {
+  evidence: { Icon: BarChart3, labelKey: "evidence" },
+  what_to_show: { Icon: Palette, labelKey: "visual" },
+  notes: { Icon: StickyNote, labelKey: "notes" },
 }
 
 /** Regex detecting [TBD] markers in sub-item values. */
@@ -75,6 +76,7 @@ function renderValue(value: string): (string | React.ReactElement)[] {
  * @returns JSX element for the detail panel
  */
 function DetailPanel({ subItems, state }: { subItems: OutlineSubItem[]; state: SlideState }): React.ReactElement {
+  const t = useTranslations("outline")
   const whatToSay = subItems.find((s) => s.key === "what_to_say")
   const others = subItems.filter((s) => s.key !== "what_to_say")
 
@@ -106,7 +108,7 @@ function DetailPanel({ subItems, state }: { subItems: OutlineSubItem[]; state: S
           {others.map((item) => {
             const meta = SUB_ITEM_META[item.key as Exclude<SubItemKey, "what_to_say">]
             if (!meta) return null
-            const { Icon, label } = meta
+            const { Icon, labelKey } = meta
             return (
               <div key={item.key} className="flex items-start gap-2.5">
                 <Icon
@@ -115,7 +117,7 @@ function DetailPanel({ subItems, state }: { subItems: OutlineSubItem[]; state: S
                 />
                 <div className="min-w-0 flex-1">
                   <span className="text-[11px] uppercase tracking-[0.08em] text-foreground-secondary/70 font-medium">
-                    {label}
+                    {t(labelKey)}
                   </span>
                   <p className="text-sm text-foreground/80 leading-relaxed mt-0.5">
                     {renderValue(item.value)}
@@ -227,6 +229,7 @@ interface OutlineViewProps {
 }
 
 export function OutlineView({ content }: OutlineViewProps): React.ReactElement {
+  const t = useTranslations("outline")
   const activeRef = useRef<HTMLDivElement>(null)
   const prevActiveSlug = useRef<string | null>(null)
 
@@ -260,7 +263,7 @@ export function OutlineView({ content }: OutlineViewProps): React.ReactElement {
           <FileText className="h-5 w-5 text-foreground-muted/30" />
         </div>
         <p className="text-sm text-foreground-muted">
-          Outline will appear here when the agent writes it.
+          {t("emptyState")}
         </p>
       </div>
     )

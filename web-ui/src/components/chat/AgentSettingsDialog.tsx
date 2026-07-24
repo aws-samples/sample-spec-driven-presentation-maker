@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from "react"
 import { X, Plus, Trash2 } from "lucide-react"
+import { notifyError } from "@/lib/errors"
 
 export interface AgentConfig {
   id: string
@@ -68,7 +69,7 @@ export function saveAgents(agents: AgentConfig[]) {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ agents }),
-    }).catch(() => {})
+    }).catch((err) => notifyError("Failed to save agent settings to server", err))
   }
 }
 
@@ -83,7 +84,7 @@ export function setActiveAgentId(id: string) {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ activeAgent: id }),
-    }).catch(() => {})
+    }).catch((err) => notifyError("Failed to save active agent to server", err))
   }
 }
 

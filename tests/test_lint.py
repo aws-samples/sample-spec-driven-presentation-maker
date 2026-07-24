@@ -78,6 +78,13 @@ class TestLintShape:
         diags = lint([{"elements": [{"type": "shape", "shape": "rectangle", "width": 100}]}])
         assert any("missing 'x'" in d["message"] for d in diags)
 
+    def test_missing_shape_name(self):
+        """A shape without 'shape' is silently dropped by the builder — lint must flag it."""
+        diags = lint([{"elements": [
+            {"type": "shape", "x": 0, "y": 0, "width": 100, "height": 50}
+        ]}])
+        assert any(d["rule"] == "shape-missing-name" for d in diags)
+
 
 # ===================================================================
 # textbox

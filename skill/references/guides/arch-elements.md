@@ -6,6 +6,13 @@ Common components for architecture diagrams (borders, groups, arrows, scale, col
 
 Shared components and rules used across architecture diagram patterns (simple / complex).
 
+> **Building a diagram from connections (what-links-to-what)?** Prefer the
+> nested-JSON layout engine — it auto-places icons and auto-routes orthogonal
+> arrows, minimizing crossings/pierces. See
+> [arch-layout-engine.md](arch-layout-engine.md). This file (arch-elements.md)
+> covers the shared vocabulary — group colors/types, boundary & logo, box
+> nodes, manual arrow geometry — used by both the engine and hand-placement.
+
 ---
 
 ## Core Principles
@@ -289,7 +296,7 @@ Minimal (label only):
 
 ### Rendering
 
-The layout engine expands box nodes into existing element types (colors switch with `--theme`):
+The layout engine expands box nodes into existing element types (colors switch with the `theme` arg / `--theme` flag):
 
 - `rounded_rectangle`: semi-transparent background (opacity 0.18) + border + shadow "sm" + corner radius (0.07)
 - `textbox`: sublabel (muted) → label (bold) → description (muted), with autofit

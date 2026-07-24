@@ -44,6 +44,9 @@ admin-ui/dist/
 web-ui/node_modules/
 web-ui/.next/
 web-ui/public/aws-exports.json
+web-ui/e2e/.tmp/
+web-ui/test-results/
+web-ui/playwright-report/
 
 # Kiro / Q-SPEC (local steering, specs, settings)
 .kiro/*
@@ -53,6 +56,7 @@ web-ui/public/aws-exports.json
 !.kiro/steering/tech-public.md
 !.kiro/steering/versioning.md
 !.kiro/steering/steering-policy.md
+!.kiro/steering/i18n.md
 
 # Config (contains secrets)
 infra/config.yaml
@@ -65,6 +69,7 @@ skill/assets/config.json
 .ash/
 ?/
 skill/sdpm/.cache/
+skill/.cache/
 
 # Temporary workspace
 tmp/

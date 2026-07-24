@@ -26,6 +26,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Layers, Star, MoreHorizontal, Trash2, Building2, Lock, Share2, Download, Users, Link, FolderOpen } from "lucide-react"
 import { CloudOnly, IS_LOCAL } from "@/lib/mode"
+import { formatDate, meshGradient } from "@/lib/utils"
+import { useTranslations } from "next-intl"
+import { useLocale } from "@/i18n/LocaleProvider"
 
 
 interface DeckCardProps {
@@ -42,44 +45,9 @@ interface DeckCardProps {
   onOpenFolder?: (deckId: string) => void
 }
 
-/**
- * Format an ISO timestamp as a relative date string.
- *
- * @param iso - ISO 8601 timestamp
- * @returns Human-readable relative date (e.g. "Today", "3d ago", "Feb 14")
- */
-function formatDate(iso: string): string {
-  if (!iso) return ""
-  const d = new Date(iso)
-  const now = new Date()
-  const diff = Math.floor((now.getTime() - d.getTime()) / 86400000)
-  if (diff === 0) return "Today"
-  if (diff === 1) return "Yesterday"
-  if (diff < 7) return `${diff}d ago`
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-}
-
-/**
- * Generate a deterministic mesh gradient from a deck ID.
- * Combines multiple radial gradients for an organic, unique appearance.
- *
- * @param id - Deck identifier used as seed
- * @returns CSS background value with layered gradients
- */
-function meshGradient(id: string): string {
-  const seed = id.charCodeAt(0) * 47 + (id.charCodeAt(id.length - 1) || 0) * 31
-  const h1 = seed % 360
-  const h2 = (h1 + 60) % 360
-  const h3 = (h1 + 180) % 360
-  return [
-    `radial-gradient(ellipse at 20% 20%, oklch(0.28 0.04 ${h1}) 0%, transparent 50%)`,
-    `radial-gradient(ellipse at 80% 80%, oklch(0.22 0.03 ${h2}) 0%, transparent 50%)`,
-    `radial-gradient(ellipse at 60% 30%, oklch(0.18 0.02 ${h3}) 0%, transparent 60%)`,
-    `linear-gradient(135deg, oklch(0.14 0.01 ${h1}) 0%, oklch(0.11 0.005 260) 100%)`,
-  ].join(", ")
-}
-
 export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOpen, onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, onOpenFolder }: DeckCardProps) {
+  const t = useTranslations("deckCard")
+  const { locale } = useLocale()
   return (
     <div
       role="button"
@@ -107,7 +75,8 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
               ? "text-brand-amber"
               : "text-white/30 sm:opacity-0 sm:group-hover:opacity-100 hover:text-brand-amber/70"
           }`}
-          aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+          aria-label={isFavorite ? t("removeFromFavorites") : t("addToFavorites")}
+          aria-pressed={isFavorite}
         >
           <Star className={`h-3.5 w-3.5 ${isFavorite ? "fill-current" : ""}`} strokeWidth={isFavorite ? 0 : 1.5} />
         </button>
@@ -118,7 +87,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
               className="p-1 transition-all flex items-center justify-center drop-shadow-[0_1px_2px_oklch(0_0_0/60%)] text-white/30 sm:opacity-0 sm:group-hover:opacity-100 hover:text-white/70"
-              aria-label="Deck actions"
+              aria-label={t("deckActions")}
             >
               <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
@@ -133,18 +102,18 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
               onClick={() => navigator.clipboard.writeText(`${window.location.origin}/decks#${deck.deckId}`)}
             >
               <Link className="h-3.5 w-3.5" />
-              Copy URL
+              {t("copyUrl")}
             </DropdownMenuItem>
             {onOpenFolder && IS_LOCAL && (
               <DropdownMenuItem onClick={() => onOpenFolder(deck.deckId)}>
                 <FolderOpen className="h-3.5 w-3.5" />
-                Open Folder
+                {t("openFolder")}
               </DropdownMenuItem>
             )}
             {onDownload && (
               <DropdownMenuItem onClick={() => onDownload(deck.deckId)}>
                 {IS_LOCAL ? <FolderOpen className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
-                {IS_LOCAL ? "Open PPTX" : "Download PPTX"}
+                {IS_LOCAL ? t("openPptx") : t("downloadPptx")}
               </DropdownMenuItem>
             )}
             <CloudOnly>
@@ -155,14 +124,14 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
                   onClick={() => onToggleVisibility(deck.deckId, deck.visibility === "public" ? "private" : "public")}
                 >
                   {deck.visibility === "public" ? <Lock className="h-3.5 w-3.5" /> : <Building2 className="h-3.5 w-3.5" />}
-                  {deck.visibility === "public" ? "Make Private" : "Make Internal"}
+                  {deck.visibility === "public" ? t("makePrivate") : t("makeInternal")}
                 </DropdownMenuItem>
               </>
             )}
             {isOwner && onShare && (
               <DropdownMenuItem onClick={() => onShare(deck.deckId)}>
                 <Share2 className="h-3.5 w-3.5" />
-                Share
+                {t("share")}
               </DropdownMenuItem>
             )}
             </CloudOnly>
@@ -174,7 +143,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
                   className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  Delete
+                  {t("delete")}
                 </DropdownMenuItem>
               </>
             )}
@@ -187,7 +156,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
         {deck.thumbnailUrl ? (
           <img
             src={deck.thumbnailUrl}
-            alt={`Preview of ${deck.name}`}
+            alt={t("previewAlt", { name: deck.name })}
             className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700 ease-out"
           />
         ) : (
@@ -212,12 +181,12 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium backdrop-blur-md"
               style={{ background: "oklch(0.55 0.15 160 / 0.35)", color: "oklch(0.9 0.1 160)" }}>
               <Building2 className="h-2.5 w-2.5" />
-              Internal
+              {t("internal")}
             </div>
           ) : (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-foreground-secondary bg-black/50 backdrop-blur-md">
               <Lock className="h-2.5 w-2.5" />
-              Private
+              {t("private")}
             </div>
           )}
           {deck.collaborators && deck.collaborators.length > 0 && (
@@ -241,7 +210,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
         <div className="flex items-center gap-2 mt-2 text-xs text-foreground/50">
           {deck.owner && <span>{deck.owner}</span>}
           {deck.owner && deck.updatedAt && <span className="opacity-40">·</span>}
-          {deck.updatedAt && <span>{formatDate(deck.updatedAt)}</span>}
+          {deck.updatedAt && <span>{formatDate(deck.updatedAt, locale)}</span>}
         </div>
       </div>
     </div>

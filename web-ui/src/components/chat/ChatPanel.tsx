@@ -16,19 +16,22 @@ import { buildAttachedMarkers } from "@/lib/attachmentMarker"
 import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
 import { getChatHistory, patchDeck } from "@/services/deckService"
 import type { UploadedFile } from "@/services/uploadService"
-import { useChatStream, type Message, type ToolUseCallbackData } from "@/hooks/useChatStream"
+import { useChatStream, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage, ToolUse } from "./ChatMessage"
-import { McpStatusBar, McpServerStatus } from "./McpStatusBar"
+import { McpStatusBar } from "./McpStatusBar"
 import { FileDropZone } from "./FileDropZone"
 import { useIsMobile } from "@/hooks/UseMobile"
 import { Send, ChevronRight } from "lucide-react"
 import { ModeSelector } from "./ModeSelector"
 import { usePreferences } from "@/hooks/usePreferences"
+import { notifyError } from "@/lib/errors"
+import { toast } from "sonner"
+import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
+import { useTranslations } from "next-intl"
 
 interface ChatPanelProps {
   deckId: string
-  deckName?: string
   chatSessionId?: string
   slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
@@ -41,7 +44,8 @@ export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, deckName, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
+  const t = useTranslations("chat")
   // --- Session ---
   const [sessionId, setSessionId] = useState(() => {
     if (chatSessionId) return chatSessionId
@@ -95,7 +99,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deckId: did, messages: stream.messagesRef.current }),
-    }).catch(() => {})
+    }).catch((err) => notifyError(t("errorSaveHistory"), err))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -106,7 +110,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     // Deck created
     if (toolUseData?.completed && toolUseData?.result?.deckId && onDeckCreated) {
       const resultDeckId = String(toolUseData.result.deckId)
-      if (idToken) patchDeck(resultDeckId, { chatSessionId: sessionId }, idToken).catch(() => {})
+      // intentional: best-effort — chat session linkage is a convenience; deck creation already succeeded
+      if (idToken) patchDeck(resultDeckId, { chatSessionId: sessionId }, idToken).catch((err) => console.error("patchDeck failed", err))
       onDeckCreated(resultDeckId)
       saveLocalChat(resultDeckId)
     }
@@ -187,117 +192,17 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       if (!sessionId) return
       setHistoryLoading(true)
       try {
-        const history = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
+        const { messages: history, truncated } = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
+        if (truncated) {
+          toast.info(t("historyTruncated"))
+        }
         if (history.length > 0) {
           // Local mode: .chat.json is already in ChatPanel's internal format
-          if (IS_LOCAL && (history[0] as unknown as Record<string, unknown>)?.toolUses !== undefined) {
-            stream.setMessages(history.map((m) => {
-              const raw = m as unknown as Record<string, unknown>
-              return {
-                role: ((raw.role as string) || "assistant") as "user" | "assistant",
-                content: (typeof raw.content === "string" ? raw.content : "") as string,
-                toolUses: (raw.toolUses as ToolUse[]) || [],
-                blocks: (raw.blocks as ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[]) || undefined,
-              }
-            }))
+          if (IS_LOCAL && isLocalHistoryFormat(history)) {
+            stream.setMessages(parseLocalHistory(history))
             return
           }
-          const parsed: Message[] = []
-          for (const m of history) {
-            let text = ""
-            const toolUses: ToolUse[] = []
-            const snippets: { label: string; text: string }[] = []
-
-            if (typeof m.content === "string") {
-              text = m.content.replace(/<!--sdpm:[^>]*-->\n?/g, "")
-            } else if (Array.isArray(m.content)) {
-              const contentBlocks = m.content as unknown as Record<string, unknown>[]
-              if (m.role === "user" && contentBlocks.some((b) => b.toolResult)) {
-                for (const block of contentBlocks) {
-                  const b = block
-                  if (b.toolResult) {
-                    const tr = b.toolResult as Record<string, unknown>
-                    const tuId = tr.toolUseId as string
-                    const status = (tr.status as string) || "success"
-                    let resultText = ""
-                    for (const c of (tr.content as Record<string, unknown>[]) || []) {
-                      if (c.text) resultText += c.text as string
-                    }
-                    if (parsed.length > 0) {
-                      const prev = parsed[parsed.length - 1]
-                      if (prev.role === "assistant") {
-                        const matchedTool = prev.toolUses.find((t) => t.toolUseId === tuId)
-                        if (matchedTool) {
-                          matchedTool.status = status as "success" | "error"
-                          try { matchedTool.result = JSON.parse(resultText) } catch { matchedTool.result = resultText as unknown as Record<string, unknown> }
-                        }
-                        if (prev.blocks) {
-                          for (const bl of prev.blocks) {
-                            if (bl.type === "tool" && bl.tool.toolUseId === tuId) {
-                              bl.tool.status = status as "success" | "error"
-                              try { bl.tool.result = JSON.parse(resultText) } catch { bl.tool.result = resultText as unknown as Record<string, unknown> }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                continue
-              }
-
-              for (const block of contentBlocks) {
-                const b = block
-                if (b.toolUse) {
-                  const tu = b.toolUse as Record<string, unknown>
-                  toolUses.push({
-                    toolUseId: (tu.toolUseId as string) || "",
-                    name: (tu.name as string) || "",
-                    input: (tu.input as Record<string, unknown>) || {},
-                  })
-                } else if (b.text && toolUses.length === 0) {
-                  const cleaned = (b.text as string).replace(/<!--sdpm:[^>]*-->\n?/g, "")
-                  if (cleaned) text += (text ? "\n" : "") + cleaned
-                }
-              }
-            }
-            if (!text.trim() && toolUses.length === 0) continue
-            const blocks: ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[] = []
-            if (m.role === "assistant" && Array.isArray(m.content)) {
-              for (const block of m.content) {
-                const b = block as Record<string, unknown>
-                if (b.text) {
-                  blocks.push({ type: "text", text: b.text as string })
-                } else if (b.toolUse) {
-                  const tu = b.toolUse as Record<string, unknown>
-                  blocks.push({ type: "tool", tool: {
-                    toolUseId: (tu.toolUseId as string) || "",
-                    name: (tu.name as string) || "",
-                    input: (tu.input as Record<string, unknown>) || {},
-                  }})
-                }
-              }
-            }
-            parsed.push({
-              role: m.role as "user" | "assistant",
-              content: text,
-              toolUses,
-              blocks: blocks.length > 0 ? blocks : undefined,
-              snippets: snippets.length > 0 ? snippets : undefined,
-              ...((m.role === "user") && (() => {
-                const attRe = /\[Attached:\s*(.+?)\s*\(uploadId:\s*[^)]+\)\]/g
-                const atts: { fileName: string; fileType: string }[] = []
-                let am: RegExpExecArray | null
-                while ((am = attRe.exec(text)) !== null) {
-                  const fn = am[1]
-                  const ext = fn.split(".").pop()?.toLowerCase() || ""
-                  const mimeMap: Record<string, string> = { pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", pdf: "application/pdf", png: "image/png", json: "application/json", md: "text/markdown", txt: "text/plain" }
-                  atts.push({ fileName: fn, fileType: mimeMap[ext] || "application/octet-stream" })
-                }
-                return atts.length > 0 ? { attachments: atts } : {}
-              })()),
-            })
-          }
+          const parsed = parseCloudHistory(history)
           if (parsed.length > 0) stream.setMessages(parsed)
         }
       } finally {
@@ -523,7 +428,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   return (
     <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={stream.isLoading} className="flex flex-col h-full">
       {/* Messages area */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4" role="log" aria-label="Chat messages"
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4" role="log" aria-label={t("chatMessages")}
         onScroll={() => {
           const el = scrollContainerRef.current
           if (!el) return
@@ -544,10 +449,22 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-teal-soft mb-5">
               <Send className="h-5 w-5 text-brand-teal" />
             </div>
-            <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-1">Let&apos;s present</h2>
-            <p className="text-sm text-foreground-muted leading-relaxed mb-8">
-              Drop a URL, paste notes, or describe your idea
+            <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-1">{t("letsPresent")}</h2>
+            <p className="text-sm text-foreground-muted leading-relaxed mb-6">
+              {t("emptyHint")}
             </p>
+            <div className="flex flex-col gap-2 w-full max-w-[320px] mb-8">
+              {[t("example1"), t("example2"), t("example3")].map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  onClick={() => chatInputRef.current?.insertAtCursor(example)}
+                  className="text-left text-sm text-foreground-muted px-3.5 py-2.5 rounded-xl border border-border hover:border-border-hover hover:text-foreground transition-colors"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
             {parallelAgents && <ModeSelector value={agentMode} onChange={setAgentMode} />}
           </div>
         ) : (
@@ -591,11 +508,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           isLoading={isLoading}
           onStop={stream.stopGeneration}
           disabled={!configLoaded || reconnectLoading}
-          placeholder={isMobile ? "Ask anything…" : "Ask anything…  ⌘↵ send"}
+          placeholder={isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
           idToken={auth.user?.id_token}
           sessionId={sessionId}
           deckId={deckId}
-          stopTitle={composeInFlight ? "Force stop — partial report may be lost" : undefined}
+          stopTitle={composeInFlight ? t("forceStop") : undefined}
         >
           {/* Options expander */}
           <div className="px-2">
@@ -605,7 +522,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               className="flex items-center gap-1 text-[11px] text-foreground-muted hover:text-foreground transition-colors py-1"
             >
               <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${optionsOpen ? "rotate-90" : ""}`} />
-              Options
+              {t("options")}
             </button>
             {optionsOpen && (
               <div className="flex flex-col gap-2 pb-2 pl-1">
@@ -613,8 +530,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
                   bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
                   <div className="flex flex-col gap-0.5 min-w-0">
-                    <span className="text-xs text-foreground-secondary font-medium select-none">Fetch web images</span>
-                    <span className="text-[11px] text-foreground-muted select-none leading-snug">Include images from websites in presentations</span>
+                    <span className="text-xs text-foreground-secondary font-medium select-none">{t("fetchWebImages")}</span>
+                    <span className="text-[11px] text-foreground-muted select-none leading-snug">{t("fetchWebImagesDescription")}</span>
                   </div>
                   <button
                     type="button"
@@ -636,13 +553,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
                   <div className="flex flex-col gap-0.5 min-w-0">
                     <span className="text-xs text-foreground-secondary font-medium select-none flex items-center gap-2">
-                      Parallel agents
+                      {t("parallelAgents")}
                       <span className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-semibold tracking-wide
                         bg-brand-amber-soft text-brand-amber border border-brand-amber/25">
-                        🧪 Experimental
+                        {t("experimental")}
                       </span>
                     </span>
-                    <span className="text-[11px] text-foreground-muted select-none leading-snug">Multiple composer agents generate slides in parallel</span>
+                    <span className="text-[11px] text-foreground-muted select-none leading-snug">{t("parallelAgentsDescription")}</span>
                   </div>
                   <button
                     type="button"

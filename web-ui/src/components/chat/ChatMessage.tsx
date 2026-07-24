@@ -178,7 +178,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
   let match: RegExpExecArray | null
   let cleanContent = content
   while ((match = snippetRegex.exec(content)) !== null) {
-    inlineSnippets.push({ label: "Text snippet", text: match[1].trim() })
+    inlineSnippets.push({ label: "", text: match[1].trim() })  // empty label → SnippetBlock renders localized fallback
   }
   if (inlineSnippets.length > 0) {
     cleanContent = content.replace(/\n*---snippet---\n[\s\S]*?---\/snippet---/g, "").trim()

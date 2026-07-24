@@ -1,0 +1,17 @@
+{
+  "name": "sdpm",
+  "owner": {
+    "name": "aws-samples",
+    "url": "https://github.com/aws-samples/sample-spec-driven-presentation-maker"
+  },
+  "metadata": {
+    "description": "Spec-driven PowerPoint generation for Claude Code (local MCP + compose sub-agent)."
+  },
+  "plugins": [
+    {
+      "name": "sdpm",
+      "source": "./",
+      "description": "Spec-driven PowerPoint generation with a compose sub-agent (Claude Code)."
+    }
+  ]
+}

@@ -68,6 +68,7 @@ export function useWorkspace(
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevSlideKeyRef = useRef<string>("")
   const stablePreviewUrls = useRef<Map<string, { url: string }>>(new Map())
+  const prevDeckSnapshotRef = useRef<string>("")
 
   // Clear URL cache when switching decks
   useEffect(() => {
@@ -156,7 +157,17 @@ export function useWorkspace(
             data.defsUrl = cached.url
           }
         }
-        setDeck(data)
+        // Skip the state update when nothing changed — URLs are stabilised
+        // above, so an identical snapshot means an identical render. Polling
+        // runs every 1-6s; without this every poll re-renders the carousel.
+        // Note: string comparison assumes the API returns keys in a stable
+        // order (same endpoint, same serializer). A key-order change would
+        // only cause an extra render, never a missed update.
+        const snapshot = JSON.stringify(data)
+        if (snapshot !== prevDeckSnapshotRef.current) {
+          prevDeckSnapshotRef.current = snapshot
+          setDeck(data)
+        }
       } catch {
         // Deck may not exist yet
       }
@@ -171,6 +182,7 @@ export function useWorkspace(
 
     if (isAuthenticated) {
       prevSlideKeyRef.current = ""
+      prevDeckSnapshotRef.current = ""
       stablePreviewUrls.current.clear()
       poll() // immediate first fetch
     }

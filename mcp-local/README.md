@@ -33,7 +33,6 @@ uv run python server.py
 | `init_presentation` | Initialize workspace with template and fonts |
 | `analyze_template` | Analyze a PPTX template (layouts, colors, fonts) |
 | `generate_pptx` | Generate PPTX from JSON |
-| `get_preview` | Generate PNG previews (requires LibreOffice + poppler) |
 | `measure_slides` | Measure text bounding boxes (requires LibreOffice) |
 | `search_assets` | Search icons by keyword |
 | `list_asset_sources` | List available asset sources |
@@ -50,5 +49,5 @@ uv run python server.py
 ## Requirements
 
 - Python 3.10+
-- LibreOffice (for `get_preview` and `measure_slides` tools)
+- LibreOffice (for `run_python` preview generation and `measure_slides` tools)
 - poppler-utils (`pdftoppm`) for PNG conversion

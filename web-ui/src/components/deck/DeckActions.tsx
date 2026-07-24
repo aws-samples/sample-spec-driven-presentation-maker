@@ -11,6 +11,7 @@ import { useState, useEffect, useRef } from "react"
 import { Lock, Share2, X, Trash2, Building2 } from "lucide-react"
 import { searchUsers, UserSearchResult } from "@/services/deckService"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
+import { useTranslations } from "next-intl"
 
 interface DeckActionsProps {
   visibility?: "public" | "private"
@@ -22,6 +23,7 @@ interface DeckActionsProps {
 }
 
 export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, collaborators = [], collaboratorAliases: initialAliases = {} }: DeckActionsProps) {
+  const t = useTranslations("deckActions")
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [shareQuery, setShareQuery] = useState("")
@@ -71,7 +73,7 @@ export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, 
         }`}
       >
         {isPublic ? <Building2 className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
-        {isPublic ? "Internal" : "Private"}
+        {isPublic ? t("internal") : t("private")}
       </button>
 
       <button
@@ -79,16 +81,16 @@ export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, 
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-muted/50 text-muted-foreground border border-border/40 hover:text-foreground transition-colors"
       >
         <Share2 className="h-3 w-3" />
-        Share{collabList.length > 0 && ` (${collabList.length})`}
+        {t("share")}{collabList.length > 0 && ` (${collabList.length})`}
       </button>
 
       {/* Publish confirmation */}
       <ConfirmDialog
         open={showPublishConfirm}
         onOpenChange={setShowPublishConfirm}
-        title="Share internally?"
-        description="This deck will be discoverable by everyone in the organization."
-        confirmLabel="Share"
+        title={t("shareInternallyTitle")}
+        description={t("shareInternallyDescription")}
+        confirmLabel={t("share")}
         variant="default"
         onConfirm={() => { onVisibilityChange("public"); setShowPublishConfirm(false) }}
       />
@@ -100,7 +102,7 @@ export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, 
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-blue-500/10"><Share2 className="h-5 w-5 text-blue-400" /></div>
-                <h3 className="text-sm font-semibold">Share this deck</h3>
+                <h3 className="text-sm font-semibold">{t("shareThisDeck")}</h3>
               </div>
               <button onClick={() => { setShowShare(false); setShareQuery(""); setSuggestions([]) }} className="p-1 rounded hover:bg-muted"><X className="h-4 w-4" /></button>
             </div>
@@ -119,7 +121,7 @@ export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, 
                   if (e.key === "ArrowUp") { e.preventDefault(); setSelectedIndex((i) => (i - 1 + suggestions.length) % suggestions.length) }
                   if (e.key === "Enter") { addUser(suggestions[selectedIndex]) }
                 }}
-                placeholder="Search by alias…"
+                placeholder={t("searchByAlias")}
                 className="w-full px-3 py-2 text-sm bg-muted/50 border border-border/40 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
                 autoFocus
               />
@@ -147,7 +149,7 @@ export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, 
             {/* Collaborator list */}
             {collabList.length > 0 && (
               <div className="border-t border-border/30 pt-2">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Collaborators</p>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">{t("collaborators")}</p>
                 <div className="space-y-1 max-h-[120px] overflow-y-auto">
                   {collabList.map((sub) => (
                     <div key={sub} className="flex items-center justify-between px-2 py-1 rounded-md hover:bg-muted/30">
@@ -160,7 +162,7 @@ export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, 
                       <button
                         onClick={() => removeUser(sub)}
                         className="p-0.5 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
-                        aria-label={`Remove ${collabAliases[sub] || sub}`}
+                        aria-label={t("removeCollaborator", { name: collabAliases[sub] || sub })}
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -171,7 +173,7 @@ export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, 
             )}
 
             {collabList.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-2">No collaborators yet</p>
+              <p className="text-xs text-muted-foreground text-center py-2">{t("noCollaborators")}</p>
             )}
           </div>
         </div>

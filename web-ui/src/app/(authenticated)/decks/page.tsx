@@ -34,9 +34,11 @@ import { useSwipe } from "@/hooks/useSwipe"
 import { useDeckList } from "@/hooks/useDeckList"
 import { useWorkspace } from "@/hooks/useWorkspace"
 import { Plus, MessageSquare, Image as ImageIcon, Star } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { IS_LOCAL } from "@/lib/mode"
 
 export default function DecksPage() {
+  const t = useTranslations("decksPage")
   const auth = useAuth()
   const isMobile = useIsMobile()
   const idToken = auth.user?.id_token
@@ -68,6 +70,15 @@ export default function DecksPage() {
     chatRef.current?.insertAtCursor(msg)
   }, [ws.deck?.specs?.artDirection])
 
+  /** Handle inline template selection — insert message into chat input.
+   *  isChange is true when deck.json already has a confirmed template. */
+  const handleTemplateSelect = useCallback((name: string, isChange: boolean) => {
+    const msg = isChange
+      ? `I want to change the template to "${name}". `
+      : `I'll use the "${name}" template. `
+    chatRef.current?.insertAtCursor(msg)
+  }, [])
+
   /* ── Render ── */
   return (
     <AppShell
@@ -90,7 +101,7 @@ export default function DecksPage() {
                     }`}
                   >
                     <MessageSquare className="h-4 w-4" />
-                    Chat
+                    {t("chat")}
                   </button>
                   <button
                     onClick={() => setActiveTab("preview")}
@@ -99,7 +110,7 @@ export default function DecksPage() {
                     }`}
                   >
                     <ImageIcon className="h-4 w-4" />
-                    Preview
+                    {t("preview")}
                     {ws.hasSlides && <span className="w-1.5 h-1.5 rounded-full bg-green-500" />}
                   </button>
                 </div>
@@ -142,6 +153,8 @@ export default function DecksPage() {
                     specs={ws.deck?.specs}
                     workflowPhase={workflowPhase}
                     onStyleSelect={handleStyleSelect}
+                    onTemplateSelect={handleTemplateSelect}
+                    currentTemplate={ws.deck?.template}
                     idToken={idToken}
                     ownerAlias={!ws.isOwner ? ws.deck?.ownerAlias : undefined}
                     headerActions={
@@ -154,7 +167,7 @@ export default function DecksPage() {
                                 ? "text-brand-amber"
                                 : "text-foreground-muted hover:text-brand-amber"
                             }`}
-                            aria-label={list.favoriteIds.has(ws.activeDeckId!) ? "Remove from favorites" : "Add to favorites"}
+                            aria-label={list.favoriteIds.has(ws.activeDeckId!) ? t("removeFromFavorites") : t("addToFavorites")}
                           >
                             <Star className={`h-4 w-4 ${list.favoriteIds.has(ws.activeDeckId!) ? "fill-current" : ""}`} />
                           </button>
@@ -237,9 +250,9 @@ export default function DecksPage() {
       <ConfirmDialog
         open={!!list.deleteTarget}
         onOpenChange={(open) => { if (!open) list.setDeleteTarget(null) }}
-        title="Delete this deck?"
-        description={<><span className="font-medium text-foreground">{list.deleteTarget?.name}</span> will be permanently deleted after 30 days. This action cannot be undone.</>}
-        confirmLabel="Delete"
+        title={t("deleteTitle")}
+        description={<>{t.rich("deleteDescription", { name: () => <span className="font-medium text-foreground">{list.deleteTarget?.name}</span> })}</>}
+        confirmLabel={t("delete")}
         variant="destructive"
         onConfirm={list.confirmDelete}
       />
@@ -255,7 +268,7 @@ export default function DecksPage() {
                   className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-brand-teal text-primary-foreground shadow-lg text-sm font-medium animate-card-in"
                 >
                   <Plus className="h-4 w-4" />
-                  New Deck
+                  {t("newDeck")}
                 </button>
               </div>
             </>
@@ -263,7 +276,7 @@ export default function DecksPage() {
           <button
             onClick={() => setFabOpen(!fabOpen)}
             className={`w-14 h-14 rounded-full bg-brand-teal text-primary-foreground shadow-xl flex items-center justify-center transition-transform duration-200 ${fabOpen ? "rotate-45" : ""}`}
-            aria-label="Create new deck"
+            aria-label={t("createNewDeck")}
             aria-expanded={fabOpen}
           >
             <Plus className="h-6 w-6" />

@@ -9,6 +9,7 @@
 
 import { useState } from "react"
 import { ChevronDown, ChevronRight, FileText } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 interface SnippetBlockProps {
   /** Full snippet text. */
@@ -24,6 +25,7 @@ interface SnippetBlockProps {
  * @param props - SnippetBlockProps
  */
 export function SnippetBlock({ text, label }: SnippetBlockProps) {
+  const t = useTranslations("snippet")
   const [expanded, setExpanded] = useState(false)
 
   const lines = text.split("\n")
@@ -44,7 +46,7 @@ export function SnippetBlock({ text, label }: SnippetBlockProps) {
         )}
         <FileText className="h-3 w-3 text-muted-foreground flex-none" />
         <span className="truncate text-muted-foreground">
-          {label || "Text snippet"} ({text.length.toLocaleString()} chars)
+          {label || t("textSnippet")} ({t("charCount", { count: text.length })})
         </span>
       </button>
 

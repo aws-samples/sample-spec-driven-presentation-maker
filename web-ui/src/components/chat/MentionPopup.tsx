@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback, KeyboardEvent } from "react"
 import { createPortal } from "react-dom"
 import { Layers, FileText } from "lucide-react"
 import { useIsMobile } from "@/hooks/UseMobile"
+import { useTranslations } from "next-intl"
 
 export interface MentionItem {
   /** Display label (e.g. "Page 1", "営業提案テンプレート"). */
@@ -51,6 +52,7 @@ interface MentionPopupProps {
  * @param props - MentionPopupProps
  */
 export function MentionPopup({ visible, query, items, onSelect, onClose, position, textareaRef }: MentionPopupProps) {
+  const t = useTranslations("chat")
   const [selectedIndex, setSelectedIndex] = useState(0)
   const isMobile = useIsMobile()
 
@@ -130,7 +132,7 @@ export function MentionPopup({ visible, query, items, onSelect, onClose, positio
       <div
         className="bg-popover border border-border rounded-lg shadow-lg py-1 max-h-[300px] overflow-y-auto min-w-[200px] max-w-[min(240px,calc(100vw-2rem))]"
         role="listbox"
-        aria-label="Mention suggestions"
+        aria-label={t("mentionSuggestions")}
       >
         {slides.length > 0 && (
           <>

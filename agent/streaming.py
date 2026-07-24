@@ -62,12 +62,21 @@ async def stream_agent(agent: Agent, user_query: str, session_id: str, cancel: a
 
     stream_iter = agent.stream_async(user_query).__aiter__()
     pending = None
+    cancel_task: asyncio.Task | None = None
 
     while True:
         if pending is None:
             pending = asyncio.ensure_future(_next(stream_iter))
-        done, _ = await asyncio.wait({pending}, timeout=KEEPALIVE_INTERVAL)
-        if done:
+        # Wait on the cancel event too so cancellation wakes us immediately
+        # instead of after the keepalive timeout. Once cancelled mid-tool we
+        # stop watching it — _should_stop() re-checks when the tool result lands.
+        wait_set = {pending}
+        if not cancel.is_set():
+            if cancel_task is None or cancel_task.done():
+                cancel_task = asyncio.ensure_future(cancel.wait())
+            wait_set.add(cancel_task)
+        done, _ = await asyncio.wait(wait_set, timeout=KEEPALIVE_INTERVAL, return_when=asyncio.FIRST_COMPLETED)
+        if pending in done:
             try:
                 event = pending.result()
                 if isinstance(event, dict) and "event" in event:
@@ -126,7 +135,13 @@ async def stream_agent(agent: Agent, user_query: str, session_id: str, cancel: a
                     yield _tool_payload(last_tool_use)
                 break
         else:
-            yield {"keepalive": True}
             if _should_stop():
                 logger.info("Stopping stream (idle) for session %s", session_id[:12])
                 break
+            if not done:
+                yield {"keepalive": True}
+
+    if cancel_task is not None and not cancel_task.done():
+        cancel_task.cancel()
+    if pending is not None and not pending.done():
+        pending.cancel()

@@ -52,13 +52,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ? outlineText.split("\n").map(l => /^-\s*\[([a-z0-9-]+)\]/.exec(l)?.[1]).filter((s): s is string => !!s)
     : []
 
-  // Index preview PNGs
+  // Index preview PNGs — supports both slug-named ({slug}.png) and legacy page-numbered (page{N}-*.png)
+  const previewBySlug = new Map<string, string>()
   const previewByPage = new Map<number, string>()
   const previewDir = path.join(dp, "preview")
   if (fs.existsSync(previewDir)) {
     for (const f of fs.readdirSync(previewDir)) {
       if (!f.endsWith(".png")) continue
-      const m = f.match(/^page(\d+)[-.]/); if (m) previewByPage.set(parseInt(m[1]), f)
+      const pageMatch = f.match(/^page(\d+)[-.]/); if (pageMatch) { previewByPage.set(parseInt(pageMatch[1]), f); continue }
+      const slugMatch = f.match(/^([a-z0-9-]+)\.png$/); if (slugMatch) previewBySlug.set(slugMatch[1], f)
     }
   }
 
@@ -73,7 +75,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       if (!fs.existsSync(path.join(slidesDir, `${slug}.json`))) continue
       pageNum++
       const composeFile = composeBySlug.get(slug)
-      const previewFile = previewByPage.get(pageNum)
+      const previewFile = previewBySlug.get(slug) || previewByPage.get(pageNum)
       slides.push({
         slug,
         previewUrl: previewFile ? `/api/preview/${deckId}/preview/${previewFile}` : null,
@@ -97,6 +99,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     name: deckJson.name || deckId,
     slideOrder: deckJson.slideOrder || [],
     slides,
+    template: deckJson.template || null,
     defsUrl: defsFilename ? `/api/preview/${deckId}/compose/${defsFilename}` : null,
     pptxUrl: fs.existsSync(pptxPath) ? `/api/preview/${deckId}/output.pptx` : null,
     specs,

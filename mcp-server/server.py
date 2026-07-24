@@ -717,7 +717,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     if deck_id:
         _check_deck_access(deck_id, action="edit_slide" if save else "read")
 
-    output, outline_rejected, lint_diagnostics = sandbox_mod.execute_in_sandbox(
+    output, outline_warnings, lint_diagnostics = sandbox_mod.execute_in_sandbox(
         code=code,
         storage=_storage,
         region=_region,
@@ -728,9 +728,8 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
 
     result: dict = {"output": output}
 
-    if outline_rejected:
-        errs = result.setdefault("errors", {})
-        errs["outline"] = (
+    if outline_warnings:
+        result.setdefault("warnings", {})["outline"] = (
             "outline.md format violation. "
             "Read workflow `create-new-1-outline` for the correct format."
         )
@@ -759,7 +758,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
                 sid = s.get("id", "")
                 if sid:
                     slug_to_page[sid] = i + 1
-            page_numbers = [slug_to_page[slug] for slug in measure_slides if slug in slug_to_page]
+            page_numbers = [slug_to_page[slug] for slug in (measure_slides or []) if slug in slug_to_page]
             page_to_slug = {v: k for k, v in slug_to_page.items()}
 
             # Measure
@@ -996,6 +995,57 @@ def grid(spec: str, purpose: str = "") -> str:
     except (json.JSONDecodeError, TypeError) as e:
         return json.dumps({"error": f"Invalid grid spec JSON: {e}"})
     result = compute_grid(grid_spec)
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def arch_diagram(
+    spec: str,
+    x: int = 100, y: int = 180, width: int = 1720, height: int = 800,
+    theme: str = "dark",
+) -> str:
+    """Auto-layout an architecture/flow diagram from a logical-structure JSON.
+
+    Turns a nested structure of groups, icons and connections into fully-placed
+    slide elements with auto-routed orthogonal arrows. You describe *what
+    connects to what*; the engine computes coordinates, clusters related icons,
+    picks arrow ports/bends, and minimizes crossings and icon pierces. Prefer
+    this over hand-placing coordinates for any diagram with more than a few
+    connections.
+
+    Read the guide `arch-layout-engine` (via read_guides) for the JSON schema
+    and the techniques that reach 0 crossings (connect to a GROUP not every
+    icon; `fan: "merge"` bundles; perpendicular branch wrappers).
+
+    Args:
+        spec: JSON string. Top-level keys: `direction` ("horizontal"/"vertical"),
+            `iconSize`, `children` (nested nodes/groups), `connections`
+            (`{from, to, label?, fan?}`). A `targetArea` object inside the JSON
+            overrides x/y/width/height.
+        x: Target area X offset in px.
+        y: Target area Y offset in px.
+        width: Target area width in px (engine scales the diagram to fit).
+        height: Target area height in px.
+        theme: "dark" or "light" — affects box-node text colors.
+
+    Returns:
+        JSON with `elements` (sdpm element array), `bbox` (final bounding box),
+        optional `warnings` (facts about layout defects), and `metrics`
+        (objective QA numbers: `crossings`/`pierces`/`group_pierces` are 0 for a
+        clean diagram; `overflow` > 0 means the layout spills off the box;
+        `score` is the judge's lexicographic tuple, lower is better). Inspect
+        these and iterate on STRUCTURE (not coordinates) when defects remain.
+    """
+    from sdpm.layout.render import render_architecture
+
+    try:
+        tree = json.loads(spec)
+    except (json.JSONDecodeError, TypeError) as e:
+        return json.dumps({"error": f"Invalid diagram spec JSON: {e}"})
+    result = render_architecture(
+        tree, x=x, y=y, width=width, height=height, theme=theme,
+        include_metrics=True,
+    )
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 

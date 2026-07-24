@@ -3,6 +3,7 @@
 """Composer agent: compose_slides tool with parallel execution, prefetch, and post-build."""
 
 import json
+import logging
 import os
 import queue
 import time
@@ -16,6 +17,9 @@ from strands.types.tools import ToolContext
 from composition import resolve_parts
 from cost_logger import log_usage
 from modes import MODES  # imported lazily in compose_slides if needed
+from resilience import call_tool_with_retry
+
+logger = logging.getLogger("sdpm.agent")
 
 
 # Soft-stop signal: the webui cancel button sends InvokeAgentRuntimeCommand
@@ -92,7 +96,8 @@ def _prefetch_deck_specs(mcp_client, deck_id: str, assigned_slugs: list[str]) ->
         "        specs['slides/ (other, read via run_python if needed)'] = ', '.join(_others)\n"
         "print(json.dumps(specs, ensure_ascii=False))\n"
     )
-    result = mcp_client.call_tool_sync(
+    result = call_tool_with_retry(
+        mcp_client,
         tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
         name="run_python",
         arguments={"code": code, "deck_id": deck_id, "purpose": "prefetch deck specs"},
@@ -123,7 +128,7 @@ def _build_deck_context(sections: list[str]) -> str:
     return "# Deck-Specific References\n\n" + "\n\n---\n\n".join(sections)
 
 
-def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, extra_tools=None):
+def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, extra_tools=None, model_id: str = ""):
     """Create compose_slides tool with closed-over MCP servers and model.
 
     Args:
@@ -228,7 +233,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 "    missing.append('specs/art-direction')\n"
                 "print(json.dumps(missing))\n"
             )
-            check_result = mcp_client.call_tool_sync(
+            check_result = call_tool_with_retry(
+                mcp_client,
                 tool_use_id=f"precheck-{uuid.uuid4().hex[:8]}",
                 name="run_python",
                 arguments={"code": check_code, "deck_id": deck_id, "purpose": "spec file existence check"},
@@ -279,6 +285,11 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 composer_cfg.parts, mcp_client=mcp_client, context={}
             )
             static_prompt = composer_system
+
+            # Determine if the composer model supports prompt caching
+            from model_profiles import MODEL_PROFILES
+            _profile = MODEL_PROFILES.get(model_id)
+            _cache_enabled = (_profile.cache_strategy == "auto") if _profile else True
 
             progress_q: queue.Queue = queue.Queue()
 
@@ -388,7 +399,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 composer = Agent(
                     system_prompt=[
                         {"text": static_prompt},
-                        {"cachePoint": {"type": "default"}},
+                        *([ {"cachePoint": {"type": "default"}} ] if _cache_enabled else []),
                     ],
                     messages=list(composer_history),
                     tools=_group_tools,
@@ -397,6 +408,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                     trace_attributes={
                         "group.index": gi,
                         "group.slugs": ",".join(group["slugs"]),
+                        "model.id": model_id,
+                        "purpose": "compose",
                     },
                 )
                 composer.hooks.add_callback(AfterInvocationEvent, log_usage)
@@ -525,7 +538,12 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                                 summaries[slugs_label] = result["response"]
                                 yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
                             except Exception as e:
-                                errors.append({"slugs": group["slugs"], "error": str(e)})
+                                errors.append({
+                                    "group_index": gi + 1,
+                                    "slugs": group["slugs"],
+                                    "instruction": group.get("instruction", ""),
+                                    "error": str(e),
+                                })
                                 yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(e)}
 
                         if futures:
@@ -538,20 +556,29 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                     break
 
         except Exception as e:
-            failed_slugs = [s for g in slide_groups for s in g["slugs"] if s not in generated]
-            errors.append({
-                "slugs": failed_slugs,
-                "error": str(e),
-                "phase": "prefetch" if not generated else "compose",
-            })
+            # Infrastructure failure (prefetch etc.) — record each unfinished
+            # group separately so they stay individually retryable.
+            phase = "prefetch" if not generated else "compose"
+            for gi, g in enumerate(slide_groups):
+                remaining = [s for s in g["slugs"] if s not in generated]
+                if remaining:
+                    errors.append({
+                        "group_index": gi + 1,
+                        "slugs": remaining,
+                        "instruction": g.get("instruction", ""),
+                        "error": str(e),
+                        "phase": phase,
+                    })
 
         # Post-compose: build PPTX + assemble report
         yield {"status": "building", "message": "Building final PPTX..."}
         cancelled = _is_compose_stopped(parent_tool_use_id)
+        partial = bool(errors) and bool(generated)
         report = {
-            "status": "cancelled" if cancelled else "completed",
+            "status": "cancelled" if cancelled else ("partial" if partial else ("failed" if errors else "completed")),
             "generated_slides": generated,
-            "errors": errors,
+            "failed_groups": errors,
+            "partial": partial,
             "summaries": summaries,
         }
         if cancelled:
@@ -559,11 +586,21 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 "Stopped by user cancellation. Do NOT retry automatically — "
                 "ask the user how to proceed (resume, adjust scope, or abandon)."
             )
+        elif errors:
+            failed_slugs = sorted({s for e in errors for s in e["slugs"]})
+            report["notice"] = (
+                f"{len(generated)}/{total} slides were generated; groups covering "
+                f"{failed_slugs} failed. Successfully generated slides do NOT need "
+                "regeneration. Tell the user which slides failed and why, and offer "
+                "to retry — on retry, call compose_slides again with ONLY the failed "
+                "groups (reuse each group's slugs and instruction from failed_groups)."
+            )
 
         if generated and mcp_client:
             # Generate PPTX
             try:
-                build_result = mcp_client.call_tool_sync(
+                build_result = call_tool_with_retry(
+                    mcp_client,
                     tool_use_id=f"build-{uuid.uuid4().hex[:8]}",
                     name="generate_pptx",
                     arguments={"deck_id": deck_id},

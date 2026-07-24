@@ -100,8 +100,8 @@ order (first N slides, next N, ...) — group by design relationship.
 
 1. **Consistency review pass**: invoke a single sdpm-composer subagent with
    ALL slugs in the deck and instruction: "Consistency review."
-2. **Verification**: call `get_preview(deck_id, slugs=[...])` to see the
-   post-review state. Look for individual-slide defects.
+2. **Verification**: check the `preview_files` returned from the consistency review's
+   `run_python(save=True)` calls. Look for individual-slide defects.
 3. **Per-slide fix pass** (only if defects found): invoke subagents again
    with parallel groups, one per affected slide. Describe the problem, not the solution.
 4. Present the final result to the user with preview images

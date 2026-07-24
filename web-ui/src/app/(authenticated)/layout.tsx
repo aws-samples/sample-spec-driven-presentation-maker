@@ -5,11 +5,16 @@
  */
 
 import { AuthProvider } from "@/components/auth/AuthProvider"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 
 export default function AuthenticatedLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  return <AuthProvider>{children}</AuthProvider>
+  return (
+    <ErrorBoundary label="The app">
+      <AuthProvider>{children}</AuthProvider>
+    </ErrorBoundary>
+  )
 }

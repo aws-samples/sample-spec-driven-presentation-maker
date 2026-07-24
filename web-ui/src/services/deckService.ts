@@ -38,6 +38,8 @@ export interface DeckDetail {
   name: string
   slideOrder: string[]
   slides: SlidePreview[]
+  /** Confirmed template from deck.json (e.g. "corporate.pptx"), null when unconfirmed. */
+  template?: string | null
   defsUrl?: string | null
   pptxUrl: string | null
   specs?: SpecFiles | null
@@ -179,6 +181,7 @@ export interface SlideSearchResult {
  * @returns Array of matching slides with preview URLs
  */
 export async function searchSlides(query: string, idToken: string): Promise<SlideSearchResult[]> {
+  if (IS_LOCAL) return []
   const base = await getApiBaseUrl()
   const resp = await fetch(`${base}slides/search?q=${encodeURIComponent(query)}`, {
     headers: { Authorization: `Bearer ${idToken}` },
@@ -194,35 +197,41 @@ export interface ChatMessage {
   timestamp: number
 }
 
+export interface ChatHistoryResult {
+  messages: ChatMessage[]
+  /** True when the backend dropped oldest messages to fit the response size limit. */
+  truncated: boolean
+}
+
 /**
  * Fetch chat history for a session.
  *
  * @param sessionId - Conversation session ID
  * @param idToken - Cognito ID token
- * @returns Array of chat messages sorted by timestamp
+ * @returns Messages sorted by timestamp, plus a truncation flag
  */
-export async function getChatHistory(sessionId: string, idToken: string, deckId?: string): Promise<ChatMessage[]> {
+export async function getChatHistory(sessionId: string, idToken: string, deckId?: string): Promise<ChatHistoryResult> {
   if (IS_LOCAL) {
-    if (!deckId || deckId === "new") return []
+    if (!deckId || deckId === "new") return { messages: [], truncated: false }
     // Load session context + saved messages
     const res = await fetch("/api/agent/load", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId, deckId }),
     })
-    if (!res.ok) return []
+    if (!res.ok) return { messages: [], truncated: false }
     const data = await res.json()
-    return data.messages || []
+    return { messages: data.messages || [], truncated: false }
   }
   const base = await getApiBaseUrl()
   const response = await fetch(`${base}chat/${sessionId}`, {
     headers: { Authorization: `Bearer ${idToken}` },
   })
 
-  if (!response.ok) return []
+  if (!response.ok) return { messages: [], truncated: false }
 
   const data = await response.json()
-  return data.messages || []
+  return { messages: data.messages || [], truncated: data.truncated === true }
 }
 
 /**
@@ -582,6 +591,15 @@ export async function uploadTemplate(file: File, description: string, idToken: s
   const base = await getApiBaseUrl()
   const name = file.name.replace(/\.pptx$/, "")
 
+  // Local mode: no S3/presigned URL — POST the file directly as multipart form-data.
+  if (IS_LOCAL) {
+    const form = new FormData()
+    form.append("file", file)
+    form.append("description", description)
+    const res = await fetch(`${base}templates/user`, { method: "POST", body: form })
+    return res.json()
+  }
+
   // Step 1: Get presigned URL
   const presignRes = await fetch(`${base}templates/user/upload-url`, {
     method: "POST",
@@ -622,6 +640,17 @@ export async function deleteTemplate(name: string, idToken: string): Promise<{ d
 export async function updateTemplateDescription(name: string, description: string, idToken: string): Promise<{ updated?: string; error?: string }> {
   const base = await getApiBaseUrl()
   const res = await fetch(`${base}templates/user/${encodeURIComponent(name)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ description }),
+  })
+  return res.json()
+}
+
+/** Update the current user's note for a builtin template. */
+export async function updateBuiltinTemplateNote(name: string, description: string, idToken: string): Promise<{ updated?: string; error?: string }> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}templates/builtin/${encodeURIComponent(name)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
     body: JSON.stringify({ description }),

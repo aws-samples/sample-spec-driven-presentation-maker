@@ -17,6 +17,7 @@
 import { SlideSearchResult } from "@/services/deckService"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Search, Layers } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 interface SearchResultsGridProps {
   results: SlideSearchResult[]
@@ -25,10 +26,11 @@ interface SearchResultsGridProps {
 }
 
 export function SearchResultsGrid({ results, searching, onSlideClick }: SearchResultsGridProps) {
+  const t = useTranslations("search")
   return (
     <>
-      <p className="text-xs text-foreground-muted font-medium mb-4">
-        {searching ? "Searching slides across the organization…" : `${results.length} result${results.length !== 1 ? "s" : ""} found`}
+      <p role="status" aria-live="polite" className="text-xs text-foreground-muted font-medium mb-4">
+        {searching ? t("searching") : t("resultsFound", { count: results.length })}
       </p>
 
       {searching ? (
@@ -55,7 +57,7 @@ export function SearchResultsGrid({ results, searching, onSlideClick }: SearchRe
                 {r.previewUrl ? (
                   <img
                     src={r.previewUrl}
-                    alt={`${r.deckName} page ${r.pageNumber}`}
+                    alt={t("resultAlt", { deck: r.deckName, page: r.pageNumber })}
                     className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
                   />
                 ) : (
@@ -66,12 +68,12 @@ export function SearchResultsGrid({ results, searching, onSlideClick }: SearchRe
               </div>
               <div className="px-4 py-3.5">
                 <h3 className="text-sm font-medium text-foreground/90 truncate leading-snug">
-                  {r.deckName || "Untitled"}
+                  {r.deckName || t("untitled")}
                 </h3>
                 <p className="text-[11px] text-foreground-muted mt-1 tracking-wide uppercase">
                   {r.ownerAlias}
                   <span className="mx-1.5 opacity-40">·</span>
-                  Page {r.pageNumber}
+                  {t("page", { number: r.pageNumber })}
                 </p>
               </div>
             </button>
@@ -80,8 +82,8 @@ export function SearchResultsGrid({ results, searching, onSlideClick }: SearchRe
       ) : (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Search className="h-8 w-8 text-foreground-muted/20 mb-4" />
-          <p className="text-sm font-medium text-foreground/60 mb-1">No matching slides</p>
-          <p className="text-xs text-foreground-muted">Try different keywords or a broader search term.</p>
+          <p className="text-sm font-medium text-foreground/60 mb-1">{t("noMatches")}</p>
+          <p className="text-xs text-foreground-muted">{t("noMatchesHint")}</p>
         </div>
       )}
     </>

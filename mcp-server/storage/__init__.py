@@ -204,6 +204,17 @@ class Storage(ABC):
     # --- User Templates ---
 
     @abstractmethod
+    def get_builtin_template_notes(self, user_id: str) -> dict[str, str]:
+        """Get per-user notes for builtin templates.
+
+        Args:
+            user_id: User identifier.
+
+        Returns:
+            Mapping of builtin template name to user-provided description.
+        """
+
+    @abstractmethod
     def list_user_templates(self, user_id: str) -> list[dict]:
         """List user-uploaded templates metadata from DDB.
 

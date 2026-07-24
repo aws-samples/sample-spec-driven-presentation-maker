@@ -26,6 +26,11 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConf
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from authz import authorize
+from chat_history import (
+    cap_messages_size,
+    strip_tool_result_content,
+    truncate_tool_inputs,
+)
 from common import get_user_id, now_iso, presigned_url
 from shared.schema import (
     deck_pk, deck_sk, shared_pk, fav_sk, upload_sk,
@@ -496,6 +501,18 @@ def list_templates() -> Dict[str, Any]:
         for item in resp.get("Responses", {}).get(table.name, []):
             ddb_cache[item["name"]] = item
 
+    # Per-user notes overlay builtin metadata without modifying shared cache rows.
+    builtin_notes: Dict[str, str] = {}
+    if s3_templates:
+        resp = table.query(
+            KeyConditionExpression=Key("PK").eq(f"USER#{user_id}")
+            & Key("SK").begins_with("BUILTIN_NOTE#"),
+        )
+        builtin_notes = {
+            item["SK"].removeprefix("BUILTIN_NOTE#"): item.get("description", "")
+            for item in resp.get("Items", [])
+        }
+
     # Build builtin list with lazy analysis
     to_analyze: List[str] = []
     for name, etag in s3_templates.items():
@@ -508,7 +525,7 @@ def list_templates() -> Dict[str, Any]:
             templates.append({
                 "name": name,
                 "source": "builtin",
-                "description": cached.get("description", ""),
+                "description": builtin_notes.get(name, cached.get("description", "")),
                 "theme_colors": analysis.get("theme_colors", {}),
                 "fonts": cached.get("fonts", {}),
                 "layout_count": len(analysis.get("layouts", [])),
@@ -518,7 +535,7 @@ def list_templates() -> Dict[str, Any]:
             templates.append({
                 "name": name,
                 "source": "builtin",
-                "description": "",
+                "description": builtin_notes.get(name, ""),
                 "theme_colors": {},
                 "fonts": {},
                 "layout_count": 0,
@@ -603,6 +620,40 @@ def download_template(name: str) -> Any:
         return {"downloadUrl": url}
     except Exception:
         return {"error": "Template not found"}, 404
+
+
+@app.patch("/templates/builtin/<name>")
+def patch_builtin_template_note(name: str) -> Dict[str, Any]:
+    """Create, update, or clear the current user's note for a builtin template.
+
+    Body: {"description": str}. Blank descriptions clear the user overlay.
+    """
+    user_id = get_user_id(app.current_event)
+    body = app.current_event.json_body or {}
+    description_raw = body.get("description")
+    if not isinstance(description_raw, str):
+        return {"error": "Description must be a string"}, 400
+    if not name or not re.fullmatch(r"[a-zA-Z0-9_\-\s.()]+", name):
+        return {"error": "Invalid template name"}, 400
+
+    # Notes can only target builtin templates that currently exist in S3.
+    try:
+        s3_client.head_object(Bucket=RESOURCE_BUCKET, Key=f"templates/{name}.pptx")
+    except Exception:
+        return {"error": "Template not found"}, 404
+
+    key = {"PK": f"USER#{user_id}", "SK": f"BUILTIN_NOTE#{name}"}
+    description = description_raw.strip()
+    if not description:
+        table.delete_item(Key=key)
+    else:
+        table.put_item(Item={
+            **key,
+            "name": name,
+            "description": description,
+            "updatedAt": now_iso(),
+        })
+    return {"updated": name, "description": description}
 
 
 @app.post("/templates/user/upload-url")
@@ -974,12 +1025,21 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
             pass
     specs["artDirection"] = art_direction_content
 
+    # Confirmed template name from deck.json (written by the agent at Art Direction)
+    template = None
+    try:
+        dj_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/deck.json")
+        template = json.loads(dj_resp["Body"].read()).get("template") or None
+    except Exception:
+        pass
+
     return {
         "deckId": deck_id,
         "name": deck.get("name", "Untitled"),
         "slideCount": len(slides),
         "slides": slides,
         "specs": specs,
+        "template": template,
         "defsUrl": preview_url(defs_key) if has_defs else None,
         "pptxUrl": (_cf_signed_url(pptx_key) or presigned_url(s3_client, BUCKET_NAME, pptx_key)) if pptx_key else None,
         "updatedAt": deck.get("updatedAt", ""),
@@ -1253,14 +1313,18 @@ def get_chat(session_id: str) -> Dict[str, Any]:
         # Strands stores events in reverse chronological order
         messages.reverse()
 
-        # Strip toolResult content — frontend only needs status for ToolCard display.
-        # Agent reads from Amazon Bedrock AgentCore Memory directly, not via this API.
-        # This prevents Lambda 6MB response limit errors on long conversations.
-        for msg in messages:
-            if msg.get("role") == "user" and isinstance(msg.get("content"), list):
-                for block in msg["content"]:
-                    if isinstance(block, dict) and "toolResult" in block:
-                        block["toolResult"]["content"] = []
+        # Keep the response under Lambda's 6MB limit (see chat_history.py):
+        # toolResult bodies and giant toolUse inputs are UI-irrelevant; the
+        # agent reads AgentCore Memory directly, not via this API.
+        strip_tool_result_content(messages)
+        truncate_tool_inputs(messages)
+        messages, truncated = cap_messages_size(messages)
+        if truncated:
+            logger.warning(
+                "Chat history for session %s exceeded size budget — oldest messages dropped",
+                session_id,
+            )
+            return {"messages": messages, "truncated": True}
     except Exception as e:
         logger.warning("Failed to read chat history from AgentCore Memory: %s", e)
 

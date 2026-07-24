@@ -44,9 +44,56 @@
 |---|---|
 | エージェントスキル（Claude Code, Codex CLI, Cursor, Kiro, Copilot） | [はじめに — Layer 1](docs/ja/getting-started.md#layer-1-kiro-cli-スキル) |
 | ローカル MCP クライアント（Claude Desktop, Claude Cowork） | [はじめに — Layer 2](docs/ja/getting-started.md#layer-2-ローカル-mcp-サーバー) |
-| リモート MCP / Web UI（AWS デプロイ） | [推奨デプロイ手順](docs/ja/deploy-cloudshell.md) |
+| リモート MCP / Web UI（AWS デプロイ） | [デプロイ手順](docs/ja/deploy-cloudshell.md) |
 
-AWS デプロイは CloudShell や任意のローカルシェルから実行でき、CDK/Docker のローカルインストールは不要です。
+### 🧩 Claude Code プラグイン（ワンコマンド導入）
+
+Claude Code ユーザーはプラグインで一括導入できます（手動の MCP 設定は不要）。プラグインは
+**ローカル MCP サーバー**・**オーケストレーター skill**・スライドを並列生成する
+**compose サブエージェント** をまとめて登録します。
+
+**事前インストール（プラグインには同梱できません。初回のみ各自で導入）:**
+
+- [`uv`](https://docs.astral.sh/uv/) を `PATH` に — ローカル MCP サーバーを起動し、初回起動時に
+  Python 依存を透過解決します（コールドスタートは数十秒）。
+- **LibreOffice** と **poppler** — スライドプレビュー（HTML/SVG → PNG）の描画に必要です。
+
+**導入（自動 — リポジトリDL・MCP/skill/サブエージェント登録まで完了）:**
+
+```bash
+# Claude Code 内で実行:
+/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker
+/plugin install sdpm@sdpm
+```
+
+`/plugin install` でリポジトリがクローンされ（`mcp-local/`・`skill/` も同梱DL）、`uv` 経由で
+`sdpm` MCP サーバーが自動起動し、`sdpm` skill と `sdpm:sdpm-composer` サブエージェントが登録
+されます。`/plugin list`・`/mcp`（`sdpm` 接続）・`/agents`（`sdpm:sdpm-composer` 表示）で確認
+してください。あとは「〇〇のスライドを作って」と頼むだけで、skill が briefing → outline →
+art direction を進め、Phase 2（compose）を複数の composer サブエージェントへ並列委譲し、
+review まで実施します。
+
+> **どの入口を使う？** **Kiro CLI** → Layer 1 の skill。**Claude Desktop / その他 MCP
+> クライアント** → Layer 2 のローカル MCP サーバー。**Claude Code** → このプラグイン（同じ
+> Layer 2 MCP サーバーを CC ネイティブの skill + 並列 compose サブエージェントで包んだもの）。
+
+### 🚀 AWS アカウントだけですぐに開始！ ワンクリックデプロイ
+
+| リージョン | デプロイ |
+|-----------|---------|
+| 東京 (ap-northeast-1) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://ap-northeast-1.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+| バージニア北部 (us-east-1) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-east-1.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+| オレゴン (us-west-2) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-west-2.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
+
+パラメータの詳細や別のデプロイ方法については [デプロイ手順](docs/ja/deploy-cloudshell.md) を参照してください。
+
+---
+
+## ワークショップ
+
+様々なシチュエーションでスライドを作成するためのサンプルデータを用意したハンズオンワークショップです。URL・PDF・CSV・議事録などからのスライド生成を実践できます。製造業、金融、ヘルスケア、IT など業界別シナリオも収録しています。
+
+📖 **[ワークショップ](https://catalog.us-east-1.prod.workshops.aws/workshops/a275330a-0ae0-40b2-ad35-264e263c3882/ja-JP)**
 
 ---
 

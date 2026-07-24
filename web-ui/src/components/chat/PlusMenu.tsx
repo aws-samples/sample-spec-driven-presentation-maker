@@ -8,6 +8,7 @@
 
 import { useRef, useState } from "react"
 import { Plus, Paperclip, FileText } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 interface PlusMenuProps {
   /** Called when user selects files via the file picker. */
@@ -24,6 +25,7 @@ interface PlusMenuProps {
  * @param props - PlusMenuProps
  */
 export function PlusMenu({ onFilesSelected, onSnippetRequest, disabled }: PlusMenuProps) {
+  const t = useTranslations("plusMenu")
   const [open, setOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -36,7 +38,7 @@ export function PlusMenu({ onFilesSelected, onSnippetRequest, disabled }: PlusMe
         onClick={() => setOpen(!open)}
         disabled={disabled}
         className="p-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 touch-target flex items-center justify-center"
-        aria-label="Attach file or snippet"
+        aria-label={t("attachLabel")}
         aria-expanded={open}
       >
         <Plus className="h-4 w-4" />
@@ -58,7 +60,7 @@ export function PlusMenu({ onFilesSelected, onSnippetRequest, disabled }: PlusMe
               }}
             >
               <Paperclip className="h-4 w-4 text-muted-foreground" />
-              Attach file
+              {t("attachFile")}
             </button>
             <button
               type="button"
@@ -69,7 +71,7 @@ export function PlusMenu({ onFilesSelected, onSnippetRequest, disabled }: PlusMe
               }}
             >
               <FileText className="h-4 w-4 text-muted-foreground" />
-              Text snippet
+              {t("textSnippet")}
             </button>
           </div>
         </>

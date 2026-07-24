@@ -23,6 +23,7 @@ def list_templates(storage: Storage, user_id: str = "") -> dict[str, Any]:
         Dict with list of templates (name, source, description, fonts, layout_count).
     """
     templates = []
+    builtin_notes = storage.get_builtin_template_notes(user_id) if user_id else {}
 
     # Builtin templates
     for t in storage.list_templates():
@@ -33,7 +34,7 @@ def list_templates(storage: Storage, user_id: str = "") -> dict[str, Any]:
         templates.append({
             "name": t.get("name", ""),
             "source": "builtin",
-            "description": t.get("description", ""),
+            "description": builtin_notes.get(t.get("name", ""), t.get("description", "")),
             "fonts": t.get("fonts", {}),
             "layout_count": len(analysis.get("layouts", [])),
         })

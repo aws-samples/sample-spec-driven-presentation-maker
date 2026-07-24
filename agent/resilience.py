@@ -10,11 +10,36 @@ ignores those prompts (observed in production logs).
 import hashlib
 import json
 import logging
+import random
+import time
 from dataclasses import dataclass, field
 
 from strands.hooks.events import AfterToolCallEvent
 
 logger = logging.getLogger("sdpm.agent")
+
+
+def call_tool_with_retry(mcp_client, *, tool_use_id: str, name: str, arguments: dict,
+                         max_attempts: int = 3, base_delay: float = 2.0) -> dict:
+    """call_tool_sync with exponential backoff for transient MCP failures.
+
+    Retries only on transport-level exceptions (connection drops, timeouts).
+    A result with status="error" is a tool-level failure the caller must
+    handle — retrying it would repeat the same deterministic error.
+    """
+    if max_attempts < 1:
+        raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
+    for attempt in range(max_attempts):
+        try:
+            return mcp_client.call_tool_sync(tool_use_id=tool_use_id, name=name, arguments=arguments)
+        except Exception as e:
+            if attempt == max_attempts - 1:
+                raise
+            delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+            logger.warning("MCP call %s failed (attempt %d/%d): %s — retrying in %.1fs",
+                           name, attempt + 1, max_attempts, e, delay)
+            time.sleep(delay)
+    raise RuntimeError("unreachable")
 
 
 @dataclass

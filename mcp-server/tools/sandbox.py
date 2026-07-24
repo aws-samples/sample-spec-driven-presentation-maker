@@ -94,7 +94,7 @@ def execute_in_sandbox(
         files: Additional S3 keys to download into sandbox by basename.
 
     Returns:
-        Tuple of (code execution output, outline_rejected flag).
+        Tuple of (code execution output, outline_warnings list).
 
     Raises:
         ValueError: If save=True without deck_id, or duplicate filenames in files.
@@ -149,15 +149,15 @@ def execute_in_sandbox(
         output = _collect_stream(response)
 
         # Save modified workspace files back to S3
-        outline_rejected = False
+        outline_warnings: list[dict] = []
         lint_diagnostics: list[dict] = []
         if save and deck_id:
-            outline_rejected, lint_diagnostics = _save_deck_workspace(
+            outline_warnings, lint_diagnostics = _save_deck_workspace(
                 client, session_id, storage, deck_id,
             )
             logger.info("Deck workspace saved for deck %s", deck_id)
 
-        return output, outline_rejected, lint_diagnostics
+        return output, outline_warnings, lint_diagnostics
 
     finally:
         client.stop_code_interpreter_session(
@@ -269,16 +269,15 @@ def _save_deck_workspace(
 
     file_map: dict[str, str] = json.loads(raw)
 
-    # Lint outline.md before saving — reject on failure
-    outline_rejected = False
+    # Lint outline.md before saving — warn on failure
+    outline_warnings: list[dict] = []
     outline_key = "specs/outline.md"
     if outline_key in file_map and file_map[outline_key].strip():
         from sdpm.schema.lint_outline import lint_outline
 
-        if lint_outline(file_map[outline_key]):
-            del file_map[outline_key]
-            outline_rejected = True
-            logger.warning("outline.md lint failed for deck %s — not saved", deck_id)
+        outline_warnings = lint_outline(file_map[outline_key])
+        if outline_warnings:
+            logger.warning("outline.md lint warnings for deck %s: %s", deck_id, outline_warnings)
 
     # Lint and sanitize slide JSON before saving
     lint_diagnostics: list[dict] = []
@@ -308,7 +307,7 @@ def _save_deck_workspace(
             content_type=_content_type(rel_path),
         )
 
-    return outline_rejected, lint_diagnostics
+    return outline_warnings, lint_diagnostics
 
 
 def _inject_helpers(client: Any, session_id: str) -> None:
