@@ -643,3 +643,16 @@ class TestSysClrResolution:
         # 20% lum + 80% offset of black = #CCCCCC light gray
         assert el["fill"] == "#CCCCCC"
         assert el["opacity"] == 0.3
+
+    def test_sysclr_gradient_stops_survive(self):
+        """sysClr gradient stops were dropped — a 4-stop green→white
+        gradient collapsed to a single green stop (rendered solid)."""
+        el = self._shape_slide(fill_xml=(
+            f'<a:gradFill {self.A}><a:gsLst>'
+            '<a:gs pos="0"><a:srgbClr val="00B050"/></a:gs>'
+            '<a:gs pos="37000"><a:sysClr val="window" lastClr="FFFFFF"/></a:gs>'
+            '<a:gs pos="100000"><a:sysClr val="window" lastClr="FFFFFF"/></a:gs>'
+            '</a:gsLst><a:lin ang="0" scaled="1"/></a:gradFill>'))
+        stops = el["gradient"]["stops"]
+        assert [(s["position"], s["color"]) for s in stops] == [
+            (0.0, "#00B050"), (0.37, "#FFFFFF"), (1.0, "#FFFFFF")]

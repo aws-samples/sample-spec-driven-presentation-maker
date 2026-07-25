@@ -306,6 +306,14 @@ def _extract_fill_from_xml(sp_pr, theme_colors=None, color_mapping=None):
                 alpha = scheme.find('a:alpha', _NS)
                 if alpha is not None:
                     stop_info["opacity"] = round(int(alpha.get('val')) / 100000, 2)
+            else:
+                sys_hex = _sys_hex(gs)
+                if sys_hex:
+                    stop_info["color"] = sys_hex
+                    sys_clr = gs.find('.//a:sysClr', _NS)
+                    alpha = sys_clr.find('a:alpha', _NS) if sys_clr is not None else None
+                    if alpha is not None:
+                        stop_info["opacity"] = round(int(alpha.get('val')) / 100000, 2)
             if "color" in stop_info:
                 stops.append(stop_info)
         if stops:
@@ -396,6 +404,13 @@ def _extract_line_from_xml(sp_pr, theme_colors=None, color_mapping=None):
                 alpha = scheme.find('a:alpha', _NS)
                 if alpha is not None:
                     opacity = round(int(alpha.get('val')) / 100000, 2)
+            else:
+                color = _sys_hex(gs)
+                if color:
+                    sys_clr = gs.find('.//a:sysClr', _NS)
+                    alpha = sys_clr.find('a:alpha', _NS) if sys_clr is not None else None
+                    if alpha is not None:
+                        opacity = round(int(alpha.get('val')) / 100000, 2)
             if color:
                 stop_info = {"position": pos, "color": color}
                 if opacity is not None:
