@@ -59,7 +59,11 @@ class TestPptxToJsonDeckStructure:
         assert not (out_dir / "slides.json").exists(), "legacy slides.json must not be emitted"
 
     def test_pptx_to_json_slug_format(self, fixture_pptx: Path, tmp_path: Path) -> None:
-        """Slug format is slide-NN (hyphen + 2-digit zero-padded) and matches parse_outline_slugs regex."""
+        """Slug format is slide-NNN (hyphen + 3-digit zero-padded) and matches parse_outline_slugs regex.
+
+        3-digit padding keeps lexicographic sort == presentation order up to
+        999 slides (2-digit broke at 100+: "slide-100" < "slide-11").
+        """
         from sdpm.api import parse_outline_slugs
         from sdpm.converter import pptx_to_json
 
@@ -67,9 +71,9 @@ class TestPptxToJsonDeckStructure:
         pptx_to_json(fixture_pptx, output_dir=out_dir)
 
         slide_files = sorted((out_dir / "slides").glob("*.json"))
-        slug_re = re.compile(r"^slide-\d{2}$")
+        slug_re = re.compile(r"^slide-\d{3}$")
         for f in slide_files:
-            assert slug_re.match(f.stem), f"slug must match slide-NN format: {f.stem}"
+            assert slug_re.match(f.stem), f"slug must match slide-NNN format: {f.stem}"
 
         # Sanity: construct fake outline.md with these slugs and verify parse_outline_slugs accepts them
         fake_outline = "\n".join(f"- [{f.stem}] msg" for f in slide_files)
@@ -134,7 +138,9 @@ class TestConvertPptxThemeHints:
         fonts = result.theme_hints["fonts"]
         assert isinstance(fonts, dict)
 
-    def test_convert_pptx_theme_hints_uses_slide_bg(self, tmp_path: Path) -> None:
+    def test_convert_pptx_theme_hints_uses_slide_bg(
+        self, fixture_pptx: Path, tmp_path: Path,
+    ) -> None:
         """When slide has explicit background, luminance reflects it (median across slides).
 
         Synthetic fixture: modify slide XML to force explicit backgrounds.
@@ -144,7 +150,7 @@ class TestConvertPptxThemeHints:
         from shared.ingest import convert_file
 
         out_dir = tmp_path / "out"
-        result = convert_file(_FIXTURE_PPTX, out_dir)
+        result = convert_file(fixture_pptx, out_dir)
         # The fixture may or may not have explicit slide bg; we just verify the median is valid.
         # (Full-fidelity synthetic testing of slide-bg override is deferred; the pipeline
         # correctness is validated via test_convert_pptx_theme_hints_keys.)
@@ -250,7 +256,7 @@ class TestUploadFileGuideInstruction:
         """Helper: upload the fixture PPTX via mcp-local/upload_tools.upload_file."""
         # Route SDPM_DECK_ROOT so session storage lives under tmp_path
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import upload_file
 
         # Copy fixture to tmp_path so the temp upload path is stable
@@ -305,7 +311,7 @@ class TestReadUploadedFileTextSummary:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import read_uploaded_file, upload_file
 
         src = tmp_path / "input.pptx"
@@ -331,7 +337,7 @@ class TestImportAttachmentSlidesDir:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import import_attachment, upload_file
 
         src = tmp_path / "input.pptx"
@@ -364,7 +370,7 @@ class TestImportAttachmentSlidesDir:
     ) -> None:
         """Placeholder template lives at deck/template.pptx (deck-local path)."""
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import import_attachment, upload_file
 
         src = tmp_path / "input.pptx"
@@ -396,19 +402,23 @@ class TestImportAttachmentSlidesDir:
 class TestCloudImportConvertedCopiesTemplate:
     """mcp-server/tools/attachment._import_converted handles template.pptx specially."""
 
-    def test_import_converted_copies_template_to_deck_root(self) -> None:
+    def test_import_converted_copies_template_to_deck_root(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         import types
         from unittest.mock import MagicMock
 
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-server"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-server"))
         # mcp-server has its own dependency set; stub the modules that the
         # attachment module imports at top level so we can import it under
-        # the local-test venv.
-        sys.modules.setdefault("requests", types.ModuleType("requests"))
+        # the local-test venv. monkeypatch.setitem reverts after this test so
+        # the stubs cannot leak into other tests (import-order hazard).
+        if "requests" not in sys.modules:
+            monkeypatch.setitem(sys.modules, "requests", types.ModuleType("requests"))
         if "storage" not in sys.modules:
             stg_mod = types.ModuleType("storage")
             stg_mod.Storage = object  # type stub
-            sys.modules["storage"] = stg_mod
+            monkeypatch.setitem(sys.modules, "storage", stg_mod)
         from tools.attachment import _import_converted
 
         converted_prefix = "uploads/u1/up1/converted"
@@ -498,7 +508,7 @@ class TestDeckRootEnvHandling:
         self, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.delenv("SDPM_DECK_ROOT", raising=False)
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import _deck_root
 
         root = _deck_root()
@@ -509,7 +519,7 @@ class TestDeckRootEnvHandling:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "custom"))
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import _deck_root
 
         assert _deck_root() == tmp_path / "custom"
@@ -518,7 +528,7 @@ class TestDeckRootEnvHandling:
         self, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("SDPM_DECK_ROOT", "   ")
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import _deck_root
 
         assert _deck_root() == Path.home() / "Documents" / "SDPM-Presentations"

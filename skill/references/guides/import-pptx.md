@@ -80,7 +80,7 @@ The helper copies session files into the deck:
 
 - `template.pptx` — PPTX-derived placeholder template (deck root)
 - `attachments/{shortId}_deck.json` — PPTX-derived fonts / defaultTextColor
-- `attachments/{shortId}/slides/slide-NN.json` — per-slide JSON
+- `attachments/{shortId}/slides/slide-NNN.json` — per-slide JSON
 - `images/{shortId}_*` — extracted images (flattened into deck/images/)
 
 The returned JSON includes `shortId`, `templatePath`, `deckJson`, and
@@ -158,8 +158,8 @@ Python literal:
 ```python
 # Agent fills this list from slide content seen in Step 3-1.
 pairs = [
-    ("slide-01", "Introduction to the system"),
-    ("slide-02", "Storage classes overview"),
+    ("slide-001", "Introduction to the system"),
+    ("slide-002", "Storage classes overview"),
     # ... one entry per slide, matching attachments/{shortId}/slides/*.json
 ]
 lines = [f"- [{slug}] {msg}" for slug, msg in pairs]
@@ -173,7 +173,7 @@ Call with `run_python(code=<above>, deck_id=deck_id, save=True)`
 Requirements (outline lint will otherwise reject the write on Cloud):
 
 - Each slug MUST match the filename of an imported slide
-  (`slide-01`, `slide-02`, ...) — do not rename.
+  (`slide-001`, `slide-002`, ...) — do not rename.
 - Messages MUST be non-empty.
 - One line per slide, no sub-items.
 
@@ -194,7 +194,7 @@ Assemble the slug list from Step 3-2 as a Python literal:
 
 ```python
 short_id = "<result['shortId']>"
-slugs = ["slide-01", "slide-02", "slide-03"]  # agent fills from Step 3-2
+slugs = ["slide-001", "slide-002", "slide-003"]  # agent fills from Step 3-2
 # image_mapping is in the import_attachment result. It maps the original
 # converter-emitted filename (e.g. "slide1_image1.png") to its
 # deck-relative path after rename (e.g. "images/<shortId>_slide1_image1.png").
@@ -361,7 +361,7 @@ bar is a "section divider" or that the rounded box is a "card with
 shadow". You have to look.
 
 ```
-get_preview(deck_id, slugs=["slide-01", "slide-03", "slide-05",
+get_preview(deck_id, slugs=["slide-001", "slide-003", "slide-005",
                             "<a section-header slug>",
                             "<a content slug with cards / lists>"],
             quality="high")

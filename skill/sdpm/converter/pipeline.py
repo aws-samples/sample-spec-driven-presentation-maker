@@ -6,8 +6,8 @@ Output structure (deck format — stable since pptx-import-edit):
     {output_dir}/
         ├── deck.json              # {fonts, defaultTextColor}  (template set by caller)
         ├── slides/
-        │   ├── slide-01.json
-        │   ├── slide-02.json
+        │   ├── slide-001.json
+        │   ├── slide-002.json
         │   └── ...
         └── images/                # extracted slide images
 
@@ -41,7 +41,7 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: boo
 
     On-disk output:
         deck.json  (fonts + defaultTextColor; template left unset)
-        slides/slide-{NN}.json  (one per slide; NN is 2-digit 1-based)
+        slides/slide-{NNN}.json  (one per slide; NNN is 3-digit 1-based)
         images/   (unchanged — populated by extract_slide)
     """
     actual_path = pptx_path
@@ -107,9 +107,11 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: boo
         deck_meta["defaultTextColor"] = result["defaultTextColor"]
     write_json(output_dir / "deck.json", deck_meta)
 
-    # Write slides/slide-{NN}.json (1-based, zero-padded, hyphen separator to match parse_outline_slugs)
+    # Write slides/slide-{NNN}.json (1-based, zero-padded, hyphen separator to match parse_outline_slugs).
+    # 3-digit padding keeps lexicographic sort == presentation order for decks
+    # up to 999 slides (2-digit broke ordering at 100+: "slide-100" < "slide-11").
     for idx, slide_dict in enumerate(result["slides"], start=1):
-        slug = f"slide-{idx:02d}"
+        slug = f"slide-{idx:03d}"
         slide_path = slides_dir / f"{slug}.json"
         write_json(slide_path, slide_dict)
 
