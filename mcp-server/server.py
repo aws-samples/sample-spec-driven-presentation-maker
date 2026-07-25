@@ -237,10 +237,13 @@ def analyze_template(template: str, deck_id: str = "") -> str:
             from pathlib import Path
             from sdpm.analyzer import analyze_template as _analyze
             data = _storage.download_file_from_pptx_bucket(f"decks/{deck_id}/template.pptx")
-            tmp = Path(tempfile.mkdtemp())
-            tpl_path = tmp / "template.pptx"
-            tpl_path.write_bytes(data)
-            analysis = _analyze(tpl_path)
+            # TemporaryDirectory (not mkdtemp): this server is long-running,
+            # leaked tmpdirs would accumulate. The analysis dict holds no
+            # file references, so cleanup on exit is safe.
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tpl_path = Path(tmpdir) / "template.pptx"
+                tpl_path.write_bytes(data)
+                analysis = _analyze(tpl_path)
             analysis["templateName"] = "template.pptx"
             return json.dumps(analysis, ensure_ascii=False)
         except Exception as e:

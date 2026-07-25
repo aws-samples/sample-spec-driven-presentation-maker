@@ -68,7 +68,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         setSessionId(chatSessionId)
       }
     }
-  }, [chatSessionId])
+    // After the swap chatSessionId === sessionId, so the re-run is a no-op.
+  }, [chatSessionId, sessionId])
 
   // --- Config ---
   const [configLoaded, setConfigLoaded] = useState(false)
@@ -414,14 +415,17 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // Sync streaming flag and flush any deferred sessionId swap once
   // streaming finishes — at that point loadHistory can safely re-fetch
   // (the .chat.json server-side state is already complete).
+  // Uses the combined isLoading (not stream.isLoading alone): a Local
+  // reconnect stream (reconnectLoading) is also in-flight — flushing the
+  // swap during it would clobber the reconnecting messages the same way.
   useEffect(() => {
-    isLoadingRef.current = stream.isLoading
-    if (!stream.isLoading && pendingChatSessionIdRef.current) {
+    isLoadingRef.current = isLoading
+    if (!isLoading && pendingChatSessionIdRef.current) {
       const next = pendingChatSessionIdRef.current
       pendingChatSessionIdRef.current = null
       setSessionId(next)
     }
-  }, [stream.isLoading])
+  }, [isLoading])
 
   const isInitial = stream.messages.length === 0 && !historyLoading
 

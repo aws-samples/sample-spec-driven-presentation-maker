@@ -313,3 +313,86 @@ class TestTranslateApply:
         assert proc.returncode == 0
         brief = (derived / "specs" / "brief.md").read_text(encoding="utf-8")
         assert "Original English content" in brief, "specs/ must remain in source language"
+
+
+# ---------------------------------------------------------------------------
+# _sync_gradient_runs — gradient run sync after translation (PR #215 follow-up, R4)
+# ---------------------------------------------------------------------------
+
+
+def _load_apply_module():
+    """Import scripts/translate_apply.py as a module for unit-level tests."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("translate_apply", _APPLY_CLI)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_GRAD_A = {"angle": 0, "stops": [{"position": 0.0, "color": "#FF0000"}]}
+_GRAD_B = {"angle": 0, "stops": [{"position": 0.0, "color": "#0000FF"}]}
+
+
+class TestSyncGradientRuns:
+    """Sync decisions must compare against the PRE-translation text.
+
+    The old implementation ran after text replacement and compared
+    run-concat against the translated text, so: multi-run whole-paragraph
+    gradients were never synced, and a partial-gradient single run was
+    wrongly expanded to the full translated text.
+    """
+
+    def _apply_node(self, node: dict, dictionary: dict[str, str]) -> dict:
+        mod = _load_apply_module()
+        return mod._apply(node, dictionary, {})
+
+    def test_whole_paragraph_multi_run_same_gradient_collapses(self) -> None:
+        node = {
+            "text": "Hello World",
+            "_textGradientRuns": [
+                {"text": "Hello ", "gradient": _GRAD_A},
+                {"text": "World", "gradient": _GRAD_A},
+            ],
+        }
+        self._apply_node(node, {"Hello World": "こんにちは世界"})
+        assert node["text"] == "こんにちは世界"
+        assert node["_textGradientRuns"] == [
+            {"text": "こんにちは世界", "gradient": _GRAD_A},
+        ]
+
+    def test_whole_paragraph_single_run_syncs(self) -> None:
+        node = {
+            "text": "Hello",
+            "_textGradientRuns": [{"text": "Hello", "gradient": _GRAD_A}],
+        }
+        self._apply_node(node, {"Hello": "こんにちは"})
+        assert node["_textGradientRuns"] == [
+            {"text": "こんにちは", "gradient": _GRAD_A},
+        ]
+
+    def test_partial_gradient_single_run_is_not_expanded(self) -> None:
+        """Regression: a partial-paragraph gradient run must stay untouched."""
+        node = {
+            "text": "Hello World",
+            "_textGradientRuns": [{"text": "World", "gradient": _GRAD_A}],
+        }
+        self._apply_node(node, {"Hello World": "こんにちは世界"})
+        # Old code rewrote runs[0].text to the full translated text,
+        # expanding the gradient to the entire paragraph.
+        assert node["_textGradientRuns"] == [{"text": "World", "gradient": _GRAD_A}]
+
+    def test_multi_gradient_runs_left_unchanged(self) -> None:
+        runs = [
+            {"text": "Hello ", "gradient": _GRAD_A},
+            {"text": "World", "gradient": _GRAD_B},
+        ]
+        node = {"text": "Hello World", "_textGradientRuns": [dict(r) for r in runs]}
+        self._apply_node(node, {"Hello World": "こんにちは世界"})
+        assert node["_textGradientRuns"] == runs
+
+    def test_untranslated_paragraph_is_untouched(self) -> None:
+        runs = [{"text": "Hello", "gradient": _GRAD_A}]
+        node = {"text": "Hello", "_textGradientRuns": [dict(r) for r in runs]}
+        self._apply_node(node, {})
+        assert node["_textGradientRuns"] == runs

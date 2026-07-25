@@ -30,7 +30,12 @@ from pathlib import Path
 from mcp.server.fastmcp.utilities.types import Image
 from PIL import Image as PILImage
 
-from shared.ingest import IMAGE_EXTS, TEXT_EXTS, convert_file
+from shared.ingest import (
+    IMAGE_EXTS,
+    TEXT_EXTS,
+    PPTX_GUIDE_INSTRUCTION as _GUIDE_INSTRUCTION,
+    convert_file,
+)
 
 _JPEG_QUALITY = 80
 _MAX_LONG_EDGE = 1280
@@ -132,17 +137,6 @@ def _analyze_colors(file_path: Path) -> dict | None:
     except Exception:
         return None
 
-
-_GUIDE_INSTRUCTION = (
-    "This PPTX can either be converted into an editable deck, or used as "
-    "reference material for a new deck. "
-    "If the user's intent is to edit this PPTX, call read_guides(['import-pptx']) "
-    "and follow it exactly. "
-    "If the intent is to use as reference, proceed with the normal briefing flow "
-    "and call read_uploaded_file to access content. "
-    "If the user's intent is ambiguous, use the `hearing` tool once to clarify "
-    "before choosing."
-)
 
 
 def upload_file(session_id: str, file_path: str, filename: str = "") -> str:
@@ -286,77 +280,23 @@ def _format_cat_n(text: str, file_name: str, offset: int, limit: int) -> str:
 def _format_deck_text_summary(upload_dir: Path, file_name: str, offset: int, limit: int) -> str:
     """Format a deck-structure upload (deck.json + slides/) as a markdown-style text summary.
 
-    Output shape::
-
-        --- Slide 1: <title> ---
-        <body text>
-
-        --- Slide 2: <title> ---
-        ...
-
-    The title is taken from slide["title"] (string or dict-with-text).
-    Body text concatenates element ``text``, ``paragraphs[].text``, ``items``,
-    table ``headers`` / ``rows``, and recursive group elements.
+    Summary content comes from the engine (``sdpm.utils.deck_summary``);
+    this wrapper only performs filesystem I/O and cat -n pagination.
     """
+    from sdpm.utils.deck_summary import deck_text_summary
+
     slides_dir = upload_dir / "slides"
     if not slides_dir.is_dir():
         return f"No slides/ directory found in {file_name}."
 
-    def _extract_title(data: dict) -> str:
-        t = data.get("title")
-        if isinstance(t, str):
-            return t
-        if isinstance(t, dict):
-            return t.get("text", "") or ""
-        return ""
-
-    def _collect_text(node, out: list[str]) -> None:
-        if isinstance(node, dict):
-            for key in ("text", "subtitle", "label", "date", "notes"):
-                v = node.get(key)
-                if isinstance(v, str) and v.strip():
-                    out.append(v)
-            for p in node.get("paragraphs", []) or []:
-                if isinstance(p, dict):
-                    t = p.get("text")
-                    if isinstance(t, str) and t.strip():
-                        out.append(t)
-            for item in node.get("items", []) or []:
-                if isinstance(item, str) and item.strip():
-                    out.append(item)
-            headers = node.get("headers")
-            if isinstance(headers, list):
-                out.extend(str(c) for c in headers if c)
-            rows = node.get("rows")
-            if isinstance(rows, list):
-                for row in rows:
-                    if isinstance(row, list):
-                        out.extend(str(c) for c in row if c)
-            for child in node.get("elements", []) or []:
-                _collect_text(child, out)
-
-    sections: list[str] = []
-    for i, slide_file in enumerate(sorted(slides_dir.glob("slide-*.json")), start=1):
+    slides: list[dict] = []
+    for slide_file in sorted(slides_dir.glob("slide-*.json")):
         try:
-            data = json.loads(slide_file.read_text(encoding="utf-8"))
+            slides.append(json.loads(slide_file.read_text(encoding="utf-8")))
         except Exception:
-            continue
-        title = _extract_title(data)
-        header = f"--- Slide {i}: {title} ---" if title else f"--- Slide {i} ---"
-        body_parts: list[str] = []
-        for el in data.get("elements", []) or []:
-            _collect_text(el, body_parts)
-        # Drop duplicates while keeping order
-        seen: set[str] = set()
-        deduped: list[str] = []
-        for p in body_parts:
-            if p not in seen:
-                seen.add(p)
-                deduped.append(p)
-        body = "\n".join(deduped)
-        sections.append(f"{header}\n{body}".rstrip())
+            slides.append({})  # keep slide numbering aligned with file order
 
-    return _format_cat_n("\n\n".join(sections), file_name, offset, limit)
+    return _format_cat_n(deck_text_summary(slides), file_name, offset, limit)
 
 
 def read_uploaded_file(upload_id: str, offset: int = 0, limit: int = 2000) -> list:

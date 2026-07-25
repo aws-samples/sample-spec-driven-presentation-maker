@@ -145,4 +145,34 @@ def extract_fav_id(sk: str) -> str:
     return sk.replace(FAV_SK_PREFIX, "")
 
 
+# ---------------------------------------------------------------------------
+# Item builders
+# ---------------------------------------------------------------------------
+
+
+def theme_hints_ddb_item(theme_hints: dict | None) -> dict:
+    """Build the DynamoDB ``themeHints`` attribute from a ConversionResult.
+
+    Tolerates ``theme_hints=None`` (shared.ingest continues with a warning
+    when theme extraction fails) so a successful conversion is never
+    reported as failed. DynamoDB rejects native floats, so
+    ``backgroundLuminance`` is round-tripped via ``str(Decimal)``.
+
+    Args:
+        theme_hints: ``ConversionResult.theme_hints`` — may be None.
+
+    Returns:
+        Dict with backgroundLuminance (Decimal | None), accentColors, fonts.
+    """
+    from decimal import Decimal
+
+    hints = theme_hints or {}
+    bg_lum = hints.get("backgroundLuminance")
+    return {
+        "backgroundLuminance": Decimal(str(bg_lum)) if bg_lum is not None else None,
+        "accentColors": hints.get("accentColors", []),
+        "fonts": hints.get("fonts", {}),
+    }
+
+
 
