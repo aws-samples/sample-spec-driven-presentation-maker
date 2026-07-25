@@ -23,25 +23,32 @@ Run `guides` to review available guides. Read any that are relevant to the upcom
 ### 1. Run diff
 
 ```bash
-uv run python3 scripts/pptx_builder.py diff {output_json} {edited_pptx}
+# baseline is the deck directory (deck.json + slides/) or a slides JSON
+uv run python3 scripts/pptx_builder.py diff {deck_dir} {edited_pptx}
 ```
 
-The diff command accepts a PPTX file directly (it runs pptx_to_json internally).
+The diff command accepts a deck directory or PPTX file directly (it builds /
+converts to roundtrip JSON internally). On MCP, call
+`diff_pptx(baseline={deck_dir}, edited={edited_pptx})` instead.
 
 ---
 
 ### 2. Apply hand-edits to JSON
 
-Read the diff output and apply the hand-edit changes to output_json.
+Read the diff output and apply the hand-edit changes to the deck's slide JSON.
 
-- **Modified elements**: Read property diffs and edit output_json directly
-- **Added slides/elements**: Copy the relevant parts from `/tmp/sdpm/{project}/edited/slides.json` into output_json (diff output is a summary only — refer to the roundtrip JSON for actual data)
-- **Added images**: Reference them via src path from `/tmp/sdpm/{project}/edited/images/`
-- **Reordered slides**: Change the slide array order in output_json
+- **Modified elements**: Read property diffs and edit the deck's `slides/*.json` directly
+- **Added slides/elements**: The diff output is a summary only. For actual data, run
+  `uv run python3 scripts/pptx_to_json.py {edited_pptx} -o {tmp_dir}` (or the `pptx_to_json`
+  MCP tool) — it writes the roundtrip deck structure (`{tmp_dir}/slides/slide-NN.json` +
+  `{tmp_dir}/images/`) — then copy the relevant parts into the deck's slide JSON
+- **Added images**: Copy them from `{tmp_dir}/images/` into the deck's `images/` and reference via `src`
+- **Reordered slides**: Reorder `specs/outline.md` (deck) or the slide array (single JSON)
 
 **Constraints:**
-- You MUST use diff output to identify changes — do NOT re-extract the entire PPTX because roundtrip JSON loses builder-specific metadata
-- You MUST apply changes to the original output_json, not the roundtrip JSON
+- You MUST use diff output to identify changes — do NOT replace the deck's slide JSON with
+  re-extracted roundtrip JSON because roundtrip JSON loses builder-specific metadata
+- You MUST apply changes to the deck's original slide JSON, not the roundtrip JSON
 
 ---
 

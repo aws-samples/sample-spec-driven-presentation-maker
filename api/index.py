@@ -1460,23 +1460,51 @@ def presign_upload() -> Dict[str, Any]:
 _TEXT_EXTRACTABLE = {"text/plain", "text/markdown", "application/json"}
 
 
-def _extract_pptx_text(s3_key: str) -> str:
-    """Extract slide text from PPTX using zipfile + XML (no python-pptx needed)."""
-    import io
-    import re
-    import zipfile
-    obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=s3_key)
-    data = obj["Body"].read()
-    slides_text = []
-    with zipfile.ZipFile(io.BytesIO(data)) as zf:
-        slide_names = sorted(n for n in zf.namelist() if re.match(r"ppt/slides/slide\d+\.xml$", n))
-        for name in slide_names:
-            xml = zf.read(name).decode("utf-8")
-            texts = re.findall(r"<a:t>([^<]+)</a:t>", xml)
-            if texts:
-                slide_num = re.search(r"slide(\d+)", name).group(1)
-                slides_text.append(f"--- Slide {slide_num} ---\n" + "\n".join(texts))
-    return "\n\n".join(slides_text)
+# Shared guide instruction for PPTX uploads — same text as Local mode.
+_PPTX_GUIDE_INSTRUCTION = (
+    "This PPTX can either be converted into an editable deck, or used as "
+    "reference material for a new deck. "
+    "If the user's intent is to edit this PPTX, call read_guides(['import-pptx']) "
+    "and follow it exactly. "
+    "If the intent is to use as reference, proceed with the normal briefing flow "
+    "and call read_uploaded_file to access content. "
+    "If the user's intent is ambiguous, use the `hearing` tool once to clarify "
+    "before choosing."
+)
+
+
+def _pptx_guide_fields(item_or_values: Dict[str, Any]) -> Dict[str, Any]:
+    """Build the guide/guideInstruction/suggestedName/slideCount/themeHints fields
+    for a PPTX upload. Accepts either a fresh expr_values dict (from process_upload)
+    or a DDB item (from get_upload_status). Returns {} when the record has no
+    deck-structure metadata (non-PPTX uploads).
+    """
+    theme = item_or_values.get(":th") if ":th" in item_or_values else item_or_values.get("themeHints")
+    slide_count = (
+        item_or_values.get(":sc") if ":sc" in item_or_values else item_or_values.get("slideCount")
+    )
+    suggested = (
+        item_or_values.get(":sn")
+        if ":sn" in item_or_values
+        else item_or_values.get("suggestedName")
+    )
+    if theme is None and slide_count is None and suggested is None:
+        return {}
+    if theme is not None:
+        # DDB returns numeric values as Decimal; JSON serializer on the
+        # response can't handle Decimal, so coerce backgroundLuminance back
+        # to a float.
+        from decimal import Decimal
+        bg_lum = theme.get("backgroundLuminance") if isinstance(theme, dict) else None
+        if isinstance(bg_lum, Decimal):
+            theme = {**theme, "backgroundLuminance": float(bg_lum)}
+    return {
+        "guide": "import-pptx",
+        "guideInstruction": _PPTX_GUIDE_INSTRUCTION,
+        "suggestedName": suggested,
+        "slideCount": int(slide_count) if slide_count is not None else None,
+        "themeHints": theme,
+    }
 
 
 @app.post("/uploads/<upload_id>/process")
@@ -1521,7 +1549,7 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
         expr_values[":st"] = "completed"
 
     # --- Binary files (PDF/DOCX/XLSX/PPTX): download → convert → upload ---
-    elif ext in (".pdf", ".docx", ".xlsx") and s3_key:
+    elif ext in (".pdf", ".docx", ".xlsx", ".pptx") and s3_key:
         converted_prefix = f"uploads/{user_id}/{upload_id}/converted"
         try:
             with tempfile.TemporaryDirectory() as tmp:
@@ -1560,6 +1588,22 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
                     if result.warnings:
                         update_expr_parts.append("conversionWarnings = :cw")
                         expr_values[":cw"] = result.warnings
+                    # PPTX deck-structure metadata — stored for the edit guide
+                    # and returned by process_upload / get_upload_status.
+                    if result.deck_structure:
+                        from decimal import Decimal
+                        bg_lum = result.theme_hints.get("backgroundLuminance")
+                        update_expr_parts.append("themeHints = :th")
+                        expr_values[":th"] = {
+                            # DynamoDB rejects native floats; round-trip via str(Decimal).
+                            "backgroundLuminance": Decimal(str(bg_lum)) if bg_lum is not None else None,
+                            "accentColors": result.theme_hints.get("accentColors", []),
+                            "fonts": result.theme_hints.get("fonts", {}),
+                        }
+                        update_expr_parts.append("slideCount = :sc")
+                        expr_values[":sc"] = result.slide_count
+                        update_expr_parts.append("suggestedName = :sn")
+                        expr_values[":sn"] = result.suggested_name
 
         except Exception as e:
             logger.exception("Conversion failed for %s", upload_id)
@@ -1581,12 +1625,14 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
     if file_type.startswith("image/") and s3_key:
         image_url = presigned_url(s3_client, BUCKET_NAME, s3_key)
 
-    return {
+    response: Dict[str, Any] = {
         "uploadId": upload_id,
         "status": expr_values[":st"],
         "extractedText": extracted_text,
         "imageUrl": image_url,
     }
+    response.update(_pptx_guide_fields(expr_values))
+    return response
 
 
 @app.get("/uploads/<upload_id>/status")
@@ -1602,7 +1648,7 @@ def get_upload_status(upload_id: str) -> Dict[str, Any]:
     if item.get("fileType", "").startswith("image/") and item.get("s3KeyRaw"):
         image_url = presigned_url(s3_client, BUCKET_NAME, item["s3KeyRaw"])
 
-    return {
+    response: Dict[str, Any] = {
         "uploadId": upload_id,
         "fileName": item.get("fileName", ""),
         "fileType": item.get("fileType", ""),
@@ -1610,6 +1656,8 @@ def get_upload_status(upload_id: str) -> Dict[str, Any]:
         "extractedText": item.get("extractedText"),
         "imageUrl": image_url,
     }
+    response.update(_pptx_guide_fields(item))
+    return response
 
 
 # ---------------------------------------------------------------------------

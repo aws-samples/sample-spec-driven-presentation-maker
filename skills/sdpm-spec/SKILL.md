@@ -65,6 +65,8 @@ MCP, so translate every such command:
 | `pptx_builder.py code-block …` | `code_to_slide(...)` |
 | `pptx_builder.py image-size {path} --width {px}` | **no MCP tool** — compute proportional size in `run_python` (`new_h = round(orig_h * target_w / orig_w)`) |
 | `pptx_to_json.py {pptx}` | `pptx_to_json(...)` |
+| `pptx_builder.py diff {deck_dir} {edited_pptx}` | `diff_pptx(baseline=..., edited=...)` |
+| (import an existing PPTX / user file) | `upload_file(file_path)` → follow `guideInstruction`, then `import_attachment(source=uploadId, deck_id=...)` |
 | reading local deck files (`read_text` / `read_json`) | `run_python(purpose=..., code="...", deck_id=<path>)` sandbox functions |
 | fetching a URL the user gave | CC-native **WebFetch** (the MCP has no `web_fetch`) |
 
@@ -83,8 +85,12 @@ D create style). For a **new presentation** (A):
 → `read_workflows(["create-new-1-briefing"])` and follow each workflow's **Next Step** link.
 Do not decide structure/content/design before loading the workflow.
 
-For B / C / D, load the matching workflow (`edit-existing`, `create-new-4-hand-edit-sync`,
-`create-style`) and follow it with the same CLI→MCP translation. The delegation flow below is
+For **B (edit existing PPTX)**: call `upload_file(file_path)` with the user's PPTX path —
+the response contains `uploadId` and `guideInstruction` (→ `read_guides(["import-pptx"])`).
+Follow that guide; it drives init → `import_attachment(source=uploadId, deck_id=...)` →
+brief/outline → build → art-direction. For C / D, load the matching workflow
+(`create-new-4-hand-edit-sync`, `create-style`) and follow it with the same CLI→MCP
+translation. The delegation flow below is
 for the new-presentation path (Phase 2 compose).
 
 ## Phase 1 — Briefing → Outline → Art Direction (you drive this directly, with hearing)
