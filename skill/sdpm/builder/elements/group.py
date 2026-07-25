@@ -41,8 +41,49 @@ class GroupMixin:
             elif sub_type == "chart":
                 self._add_chart(slide, sub_elem)
     
+    def _sanitize_injected_xml(self, xml_el):
+        """Replace OLE graphicFrames in injected raw XML with their fallback picture.
+
+        Embedded OLE objects carry an r:id pointing at an oleObject part that
+        does not exist in the rebuilt package — PowerPoint then reports the
+        presentation as damaged and strips the slide. The mc:Fallback branch
+        holds a plain picture of the object, so swap the whole graphicFrame
+        for that pic (its r:embed is remapped by _reattach_xml_images).
+        """
+        ns_p = 'http://schemas.openxmlformats.org/presentationml/2006/main'
+        ns_a = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+        for gf in list(xml_el.iter(f'{{{ns_p}}}graphicFrame')):
+            if gf.find(f'.//{{{ns_p}}}oleObj') is None:
+                continue
+            parent = gf.getparent()
+            if parent is None:
+                continue
+            pic = gf.find(f'.//{{{ns_p}}}pic')
+            if pic is None:
+                parent.remove(gf)
+                continue
+            # Position: the graphicFrame's p:xfrm is authoritative
+            frame_xfrm = gf.find(f'{{{ns_p}}}xfrm')
+            sp_pr = pic.find(f'{{{ns_p}}}spPr')
+            if frame_xfrm is not None and sp_pr is not None:
+                from lxml import etree
+                a_xfrm = sp_pr.find(f'{{{ns_a}}}xfrm')
+                if a_xfrm is None:
+                    a_xfrm = etree.Element(f'{{{ns_a}}}xfrm')
+                    sp_pr.insert(0, a_xfrm)
+                for tag in ('off', 'ext'):
+                    src = frame_xfrm.find(f'{{{ns_a}}}{tag}')
+                    dst = a_xfrm.find(f'{{{ns_a}}}{tag}')
+                    if src is not None:
+                        if dst is None:
+                            dst = etree.SubElement(a_xfrm, f'{{{ns_a}}}{tag}')
+                        for k, v in src.attrib.items():
+                            dst.set(k, v)
+            parent.replace(gf, pic)
+
     def _reattach_xml_images(self, slide, xml_el, images_map):
         """Rewrite r:embed/r:link ids in injected XML to freshly added parts."""
+        self._sanitize_injected_xml(xml_el)
         if not images_map:
             return
         r_ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'

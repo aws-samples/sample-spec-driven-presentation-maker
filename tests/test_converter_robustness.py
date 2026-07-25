@@ -962,3 +962,45 @@ class TestNoEffectsSuppression:
         assert marked._element.spPr.find(f"{ns_a}effectLst") is not None
         # default behavior unchanged for AI-authored decks
         assert unmarked._element.find(f"{ns_p}style") is not None
+
+
+class TestOleSanitization:
+    """Injected raw group XML carried embedded OLE objects whose r:id
+    pointed at parts that don't exist in the rebuilt package — PowerPoint
+    reported the file as damaged and stripped the slide. OLE frames are
+    swapped for their mc:Fallback picture."""
+
+    def test_ole_graphicframe_replaced_by_fallback_pic(self):
+        from lxml import etree
+
+        from sdpm.builder import PPTXBuilder
+        ns_p = "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ns_a = "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ns_r = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        xml = f'''<p:grpSp xmlns:p="{ns_p}" xmlns:a="{ns_a}" xmlns:r="{ns_r}"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+          <p:graphicFrame>
+            <p:xfrm><a:off x="100" y="200"/><a:ext cx="300" cy="400"/></p:xfrm>
+            <a:graphic><a:graphicData uri="{ns_p.replace('presentationml/2006/main','presentationml/2006/ole')}">
+              <mc:AlternateContent>
+                <mc:Choice Requires="v"><p:oleObj r:id="rId99" imgW="1" imgH="1"/></mc:Choice>
+                <mc:Fallback><p:oleObj>
+                  <p:pic>
+                    <p:blipFill><a:blip r:embed="rId98"/></p:blipFill>
+                    <p:spPr/>
+                  </p:pic>
+                </p:oleObj></mc:Fallback>
+              </mc:AlternateContent>
+            </a:graphicData></a:graphic>
+          </p:graphicFrame>
+        </p:grpSp>'''
+        el = etree.fromstring(xml)
+        b = PPTXBuilder(_template(), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"},
+                        default_text_color="#000000")
+        b._sanitize_injected_xml(el)
+        assert el.find(f".//{{{ns_p}}}oleObj") is None
+        assert el.find(f".//{{{ns_p}}}graphicFrame") is None
+        pic = el.find(f".//{{{ns_p}}}pic")
+        assert pic is not None
+        off = pic.find(f".//{{{ns_a}}}xfrm/{{{ns_a}}}off")
+        assert off is not None and off.get("x") == "100"
