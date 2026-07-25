@@ -249,6 +249,17 @@ class ImageMixin:
                 )
                 pic.line.width = Pt(elem.get("lineWidth", 1))
 
+        # Apply flip (mirrored pictures — cutout photos rely on this to face
+        # the right way). pic may be a Picture or a raw XML element (SVG path).
+        if (elem.get("flipH") or elem.get("flipV")) and pic is not None:
+            pic_el = pic._element if hasattr(pic, '_element') else pic
+            xfrm = pic_el.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm')
+            if xfrm is not None:
+                if elem.get("flipH"):
+                    xfrm.set('flipH', '1')
+                if elem.get("flipV"):
+                    xfrm.set('flipV', '1')
+
         # Apply rotation
         if rotation != 0:
             if is_svg:

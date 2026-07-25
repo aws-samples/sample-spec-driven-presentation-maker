@@ -1090,3 +1090,59 @@ class TestSubpixelGroupRawFallback:
     def test_normal_group_still_flattened(self):
         g = self._make_deck(lambda group: None)
         assert "_groupXml" not in g
+
+
+class TestPictureFlip:
+    """Mirrored pictures (flipH) lost their flip on round-trip.
+
+    A cutout photo whose subject sits on one side of the canvas showed the
+    subject on the wrong side. Converter now extracts flipH/flipV for
+    pictures and the builder applies them.
+    """
+
+    def test_flip_roundtrip(self, tmp_path):
+        from pptx.util import Emu as E
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        from PIL import Image as PILImage
+        img_file = tmp_path / "img.png"
+        PILImage.new("RGB", (40, 20), "red").save(img_file)
+        pic = slide.shapes.add_picture(str(img_file), E(0), E(0), E(914400), E(457200))
+        pic._element.spPr.xfrm.set("flipH", "1")
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        el = next(e for s in result["slides"] for e in s["elements"] if e.get("type") == "image")
+        assert el.get("flipH") is True
+
+        # Builder applies it back
+        from sdpm.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
+        out_slide = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
+        el["src"] = str((tmp_path / "out" / el["src"]).resolve())
+        b._add_image(out_slide, el)
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        xfrms = out_slide.shapes[-1]._element.findall(f".//{ns}xfrm")
+        assert any(x.get("flipH") == "1" for x in xfrms)
+
+
+class TestSlideFilenamePadding:
+    """Decks with 100+ slides broke lexicographic ordering.
+
+    slide-100.json sorted before slide-11.json, shuffling every consumer
+    that sorts by filename. Pad width now follows the slide count.
+    """
+
+    def test_pad_width_follows_count(self, tmp_path):
+        prs = Presentation(str(_template()))
+        for _ in range(101):
+            prs.slides.add_slide(prs.slide_layouts[-1])
+        src = tmp_path / "big.pptx"
+        prs.save(src)
+        pptx_to_json(src, tmp_path / "out")
+        names = sorted(p.name for p in (tmp_path / "out" / "slides").glob("*.json"))
+        assert names[0] == "slide-001.json"
+        assert "slide-101.json" in names
+        # Lexicographic == numeric
+        nums = [int(n.split("-")[1].split(".")[0]) for n in names]
+        assert nums == sorted(nums)

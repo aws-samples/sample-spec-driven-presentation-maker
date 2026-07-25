@@ -1017,6 +1017,10 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
     # Extract hyperlink
     if hasattr(shape, 'click_action') and shape.click_action.hyperlink:
         elem["link"] = shape.click_action.hyperlink.address
+
+    # Mirrored pictures (flipH/flipV) — without this a cutout photo shows
+    # its subject on the wrong side of the frame.
+    _add_flip(elem, shape)
     
     # Extract image effects into _originalEffects (underscore-prefixed so builder
     # ignores them by default).  When reusing images in new slides, agents should

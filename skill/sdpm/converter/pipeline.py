@@ -109,9 +109,12 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: boo
     deck_meta["autoSpacing"] = False
     write_json(output_dir / "deck.json", deck_meta)
 
-    # Write slides/slide-{NN}.json (1-based, zero-padded, hyphen separator to match parse_outline_slugs)
+    # Write slides/slide-{NN}.json (1-based, zero-padded, hyphen separator to match parse_outline_slugs).
+    # Pad width follows the slide count so lexicographic order == numeric order
+    # (consumers sort by filename; 2-digit padding breaks past 99 slides).
+    pad = max(2, len(str(len(result["slides"]))))
     for idx, slide_dict in enumerate(result["slides"], start=1):
-        slug = f"slide-{idx:02d}"
+        slug = f"slide-{idx:0{pad}d}"
         slide_path = slides_dir / f"{slug}.json"
         write_json(slide_path, slide_dict)
 
