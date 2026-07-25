@@ -10,16 +10,60 @@ from .xml_helpers import _extract_fill_from_xml
 from .text import _extract_styled_text
 
 
+def _cell_lststyle_color(tc, theme_colors, color_mapping):
+    """Default text color defined by the cell's own txBody lstStyle.
+
+    Table cells can carry a per-cell lstStyle whose lvl1 defRPr solidFill
+    sets the text color (e.g. white header cells). Runs without an explicit
+    color inherit it — not the slide-level tx1 default.
+    """
+    try:
+        lst = tc.find('a:txBody/a:lstStyle', _NS)
+        if lst is None:
+            return None
+        d = lst.find('a:lvl1pPr/a:defRPr', _NS)
+        if d is None:
+            return None
+        solid = d.find('a:solidFill', _NS)
+        if solid is None:
+            return None
+        srgb = solid.find('a:srgbClr', _NS)
+        if srgb is not None:
+            return _hex(srgb)
+        scheme = solid.find('a:schemeClr', _NS)
+        if scheme is not None:
+            from .color import _resolve_color_with_transforms
+            return _resolve_color_with_transforms(scheme, theme_colors, color_mapping)
+        from .xml_helpers import _sys_hex
+        return _sys_hex(solid)
+    except Exception:
+        return None
+
+
 def _extract_cell(cell, theme_colors=None, color_mapping=None):
     """Extract cell as string (text only) or dict (has extra properties)."""
     tc = cell._tc
     tc_pr = tc.find('a:tcPr', _NS)
     tf = cell.text_frame
+    # Cell-level default text color (from the cell's own lstStyle):
+    # suppress the tx1 fallback for inheriting runs and emit it as the
+    # cell's "color" prop instead.
+    cell_color = _cell_lststyle_color(tc, theme_colors, color_mapping)
     styled_parts = []
     for para in tf.paragraphs:
-        styled_parts.append(_extract_styled_text(para.runs, theme_colors, color_mapping, paragraph=para))
+        part = _extract_styled_text(para.runs, theme_colors, color_mapping,
+                                    is_placeholder=bool(cell_color), paragraph=para)
+        # Bullets: the builder has no list support inside table cells, so
+        # keep the rendered bullet character as literal text.
+        pPr = para._element.find('a:pPr', _NS)
+        bu = pPr.find('a:buChar', _NS) if pPr is not None else None
+        if bu is not None and para.text.strip():
+            part = f"{bu.get('char', '•')}{part}"
+        styled_parts.append(part)
     text = "\n".join(styled_parts)
     props = {}
+    if cell_color:
+        props["color"] = cell_color
 
     if tc_pr is not None:
         # Fill → background
@@ -67,6 +111,11 @@ def _extract_cell(cell, theme_colors=None, color_mapping=None):
                         resolved = _resolve_scheme_color(scheme.get('val'), theme_colors, color_mapping)
                         if resolved:
                             border["color"] = resolved
+                    else:
+                        from .xml_helpers import _sys_hex
+                        sys_hex = _sys_hex(sf)
+                        if sys_hex:
+                            border["color"] = sys_hex
             if border:
                 borders[side] = border
         if borders:

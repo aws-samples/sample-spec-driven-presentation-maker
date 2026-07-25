@@ -798,3 +798,86 @@ class TestTextSizingAndWrap:
         el = next(e for s in result["slides"] for e in s["elements"]
                   if e.get("type") == "shape" and "運用者" in str(e.get("text", "")))
         assert el.get("fontSize") == 18
+
+
+class TestTableCellFidelity:
+    """Table-cell fidelity bugs from a real deck's spec table.
+
+    - per-cell lstStyle text color (white header text) fell back to tx1 black
+    - sysClr cell borders lost their color (white gridlines vanished)
+    - buChar bullets inside cells were dropped (builder has no cell lists)
+    """
+
+    @staticmethod
+    def _convert(mutate):
+        import tempfile
+
+        from pptx.util import Emu as E
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        gfx = slide.shapes.add_table(2, 2, E(1270000), E(635000), E(5080000), E(1905000))
+        mutate(gfx.table)
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "t.pptx"
+            prs.save(p)
+            result = pptx_to_json(p, Path(td) / "out")
+        for s in result["slides"]:
+            for e in s["elements"]:
+                if e.get("type") == "table":
+                    return e
+        raise AssertionError("no table extracted")
+
+    NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+
+    def test_cell_lststyle_color_extracted(self):
+        from lxml import etree
+
+        def mutate(tbl):
+            cell = tbl.rows[0].cells[0]
+            cell.text = "概要"
+            txBody = cell._tc.find(f"{self.NS}txBody")
+            lst = txBody.find(f"{self.NS}lstStyle")
+            lvl = etree.SubElement(lst, f"{self.NS}lvl1pPr")
+            d = etree.SubElement(lvl, f"{self.NS}defRPr")
+            sf = etree.SubElement(d, f"{self.NS}solidFill")
+            etree.SubElement(sf, f"{self.NS}srgbClr").set("val", "FFEE00")
+        t = self._convert(mutate)
+        cell = t["headers"][0] if t.get("headers") else t["rows"][0][0]
+        assert isinstance(cell, dict) and cell.get("color") == "#FFEE00"
+        assert "#000000" not in str(cell.get("text"))
+
+    def test_sysclr_border_color_extracted(self):
+        from lxml import etree
+
+        def mutate(tbl):
+            cell = tbl.rows[0].cells[0]
+            cell.text = "x"
+            tcPr = cell._tc.get_or_add_tcPr()
+            ln = etree.SubElement(tcPr, f"{self.NS}lnB")
+            ln.set("w", "12700")
+            sf = etree.SubElement(ln, f"{self.NS}solidFill")
+            sys_el = etree.SubElement(sf, f"{self.NS}sysClr")
+            sys_el.set("val", "window")
+            sys_el.set("lastClr", "FFFFFF")
+        t = self._convert(mutate)
+        cell = t["headers"][0] if t.get("headers") else t["rows"][0][0]
+        assert cell["borders"]["bottom"]["color"] == "#FFFFFF"
+
+    def test_cell_bullets_kept_as_text(self):
+        from lxml import etree
+
+        def mutate(tbl):
+            cell = tbl.rows[0].cells[0]
+            tf = cell.text_frame
+            tf.text = "各システムに対するドメイン知識"
+            p2 = tf.add_paragraph()
+            p2.text = "CLAPの仕様理解"
+            for para in tf.paragraphs:
+                pPr = para._element.get_or_add_pPr()
+                bu = etree.SubElement(pPr, f"{self.NS}buChar")
+                bu.set("char", "•")
+        t = self._convert(mutate)
+        cell = t["headers"][0] if t.get("headers") else t["rows"][0][0]
+        text = cell["text"] if isinstance(cell, dict) else cell
+        assert text.count("•") == 2
