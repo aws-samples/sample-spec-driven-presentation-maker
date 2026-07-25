@@ -864,7 +864,9 @@ class TestTableCellFidelity:
         cell = t["headers"][0] if t.get("headers") else t["rows"][0][0]
         assert cell["borders"]["bottom"]["color"] == "#FFFFFF"
 
-    def test_cell_bullets_kept_as_text(self):
+    def test_cell_bullets_roundtrip(self):
+        import tempfile
+
         from lxml import etree
 
         def mutate(tbl):
@@ -879,5 +881,21 @@ class TestTableCellFidelity:
                 bu.set("char", "•")
         t = self._convert(mutate)
         cell = t["headers"][0] if t.get("headers") else t["rows"][0][0]
-        text = cell["text"] if isinstance(cell, dict) else cell
-        assert text.count("•") == 2
+        assert isinstance(cell, dict)
+        paras = cell["paragraphs"]
+        assert [p.get("bullet") for p in paras] == ["•", "•"]
+        # Rebuild: builder must emit real buChar bullets on each a:p
+        from sdpm.builder import PPTXBuilder
+        b = PPTXBuilder(_template(), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"},
+                        default_text_color="#000000", auto_spacing=False)
+        b.add_slide({"layout": "Blank", "elements": [t]})
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "rebuilt.pptx"
+            b.save(out)
+            prs = Presentation(str(out))
+            gfx = next(sh for sh in prs.slides[0].shapes if sh.has_table)
+        tc = gfx.table.rows[0].cells[0]._tc
+        bu_chars = tc.findall(f".//{self.NS}buChar")
+        assert [b_.get("char") for b_ in bu_chars] == ["•", "•"]
+        texts = [p.text for p in gfx.table.rows[0].cells[0].text_frame.paragraphs]
+        assert texts == ["各システムに対するドメイン知識", "CLAPの仕様理解"]

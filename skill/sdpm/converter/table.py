@@ -50,18 +50,22 @@ def _extract_cell(cell, theme_colors=None, color_mapping=None):
     # cell's "color" prop instead.
     cell_color = _cell_lststyle_color(tc, theme_colors, color_mapping)
     styled_parts = []
+    bullet_chars = []
     for para in tf.paragraphs:
         part = _extract_styled_text(para.runs, theme_colors, color_mapping,
                                     is_placeholder=bool(cell_color), paragraph=para)
-        # Bullets: the builder has no list support inside table cells, so
-        # keep the rendered bullet character as literal text.
         pPr = para._element.find('a:pPr', _NS)
         bu = pPr.find('a:buChar', _NS) if pPr is not None else None
-        if bu is not None and para.text.strip():
-            part = f"{bu.get('char', '•')}{part}"
+        bullet_chars.append(bu.get('char', '•') if bu is not None and para.text.strip() else None)
         styled_parts.append(part)
     text = "\n".join(styled_parts)
     props = {}
+    if any(bullet_chars):
+        # Bulleted lines → paragraphs form (builder renders real buChar bullets)
+        props["paragraphs"] = [
+            {"text": part, "bullet": bc} if bc else {"text": part}
+            for part, bc in zip(styled_parts, bullet_chars)
+        ]
     if cell_color:
         props["color"] = cell_color
 

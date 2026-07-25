@@ -244,17 +244,46 @@ class TableMixin:
                     text_color = RGBColor.from_string(color_val.lstrip('#'))
 
                 align = resolved.get("text-align")
-                if align:
-                    para.alignment = {"left": PP_ALIGN.LEFT, "center": PP_ALIGN.CENTER, "right": PP_ALIGN.RIGHT}.get(align)
+                align_val = {"left": PP_ALIGN.LEFT, "center": PP_ALIGN.CENTER, "right": PP_ALIGN.RIGHT}.get(align) if align else None
+                if align_val is not None:
+                    para.alignment = align_val
 
-                self._apply_styled_text(para, str(text), default_color=text_color, no_default_color=text_color is None)
+                cell_paras = cell_val.get("paragraphs") if isinstance(cell_val, dict) else None
+                if cell_paras:
+                    # Paragraph list with optional bullets: one a:p per item.
+                    tf = cell.text_frame
+                    a_ns = nsmap["a"]
+                    for pi, pd in enumerate(cell_paras):
+                        if isinstance(pd, str):
+                            pd = {"text": pd}
+                        p = tf.paragraphs[0] if pi == 0 else tf.add_paragraph()
+                        if align_val is not None:
+                            p.alignment = align_val
+                        self._apply_styled_text(p, str(pd.get("text", "")), default_color=text_color, no_default_color=text_color is None)
+                        pPr = p._element.get_or_add_pPr()
+                        bu = pd.get("bullet")
+                        if bu:
+                            char = bu if isinstance(bu, str) else "•"
+                            bu_font = etree.SubElement(pPr, f'{{{a_ns}}}buFont')
+                            bu_font.set('typeface', 'Arial')
+                            bu_char = etree.SubElement(pPr, f'{{{a_ns}}}buChar')
+                            bu_char.set('char', char)
+                            # Hanging indent so wrapped lines align after the bullet
+                            pPr.set('marL', '171450')
+                            pPr.set('indent', '-171450')
+                        else:
+                            etree.SubElement(pPr, f'{{{a_ns}}}buNone')
+                    cell_runs = [r for p in cell.text_frame.paragraphs for r in p.runs]
+                else:
+                    self._apply_styled_text(para, str(text), default_color=text_color, no_default_color=text_color is None)
+                    cell_runs = para.runs
 
                 # Font properties on all runs
                 font_weight = resolved.get("font-weight")
                 font_style = resolved.get("font-style")
                 text_decoration = resolved.get("text-decoration")
                 font_size = resolved.get("font-size")
-                for run in para.runs:
+                for run in cell_runs:
                     if font_weight == "bold":
                         run.font.bold = True
                     if font_style == "italic":
