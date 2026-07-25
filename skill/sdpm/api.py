@@ -85,9 +85,18 @@ def list_templates_with_metadata(
 
     Pure function — no I/O beyond filesystem glob.
 
+    Consumers are the local paths only (L1 CLI, mcp-local, local Web UI via
+    state.json). The cloud path (mcp-server) does NOT use this function — it has
+    an independent listing in mcp-server/tools/template.py where builtin notes
+    are first-class DDB items (BUILTIN_NOTE#<name>), merged at the tool layer.
+    Keep that divergence in mind before consolidating.
+
     Args:
         templates_dirs: From get_templates_dirs(). Last entry is bundled.
-        metadata: {name: {description, theme_colors, fonts, layout_count}} from state.json or DDB.
+        metadata: {name: {description, theme_colors, fonts, layout_count}} from state.json.
+            Builtin templates are looked up under "builtin:<name>" first (the key
+            local Web UI uses for its analysis cache; user notes share the entry),
+            falling back to "<name>" for backward compatibility.
 
     Returns:
         Sorted list of template dicts with name, source, description, theme_colors, fonts, layout_count.
@@ -103,6 +112,10 @@ def list_templates_with_metadata(
                 continue
             source = "builtin" if d == bundled_dir else "user"
             meta = metadata.get(name, {})
+            if source == "builtin":
+                # builtin: prefix keeps builtin metadata (incl. user notes) from
+                # colliding with a same-named user template entry.
+                meta = metadata.get(f"builtin:{name}") or meta
             seen[name] = {
                 "name": name,
                 "source": source,
