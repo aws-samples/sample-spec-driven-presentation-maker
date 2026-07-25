@@ -213,12 +213,41 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
                 paras.append(p)
             elem["paragraphs"] = paras
     else:
-        parts = []
-        for i, para in enumerate(all_paragraphs):
-            if i > 0:
-                parts.append('\n')
-            parts.append(_extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para))
-        elem["text"] = ''.join(parts)
+        # Empty paragraphs with an explicit endParaRPr size act as sized
+        # spacers (they shift anchored text); the joined-text form cannot
+        # carry per-line sizes, so switch to paragraphs mode when present.
+        ns_a = _NS["a"]
+
+        def _end_sz(para):
+            endPr = para._element.find(f'{{{ns_a}}}endParaRPr')
+            if endPr is not None and endPr.get('sz'):
+                return int(endPr.get('sz')) / 100
+            return None
+
+        sized_empties = [para for para in all_paragraphs
+                         if not para.text.strip() and _end_sz(para)
+                         and _end_sz(para) != default_font_size]
+        if sized_empties:
+            paras = []
+            for para in all_paragraphs:
+                p = {"text": _extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para)}
+                a = _get_alignment(para)
+                if a:
+                    p["align"] = a
+                if para.runs and para.runs[0].font.size:
+                    p["fontSize"] = int(para.runs[0].font.size.pt)
+                esz = _end_sz(para)
+                if esz:
+                    p["endFontSize"] = esz
+                paras.append(p)
+            elem["paragraphs"] = paras
+        else:
+            parts = []
+            for i, para in enumerate(all_paragraphs):
+                if i > 0:
+                    parts.append('\n')
+                parts.append(_extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para))
+            elem["text"] = ''.join(parts)
         # Extract indent/marL from first paragraph for single-text shapes
         if paragraphs_with_text:
             pPr = paragraphs_with_text[0]._element.find(f'{{{_NS["a"]}}}pPr')

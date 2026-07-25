@@ -215,7 +215,7 @@ class FormattingMixin:
         Args:
             font_family: If specified, use this font for halfwidth chars (e.g., 'Lucida Console' for code)
         """
-        segments = parse_styled_text(text)
+        segments = parse_styled_text(text, auto_spacing=getattr(self, 'auto_spacing', True))
         paragraph.clear()
         from lxml import etree
         from pptx.oxml.ns import qn

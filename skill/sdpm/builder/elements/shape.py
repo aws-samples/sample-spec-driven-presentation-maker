@@ -280,17 +280,11 @@ class ShapeMixin:
                     
                     # Apply text alignment
                     align = elem.get("align", "center")
-                    if align == "center":
-                        p.alignment = 2
-                    elif align == "right":
-                        p.alignment = 3
-                    elif align == "left":
-                        p.alignment = 1
-                    else:
-                        p.alignment = 2  # Default center
+                    p.alignment = {"center": 2, "right": 3, "left": 1,
+                                   "justify": 4, "just": 4}.get(align, 2)
             elif paragraphs:
                 # Paragraphs array with per-paragraph styles
-                align_map = {"left": 1, "center": 2, "right": 3}
+                align_map = {"left": 1, "center": 2, "right": 3, "justify": 4, "just": 4}
                 for i, para_def in enumerate(paragraphs):
                     p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
                     if isinstance(para_def, str):
@@ -337,7 +331,7 @@ class ShapeMixin:
                 
                 # Apply text alignment
                 align = elem.get("align", "center")
-                align_val = {"center": 2, "right": 3, "left": 1}.get(align, 2)
+                align_val = {"center": 2, "right": 3, "left": 1, "justify": 4, "just": 4}.get(align, 2)
                 for p in tf.paragraphs:
                     p.alignment = align_val
                 

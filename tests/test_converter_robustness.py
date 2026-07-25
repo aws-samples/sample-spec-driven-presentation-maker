@@ -682,3 +682,60 @@ class TestSrgbTintSemantics:
         r, g, b = int(out[1:3], 16), int(out[3:5], 16), int(out[5:7], 16)
         assert r > g and r > b  # pushed toward pure red
         assert (r - g) > (0x99 - 0x66)  # more separation than input
+
+
+class TestImportTextFidelity:
+    """Header/label text drifted on rebuild (found on a real deck).
+
+    - align="justify" fell back to center in the shape builder
+    - CJK↔Latin auto-spacing mutated imported text (autoSpacing deck flag)
+    - empty paragraphs lost their endParaRPr size, shifting anchored text
+    """
+
+    def test_parse_styled_text_auto_spacing_off(self):
+        from sdpm.utils.text import parse_styled_text
+        text = "{{font=Meiryo UI:自動化基盤は}}{{bold,font=Meiryo UI:CLAP/TMT/DNA}}{{font=Meiryo UI:により構成される}}"
+        on = parse_styled_text(text)
+        off = parse_styled_text(text, auto_spacing=False)
+        assert on[0]["text"].endswith(" ")  # spacing applied by default
+        assert off[0]["text"] == "自動化基盤は"  # verbatim when disabled
+        assert off[1]["text"] == "CLAP/TMT/DNA"
+
+    def test_converted_deck_disables_auto_spacing(self):
+        import tempfile
+        prs = Presentation(str(_template()))
+        prs.slides.add_slide(prs.slide_layouts[-1])
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "t.pptx"
+            prs.save(p)
+            pptx_to_json(p, Path(td) / "out")
+            deck = json.loads((Path(td) / "out" / "deck.json").read_text())
+        assert deck["autoSpacing"] is False
+
+    def test_sized_empty_paragraphs_roundtrip(self):
+        import tempfile
+
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E, Pt
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, E(1270000), E(635000), E(2540000), E(1905000))
+        tf = sp.text_frame
+        tf.paragraphs[0].text = "Title"
+        tf.paragraphs[0].runs[0].font.size = Pt(12)
+        for _ in range(2):
+            para = tf.add_paragraph()  # empty spacer, larger than the text
+            from lxml import etree
+            from pptx.oxml.ns import qn
+            end = etree.SubElement(para._p, qn('a:endParaRPr'))
+            end.set('sz', '1600')
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "t.pptx"
+            prs.save(p)
+            result = pptx_to_json(p, Path(td) / "out")
+        shapes = [e for s in result["slides"] for e in s["elements"]
+                  if e.get("type") == "shape" and "paragraphs" in e]
+        assert shapes, "sized empty paragraphs should force paragraphs mode"
+        paras = shapes[0]["paragraphs"]
+        assert [pa.get("endFontSize") for pa in paras[1:]] == [16.0, 16.0]

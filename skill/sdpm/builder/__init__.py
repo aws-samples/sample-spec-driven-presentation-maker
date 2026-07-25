@@ -72,7 +72,7 @@ class PPTXBuilder(
 
     def __init__(self, template_path: Path, custom_template: bool = False,
                  fonts: dict = None, base_dir: Path = None, keep_empty_placeholders: bool = False,
-                 default_text_color: str = None):
+                 default_text_color: str = None, auto_spacing: bool = True):
         """Initialize PPTXBuilder.
 
         Args:
@@ -106,6 +106,7 @@ class PPTXBuilder(
         self.EMU_PER_PX = int(self.prs.slide_width) / 1920
         self.custom_template = custom_template
         self.fonts = fonts
+        self.auto_spacing = auto_spacing  # CJK↔Latin spacing; False = keep source text verbatim
         self.keep_empty_placeholders = keep_empty_placeholders
         self.layouts = self._build_layout_map()
         self.invalid_layouts: list[dict] = []  # {"slug", "attempted", "used", "available"}
