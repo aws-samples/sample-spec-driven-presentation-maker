@@ -54,11 +54,11 @@ _INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generat
 → Read `read_workflows(["create-new-1-briefing"])` to start. Follow each file's Next Step from there.
 """
 
-# TODO: Add these workflows when web UI supports them
-# ## Workflow B: Edit Existing PPTX
-# When an existing PPTX is provided.
-# → Read `read_workflows(["edit-existing"])` to start.
+# Edit-existing-PPTX flow on Cloud is driven by upload_file returning
+# guideInstruction: "read_guides([\"import-pptx\"])" — the spec agent
+# follows that pointer instead of a hard-coded workflow name here.
 #
+# TODO: Add these workflows when web UI supports them
 # ## Workflow C: Hand-Edit Sync
 # When the user hand-edits the generated PPTX in PowerPoint and then asks for further changes.
 # → Read `read_workflows(["create-new-4-hand-edit-sync"])` to start.
@@ -207,18 +207,48 @@ def init_presentation(name: str) -> str:
 
 
 @mcp.tool()
-def analyze_template(template: str) -> str:
+def analyze_template(template: str, deck_id: str = "") -> str:
     """Get pre-analyzed template information — layouts, theme colors, fonts.
     Call this to understand what layouts are available before building slides.
 
     Args:
-        template: Template name from list_templates. Required.
+        template: Template name from list_templates, OR "template.pptx" to
+            analyze the deck-local placeholder template (set by import_attachment
+            during the import-pptx flow). When passing "template.pptx", deck_id
+            must also be supplied.
+        deck_id: Required only when template == "template.pptx" — identifies
+            the deck whose deck-local template.pptx should be analyzed.
 
     Returns:
         JSON with layouts, theme colors, and font information.
     """
     if not template or not template.strip():
         return json.dumps({"error": "template is required"})
+
+    # Deck-local placeholder template (PPTX-derived; copied by import_attachment
+    # during the import-pptx guide). Download from the deck workspace bucket
+    # and analyze on the fly so import-pptx Step 5 can extract theme colors
+    # and layouts without first registering the source PPTX as a sdpm template.
+    if template == "template.pptx":
+        if not deck_id:
+            return json.dumps({"error": "deck_id is required when template == 'template.pptx'"})
+        try:
+            import tempfile
+            from pathlib import Path
+            from sdpm.analyzer import analyze_template as _analyze
+            data = _storage.download_file_from_pptx_bucket(f"decks/{deck_id}/template.pptx")
+            # TemporaryDirectory (not mkdtemp): this server is long-running,
+            # leaked tmpdirs would accumulate. The analysis dict holds no
+            # file references, so cleanup on exit is safe.
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tpl_path = Path(tmpdir) / "template.pptx"
+                tpl_path.write_bytes(data)
+                analysis = _analyze(tpl_path)
+            analysis["templateName"] = "template.pptx"
+            return json.dumps(analysis, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"error": f"Failed to analyze deck-local template: {e}"})
+
     return json.dumps(
         template_mod.analyze_template(template_name=template, storage=_storage, user_id=_get_user_id()),
         ensure_ascii=False,
@@ -613,8 +643,8 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
 
     If deck_id is provided, the entire deck workspace is loaded as files:
         deck.json           — deck metadata (template, fonts, defaultTextColor)
-        slides/{slug}.json  — per-slide data (read/write via json.load/json.dump)
-        specs/brief.md     — briefing document
+        slides/{slug}.json  — per-slide data
+        specs/brief.md      — briefing document
         specs/art-direction.html — design direction (HTML)
         specs/outline.md    — slide outline (1 line = 1 slide = 1 message)
         includes/           — code block JSON files (created by code_to_slide)
@@ -622,7 +652,22 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
 
     Legacy decks with presentation.json are also supported (read-only compat).
 
-    All files are accessible via normal file I/O (open, read, write).
+    ## Sandbox helpers (preferred — identical API on Local and Cloud)
+
+        read_json(path)          → dict/list   Read a JSON file
+        write_json(path, data)   → None        Write data as JSON
+        read_text(path)          → str         Read a text file
+        write_text(path, text)   → None        Write a text file
+        list_files(subdir=".")   → list[str]   List filenames in a subdirectory
+
+    All paths are relative to the deck root. The helpers are injected
+    automatically — do NOT write `from _sdpm_helpers import ...` yourself;
+    the import is prepended by the sandbox. Using the helpers keeps the
+    same code portable between Local (AST-restricted) and Cloud.
+
+    Raw `open()` / `json.load` still work on Cloud for backward compat,
+    but new code should prefer the helpers.
+
     If save=True, all modified/new workspace files are written back to S3.
 
     **Always specify measure_slides when editing slides.** Runs validation after
@@ -637,12 +682,25 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     Example: files=["uploads/tmp/user/abc/data.csv"] → accessible as "data.csv" in code.
 
     Examples:
-        Edit slides:   run_python(code="...", deck_id="abc", save=True, measure_slides=["title", "feature-a"])
-        Edit specs:    run_python(code="open('specs/brief.md','w').write('...')", deck_id="abc", save=True)
-        Measure only:  run_python(code="print('ok')", deck_id="abc", measure_slides=["title"])
-        Compute:       run_python(code="print(2**100)")
-        CSV:           run_python(code="import pandas as pd; print(pd.read_csv('data.csv'))",
-                                  files=["uploads/tmp/user/x/data.csv"])
+        Edit slide:
+            data = read_json("slides/title.json")
+            data["elements"][0]["text"] = "New Title"
+            write_json("slides/title.json", data)
+            # run_python(code=<above>, deck_id="abc", save=True, measure_slides=["title"])
+
+        Edit spec:
+            write_text("specs/brief.md", "# Brief\\n\\nContents...")
+            # run_python(code=<above>, deck_id="abc", save=True)
+
+        Read deck metadata:
+            deck = read_json("deck.json")
+            print(deck.get("template"))
+
+        List slide files:
+            print(list_files("slides"))
+
+        General computation (no deck_id):
+            print(2 ** 100)
 
     Args:
         code: Python code to execute.

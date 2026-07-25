@@ -198,17 +198,37 @@ def _prepare_workspace(
 
     # Resolve template
     template_key = ""
+    template_path = tmpdir / "template.pptx"
     tmpl_name = presentation.get("template", "")
+    # Deck-local placeholder template (PPTX-derived; copied by import_attachment).
+    # When deck.json["template"] == "template.pptx", read decks/{deck_id}/template.pptx
+    # from the deck workspace bucket instead of treating it as a sdpm template name.
+    if tmpl_name == "template.pptx":
+        deck_template_key = f"decks/{deck_id}/template.pptx"
+        try:
+            template_path.write_bytes(
+                storage.download_file_from_pptx_bucket(deck_template_key),
+            )
+        except Exception as e:
+            # Do NOT fall back to a stock template: imported decks reference
+            # layout names from the original PPTX, so building with a stock
+            # template would fail later with an obscure layout mismatch.
+            raise ValueError(
+                f"Deck template not found: {deck_template_key}. "
+                "This deck was imported from a PPTX and requires its own "
+                "template.pptx. Re-import the PPTX to restore it."
+            ) from e
+        tmpl_name = ""  # signal: resolved
     if tmpl_name:
         normalized = tmpl_name.removesuffix(".pptx")
         for t in storage.list_templates():
             if t.get("name") == normalized:
                 template_key = t.get("s3Key", "")
                 break
-    if not template_key:
-        template_key = deck.get("templateS3Key", "templates/blank-dark.pptx")
-    template_path = tmpdir / "template.pptx"
-    template_path.write_bytes(storage.download_file(key=template_key))
+    if not template_path.exists():
+        if not template_key:
+            template_key = deck.get("templateS3Key", "templates/blank-dark.pptx")
+        template_path.write_bytes(storage.download_file(key=template_key))
 
     # Fonts
     fonts = presentation.get("fonts") or deck.get("fonts")

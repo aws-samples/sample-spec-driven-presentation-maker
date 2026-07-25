@@ -30,7 +30,12 @@ from pathlib import Path
 from mcp.server.fastmcp.utilities.types import Image
 from PIL import Image as PILImage
 
-from shared.ingest import IMAGE_EXTS, TEXT_EXTS, convert_file
+from shared.ingest import (
+    IMAGE_EXTS,
+    TEXT_EXTS,
+    PPTX_GUIDE_INSTRUCTION as _GUIDE_INSTRUCTION,
+    convert_file,
+)
 
 _JPEG_QUALITY = 80
 _MAX_LONG_EDGE = 1280
@@ -49,8 +54,10 @@ def _convert_webp_to_png(data: bytes) -> bytes:
 
 
 def _deck_root() -> Path:
-    root = os.environ.get("SDPM_DECK_ROOT", "")
-    return Path(root) if root else Path.home() / "Documents" / "SDPM-Presentations"
+    env_value = os.environ.get("SDPM_DECK_ROOT", "").strip()
+    if env_value:
+        return Path(env_value)
+    return Path.home() / "Documents" / "SDPM-Presentations"
 
 
 def _session_dir(session_id: str) -> Path:
@@ -131,6 +138,7 @@ def _analyze_colors(file_path: Path) -> dict | None:
         return None
 
 
+
 def upload_file(session_id: str, file_path: str, filename: str = "") -> str:
     """Convert and store a file in session storage.
 
@@ -140,7 +148,15 @@ def upload_file(session_id: str, file_path: str, filename: str = "") -> str:
         filename: Original filename (defaults to basename of file_path).
 
     Returns:
-        JSON with {uploadId, fileName, fileType, status, filePath?, colorAnalysis?}.
+        JSON with {uploadId, fileName, fileType, status, warnings?, filePath?, colorAnalysis?}.
+
+        For PPTX uploads that successfully converted to deck structure, the
+        response additionally contains:
+            guide: "import-pptx"
+            guideInstruction: <intent-branching hint for the agent>
+            suggestedName: file stem
+            slideCount: number of slides
+            themeHints: {backgroundLuminance, accentColors, fonts}
     """
     src = Path(file_path)
     if not src.exists():
@@ -161,6 +177,7 @@ def upload_file(session_id: str, file_path: str, filename: str = "") -> str:
         "warnings": [],
     }
 
+    conversion_result = None  # shared.ingest.ConversionResult or None
     try:
         # Passthrough: images/text — just copy the raw file
         if ext in IMAGE_EXTS or ext in TEXT_EXTS:
@@ -169,13 +186,18 @@ def upload_file(session_id: str, file_path: str, filename: str = "") -> str:
             meta["rawFile"] = original_name
         else:
             # Convert via shared pipeline
-            result = convert_file(src, upload_dir)
-            if result.status == "error":
+            conversion_result = convert_file(src, upload_dir)
+            if conversion_result.status == "error":
                 meta["status"] = "error"
-                meta["error"] = result.error or "Conversion failed"
+                meta["error"] = conversion_result.error or "Conversion failed"
             else:
                 meta["status"] = "converted"
-                meta["warnings"] = result.warnings
+                meta["warnings"] = conversion_result.warnings
+                if conversion_result.deck_structure:
+                    meta["deckStructure"] = True
+                    meta["slideCount"] = conversion_result.slide_count
+                    meta["themeHints"] = conversion_result.theme_hints
+                    meta["suggestedName"] = conversion_result.suggested_name
     except Exception as e:
         meta["status"] = "error"
         meta["error"] = str(e)
@@ -198,16 +220,19 @@ def upload_file(session_id: str, file_path: str, filename: str = "") -> str:
     if meta["status"] == "completed":
         response["filePath"] = str((upload_dir / original_name).resolve())
     elif meta["status"] == "converted":
-        stem = original_name.rsplit(".", 1)[0] if "." in original_name else original_name
-        md_path = upload_dir / f"{stem}.md"
-        json_path = upload_dir / "slides.json"
-        if md_path.exists():
-            response["filePath"] = str(md_path.resolve())
-        elif json_path.exists():
-            response["filePath"] = str(json_path.resolve())
-        images_dir = upload_dir / "images"
-        if images_dir.exists():
-            response["imagesDir"] = str(images_dir.resolve())
+        # Deck-structure PPTX: filePath would only point at deck.json and miss
+        # slides/, so the guide/themeHints fields below replace it.
+        if conversion_result is None or not conversion_result.deck_structure:
+            stem = original_name.rsplit(".", 1)[0] if "." in original_name else original_name
+            md_path = upload_dir / f"{stem}.md"
+            json_path = upload_dir / "slides.json"
+            if md_path.exists():
+                response["filePath"] = str(md_path.resolve())
+            elif json_path.exists():
+                response["filePath"] = str(json_path.resolve())
+            images_dir = upload_dir / "images"
+            if images_dir.exists():
+                response["imagesDir"] = str(images_dir.resolve())
 
     # Color analysis for images
     if file_type.startswith("image/") and meta["status"] == "completed":
@@ -215,6 +240,13 @@ def upload_file(session_id: str, file_path: str, filename: str = "") -> str:
         if colors:
             response["colorAnalysis"] = colors
 
+    # PPTX deck-structure: include guide hints for the agent
+    if conversion_result is not None and conversion_result.deck_structure:
+        response["guide"] = "import-pptx"
+        response["guideInstruction"] = _GUIDE_INSTRUCTION
+        response["suggestedName"] = conversion_result.suggested_name
+        response["slideCount"] = conversion_result.slide_count
+        response["themeHints"] = conversion_result.theme_hints
     return json.dumps(response, ensure_ascii=False)
 
 
@@ -243,6 +275,28 @@ def _format_cat_n(text: str, file_name: str, offset: int, limit: int) -> str:
     body = "\n".join(numbered)
     footer = f"\n\n[Continue reading: call with offset={end}]" if end < total else ""
     return f"{header}\n\n{body}{footer}"
+
+
+def _format_deck_text_summary(upload_dir: Path, file_name: str, offset: int, limit: int) -> str:
+    """Format a deck-structure upload (deck.json + slides/) as a markdown-style text summary.
+
+    Summary content comes from the engine (``sdpm.utils.deck_summary``);
+    this wrapper only performs filesystem I/O and cat -n pagination.
+    """
+    from sdpm.utils.deck_summary import deck_text_summary
+
+    slides_dir = upload_dir / "slides"
+    if not slides_dir.is_dir():
+        return f"No slides/ directory found in {file_name}."
+
+    slides: list[dict] = []
+    for slide_file in sorted(slides_dir.glob("slide-*.json")):
+        try:
+            slides.append(json.loads(slide_file.read_text(encoding="utf-8")))
+        except Exception:
+            slides.append({})  # keep slide numbering aligned with file order
+
+    return _format_cat_n(deck_text_summary(slides), file_name, offset, limit)
 
 
 def read_uploaded_file(upload_id: str, offset: int = 0, limit: int = 2000) -> list:
@@ -275,12 +329,34 @@ def read_uploaded_file(upload_id: str, offset: int = 0, limit: int = 2000) -> li
 
     # Converted (PDF/DOCX/XLSX/PPTX)
     if status == "converted":
+        # PPTX: deck structure — full text summary across slides
+        is_deck = (upload_dir / "deck.json").exists() and (upload_dir / "slides").is_dir()
+        if is_deck:
+            result.append(_format_deck_text_summary(upload_dir, file_name, offset, limit))
+            # Image previews (converter extracted slide images)
+            img_dir = upload_dir / "images"
+            if img_dir.exists():
+                imgs = sorted(img_dir.iterdir())
+                for i, img_file in enumerate(imgs):
+                    if i >= _MAX_IMAGE_PREVIEWS:
+                        result.append(f"({len(imgs) - i} more images not previewed)")
+                        break
+                    try:
+                        jpeg = _to_jpeg(img_file.read_bytes())
+                        result.append(f"Extracted image: {img_file.name}")
+                        result.append(Image(data=jpeg, format="jpeg"))
+                    except Exception:
+                        continue
+            if warning_text:
+                result.append(warning_text)
+            return result
         # Try Markdown
         stem = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
         md_path = upload_dir / f"{stem}.md"
         if md_path.exists():
             result.append(_format_cat_n(md_path.read_text(encoding="utf-8"), file_name, offset, limit))
-        # Try PPTX JSON
+        # Try PPTX JSON (legacy slides.json — kept for backward compat; deck structure is
+        # handled by the is_deck branch above).
         json_path = upload_dir / "slides.json"
         if not result and json_path.exists():
             pretty = json.dumps(json.loads(json_path.read_text(encoding="utf-8")), ensure_ascii=False, indent=2)
@@ -349,7 +425,7 @@ def _import_from_upload(upload_id: str, deck_id: str, filename: str) -> str:
     file_type = meta.get("fileType", "")
 
     short_id = uuid.uuid4().hex[:8]
-    result: dict = {"source": upload_id, "files": [], "image_mapping": {}}
+    result: dict = {"source": upload_id, "files": [], "image_mapping": {}, "shortId": short_id}
 
     images_dir = deck_dir / "images"
     attachments_dir = deck_dir / "attachments"
@@ -366,19 +442,33 @@ def _import_from_upload(upload_id: str, deck_id: str, filename: str) -> str:
                     shutil.copy2(img, images_dir / dest_name)
                     result["files"].append(f"images/{dest_name}")
                     result["image_mapping"][img.name] = f"images/{dest_name}"
+            elif src_file.is_dir():
+                # Preserve directory structure (e.g. slides/) under
+                # attachments/{shortId}/{name}/ so agents can walk it.
+                dest_subdir = attachments_dir / short_id / src_file.name
+                dest_subdir.mkdir(parents=True, exist_ok=True)
+                for child in src_file.iterdir():
+                    if child.is_file():
+                        shutil.copy2(child, dest_subdir / child.name)
+                        result["files"].append(
+                            f"attachments/{short_id}/{src_file.name}/{child.name}"
+                        )
             elif src_file.is_file():
+                # PPTX-derived placeholder template lives at deck/template.pptx
+                # so pptx_builder can resolve it via the deck-local relative path.
+                if src_file.name == "template.pptx":
+                    shutil.copy2(src_file, deck_dir / "template.pptx")
+                    result["files"].append("template.pptx")
+                    result["templatePath"] = "template.pptx"
+                    continue
                 attachments_dir.mkdir(exist_ok=True)
-                if src_file.name == "slides.json":
-                    dest_name = f"{short_id}_{file_name.rsplit('.', 1)[0]}.json"
-                    shutil.copy2(src_file, attachments_dir / dest_name)
-                    result["files"].append(f"attachments/{dest_name}")
-                    result["json"] = f"attachments/{dest_name}"
-                else:
-                    dest_name = f"{short_id}_{src_file.name}"
-                    shutil.copy2(src_file, attachments_dir / dest_name)
-                    result["files"].append(f"attachments/{dest_name}")
-                    if src_file.suffix == ".md":
-                        result["markdown"] = f"attachments/{dest_name}"
+                dest_name = f"{short_id}_{src_file.name}"
+                shutil.copy2(src_file, attachments_dir / dest_name)
+                result["files"].append(f"attachments/{dest_name}")
+                if src_file.suffix == ".md":
+                    result["markdown"] = f"attachments/{dest_name}"
+                if src_file.name == "deck.json":
+                    result["deckJson"] = f"attachments/{dest_name}"
         return json.dumps(result, ensure_ascii=False)
 
     if status == "completed":

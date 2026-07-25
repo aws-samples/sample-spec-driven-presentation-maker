@@ -27,3 +27,4 @@ from .elements import (extract_shape_element as extract_shape_element,
 from .table import extract_table_element as extract_table_element
 from .chart import extract_chart_element as extract_chart_element
 from .constants import _NS as _NS, EMU_PER_PX as EMU_PER_PX
+from .template import extract_placeholder_template as extract_placeholder_template

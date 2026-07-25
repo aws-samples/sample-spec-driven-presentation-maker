@@ -27,6 +27,7 @@ import sandbox_tools  # noqa: E402
 import tools  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 from upload_tools import import_attachment as _import_attachment  # noqa: E402
+from upload_tools import upload_file as _upload_file  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Instructions
@@ -50,8 +51,11 @@ When no existing PPTX is provided.
 
 ## Workflow B: Edit Existing PPTX
 
-When an existing PPTX is provided.
-→ Read `read_workflows(["edit-existing"])` to start.
+When an existing PPTX is provided. Call `upload_file(file_path)` first —
+for PPTX it converts the file into a deck structure and the response
+contains `guideInstruction: "read_guides([\"import-pptx\"])"`, so just
+follow that instruction. (Web UI / API uploads return the same fields
+automatically.)
 
 ## Workflow C: Hand-Edit Sync
 
@@ -94,6 +98,7 @@ mcp.tool()(tools.code_to_slide)
 mcp.tool()(tools.grid)
 mcp.tool()(tools.arch_diagram)
 mcp.tool()(tools.pptx_to_json)
+mcp.tool()(tools.diff_pptx)
 
 # Sandbox tools (shared)
 mcp.tool()(sandbox_tools.run_python)
@@ -103,6 +108,31 @@ mcp.tool()(sandbox_tools.run_style_python)
 # ---------------------------------------------------------------------------
 # MCP-specific tools (overrides or additions)
 # ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def upload_file(file_path: str, filename: str = "") -> str:
+    """Convert and stage a local file for deck import.
+
+    For PPTX: converts the file into a deck structure (deck.json +
+    slides/*.json + images/ + placeholder template) and returns an
+    `uploadId` plus `guideInstruction` — follow that instruction
+    (typically `read_guides(["import-pptx"])`), then import into a deck
+    via `import_attachment(source=uploadId, deck_id=...)`.
+
+    Other file types (images, documents) are converted/staged the same
+    way for later `import_attachment`.
+
+    Args:
+        file_path: Absolute path to the source file.
+        filename: Original filename (defaults to basename of file_path).
+
+    Returns:
+        JSON with {uploadId, fileName, fileType, status, warnings?} and,
+        for PPTX converted to deck structure, additionally
+        {guide, guideInstruction, suggestedName, slideCount, themeHints}.
+    """
+    return _upload_file(session_id="mcp-local", file_path=file_path, filename=filename)
 
 
 @mcp.tool()

@@ -50,13 +50,15 @@ function handleLine(ps: ProcessState, line: string) {
   let msg: Record<string, unknown>
   try { msg = JSON.parse(line) } catch { return }
 
-  // JSON-RPC response
+  // JSON-RPC response — resolve the pending promise, then fall through
+  // so the end_turn detection below can flip ps.running back to false.
+  // Returning here would short-circuit reuse: each turn would spawn a fresh
+  // process, dropping the prior turn's context (read_guides, upload result,
+  // hearing answers) and making the agent appear to drift back into Phase 1.
   if (msg.id != null && ps.pending.has(msg.id as number)) {
     const resolve = ps.pending.get(msg.id as number)!
     ps.pending.delete(msg.id as number)
     resolve(msg.result)
-    for (const fn of ps.listeners) fn(msg)
-    return
   }
 
   // Auto-approve permission requests
