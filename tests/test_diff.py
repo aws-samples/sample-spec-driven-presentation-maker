@@ -98,5 +98,75 @@ class TestDiffDeckDirBaseline:
         assert "ADDED" in result["report"]
 
 
+class TestDiffSourceJsonBaseline:
+    """Regression tests for the source-JSON baseline path.
+
+    ``load_slides_json_or_pptx`` builds a PPTX from a source slides JSON
+    (template + builder elements) before diffing. This path once crashed
+    with ``ImportError: cannot import name '_get_templates_dirs'`` because
+    the import didn't match the actual ``sdpm.api.get_templates_dirs`` name
+    (PR #215 follow-up, R1) — no test exercised it.
+    """
+
+    @pytest.fixture()
+    def source_json(self, tmp_path: Path) -> Path:
+        path = tmp_path / "source.json"
+        path.write_text(json.dumps({
+            "template": "blank-dark.pptx",
+            "fonts": {"fullwidth": "Meiryo", "halfwidth": "Arial"},
+            "defaultTextColor": "#FFFFFF",
+            "slides": [
+                {
+                    "layout": "Blank",
+                    "elements": [
+                        {"type": "textbox", "text": "Source Title", "x": 100, "y": 100,
+                         "width": 800, "height": 80, "fontSize": 32},
+                    ],
+                },
+            ],
+        }))
+        return path
+
+    def test_source_json_baseline_loads(self, source_json: Path) -> None:
+        """Named-template resolution (get_templates_dirs) must not crash."""
+        from sdpm.diff import load_slides_json_or_pptx
+
+        baseline = load_slides_json_or_pptx(str(source_json))
+        assert baseline["slides"], "source JSON baseline produced no slides"
+
+    def test_source_json_baseline_diff_detects_edit(
+        self, source_json: Path, tmp_path: Path,
+    ) -> None:
+        """End-to-end: pptx_builder.py diff <source.json> <edited.pptx>."""
+        from sdpm.api import _find_template_in_dirs, get_templates_dirs
+        from sdpm.builder import PPTXBuilder
+
+        template = _find_template_in_dirs("blank-dark.pptx", get_templates_dirs())
+        assert template is not None
+        data = json.loads(source_json.read_text())
+        builder = PPTXBuilder(template, fonts=data["fonts"],
+                              base_dir=source_json.parent,
+                              default_text_color=data["defaultTextColor"])
+        for slide_def in data["slides"]:
+            builder.add_slide(slide_def)
+        pptx = tmp_path / "built.pptx"
+        builder.save(pptx)
+
+        from pptx import Presentation
+        prs = Presentation(str(pptx))
+        edited = False
+        for shape in prs.slides[0].shapes:
+            if shape.has_text_frame and "Source Title" in shape.text_frame.text:
+                shape.text_frame.paragraphs[0].runs[0].text = "Edited Source Title"
+                edited = True
+        assert edited, "fixture text not found in built PPTX"
+        edited_pptx = tmp_path / "edited.pptx"
+        prs.save(str(edited_pptx))
+
+        result = diff_report(str(source_json), edited_pptx)
+        assert result["has_diff"] is True
+        assert "Edited Source Title" in result["report"]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
