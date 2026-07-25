@@ -5,6 +5,23 @@ import type { UploadedFile } from "@/services/uploadService"
 
 /** Build [Attached:...] marker string for a single file. */
 export function buildAttachedMarker(file: UploadedFile): string {
+  // PPTX deck-structure: when upload_file produced a guide hint, include
+  // it inline so the agent branches into the import-pptx guide instead of
+  // probing list_workflows or treating the upload as generic reference
+  // material. uploadId is still surfaced so the agent can call
+  // import_attachment / read_uploaded_file later.
+  if (file.guide && file.guideInstruction) {
+    const parts = [
+      `uploadId: ${file.uploadId}`,
+      `guide: ${file.guide}`,
+      `guideInstruction: ${JSON.stringify(file.guideInstruction)}`,
+    ]
+    if (file.suggestedName) parts.push(`suggestedName: "${file.suggestedName}"`)
+    if (typeof file.slideCount === "number") parts.push(`slideCount: ${file.slideCount}`)
+    if (file.themeHints) parts.push(`themeHints: ${JSON.stringify(file.themeHints)}`)
+    return `[Attached: ${file.fileName} (${parts.join(", ")})]`
+  }
+
   if (IS_LOCAL && file.filePath) {
     const parts = [`path: "${file.filePath}"`]
     if (file.imagesDir) parts.push(`images: "${file.imagesDir}"`)
