@@ -151,6 +151,39 @@ class TestConvertPptxThemeHints:
         assert 0.0 <= result.theme_hints["backgroundLuminance"] <= 1.0
 
 
+class TestThemeHintsDdbItem:
+    """theme_hints_ddb_item must tolerate theme_hints=None (PR #215 follow-up, R2).
+
+    shared.ingest._convert_pptx returns theme_hints=None (with deck_structure=True)
+    when theme extraction fails; the Cloud upload path once crashed with
+    AttributeError on ``None.get`` — turning a successful conversion into
+    "Conversion failed".
+    """
+
+    def test_none_theme_hints_returns_empty_defaults(self) -> None:
+        from shared.schema import theme_hints_ddb_item
+
+        item = theme_hints_ddb_item(None)
+        assert item["backgroundLuminance"] is None
+        assert item["accentColors"] == []
+        assert item["fonts"] == {}
+
+    def test_populated_theme_hints_converts_luminance_to_decimal(self) -> None:
+        from decimal import Decimal
+
+        from shared.schema import theme_hints_ddb_item
+
+        item = theme_hints_ddb_item({
+            "backgroundLuminance": 0.12,
+            "accentColors": ["#FF0000"],
+            "fonts": {"halfwidth": "Arial"},
+        })
+        assert isinstance(item["backgroundLuminance"], Decimal)
+        assert item["backgroundLuminance"] == Decimal("0.12")
+        assert item["accentColors"] == ["#FF0000"]
+        assert item["fonts"] == {"halfwidth": "Arial"}
+
+
 # ---------------------------------------------------------------------------
 # T3: Local upload_file returns guide/guideInstruction for PPTX
 # ---------------------------------------------------------------------------

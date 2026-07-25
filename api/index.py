@@ -37,6 +37,7 @@ from shared.schema import (
     DECK_SK_PREFIX, FAV_SK_PREFIX,
     extract_deck_id, extract_fav_id,
     GSI_PUBLIC_DECKS, public_gsi1pk,
+    theme_hints_ddb_item,
 )
 
 # Environment variables
@@ -1591,15 +1592,12 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
                     # PPTX deck-structure metadata — stored for the edit guide
                     # and returned by process_upload / get_upload_status.
                     if result.deck_structure:
-                        from decimal import Decimal
-                        bg_lum = result.theme_hints.get("backgroundLuminance")
+                        # theme_hints may be None when theme extraction failed
+                        # (ingest logs a warning and continues) — the helper
+                        # guards so a successful conversion is not reported
+                        # as failed.
                         update_expr_parts.append("themeHints = :th")
-                        expr_values[":th"] = {
-                            # DynamoDB rejects native floats; round-trip via str(Decimal).
-                            "backgroundLuminance": Decimal(str(bg_lum)) if bg_lum is not None else None,
-                            "accentColors": result.theme_hints.get("accentColors", []),
-                            "fonts": result.theme_hints.get("fonts", {}),
-                        }
+                        expr_values[":th"] = theme_hints_ddb_item(result.theme_hints)
                         update_expr_parts.append("slideCount = :sc")
                         expr_values[":sc"] = result.slide_count
                         update_expr_parts.append("suggestedName = :sn")
