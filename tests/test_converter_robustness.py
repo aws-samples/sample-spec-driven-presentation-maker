@@ -1044,3 +1044,49 @@ class TestGroupLineTransform:
         assert (line["x2"], line["y2"]) == (400, 400)
         # The buggy path also left width/height keys on lines — must not
         assert "width" not in line and "height" not in line
+
+
+class TestSubpixelGroupRawFallback:
+    """Icons in miniature nested coordinate systems vanished (0x0).
+
+    Vector icon art often nests groups whose chExt is a few hundred EMU
+    (sub-pixel units, scaled up ~274x by the parent xfrm). Px-rounded
+    flattening collapses every child to 0x0. Such groups now fall back
+    to raw XML injection; freeform detection is also recursive.
+    """
+
+    @staticmethod
+    def _make_deck(mutate_group):
+        import tempfile
+
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        a = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, E(0), E(0), E(635000), E(635000))
+        b = slide.shapes.add_shape(MSO_SHAPE.OVAL, E(635000), E(0), E(635000), E(635000))
+        group = slide.shapes.add_group_shape([a, b])
+        mutate_group(group)
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "t.pptx"
+            prs.save(p)
+            result = pptx_to_json(p, Path(td) / "out")
+        return next(e for s in result["slides"] for e in s["elements"] if e.get("type") == "group")
+
+    def test_subpixel_child_space_uses_raw_xml(self):
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        nsp = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+
+        def mutate(group):
+            xfrm = group._element.find(f"{nsp}grpSpPr/{ns}xfrm")
+            # Miniature child space: 1000x1000 EMU (≪ 1px) like icon art
+            xfrm.find(f"{ns}chOff").set("x", "0")
+            xfrm.find(f"{ns}chOff").set("y", "0")
+            xfrm.find(f"{ns}chExt").set("cx", "1000")
+            xfrm.find(f"{ns}chExt").set("cy", "1000")
+        g = self._make_deck(mutate)
+        assert "_groupXml" in g
+
+    def test_normal_group_still_flattened(self):
+        g = self._make_deck(lambda group: None)
+        assert "_groupXml" not in g

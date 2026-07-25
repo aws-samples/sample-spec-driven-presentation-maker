@@ -1230,11 +1230,33 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
     if rot is not None:
         elem["rotation"] = rot
 
-    # Save raw XML for groups that can't be losslessly flattened
-    # (rotated groups, or groups with many freeforms like SVG icons)
-    has_freeforms = any(child._element.tag.endswith('}sp') and
-                        child.shape_type == 5 for child in shape.shapes)
-    if rot is not None or has_freeforms:
+    # Save raw XML for groups that can't be losslessly flattened:
+    # rotated groups, groups containing freeforms (recursively — vector
+    # icon art nests them deep), and groups whose child coordinate space
+    # is sub-pixel (px-rounded flattening collapses everything to 0x0).
+    def _has_freeforms(g):
+        for child in g.shapes:
+            if child.shape_type == 6 and _has_freeforms(child):
+                return True
+            if child._element.tag.endswith('}sp') and child.shape_type == 5:
+                return True
+        return False
+
+    def _subpixel_children(g):
+        xf = g._element.find(f'{{{_NS["p"]}}}grpSpPr/{{{_NS["a"]}}}xfrm')
+        che = xf.find(f'{{{_NS["a"]}}}chExt') if xf is not None else None
+        if che is None:
+            return False
+        # chExt in EMU: below ~1px per unit means children live in a
+        # miniature coordinate system that px rounding destroys.
+        try:
+            return 0 < int(che.get('cx', '0')) < int(EMU_PER_PX * 10) or \
+                   0 < int(che.get('cy', '0')) < int(EMU_PER_PX * 10)
+        except Exception:
+            return False
+
+    has_freeforms = _has_freeforms(shape)
+    if rot is not None or has_freeforms or _subpixel_children(shape):
         try:
             from lxml import etree as _et
             elem["_groupXml"] = _et.tostring(shape._element, encoding='unicode')
