@@ -68,8 +68,11 @@ class TextboxMixin:
             tag = child.tag.split('}')[1]
             if tag in ('spAutoFit', 'noAutofit', 'normAutofit'):
                 bodyPr.remove(child)
-        if not elem.get("_noAutofit"):
-            tf.word_wrap = not auto_width
+        if auto_width:
+            # wrap=none is orthogonal to autofit — honor it even with _noAutofit
+            tf.word_wrap = False
+        elif not elem.get("_noAutofit"):
+            tf.word_wrap = True
         
         # Apply rotation
         rotation = elem.get("rotation", _DEFAULTS["rotation"])

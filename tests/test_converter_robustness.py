@@ -739,3 +739,62 @@ class TestImportTextFidelity:
         assert shapes, "sized empty paragraphs should force paragraphs mode"
         paras = shapes[0]["paragraphs"]
         assert [pa.get("endFontSize") for pa in paras[1:]] == [16.0, 16.0]
+
+
+class TestTextSizingAndWrap:
+    """Two more label-fidelity bugs from a real deck.
+
+    - autoWidth (wrap=none) was ignored when the textbox also carried
+      _noAutofit, so no-wrap labels re-wrapped mid-word on rebuild
+    - runs with no explicit sz inherit the presentation default (spec
+      fallback 18pt), but rebuilt text got the builder default (14pt)
+    """
+
+    def test_autowidth_survives_noautofit(self):
+        import tempfile
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        from pptx.util import Emu as E
+        tb = slide.shapes.add_textbox(E(1270000), E(635000), E(1905000), E(444500))
+        tb.text_frame.text = "シナリオ開発プロセス"
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        body = tb.text_frame._txBody.find(f"{ns}bodyPr")
+        body.set("wrap", "none")
+        from lxml import etree
+        etree.SubElement(body, f"{ns}noAutofit")
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "t.pptx"
+            prs.save(src)
+            result = pptx_to_json(src, Path(td) / "out")
+            el = next(e for s in result["slides"] for e in s["elements"] if e.get("type") == "textbox")
+            assert el.get("autoWidth") is True
+            el["_noAutofit"] = True  # coexists with autoWidth on real decks
+            # Rebuild and confirm wrap=none survives
+            from sdpm.builder import PPTXBuilder
+            b = PPTXBuilder(_template(), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"},
+                            default_text_color="#000000")
+            b.add_slide({"layout": "Blank", "elements": [el]})
+            out = Path(td) / "rebuilt.pptx"
+            b.save(out)
+            reprs = Presentation(str(out))
+            tb2 = next(sh for sh in reprs.slides[0].shapes if sh.has_text_frame and "シナリオ" in sh.text_frame.text)
+            body2 = tb2.text_frame._txBody.find(f"{ns}bodyPr")
+            assert body2.get("wrap") == "none"
+
+    def test_unsized_runs_get_inherited_default(self):
+        import tempfile
+
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, E(1270000), E(635000), E(5080000), E(952500))
+        sp.text_frame.text = "運用者がワークフローエディタを用いて作成"
+        # no explicit run size — inherits presentation default (18pt fallback)
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "t.pptx"
+            prs.save(src)
+            result = pptx_to_json(src, Path(td) / "out")
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if e.get("type") == "shape" and "運用者" in str(e.get("text", "")))
+        assert el.get("fontSize") == 18

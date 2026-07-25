@@ -106,6 +106,28 @@ def _detect_font_size(paragraphs):
     return most_common
 
 
+def _inherited_default_size(shape):
+    """Effective size for runs with no explicit sz anywhere in the shape.
+
+    Non-placeholder shape text inherits from presentation.xml
+    defaultTextStyle; absent that, the OOXML spec default for defRPr sz
+    is 1800 (18pt). The builder's shape default is 14pt, so the inherited
+    size must be made explicit or rebuilt text shrinks.
+    """
+    try:
+        pres = shape.part.package.presentation_part._element
+        dts = pres.find(f'{{{_NS["p"]}}}defaultTextStyle')
+        if dts is not None:
+            l1 = dts.find(f'{{{_NS["a"]}}}lvl1pPr')
+            d = l1.find(f'{{{_NS["a"]}}}defRPr') if l1 is not None else None
+            if d is not None and d.get('sz'):
+                sz = int(d.get('sz')) / 100
+                return int(sz) if sz == int(sz) else sz
+    except Exception:
+        pass
+    return 18
+
+
 _ALIGN_MAP = {1: "left", 2: "center", 3: "right", 4: "justify"}
 
 def _get_alignment(paragraph):
@@ -174,6 +196,11 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
     # Skip default_font_size if shape has lstStyle (sizes handled by lstStyle)
     has_lstStyle = _serialize_lstStyle(shape) is not None
     default_font_size = None if has_lstStyle else _detect_font_size(paragraphs_with_text)
+    if (default_font_size is None and not has_lstStyle and paragraphs_with_text
+            and any(r.font.size is None for para in paragraphs_with_text for r in para.runs)):
+        # Runs without explicit sz inherit the presentation default (spec
+        # fallback 18pt) — make it explicit or the builder default applies.
+        default_font_size = _inherited_default_size(shape)
 
     if _has_bullets(paragraphs_with_text):
         # Check if all text paragraphs have bullets — if mixed, use text mode
