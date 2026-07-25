@@ -182,6 +182,34 @@ def add_svg_to_slide(slide, svg_bytes: bytes, x, y, width, height):
     from pptx.opc.package import Part
     from pptx.opc.packuri import PackURI
 
+    # OOXML <a:stretch> fills the frame exactly (distorting aspect), but
+    # SVG renderers letterbox by default — and LibreOffice ignores
+    # preserveAspectRatio="none". Bake the distortion into the SVG itself:
+    # reshape the viewBox to the frame aspect and scale the content.
+    try:
+        root = etree.fromstring(svg_bytes)
+        vb = root.get('viewBox')
+        if vb and width and height:
+            parts = [float(v) for v in vb.replace(',', ' ').split()]
+            if len(parts) == 4 and parts[2] > 0 and parts[3] > 0:
+                vb_ratio = parts[2] / parts[3]
+                frame_ratio = width / height
+                if abs(vb_ratio - frame_ratio) / max(vb_ratio, frame_ratio) > 0.02:
+                    new_h = parts[2] / frame_ratio
+                    sy = new_h / parts[3]
+                    g = etree.SubElement(root, '{http://www.w3.org/2000/svg}g')
+                    g.set('transform', f'translate(0 {-parts[1] * sy + parts[1]:g}) scale(1 {sy:g})')
+                    for child in list(root):
+                        if child is not g:
+                            root.remove(child)
+                            g.append(child)
+                    root.set('viewBox', f'{parts[0]:g} {parts[1]:g} {parts[2]:g} {new_h:g}')
+        if root.get('preserveAspectRatio') is None:
+            root.set('preserveAspectRatio', 'none')
+        svg_bytes = etree.tostring(root)
+    except Exception:
+        pass
+
     slide_part = slide.part
 
     idx = 1

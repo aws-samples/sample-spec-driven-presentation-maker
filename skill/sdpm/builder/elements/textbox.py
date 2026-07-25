@@ -231,14 +231,19 @@ class TextboxMixin:
         
         # Apply line spacing (single-text) - must be before buNone in pPr
         lnSpcPct = elem.get("lineSpacingPct")
-        if lnSpcPct:
+        lnSpcPt = elem.get("lineSpacingPt")
+        if lnSpcPct or lnSpcPt:
             from lxml import etree as _et
             from pptx.oxml.ns import qn as _qn
             for p in tf.paragraphs:
                 pPr = p._element.get_or_add_pPr()
                 lnSpc = _et.Element(_qn('a:lnSpc'))
-                spcPct = _et.SubElement(lnSpc, _qn('a:spcPct'))
-                spcPct.set('val', str(lnSpcPct))
+                if lnSpcPt:
+                    spcEl = _et.SubElement(lnSpc, _qn('a:spcPts'))
+                    spcEl.set('val', str(int(lnSpcPt * 100)))
+                else:
+                    spcEl = _et.SubElement(lnSpc, _qn('a:spcPct'))
+                    spcEl.set('val', str(lnSpcPct))
                 pPr.insert(0, lnSpc)
         
         # Apply character spacing

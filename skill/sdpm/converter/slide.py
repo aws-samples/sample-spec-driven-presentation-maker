@@ -184,7 +184,39 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                         slide_w, slide_h = 1920, 1080
                     grad = bgPr.find(f'{{{_NS["a"]}}}gradFill')
                     blip_fill = bgPr.find(f'{{{_NS["a"]}}}blipFill')
-                    if grad is not None:
+                    patt = bgPr.find(f'{{{_NS["a"]}}}pattFill')
+                    if patt is not None:
+                        # Pattern background (e.g. dotGrid graph paper): the
+                        # builder supports patternFill on shapes, so emit a
+                        # full-slide rectangle at the bottom of the z-order.
+                        from .color import _resolve_color_with_transforms
+
+                        def _patt_color(tag, default):
+                            clr = patt.find(f'{{{_NS["a"]}}}{tag}')
+                            if clr is None:
+                                return default
+                            srgb_c = clr.find(f'{{{_NS["a"]}}}srgbClr')
+                            if srgb_c is not None:
+                                return f"#{srgb_c.get('val')}"
+                            scheme_c = clr.find(f'{{{_NS["a"]}}}schemeClr')
+                            if scheme_c is not None:
+                                return _resolve_color_with_transforms(
+                                    scheme_c, theme_colors, color_mapping) or default
+                            return default
+
+                        bg_extra_element = {
+                            "type": "shape",
+                            "shape": "rectangle",
+                            "x": 0, "y": 0, "width": slide_w, "height": slide_h,
+                            "patternFill": {
+                                "pattern": patt.get('prst', 'dotGrid'),
+                                "fgColor": _patt_color('fgClr', '#D9D9D9'),
+                                "bgColor": _patt_color('bgClr', '#FFFFFF'),
+                            },
+                            "line": "none",
+                            "_noEffects": True,
+                        }
+                    elif grad is not None:
                         from .xml_helpers import _extract_fill_from_xml
                         fill_info = _extract_fill_from_xml(bgPr, theme_colors, color_mapping)
                         if fill_info.get("gradient"):

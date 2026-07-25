@@ -838,6 +838,11 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
             lnSpc_pct = pPr.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}lnSpc/{http://schemas.openxmlformats.org/drawingml/2006/main}spcPct')
             if lnSpc_pct is not None:
                 elem["lineSpacingPct"] = int(lnSpc_pct.get('val'))
+            # Fixed-point spacing (spcPts) — e.g. a 48pt title with 31.2pt
+            # spacing renders much higher/tighter than the default.
+            lnSpc_pts = pPr.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}lnSpc/{http://schemas.openxmlformats.org/drawingml/2006/main}spcPts')
+            if lnSpc_pts is not None:
+                elem["lineSpacingPt"] = int(lnSpc_pts.get('val')) / 100
     
     # Extract visual effects
     try:
@@ -978,6 +983,28 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
     # Check for SVG (asvg:svgBlip)
     svg_bytes = _extract_svg_blob(shape)
     if svg_bytes is not None:
+        # PowerPoint crops via blipFill srcRect; SVG frames lose it in the
+        # builder path, so bake the crop into the viewBox instead.
+        src_rect = shape._element.find(
+            f'{{{_NS["p"]}}}blipFill/{{{_NS["a"]}}}srcRect')
+        if src_rect is not None:
+            try:
+                from lxml import etree as _et
+                root = _et.fromstring(svg_bytes)
+                vb = root.get('viewBox')
+                if vb:
+                    mx, my, vw, vh = [float(v) for v in vb.replace(',', ' ').split()]
+                    pct = {k: int(src_rect.get(k, '0')) / 100000 for k in ('l', 't', 'r', 'b')}
+                    if any(pct.values()) and vw > 0 and vh > 0:
+                        nx = mx + pct['l'] * vw
+                        ny = my + pct['t'] * vh
+                        nw = vw * (1 - pct['l'] - pct['r'])
+                        nh = vh * (1 - pct['t'] - pct['b'])
+                        if nw > 0 and nh > 0:
+                            root.set('viewBox', f'{nx:g} {ny:g} {nw:g} {nh:g}')
+                            svg_bytes = _et.tostring(root)
+            except Exception:
+                pass
         if output_dir:
             images_dir = Path(output_dir) / "images"
             images_dir.mkdir(exist_ok=True)
@@ -987,6 +1014,8 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
         # Imported artwork keeps its own colors — opt out of the builder's
         # theme-icon recolor (which repainted e.g. green wave shapes black).
         elem["iconColor"] = "none"
+        _add_flip(elem, shape)
+        elem["fit"] = "stretch"
         return elem
     
     # Save image to file
@@ -1021,6 +1050,11 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
     # Mirrored pictures (flipH/flipV) — without this a cutout photo shows
     # its subject on the wrong side of the frame.
     _add_flip(elem, shape)
+
+    # PowerPoint's <a:stretch><a:fillRect/> fills the frame exactly,
+    # distorting aspect if needed. The builder default (contain) would
+    # shrink e.g. a full-width wave band into a left-anchored blob.
+    elem["fit"] = "stretch"
     
     # Extract image effects into _originalEffects (underscore-prefixed so builder
     # ignores them by default).  When reusing images in new slides, agents should

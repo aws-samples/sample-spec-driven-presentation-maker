@@ -1146,3 +1146,97 @@ class TestSlideFilenamePadding:
         # Lexicographic == numeric
         nums = [int(n.split("-")[1].split(".")[0]) for n in names]
         assert nums == sorted(nums)
+
+
+class TestP3FidelityFixes:
+    """Round-trip fixes found on a template deck's feature-cards slide."""
+
+    def _rt(self, mutate, tmp_path):
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        mutate(prs, slide)
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        return pptx_to_json(src, tmp_path / "out")
+
+    def test_fixed_point_line_spacing_extracted(self, tmp_path):
+        from pptx.util import Emu as E, Pt
+        from lxml import etree
+        from pptx.oxml.ns import qn
+
+        def mutate(prs, slide):
+            tb = slide.shapes.add_textbox(E(0), E(0), E(914400), E(457200))
+            tb.text_frame.text = "title"
+            tb.text_frame.paragraphs[0].font.size = Pt(48)
+            pPr = tb.text_frame.paragraphs[0]._p.get_or_add_pPr()
+            lnSpc = etree.SubElement(pPr, qn('a:lnSpc'))
+            etree.SubElement(lnSpc, qn('a:spcPts')).set('val', '3120')
+            pPr.insert(0, lnSpc)
+        result = self._rt(mutate, tmp_path)
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if e.get("type") == "textbox" and "title" in str(e.get("text", "")))
+        assert el.get("lineSpacingPt") == 31.2
+
+    def test_style_fontref_color_extracted(self, tmp_path):
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E
+        from lxml import etree
+        from pptx.oxml.ns import qn
+
+        def mutate(prs, slide):
+            sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, E(0), E(0), E(914400), E(457200))
+            sp.text_frame.text = "header"
+            # python-pptx's add_shape already writes a p:style — point its
+            # fontRef at accent1 (differs from the default text color).
+            fr = sp._element.find(qn('p:style') + '/' + qn('a:fontRef'))
+            for child in list(fr):
+                fr.remove(child)
+            etree.SubElement(fr, qn('a:schemeClr')).set('val', 'accent1')
+        result = self._rt(mutate, tmp_path)
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if "header" in str(e.get("text", "")))
+        # accent1 differs from the default text color, so it must be kept
+        assert el.get("fontColor", "").startswith("#")
+
+    def test_pattern_background_emitted(self, tmp_path):
+        from lxml import etree
+        from pptx.oxml.ns import qn
+
+        def mutate(prs, slide):
+            cSld = slide._element.find(qn('p:cSld'))
+            bg = etree.Element(qn('p:bg'))
+            bgPr = etree.SubElement(bg, qn('p:bgPr'))
+            patt = etree.SubElement(bgPr, qn('a:pattFill')); patt.set('prst', 'dotGrid')
+            fg = etree.SubElement(patt, qn('a:fgClr'))
+            etree.SubElement(fg, qn('a:srgbClr')).set('val', 'D9D9D9')
+            bgc = etree.SubElement(patt, qn('a:bgClr'))
+            etree.SubElement(bgc, qn('a:srgbClr')).set('val', 'FFFFFF')
+            etree.SubElement(bgPr, qn('a:effectLst'))
+            cSld.insert(0, bg)
+        result = self._rt(mutate, tmp_path)
+        els = [e for s in result["slides"] for e in s["elements"] if e.get("patternFill")]
+        assert els and els[0]["patternFill"]["pattern"] == "dotGrid"
+        assert els[0]["patternFill"]["fgColor"].upper() == "#D9D9D9"
+
+    def test_svg_srcrect_baked_into_viewbox(self, tmp_path):
+        # srcRect crop on an svgBlip pic must survive as a viewBox crop
+        svg = (b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">'
+               b'<path d="M0 128 1440 192" fill="#C21340"/></svg>')
+
+        def mutate(prs, slide):
+            from sdpm.utils.svg import add_svg_to_slide
+            from lxml import etree
+            from pptx.oxml.ns import qn
+            add_svg_to_slide(slide, svg, 0, 0, 4114800, 914400)  # ratio 4.5 = viewBox
+            pic = slide.shapes._spTree[-1]
+            bf = pic.find(qn('p:blipFill'))
+            sr = etree.SubElement(bf, qn('a:srcRect'))
+            sr.set('b', '43426')
+            blip = bf.find(qn('a:blip'))
+            blip.addnext(sr)
+        result = self._rt(mutate, tmp_path)
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if e.get("type") == "image" and str(e.get("src", "")).endswith(".svg"))
+        out_svg = (tmp_path / "out" / el["src"]).read_bytes().decode()
+        assert 'viewBox="0 0 1440 181' in out_svg  # 320 * (1 - 0.43426) ≈ 181
+        assert el.get("fit") == "stretch"

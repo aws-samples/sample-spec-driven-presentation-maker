@@ -172,6 +172,22 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
         if body_pr.get('wrap') == 'none':
             elem["autoWidth"] = True
 
+    # Line spacing (a:lnSpc) — fixed-point spacing repositions text visibly
+    # (e.g. a 48pt title with 31.2pt spacing sits much higher than default).
+    if tf.paragraphs:
+        first_pPr = tf.paragraphs[0]._element.find(f'{{{_NS["a"]}}}pPr')
+        if first_pPr is not None:
+            lnSpc = first_pPr.find(f'{{{_NS["a"]}}}lnSpc')
+            if lnSpc is not None:
+                spcPts = lnSpc.find(f'{{{_NS["a"]}}}spcPts')
+                spcPct = lnSpc.find(f'{{{_NS["a"]}}}spcPct')
+                if spcPts is not None and spcPts.get('val'):
+                    elem["lineSpacingPt"] = int(spcPts.get('val')) / 100
+                elif spcPct is not None and spcPct.get('val'):
+                    val = int(spcPct.get('val'))
+                    if val != 100000:
+                        elem["lineSpacingPct"] = val
+
     default_text_color = builder_text_color
     if not default_text_color and color_mapping and theme_colors:
         tx1 = color_mapping.get('tx1', 'dk1')
@@ -190,6 +206,20 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
         # Use builder's text color as default so explicit colors are preserved
         if _builder_text_color:
             default_text_color = _builder_text_color
+
+    # p:style/a:fontRef: shapes styled via theme (e.g. white text on an
+    # accent-filled bar) inherit their text color from the style, not from
+    # run properties. Resolve it so the builder doesn't paint them with the
+    # deck default.
+    font_ref = shape._element.find(f'{{{_NS["p"]}}}style/{{{_NS["a"]}}}fontRef')
+    if font_ref is not None and theme_colors:
+        scheme_el = font_ref.find(f'{{{_NS["a"]}}}schemeClr')
+        if scheme_el is not None:
+            from .color import _resolve_color_with_transforms
+            ref_color = _resolve_color_with_transforms(scheme_el, theme_colors, color_mapping)
+            if ref_color and ref_color.lower() != (default_text_color or '').lower():
+                elem["fontColor"] = ref_color
+                default_text_color = ref_color
 
     paragraphs_with_text = [p for p in tf.paragraphs if p.text.strip()]
     all_paragraphs = list(tf.paragraphs)
