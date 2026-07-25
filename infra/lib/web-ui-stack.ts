@@ -231,9 +231,7 @@ function handler(event) {
             "bash", "-c",
             "pip install -r /asset-input/api/requirements.txt -t /asset-output/ && " +
             "cp -r /asset-input/api/* /asset-input/shared /asset-output/ && " +
-            "mkdir -p /asset-output/sdpm && cp -r /asset-input/skill/sdpm/analyzer /asset-output/sdpm/ && " +
-            "cp /asset-input/skill/sdpm/__init__.py /asset-output/sdpm/ && " +
-            "mkdir -p /asset-output/sdpm/utils && cp /asset-input/skill/sdpm/utils/__init__.py /asset-input/skill/sdpm/utils/io.py /asset-output/sdpm/utils/",
+            "cp -r /asset-input/skill/sdpm /asset-output/sdpm",
           ],
           local: {
             tryBundle(outputDir: string): boolean {
@@ -250,10 +248,9 @@ function handler(event) {
               }
               execSync(`cp -r ${root}/api/* ${outputDir}/`, { stdio: "inherit" });
               execSync(`cp -r ${root}/shared ${outputDir}/shared`, { stdio: "inherit" });
-              execSync(`mkdir -p ${outputDir}/sdpm/utils`, { stdio: "inherit" });
-              execSync(`cp -r ${root}/skill/sdpm/analyzer ${outputDir}/sdpm/`, { stdio: "inherit" });
-              execSync(`cp ${root}/skill/sdpm/__init__.py ${outputDir}/sdpm/`, { stdio: "inherit" });
-              execSync(`cp ${root}/skill/sdpm/utils/__init__.py ${root}/skill/sdpm/utils/io.py ${outputDir}/sdpm/utils/`, { stdio: "inherit" });
+              // sdpm Engine — required by shared.ingest._convert_pptx for upload-time
+              // PPTX → deck conversion (deck.json + slides/*.json + template.pptx).
+              execSync(`cp -r ${root}/skill/sdpm ${outputDir}/sdpm`, { stdio: "inherit" });
               return true;
             },
           },

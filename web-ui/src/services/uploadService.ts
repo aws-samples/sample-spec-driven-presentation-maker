@@ -33,6 +33,15 @@ export interface UploadedFile {
   filePath?: string
   imagesDir?: string
   colorAnalysis?: { palette: { hex: string; ratio: number }[]; brightness: string; saturation: string }
+  // PPTX deck-structure conversion fields (set by mcp-local/upload_tools.py
+  // and the Cloud upload Lambda when convert_file produces a deck). The
+  // agent uses `guideInstruction` to branch into the import-pptx guide
+  // instead of treating the file as generic reference material.
+  guide?: string
+  guideInstruction?: string
+  suggestedName?: string
+  slideCount?: number
+  themeHints?: { backgroundLuminance?: number; accentColors?: string[]; fonts?: Record<string, string> }
 }
 
 let apiBaseUrl = ""
@@ -121,6 +130,14 @@ export async function uploadFile(
     if (data.filePath) uploaded.filePath = data.filePath
     if (data.imagesDir) uploaded.imagesDir = data.imagesDir
     if (data.colorAnalysis) uploaded.colorAnalysis = data.colorAnalysis
+    // PPTX deck-structure: forward guide hints so the agent can branch
+    // into the import-pptx guide instead of treating the upload as a
+    // generic reference file.
+    if (data.guide) uploaded.guide = data.guide
+    if (data.guideInstruction) uploaded.guideInstruction = data.guideInstruction
+    if (data.suggestedName) uploaded.suggestedName = data.suggestedName
+    if (typeof data.slideCount === "number") uploaded.slideCount = data.slideCount
+    if (data.themeHints) uploaded.themeHints = data.themeHints
     onProgress?.(uploaded)
     return uploaded
   }
@@ -184,6 +201,13 @@ export async function uploadFile(
   uploadedFile.status = processResult.status
   uploadedFile.extractedText = processResult.extractedText
   uploadedFile.imageUrl = processResult.imageUrl
+  // PPTX deck-structure: forward guide hints from the Cloud upload Lambda
+  // so the agent can branch into the import-pptx guide.
+  if (processResult.guide) uploadedFile.guide = processResult.guide
+  if (processResult.guideInstruction) uploadedFile.guideInstruction = processResult.guideInstruction
+  if (processResult.suggestedName) uploadedFile.suggestedName = processResult.suggestedName
+  if (typeof processResult.slideCount === "number") uploadedFile.slideCount = processResult.slideCount
+  if (processResult.themeHints) uploadedFile.themeHints = processResult.themeHints
   onProgress?.(uploadedFile)
 
   return uploadedFile
@@ -224,6 +248,14 @@ export async function pollUploadStatus(
         status: result.status,
         extractedText: result.extractedText,
         imageUrl: result.imageUrl,
+        // Forward PPTX deck-structure guide hints (set by Cloud upload Lambda
+        // when convert_file produces a deck) so polling clients see the same
+        // import-pptx branching signal as synchronous-completion clients.
+        guide: result.guide,
+        guideInstruction: result.guideInstruction,
+        suggestedName: result.suggestedName,
+        slideCount: typeof result.slideCount === "number" ? result.slideCount : undefined,
+        themeHints: result.themeHints,
       }
     }
 

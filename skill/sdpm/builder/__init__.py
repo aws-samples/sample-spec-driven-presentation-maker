@@ -314,9 +314,12 @@ class PPTXBuilder(
 
         if "notes" in slide_def:
             notes_frame = slide.notes_slide.notes_text_frame
-            notes_frame.clear()
-            p = notes_frame.paragraphs[0]
-            self._apply_styled_text(p, slide_def["notes"])
+            if notes_frame is not None:
+                notes_frame.clear()
+                p = notes_frame.paragraphs[0]
+                self._apply_styled_text(p, slide_def["notes"])
+            # Else: notesMaster lacks a body placeholder (degenerate source PPTX);
+            # silently skip notes rather than crash the build.
 
         # Remove empty placeholders
         if not self.keep_empty_placeholders:

@@ -1,7 +1,7 @@
 # Dependencies for Strands Agent. AI model access requires appropriate
 # IAM permissions and Bedrock model access grants.
 strands-agents[otel,openai]>=1.47.0
-mcp>=1.23.1
+mcp>=1.28.1
 bedrock-agentcore[strands-agents]>=1.0.6
 aws-opentelemetry-distro>=0.10.0
 awslabs.aws-pricing-mcp-server
