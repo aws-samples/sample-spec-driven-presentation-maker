@@ -550,3 +550,96 @@ class TestRotatedConnectors:
         assert "elbowStart" not in base
         assert (base["x1"], base["y1"]) == (200, 100)
         assert (base["x2"], base["y2"]) == (400, 300)
+
+
+class TestTextboxVerticalAnchor:
+    """Textboxes with bodyPr anchor= lost their vertical alignment.
+
+    extract_shape_element extracted verticalAlign but the textbox path did
+    not, so center/bottom-anchored labels rendered top-aligned on rebuild
+    (builder textbox default is top).
+    """
+
+    @staticmethod
+    def _textbox_slide(anchor=None):
+        import tempfile
+
+        from pptx.util import Emu as E
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        tb = slide.shapes.add_textbox(E(1270000), E(635000), E(2540000), E(635000))
+        tb.text_frame.text = "label"
+        if anchor:
+            ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+            tb.text_frame._txBody.find(f"{ns}bodyPr").set("anchor", anchor)
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "t.pptx"
+            prs.save(p)
+            result = pptx_to_json(p, Path(td) / "out")
+        boxes = [e for s in result["slides"] for e in s["elements"] if e.get("type") == "textbox"]
+        assert boxes
+        return boxes[0]
+
+    def test_center_anchor_extracted(self):
+        assert self._textbox_slide("ctr")["verticalAlign"] == "middle"
+
+    def test_bottom_anchor_extracted(self):
+        assert self._textbox_slide("b")["verticalAlign"] == "bottom"
+
+    def test_no_anchor_stays_unset(self):
+        assert "verticalAlign" not in self._textbox_slide(None)
+
+
+class TestSysClrResolution:
+    """<a:sysClr> fills/lines resolved to 'none', dropping visible borders."""
+
+    @staticmethod
+    def _shape_slide(fill_xml=None, line_xml=None):
+        import tempfile
+
+        from lxml import etree
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, E(1270000), E(635000), E(2540000), E(1270000))
+        ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
+        sp_pr = sp._element.spPr
+        # Drop the default style-based fill python-pptx leaves in place
+        for tag in ("solidFill", "ln"):
+            for el in sp_pr.findall(f"{{{ns}}}{tag}"):
+                sp_pr.remove(el)
+        style = sp._element.find("{http://schemas.openxmlformats.org/presentationml/2006/main}style")
+        if style is not None:
+            sp._element.remove(style)
+        geom = sp_pr.find(f"{{{ns}}}prstGeom")
+        if fill_xml:
+            geom.addnext(etree.fromstring(fill_xml))
+        if line_xml:
+            sp_pr.append(etree.fromstring(line_xml))
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "t.pptx"
+            prs.save(p)
+            result = pptx_to_json(p, Path(td) / "out")
+        shapes = [e for s in result["slides"] for e in s["elements"] if e.get("type") == "shape"]
+        assert shapes
+        return shapes[0]
+
+    A = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+
+    def test_sysclr_line_uses_lastclr(self):
+        el = self._shape_slide(line_xml=(
+            f'<a:ln {self.A} w="19050"><a:solidFill>'
+            '<a:sysClr val="windowText" lastClr="000000"/></a:solidFill></a:ln>'))
+        assert el["line"] == "#000000"
+
+    def test_sysclr_fill_applies_lum_transforms_and_alpha(self):
+        el = self._shape_slide(fill_xml=(
+            f'<a:solidFill {self.A}><a:sysClr val="windowText" lastClr="000000">'
+            '<a:lumMod val="20000"/><a:lumOff val="80000"/><a:alpha val="30000"/>'
+            '</a:sysClr></a:solidFill>'))
+        # 20% lum + 80% offset of black = #CCCCCC light gray
+        assert el["fill"] == "#CCCCCC"
+        assert el["opacity"] == 0.3

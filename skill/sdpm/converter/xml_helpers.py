@@ -12,6 +12,28 @@ from .constants import _NS, _hex, EMU_PER_PX
 from .color import _resolve_scheme_color, _resolve_color_with_transforms, apply_color_transforms
 
 
+def _sys_hex(solid):
+    """Resolve <a:sysClr> (Windows system color) inside a solidFill.
+
+    Office writes the concretely rendered color into lastClr, so use it
+    (falling back to black/white for the two common values) and apply any
+    child transforms (lumMod/lumOff/tint/shade) the same way as srgbClr.
+    """
+    sys_clr = solid.find('a:sysClr', _NS)
+    if sys_clr is None:
+        return None
+    base = f"#{sys_clr.get('lastClr')}" if sys_clr.get('lastClr') else \
+        {"windowText": "#000000", "window": "#FFFFFF"}.get(sys_clr.get('val'))
+    if not base:
+        return None
+    transforms = {}
+    for t in ('lumMod', 'lumOff', 'tint', 'shade'):
+        el = sys_clr.find(f'a:{t}', _NS)
+        if el is not None:
+            transforms[t] = el.get('val')
+    return _apply_srgb_transforms(base, transforms) if transforms else base
+
+
 def _apply_srgb_transforms(hex_color, transforms):
     """Apply lumMod/lumOff/tint/shade transforms to an srgbClr."""
     h = hex_color.lstrip("#")
@@ -245,6 +267,14 @@ def _extract_fill_from_xml(sp_pr, theme_colors=None, color_mapping=None):
             alpha = scheme.find('a:alpha', _NS)
             if alpha is not None:
                 result["opacity"] = round(int(alpha.get('val')) / 100000, 2)
+        else:
+            sys_hex = _sys_hex(solid)
+            if sys_hex:
+                result["fill"] = sys_hex
+                sys_clr = solid.find('a:sysClr', _NS)
+                alpha = sys_clr.find('a:alpha', _NS) if sys_clr is not None else None
+                if alpha is not None:
+                    result["opacity"] = round(int(alpha.get('val')) / 100000, 2)
         return result if "fill" in result else {"fill": "none"}
     # Gradient fill
     grad = sp_pr.find('a:gradFill', _NS)
@@ -406,6 +436,10 @@ def _extract_line_from_xml(sp_pr, theme_colors=None, color_mapping=None):
             resolved = _resolve_color_with_transforms(scheme, theme_colors, color_mapping)
             if resolved:
                 result["line"] = resolved
+        else:
+            sys_hex = _sys_hex(solid)
+            if sys_hex:
+                result["line"] = sys_hex
     if "line" not in result and "lineGradient" not in result:
         # Only set none if ln has noFill; otherwise leave unset for style resolution
         if ln.find('a:noFill', _NS) is not None:

@@ -554,6 +554,13 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
     if tf.margin_bottom is not None and tf.margin_bottom != 45720:
         elem["marginBottom"] = round(tf.margin_bottom / EMU_PER_PX)
     
+    # Extract vertical anchor (builder textbox default is top when unset)
+    if tf.vertical_anchor is not None:
+        _va_reverse = {1: "top", 3: "middle", 4: "bottom"}
+        va = _va_reverse.get(int(tf.vertical_anchor))
+        if va:
+            elem["verticalAlign"] = va
+
     # Extract fill and line using XML helpers
     try:
         sp_pr_xml = shape._element.find('.//{http://schemas.openxmlformats.org/presentationml/2006/main}spPr')
