@@ -656,3 +656,29 @@ class TestSysClrResolution:
         stops = el["gradient"]["stops"]
         assert [(s["position"], s["color"]) for s in stops] == [
             (0.0, "#00B050"), (0.37, "#FFFFFF"), (1.0, "#FFFFFF")]
+
+
+class TestSrgbTintSemantics:
+    """ECMA-376 tint: val=100000 must leave the color unchanged.
+
+    The old formula was inverted (100% tint → white), washing out
+    gradient fills that Office writes with tint/shade/satMod stops.
+    """
+
+    def test_full_tint_is_identity(self):
+        from sdpm.converter.xml_helpers import _apply_srgb_transforms
+        assert _apply_srgb_transforms("#B22600", {"tint": "100000"}) == "#B22600"
+
+    def test_partial_tint_mixes_toward_white(self):
+        from sdpm.converter.xml_helpers import _apply_srgb_transforms
+        out = _apply_srgb_transforms("#B22600", {"tint": "50000"})
+        r, g, b = int(out[1:3], 16), int(out[3:5], 16), int(out[5:7], 16)
+        assert r > 0xB2 and g > 0x26 and b > 0x00  # lighter than input
+        assert out != "#FFFFFF"
+
+    def test_satmod_boosts_saturation(self):
+        from sdpm.converter.xml_helpers import _apply_srgb_transforms
+        out = _apply_srgb_transforms("#996666", {"satMod": "300000"})
+        r, g, b = int(out[1:3], 16), int(out[3:5], 16), int(out[5:7], 16)
+        assert r > g and r > b  # pushed toward pure red
+        assert (r - g) > (0x99 - 0x66)  # more separation than input

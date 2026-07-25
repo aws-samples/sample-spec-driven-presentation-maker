@@ -35,7 +35,7 @@ def _sys_hex(solid):
 
 
 def _apply_srgb_transforms(hex_color, transforms):
-    """Apply lumMod/lumOff/tint/shade transforms to an srgbClr."""
+    """Apply lumMod/lumOff/tint/shade/satMod transforms to an srgbClr."""
     h = hex_color.lstrip("#")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
     if 'lumMod' in transforms or 'lumOff' in transforms:
@@ -45,14 +45,22 @@ def _apply_srgb_transforms(hex_color, transforms):
         g = min(255, max(0, int(g * mod + 255 * off)))
         b = min(255, max(0, int(b * mod + 255 * off)))
     if 'tint' in transforms:
+        # ECMA-376: an N% tint is N% of the input color mixed with (100-N)%
+        # white — val=100000 leaves the color unchanged (in linear gamma).
         t = int(transforms['tint']) / 100000
         rl, gl, bl = pow(r/255, 2.2), pow(g/255, 2.2), pow(b/255, 2.2)
-        rl, gl, bl = rl + (1-rl)*t, gl + (1-gl)*t, bl + (1-bl)*t
+        rl, gl, bl = rl*t + (1-t), gl*t + (1-t), bl*t + (1-t)
         r, g, b = int(pow(max(0,rl), 1/2.2)*255), int(pow(max(0,gl), 1/2.2)*255), int(pow(max(0,bl), 1/2.2)*255)
     if 'shade' in transforms:
         s = int(transforms['shade']) / 100000
         rl, gl, bl = pow(r/255, 2.2)*s, pow(g/255, 2.2)*s, pow(b/255, 2.2)*s
         r, g, b = int(pow(max(0,rl), 1/2.2)*255), int(pow(max(0,gl), 1/2.2)*255), int(pow(max(0,bl), 1/2.2)*255)
+    if 'satMod' in transforms:
+        import colorsys
+        m = int(transforms['satMod']) / 100000
+        hh, ll, ss = colorsys.rgb_to_hls(r/255, g/255, b/255)
+        rr, gg, bb = colorsys.hls_to_rgb(hh, ll, min(1.0, ss * m))
+        r, g, b = int(rr*255), int(gg*255), int(bb*255)
     return f"#{min(255,max(0,r)):02X}{min(255,max(0,g)):02X}{min(255,max(0,b)):02X}"
 
 def extract_line_dash(shape):
