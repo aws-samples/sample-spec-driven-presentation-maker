@@ -120,6 +120,17 @@ class ShapeMixin:
             sp_pr = shape._element.find(qn('p:spPr'))
             for pg in sp_pr.findall(qn('a:prstGeom')):
                 pg.set('prst', raw_prst)
+
+        # Source had no effects: drop python-pptx's default <p:style> (its
+        # effectRef pulls the theme shadow; explicit fill/line are applied
+        # below anyway) and write an empty effectLst for good measure.
+        if elem.get("_noEffects"):
+            from lxml import etree as _et_fx
+            from pptx.oxml.ns import qn as _qn_fx
+            for _st in shape._element.findall(_qn_fx('p:style')):
+                shape._element.remove(_st)
+            if shape._element.spPr.find(_qn_fx('a:effectLst')) is None:
+                _et_fx.SubElement(shape._element.spPr, _qn_fx('a:effectLst'))
         
         # Apply rotation
         rotation = elem.get("rotation", _DEFAULTS["rotation"])

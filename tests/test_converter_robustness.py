@@ -904,3 +904,61 @@ class TestTableCellFidelity:
         assert [p_.get("marL") for p_ in pprs] == ["93663", "93663"]
         texts = [p.text for p in gfx.table.rows[0].cells[0].text_frame.paragraphs]
         assert texts == ["各システムに対するドメイン知識", "CLAPの仕様理解"]
+
+
+class TestNoEffectsSuppression:
+    """Rebuilt shapes gained a theme shadow the source never had.
+
+    python-pptx's add_shape writes a default <p:style> whose effectRef
+    references the theme effect style (a shadow in both built-in
+    templates). Shapes converted from decks whose spPr carries no
+    effects now emit _noEffects, and the builder drops the style and
+    writes an empty effectLst.
+    """
+
+    def test_plain_shape_marks_no_effects(self):
+        import tempfile
+
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, E(1270000), E(635000), E(2540000), E(635000))
+        # python-pptx's own style stays (effectRef idx=2 in the template
+        # theme), but spPr has no effectLst → still "no effects" per source?
+        # No: effectRef>0 means themed effects apply. Clear the style to
+        # simulate the common hand-drawn shape (no style, no effects).
+        style = sp._element.find("{http://schemas.openxmlformats.org/presentationml/2006/main}style")
+        if style is not None:
+            sp._element.remove(style)
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "t.pptx"
+            prs.save(p)
+            result = pptx_to_json(p, Path(td) / "out")
+        el = next(e for s in result["slides"] for e in s["elements"] if e.get("type") == "shape")
+        assert el.get("_noEffects") is True
+
+    def test_builder_suppresses_theme_shadow(self):
+        import tempfile
+
+        from sdpm.builder import PPTXBuilder
+        b = PPTXBuilder(_template(), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"},
+                        default_text_color="#000000")
+        b.add_slide({"layout": "Blank", "elements": [
+            {"type": "shape", "shape": "rectangle", "x": 100, "y": 100,
+             "width": 300, "height": 100, "fill": "#F2F2F2", "_noEffects": True},
+            {"type": "shape", "shape": "rectangle", "x": 100, "y": 300,
+             "width": 300, "height": 100, "fill": "#F2F2F2"},
+        ]})
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "t.pptx"
+            b.save(out)
+            prs = Presentation(str(out))
+        ns_p = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+        ns_a = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        shapes = [sh for sh in prs.slides[0].shapes if sh.shape_type is not None]
+        marked, unmarked = shapes[0], shapes[1]
+        assert marked._element.find(f"{ns_p}style") is None
+        assert marked._element.spPr.find(f"{ns_a}effectLst") is not None
+        # default behavior unchanged for AI-authored decks
+        assert unmarked._element.find(f"{ns_p}style") is not None

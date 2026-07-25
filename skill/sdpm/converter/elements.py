@@ -485,6 +485,18 @@ def extract_shape_element(shape, theme_colors=None, color_mapping=None, theme_st
         
         # Extract visual effects
         elem.update(_extract_visual_effects(sp_pr_xml, theme_colors, color_mapping))
+
+        # No effects in source → say so explicitly. The builder's add_shape
+        # carries python-pptx's default <p:style> whose effectRef pulls the
+        # theme shadow; an empty effectLst is needed to suppress it.
+        if not any(k in elem for k in ("shadow", "glow", "softEdge", "reflection")):
+            try:
+                style_el = shape._element.find(f'{{{_NS["p"]}}}style')
+                eff_ref = style_el.find(f'{{{_NS["a"]}}}effectRef') if style_el is not None else None
+                if eff_ref is None or int(eff_ref.get('idx', '0') or 0) == 0:
+                    elem["_noEffects"] = True
+            except Exception:
+                pass
         
         # Preserve lstStyle for roundtrip fidelity (non-placeholder shapes)
         _lst = _serialize_lstStyle(shape) if shape.has_text_frame else None

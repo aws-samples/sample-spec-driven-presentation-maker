@@ -72,6 +72,16 @@ class FormattingMixin:
         """Apply fill, gradient, and line formatting to a shape."""
         gradient = elem.get("gradient")
         fill_color = elem.get("fill")
+
+        # Source had no effects: write an empty effectLst so the theme
+        # shadow referenced by python-pptx's default <p:style> effectRef
+        # doesn't apply.
+        if elem.get("_noEffects"):
+            from lxml import etree as _et_fx
+            from pptx.oxml.ns import qn as _qn_fx
+            sp_pr = shape._element.spPr
+            if sp_pr.find(_qn_fx('a:effectLst')) is None:
+                _et_fx.SubElement(sp_pr, _qn_fx('a:effectLst'))
         
         if gradient:
             self._apply_gradient_fill(shape, gradient)
