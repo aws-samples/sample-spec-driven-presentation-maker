@@ -19,6 +19,29 @@ from pptx import Presentation
 
 _REL_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 
+# Extension URI of the PowerPoint section list (p14:sectionLst) inside
+# presentation.xml's <p:extLst>.
+_SECTION_EXT_URI = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
+
+
+def _drop_section_list(presentation_el) -> None:
+    """Remove the section-list ext from a <p:presentation> element.
+
+    Args:
+        presentation_el: The lxml ``<p:presentation>`` element
+            (parent of ``<p:sldIdLst>``).
+    """
+    from pptx.oxml.ns import qn
+
+    ext_lst = presentation_el.find(qn("p:extLst"))
+    if ext_lst is None:
+        return
+    for ext in list(ext_lst.findall(qn("p:ext"))):
+        if ext.get("uri") == _SECTION_EXT_URI:
+            ext_lst.remove(ext)
+    if len(ext_lst) == 0:
+        presentation_el.remove(ext_lst)
+
 
 def extract_placeholder_template(
     pptx_path: str | Path,
@@ -64,6 +87,14 @@ def extract_placeholder_template(
             except KeyError:
                 pass
         sldIdLst.remove(entry)
+
+    # Step 2b: drop the section list (p14:sectionLst) if present. Sections
+    # reference the original slide IDs; keeping them after the slides are
+    # dropped leaves stale IDs that trigger PowerPoint's repair prompt.
+    # Removing the whole ext (rather than patching individual entries) is
+    # the safest option — section grouping is meaningless for a
+    # placeholder-only template anyway.
+    _drop_section_list(sldIdLst.getparent())
 
     # Step 3: emit one placeholder-only sample slide per *used* layout.
     # Iterate masters/layouts in their original order so the output
