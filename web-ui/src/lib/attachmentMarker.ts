@@ -16,7 +16,9 @@ export function buildAttachedMarker(file: UploadedFile): string {
       `guide: ${file.guide}`,
       `guideInstruction: ${JSON.stringify(file.guideInstruction)}`,
     ]
-    if (file.suggestedName) parts.push(`suggestedName: "${file.suggestedName}"`)
+    // JSON.stringify (like guideInstruction above): a quote in the file stem
+    // would otherwise break the [Attached: ...] marker format.
+    if (file.suggestedName) parts.push(`suggestedName: ${JSON.stringify(file.suggestedName)}`)
     if (typeof file.slideCount === "number") parts.push(`slideCount: ${file.slideCount}`)
     if (file.themeHints) parts.push(`themeHints: ${JSON.stringify(file.themeHints)}`)
     return `[Attached: ${file.fileName} (${parts.join(", ")})]`

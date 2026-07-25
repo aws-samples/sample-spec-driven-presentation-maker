@@ -59,7 +59,11 @@ class TestPptxToJsonDeckStructure:
         assert not (out_dir / "slides.json").exists(), "legacy slides.json must not be emitted"
 
     def test_pptx_to_json_slug_format(self, fixture_pptx: Path, tmp_path: Path) -> None:
-        """Slug format is slide-NN (hyphen + 2-digit zero-padded) and matches parse_outline_slugs regex."""
+        """Slug format is slide-NNN (hyphen + 3-digit zero-padded) and matches parse_outline_slugs regex.
+
+        3-digit padding keeps lexicographic sort == presentation order up to
+        999 slides (2-digit broke at 100+: "slide-100" < "slide-11").
+        """
         from sdpm.api import parse_outline_slugs
         from sdpm.converter import pptx_to_json
 
@@ -67,9 +71,9 @@ class TestPptxToJsonDeckStructure:
         pptx_to_json(fixture_pptx, output_dir=out_dir)
 
         slide_files = sorted((out_dir / "slides").glob("*.json"))
-        slug_re = re.compile(r"^slide-\d{2}$")
+        slug_re = re.compile(r"^slide-\d{3}$")
         for f in slide_files:
-            assert slug_re.match(f.stem), f"slug must match slide-NN format: {f.stem}"
+            assert slug_re.match(f.stem), f"slug must match slide-NNN format: {f.stem}"
 
         # Sanity: construct fake outline.md with these slugs and verify parse_outline_slugs accepts them
         fake_outline = "\n".join(f"- [{f.stem}] msg" for f in slide_files)
@@ -134,7 +138,9 @@ class TestConvertPptxThemeHints:
         fonts = result.theme_hints["fonts"]
         assert isinstance(fonts, dict)
 
-    def test_convert_pptx_theme_hints_uses_slide_bg(self, tmp_path: Path) -> None:
+    def test_convert_pptx_theme_hints_uses_slide_bg(
+        self, fixture_pptx: Path, tmp_path: Path,
+    ) -> None:
         """When slide has explicit background, luminance reflects it (median across slides).
 
         Synthetic fixture: modify slide XML to force explicit backgrounds.
@@ -144,11 +150,98 @@ class TestConvertPptxThemeHints:
         from shared.ingest import convert_file
 
         out_dir = tmp_path / "out"
-        result = convert_file(_FIXTURE_PPTX, out_dir)
+        result = convert_file(fixture_pptx, out_dir)
         # The fixture may or may not have explicit slide bg; we just verify the median is valid.
         # (Full-fidelity synthetic testing of slide-bg override is deferred; the pipeline
         # correctness is validated via test_convert_pptx_theme_hints_keys.)
         assert 0.0 <= result.theme_hints["backgroundLuminance"] <= 1.0
+
+
+
+class TestThemeHintsDdbItem:
+    """theme_hints_ddb_item must tolerate theme_hints=None (PR #215 follow-up, R2).
+
+    shared.ingest._convert_pptx returns theme_hints=None (with deck_structure=True)
+    when theme extraction fails; the Cloud upload path once crashed with
+    AttributeError on ``None.get`` — turning a successful conversion into
+    "Conversion failed".
+    """
+
+    def test_none_theme_hints_returns_empty_defaults(self) -> None:
+        from shared.schema import theme_hints_ddb_item
+
+        item = theme_hints_ddb_item(None)
+        assert item["backgroundLuminance"] is None
+        assert item["accentColors"] == []
+        assert item["fonts"] == {}
+
+    def test_populated_theme_hints_converts_luminance_to_decimal(self) -> None:
+        from decimal import Decimal
+
+        from shared.schema import theme_hints_ddb_item
+
+        item = theme_hints_ddb_item({
+            "backgroundLuminance": 0.12,
+            "accentColors": ["#FF0000"],
+            "fonts": {"halfwidth": "Arial"},
+        })
+        assert isinstance(item["backgroundLuminance"], Decimal)
+        assert item["backgroundLuminance"] == Decimal("0.12")
+        assert item["accentColors"] == ["#FF0000"]
+        assert item["fonts"] == {"halfwidth": "Arial"}
+
+
+class TestDeckTextSummaryEngine:
+    """sdpm.utils.deck_summary — single source for Local/Cloud text summaries.
+
+    PR #215 follow-up (R5): the summary logic was verbatim-duplicated in
+    mcp-local/upload_tools.py and mcp-server/tools/upload.py; it now lives
+    in the engine per the logic-sharing steering.
+    """
+
+    def test_summary_shape_titles_and_dedup(self) -> None:
+        from sdpm.utils.deck_summary import deck_text_summary
+
+        slides = [
+            {
+                "title": "Plain Title",
+                "elements": [
+                    {"type": "textbox", "text": "Body text"},
+                    {"type": "textbox", "text": "Body text"},  # duplicate → dropped
+                ],
+            },
+            {
+                "title": {"text": "Dict Title"},
+                "elements": [
+                    {
+                        "type": "group",
+                        "elements": [{"type": "textbox", "text": "Nested"}],
+                    },
+                    {
+                        "type": "table",
+                        "headers": ["H1", "H2"],
+                        "rows": [["a", "b"]],
+                    },
+                    {"type": "textbox", "items": ["Item A"]},
+                ],
+            },
+            {},  # unparseable/empty slide keeps its number
+        ]
+        out = deck_text_summary(slides)
+        assert "--- Slide 1: Plain Title ---" in out
+        assert out.count("Body text") == 1
+        assert "--- Slide 2: Dict Title ---" in out
+        assert "Nested" in out and "H1" in out and "Item A" in out
+        assert "--- Slide 3 ---" in out
+
+    def test_local_and_cloud_wrappers_delegate_to_engine(self) -> None:
+        """Guard against re-duplication: neither consumer defines the logic."""
+        local_src = (_REPO_ROOT / "mcp-local" / "upload_tools.py").read_text(encoding="utf-8")
+        cloud_src = (_REPO_ROOT / "mcp-server" / "tools" / "upload.py").read_text(encoding="utf-8")
+        for src, name in ((local_src, "mcp-local"), (cloud_src, "mcp-server")):
+            assert "deck_text_summary" in src, f"{name} must use the engine helper"
+            assert "def _collect_text" not in src, f"{name} re-duplicates _collect_text"
+            assert "def _extract_title" not in src, f"{name} re-duplicates _extract_title"
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +256,7 @@ class TestUploadFileGuideInstruction:
         """Helper: upload the fixture PPTX via mcp-local/upload_tools.upload_file."""
         # Route SDPM_DECK_ROOT so session storage lives under tmp_path
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import upload_file
 
         # Copy fixture to tmp_path so the temp upload path is stable
@@ -218,7 +311,7 @@ class TestReadUploadedFileTextSummary:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import read_uploaded_file, upload_file
 
         src = tmp_path / "input.pptx"
@@ -244,7 +337,7 @@ class TestImportAttachmentSlidesDir:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import import_attachment, upload_file
 
         src = tmp_path / "input.pptx"
@@ -277,7 +370,7 @@ class TestImportAttachmentSlidesDir:
     ) -> None:
         """Placeholder template lives at deck/template.pptx (deck-local path)."""
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import import_attachment, upload_file
 
         src = tmp_path / "input.pptx"
@@ -309,19 +402,23 @@ class TestImportAttachmentSlidesDir:
 class TestCloudImportConvertedCopiesTemplate:
     """mcp-server/tools/attachment._import_converted handles template.pptx specially."""
 
-    def test_import_converted_copies_template_to_deck_root(self) -> None:
+    def test_import_converted_copies_template_to_deck_root(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         import types
         from unittest.mock import MagicMock
 
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-server"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-server"))
         # mcp-server has its own dependency set; stub the modules that the
         # attachment module imports at top level so we can import it under
-        # the local-test venv.
-        sys.modules.setdefault("requests", types.ModuleType("requests"))
+        # the local-test venv. monkeypatch.setitem reverts after this test so
+        # the stubs cannot leak into other tests (import-order hazard).
+        if "requests" not in sys.modules:
+            monkeypatch.setitem(sys.modules, "requests", types.ModuleType("requests"))
         if "storage" not in sys.modules:
             stg_mod = types.ModuleType("storage")
             stg_mod.Storage = object  # type stub
-            sys.modules["storage"] = stg_mod
+            monkeypatch.setitem(sys.modules, "storage", stg_mod)
         from tools.attachment import _import_converted
 
         converted_prefix = "uploads/u1/up1/converted"
@@ -411,7 +508,7 @@ class TestDeckRootEnvHandling:
         self, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.delenv("SDPM_DECK_ROOT", raising=False)
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import _deck_root
 
         root = _deck_root()
@@ -422,7 +519,7 @@ class TestDeckRootEnvHandling:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "custom"))
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import _deck_root
 
         assert _deck_root() == tmp_path / "custom"
@@ -431,7 +528,7 @@ class TestDeckRootEnvHandling:
         self, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("SDPM_DECK_ROOT", "   ")
-        sys.path.insert(0, str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
         from upload_tools import _deck_root
 
         assert _deck_root() == Path.home() / "Documents" / "SDPM-Presentations"
@@ -445,6 +542,65 @@ class TestDeckRootEnvHandling:
 class TestExtractPlaceholderTemplate:
     """extract_placeholder_template keeps every master/layout, replaces slides
     with one placeholder-only sample per *used* layout."""
+
+    def test_drops_stale_section_list(self, fixture_pptx: Path, tmp_path: Path) -> None:
+        """Sections referencing dropped slide IDs must be removed (R6).
+
+        Corporate templates often use sections; stale slide IDs inside
+        <p14:sectionLst> trigger PowerPoint's repair prompt.
+        """
+        from lxml import etree
+        from pptx import Presentation
+        from pptx.oxml.ns import qn
+        from sdpm.converter.template import extract_placeholder_template
+
+        _P14 = "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        _SECTION_URI = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
+
+        # Build a section-bearing fixture: wrap all slides in one section.
+        prs = Presentation(str(fixture_pptx))
+        pres_el = prs.slides._sldIdLst.getparent()
+        slide_ids = [e.get("id") for e in prs.slides._sldIdLst]
+        assert slide_ids, "fixture must have slides"
+        ext_lst = pres_el.find(qn("p:extLst"))
+        if ext_lst is None:
+            ext_lst = etree.SubElement(pres_el, qn("p:extLst"))
+        ext = etree.SubElement(ext_lst, qn("p:ext"))
+        ext.set("uri", _SECTION_URI)
+        section_lst = etree.SubElement(ext, f"{{{_P14}}}sectionLst")
+        section = etree.SubElement(section_lst, f"{{{_P14}}}section")
+        section.set("name", "Intro")
+        section.set("id", "{11111111-1111-1111-1111-111111111111}")
+        sect_slides = etree.SubElement(section, f"{{{_P14}}}sldIdLst")
+        for sid in slide_ids:
+            sld = etree.SubElement(sect_slides, f"{{{_P14}}}sldId")
+            sld.set("id", sid)
+        src = tmp_path / "with_sections.pptx"
+        prs.save(str(src))
+
+        out = tmp_path / "template.pptx"
+        extract_placeholder_template(src, out)
+
+        out_prs = Presentation(str(out))
+        out_xml = etree.tostring(
+            out_prs.slides._sldIdLst.getparent(), encoding="unicode",
+        )
+        assert "sectionLst" not in out_xml, "stale sectionLst must be dropped"
+        assert _SECTION_URI not in out_xml
+        # Output must still be loadable with slides present.
+        assert len(out_prs.slides) > 0
+
+    def test_source_without_sections_is_unaffected(
+        self, fixture_pptx: Path, tmp_path: Path
+    ) -> None:
+        """No-section sources keep working (guard for the cleanup step)."""
+        from pptx import Presentation
+        from sdpm.converter.template import extract_placeholder_template
+
+        out = tmp_path / "template.pptx"
+        meta = extract_placeholder_template(fixture_pptx, out)
+        assert meta["used_layout_count"] > 0
+        assert len(Presentation(str(out)).slides) > 0
 
     def test_drops_source_content_emits_one_slide_per_used_layout(
         self, fixture_pptx: Path, tmp_path: Path
