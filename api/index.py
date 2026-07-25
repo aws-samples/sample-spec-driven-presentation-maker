@@ -32,6 +32,7 @@ from chat_history import (
     truncate_tool_inputs,
 )
 from common import get_user_id, now_iso, presigned_url
+from shared.ingest import PPTX_GUIDE_INSTRUCTION as _PPTX_GUIDE_INSTRUCTION
 from shared.schema import (
     deck_pk, deck_sk, shared_pk, fav_sk, upload_sk,
     DECK_SK_PREFIX, FAV_SK_PREFIX,
@@ -1459,19 +1460,6 @@ def presign_upload() -> Dict[str, Any]:
 
 # Text-extractable MIME types (can be read directly from S3 in Lambda)
 _TEXT_EXTRACTABLE = {"text/plain", "text/markdown", "application/json"}
-
-
-# Shared guide instruction for PPTX uploads — same text as Local mode.
-_PPTX_GUIDE_INSTRUCTION = (
-    "This PPTX can either be converted into an editable deck, or used as "
-    "reference material for a new deck. "
-    "If the user's intent is to edit this PPTX, call read_guides(['import-pptx']) "
-    "and follow it exactly. "
-    "If the intent is to use as reference, proceed with the normal briefing flow "
-    "and call read_uploaded_file to access content. "
-    "If the user's intent is ambiguous, use the `hearing` tool once to clarify "
-    "before choosing."
-)
 
 
 def _pptx_guide_fields(item_or_values: Dict[str, Any]) -> Dict[str, Any]:

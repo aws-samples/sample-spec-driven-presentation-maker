@@ -151,6 +151,7 @@ class TestConvertPptxThemeHints:
         assert 0.0 <= result.theme_hints["backgroundLuminance"] <= 1.0
 
 
+
 class TestThemeHintsDdbItem:
     """theme_hints_ddb_item must tolerate theme_hints=None (PR #215 follow-up, R2).
 
@@ -182,6 +183,59 @@ class TestThemeHintsDdbItem:
         assert item["backgroundLuminance"] == Decimal("0.12")
         assert item["accentColors"] == ["#FF0000"]
         assert item["fonts"] == {"halfwidth": "Arial"}
+
+
+class TestDeckTextSummaryEngine:
+    """sdpm.utils.deck_summary — single source for Local/Cloud text summaries.
+
+    PR #215 follow-up (R5): the summary logic was verbatim-duplicated in
+    mcp-local/upload_tools.py and mcp-server/tools/upload.py; it now lives
+    in the engine per the logic-sharing steering.
+    """
+
+    def test_summary_shape_titles_and_dedup(self) -> None:
+        from sdpm.utils.deck_summary import deck_text_summary
+
+        slides = [
+            {
+                "title": "Plain Title",
+                "elements": [
+                    {"type": "textbox", "text": "Body text"},
+                    {"type": "textbox", "text": "Body text"},  # duplicate → dropped
+                ],
+            },
+            {
+                "title": {"text": "Dict Title"},
+                "elements": [
+                    {
+                        "type": "group",
+                        "elements": [{"type": "textbox", "text": "Nested"}],
+                    },
+                    {
+                        "type": "table",
+                        "headers": ["H1", "H2"],
+                        "rows": [["a", "b"]],
+                    },
+                    {"type": "textbox", "items": ["Item A"]},
+                ],
+            },
+            {},  # unparseable/empty slide keeps its number
+        ]
+        out = deck_text_summary(slides)
+        assert "--- Slide 1: Plain Title ---" in out
+        assert out.count("Body text") == 1
+        assert "--- Slide 2: Dict Title ---" in out
+        assert "Nested" in out and "H1" in out and "Item A" in out
+        assert "--- Slide 3 ---" in out
+
+    def test_local_and_cloud_wrappers_delegate_to_engine(self) -> None:
+        """Guard against re-duplication: neither consumer defines the logic."""
+        local_src = (_REPO_ROOT / "mcp-local" / "upload_tools.py").read_text(encoding="utf-8")
+        cloud_src = (_REPO_ROOT / "mcp-server" / "tools" / "upload.py").read_text(encoding="utf-8")
+        for src, name in ((local_src, "mcp-local"), (cloud_src, "mcp-server")):
+            assert "deck_text_summary" in src, f"{name} must use the engine helper"
+            assert "def _collect_text" not in src, f"{name} re-duplicates _collect_text"
+            assert "def _extract_title" not in src, f"{name} re-duplicates _extract_title"
 
 
 # ---------------------------------------------------------------------------
@@ -478,6 +532,65 @@ class TestDeckRootEnvHandling:
 class TestExtractPlaceholderTemplate:
     """extract_placeholder_template keeps every master/layout, replaces slides
     with one placeholder-only sample per *used* layout."""
+
+    def test_drops_stale_section_list(self, fixture_pptx: Path, tmp_path: Path) -> None:
+        """Sections referencing dropped slide IDs must be removed (R6).
+
+        Corporate templates often use sections; stale slide IDs inside
+        <p14:sectionLst> trigger PowerPoint's repair prompt.
+        """
+        from lxml import etree
+        from pptx import Presentation
+        from pptx.oxml.ns import qn
+        from sdpm.converter.template import extract_placeholder_template
+
+        _P14 = "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        _SECTION_URI = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
+
+        # Build a section-bearing fixture: wrap all slides in one section.
+        prs = Presentation(str(fixture_pptx))
+        pres_el = prs.slides._sldIdLst.getparent()
+        slide_ids = [e.get("id") for e in prs.slides._sldIdLst]
+        assert slide_ids, "fixture must have slides"
+        ext_lst = pres_el.find(qn("p:extLst"))
+        if ext_lst is None:
+            ext_lst = etree.SubElement(pres_el, qn("p:extLst"))
+        ext = etree.SubElement(ext_lst, qn("p:ext"))
+        ext.set("uri", _SECTION_URI)
+        section_lst = etree.SubElement(ext, f"{{{_P14}}}sectionLst")
+        section = etree.SubElement(section_lst, f"{{{_P14}}}section")
+        section.set("name", "Intro")
+        section.set("id", "{11111111-1111-1111-1111-111111111111}")
+        sect_slides = etree.SubElement(section, f"{{{_P14}}}sldIdLst")
+        for sid in slide_ids:
+            sld = etree.SubElement(sect_slides, f"{{{_P14}}}sldId")
+            sld.set("id", sid)
+        src = tmp_path / "with_sections.pptx"
+        prs.save(str(src))
+
+        out = tmp_path / "template.pptx"
+        extract_placeholder_template(src, out)
+
+        out_prs = Presentation(str(out))
+        out_xml = etree.tostring(
+            out_prs.slides._sldIdLst.getparent(), encoding="unicode",
+        )
+        assert "sectionLst" not in out_xml, "stale sectionLst must be dropped"
+        assert _SECTION_URI not in out_xml
+        # Output must still be loadable with slides present.
+        assert len(out_prs.slides) > 0
+
+    def test_source_without_sections_is_unaffected(
+        self, fixture_pptx: Path, tmp_path: Path
+    ) -> None:
+        """No-section sources keep working (guard for the cleanup step)."""
+        from pptx import Presentation
+        from sdpm.converter.template import extract_placeholder_template
+
+        out = tmp_path / "template.pptx"
+        meta = extract_placeholder_template(fixture_pptx, out)
+        assert meta["used_layout_count"] > 0
+        assert len(Presentation(str(out)).slides) > 0
 
     def test_drops_source_content_emits_one_slide_per_used_layout(
         self, fixture_pptx: Path, tmp_path: Path
