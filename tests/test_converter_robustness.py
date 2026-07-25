@@ -877,6 +877,8 @@ class TestTableCellFidelity:
             p2.text = "CLAPの仕様理解"
             for para in tf.paragraphs:
                 pPr = para._element.get_or_add_pPr()
+                pPr.set("marL", "93663")
+                pPr.set("indent", "-93663")
                 bu = etree.SubElement(pPr, f"{self.NS}buChar")
                 bu.set("char", "•")
         t = self._convert(mutate)
@@ -884,6 +886,7 @@ class TestTableCellFidelity:
         assert isinstance(cell, dict)
         paras = cell["paragraphs"]
         assert [p.get("bullet") for p in paras] == ["•", "•"]
+        assert [p.get("marL") for p in paras] == [93663, 93663]
         # Rebuild: builder must emit real buChar bullets on each a:p
         from sdpm.builder import PPTXBuilder
         b = PPTXBuilder(_template(), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"},
@@ -897,5 +900,7 @@ class TestTableCellFidelity:
         tc = gfx.table.rows[0].cells[0]._tc
         bu_chars = tc.findall(f".//{self.NS}buChar")
         assert [b_.get("char") for b_ in bu_chars] == ["•", "•"]
+        pprs = tc.findall(f".//{self.NS}pPr")
+        assert [p_.get("marL") for p_ in pprs] == ["93663", "93663"]
         texts = [p.text for p in gfx.table.rows[0].cells[0].text_frame.paragraphs]
         assert texts == ["各システムに対するドメイン知識", "CLAPの仕様理解"]

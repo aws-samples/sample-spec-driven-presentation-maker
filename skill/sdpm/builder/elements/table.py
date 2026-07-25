@@ -268,11 +268,16 @@ class TableMixin:
                             bu_font.set('typeface', 'Arial')
                             bu_char = etree.SubElement(pPr, f'{{{a_ns}}}buChar')
                             bu_char.set('char', char)
-                            # Hanging indent so wrapped lines align after the bullet
-                            pPr.set('marL', '171450')
-                            pPr.set('indent', '-171450')
+                            # Hanging indent so wrapped lines align after the
+                            # bullet — explicit marL/indent (EMU) win.
+                            pPr.set('marL', str(pd.get('marL', 171450)))
+                            pPr.set('indent', str(pd.get('indent', -171450)))
                         else:
                             etree.SubElement(pPr, f'{{{a_ns}}}buNone')
+                            if pd.get('marL') is not None:
+                                pPr.set('marL', str(pd['marL']))
+                            if pd.get('indent') is not None:
+                                pPr.set('indent', str(pd['indent']))
                     cell_runs = [r for p in cell.text_frame.paragraphs for r in p.runs]
                 else:
                     self._apply_styled_text(para, str(text), default_color=text_color, no_default_color=text_color is None)

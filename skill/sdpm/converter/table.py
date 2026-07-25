@@ -62,10 +62,17 @@ def _extract_cell(cell, theme_colors=None, color_mapping=None):
     props = {}
     if any(bullet_chars):
         # Bulleted lines → paragraphs form (builder renders real buChar bullets)
-        props["paragraphs"] = [
-            {"text": part, "bullet": bc} if bc else {"text": part}
-            for part, bc in zip(styled_parts, bullet_chars)
-        ]
+        paras = []
+        for para, part, bc in zip(tf.paragraphs, styled_parts, bullet_chars):
+            pd = {"text": part, "bullet": bc} if bc else {"text": part}
+            pPr = para._element.find('a:pPr', _NS)
+            if pPr is not None:
+                if pPr.get('marL') is not None:
+                    pd["marL"] = int(pPr.get('marL'))
+                if pPr.get('indent') is not None:
+                    pd["indent"] = int(pPr.get('indent'))
+            paras.append(pd)
+        props["paragraphs"] = paras
     if cell_color:
         props["color"] = cell_color
 
