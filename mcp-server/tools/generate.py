@@ -209,9 +209,16 @@ def _prepare_workspace(
             template_path.write_bytes(
                 storage.download_file_from_pptx_bucket(deck_template_key),
             )
-            tmpl_name = ""  # signal: resolved
-        except Exception:
-            tmpl_name = ""  # fall through to sdpm-template lookup below
+        except Exception as e:
+            # Do NOT fall back to a stock template: imported decks reference
+            # layout names from the original PPTX, so building with a stock
+            # template would fail later with an obscure layout mismatch.
+            raise ValueError(
+                f"Deck template not found: {deck_template_key}. "
+                "This deck was imported from a PPTX and requires its own "
+                "template.pptx. Re-import the PPTX to restore it."
+            ) from e
+        tmpl_name = ""  # signal: resolved
     if tmpl_name:
         normalized = tmpl_name.removesuffix(".pptx")
         for t in storage.list_templates():
