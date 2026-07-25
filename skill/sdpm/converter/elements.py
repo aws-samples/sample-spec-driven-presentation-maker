@@ -1326,6 +1326,22 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
                         abs_x = group_off_x + (child_x - ch_off_x) * scale_x
                         abs_y = group_off_y + (child_y - ch_off_y) * scale_y
                         
+                        if sub_elem.get("type") == "line" and "x1" in sub_elem:
+                            # Lines carry endpoints, not x/y/width/height —
+                            # transform x1/y1/x2/y2 through the group xfrm.
+                            def _gx(px_):
+                                return round((group_off_x + (px_ * EMU_PER_PX - ch_off_x) * scale_x) / EMU_PER_PX)
+                            def _gy(py_):
+                                return round((group_off_y + (py_ * EMU_PER_PX - ch_off_y) * scale_y) / EMU_PER_PX)
+                            for k in ("x1", "x2"):
+                                if sub_elem.get(k) is not None:
+                                    sub_elem[k] = _gx(sub_elem[k])
+                            for k in ("y1", "y2"):
+                                if sub_elem.get(k) is not None:
+                                    sub_elem[k] = _gy(sub_elem[k])
+                            elem["elements"].append(sub_elem)
+                            continue
+
                         sub_elem["x"] = round(abs_x / EMU_PER_PX)
                         sub_elem["y"] = round(abs_y / EMU_PER_PX)
                         sub_elem["width"] = round(sub_shape.width * scale_x / EMU_PER_PX)
@@ -1343,6 +1359,14 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
                         if sub_elem.get("type") == "group" and sub_elem.get("elements"):
                             def _apply_group_transform(elements, gox, goy, gcx, gcy, sx, sy):
                                 for el in elements:
+                                    if el.get("type") == "line" and "x1" in el:
+                                        for k in ("x1", "x2"):
+                                            if el.get(k) is not None:
+                                                el[k] = round((gox + (el[k] * EMU_PER_PX - gcx) * sx) / EMU_PER_PX)
+                                        for k in ("y1", "y2"):
+                                            if el.get(k) is not None:
+                                                el[k] = round((goy + (el[k] * EMU_PER_PX - gcy) * sy) / EMU_PER_PX)
+                                        continue
                                     if "x" in el and "y" in el:
                                         old_x = el["x"] * EMU_PER_PX
                                         old_y = el["y"] * EMU_PER_PX

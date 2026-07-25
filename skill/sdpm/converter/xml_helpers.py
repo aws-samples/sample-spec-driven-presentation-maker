@@ -454,7 +454,8 @@ def _extract_line_from_xml(sp_pr, theme_colors=None, color_mapping=None):
         srgb = solid.find('a:srgbClr', _NS)
         scheme = solid.find('a:schemeClr', _NS)
         if srgb is not None:
-            result["line"] = _hex(srgb)
+            from .color import apply_element_transforms
+            result["line"] = apply_element_transforms(_hex(srgb), srgb)
         elif scheme is not None:
             resolved = _resolve_color_with_transforms(scheme, theme_colors, color_mapping)
             if resolved:

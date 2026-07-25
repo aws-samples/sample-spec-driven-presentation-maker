@@ -1004,3 +1004,43 @@ class TestOleSanitization:
         assert pic is not None
         off = pic.find(f".//{{{ns_a}}}xfrm/{{{ns_a}}}off")
         assert off is not None and off.get("x") == "100"
+
+
+class TestGroupLineTransform:
+    """Connectors inside scaled groups kept child-space endpoints.
+
+    The group transform only rewrote x/y/width/height, but line elements
+    carry x1/y1/x2/y2 — so step lines in an Excel-pasted roadmap group
+    (scale_y 1.59) drew far from their true position.
+    """
+
+    def test_line_endpoints_transformed(self):
+        import tempfile
+
+        from lxml import etree
+        from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
+        from pptx.util import Emu as E
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, E(0), E(0), E(635000), E(635000))
+        conn = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, E(635000), E(635000), E(1270000), E(1270000))
+        group = slide.shapes.add_group_shape([sp, conn])
+        # Force a non-identity transform: double the group extent (scale 2x)
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        nsp = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+        xfrm = group._element.find(f"{nsp}grpSpPr/{ns}xfrm")
+        ext = xfrm.find(f"{ns}ext")
+        ext.set("cx", str(int(ext.get("cx")) * 2))
+        ext.set("cy", str(int(ext.get("cy")) * 2))
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "t.pptx"
+            prs.save(p)
+            result = pptx_to_json(p, Path(td) / "out")
+        grp = next(e for s in result["slides"] for e in s["elements"] if e.get("type") == "group")
+        line = next(e for e in grp["elements"] if e.get("type") == "line")
+        # Child endpoints (100,100)->(200,200)px scaled 2x from group origin (0,0)
+        assert (line["x1"], line["y1"]) == (200, 200)
+        assert (line["x2"], line["y2"]) == (400, 400)
+        # The buggy path also left width/height keys on lines — must not
+        assert "width" not in line and "height" not in line
