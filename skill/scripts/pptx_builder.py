@@ -222,25 +222,36 @@ def cmd_list_asset_sources(args):
 
 
 def cmd_list_templates(args):
-    """List available PPTX templates.
+    """List available PPTX templates with source and description.
 
     Includes user-local templates (via $SDPM_TEMPLATES_DIR or ~/.config/sdpm/templates/)
     in addition to the package-bundled ones. User-local templates shadow bundled
-    templates with the same stem.
+    templates with the same stem. Descriptions come from state.json user notes —
+    the art-direction workflow instructs agents to consider them when selecting
+    a template.
     """
-    from sdpm.api import get_templates_dirs
+    from sdpm.api import get_templates_dirs, list_templates_with_metadata
+    from sdpm.config import get_state
 
-    seen: dict[str, Path] = {}
-    for d in get_templates_dirs():
+    templates_dirs = get_templates_dirs()
+    templates = list_templates_with_metadata(
+        templates_dirs,
+        get_state().get("template_metadata", {}),
+    )
+    if not templates:
+        print("No templates found.", file=sys.stderr)
+        return
+    # Resolved path per stem (first match wins — same order as the engine).
+    # Kept in the output because agents need it to locate user-local templates.
+    paths: dict[str, Path] = {}
+    for d in templates_dirs:
         if not d.exists():
             continue
         for t in sorted(d.glob("*.pptx")):
-            seen.setdefault(t.stem, t)
-    if not seen:
-        print("No templates found.", file=sys.stderr)
-        return
-    for stem in sorted(seen):
-        print(f"  {stem}  {seen[stem]}")
+            paths.setdefault(t.stem, t)
+    for t in templates:
+        desc = f"  — {t['description']}" if t["description"] else ""
+        print(f"  {t['name']:<24} [{t['source']}]  {paths[t['name']]}{desc}")
 
 
 def cmd_search_patterns(args):
