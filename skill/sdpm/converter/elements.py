@@ -78,7 +78,12 @@ def extract_line_element(shape, theme_colors=None, color_mapping=None, theme_sty
         h = round(shape.height / EMU_PER_PX)
         x1, y1, x2, y2 = x, y, x + w, y + h
 
-        # Absorb flip into coordinates
+        # Absorb flip and rotation into coordinates.
+        # OOXML renders a connector inside its bounding box (start at one
+        # corner, end at the opposite), flips it, then rotates the whole box
+        # about its center. The schema has no rotation on lines, so bake the
+        # rotation into the endpoints instead.
+        rot_deg = 0
         try:
             xfrm = shape._element.spPr.find(
                 './/{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm')
@@ -87,8 +92,19 @@ def extract_line_element(shape, theme_colors=None, color_mapping=None, theme_sty
                     x1, x2 = x2, x1
                 if xfrm.get('flipV') == '1':
                     y1, y2 = y2, y1
+                rot_deg = int(xfrm.get('rot', '0')) / 60000
         except Exception:
             pass
+        if rot_deg:
+            import math
+            theta = math.radians(rot_deg)  # clockwise in y-down coords
+            c, s = math.cos(theta), math.sin(theta)
+            cx0, cy0 = x + w / 2, y + h / 2
+            def _rot(px_, py_):
+                dx, dy = px_ - cx0, py_ - cy0
+                return round(cx0 + dx * c - dy * s), round(cy0 + dx * s + dy * c)
+            x1, y1 = _rot(x1, y1)
+            x2, y2 = _rot(x2, y2)
 
         elem = {"type": "line", "x1": x1, "y1": y1, "x2": x2, "y2": y2}
         
@@ -107,6 +123,12 @@ def extract_line_element(shape, theme_colors=None, color_mapping=None, theme_sty
                         elem["connectorType"] = "straight"
                     elif 'bent' in prst.lower():
                         elem["connectorType"] = "elbow"
+                        # A 90/270° rotated bent connector renders V-H-V
+                        # (first segment vertical); the builder reconstructs
+                        # elbows as H-V-H unless told otherwise.
+                        r = rot_deg % 360
+                        if 45 <= r < 135 or 225 <= r < 315:
+                            elem["elbowStart"] = "vertical"
                     elif 'curved' in prst.lower():
                         elem["connectorType"] = "curved"
                 

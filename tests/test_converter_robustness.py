@@ -493,3 +493,60 @@ class TestGroupImageReattach:
         assert groups[0].get("_groupImages"), "group-referenced image not saved"
         rel = list(groups[0]["_groupImages"].values())[0]
         assert (tmp_path / "out" / rel).exists()
+
+
+class TestRotatedConnectors:
+    """Connectors carrying xfrm rot= (90/180/270°) lost their orientation.
+
+    The schema has no rotation on line elements, so the converter must bake
+    the rotation into the endpoints — and flag 90/270° bent connectors as
+    V-H-V via elbowStart so the builder reconstructs the elbow correctly.
+    """
+
+    @staticmethod
+    def _connector_slide(rot_deg, prst="bentConnector3", flip_v=False):
+        import tempfile
+
+        from pptx.enum.shapes import MSO_CONNECTOR
+
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        conn = slide.shapes.add_connector(
+            MSO_CONNECTOR.ELBOW, Emu(1270000), Emu(635000), Emu(2540000), Emu(1905000))
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        sp_pr = conn._element.spPr
+        sp_pr.find(f"{ns}prstGeom").set("prst", prst)
+        xfrm = sp_pr.find(f"{ns}xfrm")
+        if rot_deg:
+            xfrm.set("rot", str(rot_deg * 60000))
+        if flip_v:
+            xfrm.set("flipV", "1")
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "t.pptx"
+            prs.save(p)
+            result = pptx_to_json(p, Path(td) / "out")
+        lines = [e for s in result["slides"] for e in s["elements"] if e.get("type") == "line"]
+        assert lines, "connector was not extracted"
+        return lines[0]
+
+    def test_180_rotation_swaps_endpoints(self):
+        base = self._connector_slide(rot_deg=0)
+        rot = self._connector_slide(rot_deg=180)
+        # 180° = point reflection through the box center: endpoints swap.
+        assert (rot["x1"], rot["y1"]) == (base["x2"], base["y2"])
+        assert (rot["x2"], rot["y2"]) == (base["x1"], base["y1"])
+        assert "elbowStart" not in rot  # still starts horizontal
+
+    def test_90_rotation_marks_vertical_elbow(self):
+        rot = self._connector_slide(rot_deg=90)
+        assert rot["elbowStart"] == "vertical"
+
+    def test_270_rotation_marks_vertical_elbow(self):
+        rot = self._connector_slide(rot_deg=270, flip_v=True)
+        assert rot["elbowStart"] == "vertical"
+
+    def test_unrotated_connector_unchanged(self):
+        base = self._connector_slide(rot_deg=0)
+        assert "elbowStart" not in base
+        assert (base["x1"], base["y1"]) == (200, 100)
+        assert (base["x2"], base["y2"]) == (400, 300)
