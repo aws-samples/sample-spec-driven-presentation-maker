@@ -388,6 +388,11 @@ def _extract_line_from_xml(sp_pr, theme_colors=None, color_mapping=None):
     if w:
         result["lineWidth"] = round(int(w) / 12700, 1)
         result["_lineWidthEmu"] = int(w)
+    # Line cap — round caps close the visual gap at arc/line endpoints
+    # (a thick donut arc with flat caps shows square ends and a gap).
+    cap = ln.get('cap')
+    if cap and cap != 'flat':
+        result["_lineCap"] = cap
     # noFill
     if ln.find('a:noFill', _NS) is not None:
         result["line"] = "none"

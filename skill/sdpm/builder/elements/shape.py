@@ -215,6 +215,9 @@ class ShapeMixin:
             fwd = {"lineGradient": line_gradient}
             if elem.get("lineWidth") is not None:
                 fwd["lineWidth"] = line_width
+            for k in ("_lineWidthEmu", "_lineCap"):
+                if elem.get(k) is not None:
+                    fwd[k] = elem[k]
             self._apply_shape_formatting(shape, fwd)
         elif line_color == "none" or line_color is None:
             shape.line.fill.background()
@@ -227,7 +230,12 @@ class ShapeMixin:
                 int(hex_color[4:6], 16)
             )
             shape.line.width = Pt(line_width)
-        
+            if elem.get("_lineCap"):
+                from pptx.oxml.ns import qn as _qn_cap
+                ln_cap = shape._element.spPr.find(_qn_cap('a:ln'))
+                if ln_cap is not None:
+                    ln_cap.set('cap', elem["_lineCap"])
+
         # Apply dash style to shape line
         self._apply_dash_style(shape, elem)
         

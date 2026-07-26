@@ -119,7 +119,7 @@ class FormattingMixin:
                     eff.addprevious(ln)
                 else:
                     sp_pr.append(ln)
-            ln.set('cap', 'flat')
+            ln.set('cap', elem.get("_lineCap", 'flat'))
             if elem.get("_lineWidthEmu") is not None:
                 ln.set('w', str(elem["_lineWidthEmu"]))
             elif elem.get("lineWidth") is not None:
@@ -143,7 +143,7 @@ class FormattingMixin:
                 sp_pr = shape._element.spPr
                 ln = sp_pr.find(qn('a:ln'))
                 if ln is not None:
-                    ln.set('cap', 'flat')
+                    ln.set('cap', elem.get("_lineCap", 'flat'))
             except Exception:
                 pass
             # Apply line opacity

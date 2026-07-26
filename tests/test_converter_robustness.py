@@ -1570,3 +1570,34 @@ class TestArcAdjustments:
         vals = [int(g.get('fmla').split()[1]) for g in gds]
         assert abs(vals[0] - 16200000) < 3000   # 270°
         assert abs(vals[1] - 14046700) < 3000   # 234.1°
+
+
+class TestLineCap:
+    """cap="rnd" was dropped — thick donut arcs showed square ends + gap."""
+
+    def test_round_cap_roundtrip(self, tmp_path):
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E
+        from pptx.oxml.ns import qn
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        arc = slide.shapes.add_shape(MSO_SHAPE.ARC, E(0), E(0), E(1905000), E(1905000))
+        from pptx.dml.color import RGBColor
+        arc.fill.background()
+        arc.line.color.rgb = RGBColor(0xFA, 0x8E, 0xF0)
+        arc.line.width = Emu(158750)
+        ln = arc._element.spPr.find(qn('a:ln'))
+        ln.set('cap', 'rnd')
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if e.get("shape") == "arc")
+        assert el.get("_lineCap") == "rnd"
+
+        from sdpm.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
+        out = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
+        b._add_shape(out, el)
+        out_ln = out.shapes[-1]._element.spPr.find(qn('a:ln'))
+        assert out_ln is not None and out_ln.get('cap') == 'rnd'
