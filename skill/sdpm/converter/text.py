@@ -4,7 +4,7 @@
 from .constants import _NS, EMU_PER_PX, _serialize_lstStyle
 from .color import extract_text_color
 
-def _extract_styled_text(runs, theme_colors=None, color_mapping=None, default_font_size=None, default_text_color=None, is_placeholder=False, paragraph=None):
+def _extract_styled_text(runs, theme_colors=None, color_mapping=None, default_font_size=None, default_text_color=None, is_placeholder=False, paragraph=None, suppress_inherited=False):
     """Convert a list of runs to styled text string. If paragraph is provided, handles <a:br> (soft line breaks)."""
     parts = []
     # If paragraph element is available, iterate children to capture <a:br> elements
@@ -18,7 +18,7 @@ def _extract_styled_text(runs, theme_colors=None, color_mapping=None, default_fo
             elif tag == 'r' and run_idx < len(runs):
                 run = runs[run_idx]
                 run_idx += 1
-                formatted = _format_run(run, theme_colors, color_mapping, default_font_size, default_text_color, is_placeholder)
+                formatted = _format_run(run, theme_colors, color_mapping, default_font_size, default_text_color, is_placeholder, suppress_inherited)
                 if pending_br:
                     # Insert \u000b before the run (outside link tags)
                     if formatted.startswith('{{') and 'link:' in formatted:
@@ -36,10 +36,10 @@ def _extract_styled_text(runs, theme_colors=None, color_mapping=None, default_fo
         return ''.join(parts)
     # Fallback: runs only
     for run in runs:
-        parts.append(_format_run(run, theme_colors, color_mapping, default_font_size, default_text_color, is_placeholder))
+        parts.append(_format_run(run, theme_colors, color_mapping, default_font_size, default_text_color, is_placeholder, suppress_inherited))
     return ''.join(parts)
 
-def _format_run(run, theme_colors=None, color_mapping=None, default_font_size=None, default_text_color=None, is_placeholder=False):
+def _format_run(run, theme_colors=None, color_mapping=None, default_font_size=None, default_text_color=None, is_placeholder=False, suppress_inherited=False):
     """Format a single run with styled text markup."""
     if not run.text:
         return ''
@@ -62,9 +62,14 @@ def _format_run(run, theme_colors=None, color_mapping=None, default_font_size=No
         if default_font_size is None or pt != default_font_size:
             styles.append(f"{pt}pt")
     try:
-        hex_color = extract_text_color(run, theme_colors, color_mapping, is_placeholder=is_placeholder)
-        if hex_color and hex_color != default_text_color:
-            styles.append(hex_color)
+        # When the shape's p:style fontRef supplies the text color (emitted
+        # as elem fontColor), runs without their own solidFill must NOT get
+        # the inherited tx1 fallback baked in — it would override fontRef.
+        has_own_color = run.font.color is not None and run.font.color.type is not None
+        if not (suppress_inherited and not has_own_color):
+            hex_color = extract_text_color(run, theme_colors, color_mapping, is_placeholder=is_placeholder)
+            if hex_color and hex_color != default_text_color:
+                styles.append(hex_color)
     except Exception:
         pass
     if run.font.name:
@@ -220,6 +225,7 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
             if ref_color and ref_color.lower() != (default_text_color or '').lower():
                 elem["fontColor"] = ref_color
                 default_text_color = ref_color
+    _suppress_inherited = "fontColor" in elem
 
     paragraphs_with_text = [p for p in tf.paragraphs if p.text.strip()]
     all_paragraphs = list(tf.paragraphs)
@@ -239,7 +245,7 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
         if len(non_bullet) == 0:
             items = []
             for para in paragraphs_with_text:
-                t = _extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para)
+                t = _extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para, suppress_inherited=_suppress_inherited)
                 if t.strip():
                     items.append(t)
             if items:
@@ -249,7 +255,7 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
             paras = []
             for para in all_paragraphs:
                 p = {}
-                t = _extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para)
+                t = _extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para, suppress_inherited=_suppress_inherited)
                 p["text"] = t
                 pPr = para._element.find(f'{{{ns_a}}}pPr')
                 if pPr is not None:
@@ -287,7 +293,7 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
         if sized_empties:
             paras = []
             for para in all_paragraphs:
-                p = {"text": _extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para)}
+                p = {"text": _extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para, suppress_inherited=_suppress_inherited)}
                 a = _get_alignment(para)
                 if a:
                     p["align"] = a
@@ -303,7 +309,7 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
             for i, para in enumerate(all_paragraphs):
                 if i > 0:
                     parts.append('\n')
-                parts.append(_extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para))
+                parts.append(_extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para, suppress_inherited=_suppress_inherited))
             elem["text"] = ''.join(parts)
         # Extract indent/marL from first paragraph for single-text shapes
         if paragraphs_with_text:

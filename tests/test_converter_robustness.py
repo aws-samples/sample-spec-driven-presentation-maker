@@ -1240,3 +1240,49 @@ class TestP3FidelityFixes:
         out_svg = (tmp_path / "out" / el["src"]).read_bytes().decode()
         assert 'viewBox="0 0 1440 181' in out_svg  # 320 * (1 - 0.43426) ≈ 181
         assert el.get("fit") == "stretch"
+
+
+class TestPowerPointStrictness:
+    """Bugs invisible in LibreOffice (lenient) but visible in PowerPoint."""
+
+    def test_fontref_runs_not_overridden_by_inherited_black(self, tmp_path):
+        # Runs WITHOUT their own color must not get the inherited tx1
+        # fallback baked in when the style fontRef supplies the color.
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E
+        from lxml import etree
+        from pptx.oxml.ns import qn
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, E(0), E(0), E(914400), E(457200))
+        sp.text_frame.text = "header"
+        fr = sp._element.find(qn('p:style') + '/' + qn('a:fontRef'))
+        for child in list(fr):
+            fr.remove(child)
+        etree.SubElement(fr, qn('a:schemeClr')).set('val', 'accent1')
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if "header" in str(e.get("text", "")))
+        assert el.get("fontColor", "").startswith("#")
+        # No color tag baked into the run text
+        assert "#" not in str(el["text"]).replace(el.get("fontColor"), "")
+
+    def test_pattern_fill_schema_order(self, tmp_path):
+        # PowerPoint ignores fills that appear after a:ln in spPr.
+        from sdpm.builder import PPTXBuilder
+        from pptx.oxml.ns import qn
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
+        slide = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
+        b._add_shape(slide, {
+            "type": "shape", "shape": "rectangle",
+            "x": 0, "y": 0, "width": 100, "height": 100,
+            "patternFill": {"pattern": "dotGrid", "fgColor": "#D9D9D9", "bgColor": "#FFFFFF"},
+            "line": "none",
+        })
+        sp_pr = slide.shapes[-1]._element.spPr
+        tags = [c.tag.split('}')[-1] for c in sp_pr]
+        assert 'pattFill' in tags
+        assert tags.index('pattFill') < tags.index('ln')
+        assert tags.index('prstGeom') < tags.index('pattFill')

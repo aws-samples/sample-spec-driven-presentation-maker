@@ -183,7 +183,7 @@ class ShapeMixin:
             for tag in ('a:solidFill', 'a:gradFill', 'a:noFill', 'a:pattFill'):
                 for el in sp_pr.findall(qn(tag)):
                     sp_pr.remove(el)
-            patt = etree.SubElement(sp_pr, qn('a:pattFill'))
+            patt = etree.Element(qn('a:pattFill'))
             patt.set('prst', pattern_fill.get("pattern", "dkDnDiag"))
             fg = etree.SubElement(patt, qn('a:fgClr'))
             fg_srgb = etree.SubElement(fg, qn('a:srgbClr'))
@@ -191,6 +191,20 @@ class ShapeMixin:
             bg = etree.SubElement(patt, qn('a:bgClr'))
             bg_srgb = etree.SubElement(bg, qn('a:srgbClr'))
             bg_srgb.set('val', pattern_fill.get("bgColor", "#000000").lstrip("#"))
+            # CT_ShapeProperties is an ordered sequence: the fill must come
+            # BEFORE a:ln/a:effectLst. PowerPoint silently ignores fills that
+            # appear out of order (LibreOffice is lenient, so renders hid the
+            # bug). Insert after prstGeom/custGeom when present.
+            anchor = None
+            for tag in ('a:prstGeom', 'a:custGeom', 'a:xfrm'):
+                el = sp_pr.find(qn(tag))
+                if el is not None:
+                    anchor = el
+                    break
+            if anchor is not None:
+                anchor.addnext(patt)
+            else:
+                sp_pr.insert(0, patt)
         
         # Apply line color or gradient
         line_gradient = elem.get("lineGradient")
