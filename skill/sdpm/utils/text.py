@@ -172,6 +172,9 @@ def _parse_non_link_styles(text, auto_spacing=True):
                     segment["baseline"] = int(attr[9:])
                 except ValueError:
                     pass
+            elif attr.startswith("highlight=#"):
+                # Text highlight (marker) color — a:highlight
+                segment["highlight"] = attr[10:]
 
         segments.append(segment)
         last_end = match.end()

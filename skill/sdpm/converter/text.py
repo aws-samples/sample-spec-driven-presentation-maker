@@ -80,6 +80,20 @@ def _format_run(run, theme_colors=None, color_mapping=None, default_font_size=No
             bl = int(rPr_bl.get('baseline'))
             if bl != 0:
                 styles.append(f"baseline={bl}")
+        # Text highlight (marker color) — a:highlight
+        if rPr_bl is not None:
+            hl = rPr_bl.find(f'{{{_NS["a"]}}}highlight')
+            if hl is not None:
+                srgb_hl = hl.find(f'{{{_NS["a"]}}}srgbClr')
+                if srgb_hl is not None and srgb_hl.get('val'):
+                    styles.append(f"highlight=#{srgb_hl.get('val')}")
+                else:
+                    scheme_hl = hl.find(f'{{{_NS["a"]}}}schemeClr')
+                    if scheme_hl is not None:
+                        from .color import _resolve_color_with_transforms
+                        resolved_hl = _resolve_color_with_transforms(scheme_hl, theme_colors, color_mapping)
+                        if resolved_hl:
+                            styles.append(f"highlight={resolved_hl}")
     except Exception:
         pass
     if run.font.name:

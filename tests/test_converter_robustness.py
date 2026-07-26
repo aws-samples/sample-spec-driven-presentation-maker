@@ -1431,3 +1431,42 @@ class TestEndParaRPrLineHeight:
         last_p = out.shapes[-1].text_frame.paragraphs[-1]._p
         ep = last_p.find(f"{ns}endParaRPr")
         assert ep is not None and ep.get('sz') == '8000'
+
+
+class TestTextHighlight:
+    """a:highlight (marker color) was dropped on round-trip."""
+
+    def test_highlight_roundtrip(self, tmp_path):
+        from pptx.util import Emu as E
+        from lxml import etree
+        from pptx.oxml.ns import qn
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        tb = slide.shapes.add_textbox(E(0), E(0), E(2743200), E(457200))
+        tb.text_frame.text = "highlighted text"
+        run = tb.text_frame.paragraphs[0].runs[0]
+        rPr = run._r.get_or_add_rPr()
+        hl = etree.SubElement(rPr, qn('a:highlight'))
+        etree.SubElement(hl, qn('a:srgbClr')).set('val', '336600')
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if "highlighted" in str(e.get("text", "")))
+        assert "highlight=#336600" in el["text"]
+
+        # Builder writes a:highlight before a:latin (schema order)
+        from sdpm.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
+        out = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
+        b._add_textbox(out, el)
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        rPrs = out.shapes[-1].text_frame._txBody.findall(f".//{ns}r/{ns}rPr")
+        hls = [r.find(f"{ns}highlight") for r in rPrs]
+        assert any(h is not None for h in hls)
+        for r in rPrs:
+            h = r.find(f"{ns}highlight")
+            latin = r.find(f"{ns}latin")
+            if h is not None and latin is not None:
+                children = list(r)
+                assert children.index(h) < children.index(latin)

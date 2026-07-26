@@ -293,6 +293,19 @@ class FormattingMixin:
                         sym.set('typeface', actual_font)
                     if seg.get("baseline") is not None:
                         run._r.get_or_add_rPr().set('baseline', str(seg["baseline"]))
+                    if seg.get("highlight"):
+                        # a:highlight must precede a:latin in CT_TextCharacterProperties
+                        from lxml import etree as _et_hl
+                        from pptx.oxml.ns import qn as _qn_hl
+                        rPr_hl = run._r.get_or_add_rPr()
+                        hl = _et_hl.Element(_qn_hl('a:highlight'))
+                        srgb_hl = _et_hl.SubElement(hl, _qn_hl('a:srgbClr'))
+                        srgb_hl.set('val', seg["highlight"].lstrip('#').upper())
+                        latin_hl = rPr_hl.find(_qn_hl('a:latin'))
+                        if latin_hl is not None:
+                            latin_hl.addprevious(hl)
+                        else:
+                            rPr_hl.append(hl)
                     # Apply all styles per run so multi-line labels render consistently
                     font_size = seg.get("fontSize") or default_font_size
                     if font_size:
