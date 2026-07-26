@@ -1533,3 +1533,40 @@ class TestQcDeckFixes:
         cxn = slide.shapes[-1]._element
         assert cxn.find(qn('p:style')) is None
         assert cxn.spPr.find(qn('a:effectLst')) is not None
+
+
+class TestArcAdjustments:
+    """arc avLst angles round-trip through the builder's intuitive API.
+
+    Raw adj values are angles in 60000ths of a degree; the builder's arc
+    API expects [startDeg, sweepDeg]. Passing raw values drew an 85%
+    donut ring as a ~40% arc.
+    """
+
+    def test_arc_angle_roundtrip(self, tmp_path):
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        arc = slide.shapes.add_shape(MSO_SHAPE.ARC, E(0), E(0), E(1905000), E(1905000))
+        arc.adjustments[0] = 162.0   # 270° * 0.6 (python-pptx unit)
+        arc.adjustments[1] = 140.467  # 234.1° * 0.6
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if e.get("shape") == "arc")
+        start, sweep = el["adjustments"][:2]
+        assert abs(start - 270.0) < 0.01
+        assert abs(sweep - ((234.112 - 270) % 360)) < 0.01
+
+        # Builder converts back to the original raw angles
+        from sdpm.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
+        out = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
+        b._add_shape(out, el)
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        gds = out.shapes[-1]._element.spPr.findall(f".//{ns}avLst/{ns}gd")
+        vals = [int(g.get('fmla').split()[1]) for g in gds]
+        assert abs(vals[0] - 16200000) < 3000   # 270°
+        assert abs(vals[1] - 14046700) < 3000   # 234.1°
