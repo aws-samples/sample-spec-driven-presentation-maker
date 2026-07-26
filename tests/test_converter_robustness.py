@@ -1470,3 +1470,66 @@ class TestTextHighlight:
             if h is not None and latin is not None:
                 children = list(r)
                 assert children.index(h) < children.index(latin)
+
+
+class TestQcDeckFixes:
+    """p12 of the QC deck: quote alignment, circle outlines, line shadow."""
+
+    def test_paragraph_align_survives_lststyle(self, tmp_path):
+        # Explicit algn=l per paragraph must roundtrip — otherwise a
+        # centered lstStyle default silently wins.
+        from pptx.util import Emu as E
+        from pptx.enum.text import PP_ALIGN
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        tb = slide.shapes.add_textbox(E(0), E(0), E(2743200), E(914400))
+        tf = tb.text_frame
+        tf.text = "quote one"
+        p2 = tf.add_paragraph(); p2.text = "quote two"
+        for p in tf.paragraphs:
+            p.alignment = PP_ALIGN.LEFT
+        # Force paragraphs-mode via differing per-para sizes
+        from pptx.util import Pt
+        tf.paragraphs[0].runs[0].font.size = Pt(20)
+        tf.paragraphs[1].runs[0].font.size = Pt(14)
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if "quote" in str(e.get("text", "")) + str(e.get("paragraphs", "")))
+        if el.get("paragraphs"):
+            assert all(p.get("align") == "left" for p in el["paragraphs"] if p.get("text"))
+        else:
+            assert el.get("align") == "left"
+
+    def test_line_gradient_ln_before_effectlst(self):
+        # a:ln appended after a:effectLst is ignored by PowerPoint —
+        # white circles lost their gradient outlines and vanished.
+        from sdpm.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
+        slide = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
+        b._add_shape(slide, {
+            "type": "shape", "shape": "flowChartConnector",
+            "x": 0, "y": 0, "width": 24, "height": 24, "fill": "#FFFFFF",
+            "lineGradient": {"stops": [{"position": 0.0, "color": "#FA8EF0"},
+                                        {"position": 1.0, "color": "#64AEF8"}],
+                             "angle": 40.0, "type": "linear"},
+            "_noEffects": True,
+        })
+        sp_pr = slide.shapes[-1]._element.spPr
+        tags = [c.tag.split('}')[-1] for c in sp_pr]
+        assert 'ln' in tags and 'effectLst' in tags
+        assert tags.index('ln') < tags.index('effectLst')
+
+    def test_connector_noeffects_drops_style(self):
+        # python-pptx's default connector style (effectRef idx=1) painted a
+        # theme shadow under plain lines.
+        from sdpm.builder import PPTXBuilder
+        from pptx.oxml.ns import qn
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
+        slide = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
+        b._add_line(slide, {"type": "line", "x1": 100, "y1": 50, "x2": 500, "y2": 50,
+                            "lineWidth": 3.0, "color": "#4F81BD", "_noEffects": True})
+        cxn = slide.shapes[-1]._element
+        assert cxn.find(qn('p:style')) is None
+        assert cxn.spPr.find(qn('a:effectLst')) is not None

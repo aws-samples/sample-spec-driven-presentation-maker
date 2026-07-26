@@ -111,7 +111,14 @@ class FormattingMixin:
             sp_pr = shape._element.spPr
             ln = sp_pr.find(qn('a:ln'))
             if ln is None:
-                ln = etree.SubElement(sp_pr, qn('a:ln'))
+                # a:ln must precede a:effectLst (PowerPoint drops
+                # out-of-order children — the outline vanished).
+                ln = etree.Element(qn('a:ln'))
+                eff = sp_pr.find(qn('a:effectLst'))
+                if eff is not None:
+                    eff.addprevious(ln)
+                else:
+                    sp_pr.append(ln)
             ln.set('cap', 'flat')
             if elem.get("_lineWidthEmu") is not None:
                 ln.set('w', str(elem["_lineWidthEmu"]))

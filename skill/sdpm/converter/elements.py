@@ -187,7 +187,24 @@ def extract_line_element(shape, theme_colors=None, color_mapping=None, theme_sty
         dash = extract_line_dash(shape)
         if dash:
             elem["dashStyle"] = dash
-        
+
+        # No effects in source → say so explicitly (same rule as shapes).
+        # python-pptx's add_connector default <p:style> has effectRef idx=1
+        # (theme shadow), which painted a shadow under plain lines.
+        try:
+            style_el = shape._element.find(f'{{{_NS["p"]}}}style')
+            eff_ref = style_el.find(f'{{{_NS["a"]}}}effectRef') if style_el is not None else None
+            has_own_effects = False
+            sp_pr_el = shape._element.find(f'{{{_NS["p"]}}}spPr')
+            if sp_pr_el is not None:
+                eff_lst = sp_pr_el.find(f'{{{_NS["a"]}}}effectLst')
+                has_own_effects = eff_lst is not None and len(eff_lst) > 0
+            if not has_own_effects and (
+                    eff_ref is None or int(eff_ref.get('idx', '0') or 0) == 0):
+                elem["_noEffects"] = True
+        except Exception:
+            pass
+
         return elem
     except Exception as e:
         print(f"Warning: Failed to extract line: {e}", file=sys.stderr)
@@ -727,6 +744,11 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
             
             item_text = _extract_styled_text(paragraph.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, is_placeholder=is_placeholder, paragraph=paragraph)
             para_info = {"text": item_text}
+            # Explicit paragraph alignment — without it a shape-level
+            # lstStyle default (e.g. centered) silently wins.
+            _algn = _get_alignment(paragraph)
+            if _algn:
+                para_info["align"] = _algn
             if has_bullet or numbering_type:
                 list_def = {}
                 if numbering_type:
