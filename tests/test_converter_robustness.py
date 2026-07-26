@@ -1394,3 +1394,40 @@ class TestPowerPointTextLayout:
         assert runs and all(
             r.find(f"{ns}rPr") is not None and r.find(f"{ns}rPr").get("lang") == "ja-JP"
             for r in runs)
+
+
+class TestEndParaRPrLineHeight:
+    """endParaRPr pins line height next to baseline-shrunk runs.
+
+    A full-size 80pt endParaRPr beside a baseline-offset '01' keeps the
+    line tall in PowerPoint; dropping it shifted the digits up.
+    """
+
+    def test_endpara_size_roundtrip(self, tmp_path):
+        from pptx.util import Emu as E, Pt
+        from lxml import etree
+        from pptx.oxml.ns import qn
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        tb = slide.shapes.add_textbox(E(0), E(0), E(914400), E(914400))
+        tb.text_frame.text = "01"
+        run = tb.text_frame.paragraphs[0].runs[0]
+        run.font.size = Pt(80)
+        run._r.get_or_add_rPr().set('baseline', '-15079')
+        endPr = etree.SubElement(tb.text_frame.paragraphs[0]._p, qn('a:endParaRPr'))
+        endPr.set('sz', '8000')
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if "01" in str(e.get("text", "")))
+        assert el.get("_endParaSize") == 80.0
+
+        from sdpm.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
+        out = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
+        b._add_textbox(out, el)
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        last_p = out.shapes[-1].text_frame.paragraphs[-1]._p
+        ep = last_p.find(f"{ns}endParaRPr")
+        assert ep is not None and ep.get('sz') == '8000'

@@ -251,6 +251,17 @@ class TextboxMixin:
                     spcEl.set('val', str(lnSpcPct))
                 pPr.insert(0, lnSpc)
         
+        # Restore endParaRPr size — it pins the paragraph line height
+        # (e.g. full-size endParaRPr next to a baseline-shrunk run).
+        end_para_size = elem.get("_endParaSize")
+        if end_para_size and tf.paragraphs:
+            from lxml import etree as _et_ep
+            from pptx.oxml.ns import qn as _qn_ep
+            last_p = tf.paragraphs[-1]._p
+            if last_p.find(_qn_ep('a:endParaRPr')) is None:
+                endPr = _et_ep.SubElement(last_p, _qn_ep('a:endParaRPr'))
+                endPr.set('sz', str(int(end_para_size * 100)))
+
         # Apply character spacing
         spc = elem.get("_spc")
         if spc is not None:

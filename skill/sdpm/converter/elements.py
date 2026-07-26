@@ -810,7 +810,25 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
         text_parts.append(_extract_styled_text(paragraph.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, is_placeholder=is_placeholder, paragraph=paragraph))
     
     elem["text"] = ''.join(text_parts)
-    
+
+    # endParaRPr pins the paragraph line height (e.g. a full-size 80pt
+    # endParaRPr next to a baseline-shrunk run keeps the line tall;
+    # dropping it shifts the text up within the box).
+    if shape.text_frame.paragraphs:
+        _last_p = shape.text_frame.paragraphs[-1]
+        _endPr = _last_p._element.find(f'{{{_NS["a"]}}}endParaRPr')
+        if _endPr is not None and _endPr.get('sz'):
+            _end_sz = int(_endPr.get('sz')) / 100
+            _last_runs = _last_p.runs
+            _last_run_sz = (_last_runs[-1].font.size.pt
+                            if _last_runs and _last_runs[-1].font.size else None)
+            _has_baseline = any(
+                (r._r.find(f'{{{_NS["a"]}}}rPr') is not None
+                 and r._r.find(f'{{{_NS["a"]}}}rPr').get('baseline'))
+                for r in _last_runs)
+            if _has_baseline or (_last_run_sz is not None and _end_sz != _last_run_sz):
+                elem["_endParaSize"] = _end_sz
+
     # Extract indent/marL from first paragraph
     if shape.text_frame.paragraphs:
         from pptx.oxml.ns import qn as _qn

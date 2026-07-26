@@ -321,6 +321,24 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
                     parts.append('\n')
                 parts.append(_extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para, suppress_inherited=_suppress_inherited))
             elem["text"] = ''.join(parts)
+            # endParaRPr pins the paragraph line height (e.g. a full-size
+            # 80pt endParaRPr next to a baseline-shrunk run keeps the line
+            # tall; dropping it shifts the text up). Roundtrip it when it
+            # differs from the last run's size or the runs are baseline-offset.
+            if all_paragraphs:
+                last_p = all_paragraphs[-1]
+                endPr = last_p._element.find(f'{{{_NS["a"]}}}endParaRPr')
+                if endPr is not None and endPr.get('sz'):
+                    end_sz = int(endPr.get('sz')) / 100
+                    last_runs = last_p.runs
+                    last_run_sz = (last_runs[-1].font.size.pt
+                                   if last_runs and last_runs[-1].font.size else None)
+                    has_baseline = any(
+                        (r._r.find(f'{{{_NS["a"]}}}rPr') is not None
+                         and r._r.find(f'{{{_NS["a"]}}}rPr').get('baseline'))
+                        for r in last_runs)
+                    if has_baseline or (last_run_sz is not None and end_sz != last_run_sz):
+                        elem["_endParaSize"] = end_sz
         # Extract indent/marL from first paragraph for single-text shapes
         if paragraphs_with_text:
             pPr = paragraphs_with_text[0]._element.find(f'{{{_NS["a"]}}}pPr')
