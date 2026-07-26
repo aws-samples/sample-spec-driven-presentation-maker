@@ -1286,3 +1286,70 @@ class TestPowerPointStrictness:
         assert 'pattFill' in tags
         assert tags.index('pattFill') < tags.index('ln')
         assert tags.index('prstGeom') < tags.index('pattFill')
+
+
+class TestSalesDeckFixes:
+    """Fixes from the sales-template deck (p1 fade, p3 numbers/title)."""
+
+    def test_baseline_roundtrip(self, tmp_path):
+        # Sub/superscript baseline must survive: renderers auto-shrink
+        # offset runs, so dropping it made an 80pt "01" wrap vertically.
+        from pptx.util import Emu as E, Pt
+        from pptx.oxml.ns import qn
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        tb = slide.shapes.add_textbox(E(0), E(0), E(914400), E(914400))
+        tb.text_frame.text = "01"
+        run = tb.text_frame.paragraphs[0].runs[0]
+        run.font.size = Pt(80)
+        run._r.get_or_add_rPr().set('baseline', '-15079')
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if "01" in str(e.get("text", "")))
+        assert "baseline=-15079" in el["text"]
+        # Parser understands the tag
+        from sdpm.utils.text import parse_styled_text
+        segs = parse_styled_text(el["text"])
+        assert any(s.get("baseline") == -15079 for s in segs)
+
+    def test_orphaned_placeholder_rescued(self, tmp_path):
+        # idx=0xFFFFFFFF placeholders (no layout counterpart) were stored in
+        # the placeholders dict where the builder can never match them.
+        from pptx.oxml.ns import qn
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        tb = slide.shapes.add_textbox(0, 0, 914400, 457200)
+        tb.text_frame.text = "orphan title"
+        # Turn the textbox into an orphaned placeholder
+        nvPr = tb._element.find(qn('p:nvSpPr') + '/' + qn('p:nvPr'))
+        from lxml import etree
+        ph = etree.SubElement(nvPr, qn('p:ph'))
+        ph.set('type', 'title')
+        ph.set('idx', '4294967295')
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        found = any("orphan title" in str(e.get("text", ""))
+                    for s in result["slides"] for e in s["elements"])
+        assert found, "orphaned placeholder must be rescued as a textbox element"
+
+    def test_gradient_fill_schema_order(self, tmp_path):
+        # PowerPoint ignores gradFill placed after a:ln (LibreOffice renders
+        # it, hiding the bug) — the p1 fade shape vanished in PowerPoint.
+        from sdpm.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
+        slide = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
+        b._add_shape(slide, {
+            "type": "shape", "shape": "rectangle",
+            "x": 0, "y": 0, "width": 100, "height": 100,
+            "gradient": {"stops": [{"position": 0.27, "color": "#F6F8FB"},
+                                    {"position": 1.0, "color": "#FFFFFF", "opacity": 0.0}],
+                          "angle": 0.0, "type": "linear"},
+            "line": "none", "_noEffects": True,
+        })
+        sp_pr = slide.shapes[-1]._element.spPr
+        tags = [c.tag.split('}')[-1] for c in sp_pr]
+        assert 'gradFill' in tags
+        assert tags.index('gradFill') < tags.index('ln')

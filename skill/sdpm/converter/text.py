@@ -72,6 +72,16 @@ def _format_run(run, theme_colors=None, color_mapping=None, default_font_size=No
                 styles.append(hex_color)
     except Exception:
         pass
+    # Sub/superscript (a:rPr baseline) — renderers auto-shrink offset runs,
+    # so dropping it makes e.g. an 80pt decorative "01" render full-size.
+    try:
+        rPr_bl = run._r.find(f'{{{_NS["a"]}}}rPr')
+        if rPr_bl is not None and rPr_bl.get('baseline'):
+            bl = int(rPr_bl.get('baseline'))
+            if bl != 0:
+                styles.append(f"baseline={bl}")
+    except Exception:
+        pass
     if run.font.name:
         # Check for sym font (Wingdings etc) for PUA characters
         font_name = run.font.name

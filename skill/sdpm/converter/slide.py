@@ -268,6 +268,16 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
         if ph_type in (10, 11, 12, 13, 14, 15, 16):  # DATE, SLIDE_NUMBER, FOOTER, HEADER, etc.
             continue
         str_idx = str(idx)
+        # Orphaned placeholder: the layout has no placeholder with this idx
+        # (idx 0xFFFFFFFF, or a slide that outlived its layout). The builder
+        # can never match it, so rescue it as a positioned textbox instead.
+        try:
+            layout_idxs = {ph.placeholder_format.idx for ph in slide.slide_layout.placeholders}
+        except Exception:
+            layout_idxs = None
+        if layout_idxs is not None and idx not in layout_idxs:
+            dup_placeholder_ids.add(shape.shape_id)
+            continue
         if str_idx in placeholders:
             # Duplicate placeholder idx on one slide (Google Slides exports do
             # this — e.g. two TITLE/idx=0 shapes). The dict can hold only one,

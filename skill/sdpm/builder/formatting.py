@@ -183,11 +183,23 @@ class FormattingMixin:
 
         grad_fill = _build_grad_fill_element(gradient)
 
-        ln_el = sp_pr.find(qn('a:ln'))
-        if ln_el is not None:
-            sp_pr.insert(list(sp_pr).index(ln_el), grad_fill)
+        # CT_ShapeProperties is an ordered sequence (fill before a:ln /
+        # a:effectLst). PowerPoint silently ignores out-of-order fills, so
+        # anchor on the geometry element rather than appending.
+        anchor = None
+        for tag in ('a:prstGeom', 'a:custGeom', 'a:xfrm'):
+            el = sp_pr.find(qn(tag))
+            if el is not None:
+                anchor = el
+                break
+        if anchor is not None:
+            anchor.addnext(grad_fill)
         else:
-            sp_pr.append(grad_fill)
+            ln_el = sp_pr.find(qn('a:ln'))
+            if ln_el is not None:
+                sp_pr.insert(list(sp_pr).index(ln_el), grad_fill)
+            else:
+                sp_pr.insert(0, grad_fill)
     
     def _set_fill_opacity(self, shape, opacity):
         """Set fill opacity using low-level XML manipulation.
@@ -274,6 +286,8 @@ class FormattingMixin:
                         rPr = run._r.get_or_add_rPr()
                         sym = _et.SubElement(rPr, _qn('a:sym'))
                         sym.set('typeface', actual_font)
+                    if seg.get("baseline") is not None:
+                        run._r.get_or_add_rPr().set('baseline', str(seg["baseline"]))
                     # Apply all styles per run so multi-line labels render consistently
                     font_size = seg.get("fontSize") or default_font_size
                     if font_size:

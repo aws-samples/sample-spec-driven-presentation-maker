@@ -164,6 +164,14 @@ def _parse_non_link_styles(text, auto_spacing=True):
                     pass
             elif attr.startswith("font="):
                 segment["fontName"] = attr[5:]
+            elif attr.startswith("baseline="):
+                # Sub/superscript offset in 1000ths of a percent (OOXML raw).
+                # Renderers auto-shrink offset runs, so dropping this made
+                # e.g. an 80pt "01" render full-size and wrap.
+                try:
+                    segment["baseline"] = int(attr[9:])
+                except ValueError:
+                    pass
 
         segments.append(segment)
         last_end = match.end()
