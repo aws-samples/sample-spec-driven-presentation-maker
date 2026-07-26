@@ -1353,3 +1353,44 @@ class TestSalesDeckFixes:
         tags = [c.tag.split('}')[-1] for c in sp_pr]
         assert 'gradFill' in tags
         assert tags.index('gradFill') < tags.index('ln')
+
+
+class TestPowerPointTextLayout:
+    """PowerPoint re-runs text layout on open; two attributes control it."""
+
+    def test_spautofit_restored_on_textbox(self, tmp_path):
+        from pptx.util import Emu as E, Pt
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        tb = slide.shapes.add_textbox(E(0), E(0), E(914400), E(457200))
+        tb.text_frame.text = "title"
+        tb.text_frame.paragraphs[0].runs[0].font.size = Pt(32)
+        from pptx.enum.text import MSO_AUTO_SIZE
+        tb.text_frame.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if "title" in str(e.get("text", "")))
+        assert el.get("_spAutoFit") is True
+
+        from sdpm.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
+        out = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
+        b._add_textbox(out, el)
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        bodyPr = out.shapes[-1].text_frame._txBody.find(f"{ns}bodyPr")
+        assert bodyPr.find(f"{ns}spAutoFit") is not None
+
+    def test_japanese_runs_get_lang(self):
+        # Kinsoku / trailing-punctuation compression keys off run lang.
+        from sdpm.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
+        slide = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
+        b._add_textbox(slide, {"type": "textbox", "x": 0, "y": 0, "width": 500, "height": 100,
+                               "text": "課題があります。", "fontSize": 32})
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        runs = slide.shapes[-1].text_frame._txBody.findall(f".//{ns}r")
+        assert runs and all(
+            r.find(f"{ns}rPr") is not None and r.find(f"{ns}rPr").get("lang") == "ja-JP"
+            for r in runs)

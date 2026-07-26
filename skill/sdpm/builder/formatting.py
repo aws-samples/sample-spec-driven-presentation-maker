@@ -262,6 +262,11 @@ class FormattingMixin:
                             br_rPr.set('u', 'sng')
                     run = paragraph.add_run()
                     run.text = line
+                    # PowerPoint's East-Asian line breaking (kinsoku, trailing
+                    # punctuation compression) keys off the run language —
+                    # without it borderline Japanese lines wrap mid-sentence.
+                    if any('\u3000' <= ch <= '\u9fff' or '\uff00' <= ch <= '\uffef' for ch in line):
+                        run._r.get_or_add_rPr().set('lang', 'ja-JP')
                     run.font.name = seg.get("fontName") or (None if no_default_font else font_name) or None
                     # python-pptx only writes a:latin; CJK glyphs render with
                     # a:ea, so an explicit font tag must set both or Japanese

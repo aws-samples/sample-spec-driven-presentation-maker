@@ -73,6 +73,11 @@ class TextboxMixin:
             tf.word_wrap = False
         elif not elem.get("_noAutofit"):
             tf.word_wrap = True
+        if elem.get("_spAutoFit"):
+            # Restore shape-to-fit-text: PowerPoint re-runs autofit layout on
+            # open; without it borderline text wraps where the original grew.
+            from pptx.enum.text import MSO_AUTO_SIZE as _AS
+            tf.auto_size = _AS.SHAPE_TO_FIT_TEXT
         
         # Apply rotation
         rotation = elem.get("rotation", _DEFAULTS["rotation"])
