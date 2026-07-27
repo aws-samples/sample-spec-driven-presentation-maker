@@ -66,7 +66,7 @@ def normalize_spacing(text):
     return ''.join(result)
 
 
-def parse_styled_text(text):
+def parse_styled_text(text, auto_spacing=True):
     """Parse {{attrs:text}} syntax into styled segments.
 
     Supported attrs (comma-separated):
@@ -75,6 +75,11 @@ def parse_styled_text(text):
     - #RRGGBB (color)
     - NNpt (font size)
     - link:URL (hyperlink)
+
+    Args:
+        auto_spacing: Insert half-width spaces between CJK and Latin text
+            (typography for AI-authored decks). Pass False to preserve the
+            source text verbatim (e.g. decks imported from existing PPTX).
     """
     link_pattern = r'\{\{(?:(\d+pt),)?link:([^}]+)\}\}'
     segments = []
@@ -83,7 +88,7 @@ def parse_styled_text(text):
     for match in re.finditer(link_pattern, text):
         if match.start() > last_end:
             plain_part = text[last_end:match.start()]
-            segments.extend(_parse_non_link_styles(plain_part))
+            segments.extend(_parse_non_link_styles(plain_part, auto_spacing=auto_spacing))
 
         size_attr = match.group(1)  # e.g. "14pt" or None
         content = match.group(2)
@@ -111,12 +116,12 @@ def parse_styled_text(text):
         last_end = match.end()
 
     if last_end < len(text):
-        segments.extend(_parse_non_link_styles(text[last_end:]))
+        segments.extend(_parse_non_link_styles(text[last_end:], auto_spacing=auto_spacing))
 
     return segments if segments else [{"text": text}]
 
 
-def _parse_non_link_styles(text):
+def _parse_non_link_styles(text, auto_spacing=True):
     """Parse non-link styled text."""
     pattern = r'\{\{([^:}]+):((?:\\}|[^}])+)\}\}'
     segments = []
@@ -124,7 +129,9 @@ def _parse_non_link_styles(text):
 
     for match in re.finditer(pattern, text):
         if match.start() > last_end:
-            plain_text = normalize_spacing(text[last_end:match.start()])
+            plain_text = text[last_end:match.start()]
+            if auto_spacing:
+                plain_text = normalize_spacing(plain_text)
             segments.append({"text": plain_text})
 
         raw_attrs = match.group(1)
@@ -137,7 +144,7 @@ def _parse_non_link_styles(text):
             inner_text = inner_text[8:]  # skip "#RRGGBB:"
         attrs = raw_attrs.split(',')
         has_font = any(a.startswith('font=') for a in attrs)
-        inner_text = inner_text if has_font else normalize_spacing(inner_text)
+        inner_text = inner_text if (has_font or not auto_spacing) else normalize_spacing(inner_text)
         segment = {"text": inner_text}
 
         for attr in attrs:
@@ -157,13 +164,29 @@ def _parse_non_link_styles(text):
                     pass
             elif attr.startswith("font="):
                 segment["fontName"] = attr[5:]
+            elif attr.startswith("baseline="):
+                # Sub/superscript offset in 1000ths of a percent (OOXML raw).
+                # Renderers auto-shrink offset runs, so dropping this made
+                # e.g. an 80pt "01" render full-size and wrap.
+                try:
+                    segment["baseline"] = int(attr[9:])
+                except ValueError:
+                    pass
+            elif attr.startswith("highlight=#"):
+                # Text highlight (marker) color — a:highlight
+                segment["highlight"] = attr[10:]
 
         segments.append(segment)
         last_end = match.end()
 
     if last_end < len(text):
-        plain_text = normalize_spacing(text[last_end:])
+        plain_text = text[last_end:]
+        if auto_spacing:
+            plain_text = normalize_spacing(plain_text)
         segments.append({"text": plain_text})
+
+    if not auto_spacing:
+        return segments
 
     for i in range(len(segments) - 1):
         cur_text = segments[i]["text"]

@@ -52,7 +52,24 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (deckId === "new") return generateSessionId()
     return deckId.padEnd(36, "0")
   })
-  useEffect(() => { if (chatSessionId) setSessionId((prev) => (chatSessionId !== prev ? chatSessionId : prev)) }, [chatSessionId])
+  // Mid-stream guard: when a deck is created while the agent is still
+  // streaming (init_presentation in the import-pptx guide), the parent
+  // re-renders with a fresh chatSessionId. Swapping sessionId here would
+  // re-trigger history loading and clobber the in-flight messages
+  // (toolUses disappear from the UI). Defer the swap until streaming
+  // finishes, then apply it once isLoading flips back to false.
+  const pendingChatSessionIdRef = useRef<string | null>(null)
+  const isLoadingRef = useRef(false)
+  useEffect(() => {
+    if (chatSessionId && chatSessionId !== sessionId) {
+      if (isLoadingRef.current) {
+        pendingChatSessionIdRef.current = chatSessionId
+      } else {
+        setSessionId(chatSessionId)
+      }
+    }
+    // After the swap chatSessionId === sessionId, so the re-run is a no-op.
+  }, [chatSessionId, sessionId])
 
   // --- Config ---
   const [configLoaded, setConfigLoaded] = useState(false)
@@ -200,6 +217,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // --- Reconnect to running background session (Local mode) ---
   useEffect(() => {
     if (!IS_LOCAL || !deckId || deckId === "new") return
+    // Skip reconnect when this ChatPanel is already streaming via
+    // /api/agent/invoke. Without this guard, the deckId prop swap from
+    // "new" → real deckId after init_presentation triggers a second SSE
+    // consumer (EventSource), which reads the same stream alongside the
+    // in-flight fetch — every chunk lands in setMessages twice and the
+    // tool cards / text either get clobbered or duplicated mid-stream.
+    if (isLoadingRef.current) return
     let es: EventSource | null = null
     let completion = ""
     const toolPositions = new Map<string, number>()
@@ -387,6 +411,22 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [stream.isLoading, stream.messages])
 
   const isLoading = stream.isLoading || reconnectLoading
+
+  // Sync streaming flag and flush any deferred sessionId swap once
+  // streaming finishes — at that point loadHistory can safely re-fetch
+  // (the .chat.json server-side state is already complete).
+  // Uses the combined isLoading (not stream.isLoading alone): a Local
+  // reconnect stream (reconnectLoading) is also in-flight — flushing the
+  // swap during it would clobber the reconnecting messages the same way.
+  useEffect(() => {
+    isLoadingRef.current = isLoading
+    if (!isLoading && pendingChatSessionIdRef.current) {
+      const next = pendingChatSessionIdRef.current
+      pendingChatSessionIdRef.current = null
+      setSessionId(next)
+    }
+  }, [isLoading])
+
   const isInitial = stream.messages.length === 0 && !historyLoading
 
   return (

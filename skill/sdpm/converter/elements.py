@@ -78,7 +78,12 @@ def extract_line_element(shape, theme_colors=None, color_mapping=None, theme_sty
         h = round(shape.height / EMU_PER_PX)
         x1, y1, x2, y2 = x, y, x + w, y + h
 
-        # Absorb flip into coordinates
+        # Absorb flip and rotation into coordinates.
+        # OOXML renders a connector inside its bounding box (start at one
+        # corner, end at the opposite), flips it, then rotates the whole box
+        # about its center. The schema has no rotation on lines, so bake the
+        # rotation into the endpoints instead.
+        rot_deg = 0
         try:
             xfrm = shape._element.spPr.find(
                 './/{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm')
@@ -87,8 +92,19 @@ def extract_line_element(shape, theme_colors=None, color_mapping=None, theme_sty
                     x1, x2 = x2, x1
                 if xfrm.get('flipV') == '1':
                     y1, y2 = y2, y1
+                rot_deg = int(xfrm.get('rot', '0')) / 60000
         except Exception:
             pass
+        if rot_deg:
+            import math
+            theta = math.radians(rot_deg)  # clockwise in y-down coords
+            c, s = math.cos(theta), math.sin(theta)
+            cx0, cy0 = x + w / 2, y + h / 2
+            def _rot(px_, py_):
+                dx, dy = px_ - cx0, py_ - cy0
+                return round(cx0 + dx * c - dy * s), round(cy0 + dx * s + dy * c)
+            x1, y1 = _rot(x1, y1)
+            x2, y2 = _rot(x2, y2)
 
         elem = {"type": "line", "x1": x1, "y1": y1, "x2": x2, "y2": y2}
         
@@ -107,6 +123,12 @@ def extract_line_element(shape, theme_colors=None, color_mapping=None, theme_sty
                         elem["connectorType"] = "straight"
                     elif 'bent' in prst.lower():
                         elem["connectorType"] = "elbow"
+                        # A 90/270° rotated bent connector renders V-H-V
+                        # (first segment vertical); the builder reconstructs
+                        # elbows as H-V-H unless told otherwise.
+                        r = rot_deg % 360
+                        if 45 <= r < 135 or 225 <= r < 315:
+                            elem["elbowStart"] = "vertical"
                     elif 'curved' in prst.lower():
                         elem["connectorType"] = "curved"
                 
@@ -165,7 +187,24 @@ def extract_line_element(shape, theme_colors=None, color_mapping=None, theme_sty
         dash = extract_line_dash(shape)
         if dash:
             elem["dashStyle"] = dash
-        
+
+        # No effects in source → say so explicitly (same rule as shapes).
+        # python-pptx's add_connector default <p:style> has effectRef idx=1
+        # (theme shadow), which painted a shadow under plain lines.
+        try:
+            style_el = shape._element.find(f'{{{_NS["p"]}}}style')
+            eff_ref = style_el.find(f'{{{_NS["a"]}}}effectRef') if style_el is not None else None
+            has_own_effects = False
+            sp_pr_el = shape._element.find(f'{{{_NS["p"]}}}spPr')
+            if sp_pr_el is not None:
+                eff_lst = sp_pr_el.find(f'{{{_NS["a"]}}}effectLst')
+                has_own_effects = eff_lst is not None and len(eff_lst) > 0
+            if not has_own_effects and (
+                    eff_ref is None or int(eff_ref.get('idx', '0') or 0) == 0):
+                elem["_noEffects"] = True
+        except Exception:
+            pass
+
         return elem
     except Exception as e:
         print(f"Warning: Failed to extract line: {e}", file=sys.stderr)
@@ -345,6 +384,15 @@ def extract_shape_element(shape, theme_colors=None, color_mapping=None, theme_st
                         fmla = gd.get('fmla', '')
                         if fmla.startswith('val '):
                             adjs.append(round(int(fmla.split()[1]) / 100000, 5))
+                    prst_name = prst_geom.get('prst')
+                    if prst_name == 'arc' and len(adjs) >= 2:
+                        # Raw adj are angles in 60000ths of a degree, but the
+                        # builder's arc API is [startDeg, sweepDeg] — feeding
+                        # raw values drew a 353° ring as ~40%.
+                        start_deg = round(adjs[0] * 100000 / 60000, 3)
+                        end_deg = round(adjs[1] * 100000 / 60000, 3)
+                        sweep = round((end_deg - start_deg) % 360, 3)
+                        adjs = [start_deg, sweep]
                     if adjs:
                         elem["adjustments"] = adjs
         except Exception:
@@ -463,6 +511,18 @@ def extract_shape_element(shape, theme_colors=None, color_mapping=None, theme_st
         
         # Extract visual effects
         elem.update(_extract_visual_effects(sp_pr_xml, theme_colors, color_mapping))
+
+        # No effects in source → say so explicitly. The builder's add_shape
+        # carries python-pptx's default <p:style> whose effectRef pulls the
+        # theme shadow; an empty effectLst is needed to suppress it.
+        if not any(k in elem for k in ("shadow", "glow", "softEdge", "reflection")):
+            try:
+                style_el = shape._element.find(f'{{{_NS["p"]}}}style')
+                eff_ref = style_el.find(f'{{{_NS["a"]}}}effectRef') if style_el is not None else None
+                if eff_ref is None or int(eff_ref.get('idx', '0') or 0) == 0:
+                    elem["_noEffects"] = True
+            except Exception:
+                pass
         
         # Preserve lstStyle for roundtrip fidelity (non-placeholder shapes)
         _lst = _serialize_lstStyle(shape) if shape.has_text_frame else None
@@ -532,6 +592,13 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
     if tf.margin_bottom is not None and tf.margin_bottom != 45720:
         elem["marginBottom"] = round(tf.margin_bottom / EMU_PER_PX)
     
+    # Extract vertical anchor (builder textbox default is top when unset)
+    if tf.vertical_anchor is not None:
+        _va_reverse = {1: "top", 3: "middle", 4: "bottom"}
+        va = _va_reverse.get(int(tf.vertical_anchor))
+        if va:
+            elem["verticalAlign"] = va
+
     # Extract fill and line using XML helpers
     try:
         sp_pr_xml = shape._element.find('.//{http://schemas.openxmlformats.org/presentationml/2006/main}spPr')
@@ -573,7 +640,32 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
                 elem["_textGradientRuns"] = grad_runs
     except Exception:
         pass
-    
+
+    # Extract run-level text effects (glow/shadow on the characters). All
+    # runs sharing one effectLst is the common case (decorated headline);
+    # store the raw XML for lossless rebuild.
+    try:
+        from lxml import etree as _et_eff
+        effect_xmls = set()
+        has_run = False
+        for para in shape.text_frame.paragraphs:
+            for run in para.runs:
+                if not run.text.strip():
+                    continue
+                has_run = True
+                rpr = run._r.find(f'{{{_NS["a"]}}}rPr')
+                eff = rpr.find(f'{{{_NS["a"]}}}effectLst') if rpr is not None else None
+                if eff is not None and len(eff) > 0:
+                    effect_xmls.add(_et_eff.tostring(eff, encoding='unicode'))
+                else:
+                    effect_xmls.add("")
+        if has_run and len(effect_xmls) == 1:
+            xml = effect_xmls.pop()
+            if xml:
+                elem["_textEffects"] = xml
+    except Exception:
+        pass
+
     # Detect cap=none and bold=off overrides (when lstStyle has cap=all / b=1)
     try:
         _all_runs = [r for p in shape.text_frame.paragraphs for r in p.runs]
@@ -661,6 +753,11 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
             
             item_text = _extract_styled_text(paragraph.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, is_placeholder=is_placeholder, paragraph=paragraph)
             para_info = {"text": item_text}
+            # Explicit paragraph alignment — without it a shape-level
+            # lstStyle default (e.g. centered) silently wins.
+            _algn = _get_alignment(paragraph)
+            if _algn:
+                para_info["align"] = _algn
             if has_bullet or numbering_type:
                 list_def = {}
                 if numbering_type:
@@ -744,7 +841,25 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
         text_parts.append(_extract_styled_text(paragraph.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, is_placeholder=is_placeholder, paragraph=paragraph))
     
     elem["text"] = ''.join(text_parts)
-    
+
+    # endParaRPr pins the paragraph line height (e.g. a full-size 80pt
+    # endParaRPr next to a baseline-shrunk run keeps the line tall;
+    # dropping it shifts the text up within the box).
+    if shape.text_frame.paragraphs:
+        _last_p = shape.text_frame.paragraphs[-1]
+        _endPr = _last_p._element.find(f'{{{_NS["a"]}}}endParaRPr')
+        if _endPr is not None and _endPr.get('sz'):
+            _end_sz = int(_endPr.get('sz')) / 100
+            _last_runs = _last_p.runs
+            _last_run_sz = (_last_runs[-1].font.size.pt
+                            if _last_runs and _last_runs[-1].font.size else None)
+            _has_baseline = any(
+                (r._r.find(f'{{{_NS["a"]}}}rPr') is not None
+                 and r._r.find(f'{{{_NS["a"]}}}rPr').get('baseline'))
+                for r in _last_runs)
+            if _has_baseline or (_last_run_sz is not None and _end_sz != _last_run_sz):
+                elem["_endParaSize"] = _end_sz
+
     # Extract indent/marL from first paragraph
     if shape.text_frame.paragraphs:
         from pptx.oxml.ns import qn as _qn
@@ -772,6 +887,11 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
             lnSpc_pct = pPr.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}lnSpc/{http://schemas.openxmlformats.org/drawingml/2006/main}spcPct')
             if lnSpc_pct is not None:
                 elem["lineSpacingPct"] = int(lnSpc_pct.get('val'))
+            # Fixed-point spacing (spcPts) — e.g. a 48pt title with 31.2pt
+            # spacing renders much higher/tighter than the default.
+            lnSpc_pts = pPr.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}lnSpc/{http://schemas.openxmlformats.org/drawingml/2006/main}spcPts')
+            if lnSpc_pts is not None:
+                elem["lineSpacingPt"] = int(lnSpc_pts.get('val')) / 100
     
     # Extract visual effects
     try:
@@ -800,20 +920,6 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
             elem["_spc"] = spc_values.pop()
     
     return elem
-    """Extract SVG bytes from asvg:svgBlip if present. Returns bytes or None."""
-    ASVG_NS = 'http://schemas.microsoft.com/office/drawing/2016/SVG/main'
-    svg_blip = shape._element.find(f'.//{{{ASVG_NS}}}svgBlip')
-    if svg_blip is None:
-        return None
-    r_ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
-    r_embed = svg_blip.get(f'{{{r_ns}}}embed')
-    if not r_embed:
-        return None
-    try:
-        part = shape.part.rels[r_embed].target_part
-        return part.blob
-    except (KeyError, Exception):
-        return None
 
 def extract_video_element(shape, output_dir=None, slide_idx=0, img_idx=0):
     """Extract video as element dict, saving video file and poster image."""
@@ -863,6 +969,45 @@ def extract_video_element(shape, output_dir=None, slide_idx=0, img_idx=0):
     return elem
 
 
+def _image_ext(part):
+    """File extension for an image part, derived from its content type."""
+    return part.content_type.split('/')[-1].replace('jpeg', 'jpg').replace('svg+xml', 'svg')
+
+
+def _save_image_part(part, output_dir, filename):
+    """Write an image part's blob under {output_dir}/images/. Returns deck-relative path."""
+    images_dir = Path(output_dir) / "images"
+    images_dir.mkdir(exist_ok=True)
+    (images_dir / filename).write_bytes(part.blob)
+    return f"images/{filename}"
+
+
+def _save_referenced_images(shape, output_dir, slide_idx, img_counter, prefix):
+    """Save every image part referenced (r:embed / r:link) inside a shape's XML.
+
+    Used when raw XML is re-injected on rebuild (rawShape _shapeXml / group
+    _groupXml): without the returned rId → deck-relative-path mapping the
+    injected XML carries dangling r:embed ids and its pictures vanish.
+
+    Returns (rid_map, img_counter).
+    """
+    rid_map = {}
+    if output_dir is None:
+        return rid_map, img_counter
+    for el_ref in shape._element.iter():
+        rid = el_ref.get(f'{{{_NS["r"]}}}embed') or el_ref.get(f'{{{_NS["r"]}}}link')
+        if not rid or rid in rid_map:
+            continue
+        try:
+            part = shape.part.rels[rid].target_part
+            fname = f"slide{slide_idx + 1}_{prefix}{img_counter + 1}_{rid}.{_image_ext(part)}"
+            rid_map[rid] = _save_image_part(part, output_dir, fname)
+            img_counter += 1
+        except Exception:
+            continue
+    return rid_map, img_counter
+
+
 def _extract_svg_blob(shape):
     """Extract SVG bytes from asvg:svgBlip if present. Returns bytes or None."""
     ASVG_NS = 'http://schemas.microsoft.com/office/drawing/2016/SVG/main'
@@ -887,12 +1032,39 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
     # Check for SVG (asvg:svgBlip)
     svg_bytes = _extract_svg_blob(shape)
     if svg_bytes is not None:
+        # PowerPoint crops via blipFill srcRect; SVG frames lose it in the
+        # builder path, so bake the crop into the viewBox instead.
+        src_rect = shape._element.find(
+            f'{{{_NS["p"]}}}blipFill/{{{_NS["a"]}}}srcRect')
+        if src_rect is not None:
+            try:
+                from lxml import etree as _et
+                root = _et.fromstring(svg_bytes)
+                vb = root.get('viewBox')
+                if vb:
+                    mx, my, vw, vh = [float(v) for v in vb.replace(',', ' ').split()]
+                    pct = {k: int(src_rect.get(k, '0')) / 100000 for k in ('l', 't', 'r', 'b')}
+                    if any(pct.values()) and vw > 0 and vh > 0:
+                        nx = mx + pct['l'] * vw
+                        ny = my + pct['t'] * vh
+                        nw = vw * (1 - pct['l'] - pct['r'])
+                        nh = vh * (1 - pct['t'] - pct['b'])
+                        if nw > 0 and nh > 0:
+                            root.set('viewBox', f'{nx:g} {ny:g} {nw:g} {nh:g}')
+                            svg_bytes = _et.tostring(root)
+            except Exception:
+                pass
         if output_dir:
             images_dir = Path(output_dir) / "images"
             images_dir.mkdir(exist_ok=True)
             filename = f"slide{slide_idx + 1}_image{img_idx + 1}.svg"
             (images_dir / filename).write_bytes(svg_bytes)
             elem["src"] = f"images/{filename}"
+        # Imported artwork keeps its own colors — opt out of the builder's
+        # theme-icon recolor (which repainted e.g. green wave shapes black).
+        elem["iconColor"] = "none"
+        _add_flip(elem, shape)
+        elem["fit"] = "stretch"
         return elem
     
     # Save image to file
@@ -923,6 +1095,15 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
     # Extract hyperlink
     if hasattr(shape, 'click_action') and shape.click_action.hyperlink:
         elem["link"] = shape.click_action.hyperlink.address
+
+    # Mirrored pictures (flipH/flipV) — without this a cutout photo shows
+    # its subject on the wrong side of the frame.
+    _add_flip(elem, shape)
+
+    # PowerPoint's <a:stretch><a:fillRect/> fills the frame exactly,
+    # distorting aspect if needed. The builder default (contain) would
+    # shrink e.g. a full-width wave band into a left-anchored blob.
+    elem["fit"] = "stretch"
     
     # Extract image effects into _originalEffects (underscore-prefixed so builder
     # ignores them by default).  When reusing images in new slides, agents should
@@ -996,13 +1177,96 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
     
     return elem
 
+def _extract_blipfill_image(shape, output_dir, slide_idx, img_counter):
+    """Picture-filled shape/textbox (spPr>blipFill) → image element.
+
+    PowerPoint allows any shape to be filled with a picture. The builder has
+    no image-fill support, so a text-less picture-filled shape is best
+    reproduced as a plain image element with the same geometry. Returns the
+    element or None (has text / no blipFill / extraction failed).
+    """
+    try:
+        if shape.has_text_frame and shape.text_frame.text.strip():
+            return None
+        sp_pr = shape._element.spPr
+        blip_fill = sp_pr.find(f'{{{_NS["a"]}}}blipFill') if sp_pr is not None else None
+        if blip_fill is None:
+            return None
+        blip = blip_fill.find(f'{{{_NS["a"]}}}blip')
+        if blip is None:
+            return None
+        r_ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+        rid = blip.get(f'{{{r_ns}}}embed')
+        is_svg = False
+        if rid is None:
+            svg_blip = blip.find(
+                './/{http://schemas.microsoft.com/office/drawing/2016/SVG/main}svgBlip')
+            if svg_blip is not None:
+                rid = svg_blip.get(f'{{{r_ns}}}embed')
+                is_svg = True
+        if rid is None or output_dir is None:
+            return None
+        part = shape.part.rels[rid].target_part
+        ext = 'svg' if is_svg else _image_ext(part)
+        filename = f"slide{slide_idx + 1}_image{img_counter + 1}.{ext}"
+        elem = _base_element(shape, "image")
+        elem["src"] = _save_image_part(part, output_dir, filename)
+        elem["fit"] = "cover"
+        if ext == 'svg':
+            elem["iconColor"] = "none"
+        elem.pop("fill", None)
+        elem.pop("line", None)
+        return elem
+    except Exception:
+        return None
+
+
+def _shape_needs_raw_passthrough(shape):
+    """WordArt-class decoration the JSON schema can't express.
+
+    - prstTxWarp: warped text (arch / circle / wave WordArt)
+    - run-level blipFill: characters painted with a picture
+    """
+    try:
+        x_el = shape._element
+        warp = x_el.find(f'.//{{{_NS["a"]}}}prstTxWarp')
+        if warp is not None and warp.get('prst') not in (None, 'textNoShape'):
+            return True
+        tx_body = x_el.find(f'.//{{{_NS["p"]}}}txBody')
+        if tx_body is not None:
+            for rpr in tx_body.iter(f'{{{_NS["a"]}}}rPr'):
+                if rpr.find(f'{{{_NS["a"]}}}blipFill') is not None:
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+def _extract_raw_shape(shape, output_dir, slide_idx, img_counter):
+    """Save shape XML verbatim (plus referenced images) for lossless rebuild."""
+    from lxml import etree as _et
+    elem = _base_element(shape, "rawShape")
+    elem["_shapeXml"] = _et.tostring(shape._element, encoding='unicode')
+    rid_map, img_counter = _save_referenced_images(shape, output_dir, slide_idx, img_counter, "raw")
+    if rid_map:
+        elem["_shapeImages"] = rid_map
+    return elem, img_counter
+
+
 def _dispatch_shape(shape, theme_colors=None, color_mapping=None, theme_styles=None, output_dir=None, slide_idx=0, img_counter=0, builder_text_color=None, pptx_path=None):
     """Dispatch shape extraction by type. Returns (elem, img_counter)."""
     elem = None
+    if shape.shape_type in (MSO_SHAPE_TYPE.TEXT_BOX, MSO_SHAPE_TYPE.AUTO_SHAPE,
+                            MSO_SHAPE_TYPE.FREEFORM) and _shape_needs_raw_passthrough(shape):
+        return _extract_raw_shape(shape, output_dir, slide_idx, img_counter)
     if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
         elem, img_counter = extract_group_element(shape, theme_colors, color_mapping, theme_styles, output_dir, slide_idx, img_counter, builder_text_color=builder_text_color)
     elif shape.shape_type == MSO_SHAPE_TYPE.TEXT_BOX:
-        elem = extract_textbox_element(shape, theme_colors, color_mapping, theme_styles, builder_text_color=builder_text_color)
+        elem = _extract_blipfill_image(shape, output_dir, slide_idx, img_counter)
+        if elem:
+            img_counter += 1
+        else:
+            elem = extract_textbox_element(shape, theme_colors, color_mapping, theme_styles, builder_text_color=builder_text_color)
     elif shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
         elem = extract_picture_element(shape, output_dir, slide_idx, img_counter, theme_colors, color_mapping)
         if elem:
@@ -1024,6 +1288,10 @@ def _dispatch_shape(shape, theme_colors=None, color_mapping=None, theme_styles=N
         if elem:
             img_counter += 1
     elif shape.shape_type in (MSO_SHAPE_TYPE.AUTO_SHAPE, MSO_SHAPE_TYPE.FREEFORM):
+        elem = _extract_blipfill_image(shape, output_dir, slide_idx, img_counter)
+        if elem:
+            img_counter += 1
+            return elem, img_counter
         if shape.shape_type == MSO_SHAPE_TYPE.FREEFORM:
             elem = extract_freeform_element(shape, theme_colors, color_mapping, builder_text_color=builder_text_color)
         if not elem:
@@ -1049,14 +1317,41 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
     if rot is not None:
         elem["rotation"] = rot
 
-    # Save raw XML for groups that can't be losslessly flattened
-    # (rotated groups, or groups with many freeforms like SVG icons)
-    has_freeforms = any(child._element.tag.endswith('}sp') and
-                        child.shape_type == 5 for child in shape.shapes)
-    if rot is not None or has_freeforms:
+    # Save raw XML for groups that can't be losslessly flattened:
+    # rotated groups, groups containing freeforms (recursively — vector
+    # icon art nests them deep), and groups whose child coordinate space
+    # is sub-pixel (px-rounded flattening collapses everything to 0x0).
+    def _has_freeforms(g):
+        for child in g.shapes:
+            if child.shape_type == 6 and _has_freeforms(child):
+                return True
+            if child._element.tag.endswith('}sp') and child.shape_type == 5:
+                return True
+        return False
+
+    def _subpixel_children(g):
+        xf = g._element.find(f'{{{_NS["p"]}}}grpSpPr/{{{_NS["a"]}}}xfrm')
+        che = xf.find(f'{{{_NS["a"]}}}chExt') if xf is not None else None
+        if che is None:
+            return False
+        # chExt in EMU: below ~1px per unit means children live in a
+        # miniature coordinate system that px rounding destroys.
+        try:
+            return 0 < int(che.get('cx', '0')) < int(EMU_PER_PX * 10) or \
+                   0 < int(che.get('cy', '0')) < int(EMU_PER_PX * 10)
+        except Exception:
+            return False
+
+    has_freeforms = _has_freeforms(shape)
+    if rot is not None or has_freeforms or _subpixel_children(shape):
         try:
             from lxml import etree as _et
             elem["_groupXml"] = _et.tostring(shape._element, encoding='unicode')
+            # Save any images referenced from inside the group XML — see
+            # _save_referenced_images for why the rId mapping is required.
+            rid_map, img_counter = _save_referenced_images(shape, output_dir, slide_idx, img_counter, "grp")
+            if rid_map:
+                elem["_groupImages"] = rid_map
         except Exception:
             pass
     
@@ -1140,6 +1435,22 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
                         abs_x = group_off_x + (child_x - ch_off_x) * scale_x
                         abs_y = group_off_y + (child_y - ch_off_y) * scale_y
                         
+                        if sub_elem.get("type") == "line" and "x1" in sub_elem:
+                            # Lines carry endpoints, not x/y/width/height —
+                            # transform x1/y1/x2/y2 through the group xfrm.
+                            def _gx(px_):
+                                return round((group_off_x + (px_ * EMU_PER_PX - ch_off_x) * scale_x) / EMU_PER_PX)
+                            def _gy(py_):
+                                return round((group_off_y + (py_ * EMU_PER_PX - ch_off_y) * scale_y) / EMU_PER_PX)
+                            for k in ("x1", "x2"):
+                                if sub_elem.get(k) is not None:
+                                    sub_elem[k] = _gx(sub_elem[k])
+                            for k in ("y1", "y2"):
+                                if sub_elem.get(k) is not None:
+                                    sub_elem[k] = _gy(sub_elem[k])
+                            elem["elements"].append(sub_elem)
+                            continue
+
                         sub_elem["x"] = round(abs_x / EMU_PER_PX)
                         sub_elem["y"] = round(abs_y / EMU_PER_PX)
                         sub_elem["width"] = round(sub_shape.width * scale_x / EMU_PER_PX)
@@ -1157,6 +1468,14 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
                         if sub_elem.get("type") == "group" and sub_elem.get("elements"):
                             def _apply_group_transform(elements, gox, goy, gcx, gcy, sx, sy):
                                 for el in elements:
+                                    if el.get("type") == "line" and "x1" in el:
+                                        for k in ("x1", "x2"):
+                                            if el.get(k) is not None:
+                                                el[k] = round((gox + (el[k] * EMU_PER_PX - gcx) * sx) / EMU_PER_PX)
+                                        for k in ("y1", "y2"):
+                                            if el.get(k) is not None:
+                                                el[k] = round((goy + (el[k] * EMU_PER_PX - gcy) * sy) / EMU_PER_PX)
+                                        continue
                                     if "x" in el and "y" in el:
                                         old_x = el["x"] * EMU_PER_PX
                                         old_y = el["y"] * EMU_PER_PX

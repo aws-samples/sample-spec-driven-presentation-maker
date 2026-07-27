@@ -10,16 +10,71 @@ from .xml_helpers import _extract_fill_from_xml
 from .text import _extract_styled_text
 
 
+def _cell_lststyle_color(tc, theme_colors, color_mapping):
+    """Default text color defined by the cell's own txBody lstStyle.
+
+    Table cells can carry a per-cell lstStyle whose lvl1 defRPr solidFill
+    sets the text color (e.g. white header cells). Runs without an explicit
+    color inherit it — not the slide-level tx1 default.
+    """
+    try:
+        lst = tc.find('a:txBody/a:lstStyle', _NS)
+        if lst is None:
+            return None
+        d = lst.find('a:lvl1pPr/a:defRPr', _NS)
+        if d is None:
+            return None
+        solid = d.find('a:solidFill', _NS)
+        if solid is None:
+            return None
+        srgb = solid.find('a:srgbClr', _NS)
+        if srgb is not None:
+            return _hex(srgb)
+        scheme = solid.find('a:schemeClr', _NS)
+        if scheme is not None:
+            from .color import _resolve_color_with_transforms
+            return _resolve_color_with_transforms(scheme, theme_colors, color_mapping)
+        from .xml_helpers import _sys_hex
+        return _sys_hex(solid)
+    except Exception:
+        return None
+
+
 def _extract_cell(cell, theme_colors=None, color_mapping=None):
     """Extract cell as string (text only) or dict (has extra properties)."""
     tc = cell._tc
     tc_pr = tc.find('a:tcPr', _NS)
     tf = cell.text_frame
+    # Cell-level default text color (from the cell's own lstStyle):
+    # suppress the tx1 fallback for inheriting runs and emit it as the
+    # cell's "color" prop instead.
+    cell_color = _cell_lststyle_color(tc, theme_colors, color_mapping)
     styled_parts = []
+    bullet_chars = []
     for para in tf.paragraphs:
-        styled_parts.append(_extract_styled_text(para.runs, theme_colors, color_mapping, paragraph=para))
+        part = _extract_styled_text(para.runs, theme_colors, color_mapping,
+                                    is_placeholder=bool(cell_color), paragraph=para)
+        pPr = para._element.find('a:pPr', _NS)
+        bu = pPr.find('a:buChar', _NS) if pPr is not None else None
+        bullet_chars.append(bu.get('char', '•') if bu is not None and para.text.strip() else None)
+        styled_parts.append(part)
     text = "\n".join(styled_parts)
     props = {}
+    if any(bullet_chars):
+        # Bulleted lines → paragraphs form (builder renders real buChar bullets)
+        paras = []
+        for para, part, bc in zip(tf.paragraphs, styled_parts, bullet_chars):
+            pd = {"text": part, "bullet": bc} if bc else {"text": part}
+            pPr = para._element.find('a:pPr', _NS)
+            if pPr is not None:
+                if pPr.get('marL') is not None:
+                    pd["marL"] = int(pPr.get('marL'))
+                if pPr.get('indent') is not None:
+                    pd["indent"] = int(pPr.get('indent'))
+            paras.append(pd)
+        props["paragraphs"] = paras
+    if cell_color:
+        props["color"] = cell_color
 
     if tc_pr is not None:
         # Fill → background
@@ -30,9 +85,11 @@ def _extract_cell(cell, theme_colors=None, color_mapping=None):
             srgb = solid.find('a:srgbClr', _NS)
             scheme = solid.find('a:schemeClr', _NS)
             if srgb is not None:
-                props["background"] = _hex(srgb)
+                from .color import apply_element_transforms
+                props["background"] = apply_element_transforms(_hex(srgb), srgb)
             elif scheme is not None:
-                resolved = _resolve_scheme_color(scheme.get('val'), theme_colors, color_mapping)
+                from .color import _resolve_color_with_transforms
+                resolved = _resolve_color_with_transforms(scheme, theme_colors, color_mapping)
                 if resolved:
                     props["background"] = resolved
         elif grad is not None:
@@ -65,6 +122,11 @@ def _extract_cell(cell, theme_colors=None, color_mapping=None):
                         resolved = _resolve_scheme_color(scheme.get('val'), theme_colors, color_mapping)
                         if resolved:
                             border["color"] = resolved
+                    else:
+                        from .xml_helpers import _sys_hex
+                        sys_hex = _sys_hex(sf)
+                        if sys_hex:
+                            border["color"] = sys_hex
             if border:
                 borders[side] = border
         if borders:
@@ -77,6 +139,10 @@ def _extract_cell(cell, theme_colors=None, color_mapping=None):
             va = _va_reverse.get(anchor)
             if va:
                 props["vertical-align"] = va
+        else:
+            # OOXML default anchor is top, but the builder's documented
+            # default is middle — emit explicitly to keep source fidelity.
+            props["vertical-align"] = "top"
 
         # Padding (cell inset)
         padding = {}
@@ -174,18 +240,27 @@ def _parse_table_style(pptx_path, style_id, theme_colors, color_mapping):
                     return base
             return None
 
-        def resolve_border_color(tc_bdr):
+        def resolve_border(tc_bdr):
+            """Return {'color': hex, 'width': pt} from the first solid border side."""
             if tc_bdr is None:
                 return None
-            for tag in ['a:left', 'a:right', 'a:top', 'a:bottom', 'a:insideH', 'a:insideV']:
-                ln = tc_bdr.find(f'{tag}/a:ln/a:solidFill', _NS)
-                if ln is not None:
-                    scheme = ln.find('a:schemeClr', _NS)
-                    if scheme is not None:
-                        return _resolve_scheme_color(scheme.get('val'), theme_colors, color_mapping)
-                    srgb = ln.find('a:srgbClr', _NS)
-                    if srgb is not None:
-                        return _hex(srgb)
+            for tag in ['a:insideH', 'a:insideV', 'a:left', 'a:right', 'a:top', 'a:bottom']:
+                ln_el = tc_bdr.find(f'{tag}/a:ln', _NS)
+                if ln_el is None:
+                    continue
+                fill = ln_el.find('a:solidFill', _NS)
+                if fill is None:
+                    continue
+                color = None
+                scheme = fill.find('a:schemeClr', _NS)
+                if scheme is not None:
+                    color = _resolve_scheme_color(scheme.get('val'), theme_colors, color_mapping)
+                srgb = fill.find('a:srgbClr', _NS)
+                if srgb is not None:
+                    color = _hex(srgb)
+                if color:
+                    w = ln_el.get('w')
+                    return {"color": color, "width": round(int(w) / 12700, 1) if w else 1}
             return None
 
         def resolve_text_color(tc_txt):
@@ -207,9 +282,9 @@ def _parse_table_style(pptx_path, style_id, theme_colors, color_mapping):
                 f = resolve_fill(tc_style)
                 if f:
                     info['background'] = f
-                bc = resolve_border_color(tc_style.find('a:tcBdr', _NS))
-                if bc:
-                    info['borderColor'] = bc
+                bd = resolve_border(tc_style.find('a:tcBdr', _NS))
+                if bd:
+                    info['border'] = bd
             tc_txt = part.find('a:tcTxStyle', _NS)
             if tc_txt is not None:
                 tc = resolve_text_color(tc_txt)
@@ -288,6 +363,21 @@ def extract_table_element(shape, theme_colors=None, color_mapping=None, pptx_pat
                 for ri, row in enumerate(elem["rows"]):
                     style = band1 if ri % 2 == 0 else band2
                     elem["rows"][ri] = [_apply_style_to_cell(c, style) for c in row]
+
+                # Emit a table-level style so the builder reproduces the theme
+                # table style instead of applying its own default banding.
+                style_out = {}
+                body = {"background": band1.get("background", "none")}
+                header = {"background": first_row.get("background", body["background"])}
+                if first_row.get("font-weight"):
+                    header["font-weight"] = first_row["font-weight"]
+                if has_band_row:
+                    style_out["altRow"] = {"background": band2.get("background", "none")}
+                style_out["body"] = body
+                style_out["header"] = header
+                if whole.get("border"):
+                    style_out["border"] = dict(whole["border"])
+                elem["style"] = style_out
 
         return elem
     except Exception as e:

@@ -68,8 +68,16 @@ class TextboxMixin:
             tag = child.tag.split('}')[1]
             if tag in ('spAutoFit', 'noAutofit', 'normAutofit'):
                 bodyPr.remove(child)
-        if not elem.get("_noAutofit"):
-            tf.word_wrap = not auto_width
+        if auto_width:
+            # wrap=none is orthogonal to autofit — honor it even with _noAutofit
+            tf.word_wrap = False
+        elif not elem.get("_noAutofit"):
+            tf.word_wrap = True
+        if elem.get("_spAutoFit"):
+            # Restore shape-to-fit-text: PowerPoint re-runs autofit layout on
+            # open; without it borderline text wraps where the original grew.
+            from pptx.enum.text import MSO_AUTO_SIZE as _AS
+            tf.auto_size = _AS.SHAPE_TO_FIT_TEXT
         
         # Apply rotation
         rotation = elem.get("rotation", _DEFAULTS["rotation"])
@@ -228,16 +236,32 @@ class TextboxMixin:
         
         # Apply line spacing (single-text) - must be before buNone in pPr
         lnSpcPct = elem.get("lineSpacingPct")
-        if lnSpcPct:
+        lnSpcPt = elem.get("lineSpacingPt")
+        if lnSpcPct or lnSpcPt:
             from lxml import etree as _et
             from pptx.oxml.ns import qn as _qn
             for p in tf.paragraphs:
                 pPr = p._element.get_or_add_pPr()
                 lnSpc = _et.Element(_qn('a:lnSpc'))
-                spcPct = _et.SubElement(lnSpc, _qn('a:spcPct'))
-                spcPct.set('val', str(lnSpcPct))
+                if lnSpcPt:
+                    spcEl = _et.SubElement(lnSpc, _qn('a:spcPts'))
+                    spcEl.set('val', str(int(lnSpcPt * 100)))
+                else:
+                    spcEl = _et.SubElement(lnSpc, _qn('a:spcPct'))
+                    spcEl.set('val', str(lnSpcPct))
                 pPr.insert(0, lnSpc)
         
+        # Restore endParaRPr size — it pins the paragraph line height
+        # (e.g. full-size endParaRPr next to a baseline-shrunk run).
+        end_para_size = elem.get("_endParaSize")
+        if end_para_size and tf.paragraphs:
+            from lxml import etree as _et_ep
+            from pptx.oxml.ns import qn as _qn_ep
+            last_p = tf.paragraphs[-1]._p
+            if last_p.find(_qn_ep('a:endParaRPr')) is None:
+                endPr = _et_ep.SubElement(last_p, _qn_ep('a:endParaRPr'))
+                endPr.set('sz', str(int(end_para_size * 100)))
+
         # Apply character spacing
         spc = elem.get("_spc")
         if spc is not None:
@@ -302,6 +326,29 @@ class TextboxMixin:
         grad_runs = elem.get("_textGradientRuns")
         if grad_runs:
             self._apply_text_gradient_runs(textbox, grad_runs)
+
+        # Re-apply run-level text effects (glow/shadow) saved by the converter
+        text_effects = elem.get("_textEffects")
+        if text_effects:
+            try:
+                from lxml import etree as _et
+                from pptx.oxml.ns import qn as _qn
+                for r in textbox._element.findall('.//' + _qn('a:r')):
+                    rPr = r.find(_qn('a:rPr'))
+                    if rPr is None:
+                        rPr = r.makeelement(_qn('a:rPr'), {})
+                        r.insert(0, rPr)
+                    for old_eff in rPr.findall(_qn('a:effectLst')):
+                        rPr.remove(old_eff)
+                    eff = _et.fromstring(text_effects)
+                    # schema order: effectLst goes before latin/ea/cs fonts
+                    font_el = rPr.find(_qn('a:latin'))
+                    if font_el is not None:
+                        rPr.insert(list(rPr).index(font_el), eff)
+                    else:
+                        rPr.append(eff)
+            except Exception:
+                pass
         
         # Override cap=all and bold from lstStyle
         if elem.get("_capNone") or elem.get("_boldOff"):

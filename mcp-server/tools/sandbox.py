@@ -31,6 +31,45 @@ logger = logging.getLogger(__name__)
 _WORKSPACE_PREFIXES = ("deck.json", "slides/", "specs/", "includes/", "attachments/")
 
 
+# Helpers injected into every sandbox session so agent code can be written once
+# and run unchanged on Local (AST-restricted subprocess) and Cloud (AgentCore
+# Code Interpreter). These mirror mcp-local/sandbox.py's _RUNNER_WITH_DECK.
+_HELPERS_PY = '''\
+import json as _json
+from pathlib import Path as _Path
+
+def read_json(path):
+    return _json.loads(_Path(path).read_text(encoding="utf-8"))
+
+def write_json(path, data):
+    p = _Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(_json.dumps(data, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+
+def read_text(path):
+    return _Path(path).read_text(encoding="utf-8")
+
+def write_text(path, text):
+    p = _Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(text, encoding="utf-8")
+
+def list_files(subdir="."):
+    d = _Path(subdir)
+    if not d.is_dir():
+        raise FileNotFoundError(f"Not a directory: {subdir}")
+    return sorted(f.name for f in d.iterdir() if f.is_file())
+'''
+
+# Prepended to every user code invocation so read_json / write_json / ...
+# are available without an explicit import. Agents must NOT write their own
+# 'from _sdpm_helpers import ...' line — the injection handles it so Local
+# and Cloud guide code can stay identical (Local's AST forbids import).
+_HELPERS_IMPORT = (
+    "from _sdpm_helpers import read_json, write_json, read_text, write_text, list_files\n"
+)
+
+
 def execute_in_sandbox(
     code: str,
     storage: Storage,
@@ -86,6 +125,10 @@ def execute_in_sandbox(
         if deck_id:
             _upload_deck_workspace(client, session_id, storage, deck_id)
 
+        # Inject shared sandbox helpers (read_json / write_json / ...) so user
+        # code can use the same API on Local and Cloud.
+        _inject_helpers(client, session_id)
+
         # Upload additional files by basename
         if files:
             file_contents = []
@@ -95,12 +138,13 @@ def execute_in_sandbox(
                 file_contents.append({"path": basename, "text": data.decode("utf-8")})
             _write_files(client, session_id, file_contents)
 
-        # Execute user code
+        # Execute user code (prefixed with helper import so agents can use
+        # read_json / write_json / ... without an explicit import).
         response = client.invoke_code_interpreter(
             codeInterpreterIdentifier="aws.codeinterpreter.v1",
             sessionId=session_id,
             name="executeCode",
-            arguments={"language": "python", "code": code},
+            arguments={"language": "python", "code": _HELPERS_IMPORT + code},
         )
         output = _collect_stream(response)
 
@@ -264,6 +308,16 @@ def _save_deck_workspace(
         )
 
     return outline_warnings, lint_diagnostics
+
+
+def _inject_helpers(client: Any, session_id: str) -> None:
+    """Write the shared helper module into the sandbox cwd.
+
+    Runs after _upload_deck_workspace so `_sdpm_helpers.py` sits alongside
+    the deck files. User code gets these helpers via the `_HELPERS_IMPORT`
+    prefix prepended to every invocation in `execute_in_sandbox`.
+    """
+    _write_files(client, session_id, [{"path": "_sdpm_helpers.py", "text": _HELPERS_PY}])
 
 
 def _write_files(client: Any, session_id: str, content: list[dict[str, str]]) -> None:

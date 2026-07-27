@@ -72,7 +72,7 @@ class PPTXBuilder(
 
     def __init__(self, template_path: Path, custom_template: bool = False,
                  fonts: dict = None, base_dir: Path = None, keep_empty_placeholders: bool = False,
-                 default_text_color: str = None):
+                 default_text_color: str = None, auto_spacing: bool = True):
         """Initialize PPTXBuilder.
 
         Args:
@@ -106,6 +106,7 @@ class PPTXBuilder(
         self.EMU_PER_PX = int(self.prs.slide_width) / 1920
         self.custom_template = custom_template
         self.fonts = fonts
+        self.auto_spacing = auto_spacing  # CJK↔Latin spacing; False = keep source text verbatim
         self.keep_empty_placeholders = keep_empty_placeholders
         self.layouts = self._build_layout_map()
         self.invalid_layouts: list[dict] = []  # {"slug", "attempted", "used", "available"}
@@ -197,6 +198,14 @@ class PPTXBuilder(
                 "available": list(self.layouts.keys()),
             })
         slide = self.prs.slides.add_slide(layout)
+
+        # Hidden slide (round-trips PowerPoint's Hide Slide flag)
+        if slide_def.get("hidden"):
+            slide._element.set("show", "0")
+
+        # Hide Background Graphics (round-trips showMasterSp="0")
+        if slide_def.get("hideMasterShapes"):
+            slide._element.set("showMasterSp", "0")
 
         self._fill_placeholders(slide, slide_def)
 
@@ -311,12 +320,21 @@ class PPTXBuilder(
                 self._add_chart(slide, elem)
             elif elem_type == "video":
                 self._add_video(slide, elem)
+            elif elem_type == "rawShape":
+                self._add_raw_shape(slide, elem)
+            else:
+                import sys as _sys
+                print(f"Warning: unknown element type {elem_type!r} skipped "
+                      f"(slide {slide_def.get('id', '?')})", file=_sys.stderr)
 
         if "notes" in slide_def:
             notes_frame = slide.notes_slide.notes_text_frame
-            notes_frame.clear()
-            p = notes_frame.paragraphs[0]
-            self._apply_styled_text(p, slide_def["notes"])
+            if notes_frame is not None:
+                notes_frame.clear()
+                p = notes_frame.paragraphs[0]
+                self._apply_styled_text(p, slide_def["notes"])
+            # Else: notesMaster lacks a body placeholder (degenerate source PPTX);
+            # silently skip notes rather than crash the build.
 
         # Remove empty placeholders
         if not self.keep_empty_placeholders:

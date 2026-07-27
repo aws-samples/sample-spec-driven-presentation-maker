@@ -378,16 +378,51 @@ def arch_diagram(
 
 
 def pptx_to_json(pptx_path: str) -> dict[str, Any]:
-    """Convert an existing PPTX file to JSON representation.
+    """Convert PPTX to JSON representation.
 
-    Args:
-        pptx_path: Path to the PPTX file.
+    Writes a deck-structure directory (``deck.json`` + ``slides/slide-NN.json``
+    + ``images/``) alongside the input PPTX (``{stem}/`` sibling directory).
+    The returned dict still contains ``{slides, fonts, defaultTextColor}`` for
+    in-memory use.
+
+    Note: the on-disk output is deck-structure (since pptx-import-edit);
+    no single ``slides.json`` file is produced. Callers that need an
+    editable deck should prefer the upload → import_attachment flow.
 
     Returns:
-        Dict with slide data in JSON format.
+        Dict with slides list plus deck metadata (fonts, defaultTextColor),
+        plus ``deck_dir`` (string path to the written directory) for
+        downstream tooling.
     """
     from sdpm.converter import pptx_to_json as _convert
     path = Path(pptx_path)
     if not path.exists():
         raise FileNotFoundError(f"PPTX not found: {pptx_path}")
-    return _convert(str(path))
+    result = _convert(path)
+    deck_dir = path.with_suffix("")
+    if isinstance(result, dict):
+        result = {**result, "deck_dir": str(deck_dir)}
+    return result
+
+
+def diff_pptx(baseline: str, edited: str) -> dict[str, Any]:
+    """Compare a deck with a hand-edited PPTX and report the changes.
+
+    Use for hand-edit sync (Workflow C): the user edited the generated PPTX
+    in PowerPoint and asks for further changes. Apply the reported hand-edits
+    to the deck's slide JSON before editing/regenerating — otherwise they are
+    lost on the next generate_pptx.
+
+    Args:
+        baseline: Deck directory (deck.json + slides/), slides JSON, or PPTX.
+        edited: The hand-edited PPTX (or deck directory / slides JSON).
+
+    Returns:
+        Dict with has_diff (bool) and report (per-slide changed / added /
+        removed elements and properties).
+    """
+    from sdpm.diff import diff_report
+    for p in (baseline, edited):
+        if not Path(p).exists():
+            raise FileNotFoundError(f"Not found: {p}")
+    return diff_report(baseline, edited)

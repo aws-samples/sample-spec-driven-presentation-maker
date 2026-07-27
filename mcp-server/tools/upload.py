@@ -207,6 +207,45 @@ def _format_cat_n(text: str, file_name: str, offset: int, limit: int) -> str:
     return f"{header}\n\n{body}{footer}"
 
 
+def _format_deck_summary_from_s3(
+    storage: Storage, prefix: str, file_name: str, offset: int, limit: int,
+) -> str | None:
+    """Return a markdown-style slide summary when the S3 prefix contains deck structure.
+
+    Summary content comes from the engine (``sdpm.utils.deck_summary``) so
+    agents receive identical content from Local and Cloud modes; this
+    wrapper only performs S3 I/O and cat -n pagination.
+    """
+    import json as _json
+
+    from sdpm.utils.deck_summary import deck_text_summary
+
+    # Cheap check: is there a deck.json + at least one slides/slide-*.json?
+    try:
+        deck_bytes = storage.download_file_from_pptx_bucket(f"{prefix}/deck.json")
+        _ = deck_bytes  # only used to confirm existence
+    except Exception:
+        return None
+
+    slide_keys = [
+        k for k in storage.list_files(f"{prefix}/slides/", bucket=storage.pptx_bucket)
+        if k.endswith(".json")
+    ]
+    if not slide_keys:
+        return None
+
+    slides: list[dict] = []
+    for key in sorted(slide_keys):
+        try:
+            slides.append(_json.loads(
+                storage.download_file_from_pptx_bucket(key).decode("utf-8"),
+            ))
+        except Exception:
+            slides.append({})  # keep slide numbering aligned with key order
+
+    return _format_cat_n(deck_text_summary(slides), file_name, offset, limit)
+
+
 def _read_converted(
     storage: Storage, prefix: str, file_name: str, warning_text: str,
     offset: int, limit: int,
@@ -214,25 +253,18 @@ def _read_converted(
     """Read converted files from S3 prefix (cat -n format)."""
     result: list = []
 
-    # Try Markdown (.md)
-    md_found = False
-    stem = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
-    candidate = f"{prefix}/{stem}.md"
-    try:
-        md_data = storage.download_file_from_pptx_bucket(candidate)
-        result.append(_format_cat_n(md_data.decode("utf-8"), file_name, offset, limit))
-        md_found = True
-    except Exception:
-        pass
+    # Deck structure (PPTX): full slide text summary
+    deck_summary = _format_deck_summary_from_s3(storage, prefix, file_name, offset, limit)
+    if deck_summary is not None:
+        result.append(deck_summary)
 
-    # Try JSON (slides.json for PPTX)
-    if not md_found:
+    # Try Markdown (.md) — PDF/DOCX/XLSX path
+    if not result:
+        stem = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
+        candidate = f"{prefix}/{stem}.md"
         try:
-            json_data = storage.download_file_from_pptx_bucket(f"{prefix}/slides.json")
-            # JSON is usually compact; format with line numbers too
-            import json as _json
-            pretty = _json.dumps(_json.loads(json_data), ensure_ascii=False, indent=2)
-            result.append(_format_cat_n(pretty, file_name, offset, limit))
+            md_data = storage.download_file_from_pptx_bucket(candidate)
+            result.append(_format_cat_n(md_data.decode("utf-8"), file_name, offset, limit))
         except Exception:
             pass
 

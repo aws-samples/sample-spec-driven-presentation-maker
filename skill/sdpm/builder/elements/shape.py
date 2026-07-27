@@ -120,6 +120,17 @@ class ShapeMixin:
             sp_pr = shape._element.find(qn('p:spPr'))
             for pg in sp_pr.findall(qn('a:prstGeom')):
                 pg.set('prst', raw_prst)
+
+        # Source had no effects: drop python-pptx's default <p:style> (its
+        # effectRef pulls the theme shadow; explicit fill/line are applied
+        # below anyway) and write an empty effectLst for good measure.
+        if elem.get("_noEffects"):
+            from lxml import etree as _et_fx
+            from pptx.oxml.ns import qn as _qn_fx
+            for _st in shape._element.findall(_qn_fx('p:style')):
+                shape._element.remove(_st)
+            if shape._element.spPr.find(_qn_fx('a:effectLst')) is None:
+                _et_fx.SubElement(shape._element.spPr, _qn_fx('a:effectLst'))
         
         # Apply rotation
         rotation = elem.get("rotation", _DEFAULTS["rotation"])
@@ -172,7 +183,7 @@ class ShapeMixin:
             for tag in ('a:solidFill', 'a:gradFill', 'a:noFill', 'a:pattFill'):
                 for el in sp_pr.findall(qn(tag)):
                     sp_pr.remove(el)
-            patt = etree.SubElement(sp_pr, qn('a:pattFill'))
+            patt = etree.Element(qn('a:pattFill'))
             patt.set('prst', pattern_fill.get("pattern", "dkDnDiag"))
             fg = etree.SubElement(patt, qn('a:fgClr'))
             fg_srgb = etree.SubElement(fg, qn('a:srgbClr'))
@@ -180,6 +191,20 @@ class ShapeMixin:
             bg = etree.SubElement(patt, qn('a:bgClr'))
             bg_srgb = etree.SubElement(bg, qn('a:srgbClr'))
             bg_srgb.set('val', pattern_fill.get("bgColor", "#000000").lstrip("#"))
+            # CT_ShapeProperties is an ordered sequence: the fill must come
+            # BEFORE a:ln/a:effectLst. PowerPoint silently ignores fills that
+            # appear out of order (LibreOffice is lenient, so renders hid the
+            # bug). Insert after prstGeom/custGeom when present.
+            anchor = None
+            for tag in ('a:prstGeom', 'a:custGeom', 'a:xfrm'):
+                el = sp_pr.find(qn(tag))
+                if el is not None:
+                    anchor = el
+                    break
+            if anchor is not None:
+                anchor.addnext(patt)
+            else:
+                sp_pr.insert(0, patt)
         
         # Apply line color or gradient
         line_gradient = elem.get("lineGradient")
@@ -190,6 +215,9 @@ class ShapeMixin:
             fwd = {"lineGradient": line_gradient}
             if elem.get("lineWidth") is not None:
                 fwd["lineWidth"] = line_width
+            for k in ("_lineWidthEmu", "_lineCap"):
+                if elem.get(k) is not None:
+                    fwd[k] = elem[k]
             self._apply_shape_formatting(shape, fwd)
         elif line_color == "none" or line_color is None:
             shape.line.fill.background()
@@ -202,7 +230,12 @@ class ShapeMixin:
                 int(hex_color[4:6], 16)
             )
             shape.line.width = Pt(line_width)
-        
+            if elem.get("_lineCap"):
+                from pptx.oxml.ns import qn as _qn_cap
+                ln_cap = shape._element.spPr.find(_qn_cap('a:ln'))
+                if ln_cap is not None:
+                    ln_cap.set('cap', elem["_lineCap"])
+
         # Apply dash style to shape line
         self._apply_dash_style(shape, elem)
         
@@ -280,17 +313,11 @@ class ShapeMixin:
                     
                     # Apply text alignment
                     align = elem.get("align", "center")
-                    if align == "center":
-                        p.alignment = 2
-                    elif align == "right":
-                        p.alignment = 3
-                    elif align == "left":
-                        p.alignment = 1
-                    else:
-                        p.alignment = 2  # Default center
+                    p.alignment = {"center": 2, "right": 3, "left": 1,
+                                   "justify": 4, "just": 4}.get(align, 2)
             elif paragraphs:
                 # Paragraphs array with per-paragraph styles
-                align_map = {"left": 1, "center": 2, "right": 3}
+                align_map = {"left": 1, "center": 2, "right": 3, "justify": 4, "just": 4}
                 for i, para_def in enumerate(paragraphs):
                     p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
                     if isinstance(para_def, str):
@@ -337,7 +364,7 @@ class ShapeMixin:
                 
                 # Apply text alignment
                 align = elem.get("align", "center")
-                align_val = {"center": 2, "right": 3, "left": 1}.get(align, 2)
+                align_val = {"center": 2, "right": 3, "left": 1, "justify": 4, "just": 4}.get(align, 2)
                 for p in tf.paragraphs:
                     p.alignment = align_val
                 

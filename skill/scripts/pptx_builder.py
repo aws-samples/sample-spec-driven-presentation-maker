@@ -27,13 +27,6 @@ from sdpm.assets import (  # noqa: F401
     resolve_icon_path,
     search_assets,
 )
-from sdpm.diff import (
-    _diff_value,
-    _elem_id,
-    align_slides,
-    load_slides_json_or_pptx,
-    match_elements,
-)
 from sdpm.layout import (  # noqa: F401
     _group_member_ids,
     _layout_collect,
@@ -229,25 +222,36 @@ def cmd_list_asset_sources(args):
 
 
 def cmd_list_templates(args):
-    """List available PPTX templates.
+    """List available PPTX templates with source and description.
 
     Includes user-local templates (via $SDPM_TEMPLATES_DIR or ~/.config/sdpm/templates/)
     in addition to the package-bundled ones. User-local templates shadow bundled
-    templates with the same stem.
+    templates with the same stem. Descriptions come from state.json user notes —
+    the art-direction workflow instructs agents to consider them when selecting
+    a template.
     """
-    from sdpm.api import get_templates_dirs
+    from sdpm.api import get_templates_dirs, list_templates_with_metadata
+    from sdpm.config import get_state
 
-    seen: dict[str, Path] = {}
-    for d in get_templates_dirs():
+    templates_dirs = get_templates_dirs()
+    templates = list_templates_with_metadata(
+        templates_dirs,
+        get_state().get("template_metadata", {}),
+    )
+    if not templates:
+        print("No templates found.", file=sys.stderr)
+        return
+    # Resolved path per stem (first match wins — same order as the engine).
+    # Kept in the output because agents need it to locate user-local templates.
+    paths: dict[str, Path] = {}
+    for d in templates_dirs:
         if not d.exists():
             continue
         for t in sorted(d.glob("*.pptx")):
-            seen.setdefault(t.stem, t)
-    if not seen:
-        print("No templates found.", file=sys.stderr)
-        return
-    for stem in sorted(seen):
-        print(f"  {stem}  {seen[stem]}")
+            paths.setdefault(t.stem, t)
+    for t in templates:
+        desc = f"  — {t['description']}" if t["description"] else ""
+        print(f"  {t['name']:<24} [{t['source']}]  {paths[t['name']]}{desc}")
 
 
 def cmd_search_patterns(args):
@@ -604,94 +608,9 @@ def cmd_grid(args):
 
 def cmd_diff(args):
     """Compare two slide JSONs (or PPTXs) and show manual edit changes."""
-    base = load_slides_json_or_pptx(args.baseline)
-    edit = load_slides_json_or_pptx(args.edited)
-
-    base_slides = base.get("slides", [])
-    edit_slides = edit.get("slides", [])
-    _SKIP_KEYS = {"masterIndex", "_comment"}
-    has_diff = False
-
-    alignment = align_slides(base_slides, edit_slides)
-
-    for bi, ei in alignment:
-        if bi is None:
-            es = edit_slides[ei]
-            title = es.get("title", "")
-            if isinstance(title, dict):
-                title = title.get("text", "")
-            print(f'\n=== ADDED slide (edited #{ei+1}) "{title[:40]}" ===')
-            print(f"  layout: {es.get('layout')}, elements: {len(es.get('elements', []))}")
-            has_diff = True
-            continue
-        if ei is None:
-            bs = base_slides[bi]
-            title = bs.get("title", "")
-            if isinstance(title, dict):
-                title = title.get("text", "")
-            print(f'\n=== REMOVED slide (baseline #{bi+1}) "{title[:40]}" ===')
-            has_diff = True
-            continue
-
-        bs, es = base_slides[bi], edit_slides[ei]
-        slide_diffs = []
-
-        for key in ("layout", "title", "notes"):
-            bv, ev = bs.get(key), es.get(key)
-            if bv != ev and (bv or ev):
-                slide_diffs.append(_diff_value(key, bv, ev))
-
-        b_elems = [e for e in bs.get("elements", []) if "_comment" not in e]
-        e_elems = [e for e in es.get("elements", []) if "_comment" not in e]
-
-        pairs, added = match_elements(b_elems, e_elems)
-        elem_diffs = []
-
-        for bj, ej in pairs:
-            be = b_elems[bj]
-            if ej is None:
-                elem_diffs.append(f"  REMOVED [{bj}] {_elem_id(be)}")
-                continue
-            ee = e_elems[ej]
-            all_keys = sorted(set(list(be.keys()) + list(ee.keys())) - _SKIP_KEYS)
-            changes = []
-            for key in all_keys:
-                bv, ev = be.get(key), ee.get(key)
-                if bv == ev:
-                    continue
-                if bv is None:
-                    changes.append(f"+{key}={json.dumps(ev, ensure_ascii=False)[:40]}")
-                elif ev is None:
-                    changes.append(f"-{key}")
-                else:
-                    if isinstance(bv, (int, float)) and isinstance(ev, (int, float)) and abs(bv - ev) <= 2:
-                        continue
-                    changes.append(_diff_value(key, bv, ev))
-            if changes:
-                elem_diffs.append(f"  [{bj}] {_elem_id(be)}:")
-                for c in changes:
-                    elem_diffs.append(f"    {c}")
-
-        for ej in added:
-            ee = e_elems[ej]
-            elem_diffs.append(f"  ADDED {_elem_id(ee)}:")
-            elem_diffs.append(f"    {json.dumps(ee, ensure_ascii=False)[:300]}")
-
-        moved = bi != ei
-        if slide_diffs or elem_diffs or moved:
-            title = bs.get("title", es.get("title", ""))
-            if isinstance(title, dict):
-                title = title.get("text", "")
-            moved_str = f" (moved: #{bi+1}→#{ei+1})" if moved else ""
-            print(f'\n=== Slide (baseline #{bi+1} ↔ edited #{ei+1}) "{title[:40]}"{moved_str} ===')
-            for d in slide_diffs:
-                print(f"  {d}")
-            for d in elem_diffs:
-                print(d)
-            has_diff = True
-
-    if not has_diff:
-        print("No differences found.")
+    from sdpm.diff import diff_report
+    result = diff_report(args.baseline, args.edited)
+    print(result["report"])
 
 
 def main():
@@ -764,9 +683,9 @@ def main():
     p_layout.add_argument("--height", type=int, default=None, help="Target area height (px)")
     p_layout.add_argument("--theme", choices=["dark", "light"], default="dark", help="Theme for box text colors (default: dark)")
 
-    p_diff = subparsers.add_parser("diff", help="Compare two slide JSONs/PPTXs and show changes (for manual edit detection)")
-    p_diff.add_argument("baseline", help="Baseline slides JSON or PPTX (original)")
-    p_diff.add_argument("edited", help="Edited slides JSON or PPTX (manually edited)")
+    p_diff = subparsers.add_parser("diff", help="Compare two decks/JSONs/PPTXs and show changes (for manual edit detection)")
+    p_diff.add_argument("baseline", help="Baseline deck directory, slides JSON, or PPTX (original)")
+    p_diff.add_argument("edited", help="Edited deck directory, slides JSON, or PPTX (manually edited)")
 
     p_analyze = subparsers.add_parser("analyze-template", help="Analyze PPTX template: extract layouts and theme")
     p_analyze.add_argument("input", help="Template PPTX file path")
