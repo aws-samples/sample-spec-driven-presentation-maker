@@ -72,6 +72,16 @@ class FormattingMixin:
         """Apply fill, gradient, and line formatting to a shape."""
         gradient = elem.get("gradient")
         fill_color = elem.get("fill")
+
+        # Source had no effects: write an empty effectLst so the theme
+        # shadow referenced by python-pptx's default <p:style> effectRef
+        # doesn't apply.
+        if elem.get("_noEffects"):
+            from lxml import etree as _et_fx
+            from pptx.oxml.ns import qn as _qn_fx
+            sp_pr = shape._element.spPr
+            if sp_pr.find(_qn_fx('a:effectLst')) is None:
+                _et_fx.SubElement(sp_pr, _qn_fx('a:effectLst'))
         
         if gradient:
             self._apply_gradient_fill(shape, gradient)
@@ -101,8 +111,15 @@ class FormattingMixin:
             sp_pr = shape._element.spPr
             ln = sp_pr.find(qn('a:ln'))
             if ln is None:
-                ln = etree.SubElement(sp_pr, qn('a:ln'))
-            ln.set('cap', 'flat')
+                # a:ln must precede a:effectLst (PowerPoint drops
+                # out-of-order children — the outline vanished).
+                ln = etree.Element(qn('a:ln'))
+                eff = sp_pr.find(qn('a:effectLst'))
+                if eff is not None:
+                    eff.addprevious(ln)
+                else:
+                    sp_pr.append(ln)
+            ln.set('cap', elem.get("_lineCap", 'flat'))
             if elem.get("_lineWidthEmu") is not None:
                 ln.set('w', str(elem["_lineWidthEmu"]))
             elif elem.get("lineWidth") is not None:
@@ -126,7 +143,7 @@ class FormattingMixin:
                 sp_pr = shape._element.spPr
                 ln = sp_pr.find(qn('a:ln'))
                 if ln is not None:
-                    ln.set('cap', 'flat')
+                    ln.set('cap', elem.get("_lineCap", 'flat'))
             except Exception:
                 pass
             # Apply line opacity
@@ -173,11 +190,23 @@ class FormattingMixin:
 
         grad_fill = _build_grad_fill_element(gradient)
 
-        ln_el = sp_pr.find(qn('a:ln'))
-        if ln_el is not None:
-            sp_pr.insert(list(sp_pr).index(ln_el), grad_fill)
+        # CT_ShapeProperties is an ordered sequence (fill before a:ln /
+        # a:effectLst). PowerPoint silently ignores out-of-order fills, so
+        # anchor on the geometry element rather than appending.
+        anchor = None
+        for tag in ('a:prstGeom', 'a:custGeom', 'a:xfrm'):
+            el = sp_pr.find(qn(tag))
+            if el is not None:
+                anchor = el
+                break
+        if anchor is not None:
+            anchor.addnext(grad_fill)
         else:
-            sp_pr.append(grad_fill)
+            ln_el = sp_pr.find(qn('a:ln'))
+            if ln_el is not None:
+                sp_pr.insert(list(sp_pr).index(ln_el), grad_fill)
+            else:
+                sp_pr.insert(0, grad_fill)
     
     def _set_fill_opacity(self, shape, opacity):
         """Set fill opacity using low-level XML manipulation.
@@ -215,7 +244,7 @@ class FormattingMixin:
         Args:
             font_family: If specified, use this font for halfwidth chars (e.g., 'Lucida Console' for code)
         """
-        segments = parse_styled_text(text)
+        segments = parse_styled_text(text, auto_spacing=getattr(self, 'auto_spacing', True))
         paragraph.clear()
         from lxml import etree
         from pptx.oxml.ns import qn
@@ -240,7 +269,27 @@ class FormattingMixin:
                             br_rPr.set('u', 'sng')
                     run = paragraph.add_run()
                     run.text = line
+                    # PowerPoint's East-Asian line breaking (kinsoku, trailing
+                    # punctuation compression) keys off the run language —
+                    # without it borderline Japanese lines wrap mid-sentence.
+                    if any('\u3000' <= ch <= '\u9fff' or '\uff00' <= ch <= '\uffef' for ch in line):
+                        run._r.get_or_add_rPr().set('lang', 'ja-JP')
                     run.font.name = seg.get("fontName") or (None if no_default_font else font_name) or None
+                    # python-pptx only writes a:latin; CJK glyphs render with
+                    # a:ea, so an explicit font tag must set both or Japanese
+                    # text silently keeps the theme font.
+                    if seg.get("fontName"):
+                        from lxml import etree as _et_ea
+                        from pptx.oxml.ns import qn as _qn_ea
+                        rPr = run._r.get_or_add_rPr()
+                        ea = rPr.find(_qn_ea('a:ea'))
+                        if ea is None:
+                            ea = _et_ea.SubElement(rPr, _qn_ea('a:ea'))
+                            latin = rPr.find(_qn_ea('a:latin'))
+                            if latin is not None:
+                                rPr.remove(ea)
+                                rPr.insert(list(rPr).index(latin) + 1, ea)
+                        ea.set('typeface', seg["fontName"])
                     # Set sym font for symbol fonts (Wingdings etc)
                     actual_font = run.font.name
                     if actual_font and actual_font.startswith(('Wingdings', 'Symbol', 'Webdings')):
@@ -249,6 +298,21 @@ class FormattingMixin:
                         rPr = run._r.get_or_add_rPr()
                         sym = _et.SubElement(rPr, _qn('a:sym'))
                         sym.set('typeface', actual_font)
+                    if seg.get("baseline") is not None:
+                        run._r.get_or_add_rPr().set('baseline', str(seg["baseline"]))
+                    if seg.get("highlight"):
+                        # a:highlight must precede a:latin in CT_TextCharacterProperties
+                        from lxml import etree as _et_hl
+                        from pptx.oxml.ns import qn as _qn_hl
+                        rPr_hl = run._r.get_or_add_rPr()
+                        hl = _et_hl.Element(_qn_hl('a:highlight'))
+                        srgb_hl = _et_hl.SubElement(hl, _qn_hl('a:srgbClr'))
+                        srgb_hl.set('val', seg["highlight"].lstrip('#').upper())
+                        latin_hl = rPr_hl.find(_qn_hl('a:latin'))
+                        if latin_hl is not None:
+                            latin_hl.addprevious(hl)
+                        else:
+                            rPr_hl.append(hl)
                     # Apply all styles per run so multi-line labels render consistently
                     font_size = seg.get("fontSize") or default_font_size
                     if font_size:

@@ -12,8 +12,30 @@ from .constants import _NS, _hex, EMU_PER_PX
 from .color import _resolve_scheme_color, _resolve_color_with_transforms, apply_color_transforms
 
 
+def _sys_hex(solid):
+    """Resolve <a:sysClr> (Windows system color) inside a solidFill.
+
+    Office writes the concretely rendered color into lastClr, so use it
+    (falling back to black/white for the two common values) and apply any
+    child transforms (lumMod/lumOff/tint/shade) the same way as srgbClr.
+    """
+    sys_clr = solid.find('a:sysClr', _NS)
+    if sys_clr is None:
+        return None
+    base = f"#{sys_clr.get('lastClr')}" if sys_clr.get('lastClr') else \
+        {"windowText": "#000000", "window": "#FFFFFF"}.get(sys_clr.get('val'))
+    if not base:
+        return None
+    transforms = {}
+    for t in ('lumMod', 'lumOff', 'tint', 'shade'):
+        el = sys_clr.find(f'a:{t}', _NS)
+        if el is not None:
+            transforms[t] = el.get('val')
+    return _apply_srgb_transforms(base, transforms) if transforms else base
+
+
 def _apply_srgb_transforms(hex_color, transforms):
-    """Apply lumMod/lumOff/tint/shade transforms to an srgbClr."""
+    """Apply lumMod/lumOff/tint/shade/satMod transforms to an srgbClr."""
     h = hex_color.lstrip("#")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
     if 'lumMod' in transforms or 'lumOff' in transforms:
@@ -23,14 +45,22 @@ def _apply_srgb_transforms(hex_color, transforms):
         g = min(255, max(0, int(g * mod + 255 * off)))
         b = min(255, max(0, int(b * mod + 255 * off)))
     if 'tint' in transforms:
+        # ECMA-376: an N% tint is N% of the input color mixed with (100-N)%
+        # white — val=100000 leaves the color unchanged (in linear gamma).
         t = int(transforms['tint']) / 100000
         rl, gl, bl = pow(r/255, 2.2), pow(g/255, 2.2), pow(b/255, 2.2)
-        rl, gl, bl = rl + (1-rl)*t, gl + (1-gl)*t, bl + (1-bl)*t
+        rl, gl, bl = rl*t + (1-t), gl*t + (1-t), bl*t + (1-t)
         r, g, b = int(pow(max(0,rl), 1/2.2)*255), int(pow(max(0,gl), 1/2.2)*255), int(pow(max(0,bl), 1/2.2)*255)
     if 'shade' in transforms:
         s = int(transforms['shade']) / 100000
         rl, gl, bl = pow(r/255, 2.2)*s, pow(g/255, 2.2)*s, pow(b/255, 2.2)*s
         r, g, b = int(pow(max(0,rl), 1/2.2)*255), int(pow(max(0,gl), 1/2.2)*255), int(pow(max(0,bl), 1/2.2)*255)
+    if 'satMod' in transforms:
+        import colorsys
+        m = int(transforms['satMod']) / 100000
+        hh, ll, ss = colorsys.rgb_to_hls(r/255, g/255, b/255)
+        rr, gg, bb = colorsys.hls_to_rgb(hh, ll, min(1.0, ss * m))
+        r, g, b = int(rr*255), int(gg*255), int(bb*255)
     return f"#{min(255,max(0,r)):02X}{min(255,max(0,g)):02X}{min(255,max(0,b)):02X}"
 
 def extract_line_dash(shape):
@@ -245,6 +275,14 @@ def _extract_fill_from_xml(sp_pr, theme_colors=None, color_mapping=None):
             alpha = scheme.find('a:alpha', _NS)
             if alpha is not None:
                 result["opacity"] = round(int(alpha.get('val')) / 100000, 2)
+        else:
+            sys_hex = _sys_hex(solid)
+            if sys_hex:
+                result["fill"] = sys_hex
+                sys_clr = solid.find('a:sysClr', _NS)
+                alpha = sys_clr.find('a:alpha', _NS) if sys_clr is not None else None
+                if alpha is not None:
+                    result["opacity"] = round(int(alpha.get('val')) / 100000, 2)
         return result if "fill" in result else {"fill": "none"}
     # Gradient fill
     grad = sp_pr.find('a:gradFill', _NS)
@@ -276,6 +314,14 @@ def _extract_fill_from_xml(sp_pr, theme_colors=None, color_mapping=None):
                 alpha = scheme.find('a:alpha', _NS)
                 if alpha is not None:
                     stop_info["opacity"] = round(int(alpha.get('val')) / 100000, 2)
+            else:
+                sys_hex = _sys_hex(gs)
+                if sys_hex:
+                    stop_info["color"] = sys_hex
+                    sys_clr = gs.find('.//a:sysClr', _NS)
+                    alpha = sys_clr.find('a:alpha', _NS) if sys_clr is not None else None
+                    if alpha is not None:
+                        stop_info["opacity"] = round(int(alpha.get('val')) / 100000, 2)
             if "color" in stop_info:
                 stops.append(stop_info)
         if stops:
@@ -342,6 +388,11 @@ def _extract_line_from_xml(sp_pr, theme_colors=None, color_mapping=None):
     if w:
         result["lineWidth"] = round(int(w) / 12700, 1)
         result["_lineWidthEmu"] = int(w)
+    # Line cap — round caps close the visual gap at arc/line endpoints
+    # (a thick donut arc with flat caps shows square ends and a gap).
+    cap = ln.get('cap')
+    if cap and cap != 'flat':
+        result["_lineCap"] = cap
     # noFill
     if ln.find('a:noFill', _NS) is not None:
         result["line"] = "none"
@@ -366,6 +417,13 @@ def _extract_line_from_xml(sp_pr, theme_colors=None, color_mapping=None):
                 alpha = scheme.find('a:alpha', _NS)
                 if alpha is not None:
                     opacity = round(int(alpha.get('val')) / 100000, 2)
+            else:
+                color = _sys_hex(gs)
+                if color:
+                    sys_clr = gs.find('.//a:sysClr', _NS)
+                    alpha = sys_clr.find('a:alpha', _NS) if sys_clr is not None else None
+                    if alpha is not None:
+                        opacity = round(int(alpha.get('val')) / 100000, 2)
             if color:
                 stop_info = {"position": pos, "color": color}
                 if opacity is not None:
@@ -401,11 +459,16 @@ def _extract_line_from_xml(sp_pr, theme_colors=None, color_mapping=None):
         srgb = solid.find('a:srgbClr', _NS)
         scheme = solid.find('a:schemeClr', _NS)
         if srgb is not None:
-            result["line"] = _hex(srgb)
+            from .color import apply_element_transforms
+            result["line"] = apply_element_transforms(_hex(srgb), srgb)
         elif scheme is not None:
             resolved = _resolve_color_with_transforms(scheme, theme_colors, color_mapping)
             if resolved:
                 result["line"] = resolved
+        else:
+            sys_hex = _sys_hex(solid)
+            if sys_hex:
+                result["line"] = sys_hex
     if "line" not in result and "lineGradient" not in result:
         # Only set none if ln has noFill; otherwise leave unset for style resolution
         if ln.find('a:noFill', _NS) is not None:

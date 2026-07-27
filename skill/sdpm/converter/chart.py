@@ -136,15 +136,15 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
                         srgb = solid.find('a:srgbClr', ns_c)
                         scheme = solid.find('a:schemeClr', ns_c)
                         if srgb is not None:
-                            point_colors[pt_idx] = _hex(srgb)
+                            point_colors[str(pt_idx)] = _hex(srgb)
                         elif scheme is not None:
                             resolved = _resolve_scheme_color(scheme.get('val'), theme_colors, color_mapping)
                             if resolved:
-                                point_colors[pt_idx] = resolved
+                                point_colors[str(pt_idx)] = resolved
                     elif grad is not None:
                         # Preserve gradient as XML
                         from lxml import etree as _et
-                        point_xml[pt_idx] = _et.tostring(spPr, encoding='unicode')
+                        point_xml[str(pt_idx)] = _et.tostring(spPr, encoding='unicode')
             if point_colors and si < len(series_list):
                 series_list[si]["pointColors"] = point_colors
             if point_xml and si < len(series_list):

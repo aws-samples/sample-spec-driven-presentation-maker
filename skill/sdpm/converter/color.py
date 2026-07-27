@@ -19,6 +19,16 @@ _THEME_ENUM_TO_NAME = {
     9: 'accent5', 10: 'accent6', 13: 'tx1', 14: 'bg1'
 }
 
+# Common OOXML preset color names (a:prstClr). Not exhaustive — covers the
+# names seen in real decks; unknown names simply resolve to None.
+_PRST_CLR = {
+    "white": "#FFFFFF", "black": "#000000", "red": "#FF0000", "green": "#008000",
+    "blue": "#0000FF", "yellow": "#FFFF00", "cyan": "#00FFFF", "magenta": "#FF00FF",
+    "gray": "#808080", "grey": "#808080", "ltGray": "#D3D3D3", "dkGray": "#404040",
+    "orange": "#FFA500", "purple": "#800080", "brown": "#A52A2A", "pink": "#FFC0CB",
+}
+
+
 def extract_text_color(run, theme_colors=None, color_mapping=None, is_placeholder=False):
     """Extract text color from run, converting theme colors to RGB.
     Returns None for scheme colors that map to the default text role (tx1)."""
@@ -53,6 +63,17 @@ def extract_text_color(run, theme_colors=None, color_mapping=None, is_placeholde
             if theme_colors and run.font.color.theme_color in theme_colors:
                 return theme_colors[run.font.color.theme_color]
             return "#000000"
+        elif run.font.color and getattr(run.font.color, "type", None) is not None and int(run.font.color.type) == 102:
+            # PRESET color (<a:prstClr val="white"/>) — resolve via name table
+            from pptx.oxml.ns import qn
+            rPr = run._r.find(qn('a:rPr'))
+            if rPr is not None:
+                prst = rPr.find(f'{{{_NS["a"]}}}solidFill/{{{_NS["a"]}}}prstClr')
+                if prst is not None:
+                    hex_val = _PRST_CLR.get(prst.get('val'))
+                    if hex_val:
+                        return apply_element_transforms(hex_val, prst)
+            return None
         elif run.font.color is None or run.font.color.type is None:
             if is_placeholder:
                 return None
@@ -202,6 +223,42 @@ def _resolve_color_with_transforms(scheme_el, theme_colors, color_mapping, overr
         r, g, b = min(1.0, max(0.0, r)), min(1.0, max(0.0, g)), min(1.0, max(0.0, b))
         resolved = f"#{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
     return resolved
+
+def apply_element_transforms(base_hex, color_el):
+    """Apply lumMod/lumOff/tint/shade children of a color element to a hex.
+
+    Works for srgbClr as well as schemeClr — PowerPoint emits e.g.
+    <a:srgbClr val="4F81BD"><a:lumMod val="75000"/></a:srgbClr> and dropping
+    the transform shifts the rendered color dramatically.
+    """
+    lum_mod = color_el.find('a:lumMod', _NS)
+    lum_off = color_el.find('a:lumOff', _NS)
+    shade = color_el.find('a:shade', _NS)
+    tint = color_el.find('a:tint', _NS)
+    if lum_mod is None and lum_off is None and shade is None and tint is None:
+        return base_hex
+    hx = base_hex.lstrip('#')
+    r, g, b = int(hx[0:2], 16) / 255, int(hx[2:4], 16) / 255, int(hx[4:6], 16) / 255
+    if shade is not None:
+        f = int(shade.get('val')) / 100000
+        r, g, b = pow(r, 2.2) * f, pow(g, 2.2) * f, pow(b, 2.2) * f
+        r, g, b = pow(max(0, r), 1/2.2), pow(max(0, g), 1/2.2), pow(max(0, b), 1/2.2)
+    if tint is not None:
+        f = int(tint.get('val')) / 100000
+        rl, gl, bl = pow(r, 2.2), pow(g, 2.2), pow(b, 2.2)
+        rl, gl, bl = rl + (1-rl)*(1-f), gl + (1-gl)*(1-f), bl + (1-bl)*(1-f)
+        r, g, b = pow(max(0, rl), 1/2.2), pow(max(0, gl), 1/2.2), pow(max(0, bl), 1/2.2)
+    if lum_mod is not None or lum_off is not None:
+        h, lum, sat = colorsys.rgb_to_hls(r, g, b)
+        if lum_mod is not None:
+            lum *= int(lum_mod.get('val')) / 100000
+        if lum_off is not None:
+            lum += int(lum_off.get('val')) / 100000
+        lum = min(1.0, max(0.0, lum))
+        r, g, b = colorsys.hls_to_rgb(h, lum, sat)
+    r, g, b = min(1.0, max(0.0, r)), min(1.0, max(0.0, g)), min(1.0, max(0.0, b))
+    return f"#{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
+
 
 def apply_color_transforms(base_color_hex, transforms):
     """Apply color transforms (lumMod, tint) to a base color."""

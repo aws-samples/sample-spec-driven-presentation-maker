@@ -276,6 +276,23 @@ def diff_report(baseline, edited) -> dict:
             if bv != ev and (bv or ev):
                 slide_diffs.append(_diff_value(key, bv, ev))
 
+        # Compare placeholders (title/body text captured by idx) — hand-edits
+        # to titles land here, not in elements.
+        b_ph = bs.get("placeholders") or {}
+        e_ph = es.get("placeholders") or {}
+        for idx in sorted(set(b_ph) | set(e_ph)):
+            bv, ev = b_ph.get(idx), e_ph.get(idx)
+            if bv == ev:
+                continue
+            b_txt = bv.get("text") if isinstance(bv, dict) else bv
+            e_txt = ev.get("text") if isinstance(ev, dict) else ev
+            if b_txt != e_txt:
+                slide_diffs.append(_diff_value(f"placeholder[{idx}]", b_txt, e_txt))
+            elif bv != ev:
+                slide_diffs.append(_diff_value(f"placeholder[{idx}] (format/position)",
+                                               json.dumps(bv, ensure_ascii=False)[:60],
+                                               json.dumps(ev, ensure_ascii=False)[:60]))
+
         b_elems = [e for e in bs.get("elements", []) if "_comment" not in e]
         e_elems = [e for e in es.get("elements", []) if "_comment" not in e]
 

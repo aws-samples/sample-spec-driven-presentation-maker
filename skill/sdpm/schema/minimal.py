@@ -60,7 +60,7 @@ def _strip_conditional(elem: dict) -> None:
 
 def _strip_internal_keys(obj):
     if isinstance(obj, dict):
-        return {k: _strip_internal_keys(v) for k, v in obj.items() if not k.startswith('_')}
+        return {k: _strip_internal_keys(v) for k, v in obj.items() if not (isinstance(k, str) and k.startswith('_'))}
     if isinstance(obj, list):
         return [_strip_internal_keys(i) for i in obj]
     return obj

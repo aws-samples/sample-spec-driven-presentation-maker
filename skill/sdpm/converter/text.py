@@ -4,7 +4,7 @@
 from .constants import _NS, EMU_PER_PX, _serialize_lstStyle
 from .color import extract_text_color
 
-def _extract_styled_text(runs, theme_colors=None, color_mapping=None, default_font_size=None, default_text_color=None, is_placeholder=False, paragraph=None):
+def _extract_styled_text(runs, theme_colors=None, color_mapping=None, default_font_size=None, default_text_color=None, is_placeholder=False, paragraph=None, suppress_inherited=False):
     """Convert a list of runs to styled text string. If paragraph is provided, handles <a:br> (soft line breaks)."""
     parts = []
     # If paragraph element is available, iterate children to capture <a:br> elements
@@ -18,7 +18,7 @@ def _extract_styled_text(runs, theme_colors=None, color_mapping=None, default_fo
             elif tag == 'r' and run_idx < len(runs):
                 run = runs[run_idx]
                 run_idx += 1
-                formatted = _format_run(run, theme_colors, color_mapping, default_font_size, default_text_color, is_placeholder)
+                formatted = _format_run(run, theme_colors, color_mapping, default_font_size, default_text_color, is_placeholder, suppress_inherited)
                 if pending_br:
                     # Insert \u000b before the run (outside link tags)
                     if formatted.startswith('{{') and 'link:' in formatted:
@@ -36,10 +36,10 @@ def _extract_styled_text(runs, theme_colors=None, color_mapping=None, default_fo
         return ''.join(parts)
     # Fallback: runs only
     for run in runs:
-        parts.append(_format_run(run, theme_colors, color_mapping, default_font_size, default_text_color, is_placeholder))
+        parts.append(_format_run(run, theme_colors, color_mapping, default_font_size, default_text_color, is_placeholder, suppress_inherited))
     return ''.join(parts)
 
-def _format_run(run, theme_colors=None, color_mapping=None, default_font_size=None, default_text_color=None, is_placeholder=False):
+def _format_run(run, theme_colors=None, color_mapping=None, default_font_size=None, default_text_color=None, is_placeholder=False, suppress_inherited=False):
     """Format a single run with styled text markup."""
     if not run.text:
         return ''
@@ -62,9 +62,38 @@ def _format_run(run, theme_colors=None, color_mapping=None, default_font_size=No
         if default_font_size is None or pt != default_font_size:
             styles.append(f"{pt}pt")
     try:
-        hex_color = extract_text_color(run, theme_colors, color_mapping, is_placeholder=is_placeholder)
-        if hex_color and hex_color != default_text_color:
-            styles.append(hex_color)
+        # When the shape's p:style fontRef supplies the text color (emitted
+        # as elem fontColor), runs without their own solidFill must NOT get
+        # the inherited tx1 fallback baked in — it would override fontRef.
+        has_own_color = run.font.color is not None and run.font.color.type is not None
+        if not (suppress_inherited and not has_own_color):
+            hex_color = extract_text_color(run, theme_colors, color_mapping, is_placeholder=is_placeholder)
+            if hex_color and hex_color != default_text_color:
+                styles.append(hex_color)
+    except Exception:
+        pass
+    # Sub/superscript (a:rPr baseline) — renderers auto-shrink offset runs,
+    # so dropping it makes e.g. an 80pt decorative "01" render full-size.
+    try:
+        rPr_bl = run._r.find(f'{{{_NS["a"]}}}rPr')
+        if rPr_bl is not None and rPr_bl.get('baseline'):
+            bl = int(rPr_bl.get('baseline'))
+            if bl != 0:
+                styles.append(f"baseline={bl}")
+        # Text highlight (marker color) — a:highlight
+        if rPr_bl is not None:
+            hl = rPr_bl.find(f'{{{_NS["a"]}}}highlight')
+            if hl is not None:
+                srgb_hl = hl.find(f'{{{_NS["a"]}}}srgbClr')
+                if srgb_hl is not None and srgb_hl.get('val'):
+                    styles.append(f"highlight=#{srgb_hl.get('val')}")
+                else:
+                    scheme_hl = hl.find(f'{{{_NS["a"]}}}schemeClr')
+                    if scheme_hl is not None:
+                        from .color import _resolve_color_with_transforms
+                        resolved_hl = _resolve_color_with_transforms(scheme_hl, theme_colors, color_mapping)
+                        if resolved_hl:
+                            styles.append(f"highlight={resolved_hl}")
     except Exception:
         pass
     if run.font.name:
@@ -104,6 +133,28 @@ def _detect_font_size(paragraphs):
         return None
     most_common = max(sizes, key=sizes.get)
     return most_common
+
+
+def _inherited_default_size(shape):
+    """Effective size for runs with no explicit sz anywhere in the shape.
+
+    Non-placeholder shape text inherits from presentation.xml
+    defaultTextStyle; absent that, the OOXML spec default for defRPr sz
+    is 1800 (18pt). The builder's shape default is 14pt, so the inherited
+    size must be made explicit or rebuilt text shrinks.
+    """
+    try:
+        pres = shape.part.package.presentation_part._element
+        dts = pres.find(f'{{{_NS["p"]}}}defaultTextStyle')
+        if dts is not None:
+            l1 = dts.find(f'{{{_NS["a"]}}}lvl1pPr')
+            d = l1.find(f'{{{_NS["a"]}}}defRPr') if l1 is not None else None
+            if d is not None and d.get('sz'):
+                sz = int(d.get('sz')) / 100
+                return int(sz) if sz == int(sz) else sz
+    except Exception:
+        pass
+    return 18
 
 
 _ALIGN_MAP = {1: "left", 2: "center", 3: "right", 4: "justify"}
@@ -150,6 +201,22 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
         if body_pr.get('wrap') == 'none':
             elem["autoWidth"] = True
 
+    # Line spacing (a:lnSpc) — fixed-point spacing repositions text visibly
+    # (e.g. a 48pt title with 31.2pt spacing sits much higher than default).
+    if tf.paragraphs:
+        first_pPr = tf.paragraphs[0]._element.find(f'{{{_NS["a"]}}}pPr')
+        if first_pPr is not None:
+            lnSpc = first_pPr.find(f'{{{_NS["a"]}}}lnSpc')
+            if lnSpc is not None:
+                spcPts = lnSpc.find(f'{{{_NS["a"]}}}spcPts')
+                spcPct = lnSpc.find(f'{{{_NS["a"]}}}spcPct')
+                if spcPts is not None and spcPts.get('val'):
+                    elem["lineSpacingPt"] = int(spcPts.get('val')) / 100
+                elif spcPct is not None and spcPct.get('val'):
+                    val = int(spcPct.get('val'))
+                    if val != 100000:
+                        elem["lineSpacingPct"] = val
+
     default_text_color = builder_text_color
     if not default_text_color and color_mapping and theme_colors:
         tx1 = color_mapping.get('tx1', 'dk1')
@@ -169,11 +236,31 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
         if _builder_text_color:
             default_text_color = _builder_text_color
 
+    # p:style/a:fontRef: shapes styled via theme (e.g. white text on an
+    # accent-filled bar) inherit their text color from the style, not from
+    # run properties. Resolve it so the builder doesn't paint them with the
+    # deck default.
+    font_ref = shape._element.find(f'{{{_NS["p"]}}}style/{{{_NS["a"]}}}fontRef')
+    if font_ref is not None and theme_colors:
+        scheme_el = font_ref.find(f'{{{_NS["a"]}}}schemeClr')
+        if scheme_el is not None:
+            from .color import _resolve_color_with_transforms
+            ref_color = _resolve_color_with_transforms(scheme_el, theme_colors, color_mapping)
+            if ref_color and ref_color.lower() != (default_text_color or '').lower():
+                elem["fontColor"] = ref_color
+                default_text_color = ref_color
+    _suppress_inherited = "fontColor" in elem
+
     paragraphs_with_text = [p for p in tf.paragraphs if p.text.strip()]
     all_paragraphs = list(tf.paragraphs)
     # Skip default_font_size if shape has lstStyle (sizes handled by lstStyle)
     has_lstStyle = _serialize_lstStyle(shape) is not None
     default_font_size = None if has_lstStyle else _detect_font_size(paragraphs_with_text)
+    if (default_font_size is None and not has_lstStyle and paragraphs_with_text
+            and any(r.font.size is None for para in paragraphs_with_text for r in para.runs)):
+        # Runs without explicit sz inherit the presentation default (spec
+        # fallback 18pt) — make it explicit or the builder default applies.
+        default_font_size = _inherited_default_size(shape)
 
     if _has_bullets(paragraphs_with_text):
         # Check if all text paragraphs have bullets — if mixed, use text mode
@@ -182,7 +269,7 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
         if len(non_bullet) == 0:
             items = []
             for para in paragraphs_with_text:
-                t = _extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para)
+                t = _extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para, suppress_inherited=_suppress_inherited)
                 if t.strip():
                     items.append(t)
             if items:
@@ -192,7 +279,7 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
             paras = []
             for para in all_paragraphs:
                 p = {}
-                t = _extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para)
+                t = _extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para, suppress_inherited=_suppress_inherited)
                 p["text"] = t
                 pPr = para._element.find(f'{{{ns_a}}}pPr')
                 if pPr is not None:
@@ -213,12 +300,59 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
                 paras.append(p)
             elem["paragraphs"] = paras
     else:
-        parts = []
-        for i, para in enumerate(all_paragraphs):
-            if i > 0:
-                parts.append('\n')
-            parts.append(_extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para))
-        elem["text"] = ''.join(parts)
+        # Empty paragraphs with an explicit endParaRPr size act as sized
+        # spacers (they shift anchored text); the joined-text form cannot
+        # carry per-line sizes, so switch to paragraphs mode when present.
+        ns_a = _NS["a"]
+
+        def _end_sz(para):
+            endPr = para._element.find(f'{{{ns_a}}}endParaRPr')
+            if endPr is not None and endPr.get('sz'):
+                return int(endPr.get('sz')) / 100
+            return None
+
+        sized_empties = [para for para in all_paragraphs
+                         if not para.text.strip() and _end_sz(para)
+                         and _end_sz(para) != default_font_size]
+        if sized_empties:
+            paras = []
+            for para in all_paragraphs:
+                p = {"text": _extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para, suppress_inherited=_suppress_inherited)}
+                a = _get_alignment(para)
+                if a:
+                    p["align"] = a
+                if para.runs and para.runs[0].font.size:
+                    p["fontSize"] = int(para.runs[0].font.size.pt)
+                esz = _end_sz(para)
+                if esz:
+                    p["endFontSize"] = esz
+                paras.append(p)
+            elem["paragraphs"] = paras
+        else:
+            parts = []
+            for i, para in enumerate(all_paragraphs):
+                if i > 0:
+                    parts.append('\n')
+                parts.append(_extract_styled_text(para.runs, theme_colors, color_mapping, default_font_size=default_font_size, default_text_color=default_text_color, paragraph=para, suppress_inherited=_suppress_inherited))
+            elem["text"] = ''.join(parts)
+            # endParaRPr pins the paragraph line height (e.g. a full-size
+            # 80pt endParaRPr next to a baseline-shrunk run keeps the line
+            # tall; dropping it shifts the text up). Roundtrip it when it
+            # differs from the last run's size or the runs are baseline-offset.
+            if all_paragraphs:
+                last_p = all_paragraphs[-1]
+                endPr = last_p._element.find(f'{{{_NS["a"]}}}endParaRPr')
+                if endPr is not None and endPr.get('sz'):
+                    end_sz = int(endPr.get('sz')) / 100
+                    last_runs = last_p.runs
+                    last_run_sz = (last_runs[-1].font.size.pt
+                                   if last_runs and last_runs[-1].font.size else None)
+                    has_baseline = any(
+                        (r._r.find(f'{{{_NS["a"]}}}rPr') is not None
+                         and r._r.find(f'{{{_NS["a"]}}}rPr').get('baseline'))
+                        for r in last_runs)
+                    if has_baseline or (last_run_sz is not None and end_sz != last_run_sz):
+                        elem["_endParaSize"] = end_sz
         # Extract indent/marL from first paragraph for single-text shapes
         if paragraphs_with_text:
             pPr = paragraphs_with_text[0]._element.find(f'{{{_NS["a"]}}}pPr')

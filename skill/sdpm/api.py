@@ -346,6 +346,7 @@ class BuildConfig:
     base_dir: Path = field(default_factory=lambda: Path("."))
     warnings: list[str] = field(default_factory=list)
     lint_diagnostics: list = field(default_factory=list)
+    auto_spacing: bool = True  # deck.json "autoSpacing"; False for imported decks
 
 
 def _assemble_slides_from_dir(
@@ -507,6 +508,7 @@ def _resolve_config(
         base_dir=base_dir,
         warnings=warnings,
         lint_diagnostics=lint_diagnostics,
+        auto_spacing=data.get("autoSpacing", True),
     )
 
 
@@ -520,6 +522,7 @@ def _build(config: BuildConfig, output_path: Path) -> Path:
         fonts=config.fonts,
         base_dir=config.base_dir,
         default_text_color=config.default_text_color,
+        auto_spacing=config.auto_spacing,
     )
     for s in config.slides:
         builder.add_slide(s)

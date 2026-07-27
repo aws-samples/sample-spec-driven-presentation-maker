@@ -232,6 +232,16 @@ else:
                 mapped = image_mapping.get(base)
                 if mapped:
                     node["src"] = mapped
+            # Faithful reproduction: spread _originalEffects (crop, mask,
+            # brightness...) into the element. The builder ignores the
+            # underscore key by design — without this the original image
+            # framing (e.g. a full-width cropped photo band) is lost.
+            # Only skip this when you intentionally reuse the image as
+            # fresh material in a NEW slide of your own design.
+            oe = node.pop("_originalEffects", None)
+            if oe:
+                for k, v in oe.items():
+                    node.setdefault(k, v)
             for v in node.values():
                 _rewrite_image_refs(v)
         elif isinstance(node, list):
