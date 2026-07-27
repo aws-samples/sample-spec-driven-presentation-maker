@@ -32,11 +32,13 @@ from chat_history import (
     truncate_tool_inputs,
 )
 from common import get_user_id, now_iso, presigned_url
+from shared.ingest import PPTX_GUIDE_INSTRUCTION as _PPTX_GUIDE_INSTRUCTION
 from shared.schema import (
     deck_pk, deck_sk, shared_pk, fav_sk, upload_sk,
     DECK_SK_PREFIX, FAV_SK_PREFIX,
     extract_deck_id, extract_fav_id,
     GSI_PUBLIC_DECKS, public_gsi1pk,
+    theme_hints_ddb_item,
 )
 
 # Environment variables
@@ -1460,19 +1462,6 @@ def presign_upload() -> Dict[str, Any]:
 _TEXT_EXTRACTABLE = {"text/plain", "text/markdown", "application/json"}
 
 
-# Shared guide instruction for PPTX uploads — same text as Local mode.
-_PPTX_GUIDE_INSTRUCTION = (
-    "This PPTX can either be converted into an editable deck, or used as "
-    "reference material for a new deck. "
-    "If the user's intent is to edit this PPTX, call read_guides(['import-pptx']) "
-    "and follow it exactly. "
-    "If the intent is to use as reference, proceed with the normal briefing flow "
-    "and call read_uploaded_file to access content. "
-    "If the user's intent is ambiguous, use the `hearing` tool once to clarify "
-    "before choosing."
-)
-
-
 def _pptx_guide_fields(item_or_values: Dict[str, Any]) -> Dict[str, Any]:
     """Build the guide/guideInstruction/suggestedName/slideCount/themeHints fields
     for a PPTX upload. Accepts either a fresh expr_values dict (from process_upload)
@@ -1591,15 +1580,12 @@ def process_upload(upload_id: str) -> Dict[str, Any]:
                     # PPTX deck-structure metadata — stored for the edit guide
                     # and returned by process_upload / get_upload_status.
                     if result.deck_structure:
-                        from decimal import Decimal
-                        bg_lum = result.theme_hints.get("backgroundLuminance")
+                        # theme_hints may be None when theme extraction failed
+                        # (ingest logs a warning and continues) — the helper
+                        # guards so a successful conversion is not reported
+                        # as failed.
                         update_expr_parts.append("themeHints = :th")
-                        expr_values[":th"] = {
-                            # DynamoDB rejects native floats; round-trip via str(Decimal).
-                            "backgroundLuminance": Decimal(str(bg_lum)) if bg_lum is not None else None,
-                            "accentColors": result.theme_hints.get("accentColors", []),
-                            "fonts": result.theme_hints.get("fonts", {}),
-                        }
+                        expr_values[":th"] = theme_hints_ddb_item(result.theme_hints)
                         update_expr_parts.append("slideCount = :sc")
                         expr_values[":sc"] = result.slide_count
                         update_expr_parts.append("suggestedName = :sn")

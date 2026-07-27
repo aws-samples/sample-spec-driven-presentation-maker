@@ -118,6 +118,54 @@ def test_list_templates_with_metadata_user_shadows_builtin(tmp_path: Path) -> No
     assert result[0]["source"] == "user"
 
 
+def test_list_templates_with_metadata_builtin_prefix_key_wins(tmp_path: Path) -> None:
+    """Builtin templates read metadata from 'builtin:<name>' first."""
+    bundled_dir = tmp_path / "bundled"
+    bundled_dir.mkdir()
+    (bundled_dir / "blank-dark.pptx").write_bytes(b"dummy")
+
+    metadata = {
+        "builtin:blank-dark": {"description": "User note", "layout_count": 7},
+        "blank-dark": {"description": "Legacy entry", "layout_count": 1},
+    }
+    result = list_templates_with_metadata([bundled_dir], metadata)
+
+    assert result[0]["description"] == "User note"
+    assert result[0]["layout_count"] == 7
+
+
+def test_list_templates_with_metadata_builtin_falls_back_to_plain_key(tmp_path: Path) -> None:
+    """Without a 'builtin:' entry, builtin metadata falls back to '<name>' (legacy)."""
+    bundled_dir = tmp_path / "bundled"
+    bundled_dir.mkdir()
+    (bundled_dir / "blank-dark.pptx").write_bytes(b"dummy")
+
+    metadata = {"blank-dark": {"description": "Legacy entry"}}
+    result = list_templates_with_metadata([bundled_dir], metadata)
+
+    assert result[0]["description"] == "Legacy entry"
+
+
+def test_list_templates_with_metadata_builtin_prefix_not_used_for_user(tmp_path: Path) -> None:
+    """A same-named user template must not pick up the 'builtin:' entry."""
+    user_dir = tmp_path / "user"
+    bundled_dir = tmp_path / "bundled"
+    user_dir.mkdir()
+    bundled_dir.mkdir()
+    (user_dir / "shared.pptx").write_bytes(b"user-ver")
+    (bundled_dir / "shared.pptx").write_bytes(b"bundled-ver")
+
+    metadata = {
+        "shared": {"description": "User template note"},
+        "builtin:shared": {"description": "Builtin note"},
+    }
+    result = list_templates_with_metadata([user_dir, bundled_dir], metadata)
+
+    assert len(result) == 1
+    assert result[0]["source"] == "user"
+    assert result[0]["description"] == "User template note"
+
+
 def test_analyze_and_store_template() -> None:
     template_path = Path(__file__).parent.parent / "skill" / "templates" / "blank-dark.pptx"
     if not template_path.exists():

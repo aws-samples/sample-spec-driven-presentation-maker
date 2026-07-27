@@ -26,8 +26,6 @@ import {
 } from "@/services/deckService"
 import { Download, Trash2, Upload, FileText, Type, LayoutGrid, X } from "lucide-react"
 
-const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === "local"
-
 export default function TemplatesPage() {
   const t = useTranslations("templatesPage")
   const tCommon = useTranslations("common")
@@ -158,7 +156,7 @@ export default function TemplatesPage() {
                       key={t.name}
                       template={t}
                       onDownload={handleDownload}
-                      onEditDescription={IS_LOCAL ? undefined : handleUpdateBuiltinNote}
+                      onEditDescription={handleUpdateBuiltinNote}
                     />
                   ))}
                 </div>

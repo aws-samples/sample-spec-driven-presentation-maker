@@ -15,11 +15,13 @@ Structural attributes (layout, type, shape, src, fontColor, fontFamily, etc.)
 are never touched. ``\x0b`` (vertical tab) is preserved because the map file
 round-trips via ``json``.
 
-Entire-paragraph gradients sync automatically:  when a paragraph carries
-``_textGradientRuns`` whose concatenated text equals the paragraph's
-``text``, the runs are replaced so they stay consistent with the translated
-paragraph. Partial paragraph gradients are left unchanged — the operator
-must adjust the runs manually.
+Entire-paragraph gradients sync on a best-effort basis: when a paragraph
+carries ``_textGradientRuns`` whose concatenated text equals the paragraph's
+pre-translation ``text`` AND all runs share the same gradient, the runs are
+collapsed into a single run carrying the translated text. Multi-gradient
+runs and partial paragraph gradients cannot be re-segmented reliably after
+translation — they are left unchanged with a warning, and the operator must
+adjust the runs manually.
 """
 
 from __future__ import annotations
@@ -83,6 +85,10 @@ def _apply(
 ):
     """Recursively rewrite translatable strings in-place and return node."""
     if isinstance(node, dict):
+        # Capture the pre-translation paragraph text: _sync_gradient_runs
+        # must decide "did the runs span the entire paragraph?" against the
+        # ORIGINAL text (comparing against the translated text is meaningless).
+        original_text = node.get("text") if isinstance(node.get("text"), str) else None
         for key, value in list(node.items()):
             if key in _SKIP_KEYS:
                 continue
@@ -121,37 +127,59 @@ def _apply(
                         _apply(child, dictionary, counter)
             elif isinstance(value, dict):
                 _apply(value, dictionary, counter)
-        _sync_gradient_runs(node)
+        _sync_gradient_runs(node, original_text)
     elif isinstance(node, list):
         for child in node:
             _apply(child, dictionary, counter)
     return node
 
 
-def _sync_gradient_runs(node: dict) -> None:
-    """When a paragraph's gradient covers the whole text, rewrite runs.text.
+def _sync_gradient_runs(node: dict, original_text: str | None) -> None:
+    """Best-effort sync of ``_textGradientRuns`` after paragraph translation.
 
-    Only applies when sum of run texts equalled the original ``text`` — that
-    is the entire-paragraph gradient case. Partial gradients keep the runs
-    intact; the operator must adjust them manually.
+    The builder re-applies per-run gradients by EXACT text match
+    (``_apply_text_gradient_runs``), so stale run texts silently lose their
+    gradient in the built PPTX. Sync is only attempted when the runs
+    originally spanned the entire paragraph — their concatenation equals the
+    pre-translation ``text``:
+
+    - All runs share the same gradient → collapse to a single run carrying
+      the translated text (visually identical: whole paragraph, one gradient).
+    - Runs carry different gradients → left unchanged and a warning is
+      printed; translation moves word boundaries, so there is no reliable
+      re-segmentation. The operator must adjust the runs manually.
+
+    Partial-paragraph gradients are always left unchanged (with a warning
+    when the paragraph was translated), never expanded to the whole text.
     """
-    if not isinstance(node, dict):
-        return
     runs = node.get("_textGradientRuns")
     text = node.get("text")
-    if not isinstance(runs, list) or not isinstance(text, str):
+    if not isinstance(runs, list) or not isinstance(text, str) or original_text is None:
         return
     if not all(isinstance(r, dict) and isinstance(r.get("text", ""), str) for r in runs):
         return
+    if text == original_text:
+        return  # paragraph not translated; runs still in sync
     run_concat = "".join(r.get("text", "") for r in runs)
-    # Only sync when the runs originally spanned the entire paragraph.
-    if run_concat and run_concat == text:
-        # Already in sync (pre-translation state); no-op.
+    if not run_concat or run_concat != original_text:
+        # Partial-paragraph gradient: the run texts no longer occur in the
+        # translated paragraph, so the gradient will not re-apply on build.
+        print(
+            "WARNING: partial-paragraph gradient runs left unsynced for "
+            f"translated text {text[:40]!r} — adjust _textGradientRuns manually.",
+            file=sys.stderr,
+        )
         return
-    if run_concat and run_concat != text:
-        # If the text is now shorter/longer (translated), collapse to single run.
-        if len(runs) == 1:
-            runs[0]["text"] = text
+    gradients = {json.dumps(r.get("gradient"), sort_keys=True) for r in runs}
+    if len(gradients) == 1:
+        node["_textGradientRuns"] = [{"text": text, "gradient": runs[0].get("gradient")}]
+    else:
+        print(
+            "WARNING: multi-gradient runs spanning the paragraph could not be "
+            f"synced for translated text {text[:40]!r} — adjust "
+            "_textGradientRuns manually.",
+            file=sys.stderr,
+        )
 
 
 def _diff_summary(before: dict, after: dict) -> list[tuple[str, str]]:

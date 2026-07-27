@@ -212,7 +212,7 @@ export function ChatPanelShell({
           <ChatPanel
             key={`a-${panelAKey}`}
             ref={panelAVisible ? chatRef : undefined}
-            deckId="new"
+            deckId={panelADeckId ?? "new"}
             slideSlugs={panelAOwnsCurrentDeck ? (slideSlugs || []) : []}
             onDeckCreated={handlePanelADeckCreated}
             onPreviewInvalidated={onPreviewInvalidated}

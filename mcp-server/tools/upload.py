@@ -212,10 +212,13 @@ def _format_deck_summary_from_s3(
 ) -> str | None:
     """Return a markdown-style slide summary when the S3 prefix contains deck structure.
 
-    Output shape mirrors the Local `_format_deck_text_summary` helper so agents
-    receive identical content from both modes.
+    Summary content comes from the engine (``sdpm.utils.deck_summary``) so
+    agents receive identical content from Local and Cloud modes; this
+    wrapper only performs S3 I/O and cat -n pagination.
     """
     import json as _json
+
+    from sdpm.utils.deck_summary import deck_text_summary
 
     # Cheap check: is there a deck.json + at least one slides/slide-*.json?
     try:
@@ -231,61 +234,16 @@ def _format_deck_summary_from_s3(
     if not slide_keys:
         return None
 
-    def _extract_title(data: dict) -> str:
-        t = data.get("title")
-        if isinstance(t, str):
-            return t
-        if isinstance(t, dict):
-            return t.get("text", "") or ""
-        return ""
-
-    def _collect_text(node, out: list[str]) -> None:
-        if isinstance(node, dict):
-            for key in ("text", "subtitle", "label", "date", "notes"):
-                v = node.get(key)
-                if isinstance(v, str) and v.strip():
-                    out.append(v)
-            for p in node.get("paragraphs", []) or []:
-                if isinstance(p, dict):
-                    t = p.get("text")
-                    if isinstance(t, str) and t.strip():
-                        out.append(t)
-            for item in node.get("items", []) or []:
-                if isinstance(item, str) and item.strip():
-                    out.append(item)
-            headers = node.get("headers")
-            if isinstance(headers, list):
-                out.extend(str(c) for c in headers if c)
-            rows = node.get("rows")
-            if isinstance(rows, list):
-                for row in rows:
-                    if isinstance(row, list):
-                        out.extend(str(c) for c in row if c)
-            for child in node.get("elements", []) or []:
-                _collect_text(child, out)
-
-    sections: list[str] = []
-    for i, key in enumerate(sorted(slide_keys), start=1):
+    slides: list[dict] = []
+    for key in sorted(slide_keys):
         try:
-            data = _json.loads(
+            slides.append(_json.loads(
                 storage.download_file_from_pptx_bucket(key).decode("utf-8"),
-            )
+            ))
         except Exception:
-            continue
-        title = _extract_title(data)
-        header = f"--- Slide {i}: {title} ---" if title else f"--- Slide {i} ---"
-        body_parts: list[str] = []
-        for el in data.get("elements", []) or []:
-            _collect_text(el, body_parts)
-        seen: set[str] = set()
-        deduped: list[str] = []
-        for p in body_parts:
-            if p not in seen:
-                seen.add(p)
-                deduped.append(p)
-        sections.append(f"{header}\n{chr(10).join(deduped)}".rstrip())
+            slides.append({})  # keep slide numbering aligned with key order
 
-    return _format_cat_n("\n\n".join(sections), file_name, offset, limit)
+    return _format_cat_n(deck_text_summary(slides), file_name, offset, limit)
 
 
 def _read_converted(
