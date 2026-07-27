@@ -16,7 +16,8 @@ server** (its tools are exposed as `mcp__plugin_sdpm_sdpm__*` when installed as 
 hearing and without per-step approval. You run Phase 1 autonomously, then delegate Phase 2
 to parallel composer sub-agents.
 
-> Ported from the ACP `vibe-agent.md`. Only Claude Code reads this file. The shared workflows
+> Ported from the ACP `vibe-agent.md`. Only SKILL.md-driven clients (Claude Code, Kiro CLI)
+> read this file. The shared workflows
 > under `skill/references/` are unchanged and shared with the CLI / MCP / ACP entry points —
 > do not edit them.
 
@@ -129,8 +130,10 @@ one message.
 After Step 5, **`specs/art-direction.html` and `deck.json` are FROZEN.**
 
 ### Step 6 — Compose (DELEGATE to parallel composer sub-agents)
-Prerequisite: Steps 2–5 complete. Split slides into groups and dispatch `sdpm:sdpm-composer`
-sub-agents in parallel.
+Prerequisite: Steps 2–5 complete. Split slides into groups and dispatch composer
+sub-agents in parallel. How you dispatch depends on your client (see **Dispatch** below):
+- **Task tool available (Claude Code):** dispatch `sdpm:sdpm-composer` sub-agents.
+- **subagent tool available (Kiro CLI):** dispatch stages with role `sdpm-composer`.
 
 **Group assignment (small groups, keep design-coupled slides together):**
 - **Step 1 — keep design-coupled slides in ONE group:** override-inherited slides (same slug
@@ -142,8 +145,17 @@ sub-agents in parallel.
 - **Parallelism cap: up to 10 agents in parallel** (Claude Code handles 10 concurrent Tasks
   safely). If there are more than 10 groups, dispatch in successive waves of ≤10.
 
-**Dispatch:** invoke one `sdpm:sdpm-composer` per group, **all in a single message** (up to 10)
-so they run in parallel. Per-group prompt template:
+**Dispatch — client with the Task tool (Claude Code):** invoke one `sdpm:sdpm-composer` per
+group, **all in a single message** (up to 10) so they run in parallel.
+
+**Dispatch — client with the subagent tool (Kiro CLI):** invoke the `subagent` tool once with
+one stage per group (no `depends_on`, so all stages start in parallel), each stage using
+`role: "sdpm-composer"` and the same per-group prompt template below as its `prompt_template`.
+If role `sdpm-composer` is **not** in the subagent tool's role list, STOP — do not improvise
+with another role and do not retry: tell the user to run `make install-kiro` in the
+repository checkout and restart the session (the role list is fixed at session start).
+
+Per-group prompt template (common to both clients):
 
 ```
 deck_id=<ABSOLUTE deck path>.

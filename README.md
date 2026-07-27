@@ -70,9 +70,32 @@ sub-agent. Verify with `/plugin list`, `/mcp` (expect `sdpm` connected), and `/a
 skill drives briefing → outline → art direction, then delegates Phase 2 (compose) to parallel
 composer sub-agents, and finishes with review.
 
-> **Which entry point?** **Kiro CLI** → use the Layer 1 skill. **Claude Desktop / other MCP
-> clients** → use the Layer 2 local MCP server. **Claude Code** → use this plugin (it wraps the
-> same Layer 2 MCP server with a CC-native skill + parallel compose sub-agent).
+> **Which entry point?** **Kiro CLI** → `make install-kiro` (next section). **Claude Desktop /
+> other MCP clients** → use the Layer 2 local MCP server. **Claude Code** → use this plugin (it
+> wraps the same Layer 2 MCP server with a CC-native skill + parallel compose sub-agent).
+
+### 🛠 Kiro CLI setup (skill + parallel compose sub-agents)
+
+Kiro CLI users get the same flow — the `sdpm-vibe` skill drives Phase 1, then dispatches
+parallel `sdpm-composer` sub-agents for Phase 2 — via one make target. The same
+prerequisites apply: [`uv`](https://docs.astral.sh/uv/) on your `PATH`, plus **LibreOffice**
+and **poppler** for slide previews.
+
+```bash
+git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
+cd sample-spec-driven-presentation-maker
+make install-kiro
+kiro-cli chat   # then just ask: "make slides about ..."
+```
+
+`make install-kiro` symlinks the skills into `~/.kiro/skills/`, generates the composer
+agent config at `~/.kiro/agents/sdpm-composer.json`, and registers the `sdpm` local MCP
+server in the global `~/.kiro/settings/mcp.json` (pass `--agent NAME` to
+`clients/kiro/install.py` to target a specific agent config instead). It is safe to re-run.
+
+**Updating:** `git pull` in the checkout is enough — skills are symlinks and the composer
+prompt is a `file://` reference into the checkout, so no reinstall is needed. Re-run
+`make install-kiro` only if you move the checkout to a different path.
 
 ### 🚀 One-Click Deploy — Just an AWS Account to Get Started
 
