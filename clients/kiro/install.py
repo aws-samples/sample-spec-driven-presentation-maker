@@ -89,8 +89,8 @@ def render_composer_agent() -> Path:
     return dest
 
 
-def _mcp_server_registered(config_path: Path) -> bool:
-    """Return True if the sdpm MCP server is present in the given config file."""
+def _mcp_server_name_present(config_path: Path) -> bool:
+    """Return True if an entry named sdpm exists (regardless of where it points)."""
     try:
         data = json.loads(config_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -98,15 +98,39 @@ def _mcp_server_registered(config_path: Path) -> bool:
     return MCP_SERVER_NAME in data.get("mcpServers", {})
 
 
+def _mcp_server_registered(config_path: Path, expected_dir: Path) -> bool:
+    """Return True if the sdpm MCP server already points at this checkout.
+
+    Checking the name alone is not enough: a registration left behind by a
+    checkout that has since moved or been deleted would be treated as valid,
+    so ``make install-kiro`` could not repair it (which is exactly what the
+    README tells users to do after moving the checkout).
+    """
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    server = data.get("mcpServers", {}).get(MCP_SERVER_NAME)
+    if not isinstance(server, dict):
+        return False
+    return str(expected_dir) in [str(a) for a in server.get("args", [])]
+
+
 def register_mcp_server(kiro_cli: str | None, agent: str | None) -> None:
-    """Register the sdpm MCP server via `kiro-cli mcp add` (idempotent)."""
+    """Register the sdpm MCP server via `kiro-cli mcp add` (idempotent).
+
+    Re-registers with ``--force`` when an entry exists but points elsewhere
+    (moved checkout, or switching between multiple checkouts).
+    """
     target = f"agent '{agent}'" if agent else "global ~/.kiro/settings/mcp.json"
     print(f"[3/3] Registering MCP server '{MCP_SERVER_NAME}' in {target}")
 
     config_path = AGENTS_DEST / f"{agent}.json" if agent else GLOBAL_MCP_JSON
-    if _mcp_server_registered(config_path):
+    mcp_dir = REPO_ROOT / "mcp-local"
+    if _mcp_server_registered(config_path, mcp_dir):
         info(f"'{MCP_SERVER_NAME}' already registered in {config_path} (skipped)")
         return
+    stale = _mcp_server_name_present(config_path)
 
     if kiro_cli is None:
         warn(
@@ -116,7 +140,7 @@ def register_mcp_server(kiro_cli: str | None, agent: str | None) -> None:
         )
         return
 
-    args = ["run", "--directory", str(REPO_ROOT / "mcp-local"), "python", "server.py"]
+    args = ["run", "--directory", str(mcp_dir), "python", "server.py"]
     cmd = [
         kiro_cli,
         "mcp",
@@ -130,6 +154,8 @@ def register_mcp_server(kiro_cli: str | None, agent: str | None) -> None:
         "--timeout",
         "120000",
     ]
+    if stale:
+        cmd.append("--force")
     if agent:
         cmd += ["--agent", agent]
     else:
@@ -138,7 +164,7 @@ def register_mcp_server(kiro_cli: str | None, agent: str | None) -> None:
     if result.returncode != 0:
         warn(f"`{' '.join(cmd)}` failed:\n{result.stderr.strip() or result.stdout.strip()}")
         return
-    info(f"'{MCP_SERVER_NAME}' registered in {config_path}")
+    info(f"'{MCP_SERVER_NAME}' {'updated' if stale else 'registered'} in {config_path}")
 
 
 def main() -> int:
