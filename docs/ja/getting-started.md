@@ -31,31 +31,15 @@ Layer 3〜4 を **ローカル CDK で直接デプロイする場合** は追加
 
 ---
 
-## Layer 1: Kiro CLI スキル
+## Layer 1: エージェントスキル（MCP なし）
 
-最もシンプルな使い方です。
+最もシンプルな使い方です。`skill/` ディレクトリをエージェントのスキルディレクトリにコピーまたは
+symlink します。エージェントは `scripts/pptx_builder.py` 経由でエンジンを呼び出すため、MCP
+サーバーは不要です。
 
-### Kiro CLI — make ターゲット 1 つ（推奨）
-
-```bash
-git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
-cd sample-spec-driven-presentation-maker
-make install-kiro
-kiro-cli chat   # あとは「〜のスライドを作って」と頼むだけ
-```
-
-skill を `~/.kiro/skills/` へ symlink し、composer エージェント設定を
-`~/.kiro/agents/sdpm-composer.json` に生成し、`sdpm` ローカル MCP サーバーを
-`~/.kiro/settings/mcp.json` に登録します。前提: [`uv`](https://docs.astral.sh/uv/) が
-`PATH` にあること、プレビュー用に **LibreOffice** と **poppler**。
-
-MCP サーバーはこの clone 先から起動するため、**ディレクトリはそのまま置いておいてください**。
-更新は `git pull` だけで十分です（skill は symlink、composer プロンプトは `file://` 参照）。
-別パスへ移動した場合のみ `make install-kiro` を再実行してください。
-
-### その他のエージェント — 手動インストール
-
-`skill/` ディレクトリをエージェントのスキルディレクトリにコピーまたは symlink し、以下を実行します。
+> **Kiro CLI ユーザーの方:** [Layer 2](#layer-2-ローカル-mcp-サーバー) をご覧ください —
+> `make install-kiro` でローカル MCP サーバーと、それを駆動する skill（並列 composer
+> サブエージェントを含む）が一度に設定されます。
 
 ```bash
 # 依存関係のインストール
@@ -78,7 +62,30 @@ uv run python3 scripts/pptx_builder.py examples
 
 spec-driven-presentation-maker を MCP 対応の任意のクライアントに接続します。AWS アカウントは不要です。
 
-### サーバーの起動
+### Kiro CLI — make ターゲット 1 つ（推奨）
+
+Kiro CLI では、MCP サーバーとそれを駆動する skill（並列 composer サブエージェントを含む）が
+1 つのターゲットで設定できます。
+
+```bash
+git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
+cd sample-spec-driven-presentation-maker
+make install-kiro
+kiro-cli chat   # あとは「〜のスライドを作って」と頼むだけ
+```
+
+`sdpm` ローカル MCP サーバーを `~/.kiro/settings/mcp.json` に登録し、skill を
+`~/.kiro/skills/` へ symlink し、composer エージェント設定を
+`~/.kiro/agents/sdpm-composer.json` に生成します。前提: [`uv`](https://docs.astral.sh/uv/) が
+`PATH` にあること、プレビュー用に **LibreOffice** と **poppler**。
+
+MCP サーバーはこの clone 先から起動するため、**ディレクトリはそのまま置いておいてください**。
+更新は `git pull` だけで十分です（skill は symlink、composer プロンプトは `file://` 参照）。
+別パスへ移動した場合のみ `make install-kiro` を再実行してください。
+
+### その他の MCP クライアント — 手動セットアップ
+
+#### サーバーの起動
 
 ```bash
 cd mcp-local
@@ -86,7 +93,7 @@ uv sync
 uv run python server.py
 ```
 
-### MCP クライアントの設定
+#### MCP クライアントの設定
 
 クライアントの MCP 設定ファイル（`claude_desktop_config.json`、`.vscode/mcp.json` 等）に以下を追加します。
 
@@ -101,7 +108,7 @@ uv run python server.py
 }
 ```
 
-### 動作確認
+#### 動作確認
 
 エージェントに「プレゼンテーションを作って」と依頼してください。以下のワークフローが自動的に実行されます。
 

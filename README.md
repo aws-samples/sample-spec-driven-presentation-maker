@@ -39,7 +39,8 @@ Choose your environment and follow the setup guide:
 
 | Environment | Setup |
 |---|---|
-| Agent skill (Claude Code, Codex CLI, Cursor, Kiro, Copilot) | [Getting Started — Layer 1](docs/en/getting-started.md#layer-1-kiro-cli-skill) |
+| Agent skill, no MCP (Claude Code, Codex CLI, Cursor, Copilot) | [Getting Started — Layer 1](docs/en/getting-started.md#layer-1-agent-skill-no-mcp) |
+| Kiro CLI (MCP + skills, one command) | [`make install-kiro`](#-kiro-cli-setup-mcp-server--skills--parallel-compose-sub-agents) |
 | Local MCP client (Claude Desktop, Claude Cowork) | [Getting Started — Layer 2](docs/en/getting-started.md#layer-2-local-mcp-server) |
 | Remote MCP / Web UI (AWS deployment) | [Deploy Guide](docs/en/deploy-cloudshell.md) |
 
@@ -74,7 +75,7 @@ composer sub-agents, and finishes with review.
 > other MCP clients** → use the Layer 2 local MCP server. **Claude Code** → use this plugin (it
 > wraps the same Layer 2 MCP server with a CC-native skill + parallel compose sub-agent).
 
-### 🛠 Kiro CLI setup (skill + parallel compose sub-agents)
+### 🛠 Kiro CLI setup (MCP server + skills + parallel compose sub-agents)
 
 Kiro CLI users get the same flow — the `sdpm-vibe` skill drives Phase 1, then dispatches
 parallel `sdpm-composer` sub-agents for Phase 2 — via one make target. The same
@@ -126,8 +127,8 @@ Built on a 4-layer architecture. Each layer is a thin wrapper around the previou
 
 | Use Case | Layer | AWS |
 |---|---|:---:|
-| Personal use with Kiro CLI | Layer 1: `skill/` | Not required |
-| Local MCP (Claude Desktop, VS Code, Kiro) | Layer 2: `skill/` + `mcp-local/` | Not required |
+| Agent skill only (no MCP) | Layer 1: `skill/` | Not required |
+| Local MCP (Kiro CLI, Claude Desktop, VS Code) | Layer 2: `skill/` + `mcp-local/` | Not required |
 | Team deployment | Layer 3: + `mcp-server/` + `infra/` | Required |
 | Full stack | Layer 4: + `agent/` + `api/` + `web-ui/` | Required |
 

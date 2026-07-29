@@ -31,31 +31,15 @@ Additional requirements for **deploying Layer 3–4 with local CDK directly** (n
 
 ---
 
-## Layer 1: Kiro CLI Skill
+## Layer 1: Agent Skill (no MCP)
 
-The simplest way to use spec-driven-presentation-maker.
+The simplest way to use spec-driven-presentation-maker: copy or symlink the `skill/`
+directory into your agent's skills directory. The agent calls the engine through
+`scripts/pptx_builder.py` — no MCP server involved.
 
-### Kiro CLI — one make target (recommended)
-
-```bash
-git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
-cd sample-spec-driven-presentation-maker
-make install-kiro
-kiro-cli chat   # then just ask: "make slides about ..."
-```
-
-This symlinks the skills into `~/.kiro/skills/`, generates the composer agent config at
-`~/.kiro/agents/sdpm-composer.json`, and registers the `sdpm` local MCP server in
-`~/.kiro/settings/mcp.json`. Prerequisites: [`uv`](https://docs.astral.sh/uv/) on your
-`PATH`, plus **LibreOffice** and **poppler** for slide previews.
-
-Keep the checkout where it is — the MCP server runs from it. `git pull` is enough to
-update (skills are symlinks; the composer prompt is a `file://` reference). Re-run
-`make install-kiro` only if you move the checkout.
-
-### Other agents — manual install
-
-Copy or symlink the `skill/` directory to your agent's skills directory, then:
+> **Kiro CLI users:** you probably want [Layer 2](#layer-2-local-mcp-server) instead —
+> `make install-kiro` sets up the local MCP server plus the skills that drive it,
+> including parallel composer sub-agents.
 
 ```bash
 # Install dependencies
@@ -78,7 +62,30 @@ The engine, references (design patterns, workflows, guides), sample templates (d
 
 Connect spec-driven-presentation-maker to any MCP-compatible client. No AWS account required.
 
-### Start the Server
+### Kiro CLI — one make target (recommended)
+
+Kiro CLI users get the MCP server plus the skills that drive it (including parallel
+composer sub-agents) from a single target:
+
+```bash
+git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
+cd sample-spec-driven-presentation-maker
+make install-kiro
+kiro-cli chat   # then just ask: "make slides about ..."
+```
+
+This registers the `sdpm` local MCP server in `~/.kiro/settings/mcp.json`, symlinks the
+skills into `~/.kiro/skills/`, and generates the composer agent config at
+`~/.kiro/agents/sdpm-composer.json`. Prerequisites: [`uv`](https://docs.astral.sh/uv/) on
+your `PATH`, plus **LibreOffice** and **poppler** for slide previews.
+
+Keep the checkout where it is — the MCP server runs from it. `git pull` is enough to
+update (skills are symlinks; the composer prompt is a `file://` reference). Re-run
+`make install-kiro` only if you move the checkout.
+
+### Other MCP clients — manual setup
+
+#### Start the Server
 
 ```bash
 cd mcp-local
@@ -86,7 +93,7 @@ uv sync
 uv run python server.py
 ```
 
-### Configure Your MCP Client
+#### Configure Your MCP Client
 
 Add to your client's MCP configuration file (`claude_desktop_config.json`, `.vscode/mcp.json`, etc.):
 
@@ -101,7 +108,7 @@ Add to your client's MCP configuration file (`claude_desktop_config.json`, `.vsc
 }
 ```
 
-### Verify
+#### Verify
 
 Ask your agent to "create a presentation." The following workflow runs automatically:
 

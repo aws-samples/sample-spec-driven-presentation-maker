@@ -42,7 +42,8 @@
 
 | 環境 | セットアップ |
 |---|---|
-| エージェントスキル（Claude Code, Codex CLI, Cursor, Kiro, Copilot） | [はじめに — Layer 1](docs/ja/getting-started.md#layer-1-kiro-cli-スキル) |
+| エージェントスキル（MCP なし: Claude Code, Codex CLI, Cursor, Copilot） | [はじめに — Layer 1](docs/ja/getting-started.md#layer-1-エージェントスキルmcp-なし) |
+| Kiro CLI（MCP + skill、1 コマンド） | [`make install-kiro`](#-kiro-cli-セットアップmcp-サーバー--skill--並列-compose-サブエージェント) |
 | ローカル MCP クライアント（Claude Desktop, Claude Cowork） | [はじめに — Layer 2](docs/ja/getting-started.md#layer-2-ローカル-mcp-サーバー) |
 | リモート MCP / Web UI（AWS デプロイ） | [デプロイ手順](docs/ja/deploy-cloudshell.md) |
 
@@ -77,7 +78,7 @@ review まで実施します。
 > MCP クライアント** → Layer 2 のローカル MCP サーバー。**Claude Code** → このプラグイン（同じ
 > Layer 2 MCP サーバーを CC ネイティブの skill + 並列 compose サブエージェントで包んだもの）。
 
-### 🛠 Kiro CLI セットアップ（skill + 並列 compose サブエージェント）
+### 🛠 Kiro CLI セットアップ（MCP サーバー + skill + 並列 compose サブエージェント）
 
 Kiro CLI ユーザーも同じフロー — `sdpm-vibe` skill が Phase 1 を進め、Phase 2 を
 `sdpm-composer` サブエージェントへ並列委譲 — を make ターゲット 1 つで導入できます。
@@ -130,7 +131,7 @@ kiro-cli chat   # あとは「〇〇のスライドを作って」と頼むだ�
 
 | ユースケース | レイヤー | AWS |
 |---|---|:---:|
-| Kiro CLI で個人利用 | Layer 1: `skill/` | 不要 |
+| エージェントスキルのみ（MCP なし） | Layer 1: `skill/` | 不要 |
 | ローカル MCP（Claude Desktop, VS Code, Kiro） | Layer 2: `skill/` + `mcp-local/` | 不要 |
 | チームデプロイ | Layer 3: + `mcp-server/` + `infra/` | 必要 |
 | フルスタック | Layer 4: + `agent/` + `api/` + `web-ui/` | 必要 |
