@@ -28,7 +28,19 @@ Do NOT work inside this repo for everyday slide generation.
 
 The skill entry point is `skill/SKILL.md` — agents read it to discover workflows.
 
-**Install into an agent's skill directory (recommended)** (e.g. `~/.kiro/skills/sdpm/`):
+**Kiro CLI users — one make target (recommended):**
+
+```bash
+make install-kiro
+```
+
+Symlinks the skills into `~/.kiro/skills/`, generates the composer agent config, and
+registers the `sdpm` local MCP server. Keep the checkout in place (the MCP server runs
+from it); `git pull` is enough to update. See the [README](README.md#-kiro-cli-setup-skill--parallel-compose-sub-agents).
+
+**Claude Code users:** install the plugin instead (`/plugin install sdpm@sdpm`) — it registers the local MCP server, skill, and compose sub-agent automatically. See the README.
+
+**Other agents — install into the agent's skill directory manually:**
 copy or symlink `skill/` into the agent's configured skill path, then install dependencies:
 
 ```bash
@@ -36,8 +48,6 @@ cd skill && uv sync
 ```
 
 Consult your agent's docs for the exact skill path. See [Getting Started](docs/en/getting-started.md#layer-1-kiro-cli-skill).
-
-**Claude Code users:** install the plugin instead (`/plugin install sdpm@sdpm`) — it registers the local MCP server, skill, and compose sub-agent automatically. See the README.
 
 Note: installing `skill/` as a pip package (`pip install git+...#subdirectory=skill`) only installs the `sdpm` Python engine — the SKILL.md, templates, and references are not bundled. It is intended for embedding the engine (e.g. the L3 Docker image), not for end-user skill installs.
 

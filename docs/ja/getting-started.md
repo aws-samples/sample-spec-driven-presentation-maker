@@ -33,7 +33,29 @@ Layer 3〜4 を **ローカル CDK で直接デプロイする場合** は追加
 
 ## Layer 1: Kiro CLI スキル
 
-最もシンプルな使い方です。`skill/` ディレクトリを Kiro CLI のスキルディレクトリにコピーするだけで動作します。
+最もシンプルな使い方です。
+
+### Kiro CLI — make ターゲット 1 つ（推奨）
+
+```bash
+git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
+cd sample-spec-driven-presentation-maker
+make install-kiro
+kiro-cli chat   # あとは「〜のスライドを作って」と頼むだけ
+```
+
+skill を `~/.kiro/skills/` へ symlink し、composer エージェント設定を
+`~/.kiro/agents/sdpm-composer.json` に生成し、`sdpm` ローカル MCP サーバーを
+`~/.kiro/settings/mcp.json` に登録します。前提: [`uv`](https://docs.astral.sh/uv/) が
+`PATH` にあること、プレビュー用に **LibreOffice** と **poppler**。
+
+MCP サーバーはこの clone 先から起動するため、**ディレクトリはそのまま置いておいてください**。
+更新は `git pull` だけで十分です（skill は symlink、composer プロンプトは `file://` 参照）。
+別パスへ移動した場合のみ `make install-kiro` を再実行してください。
+
+### その他のエージェント — 手動インストール
+
+`skill/` ディレクトリをエージェントのスキルディレクトリにコピーまたは symlink し、以下を実行します。
 
 ```bash
 # 依存関係のインストール

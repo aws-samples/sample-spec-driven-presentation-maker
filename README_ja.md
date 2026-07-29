@@ -96,6 +96,10 @@ kiro-cli chat   # あとは「〇〇のスライドを作って」と頼むだ�
 `~/.kiro/settings/mcp.json` に登録します（特定のエージェント設定に追加したい場合は
 `clients/kiro/install.py --agent NAME` を直接実行）。再実行しても安全です。
 
+**チェックアウトはそのまま置いてください:** ローカル MCP サーバーはチェックアウトから起動するため
+（`uv run --directory <checkout>/mcp-local`）、clone を削除・移動すると Kiro の sdpm ツールが
+動かなくなります。
+
 **更新:** チェックアウトで `git pull` するだけで反映されます — skill は symlink、composer
 プロンプトはチェックアウトへの `file://` 参照のため再インストール不要です。チェックアウトを
 別パスへ移動した場合のみ `make install-kiro` を再実行してください。

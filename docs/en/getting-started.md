@@ -33,7 +33,29 @@ Additional requirements for **deploying Layer 3–4 with local CDK directly** (n
 
 ## Layer 1: Kiro CLI Skill
 
-The simplest way to use spec-driven-presentation-maker. Copy the `skill/` directory to your Kiro CLI skills directory.
+The simplest way to use spec-driven-presentation-maker.
+
+### Kiro CLI — one make target (recommended)
+
+```bash
+git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
+cd sample-spec-driven-presentation-maker
+make install-kiro
+kiro-cli chat   # then just ask: "make slides about ..."
+```
+
+This symlinks the skills into `~/.kiro/skills/`, generates the composer agent config at
+`~/.kiro/agents/sdpm-composer.json`, and registers the `sdpm` local MCP server in
+`~/.kiro/settings/mcp.json`. Prerequisites: [`uv`](https://docs.astral.sh/uv/) on your
+`PATH`, plus **LibreOffice** and **poppler** for slide previews.
+
+Keep the checkout where it is — the MCP server runs from it. `git pull` is enough to
+update (skills are symlinks; the composer prompt is a `file://` reference). Re-run
+`make install-kiro` only if you move the checkout.
+
+### Other agents — manual install
+
+Copy or symlink the `skill/` directory to your agent's skills directory, then:
 
 ```bash
 # Install dependencies

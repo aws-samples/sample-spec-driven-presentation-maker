@@ -93,6 +93,9 @@ agent config at `~/.kiro/agents/sdpm-composer.json`, and registers the `sdpm` lo
 server in the global `~/.kiro/settings/mcp.json` (pass `--agent NAME` to
 `clients/kiro/install.py` to target a specific agent config instead). It is safe to re-run.
 
+**Keep the checkout in place:** the local MCP server runs from it (`uv run --directory
+<checkout>/mcp-local`), so deleting or moving the clone breaks the sdpm tools in Kiro.
+
 **Updating:** `git pull` in the checkout is enough — skills are symlinks and the composer
 prompt is a `file://` reference into the checkout, so no reinstall is needed. Re-run
 `make install-kiro` only if you move the checkout to a different path.
