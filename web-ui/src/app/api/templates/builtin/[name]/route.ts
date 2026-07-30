@@ -4,7 +4,7 @@
  *
  * Mirrors the cloud `PATCH /templates/builtin/<name>` endpoint. Notes live
  * under `template_metadata["builtin:<name>"].description` — the same key the
- * templates listing already uses for builtin analysis caches — so mcp-local
+ * templates listing already uses for builtin analysis caches — so servers/local
  * and the L1 CLI pick them up through the engine without extra plumbing.
  */
 import fs from "fs"

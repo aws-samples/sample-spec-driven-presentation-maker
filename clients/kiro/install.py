@@ -116,7 +116,7 @@ def register_mcp_server(kiro_cli: str | None, agent: str | None) -> None:
     print(f"[2/2] Registering MCP server '{MCP_SERVER_NAME}' in {target}")
 
     config_path = AGENTS_DEST / f"{agent}.json" if agent else GLOBAL_MCP_JSON
-    mcp_dir = REPO_ROOT / "mcp-local"
+    mcp_dir = REPO_ROOT / "servers" / "local"
     if _mcp_server_registered(config_path, mcp_dir):
         info(f"'{MCP_SERVER_NAME}' already registered in {config_path} (skipped)")
         return

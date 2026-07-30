@@ -30,14 +30,14 @@ COPY personas/ personas/
 COPY skill/templates/ skill/templates/
 ENV SDPM_SKILL_ROOT=/app/skill
 
-# Install mcp-server
+# Install remote server
 COPY shared/ shared/
-COPY mcp-server/pyproject.toml mcp-server/pyproject.toml
-COPY mcp-server/tools/ mcp-server/tools/
-COPY mcp-server/storage/ mcp-server/storage/
-COPY mcp-server/server.py mcp-server/server.py
-COPY mcp-server/server_utils.py mcp-server/server_utils.py
-RUN python3.13 -m pip install --no-cache-dir ./mcp-server
+COPY servers/remote/pyproject.toml servers/remote/pyproject.toml
+COPY servers/remote/tools/ servers/remote/tools/
+COPY servers/remote/storage/ servers/remote/storage/
+COPY servers/remote/server.py servers/remote/server.py
+COPY servers/remote/server_utils.py servers/remote/server_utils.py
+RUN python3.13 -m pip install --no-cache-dir ./servers/remote
 
 ENV PYTHONPATH=/app
 
@@ -50,4 +50,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD python3.13 -c "import socket; s=socket.create_connection(('localhost',8000),2); s.close()" || exit 1
 
-CMD ["opentelemetry-instrument", "python3.13", "mcp-server/server.py"]
+CMD ["opentelemetry-instrument", "python3.13", "servers/remote/server.py"]

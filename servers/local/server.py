@@ -13,18 +13,19 @@ read Server Instructions work too.
 
 Usage:
     python server.py
-    # or via MCP client config: {"command": "python", "args": ["mcp-local/server.py"]}
+    # or via MCP client config: {"command": "python", "args": ["servers/local/server.py"]}
 """
 
 import sys
 from pathlib import Path
 
 # Add skill/ to sys.path so sdpm package is importable
-_SKILL_DIR = Path(__file__).resolve().parent.parent / "skill"
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_SKILL_DIR = _REPO_ROOT / "skill"
 sys.path.insert(0, str(_SKILL_DIR))
 
 # Add project root to sys.path so shared/ package is importable
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(_REPO_ROOT))
 
 import sandbox_tools  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402

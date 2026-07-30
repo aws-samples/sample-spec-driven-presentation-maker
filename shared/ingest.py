@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 _PDF_MAX_PAGES = 100
 
 # File types that need no conversion (caller copies as-is). Public — used by callers
-# (api/index.py, mcp-local/upload_tools.py) to detect passthrough files.
+# (api/index.py, servers/local/upload_tools.py) to detect passthrough files.
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 TEXT_EXTS = {".csv", ".json", ".txt", ".md", ".html"}
 PASSTHROUGH_EXTS = IMAGE_EXTS | TEXT_EXTS
@@ -41,7 +41,7 @@ _PASSTHROUGH_EXTS = PASSTHROUGH_EXTS
 
 # Agent-facing hint returned with PPTX uploads (deck-structure conversions).
 # Single source shared by the Cloud upload path (api/index.py) and the Local
-# upload path (mcp-local/upload_tools.py) — keep intent-branching wording
+# upload path (servers/local/upload_tools.py) — keep intent-branching wording
 # identical across modes.
 PPTX_GUIDE_INSTRUCTION = (
     "This PPTX can either be converted into an editable deck, or used as "

@@ -3,7 +3,7 @@
 /**
  * ACP Agent Adapter — server-side storage for agent configs.
  * Mirrors AgentSettingsDialog's AgentConfig interface.
- * Stores in mcp-local/.sdpm/acp-config.json.
+ * Stores in servers/local/.sdpm/acp-config.json.
  */
 
 import fs from "fs"
@@ -35,7 +35,7 @@ const PRESETS: AgentConfig[] = [
   },
 ]
 
-const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
+const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
 // SDPM_ACP_CONFIG_DIR: override for tests (E2E points this at a sandbox
 // so the stub agent config never touches the developer's real one)
 const CONFIG_DIR = process.env.SDPM_ACP_CONFIG_DIR || path.join(MCP_LOCAL_DIR, ".sdpm")

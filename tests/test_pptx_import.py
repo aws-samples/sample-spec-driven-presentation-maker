@@ -5,9 +5,9 @@
 Covers T8 from .kiro/specs/pptx-import-edit/tasks.md:
 - pptx_to_json output: deck.json + slides/slide-NN.json
 - shared/ingest._convert_pptx: ConversionResult with deck_structure / theme_hints
-- mcp-local/upload_tools: guide/guideInstruction in response
-- mcp-local/upload_tools.read_uploaded_file: deck text summary
-- mcp-local/upload_tools._import_from_upload: slides/ recursive copy + shortId
+- servers/local/upload_tools: guide/guideInstruction in response
+- servers/local/upload_tools.read_uploaded_file: deck text summary
+- servers/local/upload_tools._import_from_upload: slides/ recursive copy + shortId
 - pptx_builder.py CLI: accepts deck directory
 - Non-regression: PDF/DOCX/XLSX import unchanged
 """
@@ -195,7 +195,7 @@ class TestDeckTextSummaryEngine:
     """sdpm.utils.deck_summary — single source for Local/Cloud text summaries.
 
     PR #215 follow-up (R5): the summary logic was verbatim-duplicated in
-    mcp-local/upload_tools.py and mcp-server/tools/upload.py; it now lives
+    servers/local/upload_tools.py and servers/remote/tools/upload.py; it now lives
     in the engine per the logic-sharing steering.
     """
 
@@ -236,9 +236,9 @@ class TestDeckTextSummaryEngine:
 
     def test_local_and_cloud_wrappers_delegate_to_engine(self) -> None:
         """Guard against re-duplication: neither consumer defines the logic."""
-        local_src = (_REPO_ROOT / "mcp-local" / "upload_tools.py").read_text(encoding="utf-8")
-        cloud_src = (_REPO_ROOT / "mcp-server" / "tools" / "upload.py").read_text(encoding="utf-8")
-        for src, name in ((local_src, "mcp-local"), (cloud_src, "mcp-server")):
+        local_src = (_REPO_ROOT / "servers" / "local" / "upload_tools.py").read_text(encoding="utf-8")
+        cloud_src = (_REPO_ROOT / "servers" / "remote" / "tools" / "upload.py").read_text(encoding="utf-8")
+        for src, name in ((local_src, "servers/local"), (cloud_src, "servers/remote")):
             assert "deck_text_summary" in src, f"{name} must use the engine helper"
             assert "def _collect_text" not in src, f"{name} re-duplicates _collect_text"
             assert "def _extract_title" not in src, f"{name} re-duplicates _extract_title"
@@ -253,10 +253,10 @@ class TestUploadFileGuideInstruction:
     """Local upload_file must return guide, guideInstruction, suggestedName, slideCount, themeHints."""
 
     def _upload_pptx(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
-        """Helper: upload the fixture PPTX via mcp-local/upload_tools.upload_file."""
+        """Helper: upload the fixture PPTX via servers/local/upload_tools.upload_file."""
         # Route SDPM_DECK_ROOT so session storage lives under tmp_path
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
         from upload_tools import upload_file
 
         # Copy fixture to tmp_path so the temp upload path is stable
@@ -311,7 +311,7 @@ class TestReadUploadedFileTextSummary:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
         from upload_tools import read_uploaded_file, upload_file
 
         src = tmp_path / "input.pptx"
@@ -337,7 +337,7 @@ class TestImportAttachmentSlidesDir:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
         from upload_tools import import_attachment, upload_file
 
         src = tmp_path / "input.pptx"
@@ -370,7 +370,7 @@ class TestImportAttachmentSlidesDir:
     ) -> None:
         """Placeholder template lives at deck/template.pptx (deck-local path)."""
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
         from upload_tools import import_attachment, upload_file
 
         src = tmp_path / "input.pptx"
@@ -400,7 +400,7 @@ class TestImportAttachmentSlidesDir:
 
 
 class TestCloudImportConvertedCopiesTemplate:
-    """mcp-server/tools/attachment._import_converted handles template.pptx specially."""
+    """servers/remote/tools/attachment._import_converted handles template.pptx specially."""
 
     def test_import_converted_copies_template_to_deck_root(
         self, monkeypatch: pytest.MonkeyPatch,
@@ -408,7 +408,7 @@ class TestCloudImportConvertedCopiesTemplate:
         import types
         from unittest.mock import MagicMock
 
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-server"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "remote"))
         # mcp-server has its own dependency set; stub the modules that the
         # attachment module imports at top level so we can import it under
         # the local-test venv. monkeypatch.setitem reverts after this test so
@@ -508,7 +508,7 @@ class TestDeckRootEnvHandling:
         self, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.delenv("SDPM_DECK_ROOT", raising=False)
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
         from upload_tools import _deck_root
 
         root = _deck_root()
@@ -519,7 +519,7 @@ class TestDeckRootEnvHandling:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "custom"))
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
         from upload_tools import _deck_root
 
         assert _deck_root() == tmp_path / "custom"
@@ -528,7 +528,7 @@ class TestDeckRootEnvHandling:
         self, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("SDPM_DECK_ROOT", "   ")
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "mcp-local"))
+        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
         from upload_tools import _deck_root
 
         assert _deck_root() == Path.home() / "Documents" / "SDPM-Presentations"

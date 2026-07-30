@@ -7,7 +7,7 @@
 import fs from "fs"
 import path from "path"
 
-const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
+const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
 const ACP_AGENTS_DIR = path.join(MCP_LOCAL_DIR, ".kiro", "acp-agents")
 const CONFIG_DIR = path.join(MCP_LOCAL_DIR, ".sdpm")
 const CONFIG_PATH = path.join(CONFIG_DIR, "acp-agent-selection.json")

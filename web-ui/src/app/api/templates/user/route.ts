@@ -6,8 +6,8 @@ import path from "path"
 import { execFileSync } from "child_process"
 import { getUserConfigDir, getState, updateState } from "@/lib/local/sdpmPaths"
 
-/** mcp-local directory (uv-managed venv with sdpm deps). */
-const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
+/** servers/local directory (uv-managed venv with sdpm deps). */
+const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
 
 function getUserTemplatesDir(): string {
   return path.join(getUserConfigDir(), "templates")

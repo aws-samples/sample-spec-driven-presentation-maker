@@ -33,7 +33,7 @@ _WORKSPACE_PREFIXES = ("deck.json", "slides/", "specs/", "includes/", "attachmen
 
 # Helpers injected into every sandbox session so agent code can be written once
 # and run unchanged on Local (AST-restricted subprocess) and Cloud (AgentCore
-# Code Interpreter). These mirror mcp-local/sandbox.py's _RUNNER_WITH_DECK.
+# Code Interpreter). These mirror servers/local/sandbox.py's _RUNNER_WITH_DECK.
 _HELPERS_PY = '''\
 import json as _json
 from pathlib import Path as _Path

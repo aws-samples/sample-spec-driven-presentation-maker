@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * Local File Upload API — receives a file from the browser and converts it
- * via mcp-local/upload_tools.upload_file (Python subprocess).
+ * via servers/local/upload_tools.upload_file (Python subprocess).
  * Local mode only.
  */
 
@@ -11,7 +11,7 @@ import fs from "fs"
 import os from "os"
 import path from "path"
 
-const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
+const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
 
 export async function POST(req: Request): Promise<Response> {
   const form = await req.formData()

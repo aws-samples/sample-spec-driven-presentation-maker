@@ -33,7 +33,7 @@ export interface UploadedFile {
   filePath?: string
   imagesDir?: string
   colorAnalysis?: { palette: { hex: string; ratio: number }[]; brightness: string; saturation: string }
-  // PPTX deck-structure conversion fields (set by mcp-local/upload_tools.py
+  // PPTX deck-structure conversion fields (set by servers/local/upload_tools.py
   // and the Cloud upload Lambda when convert_file produces a deck). The
   // agent uses `guideInstruction` to branch into the import-pptx guide
   // instead of treating the file as generic reference material.
@@ -102,7 +102,7 @@ export async function uploadFile(
   deckId?: string,
   onProgress?: (status: UploadedFile) => void,
 ): Promise<UploadedFile> {
-  // Local mode: POST to /api/upload (Next.js API Route → mcp-local/upload_tools)
+  // Local mode: POST to /api/upload (Next.js API Route → servers/local/upload_tools)
   if (IS_LOCAL) {
     const form = new FormData()
     form.append("file", file)

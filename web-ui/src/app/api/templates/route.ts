@@ -9,8 +9,8 @@ import { getUserConfigDir, getState, updateState } from "@/lib/local/sdpmPaths"
 /** Bundled templates directory. */
 const BUNDLED_TEMPLATES_DIR = path.resolve(process.cwd(), "..", "skill", "templates")
 
-/** mcp-local directory (uv-managed venv with sdpm deps). */
-const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
+/** servers/local directory (uv-managed venv with sdpm deps). */
+const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
 
 /** User-local templates directory. */
 function getUserTemplatesDir(): string {

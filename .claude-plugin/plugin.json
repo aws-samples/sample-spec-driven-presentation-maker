@@ -10,7 +10,7 @@
   "mcpServers": {
     "sdpm": {
       "command": "uv",
-      "args": ["run", "--directory", "${CLAUDE_PLUGIN_ROOT}/mcp-local", "python", "server.py"]
+      "args": ["run", "--directory", "${CLAUDE_PLUGIN_ROOT}/servers/local", "python", "server.py"]
     }
   }
 }
