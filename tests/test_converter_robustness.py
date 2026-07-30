@@ -24,7 +24,7 @@ from sdpm.engine.schema.minimal import _strip_internal_keys
 
 
 def _template() -> Path:
-    return Path(__file__).parent.parent / "skill" / "templates" / "blank-dark.pptx"
+    return Path(__file__).parent.parent / "sdpm" / "templates" / "blank-dark.pptx"
 
 
 def _title_slide(prs):

@@ -19,16 +19,16 @@ RUN dnf install -y --setopt=install_weak_deps=False \
 WORKDIR /app
 
 # Install skill (engine) first for layer caching
-COPY skill/pyproject.toml skill/pyproject.toml
-COPY skill/sdpm/ skill/sdpm/
-RUN python3.13 -m pip install --no-cache-dir ./skill
+COPY sdpm/pyproject.toml sdpm/pyproject.toml
+COPY sdpm/sdpm/ sdpm/sdpm/
+RUN python3.13 -m pip install --no-cache-dir ./sdpm
 
 # Bundled knowledge data (references / templates) — served by the shared tool
 # contract via SDPM_SKILL_ROOT. Assets stay on S3 (user-extensible, 36MB).
-COPY skill/references/ skill/references/
+COPY sdpm/references/ sdpm/references/
 COPY personas/ personas/
-COPY skill/templates/ skill/templates/
-ENV SDPM_SKILL_ROOT=/app/skill
+COPY sdpm/templates/ sdpm/templates/
+ENV SDPM_SKILL_ROOT=/app/sdpm
 
 # Install remote server
 COPY shared/ shared/

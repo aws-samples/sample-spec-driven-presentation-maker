@@ -1442,7 +1442,7 @@ requires-dist = [
     { name = "pdfplumber", specifier = ">=0.11.0" },
     { name = "pypdf", specifier = ">=6.14.2" },
     { name = "python-docx", specifier = ">=1.0.0" },
-    { name = "sdpm-skill", directory = "../../skill" },
+    { name = "sdpm-skill", directory = "../../sdpm" },
 ]
 
 [package.metadata.requires-dev]
@@ -1453,7 +1453,7 @@ dev = [
 
 [[package]]
 name = "sdpm-skill"
-source = { directory = "../../skill" }
+source = { directory = "../../sdpm" }
 dependencies = [
     { name = "defusedxml" },
     { name = "lxml" },

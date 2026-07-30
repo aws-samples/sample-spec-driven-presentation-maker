@@ -15,9 +15,9 @@ Usage:
 import sys
 from pathlib import Path
 
-# Add skill/ to sys.path so sdpm package is importable
+# Add sdpm/ (skill root) to sys.path so sdpm package is importable
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_SKILL_DIR = _REPO_ROOT / "skill"
+_SKILL_DIR = _REPO_ROOT / "sdpm"
 sys.path.insert(0, str(_SKILL_DIR))
 
 # Add project root to sys.path so shared/ package is importable

@@ -5,8 +5,8 @@ import fs from "fs"
 import path from "path"
 import os from "os"
 
-/** Bundled styles directory (skill/references/examples/styles/). */
-export const BUNDLED_STYLES_DIR = path.resolve(process.cwd(), "..", "skill", "references", "examples", "styles")
+/** Bundled styles directory (sdpm/references/examples/styles/). */
+export const BUNDLED_STYLES_DIR = path.resolve(process.cwd(), "..", "sdpm", "references", "examples", "styles")
 
 /** User config directory (~/.config/sdpm on macOS/Linux, %APPDATA%/sdpm on Windows). */
 export function getUserConfigDir(): string {

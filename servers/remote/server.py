@@ -21,8 +21,8 @@ import time
 from contextvars import ContextVar
 from pathlib import Path
 
-# Add skill/ to sys.path so sdpm engine is importable
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skill"))
+# Add sdpm/ (skill root) to sys.path so the engine is importable
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "sdpm"))
 
 import boto3  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402

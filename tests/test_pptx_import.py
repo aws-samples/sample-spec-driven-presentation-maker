@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_FIXTURE_PPTX = _REPO_ROOT / "skill" / "references" / "examples" / "components.pptx"
+_FIXTURE_PPTX = _REPO_ROOT / "sdpm" / "references" / "examples" / "components.pptx"
 
 
 @pytest.fixture
@@ -470,7 +470,7 @@ class TestPptxBuilderCliAcceptsDeckDir:
         # pptx_to_json writes deck.json (with template=None) — supply template for generate
         deck_json_path = deck_dir / "deck.json"
         deck_data = json.loads(deck_json_path.read_text(encoding="utf-8"))
-        deck_data["template"] = str(_REPO_ROOT / "skill" / "templates" / "blank-dark.pptx")
+        deck_data["template"] = str(_REPO_ROOT / "sdpm" / "templates" / "blank-dark.pptx")
         deck_json_path.write_text(json.dumps(deck_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
         # Build an outline covering all slides
@@ -482,7 +482,7 @@ class TestPptxBuilderCliAcceptsDeckDir:
 
         # CLI: pptx_builder.py generate {deck_dir} -o {output}
         output_pptx = tmp_path / "out.pptx"
-        cli = _REPO_ROOT / "skill" / "scripts" / "pptx_builder.py"
+        cli = _REPO_ROOT / "sdpm" / "scripts" / "pptx_builder.py"
         proc = subprocess.run(
             [sys.executable, str(cli), "generate", str(deck_dir), "-o", str(output_pptx)],
             capture_output=True, text=True, timeout=120,
@@ -720,7 +720,7 @@ class TestConvertPptxOutputsTemplate:
         )
 
         output_pptx = tmp_path / "out.pptx"
-        cli = _REPO_ROOT / "skill" / "scripts" / "pptx_builder.py"
+        cli = _REPO_ROOT / "sdpm" / "scripts" / "pptx_builder.py"
         proc = subprocess.run(
             [sys.executable, str(cli), "generate", str(deck_dir), "-o", str(output_pptx)],
             capture_output=True, text=True, timeout=180,

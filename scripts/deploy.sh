@@ -206,8 +206,8 @@ zip -r "${SOURCE_ZIP}" . \
   -x "web-ui/node_modules/*" \
   -x "web-ui/.next/*" \
   -x "web-ui/build/*" \
-  -x "skill/assets/aws/*" \
-  -x "skill/assets/material/*" \
+  -x "sdpm/assets/aws/*" \
+  -x "sdpm/assets/material/*" \
   -x ".ruff_cache/*" \
   -x ".pytest_cache/*" \
   -x ".DS_Store" \

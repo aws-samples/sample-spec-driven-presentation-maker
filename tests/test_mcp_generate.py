@@ -11,7 +11,7 @@ import pytest
 
 from tools import generate as generate_mod
 
-_TEMPLATE = Path(__file__).resolve().parent.parent / "skill" / "templates" / "blank-dark.pptx"
+_TEMPLATE = Path(__file__).resolve().parent.parent / "sdpm" / "templates" / "blank-dark.pptx"
 
 _SLIDE = {
     "layout": "blank",

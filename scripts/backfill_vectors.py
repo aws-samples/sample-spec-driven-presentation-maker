@@ -20,8 +20,8 @@ import json
 import sys
 from pathlib import Path
 
-# Add mcp-server to path for KBSync import
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "mcp-server"))
+# Add servers/remote to path for KBSync import
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "servers" / "remote"))
 
 import boto3  # noqa: E402
 
