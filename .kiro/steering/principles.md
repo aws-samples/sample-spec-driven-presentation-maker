@@ -24,6 +24,43 @@ Mode behavior (vibe / spec / style / composer) lives ONLY in `personas/*.md` and
 served to MCP clients via `start_presentation(mode=...)`. Client-side files are thin
 wiring (composer sub-agent registration).
 
+## Design Philosophy — Ports and Adapters
+
+The v0.5 structure is a deliberate Ports and Adapters (Hexagonal) architecture:
+
+| Element | Pattern role |
+|---|---|
+| `sdpm.engine` / `sdpm.knowledge` | Core domain — pure logic, knows nothing about the outside |
+| `sdpm.api` | Facade over the core (generate / preview / init / code_block) |
+| `sdpm.tools` | The **port** — every operation defined once as a contract |
+| `servers/local` | Adapter: stdio MCP + ACP transport |
+| `servers/remote` | Adapter: HTTP MCP + AWS infrastructure (S3 / DynamoDB) |
+| CLI + `sdpm/SKILL.md` | Adapter: no-MCP path |
+| `agent/`, `web-ui/` | Outer applications consuming the port |
+
+Rules that follow from this:
+
+1. **Dependency rule** — dependencies point inward only
+   (servers → tools → engine/knowledge). The core never imports from
+   servers, clients, or infra.
+2. **Adapters hold only transport/infrastructure differences.** If a piece of
+   logic is not about transport or storage, it belongs in the core.
+3. **Deliberate deviation: no storage port.** The core defines no Storage
+   abstraction; S3/DynamoDB live entirely inside `servers/remote`. This trades
+   hexagonal purity for one less abstraction — acceptable while there is a
+   single cloud backend. Revisit only if a second backend appears.
+4. **Personas are content, not client config** ("server-driven behavior").
+   Behavior is served through the port via `start_presentation(mode=...)`,
+   so client-side files stay minimal wiring and never duplicate behavior text.
+5. **Change-locality goal** — the structure is optimised so that:
+   prompt changes touch only `personas/`; engine changes touch only
+   `sdpm/sdpm/engine/`; a new client touches only `clients/`; a new tool
+   touches only `sdpm/sdpm/tools/`.
+
+Known debt against this philosophy (tracked for v0.5.x): `agent/prompts/role/`
+bypasses the personas port; `converter/elements.py` is a low-cohesion monolith
+inside the core; `api/index.py` has no test coverage.
+
 ## Engine & Knowledge (`sdpm/sdpm/`)
 
 The single source of truth for all business logic, split into two peer subpackages:
