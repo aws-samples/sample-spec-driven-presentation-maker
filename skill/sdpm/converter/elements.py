@@ -44,6 +44,7 @@ _PRESET_MAP = {
     'flowChartTerminator': 'flowchart_terminator',
     'leftBracket': 'left_bracket', 'rightBracket': 'right_bracket',
     'can': 'cylinder', 'mathNotEqual': 'math_not_equal',
+    'foldedCorner': 'folded_corner',
 }
 
 def _resolve_shape_name(shape):
