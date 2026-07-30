@@ -38,7 +38,7 @@ def code_block_to_include(
         Dict with include_path for use in presentation.json.
     """
     from sdpm.utils.text import highlight_code
-    from sdpm.builder.constants import CODE_COLORS
+    from sdpm.engine.builder.constants import CODE_COLORS
 
     colors = CODE_COLORS.get(theme, CODE_COLORS["dark"])
     bg = colors["background"]

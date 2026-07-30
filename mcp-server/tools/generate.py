@@ -10,7 +10,7 @@ Presigned URLs are used for time-limited access to output files.
 # data classification, and IAM policies. See SECURITY.md for details.
 
 Reads deck.json + outline.md + slides/*.json + includes from S3,
-resolves include references, and builds PPTX via sdpm.builder.
+resolves include references, and builds PPTX via sdpm.engine.builder.
 """
 
 import json
@@ -106,8 +106,8 @@ def _prepare_workspace(
         (tmpdir, slides, build_kwargs) where build_kwargs has keys:
         template_path, custom_template, fonts, base_dir, default_text_color
     """
-    from sdpm.analyzer import extract_fonts
-    from sdpm.builder import PPTXBuilder  # noqa: F401 — validate import
+    from sdpm.engine.analyzer import extract_fonts
+    from sdpm.engine.builder import PPTXBuilder  # noqa: F401 — validate import
 
     deck = storage.get_deck(deck_id, user_id)
     if not deck:
@@ -190,7 +190,7 @@ def _prepare_workspace(
                         dest.write_bytes(storage.download_file(key=s3_key))
 
     # Point engine's ASSETS_DIR to tmpdir/assets
-    import sdpm.assets as _assets_mod
+    import sdpm.knowledge.assets as _assets_mod
     _assets_mod.ASSETS_DIR = assets_dir
     _assets_mod.ICON_DIR = assets_dir
     _assets_mod.ICON_LOCAL_DIR = assets_dir
@@ -269,7 +269,7 @@ def generate_pptx(
     Raises:
         ValueError: If deck not found or has no slides.
     """
-    from sdpm.builder import PPTXBuilder, resolve_override
+    from sdpm.engine.builder import PPTXBuilder, resolve_override
 
     tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, storage)
     try:

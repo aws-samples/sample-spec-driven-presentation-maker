@@ -1,12 +1,12 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Tests for sdpm.checks.font_size."""
+"""Tests for sdpm.engine.checks.font_size."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from sdpm.checks.font_size import (
+from sdpm.engine.checks.font_size import (
     _walk_font_sizes,
     check_font_size_tokens,
     find_art_direction,

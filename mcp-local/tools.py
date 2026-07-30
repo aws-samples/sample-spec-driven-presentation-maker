@@ -42,7 +42,7 @@ def analyze_template(template: str, layout: str = "") -> dict[str, Any]:
     Returns:
         Dict with layouts, theme_colors, fonts, and optional layout_detail.
     """
-    from sdpm.analyzer import analyze_template as _analyze, get_layout_placeholders
+    from sdpm.engine.analyzer import analyze_template as _analyze, get_layout_placeholders
     from sdpm.api import _find_template_in_dirs, get_templates_dirs
 
     if not template:
@@ -77,7 +77,7 @@ def generate_pptx(deck_id: str) -> dict[str, Any]:
         Dict with output_path and slide summary.
     """
     from sdpm.api import generate
-    from sdpm.assets import invalidate_manifest_cache
+    from sdpm.knowledge.assets import invalidate_manifest_cache
     invalidate_manifest_cache()
     return generate(
         json_path=deck_id,
@@ -126,7 +126,7 @@ def search_assets(
     Returns:
         Dict with query and results list.
     """
-    from sdpm.assets import invalidate_manifest_cache, search_assets as _search
+    from sdpm.knowledge.assets import invalidate_manifest_cache, search_assets as _search
     invalidate_manifest_cache()
     return {
         "query": query,
@@ -145,7 +145,7 @@ def list_asset_sources() -> dict[str, Any]:
     Returns:
         Dict with sources list.
     """
-    from sdpm.assets import invalidate_manifest_cache, list_sources
+    from sdpm.knowledge.assets import invalidate_manifest_cache, list_sources
     invalidate_manifest_cache()
     return {"sources": list_sources()}
 
@@ -206,7 +206,7 @@ def read_examples(names: list[str]) -> dict[str, Any]:
     Returns:
         Dict with documents list.
     """
-    from sdpm.reference import read_docs
+    from sdpm.knowledge.reference import read_docs
     return {"documents": read_docs(_REFERENCES_DIR / "examples", names)}
 
 
@@ -216,7 +216,7 @@ def list_workflows() -> dict[str, Any]:
     Returns:
         Dict with items list (name, description).
     """
-    from sdpm.reference import list_category
+    from sdpm.knowledge.reference import list_category
     return {"items": list_category(_REFERENCES_DIR / "workflows")}
 
 
@@ -229,7 +229,7 @@ def read_workflows(names: list[str]) -> dict[str, Any]:
     Returns:
         Dict with documents list.
     """
-    from sdpm.reference import read_docs
+    from sdpm.knowledge.reference import read_docs
     return {"documents": read_docs(_REFERENCES_DIR / "workflows", names)}
 
 
@@ -239,7 +239,7 @@ def list_guides() -> dict[str, Any]:
     Returns:
         Dict with items list (name, description).
     """
-    from sdpm.reference import list_category
+    from sdpm.knowledge.reference import list_category
     return {"items": list_category(_REFERENCES_DIR / "guides")}
 
 
@@ -252,7 +252,7 @@ def read_guides(names: list[str]) -> dict[str, Any]:
     Returns:
         Dict with documents list.
     """
-    from sdpm.reference import read_docs
+    from sdpm.knowledge.reference import read_docs
     return {"documents": read_docs(_REFERENCES_DIR / "guides", names)}
 
 
@@ -313,7 +313,7 @@ def grid(purpose: str, spec: str) -> dict[str, Any]:
         Dict with named rectangles containing x, y, w, h coordinates.
     """
     import json
-    from sdpm.layout.grid import compute_grid
+    from sdpm.engine.layout.grid import compute_grid
 
     try:
         grid_spec = json.loads(spec)
@@ -365,7 +365,7 @@ def arch_diagram(
             STRUCTURE (not coordinates) when defects remain.
     """
     import json
-    from sdpm.layout.render import render_architecture
+    from sdpm.engine.layout.render import render_architecture
 
     try:
         tree = json.loads(spec)
@@ -394,7 +394,7 @@ def pptx_to_json(pptx_path: str) -> dict[str, Any]:
         plus ``deck_dir`` (string path to the written directory) for
         downstream tooling.
     """
-    from sdpm.converter import pptx_to_json as _convert
+    from sdpm.engine.converter import pptx_to_json as _convert
     path = Path(pptx_path)
     if not path.exists():
         raise FileNotFoundError(f"PPTX not found: {pptx_path}")
@@ -421,7 +421,7 @@ def diff_pptx(baseline: str, edited: str) -> dict[str, Any]:
         Dict with has_diff (bool) and report (per-slide changed / added /
         removed elements and properties).
     """
-    from sdpm.diff import diff_report
+    from sdpm.engine.diff import diff_report
     for p in (baseline, edited):
         if not Path(p).exists():
             raise FileNotFoundError(f"Not found: {p}")

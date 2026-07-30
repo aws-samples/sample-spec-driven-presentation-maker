@@ -1,13 +1,13 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Tests for sdpm.layout.render and sdpm.layout.metrics."""
+"""Tests for sdpm.engine.layout.render and sdpm.engine.layout.metrics."""
 
 from __future__ import annotations
 
 import copy
 
-from sdpm.layout.metrics import measure, measure_layout, score
-from sdpm.layout.render import build_layout, render_architecture
+from sdpm.engine.layout.metrics import measure, measure_layout, score
+from sdpm.engine.layout.render import build_layout, render_architecture
 
 # ---------------------------------------------------------------------------
 # Fixtures

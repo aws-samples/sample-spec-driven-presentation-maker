@@ -1,8 +1,8 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Tests for sdpm.schema.lint."""
+"""Tests for sdpm.engine.schema.lint."""
 
-from sdpm.schema.lint import lint
+from sdpm.engine.schema.lint import lint
 
 
 # ===================================================================

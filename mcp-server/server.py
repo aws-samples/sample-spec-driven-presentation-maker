@@ -235,7 +235,7 @@ def analyze_template(template: str, deck_id: str = "") -> str:
         try:
             import tempfile
             from pathlib import Path
-            from sdpm.analyzer import analyze_template as _analyze
+            from sdpm.engine.analyzer import analyze_template as _analyze
             data = _storage.download_file_from_pptx_bucket(f"decks/{deck_id}/template.pptx")
             # TemporaryDirectory (not mkdtemp): this server is long-running,
             # leaked tmpdirs would accumulate. The analysis dict holds no
@@ -381,7 +381,7 @@ def get_preview(deck_id: str, slugs: list[str], quality: str = "high") -> list:
 
 def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> tuple[Path, list[dict]]:
     """Build PPTX from slides JSON. Returns (pptx_path, invalid_layouts)."""
-    from sdpm.builder import PPTXBuilder, resolve_override
+    from sdpm.engine.builder import PPTXBuilder, resolve_override
 
     builder = PPTXBuilder(**build_kwargs)
     id_map: dict[str, dict] = {}
@@ -410,7 +410,7 @@ def _export_svg(tmpdir: Path, pptx_path: Path) -> Path:
 def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int],
                  page_to_slug: dict[int, str] | None = None) -> str:
     """PPTX → SVG → bbox measurement → report string."""
-    from sdpm.preview.measure import measure_from_svg, format_measure_report
+    from sdpm.engine.preview.measure import measure_from_svg, format_measure_report
 
     svg_path = _export_svg(tmpdir, pptx_path)
     if not svg_path.exists():
@@ -776,7 +776,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
 
             # Layout bias (filter to measured slides; bias uses 1-based)
             try:
-                from sdpm.preview import check_layout_imbalance_data
+                from sdpm.engine.preview import check_layout_imbalance_data
                 layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in set(page_numbers)]
                 if layout_bias:
                     result["warnings"] = {"layoutBias": layout_bias}
@@ -991,7 +991,7 @@ def grid(spec: str, purpose: str = "") -> str:
     Returns:
         JSON with named rectangles containing x, y, w, h coordinates.
     """
-    from sdpm.layout.grid import compute_grid
+    from sdpm.engine.layout.grid import compute_grid
 
     try:
         grid_spec = json.loads(spec)
@@ -1039,7 +1039,7 @@ def arch_diagram(
         `score` is the judge's lexicographic tuple, lower is better). Inspect
         these and iterate on STRUCTURE (not coordinates) when defects remain.
     """
-    from sdpm.layout.render import render_architecture
+    from sdpm.engine.layout.render import render_architecture
 
     try:
         tree = json.loads(spec)

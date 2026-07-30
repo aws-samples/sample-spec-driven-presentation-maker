@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT-0
 """Layout QA harness: objective quality metrics for the layout engine.
 
-Runs the REAL engine pipeline (``sdpm.layout.render.build_layout``, the same
+Runs the REAL engine pipeline (``sdpm.engine.layout.render.build_layout``, the same
 one used by ``pptx_builder.py layout``) on a logical structure JSON, then
 measures geometric quality:
   - crossings   : pairs of edge segments that intersect
@@ -11,7 +11,7 @@ measures geometric quality:
   - bad_ports   : first/last segment not perpendicular to its node edge
   - backwards   : first segment travels opposite to the port's outward normal
 
-The pipeline and the metric definitions live in the ``sdpm.layout`` package so
+The pipeline and the metric definitions live in the ``sdpm.engine.layout`` package so
 this harness and the CLI can never drift apart. This file is a thin CLI shim.
 
 Usage:
@@ -26,7 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Re-exported for backward compatibility (e.g. layout_search.py imports these).
-from sdpm.layout.metrics import (  # noqa: E402,F401
+from sdpm.engine.layout.metrics import (  # noqa: E402,F401
     measure,
     measure_layout,
     score,

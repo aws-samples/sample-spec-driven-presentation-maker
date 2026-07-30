@@ -55,13 +55,13 @@ def main() -> None:
     fonts = {"fullwidth": None, "halfwidth": None}
     try:
         from pathlib import Path as P
-        from sdpm.analyzer import analyze_template, extract_fonts
+        from sdpm.engine.analyzer import analyze_template, extract_fonts
         analysis = analyze_template(P(args.file))
         analysis_json = json.dumps(analysis, ensure_ascii=False)
         fonts = extract_fonts(P(args.file))
         print(f"Template analysis complete: {len(analysis.get('layouts', []))} layouts, fonts={fonts}")
     except ImportError:
-        print("Warning: sdpm.analyzer not available, skipping analysis")
+        print("Warning: sdpm.engine.analyzer not available, skipping analysis")
 
     # Register in DynamoDB
     item = {

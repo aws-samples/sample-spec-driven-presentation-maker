@@ -20,15 +20,17 @@ Layer 4 hosts the Strands Agent (SPEC agent + composer agents) and the React Web
 The SPEC agent handles user dialogue (Phase 1). Composer agents handle slide generation
 (Phase 2+3) via the `compose_slides` tool (Agents as Tools pattern).
 
-## Engine (`skill/sdpm/`)
+## Engine & Knowledge (`skill/sdpm/`)
 
-The PPTX generation engine. The single source of truth for all business logic.
+The single source of truth for all business logic, split into two peer subpackages:
 
-- `sdpm.builder` — PPTX construction (slide generation, template processing)
-- `sdpm.preview` — Preview (PDF/PNG conversion, autofit, layout validation)
-- `sdpm.reference` — Reference document access
-- `sdpm.api` — High-level API (generate, preview, init, code_block)
-- `sdpm.analyzer`, `sdpm.converter`, `sdpm.layout`, `sdpm.utils` — Utilities
+- `sdpm.engine` — json ↔ pptx conversion
+  (`builder`, `converter`, `layout`, `schema`, `preview`, `checks`, `diff`, `analyzer`)
+- `sdpm.knowledge` — knowledge storage & retrieval
+  (`reference`, `assets`)
+- `sdpm.api` — High-level API facade (generate, preview, init, code_block)
+- `sdpm.config` — Config + path anchors (ASSETS_DIR, REFERENCES_DIR, TEMPLATES_DIR, ...)
+- `sdpm.utils` — Shared utilities
 
 ## Skill (`skill/`)
 
@@ -40,7 +42,7 @@ Installed as `sdpm-skill` and consumed by Layer 2 and Layer 3.
 MCP server for local environments. Must be a **thin wrapper**.
 
 - Input: Convert MCP JSON params to Engine API arguments
-- Processing: Call Engine API (`sdpm.api.*`, `sdpm.reference.*`)
+- Processing: Call Engine API (`sdpm.api.*`, `sdpm.knowledge.reference.*`)
 - Output: Convert results to JSON strings
 - No independent logic (do not implement logic that doesn't exist in Engine API)
 

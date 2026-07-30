@@ -28,7 +28,7 @@ dev = [
 line-length = 120
 
 [tool.ruff.lint.per-file-ignores]
-"sdpm/converter/color.py" = ["E402"]
-"sdpm/converter/constants.py" = ["E402"]
-"sdpm/converter/slide.py" = ["E402"]
-"sdpm/converter/xml_helpers.py" = ["E402"]
+"sdpm/engine/converter/color.py" = ["E402"]
+"sdpm/engine/converter/constants.py" = ["E402"]
+"sdpm/engine/converter/slide.py" = ["E402"]
+"sdpm/engine/converter/xml_helpers.py" = ["E402"]

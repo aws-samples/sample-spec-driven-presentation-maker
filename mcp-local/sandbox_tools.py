@@ -145,7 +145,7 @@ Audience: Developers
     # Lint outline.md
     outline_path = deck_dir / "specs" / "outline.md"
     if outline_path.exists() and outline_path.read_text(encoding="utf-8").strip():
-        from sdpm.schema.lint_outline import lint_outline
+        from sdpm.engine.schema.lint_outline import lint_outline
         if lint_outline(outline_path.read_text(encoding="utf-8")):
             result.setdefault("warnings", {})["outline"] = (
                 "outline.md format violation. "
@@ -153,7 +153,7 @@ Audience: Developers
             )
 
     # Lint and sanitize slide JSON
-    from sdpm.schema.lint import lint_and_sanitize
+    from sdpm.engine.schema.lint import lint_and_sanitize
     slides_dir = deck_dir / "slides"
     if slides_dir.is_dir():
         lint_diagnostics: list[dict] = []
@@ -181,8 +181,8 @@ Audience: Developers
         import shutil
 
         from sdpm.api import generate, parse_outline_slugs
-        from sdpm.assets import invalidate_manifest_cache
-        from sdpm.preview import get_work_dir
+        from sdpm.knowledge.assets import invalidate_manifest_cache
+        from sdpm.engine.preview import get_work_dir
 
         invalidate_manifest_cache()
         _build_warnings: list[str] = []
@@ -332,14 +332,14 @@ Audience: Developers
                 # --- Measure ---
                 if svg_path and pptx_slugs:
                     try:
-                        from sdpm.preview.measure import measure_from_svg, format_measure_report
+                        from sdpm.engine.preview.measure import measure_from_svg, format_measure_report
                         slug_to_page = {s: i + 1 for i, s in enumerate(pptx_slugs)}
                         page_to_slug = {v: k for k, v in slug_to_page.items()}
                         slide_indices = [slug_to_page[s] for s in measure_slides if s in slug_to_page]
                         if slide_indices:
                             results = measure_from_svg(svg_path, slide_indices)
                             try:
-                                from sdpm.preview.judge import judge_from_svg
+                                from sdpm.engine.preview.judge import judge_from_svg
                                 judgments = judge_from_svg(svg_path, slide_indices)
                             except Exception:
                                 judgments = None  # best-effort: never break measure
@@ -358,7 +358,7 @@ Audience: Developers
                 # --- Preview: PDF → PNG (slug-named) ---
                 if iso_pptx.exists():
                     try:
-                        from sdpm.preview import export_pdf
+                        from sdpm.engine.preview import export_pdf
                         preview_dir = deck_dir / "preview"
                         preview_dir.mkdir(exist_ok=True)
 

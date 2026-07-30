@@ -227,7 +227,7 @@ def highlight_code(code: str, language: str, theme: str = "dark") -> str:
     from pygments import lex
     from pygments.lexers import get_lexer_by_name
     from pygments.token import Token
-    from sdpm.builder.constants import CODE_COLORS
+    from sdpm.engine.builder.constants import CODE_COLORS
 
     colors = CODE_COLORS.get(theme, CODE_COLORS["dark"])
 

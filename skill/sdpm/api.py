@@ -22,9 +22,9 @@ def get_templates_dirs() -> list[Path]:
       2. get_user_config_dir()/templates/ — user-local templates
       3. Package-bundled templates/ directory (skill/templates/)
     """
-    from sdpm.config import _get_resource_dirs
+    from sdpm.config import TEMPLATES_DIR, _get_resource_dirs
 
-    bundled = Path(__file__).parent.parent / "templates"
+    bundled = TEMPLATES_DIR
     return _get_resource_dirs("SDPM_TEMPLATES_DIR", "templates", bundled)
 
 
@@ -37,7 +37,7 @@ def get_styles_dirs() -> list[Path]:
       3. Package-bundled references/examples/styles/ directory
     """
     from sdpm.config import _get_resource_dirs
-    from sdpm.reference import BUNDLED_STYLES_DIR
+    from sdpm.knowledge.reference import BUNDLED_STYLES_DIR
 
     return _get_resource_dirs("SDPM_STYLES_DIR", "styles", BUNDLED_STYLES_DIR)
 
@@ -62,7 +62,7 @@ def list_styles_filtered(
         Filtered list with pinned/source metadata.
     """
     from sdpm.config import get_user_config_dir
-    from sdpm.reference import filter_styles, list_styles_merged
+    from sdpm.knowledge.reference import filter_styles, list_styles_merged
 
     user_dir = get_user_config_dir() / "styles"
     raw = list_styles_merged(styles_dirs)
@@ -140,7 +140,7 @@ def analyze_and_store_template(template_path: Path, description: str = "") -> di
     Returns:
         Dict with name, description, theme_colors, fonts, layout_count, layouts.
     """
-    from sdpm.analyzer import analyze_template as _analyze
+    from sdpm.engine.analyzer import analyze_template as _analyze
 
     result = _analyze(template_path)
     return {
@@ -242,7 +242,7 @@ def _get_output_base_dir() -> Path:
         return get_output_dir()
     except Exception:
         pass
-    from sdpm.preview.backend import _is_wsl
+    from sdpm.engine.preview.backend import _is_wsl
 
     if _is_wsl():
         import subprocess
@@ -284,7 +284,7 @@ def init(
     Returns:
         Dict with output_dir, deck_json, template, fonts, workspace.
     """
-    from sdpm.analyzer import extract_fonts
+    from sdpm.engine.analyzer import extract_fonts
     from sdpm.utils.io import write_json
 
     if output_dir:
@@ -426,7 +426,7 @@ def _resolve_config(
 
     Raises FileNotFoundError, ValueError on missing template/icons.
     """
-    from sdpm.builder import resolve_override, validate_icons_in_json
+    from sdpm.engine.builder import resolve_override, validate_icons_in_json
     from sdpm.utils.io import read_json
 
     input_path = Path(json_path)
@@ -448,8 +448,8 @@ def _resolve_config(
     template_file, custom = _resolve_template(data, str(input_path), templates_dirs)
 
     # Auto-fill fonts
-    from sdpm.analyzer import extract_fonts as _extract_fonts
-    from sdpm.analyzer import _extract_theme_colors_raw
+    from sdpm.engine.analyzer import extract_fonts as _extract_fonts
+    from sdpm.engine.analyzer import _extract_theme_colors_raw
 
     fonts = data.get("fonts")
     if not fonts or not fonts.get("fullwidth"):
@@ -464,7 +464,7 @@ def _resolve_config(
         warnings.append(f"defaultTextColor auto-set to {dtc}")
 
     # Lint
-    from sdpm.schema.lint import lint as lint_slides
+    from sdpm.engine.schema.lint import lint as lint_slides
 
     lint_diagnostics = lint_slides(data)
 
@@ -474,7 +474,7 @@ def _resolve_config(
         raise ValueError(f"Missing assets ({len(missing)}): {', '.join(sorted(missing)[:10])}")
 
     # Token discipline: fontSize must come from --fs-* tokens in active style
-    from sdpm.checks import check_font_size_tokens, check_includes, check_overlay_textbox
+    from sdpm.engine.checks import check_font_size_tokens, check_includes, check_overlay_textbox
 
     fs_warnings = check_font_size_tokens(data, input_path)
     warnings.extend(fs_warnings)
@@ -514,7 +514,7 @@ def _resolve_config(
 
 def _build(config: BuildConfig, output_path: Path) -> Path:
     """Build PPTX from resolved config. Returns output path."""
-    from sdpm.builder import PPTXBuilder
+    from sdpm.engine.builder import PPTXBuilder
 
     builder = PPTXBuilder(
         config.template_path,
@@ -547,7 +547,7 @@ def generate(
     Returns:
         Dict with output_path, slide_count, slides summary, warnings.
     """
-    from sdpm.preview import check_layout_imbalance_data
+    from sdpm.engine.preview import check_layout_imbalance_data
 
     config = _resolve_config(json_path, only_slugs=only_slugs)
 
@@ -601,8 +601,8 @@ def measure(
     """
     import tempfile
 
-    from sdpm.preview.backend import LibreOfficeBackend, get_work_dir
-    from sdpm.preview.measure import format_measure_report, measure_from_svg
+    from sdpm.engine.preview.backend import LibreOfficeBackend, get_work_dir
+    from sdpm.engine.preview.measure import format_measure_report, measure_from_svg
 
     config = _resolve_config(json_path)
 
@@ -665,7 +665,7 @@ def preview(
 
     from pptx import Presentation
 
-    from sdpm.preview import export_pdf
+    from sdpm.engine.preview import export_pdf
 
     config = _resolve_config(json_path)
 
@@ -681,7 +681,7 @@ def preview(
     _build(config, out)
 
     # Preview dir — use project-local _work/ to avoid macOS EDR/DLP blocking system temp
-    from sdpm.preview import get_work_dir
+    from sdpm.engine.preview import get_work_dir
     work_dir = get_work_dir(input_path.parent if input_path.is_dir() else input_path.resolve().parent)
     out_dir = Path(tempfile.mkdtemp(dir=work_dir))
 
@@ -791,7 +791,7 @@ def code_block(
     Returns:
         List of element dicts for slide JSON.
     """
-    from sdpm.builder.constants import CODE_COLORS
+    from sdpm.engine.builder.constants import CODE_COLORS
     from sdpm.utils.text import highlight_code
 
     colors = CODE_COLORS.get(theme, CODE_COLORS["dark"])

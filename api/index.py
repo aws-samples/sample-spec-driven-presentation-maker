@@ -545,7 +545,7 @@ def list_templates() -> Dict[str, Any]:
 
     # Lazy analyze uncached builtins (async would be better but keep simple)
     if to_analyze:
-        from sdpm.analyzer import analyze_template as _analyze
+        from sdpm.engine.analyzer import analyze_template as _analyze
 
         tmp = Path(tempfile.mkdtemp())
         for name in to_analyze:
@@ -718,7 +718,7 @@ def upload_user_template() -> Dict[str, Any]:
     tpl_path = tmp / f"{name}.pptx"
     s3_client.download_file(BUCKET_NAME, s3_key, str(tpl_path))
 
-    from sdpm.analyzer import analyze_template as _analyze
+    from sdpm.engine.analyzer import analyze_template as _analyze
 
     analysis = _analyze(tpl_path)
     metadata = {

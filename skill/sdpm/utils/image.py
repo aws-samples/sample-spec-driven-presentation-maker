@@ -3,7 +3,7 @@
 """Image utilities: path resolution and image effects."""
 from pathlib import Path
 
-from sdpm.assets import resolve_asset_path
+from sdpm.knowledge.assets import resolve_asset_path
 
 
 def resolve_image_path(src: str, theme: str = "light") -> Path:

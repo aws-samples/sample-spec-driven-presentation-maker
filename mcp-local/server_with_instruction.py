@@ -100,7 +100,7 @@ def list_styles(include_all: bool = False) -> dict:
         Dict with styles list (name, description, pinned, source).
     """
     from sdpm.api import get_styles_dirs
-    from sdpm.reference import open_styles_gallery
+    from sdpm.knowledge.reference import open_styles_gallery
     open_styles_gallery(get_styles_dirs())
     return tools.list_styles(include_all=include_all)
 

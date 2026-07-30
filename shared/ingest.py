@@ -435,7 +435,7 @@ def _extract_theme_hints(pptx_path: Path, deck_json_path: Path, slides_dir: Path
     import json as _json
     import statistics
 
-    from sdpm.converter.color import extract_theme_colors_and_mapping
+    from sdpm.engine.converter.color import extract_theme_colors_and_mapping
 
     # Theme colors. PowerPoint can ship multiple slideMasters with
     # different clrMaps; corporate decks frequently flip bg1=dk1 (dark
@@ -581,7 +581,7 @@ def _convert_pptx(file_path: Path, output_dir: Path) -> ConversionResult:
     import json
 
     try:
-        from sdpm.converter import pptx_to_json
+        from sdpm.engine.converter import pptx_to_json
     except ImportError as e:
         return ConversionResult(status="error", error=f"Missing dependency: {e}")
 
@@ -612,7 +612,7 @@ def _convert_pptx(file_path: Path, output_dir: Path) -> ConversionResult:
                 logger.warning("theme_hints extraction failed: %s", e)
             suggested_name = file_path.stem
             try:
-                from sdpm.converter.template import extract_placeholder_template
+                from sdpm.engine.converter.template import extract_placeholder_template
 
                 template_out = output_dir / "template.pptx"
                 extract_placeholder_template(file_path, template_out)

@@ -273,7 +273,7 @@ def _save_deck_workspace(
     outline_warnings: list[dict] = []
     outline_key = "specs/outline.md"
     if outline_key in file_map and file_map[outline_key].strip():
-        from sdpm.schema.lint_outline import lint_outline
+        from sdpm.engine.schema.lint_outline import lint_outline
 
         outline_warnings = lint_outline(file_map[outline_key])
         if outline_warnings:
@@ -281,7 +281,7 @@ def _save_deck_workspace(
 
     # Lint and sanitize slide JSON before saving
     lint_diagnostics: list[dict] = []
-    from sdpm.schema.lint import lint_and_sanitize
+    from sdpm.engine.schema.lint import lint_and_sanitize
 
     for rel_path in list(file_map.keys()):
         if rel_path.startswith("slides/") and rel_path.endswith(".json"):

@@ -86,7 +86,7 @@ def analyze_template(template_name: str, storage: Storage, user_id: str = "") ->
                 # Analyze on the fly
                 import tempfile
                 from pathlib import Path
-                from sdpm.analyzer import analyze_template as _analyze
+                from sdpm.engine.analyzer import analyze_template as _analyze
                 data = storage.download_user_template(user_id, normalized)
                 tmp = Path(tempfile.mkdtemp())
                 tpl_path = tmp / "template.pptx"
@@ -116,7 +116,7 @@ def analyze_template(template_name: str, storage: Storage, user_id: str = "") ->
     if not analysis_raw or analysis_raw == "{}":
         import tempfile
         from pathlib import Path
-        from sdpm.analyzer import analyze_template as _analyze
+        from sdpm.engine.analyzer import analyze_template as _analyze
 
         s3_key = tmpl.get("s3Key", "")
         if not s3_key:

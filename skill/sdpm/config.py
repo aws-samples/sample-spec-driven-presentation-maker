@@ -11,6 +11,16 @@ from typing import Optional
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 
+# Path anchors for the skill distribution (package dir = sdpm/, root = its parent).
+# All bundled-data lookups must go through these so that moving modules inside
+# the package never silently changes what they point at.
+PACKAGE_DIR = Path(__file__).resolve().parent
+SKILL_ROOT = PACKAGE_DIR.parent
+REFERENCES_DIR = SKILL_ROOT / "references"
+TEMPLATES_DIR = SKILL_ROOT / "templates"
+SCRIPTS_DIR = SKILL_ROOT / "scripts"
+CACHE_DIR = SKILL_ROOT / ".cache"
+
 _DEFAULTS = {
     "output_dir": "~/Documents/SDPM-Presentations",
     "extra_sources": [],

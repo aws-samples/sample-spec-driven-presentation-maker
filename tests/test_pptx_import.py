@@ -45,7 +45,7 @@ class TestPptxToJsonDeckStructure:
 
     def test_pptx_to_json_outputs_deck_structure(self, fixture_pptx: Path, tmp_path: Path) -> None:
         """Output directory contains deck.json and slides/slide-NN.json — no single slides.json."""
-        from sdpm.converter import pptx_to_json
+        from sdpm.engine.converter import pptx_to_json
 
         out_dir = tmp_path / "out"
         pptx_to_json(fixture_pptx, output_dir=out_dir)
@@ -65,7 +65,7 @@ class TestPptxToJsonDeckStructure:
         999 slides (2-digit broke at 100+: "slide-100" < "slide-11").
         """
         from sdpm.api import parse_outline_slugs
-        from sdpm.converter import pptx_to_json
+        from sdpm.engine.converter import pptx_to_json
 
         out_dir = tmp_path / "out"
         pptx_to_json(fixture_pptx, output_dir=out_dir)
@@ -84,7 +84,7 @@ class TestPptxToJsonDeckStructure:
 
     def test_deck_json_has_fonts_and_default_text_color(self, fixture_pptx: Path, tmp_path: Path) -> None:
         """deck.json contains fonts dict and defaultTextColor (both PPTX-derived)."""
-        from sdpm.converter import pptx_to_json
+        from sdpm.engine.converter import pptx_to_json
 
         out_dir = tmp_path / "out"
         pptx_to_json(fixture_pptx, output_dir=out_dir)
@@ -462,7 +462,7 @@ class TestCloudImportConvertedCopiesTemplate:
 class TestPptxBuilderCliAcceptsDeckDir:
     def test_pptx_builder_cli_generate_on_deck_dir(self, fixture_pptx: Path, tmp_path: Path) -> None:
         """Convert PPTX → deck structure → pptx_builder.py generate should work on the directory."""
-        from sdpm.converter import pptx_to_json
+        from sdpm.engine.converter import pptx_to_json
 
         deck_dir = tmp_path / "deck"
         pptx_to_json(fixture_pptx, output_dir=deck_dir)
@@ -552,7 +552,7 @@ class TestExtractPlaceholderTemplate:
         from lxml import etree
         from pptx import Presentation
         from pptx.oxml.ns import qn
-        from sdpm.converter.template import extract_placeholder_template
+        from sdpm.engine.converter.template import extract_placeholder_template
 
         _P14 = "http://schemas.microsoft.com/office/powerpoint/2010/main"
         _SECTION_URI = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
@@ -595,7 +595,7 @@ class TestExtractPlaceholderTemplate:
     ) -> None:
         """No-section sources keep working (guard for the cleanup step)."""
         from pptx import Presentation
-        from sdpm.converter.template import extract_placeholder_template
+        from sdpm.engine.converter.template import extract_placeholder_template
 
         out = tmp_path / "template.pptx"
         meta = extract_placeholder_template(fixture_pptx, out)
@@ -606,7 +606,7 @@ class TestExtractPlaceholderTemplate:
         self, fixture_pptx: Path, tmp_path: Path
     ) -> None:
         from pptx import Presentation
-        from sdpm.converter.template import extract_placeholder_template
+        from sdpm.engine.converter.template import extract_placeholder_template
 
         src_prs = Presentation(str(fixture_pptx))
         assert len(src_prs.slides) > 0
@@ -629,7 +629,7 @@ class TestExtractPlaceholderTemplate:
     ) -> None:
         """All slide_layouts are preserved (including layouts the source never used)."""
         from pptx import Presentation
-        from sdpm.converter.template import extract_placeholder_template
+        from sdpm.engine.converter.template import extract_placeholder_template
 
         src_prs = Presentation(str(fixture_pptx))
         src_layout_names = []
@@ -651,7 +651,7 @@ class TestExtractPlaceholderTemplate:
     ) -> None:
         """slide_master count is preserved."""
         from pptx import Presentation
-        from sdpm.converter.template import extract_placeholder_template
+        from sdpm.engine.converter.template import extract_placeholder_template
 
         src_master_count = len(Presentation(str(fixture_pptx)).slide_masters)
 
@@ -665,7 +665,7 @@ class TestExtractPlaceholderTemplate:
         self, fixture_pptx: Path, tmp_path: Path
     ) -> None:
         """Dropping slide content shrinks the file."""
-        from sdpm.converter.template import extract_placeholder_template
+        from sdpm.engine.converter.template import extract_placeholder_template
 
         out = tmp_path / "template.pptx"
         meta = extract_placeholder_template(fixture_pptx, out)

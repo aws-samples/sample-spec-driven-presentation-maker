@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import argparse
 import json
 
-from sdpm.assets import (  # noqa: F401
+from sdpm.knowledge.assets import (  # noqa: F401
     ICON_DIR,
     ICON_LOCAL_DIR,
     check_asset_exists,
@@ -27,7 +27,7 @@ from sdpm.assets import (  # noqa: F401
     resolve_icon_path,
     search_assets,
 )
-from sdpm.layout import (  # noqa: F401
+from sdpm.engine.layout import (  # noqa: F401
     _group_member_ids,
     _layout_collect,
     _layout_route_connections,
@@ -40,8 +40,8 @@ from sdpm.layout import (  # noqa: F401
     measure_natural_child_sizes,
     optimize_order,
 )
-from sdpm.layout.render import render_architecture
-from sdpm.preview.backend import _is_wsl
+from sdpm.engine.layout.render import render_architecture
+from sdpm.engine.preview.backend import _is_wsl
 from sdpm.utils.effects import apply_effects  # noqa: F401
 from sdpm.utils.image import apply_image_effects, resolve_image_path  # noqa: F401
 from sdpm.utils.io import read_json, write_json
@@ -211,7 +211,7 @@ def cmd_search_assets(args):
 
 def cmd_list_asset_sources(args):
     """List available asset sources."""
-    from sdpm.assets import list_sources
+    from sdpm.knowledge.assets import list_sources
     sources = list_sources()
     if not sources:
         print("No asset sources found.", file=sys.stderr)
@@ -256,7 +256,7 @@ def cmd_list_templates(args):
 
 def cmd_search_patterns(args):
     """Search patterns by keywords."""
-    from sdpm.reference import search_patterns
+    from sdpm.knowledge.reference import search_patterns
     results = search_patterns(args.query, limit=args.limit)
     if not results:
         print("No matches found.")
@@ -268,7 +268,7 @@ def cmd_search_patterns(args):
 
 def cmd_examples(args):
     """List or show design examples (components/patterns/styles)."""
-    from sdpm.reference import open_styles_gallery, read_docs
+    from sdpm.knowledge.reference import open_styles_gallery, read_docs
 
     examples_dir = Path(__file__).parent.parent / "references" / "examples"
     if not examples_dir.exists():
@@ -288,7 +288,7 @@ def cmd_examples(args):
         # styles/ directory — searches user-local + bundled
         if base == "styles":
             from sdpm.api import get_styles_dirs
-            from sdpm.reference import list_styles_merged
+            from sdpm.knowledge.reference import list_styles_merged
             styles_dirs = get_styles_dirs()
             if sub is None:
                 for s in list_styles_merged(styles_dirs):
@@ -324,7 +324,7 @@ def cmd_examples(args):
 
 def cmd_workflows(args):
     """List or show workflow documents."""
-    from sdpm.reference import list_category, read_docs
+    from sdpm.knowledge.reference import list_category, read_docs
     d = Path(__file__).parent.parent / "references" / "workflows"
     if not args.names:
         print("# Workflows")
@@ -341,7 +341,7 @@ def cmd_workflows(args):
 
 def cmd_guides(args):
     """List or show guide documents."""
-    from sdpm.reference import list_category, read_docs
+    from sdpm.knowledge.reference import list_category, read_docs
     d = Path(__file__).parent.parent / "references" / "guides"
     if not args.names:
         print("# Guides")
@@ -423,7 +423,7 @@ def cmd_code_block(args):
 def cmd_layout(args):
     """Layout engine: compute coordinates from logical structure JSON.
 
-    Thin CLI wrapper around ``sdpm.layout.render.render_architecture`` (the
+    Thin CLI wrapper around ``sdpm.engine.layout.render.render_architecture`` (the
     canonical pipeline). CLI output intentionally omits the ``metrics`` key so
     stdout stays byte-compatible with prior versions; use ``layout_qa.py`` for
     metrics.
@@ -465,7 +465,7 @@ def cmd_layout(args):
 
 def cmd_analyze_template(args):
     """Analyze a PPTX template: extract layouts, theme, and placeholder details."""
-    from sdpm.analyzer import analyze_template, get_layout_placeholders
+    from sdpm.engine.analyzer import analyze_template, get_layout_placeholders
 
     template_path = Path(args.input).resolve()
     if not template_path.exists():
@@ -506,8 +506,8 @@ def cmd_analyze_template(args):
     if not result["color_usage"]:
         import subprocess
 
-        from sdpm.analyzer import cache_color_usage, cache_preview_pngs, extract_color_usage_from_pngs
-        from sdpm.preview import export_pdf
+        from sdpm.engine.analyzer import cache_color_usage, cache_preview_pngs, extract_color_usage_from_pngs
+        from sdpm.engine.preview import export_pdf
         import tempfile as _tf
         preview_dir = Path(_tf.mkdtemp())
         try:
@@ -593,7 +593,7 @@ def cmd_image_size(args):
 
 def cmd_grid(args):
     """Compute CSS Grid layout coordinates."""
-    from sdpm.layout.grid import compute_grid
+    from sdpm.engine.layout.grid import compute_grid
 
     if args.input == "-":
         spec = json.loads(sys.stdin.read())
@@ -608,7 +608,7 @@ def cmd_grid(args):
 
 def cmd_diff(args):
     """Compare two slide JSONs (or PPTXs) and show manual edit changes."""
-    from sdpm.diff import diff_report
+    from sdpm.engine.diff import diff_report
     result = diff_report(args.baseline, args.edited)
     print(result["report"])
 

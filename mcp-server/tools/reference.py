@@ -160,7 +160,7 @@ def _list_pptx_descriptions_from_bytes(pptx_bytes: bytes) -> str:
     Returns:
         Text listing with page number and description per line.
     """
-    from sdpm.reference import list_pptx_descriptions
+    from sdpm.knowledge.reference import list_pptx_descriptions
 
     with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
         tmp.write(pptx_bytes)
@@ -184,7 +184,7 @@ def _render_pptx_from_bytes(pptx_bytes: bytes, pages: list[int] | None = None) -
     Returns:
         Rendered text output with page headers and notes.
     """
-    from sdpm.reference import get_pptx_notes
+    from sdpm.knowledge.reference import get_pptx_notes
 
     with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
         tmp.write(pptx_bytes)
@@ -215,7 +215,7 @@ def list_styles(storage: Storage, user_id: str = "", include_all: bool = False) 
     Returns:
         Dict with styles list (name, description, pinned, source).
     """
-    from sdpm.reference import filter_styles
+    from sdpm.knowledge.reference import filter_styles
 
     # 1. Builtin styles from resource bucket
     cache_key = "list:styles"
