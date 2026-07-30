@@ -17,8 +17,8 @@ Do NOT work inside this repo for everyday slide generation.
 
 | Environment | Layer | AWS |
 |---|---|:---:|
-| SKILL.md-compatible agent (Claude Code, Codex CLI, Cursor, Kiro, Copilot) | **L1** `skill/` | No |
-| Local MCP client (Claude Desktop, Claude Cowork) | **L2** `mcp-local/` | No |
+| SKILL.md-compatible agent, no MCP (Claude Code, Codex CLI, Cursor, Copilot) | **L1** `skill/` | No |
+| Local MCP client (Kiro CLI, Claude Desktop, Claude Cowork) | **L2** `mcp-local/` | No |
 | Remote-only MCP client (Claude.ai web) | **L3** `mcp-server/` + `infra/` | Yes |
 | Web UI in browser | **L4** Full stack | Yes |
 
@@ -27,17 +27,22 @@ Do NOT work inside this repo for everyday slide generation.
 ## Layer 1: Agent Skill
 
 The skill entry point is `skill/SKILL.md` — agents read it to discover workflows.
+The agent calls the engine through `scripts/pptx_builder.py` — no MCP server involved.
 
-**Install into an agent's skill directory (recommended)** (e.g. `~/.kiro/skills/sdpm/`):
+**Kiro CLI users:** you probably want [Layer 2](#layer-2-local-mcp-server) instead —
+`make install-kiro` sets up the local MCP server plus the skills that drive it
+(including parallel composer sub-agents).
+
+**Claude Code users:** install the plugin instead (`/plugin install sdpm@sdpm`) — it registers the local MCP server, skill, and compose sub-agent automatically. See the README.
+
+**Install into an agent's skill directory:**
 copy or symlink `skill/` into the agent's configured skill path, then install dependencies:
 
 ```bash
 cd skill && uv sync
 ```
 
-Consult your agent's docs for the exact skill path. See [Getting Started](docs/en/getting-started.md#layer-1-kiro-cli-skill).
-
-**Claude Code users:** install the plugin instead (`/plugin install sdpm@sdpm`) — it registers the local MCP server, skill, and compose sub-agent automatically. See the README.
+Consult your agent's docs for the exact skill path. See [Getting Started](docs/en/getting-started.md#layer-1-agent-skill-no-mcp).
 
 Note: installing `skill/` as a pip package (`pip install git+...#subdirectory=skill`) only installs the `sdpm` Python engine — the SKILL.md, templates, and references are not bundled. It is intended for embedding the engine (e.g. the L3 Docker image), not for end-user skill installs.
 
@@ -51,6 +56,19 @@ uv run python3 scripts/download_material_icons.py
 ---
 
 ## Layer 2: Local MCP Server
+
+**Kiro CLI — one make target:**
+
+```bash
+make install-kiro
+```
+
+Registers the `sdpm` MCP server in `~/.kiro/settings/mcp.json`, symlinks the skills into
+`~/.kiro/skills/`, and generates the composer agent config. Keep the checkout in place
+(the MCP server runs from it); `git pull` is enough to update. Re-run only if you move
+the checkout.
+
+**Other MCP clients:**
 
 ```bash
 cd mcp-local && uv sync
