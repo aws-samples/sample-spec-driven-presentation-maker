@@ -3,8 +3,8 @@
 # Versioning
 
 ## Engine Version
-- Single source of truth: `__version__` in `skill/sdpm/__init__.py`
-- `skill/pyproject.toml` uses dynamic version, auto-read from `__init__.py`
+- Single source of truth: `__version__` in `sdpm/sdpm/__init__.py`
+- `sdpm/pyproject.toml` uses dynamic version, auto-read from `__init__.py`
 - When changing version, edit `__init__.py` only
 
 ## SemVer

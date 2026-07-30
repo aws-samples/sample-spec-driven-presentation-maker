@@ -33,17 +33,17 @@ Additional requirements for **deploying Layer 3–4 with local CDK directly** (n
 
 ## Layer 1: Agent Skill (no MCP)
 
-The simplest way to use spec-driven-presentation-maker: copy or symlink the `skill/`
+The simplest way to use spec-driven-presentation-maker: copy or symlink the `sdpm/`
 directory into your agent's skills directory. The agent calls the engine through
 `scripts/pptx_builder.py` — no MCP server involved.
 
 > **Kiro CLI users:** you probably want [Layer 2](#layer-2-local-mcp-server) instead —
-> `make install-kiro` sets up the local MCP server plus the skills that drive it,
-> including parallel composer sub-agents.
+> `make install-kiro` sets up the local MCP server (mode behavior included) plus the
+> composer sub-agent for parallel slide generation.
 
 ```bash
 # Install dependencies
-cd skill
+cd sdpm
 uv sync
 
 # Download icons (optional, recommended)
@@ -64,8 +64,8 @@ Connect spec-driven-presentation-maker to any MCP-compatible client. No AWS acco
 
 ### Kiro CLI — one make target (recommended)
 
-Kiro CLI users get the MCP server plus the skills that drive it (including parallel
-composer sub-agents) from a single target:
+Kiro CLI users get the MCP server (mode behavior included — no skill files) plus the
+composer sub-agent for parallel slide generation, from a single target:
 
 ```bash
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
@@ -74,13 +74,14 @@ make install-kiro
 kiro-cli chat   # then just ask: "make slides about ..."
 ```
 
-This registers the `sdpm` local MCP server in `~/.kiro/settings/mcp.json`, symlinks the
-skills into `~/.kiro/skills/`, and generates the composer agent config at
-`~/.kiro/agents/sdpm-composer.json`. Prerequisites: [`uv`](https://docs.astral.sh/uv/) on
+This registers the `sdpm` local MCP server in `~/.kiro/settings/mcp.json` and generates
+the composer agent config at `~/.kiro/agents/sdpm-composer.json`. Mode behavior
+(vibe / spec / style) is served by the MCP server itself via `start_presentation(mode=...)`
+— nothing else to install. Prerequisites: [`uv`](https://docs.astral.sh/uv/) on
 your `PATH`, plus **LibreOffice** and **poppler** for slide previews.
 
 Keep the checkout where it is — the MCP server runs from it. `git pull` is enough to
-update (skills are symlinks; the composer prompt is a `file://` reference). Re-run
+update (the composer prompt is a `file://` reference into `personas/`). Re-run
 `make install-kiro` only if you move the checkout.
 
 ### Other MCP clients — manual setup
@@ -88,7 +89,7 @@ update (skills are symlinks; the composer prompt is a `file://` reference). Re-r
 #### Start the Server
 
 ```bash
-cd mcp-local
+cd servers/local
 uv sync
 uv run python server.py
 ```
@@ -102,7 +103,7 @@ Add to your client's MCP configuration file (`claude_desktop_config.json`, `.vsc
   "mcpServers": {
     "spec-driven-presentation-maker": {
       "command": "uv",
-      "args": ["run", "--directory", "/absolute/path/to/mcp-local", "python", "server.py"]
+      "args": ["run", "--directory", "/absolute/path/to/servers/local", "python", "server.py"]
     }
   }
 }

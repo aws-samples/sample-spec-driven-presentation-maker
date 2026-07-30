@@ -67,7 +67,7 @@ Open [http://localhost:3000](http://localhost:3000) (Next.js picks the next free
 
 ### How it works
 
-Setting `NEXT_PUBLIC_MODE=local` enables the Next.js API Routes under `src/app/api/` and spawns `kiro-cli acp --agent sdpm-spec` per active deck. The agent definitions live under [`mcp-local/.kiro/agents/`](../mcp-local/.kiro/agents/) and share the MCP toolset from [`mcp-local/server_acp.py`](../mcp-local/server_acp.py).
+Setting `NEXT_PUBLIC_MODE=local` enables the Next.js API Routes under `src/app/api/` and spawns `kiro-cli acp --agent sdpm-spec` per active deck. The agent definitions live under [`servers/local/.kiro/agents/`](../servers/local/.kiro/agents/) and share the MCP toolset from [`servers/local/server_acp.py`](../servers/local/server_acp.py).
 
 ---
 
@@ -162,7 +162,7 @@ npm run test:e2e  # E2E test (Playwright — first run: npx playwright install c
 The E2E test starts the Web UI in Local mode against a stub ACP agent
 (`e2e/stub-agent.mjs`), so it needs no AWS and no `kiro-cli`. Decks and agent
 config are sandboxed under `e2e/.tmp/` — your real `~/Documents/SDPM-Presentations`
-and `mcp-local/.sdpm/` are never touched.
+and `servers/local/.sdpm/` are never touched.
 
 ---
 

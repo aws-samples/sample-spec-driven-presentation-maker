@@ -6,7 +6,7 @@ Local stdio MCP server for desktop MCP clients. No AWS required.
 
 ```bash
 # Install
-cd mcp-local && uv sync
+cd servers/local && uv sync
 
 # Run
 uv run python server.py
@@ -20,7 +20,7 @@ uv run python server.py
   "mcpServers": {
     "spec-driven-presentation-maker": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/spec-driven-presentation-maker/mcp-local", "python", "server.py"]
+      "args": ["run", "--directory", "/path/to/spec-driven-presentation-maker/servers/local", "python", "server.py"]
     }
   }
 }

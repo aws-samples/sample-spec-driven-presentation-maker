@@ -64,7 +64,7 @@ npm run dev:local
 
 ### 動作の仕組み
 
-`NEXT_PUBLIC_MODE=local` が設定され、`src/app/api/` 以下の Next.js API Routes が有効化され、アクティブなデッキごとに `kiro-cli acp --agent sdpm-spec` を子プロセスとして起動します。Agent 定義は [`mcp-local/.kiro/agents/`](../mcp-local/.kiro/agents/) に、MCP ツールは [`mcp-local/server_acp.py`](../mcp-local/server_acp.py) に格納されています。
+`NEXT_PUBLIC_MODE=local` が設定され、`src/app/api/` 以下の Next.js API Routes が有効化され、アクティブなデッキごとに `kiro-cli acp --agent sdpm-spec` を子プロセスとして起動します。Agent 定義は [`servers/local/.kiro/agents/`](../servers/local/.kiro/agents/) に、MCP ツールは [`servers/local/server_acp.py`](../servers/local/server_acp.py) に格納されています。
 
 ---
 
@@ -140,7 +140,7 @@ npm run test:e2e  # E2E テスト（Playwright — 初回は npx playwright inst
 E2E テストはスタブ ACP エージェント（`e2e/stub-agent.mjs`）を使って Web UI を
 ローカルモードで起動するため、AWS も `kiro-cli` も不要。デッキとエージェント設定は
 `e2e/.tmp/` 配下にサンドボックス化され、実際の `~/Documents/SDPM-Presentations` や
-`mcp-local/.sdpm/` には触れない。
+`servers/local/.sdpm/` には触れない。
 
 ---
 
@@ -213,8 +213,8 @@ Cognito OIDC 認証フロー。
 | ドキュメント | 説明 |
 |---|---|
 | [セットアップガイド](../docs/ja/getting-started.md) | Layer 1〜4 の構築手順 |
-| [アーキテクチャ](../docs/ja/architecture.md) | 4層設計、データフロー、認証モデル |
-| [推奨デプロイ手順](../docs/ja/deploy-cloudshell.md) | AWS デプロイの推奨手順（CloudShell・ローカル対応） |
+| [アーキテクチャ](../docs/en/architecture.md) | 4層設計、データフロー、認証モデル |
+| [推奨デプロイ手順](../docs/en/deploy-cloudshell.md) | AWS デプロイの推奨手順（CloudShell・ローカル対応） |
 
 ---
 

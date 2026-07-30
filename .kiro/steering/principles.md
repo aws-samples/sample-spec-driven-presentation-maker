@@ -2,25 +2,29 @@
 
 # Principles
 
-## Architecture: 4-Layer Structure
+## Architecture
 
 ```
 Layer 4: Agent + Web UI (agent/, web-ui/)
   ↓ uses
-Layer 3: MCP Remote (mcp-server/)   ← AWS (S3/DynamoDB)
-  ↓ uses
-Skill Engine (skill/sdpm/)          ← Single source of business logic
+Layer 3: servers/remote   ← AWS (S3/DynamoDB), HTTP MCP
+  ↓ binds
+sdpm.tools (MCP tool contract — single definition)
+  ↑ binds
+Layer 2: servers/local    ← stdio MCP + ACP
   ↑ uses
-Layer 2: MCP Local (mcp-local/)
-  ↑ uses
-Layer 1: CLI (skill/scripts/pptx_builder.py)
+Layer 1: CLI (sdpm/scripts/pptx_builder.py) + sdpm/SKILL.md
 ```
 
 Layer 4 hosts the Strands Agent (SPEC agent + composer agents) and the React Web UI.
 The SPEC agent handles user dialogue (Phase 1). Composer agents handle slide generation
 (Phase 2+3) via the `compose_slides` tool (Agents as Tools pattern).
 
-## Engine & Knowledge (`skill/sdpm/`)
+Mode behavior (vibe / spec / style / composer) lives ONLY in `personas/*.md` and is
+served to MCP clients via `start_presentation(mode=...)`. Client-side files are thin
+wiring (composer sub-agent registration).
+
+## Engine & Knowledge (`sdpm/sdpm/`)
 
 The single source of truth for all business logic, split into two peer subpackages:
 
@@ -32,25 +36,35 @@ The single source of truth for all business logic, split into two peer subpackag
 - `sdpm.config` — Config + path anchors (ASSETS_DIR, REFERENCES_DIR, TEMPLATES_DIR, ...)
 - `sdpm.utils` — Shared utilities
 
-## Skill (`skill/`)
+## Skill root (`sdpm/`)
 
-Package containing Engine + CLI + reference documents + templates.
-Installed as `sdpm-skill` and consumed by Layer 2 and Layer 3.
+Distribution root containing the `sdpm` Python package + CLI + reference
+documents + templates. Installed as `sdpm-skill` and consumed by Layer 2 and Layer 3.
 
-## MCP Local (`mcp-local/`) — Layer 2
+## Tool contract (`sdpm.tools`)
 
-MCP server for local environments. Must be a **thin wrapper**.
+Every MCP tool is defined once here: name, signature, docstring, and logic
+(delegating to `sdpm.engine` / `sdpm.knowledge`). Servers register these
+functions directly (`mcp.tool()(tools.xxx)`) — never redefine a tool body
+in a server.
 
-- Input: Convert MCP JSON params to Engine API arguments
-- Processing: Call Engine API (`sdpm.api.*`, `sdpm.knowledge.reference.*`)
-- Output: Convert results to JSON strings
-- No independent logic (do not implement logic that doesn't exist in Engine API)
+`start_presentation(mode=...)` is part of the contract and serves
+`personas/*.md` to any MCP client.
 
-## MCP Remote (`mcp-server/`) — Layer 3
+## Local server (`servers/local/`) — Layer 2
 
-MCP server running on AWS with S3/DynamoDB dependencies.
+stdio MCP + ACP server for local environments. Must be a **thin bind** of
+`sdpm.tools`. Local-transport specifics (session-scoped upload staging,
+browser style gallery, ACP hearing UI) are the only allowed additions.
 
-- Infrastructure-dependent operations (S3 Storage file access, etc.) may have independent implementations
+## Remote server (`servers/remote/`) — Layer 3
+
+HTTP MCP server running on AWS with S3/DynamoDB dependencies.
+
+- Binds contract tools where possible; workspace tools materialize the S3
+  deck into a tmpdir and delegate to `sdpm.api` (same code path as local)
+- Infrastructure-dependent operations (user templates/styles on S3, DynamoDB
+  records, presigned URLs, Code Interpreter) may have independent implementations
 - However, use Engine logic when equivalent functionality exists
 
 ## Logic Sharing Principles

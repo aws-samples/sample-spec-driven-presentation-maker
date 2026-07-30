@@ -31,81 +31,37 @@
 
 ### ワークフロー
 
-
 ![workflow](./docs/assets/workflow-ja.png)
 
 ---
 
 ## クイックスタート
 
-利用環境に応じたセットアップ手順を参照してください:
+統合面は MCP サーバー 1 つだけです。エージェントを接続してスライド作成を頼むだけ —
+モードの振る舞いはサーバー自身が `start_presentation` ツールで配信するため、
+**skill ファイルのインストールは不要**です。
 
 | 環境 | セットアップ |
 |---|---|
-| エージェントスキル（MCP なし: Claude Code, Codex CLI, Cursor, Copilot） | [はじめに — Layer 1](docs/ja/getting-started.md#layer-1-エージェントスキルmcp-なし) |
-| Kiro CLI（MCP + skill、1 コマンド） | [`make install-kiro`](#-kiro-cli-セットアップmcp-サーバー--skill--並列-compose-サブエージェント) |
-| ローカル MCP クライアント（Claude Desktop, Claude Cowork） | [はじめに — Layer 2](docs/ja/getting-started.md#layer-2-ローカル-mcp-サーバー) |
-| リモート MCP / Web UI（AWS デプロイ） | [デプロイ手順](docs/ja/deploy-cloudshell.md) |
+| Claude Code | `/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker` → `/plugin install sdpm@sdpm` |
+| Kiro CLI | このリポジトリを `git clone` して `make install-kiro` |
+| Claude Desktop / 任意の MCP クライアント | `servers/local` を stdio MCP サーバーとして登録 — [はじめに](docs/ja/getting-started.md) 参照 |
+| MCP なし（Codex CLI, Cursor など） | エージェントに [`sdpm/SKILL.md`](sdpm/SKILL.md) を読ませる — CLI を直接駆動します |
+| チーム利用 / リモート MCP / Web UI（AWS） | [デプロイ手順](docs/en/deploy-cloudshell.md) |
 
-### 🧩 Claude Code プラグイン（ワンコマンド導入）
+**ローカル利用の前提:** [`uv`](https://docs.astral.sh/uv/) が `PATH` にあること。
+スライドプレビュー（PNG 描画）には **LibreOffice** と **poppler** も必要です。
 
-Claude Code ユーザーはプラグインで一括導入できます（手動の MCP 設定は不要）。プラグインは
-**ローカル MCP サーバー**・**オーケストレーター skill**・スライドを並列生成する
-**compose サブエージェント** をまとめて登録します。
+**チェックアウトはそのまま置いてください:** Claude Code / Kiro / ローカル MCP は
+チェックアウトからサーバーを起動します（`uv run --directory <checkout>/servers/local`）。
+更新は `git pull` だけ — ペルソナやナレッジはチェックアウトから直接読まれます。
 
-**事前インストール（プラグインには同梱できません。初回のみ各自で導入）:**
+> **v0.4 からのアップグレード:** ディレクトリ構成とインストール手順が変わりました —
+> [v0.5 移行ガイド](docs/en/migration-v0.5.md) を参照してください。
 
-- [`uv`](https://docs.astral.sh/uv/) を `PATH` に — ローカル MCP サーバーを起動し、初回起動時に
-  Python 依存を透過解決します（コールドスタートは数十秒）。
-- **LibreOffice** と **poppler** — スライドプレビュー（HTML/SVG → PNG）の描画に必要です。
+---
 
-**導入（自動 — リポジトリDL・MCP/skill/サブエージェント登録まで完了）:**
-
-```bash
-# Claude Code 内で実行:
-/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker
-/plugin install sdpm@sdpm
-```
-
-`/plugin install` でリポジトリがクローンされ（`mcp-local/`・`skill/` も同梱DL）、`uv` 経由で
-`sdpm` MCP サーバーが自動起動し、`sdpm` skill と `sdpm:sdpm-composer` サブエージェントが登録
-されます。`/plugin list`・`/mcp`（`sdpm` 接続）・`/agents`（`sdpm:sdpm-composer` 表示）で確認
-してください。あとは「〇〇のスライドを作って」と頼むだけで、skill が briefing → outline →
-art direction を進め、Phase 2（compose）を複数の composer サブエージェントへ並列委譲し、
-review まで実施します。
-
-> **どの入口を使う？** **Kiro CLI** → `make install-kiro`（次節）。**Claude Desktop / その他
-> MCP クライアント** → Layer 2 のローカル MCP サーバー。**Claude Code** → このプラグイン（同じ
-> Layer 2 MCP サーバーを CC ネイティブの skill + 並列 compose サブエージェントで包んだもの）。
-
-### 🛠 Kiro CLI セットアップ（MCP サーバー + skill + 並列 compose サブエージェント）
-
-Kiro CLI ユーザーも同じフロー — `sdpm-vibe` skill が Phase 1 を進め、Phase 2 を
-`sdpm-composer` サブエージェントへ並列委譲 — を make ターゲット 1 つで導入できます。
-事前インストールは同じく [`uv`](https://docs.astral.sh/uv/)（`PATH` に）、および
-スライドプレビュー用の **LibreOffice** と **poppler** です。
-
-```bash
-git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
-cd sample-spec-driven-presentation-maker
-make install-kiro
-kiro-cli chat   # あとは「〇〇のスライドを作って」と頼むだけ
-```
-
-`make install-kiro` は skill を `~/.kiro/skills/` へ symlink し、composer エージェント設定
-`~/.kiro/agents/sdpm-composer.json` を生成し、`sdpm` ローカル MCP サーバーをグローバル
-`~/.kiro/settings/mcp.json` に登録します（特定のエージェント設定に追加したい場合は
-`clients/kiro/install.py --agent NAME` を直接実行）。再実行しても安全です。
-
-**チェックアウトはそのまま置いてください:** ローカル MCP サーバーはチェックアウトから起動するため
-（`uv run --directory <checkout>/mcp-local`）、clone を削除・移動すると Kiro の sdpm ツールが
-動かなくなります。
-
-**更新:** チェックアウトで `git pull` するだけで反映されます — skill は symlink、composer
-プロンプトはチェックアウトへの `file://` 参照のため再インストール不要です。チェックアウトを
-別パスへ移動した場合のみ `make install-kiro` を再実行してください。
-
-### 🚀 AWS アカウントだけですぐに開始！ ワンクリックデプロイ
+## 🚀 AWS アカウントだけですぐに開始！ ワンクリックデプロイ
 
 | リージョン | デプロイ |
 |-----------|---------|
@@ -113,7 +69,7 @@ kiro-cli chat   # あとは「〇〇のスライドを作って」と頼むだ�
 | バージニア北部 (us-east-1) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-east-1.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
 | オレゴン (us-west-2) | [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-west-2.console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=SdpmDeploymentStack&templateURL=https://aws-ml-jp.s3.ap-northeast-1.amazonaws.com/asset-deployments/SdpmDeploymentStack.yaml) |
 
-パラメータの詳細や別のデプロイ方法については [デプロイ手順](docs/ja/deploy-cloudshell.md) を参照してください。
+パラメータの詳細や別のデプロイ方法については [デプロイ手順](docs/en/deploy-cloudshell.md) を参照してください。
 
 ---
 
@@ -127,51 +83,37 @@ kiro-cli chat   # あとは「〇〇のスライドを作って」と頼むだ�
 
 ## アーキテクチャ
 
-4 層アーキテクチャで構成されています。各レイヤーは前のレイヤーの薄いラッパーです。必要なレイヤーだけ選んで使えます。
+```
+sdpm/        エンジン（json <-> pptx）+ ナレッジ（references, assets, templates）
+personas/    モードの振る舞い — start_presentation(mode=...) で全 MCP クライアントに配信
+servers/     local（stdio, AWS 不要）/ remote（HTTP, S3 + DynamoDB）— 単一ツールコントラクトの薄い bind
+clients/     クライアント別の配線（Claude Code plugin エージェント、Kiro インストーラ）
+agent/ api/ infra/ web-ui/   オプションの AWS クラウドスタック（Strands Agent, REST API, CDK, React UI）
+```
 
-| ユースケース | レイヤー | AWS |
-|---|---|:---:|
-| エージェントスキルのみ（MCP なし） | Layer 1: `skill/` | 不要 |
-| ローカル MCP（Claude Desktop, VS Code, Kiro） | Layer 2: `skill/` + `mcp-local/` | 不要 |
-| チームデプロイ | Layer 3: + `mcp-server/` + `infra/` | 必要 |
-| フルスタック | Layer 4: + `agent/` + `api/` + `web-ui/` | 必要 |
-
-詳細は[アーキテクチャ](docs/ja/architecture.md)を参照してください。
+エージェントに必要なもの — ツール・ワークフロー・ガイド・モードの振る舞い — はすべて
+MCP サーバーが配信します。クライアント側のファイルは最小限の配線（composer サブエージェント登録）
+だけです。全体像は [Architecture](docs/en/architecture.md) を参照してください。
 
 ---
 
 ## ドキュメント
 
+詳細ドキュメントは英語版に一本化しています（日本語は README と「はじめに」のみ）。
+
 | ドキュメント | 説明 |
 |---|---|
-| [アーキテクチャ](docs/ja/architecture.md) | 4 層構成、データフロー、認証モデル、MCP ツール一覧 |
-| [はじめに](docs/ja/getting-started.md) | Layer 1〜4 のセットアップとデプロイ手順 |
-| [推奨デプロイ手順](docs/ja/deploy-cloudshell.md) | AWS デプロイの推奨手順（CloudShell・ローカル Linux/macOS/WSL 対応、CDK/Docker 不要） |
-| [エージェント接続](docs/ja/add-to-gateway.md) | MCP クライアントの接続方法 |
-| [Teams・Slack 連携](docs/ja/teams-slack-integration.md) | チャットプラットフォーム連携 |
-| [テンプレート・アセット](docs/ja/custom-template.md) | カスタムテンプレートとアセットの追加 |
-| [コスト試算](docs/ja/cost.md) | 月額コストの内訳と最適化 |
-| [削除手順](docs/ja/uninstall.md) | デプロイ済み AWS リソースの削除 |
+| [はじめに（日本語）](docs/ja/getting-started.md) | 各環境のセットアップ手順 |
+| [Getting Started](docs/en/getting-started.md) | Setup for every environment |
+| [Architecture](docs/en/architecture.md) | レイヤー設計、データフロー、認証モデル、MCP ツール一覧 |
+| [Migration to v0.5](docs/en/migration-v0.5.md) | v0.4 からの移行（パス変更、skills 廃止） |
+| [Recommended Deploy](docs/en/deploy-cloudshell.md) | CloudShell からの AWS デプロイ（CDK/Docker 不要） |
+| [Connecting Agents](docs/en/add-to-gateway.md) | MCP クライアントの接続方法 |
+| [Teams & Slack Integration](docs/en/teams-slack-integration.md) | チャットプラットフォーム連携 |
+| [Custom Templates & Assets](docs/en/custom-template.md) | カスタムテンプレートとアセットの追加 |
+| [Cost Estimates](docs/en/cost.md) | 月額コストの内訳と最適化 |
+| [Uninstall](docs/en/uninstall.md) | デプロイ済み AWS リソースの削除 |
 | [Web UI（ローカルモード — 実験的機能）](web-ui/README_ja.md#local-mode) | Kiro CLI ACP をバックエンドにローカル環境で Web UI を動作させる（AWS 不要） |
-
----
-
-## ディレクトリ構成
-
-```
-spec-driven-presentation-maker/
-├── skill/            Layer 1 — エンジン、リファレンス、テンプレート
-├── mcp-local/        Layer 2 — ローカル stdio MCP サーバー
-├── mcp-server/       Layer 3 — Streamable HTTP MCP サーバー（LibreOffice 内蔵）
-├── infra/            Layer 3-4 — CDK スタック
-├── agent/            Layer 4 — Strands Agent
-├── api/              Layer 4 — 統合 REST API Lambda
-├── web-ui/           Layer 4 — React Web UI
-├── shared/           共有モジュール（認可・スキーマ）
-├── scripts/          デプロイ・運用ヘルパー
-├── tests/            ユニットテスト
-└── docs/             ドキュメント
-```
 
 ---
 
