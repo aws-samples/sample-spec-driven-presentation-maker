@@ -1,20 +1,33 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""spec-driven-presentation-maker Local MCP Tools (Layer 2).
+"""sdpm.tools — MCP tool contract (single definition for all servers).
 
 Security: AWS manages infrastructure security. You manage access control,
 data classification, and IAM policies. See SECURITY.md for details.
 
-Tool interface layer — defines signatures, docstrings, and delegates to Engine.
-Each function is directly registrable via ``mcp.tool()(tools.xxx)``.
-No AWS dependencies. No deck management (that's Layer 3).
+Tool interface layer — defines names, signatures, docstrings, and delegates
+to the engine (:mod:`sdpm.engine`) and knowledge (:mod:`sdpm.knowledge`)
+layers. Each function is directly registrable via ``mcp.tool()(tools.xxx)``.
+
+Filesystem-workspace based: ``deck_id`` is a local directory path. Servers
+whose decks live elsewhere (e.g. S3) materialize a workspace first, or bind
+their own infrastructure-specific variants.
 """
 
 from pathlib import Path
 from typing import Any
 
-_SKILL_DIR = Path(__file__).resolve().parent.parent / "skill"
-_REFERENCES_DIR = _SKILL_DIR / "references"
+from sdpm.config import REFERENCES_DIR as _REFERENCES_DIR
+from sdpm.tools.instructions import INSTRUCTIONS as _INSTRUCTIONS
+
+
+def start_presentation() -> str:
+    """REQUIRED FIRST STEP for creating any PowerPoint/presentation/slide deck.
+    Call this before using any other tool when the user wants to create, edit, or modify slides.
+
+    Returns the complete workflow options and step-by-step instructions.
+    """
+    return _INSTRUCTIONS
 
 
 def init_presentation(name: str) -> dict[str, Any]:

@@ -513,7 +513,7 @@ def _resolve_config(
 
 
 def _build(config: BuildConfig, output_path: Path) -> Path:
-    """Build PPTX from resolved config. Returns output path."""
+    """Build PPTX from resolved config. Returns (output path, invalid_layouts)."""
     from sdpm.engine.builder import PPTXBuilder
 
     builder = PPTXBuilder(
@@ -527,7 +527,7 @@ def _build(config: BuildConfig, output_path: Path) -> Path:
     for s in config.slides:
         builder.add_slide(s)
     builder.save(output_path)
-    return output_path
+    return output_path, builder.invalid_layouts
 
 
 def generate(
@@ -560,7 +560,7 @@ def generate(
     else:
         out = Path(output_path)
 
-    _build(config, out)
+    _, invalid_layouts = _build(config, out)
 
     imbalance = check_layout_imbalance_data(out, config.slides)
     if imbalance:
@@ -581,6 +581,11 @@ def generate(
         "slides": summary,
         "warnings": config.warnings,
     }
+    if invalid_layouts:
+        result["invalid_layouts"] = [
+            {"slug": e["slug"], "attempted": e["attempted"], "used": e["used"]}
+            for e in invalid_layouts
+        ]
     if config.lint_diagnostics:
         result["errors"] = {"lintDiagnostics": config.lint_diagnostics}
     return result

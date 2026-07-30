@@ -35,6 +35,8 @@ from tools import template as template_mod  # noqa: E402
 from tools import init as init_mod  # noqa: E402
 from tools import code_block as code_block_mod  # noqa: E402
 
+from sdpm import tools as contract  # noqa: E402
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("sdpm.mcp")
 
@@ -505,82 +507,27 @@ def apply_style(deck_id: str, style: str) -> str:
     except Exception:
         pass
 
-    # Fall back to builtin
+    # Fall back to builtin (bundled in the image)
     if html_bytes is None:
-        builtin_key = f"references/examples/styles/{style}.html"
-        html_bytes = _storage.download_file(key=builtin_key)
+        from sdpm.knowledge.reference import BUNDLED_STYLES_DIR
+        builtin_path = BUNDLED_STYLES_DIR / f"{style}.html"
+        if not builtin_path.exists():
+            raise FileNotFoundError(f"Style not found: {style}")
+        html_bytes = builtin_path.read_bytes()
 
     dest_key = f"decks/{deck_id}/specs/art-direction.html"
     _storage.upload_file(key=dest_key, data=html_bytes, content_type="text/html")
     return json.dumps({"applied": style, "path": "specs/art-direction.html"})
 
 
-@mcp.tool()
-def read_examples(names: list[str]) -> str:
-    """Read design examples (components/patterns).
-    Without page specifier returns a listing of slide descriptions.
-    With page specifier returns full content.
+# --- Reference tools (bound from the shared contract; bundled data baked into the image) ---
 
-    Workflow equivalent: ``examples {name}``
-
-    Examples:
-        read_examples(["patterns"]) → listing with page numbers
-        read_examples(["patterns/3"]) → full content of page 3
-        read_examples(["components/all"]) → all component pages
-
-    Args:
-        names: Example names, e.g. ["patterns", "patterns/3", "components/all"].
-
-    Returns:
-        JSON with document contents.
-    """
-    return json.dumps(reference.read_examples(names=names, storage=_storage), ensure_ascii=False)
-
-
-@mcp.tool()
-def list_workflows() -> str:
-    """List all available workflow documents (phase-by-phase instructions).
-
-    Returns:
-        JSON with list of workflows.
-    """
-    return json.dumps(reference.list_workflows(storage=_storage), ensure_ascii=False)
-
-
-@mcp.tool()
-def read_workflows(names: list[str]) -> str:
-    """Read one or more workflow documents. Use list_workflows first to find names.
-
-    Args:
-        names: Workflow names, e.g. ["create-new-2-compose", "slide-json-spec"].
-
-    Returns:
-        JSON with document contents.
-    """
-    return json.dumps(reference.read_workflows(names=names, storage=_storage), ensure_ascii=False)
-
-
-@mcp.tool()
-def list_guides() -> str:
-    """List all available guide documents (design rules, review checklists).
-
-    Returns:
-        JSON with list of guides.
-    """
-    return json.dumps(reference.list_guides(storage=_storage), ensure_ascii=False)
-
-
-@mcp.tool()
-def read_guides(names: list[str]) -> str:
-    """Read one or more guide documents. Use list_guides first to find names.
-
-    Args:
-        names: Guide names, e.g. ["design-rules"].
-
-    Returns:
-        JSON with document contents.
-    """
-    return json.dumps(reference.read_guides(names=names, storage=_storage), ensure_ascii=False)
+mcp.tool()(contract.start_presentation)
+mcp.tool()(contract.read_examples)
+mcp.tool()(contract.list_workflows)
+mcp.tool()(contract.read_workflows)
+mcp.tool()(contract.list_guides)
+mcp.tool()(contract.read_guides)
 
 
 # --- Utility Tools ---
@@ -972,84 +919,10 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     return json.dumps(result, ensure_ascii=False)
 
 
-@mcp.tool()
-def grid(spec: str, purpose: str = "") -> str:
-    """Compute CSS Grid layout coordinates from a grid specification.
-    Use before placing elements to calculate exact positions.
+# --- Layout tools (bound from the shared contract) ---
 
-    Args:
-        spec: JSON string with grid spec. Keys:
-            area: {"x", "y", "w", "h"} (required)
-            columns: track-list string, e.g. "1fr 2fr" (default "1fr")
-            rows: track-list string (default "1fr")
-            gap: str or int, e.g. "20" or "20 40" (row-gap col-gap)
-            areas: 2D list of area names (optional)
-            items: dict of item overrides (optional)
-        purpose: Brief user-facing description (e.g. '3-column icon layout').
-            Shown in the UI.
-
-    Returns:
-        JSON with named rectangles containing x, y, w, h coordinates.
-    """
-    from sdpm.engine.layout.grid import compute_grid
-
-    try:
-        grid_spec = json.loads(spec)
-    except (json.JSONDecodeError, TypeError) as e:
-        return json.dumps({"error": f"Invalid grid spec JSON: {e}"})
-    result = compute_grid(grid_spec)
-    return json.dumps(result, ensure_ascii=False, indent=2)
-
-
-@mcp.tool()
-def arch_diagram(
-    spec: str,
-    x: int = 100, y: int = 180, width: int = 1720, height: int = 800,
-    theme: str = "dark",
-) -> str:
-    """Auto-layout an architecture/flow diagram from a logical-structure JSON.
-
-    Turns a nested structure of groups, icons and connections into fully-placed
-    slide elements with auto-routed orthogonal arrows. You describe *what
-    connects to what*; the engine computes coordinates, clusters related icons,
-    picks arrow ports/bends, and minimizes crossings and icon pierces. Prefer
-    this over hand-placing coordinates for any diagram with more than a few
-    connections.
-
-    Read the guide `arch-layout-engine` (via read_guides) for the JSON schema
-    and the techniques that reach 0 crossings (connect to a GROUP not every
-    icon; `fan: "merge"` bundles; perpendicular branch wrappers).
-
-    Args:
-        spec: JSON string. Top-level keys: `direction` ("horizontal"/"vertical"),
-            `iconSize`, `children` (nested nodes/groups), `connections`
-            (`{from, to, label?, fan?}`). A `targetArea` object inside the JSON
-            overrides x/y/width/height.
-        x: Target area X offset in px.
-        y: Target area Y offset in px.
-        width: Target area width in px (engine scales the diagram to fit).
-        height: Target area height in px.
-        theme: "dark" or "light" — affects box-node text colors.
-
-    Returns:
-        JSON with `elements` (sdpm element array), `bbox` (final bounding box),
-        optional `warnings` (facts about layout defects), and `metrics`
-        (objective QA numbers: `crossings`/`pierces`/`group_pierces` are 0 for a
-        clean diagram; `overflow` > 0 means the layout spills off the box;
-        `score` is the judge's lexicographic tuple, lower is better). Inspect
-        these and iterate on STRUCTURE (not coordinates) when defects remain.
-    """
-    from sdpm.engine.layout.render import render_architecture
-
-    try:
-        tree = json.loads(spec)
-    except (json.JSONDecodeError, TypeError) as e:
-        return json.dumps({"error": f"Invalid diagram spec JSON: {e}"})
-    result = render_architecture(
-        tree, x=x, y=y, width=width, height=height, theme=theme,
-        include_metrics=True,
-    )
-    return json.dumps(result, ensure_ascii=False, indent=2)
+mcp.tool()(contract.grid)
+mcp.tool()(contract.arch_diagram)
 
 
 # --- Style Execution (Code Interpreter) ---

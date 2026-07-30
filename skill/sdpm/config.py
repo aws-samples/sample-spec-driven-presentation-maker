@@ -9,13 +9,16 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
-
 # Path anchors for the skill distribution (package dir = sdpm/, root = its parent).
 # All bundled-data lookups must go through these so that moving modules inside
 # the package never silently changes what they point at.
+# SDPM_SKILL_ROOT overrides the root for installs where the package is
+# separated from its bundled data (e.g. pip-installed engine in a container
+# with references/ and templates/ copied elsewhere).
 PACKAGE_DIR = Path(__file__).resolve().parent
-SKILL_ROOT = PACKAGE_DIR.parent
+_skill_root_env = os.environ.get("SDPM_SKILL_ROOT")
+SKILL_ROOT = Path(_skill_root_env).expanduser() if _skill_root_env else PACKAGE_DIR.parent
+ASSETS_DIR = SKILL_ROOT / "assets"
 REFERENCES_DIR = SKILL_ROOT / "references"
 TEMPLATES_DIR = SKILL_ROOT / "templates"
 SCRIPTS_DIR = SKILL_ROOT / "scripts"

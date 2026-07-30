@@ -250,12 +250,13 @@ def generate_pptx(
     storage: Storage,
     kb_sync: object | None = None,
 ) -> dict:
-    """Generate a PowerPoint file from S3 presentation.json.
+    """Generate a PowerPoint file from the deck's S3 workspace.
 
-    Downloads presentation.json and all includes/ files to a tmpdir,
-    then uses engine builder with base_dir set to tmpdir for include resolution.
-    Template is resolved from presentation.json's "template" field.
-    After PPTX build, generates WebP previews synchronously via LibreOffice.
+    Materializes the S3 workspace (deck.json, specs/, slides/, includes/,
+    images/, referenced assets, template) into a tmpdir, then delegates the
+    build to the engine facade ``sdpm.api.generate`` — the same code path as
+    the local server. Remote-only orchestration (S3 upload, deck record
+    update, WebP previews, KB sync) happens around it.
 
     Args:
         deck_id: Deck identifier.
@@ -269,24 +270,23 @@ def generate_pptx(
     Raises:
         ValueError: If deck not found or has no slides.
     """
-    from sdpm.engine.builder import PPTXBuilder, resolve_override
+    from sdpm.api import generate as api_generate
 
     tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, storage)
     try:
-        builder = PPTXBuilder(**build_kwargs)
-
-        # Build id_map for resolve_override
-        id_map: dict[str, dict] = {}
-        for s in slides:
-            if "id" in s:
-                id_map[s["id"]] = s
-
-        for s in slides:
-            resolved = resolve_override(s, id_map)
-            builder.add_slide(resolved)
+        # Rewrite deck.json so api.generate resolves exactly what the
+        # workspace materialized (template file, fonts, text color).
+        deck_meta = json.loads((tmpdir / "deck.json").read_text(encoding="utf-8"))
+        deck_meta["template"] = str(Path(build_kwargs["template_path"]).name)
+        deck_meta["fonts"] = build_kwargs["fonts"]
+        if build_kwargs.get("default_text_color"):
+            deck_meta["defaultTextColor"] = build_kwargs["default_text_color"]
+        (tmpdir / "deck.json").write_text(
+            json.dumps(deck_meta, ensure_ascii=False), encoding="utf-8"
+        )
 
         out = tmpdir / "output.pptx"
-        builder.save(out)
+        gen_result = api_generate(json_path=tmpdir, output_path=out)
 
         # Upload PPTX to S3
         pptx_key = f"pptx/{deck_id}/{uuid.uuid4()}.pptx"
@@ -326,20 +326,16 @@ def generate_pptx(
 
     result: dict = {
         "status": "completed",
-        "slideCount": len(slides),
-        "slides": [
-            f"page{i:02d} - {s.get('title', {}).get('text', s.get('title', '(no title)')) if isinstance(s.get('title'), dict) else s.get('title', '(no title)')}"
-            for i, s in enumerate(slides, 1)
-        ],
+        "slideCount": gen_result["slide_count"],
+        "slides": gen_result["slides"],
     }
     warnings: dict = {}
     if kb_error:
         warnings["kbSyncFailed"] = kb_error
-    if builder.invalid_layouts:
-        warnings["invalidLayouts"] = [
-            {"slug": e["slug"], "attempted": e["attempted"], "used": e["used"]}
-            for e in builder.invalid_layouts
-        ]
+    if gen_result.get("invalid_layouts"):
+        warnings["invalidLayouts"] = gen_result["invalid_layouts"]
+    if gen_result.get("warnings"):
+        warnings["build"] = gen_result["warnings"]
     if warnings:
         result["warnings"] = warnings
     return result

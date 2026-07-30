@@ -23,7 +23,7 @@ sys.path.insert(0, str(_SKILL_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import sandbox_tools  # noqa: E402
-import tools  # noqa: E402
+from sdpm import tools  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 # ---------------------------------------------------------------------------
