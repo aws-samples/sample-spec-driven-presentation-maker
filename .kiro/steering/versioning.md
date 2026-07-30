@@ -20,3 +20,8 @@
 - Breaking changes must always bump MAJOR
 - No release needed for internal-only refactoring
 - Git tag format: `v{MAJOR}.{MINOR}.{PATCH}` (e.g., `v0.1.0`)
+
+## Changelog
+- `CHANGELOG.md` (Keep a Changelog format) — update the `[Unreleased]` section
+  as user-facing changes land; move entries under a version heading when tagging
+- Internal-only refactoring does not need an entry unless it breaks consumers
