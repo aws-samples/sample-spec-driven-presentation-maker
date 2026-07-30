@@ -23,6 +23,9 @@ REFERENCES_DIR = SKILL_ROOT / "references"
 TEMPLATES_DIR = SKILL_ROOT / "templates"
 SCRIPTS_DIR = SKILL_ROOT / "scripts"
 CACHE_DIR = SKILL_ROOT / ".cache"
+# Canonical persona definitions (mode behaviors served via start_presentation).
+# Lives at the repo root, one level above the skill root.
+PERSONAS_DIR = SKILL_ROOT.parent / "personas"
 
 _DEFAULTS = {
     "output_dir": "~/Documents/SDPM-Presentations",

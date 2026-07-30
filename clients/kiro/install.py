@@ -3,18 +3,19 @@
 
 Idempotent installer that wires this repository checkout into Kiro CLI:
 
-1. Symlinks the skills under ``skills/`` (sdpm-vibe, sdpm-spec, ...) into
-   ``~/.kiro/skills/`` so Kiro CLI discovers them.
-2. Renders ``clients/kiro/sdpm-composer.json.tmpl`` (resolving ``{{CHECKOUT}}``
+1. Renders ``clients/kiro/sdpm-composer.json.tmpl`` (resolving ``{{CHECKOUT}}``
    to this checkout's absolute path) into ``~/.kiro/agents/sdpm-composer.json``
-   so the sdpm-vibe skill can dispatch composer sub-agents via the subagent tool.
-3. Registers the ``sdpm`` MCP server in the global ``~/.kiro/settings/mcp.json``
+   so the orchestrator can dispatch composer sub-agents via the subagent tool.
+2. Registers the ``sdpm`` MCP server in the global ``~/.kiro/settings/mcp.json``
    via ``kiro-cli mcp add`` (skipped if already registered). Use ``--agent NAME``
    to register it into a specific agent config instead.
 
-The repository stays the single source of truth: skills are symlinks and the
-composer prompt is a ``file://`` reference, so ``git pull`` updates take effect
+The repository stays the single source of truth: the composer prompt is a
+``file://`` reference into ``personas/``, so ``git pull`` updates take effect
 without re-running this script. Re-run only if you move the checkout.
+
+Mode behavior (vibe/spec/style) is served by the MCP server itself via the
+``start_presentation(mode=...)`` tool — no skill files are installed.
 """
 
 from __future__ import annotations
@@ -28,11 +29,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent.parent
-SKILLS_SRC = REPO_ROOT / "skills"
 TEMPLATE = HERE / "sdpm-composer.json.tmpl"
 
 KIRO_HOME = Path.home() / ".kiro"
-SKILLS_DEST = KIRO_HOME / "skills"
 AGENTS_DEST = KIRO_HOME / "agents"
 GLOBAL_MCP_JSON = KIRO_HOME / "settings" / "mcp.json"
 
@@ -47,34 +46,25 @@ def warn(msg: str) -> None:
     print(f"  WARNING: {msg}", file=sys.stderr)
 
 
-def symlink_skills() -> None:
-    """Symlink each skill directory under skills/ into ~/.kiro/skills/."""
-    print("[1/3] Linking skills into ~/.kiro/skills/")
-    SKILLS_DEST.mkdir(parents=True, exist_ok=True)
-    for src in sorted(SKILLS_SRC.iterdir()):
-        if not src.is_dir() or not (src / "SKILL.md").is_file():
-            continue
-        link = SKILLS_DEST / src.name
-        if link.is_symlink():
-            if link.resolve() == src.resolve():
-                info(f"{link} -> {src} (already linked, skipped)")
-                continue
+def cleanup_stale_skill_links() -> None:
+    """Remove dangling sdpm skill symlinks left by pre-v0.5 installs.
+
+    v0.5 removed the skills/ directory (mode behavior is now served by the
+    MCP server via start_presentation), so symlinks created by older
+    installers now dangle after `git pull`.
+    """
+    skills_dest = KIRO_HOME / "skills"
+    if not skills_dest.is_dir():
+        return
+    for link in skills_dest.glob("sdpm-*"):
+        if link.is_symlink() and not link.exists():
             link.unlink()
-            link.symlink_to(src)
-            info(f"{link} -> {src} (re-pointed stale symlink)")
-        elif link.exists():
-            warn(
-                f"{link} exists and is not a symlink — left untouched. "
-                f"Remove it and re-run to link {src}."
-            )
-        else:
-            link.symlink_to(src)
-            info(f"{link} -> {src} (linked)")
+            info(f"{link} (removed dangling pre-v0.5 skill symlink)")
 
 
 def render_composer_agent() -> Path:
     """Render the composer agent config template into ~/.kiro/agents/."""
-    print("[2/3] Generating ~/.kiro/agents/sdpm-composer.json")
+    print("[1/2] Generating ~/.kiro/agents/sdpm-composer.json")
     rendered = TEMPLATE.read_text(encoding="utf-8").replace(
         "{{CHECKOUT}}", str(REPO_ROOT)
     )
@@ -123,7 +113,7 @@ def register_mcp_server(kiro_cli: str | None, agent: str | None) -> None:
     (moved checkout, or switching between multiple checkouts).
     """
     target = f"agent '{agent}'" if agent else "global ~/.kiro/settings/mcp.json"
-    print(f"[3/3] Registering MCP server '{MCP_SERVER_NAME}' in {target}")
+    print(f"[2/2] Registering MCP server '{MCP_SERVER_NAME}' in {target}")
 
     config_path = AGENTS_DEST / f"{agent}.json" if agent else GLOBAL_MCP_JSON
     mcp_dir = REPO_ROOT / "mcp-local"
@@ -184,7 +174,7 @@ def main() -> int:
     if kiro_cli is None:
         warn("kiro-cli not found on PATH — file generation will proceed anyway.")
 
-    symlink_skills()
+    cleanup_stale_skill_links()
     render_composer_agent()
     register_mcp_server(kiro_cli, opts.agent)
 
@@ -192,12 +182,12 @@ def main() -> int:
         "\nDone. Usage:\n"
         "  1. Make sure `uv` and LibreOffice/poppler are installed (previews need them).\n"
         "  2. Start a NEW session: kiro-cli chat\n"
-        '  3. Ask for slides, e.g. "このURLをスライドにして https://..." — the sdpm-vibe\n'
-        "     skill runs Phase 1 and dispatches sdpm-composer sub-agents for Phase 2.\n"
+        '  3. Ask for slides, e.g. "このURLをスライドにして https://..." — the agent calls\n'
+        "     start_presentation(mode=...) and dispatches sdpm-composer sub-agents.\n"
         "\n"
-        "Updates: `git pull` in this checkout is enough (skills are symlinks; the\n"
-        "composer prompt is a file:// reference). Re-run `make install-kiro` only if\n"
-        "you move the checkout."
+        "Updates: `git pull` in this checkout is enough (the composer prompt is a\n"
+        "file:// reference into personas/). Re-run `make install-kiro` only if you\n"
+        "move the checkout."
     )
     return 0
 

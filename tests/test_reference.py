@@ -42,6 +42,21 @@ class TestContractReference:
         assert "read_workflows" in text
         assert "create-new-1-briefing" in text
 
+    @pytest.mark.parametrize("mode,needle", [
+        ("vibe", "Vibe Workflow"),
+        ("spec", "Phase 1 Flow"),
+        ("style", "run_style_python"),
+        ("composer", "assigned slugs"),
+    ])
+    def test_start_presentation_modes(self, mode, needle):
+        text = contract.start_presentation(mode=mode)
+        assert needle in text
+
+    def test_start_presentation_unknown_mode(self):
+        text = contract.start_presentation(mode="bogus")
+        assert "Unknown mode" in text
+        assert "vibe" in text
+
 
 class TestRemoteListStyles:
     """Remote list_styles merges bundled styles with user styles from storage."""

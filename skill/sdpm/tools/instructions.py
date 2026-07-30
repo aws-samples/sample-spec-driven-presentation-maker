@@ -9,6 +9,11 @@ MCP Server Instructions (for clients that read them) and via the
 
 INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generation from JSON.
 
+**Mode shortcuts:** if the user's intent is already clear, skip this menu and call
+`start_presentation(mode=...)` — `"vibe"` for fast generation from existing material
+(minimal questions), `"spec"` for dialogue-driven design with hearings and approvals,
+`"style"` for creating a reusable style guide. The returned instructions replace this menu.
+
 **Critical constraint:** Do NOT make any decisions about slide structure, content, design, or layout before loading the workflow. The workflow files contain the full process including briefing, outline, and art direction. Wait until the workflow is loaded and follow it step by step.
 
 **Present the options and ask which to do:**

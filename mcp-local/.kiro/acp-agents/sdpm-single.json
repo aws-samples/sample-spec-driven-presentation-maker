@@ -12,7 +12,7 @@
       "timeout": 120000
     }
   },
-  "prompt": "file://../../acp-agent-prompts/single-agent.md",
+  "prompt": "file://../../../personas/single.md",
   "tools": [
     "@sdpm/analyze_template",
     "@sdpm/apply_style",

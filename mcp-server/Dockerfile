@@ -26,6 +26,7 @@ RUN python3.13 -m pip install --no-cache-dir ./skill
 # Bundled knowledge data (references / templates) — served by the shared tool
 # contract via SDPM_SKILL_ROOT. Assets stay on S3 (user-extensible, 36MB).
 COPY skill/references/ skill/references/
+COPY personas/ personas/
 COPY skill/templates/ skill/templates/
 ENV SDPM_SKILL_ROOT=/app/skill
 

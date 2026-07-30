@@ -60,7 +60,7 @@
       "timeout": 120000
     }
   },
-  "prompt": "file://../../acp-agent-prompts/composer.md",
+  "prompt": "file://../../../personas/composer.md",
   "resources": [
     "file://../../../skill/references/workflows/create-new-2-compose.md",
     "file://../../../skill/references/workflows/create-new-3-review.md",

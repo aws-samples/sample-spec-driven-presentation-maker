@@ -17,17 +17,51 @@ their own infrastructure-specific variants.
 from pathlib import Path
 from typing import Any
 
+from sdpm.config import PERSONAS_DIR as _PERSONAS_DIR
 from sdpm.config import REFERENCES_DIR as _REFERENCES_DIR
 from sdpm.tools.instructions import INSTRUCTIONS as _INSTRUCTIONS
 
+_MODES = ("vibe", "spec", "style", "composer")
 
-def start_presentation() -> str:
+
+def start_presentation(mode: str = "") -> str:
     """REQUIRED FIRST STEP for creating any PowerPoint/presentation/slide deck.
     Call this before using any other tool when the user wants to create, edit, or modify slides.
 
-    Returns the complete workflow options and step-by-step instructions.
+    Returns the behavior instructions for the requested mode — follow them for the rest
+    of the conversation.
+
+    Args:
+        mode: Which behavior to load.
+            - "vibe": fast, autonomous generation from source material the user already
+              has (URL, paper, transcript, pasted text). Minimal questions, no per-step
+              approval. Use when the user says "turn this into slides" / "quick deck".
+            - "spec": dialogue-driven design — real hearing, structured requirements,
+              user approval at each step. Use when the user wants to shape the deck
+              through conversation, or wants to edit an existing PPTX / create a style
+              via the guided menu.
+            - "style": create a reusable style guide (HTML design tokens) through dialogue.
+            - "composer": silent slide composition from approved specs. Used by composer
+              sub-agents, or by the orchestrator itself when no sub-agent mechanism exists.
+            - "" (omitted): the interactive workflow menu (choose A-D with the user).
+
+    Returns:
+        Markdown instructions for the selected mode.
     """
-    return _INSTRUCTIONS
+    if not mode:
+        return _INSTRUCTIONS
+    if mode not in _MODES:
+        return (
+            f"Unknown mode: {mode!r}. Valid modes: {', '.join(_MODES)}, "
+            "or call without arguments for the workflow menu."
+        )
+    persona_path = _PERSONAS_DIR / f"{mode}.md"
+    if not persona_path.exists():
+        raise FileNotFoundError(
+            f"Persona file not found: {persona_path}. "
+            "The personas/ directory must ship alongside the skill root."
+        )
+    return persona_path.read_text(encoding="utf-8")
 
 
 def init_presentation(name: str) -> dict[str, Any]:
