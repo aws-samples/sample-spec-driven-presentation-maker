@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "spec-driven-presentation-maker MCP Server — Streamable HTTP for AgentCore Runtime (Layer 3)"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp[cli]",
+    "mcp[cli]>=1.28.1,<2",
     "boto3",
     "sdpm-skill",
     "aws-opentelemetry-distro>=0.10.0",
