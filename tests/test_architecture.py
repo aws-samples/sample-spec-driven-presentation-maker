@@ -31,15 +31,20 @@ _CORE_FILES = sorted(
 
 
 def _module_parts(path: Path) -> list[str]:
-    """Dotted module parts relative to the package root.
+    """Dotted module parts relative to the package root, for relative-import
+    resolution.
 
-    e.g. engine/diff/__init__.py -> ["sdpm", "engine", "diff"]
+    ``__init__`` is deliberately KEPT as the last segment: for a package
+    ``__init__.py``, ``from .. import x`` resolves against the package
+    itself (level 1 = the package), so slicing must consume the
+    ``__init__`` placeholder first. Stripping it would shift resolution
+    one level too far up (review finding, PR #230 round 2).
+
+    e.g. engine/diff/__init__.py -> ["sdpm", "engine", "diff", "__init__"]
+         engine/x.py             -> ["sdpm", "engine", "x"]
     """
     rel = path.relative_to(_SDPM_PKG).with_suffix("")
-    parts = ["sdpm", *rel.parts]
-    if parts[-1] == "__init__":
-        parts.pop()
-    return parts
+    return ["sdpm", *rel.parts]
 
 
 def _forbidden_imports(source: str, module_parts: list[str]) -> list[str]:
@@ -87,26 +92,42 @@ def test_core_does_not_import_outer_layers(path: Path):
     )
 
 
-@pytest.mark.parametrize("code,should_hit", [
+_MOD = ["sdpm", "engine", "x"]                       # regular module sdpm/engine/x.py
+_PKG_INIT = ["sdpm", "engine", "__init__"]           # sdpm/engine/__init__.py
+_NESTED_INIT = ["sdpm", "engine", "diff", "__init__"]  # sdpm/engine/diff/__init__.py
+
+
+@pytest.mark.parametrize("module_parts,code,should_hit", [
     # forms the old regex version missed
-    ("from sdpm import api", True),
-    ("from sdpm import api, config", True),
-    ("from sdpm import tools", True),
-    ("from ..api import generate", True),
-    ("from .. import tools", True),
-    ("import sdpm.api", True),
-    ("import sdpm.api.generate", True),
-    ("from sdpm.tools import instructions", True),
-    ("from sdpm.api import generate", True),
+    (_MOD, "from sdpm import api", True),
+    (_MOD, "from sdpm import api, config", True),
+    (_MOD, "from sdpm import tools", True),
+    (_MOD, "from ..api import generate", True),
+    (_MOD, "from .. import tools", True),
+    (_MOD, "import sdpm.api", True),
+    (_MOD, "import sdpm.api.generate", True),
+    (_MOD, "from sdpm.tools import instructions", True),
+    (_MOD, "from sdpm.api import generate", True),
+    # package __init__ contexts (round-2 review: __init__ stripping shifted
+    # relative resolution one level too far up and these were MISSED)
+    (_PKG_INIT, "from .. import tools", True),
+    (_PKG_INIT, "from ..api import generate", True),
+    (_NESTED_INIT, "from ... import api", True),
+    (_NESTED_INIT, "from ...api import generate", True),
+    (_NESTED_INIT, "from ...tools import instructions", True),
     # allowed
-    ("from sdpm.config import SCRIPTS_DIR", False),
-    ("from sdpm import config", False),
-    ("from ..config import SCRIPTS_DIR", False),
-    ("from . import color", False),
-    ("from sdpm.engine.builder import PPTXBuilder", False),
-    ("import json", False),
+    (_MOD, "from sdpm.config import SCRIPTS_DIR", False),
+    (_MOD, "from sdpm import config", False),
+    (_MOD, "from ..config import SCRIPTS_DIR", False),
+    (_MOD, "from . import color", False),
+    (_MOD, "from sdpm.engine.builder import PPTXBuilder", False),
+    (_MOD, "import json", False),
+    (_PKG_INIT, "from . import builder", False),
+    (_PKG_INIT, "from .. import config", False),
+    (_NESTED_INIT, "from ... import config", False),
+    (_NESTED_INIT, "from .. import builder", False),
 ])
-def test_detector_catches_all_import_forms(code: str, should_hit: bool):
-    """Self-test of the detector, simulating a module at sdpm/engine/x.py."""
-    hits = _forbidden_imports(code, ["sdpm", "engine", "x"])
-    assert bool(hits) == should_hit, f"{code!r}: expected hit={should_hit}, got {hits}"
+def test_detector_catches_all_import_forms(module_parts: list, code: str, should_hit: bool):
+    """Self-test of the detector across module and package-__init__ contexts."""
+    hits = _forbidden_imports(code, module_parts)
+    assert bool(hits) == should_hit, f"{code!r} in {module_parts}: expected hit={should_hit}, got {hits}"
