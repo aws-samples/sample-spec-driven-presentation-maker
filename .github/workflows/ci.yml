@@ -23,6 +23,20 @@ jobs:
       - name: Test
         run: uv run pytest tests/ -v
 
+  # Local-surface guard: boots servers/local over real stdio (no mocks) and
+  # exercises filesystem-anchored resolution (templates, personas). The unit
+  # suite mocks this surface, so regressions here used to slip through.
+  local-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v8.0.0
+      - name: Smoke test local MCP server
+        run: uv run python scripts/smoke_local.py
+
   web-ui:
     runs-on: ubuntu-latest
     steps:

@@ -59,7 +59,11 @@ def start_presentation(mode: str = "") -> str:
     if not persona_path.exists():
         raise FileNotFoundError(
             f"Persona file not found: {persona_path}. "
-            "The personas/ directory must ship alongside the skill root."
+            "The personas/ directory must ship alongside the skill root. "
+            "If you moved or renamed the checkout, your MCP client config may "
+            "still point at the old path — re-register the server (e.g. "
+            "`make install-kiro`) or set SDPM_SKILL_ROOT. Run `make doctor` "
+            "in the checkout to diagnose."
         )
     return persona_path.read_text(encoding="utf-8")
 
