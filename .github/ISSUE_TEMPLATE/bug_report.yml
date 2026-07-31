@@ -1,0 +1,47 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where does it happen?
+      options:
+        - Local MCP server (servers/local — Claude Code / Kiro / Claude Desktop)
+        - CLI / SKILL.md (no MCP)
+        - Cloud stack (Web UI / agent / remote MCP on AWS)
+        - Engine (generated PPTX is wrong)
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: |
+        1. Asked the agent to "..."
+        2. Expected ...
+        3. Got ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output / logs
+      description: Error messages, tool output, or a minimal slide JSON that reproduces the issue.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Git tag / commit, or `__version__` from sdpm/sdpm/__init__.py
+      placeholder: v0.5.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, MCP client (and version), Python version
+      placeholder: macOS 15, Claude Code 2.x, Python 3.12
