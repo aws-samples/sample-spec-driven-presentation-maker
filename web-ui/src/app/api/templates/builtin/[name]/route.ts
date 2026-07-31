@@ -9,10 +9,7 @@
  */
 import fs from "fs"
 import path from "path"
-import { getState, updateState } from "@/lib/local/sdpmPaths"
-
-/** Bundled templates directory. */
-const BUNDLED_TEMPLATES_DIR = path.resolve(process.cwd(), "..", "skill", "templates")
+import { getState, updateState, BUNDLED_TEMPLATES_DIR } from "@/lib/local/sdpmPaths"
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ name: string }> }) {
   const { name } = await params

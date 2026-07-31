@@ -4,7 +4,7 @@
 import fs from "fs"
 import path from "path"
 import { execFileSync } from "child_process"
-import { getUserConfigDir, getState, updateState } from "@/lib/local/sdpmPaths"
+import { getUserConfigDir, getState, updateState, SDPM_ROOT } from "@/lib/local/sdpmPaths"
 
 /** servers/local directory (uv-managed venv with sdpm deps). */
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   // Analyze template
   let meta: Record<string, unknown> = { description }
   try {
-    const skillDir = path.resolve(process.cwd(), "..", "skill")
+    const skillDir = SDPM_ROOT
     const script = `import sys; sys.path.insert(0, sys.argv[1]); import json; from sdpm.api import analyze_and_store_template; from pathlib import Path; r=analyze_and_store_template(Path(sys.argv[2]), description=sys.argv[3]); print(json.dumps(r, ensure_ascii=False))`
     const result = execFileSync("uv", ["run", "--directory", MCP_LOCAL_DIR, "python", "-c", script, skillDir, outputPath, description], {
       encoding: "utf-8",

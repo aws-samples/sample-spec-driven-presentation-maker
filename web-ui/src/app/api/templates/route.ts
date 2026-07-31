@@ -4,10 +4,7 @@
 import fs from "fs"
 import path from "path"
 import { execFileSync } from "child_process"
-import { getUserConfigDir, getState, updateState } from "@/lib/local/sdpmPaths"
-
-/** Bundled templates directory. */
-const BUNDLED_TEMPLATES_DIR = path.resolve(process.cwd(), "..", "skill", "templates")
+import { getUserConfigDir, getState, updateState, SDPM_ROOT, BUNDLED_TEMPLATES_DIR } from "@/lib/local/sdpmPaths"
 
 /** servers/local directory (uv-managed venv with sdpm deps). */
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
@@ -27,7 +24,7 @@ export async function GET() {
   const seen = new Set<string>()
   const templates: Array<Record<string, unknown>> = []
 
-  const skillDir = path.resolve(process.cwd(), "..", "skill")
+  const skillDir = SDPM_ROOT
 
   function analyzeAndCache(templatePath: string, name: string): Record<string, unknown> {
     try {

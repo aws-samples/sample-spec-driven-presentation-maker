@@ -5,8 +5,14 @@ import fs from "fs"
 import path from "path"
 import os from "os"
 
+/** Skill distribution root (repo's sdpm/ — engine package + references + templates). */
+export const SDPM_ROOT = path.resolve(process.cwd(), "..", "sdpm")
+
+/** Bundled templates directory (sdpm/templates/). */
+export const BUNDLED_TEMPLATES_DIR = path.join(SDPM_ROOT, "templates")
+
 /** Bundled styles directory (sdpm/references/examples/styles/). */
-export const BUNDLED_STYLES_DIR = path.resolve(process.cwd(), "..", "sdpm", "references", "examples", "styles")
+export const BUNDLED_STYLES_DIR = path.join(SDPM_ROOT, "references", "examples", "styles")
 
 /** User config directory (~/.config/sdpm on macOS/Linux, %APPDATA%/sdpm on Windows). */
 export function getUserConfigDir(): string {
