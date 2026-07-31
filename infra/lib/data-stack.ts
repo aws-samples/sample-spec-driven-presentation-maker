@@ -118,7 +118,7 @@ export class DataStack extends cdk.Stack {
     // --- Deploy default resources to S3 ---
     new s3deploy.BucketDeployment(this, "DeployReferences", {
       sources: [
-        s3deploy.Source.asset(path.join(__dirname, "../../skill/references")),
+        s3deploy.Source.asset(path.join(__dirname, "../../sdpm/references")),
       ],
       destinationBucket: this.resourceBucket,
       destinationKeyPrefix: "references/",
@@ -126,15 +126,15 @@ export class DataStack extends cdk.Stack {
 
     new s3deploy.BucketDeployment(this, "DeployAssets", {
       sources: [
-        s3deploy.Source.asset(path.join(__dirname, "../../skill/templates")),
+        s3deploy.Source.asset(path.join(__dirname, "../../sdpm/templates")),
       ],
       destinationBucket: this.resourceBucket,
       destinationKeyPrefix: "templates/",
     });
 
     // Deploy asset icons — auto-download if not present
-    const assetsDir = path.join(__dirname, "../../skill/assets");
-    const scriptsDir = path.join(__dirname, "../../skill/scripts");
+    const assetsDir = path.join(__dirname, "../../sdpm/assets");
+    const scriptsDir = path.join(__dirname, "../../sdpm/scripts");
     new s3deploy.BucketDeployment(this, "DeployIcons", {
       sources: [
         s3deploy.Source.asset(scriptsDir, {

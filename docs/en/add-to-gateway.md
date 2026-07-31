@@ -1,4 +1,4 @@
-[EN](../en/add-to-gateway.md) | [JA](../ja/add-to-gateway.md)
+[EN](../en/add-to-gateway.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
 
 # Connecting Agents
 
@@ -144,8 +144,9 @@ No additional user registration is needed — any valid JWT with a `sub` claim w
 ```bash
 GENU_RUNTIME_DIR=<path-to-genu>/packages/cdk/lambda-python/generic-agent-core-runtime
 
-cp -r <path-to-sdpm>/skill $GENU_RUNTIME_DIR/sdpm-skill
-cp -r <path-to-sdpm>/mcp-local $GENU_RUNTIME_DIR/sdpm-mcp-local
+cp -r <path-to-sdpm>/sdpm $GENU_RUNTIME_DIR/sdpm-skill
+cp -r <path-to-sdpm>/servers/local $GENU_RUNTIME_DIR/sdpm-servers-local
+cp -r <path-to-sdpm>/personas $GENU_RUNTIME_DIR/sdpm-personas
 ```
 
 ### Step 2: Patch the Dockerfile
@@ -155,12 +156,16 @@ Add the following lines to `$GENU_RUNTIME_DIR/Dockerfile`, **before** the `EXPOS
 ```dockerfile
 # --- SDPM: spec-driven-presentation-maker ---
 COPY sdpm-skill/ ./sdpm-skill/
-COPY sdpm-mcp-local/ ./sdpm-mcp-local/
+COPY sdpm-servers-local/ ./sdpm-servers-local/
+COPY sdpm-personas/ ./personas/
 RUN uv pip install --python /tmp/.venv/bin/python ./sdpm-skill
 RUN /tmp/.venv/bin/python sdpm-skill/scripts/download_aws_icons.py \
  && /tmp/.venv/bin/python sdpm-skill/scripts/download_material_icons.py
-RUN ln -s /var/task/sdpm-skill /var/task/skill
+RUN ln -s /var/task/sdpm-skill /var/task/sdpm
 ```
+
+`SDPM_SKILL_ROOT=/var/task/sdpm-skill` (set in Step 3) anchors the engine's
+bundled-data lookups (references, templates, and `../personas`).
 
 ### Step 3: Register the MCP server
 
@@ -169,9 +174,10 @@ Add the following entry to `$GENU_RUNTIME_DIR/mcp-configs/agent-builder/mcp.json
 ```json
 "spec-driven-presentation-maker": {
     "command": "python",
-    "args": ["sdpm-mcp-local/server.py"],
+    "args": ["sdpm-servers-local/server.py"],
     "env": {
         "PYTHONPATH": "/var/task/sdpm-skill",
+        "SDPM_SKILL_ROOT": "/var/task/sdpm-skill",
         "SDPM_OUTPUT_DIR": "/tmp/ws"
     }
 }

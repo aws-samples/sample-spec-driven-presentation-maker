@@ -62,14 +62,14 @@ web-ui/playwright-report/
 infra/config.yaml
 
 # Assets (downloaded via scripts) and user config
-skill/assets/aws/
-skill/assets/material/
-skill/assets/config.json
+sdpm/assets/aws/
+sdpm/assets/material/
+sdpm/assets/config.json
 *.tsbuildinfo
 .ash/
 ?/
-skill/sdpm/.cache/
-skill/.cache/
+sdpm/sdpm/.cache/
+sdpm/.cache/
 
 # Temporary workspace
 tmp/
@@ -79,8 +79,8 @@ desktop/src-tauri/target/
 desktop/node_modules/
 desktop/dist/
 
-mcp-local/.venv/
-mcp-local/__pycache__/
+servers/local/.venv/
+servers/local/__pycache__/
 
 # User-generated outputs
 output/

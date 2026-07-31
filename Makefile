@@ -3,10 +3,10 @@
 all: lint test
 
 lint:
-	ruff check skill/ mcp-local/ mcp-server/ shared/ api/
+	ruff check sdpm/ servers/ shared/ api/
 
 format:
-	ruff format skill/ mcp-local/ mcp-server/ shared/ api/
+	ruff format sdpm/ servers/ shared/ api/
 
 test:
 	python -m pytest tests/ -v

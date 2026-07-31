@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import random
 
-from sdpm.layout.geometry import _count_all_crossings, _segments_cross
-from sdpm.layout.metrics import measure, score
-from sdpm.layout.render import build_layout, render_architecture
+from sdpm.engine.layout.geometry import _count_all_crossings, _segments_cross
+from sdpm.engine.layout.metrics import measure, score
+from sdpm.engine.layout.render import build_layout, render_architecture
 
 _ICONS = ["aws/lambda", "aws/s3", "aws/dynamodb", "aws/api-gateway",
           "aws/sqs", "aws/fargate", "material/person", "aws/cloudfront"]

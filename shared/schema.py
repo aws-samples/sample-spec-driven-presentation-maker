@@ -6,7 +6,7 @@ Security: AWS manages infrastructure security. You manage access control,
 data classification, and IAM policies. See SECURITY.md for details.
 
 Single source of truth for PK/SK patterns and GSI configuration.
-All DDB access in api/ and mcp-server/ should use these helpers
+All DDB access in api/ and servers/remote/ should use these helpers
 instead of hardcoding key strings.
 """
 

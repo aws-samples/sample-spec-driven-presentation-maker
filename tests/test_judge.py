@@ -1,6 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Tests for SVG-based layout judgments (sdpm.preview.judge).
+"""Tests for SVG-based layout judgments (sdpm.engine.preview.judge).
 
 Fixtures are minimal SVG documents mirroring real LibreOffice 26.x export
 structure (Slide/Page groups, TextPosition tspans with textLength,
@@ -11,8 +11,8 @@ step recorded in the spec notes; these tests pin the judgment logic.
 
 import textwrap
 
-from sdpm.preview.judge import JudgeIssue, contrast_ratio, judge_from_svg
-from sdpm.preview.measure import format_measure_report
+from sdpm.engine.preview.judge import JudgeIssue, contrast_ratio, judge_from_svg
+from sdpm.engine.preview.measure import format_measure_report
 
 
 def _svg_doc(slide_bodies: list[str], bg_fill: str = "rgb(10,22,40)") -> str:

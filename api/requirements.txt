@@ -5,7 +5,7 @@ pypdf>=4.0.0
 python-docx>=1.0.0
 openpyxl>=3.1.0
 # Required for PPTX upload-time conversion (shared/ingest._convert_pptx).
-# Mirrors skill/pyproject.toml because we copy skill/sdpm into the Lambda
+# Mirrors sdpm/pyproject.toml because we copy sdpm/sdpm into the Lambda
 # bundle without pip-installing the package itself.
 python-pptx>=1.0.0
 lxml>=5.0.0

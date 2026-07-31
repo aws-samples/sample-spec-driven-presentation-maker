@@ -5,7 +5,7 @@
 Security: AWS manages infrastructure security. You manage access control,
 data classification, and IAM policies. See SECURITY.md for details.
 
-Used by both api/ and mcp-server/ for Deck-level authorization.
+Used by both api/ and servers/remote/ for Deck-level authorization.
 
 Role resolution order:
   1. USER#{user_id} + DECK#{deck_id} exists → owner
@@ -150,7 +150,7 @@ def authorize(
 ) -> AccessDecision:
     """Authorize a user action on a Deck.
 
-    Single entry point for all Deck-level authorization across api/ and mcp-server/.
+    Single entry point for all Deck-level authorization across api/ and servers/remote/.
     Resolves the user's role via DynamoDB, then checks the permission matrix.
 
     Args:

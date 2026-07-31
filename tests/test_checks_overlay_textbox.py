@@ -1,10 +1,10 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Tests for sdpm.checks.overlay_textbox."""
+"""Tests for sdpm.engine.checks.overlay_textbox."""
 
 from __future__ import annotations
 
-from sdpm.checks.overlay_textbox import check_overlay_textbox
+from sdpm.engine.checks.overlay_textbox import check_overlay_textbox
 
 
 def _shape(**overrides):

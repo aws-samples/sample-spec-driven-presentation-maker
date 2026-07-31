@@ -1,14 +1,14 @@
 {
   "name": "sdpm-composer",
   "description": "sdpm slide composer (dispatched by the sdpm-vibe skill). Composes assigned slides from approved specs via the sdpm MCP server. No user interaction.",
-  "prompt": "file://{{CHECKOUT}}/agents/sdpm-composer.md",
+  "prompt": "file://{{CHECKOUT}}/personas/composer.md",
   "mcpServers": {
     "sdpm": {
       "command": "uv",
       "args": [
         "run",
         "--directory",
-        "{{CHECKOUT}}/mcp-local",
+        "{{CHECKOUT}}/servers/local",
         "python",
         "server.py"
       ],

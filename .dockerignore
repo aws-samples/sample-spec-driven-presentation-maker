@@ -13,8 +13,8 @@ __pycache__
 infra/cdk.out
 infra/node_modules
 
-# Layers not needed in mcp-server image
-mcp-local/
+# Layers not needed in the remote MCP server image
+servers/local/
 agent/
 web-ui/
 docs/
@@ -22,10 +22,9 @@ tests/
 scripts/
 .kiro/
 
-# Assets (large, not needed at runtime — served from S3)
-skill/assets/
-skill/templates/
-skill/references/
-skill/.venv
-skill/.ruff_cache
-skill/scripts/
+# Skill distribution: exclude everything the remote Dockerfile does not COPY.
+# NOTE: sdpm/references/ and sdpm/templates/ are COPY'd — keep them in context.
+sdpm/assets/
+sdpm/.venv
+sdpm/.ruff_cache
+sdpm/scripts/

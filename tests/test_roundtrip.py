@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from sdpm.api import generate
-from sdpm.converter.pipeline import pptx_to_json
+from sdpm.engine.converter.pipeline import pptx_to_json
 
 
 def _make_deck(tmp_path: Path, elements: list[dict], notes: str | None = None) -> Path:

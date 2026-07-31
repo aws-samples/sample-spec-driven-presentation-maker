@@ -231,7 +231,7 @@ function handler(event) {
             "bash", "-c",
             "pip install -r /asset-input/api/requirements.txt -t /asset-output/ && " +
             "cp -r /asset-input/api/* /asset-input/shared /asset-output/ && " +
-            "cp -r /asset-input/skill/sdpm /asset-output/sdpm",
+            "cp -r /asset-input/sdpm/sdpm /asset-output/sdpm",
           ],
           local: {
             tryBundle(outputDir: string): boolean {
@@ -250,7 +250,7 @@ function handler(event) {
               execSync(`cp -r ${root}/shared ${outputDir}/shared`, { stdio: "inherit" });
               // sdpm Engine — required by shared.ingest._convert_pptx for upload-time
               // PPTX → deck conversion (deck.json + slides/*.json + template.pptx).
-              execSync(`cp -r ${root}/skill/sdpm ${outputDir}/sdpm`, { stdio: "inherit" });
+              execSync(`cp -r ${root}/sdpm/sdpm ${outputDir}/sdpm`, { stdio: "inherit" });
               return true;
             },
           },

@@ -1,4 +1,4 @@
-[EN](../en/architecture.md) | [JA](../ja/architecture.md)
+[EN](../en/architecture.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
 
 # Architecture
 
@@ -22,14 +22,17 @@ Dependencies always flow top-down.
 
 ---
 
-## Layer 1: Skill (Engine)
+## Layer 1: Engine + Knowledge (`sdpm/`)
 
 The core presentation engine. No network, no AWS, no MCP — just Python.
 
-- **sdpm/** — Builder, layout engine, analyzer, converter, asset resolver
-- **references/** — Examples (slide patterns), workflows (phase instructions), guides (design rules)
-- **templates/** — Sample .pptx templates (dark/light)
-- **scripts/** — CLI entry point (`pptx_builder.py`), asset download scripts
+- **sdpm/sdpm/engine/** — json↔pptx conversion: builder, converter, layout engine, schema lint, preview, checks, diff, analyzer
+- **sdpm/sdpm/knowledge/** — knowledge retrieval: references (guides/workflows/examples) and asset search
+- **sdpm/sdpm/tools/** — the MCP tool contract: every tool's name, schema, docstring, and logic defined once; both servers register these functions directly
+- **sdpm/references/** — Examples (slide patterns), workflows (phase instructions), guides (design rules)
+- **sdpm/templates/** — Sample .pptx templates (dark/light)
+- **sdpm/scripts/** — CLI entry point (`pptx_builder.py`), asset download scripts
+- **personas/** (repo root) — canonical mode behaviors (vibe / spec / style / composer), served to MCP clients via `start_presentation(mode=...)`
 
 Key capabilities:
 - Analyze any .pptx template (layouts, colors, fonts, placeholders)
@@ -40,19 +43,19 @@ Key capabilities:
 
 ---
 
-## Layer 2: Local MCP Server
+## Layer 2: Local MCP Server (`servers/local/`)
 
-A thin MCP protocol wrapper around Layer 1. Runs as a stdio server.
+A thin bind of the `sdpm.tools` contract. Runs as a stdio server (plus an ACP variant for the local Web UI).
 
-- Exposes 17 tools via FastMCP
-- **MCP Server Instructions** — The server returns workflow constraints; compatible MCP hosts inject them into the system prompt automatically. Agents follow the spec-driven process without additional configuration.
+- Registers the contract tools via FastMCP — no tool logic of its own
+- **Mode behavior via `start_presentation(mode=...)`** — any MCP client (including ones with no skill/sub-agent mechanism, e.g. Claude Desktop) receives the vibe/spec/style/composer behavior as a tool response. Clients that read MCP Server Instructions also get the workflow menu automatically.
 - No AWS required — all files stored locally
 
 ---
 
 ## Layer 3: Remote MCP Server
 
-Layer 2 with storage swapped to Amazon DynamoDB + S3, plus authentication and authorization.
+The same `sdpm.tools` contract bound to an HTTP transport, with storage swapped to Amazon DynamoDB + S3 plus authentication and authorization. Bundled knowledge (references, templates, personas) is baked into the container image; only user data (decks, uploads, user templates/styles) lives in S3/DynamoDB.
 
 ```
 MCP Client → AgentCore Runtime → MCP Server Container

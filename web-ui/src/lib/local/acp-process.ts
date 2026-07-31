@@ -13,7 +13,7 @@ import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
 import { getActiveAgent, type AgentConfig } from "./acp-adapter"
 
 export { DECK_ROOT }
-const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
+const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
 const MAX_PROCESSES = 3
 
 type PendingResolve = (value: unknown) => void

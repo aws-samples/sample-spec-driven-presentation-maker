@@ -2,53 +2,107 @@
 
 # Principles
 
-## Architecture: 4-Layer Structure
+## Architecture
 
 ```
 Layer 4: Agent + Web UI (agent/, web-ui/)
   ↓ uses
-Layer 3: MCP Remote (mcp-server/)   ← AWS (S3/DynamoDB)
-  ↓ uses
-Skill Engine (skill/sdpm/)          ← Single source of business logic
+Layer 3: servers/remote   ← AWS (S3/DynamoDB), HTTP MCP
+  ↓ binds
+sdpm.tools (MCP tool contract — single definition)
+  ↑ binds
+Layer 2: servers/local    ← stdio MCP + ACP
   ↑ uses
-Layer 2: MCP Local (mcp-local/)
-  ↑ uses
-Layer 1: CLI (skill/scripts/pptx_builder.py)
+Layer 1: CLI (sdpm/scripts/pptx_builder.py) + sdpm/SKILL.md
 ```
 
 Layer 4 hosts the Strands Agent (SPEC agent + composer agents) and the React Web UI.
 The SPEC agent handles user dialogue (Phase 1). Composer agents handle slide generation
 (Phase 2+3) via the `compose_slides` tool (Agents as Tools pattern).
 
-## Engine (`skill/sdpm/`)
+Mode behavior (vibe / spec / style / composer) lives in `personas/*.md` and is
+served to MCP clients via `start_presentation(mode=...)`. Client-side files are thin
+wiring (composer sub-agent registration). Known exception until v0.5.x lands:
+the L4 agent still carries `agent/prompts/role/` (tracked as debt below).
 
-The PPTX generation engine. The single source of truth for all business logic.
+## Design Philosophy — Ports and Adapters
 
-- `sdpm.builder` — PPTX construction (slide generation, template processing)
-- `sdpm.preview` — Preview (PDF/PNG conversion, autofit, layout validation)
-- `sdpm.reference` — Reference document access
-- `sdpm.api` — High-level API (generate, preview, init, code_block)
-- `sdpm.analyzer`, `sdpm.converter`, `sdpm.layout`, `sdpm.utils` — Utilities
+The v0.5 structure is a deliberate Ports and Adapters (Hexagonal) architecture:
 
-## Skill (`skill/`)
+| Element | Pattern role |
+|---|---|
+| `sdpm.engine` / `sdpm.knowledge` | Core domain — pure logic, knows nothing about the outside |
+| `sdpm.api` | Facade over the core (generate / preview / init / code_block) |
+| `sdpm.tools` | The **port** — every operation defined once as a contract |
+| `servers/local` | Adapter: stdio MCP + ACP transport |
+| `servers/remote` | Adapter: HTTP MCP + AWS infrastructure (S3 / DynamoDB) |
+| CLI + `sdpm/SKILL.md` | Adapter: no-MCP path |
+| `agent/`, `web-ui/` | Outer applications consuming the port |
 
-Package containing Engine + CLI + reference documents + templates.
-Installed as `sdpm-skill` and consumed by Layer 2 and Layer 3.
+Rules that follow from this:
 
-## MCP Local (`mcp-local/`) — Layer 2
+1. **Dependency rule** — dependencies point inward only
+   (servers → tools → engine/knowledge). The core never imports from
+   servers, clients, or infra.
+2. **Adapters hold only transport/infrastructure differences.** If a piece of
+   logic is not about transport or storage, it belongs in the core.
+3. **Deliberate deviation: no storage port.** The core defines no Storage
+   abstraction; S3/DynamoDB live entirely inside `servers/remote`. This trades
+   hexagonal purity for one less abstraction — acceptable while there is a
+   single cloud backend. Revisit only if a second backend appears.
+4. **Personas are content, not client config** ("server-driven behavior").
+   Behavior is served through the port via `start_presentation(mode=...)`,
+   so client-side files stay minimal wiring and never duplicate behavior text.
+5. **Change-locality goal** — the structure is optimised so that:
+   prompt changes touch only `personas/`; engine changes touch only
+   `sdpm/sdpm/engine/`; a new client touches only `clients/`; a new tool
+   touches only `sdpm/sdpm/tools/`.
 
-MCP server for local environments. Must be a **thin wrapper**.
+Known debt against this philosophy (tracked for v0.5.x): `agent/prompts/role/`
+bypasses the personas port; `converter/elements.py` is a low-cohesion monolith
+inside the core; `api/index.py` has no test coverage.
 
-- Input: Convert MCP JSON params to Engine API arguments
-- Processing: Call Engine API (`sdpm.api.*`, `sdpm.reference.*`)
-- Output: Convert results to JSON strings
-- No independent logic (do not implement logic that doesn't exist in Engine API)
+## Engine & Knowledge (`sdpm/sdpm/`)
 
-## MCP Remote (`mcp-server/`) — Layer 3
+The single source of truth for all business logic, split into two peer subpackages:
 
-MCP server running on AWS with S3/DynamoDB dependencies.
+- `sdpm.engine` — json ↔ pptx conversion
+  (`builder`, `converter`, `layout`, `schema`, `preview`, `checks`, `diff`, `analyzer`)
+- `sdpm.knowledge` — knowledge storage & retrieval
+  (`reference`, `assets`)
+- `sdpm.api` — High-level API facade (generate, preview, init, code_block)
+- `sdpm.config` — Config + path anchors (ASSETS_DIR, REFERENCES_DIR, TEMPLATES_DIR, ...)
+- `sdpm.utils` — Shared utilities
 
-- Infrastructure-dependent operations (S3 Storage file access, etc.) may have independent implementations
+## Skill root (`sdpm/`)
+
+Distribution root containing the `sdpm` Python package + CLI + reference
+documents + templates. Installed as `sdpm-skill` and consumed by Layer 2 and Layer 3.
+
+## Tool contract (`sdpm.tools`)
+
+Every MCP tool is defined once here: name, signature, docstring, and logic
+(delegating to `sdpm.engine` / `sdpm.knowledge`). Servers register these
+functions directly (`mcp.tool()(tools.xxx)`) — never redefine a tool body
+in a server.
+
+`start_presentation(mode=...)` is part of the contract and serves
+`personas/*.md` to any MCP client.
+
+## Local server (`servers/local/`) — Layer 2
+
+stdio MCP + ACP server for local environments. Must be a **thin bind** of
+`sdpm.tools`. Local-transport specifics (session-scoped upload staging,
+browser style gallery, ACP hearing UI) are the only allowed additions.
+
+## Remote server (`servers/remote/`) — Layer 3
+
+HTTP MCP server running on AWS with S3/DynamoDB dependencies.
+
+- Binds contract tools where possible; workspace tools materialize the S3
+  deck into a tmpdir and delegate to `sdpm.api` (same code path as local)
+- Infrastructure-dependent operations (user templates/styles on S3, DynamoDB
+  records, presigned URLs, Code Interpreter) may have independent implementations
 - However, use Engine logic when equivalent functionality exists
 
 ## Logic Sharing Principles

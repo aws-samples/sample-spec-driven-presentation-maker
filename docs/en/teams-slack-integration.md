@@ -1,4 +1,4 @@
-[EN](../en/teams-slack-integration.md) | [JA](../ja/teams-slack-integration.md)
+[EN](../en/teams-slack-integration.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
 
 # Microsoft Teams & Slack Integration
 
