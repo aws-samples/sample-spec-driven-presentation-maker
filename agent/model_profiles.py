@@ -34,11 +34,16 @@ class ModelProfile:
         compose_capable: Whether the model has sufficient capability for
             slide generation (compose). Models below Sonnet-class should
             set this to ``False``.
+        max_tokens: Maximum output tokens per response. Without an explicit
+            value Bedrock applies a small model default, which truncates
+            long single-call outputs (e.g. writing specs/brief.md in one
+            run_python call) and surfaces as MaxTokensReachedException.
     """
 
     temperature: float | None = 0.1
     cache_strategy: Literal["auto", "none"] = "auto"
     compose_capable: bool = True
+    max_tokens: int | None = 32768
 
     def with_overrides(self, **kwargs) -> "ModelProfile":
         """Return a new profile with the given fields overridden.
@@ -55,6 +60,8 @@ class ModelProfile:
             kwargs["temperature"] = self.temperature
         if self.cache_strategy == "auto":
             kwargs["cache_config"] = CacheConfig(strategy="auto")
+        if self.max_tokens is not None:
+            kwargs["max_tokens"] = self.max_tokens
         return kwargs
 
 
@@ -78,16 +85,20 @@ CLAUDE_EXTENDED_THINKING = ModelProfile(temperature=None, cache_strategy="auto")
 CLAUDE_ADAPTIVE_THINKING = ModelProfile(temperature=1.0, cache_strategy="auto")
 
 # Amazon Nova 2 — supports prompt caching.
-NOVA_2_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="auto", compose_capable=False)
+NOVA_2_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="auto", compose_capable=False,
+                              max_tokens=8192)
 
 # DeepSeek — prompt caching not supported on Bedrock at time of writing.
-DEEPSEEK_DEFAULT = ModelProfile(temperature=0.6, cache_strategy="none", compose_capable=False)
+DEEPSEEK_DEFAULT = ModelProfile(temperature=0.6, cache_strategy="none", compose_capable=False,
+                                max_tokens=8192)
 
 # Qwen — prompt caching not supported on Bedrock at time of writing.
-QWEN_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="none", compose_capable=False)
+QWEN_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="none", compose_capable=False,
+                            max_tokens=8192)
 
 # Moonshot Kimi — prompt caching not supported on Bedrock at time of writing.
-KIMI_DEFAULT = ModelProfile(temperature=0.6, cache_strategy="none", compose_capable=False)
+KIMI_DEFAULT = ModelProfile(temperature=0.6, cache_strategy="none", compose_capable=False,
+                            max_tokens=8192)
 
 # OpenAI GPT — bedrock-mantle only (Responses API endpoint).
 GPT_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="none")

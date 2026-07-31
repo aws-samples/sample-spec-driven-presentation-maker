@@ -3,6 +3,7 @@
 # Spec-Driven Presentation Maker
 
 [![License: MIT-0](https://img.shields.io/badge/License-MIT--0-yellow.svg)](LICENSE)
+[![CI](https://github.com/aws-samples/sample-spec-driven-presentation-maker/actions/workflows/ci.yml/badge.svg)](https://github.com/aws-samples/sample-spec-driven-presentation-maker/actions/workflows/ci.yml)
 
 An open-source toolkit for creating presentations using a spec-driven approach.
 Design "what to communicate" first, then let AI build "how to present it."

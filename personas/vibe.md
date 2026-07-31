@@ -162,9 +162,14 @@ Each group runs as an independent composer in parallel. Groups cannot share info
 
 1. **Consistency review pass**: dispatch a single composer with ALL slugs in the deck
    and the instruction: "Consistency review."
-2. **Verification**: check the `preview_files` returned from the consistency review's
-   `run_python(save=True)` calls. Look for individual-slide defects: text overflow,
-   element overlap, broken layout, alignment issues.
+2. **Verification**: view the post-review renders yourself. If you composed
+   sequentially, use the `preview_files` returned from your `run_python(save=True)`
+   calls. If you dispatched composers, their tool results are not visible to you —
+   view the previews another way (the one exception to "do not call preview tools
+   directly"): call `get_preview(deck_id, slugs=[...all slugs...])` if that tool
+   exists, otherwise read the PNG files at `<deck>/preview/<slug>.png` with your
+   client's image-capable file reader. Look for individual-slide defects: text
+   overflow, element overlap, broken layout, alignment issues.
 3. **Per-slide fix pass** (only if defects found): dispatch composers again with
    parallel groups, one per affected slide. Describe the problem, not the solution:
    - ✅ "text overflows the card on data-points"

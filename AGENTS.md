@@ -50,8 +50,8 @@ See [Architecture](docs/en/architecture.md).
 ## Conventions
 
 - Engine source of truth: `sdpm/sdpm/` — servers must stay thin binds of `sdpm.tools`
-- Persona text lives only in `personas/*.md` for L1–L3; client-side files are thin wiring
-  (known exception: the L4 agent's `agent/prompts/role/` — being folded into personas in v0.5.x)
+- Persona text lives only in `personas/*.md` — all layers including the L4 agent fetch
+  it via `start_presentation(mode=...)`; client/agent-side files are thin wiring
   (a Kiro/CC composer definition should never duplicate behavior text)
 - Slide spec: JSON — schema and examples in `sdpm/references/`
 - Python: always `uv run`, never bare `python`

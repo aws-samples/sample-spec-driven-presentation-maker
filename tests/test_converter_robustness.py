@@ -173,7 +173,7 @@ def builder_first_layout(builder) -> str:
 
 class TestDiffDetectsPlaceholderEdits:
     def test_title_placeholder_edit_is_reported(self, tmp_path):
-        from sdpm.engine.diff import diff_report
+        from sdpm.api import diff_report
 
         base = {"slides": [{"layout": "L", "placeholders": {"0": "original title"}, "elements": []}]}
         edit = {"slides": [{"layout": "L", "placeholders": {"0": "edited title"}, "elements": []}]}
