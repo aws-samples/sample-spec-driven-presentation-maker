@@ -15,6 +15,7 @@ MODEL_NOT_READY = "model_not_ready"
 SERVICE_UNAVAILABLE = "service_unavailable"
 AUTH = "auth"
 BAD_INPUT = "bad_input"
+MAX_OUTPUT = "max_output"
 INTERNAL = "internal"
 
 _PATTERNS: list[tuple[tuple[str, ...], str]] = [
@@ -25,6 +26,7 @@ _PATTERNS: list[tuple[tuple[str, ...], str]] = [
     (("ServiceUnavailable",), SERVICE_UNAVAILABLE),
     (("ExpiredToken", "AccessDenied", "UnrecognizedClient", "invalid_token"), AUTH),
     (("ValidationException",), BAD_INPUT),
+    (("MaxTokensReachedException", "maximum token limit"), MAX_OUTPUT),
 ]
 
 

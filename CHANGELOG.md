@@ -10,6 +10,15 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cloud agent output-token limit**: model profiles now set an explicit
+  `max_tokens` (Claude 32768, others 8192) — Bedrock's small default truncated
+  long single-call outputs (e.g. writing `specs/brief.md` from a long article)
+  and killed the turn with a generic error. `MaxTokensReachedException` is also
+  classified now (`max_output`) so the Web UI shows an actionable message
+  instead of "something went wrong".
+
 ### Changed
 
 - **L4 agent personas unified**: the cloud agent (Strands) now fetches mode
