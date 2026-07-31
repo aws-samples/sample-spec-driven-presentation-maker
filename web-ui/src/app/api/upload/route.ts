@@ -47,7 +47,7 @@ function runUploadFile(sessionId: string, filePath: string, fileName: string): P
       "import sys, json",
       "sys.path.insert(0, '.')",
       "sys.path.insert(0, '..')",
-      "sys.path.insert(0, '../skill')",
+      "sys.path.insert(0, '../sdpm')",
       "from upload_tools import upload_file",
       `print(upload_file(${JSON.stringify(sessionId)}, ${JSON.stringify(filePath)}, ${JSON.stringify(fileName)}))`,
     ].join("\n")

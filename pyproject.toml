@@ -18,7 +18,7 @@ dev = [
     "Pillow",
     "qrcode",
     "pygments>=2.19.2",
-    "mcp[cli]",
+    "mcp[cli]>=1.28.1,<2",
     "boto3",
 ]
 

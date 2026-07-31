@@ -62,9 +62,9 @@
   },
   "prompt": "file://../../../../personas/composer.md",
   "resources": [
-    "file://../../../skill/references/workflows/create-new-2-compose.md",
-    "file://../../../skill/references/workflows/create-new-3-review.md",
-    "file://../../../skill/references/workflows/slide-json-spec.md",
-    "file://../../../skill/references/guides/grid.md"
+    "file://../../../../sdpm/references/workflows/create-new-2-compose.md",
+    "file://../../../../sdpm/references/workflows/create-new-3-review.md",
+    "file://../../../../sdpm/references/workflows/slide-json-spec.md",
+    "file://../../../../sdpm/references/guides/grid.md"
   ]
 }

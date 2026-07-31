@@ -85,8 +85,8 @@
   },
   "welcomeMessage": "Drop a URL, paste text, or describe what you want — I'll turn it into slides.",
   "resources": [
-    "file://../../../skill/references/workflows/create-new-1-briefing.md",
-    "file://../../../skill/references/workflows/create-new-1-outline.md",
-    "file://../../../skill/references/workflows/create-new-1-art-direction.md"
+    "file://../../../../sdpm/references/workflows/create-new-1-briefing.md",
+    "file://../../../../sdpm/references/workflows/create-new-1-outline.md",
+    "file://../../../../sdpm/references/workflows/create-new-1-art-direction.md"
   ]
 }

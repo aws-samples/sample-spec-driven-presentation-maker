@@ -14,7 +14,7 @@
   },
   "prompt": "file://../../../../personas/spec.md",
   "resources": [
-    "file://../../../skill/references/workflows/create-new-1-briefing.md"
+    "file://../../../../sdpm/references/workflows/create-new-1-briefing.md"
   ],
   "tools": [
     "@sdpm/analyze_template",

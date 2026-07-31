@@ -36,7 +36,7 @@
     "web_search"
   ],
   "resources": [
-    "file://../../../skill/references/workflows/create-style.md"
+    "file://../../../../sdpm/references/workflows/create-style.md"
   ],
   "welcomeMessage": "What style would you like to create?"
 }
