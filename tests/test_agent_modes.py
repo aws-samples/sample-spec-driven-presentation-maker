@@ -121,3 +121,15 @@ def test_compose_report_wiring_is_l4_delta_only():
     for mode in ("separated", "vibe"):
         values = [p.source.value for p in MODES[mode].parts if p.source.type == "file"]
         assert "wiring/compose_report" in values
+
+
+def test_style_creator_carries_remote_sandbox_wiring():
+    """The style persona documents the local read_style/write_style sandbox;
+    Remote's run_style_python uses style_name/save/ref_styles instead, so L4
+    must inject the adapter-specific I/O as wiring (review finding, PR #231).
+    """
+    values = [p.source.value for p in MODES["style_creator"].parts if p.source.type == "file"]
+    assert "wiring/style_remote" in values
+    wiring_text = (_PROMPTS_DIR / "wiring" / "style_remote.md").read_text(encoding="utf-8")
+    for token in ("style_name", "save=True", "ref_styles"):
+        assert token in wiring_text

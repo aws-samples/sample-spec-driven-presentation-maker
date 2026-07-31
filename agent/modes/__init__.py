@@ -134,6 +134,9 @@ MODES: dict[str, ModeConfig] = {
         parts=[
             _COMMON_LANGUAGE,
             _persona("style"),
+            # Remote's run_style_python has different sandbox I/O than the
+            # local server the persona documents (no read_style/write_style)
+            Part(Source.file("wiring/style_remote"), target="system"),
             _NOW,
             Part(
                 Source.mcp("read_workflows", {"names": ["create-style"]}),

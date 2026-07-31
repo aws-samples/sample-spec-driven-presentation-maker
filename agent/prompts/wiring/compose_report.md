@@ -16,3 +16,12 @@ method 1 in your behavior instructions). It returns a JSON report:
 `status: "cancelled"` means the user intentionally stopped the run: relay
 `notice` and `summaries` in plain text, do NOT retry or call further tools,
 and skip the Post-Compose Workflow (per your Cancellation instructions).
+
+### Post-compose verification (this environment)
+
+You cannot see the composers' own tool results (their `preview_files` stay
+inside each composer). After the consistency-review pass completes, call
+`get_preview(deck_id, slugs=[...all slugs...])` yourself to see the
+post-review rendering — this is the one exception to "do not call preview
+tools directly", and it is how you perform the Verification step of your
+Post-Compose Workflow before deciding on a per-slide fix pass.
