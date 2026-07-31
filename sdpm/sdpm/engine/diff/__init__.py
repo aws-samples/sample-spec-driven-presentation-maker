@@ -1,14 +1,13 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Slide diff: compare two slide JSONs/PPTXs and show changes."""
+"""Slide diff: pure comparison of two loaded slide structures.
+
+This module is core engine logic — it operates only on already-loaded
+dicts. Loading/building the inputs (deck directories, source JSONs, PPTX
+roundtrips) is facade orchestration and lives in :func:`sdpm.api.diff_report`.
+"""
 import json
 import re
-import subprocess
-import sys
-import tempfile
-from pathlib import Path
-
-from sdpm.config import SCRIPTS_DIR
 
 
 def _elem_x(elem):
@@ -136,116 +135,18 @@ def align_slides(base_slides, edit_slides, threshold=0.1):
     return result
 
 
-def _load_deck_as_roundtrip(deck_dir: Path) -> dict:
-    """Load deck-structure output (deck.json + slides/*.json) as a single roundtrip dict.
+def diff_slides(base: dict, edit: dict) -> dict:
+    """Compare two loaded slide structures and return a hand-edit diff report.
 
-    Restores the legacy {slides: [...], fonts, defaultTextColor} shape that the diff
-    algorithms expect. Slides are ordered by filename (slide-01, slide-02, ...).
-    """
-    deck_json = deck_dir / "deck.json"
-    slides_dir = deck_dir / "slides"
-    data: dict = {}
-    if deck_json.exists():
-        with open(deck_json) as f:
-            data = json.load(f)
-    slides: list = []
-    if slides_dir.is_dir():
-        for slide_file in sorted(slides_dir.glob("slide-*.json")):
-            with open(slide_file) as f:
-                slides.append(json.load(f))
-    data["slides"] = slides
-    return data
-
-
-def load_slides_json_or_pptx(path):
-    """Load roundtrip slides JSON from a deck directory, .json, or .pptx."""
-    path_obj = Path(path)
-    if path_obj.is_dir():
-        # Deck-structure directory (deck.json + slides/*.json + specs/outline.md):
-        # build via the canonical pipeline (outline.md ordering, includes,
-        # overrides), then roundtrip the built PPTX so both sides of the diff
-        # compare in roundtrip shape.
-        from sdpm.api import generate
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_pptx = Path(tmpdir) / "baseline.pptx"
-            generate(path_obj, output_path=tmp_pptx)
-            rt_dir = Path(tmpdir) / "rt"
-            subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                [sys.executable, str(SCRIPTS_DIR / 'pptx_to_json.py'), str(tmp_pptx), '-o', str(rt_dir)],
-                capture_output=True, text=True, check=True
-            )
-            return _load_deck_as_roundtrip(rt_dir)
-    if str(path).endswith('.pptx'):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                [sys.executable, str(SCRIPTS_DIR / 'pptx_to_json.py'), path, '-o', tmpdir],
-                capture_output=True, text=True, check=True
-            )
-            # New deck-structure output: deck.json + slides/slide-NN.json
-            return _load_deck_as_roundtrip(Path(tmpdir))
-    with open(path) as f:
-        data = json.load(f)
-    # Check if this is a source JSON (not already a roundtrip JSON) by looking
-    # for builder-specific keys in any slide's elements
-    is_source = any(
-        any(k in el for k in ("text", "src", "chartData", "include"))
-        for s in data.get("slides", [])
-        for el in s.get("elements", [])
-        if not isinstance(el, str) and "_comment" not in el
-    )
-    # Also treat as source if slides have layout/title but no elements (title, agenda, section, etc.)
-    if not is_source:
-        is_source = any(
-            s.get("layout") in ("title", "agenda", "section", "subsection", "thankyou")
-            and not s.get("elements")
-            for s in data.get("slides", [])
-        )
-    if is_source:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_pptx = Path(tmpdir) / "tmp.pptx"
-            from sdpm.api import _find_template_in_dirs, get_templates_dirs
-            from sdpm.engine.builder import PPTXBuilder, resolve_override
-            tpl_name = data.get("template")
-            if not tpl_name:
-                raise ValueError("No \"template\" specified in JSON. Cannot build for diff.")
-            template = Path(path).parent / tpl_name
-            if not template.exists():
-                named = _find_template_in_dirs(tpl_name, get_templates_dirs())
-                if named is not None:
-                    template = named
-                else:
-                    raise FileNotFoundError(f"Template not found: '{tpl_name}'. Use list_templates to see available templates.")
-            builder = PPTXBuilder(template, fonts=data.get("fonts"), base_dir=Path(path).parent,
-                                  default_text_color=data.get("defaultTextColor", "#FFFFFF"))
-            id_map = {s["id"]: s for s in data.get("slides", []) if "id" in s}
-            for slide_def in data.get("slides", []):
-                builder.add_slide(resolve_override(slide_def, id_map))
-            builder.save(tmp_pptx)
-            subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                [sys.executable, str(SCRIPTS_DIR / 'pptx_to_json.py'), str(tmp_pptx), '-o', tmpdir],
-                capture_output=True, text=True, check=True
-            )
-            return _load_deck_as_roundtrip(Path(tmpdir))
-    return data
-
-
-def diff_report(baseline, edited) -> dict:
-    """Compare two decks/JSONs/PPTXs and return a hand-edit diff report.
-
-    The canonical implementation behind ``pptx_builder.py diff`` and the
-    MCP ``diff_pptx`` tool.
-
-    Args:
-        baseline: Deck directory, slides JSON, or PPTX (the original).
-        edited: Deck directory, slides JSON, or PPTX (the hand-edited one).
+    Pure comparison — both arguments are roundtrip-shaped dicts
+    (``{"slides": [...], ...}``). To diff paths (deck directory, JSON, or
+    PPTX), use :func:`sdpm.api.diff_report`, which loads/builds the inputs
+    and delegates here.
 
     Returns:
         Dict with ``has_diff`` (bool) and ``report`` (human-readable text,
         one section per changed/added/removed slide).
     """
-    base = load_slides_json_or_pptx(str(baseline))
-    edit = load_slides_json_or_pptx(str(edited))
-
     base_slides = base.get("slides", [])
     edit_slides = edit.get("slides", [])
     skip_keys = {"masterIndex", "_comment"}

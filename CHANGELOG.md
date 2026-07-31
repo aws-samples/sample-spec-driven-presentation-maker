@@ -19,6 +19,10 @@ Entries before v0.5.0 were written retroactively as summaries.
   only transport-specific wiring (attachment wire format, `compose_slides`
   report format) remains in `agent/prompts/`. Prompt changes now touch only
   `personas/` for all layers.
+- **Internal API move**: `sdpm.engine.diff.diff_report` / `load_slides_json_or_pptx`
+  moved to `sdpm.api` (dependency-rule fix; `engine.diff` now exposes the pure
+  `diff_slides(base, edit)`). These were internal APIs — update imports if you
+  consumed them directly.
 
 ## [0.5.0] - 2026-07-31
 

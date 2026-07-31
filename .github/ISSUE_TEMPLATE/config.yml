@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security issue
+    url: https://github.com/aws-samples/sample-spec-driven-presentation-maker/blob/main/CONTRIBUTING.md#security-issue-notifications
+    about: Please do NOT file a public issue for potential vulnerabilities — follow the security reporting process instead.

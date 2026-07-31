@@ -59,7 +59,11 @@ def start_presentation(mode: str = "") -> str:
     if not persona_path.exists():
         raise FileNotFoundError(
             f"Persona file not found: {persona_path}. "
-            "The personas/ directory must ship alongside the skill root."
+            "The personas/ directory must ship alongside the skill root. "
+            "If you moved or renamed the checkout, your MCP client config may "
+            "still point at the old path — re-register the server (e.g. "
+            "`make install-kiro`) or set SDPM_SKILL_ROOT. Run `make doctor` "
+            "in the checkout to diagnose."
         )
     return persona_path.read_text(encoding="utf-8")
 
@@ -468,7 +472,7 @@ def diff_pptx(baseline: str, edited: str) -> dict[str, Any]:
         Dict with has_diff (bool) and report (per-slide changed / added /
         removed elements and properties).
     """
-    from sdpm.engine.diff import diff_report
+    from sdpm.api import diff_report
     for p in (baseline, edited):
         if not Path(p).exists():
             raise FileNotFoundError(f"Not found: {p}")

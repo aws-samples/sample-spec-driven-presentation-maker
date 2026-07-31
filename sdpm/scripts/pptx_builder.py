@@ -608,7 +608,7 @@ def cmd_grid(args):
 
 def cmd_diff(args):
     """Compare two slide JSONs (or PPTXs) and show manual edit changes."""
-    from sdpm.engine.diff import diff_report
+    from sdpm.api import diff_report
     result = diff_report(args.baseline, args.edited)
     print(result["report"])
 
