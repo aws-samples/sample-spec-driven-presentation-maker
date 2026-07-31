@@ -10,6 +10,16 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Changed
+
+- **L4 agent personas unified**: the cloud agent (Strands) now fetches mode
+  behavior from `personas/*.md` through the same `start_presentation(mode=...)`
+  port as every other client, instead of carrying its own copies in
+  `agent/prompts/role/`. Duplicated role/workflow prompt files were removed;
+  only transport-specific wiring (attachment wire format, `compose_slides`
+  report format) remains in `agent/prompts/`. Prompt changes now touch only
+  `personas/` for all layers.
+
 ## [0.5.0] - 2026-07-31
 
 Breaking architecture cleanup. No changes to the slide JSON schema — existing

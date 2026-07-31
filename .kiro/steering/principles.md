@@ -22,8 +22,10 @@ The SPEC agent handles user dialogue (Phase 1). Composer agents handle slide gen
 
 Mode behavior (vibe / spec / style / composer) lives in `personas/*.md` and is
 served to MCP clients via `start_presentation(mode=...)`. Client-side files are thin
-wiring (composer sub-agent registration). Known exception until v0.5.x lands:
-the L4 agent still carries `agent/prompts/role/` (tracked as debt below).
+wiring (composer sub-agent registration). The L4 agent fetches personas through the
+same port (`Source.mcp("start_presentation", ...)` in `agent/modes/`); only
+transport-specific wiring (attachment wire format, compose_slides report format)
+lives in `agent/prompts/`.
 
 ## Design Philosophy — Ports and Adapters
 
@@ -58,8 +60,8 @@ Rules that follow from this:
    `sdpm/sdpm/engine/`; a new client touches only `clients/`; a new tool
    touches only `sdpm/sdpm/tools/`.
 
-Known debt against this philosophy (tracked for v0.5.x): `agent/prompts/role/`
-bypasses the personas port; `converter/elements.py` is a low-cohesion monolith
+Known debt against this philosophy (tracked for v0.5.x):
+`converter/elements.py` is a low-cohesion monolith
 inside the core; `api/index.py` has no test coverage.
 
 ## Engine & Knowledge (`sdpm/sdpm/`)
