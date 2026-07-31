@@ -23,6 +23,7 @@ AUTH = _errors.AUTH
 BAD_INPUT = _errors.BAD_INPUT
 CONVERSATION_TOO_LONG = _errors.CONVERSATION_TOO_LONG
 INTERNAL = _errors.INTERNAL
+MAX_OUTPUT = _errors.MAX_OUTPUT
 MODEL_NOT_READY = _errors.MODEL_NOT_READY
 SERVICE_UNAVAILABLE = _errors.SERVICE_UNAVAILABLE
 THROTTLED = _errors.THROTTLED
@@ -47,6 +48,11 @@ class TestClassifyError:
     def test_auth_from_exception(self):
         assert classify_error(Exception("ExpiredToken")) == AUTH
 
+    def test_max_output_tokens(self):
+        assert classify_error(
+            "MaxTokensReachedException: Model stopped generating due to maximum token limit."
+        ) == MAX_OUTPUT
+
     def test_unknown_is_internal(self):
         assert classify_error("mystery failure") == INTERNAL
 
@@ -68,7 +74,7 @@ class TestTypeScriptParity:
         ts = _TS_SOURCE.read_text()
         py_codes = {
             CONVERSATION_TOO_LONG, THROTTLED, TIMEOUT, MODEL_NOT_READY,
-            SERVICE_UNAVAILABLE, AUTH, BAD_INPUT, INTERNAL,
+            SERVICE_UNAVAILABLE, AUTH, BAD_INPUT, MAX_OUTPUT, INTERNAL,
         }
         for code in py_codes:
             assert f'"{code}"' in ts, f"code {code!r} missing from agentErrors.ts"
@@ -81,7 +87,7 @@ class TestTypeScriptParity:
         ts_codes = set(re.findall(r'"([a-z_]+)"', union.group(1)))
         py_codes = {
             CONVERSATION_TOO_LONG, THROTTLED, TIMEOUT, MODEL_NOT_READY,
-            SERVICE_UNAVAILABLE, AUTH, BAD_INPUT, INTERNAL,
+            SERVICE_UNAVAILABLE, AUTH, BAD_INPUT, MAX_OUTPUT, INTERNAL,
         }
         assert ts_codes == py_codes, (
             f"code sets differ — TS only: {ts_codes - py_codes}, Python only: {py_codes - ts_codes}"
