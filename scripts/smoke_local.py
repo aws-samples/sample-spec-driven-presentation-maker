@@ -59,9 +59,17 @@ async def main() -> None:
             )
 
 
+# Hard cap so a hung server start fails fast instead of eating the CI
+# job's default 6-hour limit.
+_TIMEOUT_SECONDS = 120
+
+
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        asyncio.run(asyncio.wait_for(main(), timeout=_TIMEOUT_SECONDS))
     except AssertionError as e:
         print(f"SMOKE FAILED: {e}", file=sys.stderr)
+        sys.exit(1)
+    except asyncio.TimeoutError:  # alias of TimeoutError on 3.11+, distinct on 3.10
+        print(f"SMOKE FAILED: timed out after {_TIMEOUT_SECONDS}s (server hang?)", file=sys.stderr)
         sys.exit(1)

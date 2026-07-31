@@ -28,6 +28,7 @@ jobs:
   # suite mocks this surface, so regressions here used to slip through.
   local-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
