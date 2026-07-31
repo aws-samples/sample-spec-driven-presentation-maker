@@ -3,10 +3,10 @@
 all: lint test
 
 lint:
-	ruff check sdpm/ servers/ shared/ api/
+	ruff check sdpm/ servers/ shared/ api/ agent/
 
 format:
-	ruff format sdpm/ servers/ shared/ api/
+	ruff format sdpm/ servers/ shared/ api/ agent/
 
 test:
 	python -m pytest tests/ -v
