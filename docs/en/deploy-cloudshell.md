@@ -1,4 +1,4 @@
-[EN](../en/deploy-cloudshell.md) | [JA](../ja/deploy-cloudshell.md)
+[EN](../en/deploy-cloudshell.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
 
 # spec-driven-presentation-maker Deploy Guide
 

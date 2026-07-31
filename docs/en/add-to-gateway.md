@@ -1,4 +1,4 @@
-[EN](../en/add-to-gateway.md) | [JA](../ja/add-to-gateway.md)
+[EN](../en/add-to-gateway.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
 
 # Connecting Agents
 

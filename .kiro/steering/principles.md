@@ -20,9 +20,10 @@ Layer 4 hosts the Strands Agent (SPEC agent + composer agents) and the React Web
 The SPEC agent handles user dialogue (Phase 1). Composer agents handle slide generation
 (Phase 2+3) via the `compose_slides` tool (Agents as Tools pattern).
 
-Mode behavior (vibe / spec / style / composer) lives ONLY in `personas/*.md` and is
+Mode behavior (vibe / spec / style / composer) lives in `personas/*.md` and is
 served to MCP clients via `start_presentation(mode=...)`. Client-side files are thin
-wiring (composer sub-agent registration).
+wiring (composer sub-agent registration). Known exception until v0.5.x lands:
+the L4 agent still carries `agent/prompts/role/` (tracked as debt below).
 
 ## Design Philosophy — Ports and Adapters
 

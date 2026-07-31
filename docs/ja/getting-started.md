@@ -6,7 +6,7 @@ spec-driven-presentation-maker をローカル利用から AWS デプロイま�
 
 > **🤖 手動で読み進める必要はありません。** このリポジトリには [`AGENTS.md`](../../AGENTS.md) と [`CLAUDE.md`](../../CLAUDE.md) を同梱しています。お使いのコーディングエージェント（Claude Code, Codex CLI, Cursor, Kiro, VS Code の GitHub Copilot 等）に、例えば「このリポジトリをセットアップして」「AWS にデプロイして」「Layer 2 として Claude Desktop から使えるようにして」と話しかけてください。エージェントが AGENTS.md を読み取り、適切なレイヤーとコマンドを自動で選んで進めます。
 
-> **🚀 AWS へのデプロイだけを行いたい場合:** [ワンクリックデプロイ](../en/deploy-cloudshell.md#ワンクリックデプロイ推奨) が最も簡単です。AWS コンソールにログインし、Launch Stack ボタンを押してパラメータを入力するだけで完了します。外部 IdP 連携や WAF 設定など高度なカスタマイズが必要な場合は [CloudShell を使ったデプロイ](../en/deploy-cloudshell.md#cloudshell-を使ったデプロイ) を参照してください。本ページは、Layer 1〜2 のローカル利用や、ローカル CDK を使った開発・デバッグ向けの手順を含みます。
+> **🚀 AWS へのデプロイだけを行いたい場合:** [ワンクリックデプロイ](../en/deploy-cloudshell.md#one-click-deploy-recommended) が最も簡単です。AWS コンソールにログインし、Launch Stack ボタンを押してパラメータを入力するだけで完了します。外部 IdP 連携や WAF 設定など高度なカスタマイズが必要な場合は [CloudShell を使ったデプロイ](../en/deploy-cloudshell.md#deploy-using-cloudshell) を参照してください。本ページは、Layer 1〜2 のローカル利用や、ローカル CDK を使った開発・デバッグ向けの手順を含みます。
 
 ## どのレイヤーを使うべきか
 
@@ -117,7 +117,7 @@ uv run python server.py
 4. スライドを 1 枚ずつ構築
 5. PPTX を生成し、プレビューを表示
 
-利用可能なツールの一覧は[アーキテクチャ — MCP ツール一覧](../en/architecture.md#mcp-ツール一覧)を参照してください。
+利用可能なツールの一覧は[アーキテクチャ — MCP ツール一覧](../en/architecture.md#mcp-tool-reference)を参照してください。
 
 ---
 
@@ -191,7 +191,7 @@ npx cdk deploy --all --context modelId=global.anthropic.claude-opus-4-6-v1
 ### テンプレートの登録
 
 CDK はテンプレートファイルを S3 にデプロイしますが、`list_templates` で表示するには Amazon DynamoDB への登録が必要です。
-詳細は[カスタムテンプレート — テンプレートの登録（Layer 3）](../en/custom-template.md#layer-3リモート-mcp)を参照してください。
+詳細は[カスタムテンプレート — テンプレートの登録（Layer 3）](../en/custom-template.md#layer-3-remote-mcp)を参照してください。
 
 ### デプロイの確認
 
@@ -266,7 +266,7 @@ npx cdk deploy --all
 
 `agent` または `webUi` を有効にすると、CDK が Amazon Cognito User Pool（ホスト UI 付き）を自動作成します。ユーザーは Web UI からサインインし、JWT がスタック全体に伝播されます。
 
-認証・認可モデルの設計詳細は[アーキテクチャ — 認証・認可モデル](../en/architecture.md#認証認可モデル)を参照してください。
+認証・認可モデルの設計詳細は[アーキテクチャ — 認証・認可モデル](../en/architecture.md#authentication-and-authorization-model)を参照してください。
 
 #### 外部 OIDC IdP
 

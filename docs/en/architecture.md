@@ -1,4 +1,4 @@
-[EN](../en/architecture.md) | [JA](../ja/architecture.md)
+[EN](../en/architecture.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
 
 # Architecture
 

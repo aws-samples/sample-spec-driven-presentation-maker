@@ -1,4 +1,4 @@
-[EN](../en/custom-template.md) | [JA](../ja/custom-template.md)
+[EN](../en/custom-template.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
 
 # Custom Templates, Styles, and Assets
 
