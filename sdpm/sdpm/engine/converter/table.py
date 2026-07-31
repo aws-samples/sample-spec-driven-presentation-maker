@@ -4,7 +4,7 @@
 import sys
 import zipfile
 
-from .constants import _NS, EMU_PER_PX, _base_element, _hex
+from .constants import _NS, get_emu_per_px, _base_element, _hex
 from .color import _resolve_scheme_color, _apply_tint, _apply_shade, extract_text_color
 from .xml_helpers import _extract_fill_from_xml
 from .text import _extract_styled_text
@@ -42,6 +42,7 @@ def _cell_lststyle_color(tc, theme_colors, color_mapping):
 
 def _extract_cell(cell, theme_colors=None, color_mapping=None):
     """Extract cell as string (text only) or dict (has extra properties)."""
+    emu_per_px = get_emu_per_px()
     tc = cell._tc
     tc_pr = tc.find('a:tcPr', _NS)
     tf = cell.text_frame
@@ -149,7 +150,7 @@ def _extract_cell(cell, theme_colors=None, color_mapping=None):
         for attr, key in [('marL', 'left'), ('marR', 'right'), ('marT', 'top'), ('marB', 'bottom')]:
             v = tc_pr.get(attr)
             if v:
-                padding[key] = round(int(v) / EMU_PER_PX)
+                padding[key] = round(int(v) / emu_per_px)
         if padding:
             props["padding"] = padding
 
@@ -319,14 +320,15 @@ def _apply_style_to_cell(cell_val, style_info):
 
 def extract_table_element(shape, theme_colors=None, color_mapping=None, pptx_path=None):
     """Extract table as element dict with CSS-style property names."""
+    emu_per_px = get_emu_per_px()
     try:
         table = shape.table
         tbl_elem = table._tbl
 
         elem = _base_element(shape, "table")
 
-        elem["colWidths"] = [round(col.width / EMU_PER_PX) for col in table.columns]
-        elem["rowHeights"] = [round(row.height / EMU_PER_PX) for row in table.rows]
+        elem["colWidths"] = [round(col.width / emu_per_px) for col in table.columns]
+        elem["rowHeights"] = [round(row.height / emu_per_px) for row in table.rows]
 
         # Read table style properties for style resolution
         tbl_pr = tbl_elem.find('a:tblPr', _NS)

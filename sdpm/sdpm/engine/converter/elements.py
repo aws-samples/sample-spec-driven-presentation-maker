@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pptx.enum.shapes import MSO_SHAPE, MSO_SHAPE_TYPE
 
-from .constants import _NS, EMU_PER_PX, _base_element, _add_flip, _serialize_lstStyle, _hex
+from .constants import _NS, get_emu_per_px, _base_element, _add_flip, _serialize_lstStyle, _hex
 from .color import _resolve_color_with_transforms
 from .xml_helpers import (extract_line_dash, _resolve_line_from_style, _extract_fill_from_xml,
                           _extract_line_from_xml, _extract_effects_from_xml, _extract_visual_effects)
@@ -70,12 +70,13 @@ def _resolve_shape_name(shape):
 
 def extract_line_element(shape, theme_colors=None, color_mapping=None, theme_styles=None):
     """Extract line/connector as element dict."""
+    emu_per_px = get_emu_per_px()
     try:
         # Build x1/y1/x2/y2 from bounding box + flip
-        x = round(shape.left / EMU_PER_PX)
-        y = round(shape.top / EMU_PER_PX)
-        w = round(shape.width / EMU_PER_PX)
-        h = round(shape.height / EMU_PER_PX)
+        x = round(shape.left / emu_per_px)
+        y = round(shape.top / emu_per_px)
+        w = round(shape.width / emu_per_px)
+        h = round(shape.height / emu_per_px)
         x1, y1, x2, y2 = x, y, x + w, y + h
 
         # Absorb flip and rotation into coordinates.
@@ -212,6 +213,7 @@ def extract_line_element(shape, theme_colors=None, color_mapping=None, theme_sty
 
 def extract_freeform_element(shape, theme_colors=None, color_mapping=None, builder_text_color=None):
     """Extract freeform/curve shape as element dict with path commands in px."""
+    emu_per_px = get_emu_per_px()
     try:
         sp_pr = shape._element.spPr
         cust_geom = sp_pr.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}custGeom')
@@ -237,7 +239,7 @@ def extract_freeform_element(shape, theme_colors=None, color_mapping=None, build
             sy = shape.height / path_h if path_h else 1
 
             def to_px(x, y):
-                return round(int(x) * sx / EMU_PER_PX, 1), round(int(y) * sy / EMU_PER_PX, 1)
+                return round(int(x) * sx / emu_per_px, 1), round(int(y) * sy / emu_per_px, 1)
 
             path = []
             for child in path_el:
@@ -262,8 +264,8 @@ def extract_freeform_element(shape, theme_colors=None, color_mapping=None, build
                     swAng = int(child.get('swAng', 0))
                     path.append({
                         "cmd": "A",
-                        "wR": round(wR * sx / EMU_PER_PX, 1),
-                        "hR": round(hR * sy / EMU_PER_PX, 1),
+                        "wR": round(wR * sx / emu_per_px, 1),
+                        "hR": round(hR * sy / emu_per_px, 1),
                         "stAng": round(stAng / 60000, 2),
                         "swAng": round(swAng / 60000, 2),
                     })
@@ -342,13 +344,14 @@ def extract_freeform_element(shape, theme_colors=None, color_mapping=None, build
 
 def extract_shape_element(shape, theme_colors=None, color_mapping=None, theme_styles=None, builder_text_color=None):
     """Extract shape as element dict."""
+    emu_per_px = get_emu_per_px()
     try:
         elem = {
             "type": "shape",
-            "x": round(shape.left / EMU_PER_PX),
-            "y": round(shape.top / EMU_PER_PX),
-            "width": round(shape.width / EMU_PER_PX),
-            "height": round(shape.height / EMU_PER_PX),
+            "x": round(shape.left / emu_per_px),
+            "y": round(shape.top / emu_per_px),
+            "width": round(shape.width / emu_per_px),
+            "height": round(shape.height / emu_per_px),
             "shape": _resolve_shape_name(shape)
         }
         _add_flip(elem, shape)
@@ -536,6 +539,7 @@ def extract_shape_element(shape, theme_colors=None, color_mapping=None, theme_st
 
 def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_styles=None, is_placeholder=False, builder_text_color=None):
     """Extract textbox as element dict."""
+    emu_per_px = get_emu_per_px()
     # Check if it's actually a shape with preset geometry (not a plain textbox)
     try:
         sp_pr = shape._element.spPr
@@ -551,14 +555,14 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
     
     elem = {
         "type": "textbox",
-        "x": round(shape.left / EMU_PER_PX),  # px (1920x1080 basis)
-        "y": round(shape.top / EMU_PER_PX),
-        "width": round(shape.width / EMU_PER_PX),
+        "x": round(shape.left / emu_per_px),  # px (1920x1080 basis)
+        "y": round(shape.top / emu_per_px),
+        "width": round(shape.width / emu_per_px),
     }
     
     # Extract height (for TEXT_TO_FIT_SHAPE auto-shrink)
     if shape.height:
-        h_px = round(shape.height / EMU_PER_PX)
+        h_px = round(shape.height / emu_per_px)
         if h_px > 10:
             elem["height"] = h_px
     # Extract rotation
@@ -584,13 +588,13 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
     # Builder default for textbox: left/right=0, top/bottom=PowerPoint default
     tf = shape.text_frame
     if tf.margin_left is not None and tf.margin_left != 0:
-        elem["marginLeft"] = round(tf.margin_left / EMU_PER_PX)
+        elem["marginLeft"] = round(tf.margin_left / emu_per_px)
     if tf.margin_top is not None and tf.margin_top != 45720:
-        elem["marginTop"] = round(tf.margin_top / EMU_PER_PX)
+        elem["marginTop"] = round(tf.margin_top / emu_per_px)
     if tf.margin_right is not None and tf.margin_right != 0:
-        elem["marginRight"] = round(tf.margin_right / EMU_PER_PX)
+        elem["marginRight"] = round(tf.margin_right / emu_per_px)
     if tf.margin_bottom is not None and tf.margin_bottom != 45720:
-        elem["marginBottom"] = round(tf.margin_bottom / EMU_PER_PX)
+        elem["marginBottom"] = round(tf.margin_bottom / emu_per_px)
     
     # Extract vertical anchor (builder textbox default is top when unset)
     if tf.vertical_anchor is not None:
@@ -1311,6 +1315,7 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
     
     Note: python-pptx returns absolute slide coordinates for grouped shapes.
     """
+    emu_per_px = get_emu_per_px()
     elem = _base_element(shape, "group", elements=[])
     # Move rotation after elements for consistent key order
     rot = elem.pop("rotation", None)
@@ -1337,8 +1342,8 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
         # chExt in EMU: below ~1px per unit means children live in a
         # miniature coordinate system that px rounding destroys.
         try:
-            return 0 < int(che.get('cx', '0')) < int(EMU_PER_PX * 10) or \
-                   0 < int(che.get('cy', '0')) < int(EMU_PER_PX * 10)
+            return 0 < int(che.get('cx', '0')) < int(emu_per_px * 10) or \
+                   0 < int(che.get('cy', '0')) < int(emu_per_px * 10)
         except Exception:
             return False
 
@@ -1439,9 +1444,9 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
                             # Lines carry endpoints, not x/y/width/height —
                             # transform x1/y1/x2/y2 through the group xfrm.
                             def _gx(px_):
-                                return round((group_off_x + (px_ * EMU_PER_PX - ch_off_x) * scale_x) / EMU_PER_PX)
+                                return round((group_off_x + (px_ * emu_per_px - ch_off_x) * scale_x) / emu_per_px)
                             def _gy(py_):
-                                return round((group_off_y + (py_ * EMU_PER_PX - ch_off_y) * scale_y) / EMU_PER_PX)
+                                return round((group_off_y + (py_ * emu_per_px - ch_off_y) * scale_y) / emu_per_px)
                             for k in ("x1", "x2"):
                                 if sub_elem.get(k) is not None:
                                     sub_elem[k] = _gx(sub_elem[k])
@@ -1451,10 +1456,10 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
                             elem["elements"].append(sub_elem)
                             continue
 
-                        sub_elem["x"] = round(abs_x / EMU_PER_PX)
-                        sub_elem["y"] = round(abs_y / EMU_PER_PX)
-                        sub_elem["width"] = round(sub_shape.width * scale_x / EMU_PER_PX)
-                        sub_elem["height"] = round(sub_shape.height * scale_y / EMU_PER_PX)
+                        sub_elem["x"] = round(abs_x / emu_per_px)
+                        sub_elem["y"] = round(abs_y / emu_per_px)
+                        sub_elem["width"] = round(sub_shape.width * scale_x / emu_per_px)
+                        sub_elem["height"] = round(sub_shape.height * scale_y / emu_per_px)
                         # For freeform in group: drop raw path XML, let builder reconstruct
                         # from px coords (which match the group-scaled shape size)
                         if sub_elem.get("type") == "freeform":
@@ -1471,18 +1476,18 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
                                     if el.get("type") == "line" and "x1" in el:
                                         for k in ("x1", "x2"):
                                             if el.get(k) is not None:
-                                                el[k] = round((gox + (el[k] * EMU_PER_PX - gcx) * sx) / EMU_PER_PX)
+                                                el[k] = round((gox + (el[k] * emu_per_px - gcx) * sx) / emu_per_px)
                                         for k in ("y1", "y2"):
                                             if el.get(k) is not None:
-                                                el[k] = round((goy + (el[k] * EMU_PER_PX - gcy) * sy) / EMU_PER_PX)
+                                                el[k] = round((goy + (el[k] * emu_per_px - gcy) * sy) / emu_per_px)
                                         continue
                                     if "x" in el and "y" in el:
-                                        old_x = el["x"] * EMU_PER_PX
-                                        old_y = el["y"] * EMU_PER_PX
+                                        old_x = el["x"] * emu_per_px
+                                        old_y = el["y"] * emu_per_px
                                         new_x = gox + (old_x - gcx) * sx
                                         new_y = goy + (old_y - gcy) * sy
-                                        el["x"] = round(new_x / EMU_PER_PX)
-                                        el["y"] = round(new_y / EMU_PER_PX)
+                                        el["x"] = round(new_x / emu_per_px)
+                                        el["y"] = round(new_y / emu_per_px)
                                         if el.get("type") == "freeform":
                                             el["_xEmu"] = round(new_x)
                                             el["_yEmu"] = round(new_y)
@@ -1494,11 +1499,11 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
                                         if el.get("_widthEmu"):
                                             el["_widthEmu"] = round(el["_widthEmu"] * sx)
                                         else:
-                                            el["_widthEmu"] = round(el["width"] * EMU_PER_PX)
+                                            el["_widthEmu"] = round(el["width"] * emu_per_px)
                                         if el.get("_heightEmu"):
                                             el["_heightEmu"] = round(el["_heightEmu"] * sy)
                                         else:
-                                            el["_heightEmu"] = round(el["height"] * EMU_PER_PX)
+                                            el["_heightEmu"] = round(el["height"] * emu_per_px)
                                         el.pop("_pathLstXml", None)
                                     if el.get("type") == "group" and el.get("elements"):
                                         _apply_group_transform(el["elements"], gox, goy, gcx, gcy, sx, sy)
