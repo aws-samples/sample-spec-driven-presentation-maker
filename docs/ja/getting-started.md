@@ -4,7 +4,7 @@
 
 spec-driven-presentation-maker をローカル利用から AWS デプロイまで、段階的にセットアップする手順を説明します。
 
-> **🤖 手動で読み進める必要はありません。** このリポジトリには [`AGENTS.md`](../../AGENTS.md) と [`CLAUDE.md`](../../CLAUDE.md) を同梱しています。お使いのコーディングエージェント（Claude Code, Codex CLI, Cursor, Kiro, VS Code の GitHub Copilot 等）に、例えば「このリポジトリをセットアップして」「AWS にデプロイして」「Layer 2 として Claude Desktop から使えるようにして」と話しかけてください。エージェントが AGENTS.md を読み取り、適切なレイヤーとコマンドを自動で選んで進めます。
+> **🤖 手動で読み進める必要はありません。** このリポジトリには [`AGENTS.md`](../../AGENTS.md) を同梱しています。お使いのコーディングエージェント（Claude Code, Codex CLI, Cursor, Kiro, VS Code の GitHub Copilot 等）に、例えば「このリポジトリをセットアップして」「AWS にデプロイして」「Layer 2 として Claude Desktop から使えるようにして」と話しかけてください。エージェントが AGENTS.md を読み取り、適切なレイヤーとコマンドを自動で選んで進めます。
 
 > **🚀 AWS へのデプロイだけを行いたい場合:** [ワンクリックデプロイ](../en/deploy-cloudshell.md#one-click-deploy-recommended) が最も簡単です。AWS コンソールにログインし、Launch Stack ボタンを押してパラメータを入力するだけで完了します。外部 IdP 連携や WAF 設定など高度なカスタマイズが必要な場合は [CloudShell を使ったデプロイ](../en/deploy-cloudshell.md#deploy-using-cloudshell) を参照してください。本ページは、Layer 1〜2 のローカル利用や、ローカル CDK を使った開発・デバッグ向けの手順を含みます。
 

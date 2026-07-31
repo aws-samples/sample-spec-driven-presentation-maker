@@ -4,7 +4,7 @@
 
 Step-by-step instructions for setting up spec-driven-presentation-maker, from local usage to AWS deployment.
 
-> **🤖 You don't need to read this page manually.** This repo ships with [`AGENTS.md`](../../AGENTS.md) and [`CLAUDE.md`](../../CLAUDE.md). Just tell your coding agent (Claude Code, Codex CLI, Cursor, Kiro, GitHub Copilot in VS Code, etc.) what you want — for example, "Set up this repo," "Deploy it to AWS," or "Wire it up so I can use it from Claude Desktop as Layer 2." The agent will read AGENTS.md, pick the right layer, and run the right commands for you.
+> **🤖 You don't need to read this page manually.** This repo ships with [`AGENTS.md`](../../AGENTS.md). Just tell your coding agent (Claude Code, Codex CLI, Cursor, Kiro, GitHub Copilot in VS Code, etc.) what you want — for example, "Set up this repo," "Deploy it to AWS," or "Wire it up so I can use it from Claude Desktop as Layer 2." The agent will read AGENTS.md, pick the right layer, and run the right commands for you.
 
 > **🚀 Deploying to AWS only?** Use the [One-Click Deploy](deploy-cloudshell.md#one-click-deploy-recommended) — just sign in to the AWS Console, click the Launch Stack button, and fill in the parameters. For advanced customization (external IdP, WAF, config.yaml), you can also use [CloudShell deploy](deploy-cloudshell.md#deploy-using-cloudshell). This page covers Layer 1–2 local usage and direct-CDK workflows for development and debugging.
 

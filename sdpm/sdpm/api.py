@@ -20,7 +20,7 @@ def get_templates_dirs() -> list[Path]:
     Search order (first match wins):
       1. $SDPM_TEMPLATES_DIR — os.pathsep-separated list (same semantics as PATH)
       2. get_user_config_dir()/templates/ — user-local templates
-      3. Package-bundled templates/ directory (skill/templates/)
+      3. Package-bundled templates/ directory (sdpm/templates/)
     """
     from sdpm.config import TEMPLATES_DIR, _get_resource_dirs
 
@@ -85,9 +85,9 @@ def list_templates_with_metadata(
 
     Pure function — no I/O beyond filesystem glob.
 
-    Consumers are the local paths only (L1 CLI, mcp-local, local Web UI via
-    state.json). The cloud path (mcp-server) does NOT use this function — it has
-    an independent listing in mcp-server/tools/template.py where builtin notes
+    Consumers are the local paths only (L1 CLI, servers/local, local Web UI via
+    state.json). The cloud path (servers/remote) does NOT use this function — it has
+    an independent listing in servers/remote/tools/template.py where builtin notes
     are first-class DDB items (BUILTIN_NOTE#<name>), merged at the tool layer.
     Keep that divergence in mind before consolidating.
 
