@@ -10,6 +10,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Changed
+
+- **Internal API move**: `sdpm.engine.diff.diff_report` / `load_slides_json_or_pptx`
+  moved to `sdpm.api` (dependency-rule fix; `engine.diff` now exposes the pure
+  `diff_slides(base, edit)`). These were internal APIs — update imports if you
+  consumed them directly.
+
 ## [0.5.0] - 2026-07-31
 
 Breaking architecture cleanup. No changes to the slide JSON schema — existing

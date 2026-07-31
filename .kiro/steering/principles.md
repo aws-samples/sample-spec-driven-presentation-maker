@@ -104,6 +104,10 @@ HTTP MCP server running on AWS with S3/DynamoDB dependencies.
 - Infrastructure-dependent operations (user templates/styles on S3, DynamoDB
   records, presigned URLs, Code Interpreter) may have independent implementations
 - However, use Engine logic when equivalent functionality exists
+- Server instructions are a deliberate divergence: Local serves the shared
+  interactive menu (`sdpm.tools.instructions`); Remote serves a short
+  agent-facing form (its client is the L4 agent, which already carries the
+  persona) — see the comment above `_INSTRUCTIONS` in `servers/remote/server.py`
 
 ## Logic Sharing Principles
 

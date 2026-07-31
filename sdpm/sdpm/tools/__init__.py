@@ -472,7 +472,7 @@ def diff_pptx(baseline: str, edited: str) -> dict[str, Any]:
         Dict with has_diff (bool) and report (per-slide changed / added /
         removed elements and properties).
     """
-    from sdpm.engine.diff import diff_report
+    from sdpm.api import diff_report
     for p in (baseline, edited):
         if not Path(p).exists():
             raise FileNotFoundError(f"Not found: {p}")

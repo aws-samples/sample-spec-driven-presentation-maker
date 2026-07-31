@@ -41,6 +41,16 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 logger = logging.getLogger("sdpm.mcp")
 
 # --- MCP Server Instructions ---
+#
+# DELIBERATE DIVERGENCE from sdpm.tools.instructions (do not "unify"):
+# the shared instructions are an interactive workflow menu (choose A-D)
+# for human-driven MCP clients. On Cloud, the client is the L4 agent —
+# mode behavior arrives through its prompt (personas via
+# start_presentation), so the menu would only waste tokens and conflict
+# with the already-loaded persona. This short version states just the
+# architecture split (run_python vs MCP tools) and the entry workflow.
+# Design note: "Local = shared contract instructions, Remote = this
+# agent-facing short form" (v0.5 review round 3).
 
 _INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generation from JSON.
 
