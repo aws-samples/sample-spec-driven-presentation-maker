@@ -20,6 +20,7 @@ dev = [
     "pygments>=2.19.2",
     "mcp[cli]>=1.28.1,<2",
     "boto3",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.ruff]

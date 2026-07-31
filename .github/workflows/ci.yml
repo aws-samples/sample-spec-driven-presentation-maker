@@ -21,7 +21,7 @@ jobs:
       - name: Lint
         run: uv run ruff check sdpm/ servers/ shared/ api/
       - name: Test
-        run: uv run pytest tests/ -v
+        run: uv run pytest tests/ -v --cov=sdpm --cov-report=term
 
   web-ui:
     runs-on: ubuntu-latest

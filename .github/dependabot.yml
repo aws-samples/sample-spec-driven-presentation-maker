@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /web-ui
+    schedule:
+      interval: weekly
+    groups:
+      web-ui-deps:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /infra
+    schedule:
+      interval: weekly
+    groups:
+      infra-deps:
+        patterns: ["*"]
+  - package-ecosystem: pip
+    directory: /sdpm
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /servers/local
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /servers/remote
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
