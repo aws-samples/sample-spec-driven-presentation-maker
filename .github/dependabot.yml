@@ -6,6 +6,11 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    # Major bumps routinely break the toolchain (e.g. typescript 5->7 broke
+    # typescript-eslint; eslint 9->10). Handle majors manually.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       web-ui-deps:
         patterns: ["*"]
@@ -15,6 +20,9 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       infra-deps:
         patterns: ["*"]
