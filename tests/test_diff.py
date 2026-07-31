@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from sdpm.api import generate
-from sdpm.engine.diff import diff_report
+from sdpm.api import diff_report
 
 
 @pytest.fixture()
@@ -129,7 +129,7 @@ class TestDiffSourceJsonBaseline:
 
     def test_source_json_baseline_loads(self, source_json: Path) -> None:
         """Named-template resolution (get_templates_dirs) must not crash."""
-        from sdpm.engine.diff import load_slides_json_or_pptx
+        from sdpm.api import load_slides_json_or_pptx
 
         baseline = load_slides_json_or_pptx(str(source_json))
         assert baseline["slides"], "source JSON baseline produced no slides"
