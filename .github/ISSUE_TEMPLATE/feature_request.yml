@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest an improvement or new capability
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the use case, not just the solution — it helps us find the right design.
+      placeholder: When creating slides for ..., I can't ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution (optional)
+      description: If you have an idea of how it could work, sketch it here.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area?
+      options:
+        - Slide generation / engine (layouts, elements, charts)
+        - Agent behavior / personas (hearing, workflows)
+        - MCP servers / client integration
+        - Web UI / cloud stack
+        - Templates / styles / assets
+        - Documentation
+        - Other
+    validations:
+      required: true
