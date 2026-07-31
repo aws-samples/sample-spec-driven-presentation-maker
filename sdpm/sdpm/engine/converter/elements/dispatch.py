@@ -199,7 +199,7 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
 
                 # Transform coordinates from child coordinate system to slide coordinates
                 grp_sp_pr = shape._element.find('.//{http://schemas.openxmlformats.org/presentationml/2006/main}grpSpPr')
-                xfrm = grp_sp_pr.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm') if grp_sp_pr else None
+                xfrm = grp_sp_pr.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm') if grp_sp_pr is not None else None
                 
                 if xfrm is not None:
                     off = xfrm.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}off')
