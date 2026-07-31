@@ -1268,7 +1268,7 @@ wheels = [
 
 [[package]]
 name = "sdpm-skill"
-source = { editable = "skill" }
+source = { editable = "sdpm" }
 dependencies = [
     { name = "defusedxml" },
     { name = "lxml" },
@@ -1344,7 +1344,7 @@ dev = [
     { name = "python-pptx" },
     { name = "qrcode" },
     { name = "ruff" },
-    { name = "sdpm-skill", editable = "skill" },
+    { name = "sdpm-skill", editable = "sdpm" },
 ]
 
 [[package]]
