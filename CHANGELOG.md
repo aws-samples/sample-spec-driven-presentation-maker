@@ -10,6 +10,17 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-31
+
+### Added
+
+- `make doctor` — diagnoses local setup (uv / LibreOffice / poppler, checkout
+  path anchors) with a moved-checkout hint
+- `make smoke` — boots the local MCP server over real stdio and verifies
+  template/persona resolution (also runs in CI)
+- GitHub Releases are now created automatically on tag push (notes extracted
+  from this changelog)
+
 ### Fixed
 
 - **Cloud agent output-token limit**: model profiles now set an explicit
