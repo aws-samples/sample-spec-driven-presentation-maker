@@ -1,4 +1,4 @@
-.PHONY: all lint test format check smoke doctor install-kiro
+.PHONY: all lint test format check smoke doctor install-kiro lock
 
 all: lint test
 
@@ -24,3 +24,14 @@ doctor:
 
 install-kiro:
 	uv run python3 clients/kiro/install.py
+
+# Regenerate container dependency locks (agent + servers/remote).
+# Both images build for linux/arm64 + Python 3.13 (AgentCore Runtime).
+lock:
+	uv pip compile agent/requirements.txt \
+		--python-version 3.13 --python-platform aarch64-unknown-linux-gnu \
+		--no-header -o agent/requirements.lock
+	uv pip compile servers/remote/pyproject.toml \
+		--python-version 3.13 --python-platform aarch64-unknown-linux-gnu \
+		--no-header --no-emit-package sdpm-skill \
+		-o servers/remote/constraints.txt

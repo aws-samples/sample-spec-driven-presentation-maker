@@ -18,10 +18,14 @@ RUN dnf install -y --setopt=install_weak_deps=False \
 
 WORKDIR /app
 
+# constraints.txt pins the full dependency tree for reproducible image builds
+# (see the mcp 2.0 breakage). Regenerate with `make lock` after editing pyproject.toml.
+COPY servers/remote/constraints.txt servers/remote/constraints.txt
+
 # Install skill (engine) first for layer caching
 COPY sdpm/pyproject.toml sdpm/pyproject.toml
 COPY sdpm/sdpm/ sdpm/sdpm/
-RUN python3.13 -m pip install --no-cache-dir ./sdpm
+RUN python3.13 -m pip install --no-cache-dir -c servers/remote/constraints.txt ./sdpm
 
 # Bundled knowledge data (references / templates) — served by the shared tool
 # contract via SDPM_SKILL_ROOT. Assets stay on S3 (user-extensible, 36MB).
@@ -37,7 +41,7 @@ COPY servers/remote/tools/ servers/remote/tools/
 COPY servers/remote/storage/ servers/remote/storage/
 COPY servers/remote/server.py servers/remote/server.py
 COPY servers/remote/server_utils.py servers/remote/server_utils.py
-RUN python3.13 -m pip install --no-cache-dir ./servers/remote
+RUN python3.13 -m pip install --no-cache-dir -c servers/remote/constraints.txt ./servers/remote
 
 ENV PYTHONPATH=/app
 
