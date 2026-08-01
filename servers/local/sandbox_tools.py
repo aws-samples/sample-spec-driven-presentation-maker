@@ -36,6 +36,28 @@ def _rejection_message(violations: list[str], has_deck: bool) -> str:
     return "\n".join(lines)
 
 
+def _build_snapshot(deck_dir: Path) -> dict[str, tuple[int, int]]:
+    """Snapshot (mtime_ns, size) of files that affect the built PPTX.
+
+    Used to detect whether a run_python execution changed the deck, so the
+    output.pptx artifact can be rebuilt automatically. specs/outline.md is
+    included because slide order comes from the outline.
+    """
+    snap: dict[str, tuple[int, int]] = {}
+    for rel in ("deck.json", "presentation.json", "specs/outline.md"):
+        p = deck_dir / rel
+        if p.is_file():
+            st = p.stat()
+            snap[rel] = (st.st_mtime_ns, st.st_size)
+    for sub in ("slides", "includes"):
+        d = deck_dir / sub
+        if d.is_dir():
+            for p in d.glob("*.json"):
+                st = p.stat()
+                snap[f"{sub}/{p.name}"] = (st.st_mtime_ns, st.st_size)
+    return snap
+
+
 def run_python(purpose: str, code: str, deck_id: str = "", save: bool = False,
                measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a sandboxed environment.
@@ -97,11 +119,21 @@ Audience: Developers
 
     **Always specify measure_slides when editing slides.**
 
+    ## Persistence & build (no flags needed)
+
+    - File writes always persist — anything written via write_json/write_text
+      is saved immediately. There is no "unsaved" state.
+    - output.pptx rebuilds automatically whenever the deck changed
+      (deck.json / slides/ / includes/ / specs/outline.md).
+    - measure_slides triggers the expensive verification pass (render + text
+      overflow measurement + preview PNGs) for the given slugs only.
+
     Args:
         purpose: Brief user-facing description of what this code does. Shown in UI.
         code: Python code to execute (no import statements allowed).
         deck_id: Deck output_dir path. Optional.
-        save: When True, triggers PPTX build + preview + SVG compose after execution.
+        save: Deprecated and ignored. Writes always persist and output.pptx
+            rebuilds automatically when the deck changed.
         measure_slides: Slide slugs to measure after execution (e.g. ["title", "feature-a"]).
 
     Returns:
@@ -109,6 +141,11 @@ Audience: Developers
     """
     result: dict[str, Any] = {}
     cwd = deck_id if deck_id and Path(deck_id).is_dir() else None
+    if save:
+        result["deprecated"] = (
+            "'save' is ignored: writes always persist and output.pptx "
+            "rebuilds automatically when the deck changed."
+        )
 
     from sandbox import check_code, make_runner
 
@@ -116,6 +153,8 @@ Audience: Developers
     if violations:
         result["output"] = _rejection_message(violations, has_deck=bool(cwd))
         return json.dumps(result, ensure_ascii=False)
+
+    pre_snap = _build_snapshot(Path(cwd)) if cwd else {}
 
     try:
         runner = make_runner(deck_id if cwd else "")
@@ -166,18 +205,25 @@ Audience: Developers
                     for d in diags:
                         d["slug"] = slug
                     lint_diagnostics.extend(diags)
-                    slide_file.write_text(
-                        json.dumps(cleaned, ensure_ascii=False, indent=2) + "\n",
-                        encoding="utf-8",
-                    )
+                    # Rewrite only when sanitization changed the content —
+                    # unconditional rewrites would bump mtime every call and
+                    # falsely mark the deck as changed (auto-rebuild churn).
+                    if cleaned != slide_data:
+                        slide_file.write_text(
+                            json.dumps(cleaned, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8",
+                        )
             except (json.JSONDecodeError, TypeError):
                 pass
         if lint_diagnostics:
             errs = result.setdefault("errors", {})
             errs["lintDiagnostics"] = lint_diagnostics
 
-    # Post-processing: build PPTX + iso measure/compose/preview (lockless)
-    if save:
+    # Post-processing: build PPTX + iso measure/compose/preview (lockless).
+    # output.pptx is a derived artifact — it follows deck changes automatically.
+    # measure_slides additionally triggers the expensive verification pass.
+    deck_changed = _build_snapshot(deck_dir) != pre_snap
+    if deck_changed or measure_slides:
         import shutil
 
         from sdpm.api import generate, parse_outline_slugs
@@ -417,18 +463,12 @@ Audience: Developers
                 shutil.rmtree(iso_dir, ignore_errors=True)
 
         else:
-            # save=True without measure_slides: output.pptx only, skip compose/measure/preview
+            # Deck changed without measure_slides: output.pptx only,
+            # skip compose/measure/preview
             if _build_warnings:
                 result["warnings"] = _build_warnings
             if _build_lint:
                 result["lint_diagnostics"] = _build_lint
-
-    elif measure_slides:
-        try:
-            from sdpm.api import measure as _sdpm_measure
-            result["measure"] = _sdpm_measure(json_path=deck_input, slides=list(measure_slides))
-        except Exception as e:
-            result["measure"] = f"Measure error: {e}"
 
     return json.dumps(result, ensure_ascii=False)
 

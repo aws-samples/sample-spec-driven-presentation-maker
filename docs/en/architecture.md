@@ -96,8 +96,8 @@ S3 (resource bucket):
 
 ### Deck Workspace
 
-Using `run_python(deck_id=..., save=True)` loads the entire deck workspace into the sandbox.
-The agent can read and write files using standard Python file I/O (`open`, `json.load`, etc.), and `save=True` writes changes back to S3.
+Using `run_python(deck_id=...)` loads the entire deck workspace into the sandbox.
+The agent can read and write files using standard Python file I/O (`open`, `json.load`, etc.); modified files are written back to S3 automatically after every execution.
 
 ```
 deck.json           — deck metadata (template, fonts, defaultTextColor)
