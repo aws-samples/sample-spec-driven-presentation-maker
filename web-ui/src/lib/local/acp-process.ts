@@ -11,6 +11,7 @@ import { spawn, type ChildProcess } from "child_process"
 import path from "path"
 import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
 import { getActiveAgent, type AgentConfig } from "./acp-adapter"
+import { syncToAgentsDir } from "./agents-sync"
 
 export { DECK_ROOT }
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
@@ -113,22 +114,15 @@ function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, un
 }
 
 /** Ensure agents/ has files (first launch before Settings is opened). */
-function ensureAgentsDir(): void {
-  const fs = require("fs") as typeof import("fs")
-  const agentsDir = path.join(MCP_LOCAL_DIR, ".kiro", "agents")
-  const acpDir = path.join(MCP_LOCAL_DIR, ".kiro", "acp-agents")
-  if (!fs.existsSync(acpDir)) return
-  // Skip if agents/ already has .json files
-  if (fs.existsSync(agentsDir) && fs.readdirSync(agentsDir).some((f: string) => f.endsWith(".json"))) return
-  // Copy defaults
-  fs.mkdirSync(agentsDir, { recursive: true })
-  for (const f of fs.readdirSync(acpDir).filter((f: string) => f.endsWith(".json"))) {
-    fs.copyFileSync(path.join(acpDir, f), path.join(agentsDir, f))
-  }
-}
-
 async function spawnProcess(agentName: string, existingSessionId?: string, adapter?: AgentConfig): Promise<ProcessState> {
-  ensureAgentsDir()
+  // Re-derive .kiro/agents/ from the acp-agents catalog + user selection on
+  // every spawn (idempotent) — a `git pull` that updates the catalog takes
+  // effect on the next spawn instead of leaving stale copies behind.
+  try {
+    syncToAgentsDir()
+  } catch (e) {
+    console.error("agents/ re-derivation failed; spawning with existing files", e)
+  }
   const cfg = adapter || getActiveAgent()
   let args = [...cfg.args]
   const flagIdx = args.indexOf("--agent")
