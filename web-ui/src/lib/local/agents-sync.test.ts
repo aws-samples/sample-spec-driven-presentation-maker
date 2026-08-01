@@ -84,18 +84,50 @@ describe("syncToAgentsDir", () => {
     expect(agent.name).toBe("my-custom-vibe")
   })
 
-  it("rejects unsafe file names and skips missing catalog entries", () => {
-    syncToAgentsDir({ ...SELECTION_DEFAULTS, vibe: "../evil.json", spec: "missing.json" }, dirs)
-    const files = fs.readdirSync(dirs.agentsDir)
-    expect(files).not.toContain("sdpm-vibe.json")
-    expect(files).not.toContain("sdpm-spec.json")
-    expect(files).toContain("sdpm-composer.json")
+  it("throws on unsafe selection names and missing catalog entries — output untouched", () => {
+    syncToAgentsDir(readSelection(dirs), dirs)
+    const before = fs.readdirSync(dirs.agentsDir).sort()
+
+    expect(() => syncToAgentsDir({ ...SELECTION_DEFAULTS, vibe: "../evil.json" }, dirs))
+      .toThrow(/invalid agent selection/)
+    expect(() => syncToAgentsDir({ ...SELECTION_DEFAULTS, spec: "missing.json" }, dirs))
+      .toThrow(/missing from catalog/)
+    expect(fs.readdirSync(dirs.agentsDir).sort()).toEqual(before)
   })
 
-  it("is a no-op when the catalog directory is absent", () => {
-    fs.rmSync(dirs.acpAgentsDir, { recursive: true })
+  it("catalog source removed after a prior derivation: fails and keeps the old output intact", () => {
     syncToAgentsDir(readSelection(dirs), dirs)
-    expect(fs.existsSync(dirs.agentsDir)).toBe(false)
+    fs.rmSync(path.join(dirs.acpAgentsDir, "sdpm-spec.json"))
+    expect(() => syncToAgentsDir(readSelection(dirs), dirs)).toThrow(/missing from catalog/)
+    // The stale file is still readable (caller decides to fail the spawn),
+    // and no partial new generation was written
+    const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-spec.json"), "utf-8"))
+    expect(agent.name).toBe("sdpm-spec")
+  })
+
+  it("malformed catalog JSON: throws before any write — no mixed generations", () => {
+    syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "old-model" }, dirs)
+    // sdpm-vibe (iterated after spec) becomes malformed; change the model so
+    // a partial write would be detectable on the earlier files
+    fs.writeFileSync(path.join(dirs.acpAgentsDir, "sdpm-vibe.json"), "{broken")
+    expect(() => syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "new-model" }, dirs))
+      .toThrow(/malformed agent definition/)
+    for (const r of ROLES) {
+      const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, `${r}.json`), "utf-8"))
+      expect(agent.model).toBe("old-model") // all old generation, none new
+    }
+  })
+
+  it("sweeps stale files that are no longer part of the derivation", () => {
+    syncToAgentsDir(readSelection(dirs), dirs)
+    fs.writeFileSync(path.join(dirs.agentsDir, "old-leftover.json"), "{}")
+    syncToAgentsDir(readSelection(dirs), dirs)
+    expect(fs.readdirSync(dirs.agentsDir)).not.toContain("old-leftover.json")
+  })
+
+  it("throws when the catalog directory is absent", () => {
+    fs.rmSync(dirs.acpAgentsDir, { recursive: true })
+    expect(() => syncToAgentsDir(readSelection(dirs), dirs)).toThrow(/catalog not found/)
   })
 })
 

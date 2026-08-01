@@ -61,7 +61,13 @@ export async function PUT(req: Request) {
   }
   const current = readSelection()
   const next = { ...current, ...body }
+  // Derive first — a selection that cannot derive must not be persisted
+  // (all-or-nothing: existing agents/ output is untouched on failure).
+  try {
+    syncToAgentsDir(next)
+  } catch (e) {
+    return Response.json({ error: String(e instanceof Error ? e.message : e) }, { status: 400 })
+  }
   writeSelection(next)
-  syncToAgentsDir(next)
   return Response.json({ ok: true, selection: next })
 }

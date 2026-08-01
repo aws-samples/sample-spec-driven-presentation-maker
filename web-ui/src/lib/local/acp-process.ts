@@ -116,13 +116,11 @@ function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, un
 /** Ensure agents/ has files (first launch before Settings is opened). */
 async function spawnProcess(agentName: string, existingSessionId?: string, adapter?: AgentConfig): Promise<ProcessState> {
   // Re-derive .kiro/agents/ from the acp-agents catalog + user selection on
-  // every spawn (idempotent) — a `git pull` that updates the catalog takes
-  // effect on the next spawn instead of leaving stale copies behind.
-  try {
-    syncToAgentsDir()
-  } catch (e) {
-    console.error("agents/ re-derivation failed; spawning with existing files", e)
-  }
+  // every spawn (idempotent, all-or-nothing) — a `git pull` that updates the
+  // catalog takes effect on the next spawn. If the derivation fails, the
+  // spawn fails: launching from silently stale agent files is the exact bug
+  // this re-derivation exists to prevent.
+  syncToAgentsDir()
   const cfg = adapter || getActiveAgent()
   let args = [...cfg.args]
   const flagIdx = args.indexOf("--agent")

@@ -38,13 +38,40 @@ _ACP_AGENTS_DIR = (
     Path(__file__).resolve().parent.parent / "servers" / "local" / ".kiro" / "acp-agents"
 )
 _AGENT_FILES = sorted(_ACP_AGENTS_DIR.glob("*.json"))
-_EXPECTED_AGENTS = {
-    "sdpm-composer": 22,
-    "sdpm-single": 27,
-    "sdpm-spec": 28,
-    "sdpm-style": 9,
-    "sdpm-vibe": 28,
+
+# Exact allowlist snapshot. Any change — adding, removing, or swapping a
+# tool — is a deliberate decision that must update this test. The
+# inter-agent differences were reviewed (2026-08-01, theme 3) and are
+# intentional (see module docstring).
+_FULL_ORCHESTRATOR = {
+    "read", "glob", "grep", "use_subagent", "web_fetch", "web_search",
+    "@sdpm/analyze_template", "@sdpm/apply_style", "@sdpm/code_to_slide",
+    "@sdpm/diff_pptx", "@sdpm/generate_pptx", "@sdpm/grid", "@sdpm/hearing",
+    "@sdpm/import_attachment", "@sdpm/init_presentation",
+    "@sdpm/list_asset_sources", "@sdpm/list_guides", "@sdpm/list_styles",
+    "@sdpm/list_templates", "@sdpm/list_workflows", "@sdpm/measure_slides",
+    "@sdpm/pptx_to_json", "@sdpm/read_examples", "@sdpm/read_guides",
+    "@sdpm/read_workflows", "@sdpm/run_python", "@sdpm/search_assets",
+    "@sdpm/upload_file",
 }
+_EXPECTED_TOOLS = {
+    "sdpm-spec": _FULL_ORCHESTRATOR,
+    "sdpm-vibe": _FULL_ORCHESTRATOR,
+    # single agent does everything itself — no dispatch
+    "sdpm-single": _FULL_ORCHESTRATOR - {"use_subagent"},
+    # composers only compose: no dialogue, no nesting, no web, no upload/diff
+    "sdpm-composer": _FULL_ORCHESTRATOR - {
+        "use_subagent", "web_fetch", "web_search",
+        "@sdpm/hearing", "@sdpm/upload_file", "@sdpm/diff_pptx",
+    },
+    # style-only surface
+    "sdpm-style": {
+        "read", "glob", "grep", "web_fetch", "web_search",
+        "@sdpm/analyze_template", "@sdpm/hearing", "@sdpm/list_styles",
+        "@sdpm/run_style_python",
+    },
+}
+_EXPECTED_AGENTS = set(_EXPECTED_TOOLS)
 
 
 def _load(path: Path) -> dict:
@@ -52,7 +79,18 @@ def _load(path: Path) -> dict:
 
 
 def test_expected_agent_set():
-    assert {p.stem for p in _AGENT_FILES} == set(_EXPECTED_AGENTS)
+    assert {p.stem for p in _AGENT_FILES} == _EXPECTED_AGENTS
+
+
+@pytest.mark.parametrize("path", _AGENT_FILES, ids=lambda p: p.stem)
+def test_tool_set_snapshot(path: Path):
+    actual = set(_load(path)["tools"])
+    expected = _EXPECTED_TOOLS[path.stem]
+    assert actual == expected, (
+        f"{path.name}: allowlist changed — widening or swapping an agent's "
+        f"surface is a deliberate decision; update the snapshot.\n"
+        f"added: {sorted(actual - expected)}\nremoved: {sorted(expected - actual)}"
+    )
 
 
 @pytest.mark.parametrize("path", _AGENT_FILES, ids=lambda p: p.stem)
@@ -91,15 +129,6 @@ def test_mcp_servers_identical_across_agents():
         "All ACP agents must talk to the same sdpm server with the same config"
     )
     assert list(blocks[0].keys()) == ["sdpm"]
-
-
-def test_tool_count_snapshot():
-    counts = {p.stem: len(_load(p)["tools"]) for p in _AGENT_FILES}
-    assert counts == _EXPECTED_AGENTS, (
-        "Tool allowlist size changed — widening an agent's surface is a "
-        "deliberate decision; review the diff and update the snapshot "
-        "(see module docstring for the intent of each surface)."
-    )
 
 
 def test_cloud_deck_tools_are_subset_of_local_orchestrator():

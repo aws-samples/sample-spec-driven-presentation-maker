@@ -89,25 +89,59 @@ export function writeSelection(sel: AgentSelection, dirs: SyncDirs = DEFAULT_DIR
 /**
  * Re-derive `.kiro/agents/` from the catalog + selection. Idempotent —
  * safe (and intended) to call on every spawn.
+ *
+ * All-or-nothing: every selected definition is loaded and validated in
+ * memory first; if any source is missing or malformed, an Error is thrown
+ * and the existing output is left untouched (the caller decides whether to
+ * fail the spawn — spawning from silently stale files is the exact bug
+ * this module exists to prevent). On success the directory is replaced
+ * atomically (staged in a sibling temp dir, then swapped), so a crash can
+ * never leave a mix of old and new generations, and stale files from
+ * removed catalog entries are swept away.
  */
 export function syncToAgentsDir(
   sel: AgentSelection = readSelection(),
   dirs: SyncDirs = DEFAULT_DIRS,
 ): void {
-  if (!fs.existsSync(dirs.acpAgentsDir)) return
-  fs.mkdirSync(dirs.agentsDir, { recursive: true })
+  if (!fs.existsSync(dirs.acpAgentsDir)) {
+    throw new Error(`agents catalog not found: ${dirs.acpAgentsDir}`)
+  }
+  // Phase 1 — load and validate everything in memory. No writes yet.
+  const staged: Array<{ fileName: string; content: string }> = []
   for (const [role, fixedName] of Object.entries(ROLE_TO_FIXED)) {
     const fileName = sel[role as keyof AgentSelection] || SELECTION_DEFAULTS[role as keyof AgentSelection]
-    if (!fileName || !isSafeFileName(fileName as string)) continue
+    if (!fileName || !isSafeFileName(fileName as string)) {
+      throw new Error(`invalid agent selection for role '${role}': ${JSON.stringify(fileName)}`)
+    }
     const srcFile = path.join(dirs.acpAgentsDir, fileName as string) // nosemgrep: path-join-resolve-traversal
-    if (!fs.existsSync(srcFile)) continue
-    const agent = JSON.parse(fs.readFileSync(srcFile, "utf-8"))
+    if (!fs.existsSync(srcFile)) {
+      throw new Error(`selected agent definition missing from catalog: ${fileName} (role '${role}')`)
+    }
+    let agent: Record<string, unknown>
+    try {
+      agent = JSON.parse(fs.readFileSync(srcFile, "utf-8"))
+    } catch (e) {
+      throw new Error(`malformed agent definition in catalog: ${fileName} — ${e}`)
+    }
     if (sel.model) {
       agent.model = sel.model
     } else {
       delete agent.model
     }
-    fs.writeFileSync(path.join(dirs.agentsDir, fixedName), JSON.stringify(agent, null, 2) + "\n")
+    staged.push({ fileName: fixedName, content: JSON.stringify(agent, null, 2) + "\n" })
   }
-  fs.writeFileSync(path.join(dirs.agentsDir, "README.md"), README_MARKER)
+  // Phase 2 — write to a sibling temp dir, then swap atomically.
+  const tmpDir = dirs.agentsDir + `.tmp-${process.pid}`
+  fs.rmSync(tmpDir, { recursive: true, force: true })
+  fs.mkdirSync(tmpDir, { recursive: true })
+  try {
+    for (const { fileName, content } of staged) {
+      fs.writeFileSync(path.join(tmpDir, fileName), content)
+    }
+    fs.writeFileSync(path.join(tmpDir, "README.md"), README_MARKER)
+    fs.rmSync(dirs.agentsDir, { recursive: true, force: true })
+    fs.renameSync(tmpDir, dirs.agentsDir)
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
 }

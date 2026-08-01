@@ -135,7 +135,9 @@ what your environment provides — check your tool list in this order:
 ```
 First call start_presentation(mode="composer") and follow the returned instructions
 exactly. If that tool is not in your list but you already carry composer
-instructions, skip that call and continue.
+instructions, skip that call and continue. If the tool is unavailable and you
+do not already carry composer instructions, stop and report that the sdpm
+tools are unavailable.
 
 deck_id: {deck_id}
 assigned_slugs: {slugs}

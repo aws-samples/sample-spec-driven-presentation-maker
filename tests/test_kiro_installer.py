@@ -21,25 +21,9 @@ kiro_install = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_spec and kiro_install)
 
 
-def _generated_config(repo_root: Path) -> dict:
-    """The exact structure the old installer template rendered."""
-    return {
-        "name": "sdpm-composer",
-        "description": "sdpm slide composer (dispatched by the sdpm-vibe skill). "
-        "Composes assigned slides from approved specs via the sdpm MCP server. "
-        "No user interaction.",
-        "prompt": f"file://{repo_root}/personas/composer.md",
-        "mcpServers": {
-            "sdpm": {
-                "command": "uv",
-                "args": ["run", "--directory", f"{repo_root}/servers/local", "python", "server.py"],
-                "timeout": 120000,
-            }
-        },
-        "tools": ["read", "glob", "grep", "@sdpm"],
-        "allowedTools": ["read", "glob", "grep", "@sdpm"],
-        "useLegacyMcpJson": False,
-    }
+def _generated_config(checkout: Path) -> dict:
+    """What the old installer template rendered for ``checkout``."""
+    return kiro_install._expected_composer_config(checkout)
 
 
 @pytest.fixture
@@ -61,38 +45,68 @@ REPO_ROOT = kiro_install.REPO_ROOT
 class TestCleanupLegacyComposerAgent:
     def test_removes_known_generated_form(self, agents_dir):
         p = _write_legacy(agents_dir, _generated_config(REPO_ROOT))
-        kiro_install.cleanup_legacy_composer_agent(agents_dir, REPO_ROOT)
+        kiro_install.cleanup_legacy_composer_agent(agents_dir)
         assert not p.exists()
 
     def test_formatting_differences_do_not_block_cleanup(self, agents_dir):
         # Old installer wrote the rendered template verbatim — indentation
-        # and key order may differ across versions. Structure decides.
+        # and key order may differ across versions. Parsed equality decides.
         p = agents_dir / "sdpm-composer.json"
         p.write_text(json.dumps(_generated_config(REPO_ROOT)), encoding="utf-8")
-        kiro_install.cleanup_legacy_composer_agent(agents_dir, REPO_ROOT)
+        kiro_install.cleanup_legacy_composer_agent(agents_dir)
         assert not p.exists()
 
-    def test_keeps_user_edited_tools(self, agents_dir):
-        cfg = _generated_config(REPO_ROOT)
-        cfg["tools"] = ["read", "glob", "grep", "@sdpm", "shell"]  # user widened
-        p = _write_legacy(agents_dir, cfg)
-        kiro_install.cleanup_legacy_composer_agent(agents_dir, REPO_ROOT)
-        assert p.exists()
-
-    def test_keeps_other_checkouts_file(self, agents_dir, tmp_path):
+    def test_removes_other_checkouts_generated_file(self, agents_dir, tmp_path):
+        # A leftover from a moved/old checkout would win over self-spawn
+        # (personas prefer a registered sdpm-composer) — exactly the
+        # boundary-crossing staleness this cleanup removes.
         other = tmp_path / "elsewhere" / "checkout"
         p = _write_legacy(agents_dir, _generated_config(other))
-        kiro_install.cleanup_legacy_composer_agent(agents_dir, REPO_ROOT)
+        kiro_install.cleanup_legacy_composer_agent(agents_dir)
+        assert not p.exists()
+
+    @pytest.mark.parametrize(
+        "mutate",
+        [
+            lambda c: c.update(description="MY CUSTOM DESCRIPTION"),
+            lambda c: c.update(tools=["read", "glob", "grep", "@sdpm", "shell"]),
+            lambda c: c["mcpServers"]["sdpm"].update(timeout=999),
+            lambda c: c["mcpServers"]["sdpm"].update(env={"FOO": "1"}),
+            lambda c: c.update(useLegacyMcpJson=True),
+            lambda c: c.update(model="my-model"),
+        ],
+        ids=["description", "tools", "timeout", "extra-mcp-field", "useLegacyMcpJson", "extra-field"],
+    )
+    def test_keeps_any_user_edit(self, agents_dir, mutate):
+        cfg = _generated_config(REPO_ROOT)
+        mutate(cfg)
+        p = _write_legacy(agents_dir, cfg)
+        kiro_install.cleanup_legacy_composer_agent(agents_dir)
+        assert p.exists()
+
+    def test_keeps_mismatched_prompt_and_mcp_roots(self, agents_dir, tmp_path):
+        # prompt and MCP args must point at the SAME root to count as generated
+        cfg = _generated_config(REPO_ROOT)
+        cfg["prompt"] = f"file://{tmp_path}/other/personas/composer.md"
+        p = _write_legacy(agents_dir, cfg)
+        kiro_install.cleanup_legacy_composer_agent(agents_dir)
+        assert p.exists()
+
+    def test_keeps_malformed_null_mcp_server_without_crashing(self, agents_dir):
+        cfg = _generated_config(REPO_ROOT)
+        cfg["mcpServers"] = {"sdpm": None}
+        p = _write_legacy(agents_dir, cfg)
+        kiro_install.cleanup_legacy_composer_agent(agents_dir)  # must not raise
         assert p.exists()
 
     def test_keeps_unparseable_file(self, agents_dir):
         p = agents_dir / "sdpm-composer.json"
         p.write_text("{not json", encoding="utf-8")
-        kiro_install.cleanup_legacy_composer_agent(agents_dir, REPO_ROOT)
+        kiro_install.cleanup_legacy_composer_agent(agents_dir)
         assert p.exists()
 
     def test_noop_when_absent(self, agents_dir):
-        kiro_install.cleanup_legacy_composer_agent(agents_dir, REPO_ROOT)  # no raise
+        kiro_install.cleanup_legacy_composer_agent(agents_dir)  # no raise
         assert list(agents_dir.iterdir()) == []
 
 
