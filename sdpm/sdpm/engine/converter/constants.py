@@ -6,28 +6,45 @@ defusedxml.defuse_stdlib()
 
 import xml.etree.ElementTree as ET
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 
 _NS = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
        'p': 'http://schemas.openxmlformats.org/presentationml/2006/main',
        'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
 
+# Default scale: EMU per px on the 1920px basis of a standard 16:9 deck
+# (12192000 EMU / 1920 px). Kept as a constant for import compatibility;
+# converter internals must call get_emu_per_px() instead, which resolves
+# the scale of the *current* conversion scope.
 EMU_PER_PX = 6350
 
+# Current conversion scale. A ContextVar — not a module global — so nested
+# and concurrent conversions are isolated per execution context, and no
+# non-standard scale can leak out of a conversion.
+_CURRENT_EMU_PER_PX: ContextVar[float] = ContextVar(
+    "converter_emu_per_px", default=float(EMU_PER_PX))
 
-def set_emu_per_px(slide_width_emu):
-    """Set EMU_PER_PX based on actual slide width. Call before extraction."""
-    import sdpm.engine.converter.constants as _c
-    _c.EMU_PER_PX = slide_width_emu / 1920
-    # Update all modules that imported EMU_PER_PX
-    for mod_name in ('sdpm.engine.converter.elements', 'sdpm.engine.converter.slide',
-                     'sdpm.engine.converter.xml_helpers', 'sdpm.engine.converter.text',
-                     'sdpm.engine.converter.table', 'sdpm.engine.converter.chart',
-                     'sdpm.engine.converter.pipeline', 'sdpm.engine.converter'):
-        import sys
-        mod = sys.modules.get(mod_name)
-        if mod and hasattr(mod, 'EMU_PER_PX'):
-            mod.EMU_PER_PX = _c.EMU_PER_PX
+
+def get_emu_per_px() -> float:
+    """EMU-per-px scale of the current conversion scope (default 6350.0)."""
+    return _CURRENT_EMU_PER_PX.get()
+
+
+@contextmanager
+def conversion_scale(slide_width_emu):
+    """Scope the converter's px scale to ``slide_width_emu / 1920``.
+
+    The previous scale is always restored on exit — normal return,
+    exception, or nested use — so error paths and reentrant conversions
+    cannot poison later conversions in the same process.
+    """
+    token = _CURRENT_EMU_PER_PX.set(slide_width_emu / 1920)
+    try:
+        yield
+    finally:
+        _CURRENT_EMU_PER_PX.reset(token)
 
 def _serialize_lstStyle(source):
     """Extract lstStyle XML string from a shape/element with text frame. Returns XML string or None."""
@@ -63,25 +80,27 @@ def _hex(el):
 
 def _position_diff(shape, layout_ph):
     """Return dict of _x/_y/_width/_height where shape differs from layout placeholder."""
+    emu_per_px = get_emu_per_px()
     diff = {}
     if shape.left != layout_ph.left:
-        diff["_x"] = round(shape.left / EMU_PER_PX)
+        diff["_x"] = round(shape.left / emu_per_px)
     if shape.top != layout_ph.top:
-        diff["_y"] = round(shape.top / EMU_PER_PX)
+        diff["_y"] = round(shape.top / emu_per_px)
     if shape.width != layout_ph.width:
-        diff["_width"] = round(shape.width / EMU_PER_PX)
+        diff["_width"] = round(shape.width / emu_per_px)
     if shape.height != layout_ph.height:
-        diff["_height"] = round(shape.height / EMU_PER_PX)
+        diff["_height"] = round(shape.height / emu_per_px)
     return diff
 
 def _base_element(shape, type_name, **extra):
     """Create base element dict with position, size, rotation."""
+    emu_per_px = get_emu_per_px()
     elem = {
         "type": type_name,
-        "x": round(shape.left / EMU_PER_PX),
-        "y": round(shape.top / EMU_PER_PX),
-        "width": round(shape.width / EMU_PER_PX),
-        "height": round(shape.height / EMU_PER_PX),
+        "x": round(shape.left / emu_per_px),
+        "y": round(shape.top / emu_per_px),
+        "width": round(shape.width / emu_per_px),
+        "height": round(shape.height / emu_per_px),
         **extra,
     }
     if shape.rotation != 0:

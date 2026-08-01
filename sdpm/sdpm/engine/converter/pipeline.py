@@ -22,6 +22,7 @@ from pathlib import Path
 from pptx import Presentation
 
 from .color import extract_theme_colors_and_mapping
+from .constants import conversion_scale
 from .slide import extract_slide
 from sdpm.utils.io import write_json
 from sdpm.engine.schema.defaults import sort_element_keys
@@ -46,10 +47,6 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: boo
     """
     actual_path = pptx_path
     prs = Presentation(str(actual_path))
-
-    # Set EMU_PER_PX based on actual slide size
-    from .constants import set_emu_per_px
-    set_emu_per_px(int(prs.slide_width))
 
     # Create output directory
     if output_dir is None:
@@ -81,23 +78,25 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: boo
     if builder_text_color:
         result["defaultTextColor"] = builder_text_color
 
-    for slide_idx, slide in enumerate(prs.slides):
-        # Get slide master index
-        slide_master = slide.slide_layout.slide_master
-        master_idx = list(prs.slide_masters).index(slide_master)
+    # Scope the px scale to this deck's actual slide width (restored on exit)
+    with conversion_scale(int(prs.slide_width)):
+        for slide_idx, slide in enumerate(prs.slides):
+            # Get slide master index
+            slide_master = slide.slide_layout.slide_master
+            master_idx = list(prs.slide_masters).index(slide_master)
 
-        # Extract theme colors and mapping for this master
-        theme_colors, color_mapping, theme_styles = extract_theme_colors_and_mapping(actual_path, master_idx)
+            # Extract theme colors and mapping for this master
+            theme_colors, color_mapping, theme_styles = extract_theme_colors_and_mapping(actual_path, master_idx)
 
-        slide_dict = extract_slide(
-            slide, theme_colors, color_mapping, theme_styles, master_idx, output_dir, slide_idx,
-            pptx_path=actual_path, use_layout_names=use_layout_names, builder_text_color=builder_text_color,
-        )
-        slide_dict["elements"] = [sort_element_keys(e) for e in slide_dict.get("elements", [])]
-        if minimal:
-            from sdpm.engine.schema.minimal import minimize
-            slide_dict["elements"] = minimize(slide_dict["elements"])
-        result["slides"].append(slide_dict)
+            slide_dict = extract_slide(
+                slide, theme_colors, color_mapping, theme_styles, master_idx, output_dir, slide_idx,
+                pptx_path=actual_path, use_layout_names=use_layout_names, builder_text_color=builder_text_color,
+            )
+            slide_dict["elements"] = [sort_element_keys(e) for e in slide_dict.get("elements", [])]
+            if minimal:
+                from sdpm.engine.schema.minimal import minimize
+                slide_dict["elements"] = minimize(slide_dict["elements"])
+            result["slides"].append(slide_dict)
 
     # Write deck.json (fonts + defaultTextColor; template is caller's responsibility)
     deck_meta: dict = {}
