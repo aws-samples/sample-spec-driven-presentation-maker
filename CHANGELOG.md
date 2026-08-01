@@ -34,6 +34,10 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- Cloud: superseded PPTX artifacts are now deleted after each refresh — the
+  automatic artifact refresh no longer accumulates orphaned objects in S3
+  (`update_deck` returns previous values via `UPDATED_OLD`).
+
 - **Cloud agent output-token limit**: model profiles now set an explicit
   `max_tokens` (Claude 32768, others 8192) — Bedrock's small default truncated
   long single-call outputs (e.g. writing `specs/brief.md` from a long article)

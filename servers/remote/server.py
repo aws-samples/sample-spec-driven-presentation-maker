@@ -843,7 +843,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
                             ".presentationml.presentation"
                         ),
                     )
-                    _storage.update_deck(
+                    _old = _storage.update_deck(
                         deck_id=deck_id, user_id=user_id,
                         updates={
                             "pptxS3Key": _pptx_key,
@@ -851,6 +851,18 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
                             "slideCount": len(slides),
                         },
                     )
+                    # The record now points at the new artifact — delete the
+                    # superseded one so auto-refresh doesn't accumulate
+                    # orphaned PPTX objects (best effort; lifecycle rules
+                    # are the backstop).
+                    _old_key = (_old or {}).get("pptxS3Key")
+                    if _old_key and _old_key != _pptx_key:
+                        try:
+                            _storage._s3.delete_object(
+                                Bucket=_storage.pptx_bucket, Key=_old_key,
+                            )
+                        except Exception:
+                            pass
                 except Exception as e:
                     logger.warning("PPTX artifact refresh failed: %s", e)
                     result["pptx_error"] = (

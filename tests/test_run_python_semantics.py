@@ -354,11 +354,14 @@ class _ArtifactStorage(_FakeStorage):
         self.pptx_bucket = "test-pptx"
         self._s3 = MagicMock()
         self.fail_update = False
+        self.previous_pptx_key: str | None = None
 
     def update_deck(self, deck_id, user_id, updates):
         if self.fail_update:
             raise RuntimeError("DynamoDB down")
         self.deck_updates.append(updates)
+        # UPDATED_OLD semantics: previous values of the updated attributes
+        return {"pptxS3Key": self.previous_pptx_key} if self.previous_pptx_key else {}
 
     def list_files(self, prefix="", bucket=""):
         return []
@@ -460,3 +463,20 @@ class TestRemoteRunPythonBranching:
         assert "pptx_error" in out
         # The orphaned upload is deleted (best effort)
         assert storage._s3.delete_object.called
+
+    def test_superseded_artifact_deleted_after_refresh(self, remote_rig):
+        fake_execute, storage, calls = remote_rig
+        fake_execute.changed_paths = ["slides/a.json"]
+        storage.previous_pptx_key = "pptx/d1/old-artifact.pptx"
+        out = self._run()
+        assert "pptx_error" not in out
+        # Auto-refresh must not accumulate orphaned PPTX objects
+        storage._s3.delete_object.assert_called_once_with(
+            Bucket="test-pptx", Key="pptx/d1/old-artifact.pptx")
+
+    def test_first_artifact_deletes_nothing(self, remote_rig):
+        fake_execute, storage, calls = remote_rig
+        fake_execute.changed_paths = ["slides/a.json"]
+        storage.previous_pptx_key = None
+        self._run()
+        assert not storage._s3.delete_object.called
