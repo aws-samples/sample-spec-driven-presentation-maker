@@ -276,7 +276,8 @@ The deck's PPTX artifact and the deck record's `pptxS3Key` refresh
 automatically when the deck changes, so the Web UI's "Download PPTX"
 action works without further steps. Call `generate_pptx(deck_id=deck_id)`
 only as the final handoff — it additionally produces the WebP preview
-set and returns the download link plus a full-deck warnings report.
+set, updates the final PPTX artifact, and returns a full-deck warnings
+report.
 
 ---
 

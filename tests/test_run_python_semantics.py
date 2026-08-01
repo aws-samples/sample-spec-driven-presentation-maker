@@ -141,6 +141,57 @@ class TestLocalRunPython:
         assert "deprecated" in out
 
 
+class TestLocalLintRewriteGuard:
+    """Regression: the lint pass must not rewrite files whose sanitized
+    content is unchanged — unconditional rewrites bumped mtimes on every
+    call and rebuilt output.pptx even for read-only runs (found during the
+    local compose one-pass check)."""
+
+    _patch_generate = TestLocalRunPython._patch_generate
+
+    def test_diagnostics_only_no_rewrite_no_rebuild(
+        self, deck_dir: Path, monkeypatch
+    ):
+        # "missing-type" produces a diagnostic but sanitize changes nothing
+        bad = deck_dir / "slides" / "bad.json"
+        bad.write_text('{"elements": [{"x": 1}]}')
+        mtime = bad.stat().st_mtime_ns
+        calls = self._patch_generate(monkeypatch)
+
+        out = json.loads(sandbox_tools.run_python(
+            purpose="read only",
+            code='print("noop")',
+            deck_id=str(deck_dir),
+        ))
+        # Diagnostics are reported...
+        assert out.get("errors", {}).get("lintDiagnostics")
+        # ...but the file is untouched and no build was triggered
+        assert bad.stat().st_mtime_ns == mtime
+        assert calls == []
+
+    def test_sanitization_rewrites_and_rebuilds_once(
+        self, deck_dir: Path, monkeypatch
+    ):
+        # _spAutoFit is deprecated — sanitize removes it (content change)
+        auto = deck_dir / "slides" / "auto.json"
+        auto.write_text(json.dumps({"elements": [
+            {"type": "textbox", "text": "t", "x": 1, "y": 1, "w": 10, "h": 10,
+             "_spAutoFit": True},
+        ]}))
+        calls = self._patch_generate(monkeypatch)
+
+        json.loads(sandbox_tools.run_python(
+            purpose="read only", code='print("noop")', deck_id=str(deck_dir)))
+        # Sanitization changed the file → rewrite + rebuild
+        assert "_spAutoFit" not in auto.read_text()
+        assert len(calls) == 1
+
+        # Second read-only run: content now stable → no further rebuild
+        json.loads(sandbox_tools.run_python(
+            purpose="read only", code='print("noop")', deck_id=str(deck_dir)))
+        assert len(calls) == 1
+
+
 # ---------------------------------------------------------------------------
 # Remote: diff-based always-persist write-back
 # ---------------------------------------------------------------------------
@@ -189,6 +240,16 @@ class TestRemoteSaveWorkspace:
         assert changed == []
         assert storage.uploads == {}
 
+    def test_diagnostics_only_slide_not_reserialized(self):
+        # A changed slide with diagnostics but no sanitize effect must be
+        # written back byte-identical (pretty formatting preserved) —
+        # mirrors the Local lint rewrite guard.
+        pretty = '{\n  "elements": [\n    {\n      "x": 1\n    }\n  ]\n}'
+        storage, changed = self._run(
+            {"slides/bad.json": pretty}, {"slides/bad.json": "old"})
+        assert changed == ["slides/bad.json"]
+        assert storage.uploads["decks/deckX/slides/bad.json"] == pretty.encode()
+
 
 class TestRemoteContractShape:
     def test_execute_in_sandbox_has_no_save_gate(self):
@@ -235,6 +296,15 @@ class TestRemoteFilesCollision:
                 deck_id="d1",
                 files=["a/data.csv", "b/data.csv"],
             )
+
+    def test_guard_scoped_to_deck_sessions_and_exact_names(self):
+        # Without a deck there is nothing to shadow — deck.json is fine
+        remote_sandbox._validate_staged_files(["x/deck.json"], deck_id=None)
+        # File entries match exactly: deck.jsonl must not be rejected
+        remote_sandbox._validate_staged_files(["x/deck.jsonl"], deck_id="d1")
+        # Exact workspace file name is rejected only with a deck loaded
+        with pytest.raises(ValueError, match="collides"):
+            remote_sandbox._validate_staged_files(["x/deck.json"], deck_id="d1")
 
 
 # ---------------------------------------------------------------------------

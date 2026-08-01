@@ -70,6 +70,35 @@ _HELPERS_IMPORT = (
 )
 
 
+def _validate_staged_files(files: list[str], deck_id: str | None) -> None:
+    """Validate `files=[...]` staging names before sandbox upload.
+
+    Staged files land in the sandbox root by basename. When a deck workspace
+    is loaded, the whole workspace is persisted unconditionally afterwards —
+    a name that shadows a workspace file (e.g. "deck.json") would silently
+    overwrite the deck on S3, so those names are rejected. Without a deck
+    there is nothing to shadow, so any name is fine (general computation).
+
+    File entries in _WORKSPACE_PREFIXES match exactly ("deck.json" is
+    rejected, "deck.jsonl" is not); directory prefixes match by prefix.
+    """
+    basenames = [key.rsplit("/", 1)[-1] for key in files]
+    seen: set[str] = set()
+    for name in basenames:
+        if name in seen:
+            raise ValueError(f"Duplicate filename: {name}")
+        seen.add(name)
+        if deck_id and any(
+            name.startswith(p) if p.endswith("/") else name == p
+            for p in _WORKSPACE_PREFIXES
+        ):
+            raise ValueError(
+                f"File name {name!r} collides with the deck workspace "
+                "(writes always persist) — rename the file before "
+                "passing it via files=[...]."
+            )
+
+
 def execute_in_sandbox(
     code: str,
     storage: Storage,
@@ -102,22 +131,7 @@ def execute_in_sandbox(
         ValueError: If duplicate filenames in files.
     """
     if files:
-        basenames = [key.rsplit("/", 1)[-1] for key in files]
-        seen: set[str] = set()
-        for name in basenames:
-            if name in seen:
-                raise ValueError(f"Duplicate filename: {name}")
-            seen.add(name)
-            # Staged files land in the sandbox root by basename, and the
-            # whole workspace is persisted unconditionally afterwards — a
-            # name that shadows a workspace file (e.g. "deck.json") would
-            # silently overwrite the deck on S3. Reject it up front.
-            if any(name == p or name.startswith(p) for p in _WORKSPACE_PREFIXES):
-                raise ValueError(
-                    f"File name {name!r} collides with the deck workspace "
-                    "(writes always persist) — rename the file before "
-                    "passing it via files=[...]."
-                )
+        _validate_staged_files(files, deck_id)
 
     client = boto3.client("bedrock-agentcore", region_name=region)
 
@@ -321,7 +335,11 @@ def _save_deck_workspace(
                     for d in diags:
                         d["slug"] = slug
                     lint_diagnostics.extend(diags)
-                    file_map[rel_path] = json.dumps(cleaned, ensure_ascii=False)
+                    # Reserialize only when sanitization changed the content —
+                    # keeps Local/Remote semantics aligned (Local skips the
+                    # rewrite for diagnostics-only lint results).
+                    if cleaned != slide_data:
+                        file_map[rel_path] = json.dumps(cleaned, ensure_ascii=False)
             except (json.JSONDecodeError, TypeError):
                 pass
 

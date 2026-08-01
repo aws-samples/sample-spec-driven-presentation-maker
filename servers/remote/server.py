@@ -333,14 +333,18 @@ def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
 
 @mcp.tool()
 def generate_pptx(deck_id: str) -> str:
-    """Generate final PPTX from presentation.json. Resolves include references automatically.
-    Call after slides are written to presentation.json.
+    """Generate final PPTX — the explicit finalize/handoff step.
+
+    The PPTX artifact already refreshes automatically when the deck changes
+    (run_python post-processing); this tool additionally produces the WebP
+    preview set, syncs the knowledge base, and returns a full-deck warnings
+    report. Resolves include references automatically.
 
     Args:
         deck_id: The deck ID to generate PPTX from.
 
     Returns:
-        JSON with status and pptxS3Key.
+        JSON with status, slideCount, slides summary, and optional warnings.
     """
     _check_deck_access(deck_id, action="generate_pptx")
     import traceback
