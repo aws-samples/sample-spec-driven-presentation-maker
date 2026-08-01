@@ -17,6 +17,9 @@
 ## Release
 - Milestone-based (manual decision)
 - Tag when user-facing changes have accumulated
+- Do not pre-assign version numbers to refactoring themes in roadmaps —
+  name them "Theme N" and decide the tag at release time (a tag gated on
+  e.g. E2E can be overtaken by the next theme, breaking the numbering)
 - Breaking changes must always bump MAJOR
 - No release needed for internal-only refactoring
 - Git tag format: `v{MAJOR}.{MINOR}.{PATCH}` (e.g., `v0.1.0`)
