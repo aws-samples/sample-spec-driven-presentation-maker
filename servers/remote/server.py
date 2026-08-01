@@ -55,7 +55,7 @@ logger = logging.getLogger("sdpm.mcp")
 _INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generation from JSON.
 
 ## Architecture
-- The agent edits workspace files via `run_python(deck_id=..., save=True)` using normal file I/O
+- The agent edits workspace files via `run_python(deck_id=...)` using normal file I/O (writes always persist)
 - MCP tools handle: workflow guidance, initialization, PPTX generation, preview, references
 - MCP tools do NOT handle: slide editing, spec writing (agent responsibility via run_python)
 
@@ -333,14 +333,18 @@ def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
 
 @mcp.tool()
 def generate_pptx(deck_id: str) -> str:
-    """Generate final PPTX from presentation.json. Resolves include references automatically.
-    Call after slides are written to presentation.json.
+    """Generate final PPTX — the explicit finalize/handoff step.
+
+    The PPTX artifact already refreshes automatically when the deck changes
+    (run_python post-processing); this tool additionally produces the WebP
+    preview set, syncs the knowledge base, and returns a full-deck warnings
+    report. Resolves include references automatically.
 
     Args:
         deck_id: The deck ID to generate PPTX from.
 
     Returns:
-        JSON with status and pptxS3Key.
+        JSON with status, slideCount, slides summary, and optional warnings.
     """
     _check_deck_access(deck_id, action="generate_pptx")
     import traceback
@@ -591,6 +595,38 @@ def code_to_slide(deck_id: str, code: str, name: str,
 # --- Code Execution (Code Interpreter) ---
 
 
+def _build_relevant(p: str) -> bool:
+    """True if a workspace path affects the built PPTX artifact."""
+    return (
+        p in ("deck.json", "presentation.json", "specs/outline.md")
+        or p.startswith(("slides/", "includes/"))
+    )
+
+
+def _post_processing_plan(deck_changed: bool,
+                          measure_slides: list[str] | None) -> dict[str, bool]:
+    """Decide run_python post-processing actions (the unified contract).
+
+    - build:    cheap python-pptx build — prerequisite for both the artifact
+                refresh and the verification pass
+    - artifact: refresh the deck's PPTX artifact (follows deck changes
+                automatically; failure must surface in the result)
+    - verify:   expensive verification (measure / SVG compose / preview) —
+                triggered by measure_slides and ONLY by measure_slides
+
+    Contract matrix (pinned by tests/test_run_python_semantics.py):
+        changed=False, measure=None → nothing
+        changed=True,  measure=None → build + artifact only
+        changed=False, measure=[..] → build + verify only
+        changed=True,  measure=[..] → build + artifact + verify
+    """
+    return {
+        "build": bool(deck_changed or measure_slides),
+        "artifact": bool(deck_changed),
+        "verify": bool(measure_slides),
+    }
+
+
 @mcp.tool()
 def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool = False,
                files: list[str] | None = None, measure_slides: list[str] | None = None) -> str:
@@ -625,7 +661,16 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     Raw `open()` / `json.load` still work on Cloud for backward compat,
     but new code should prefer the helpers.
 
-    If save=True, all modified/new workspace files are written back to S3.
+    ## Persistence & build (no flags needed)
+
+    - File writes always persist — modified/new workspace files are written
+      back to S3 after every execution. There is no "unsaved" state.
+      (If you only have read access to the deck, writes are discarded and
+      the result notes it.)
+    - The deck's PPTX artifact refreshes automatically whenever the deck
+      changed (deck.json / slides/ / includes/ / specs/outline.md).
+    - measure_slides triggers the expensive verification pass (render + text
+      overflow measurement + live-preview compose) for the given slugs only.
 
     **Always specify measure_slides when editing slides.** Runs validation after
     code execution (requires deck_id):
@@ -643,11 +688,11 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
             data = read_json("slides/title.json")
             data["elements"][0]["text"] = "New Title"
             write_json("slides/title.json", data)
-            # run_python(code=<above>, deck_id="abc", save=True, measure_slides=["title"])
+            # run_python(code=<above>, deck_id="abc", measure_slides=["title"])
 
         Edit spec:
             write_text("specs/brief.md", "# Brief\\n\\nContents...")
-            # run_python(code=<above>, deck_id="abc", save=True)
+            # run_python(code=<above>, deck_id="abc")
 
         Read deck metadata:
             deck = read_json("deck.json")
@@ -662,7 +707,8 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     Args:
         code: Python code to execute.
         deck_id: Deck ID to load workspace from. Optional.
-        save: If True, save modified workspace files back to S3. Requires deck_id.
+        save: Deprecated and ignored. Writes always persist and the PPTX
+            artifact refreshes automatically when the deck changed.
         files: S3 keys of files to make available in the sandbox. Optional.
         measure_slides: List of slide slugs to measure after execution. Requires deck_id.
         purpose: Brief user-facing description of what this code does,
@@ -674,19 +720,38 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     """
     if measure_slides and not deck_id:
         return json.dumps({"error": "measure_slides requires deck_id"})
-    if deck_id:
-        _check_deck_access(deck_id, action="edit_slide" if save else "read")
 
-    output, outline_warnings, lint_diagnostics = sandbox_mod.execute_in_sandbox(
+    result: dict = {}
+    if save:
+        result["deprecated"] = (
+            "'save' is ignored: writes always persist and the PPTX artifact "
+            "refreshes automatically when the deck changed."
+        )
+
+    # Writes persist by default. If the user only has read access, run the
+    # sandbox without write-back instead of failing (read-only analysis).
+    persist_writes = True
+    if deck_id:
+        try:
+            _check_deck_access(deck_id, action="edit_slide")
+        except ValueError:
+            _check_deck_access(deck_id, action="read")
+            persist_writes = False
+            result["readOnly"] = (
+                "You have read-only access to this deck: file writes were "
+                "not persisted."
+            )
+
+    output, outline_warnings, lint_diagnostics, changed_paths = sandbox_mod.execute_in_sandbox(
         code=code,
         storage=_storage,
         region=_region,
         deck_id=deck_id,
-        save=save,
+        persist_writes=persist_writes,
         files=files,
     )
 
-    result: dict = {"output": output}
+    result["output"] = output
 
     if outline_warnings:
         result.setdefault("warnings", {})["outline"] = (
@@ -698,8 +763,12 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
         errs = result.setdefault("errors", {})
         errs["lintDiagnostics"] = lint_diagnostics
 
-    # Post-processing: measure_slides triggers PPTX build → measure/bias
-    if deck_id and (measure_slides or save):
+    # Post-processing: rebuild the PPTX artifact whenever build-relevant files
+    # changed (the artifact follows the deck automatically); measure_slides
+    # (and ONLY measure_slides) triggers the expensive verification pass.
+    deck_changed = any(_build_relevant(p) for p in changed_paths)
+    plan = _post_processing_plan(deck_changed, measure_slides)
+    if deck_id and plan["build"]:
         import shutil
         import traceback
 
@@ -721,39 +790,97 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
             page_numbers = [slug_to_page[slug] for slug in (measure_slides or []) if slug in slug_to_page]
             page_to_slug = {v: k for k, v in slug_to_page.items()}
 
-            # Measure
-            try:
-                if page_numbers:
-                    measure_result = _run_measure(tmpdir, pptx_path, page_numbers, page_to_slug=page_to_slug)
-                    result["measure"] = measure_result
-                else:
-                    result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})
-            except Exception as e:
-                result["measure"] = json.dumps({"error": str(e)})
+            if plan["verify"]:
+                # Measure
+                try:
+                    if page_numbers:
+                        measure_result = _run_measure(tmpdir, pptx_path, page_numbers, page_to_slug=page_to_slug)
+                        result["measure"] = measure_result
+                    else:
+                        result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})
+                except Exception as e:
+                    result["measure"] = json.dumps({"error": str(e)})
 
-            # Layout bias (filter to measured slides; bias uses 1-based)
-            try:
-                from sdpm.engine.preview import check_layout_imbalance_data
-                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in set(page_numbers)]
-                if layout_bias:
-                    result["warnings"] = {"layoutBias": layout_bias}
-            except Exception as e:
-                logger.warning("Layout bias check failed: %s", e)
+                # Layout bias (filter to measured slides; bias uses 1-based)
+                try:
+                    from sdpm.engine.preview import check_layout_imbalance_data
+                    layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in set(page_numbers)]
+                    if layout_bias:
+                        result["warnings"] = {"layoutBias": layout_bias}
+                except Exception as e:
+                    logger.warning("Layout bias check failed: %s", e)
 
-            # Invalid-layout errors scoped to measured slugs only. Each
-            # composer owns a subset of slides, so leaking another group's
-            # mistake would be noise (they cannot fix it anyway).
-            measured_set = set(measure_slides or [])
-            my_invalids = [e for e in invalid_layouts if e.get("slug") in measured_set]
-            if my_invalids:
-                errs = result.setdefault("errors", {})
-                for e in my_invalids:
-                    errs[e["slug"]] = {
-                        "invalidLayout": e["attempted"],
-                        "available": e["available"],
-                    }
+                # Invalid-layout errors scoped to measured slugs only. Each
+                # composer owns a subset of slides, so leaking another group's
+                # mistake would be noise (they cannot fix it anyway).
+                measured_set = set(measure_slides or [])
+                my_invalids = [e for e in invalid_layouts if e.get("slug") in measured_set]
+                if my_invalids:
+                    errs = result.setdefault("errors", {})
+                    for e in my_invalids:
+                        errs[e["slug"]] = {
+                            "invalidLayout": e["attempted"],
+                            "available": e["available"],
+                        }
 
-            if save:
+            if plan["artifact"]:
+                # Refresh the download artifact — the deck's PPTX follows deck
+                # changes automatically (same upload/record shape as
+                # generate_pptx; WebP previews and KB sync stay with
+                # generate_pptx, the explicit finalize/handoff step).
+                # A failure here means the download artifact is STALE — that
+                # must be visible to the caller, not just logged.
+                _pptx_key = None
+                try:
+                    import uuid as _uuid
+                    from datetime import datetime as _dt, timezone as _tz
+                    _pptx_key = f"pptx/{deck_id}/{_uuid.uuid4()}.pptx"
+                    _storage.upload_file(
+                        key=_pptx_key,
+                        data=Path(pptx_path).read_bytes(),
+                        content_type=(
+                            "application/vnd.openxmlformats-officedocument"
+                            ".presentationml.presentation"
+                        ),
+                    )
+                    _old = _storage.update_deck(
+                        deck_id=deck_id, user_id=user_id,
+                        updates={
+                            "pptxS3Key": _pptx_key,
+                            "updatedAt": _dt.now(_tz.utc).isoformat(),
+                            "slideCount": len(slides),
+                        },
+                    )
+                    # The record now points at the new artifact — delete the
+                    # superseded one so auto-refresh doesn't accumulate
+                    # orphaned PPTX objects (best effort; lifecycle rules
+                    # are the backstop).
+                    _old_key = (_old or {}).get("pptxS3Key")
+                    if _old_key and _old_key != _pptx_key:
+                        try:
+                            _storage._s3.delete_object(
+                                Bucket=_storage.pptx_bucket, Key=_old_key,
+                            )
+                        except Exception:
+                            pass
+                except Exception as e:
+                    logger.warning("PPTX artifact refresh failed: %s", e)
+                    result["pptx_error"] = (
+                        f"PPTX artifact refresh failed — the downloadable "
+                        f"PPTX is stale. Run generate_pptx to refresh it. "
+                        f"({e})"
+                    )
+                    if _pptx_key:
+                        # The record update may have failed after the upload
+                        # succeeded — delete the orphaned object (best effort).
+                        try:
+                            _storage._s3.delete_object(
+                                Bucket=_storage.pptx_bucket, Key=_pptx_key,
+                            )
+                        except Exception:
+                            pass
+
+            if plan["verify"]:
                 # Compose: SVG → optimized JSON for WebUI animation
                 # Only generates compose for measure_slides slugs (parallel-safe).
                 # Uses _prepare_epoch (snapshot time) so the composer with the
@@ -793,7 +920,8 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
 
                         # Determine which slugs to generate compose for
                         # Always include slugs that have no existing compose (migration + first build)
-                        compose_slugs = set(measure_slides) if measure_slides else set(slug_to_page.keys())
+                        # Verify-gated: measure_slides is always set here
+                        compose_slugs = set(measure_slides)
                         for s in slug_to_page:
                             if not _latest_key(f"{compose_prefix}{s}_"):
                                 compose_slugs.add(s)
@@ -924,7 +1052,13 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
                 pass
             else:
                 logger.exception("run_python post-processing failed: deck=%s", deck_id)
-                result["measure"] = json.dumps({"error": msg, "traceback": traceback.format_exc()})
+                if plan["verify"]:
+                    result["measure"] = json.dumps({"error": msg, "traceback": traceback.format_exc()})
+                else:
+                    result["pptx_error"] = (
+                        f"PPTX build failed — the downloadable PPTX may be "
+                        f"stale: {msg}"
+                    )
 
     return json.dumps(result, ensure_ascii=False)
 
@@ -945,7 +1079,8 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
 
     If style_name is provided, the style HTML is loaded as style.html.
     The code can read/write it via normal file I/O (open, read, write).
-    If save=True, style.html is written back to the user's style storage.
+    Writes always persist — if style.html changed, it is written back to the
+    user's style storage automatically. There is no "unsaved" state.
 
     If ref_styles are provided, they are downloaded and available as ref/{name}.html.
     Use list_styles to discover available style names.
@@ -954,16 +1089,16 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
     for color computation, palette extraction, and contrast calculation.
 
     Workspace layout:
-        style.html          — target style (read/write, saved back when save=True)
+        style.html          — target style (read/write; persisted when changed)
         ref/{name}.html     — reference styles (read-only)
 
     Examples:
         Read reference:    run_style_python(code="html = open('ref/corporate-executive.html').read(); print(html[:200])",
                                            ref_styles=["corporate-executive"])
         Create new:        run_style_python(code="open('style.html','w').write('<html>...')",
-                                           style_name="style-20260506-1430", save=True)
+                                           style_name="style-20260506-1430")
         Edit existing:     run_style_python(code="html = open('style.html').read(); html = html.replace('old','new'); open('style.html','w').write(html)",
-                                           style_name="style-20260506-1430", save=True)
+                                           style_name="style-20260506-1430")
         Compute colors:    run_style_python(code="from colorsys import rgb_to_hls; print(rgb_to_hls(0.2, 0.4, 0.6))")
 
     Args:
@@ -971,15 +1106,13 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
             written in the user's language. Shown in the UI.
         code: Python code to execute.
         style_name: Style name to load as style.html. Optional.
-        save: If True, save style.html back to storage. Requires style_name.
+        save: Deprecated and ignored. style.html persists automatically
+            when changed (requires style_name).
         ref_styles: Style names to load as ref/{name}.html. Optional.
 
     Returns:
         JSON string: {"output", "saved"?}
     """
-    if save and not style_name:
-        return json.dumps({"error": "save=True requires style_name"})
-
     user_id = _get_user_id()
 
     client = boto3.client("bedrock-agentcore", region_name=_region)
@@ -993,10 +1126,12 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
     try:
         file_contents: list[dict[str, str]] = []
 
-        # Load target style
+        # Load target style (baseline for change detection)
+        baseline_style: str | None = None
         if style_name:
             html = _load_style_html(user_id, style_name)
             if html:
+                baseline_style = html
                 file_contents.append({"path": "style.html", "text": html})
 
         # Load reference styles
@@ -1031,9 +1166,14 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
         output = sandbox_mod._collect_stream(response)
 
         result: dict = {"output": output}
+        if save:
+            result["deprecated"] = (
+                "'save' is ignored: style.html persists automatically "
+                "when changed."
+            )
 
-        # Save style.html back to S3
-        if save and style_name:
+        # Persist style.html when it changed (always — no "unsaved" state)
+        if style_name:
             read_code = "import sys\ntry:\n    print(open('style.html').read())\nexcept FileNotFoundError:\n    print('__NOT_FOUND__')\n"
             read_resp = client.invoke_code_interpreter(
                 codeInterpreterIdentifier="aws.codeinterpreter.v1",
@@ -1041,10 +1181,29 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
                 arguments={"language": "python", "code": read_code},
             )
             style_html = sandbox_mod._collect_stream(read_resp)
-            if style_html and style_html.strip() != "__NOT_FOUND__":
+            if (
+                style_html
+                and style_html.strip() != "__NOT_FOUND__"
+                # print() appends a newline — compare newline-insensitively
+                and style_html.rstrip("\n") != (baseline_style or "").rstrip("\n")
+            ):
                 key = f"user-styles/{user_id}/{style_name}.html"
                 _storage.upload_file(key=key, data=style_html.encode("utf-8"), content_type="text/html")
                 result["saved"] = {"filename": f"{style_name}.html", "key": key}
+        else:
+            # No style_name → nothing can persist. If the code wrote
+            # style.html anyway, that would be silent data loss — surface it.
+            exists_resp = client.invoke_code_interpreter(
+                codeInterpreterIdentifier="aws.codeinterpreter.v1",
+                sessionId=session_id, name="executeCode",
+                arguments={"language": "python",
+                           "code": "import os\nprint(os.path.exists('style.html'))\n"},
+            )
+            if sandbox_mod._collect_stream(exists_resp).strip() == "True":
+                result["warning"] = (
+                    "style.html was written but no style_name was given — "
+                    "it was NOT persisted. Re-run with style_name=<name>."
+                )
 
         return json.dumps(result, ensure_ascii=False)
 

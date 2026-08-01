@@ -10,6 +10,17 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Changed
+
+- `run_python` / `run_style_python`: file writes now always persist — the
+  `save` flag is deprecated and ignored (silent data loss when omitting
+  `save=True` on Cloud is no longer possible). The deck's PPTX artifact
+  refreshes automatically whenever the deck changes; `measure_slides`
+  remains the trigger for the expensive verification pass (render, text
+  overflow measurement, previews)
+- Cloud sandbox write-back is now diff-based (changed/new files only),
+  preventing a stale sandbox copy from overwriting newer S3 writes
+
 ## [0.5.1] - 2026-07-31
 
 ### Added
@@ -22,6 +33,10 @@ Entries before v0.5.0 were written retroactively as summaries.
   from this changelog)
 
 ### Fixed
+
+- Cloud: superseded PPTX artifacts are now deleted after each refresh — the
+  automatic artifact refresh no longer accumulates orphaned objects in S3
+  (`update_deck` returns previous values via `UPDATED_OLD`).
 
 - **Cloud agent output-token limit**: model profiles now set an explicit
   `max_tokens` (Claude 32768, others 8192) — Bedrock's small default truncated

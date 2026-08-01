@@ -70,45 +70,68 @@ _HELPERS_IMPORT = (
 )
 
 
+def _validate_staged_files(files: list[str], deck_id: str | None) -> None:
+    """Validate `files=[...]` staging names before sandbox upload.
+
+    Staged files land in the sandbox root by basename. When a deck workspace
+    is loaded, the whole workspace is persisted unconditionally afterwards —
+    a name that shadows a workspace file (e.g. "deck.json") would silently
+    overwrite the deck on S3, so those names are rejected. Without a deck
+    there is nothing to shadow, so any name is fine (general computation).
+
+    File entries in _WORKSPACE_PREFIXES match exactly ("deck.json" is
+    rejected, "deck.jsonl" is not); directory prefixes match by prefix.
+    """
+    basenames = [key.rsplit("/", 1)[-1] for key in files]
+    seen: set[str] = set()
+    for name in basenames:
+        if name in seen:
+            raise ValueError(f"Duplicate filename: {name}")
+        seen.add(name)
+        if deck_id and any(
+            name.startswith(p) if p.endswith("/") else name == p
+            for p in _WORKSPACE_PREFIXES
+        ):
+            raise ValueError(
+                f"File name {name!r} collides with the deck workspace "
+                "(writes always persist) — rename the file before "
+                "passing it via files=[...]."
+            )
+
+
 def execute_in_sandbox(
     code: str,
     storage: Storage,
     region: str,
     deck_id: str | None = None,
-    save: bool = False,
+    persist_writes: bool = True,
     files: list[str] | None = None,
-) -> tuple[str, bool]:
+) -> tuple[str, list[dict], list[dict], list[str]]:
     """Execute Python code in Amazon Bedrock AgentCore Code Interpreter sandbox.
 
     When deck_id is provided, the entire deck workspace is loaded into the
     sandbox filesystem. The user code can read/write any file via normal
-    file I/O (open, json.load, etc.). If save=True, modified and new files
-    are written back to S3.
+    file I/O (open, json.load, etc.). Modified and new files are always
+    written back to S3 (diff against the session-start snapshot) — there is
+    no "unsaved" state.
 
     Args:
         code: Python code to execute.
         storage: Storage backend for S3 operations.
         region: AWS region for Code Interpreter API.
         deck_id: If provided, loads deck workspace into sandbox.
-        save: If True, writes changed files back to S3. Requires deck_id.
+        persist_writes: Set False to run without write-back (used when the
+            caller only has read access to the deck).
         files: Additional S3 keys to download into sandbox by basename.
 
     Returns:
-        Tuple of (code execution output, outline_warnings list).
+        Tuple of (output, outline_warnings, lint_diagnostics, changed paths).
 
     Raises:
-        ValueError: If save=True without deck_id, or duplicate filenames in files.
+        ValueError: If duplicate filenames in files.
     """
-    if save and not deck_id:
-        raise ValueError("save=True requires deck_id")
-
     if files:
-        basenames = [key.rsplit("/", 1)[-1] for key in files]
-        seen: set[str] = set()
-        for name in basenames:
-            if name in seen:
-                raise ValueError(f"Duplicate filename: {name}")
-            seen.add(name)
+        _validate_staged_files(files, deck_id)
 
     client = boto3.client("bedrock-agentcore", region_name=region)
 
@@ -121,9 +144,11 @@ def execute_in_sandbox(
     logger.info("Code Interpreter session started: %s", session_id)
 
     try:
-        # Load deck workspace into sandbox
+        # Load deck workspace into sandbox (baseline snapshot for diff-based
+        # write-back)
+        baseline: dict[str, str] = {}
         if deck_id:
-            _upload_deck_workspace(client, session_id, storage, deck_id)
+            baseline = _upload_deck_workspace(client, session_id, storage, deck_id)
 
         # Inject shared sandbox helpers (read_json / write_json / ...) so user
         # code can use the same API on Local and Cloud.
@@ -148,16 +173,22 @@ def execute_in_sandbox(
         )
         output = _collect_stream(response)
 
-        # Save modified workspace files back to S3
+        # Always write modified workspace files back to S3 — writes persist
+        # unconditionally (diff-based, changed/new files only).
         outline_warnings: list[dict] = []
         lint_diagnostics: list[dict] = []
-        if save and deck_id:
-            outline_warnings, lint_diagnostics = _save_deck_workspace(
-                client, session_id, storage, deck_id,
+        changed_paths: list[str] = []
+        if deck_id and persist_writes:
+            outline_warnings, lint_diagnostics, changed_paths = _save_deck_workspace(
+                client, session_id, storage, deck_id, baseline=baseline,
             )
-            logger.info("Deck workspace saved for deck %s", deck_id)
+            if changed_paths:
+                logger.info(
+                    "Deck workspace saved for deck %s (%d changed files)",
+                    deck_id, len(changed_paths),
+                )
 
-        return output, outline_warnings, lint_diagnostics
+        return output, outline_warnings, lint_diagnostics, changed_paths
 
     finally:
         client.stop_code_interpreter_session(
@@ -172,7 +203,7 @@ def _upload_deck_workspace(
     session_id: str,
     storage: Storage,
     deck_id: str,
-) -> list[str]:
+) -> dict[str, str]:
     """Download all deck files from S3 and write them into the sandbox.
 
     Args:
@@ -182,7 +213,8 @@ def _upload_deck_workspace(
         deck_id: Deck identifier.
 
     Returns:
-        List of relative paths written to the sandbox.
+        Mapping of relative path → uploaded text content (baseline snapshot
+        used for diff-based write-back).
     """
     prefix = f"decks/{deck_id}/"
     keys = storage.list_files(prefix=prefix, bucket=storage.pptx_bucket)
@@ -215,7 +247,7 @@ def _upload_deck_workspace(
         },
     )
 
-    return [f["path"] for f in file_contents]
+    return {f["path"]: f["text"] for f in file_contents}
 
 
 def _save_deck_workspace(
@@ -223,24 +255,28 @@ def _save_deck_workspace(
     session_id: str,
     storage: Storage,
     deck_id: str,
-) -> bool:
+    baseline: dict[str, str] | None = None,
+) -> tuple[list[dict], list[dict], list[str]]:
     """Read workspace files from sandbox via prefix scan and write back to S3.
 
     Scans the sandbox for files matching _WORKSPACE_PREFIXES instead of
     relying on the upload paths list. This ensures newly created files
     (e.g., slides/{slug}.json) are automatically saved.
 
-    If specs/outline.md is present and fails lint, it is excluded from the
-    S3 write-back (rejected).
+    Diff-based: files whose content equals the baseline (what was uploaded
+    at session start) are skipped. This keeps the always-persist contract
+    cheap and prevents a stale sandbox copy from clobbering files another
+    writer changed on S3 in the meantime.
 
     Args:
         client: Bedrock AgentCore client.
         session_id: Code Interpreter session ID.
         storage: Storage backend.
         deck_id: Deck identifier.
+        baseline: Relative path → content as uploaded at session start.
 
     Returns:
-        True if outline.md was rejected due to lint failure, False otherwise.
+        Tuple of (outline_warnings, lint_diagnostics, changed relative paths).
     """
     # Scan sandbox for all workspace files via executeCode
     prefixes_repr = repr(_WORKSPACE_PREFIXES)
@@ -269,6 +305,12 @@ def _save_deck_workspace(
 
     file_map: dict[str, str] = json.loads(raw)
 
+    # Diff against the session-start baseline — only changed/new files are
+    # written back. Unchanged files are skipped so a stale sandbox copy can
+    # never overwrite a newer S3 write from a parallel session.
+    if baseline:
+        file_map = {p: t for p, t in file_map.items() if baseline.get(p) != t}
+
     # Lint outline.md before saving — warn on failure
     outline_warnings: list[dict] = []
     outline_key = "specs/outline.md"
@@ -293,11 +335,15 @@ def _save_deck_workspace(
                     for d in diags:
                         d["slug"] = slug
                     lint_diagnostics.extend(diags)
-                    file_map[rel_path] = json.dumps(cleaned, ensure_ascii=False)
+                    # Reserialize only when sanitization changed the content —
+                    # keeps Local/Remote semantics aligned (Local skips the
+                    # rewrite for diagnostics-only lint results).
+                    if cleaned != slide_data:
+                        file_map[rel_path] = json.dumps(cleaned, ensure_ascii=False)
             except (json.JSONDecodeError, TypeError):
                 pass
 
-    # Write back to S3
+    # Write back to S3 (changed/new files only)
     prefix = f"decks/{deck_id}/"
     for rel_path, text in file_map.items():
         s3_key = prefix + rel_path
@@ -307,7 +353,7 @@ def _save_deck_workspace(
             content_type=_content_type(rel_path),
         )
 
-    return outline_warnings, lint_diagnostics
+    return outline_warnings, lint_diagnostics, sorted(file_map.keys())
 
 
 def _inject_helpers(client: Any, session_id: str) -> None:

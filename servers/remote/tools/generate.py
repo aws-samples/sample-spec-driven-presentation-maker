@@ -298,9 +298,17 @@ def generate_pptx(
         # Update deck record
         deck = storage.get_deck(deck_id, user_id)
         now = datetime.now(timezone.utc).isoformat()
-        storage.update_deck(deck_id=deck_id, user_id=user_id, updates={
+        old = storage.update_deck(deck_id=deck_id, user_id=user_id, updates={
             "pptxS3Key": pptx_key, "updatedAt": now, "slideCount": len(slides),
         })
+        # Delete the superseded artifact (best effort) — every refresh
+        # uploads a new UUID key and only the newest is referenced.
+        old_key = (old or {}).get("pptxS3Key")
+        if old_key and old_key != pptx_key:
+            try:
+                storage._s3.delete_object(Bucket=storage.pptx_bucket, Key=old_key)
+            except Exception:
+                pass
 
         # Preview: epoch-keyed WebP (background)
         slugs = [s.get("id") or f"slide_{i + 1:02d}" for i, s in enumerate(slides)]

@@ -59,7 +59,7 @@ class AwsStorage(Storage):
         resp = self._table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"DECK#{deck_id}"})
         return resp.get("Item")
 
-    def update_deck(self, deck_id: str, user_id: str, updates: dict) -> None:
+    def update_deck(self, deck_id: str, user_id: str, updates: dict) -> dict:
         """Partial update of deck metadata in DDB.
 
         Keys with None values are removed from the item (REMOVE expression).
@@ -69,6 +69,11 @@ class AwsStorage(Storage):
             deck_id: Deck identifier.
             user_id: User identifier.
             updates: Dict of attribute names to values. None means remove.
+
+        Returns:
+            Previous values of the updated attributes (UPDATED_OLD) — lets
+            callers clean up superseded S3 objects (e.g. the old pptxS3Key)
+            without an extra read.
         """
         set_parts = []
         remove_parts = []
@@ -92,7 +97,9 @@ class AwsStorage(Storage):
         }
         if values:
             kwargs["ExpressionAttributeValues"] = values
-        self._table.update_item(**kwargs)
+        kwargs["ReturnValues"] = "UPDATED_OLD"
+        response = self._table.update_item(**kwargs)
+        return response.get("Attributes", {})
 
     # --- Presentation JSON (S3) ---
 

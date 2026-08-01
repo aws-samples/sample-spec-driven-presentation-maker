@@ -27,8 +27,12 @@ class Storage(ABC):
         """Get deck metadata. Returns None if not found."""
 
     @abstractmethod
-    def update_deck(self, deck_id: str, user_id: str, updates: dict) -> None:
-        """Partial update of deck metadata."""
+    def update_deck(self, deck_id: str, user_id: str, updates: dict) -> dict:
+        """Partial update of deck metadata.
+
+        Returns:
+            Previous values of the updated attributes (may be empty).
+        """
 
     # --- Presentation JSON (S3) ---
 
