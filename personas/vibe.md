@@ -114,33 +114,45 @@ what your environment provides — check your tool list in this order:
 
 1. **A `compose_slides` tool exists** → call
    `compose_slides(deck_id=..., slide_groups=[...])` and let the backend parallelize.
-2. **You can spawn sub-agents in parallel** (e.g. a Task tool with an `sdpm-composer`
-   agent, a `subagent` tool with role `sdpm-composer`, or `use_subagent` with
-   `agent_name: "sdpm-composer"`) → dispatch one composer per group, all in one message
-   so they run in parallel. Parallelism cap: 10 (use waves of ≤10 if more groups).
-   If the composer agent is not registered in your environment, STOP — do not improvise
-   with another role: tell the user to install the composer agent (e.g. `make install-kiro`
-   for Kiro CLI, `/plugin install sdpm@sdpm` for Claude Code) and restart the session.
+2. **You can spawn sub-agents in parallel** → dispatch one worker per group, all in one
+   message so they run in parallel. Parallelism cap: 10 (use waves of ≤10 if more
+   groups). Worker choice, in order:
+   - a registered `sdpm-composer` agent, if your environment provides one
+     (e.g. `use_subagent` with `agent_name: "sdpm-composer"`);
+   - otherwise **your own agent** (self-spawn: e.g. a `subagent` tool with your current
+     role) or a general-purpose sub-agent (e.g. a `Task` tool with `general-purpose`) —
+     no dedicated composer agent needs to be installed.
+   Use the **Composer Spawn Template** below for every dispatch — replace only the
+   `{slot}` values, keep everything else exactly as written (ASCII-only).
+   Workers approve tools from their own agent config, not from your session — if
+   spawns stall on tool approvals, ask the user to trust the sdpm tools and retry.
 3. **Neither exists** (plain MCP client) → compose **sequentially yourself**: call
    `start_presentation(mode="composer")` to load the composer behavior, then process each
    group one at a time following it. Slower, but fully functional.
 
-Per-group prompt template (for dispatch options 1 and 2 — keep prompts ASCII-clean):
+### Composer Spawn Template
 
 ```
-deck_id=<ABSOLUTE deck path>.
-Your assigned slugs: <slug-a>[, <slug-b>].
-First load references (read_workflows(["create-new-2-compose","slide-json-spec"]),
-read_guides(["grid"]), read_examples(["components/all","patterns"])), then read
-specs/brief.md, specs/outline.md, specs/art-direction.html for context.
-Compose ONLY your assigned slugs, one at a time, via run_python's write_json, and use
-the preview_files (PNG) returned by run_python(measure_slides=[slug]) as the
-source of truth. Do NOT touch other slides, deck.json, or specs/. art-direction is
-FROZEN. Do NOT advance to Phase 3. Return a summary plus any warnings.
+deck_id: {deck_id}
+assigned_slugs: {slugs}
+task_instruction: {task_instruction}
+specs_directory: {deck_id}/specs
+
+Touch ONLY your assigned slugs. If no sdpm tools are visible, stop and report
+that the sdpm tools are unavailable.
 ```
 
-Each prompt MUST include: deck_id (absolute path), the exact assigned slugs, and the
-pointer to specs/.
+The template is pure data — no bootstrap instruction. Workers that can call
+`start_presentation` discover it through the tool description ("REQUIRED FIRST
+STEP") and load the composer behavior with `mode="composer"`; dedicated
+composer agents already carry it. Do not add instructions to the template.
+
+`{deck_id}` is the absolute deck path. `{task_instruction}` values:
+- Initial compose: `Compose the assigned slides from the approved specs.`
+- Consistency review (assign ALL slugs): `Consistency review.` — exactly this string;
+  it switches the composer's mode.
+- User-requested fixes: a specific instruction summarizing the request
+  (e.g. `The text overflows the card on data-points.`).
 
 ## Slide Group Assignment
 

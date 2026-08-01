@@ -38,8 +38,8 @@ directory into your agent's skills directory. The agent calls the engine through
 `scripts/pptx_builder.py` — no MCP server involved.
 
 > **Kiro CLI users:** you probably want [Layer 2](#layer-2-local-mcp-server) instead —
-> `make install-kiro` sets up the local MCP server (mode behavior included) plus the
-> composer sub-agent for parallel slide generation.
+> `make install-kiro` sets up the local MCP server (mode behavior included); composer
+> sub-agents for parallel slide generation are self-spawned, nothing extra to install.
 
 ```bash
 # Install dependencies
@@ -64,8 +64,9 @@ Connect spec-driven-presentation-maker to any MCP-compatible client. No AWS acco
 
 ### Kiro CLI — one make target (recommended)
 
-Kiro CLI users get the MCP server (mode behavior included — no skill files) plus the
-composer sub-agent for parallel slide generation, from a single target:
+Kiro CLI users get everything from a single target — the MCP server carries the mode
+behavior, and composer sub-agents are self-spawned at compose time (no agent files
+to install):
 
 ```bash
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
@@ -74,15 +75,15 @@ make install-kiro
 kiro-cli chat   # then just ask: "make slides about ..."
 ```
 
-This registers the `sdpm` local MCP server in `~/.kiro/settings/mcp.json` and generates
-the composer agent config at `~/.kiro/agents/sdpm-composer.json`. Mode behavior
+This registers the `sdpm` local MCP server in `~/.kiro/settings/mcp.json`. Mode behavior
 (vibe / spec / style) is served by the MCP server itself via `start_presentation(mode=...)`
 — nothing else to install. Prerequisites: [`uv`](https://docs.astral.sh/uv/) on
 your `PATH`, plus **LibreOffice** and **poppler** for slide previews.
 
 Keep the checkout where it is — the MCP server runs from it. `git pull` is enough to
-update (the composer prompt is a `file://` reference into `personas/`). Re-run
-`make install-kiro` only if you move the checkout.
+update. Re-run `make install-kiro` only if you move the checkout (upgrading from
+v0.5.2 or earlier, re-run it once — it also removes the now-unneeded
+`~/.kiro/agents/sdpm-composer.json` that older installers generated).
 
 ### Other MCP clients — manual setup
 

@@ -38,8 +38,8 @@ symlink します。エージェントは `scripts/pptx_builder.py` 経由でエ
 サーバーは不要です。
 
 > **Kiro CLI ユーザーの方:** [Layer 2](#layer-2-ローカル-mcp-サーバー) をご覧ください —
-> `make install-kiro` でローカル MCP サーバー（モードの振る舞い込み）と、並列 composer
-> サブエージェントを含む）が一度に設定されます。
+> `make install-kiro` でローカル MCP サーバー（モードの振る舞い込み）が設定されます。
+> 並列スライド生成の composer サブエージェントは self-spawn されるため、追加のインストールは不要です。
 
 ```bash
 # 依存関係のインストール
@@ -64,8 +64,9 @@ spec-driven-presentation-maker を MCP 対応の任意のクライアントに�
 
 ### Kiro CLI — make ターゲット 1 つ（推奨）
 
-Kiro CLI では、MCP サーバー（モードの振る舞い込み — skill ファイル不要）と並列 composer サブエージェントが
-1 つのターゲットで設定できます。
+Kiro CLI では make ターゲット 1 つで完了します — モードの振る舞いは MCP サーバーが配信し、
+composer サブエージェントは compose 時にエージェント自身が self-spawn します
+（エージェントファイルのインストールは不要）。
 
 ```bash
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
@@ -74,13 +75,12 @@ make install-kiro
 kiro-cli chat   # あとは「〜のスライドを作って」と頼むだけ
 ```
 
-`sdpm` ローカル MCP サーバーを `~/.kiro/settings/mcp.json` に登録し、composer エージェント設定を
-`~/.kiro/agents/sdpm-composer.json` に生成します。前提: [`uv`](https://docs.astral.sh/uv/) が
+`sdpm` ローカル MCP サーバーを `~/.kiro/settings/mcp.json` に登録します。前提: [`uv`](https://docs.astral.sh/uv/) が
 `PATH` にあること、プレビュー用に **LibreOffice** と **poppler**。
 
 MCP サーバーはこの clone 先から起動するため、**ディレクトリはそのまま置いておいてください**。
-更新は `git pull` だけで十分です（composer プロンプトは `personas/` への `file://` 参照）。モードの振る舞い（vibe / spec / style）は MCP サーバー自身が `start_presentation(mode=...)` で配信します。
-別パスへ移動した場合のみ `make install-kiro` を再実行してください。
+更新は `git pull` だけで十分です。モードの振る舞い（vibe / spec / style）は MCP サーバー自身が `start_presentation(mode=...)` で配信します。
+別パスへ移動した場合のみ `make install-kiro` を再実行してください（v0.5.2 以前からのアップグレード時は一度再実行してください — 旧インストーラーが生成した不要な `~/.kiro/agents/sdpm-composer.json` も削除されます）。
 
 ### その他の MCP クライアント — 手動セットアップ
 

@@ -36,7 +36,8 @@ make install-kiro
 ```
 
 The installer removes dangling skill symlinks from pre-v0.5 installs
-(`~/.kiro/skills/sdpm-*`), regenerates the composer agent config, and
+(`~/.kiro/skills/sdpm-*`), removes the legacy generated composer agent config
+(composer sub-agents are now self-spawned — no agent file is needed), and
 re-registers the MCP server path (`servers/local`).
 
 ### Claude Desktop / other MCP clients

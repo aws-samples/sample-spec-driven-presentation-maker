@@ -18,6 +18,8 @@ Do NOT advance to Phase 3 (review). Do NOT ask the user anything.
 The orchestrator passes you:
 - **deck_id**: absolute path to the deck directory (contains `deck.json`, `specs/`, `slides/`)
 - **assigned slide slugs**: exactly which slides you own and must build
+- **task_instruction**: what to do with them — initial compose, `"Consistency review."`
+  (see Consistency Review Mode below), or a targeted fix request
 
 You write ONLY your assigned slugs. Other slugs belong to sibling composers running in
 parallel — touching them corrupts their work (data race).
