@@ -18,12 +18,12 @@ theme 3) and judged intentional, not accretion:
 
 - ``sdpm-style`` (9): style-only surface — run_style_python + hearing +
   browsing; no deck tools
-- ``sdpm-composer`` (22): no dialogue (hearing), no nested dispatch
+- ``sdpm-composer`` (23): no dialogue (hearing), no nested dispatch
   (use_subagent), no web fetch/search, no upload/diff — composers only
   compose
-- ``sdpm-single`` (27): spec surface minus use_subagent (single agent
+- ``sdpm-single`` (28): spec surface minus use_subagent (single agent
   does everything itself, no dispatch)
-- ``sdpm-spec`` / ``sdpm-vibe`` (28): full orchestrator surface
+- ``sdpm-spec`` / ``sdpm-vibe`` (29): full orchestrator surface
 
 The snapshot below pins those counts; widening any allowlist is a
 deliberate decision that must update this test.
@@ -45,7 +45,8 @@ _AGENT_FILES = sorted(_ACP_AGENTS_DIR.glob("*.json"))
 # intentional (see module docstring).
 _FULL_ORCHESTRATOR = {
     "read", "glob", "grep", "use_subagent", "web_fetch", "web_search",
-    "@sdpm/analyze_template", "@sdpm/apply_style", "@sdpm/code_to_slide",
+    "@sdpm/analyze_template", "@sdpm/apply_style", "@sdpm/arch_diagram",
+    "@sdpm/code_to_slide",
     "@sdpm/diff_pptx", "@sdpm/generate_pptx", "@sdpm/grid", "@sdpm/hearing",
     "@sdpm/import_attachment", "@sdpm/init_presentation",
     "@sdpm/list_asset_sources", "@sdpm/list_guides", "@sdpm/list_styles",
@@ -147,6 +148,10 @@ def test_cloud_deck_tools_are_subset_of_local_orchestrator():
     m = re.search(r"_DECK_TOOLS = \[(.*?)\]", modes_src, re.DOTALL)
     assert m, "agent/modes/__init__.py: _DECK_TOOLS not found"
     cloud_tools = set(re.findall(r'"([a-z_]+)"', m.group(1)))
+    assert "arch_diagram" in cloud_tools, (
+        "Cloud deck agents must expose arch_diagram because the compose workflow "
+        "requires it for architecture, system, and flow diagrams"
+    )
     cloud_only = {"read_uploaded_file", "get_preview"}  # S3/presign transport tools
 
     spec_tools = {

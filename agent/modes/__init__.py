@@ -65,7 +65,7 @@ _DECK_TOOLS = [
     "read_workflows", "list_guides", "read_guides", "search_assets",
     "list_asset_sources", "list_templates",
     "run_python", "generate_pptx", "get_preview", "code_to_slide",
-    "grid", "import_attachment",
+    "grid", "arch_diagram", "import_attachment",
 ]
 
 _STYLE_TOOLS = [

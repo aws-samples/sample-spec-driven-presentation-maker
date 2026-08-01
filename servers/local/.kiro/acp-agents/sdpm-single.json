@@ -16,6 +16,7 @@
   "tools": [
     "@sdpm/analyze_template",
     "@sdpm/apply_style",
+    "@sdpm/arch_diagram",
     "@sdpm/code_to_slide",
     "@sdpm/diff_pptx",
     "@sdpm/generate_pptx",
@@ -45,6 +46,7 @@
   "allowedTools": [
     "@sdpm/analyze_template",
     "@sdpm/apply_style",
+    "@sdpm/arch_diagram",
     "@sdpm/code_to_slide",
     "@sdpm/diff_pptx",
     "@sdpm/generate_pptx",
