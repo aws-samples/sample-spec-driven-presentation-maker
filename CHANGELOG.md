@@ -10,6 +10,17 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Changed
+
+- **Kiro CLI: composer sub-agents are now self-spawned** — `make install-kiro`
+  no longer generates `~/.kiro/agents/sdpm-composer.json`; the orchestrating
+  agent spawns composer workers itself and pulls the composer behavior through
+  `start_presentation(mode="composer")`. Upgrading from v0.5.2 or earlier,
+  re-run `make install-kiro` once: it removes the legacy generated agent file
+  (only if unmodified; a customized file is left in place with a warning).
+- `start_presentation` now accepts `mode="single"` (one agent handles dialogue
+  and composition end-to-end), making every persona reachable through the port.
+
 ## [0.5.2] - 2026-08-01
 
 ### Changed

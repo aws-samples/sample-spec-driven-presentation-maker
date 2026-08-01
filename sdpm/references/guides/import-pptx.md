@@ -588,7 +588,8 @@ direct the next edits. Suggested `inference`:
 
 A `free_text` question is appropriate here ("どこを変えたいですか?").
 After the user responds, return control to the normal edit loop
-(Cloud: `compose_slides`; Local: `use_subagent` with `sdpm-composer`).
+(Cloud: `compose_slides`; Local: dispatch composers per your persona's
+Delegation to Composer section).
 
 ---
 
