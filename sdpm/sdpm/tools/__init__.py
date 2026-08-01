@@ -43,6 +43,9 @@ def start_presentation(mode: str = "") -> str:
             - "style": create a reusable style guide (HTML design tokens) through dialogue.
             - "composer": silent slide composition from approved specs. Used by composer
               sub-agents, or by the orchestrator itself when no sub-agent mechanism exists.
+              If you were dispatched with deck_id + assigned_slugs (+ task_instruction),
+              you are a composer sub-agent — call this with mode="composer" FIRST,
+              before any other tool.
             - "single": one agent does everything end-to-end (dialogue + composition,
               no sub-agents). Used by single-agent deployments (e.g. chat integrations).
             - "" (omitted): the interactive workflow menu (choose A-D with the user).

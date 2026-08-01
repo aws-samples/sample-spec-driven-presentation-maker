@@ -149,19 +149,19 @@ checking your tool list in this order:
 ### Composer Spawn Template
 
 ```
-First call start_presentation(mode="composer") and follow the returned instructions
-exactly. If that tool is not in your list but you already carry composer
-instructions, skip that call and continue. If the tool is unavailable and you
-do not already carry composer instructions, stop and report that the sdpm
-tools are unavailable.
-
 deck_id: {deck_id}
 assigned_slugs: {slugs}
 task_instruction: {task_instruction}
 specs_directory: {deck_id}/specs
 
-Touch ONLY your assigned slugs.
+Touch ONLY your assigned slugs. If no sdpm tools are visible, stop and report
+that the sdpm tools are unavailable.
 ```
+
+The template is pure data — no bootstrap instruction. Workers that can call
+`start_presentation` discover it through the tool description ("REQUIRED FIRST
+STEP") and load the composer behavior with `mode="composer"`; dedicated
+composer agents already carry it. Do not add instructions to the template.
 
 `{deck_id}` is the absolute deck path. `{task_instruction}` values:
 - Initial compose: `Compose the assigned slides from the approved specs.`
