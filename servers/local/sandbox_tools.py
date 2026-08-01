@@ -205,10 +205,14 @@ Audience: Developers
                     for d in diags:
                         d["slug"] = slug
                     lint_diagnostics.extend(diags)
-                    slide_file.write_text(
-                        json.dumps(cleaned, ensure_ascii=False, indent=2) + "\n",
-                        encoding="utf-8",
-                    )
+                    # Rewrite only when sanitization changed the content —
+                    # unconditional rewrites would bump mtime every call and
+                    # falsely mark the deck as changed (auto-rebuild churn).
+                    if cleaned != slide_data:
+                        slide_file.write_text(
+                            json.dumps(cleaned, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8",
+                        )
             except (json.JSONDecodeError, TypeError):
                 pass
         if lint_diagnostics:
