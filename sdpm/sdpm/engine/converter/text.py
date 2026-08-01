@@ -1,7 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 """Text extraction and processing."""
-from .constants import _NS, EMU_PER_PX, _serialize_lstStyle
+from .constants import _NS, get_emu_per_px, _serialize_lstStyle
 from .color import extract_text_color
 
 def _extract_styled_text(runs, theme_colors=None, color_mapping=None, default_font_size=None, default_text_color=None, is_placeholder=False, paragraph=None, suppress_inherited=False):
@@ -179,15 +179,16 @@ def _has_bullets(paragraphs):
 
 def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_text_color=None):
     """Extract text content from shape into elem dict (items/text, fontSize, align, margins)."""
+    emu_per_px = get_emu_per_px()
     tf = shape.text_frame
     if tf.margin_left is not None and tf.margin_left != 91440:
-        elem["marginLeft"] = round(tf.margin_left / EMU_PER_PX)
+        elem["marginLeft"] = round(tf.margin_left / emu_per_px)
     if tf.margin_top is not None and tf.margin_top != 45720:
-        elem["marginTop"] = round(tf.margin_top / EMU_PER_PX)
+        elem["marginTop"] = round(tf.margin_top / emu_per_px)
     if tf.margin_right is not None and tf.margin_right != 91440:
-        elem["marginRight"] = round(tf.margin_right / EMU_PER_PX)
+        elem["marginRight"] = round(tf.margin_right / emu_per_px)
     if tf.margin_bottom is not None and tf.margin_bottom != 45720:
-        elem["marginBottom"] = round(tf.margin_bottom / EMU_PER_PX)
+        elem["marginBottom"] = round(tf.margin_bottom / emu_per_px)
     if tf.vertical_anchor is not None:
         _va_reverse = {1: "top", 3: "middle", 4: "bottom"}
         va = _va_reverse.get(int(tf.vertical_anchor))

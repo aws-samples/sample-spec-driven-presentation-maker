@@ -61,8 +61,9 @@ Rules that follow from this:
    touches only `sdpm/sdpm/tools/`.
 
 Known debt against this philosophy (tracked for v0.5.x):
-`converter/elements.py` is a low-cohesion monolith
-inside the core; `api/index.py` has no test coverage.
+`api/index.py` has no test coverage.
+(v0.5.2 resolved: `converter/elements.py` monolith → `converter/elements/`
+package with an enforced dependency DAG; scale state → ContextVar scope.)
 
 ## Engine & Knowledge (`sdpm/sdpm/`)
 

@@ -61,7 +61,7 @@ are written for the CLI (`pptx_builder.py …`); on MCP translate every CLI comm
 | `pptx_builder.py workflows <name>` | `read_workflows(["<name>"])` |
 | `pptx_builder.py guides <name>` | `read_guides(["<name>"])` |
 | `pptx_builder.py examples <name>` | `read_examples(["<name>"])` |
-| `pptx_builder.py measure {json} -p {n}` | `run_python(..., save=True, measure_slides=["{slug}"])` |
+| `pptx_builder.py measure {json} -p {n}` | `run_python(..., measure_slides=["{slug}"])` |
 | `pptx_builder.py preview {json}` | covered by the same call — it returns `preview_files` |
 | `pptx_builder.py image-size {path} --width {px}` | no tool — compute proportional size in `run_python` (`new_h = round(orig_h * target_w / orig_w)`) |
 | `pptx_builder.py code-block …` | `code_to_slide(...)` |
@@ -82,24 +82,23 @@ data = {
 write_json("slides/{slug}.json", data)
 ''',
   deck_id="<absolute deck path>",
-  save=True,
   measure_slides=["{slug}"],
 )
 ```
 
-`save=True` triggers `lint_and_sanitize` (it rewrites `slides/{slug}.json`), the PPTX
-build, PNG render, and returns `preview_files` (PNG paths), `warnings`, and
-`lint_diagnostics` — filtered to the slugs you measured. Do not write deck files through
-any other mechanism (no client-native Write/Edit) — `save=True` must stay the single
-writer. Inside the sandbox use `read_json` / `read_text` / `list_files`; `open()` is
-blocked.
+Writes always persist — there is no save flag. `measure_slides` triggers
+`lint_and_sanitize` (it rewrites `slides/{slug}.json`), the PPTX build, PNG render, and
+returns `preview_files` (PNG paths), `warnings`, and `lint_diagnostics` — filtered to
+the slugs you measured. Do not write deck files through any other mechanism (no
+client-native Write/Edit) — `run_python` must stay the single writer. Inside the
+sandbox use `read_json` / `read_text` / `list_files`; `open()` is blocked.
 
-### Per-slide save loop (MANDATORY)
+### Per-slide write loop (MANDATORY)
 
-Write and save **one slide at a time** — never batch-write multiple `slides/*.json` in a
+Write **one slide at a time** — never batch-write multiple `slides/*.json` in a
 single call (risks output truncation). Per slug:
 
-**write → `run_python(save=True, measure_slides=["{slug}"])` → inspect returned
+**write → `run_python(measure_slides=["{slug}"])` → inspect returned
 `preview_files` + `warnings` → fix if needed → next slug.**
 
 ## Working Philosophy
@@ -159,7 +158,7 @@ own **every** slide in the deck for this call. Read all `slides/*.json` directly
 overlap, alignment on a single slide) are OUT OF SCOPE — do not touch them, even if you
 notice them; a separate per-slide fix pass handles those.
 
-Fix via `run_python(save=True, measure_slides=[...])`. If the deck is already
+Fix via `run_python(measure_slides=[...])`. If the deck is already
 consistent, respond with a brief summary and return — over-editing causes new
 inconsistencies.
 

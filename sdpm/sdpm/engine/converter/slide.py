@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 
 
 
-from .constants import _NS, EMU_PER_PX, _extract_autofit_props, _position_diff
+from .constants import _NS, get_emu_per_px, _extract_autofit_props, _position_diff
 from .color import _resolve_scheme_color
 from .text import _extract_styled_text
 from .elements import (extract_textbox_element, extract_picture_element, _dispatch_shape)
@@ -73,6 +73,7 @@ def detect_layout(slide):
 
 def _resolve_inherited_styles(elements, slide, theme_colors, color_mapping):
     """Resolve inherited text color, fontSize, fontFamily from shape's lstStyle/defRPr."""
+    emu_per_px = get_emu_per_px()
     if not theme_colors or not color_mapping:
         return
     for elem in elements:
@@ -83,7 +84,7 @@ def _resolve_inherited_styles(elements, slide, theme_colors, color_mapping):
         for shape in slide.shapes:
             if not shape.has_text_frame:
                 continue
-            if round(shape.left / EMU_PER_PX) == elem.get("x") and round(shape.top / EMU_PER_PX) == elem.get("y"):
+            if round(shape.left / emu_per_px) == elem.get("x") and round(shape.top / emu_per_px) == elem.get("y"):
                 elem.update(_extract_autofit_props(shape))
                 defRPr = shape.text_frame._txBody.find(f'.//{{{_NS["a"]}}}lstStyle//{{{_NS["a"]}}}defRPr')
                 if defRPr is not None:
@@ -120,6 +121,7 @@ def _resolve_inherited_styles(elements, slide, theme_colors, color_mapping):
 
 def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=None, master_idx=0, output_dir=None, slide_idx=0, pptx_path=None, use_layout_names=False, builder_text_color=None):
     """Extract slide content to dict."""
+    emu_per_px = get_emu_per_px()
     if use_layout_names:
         layout_name = slide.slide_layout.name if slide.slide_layout.name else f"layout-{master_idx+1:02d}"
     else:
@@ -178,8 +180,8 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                     # the bottom of the z-order instead of dropping the fill.
                     try:
                         prs_obj = slide.part.package.presentation_part.presentation
-                        slide_w = round(prs_obj.slide_width / EMU_PER_PX)
-                        slide_h = round(prs_obj.slide_height / EMU_PER_PX)
+                        slide_w = round(prs_obj.slide_width / emu_per_px)
+                        slide_h = round(prs_obj.slide_height / emu_per_px)
                     except Exception:
                         slide_w, slide_h = 1920, 1080
                     grad = bgPr.find(f'{{{_NS["a"]}}}gradFill')
@@ -426,9 +428,9 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                                         lIns = mbp.get('lIns')
                                         rIns = mbp.get('rIns')
                                         if lIns is not None:
-                                            elem["marginLeft"] = round(int(lIns) / EMU_PER_PX)
+                                            elem["marginLeft"] = round(int(lIns) / emu_per_px)
                                         if rIns is not None:
-                                            elem["marginRight"] = round(int(rIns) / EMU_PER_PX)
+                                            elem["marginRight"] = round(int(rIns) / emu_per_px)
                                     break
                         except Exception:
                             pass
@@ -442,10 +444,10 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
         try:
             elem = extract_textbox_element(shape, theme_colors, color_mapping, theme_styles, is_placeholder=True, builder_text_color=builder_text_color)
             if elem and (elem.get("text", "").strip() or elem.get("paragraphs")):
-                elem["x"] = round(shape.left / EMU_PER_PX)
-                elem["y"] = round(shape.top / EMU_PER_PX)
-                elem["width"] = round(shape.width / EMU_PER_PX)
-                elem["height"] = round(shape.height / EMU_PER_PX)
+                elem["x"] = round(shape.left / emu_per_px)
+                elem["y"] = round(shape.top / emu_per_px)
+                elem["width"] = round(shape.width / emu_per_px)
+                elem["height"] = round(shape.height / emu_per_px)
                 elements.append(elem)
         except Exception:
             pass
@@ -465,10 +467,10 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                 elem = {
                     "type": "image",
                     "src": f"images/{img_name}",
-                    "x": round(shape.left / EMU_PER_PX),
-                    "y": round(shape.top / EMU_PER_PX),
-                    "width": round(shape.width / EMU_PER_PX),
-                    "height": round(shape.height / EMU_PER_PX),
+                    "x": round(shape.left / emu_per_px),
+                    "y": round(shape.top / emu_per_px),
+                    "width": round(shape.width / emu_per_px),
+                    "height": round(shape.height / emu_per_px),
                 }
                 elements.append(elem)
                 img_counter += 1

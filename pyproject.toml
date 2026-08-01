@@ -29,3 +29,11 @@ src = ["sdpm", "servers/local", "servers/remote"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    # Our own code must never emit FutureWarning (e.g. lxml element truth-testing)
+    "error::FutureWarning",
+    # Upstream-only: defusedxml's own __init__ imports its deprecated
+    # cElementTree shim on Python 3.12. Do NOT widen this filter — the
+    # security monkey patch (defuse_stdlib) must stay under scrutiny.
+    "ignore:defusedxml.cElementTree is deprecated:DeprecationWarning:defusedxml",
+]

@@ -95,9 +95,9 @@ Populate `specs/brief.md` and `specs/outline.md` **before** Step 4
 builds the deck. `specs/art-direction.html` is intentionally deferred
 to Step 5 — the rendered slide previews from Step 4 are a far better
 input for it than the upload-time image extraction. Each sub-step
-uses `run_python(save=True)` so the intermediate state is persisted —
-Cloud discards the sandbox VM between calls, so `save=False` would
-lose the write.
+uses `run_python` — writes always persist automatically (no save
+flag), so intermediate state survives even though Cloud discards the
+sandbox VM between calls.
 
 You generate these specs from the PPTX content you imported in Step 2.
 Do not call `hearing` in Step 3 — if a particular field is thin, leave
@@ -123,10 +123,10 @@ for name in sorted(files):
     print(name, "::", title)
 ```
 
-Run that via `run_python(code=<above>, deck_id=deck_id, save=False)`
+Run that via `run_python(code=<above>, deck_id=deck_id)`
 (Cloud: prepend `purpose="Inspect PPTX slides"`).
 
-Then write `specs/brief.md` in a second call with `save=True`:
+Then write `specs/brief.md` in a second call:
 
 ```python
 short_id = "<result['shortId']>"
@@ -146,7 +146,7 @@ write_text("specs/brief.md", "\n".join(lines) + "\n")
 print("brief.md written")
 ```
 
-Call as `run_python(code=<above>, deck_id=deck_id, save=True)`
+Call as `run_python(code=<above>, deck_id=deck_id)`
 (Cloud: prepend `purpose="Write brief.md from PPTX content"`).
 
 ### 3-2. outline.md (LLM summarization)
@@ -167,7 +167,7 @@ write_text("specs/outline.md", "\n".join(lines) + "\n")
 print("outline.md written:", len(pairs))
 ```
 
-Call with `run_python(code=<above>, deck_id=deck_id, save=True)`
+Call with `run_python(code=<above>, deck_id=deck_id)`
 (Cloud: add `purpose="Write outline.md from PPTX content"`).
 
 Requirements (outline lint will otherwise reject the write on Cloud):
@@ -183,12 +183,12 @@ Requirements (outline lint will otherwise reject the write on Cloud):
 
 Copy the PPTX-derived slide JSON into `slides/`, merge deck metadata
 into `deck.json` (using the deck-local `template.pptx`), and build the
-deck in a **single** `run_python` call with `save=True`.
+deck in a **single** `run_python` call with `measure_slides`.
 
 **Do not split Step 4 into multiple calls.** Each Cloud `run_python`
-runs in a fresh sandbox VM that is discarded afterward, so intermediate
-`save=False` writes are lost. Keeping Step 4 in one call ensures the
-copy, S3 writeback, build, preview, and compose all share a single VM.
+runs in a fresh sandbox VM that is discarded afterward. Keeping Step 4
+in one call ensures the copy, S3 writeback, build, preview, and compose
+all share a single VM.
 
 Assemble the slug list from Step 3-2 as a Python literal:
 
@@ -261,24 +261,23 @@ Call as:
 run_python(
     code=<above>,
     deck_id=deck_id,
-    save=True,
     measure_slides=slugs,
 )
 ```
 
 Cloud: prepend `purpose="Import PPTX slides into deck and build"`.
 
-Because `specs/outline.md` was populated in Step 3-2, `save=True`
-triggers a full build that includes every slide, followed by preview
-and SVG compose. The PPTX-derived placeholder template means **layout
+Because `specs/outline.md` was populated in Step 3-2, the build
+includes every slide, followed by preview and SVG compose (triggered
+by `measure_slides`). The PPTX-derived placeholder template means **layout
 mismatch is impossible** — the build should succeed in one shot.
 
-After the `run_python` call returns successfully, call
-`generate_pptx(deck_id=deck_id)` once. This persists `output.pptx`
-to the deck workspace and updates the deck record's `pptxS3Key`, so
-the Web UI can offer a "Download PPTX" button immediately. Without
-this call the UI sees no PPTX yet and hides the download action,
-even though the slides have rendered.
+The deck's PPTX artifact and the deck record's `pptxS3Key` refresh
+automatically when the deck changes, so the Web UI's "Download PPTX"
+action works without further steps. Call `generate_pptx(deck_id=deck_id)`
+only as the final handoff — it additionally produces the WebP preview
+set, updates the final PPTX artifact, and returns a full-deck warnings
+report.
 
 ---
 
@@ -510,7 +509,7 @@ lists, charts, or specific data into the demonstration slides — that
 content lives in `slides/` (placed by Step 4), not in the style
 specification.
 
-Write incrementally via `run_python(save=True)` — one call for the
+Write incrementally via `run_python` — one call for the
 skeleton + `:root` + first slide, then one or two more for the
 remaining slides (per the create-style workflow's incremental writing
 guidance):

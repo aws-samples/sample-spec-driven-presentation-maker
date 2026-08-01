@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 
 
 
-from .constants import _NS, _hex, EMU_PER_PX
+from .constants import _NS, _hex, get_emu_per_px
 from .color import _resolve_scheme_color, _resolve_color_with_transforms, apply_color_transforms
 
 
@@ -114,6 +114,7 @@ def _resolve_line_from_style(shape, theme_colors, color_mapping, theme_styles=No
 
 def _extract_effects_from_xml(sp_pr, theme_colors=None, color_mapping=None):
     """Extract visual effects (shadow, glow, softEdge) from spPr XML. Returns dict."""
+    emu_per_px = get_emu_per_px()
     result = {}
     if sp_pr is None:
         return result
@@ -126,9 +127,9 @@ def _extract_effects_from_xml(sp_pr, theme_colors=None, color_mapping=None):
     if outer is not None:
         s = {"type": "outer"}
         if outer.get('blurRad'):
-            s["blur"] = round(int(outer.get('blurRad')) / EMU_PER_PX)
+            s["blur"] = round(int(outer.get('blurRad')) / emu_per_px)
         if outer.get('dist'):
-            s["distance"] = round(int(outer.get('dist')) / EMU_PER_PX)
+            s["distance"] = round(int(outer.get('dist')) / emu_per_px)
         if outer.get('dir'):
             s["direction"] = round(int(outer.get('dir')) / 60000)
         clr = outer.find(f'{{{_NS["a"]}}}srgbClr')
@@ -144,9 +145,9 @@ def _extract_effects_from_xml(sp_pr, theme_colors=None, color_mapping=None):
     if inner is not None:
         s = {"type": "inner"}
         if inner.get('blurRad'):
-            s["blur"] = round(int(inner.get('blurRad')) / EMU_PER_PX)
+            s["blur"] = round(int(inner.get('blurRad')) / emu_per_px)
         if inner.get('dist'):
-            s["distance"] = round(int(inner.get('dist')) / EMU_PER_PX)
+            s["distance"] = round(int(inner.get('dist')) / emu_per_px)
         if inner.get('dir'):
             s["direction"] = round(int(inner.get('dir')) / 60000)
         clr = inner.find(f'{{{_NS["a"]}}}srgbClr')
@@ -162,7 +163,7 @@ def _extract_effects_from_xml(sp_pr, theme_colors=None, color_mapping=None):
     if glow is not None:
         g = {}
         if glow.get('rad'):
-            g["radius"] = round(int(glow.get('rad')) / EMU_PER_PX)
+            g["radius"] = round(int(glow.get('rad')) / emu_per_px)
             g["_radiusEmu"] = int(glow.get('rad'))
         clr = glow.find(f'{{{_NS["a"]}}}srgbClr')
         scheme = glow.find(f'{{{_NS["a"]}}}schemeClr')
@@ -183,20 +184,20 @@ def _extract_effects_from_xml(sp_pr, theme_colors=None, color_mapping=None):
     # Soft Edge
     se = effect_lst.find(f'{{{_NS["a"]}}}softEdge')
     if se is not None and se.get('rad'):
-        result["softEdge"] = round(int(se.get('rad')) / EMU_PER_PX)
+        result["softEdge"] = round(int(se.get('rad')) / emu_per_px)
 
     # Reflection
     ref = effect_lst.find(f'{{{_NS["a"]}}}reflection')
     if ref is not None:
         r = {}
         if ref.get('blurRad'):
-            r["blur"] = round(int(ref.get('blurRad')) / EMU_PER_PX)
+            r["blur"] = round(int(ref.get('blurRad')) / emu_per_px)
         if ref.get('stA'):
             r["opacity"] = round(int(ref.get('stA')) / 100000, 2)
         if ref.get('endPos'):
             r["size"] = round(int(ref.get('endPos')) / 1000)
         if ref.get('dist') and int(ref.get('dist')) > 0:
-            r["distance"] = round(int(ref.get('dist')) / EMU_PER_PX)
+            r["distance"] = round(int(ref.get('dist')) / emu_per_px)
         result["reflection"] = r
 
     return result

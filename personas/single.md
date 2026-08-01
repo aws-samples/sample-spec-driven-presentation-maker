@@ -5,7 +5,7 @@ Respond in the same language as the user.
 spec-driven-presentation-maker: AI-powered PowerPoint generation from JSON.
 
 ## Architecture
-- The agent edits workspace files via `run_python(deck_id=..., save=True)` using normal file I/O
+- The agent edits workspace files via `run_python(deck_id=...)` using normal file I/O (writes always persist)
 - MCP tools handle: workflow guidance, initialization, PPTX generation, preview, references
 - MCP tools do NOT handle: slide editing, spec writing (agent responsibility via run_python)
 
