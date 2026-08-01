@@ -141,9 +141,10 @@ export function syncToAgentsDir(
   fs.mkdirSync(tmpDir, { recursive: true })
   try {
     for (const { fileName, content } of staged) {
-      fs.writeFileSync(path.join(tmpDir, fileName), content)
+      // fileName comes from the ROLE_TO_FIXED constant, not user input
+      fs.writeFileSync(path.join(tmpDir, fileName), content) // nosemgrep: path-join-resolve-traversal
     }
-    fs.writeFileSync(path.join(tmpDir, "README.md"), README_MARKER)
+    fs.writeFileSync(path.join(tmpDir, "README.md"), README_MARKER) // nosemgrep: path-join-resolve-traversal
     const hadPrevious = fs.existsSync(dirs.agentsDir)
     if (hadPrevious) fs.renameSync(dirs.agentsDir, backupDir)
     try {

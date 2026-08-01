@@ -20,7 +20,8 @@ let dirs: SyncDirs
 
 function writeCatalogAgent(name: string, extra: Record<string, unknown> = {}) {
   fs.writeFileSync(
-    path.join(dirs.acpAgentsDir, `${name}.json`),
+    // test-controlled fixture name, not user input
+    path.join(dirs.acpAgentsDir, `${name}.json`), // nosemgrep: path-join-resolve-traversal
     JSON.stringify({ name, description: `${name} agent`, tools: ["read"], ...extra }, null, 2),
   )
 }
