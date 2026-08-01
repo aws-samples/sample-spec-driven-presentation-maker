@@ -10,7 +10,7 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
-## [0.5.1] - 2026-07-31
+## [0.5.1] - 2026-08-01
 
 ### Added
 
@@ -23,6 +23,9 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- Cloud: superseded PPTX artifacts are now deleted after each refresh — the
+  automatic artifact refresh no longer accumulates orphaned objects in S3
+  (`update_deck` returns previous values via `UPDATED_OLD`)
 - **Cloud agent output-token limit**: model profiles now set an explicit
   `max_tokens` (Claude 32768, others 8192) — Bedrock's small default truncated
   long single-call outputs (e.g. writing `specs/brief.md` from a long article)
@@ -32,6 +35,14 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **`run_python` persistence semantics unified**: file writes now always
+  persist — the `save` flag is deprecated and ignored (silent data loss when
+  omitting `save=True` on Cloud is no longer possible). The deck's PPTX
+  artifact refreshes automatically whenever the deck changes;
+  `measure_slides` remains the trigger for the expensive verification pass
+  (render, text overflow measurement, previews). Cloud sandbox write-back is
+  now diff-based (changed/new files only), preventing a stale sandbox copy
+  from overwriting newer S3 writes
 - **L4 agent personas unified**: the cloud agent (Strands) now fetches mode
   behavior from `personas/*.md` through the same `start_presentation(mode=...)`
   port as every other client, instead of carrying its own copies in
@@ -107,7 +118,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.3.8...v0.4.0
 [0.3.x]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.2.1...v0.3.8

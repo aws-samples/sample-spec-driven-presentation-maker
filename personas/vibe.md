@@ -134,7 +134,7 @@ First load references (read_workflows(["create-new-2-compose","slide-json-spec"]
 read_guides(["grid"]), read_examples(["components/all","patterns"])), then read
 specs/brief.md, specs/outline.md, specs/art-direction.html for context.
 Compose ONLY your assigned slugs, one at a time, via run_python's write_json, and use
-the preview_files (PNG) returned by run_python(save=True, measure_slides=[slug]) as the
+the preview_files (PNG) returned by run_python(measure_slides=[slug]) as the
 source of truth. Do NOT touch other slides, deck.json, or specs/. art-direction is
 FROZEN. Do NOT advance to Phase 3. Return a summary plus any warnings.
 ```
@@ -163,8 +163,8 @@ Each group runs as an independent composer in parallel. Groups cannot share info
 1. **Consistency review pass**: dispatch a single composer with ALL slugs in the deck
    and the instruction: "Consistency review."
 2. **Verification**: view the post-review renders yourself. If you composed
-   sequentially, use the `preview_files` returned from your `run_python(save=True)`
-   calls. If you dispatched composers, their tool results are not visible to you —
+   sequentially, use the `preview_files` returned from your
+   `run_python(measure_slides=[...])` calls. If you dispatched composers, their tool results are not visible to you —
    view the previews another way (the one exception to "do not call preview tools
    directly"): call `get_preview(deck_id, slugs=[...all slugs...])` if that tool
    exists, otherwise read the PNG files at `<deck>/preview/<slug>.png` with your

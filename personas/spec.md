@@ -172,7 +172,7 @@ Each group runs as an independent composer in parallel. Groups cannot share info
    inconsistencies (labeling, decorative elements, typography, writing style, hierarchy).
 2. **Verification**: view the post-review renders yourself. If you composed
    sequentially, use the `preview_files` returned from your
-   `run_python(save=True)` calls. If you dispatched composers, their tool
+   `run_python(measure_slides=[...])` calls. If you dispatched composers, their tool
    results are not visible to you — view the previews another way (this is
    the one exception to "do not call preview tools directly"):
    - a `get_preview` tool exists → call `get_preview(deck_id, slugs=[...all slugs...])`
