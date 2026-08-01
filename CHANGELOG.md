@@ -10,6 +10,8 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-08-01
+
 ### Changed
 
 - **Kiro CLI: composer sub-agents are now self-spawned** — `make install-kiro`
