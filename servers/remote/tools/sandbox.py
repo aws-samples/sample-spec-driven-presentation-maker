@@ -108,6 +108,16 @@ def execute_in_sandbox(
             if name in seen:
                 raise ValueError(f"Duplicate filename: {name}")
             seen.add(name)
+            # Staged files land in the sandbox root by basename, and the
+            # whole workspace is persisted unconditionally afterwards — a
+            # name that shadows a workspace file (e.g. "deck.json") would
+            # silently overwrite the deck on S3. Reject it up front.
+            if any(name == p or name.startswith(p) for p in _WORKSPACE_PREFIXES):
+                raise ValueError(
+                    f"File name {name!r} collides with the deck workspace "
+                    "(writes always persist) — rename the file before "
+                    "passing it via files=[...]."
+                )
 
     client = boto3.client("bedrock-agentcore", region_name=region)
 
@@ -179,7 +189,7 @@ def _upload_deck_workspace(
     session_id: str,
     storage: Storage,
     deck_id: str,
-) -> list[str]:
+) -> dict[str, str]:
     """Download all deck files from S3 and write them into the sandbox.
 
     Args:

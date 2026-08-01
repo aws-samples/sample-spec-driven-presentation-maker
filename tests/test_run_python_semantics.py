@@ -206,3 +206,187 @@ class TestRemoteContractShape:
         src = (_root / "servers" / "remote" / "server.py").read_text(encoding="utf-8")
         assert "save: bool = False" in src
         assert "'save' is ignored" in src
+
+
+# ---------------------------------------------------------------------------
+# Remote: staged files must not shadow the persisted workspace
+# ---------------------------------------------------------------------------
+
+
+class TestRemoteFilesCollision:
+    def test_deck_json_basename_rejected(self):
+        # files land in the sandbox root by basename and the workspace is
+        # persisted unconditionally — "deck.json" would corrupt the deck.
+        with pytest.raises(ValueError, match="collides with the deck workspace"):
+            remote_sandbox.execute_in_sandbox(
+                code="print(1)",
+                storage=_FakeStorage(),
+                region="us-east-1",
+                deck_id="d1",
+                files=["uploads/tmp/u/abc/deck.json"],
+            )
+
+    def test_duplicate_basename_still_rejected(self):
+        with pytest.raises(ValueError, match="Duplicate filename"):
+            remote_sandbox.execute_in_sandbox(
+                code="print(1)",
+                storage=_FakeStorage(),
+                region="us-east-1",
+                deck_id="d1",
+                files=["a/data.csv", "b/data.csv"],
+            )
+
+
+# ---------------------------------------------------------------------------
+# Remote: run_python top-level post-processing contract (4-pattern matrix)
+# ---------------------------------------------------------------------------
+
+import os  # noqa: E402
+
+os.environ.setdefault("DECKS_TABLE", "test-table")
+os.environ.setdefault("PPTX_BUCKET", "test-pptx")
+os.environ.setdefault("RESOURCE_BUCKET", "test-resource")
+
+import importlib.util  # noqa: E402
+
+_spec = importlib.util.spec_from_file_location(
+    "remote_server_under_test", _root / "servers" / "remote" / "server.py",
+)
+remote_server = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(remote_server)
+
+
+class TestPostProcessingPlan:
+    """The contract matrix, as a pure decision table."""
+
+    @pytest.mark.parametrize("changed,measure,expected", [
+        (False, None, {"build": False, "artifact": False, "verify": False}),
+        (True, None, {"build": True, "artifact": True, "verify": False}),
+        (False, ["a"], {"build": True, "artifact": False, "verify": True}),
+        (True, ["a"], {"build": True, "artifact": True, "verify": True}),
+    ])
+    def test_matrix(self, changed, measure, expected):
+        assert remote_server._post_processing_plan(changed, measure) == expected
+
+    def test_build_relevant_paths(self):
+        assert remote_server._build_relevant("deck.json")
+        assert remote_server._build_relevant("slides/title.json")
+        assert remote_server._build_relevant("includes/code.json")
+        assert remote_server._build_relevant("specs/outline.md")
+        assert not remote_server._build_relevant("specs/brief.md")
+        assert not remote_server._build_relevant("attachments/x/data.csv")
+
+
+class _ArtifactStorage(_FakeStorage):
+    def __init__(self):
+        super().__init__()
+        self.deck_updates: list[dict] = []
+        self.pptx_bucket = "test-pptx"
+        self._s3 = MagicMock()
+        self.fail_update = False
+
+    def update_deck(self, deck_id, user_id, updates):
+        if self.fail_update:
+            raise RuntimeError("DynamoDB down")
+        self.deck_updates.append(updates)
+
+    def list_files(self, prefix="", bucket=""):
+        return []
+
+
+@pytest.fixture()
+def remote_rig(monkeypatch, tmp_path):
+    """Monkeypatched harness to exercise run_python's real branch wiring."""
+    calls = {"prepare": 0, "build": 0, "measure": 0, "export_svg": 0}
+    storage = _ArtifactStorage()
+
+    def fake_execute(code, storage, region, deck_id=None,
+                     persist_writes=True, files=None):
+        return ("ok", [], [], fake_execute.changed_paths)
+    fake_execute.changed_paths = []
+
+    def fake_prepare(deck_id, user_id, storage):
+        calls["prepare"] += 1
+        return tmp_path, [{"id": "a"}], {}
+
+    def fake_build(tmpdir, slides, build_kwargs):
+        calls["build"] += 1
+        p = tmp_path / "out.pptx"
+        p.write_bytes(b"pptx")
+        return p, []
+
+    def fake_measure(tmpdir, pptx_path, page_numbers, page_to_slug=None):
+        calls["measure"] += 1
+        return "{}"
+
+    def fake_export_svg(tmpdir, pptx_path):
+        calls["export_svg"] += 1
+        return tmp_path / "measure.svg"  # never created → compose skipped
+
+    import tools.generate as gen_mod
+    monkeypatch.setattr(gen_mod, "_prepare_workspace", fake_prepare)
+    monkeypatch.setattr(gen_mod, "generate_previews",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lo")))
+    monkeypatch.setattr(remote_server, "_build_pptx", fake_build)
+    monkeypatch.setattr(remote_server, "_run_measure", fake_measure)
+    monkeypatch.setattr(remote_server, "_export_svg", fake_export_svg)
+    monkeypatch.setattr(remote_server, "_storage", storage)
+    monkeypatch.setattr(remote_server, "_check_deck_access", lambda *a, **k: None)
+    monkeypatch.setattr(remote_server, "_get_user_id", lambda: "user1")
+    monkeypatch.setattr(remote_server.sandbox_mod, "execute_in_sandbox", fake_execute)
+    return fake_execute, storage, calls
+
+
+class TestRemoteRunPythonBranching:
+    """Exercise the REAL run_python wiring for the 4-pattern contract matrix."""
+
+    def _run(self, measure_slides=None):
+        return json.loads(remote_server.run_python(
+            purpose="t", code="print(1)", deck_id="d1",
+            measure_slides=measure_slides,
+        ))
+
+    def test_no_change_no_measure_does_nothing(self, remote_rig):
+        fake_execute, storage, calls = remote_rig
+        fake_execute.changed_paths = []
+        out = self._run()
+        assert calls == {"prepare": 0, "build": 0, "measure": 0, "export_svg": 0}
+        assert storage.uploads == {} and "measure" not in out
+
+    def test_change_without_measure_builds_artifact_only(self, remote_rig):
+        fake_execute, storage, calls = remote_rig
+        fake_execute.changed_paths = ["slides/a.json"]
+        out = self._run()
+        assert calls["build"] == 1
+        # Cheap path only — no render, no measure, no measure-error noise
+        assert calls["measure"] == 0 and calls["export_svg"] == 0
+        assert "measure" not in out
+        # Artifact refreshed
+        assert any(k.startswith("pptx/d1/") for k in storage.uploads)
+        assert storage.deck_updates and "pptxS3Key" in storage.deck_updates[0]
+
+    def test_measure_without_change_verifies_only(self, remote_rig):
+        fake_execute, storage, calls = remote_rig
+        fake_execute.changed_paths = ["specs/brief.md"]  # not build-relevant
+        out = self._run(measure_slides=["a"])
+        assert calls["build"] == 1 and calls["measure"] == 1
+        assert "measure" in out
+        # No artifact refresh without a build-relevant change
+        assert not any(k.startswith("pptx/d1/") for k in storage.uploads)
+
+    def test_change_with_measure_does_both(self, remote_rig):
+        fake_execute, storage, calls = remote_rig
+        fake_execute.changed_paths = ["slides/a.json"]
+        out = self._run(measure_slides=["a"])
+        assert calls["build"] == 1 and calls["measure"] == 1
+        assert "measure" in out
+        assert any(k.startswith("pptx/d1/") for k in storage.uploads)
+
+    def test_artifact_failure_surfaces_and_compensates(self, remote_rig):
+        fake_execute, storage, calls = remote_rig
+        fake_execute.changed_paths = ["slides/a.json"]
+        storage.fail_update = True
+        out = self._run()
+        assert "pptx_error" in out
+        # The orphaned upload is deleted (best effort)
+        assert storage._s3.delete_object.called

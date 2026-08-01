@@ -272,12 +272,11 @@ includes every slide, followed by preview and SVG compose (triggered
 by `measure_slides`). The PPTX-derived placeholder template means **layout
 mismatch is impossible** — the build should succeed in one shot.
 
-After the `run_python` call returns successfully, call
-`generate_pptx(deck_id=deck_id)` once. This persists `output.pptx`
-to the deck workspace and updates the deck record's `pptxS3Key`, so
-the Web UI can offer a "Download PPTX" button immediately. Without
-this call the UI sees no PPTX yet and hides the download action,
-even though the slides have rendered.
+The deck's PPTX artifact and the deck record's `pptxS3Key` refresh
+automatically when the deck changes, so the Web UI's "Download PPTX"
+action works without further steps. Call `generate_pptx(deck_id=deck_id)`
+only as the final handoff — it additionally produces the WebP preview
+set and returns the download link plus a full-deck warnings report.
 
 ---
 

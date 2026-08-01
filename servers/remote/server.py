@@ -591,6 +591,38 @@ def code_to_slide(deck_id: str, code: str, name: str,
 # --- Code Execution (Code Interpreter) ---
 
 
+def _build_relevant(p: str) -> bool:
+    """True if a workspace path affects the built PPTX artifact."""
+    return (
+        p in ("deck.json", "presentation.json", "specs/outline.md")
+        or p.startswith(("slides/", "includes/"))
+    )
+
+
+def _post_processing_plan(deck_changed: bool,
+                          measure_slides: list[str] | None) -> dict[str, bool]:
+    """Decide run_python post-processing actions (the unified contract).
+
+    - build:    cheap python-pptx build — prerequisite for both the artifact
+                refresh and the verification pass
+    - artifact: refresh the deck's PPTX artifact (follows deck changes
+                automatically; failure must surface in the result)
+    - verify:   expensive verification (measure / SVG compose / preview) —
+                triggered by measure_slides and ONLY by measure_slides
+
+    Contract matrix (pinned by tests/test_run_python_semantics.py):
+        changed=False, measure=None → nothing
+        changed=True,  measure=None → build + artifact only
+        changed=False, measure=[..] → build + verify only
+        changed=True,  measure=[..] → build + artifact + verify
+    """
+    return {
+        "build": bool(deck_changed or measure_slides),
+        "artifact": bool(deck_changed),
+        "verify": bool(measure_slides),
+    }
+
+
 @mcp.tool()
 def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool = False,
                files: list[str] | None = None, measure_slides: list[str] | None = None) -> str:
@@ -729,15 +761,10 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
 
     # Post-processing: rebuild the PPTX artifact whenever build-relevant files
     # changed (the artifact follows the deck automatically); measure_slides
-    # additionally triggers the verification pass.
-    def _build_relevant(p: str) -> bool:
-        return (
-            p in ("deck.json", "presentation.json", "specs/outline.md")
-            or p.startswith(("slides/", "includes/"))
-        )
-
+    # (and ONLY measure_slides) triggers the expensive verification pass.
     deck_changed = any(_build_relevant(p) for p in changed_paths)
-    if deck_id and (measure_slides or deck_changed):
+    plan = _post_processing_plan(deck_changed, measure_slides)
+    if deck_id and plan["build"]:
         import shutil
         import traceback
 
@@ -759,43 +786,47 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
             page_numbers = [slug_to_page[slug] for slug in (measure_slides or []) if slug in slug_to_page]
             page_to_slug = {v: k for k, v in slug_to_page.items()}
 
-            # Measure
-            try:
-                if page_numbers:
-                    measure_result = _run_measure(tmpdir, pptx_path, page_numbers, page_to_slug=page_to_slug)
-                    result["measure"] = measure_result
-                else:
-                    result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})
-            except Exception as e:
-                result["measure"] = json.dumps({"error": str(e)})
+            if plan["verify"]:
+                # Measure
+                try:
+                    if page_numbers:
+                        measure_result = _run_measure(tmpdir, pptx_path, page_numbers, page_to_slug=page_to_slug)
+                        result["measure"] = measure_result
+                    else:
+                        result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})
+                except Exception as e:
+                    result["measure"] = json.dumps({"error": str(e)})
 
-            # Layout bias (filter to measured slides; bias uses 1-based)
-            try:
-                from sdpm.engine.preview import check_layout_imbalance_data
-                layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in set(page_numbers)]
-                if layout_bias:
-                    result["warnings"] = {"layoutBias": layout_bias}
-            except Exception as e:
-                logger.warning("Layout bias check failed: %s", e)
+                # Layout bias (filter to measured slides; bias uses 1-based)
+                try:
+                    from sdpm.engine.preview import check_layout_imbalance_data
+                    layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in set(page_numbers)]
+                    if layout_bias:
+                        result["warnings"] = {"layoutBias": layout_bias}
+                except Exception as e:
+                    logger.warning("Layout bias check failed: %s", e)
 
-            # Invalid-layout errors scoped to measured slugs only. Each
-            # composer owns a subset of slides, so leaking another group's
-            # mistake would be noise (they cannot fix it anyway).
-            measured_set = set(measure_slides or [])
-            my_invalids = [e for e in invalid_layouts if e.get("slug") in measured_set]
-            if my_invalids:
-                errs = result.setdefault("errors", {})
-                for e in my_invalids:
-                    errs[e["slug"]] = {
-                        "invalidLayout": e["attempted"],
-                        "available": e["available"],
-                    }
+                # Invalid-layout errors scoped to measured slugs only. Each
+                # composer owns a subset of slides, so leaking another group's
+                # mistake would be noise (they cannot fix it anyway).
+                measured_set = set(measure_slides or [])
+                my_invalids = [e for e in invalid_layouts if e.get("slug") in measured_set]
+                if my_invalids:
+                    errs = result.setdefault("errors", {})
+                    for e in my_invalids:
+                        errs[e["slug"]] = {
+                            "invalidLayout": e["attempted"],
+                            "available": e["available"],
+                        }
 
-            if deck_changed:
+            if plan["artifact"]:
                 # Refresh the download artifact — the deck's PPTX follows deck
                 # changes automatically (same upload/record shape as
                 # generate_pptx; WebP previews and KB sync stay with
                 # generate_pptx, the explicit finalize/handoff step).
+                # A failure here means the download artifact is STALE — that
+                # must be visible to the caller, not just logged.
+                _pptx_key = None
                 try:
                     import uuid as _uuid
                     from datetime import datetime as _dt, timezone as _tz
@@ -818,8 +849,22 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
                     )
                 except Exception as e:
                     logger.warning("PPTX artifact refresh failed: %s", e)
+                    result["pptx_error"] = (
+                        f"PPTX artifact refresh failed — the downloadable "
+                        f"PPTX is stale. Run generate_pptx to refresh it. "
+                        f"({e})"
+                    )
+                    if _pptx_key:
+                        # The record update may have failed after the upload
+                        # succeeded — delete the orphaned object (best effort).
+                        try:
+                            _storage._s3.delete_object(
+                                Bucket=_storage.pptx_bucket, Key=_pptx_key,
+                            )
+                        except Exception:
+                            pass
 
-            if deck_changed:
+            if plan["verify"]:
                 # Compose: SVG → optimized JSON for WebUI animation
                 # Only generates compose for measure_slides slugs (parallel-safe).
                 # Uses _prepare_epoch (snapshot time) so the composer with the
@@ -859,7 +904,8 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
 
                         # Determine which slugs to generate compose for
                         # Always include slugs that have no existing compose (migration + first build)
-                        compose_slugs = set(measure_slides) if measure_slides else set(slug_to_page.keys())
+                        # Verify-gated: measure_slides is always set here
+                        compose_slugs = set(measure_slides)
                         for s in slug_to_page:
                             if not _latest_key(f"{compose_prefix}{s}_"):
                                 compose_slugs.add(s)
@@ -990,7 +1036,13 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
                 pass
             else:
                 logger.exception("run_python post-processing failed: deck=%s", deck_id)
-                result["measure"] = json.dumps({"error": msg, "traceback": traceback.format_exc()})
+                if plan["verify"]:
+                    result["measure"] = json.dumps({"error": msg, "traceback": traceback.format_exc()})
+                else:
+                    result["pptx_error"] = (
+                        f"PPTX build failed — the downloadable PPTX may be "
+                        f"stale: {msg}"
+                    )
 
     return json.dumps(result, ensure_ascii=False)
 
@@ -1122,6 +1174,20 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
                 key = f"user-styles/{user_id}/{style_name}.html"
                 _storage.upload_file(key=key, data=style_html.encode("utf-8"), content_type="text/html")
                 result["saved"] = {"filename": f"{style_name}.html", "key": key}
+        else:
+            # No style_name → nothing can persist. If the code wrote
+            # style.html anyway, that would be silent data loss — surface it.
+            exists_resp = client.invoke_code_interpreter(
+                codeInterpreterIdentifier="aws.codeinterpreter.v1",
+                sessionId=session_id, name="executeCode",
+                arguments={"language": "python",
+                           "code": "import os\nprint(os.path.exists('style.html'))\n"},
+            )
+            if sandbox_mod._collect_stream(exists_resp).strip() == "True":
+                result["warning"] = (
+                    "style.html was written but no style_name was given — "
+                    "it was NOT persisted. Re-run with style_name=<name>."
+                )
 
         return json.dumps(result, ensure_ascii=False)
 
