@@ -95,9 +95,10 @@ export function writeSelection(sel: AgentSelection, dirs: SyncDirs = DEFAULT_DIR
  * and the existing output is left untouched (the caller decides whether to
  * fail the spawn — spawning from silently stale files is the exact bug
  * this module exists to prevent). On success the directory is replaced
- * atomically (staged in a sibling temp dir, then swapped), so a crash can
- * never leave a mix of old and new generations, and stale files from
- * removed catalog entries are swept away.
+ * transactionally (staged in a sibling temp dir, old output moved to a
+ * backup and restored if the swap fails), so a failure can never leave a
+ * mix of old and new generations — or no directory at all — and stale
+ * files from removed catalog entries are swept away.
  */
 export function syncToAgentsDir(
   sel: AgentSelection = readSelection(),
@@ -130,17 +131,28 @@ export function syncToAgentsDir(
     }
     staged.push({ fileName: fixedName, content: JSON.stringify(agent, null, 2) + "\n" })
   }
-  // Phase 2 — write to a sibling temp dir, then swap atomically.
+  // Phase 2 — transactional replacement with backup: stage a sibling temp
+  // dir, move the old output aside, swap the new one in, and restore the
+  // backup if the swap fails. No failure path loses the old generation.
   const tmpDir = dirs.agentsDir + `.tmp-${process.pid}`
+  const backupDir = dirs.agentsDir + `.bak-${process.pid}`
   fs.rmSync(tmpDir, { recursive: true, force: true })
+  fs.rmSync(backupDir, { recursive: true, force: true })
   fs.mkdirSync(tmpDir, { recursive: true })
   try {
     for (const { fileName, content } of staged) {
       fs.writeFileSync(path.join(tmpDir, fileName), content)
     }
     fs.writeFileSync(path.join(tmpDir, "README.md"), README_MARKER)
-    fs.rmSync(dirs.agentsDir, { recursive: true, force: true })
-    fs.renameSync(tmpDir, dirs.agentsDir)
+    const hadPrevious = fs.existsSync(dirs.agentsDir)
+    if (hadPrevious) fs.renameSync(dirs.agentsDir, backupDir)
+    try {
+      fs.renameSync(tmpDir, dirs.agentsDir)
+    } catch (e) {
+      if (hadPrevious) fs.renameSync(backupDir, dirs.agentsDir) // restore
+      throw e
+    }
+    fs.rmSync(backupDir, { recursive: true, force: true })
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   }

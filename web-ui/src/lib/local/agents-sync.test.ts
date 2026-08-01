@@ -1,6 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import fs from "fs"
 import os from "os"
 import path from "path"
@@ -128,6 +128,34 @@ describe("syncToAgentsDir", () => {
   it("throws when the catalog directory is absent", () => {
     fs.rmSync(dirs.acpAgentsDir, { recursive: true })
     expect(() => syncToAgentsDir(readSelection(dirs), dirs)).toThrow(/catalog not found/)
+  })
+
+  it("swap failure (tmp -> agents rename) restores the previous generation", () => {
+    syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "old-model" }, dirs)
+
+    const realRename = fs.renameSync
+    const spy = vi.spyOn(fs, "renameSync").mockImplementation((src, dest) => {
+      if (String(dest) === dirs.agentsDir && String(src).includes(".tmp-")) {
+        throw new Error("injected rename failure")
+      }
+      return realRename(src, dest)
+    })
+    try {
+      expect(() => syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "new-model" }, dirs))
+        .toThrow(/injected rename failure/)
+    } finally {
+      spy.mockRestore()
+    }
+
+    // Old generation fully restored — directory exists, old content, no leftovers
+    const files = fs.readdirSync(dirs.agentsDir).sort()
+    expect(files).toEqual([...ROLES.map((r) => `${r}.json`), "README.md"].sort())
+    for (const r of ROLES) {
+      const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, `${r}.json`), "utf-8"))
+      expect(agent.model).toBe("old-model")
+    }
+    expect(fs.readdirSync(path.dirname(dirs.agentsDir)).filter((f) => f.includes(".bak-") || f.includes(".tmp-")))
+      .toHaveLength(0) // backup restored, temp cleaned — no remnants
   })
 })
 
