@@ -10,6 +10,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Fixed
+
+- Cloud and local ACP deck agents now expose `arch_diagram`, as required by the
+  composition workflow, so architecture, system, and flow diagrams use automatic
+  routing and crossing minimization instead of silently falling back to manual
+  placement.
+
 ## [0.5.3] - 2026-08-01
 
 ### Changed
