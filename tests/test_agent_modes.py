@@ -125,11 +125,14 @@ def test_compose_report_wiring_is_l4_delta_only():
 
 def test_style_creator_carries_remote_sandbox_wiring():
     """The style persona documents the local read_style/write_style sandbox;
-    Remote's run_style_python uses style_name/save/ref_styles instead, so L4
-    must inject the adapter-specific I/O as wiring (review finding, PR #231).
+    Remote's run_style_python uses style_name/ref_styles file I/O instead, so
+    L4 must inject the adapter-specific I/O as wiring (review finding, PR #231).
+    Writes persist automatically (run-python-unified-semantics SPEC) — the
+    wiring must say so and must NOT teach a save flag.
     """
     values = [p.source.value for p in MODES["style_creator"].parts if p.source.type == "file"]
     assert "wiring/style_remote" in values
     wiring_text = (_PROMPTS_DIR / "wiring" / "style_remote.md").read_text(encoding="utf-8")
-    for token in ("style_name", "save=True", "ref_styles"):
+    for token in ("style_name", "ref_styles", "persisted automatically"):
         assert token in wiring_text
+    assert "save=True" not in wiring_text

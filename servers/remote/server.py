@@ -55,7 +55,7 @@ logger = logging.getLogger("sdpm.mcp")
 _INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generation from JSON.
 
 ## Architecture
-- The agent edits workspace files via `run_python(deck_id=..., save=True)` using normal file I/O
+- The agent edits workspace files via `run_python(deck_id=...)` using normal file I/O (writes always persist)
 - MCP tools handle: workflow guidance, initialization, PPTX generation, preview, references
 - MCP tools do NOT handle: slide editing, spec writing (agent responsibility via run_python)
 
@@ -625,7 +625,16 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     Raw `open()` / `json.load` still work on Cloud for backward compat,
     but new code should prefer the helpers.
 
-    If save=True, all modified/new workspace files are written back to S3.
+    ## Persistence & build (no flags needed)
+
+    - File writes always persist — modified/new workspace files are written
+      back to S3 after every execution. There is no "unsaved" state.
+      (If you only have read access to the deck, writes are discarded and
+      the result notes it.)
+    - The deck's PPTX artifact refreshes automatically whenever the deck
+      changed (deck.json / slides/ / includes/ / specs/outline.md).
+    - measure_slides triggers the expensive verification pass (render + text
+      overflow measurement + live-preview compose) for the given slugs only.
 
     **Always specify measure_slides when editing slides.** Runs validation after
     code execution (requires deck_id):
@@ -643,11 +652,11 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
             data = read_json("slides/title.json")
             data["elements"][0]["text"] = "New Title"
             write_json("slides/title.json", data)
-            # run_python(code=<above>, deck_id="abc", save=True, measure_slides=["title"])
+            # run_python(code=<above>, deck_id="abc", measure_slides=["title"])
 
         Edit spec:
             write_text("specs/brief.md", "# Brief\\n\\nContents...")
-            # run_python(code=<above>, deck_id="abc", save=True)
+            # run_python(code=<above>, deck_id="abc")
 
         Read deck metadata:
             deck = read_json("deck.json")
@@ -662,7 +671,8 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     Args:
         code: Python code to execute.
         deck_id: Deck ID to load workspace from. Optional.
-        save: If True, save modified workspace files back to S3. Requires deck_id.
+        save: Deprecated and ignored. Writes always persist and the PPTX
+            artifact refreshes automatically when the deck changed.
         files: S3 keys of files to make available in the sandbox. Optional.
         measure_slides: List of slide slugs to measure after execution. Requires deck_id.
         purpose: Brief user-facing description of what this code does,
@@ -674,19 +684,38 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     """
     if measure_slides and not deck_id:
         return json.dumps({"error": "measure_slides requires deck_id"})
-    if deck_id:
-        _check_deck_access(deck_id, action="edit_slide" if save else "read")
 
-    output, outline_warnings, lint_diagnostics = sandbox_mod.execute_in_sandbox(
+    result: dict = {}
+    if save:
+        result["deprecated"] = (
+            "'save' is ignored: writes always persist and the PPTX artifact "
+            "refreshes automatically when the deck changed."
+        )
+
+    # Writes persist by default. If the user only has read access, run the
+    # sandbox without write-back instead of failing (read-only analysis).
+    persist_writes = True
+    if deck_id:
+        try:
+            _check_deck_access(deck_id, action="edit_slide")
+        except ValueError:
+            _check_deck_access(deck_id, action="read")
+            persist_writes = False
+            result["readOnly"] = (
+                "You have read-only access to this deck: file writes were "
+                "not persisted."
+            )
+
+    output, outline_warnings, lint_diagnostics, changed_paths = sandbox_mod.execute_in_sandbox(
         code=code,
         storage=_storage,
         region=_region,
         deck_id=deck_id,
-        save=save,
+        persist_writes=persist_writes,
         files=files,
     )
 
-    result: dict = {"output": output}
+    result["output"] = output
 
     if outline_warnings:
         result.setdefault("warnings", {})["outline"] = (
@@ -698,8 +727,17 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
         errs = result.setdefault("errors", {})
         errs["lintDiagnostics"] = lint_diagnostics
 
-    # Post-processing: measure_slides triggers PPTX build → measure/bias
-    if deck_id and (measure_slides or save):
+    # Post-processing: rebuild the PPTX artifact whenever build-relevant files
+    # changed (the artifact follows the deck automatically); measure_slides
+    # additionally triggers the verification pass.
+    def _build_relevant(p: str) -> bool:
+        return (
+            p in ("deck.json", "presentation.json", "specs/outline.md")
+            or p.startswith(("slides/", "includes/"))
+        )
+
+    deck_changed = any(_build_relevant(p) for p in changed_paths)
+    if deck_id and (measure_slides or deck_changed):
         import shutil
         import traceback
 
@@ -753,7 +791,35 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
                         "available": e["available"],
                     }
 
-            if save:
+            if deck_changed:
+                # Refresh the download artifact — the deck's PPTX follows deck
+                # changes automatically (same upload/record shape as
+                # generate_pptx; WebP previews and KB sync stay with
+                # generate_pptx, the explicit finalize/handoff step).
+                try:
+                    import uuid as _uuid
+                    from datetime import datetime as _dt, timezone as _tz
+                    _pptx_key = f"pptx/{deck_id}/{_uuid.uuid4()}.pptx"
+                    _storage.upload_file(
+                        key=_pptx_key,
+                        data=Path(pptx_path).read_bytes(),
+                        content_type=(
+                            "application/vnd.openxmlformats-officedocument"
+                            ".presentationml.presentation"
+                        ),
+                    )
+                    _storage.update_deck(
+                        deck_id=deck_id, user_id=user_id,
+                        updates={
+                            "pptxS3Key": _pptx_key,
+                            "updatedAt": _dt.now(_tz.utc).isoformat(),
+                            "slideCount": len(slides),
+                        },
+                    )
+                except Exception as e:
+                    logger.warning("PPTX artifact refresh failed: %s", e)
+
+            if deck_changed:
                 # Compose: SVG → optimized JSON for WebUI animation
                 # Only generates compose for measure_slides slugs (parallel-safe).
                 # Uses _prepare_epoch (snapshot time) so the composer with the
@@ -945,7 +1011,8 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
 
     If style_name is provided, the style HTML is loaded as style.html.
     The code can read/write it via normal file I/O (open, read, write).
-    If save=True, style.html is written back to the user's style storage.
+    Writes always persist — if style.html changed, it is written back to the
+    user's style storage automatically. There is no "unsaved" state.
 
     If ref_styles are provided, they are downloaded and available as ref/{name}.html.
     Use list_styles to discover available style names.
@@ -954,16 +1021,16 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
     for color computation, palette extraction, and contrast calculation.
 
     Workspace layout:
-        style.html          — target style (read/write, saved back when save=True)
+        style.html          — target style (read/write; persisted when changed)
         ref/{name}.html     — reference styles (read-only)
 
     Examples:
         Read reference:    run_style_python(code="html = open('ref/corporate-executive.html').read(); print(html[:200])",
                                            ref_styles=["corporate-executive"])
         Create new:        run_style_python(code="open('style.html','w').write('<html>...')",
-                                           style_name="style-20260506-1430", save=True)
+                                           style_name="style-20260506-1430")
         Edit existing:     run_style_python(code="html = open('style.html').read(); html = html.replace('old','new'); open('style.html','w').write(html)",
-                                           style_name="style-20260506-1430", save=True)
+                                           style_name="style-20260506-1430")
         Compute colors:    run_style_python(code="from colorsys import rgb_to_hls; print(rgb_to_hls(0.2, 0.4, 0.6))")
 
     Args:
@@ -971,15 +1038,13 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
             written in the user's language. Shown in the UI.
         code: Python code to execute.
         style_name: Style name to load as style.html. Optional.
-        save: If True, save style.html back to storage. Requires style_name.
+        save: Deprecated and ignored. style.html persists automatically
+            when changed (requires style_name).
         ref_styles: Style names to load as ref/{name}.html. Optional.
 
     Returns:
         JSON string: {"output", "saved"?}
     """
-    if save and not style_name:
-        return json.dumps({"error": "save=True requires style_name"})
-
     user_id = _get_user_id()
 
     client = boto3.client("bedrock-agentcore", region_name=_region)
@@ -993,10 +1058,12 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
     try:
         file_contents: list[dict[str, str]] = []
 
-        # Load target style
+        # Load target style (baseline for change detection)
+        baseline_style: str | None = None
         if style_name:
             html = _load_style_html(user_id, style_name)
             if html:
+                baseline_style = html
                 file_contents.append({"path": "style.html", "text": html})
 
         # Load reference styles
@@ -1031,9 +1098,14 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
         output = sandbox_mod._collect_stream(response)
 
         result: dict = {"output": output}
+        if save:
+            result["deprecated"] = (
+                "'save' is ignored: style.html persists automatically "
+                "when changed."
+            )
 
-        # Save style.html back to S3
-        if save and style_name:
+        # Persist style.html when it changed (always — no "unsaved" state)
+        if style_name:
             read_code = "import sys\ntry:\n    print(open('style.html').read())\nexcept FileNotFoundError:\n    print('__NOT_FOUND__')\n"
             read_resp = client.invoke_code_interpreter(
                 codeInterpreterIdentifier="aws.codeinterpreter.v1",
@@ -1041,7 +1113,12 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
                 arguments={"language": "python", "code": read_code},
             )
             style_html = sandbox_mod._collect_stream(read_resp)
-            if style_html and style_html.strip() != "__NOT_FOUND__":
+            if (
+                style_html
+                and style_html.strip() != "__NOT_FOUND__"
+                # print() appends a newline — compare newline-insensitively
+                and style_html.rstrip("\n") != (baseline_style or "").rstrip("\n")
+            ):
                 key = f"user-styles/{user_id}/{style_name}.html"
                 _storage.upload_file(key=key, data=style_html.encode("utf-8"), content_type="text/html")
                 result["saved"] = {"filename": f"{style_name}.html", "key": key}

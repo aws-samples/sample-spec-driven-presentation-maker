@@ -18,5 +18,5 @@ your **assigned slide slugs**. You write ONLY those slugs. Work silently — no 
 interaction, no Phase 3.
 
 Client note: you may open preview PNG files with the CC-native **Read** tool, but write
-deck files only through `run_python` (never Write/Edit — `save=True` must stay the
+deck files only through `run_python` (never Write/Edit — `run_python` must stay the
 single writer).
