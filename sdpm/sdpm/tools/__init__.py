@@ -21,7 +21,7 @@ from sdpm.config import PERSONAS_DIR as _PERSONAS_DIR
 from sdpm.config import REFERENCES_DIR as _REFERENCES_DIR
 from sdpm.tools.instructions import INSTRUCTIONS as _INSTRUCTIONS
 
-_MODES = ("vibe", "spec", "style", "composer")
+_MODES = ("vibe", "spec", "style", "composer", "single")
 
 
 def start_presentation(mode: str = "") -> str:
@@ -43,6 +43,8 @@ def start_presentation(mode: str = "") -> str:
             - "style": create a reusable style guide (HTML design tokens) through dialogue.
             - "composer": silent slide composition from approved specs. Used by composer
               sub-agents, or by the orchestrator itself when no sub-agent mechanism exists.
+            - "single": one agent does everything end-to-end (dialogue + composition,
+              no sub-agents). Used by single-agent deployments (e.g. chat integrations).
             - "" (omitted): the interactive workflow menu (choose A-D with the user).
 
     Returns:

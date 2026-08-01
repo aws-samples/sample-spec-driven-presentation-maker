@@ -55,6 +55,27 @@ Rules that follow from this:
 4. **Personas are content, not client config** ("server-driven behavior").
    Behavior is served through the port via `start_presentation(mode=...)`,
    so client-side files stay minimal wiring and never duplicate behavior text.
+
+   Deciding *how* a client obtains a persona is a two-axis judgement:
+
+   - **When is the mode known?** If it is only decided in conversation
+     (user picks vibe/spec/style), the agent must fetch via
+     `start_presentation` — the default. If the mode is fixed at the
+     entry point (a dedicated composer sub-agent, the L4 agent's modes),
+     the persona may be embedded into the system prompt — but only when
+     it is **re-derived at reference/build time from `personas/`**
+     (never a hand-maintained copy).
+   - **Does the definition cross a distribution boundary?** Anything
+     copied into user-owned locations (`~/.kiro/agents/`, plugin files)
+     drifts silently after `git pull`. Prefer definitions that resolve
+     the persona live from the checkout / server; treat boundary-crossing
+     copies as generated artifacts that must be re-derivable.
+
+   Two orthogonal follow-ons: *delivery* (through the port vs. file read)
+   and *placement* (system prompt vs. task prompt) are independent choices —
+   picking one does not constrain the other. Tool docstrings (e.g.
+   `start_presentation`'s mode list) are the discovery layer — the
+   equivalent of skill frontmatter; do not create skill stubs for modes.
 5. **Change-locality goal** — the structure is optimised so that:
    prompt changes touch only `personas/`; engine changes touch only
    `sdpm/sdpm/engine/`; a new client touches only `clients/`; a new tool

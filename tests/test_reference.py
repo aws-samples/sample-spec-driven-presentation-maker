@@ -47,10 +47,18 @@ class TestContractReference:
         ("spec", "Phase 1 Flow"),
         ("style", "run_style_python"),
         ("composer", "assigned slugs"),
+        ("single", "Workflow: New Presentation"),
     ])
     def test_start_presentation_modes(self, mode, needle):
         text = contract.start_presentation(mode=mode)
         assert needle in text
+
+    def test_every_persona_file_is_served(self):
+        # personas/*.md and _MODES must stay in sync (a persona no one can
+        # request is dead content; a mode without a file raises at runtime)
+        from sdpm.config import PERSONAS_DIR
+        files = {p.stem for p in PERSONAS_DIR.glob("*.md")}
+        assert files == set(contract._MODES)
 
     def test_start_presentation_unknown_mode(self):
         text = contract.start_presentation(mode="bogus")
