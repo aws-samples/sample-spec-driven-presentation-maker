@@ -2,4 +2,4 @@
 # SPDX-License-Identifier: MIT-0
 """sdpm - Generate PowerPoint from JSON using template."""
 
-__version__ = "0.5.2"
+__version__ = "0.5.3"
