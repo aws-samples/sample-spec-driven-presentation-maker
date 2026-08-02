@@ -423,6 +423,8 @@
     "closeAria": "チャットパネルを閉じる"
   },
   "stylePicker": {
+    "sectionTitle": "スタイル",
+    "sampleCount": "{count, plural, other {サンプル # 枚}}",
     "chooseStyle": "スタイルを選択",
     "clickToPreview": "クリックでプレビュー · ★ でお気に入りをピン留め",
     "backToArtDirection": "アートディレクションに戻る",

@@ -423,6 +423,8 @@
     "closeAria": "Close chat panel"
   },
   "stylePicker": {
+    "sectionTitle": "Style",
+    "sampleCount": "{count, plural, one {# sample slide} other {# sample slides}}",
     "chooseStyle": "Choose a Style",
     "clickToPreview": "Click to preview · ★ to pin favorites",
     "backToArtDirection": "Back to Art Direction",

@@ -23,7 +23,7 @@ import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { fetchStyles, fetchStyleHtml, pinStyle, type StyleEntry } from "@/services/deckService"
 import { OutlineView } from "./OutlineView"
-import { StyleSlidePreview } from "@/components/StyleSlidePreview"
+import { StyleSlidePreview, splitStyleSlides } from "@/components/StyleSlidePreview"
 import { StyleCard } from "./StyleCard"
 import { TemplatePickerSection } from "./TemplatePickerSection"
 import { BriefWaiting, OutlineWaiting, ArtDirectionWaiting } from "./SpecWaiting"
@@ -313,31 +313,39 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
 
     // RESULT state (default when content exists)
     const isHtml = content!.trim().startsWith("<")
+    const sampleCount = isHtml ? (splitStyleSlides(content!)?.slides.length ?? 0) : 0
     return wrap(
-      <div>
-        {onStyleSelect && (
-          <div className="flex justify-end px-4 py-2">
-            <button
-              onClick={() => { userRequestedGallery.current = true; setAdMode("gallery") }}
-              className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-border hover:bg-foreground/[0.06] transition-colors"
-            >
-              <Palette className="h-3.5 w-3.5" />
-              {t("changeStyle")}
-            </button>
+      <section className="px-6 pt-4 pb-6">
+        <div className="max-w-4xl mx-auto">
+          {/* Section header — same grammar as the template section above */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-baseline gap-2.5">
+              <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">{t("sectionTitle")}</h3>
+              {sampleCount > 0 && (
+                <span className="text-xs text-foreground-muted">{t("sampleCount", { count: sampleCount })}</span>
+              )}
+            </div>
+            {onStyleSelect && (
+              <button
+                onClick={() => { userRequestedGallery.current = true; setAdMode("gallery") }}
+                className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-border hover:bg-foreground/[0.06] transition-colors"
+              >
+                <Palette className="h-3.5 w-3.5" />
+                {t("changeStyle")}
+              </button>
+            )}
           </div>
-        )}
-        {isHtml ? (
-          <StyleSlidePreview html={content!} loading={false} />
-        ) : (
-          <div className="px-6 sm:px-8 py-6">
-            <article className="document-surface prose prose-invert prose-sm max-w-3xl mx-auto spec-prose">
+          {isHtml ? (
+            <StyleSlidePreview html={content!} loading={false} />
+          ) : (
+            <article className="document-surface prose prose-invert prose-sm max-w-3xl spec-prose">
               <Markdown remarkPlugins={[remarkGfm]} components={specComponents as Components}>
                 {content!}
               </Markdown>
             </article>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </section>
     )
   }
 

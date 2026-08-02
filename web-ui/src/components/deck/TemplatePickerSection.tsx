@@ -72,6 +72,7 @@ export function TemplatePickerSection({ idToken, currentTemplate, onTemplateSele
 
   return (
     <section className="px-6 pt-4 pb-4 border-b border-border">
+      <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">{t("sectionTitle")}</h3>
         {current && (
@@ -100,6 +101,7 @@ export function TemplatePickerSection({ idToken, currentTemplate, onTemplateSele
           ))}
         </div>
       )}
+      </div>
     </section>
   )
 }

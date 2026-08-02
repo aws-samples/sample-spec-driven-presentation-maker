@@ -173,7 +173,7 @@ export function StyleSlidePreview({ html, loading }: { html: string; loading: bo
   const faceWidth = Math.max(containerWidth - 50, 0)
 
   return (
-    <div ref={measuredRef} className="w-full max-w-3xl mx-auto">
+    <div ref={measuredRef} className="w-full max-w-4xl mx-auto">
       {containerWidth > 0 ? (
         split ? (
           /* Per-slide card view */
