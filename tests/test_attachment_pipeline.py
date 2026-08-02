@@ -333,10 +333,12 @@ class TestCache:
     """Tests for stage cache identity and publish."""
 
     def test_pipeline_version_format(self):
+        import sdpm
         from sdpm.tools.attachment.cache import pipeline_version
         pv = pipeline_version()
         assert ":attachment-" in pv
-        assert pv.startswith("0.5.3:attachment-1")
+        # Derived from sdpm.__version__ so cache keys rotate on engine releases.
+        assert pv.startswith(f"{sdpm.__version__}:attachment-")
 
     def test_import_key_deterministic(self):
         from sdpm.tools.attachment.cache import compute_import_key
