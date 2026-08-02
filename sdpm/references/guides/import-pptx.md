@@ -1,6 +1,6 @@
 ---
 name: import-pptx
-description: "Convert an uploaded PPTX into an editable deck (invoked when upload_file returns guide='import-pptx' and user intent is edit)"
+description: "Convert an attached PPTX into an editable deck (invoked when read_attachment returns guideInstruction for import-pptx and user intent is edit)"
 category: guide
 ---
 
@@ -8,21 +8,22 @@ category: guide
 
 Invoke this guide when **both** are true:
 
-1. `upload_file` response contains `guide: "import-pptx"`, AND
+1. `read_attachment` response contains `guideInstruction` pointing to
+   this guide (kind=pptx), AND
 2. The user's intent is confirmed to be **editing** the PPTX (not using
    it as reference material for a new deck).
 
 If intent is ambiguous, use the `hearing` tool **once** to confirm before
 entering this guide. If the user wants to use the PPTX as reference, stop
-here and follow the normal briefing flow (use `read_uploaded_file` to
+here and follow the normal briefing flow (use `read_attachment` to
 access content when writing `specs/brief.md`).
 
 ## Overview
 
 This guide is the complete workflow for the edit branch. The user already
 provided the PPTX itself — that *is* the brief. The PPTX-derived
-**placeholder template** (extracted automatically during upload and
-copied into the deck as `deck/template.pptx`) means there is no template
+**placeholder template** is retained inside the immutable import bundle. Step 4
+points the active deck at that read-only template, so there is no template
 selection step: the deck builds against the source PPTX's own layouts.
 
 Steps 1 → 6 generate brief / outline / build / art-direction from the
@@ -45,10 +46,11 @@ from the PPTX content already in your context.
 
 ## State you must carry through the guide
 
-The triggering `upload_file` response contains fields you reuse later:
+The `read_attachment` response header and the attachment marker
+`[Attached:{"v":1,"name":"...","source":"..."}]` provide:
 
-- `uploadId` — Step 2 (`import_attachment(source=uploadId, ...)`)
-- `suggestedName` — Step 1 (`init_presentation(name=suggestedName)`)
+- `source` — Step 2 (`import_attachment(source=<source>, ...)`)
+- `fileName` — Step 1 (`init_presentation(name=<derived from fileName>)`)
 - `slideCount`, `themeHints` — Step 4 validation and style selection
 
 These values stay in your conversation context. If you cannot locate
@@ -66,218 +68,126 @@ argument**.
   template parameter would pre-populate fonts that Step 4 immediately
   overwrites with PPTX-derived fonts. Skipping the argument keeps Local
   and Cloud symmetric.
-- Template (`"template.pptx"` — deck-local), fonts, and
-  `defaultTextColor` are written to `deck.json` in Step 4.
+- The bundle template path, fonts, and `defaultTextColor` are assigned to
+  `deck.json` in Step 4; the immutable bundle itself is not modified.
 - Returns the new `deck_id` (directory path in Local, deckId in Cloud).
 
 ---
 
 ## Step 2 — Import converted files
 
-Call `import_attachment(source=<uploadId>, deck_id=<deck_id>)`.
+Call `import_attachment(source=<source>, deck_id=<deck_id>)`.
 
-The helper copies session files into the deck:
+The tool converts the PPTX and commits an immutable bundle into the deck:
 
-- `template.pptx` — PPTX-derived placeholder template (deck root)
-- `attachments/{shortId}_deck.json` — PPTX-derived fonts / defaultTextColor
-- `attachments/{shortId}/slides/slide-NNN.json` — per-slide JSON
-- `images/{shortId}_*` — extracted images (flattened into deck/images/)
+- `attachments/imports/{importKey}/deck/template.pptx` — PPTX-derived placeholder template
+- `attachments/imports/{importKey}/deck/deck.json` — fonts / defaultTextColor
+- `attachments/imports/{importKey}/deck/slides/slide-NN.json` — per-slide JSON
+- `attachments/imports/{importKey}/extracted/images/*` — extracted images
 
-The returned JSON includes `shortId`, `templatePath`, `deckJson`, and
-`files[]`. Keep `shortId` — Step 3 and Step 4 need it to locate the
-imported per-slide files.
+The returned JSON includes `importKey`, `bundlePath`, `deckJson`, and
+`files[]`. Keep `importKey` — Step 3 and Step 4 need it to locate the
+imported per-slide files within the bundle.
 
 ---
 
 ## Step 3 — Prepare brief and outline
 
-Populate `specs/brief.md` and `specs/outline.md` **before** Step 4
-builds the deck. `specs/art-direction.html` is intentionally deferred
-to Step 5 — the rendered slide previews from Step 4 are a far better
-input for it than the upload-time image extraction. Each sub-step
-uses `run_python` — writes always persist automatically (no save
-flag), so intermediate state survives even though Cloud discards the
-sandbox VM between calls.
+Populate `specs/brief.md` and `specs/outline.md` from the committed bundle before
+building. The `bundlePath` returned by Step 2 is deck-relative and identical on
+Local and Cloud (for example `attachments/imports/<importKey>`). Bundle files are
+read-only: use `read_json` / `read_text` to inspect them, and write only to active
+workspace paths such as `specs/` and `slides/`.
 
-You generate these specs from the PPTX content you imported in Step 2.
-Do not call `hearing` in Step 3 — if a particular field is thin, leave
-it succinct rather than asking the user.
-
-Sandbox helpers (`read_json / write_json / read_text / write_text /
-list_files`) are available on both Local and Cloud. Do NOT use `open()`
-or `import` inside the sandbox code — Local forbids both and the Cloud
-import is already prepended.
-
-### 3-1. brief.md (Source Material from PPTX)
-
-First, explore the imported slides to extract titles and text (no save):
+First inspect the imported slides:
 
 ```python
-short_id = "<result['shortId'] from Step 2>"
-files = list_files(f"attachments/{short_id}/slides")
-for name in sorted(files):
-    data = read_json(f"attachments/{short_id}/slides/{name}")
+bundle_path = "<result['bundlePath'] from Step 2>"
+slides_path = f"{bundle_path}/deck/slides"
+for name in sorted(list_files(slides_path)):
+    data = read_json(f"{slides_path}/{name}")
     title = data.get("title") or ""
     if isinstance(title, dict):
         title = title.get("text", "")
     print(name, "::", title)
 ```
 
-Run that via `run_python(code=<above>, deck_id=deck_id)`
-(Cloud: prepend `purpose="Inspect PPTX slides"`).
-
-Then write `specs/brief.md` in a second call:
-
-```python
-short_id = "<result['shortId']>"
-lines = ["# Brief", "", "## Source Material", ""]
-for name in sorted(list_files(f"attachments/{short_id}/slides")):
-    slug = name.removesuffix(".json")
-    data = read_json(f"attachments/{short_id}/slides/{name}")
-    title = data.get("title") or ""
-    if isinstance(title, dict):
-        title = title.get("text", "")
-    lines.append(f"### {slug}")
-    lines.append(f"Source: attachments/{short_id}/slides/{name}")
-    if title:
-        lines.append(f"Title: {title}")
-    lines.append("")
-write_text("specs/brief.md", "\n".join(lines) + "\n")
-print("brief.md written")
-```
-
-Call as `run_python(code=<above>, deck_id=deck_id)`
-(Cloud: prepend `purpose="Write brief.md from PPTX content"`).
-
-### 3-2. outline.md (LLM summarization)
-
-Summarise each slide in one line (you, the agent, produce the summary —
-the sandbox does NOT call LLMs). Pass the `(slug, message)` pairs as a
-Python literal:
+Call via `run_python(purpose="Inspect PPTX slides", code=<above>, deck_id=deck_id)`.
+Then write `specs/brief.md` with concise source summaries and bundle-relative evidence
+paths. Summarise each imported slide yourself and write `specs/outline.md` with one
+non-empty line per slide:
 
 ```python
-# Agent fills this list from slide content seen in Step 3-1.
 pairs = [
-    ("slide-001", "Introduction to the system"),
-    ("slide-002", "Storage classes overview"),
-    # ... one entry per slide, matching attachments/{shortId}/slides/*.json
+    ("slide-01", "Introduction to the system"),
+    ("slide-02", "Storage classes overview"),
 ]
-lines = [f"- [{slug}] {msg}" for slug, msg in pairs]
-write_text("specs/outline.md", "\n".join(lines) + "\n")
-print("outline.md written:", len(pairs))
+write_text("specs/outline.md", "\n".join(f"- [{slug}] {message}" for slug, message in pairs) + "\n")
 ```
 
-Call with `run_python(code=<above>, deck_id=deck_id)`
-(Cloud: add `purpose="Write outline.md from PPTX content"`).
-
-Requirements (outline lint will otherwise reject the write on Cloud):
-
-- Each slug MUST match the filename of an imported slide
-  (`slide-001`, `slide-002`, ...) — do not rename.
-- Messages MUST be non-empty.
-- One line per slide, no sub-items.
+Do not call `hearing` in Step 3. If source content is sparse, keep the generated specs
+succinct rather than asking the user.
 
 ---
 
-## Step 4 — Place slides + build + preview + compose (single `run_python`)
+## Step 4 — Activate slides + build + preview (single `run_python`)
 
-Copy the PPTX-derived slide JSON into `slides/`, merge deck metadata
-into `deck.json` (using the deck-local `template.pptx`), and build the
-deck in a **single** `run_python` call with `measure_slides`.
-
-**Do not split Step 4 into multiple calls.** Each Cloud `run_python`
-runs in a fresh sandbox VM that is discarded afterward. Keeping Step 4
-in one call ensures the copy, S3 writeback, build, preview, and compose
-all share a single VM.
-
-Assemble the slug list from Step 3-2 as a Python literal:
+The import tool itself never writes deck-root template, slides, or images. In one
+`run_python` call, select data from the immutable bundle into the active deck:
 
 ```python
-short_id = "<result['shortId']>"
-slugs = ["slide-001", "slide-002", "slide-003"]  # agent fills from Step 3-2
-# image_mapping is in the import_attachment result. It maps the original
-# converter-emitted filename (e.g. "slide1_image1.png") to its
-# deck-relative path after rename (e.g. "images/<shortId>_slide1_image1.png").
-image_mapping = {<paste image_mapping dict from Step 2 result here>}
+bundle_path = "<result['bundlePath'] from Step 2>"
+slides_path = f"{bundle_path}/deck/slides"
+slugs = [name.removesuffix(".json") for name in sorted(list_files(slides_path))]
+image_mapping = {<paste result['imageMapping'] from Step 2>}
 
-# 1. Merge PPTX-derived metadata into deck.json (deck-local placeholder template)
+# Point the active deck at the immutable bundle template; do not copy or modify it.
 deck = read_json("deck.json")
-imported = read_json(f"attachments/{short_id}_deck.json")
-deck["template"] = "template.pptx"  # deck-local; copied by import_attachment
+imported = read_json(f"{bundle_path}/deck/deck.json")
+deck["template"] = f"{bundle_path}/deck/template.pptx"
 deck["fonts"] = imported.get("fonts", {})
 deck["defaultTextColor"] = imported.get("defaultTextColor")
 write_json("deck.json", deck)
 
-# 2. Pre-flight check — every slug must have a corresponding imported slide
-missing = []
+def rewrite_image_refs(node):
+    if isinstance(node, dict):
+        if node.get("type") == "image" and isinstance(node.get("src"), str):
+            original = node["src"].split("/", 1)[-1]
+            mapped = image_mapping.get(original)
+            if mapped:
+                node["src"] = f"{bundle_path}/{mapped}"
+        effects = node.pop("_originalEffects", None)
+        if effects:
+            for key, value in effects.items():
+                node.setdefault(key, value)
+        for value in node.values():
+            rewrite_image_refs(value)
+    elif isinstance(node, list):
+        for value in node:
+            rewrite_image_refs(value)
+
 for slug in slugs:
-    try:
-        _ = read_json(f"attachments/{short_id}/slides/{slug}.json")
-    except Exception:
-        missing.append(slug)
-if missing:
-    print("ERROR missing:", missing)
-else:
-    # 3. Copy each slide JSON from attachments/ into slides/, rewriting
-    #    image src refs through image_mapping. import_attachment renames
-    #    extracted images (e.g. "slide1_image1.png" → deck/images/<shortId>_slide1_image1.png),
-    #    so the converter-emitted src strings ("images/slide1_image1.png")
-    #    no longer resolve and the build silently drops the picture.
-    def _rewrite_image_refs(node):
-        if isinstance(node, dict):
-            if node.get("type") == "image" and isinstance(node.get("src"), str):
-                src = node["src"]
-                # src looks like "images/<original_name>"
-                base = src.split("/", 1)[1] if src.startswith("images/") else src
-                mapped = image_mapping.get(base)
-                if mapped:
-                    node["src"] = mapped
-            # Faithful reproduction: spread _originalEffects (crop, mask,
-            # brightness...) into the element. The builder ignores the
-            # underscore key by design — without this the original image
-            # framing (e.g. a full-width cropped photo band) is lost.
-            # Only skip this when you intentionally reuse the image as
-            # fresh material in a NEW slide of your own design.
-            oe = node.pop("_originalEffects", None)
-            if oe:
-                for k, v in oe.items():
-                    node.setdefault(k, v)
-            for v in node.values():
-                _rewrite_image_refs(v)
-        elif isinstance(node, list):
-            for item in node:
-                _rewrite_image_refs(item)
-
-    for slug in slugs:
-        data = read_json(f"attachments/{short_id}/slides/{slug}.json")
-        _rewrite_image_refs(data)
-        write_json(f"slides/{slug}.json", data)
-    print("placed:", slugs)
+    slide = read_json(f"{slides_path}/{slug}.json")
+    rewrite_image_refs(slide)
+    write_json(f"slides/{slug}.json", slide)
+print("activated:", slugs)
 ```
 
-Call as:
+Call:
 
-```
+```text
 run_python(
+    purpose="Activate imported PPTX slides and build",
     code=<above>,
     deck_id=deck_id,
     measure_slides=slugs,
 )
 ```
 
-Cloud: prepend `purpose="Import PPTX slides into deck and build"`.
-
-Because `specs/outline.md` was populated in Step 3-2, the build
-includes every slide, followed by preview and SVG compose (triggered
-by `measure_slides`). The PPTX-derived placeholder template means **layout
-mismatch is impossible** — the build should succeed in one shot.
-
-The deck's PPTX artifact and the deck record's `pptxS3Key` refresh
-automatically when the deck changes, so the Web UI's "Download PPTX"
-action works without further steps. Call `generate_pptx(deck_id=deck_id)`
-only as the final handoff — it additionally produces the WebP preview
-set, updates the final PPTX artifact, and returns a full-deck warnings
-report.
+Keep Step 4 in one call so Cloud writeback, build, preview, and measurement share the
+same execution. The active slide JSON may reference bundle images, but code must never
+write below `attachments/imports/`. Call `generate_pptx(deck_id=deck_id)` only at final
+handoff.
 
 ---
 
@@ -351,7 +261,7 @@ Then pull a built-in style as a structural reference:
 
 ### 5-2. Extract the source PPTX's actual design tokens
 
-`themeHints` from `upload_file` is a coarse summary (a single
+`themeHints` from `read_attachment` is a coarse summary (a single
 background luminance, three accent colors, two font families). The
 source PPTX's master/theme XML and the **rendered slide previews
 generated in Step 4** carry far more precise data — layout positions,
@@ -404,18 +314,17 @@ These are the qualitative tokens (`--decoration-*`, `--shadow-*`,
 
 **Lens B — Theme XML / layouts via `analyze_template`:**
 
-Call the MCP tool on the deck-local template (`template.pptx` was
-copied here in Step 2 by `import_attachment`). It returns the full
+Call the MCP tool on the immutable bundle template returned in Step 2. It returns the full
 theme color map (lt1 / dk1 / accent1-6 / hlink / folHlink), font
 pairs (latin/eastAsian/complex), and per-layout placeholder
 positions.
 
 ```
-# Cloud (deck-local placeholder template requires deck_id):
-analyze_template(template="template.pptx", deck_id=<deck_id>)
+# Cloud (deck-owned bundle path requires deck_id):
+analyze_template(template=f"{bundlePath}/deck/template.pptx", deck_id=<deck_id>)
 
-# Local (file path is fine; deck_id ignored):
-analyze_template(template="template.pptx")
+# Local (pass the absolute deck path plus bundlePath):
+analyze_template(template=f"{deck_id}/{bundlePath}/deck/template.pptx")
 ```
 
 This is an MCP tool — do not wrap in `run_python`.
@@ -595,7 +504,7 @@ Delegation to Composer section).
 
 ## Notes on lossy conversion
 
-`pptx_to_json` has known limitations:
+The PPTX→JSON converter has known limitations:
 
 - Connectors are rendered as straight lines.
 - Arrow-head styles are not preserved.

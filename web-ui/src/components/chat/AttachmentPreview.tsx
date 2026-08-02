@@ -15,7 +15,7 @@ export interface Attachment {
   id: string
   file: File
   status: "pending" | "uploading" | "completed" | "failed"
-  uploadId?: string
+  source?: string
   extractedText?: string
   imageUrl?: string
   error?: string

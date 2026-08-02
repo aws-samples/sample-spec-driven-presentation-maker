@@ -231,12 +231,49 @@ class AwsStorage(Storage):
         resp = self._s3.get_object(Bucket=self._pptx_bucket, Key=key)
         return resp["Body"].read()
 
-    def upload_file(self, key: str, data: bytes, content_type: str = "") -> None:
+    def upload_file(
+        self, key: str, data: bytes, content_type: str = "", tagging: str = "",
+    ) -> None:
         """Upload a file to pptx bucket."""
         extra = {"ContentType": content_type} if content_type else {}
+        if tagging:
+            extra["Tagging"] = tagging
         self._s3.put_object(
             Bucket=self._pptx_bucket, Key=key, Body=data, **extra
         )
+
+    def head_object(self, key: str) -> dict[str, Any]:
+        """Read object metadata, including checksums when available."""
+        return self._s3.head_object(
+            Bucket=self._pptx_bucket, Key=key, ChecksumMode="ENABLED",
+        )
+
+    def upload_file_if_absent(
+        self, key: str, data: bytes, content_type: str = "", checksum_sha256: str = "",
+        tagging: str = "",
+    ) -> bool:
+        """Create an immutable object with S3 If-None-Match semantics."""
+        from botocore.exceptions import ClientError
+
+        extra: dict[str, Any] = {"IfNoneMatch": "*"}
+        if content_type:
+            extra["ContentType"] = content_type
+        if checksum_sha256:
+            extra["ChecksumSHA256"] = checksum_sha256
+        if tagging:
+            extra["Tagging"] = tagging
+        try:
+            self._s3.put_object(
+                Bucket=self._pptx_bucket, Key=key, Body=data, **extra,
+            )
+            return True
+        except ClientError as error:
+            response = error.response
+            status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            code = response.get("Error", {}).get("Code")
+            if status in (409, 412) or code in ("ConditionalRequestConflict", "PreconditionFailed"):
+                return False
+            raise
 
     def presign_url(self, key: str, expires: int = 3600) -> str:
         """Generate a presigned URL for pptx bucket."""
@@ -247,6 +284,28 @@ class AwsStorage(Storage):
         )
 
     # --- Listing ---
+
+    def list_object_metadata(self, prefix: str, max_objects: int = 1000) -> list[dict[str, Any]]:
+        """List a bounded page of pptx-bucket object metadata."""
+        paginator = self._s3.get_paginator("list_objects_v2")
+        objects: list[dict[str, Any]] = []
+        for page in paginator.paginate(
+            Bucket=self._pptx_bucket,
+            Prefix=prefix,
+            PaginationConfig={"MaxItems": max_objects, "PageSize": min(max_objects, 1000)},
+        ):
+            objects.extend(page.get("Contents", []))
+            if len(objects) >= max_objects:
+                break
+        return objects[:max_objects]
+
+    def delete_object_keys(self, keys: list[str]) -> None:
+        """Delete specific pptx-bucket objects in bounded S3 batches."""
+        for index in range(0, len(keys), 1000):
+            self._s3.delete_objects(
+                Bucket=self._pptx_bucket,
+                Delete={"Objects": [{"Key": key} for key in keys[index:index + 1000]]},
+            )
 
     def list_files(self, prefix: str, bucket: str = "") -> list[str]:
         """List S3 keys under prefix.

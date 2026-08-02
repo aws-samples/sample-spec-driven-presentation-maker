@@ -83,8 +83,29 @@ class Storage(ABC):
         """
 
     @abstractmethod
-    def upload_file(self, key: str, data: bytes, content_type: str = "") -> None:
-        """Upload a file to pptx bucket."""
+    def upload_file(
+        self, key: str, data: bytes, content_type: str = "", tagging: str = "",
+    ) -> None:
+        """Upload a file to pptx bucket, optionally with object tags."""
+
+    def head_object(self, key: str) -> dict[str, Any]:
+        """Read pptx-bucket object metadata without downloading it."""
+        raise NotImplementedError
+
+    def upload_file_if_absent(
+        self, key: str, data: bytes, content_type: str = "", checksum_sha256: str = "",
+        tagging: str = "",
+    ) -> bool:
+        """Conditionally create an immutable object; return False if it exists."""
+        raise NotImplementedError
+
+    def list_object_metadata(self, prefix: str, max_objects: int = 1000) -> list[dict[str, Any]]:
+        """List at most max_objects from the pptx bucket with timestamps."""
+        raise NotImplementedError
+
+    def delete_object_keys(self, keys: list[str]) -> None:
+        """Delete specific pptx-bucket keys."""
+        raise NotImplementedError
 
     @abstractmethod
     def presign_url(self, key: str, expires: int = 3600) -> str:

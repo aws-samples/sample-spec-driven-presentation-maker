@@ -63,7 +63,7 @@ export interface ChatInputHandle {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, deckId, children, stopTitle, onInputChange, textareaOverlay, textareaClassName },
+  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, children, stopTitle, onInputChange, textareaOverlay, textareaClassName },
   ref,
 ) {
   const t = useTranslations("chatInput")
@@ -160,9 +160,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       if (att.status === "pending") {
         try {
           setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "uploading" as const } : a)))
-          const result = await uploadFile(att.file, idToken ?? "", sessionId ?? "", deckId !== "new" ? deckId : undefined)
+          const result = await uploadFile(att.file, idToken ?? "", sessionId ?? "")
           uploadedFiles.push(result)
-          setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "completed" as const, uploadId: result.uploadId } : a)))
+          setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "completed" as const, source: result.source } : a)))
         } catch {
           setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "failed" as const, error: t("uploadFailed") } : a)))
         }

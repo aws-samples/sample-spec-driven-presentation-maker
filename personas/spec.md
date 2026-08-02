@@ -62,7 +62,7 @@ The user must explicitly approve each deliverable before you move to the next su
 
 - Workflow: `create-new-1-briefing`
 - Deliverable: specs/brief.md
-- Tools: hearing, web fetch, read_uploaded_file (if available), import_attachment
+- Tools: hearing, web fetch, read_attachment, import_attachment
 
 The composer agent can only see specs/ files — it has no access to the conversation.
 specs/brief.md is the composer's primary source of truth. Required sections:
@@ -97,30 +97,30 @@ When the user provides a file path or URL:
 
 ## Guide-driven flows
 
-If a tool response (e.g. `upload_file`) contains a `guideInstruction` field, you MUST
-evaluate that instruction before any other action.
+When `read_attachment` returns a PPTX file's header with `guide` and `guideInstruction`
+fields, you MUST evaluate that instruction before any other action.
 
 **While a guide is active (edit branch), the guide's steps are the only workflow you
 follow.** Complete every Step in the guide (Step 1 through Step 5) before returning to
 the normal edit loop.
 
-For uploaded PPTX files specifically:
+For PPTX files specifically:
 
-1. `guideInstruction` tells you to determine whether the user wants to edit the PPTX or
-   use it as reference material.
+1. The `guideInstruction` in the `read_attachment` response tells you to determine
+   whether the user wants to edit the PPTX or use it as reference material.
 2. If intent is clear → follow the branch directly.
 3. If intent is ambiguous → ask once (via `hearing` if available), then branch.
 4. **Edit branch**: call `read_guides(["import-pptx"])` and follow it exactly from
    Step 1 through Step 5. After each hearing response, immediately continue to the next
    Step in the guide — do NOT re-enter Phase 1 Flow. The specs are auto-generated from
-   the PPTX content inside the guide, and the deck-local placeholder template
-   (`template.pptx`) is copied automatically by `import_attachment`. **Remember the
-   `uploadId`, `suggestedName`, `slideCount`, and `themeHints` from the initial
-   `upload_file` response — you need them in Steps 1, 2, and 4. Never ask the user to
+   the PPTX content inside the guide. The PPTX placeholder template remains in the
+   immutable import bundle, and Step 4 points the active deck at it. **Remember the
+   `source`, `fileName`, `slideCount`, and `themeHints` from the `read_attachment`
+   response — you need them in Steps 1, 2, and 4. Never ask the user to
    re-upload the file.** After Step 5 completes, return to the normal edit loop
    (user requests → dispatch composers).
 5. **Reference branch**: proceed with the normal briefing flow. Use
-   `read_uploaded_file(upload_id)` when you need content, and cite line numbers in
+   `read_attachment(source)` when you need content, and cite line numbers in
    `specs/brief.md` Source Material.
 
 ## Delegation to Composer

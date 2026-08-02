@@ -13,17 +13,16 @@ second place where behavior accumulates:
   lives only there; the JSON must not duplicate it)
 - ``name`` matches the file name
 
-Tool-list differences across the 5 agents were reviewed (2026-08-01,
-theme 3) and judged intentional, not accretion:
+Tool-list differences across the 5 agents were reviewed (2026-08-02,
+stateless-attachments-mcp-cleanup) and judged intentional, not accretion:
 
 - ``sdpm-style`` (9): style-only surface — run_style_python + hearing +
   browsing; no deck tools
-- ``sdpm-composer`` (23): no dialogue (hearing), no nested dispatch
-  (use_subagent), no web fetch/search, no upload/diff — composers only
-  compose
-- ``sdpm-single`` (28): spec surface minus use_subagent (single agent
+- ``sdpm-composer`` (21): no dialogue (hearing), no nested dispatch
+  (use_subagent), no web fetch/search, no diff — composers only compose
+- ``sdpm-single`` (25): spec surface minus use_subagent (single agent
   does everything itself, no dispatch)
-- ``sdpm-spec`` / ``sdpm-vibe`` (29): full orchestrator surface
+- ``sdpm-spec`` / ``sdpm-vibe`` (26): full orchestrator surface
 
 The snapshot below pins those counts; widening any allowlist is a
 deliberate decision that must update this test.
@@ -41,7 +40,7 @@ _AGENT_FILES = sorted(_ACP_AGENTS_DIR.glob("*.json"))
 
 # Exact allowlist snapshot. Any change — adding, removing, or swapping a
 # tool — is a deliberate decision that must update this test. The
-# inter-agent differences were reviewed (2026-08-01, theme 3) and are
+# inter-agent differences were reviewed (2026-08-02) and are
 # intentional (see module docstring).
 _FULL_ORCHESTRATOR = {
     "read", "glob", "grep", "use_subagent", "web_fetch", "web_search",
@@ -49,21 +48,20 @@ _FULL_ORCHESTRATOR = {
     "@sdpm/code_to_slide",
     "@sdpm/diff_pptx", "@sdpm/generate_pptx", "@sdpm/grid", "@sdpm/hearing",
     "@sdpm/import_attachment", "@sdpm/init_presentation",
-    "@sdpm/list_asset_sources", "@sdpm/list_guides", "@sdpm/list_styles",
-    "@sdpm/list_templates", "@sdpm/list_workflows", "@sdpm/measure_slides",
-    "@sdpm/pptx_to_json", "@sdpm/read_examples", "@sdpm/read_guides",
+    "@sdpm/list_guides", "@sdpm/list_styles",
+    "@sdpm/list_templates", "@sdpm/list_workflows",
+    "@sdpm/read_attachment", "@sdpm/read_examples", "@sdpm/read_guides",
     "@sdpm/read_workflows", "@sdpm/run_python", "@sdpm/search_assets",
-    "@sdpm/upload_file",
 }
 _EXPECTED_TOOLS = {
     "sdpm-spec": _FULL_ORCHESTRATOR,
     "sdpm-vibe": _FULL_ORCHESTRATOR,
     # single agent does everything itself — no dispatch
     "sdpm-single": _FULL_ORCHESTRATOR - {"use_subagent"},
-    # composers only compose: no dialogue, no nesting, no web, no upload/diff
+    # composers only compose: no dialogue, no nesting, no web, no diff
     "sdpm-composer": _FULL_ORCHESTRATOR - {
         "use_subagent", "web_fetch", "web_search",
-        "@sdpm/hearing", "@sdpm/upload_file", "@sdpm/diff_pptx",
+        "@sdpm/hearing", "@sdpm/diff_pptx",
     },
     # style-only surface
     "sdpm-style": {
@@ -137,9 +135,8 @@ def test_cloud_deck_tools_are_subset_of_local_orchestrator():
 
     The cloud L4 agent (agent/modes) and the local ACP agents bind the same
     contract, but the local list additionally carries local-only tools
-    (hearing, upload_file, use_subagent, web_*). The reverse direction is
-    cloud-specific (read_uploaded_file, get_preview), so only this
-    direction is pinned.
+    (hearing, use_subagent, web_*). The reverse direction is
+    cloud-specific (get_preview), so only this direction is pinned.
     """
     modes_src = (
         Path(__file__).resolve().parent.parent / "agent" / "modes" / "__init__.py"
@@ -152,7 +149,7 @@ def test_cloud_deck_tools_are_subset_of_local_orchestrator():
         "Cloud deck agents must expose arch_diagram because the compose workflow "
         "requires it for architecture, system, and flow diagrams"
     )
-    cloud_only = {"read_uploaded_file", "get_preview"}  # S3/presign transport tools
+    cloud_only = {"get_preview"}  # S3/presign transport tools
 
     spec_tools = {
         t.removeprefix("@sdpm/")
