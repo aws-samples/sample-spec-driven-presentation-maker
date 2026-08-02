@@ -21,6 +21,9 @@ dev = [
     "mcp[cli]>=1.28.1,<2",
     "boto3",
     "pytest-cov>=7.1.0",
+    # shared/ingest PDF conversion (tests/test_pdf_convert.py)
+    "pypdf>=4.0.0",
+    "pdfplumber>=0.11.0",
 ]
 
 [tool.ruff]

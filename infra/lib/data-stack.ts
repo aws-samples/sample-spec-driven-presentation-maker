@@ -77,6 +77,27 @@ export class DataStack extends cdk.Stack {
       ],
       lifecycleRules: [
         {
+          // Raw user attachment sources are temporary; committed import bundles live under decks/.
+          prefix: "uploads/",
+          tagFilters: { "sdpm-class": "attachment-source" },
+          expiration: cdk.Duration.days(90),
+          noncurrentVersionExpiration: cdk.Duration.days(7),
+        },
+        {
+          // Incomplete multipart uploads have no tags yet, so S3 forbids
+          // combining AbortIncompleteMultipartUpload with tag filters —
+          // keep it in a separate prefix-only rule.
+          prefix: "uploads/",
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(1),
+        },
+        {
+          // Rebuildable attachment conversion cache.
+          prefix: "attachment-cache/v1/",
+          tagFilters: { "sdpm-class": "attachment-cache" },
+          expiration: cdk.Duration.days(7),
+          noncurrentVersionExpiration: cdk.Duration.days(7),
+        },
+        {
           // Clean up old PPTX versions after 90 days
           prefix: "pptx/",
           expiration: cdk.Duration.days(90),

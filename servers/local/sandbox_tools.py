@@ -58,7 +58,7 @@ def _build_snapshot(deck_dir: Path) -> dict[str, tuple[int, int]]:
     return snap
 
 
-def run_python(purpose: str, code: str, deck_id: str = "", save: bool = False,
+def run_python(purpose: str, code: str, deck_id: str = "",
                measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a sandboxed environment.
 
@@ -132,8 +132,6 @@ Audience: Developers
         purpose: Brief user-facing description of what this code does. Shown in UI.
         code: Python code to execute (no import statements allowed).
         deck_id: Deck output_dir path. Optional.
-        save: Deprecated and ignored. Writes always persist and output.pptx
-            rebuilds automatically when the deck changed.
         measure_slides: Slide slugs to measure after execution (e.g. ["title", "feature-a"]).
 
     Returns:
@@ -141,11 +139,6 @@ Audience: Developers
     """
     result: dict[str, Any] = {}
     cwd = deck_id if deck_id and Path(deck_id).is_dir() else None
-    if save:
-        result["deprecated"] = (
-            "'save' is ignored: writes always persist and output.pptx "
-            "rebuilds automatically when the deck changed."
-        )
 
     from sandbox import check_code, make_runner
 

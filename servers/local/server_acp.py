@@ -5,7 +5,7 @@
 Independent mcp instance with ACP-tailored tools:
 - Common tools registered from tools.py (1-line each)
 - Sandbox tools: run_python, run_style_python (shared via sandbox_tools.py)
-- ACP-specific tools: hearing, import_attachment
+- ACP-specific tools: hearing, read_attachment, import_attachment
 
 Usage:
     uv run python server_acp.py
@@ -23,9 +23,41 @@ sys.path.insert(0, str(_SKILL_DIR))
 # Add project root to sys.path so shared/ package is importable
 sys.path.insert(0, str(_REPO_ROOT))
 
+import os  # noqa: E402
 import sandbox_tools  # noqa: E402
 from sdpm import tools  # noqa: E402
+from sdpm.tools.attachment.contracts import (  # noqa: E402
+    import_attachment as _import_attachment,
+    read_attachment as _read_attachment,
+)
+from sdpm.tools.attachment.source import classify_source, validate_local_source  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
+
+
+_DECK_ROOT = Path(os.environ.get("SDPM_DECK_ROOT", Path.home() / "Documents" / "SDPM-Presentations")).resolve()
+_RAW_ATTACHMENT_ROOT = _DECK_ROOT / ".attachments"
+
+
+def read_attachment(source: str, offset: int = 0, limit: int = 10240) -> dict:
+    """Read an ACP attachment; local paths must come from the raw attachment home."""
+    if classify_source(source) == "local_path":
+        try:
+            validate_local_source(source, allow_any_path=False, root=_RAW_ATTACHMENT_ROOT)
+        except Exception as error:
+            return {"error": {"code": getattr(error, "code", "VALIDATION_ERROR"), "message": str(error)}}
+    return _read_attachment(source=source, offset=offset, limit=limit)
+
+
+def import_attachment(source: str, deck_id: str, filename: str = "") -> dict:
+    """Import into an ACP deck while keeping raw sources and decks under DECK_ROOT."""
+    try:
+        deck_path = Path(deck_id).resolve(strict=True)
+        deck_path.relative_to(_DECK_ROOT)
+        if classify_source(source) == "local_path":
+            validate_local_source(source, allow_any_path=False, root=_RAW_ATTACHMENT_ROOT)
+    except Exception as error:
+        return {"error": {"code": getattr(error, "code", "VALIDATION_ERROR"), "message": str(error)}}
+    return _import_attachment(source=source, deck_id=str(deck_path), filename=filename)
 
 # ---------------------------------------------------------------------------
 # MCP Server (independent instance — no instructions for ACP agents)
@@ -40,9 +72,7 @@ mcp = FastMCP("sdpm-acp")
 mcp.tool()(tools.init_presentation)
 mcp.tool()(tools.analyze_template)
 mcp.tool()(tools.generate_pptx)
-mcp.tool()(tools.measure_slides)
 mcp.tool()(tools.search_assets)
-mcp.tool()(tools.list_asset_sources)
 mcp.tool()(tools.list_templates)
 mcp.tool()(tools.list_styles)
 mcp.tool()(tools.apply_style)
@@ -54,8 +84,11 @@ mcp.tool()(tools.read_guides)
 mcp.tool()(tools.code_to_slide)
 mcp.tool()(tools.grid)
 mcp.tool()(tools.arch_diagram)
-mcp.tool()(tools.pptx_to_json)
 mcp.tool()(tools.diff_pptx)
+
+# Attachment tools (stateless pipeline)
+mcp.tool()(read_attachment)
+mcp.tool()(import_attachment)
 
 # Sandbox tools (shared)
 mcp.tool()(sandbox_tools.run_python)
@@ -109,65 +142,5 @@ def hearing(
     return "Questions displayed to user. Wait for their response."
 
 
-# ---------------------------------------------------------------------------
-# Upload / attachment tools
-# ---------------------------------------------------------------------------
-from upload_tools import (  # noqa: E402
-    import_attachment as _import_attachment,
-    cleanup_old_sessions as _cleanup_old_sessions,
-    upload_file as _upload_file,
-)
-
-
-@mcp.tool()
-def upload_file(file_path: str, filename: str = "") -> str:
-    """Convert and stage a local file for deck import.
-
-    Use when the user gives a local file path in chat (Web UI uploads are
-    staged automatically and arrive as [Attached: ...] markers instead).
-
-    For PPTX: converts the file into a deck structure and returns an
-    `uploadId` plus `guideInstruction` — follow that instruction
-    (typically `read_guides(["import-pptx"])`), then import into a deck
-    via `import_attachment(source=uploadId, deck_id=...)`.
-
-    Args:
-        file_path: Absolute path to the source file.
-        filename: Original filename (defaults to basename of file_path).
-
-    Returns:
-        JSON with {uploadId, fileName, fileType, status, warnings?} and,
-        for PPTX converted to deck structure, additionally
-        {guide, guideInstruction, suggestedName, slideCount, themeHints}.
-    """
-    return _upload_file(session_id="mcp-local", file_path=file_path, filename=filename)
-
-
-@mcp.tool()
-def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
-    """Import a file into the deck workspace for use in slides.
-
-    source is either an uploadId or an HTTP(S) URL.
-    - uploadId: copies pre-converted files from session storage to deck.
-    - URL: downloads image and saves to deck.
-
-    Args:
-        source: Upload ID from [Attached: ...] message, or an HTTP(S) URL.
-        deck_id: The deck directory path (must be initialized via init_presentation).
-        filename: Optional output filename.
-
-    Returns:
-        JSON with saved file paths and image_mapping.
-    """
-    return _import_attachment(source=source, deck_id=deck_id, filename=filename)
-
-
 if __name__ == "__main__":
-    try:
-        removed = _cleanup_old_sessions()
-        if removed:
-            print(f"[session-cleanup] Removed {removed} expired session(s)", file=sys.stderr)
-    except Exception as e:
-        print(f"[session-cleanup] Failed: {e}", file=sys.stderr)
-
     mcp.run(transport="stdio")

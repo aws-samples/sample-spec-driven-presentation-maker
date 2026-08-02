@@ -10,8 +10,8 @@ The contract (decided 2026-08-01, see the run-python-unified-semantics SPEC):
    changed (deck.json / slides/ / includes/ / specs/outline.md).
 3. ``measure_slides`` is the only trigger for the expensive verification
    pass (render + measure + preview).
-4. The legacy ``save`` argument is accepted but ignored (deprecation note
-   in the result), so older callers keep working.
+4. The legacy ``save`` argument is removed from every public surface.
+5. Committed ``attachments/imports/`` bundles are readable but never writable or persisted.
 
 These tests pin the semantics so an adapter cannot silently diverge again
 (the v0.5.1 cloud E2E regression was exactly such a divergence).
@@ -126,20 +126,22 @@ class TestLocalRunPython:
         assert (deck_dir / "specs" / "brief.md").read_text() == "# Brief"
         assert calls == []
 
-    def test_save_flag_is_ignored_with_deprecation_note(
-        self, deck_dir: Path, monkeypatch
-    ):
-        calls = self._patch_generate(monkeypatch)
-        out = json.loads(sandbox_tools.run_python(
-            purpose="read only with legacy save flag",
-            code='print("hi")',
-            deck_id=str(deck_dir),
-            save=True,
-        ))
-        # save no longer forces a build (nothing changed)
-        assert calls == []
-        assert "deprecated" in out
 
+    def test_committed_import_bundle_is_read_only(self, deck_dir: Path, monkeypatch):
+        calls = self._patch_generate(monkeypatch)
+        bundle_file = deck_dir / "attachments" / "imports" / "key" / "deck" / "deck.json"
+        bundle_file.parent.mkdir(parents=True)
+        bundle_file.write_text('{"name":"original"}')
+
+        out = json.loads(sandbox_tools.run_python(
+            purpose="attempt bundle mutation",
+            code='write_json("attachments/imports/key/deck/deck.json", {"name": "changed"})',
+            deck_id=str(deck_dir),
+        ))
+
+        assert "read-only" in out["output"]
+        assert json.loads(bundle_file.read_text()) == {"name": "original"}
+        assert calls == []
 
 class TestLocalLintRewriteGuard:
     """Regression: the lint pass must not rewrite files whose sanitized
@@ -250,6 +252,15 @@ class TestRemoteSaveWorkspace:
         assert changed == ["slides/bad.json"]
         assert storage.uploads["decks/deckX/slides/bad.json"] == pretty.encode()
 
+    def test_committed_import_bundle_is_never_written_back(self):
+        immutable = "attachments/imports/key/deck/deck.json"
+        storage, changed = self._run(
+            {immutable: '{"name":"changed"}', "specs/brief.md": "new"},
+            {immutable: '{"name":"original"}', "specs/brief.md": "old"},
+        )
+        assert changed == ["specs/brief.md"]
+        assert f"decks/deckX/{immutable}" not in storage.uploads
+
 
 class TestRemoteContractShape:
     def test_execute_in_sandbox_has_no_save_gate(self):
@@ -260,51 +271,11 @@ class TestRemoteContractShape:
         )
         assert sig.parameters["persist_writes"].default is True
 
-    def test_remote_run_python_still_accepts_save_for_compat(self):
-        # The MCP-facing tool keeps the parameter (deprecated, ignored) so
-        # existing callers don't break. Read by explicit path — both servers
-        # ship a server.py, so module resolution is ambiguous here.
-        src = (_root / "servers" / "remote" / "server.py").read_text(encoding="utf-8")
-        assert "save: bool = False" in src
-        assert "'save' is ignored" in src
-
 
 # ---------------------------------------------------------------------------
 # Remote: staged files must not shadow the persisted workspace
 # ---------------------------------------------------------------------------
 
-
-class TestRemoteFilesCollision:
-    def test_deck_json_basename_rejected(self):
-        # files land in the sandbox root by basename and the workspace is
-        # persisted unconditionally — "deck.json" would corrupt the deck.
-        with pytest.raises(ValueError, match="collides with the deck workspace"):
-            remote_sandbox.execute_in_sandbox(
-                code="print(1)",
-                storage=_FakeStorage(),
-                region="us-east-1",
-                deck_id="d1",
-                files=["uploads/tmp/u/abc/deck.json"],
-            )
-
-    def test_duplicate_basename_still_rejected(self):
-        with pytest.raises(ValueError, match="Duplicate filename"):
-            remote_sandbox.execute_in_sandbox(
-                code="print(1)",
-                storage=_FakeStorage(),
-                region="us-east-1",
-                deck_id="d1",
-                files=["a/data.csv", "b/data.csv"],
-            )
-
-    def test_guard_scoped_to_deck_sessions_and_exact_names(self):
-        # Without a deck there is nothing to shadow — deck.json is fine
-        remote_sandbox._validate_staged_files(["x/deck.json"], deck_id=None)
-        # File entries match exactly: deck.jsonl must not be rejected
-        remote_sandbox._validate_staged_files(["x/deck.jsonl"], deck_id="d1")
-        # Exact workspace file name is rejected only with a deck loaded
-        with pytest.raises(ValueError, match="collides"):
-            remote_sandbox._validate_staged_files(["x/deck.json"], deck_id="d1")
 
 
 # ---------------------------------------------------------------------------

@@ -1,151 +1,95 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-/**
- * Upload Service — handles file upload via presigned URLs and processing.
- *
- * Flow: presign → S3 PUT → process → poll status
- */
+/** Stateless raw attachment upload service. Conversion happens on read/import. */
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+import { IS_LOCAL } from "@/lib/mode"
+
+const MAX_FILE_SIZE = 100 * 1024 * 1024
 const MAX_FILES = 5
 
-const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === "local"
-
-const ALLOWED_TYPES: Record<string, string> = {
-  "text/plain": "txt",
-  "text/markdown": "md",
-  "application/json": "json",
-  "application/pdf": "pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
-  "image/png": "png",
-}
+const ALLOWED_TYPES = new Set([
+  "text/plain",
+  "text/markdown",
+  "text/csv",
+  "text/html",
+  "application/json",
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "image/svg+xml",
+])
 
 export interface UploadedFile {
-  uploadId: string
+  source: string
   fileName: string
   fileType: string
   fileSize: number
-  status: "uploading" | "processing" | "completed" | "failed"
-  extractedText?: string
-  imageUrl?: string
-  filePath?: string
-  imagesDir?: string
-  colorAnalysis?: { palette: { hex: string; ratio: number }[]; brightness: string; saturation: string }
-  // PPTX deck-structure conversion fields (set by servers/local/upload_tools.py
-  // and the Cloud upload Lambda when convert_file produces a deck). The
-  // agent uses `guideInstruction` to branch into the import-pptx guide
-  // instead of treating the file as generic reference material.
-  guide?: string
-  guideInstruction?: string
-  suggestedName?: string
-  slideCount?: number
-  themeHints?: { backgroundLuminance?: number; accentColors?: string[]; fonts?: Record<string, string> }
+  status: "uploading" | "completed" | "failed"
 }
 
 let apiBaseUrl = ""
 
-/**
- * Load the API base URL from aws-exports.json.
- *
- * @returns Base URL string
- */
 async function getApiBaseUrl(): Promise<string> {
   if (apiBaseUrl) return apiBaseUrl
   const response = await fetch("/aws-exports.json")
+  if (!response.ok) throw new Error("Failed to load API configuration")
   const config = await response.json()
   apiBaseUrl = config.apiBaseUrl || ""
   return apiBaseUrl
 }
 
-/**
- * Validate a file before upload.
- *
- * @param file - File to validate
- * @returns Error message or null if valid
- */
 export function validateFile(file: File): string | null {
-  if (!ALLOWED_TYPES[file.type]) {
+  if (!ALLOWED_TYPES.has(file.type)) {
     return `Unsupported file type: ${file.type || file.name.split(".").pop()}`
   }
   if (file.size > MAX_FILE_SIZE) {
-    return `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum is 20MB.`
+    return `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum is 100MB.`
   }
   return null
 }
 
-/**
- * Check if adding more files would exceed the limit.
- *
- * @param currentCount - Current number of attached files
- * @returns True if more files can be added
- */
 export function canAddMoreFiles(currentCount: number): boolean {
   return currentCount < MAX_FILES
 }
 
-/**
- * Upload a file via presigned URL and trigger processing.
- *
- * @param file - File to upload
- * @param idToken - Cognito ID token
- * @param sessionId - Chat session ID
- * @param deckId - Optional deck ID for context
- * @param onProgress - Optional callback for status updates
- * @returns UploadedFile with status
- */
+/** Upload raw bytes and return the source identifier embedded in the chat marker. */
 export async function uploadFile(
   file: File,
   idToken: string,
   sessionId: string,
-  deckId?: string,
   onProgress?: (status: UploadedFile) => void,
 ): Promise<UploadedFile> {
-  // Local mode: POST to /api/upload (Next.js API Route → servers/local/upload_tools)
+  const uploaded: UploadedFile = {
+    source: "",
+    fileName: file.name,
+    fileType: file.type,
+    fileSize: file.size,
+    status: "uploading",
+  }
+  onProgress?.(uploaded)
+
   if (IS_LOCAL) {
     const form = new FormData()
     form.append("file", file)
     form.append("sessionId", sessionId)
-
-    const uploaded: UploadedFile = {
-      uploadId: "",
-      fileName: file.name,
-      fileType: file.type,
-      fileSize: file.size,
-      status: "uploading",
+    const response = await fetch("/api/attachments", { method: "POST", body: form })
+    const result = await response.json().catch(() => ({ error: "Upload failed" }))
+    if (!response.ok || result.error || typeof result.source !== "string") {
+      throw new Error(result.error || "Failed to store attachment")
     }
-    onProgress?.(uploaded)
-
-    const resp = await fetch("/api/upload", { method: "POST", body: form })
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ error: "Upload failed" }))
-      throw new Error(err.error || "Failed to upload file")
-    }
-    const data = await resp.json()
-    if (data.error) throw new Error(data.error)
-
-    uploaded.uploadId = data.uploadId
-    uploaded.status = data.status === "converted" || data.status === "completed" ? "completed" : "failed"
-    if (data.filePath) uploaded.filePath = data.filePath
-    if (data.imagesDir) uploaded.imagesDir = data.imagesDir
-    if (data.colorAnalysis) uploaded.colorAnalysis = data.colorAnalysis
-    // PPTX deck-structure: forward guide hints so the agent can branch
-    // into the import-pptx guide instead of treating the upload as a
-    // generic reference file.
-    if (data.guide) uploaded.guide = data.guide
-    if (data.guideInstruction) uploaded.guideInstruction = data.guideInstruction
-    if (data.suggestedName) uploaded.suggestedName = data.suggestedName
-    if (typeof data.slideCount === "number") uploaded.slideCount = data.slideCount
-    if (data.themeHints) uploaded.themeHints = data.themeHints
+    uploaded.source = result.source
+    uploaded.status = "completed"
     onProgress?.(uploaded)
     return uploaded
   }
 
   const base = await getApiBaseUrl()
-
-  // Step 1: Get presigned URL
-  const presignResp = await fetch(`${base}uploads/presign`, {
+  const presignResponse = await fetch(`${base}attachments/presign`, {
     method: "POST",
     headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -154,113 +98,38 @@ export async function uploadFile(
       fileSize: file.size,
     }),
   })
-
-  if (!presignResp.ok) {
-    const err = await presignResp.json()
-    throw new Error(err.error || "Failed to get upload URL")
+  const presign = await presignResponse.json().catch(() => ({ error: "Presign failed" }))
+  if (
+    !presignResponse.ok
+    || typeof presign.source !== "string"
+    || typeof presign.presignedUrl !== "string"
+    || !presign.requiredHeaders
+    || typeof presign.requiredHeaders !== "object"
+  ) {
+    throw new Error(presign.error || "Failed to get attachment upload URL")
+  }
+  const requiredHeaders = Object.fromEntries(
+    Object.entries(presign.requiredHeaders).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  )
+  if (
+    requiredHeaders["Content-Type"] !== file.type
+    || requiredHeaders["If-None-Match"] !== "*"
+    || requiredHeaders["x-amz-tagging"] !== "sdpm-class=attachment-source"
+  ) {
+    throw new Error("Invalid attachment upload contract")
   }
 
-  const { uploadId, presignedUrl } = await presignResp.json()
-
-  const uploadedFile: UploadedFile = {
-    uploadId,
-    fileName: file.name,
-    fileType: file.type,
-    fileSize: file.size,
-    status: "uploading",
-  }
-  onProgress?.(uploadedFile)
-
-  // Step 2: Upload to S3
-  const putResp = await fetch(presignedUrl, {
+  uploaded.source = presign.source
+  const putResponse = await fetch(presign.presignedUrl, {
     method: "PUT",
-    headers: { "Content-Type": file.type },
+    headers: requiredHeaders,
     body: file,
   })
+  if (!putResponse.ok) throw new Error("Failed to upload attachment")
 
-  if (!putResp.ok) {
-    throw new Error("Failed to upload file to S3")
-  }
-
-  // Step 3: Trigger processing
-  uploadedFile.status = "processing"
-  onProgress?.(uploadedFile)
-
-  const processResp = await fetch(`${base}uploads/${uploadId}/process`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ sessionId, deckId: deckId || "" }),
-  })
-
-  if (!processResp.ok) {
-    throw new Error("Failed to process file")
-  }
-
-  const processResult = await processResp.json()
-
-  uploadedFile.status = processResult.status
-  uploadedFile.extractedText = processResult.extractedText
-  uploadedFile.imageUrl = processResult.imageUrl
-  // PPTX deck-structure: forward guide hints from the Cloud upload Lambda
-  // so the agent can branch into the import-pptx guide.
-  if (processResult.guide) uploadedFile.guide = processResult.guide
-  if (processResult.guideInstruction) uploadedFile.guideInstruction = processResult.guideInstruction
-  if (processResult.suggestedName) uploadedFile.suggestedName = processResult.suggestedName
-  if (typeof processResult.slideCount === "number") uploadedFile.slideCount = processResult.slideCount
-  if (processResult.themeHints) uploadedFile.themeHints = processResult.themeHints
-  onProgress?.(uploadedFile)
-
-  return uploadedFile
-}
-
-/**
- * Poll upload status until completed or failed.
- *
- * @param uploadId - Upload identifier
- * @param idToken - Cognito ID token
- * @param intervalMs - Polling interval in milliseconds
- * @param maxAttempts - Maximum polling attempts
- * @returns Final UploadedFile status
- */
-export async function pollUploadStatus(
-  uploadId: string,
-  idToken: string,
-  intervalMs: number = 2000,
-  maxAttempts: number = 30,
-): Promise<UploadedFile> {
-  const base = await getApiBaseUrl()
-
-  for (let i = 0; i < maxAttempts; i++) {
-    const resp = await fetch(`${base}uploads/${uploadId}/status`, {
-      headers: { Authorization: `Bearer ${idToken}` },
-    })
-
-    if (!resp.ok) throw new Error("Failed to check upload status")
-
-    const result = await resp.json()
-
-    if (result.status === "completed" || result.status === "failed") {
-      return {
-        uploadId: result.uploadId,
-        fileName: result.fileName,
-        fileType: result.fileType,
-        fileSize: 0,
-        status: result.status,
-        extractedText: result.extractedText,
-        imageUrl: result.imageUrl,
-        // Forward PPTX deck-structure guide hints (set by Cloud upload Lambda
-        // when convert_file produces a deck) so polling clients see the same
-        // import-pptx branching signal as synchronous-completion clients.
-        guide: result.guide,
-        guideInstruction: result.guideInstruction,
-        suggestedName: result.suggestedName,
-        slideCount: typeof result.slideCount === "number" ? result.slideCount : undefined,
-        themeHints: result.themeHints,
-      }
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, intervalMs))
-  }
-
-  throw new Error("Upload processing timed out")
+  uploaded.status = "completed"
+  onProgress?.(uploaded)
+  return uploaded
 }

@@ -4,8 +4,8 @@
 
 import json
 import pytest
-from unittest.mock import MagicMock, patch
-from tools.assets import search_assets, list_asset_sources, _manifest_cache
+from unittest.mock import MagicMock
+from tools.assets import search_assets, _manifest_cache
 
 
 SAMPLE_MANIFEST = json.dumps([

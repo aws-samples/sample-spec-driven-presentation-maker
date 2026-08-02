@@ -12,7 +12,7 @@
 import {
   BookOpen, List, Search, FolderPlus, Pencil, Image,
   Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench, Loader2,
-  FileText, Download, Play, Code, Palette, LayoutTemplate, Package,
+  FileText, Download, Play, Code, Palette, LayoutTemplate,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { useTranslations } from "next-intl"
@@ -35,7 +35,6 @@ const TOOL_META: Record<string, { Icon: LucideIcon; label: string }> = {
   clone_slide:        { Icon: Copy,            label: "Cloning slide" },
   web_search:         { Icon: Globe,           label: "Searching" },
   web_fetch:          { Icon: FileText,        label: "Fetching page" },
-  read_uploaded_file: { Icon: FileText,        label: "Reading file" },
   // MCP Server tools
   init_presentation:  { Icon: FolderPlus,      label: "Initializing deck" },
   analyze_template:   { Icon: LayoutTemplate,  label: "Analyzing template" },
@@ -49,11 +48,9 @@ const TOOL_META: Record<string, { Icon: LucideIcon; label: string }> = {
   list_guides:        { Icon: List,            label: "Listing guides" },
   read_guides:        { Icon: BookOpen,        label: "Reading guide" },
   search_assets:      { Icon: Search,          label: "Searching assets" },
-  list_asset_sources: { Icon: Package,         label: "Listing sources" },
   get_preview:        { Icon: Image,           label: "Getting preview" },
   run_python:         { Icon: Code,            label: "Running code" },
   code_to_slide:      { Icon: Code,            label: "Code to slide" },
-  pptx_to_json:       { Icon: FileText,        label: "Converting PPTX" },
   grid:               { Icon: LayoutTemplate,  label: "Computing layout" },
 }
 
