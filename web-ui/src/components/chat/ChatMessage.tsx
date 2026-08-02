@@ -183,7 +183,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
   if (inlineSnippets.length > 0) {
     cleanContent = content.replace(/\n*---snippet---\n[\s\S]*?---\/snippet---/g, "").trim()
   }
-  // Strip [Attached: ...] markers from display text
+  // Strip compact v1 attachment markers from display text
   cleanContent = cleanContent.replace(/\[Attached:\s*[^\]]+\]\n*/g, "").trim()
   const allSnippets = [...inlineSnippets, ...snippets]
 

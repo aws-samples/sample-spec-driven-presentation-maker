@@ -77,6 +77,14 @@ def search_assets(
         Dict with query and results list.
     """
     sources = _load_manifests(storage)
+    if not query.strip():
+        return {
+            "sources": [
+                {"name": name, "count": len(entries)}
+                for name, entries in sources
+            ]
+        }
+
     queries = query.lower().split()
     all_results: list[dict] = []
 
@@ -108,21 +116,3 @@ def search_assets(
             all_results.append(result)
 
     return {"query": query, "results": all_results}
-
-
-def list_asset_sources(storage: Storage) -> dict[str, Any]:
-    """List available asset sources with counts.
-
-    Args:
-        storage: Storage backend instance.
-
-    Returns:
-        Dict with sources list.
-    """
-    sources = _load_manifests(storage)
-    return {
-        "sources": [
-            {"name": name, "count": len(entries)}
-            for name, entries in sources
-        ]
-    }

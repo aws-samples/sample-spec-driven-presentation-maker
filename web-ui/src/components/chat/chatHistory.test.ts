@@ -87,7 +87,7 @@ describe("parseCloudHistory", () => {
 
   it("derives attachments from Attached markers in user text", () => {
     const out = parseCloudHistory(asHistory([
-      { role: "user", content: "[Attached: report.pdf (uploadId: u1)] summarize this" },
+      { role: "user", content: '[Attached:{"v":1,"name":"report.pdf","source":"uploads/user/123e4567-e89b-12d3-a456-426614174000/report.pdf"}] summarize this' },
     ]))
     expect(out[0].attachments).toEqual([{ fileName: "report.pdf", fileType: "application/pdf" }])
   })

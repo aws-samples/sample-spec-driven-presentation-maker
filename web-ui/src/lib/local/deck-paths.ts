@@ -23,7 +23,7 @@ export const DECK_ROOT = process.env.SDPM_DECK_ROOT || path.join(os.homedir(), "
  *  3. realpath check (symlink-resistant)
  */
 export function resolveDeckDir(deckId: string): string | null {
-  if (!/^[A-Za-z0-9._-]+$/.test(deckId)) return null
+  if (!/^[A-Za-z0-9._-]+$/.test(deckId) || deckId.startsWith(".")) return null
 
   const root = path.resolve(DECK_ROOT)
   const dir = path.resolve(root, deckId)

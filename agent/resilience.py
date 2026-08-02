@@ -50,6 +50,7 @@ class LoopGuard:
     fingerprint_repeat_limit: int = 3
     tool_calls: int = 0
     fingerprint_counts: dict[str, int] = field(default_factory=dict)
+    fingerprint_progress: dict[str, int] = field(default_factory=dict)
     cancelled: bool = False
     cancel_reason: str = ""
 
@@ -69,9 +70,37 @@ class LoopGuard:
             self._cancel(event, f"max_tool_calls reached ({self.tool_calls})")
             return
         fp = self._fingerprint(event)
-        self.fingerprint_counts[fp] = self.fingerprint_counts.get(fp, 0) + 1
+        progress = self._completed_stage_count(event.result)
+        previous_progress = self.fingerprint_progress.get(fp, -1)
+        if progress is not None and progress > previous_progress:
+            self.fingerprint_progress[fp] = progress
+            self.fingerprint_counts[fp] = 1
+        else:
+            self.fingerprint_counts[fp] = self.fingerprint_counts.get(fp, 0) + 1
         if self.fingerprint_counts[fp] >= self.fingerprint_repeat_limit:
             self._cancel(event, f"fingerprint {fp} repeated {self.fingerprint_counts[fp]}x")
+
+    @classmethod
+    def _completed_stage_count(cls, value: object) -> int | None:
+        """Find an IMPORT_INCOMPLETE payload in common Strands result shapes."""
+        if isinstance(value, dict):
+            if value.get("code") == "IMPORT_INCOMPLETE" and isinstance(value.get("completedStages"), list):
+                return len(value["completedStages"])
+            for key in ("content", "result", "output"):
+                progress = cls._completed_stage_count(value.get(key))
+                if progress is not None:
+                    return progress
+        elif isinstance(value, list):
+            for item in value:
+                progress = cls._completed_stage_count(item)
+                if progress is not None:
+                    return progress
+        elif isinstance(value, str):
+            try:
+                return cls._completed_stage_count(json.loads(value))
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return None
 
     def _cancel(self, event: AfterToolCallEvent, reason: str) -> None:
         if self.cancelled:

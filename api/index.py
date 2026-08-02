@@ -25,6 +25,7 @@ from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConfig
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
+from botocore.config import Config as BotoConfig
 from authz import authorize
 from chat_history import (
     cap_messages_size,
@@ -32,13 +33,11 @@ from chat_history import (
     truncate_tool_inputs,
 )
 from common import get_user_id, now_iso, presigned_url
-from shared.ingest import PPTX_GUIDE_INSTRUCTION as _PPTX_GUIDE_INSTRUCTION
 from shared.schema import (
-    deck_pk, deck_sk, shared_pk, fav_sk, upload_sk,
+    deck_pk, deck_sk, shared_pk, fav_sk,
     DECK_SK_PREFIX, FAV_SK_PREFIX,
     extract_deck_id, extract_fav_id,
     GSI_PUBLIC_DECKS, public_gsi1pk,
-    theme_hints_ddb_item,
 )
 
 # Environment variables
@@ -98,7 +97,7 @@ logger = Logger()
 metrics = Metrics()
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
-s3_client = boto3.client("s3")
+s3_client = boto3.client("s3", config=BotoConfig(signature_version="s3v4"))
 app = APIGatewayHttpResolver(cors=cors_config)
 
 # --- KB (optional) ---
@@ -1412,238 +1411,89 @@ def _cf_signed_url(s3_key: str, expires_in: int = 900) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Upload endpoints
+# Attachment raw-upload endpoint
 # ---------------------------------------------------------------------------
 
 ALLOWED_CONTENT_TYPES = {
-    "text/plain", "text/markdown", "application/json", "application/pdf",
+    "text/plain", "text/markdown", "text/csv", "text/html", "application/json",
+    "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml",
 }
+CLOUD_RAW_MAX_OBJECTS = 100
+CLOUD_RAW_MAX_BYTES = 1024 * 1024 * 1024
 
 
-@app.post("/uploads/presign")
-def presign_upload() -> Dict[str, Any]:
-    """Generate a presigned PUT URL for file upload."""
-    user_id = get_user_id(app.current_event)
-    body = app.current_event.json_body
-
-    file_name: str = body.get("fileName", "")
-    content_type: str = body.get("contentType", "")
-    file_size: int = int(body.get("fileSize", 0))
-
-    if not file_name or not content_type:
-        return {"error": "fileName and contentType are required"}, 400
-    if content_type not in ALLOWED_CONTENT_TYPES:
-        return {"error": f"Unsupported file type: {content_type}"}, 400
-    if file_size > MAX_FILE_SIZE:
-        return {"error": "File too large"}, 400
-
-    upload_id = str(uuid.uuid4())[:8]
-    s3_key = f"uploads/tmp/{user_id}/{upload_id}/{file_name}"
-
-    url = s3_client.generate_presigned_url(
-        "put_object",
-        Params={"Bucket": BUCKET_NAME, "Key": s3_key, "ContentType": content_type},
-        ExpiresIn=PRESIGNED_URL_EXPIRY,
-    )
-
-    table.put_item(Item={
-        "PK": deck_pk(user_id), "SK": upload_sk(upload_id),
-        "fileName": file_name, "fileType": content_type, "fileSize": file_size,
-        "s3KeyRaw": s3_key, "status": "uploading", "createdAt": now_iso(),
-    })
-    return {"uploadId": upload_id, "presignedUrl": url, "s3Key": s3_key}
+def _raw_attachment_usage(user_id: str) -> tuple[int, int]:
+    """Return current raw-object count and bytes for one user."""
+    count = 0
+    total_bytes = 0
+    paginator = s3_client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix=f"uploads/{user_id}/"):
+        objects = page.get("Contents", [])
+        count += len(objects)
+        total_bytes += sum(int(obj.get("Size", 0)) for obj in objects)
+        if count >= CLOUD_RAW_MAX_OBJECTS or total_bytes >= CLOUD_RAW_MAX_BYTES:
+            break
+    return count, total_bytes
 
 
-# Text-extractable MIME types (can be read directly from S3 in Lambda)
-_TEXT_EXTRACTABLE = {"text/plain", "text/markdown", "application/json"}
+def _sanitize_attachment_filename(name: str) -> str:
+    """Return a single safe UTF-8 filename for an attachment source key."""
+    name = name.replace("/", "_").replace("\\", "_").replace("..", "_")
+    name = "".join(c for c in name if ord(c) >= 0x20 and ord(c) != 0x7F).lstrip(".")
+    encoded = name.encode("utf-8")[:255]
+    name = encoded.decode("utf-8", errors="ignore")
+    if not name or name.startswith("[Attached:"):
+        raise ValueError("Invalid fileName")
+    return name
 
 
-def _pptx_guide_fields(item_or_values: Dict[str, Any]) -> Dict[str, Any]:
-    """Build the guide/guideInstruction/suggestedName/slideCount/themeHints fields
-    for a PPTX upload. Accepts either a fresh expr_values dict (from process_upload)
-    or a DDB item (from get_upload_status). Returns {} when the record has no
-    deck-structure metadata (non-PPTX uploads).
-    """
-    theme = item_or_values.get(":th") if ":th" in item_or_values else item_or_values.get("themeHints")
-    slide_count = (
-        item_or_values.get(":sc") if ":sc" in item_or_values else item_or_values.get("slideCount")
-    )
-    suggested = (
-        item_or_values.get(":sn")
-        if ":sn" in item_or_values
-        else item_or_values.get("suggestedName")
-    )
-    if theme is None and slide_count is None and suggested is None:
-        return {}
-    if theme is not None:
-        # DDB returns numeric values as Decimal; JSON serializer on the
-        # response can't handle Decimal, so coerce backgroundLuminance back
-        # to a float.
-        from decimal import Decimal
-        bg_lum = theme.get("backgroundLuminance") if isinstance(theme, dict) else None
-        if isinstance(bg_lum, Decimal):
-            theme = {**theme, "backgroundLuminance": float(bg_lum)}
-    return {
-        "guide": "import-pptx",
-        "guideInstruction": _PPTX_GUIDE_INSTRUCTION,
-        "suggestedName": suggested,
-        "slideCount": int(slide_count) if slide_count is not None else None,
-        "themeHints": theme,
-    }
-
-
-@app.post("/uploads/<upload_id>/process")
-def process_upload(upload_id: str) -> Dict[str, Any]:
-    """Process an uploaded file — convert binary files at upload time."""
-    import tempfile
-    from pathlib import Path as _Path
-    from shared.ingest import IMAGE_EXTS, convert_file
-
+@app.post("/attachments/presign")
+def presign_attachment() -> Dict[str, Any]:
+    """Presign one immutable raw attachment PUT; no processing state is created."""
     user_id = get_user_id(app.current_event)
     body = app.current_event.json_body or {}
-    session_id: str = body.get("sessionId", "")
 
-    resp = table.get_item(Key={"PK": deck_pk(user_id), "SK": upload_sk(upload_id)})
-    item = resp.get("Item")
-    if not item:
-        raise app.not_found()
+    try:
+        file_name = _sanitize_attachment_filename(str(body.get("fileName", "")))
+        file_size = int(body.get("fileSize", 0))
+    except (TypeError, ValueError):
+        return {"error": "Valid fileName and fileSize are required"}, 400
 
-    file_type = item.get("fileType", "")
-    file_name = item.get("fileName", "unknown")
-    s3_key = item.get("s3KeyRaw", "")
-    update_expr_parts = ["#st = :st", "sessionId = :sid"]
-    expr_values: Dict[str, Any] = {":sid": session_id}
-    expr_names = {"#st": "status"}
+    content_type = str(body.get("contentType", "")).split(";", 1)[0].strip().lower()
+    if content_type not in ALLOWED_CONTENT_TYPES:
+        return {"error": f"Unsupported file type: {content_type or 'unknown'}"}, 400
+    if file_size < 0 or file_size > MAX_FILE_SIZE:
+        return {"error": f"fileSize must be between 0 and {MAX_FILE_SIZE} bytes"}, 400
 
-    extracted_text = None
-    ext = _Path(file_name).suffix.lower()
+    object_count, stored_bytes = _raw_attachment_usage(user_id)
+    if object_count >= CLOUD_RAW_MAX_OBJECTS or stored_bytes + file_size > CLOUD_RAW_MAX_BYTES:
+        return {"error": "Raw attachment quota exceeded"}, 429
 
-    # --- Text files: read directly from S3 ---
-    if file_type in _TEXT_EXTRACTABLE and s3_key:
-        try:
-            obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=s3_key)
-            extracted_text = obj["Body"].read().decode("utf-8")
-            update_expr_parts.append("extractedText = :et")
-            expr_values[":et"] = extracted_text[:50000]
-            expr_values[":st"] = "completed"
-        except Exception:
-            expr_values[":st"] = "completed"
-
-    # --- Images: no conversion needed ---
-    elif ext in IMAGE_EXTS:
-        expr_values[":st"] = "completed"
-
-    # --- Binary files (PDF/DOCX/XLSX/PPTX): download → convert → upload ---
-    elif ext in (".pdf", ".docx", ".xlsx", ".pptx") and s3_key:
-        converted_prefix = f"uploads/{user_id}/{upload_id}/converted"
-        try:
-            with tempfile.TemporaryDirectory() as tmp:
-                tmp_path = _Path(tmp)
-                local_file = tmp_path / file_name
-                output_dir = tmp_path / "converted"
-
-                obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=s3_key)
-                local_file.write_bytes(obj["Body"].read())
-
-                result = convert_file(local_file, output_dir)
-
-                if result.status == "error":
-                    expr_values[":st"] = "error"
-                    update_expr_parts.append("conversionError = :ce")
-                    expr_values[":ce"] = result.error or "Unknown error"
-                else:
-                    if output_dir.exists():
-                        for f in output_dir.rglob("*"):
-                            if f.is_file():
-                                rel = f.relative_to(output_dir)
-                                s3_dest = f"{converted_prefix}/{rel}"
-                                ct = "application/octet-stream"
-                                if f.suffix in (".md", ".txt"):
-                                    ct = "text/markdown"
-                                elif f.suffix == ".json":
-                                    ct = "application/json"
-                                elif f.suffix in (".png", ".jpg", ".jpeg"):
-                                    ct = f"image/{f.suffix.lstrip('.')}"
-                                s3_client.put_object(
-                                    Bucket=BUCKET_NAME, Key=s3_dest,
-                                    Body=f.read_bytes(), ContentType=ct,
-                                )
-
-                    expr_values[":st"] = "converted"
-                    if result.warnings:
-                        update_expr_parts.append("conversionWarnings = :cw")
-                        expr_values[":cw"] = result.warnings
-                    # PPTX deck-structure metadata — stored for the edit guide
-                    # and returned by process_upload / get_upload_status.
-                    if result.deck_structure:
-                        # theme_hints may be None when theme extraction failed
-                        # (ingest logs a warning and continues) — the helper
-                        # guards so a successful conversion is not reported
-                        # as failed.
-                        update_expr_parts.append("themeHints = :th")
-                        expr_values[":th"] = theme_hints_ddb_item(result.theme_hints)
-                        update_expr_parts.append("slideCount = :sc")
-                        expr_values[":sc"] = result.slide_count
-                        update_expr_parts.append("suggestedName = :sn")
-                        expr_values[":sn"] = result.suggested_name
-
-        except Exception as e:
-            logger.exception("Conversion failed for %s", upload_id)
-            expr_values[":st"] = "error"
-            update_expr_parts.append("conversionError = :ce")
-            expr_values[":ce"] = str(e)[:500]
-
-    else:
-        expr_values[":st"] = "completed"
-
-    table.update_item(
-        Key={"PK": deck_pk(user_id), "SK": upload_sk(upload_id)},
-        UpdateExpression="SET " + ", ".join(update_expr_parts),
-        ExpressionAttributeValues=expr_values,
-        ExpressionAttributeNames=expr_names,
+    source = f"uploads/{user_id}/{uuid.uuid4()}/{file_name}"
+    presigned_url = s3_client.generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": BUCKET_NAME,
+            "Key": source,
+            "ContentType": content_type,
+            "IfNoneMatch": "*",
+            "Tagging": "sdpm-class=attachment-source",
+        },
+        ExpiresIn=PRESIGNED_URL_EXPIRY,
     )
-
-    image_url = None
-    if file_type.startswith("image/") and s3_key:
-        image_url = presigned_url(s3_client, BUCKET_NAME, s3_key)
-
-    response: Dict[str, Any] = {
-        "uploadId": upload_id,
-        "status": expr_values[":st"],
-        "extractedText": extracted_text,
-        "imageUrl": image_url,
+    return {
+        "source": source,
+        "presignedUrl": presigned_url,
+        "requiredHeaders": {
+            "Content-Type": content_type,
+            "If-None-Match": "*",
+            "x-amz-tagging": "sdpm-class=attachment-source",
+        },
     }
-    response.update(_pptx_guide_fields(expr_values))
-    return response
-
-
-@app.get("/uploads/<upload_id>/status")
-def get_upload_status(upload_id: str) -> Dict[str, Any]:
-    """Return current processing status of an upload."""
-    user_id = get_user_id(app.current_event)
-    resp = table.get_item(Key={"PK": deck_pk(user_id), "SK": upload_sk(upload_id)})
-    item = resp.get("Item")
-    if not item:
-        raise app.not_found()
-
-    image_url = None
-    if item.get("fileType", "").startswith("image/") and item.get("s3KeyRaw"):
-        image_url = presigned_url(s3_client, BUCKET_NAME, item["s3KeyRaw"])
-
-    response: Dict[str, Any] = {
-        "uploadId": upload_id,
-        "fileName": item.get("fileName", ""),
-        "fileType": item.get("fileType", ""),
-        "status": item.get("status", "unknown"),
-        "extractedText": item.get("extractedText"),
-        "imageUrl": image_url,
-    }
-    response.update(_pptx_guide_fields(item))
-    return response
 
 
 # ---------------------------------------------------------------------------

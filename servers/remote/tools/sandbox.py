@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 # Files managed by the deck workspace — only these are synced back to S3.
 _WORKSPACE_PREFIXES = ("deck.json", "slides/", "specs/", "includes/", "attachments/")
+_IMMUTABLE_IMPORT_PREFIX = "attachments/imports/"
 
 
 # Helpers injected into every sandbox session so agent code can be written once
@@ -38,10 +39,16 @@ _HELPERS_PY = '''\
 import json as _json
 from pathlib import Path as _Path
 
+def _assert_writable(path):
+    normalized = _Path(path)
+    if len(normalized.parts) >= 2 and normalized.parts[:2] == ("attachments", "imports"):
+        raise PermissionError(f"Committed import bundles are read-only: {path}")
+
 def read_json(path):
     return _json.loads(_Path(path).read_text(encoding="utf-8"))
 
 def write_json(path, data):
+    _assert_writable(path)
     p = _Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(_json.dumps(data, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
@@ -50,6 +57,7 @@ def read_text(path):
     return _Path(path).read_text(encoding="utf-8")
 
 def write_text(path, text):
+    _assert_writable(path)
     p = _Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(text, encoding="utf-8")
@@ -70,34 +78,6 @@ _HELPERS_IMPORT = (
 )
 
 
-def _validate_staged_files(files: list[str], deck_id: str | None) -> None:
-    """Validate `files=[...]` staging names before sandbox upload.
-
-    Staged files land in the sandbox root by basename. When a deck workspace
-    is loaded, the whole workspace is persisted unconditionally afterwards —
-    a name that shadows a workspace file (e.g. "deck.json") would silently
-    overwrite the deck on S3, so those names are rejected. Without a deck
-    there is nothing to shadow, so any name is fine (general computation).
-
-    File entries in _WORKSPACE_PREFIXES match exactly ("deck.json" is
-    rejected, "deck.jsonl" is not); directory prefixes match by prefix.
-    """
-    basenames = [key.rsplit("/", 1)[-1] for key in files]
-    seen: set[str] = set()
-    for name in basenames:
-        if name in seen:
-            raise ValueError(f"Duplicate filename: {name}")
-        seen.add(name)
-        if deck_id and any(
-            name.startswith(p) if p.endswith("/") else name == p
-            for p in _WORKSPACE_PREFIXES
-        ):
-            raise ValueError(
-                f"File name {name!r} collides with the deck workspace "
-                "(writes always persist) — rename the file before "
-                "passing it via files=[...]."
-            )
-
 
 def execute_in_sandbox(
     code: str,
@@ -105,7 +85,6 @@ def execute_in_sandbox(
     region: str,
     deck_id: str | None = None,
     persist_writes: bool = True,
-    files: list[str] | None = None,
 ) -> tuple[str, list[dict], list[dict], list[str]]:
     """Execute Python code in Amazon Bedrock AgentCore Code Interpreter sandbox.
 
@@ -122,16 +101,10 @@ def execute_in_sandbox(
         deck_id: If provided, loads deck workspace into sandbox.
         persist_writes: Set False to run without write-back (used when the
             caller only has read access to the deck).
-        files: Additional S3 keys to download into sandbox by basename.
 
     Returns:
         Tuple of (output, outline_warnings, lint_diagnostics, changed paths).
-
-    Raises:
-        ValueError: If duplicate filenames in files.
     """
-    if files:
-        _validate_staged_files(files, deck_id)
 
     client = boto3.client("bedrock-agentcore", region_name=region)
 
@@ -153,15 +126,6 @@ def execute_in_sandbox(
         # Inject shared sandbox helpers (read_json / write_json / ...) so user
         # code can use the same API on Local and Cloud.
         _inject_helpers(client, session_id)
-
-        # Upload additional files by basename
-        if files:
-            file_contents = []
-            for key in files:
-                data = storage.download_file_from_pptx_bucket(key)
-                basename = key.rsplit("/", 1)[-1]
-                file_contents.append({"path": basename, "text": data.decode("utf-8")})
-            _write_files(client, session_id, file_contents)
 
         # Execute user code (prefixed with helper import so agents can use
         # read_json / write_json / ... without an explicit import).
@@ -304,6 +268,10 @@ def _save_deck_workspace(
     raw = _collect_stream(response)
 
     file_map: dict[str, str] = json.loads(raw)
+    file_map = {
+        path: text for path, text in file_map.items()
+        if not path.startswith(_IMMUTABLE_IMPORT_PREFIX)
+    }
 
     # Diff against the session-start baseline — only changed/new files are
     # written back. Unchanged files are skipped so a stale sandbox copy can
