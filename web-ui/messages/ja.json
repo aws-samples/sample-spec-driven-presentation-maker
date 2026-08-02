@@ -43,6 +43,15 @@
   },
   "settings": {
     "title": "設定",
+    "appearance": "外観",
+    "appearanceDescription": "スタジオの表示とサイズを調整します",
+    "theme": "テーマ",
+    "themeLight": "ライト",
+    "themeDark": "ダーク",
+    "themeSystem": "システム",
+    "textSize": "文字サイズ",
+    "textSizeDescription": "文字とインターフェースの間隔を拡大・縮小します",
+    "textScaleLabel": "文字サイズ {scale}%",
     "language": "言語",
     "languageDescription": "インターフェースの表示言語"
   },

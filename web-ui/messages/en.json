@@ -43,6 +43,15 @@
   },
   "settings": {
     "title": "Settings",
+    "appearance": "Appearance",
+    "appearanceDescription": "Choose how the studio looks and scales",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "textSize": "Text size",
+    "textSizeDescription": "Scale text and interface spacing",
+    "textScaleLabel": "{scale}% text size",
     "language": "Language",
     "languageDescription": "Display language for the interface"
   },

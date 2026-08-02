@@ -4,6 +4,7 @@ import type { Metadata } from "next"
 import { Geist } from "next/font/google"
 import Script from "next/script"
 import { Toaster } from "@/components/ui/sonner"
+import { AppearanceProvider } from "@/components/AppearanceProvider"
 import { LocaleProvider } from "@/i18n/LocaleProvider"
 import "./globals.css"
 
@@ -11,6 +12,8 @@ const geist = Geist({
   variable: "--font-geist",
   subsets: ["latin"],
 })
+
+const textScaleScript = `try{const p=JSON.parse(localStorage.getItem("sdpm-prefs")||"{}");const s=[90,100,110,125].includes(p.textScale)?p.textScale:100;document.documentElement.style.fontSize=s+"%"}catch{}`
 
 export const metadata: Metadata = {
   title: "spec-driven-presentation-maker",
@@ -27,7 +30,7 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover" as const,
-  themeColor: "#1a1a1f",
+  themeColor: "#1a1a1c",
 }
 
 export default function RootLayout({
@@ -36,33 +39,33 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: textScaleScript }} />
+      </head>
       <body className={`${geist.variable} font-sans antialiased`}>
         {/* Noise texture overlay */}
         <div
           aria-hidden="true"
-          className="fixed inset-0 pointer-events-none z-0 opacity-[0.025]"
+          className="fixed inset-0 pointer-events-none z-0"
           style={{
+            opacity: "var(--noise-opacity)",
             backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
             backgroundSize: "256px",
           }}
         />
-        {/* Ambient teal glow */}
+        {/* Theme-aware ambient studio light */}
         <div
           aria-hidden="true"
-          className="fixed pointer-events-none z-0"
-          style={{
-            top: "-40%",
-            left: "30%",
-            width: "80%",
-            height: "80%",
-            background: "radial-gradient(ellipse, oklch(0.75 0.14 185 / 3%) 0%, transparent 60%)",
-          }}
+          className="fixed inset-0 pointer-events-none z-0"
+          style={{ background: "var(--glow)" }}
         />
-        <LocaleProvider>
-          {children}
-          <Toaster position="bottom-right" />
-        </LocaleProvider>
+        <AppearanceProvider>
+          <LocaleProvider>
+            {children}
+            <Toaster position="bottom-right" />
+          </LocaleProvider>
+        </AppearanceProvider>
         <Script
           id="sw-register"
           strategy="afterInteractive"

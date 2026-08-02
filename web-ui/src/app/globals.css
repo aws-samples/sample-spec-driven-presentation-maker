@@ -3,7 +3,7 @@
 
 @plugin "@tailwindcss/typography";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
   --color-background: var(--background);
@@ -15,8 +15,10 @@
   --color-foreground-muted: var(--foreground-muted);
   --font-sans: var(--font-geist);
   --font-mono: var(--font-geist);
-  --color-brand-teal: oklch(0.75 0.14 185);
-  --color-brand-teal-soft: oklch(0.75 0.14 185 / 12%);
+  /* Compatibility names are achromatic now; color belongs to the agents. */
+  --color-brand-teal: var(--brand);
+  --color-brand-teal-bright: var(--foreground);
+  --color-brand-teal-soft: var(--brand-soft);
   --color-brand-amber: var(--agent-data);
   --color-brand-amber-soft: color-mix(in oklch, var(--agent-data) 15%, transparent);
   --color-agent-layout: var(--agent-layout);
@@ -86,6 +88,10 @@
   --foreground: oklch(0.95 0 0);
   --foreground-secondary: oklch(0.75 0 0);
   --foreground-muted: oklch(0.65 0 0);
+  --brand: oklch(0.95 0 0);
+  --brand-soft: oklch(1 0 0 / 8%);
+  --glow: radial-gradient(ellipse at 30% -10%, oklch(1 0 0 / 2.5%) 0%, transparent 55%);
+  --noise-opacity: 0.025;
   --card: oklch(0.14 0.005 260);
   --card-foreground: oklch(0.95 0 0);
   --popover: oklch(0.14 0.005 260);
@@ -106,12 +112,46 @@
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   --agent-layout: oklch(0.52 0.19 262);
   --agent-content: oklch(0.55 0.14 170);
   --agent-visual: oklch(0.53 0.21 300);
   --agent-data: oklch(0.62 0.14 70);
   --agent-decorator: oklch(0.55 0.20 330);
   --agent-neutral: oklch(0.45 0 0);
+  --surface-subtle: oklch(0.2 0.01 260 / 3%);
+  --surface-stage: oklch(0.93 0.008 85);
+  --shadow-card: 0 1px 2px oklch(0.2 0.02 260 / 8%), 0 8px 24px oklch(0.2 0.02 260 / 8%);
+  --shadow-lift: 0 2px 4px oklch(0.2 0.02 260 / 10%), 0 16px 48px oklch(0.2 0.02 260 / 14%);
+  --shadow-slide: 0 6px 28px oklch(0.2 0.02 260 / 18%), 0 0 0 1px oklch(0.2 0.02 260 / 6%);
+  --background: oklch(0.975 0.004 85);
+  --background-raised: oklch(0.995 0.002 85);
+  --background-hover: oklch(0.955 0.005 85);
+  --background-panel: oklch(0.945 0.006 85);
+  --foreground: oklch(0.22 0.01 260);
+  --foreground-secondary: oklch(0.42 0.008 260);
+  --foreground-muted: oklch(0.55 0.006 260);
+  --brand: oklch(0.22 0.01 260);
+  --brand-soft: oklch(0.2 0.01 260 / 7%);
+  --glow: radial-gradient(ellipse at 30% -10%, oklch(0.2 0.02 260 / 2%) 0%, transparent 55%);
+  --noise-opacity: 0.018;
+  --card: oklch(0.995 0.002 85);
+  --card-foreground: oklch(0.22 0.01 260);
+  --popover: oklch(0.995 0.002 85);
+  --popover-foreground: oklch(0.22 0.01 260);
+  --primary: oklch(0.22 0.01 260);
+  --primary-foreground: oklch(0.995 0.002 85);
+  --secondary: oklch(0.92 0.006 85);
+  --secondary-foreground: oklch(0.28 0.01 260);
+  --muted: oklch(0.94 0.006 85);
+  --muted-foreground: oklch(0.48 0.008 260);
+  --accent: oklch(0.92 0.006 85);
+  --accent-foreground: oklch(0.22 0.01 260);
+  --destructive: oklch(0.55 0.2 25);
+  --border: oklch(0.2 0.01 260 / 9%);
+  --border-hover: oklch(0.2 0.01 260 / 18%);
+  --input: oklch(0.2 0.01 260 / 12%);
+  --ring: oklch(0.22 0.01 260 / 40%);
 }
 
 @layer base {
@@ -141,11 +181,9 @@ body {
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Slide shadow — makes previews pop against dark bg */
+/* Slide shadow keeps white previews distinct in both studio themes. */
 .slide-shadow {
-  box-shadow:
-    0 4px 24px oklch(0 0 0 / 40%),
-    0 0 0 1px oklch(1 0 0 / 5%);
+  box-shadow: var(--shadow-slide);
 }
 
 /* ── Spec waiting states ── */
