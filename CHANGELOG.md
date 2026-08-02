@@ -10,6 +10,8 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-02
+
 ### Breaking
 
 - **Stateless attachment pipeline** — `upload_file`, `read_uploaded_file`, and
@@ -47,6 +49,21 @@ Entries before v0.5.0 were written retroactively as summaries.
   composition workflow, so architecture, system, and flow diagrams use automatic
   routing and crossing minimization instead of silently falling back to manual
   placement.
+- Attachment presigned PUTs now use Signature Version 4 — S3 rejects the
+  conditional write (`If-None-Match`) with legacy SigV2 URLs, which broke all
+  browser uploads in some regions (e.g. ap-northeast-1).
+- The Web UI no longer sends a message when an attachment upload fails: input
+  and attachments are kept for retry and the actual error (e.g. quota
+  exceeded) is shown instead of a generic failure.
+- Per-user raw attachment caps recalibrated for internal/team deployments
+  (1000 objects / 50GB, overridable via `ATTACHMENT_MAX_OBJECTS` /
+  `ATTACHMENT_MAX_BYTES`), and S3 lifecycle rules are prefix-only so
+  attachment objects from pre-0.6 releases (which carry no `sdpm-class` tag)
+  also expire. Deployments upgrading from the old upload pipeline should
+  purge leftover `uploads/` objects — they otherwise count toward the quota.
+- `servers/remote/constraints.txt` regenerated via `make lock`;
+  `cachetools` / `protobuf` are pinned by `aws-opentelemetry-distro` and are
+  now excluded from Dependabot bumps until the distro itself is upgraded.
 
 ## [0.5.3] - 2026-08-01
 
@@ -177,7 +194,9 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.3...v0.6.0
+[0.5.3]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.4.0...v0.5.0
