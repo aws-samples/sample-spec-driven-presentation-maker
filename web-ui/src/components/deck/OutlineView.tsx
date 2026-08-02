@@ -1,15 +1,15 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * OutlineView — Editorial timeline renderer for outline specs.
+ * OutlineView — Slide-first outline renderer.
  *
- * Renders parsed outline data as a vertical timeline with three visual states:
- * - skeleton: table-of-contents only (ghost appearance)
- * - active: currently under review (pulsing node, accent border panel)
- * - done: already reviewed (subdued panel)
+ * Two adaptive modes:
+ * - Light table (3-column slide sorter): when every slide has zero sub-items
+ * - Detail view (full-width 16:9 slide cards): when any slide is enriched
  *
- * Design language: Dark Editorial × Minimal Luxury, matching the spec-driven-presentation-maker
- * web-ui design system (oklch colors, brand-teal/brand-amber accents).
+ * Design language: achromatic/Fraunces headings, ink frames with state-driven borders.
+ * Frame states: skeleton=dashed, active=solid+shadow+inverted number, done=quiet.
+ * TBD is dashed ink chip (not amber — amber is Data's agent color).
  *
  * @param props.content - Raw outline markdown string (null = empty state)
  */
@@ -17,47 +17,34 @@
 "use client"
 
 import { useEffect, useRef, useMemo } from "react"
-import { FileText, BarChart3, Palette, StickyNote } from "lucide-react"
-import { parseOutline, resolveStates } from "./outlineParser"
-import type { OutlineSlide, OutlineSubItem, SlideState, SubItemKey } from "./outlineParser"
+import { FileText } from "lucide-react"
+import { parseOutline, resolveStates, isLightTableMode, getSlideEntries } from "./outlineParser"
+import type { OutlineEntry, SlideEntry, SectionEntry, ProseEntry, OutlineSubItem, SlideState, SubItemKey } from "./outlineParser"
 import { renderColorSwatches } from "./colorSwatches"
 import { useTranslations } from "next-intl"
-
-/** Icon and label key for each sub-item key (excluding what_to_say which has no label). */
-const SUB_ITEM_META: Record<Exclude<SubItemKey, "what_to_say">, { Icon: typeof BarChart3; labelKey: "evidence" | "visual" | "notes" }> = {
-  evidence: { Icon: BarChart3, labelKey: "evidence" },
-  what_to_show: { Icon: Palette, labelKey: "visual" },
-  notes: { Icon: StickyNote, labelKey: "notes" },
-}
 
 /** Regex detecting [TBD] markers in sub-item values. */
 const TBD_RE = /\[TBD(?::?\s*([^\]]*))?\]/g
 
 /**
  * Render a sub-item value with [TBD] badges and HEX color swatches.
- *
- * @param value - Raw sub-item value string
- * @returns Array of string and React elements
  */
 function renderValue(value: string): (string | React.ReactElement)[] {
-  // First pass: replace [TBD] with badges.
   const parts = value.split(TBD_RE)
   const elements: (string | React.ReactElement)[] = []
 
   for (let i = 0; i < parts.length; i++) {
     if (i % 2 === 0) {
-      // Normal text — apply color swatch rendering.
       const text = parts[i]
       if (text) {
         elements.push(...renderColorSwatches(text))
       }
     } else {
-      // TBD capture group (detail text after colon, may be empty).
       const detail = parts[i]
       elements.push(
         <span
           key={`tbd-${i}`}
-          className="inline-flex items-center gap-1 px-1.5 py-px rounded text-[11px] font-medium bg-brand-amber-soft text-brand-amber"
+          className="inline-flex items-center gap-1 px-1.5 py-px rounded text-[11px] font-medium border border-dashed border-foreground/40 text-foreground/70"
         >
           TBD{detail ? `: ${detail}` : ""}
         </span>
@@ -68,161 +55,210 @@ function renderValue(value: string): (string | React.ReactElement)[] {
   return elements
 }
 
-/**
- * Render the detail panel for a slide with sub-items.
- *
- * @param subItems - Array of sub-items to render
- * @param state - Visual state of the parent slide
- * @returns JSX element for the detail panel
- */
-function DetailPanel({ subItems, state }: { subItems: OutlineSubItem[]; state: SlideState }): React.ReactElement {
-  const t = useTranslations("outline")
-  const whatToSay = subItems.find((s) => s.key === "what_to_say")
-  const others = subItems.filter((s) => s.key !== "what_to_say")
-
-  const isActive = state === "active"
-
-  return (
-    <div
-      className="mt-2 rounded-xl outline-panel-enter"
-      style={{
-        marginLeft: "36px",
-        padding: "16px 20px",
-        background: isActive ? "oklch(1 0 0 / 3%)" : "oklch(1 0 0 / 2%)",
-        border: "1px solid oklch(1 0 0 / 5%)",
-        borderLeft: isActive ? "2px solid oklch(0.75 0.14 185 / 40%)" : "2px solid transparent",
-        boxShadow: "inset 0 1px 0 oklch(1 0 0 / 4%)",
-        opacity: state === "done" ? 0.85 : 1,
-      }}
-    >
-      {/* what_to_say — no label, largest font, the "voice" of the slide */}
-      {whatToSay && (
-        <p className="text-sm text-foreground/90 leading-relaxed">
-          {renderValue(whatToSay.value)}
-        </p>
-      )}
-
-      {/* Other sub-items with icon + label */}
-      {others.length > 0 && (
-        <div className={whatToSay ? "mt-3 space-y-3" : "space-y-3"}>
-          {others.map((item) => {
-            const meta = SUB_ITEM_META[item.key as Exclude<SubItemKey, "what_to_say">]
-            if (!meta) return null
-            const { Icon, labelKey } = meta
-            return (
-              <div key={item.key} className="flex items-start gap-2.5">
-                <Icon
-                  className="flex-none w-3.5 h-3.5 mt-[3px] text-brand-teal/40"
-                  strokeWidth={1.5}
-                />
-                <div className="min-w-0 flex-1">
-                  <span className="text-[11px] uppercase tracking-[0.08em] text-foreground-secondary/70 font-medium">
-                    {t(labelKey)}
-                  </span>
-                  <p className="text-sm text-foreground/80 leading-relaxed mt-0.5">
-                    {renderValue(item.value)}
-                  </p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
+// ---------------------------------------------------------------------------
+// Slide Card (detail view)
+// ---------------------------------------------------------------------------
 
 /**
- * Render a single timeline node (slide entry).
- *
- * @param props.slide - Parsed slide data
- * @param props.state - Visual state (skeleton / active / done)
- * @param props.index - Position index for stagger animation delay
- * @param props.isLast - Whether this is the last node (no connector line below)
+ * A full-width 16:9-proportioned slide card.
+ * Face: title/message, what_to_say lead quote, Evidence, Visual, number+slug chrome.
+ * Below: speaker notes band (notes sub-item).
  */
-function TimelineNode({ slide, state, index, isLast }: {
-  slide: OutlineSlide
+function SlideCard({ slide, state, slideNumber }: {
+  slide: SlideEntry
   state: SlideState
-  index: number
-  isLast: boolean
+  slideNumber: number
 }): React.ReactElement {
-  const hasDetail = slide.subItems.length > 0
-  const displayNum = index + 1
+  const t = useTranslations("outline")
+  const whatToSay = slide.subItems.find((s) => s.key === "what_to_say")
+  const evidence = slide.subItems.find((s) => s.key === "evidence")
+  const visual = slide.subItems.find((s) => s.key === "what_to_show")
+  const notes = slide.subItems.find((s) => s.key === "notes")
 
-  // Node circle styles per state.
-  const nodeStyles: Record<SlideState, React.CSSProperties> = {
-    skeleton: {
-      border: "1.5px solid oklch(0.75 0.14 185 / 25%)",
-      color: "oklch(0.40 0 0)",
-      background: "transparent",
-    },
-    done: {
-      border: "1.5px solid oklch(0.75 0.14 185 / 50%)",
-      color: "oklch(0.75 0.14 185)",
-      background: "oklch(0.75 0.14 185 / 8%)",
-      boxShadow: "0 0 0 3px oklch(0.75 0.14 185 / 6%)",
-    },
-    active: {
-      border: "1.5px solid oklch(0.75 0.14 185 / 70%)",
-      color: "oklch(0.75 0.14 185)",
-      background: "oklch(0.75 0.14 185 / 15%)",
-      boxShadow: "0 0 0 4px oklch(0.75 0.14 185 / 10%)",
-    },
+  const frameClasses = {
+    skeleton: "border-dashed border-foreground/20",
+    active: "border-solid border-foreground/60 shadow-[var(--shadow-slide)]",
+    done: "border-solid border-foreground/12",
+  }
+
+  const numberClasses = {
+    skeleton: "text-foreground/30",
+    active: "bg-foreground text-background font-semibold",
+    done: "text-foreground/40",
   }
 
   return (
     <div
-      className="outline-node-enter relative flex gap-4"
-      style={{ "--stagger": `${index * 60}ms` } as React.CSSProperties}
+      className="outline-node-enter"
+      style={{ "--stagger": `${slideNumber * 50}ms` } as React.CSSProperties}
       data-state={state}
       data-slide-slug={slide.slug}
     >
-      {/* Vertical connector line (between nodes) */}
-      <div className="flex flex-col items-center flex-none" style={{ width: "24px" }}>
-        {/* Node circle */}
-        <div
-          className={`
-            flex-none w-6 h-6 rounded-full flex items-center justify-center
-            text-[11px] font-semibold tabular-nums
-            transition-all duration-300
-            ${state === "active" ? "outline-node-pulse" : ""}
-          `}
-          style={nodeStyles[state]}
-        >
-          {displayNum}
-        </div>
+      {/* Slide face — 16:9 proportioned */}
+      <div
+        className={`relative rounded-lg border overflow-hidden ${frameClasses[state]}`}
+        style={{ aspectRatio: "16 / 9" }}
+      >
+        {/* Content area */}
+        <div className="absolute inset-0 flex flex-col justify-between p-5 sm:p-6">
+          {/* Title + message */}
+          <div className="space-y-2">
+            <h3
+              className="font-[var(--font-document)] text-sm sm:text-[15px] leading-snug tracking-[-0.015em]"
+              style={{ fontWeight: "var(--document-display-weight)" } as React.CSSProperties}
+            >
+              {slide.message || slide.slug}
+            </h3>
 
-        {/* Connector line below node */}
-        {!isLast && (
-          <div
-            className="flex-1 w-px mt-2 mb-0"
-            style={{
-              background: hasDetail
-                ? "linear-gradient(to bottom, oklch(0.75 0.14 185 / 25%), oklch(0.75 0.14 185 / 10%))"
-                : "oklch(0.75 0.14 185 / 12%)",
-              minHeight: "16px",
-            }}
-          />
-        )}
+            {/* what_to_say as lead quote */}
+            {whatToSay && (
+              <blockquote className="border-l-2 border-foreground/15 pl-3 text-xs text-foreground-secondary leading-relaxed italic">
+                {renderValue(whatToSay.value)}
+              </blockquote>
+            )}
+          </div>
+
+          {/* Evidence + Visual in the mid area */}
+          {(evidence || visual) && (
+            <div className="flex-1 flex flex-col justify-center gap-2 my-3">
+              {evidence && (
+                <div className="flex items-start gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.08em] text-foreground-secondary/60 font-medium flex-none w-14">
+                    {t("evidence")}
+                  </span>
+                  <p className="text-xs text-foreground/70 leading-relaxed">
+                    {renderValue(evidence.value)}
+                  </p>
+                </div>
+              )}
+              {visual && (
+                <div className="flex items-start gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.08em] text-foreground-secondary/60 font-medium flex-none w-14">
+                    {t("visual")}
+                  </span>
+                  <p className="text-xs text-foreground/70 leading-relaxed">
+                    {renderValue(visual.value)}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Page chrome: number + slug */}
+          <div className="flex items-center justify-end gap-2">
+            <span className="text-[11px] text-foreground-secondary/50 tracking-wide">
+              {slide.slug}
+            </span>
+            <span
+              className={`inline-flex items-center justify-center w-5 h-5 rounded text-[11px] tabular-nums ${numberClasses[state]}`}
+            >
+              {slideNumber}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0 pb-6">
-        <p className="text-[15px] font-semibold text-foreground leading-snug tracking-[-0.02em]">
-          {slide.slug}
-        </p>
-        {slide.message && (
-          <p className="text-sm text-foreground-secondary leading-relaxed mt-0.5">
-            {renderColorSwatches(slide.message)}
-          </p>
-        )}
+      {/* Speaker notes band (below the slide face) */}
+      {notes && (
+        <div className="mt-1.5 px-4 py-2 rounded border border-foreground/6 bg-foreground/[0.02]">
+          <div className="flex items-start gap-2">
+            <span className="text-[11px] uppercase tracking-[0.08em] text-foreground-secondary/50 font-medium flex-none">
+              {t("notes")}
+            </span>
+            <p className="text-xs text-foreground-secondary leading-relaxed">
+              {renderValue(notes.value)}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
-        {/* Detail panel */}
-        {hasDetail && <DetailPanel subItems={slide.subItems} state={state} />}
+// ---------------------------------------------------------------------------
+// Light Table Card (compact 3-col sorter)
+// ---------------------------------------------------------------------------
+
+function LightTableCard({ slide, state, slideNumber }: {
+  slide: SlideEntry
+  state: SlideState
+  slideNumber: number
+}): React.ReactElement {
+  const frameClasses = {
+    skeleton: "border-dashed border-foreground/20",
+    active: "border-solid border-foreground/60 shadow-[var(--shadow-card)]",
+    done: "border-solid border-foreground/12",
+  }
+
+  const numberClasses = {
+    skeleton: "text-foreground/30",
+    active: "bg-foreground text-background font-semibold",
+    done: "text-foreground/40",
+  }
+
+  return (
+    <div
+      className={`outline-node-enter rounded-lg border overflow-hidden flex flex-col ${frameClasses[state]}`}
+      style={{
+        "--stagger": `${slideNumber * 40}ms`,
+        aspectRatio: "16 / 9",
+      } as React.CSSProperties}
+      data-state={state}
+      data-slide-slug={slide.slug}
+    >
+      <div className="flex-1 flex flex-col justify-between p-3">
+        <p className="text-xs font-medium text-foreground/80 leading-snug line-clamp-2">
+          {slide.message || slide.slug}
+        </p>
+        <div className="flex items-center justify-between mt-auto pt-1">
+          <span className="text-[11px] text-foreground-secondary/40 truncate max-w-[60%]">
+            {slide.slug}
+          </span>
+          <span
+            className={`inline-flex items-center justify-center w-4 h-4 rounded text-[11px] tabular-nums ${numberClasses[state]}`}
+          >
+            {slideNumber}
+          </span>
+        </div>
       </div>
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Section entry (full-width divider)
+// ---------------------------------------------------------------------------
+
+function SectionDivider({ section }: { section: SectionEntry }): React.ReactElement {
+  return (
+    <div className="col-span-full" data-entry-type="section">
+      <h2
+        className="font-[var(--font-document)] text-sm font-semibold text-foreground/70 tracking-[-0.015em] border-b border-foreground/8 pb-2 mt-6 mb-2"
+        style={{ fontWeight: "var(--document-display-weight)" } as React.CSSProperties}
+      >
+        {section.title}
+      </h2>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Prose entry
+// ---------------------------------------------------------------------------
+
+function ProseBlock({ entry }: { entry: ProseEntry }): React.ReactElement {
+  return (
+    <div className="col-span-full" data-entry-type="prose">
+      <p className="text-sm text-foreground-secondary leading-relaxed">
+        {renderColorSwatches(entry.text)}
+      </p>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 interface OutlineViewProps {
   content: string | null
@@ -233,21 +269,31 @@ export function OutlineView({ content }: OutlineViewProps): React.ReactElement {
   const activeRef = useRef<HTMLDivElement>(null)
   const prevActiveSlug = useRef<string | null>(null)
 
-  const { slides, states } = useMemo(() => {
-    if (!content) return { slides: [], states: [] }
+  const { entries, stateMap, lightTable } = useMemo(() => {
+    if (!content) return { entries: [] as OutlineEntry[], stateMap: new Map<number, SlideState>(), lightTable: false }
     const parsed = parseOutline(content)
-    return { slides: parsed, states: resolveStates(parsed) }
+    return {
+      entries: parsed,
+      stateMap: resolveStates(parsed),
+      lightTable: isLightTableMode(parsed),
+    }
   }, [content])
 
-  // Find the active slide index for auto-scroll.
-  const activeIndex = states.indexOf("active")
-  const activeSlug = activeIndex >= 0 ? slides[activeIndex].slug : null
+  // Find the active slide for auto-scroll
+  const activeSlug = useMemo(() => {
+    for (const [i, state] of stateMap.entries()) {
+      if (state === "active") {
+        const entry = entries[i]
+        if (entry.type === "slide") return entry.slug
+      }
+    }
+    return null
+  }, [entries, stateMap])
 
   // Auto-scroll to active slide when it changes.
   useEffect(() => {
     if (activeSlug !== null && activeSlug !== prevActiveSlug.current) {
       prevActiveSlug.current = activeSlug
-      // Defer to allow DOM update + animation start.
       const timer = setTimeout(() => {
         activeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
       }, 150)
@@ -255,8 +301,8 @@ export function OutlineView({ content }: OutlineViewProps): React.ReactElement {
     }
   }, [activeSlug])
 
-  // Empty state.
-  if (!content || slides.length === 0) {
+  // Empty state
+  if (!content || entries.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
         <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center mb-4">
@@ -269,25 +315,72 @@ export function OutlineView({ content }: OutlineViewProps): React.ReactElement {
     )
   }
 
+  // Track slide numbering across all entries
+  let slideCounter = 0
+
+  // Light-table mode: 3-column grid with section headings full-width
+  if (lightTable) {
+    return (
+      <div className="document-surface flex-1 overflow-y-auto px-6 sm:px-8 py-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" data-view="light-table">
+            {entries.map((entry, i) => {
+              if (entry.type === "section") {
+                return <SectionDivider key={`section-${i}`} section={entry} />
+              }
+              if (entry.type === "prose") {
+                return <ProseBlock key={`prose-${i}`} entry={entry} />
+              }
+              // Slide
+              slideCounter++
+              const state = stateMap.get(i) ?? "skeleton"
+              return (
+                <div
+                  key={entry.slug}
+                  ref={state === "active" ? activeRef : undefined}
+                >
+                  <LightTableCard
+                    slide={entry}
+                    state={state}
+                    slideNumber={slideCounter}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Detail mode: full-width slide cards
+  slideCounter = 0
   return (
     <div className="document-surface flex-1 overflow-y-auto px-6 sm:px-8 py-6">
-      <div className="max-w-2xl mx-auto">
-        {/* Timeline container with flow line animation */}
-        <div className="relative outline-timeline-draw">
-          {slides.map((slide, i) => (
+      <div className="max-w-2xl mx-auto space-y-4">
+        {entries.map((entry, i) => {
+          if (entry.type === "section") {
+            return <SectionDivider key={`section-${i}`} section={entry} />
+          }
+          if (entry.type === "prose") {
+            return <ProseBlock key={`prose-${i}`} entry={entry} />
+          }
+          // Slide
+          slideCounter++
+          const state = stateMap.get(i) ?? "skeleton"
+          return (
             <div
-              key={slide.slug}
-              ref={states[i] === "active" ? activeRef : undefined}
+              key={entry.slug}
+              ref={state === "active" ? activeRef : undefined}
             >
-              <TimelineNode
-                slide={slide}
-                state={states[i]}
-                index={i}
-                isLast={i === slides.length - 1}
+              <SlideCard
+                slide={entry}
+                state={state}
+                slideNumber={slideCounter}
               />
             </div>
-          ))}
-        </div>
+          )
+        })}
       </div>
     </div>
   )

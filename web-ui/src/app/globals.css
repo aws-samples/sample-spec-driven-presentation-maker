@@ -79,15 +79,7 @@
   --shadow-lift: 0 2px 4px oklch(0 0 0 / 35%), 0 16px 48px oklch(0 0 0 / 40%);
   --shadow-slide: 0 4px 24px oklch(0 0 0 / 45%), 0 0 0 1px oklch(1 0 0 / 6%);
 
-  /* Temporary aliases removed with the waiting-state migration in Step 7. */
-  --wait-teal: var(--agent-layout);
-  --wait-teal-dim: color-mix(in oklch, var(--agent-layout) 30%, transparent);
-  --wait-amber: var(--agent-content);
-  --wait-amber-dim: color-mix(in oklch, var(--agent-content) 30%, transparent);
-  --wait-magenta: var(--agent-visual);
-  --wait-magenta-dim: color-mix(in oklch, var(--agent-visual) 30%, transparent);
-  --wait-green: var(--agent-data);
-  --wait-green-dim: color-mix(in oklch, var(--agent-data) 30%, transparent);
+  /* Agent identity tokens are used directly; no waiting-color aliases needed. */
   --background: oklch(0.11 0.005 260);
   --background-raised: oklch(0.14 0.005 260);
   --background-hover: oklch(0.16 0.005 260);
@@ -226,7 +218,7 @@ body {
 }
 .brief-waiting { animation: brief-page-in 0.6s ease-out both; }
 .brief-waiting:hover .brief-cursor-glow {
-  box-shadow: 0 0 20px var(--wait-teal), 0 0 40px var(--wait-teal-dim);
+  box-shadow: 0 0 20px var(--agent-layout), 0 0 40px color-mix(in oklch, var(--agent-layout) 30%, transparent);
 }
 .brief-waiting:hover .brief-line-el { animation-duration: 2s; }
 

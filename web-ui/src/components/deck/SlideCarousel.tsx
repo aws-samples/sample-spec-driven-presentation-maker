@@ -21,6 +21,7 @@ import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
 import { IS_LOCAL } from "@/lib/mode"
 import { notifyError } from "@/lib/errors"
 import { useTranslations } from "next-intl"
+import { AGENT_WAIT_COLORS } from "@/components/deck/SpecWaiting"
 
 
 interface SlideCarouselProps {
@@ -208,10 +209,8 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
    *
    * @returns JSX element for the empty slides state
    */
-  const WAIT_COLORS = [
-    "oklch(0.75 0.14 185)", "oklch(0.82 0.16 75)",
-    "oklch(0.70 0.18 330)", "oklch(0.78 0.15 145)",
-  ]
+  // Use the shared five agent identity colors for waiting animations.
+  const WAIT_COLORS = AGENT_WAIT_COLORS.map((c) => c.css)
 
   function renderSlidesEmpty(): React.ReactNode {
     if (isLoading) {
@@ -236,7 +235,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                   <div
                     className="build-shimmer-el absolute inset-0"
                     style={{
-                      background: `linear-gradient(90deg, transparent, ${WAIT_COLORS[i]}40, transparent)`,
+                      background: `linear-gradient(90deg, transparent, color-mix(in oklch, ${WAIT_COLORS[i]} 25%, transparent), transparent)`,
                       opacity: 0.35,
                       animation: `build-shimmer 2.8s ease-in-out ${i * 0.3}s infinite`,
                     }}
@@ -279,7 +278,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                       "--fan-r": `${(i - 1.5) * 8}deg`,
                       border: `1.5px solid ${color}`,
                       background: `oklch(0.14 0.01 260 / ${0.8 - i * 0.1})`,
-                      boxShadow: `0 0 12px ${color}30`,
+                      boxShadow: `0 0 12px color-mix(in oklch, ${color} 19%, transparent)`,
                       animation: `compose-fan 2.4s ease-in-out ${i * 0.15}s infinite`,
                     } as React.CSSProperties}
                   >
