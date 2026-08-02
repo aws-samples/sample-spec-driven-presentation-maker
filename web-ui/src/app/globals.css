@@ -17,8 +17,14 @@
   --font-mono: var(--font-geist);
   --color-brand-teal: oklch(0.75 0.14 185);
   --color-brand-teal-soft: oklch(0.75 0.14 185 / 12%);
-  --color-brand-amber: oklch(0.82 0.16 75);
-  --color-brand-amber-soft: oklch(0.82 0.16 75 / 15%);
+  --color-brand-amber: var(--agent-data);
+  --color-brand-amber-soft: color-mix(in oklch, var(--agent-data) 15%, transparent);
+  --color-agent-layout: var(--agent-layout);
+  --color-agent-content: var(--agent-content);
+  --color-agent-visual: var(--agent-visual);
+  --color-agent-data: var(--agent-data);
+  --color-agent-decorator: var(--agent-decorator);
+  --color-state-error: var(--state-error);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -42,17 +48,37 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Dark Editorial × Minimal Luxury palette */
+/* Live Design Studio — dark is the default studio experience. */
 :root {
+  color-scheme: dark;
   --radius: 0.75rem;
-  --wait-teal: oklch(0.75 0.14 185);
-  --wait-teal-dim: oklch(0.75 0.14 185 / 30%);
-  --wait-amber: oklch(0.82 0.16 75);
-  --wait-amber-dim: oklch(0.82 0.16 75 / 30%);
-  --wait-magenta: oklch(0.70 0.18 330);
-  --wait-magenta-dim: oklch(0.70 0.18 330 / 30%);
-  --wait-green: oklch(0.78 0.15 145);
-  --wait-green-dim: oklch(0.78 0.15 145 / 30%);
+
+  /* Color answers “who”: the five agents share these identities everywhere. */
+  --agent-layout: oklch(0.68 0.16 262);
+  --agent-content: oklch(0.74 0.13 170);
+  --agent-visual: oklch(0.71 0.17 300);
+  --agent-data: oklch(0.79 0.14 75);
+  --agent-decorator: oklch(0.72 0.16 330);
+  --agent-neutral: oklch(0.55 0 0);
+  --team-gradient: linear-gradient(90deg, var(--agent-layout), var(--agent-content), var(--agent-visual), var(--agent-data), var(--agent-decorator));
+
+  /* Red is reserved for real errors; normal workflow never borrows it. */
+  --state-error: oklch(0.65 0.2 25);
+  --surface-subtle: oklch(1 0 0 / 3%);
+  --surface-stage: oklch(0.13 0.006 260);
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 30%), 0 8px 24px oklch(0 0 0 / 25%);
+  --shadow-lift: 0 2px 4px oklch(0 0 0 / 35%), 0 16px 48px oklch(0 0 0 / 40%);
+  --shadow-slide: 0 4px 24px oklch(0 0 0 / 45%), 0 0 0 1px oklch(1 0 0 / 6%);
+
+  /* Temporary aliases removed with the waiting-state migration in Step 7. */
+  --wait-teal: var(--agent-layout);
+  --wait-teal-dim: color-mix(in oklch, var(--agent-layout) 30%, transparent);
+  --wait-amber: var(--agent-content);
+  --wait-amber-dim: color-mix(in oklch, var(--agent-content) 30%, transparent);
+  --wait-magenta: var(--agent-visual);
+  --wait-magenta-dim: color-mix(in oklch, var(--agent-visual) 30%, transparent);
+  --wait-green: var(--agent-data);
+  --wait-green-dim: color-mix(in oklch, var(--agent-data) 30%, transparent);
   --background: oklch(0.11 0.005 260);
   --background-raised: oklch(0.14 0.005 260);
   --background-hover: oklch(0.16 0.005 260);
@@ -77,6 +103,15 @@
   --border-hover: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 8%);
   --ring: oklch(0.75 0.14 185 / 40%);
+}
+
+[data-theme="light"] {
+  --agent-layout: oklch(0.52 0.19 262);
+  --agent-content: oklch(0.55 0.14 170);
+  --agent-visual: oklch(0.53 0.21 300);
+  --agent-data: oklch(0.62 0.14 70);
+  --agent-decorator: oklch(0.55 0.20 330);
+  --agent-neutral: oklch(0.45 0 0);
 }
 
 @layer base {
