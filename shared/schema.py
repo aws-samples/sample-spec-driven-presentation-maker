@@ -76,18 +76,6 @@ def template_pk(template_id: str) -> str:
     return f"TEMPLATE#{template_id}"
 
 
-def upload_sk(upload_id: str) -> str:
-    """Sort key for an upload record.
-
-    Args:
-        upload_id: Upload identifier.
-
-    Returns:
-        SK string in format UPLOAD#{upload_id}.
-    """
-    return f"UPLOAD#{upload_id}"
-
-
 # ---------------------------------------------------------------------------
 # Key prefix constants (for begins_with queries)
 # ---------------------------------------------------------------------------
@@ -95,7 +83,6 @@ def upload_sk(upload_id: str) -> str:
 DECK_SK_PREFIX = "DECK#"
 FAV_SK_PREFIX = "FAV#"
 TEMPLATE_PK_PREFIX = "TEMPLATE#"
-UPLOAD_SK_PREFIX = "UPLOAD#"
 
 
 # ---------------------------------------------------------------------------

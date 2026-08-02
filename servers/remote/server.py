@@ -66,9 +66,9 @@ _INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generat
 → Read `read_workflows(["create-new-1-briefing"])` to start. Follow each file's Next Step from there.
 """
 
-# Edit-existing-PPTX flow on Cloud is driven by upload_file returning
-# guideInstruction: "read_guides([\"import-pptx\"])" — the spec agent
-# follows that pointer instead of a hard-coded workflow name here.
+# Edit-existing-PPTX flow on Cloud is driven by read_attachment returning
+# guide/guideInstruction in the response header — the spec agent follows
+# that pointer instead of a hard-coded workflow name here.
 #
 # TODO: Add these workflows when web UI supports them
 # ## Workflow C: Hand-Edit Sync
@@ -224,12 +224,9 @@ def analyze_template(template: str, deck_id: str = "") -> str:
     Call this to understand what layouts are available before building slides.
 
     Args:
-        template: Template name from list_templates, OR "template.pptx" to
-            analyze the deck-local placeholder template (set by import_attachment
-            during the import-pptx flow). When passing "template.pptx", deck_id
-            must also be supplied.
-        deck_id: Required only when template == "template.pptx" — identifies
-            the deck whose deck-local template.pptx should be analyzed.
+        template: Template name from list_templates, a legacy "template.pptx",
+            or `attachments/imports/{importKey}/deck/template.pptx` from import_attachment.
+        deck_id: Required for either deck-owned template form.
 
     Returns:
         JSON with layouts, theme colors, and font information.
@@ -237,18 +234,20 @@ def analyze_template(template: str, deck_id: str = "") -> str:
     if not template or not template.strip():
         return json.dumps({"error": "template is required"})
 
-    # Deck-local placeholder template (PPTX-derived; copied by import_attachment
-    # during the import-pptx guide). Download from the deck workspace bucket
-    # and analyze on the fly so import-pptx Step 5 can extract theme colors
-    # and layouts without first registering the source PPTX as a sdpm template.
-    if template == "template.pptx":
+    # Analyze either a legacy deck-root template or a new immutable bundle template.
+    if template == "template.pptx" or template.startswith("attachments/imports/"):
         if not deck_id:
-            return json.dumps({"error": "deck_id is required when template == 'template.pptx'"})
+            return json.dumps({"error": "deck_id is required for a deck-owned template"})
+        if ".." in template.split("/") or (
+            template != "template.pptx" and not template.endswith("/deck/template.pptx")
+        ):
+            return json.dumps({"error": "invalid deck template path"})
         try:
             import tempfile
             from pathlib import Path
             from sdpm.engine.analyzer import analyze_template as _analyze
-            data = _storage.download_file_from_pptx_bucket(f"decks/{deck_id}/template.pptx")
+            template_key = template
+            data = _storage.download_file_from_pptx_bucket(f"decks/{deck_id}/{template_key}")
             # TemporaryDirectory (not mkdtemp): this server is long-running,
             # leaked tmpdirs would accumulate. The analysis dict holds no
             # file references, so cleanup on exit is safe.
@@ -256,7 +255,7 @@ def analyze_template(template: str, deck_id: str = "") -> str:
                 tpl_path = Path(tmpdir) / "template.pptx"
                 tpl_path.write_bytes(data)
                 analysis = _analyze(tpl_path)
-            analysis["templateName"] = "template.pptx"
+            analysis["templateName"] = template
             return json.dumps(analysis, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"error": f"Failed to analyze deck-local template: {e}"})
@@ -267,30 +266,31 @@ def analyze_template(template: str, deck_id: str = "") -> str:
     )
 
 
-# --- Upload & Attachment Tools ---
+# --- Attachment Tools ---
 
 
 @mcp.tool()
-def read_uploaded_file(upload_id: str, offset: int = 0, limit: int = 2000) -> list:
-    """Read the content of a file uploaded by the user.
+def read_attachment(source: str, offset: int = 0, limit: int = 10240) -> dict:
+    """Read the content of an attached file (text projection with paging).
 
-    Files are pre-processed at upload time — documents are already converted
-    to Markdown/JSON. Output uses cat -n format (line numbers) for citation
-    and navigation. No deck_id required — works during hearing before deck creation.
+    Stateless: no conversion state is stored. The file is converted on each call
+    (with transparent caching for performance). Works before deck creation —
+    no deck_id required.
 
     Args:
-        upload_id: The upload identifier from the [Attached: ...] message.
-        offset: Starting line number (0-indexed). Default 0.
-        limit: Number of lines to read. Default 2000.
+        source: S3 key (`uploads/{userId}/{uuid}/{name}`) from the
+            [Attached:...] marker, or an HTTPS URL.
+        offset: Starting byte offset in the canonical text projection (0-based).
+        limit: Maximum bytes to return (default/max 10240, min 512).
 
     Returns:
-        Text content with line numbers (cat -n style) and/or image previews.
-        Includes total line count and a continuation hint if more content exists.
+        Text content with line numbers and structured JSON header containing
+        source, fileName, mediaType, page metadata, and optional guide hints.
     """
-    from tools.upload import read_uploaded_file as _read
+    from tools.attachment import read_attachment as _read
 
     return _read(
-        upload_id=upload_id,
+        source=source,
         user_id=_get_user_id(),
         storage=_storage,
         offset=offset,
@@ -302,18 +302,17 @@ def read_uploaded_file(upload_id: str, offset: int = 0, limit: int = 2000) -> li
 def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
     """Import a file into the deck workspace for use in slides.
 
-    source can be an uploadId (user-uploaded file) or a URL (web image).
-    For uploadId: copies pre-converted files to the deck workspace.
-    For URL: downloads and saves to the deck workspace.
+    source is an S3 key (`uploads/{userId}/{uuid}/{name}`) from the
+    [Attached:...] marker, or an HTTPS URL. Converts and commits an
+    immutable bundle into the deck's attachments directory.
 
     Args:
-        source: Upload ID from [Attached: ...] message, or an HTTP(S) URL.
+        source: S3 key from [Attached:...] message, or an HTTP(S) URL.
         deck_id: The deck ID (must be initialized via init_presentation).
         filename: Optional output filename. If omitted, derived from source.
 
     Returns:
         JSON with saved file paths and image_mapping for use in slide JSON.
-        image_mapping maps original filenames (in Markdown) to deck-relative paths.
     """
     from tools.attachment import import_attachment as _import
 
@@ -440,20 +439,23 @@ def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int],
 
 
 @mcp.tool()
-def search_assets(query: str, source_filter: str = "", limit: int = 20,
+def search_assets(query: str = "", source_filter: str = "", limit: int = 20,
                        type_filter: str = "", theme_filter: str = "") -> str:
-    """Search icons and assets by keyword. Use list_asset_sources to see available sources.
+    """Search icons and assets by keyword, or discover available sources.
+
+    Discovery mode: call with query="" (empty string) to get a listing of all
+    available asset sources with their item counts.
     Multiple keywords can be space-separated (e.g. "lambda s3 dynamodb").
 
     Args:
-        query: Search keywords, space-separated for multiple queries.
+        query: Search keywords, space-separated. Empty string triggers discovery mode.
         source_filter: Filter by source name (e.g. "aws", "material").
         limit: Maximum results per keyword.
         type_filter: Filter by type (e.g. "Architecture-Service").
         theme_filter: Filter by theme ("dark" or "light").
 
     Returns:
-        JSON with matching assets.
+        JSON with matching assets, or sources list in discovery mode.
     """
     return json.dumps(
         assets.search_assets(
@@ -462,17 +464,6 @@ def search_assets(query: str, source_filter: str = "", limit: int = 20,
         ),
     )
 
-
-@mcp.tool()
-def list_asset_sources() -> str:
-    """List available asset sources with counts.
-
-    Returns:
-        JSON with list of sources.
-    """
-    return json.dumps(
-        assets.list_asset_sources(storage=_storage),
-    )
 
 
 # --- Reference Tools ---
@@ -628,8 +619,8 @@ def _post_processing_plan(deck_changed: bool,
 
 
 @mcp.tool()
-def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool = False,
-               files: list[str] | None = None, measure_slides: list[str] | None = None) -> str:
+def run_python(purpose: str, code: str, deck_id: str | None = None,
+               measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a secure sandbox.
 
     Use this tool to edit the deck workspace or for general computation.
@@ -679,10 +670,6 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
         - Layout bias detection
     Pass the slugs of slides you edited, e.g. measure_slides=["title", "feature-a"].
 
-    If files are provided (S3 keys), they are downloaded and available by filename.
-    Supported: text files (CSV, JSON, TXT, Markdown, Python). Binary files are not supported.
-    Example: files=["uploads/tmp/user/abc/data.csv"] → accessible as "data.csv" in code.
-
     Examples:
         Edit slide:
             data = read_json("slides/title.json")
@@ -707,9 +694,6 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
     Args:
         code: Python code to execute.
         deck_id: Deck ID to load workspace from. Optional.
-        save: Deprecated and ignored. Writes always persist and the PPTX
-            artifact refreshes automatically when the deck changed.
-        files: S3 keys of files to make available in the sandbox. Optional.
         measure_slides: List of slide slugs to measure after execution. Requires deck_id.
         purpose: Brief user-facing description of what this code does,
             written in the user's language (e.g. 'Analyzing slide structure',
@@ -722,11 +706,6 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
         return json.dumps({"error": "measure_slides requires deck_id"})
 
     result: dict = {}
-    if save:
-        result["deprecated"] = (
-            "'save' is ignored: writes always persist and the PPTX artifact "
-            "refreshes automatically when the deck changed."
-        )
 
     # Writes persist by default. If the user only has read access, run the
     # sandbox without write-back instead of failing (read-only analysis).
@@ -748,7 +727,6 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, save: bool =
         region=_region,
         deck_id=deck_id,
         persist_writes=persist_writes,
-        files=files,
     )
 
     result["output"] = output
@@ -1074,7 +1052,7 @@ mcp.tool()(contract.arch_diagram)
 
 @mcp.tool()
 def run_style_python(purpose: str, code: str, style_name: str | None = None,
-                     save: bool = False, ref_styles: list[str] | None = None) -> str:
+                     ref_styles: list[str] | None = None) -> str:
     """Execute Python code in a secure sandbox for style creation/editing.
 
     If style_name is provided, the style HTML is loaded as style.html.
@@ -1106,8 +1084,6 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
             written in the user's language. Shown in the UI.
         code: Python code to execute.
         style_name: Style name to load as style.html. Optional.
-        save: Deprecated and ignored. style.html persists automatically
-            when changed (requires style_name).
         ref_styles: Style names to load as ref/{name}.html. Optional.
 
     Returns:
@@ -1166,11 +1142,6 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
         output = sandbox_mod._collect_stream(response)
 
         result: dict = {"output": output}
-        if save:
-            result["deprecated"] = (
-                "'save' is ignored: style.html persists automatically "
-                "when changed."
-            )
 
         # Persist style.html when it changed (always — no "unsaved" state)
         if style_name:

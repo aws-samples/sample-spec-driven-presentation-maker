@@ -28,8 +28,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ path: s
   if (!filePath) return new Response("Forbidden", { status: 403 })
   if (!fs.existsSync(filePath)) return new Response("Not found", { status: 404 })
 
-  const ext = path.extname(filePath)
-  const contentType = MIME[ext] || "application/octet-stream"
+  const ext = path.extname(filePath).toLowerCase()
+  const contentType = MIME[ext]
+  if (!contentType) return new Response("Not found", { status: 404 })
   const body = fs.readFileSync(filePath)
 
   return new Response(body, {

@@ -39,7 +39,7 @@ all `write_style` calls. Otherwise derive a short kebab-case stem from the user'
 
 **Other tools:**
 - `list_styles` — see available styles (for reference)
-- `read_uploaded_file` (if available) — read user-uploaded reference files
+- `read_attachment` (if available) — read user-provided reference files
 - `analyze_template` — analyze reference PPTX themes
 
 ## HTML Writing Strategy

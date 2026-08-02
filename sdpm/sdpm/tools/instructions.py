@@ -30,11 +30,11 @@ When no existing PPTX is provided.
 
 ## Workflow B: Edit Existing PPTX
 
-When an existing PPTX is provided. Call `upload_file(file_path)` first —
-for PPTX it converts the file into a deck structure and the response
-contains `guideInstruction: "read_guides([\\"import-pptx\\"])"`, so just
-follow that instruction. (Web UI / API uploads return the same fields
-automatically.)
+When an existing PPTX is provided. Call `read_attachment(source)` with the
+file path first — for PPTX the response header contains `guide` and
+`guideInstruction` fields, so follow that instruction to proceed with
+the import-pptx guide. (Web UI uploads provide the source in the
+`[Attached:...]` marker.)
 
 ## Workflow C: Hand-Edit Sync
 

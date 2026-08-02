@@ -10,6 +10,37 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Breaking
+
+- **Stateless attachment pipeline** — `upload_file`, `read_uploaded_file`, and
+  public MCP `pptx_to_json` tools are removed. Use `read_attachment(source)`
+  and `import_attachment(source, deck_id)` instead. The new tools are stateless
+  (no session storage, no uploadId) and accept local paths, S3 keys, or URLs
+  directly.
+- **`measure_slides` standalone tool removed** — measurement is now triggered
+  exclusively via `run_python(measure_slides=[...])`.
+- **`list_asset_sources` tool removed** — call `search_assets(query="")` for
+  the same discovery listing (sources with counts).
+- **`run_python` / `run_style_python` `save` parameter removed** — writes
+  always persist; the deprecated flag is no longer accepted.
+- **`run_python` `files` parameter removed** — use `read_attachment` to access
+  uploaded file content, then reference by path in code.
+- **Session restart required** — after `git pull`, restart all Local Web UI /
+  ACP sessions. The next spawn will pick up the updated agent definitions
+  (`agents-sync.ts` re-derives from `acp-agents/`). `make install-kiro` is
+  only needed for global MCP config cleanup, not for allowlist updates.
+
+### Changed
+
+- `search_assets` now supports discovery mode: calling with an empty query
+  (`query=""`) returns all asset sources with counts, replacing the removed
+  `list_asset_sources` tool.
+- `diff_pptx` now accepts committed import bundle directories as input,
+  enabling the hand-edit sync workflow without the public `pptx_to_json` tool.
+- Cloud file attachments use `POST /attachments/presign` + direct S3 PUT;
+  Local Web UI uses `POST /api/attachments`. The `[Attached:...]` marker
+  format is now `[Attached:{"v":1,"name":"...","source":"..."}]`.
+
 ### Fixed
 
 - Cloud and local ACP deck agents now expose `arch_diagram`, as required by the

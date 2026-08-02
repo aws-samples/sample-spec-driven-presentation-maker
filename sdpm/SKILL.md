@@ -30,9 +30,9 @@ When no existing PPTX is provided.
 
 ## Workflow B: Edit Existing PPTX
 
-When an existing PPTX is provided. Web UI / API path is preferred:
-`upload_file` returns `guideInstruction:
-"read_guides([\"import-pptx\"])"` automatically. For CLI flows, run
+When an existing PPTX is provided. `read_attachment` returns
+`guideInstruction: "read_guides([\"import-pptx\"])"` in its header
+when the source is a PPTX. For CLI flows, run
 `uv run python3 scripts/pptx_builder.py guides import-pptx` to start.
 
 ## Workflow C: Hand-Edit Sync

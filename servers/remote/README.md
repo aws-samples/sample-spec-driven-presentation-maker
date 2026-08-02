@@ -28,8 +28,7 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 ### Assets
 | Tool | Description |
 |------|-------------|
-| `search_assets` | Search icons and assets by keyword |
-| `list_asset_sources` | List available asset sources |
+| `search_assets` | Search icons and assets by keyword (empty query = discovery) |
 
 ### References
 | Tool | Description |
@@ -43,7 +42,7 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 |------|-------------|
 | `list_templates` | List available templates |
 | `code_block` | Generate syntax-highlighted code block JSON |
-| `read_uploaded_file` | Read pre-converted uploaded file content |
+| `read_attachment` | Read content from an attached file with byte-offset paging |
 | `import_attachment` | Import file into deck workspace |
 | `search_slides` | Semantic slide search (optional, requires Amazon Bedrock KB) |
 

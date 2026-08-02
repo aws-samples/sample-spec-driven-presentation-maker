@@ -60,16 +60,16 @@ _PREFETCH_BRIEFING = Part(
 # Tool allowlists — explicit control over which MCP tools each mode can use.
 # run_style_python is only available to style_creator.
 _DECK_TOOLS = [
-    "init_presentation", "analyze_template", "read_uploaded_file",
+    "init_presentation", "analyze_template", "read_attachment",
     "list_styles", "apply_style", "read_examples", "list_workflows",
     "read_workflows", "list_guides", "read_guides", "search_assets",
-    "list_asset_sources", "list_templates",
+    "list_templates",
     "run_python", "generate_pptx", "get_preview", "code_to_slide",
-    "grid", "arch_diagram", "import_attachment",
+    "grid", "arch_diagram", "import_attachment", "diff_pptx",
 ]
 
 _STYLE_TOOLS = [
-    "run_style_python", "list_styles", "analyze_template", "read_uploaded_file",
+    "run_style_python", "list_styles", "analyze_template", "read_attachment",
 ]
 
 

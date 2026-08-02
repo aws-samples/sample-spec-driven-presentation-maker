@@ -14,6 +14,7 @@
 import type { ChatMessage } from "@/services/deckService"
 import type { Message } from "@/hooks/useChatStream"
 import type { ToolUse } from "./ChatMessage"
+import { parseAttachedMarkers } from "@/lib/attachmentMarker"
 
 /** Strip internal sdpm marker comments from persisted text. */
 const MARKER_RE = /<!--sdpm:[^>]*-->\n?/g
@@ -36,18 +37,13 @@ export function parseLocalHistory(history: ChatMessage[]): Message[] {
   })
 }
 
-/** Derive attachment chips from `[Attached: name (uploadId: x)]` markers in user text. */
+/** Derive attachment chips from valid v1 JSON markers in user text. */
 function parseAttachments(text: string): { fileName: string; fileType: string }[] {
-  const attRe = /\[Attached:\s*(.+?)\s*\(uploadId:\s*[^)]+\)\]/g
-  const atts: { fileName: string; fileType: string }[] = []
-  let am: RegExpExecArray | null
-  while ((am = attRe.exec(text)) !== null) {
-    const fn = am[1]
-    const ext = fn.split(".").pop()?.toLowerCase() || ""
-    const mimeMap: Record<string, string> = { pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", pdf: "application/pdf", png: "image/png", json: "application/json", md: "text/markdown", txt: "text/plain" }
-    atts.push({ fileName: fn, fileType: mimeMap[ext] || "application/octet-stream" })
-  }
-  return atts
+  const mimeMap: Record<string, string> = { pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml", json: "application/json", csv: "text/csv", html: "text/html", md: "text/markdown", txt: "text/plain" }
+  return parseAttachedMarkers(text).map(({ name }) => {
+    const ext = name.split(".").pop()?.toLowerCase() || ""
+    return { fileName: name, fileType: mimeMap[ext] || "application/octet-stream" }
+  })
 }
 
 /**
