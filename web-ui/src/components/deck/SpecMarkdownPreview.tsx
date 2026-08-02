@@ -312,6 +312,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     }
 
     // RESULT state (default when content exists)
+    const isHtml = content!.trim().startsWith("<")
     return wrap(
       <div>
         {onStyleSelect && (
@@ -325,7 +326,17 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
             </button>
           </div>
         )}
-        <StyleSlidePreview html={content!} loading={false} />
+        {isHtml ? (
+          <StyleSlidePreview html={content!} loading={false} />
+        ) : (
+          <div className="px-6 sm:px-8 py-6">
+            <article className="document-surface prose prose-invert prose-sm max-w-3xl mx-auto spec-prose">
+              <Markdown remarkPlugins={[remarkGfm]} components={specComponents as Components}>
+                {content!}
+              </Markdown>
+            </article>
+          </div>
+        )}
       </div>
     )
   }
