@@ -157,6 +157,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     // Upload pending attachments
     const uploadedFiles: UploadedFile[] = []
     let uploadFailed = false
+    let uploadError: string | null = null
     for (const att of attachments) {
       if (att.status === "pending") {
         try {
@@ -164,9 +165,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           const result = await uploadFile(att.file, idToken ?? "", sessionId ?? "")
           uploadedFiles.push(result)
           setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "completed" as const, source: result.source } : a)))
-        } catch {
+        } catch (err) {
           uploadFailed = true
-          setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "failed" as const, error: t("uploadFailed") } : a)))
+          const message = err instanceof Error && err.message ? err.message : t("uploadFailed")
+          uploadError = message
+          setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "failed" as const, error: message } : a)))
         }
       }
     }
@@ -174,7 +177,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     // Do not send a message that silently drops attachments the user meant
     // to include — keep input and failed attachments so they can retry.
     if (uploadFailed) {
-      toast.error(t("uploadFailed"))
+      toast.error(uploadError ?? t("uploadFailed"))
       return
     }
 
