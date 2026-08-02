@@ -248,6 +248,29 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 |------|-------------|
 | `web_fetch` | Fetch a URL and convert to Markdown (supports HTML, PDF, images) |
 
+### Tool Surface Design Notes
+
+Deliberate asymmetries between surfaces — these are design decisions, not gaps:
+
+- **`hearing` is ACP-only (Local) / agent-level (Cloud).** Interactive hearing
+  depends on a client-side UI (the ACP session prompt on Local, the Strands
+  agent loop on Cloud). Plain MCP has no interaction channel, so `hearing` is
+  intentionally not part of the `sdpm.tools` contract — it is a
+  transport-specific addition, which the local server is allowed to carry.
+- **ACP agents have no `start_presentation`.** `start_presentation(mode=...)`
+  exists for clients where the mode is decided *in conversation*. ACP agents
+  are spawned with a fixed persona (definitions re-derived from `acp-agents/`
+  at spawn), so the mode is already known at the entry point and a mode-fetch
+  tool would be dead weight.
+- **The CLI surface is kept even where MCP tools overlap.** The CLI +
+  `sdpm/SKILL.md` form the no-MCP adapter (Layer 1). CLI subcommands cost no
+  MCP schema tokens and are the only operability for agents without MCP
+  support, so overlap with MCP tools is acceptable — they are two adapters
+  over the same engine.
+- **`search_slides` redesign is deferred.** The KB-backed search tool is kept
+  as-is on Layer 3; rethinking it (scope, index lifecycle) is a separate
+  theme, tracked outside the attachment/tool-cleanup work.
+
 ---
 
 ## CDK Stack Structure
