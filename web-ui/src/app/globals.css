@@ -13,8 +13,8 @@
   --color-foreground: var(--foreground);
   --color-foreground-secondary: var(--foreground-secondary);
   --color-foreground-muted: var(--foreground-muted);
-  --font-sans: var(--font-geist);
-  --font-mono: var(--font-geist);
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-geist-mono);
   /* Compatibility names are achromatic now; color belongs to the agents. */
   --color-brand-teal: var(--brand);
   --color-brand-teal-bright: var(--foreground);
@@ -54,6 +54,13 @@
 :root {
   color-scheme: dark;
   --radius: 0.75rem;
+  --font-ui: var(--font-bricolage), "Noto Sans JP", "Yu Gothic", sans-serif;
+  --font-display: var(--font-bricolage), "Noto Sans JP", "Yu Gothic", sans-serif;
+  --font-document: var(--font-fraunces), "Noto Serif JP", "Yu Mincho", serif;
+  --display-weight: 600;
+  --display-tracking: -0.03em;
+  --document-display-weight: 550;
+  --document-display-tracking: -0.015em;
 
   /* Color answers “who”: the five agents share these identities everywhere. */
   --agent-layout: oklch(0.68 0.16 262);
@@ -161,6 +168,20 @@
   body {
     @apply bg-background text-foreground;
   }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    letter-spacing: var(--display-tracking);
+  }
+}
+
+.document-surface h1,
+.document-surface h2,
+.document-surface h3,
+.document-surface .document-title {
+  font-family: var(--font-document);
+  font-weight: var(--document-display-weight);
+  letter-spacing: var(--document-display-tracking);
 }
 
 /* ── Noise texture overlay ── */

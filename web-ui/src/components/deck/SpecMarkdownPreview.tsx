@@ -375,7 +375,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
 
   return (
     <div className="content-enter flex-1 overflow-y-auto px-6 sm:px-8 py-6">
-      <article className="prose prose-invert prose-sm max-w-3xl mx-auto spec-prose">
+      <article className="document-surface prose prose-invert prose-sm max-w-3xl mx-auto spec-prose">
         <Markdown
           remarkPlugins={[remarkGfm]}
           components={specComponents as Components}

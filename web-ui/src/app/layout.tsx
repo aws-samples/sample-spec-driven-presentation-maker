@@ -1,16 +1,29 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import type { Metadata } from "next"
-import { Geist } from "next/font/google"
+import { Bricolage_Grotesque, Fraunces, Geist_Mono } from "next/font/google"
 import Script from "next/script"
 import { Toaster } from "@/components/ui/sonner"
 import { AppearanceProvider } from "@/components/AppearanceProvider"
 import { LocaleProvider } from "@/i18n/LocaleProvider"
 import "./globals.css"
 
-const geist = Geist({
-  variable: "--font-geist",
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
   subsets: ["latin"],
+  display: "swap",
+})
+
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  display: "swap",
+})
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+  display: "swap",
 })
 
 const textScaleScript = `try{const p=JSON.parse(localStorage.getItem("sdpm-prefs")||"{}");const s=[90,100,110,125].includes(p.textScale)?p.textScale:100;document.documentElement.style.fontSize=s+"%"}catch{}`
@@ -43,7 +56,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: textScaleScript }} />
       </head>
-      <body className={`${geist.variable} font-sans antialiased`}>
+      <body className={`${bricolage.variable} ${fraunces.variable} ${geistMono.variable} font-sans antialiased`}>
         {/* Noise texture overlay */}
         <div
           aria-hidden="true"

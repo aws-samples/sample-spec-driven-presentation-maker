@@ -270,7 +270,7 @@ export function OutlineView({ content }: OutlineViewProps): React.ReactElement {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 sm:px-8 py-6">
+    <div className="document-surface flex-1 overflow-y-auto px-6 sm:px-8 py-6">
       <div className="max-w-2xl mx-auto">
         {/* Timeline container with flow line animation */}
         <div className="relative outline-timeline-draw">

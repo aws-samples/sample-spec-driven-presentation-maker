@@ -26,7 +26,7 @@ export const C = {
   detailZone: "var(--surface-subtle)",
 }
 
-export const MONO = "var(--font-geist-mono, ui-monospace), monospace"
+export const MONO = "var(--font-geist-mono), ui-monospace, monospace"
 
 export function getToolMeta(tool: string) {
   const meta = TOOL_META[stripPrefix(tool)]
