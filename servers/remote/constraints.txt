@@ -412,7 +412,7 @@ pillow==12.3.0
     #   pdfplumber
     #   python-pptx
     #   sdpm-skill
-protobuf==6.33.5
+protobuf==7.35.1
     # via
     #   aws-opentelemetry-distro
     #   googleapis-common-protos
