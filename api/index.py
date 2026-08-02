@@ -1422,8 +1422,13 @@ ALLOWED_CONTENT_TYPES = {
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml",
 }
-CLOUD_RAW_MAX_OBJECTS = 100
-CLOUD_RAW_MAX_BYTES = 1024 * 1024 * 1024
+# Per-user raw attachment caps. These are safety valves against runaway
+# automation and leaked-token cost exposure — not usage discipline for
+# legitimate users. Defaults are deliberately generous for an internal /
+# team deployment (PPTX sources can be ~100MB each); override via Lambda
+# environment variables if your deployment needs tighter or looser bounds.
+CLOUD_RAW_MAX_OBJECTS = int(os.environ.get("ATTACHMENT_MAX_OBJECTS", "1000"))
+CLOUD_RAW_MAX_BYTES = int(os.environ.get("ATTACHMENT_MAX_BYTES", str(50 * 1024 * 1024 * 1024)))
 
 
 def _raw_attachment_usage(user_id: str) -> tuple[int, int]:
