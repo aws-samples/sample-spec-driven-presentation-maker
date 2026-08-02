@@ -45,11 +45,14 @@ from pathlib import Path
 
 deck_dir = Path(sys.argv[1]).resolve()
 
-def _resolve(rel_path):
+def _resolve(rel_path, for_write=False):
     resolved = (deck_dir / rel_path).resolve()
     prefix = str(deck_dir) + os.sep
     if not (str(resolved).startswith(prefix) or resolved == deck_dir):
         raise PermissionError(f"Access denied: {rel_path}")
+    relative = resolved.relative_to(deck_dir)
+    if for_write and len(relative.parts) >= 2 and relative.parts[:2] == ("attachments", "imports"):
+        raise PermissionError(f"Committed import bundles are read-only: {rel_path}")
     return resolved
 
 def read_json(path):
@@ -57,7 +60,7 @@ def read_json(path):
     return json.loads(p.read_text(encoding="utf-8"))
 
 def write_json(path, data):
-    p = _resolve(path)
+    p = _resolve(path, for_write=True)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
 
@@ -65,7 +68,7 @@ def read_text(path):
     return _resolve(path).read_text(encoding="utf-8")
 
 def write_text(path, text):
-    p = _resolve(path)
+    p = _resolve(path, for_write=True)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(text, encoding="utf-8")
 

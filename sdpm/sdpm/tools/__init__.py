@@ -142,48 +142,33 @@ def generate_pptx(deck_id: str) -> dict[str, Any]:
 
 
 
-def measure_slides(deck_id: str, slugs: list[str] | None = None) -> str:
-    """Measure text bounding boxes in slides.
-
-    Args:
-        deck_id: Deck directory path.
-        slugs: Optional list of slugs to measure. All if omitted.
-
-    Returns:
-        Measurement results as formatted string.
-    """
-    from sdpm.api import measure as _measure, parse_outline_slugs
-
-    outline_path = Path(deck_id) / "specs" / "outline.md"
-    all_slugs = parse_outline_slugs(outline_path) if outline_path.exists() else []
-    pptx_slugs = [s for s in all_slugs if (Path(deck_id) / "slides" / f"{s}.json").exists()]
-
-    pages: list[int] | None = None
-    if slugs:
-        slug_to_page = {s: i + 1 for i, s in enumerate(pptx_slugs)}
-        pages = [slug_to_page[s] for s in slugs if s in slug_to_page]
-
-    return _measure(json_path=deck_id, slides=pages)
-
-
 def search_assets(
-    query: str, limit: int = 20,
+    query: str = "", limit: int = 20,
     source_filter: str = "", type_filter: str = "", theme_filter: str = "",
 ) -> dict[str, Any]:
-    """Search assets (icons, images) by keyword.
+    """Search assets (icons, images) by keyword, or discover available sources.
+
+    Discovery mode: call with query="" (empty string) to get a listing of all
+    available asset sources with their item counts — useful for understanding
+    what icon packs and image libraries are available before searching.
 
     Args:
-        query: Search keyword.
-        limit: Max results (default 20).
+        query: Search keyword. Empty string triggers discovery mode.
+        limit: Max results (default 20). Ignored in discovery mode.
         source_filter: Filter by source name.
         type_filter: Filter by asset type.
         theme_filter: Filter by theme (dark/light).
 
     Returns:
-        Dict with query and results list.
+        Dict with query and results list. In discovery mode, returns
+        {query: "", sources: [{name, count, types, themes}]}.
     """
-    from sdpm.knowledge.assets import invalidate_manifest_cache, search_assets as _search
+    from sdpm.knowledge.assets import invalidate_manifest_cache, search_assets as _search, list_sources
     invalidate_manifest_cache()
+
+    if not query.strip():
+        return {"query": "", "sources": list_sources()}
+
     return {
         "query": query,
         "results": _search(
@@ -193,17 +178,6 @@ def search_assets(
             theme_filter=theme_filter or None,
         ),
     }
-
-
-def list_asset_sources() -> dict[str, Any]:
-    """List available asset sources (icon packs, image libraries).
-
-    Returns:
-        Dict with sources list.
-    """
-    from sdpm.knowledge.assets import invalidate_manifest_cache, list_sources
-    invalidate_manifest_cache()
-    return {"sources": list_sources()}
 
 
 def list_styles(include_all: bool = False) -> dict[str, Any]:
@@ -432,33 +406,6 @@ def arch_diagram(
         include_metrics=True,
     )
 
-
-def pptx_to_json(pptx_path: str) -> dict[str, Any]:
-    """Convert PPTX to JSON representation.
-
-    Writes a deck-structure directory (``deck.json`` + ``slides/slide-NN.json``
-    + ``images/``) alongside the input PPTX (``{stem}/`` sibling directory).
-    The returned dict still contains ``{slides, fonts, defaultTextColor}`` for
-    in-memory use.
-
-    Note: the on-disk output is deck-structure (since pptx-import-edit);
-    no single ``slides.json`` file is produced. Callers that need an
-    editable deck should prefer the upload → import_attachment flow.
-
-    Returns:
-        Dict with slides list plus deck metadata (fonts, defaultTextColor),
-        plus ``deck_dir`` (string path to the written directory) for
-        downstream tooling.
-    """
-    from sdpm.engine.converter import pptx_to_json as _convert
-    path = Path(pptx_path)
-    if not path.exists():
-        raise FileNotFoundError(f"PPTX not found: {pptx_path}")
-    result = _convert(path)
-    deck_dir = path.with_suffix("")
-    if isinstance(result, dict):
-        result = {**result, "deck_dir": str(deck_dir)}
-    return result
 
 
 def diff_pptx(baseline: str, edited: str) -> dict[str, Any]:

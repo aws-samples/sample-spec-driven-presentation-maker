@@ -90,25 +90,6 @@ global_settings:
         MCP server. Runs on developer's machine only.
       expiration: "2027-03-29"
 
-    # --- Bandit B310: urlopen in upload_tools ---
-
-    - rule_id: "B310"
-      path: "servers/local/upload_tools.py"
-      reason: >
-        urlopen fetches user-provided URLs for image/attachment import.
-        This is intentional functionality — the user explicitly provides
-        the URL. Local mode only.
-      expiration: "2027-03-29"
-
-    # --- Semgrep dynamic-urllib in upload_tools ---
-
-    - rule_id: "python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected"
-      path: "servers/local/upload_tools.py"
-      reason: >
-        Same as B310 above. User-provided URL for attachment import.
-        Local mode only.
-      expiration: "2027-03-29"
-
     # --- Semgrep path-join-resolve-traversal: Local-only API routes ---
     # All web-ui/src/app/api/ routes are Local-mode only (excluded from
     # cloud build). They run on the developer's own machine via localhost.
@@ -129,10 +110,10 @@ global_settings:
       expiration: "2027-03-29"
 
     - rule_id: "javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal"
-      path: "web-ui/src/app/api/upload/route.ts"
+      path: "web-ui/src/app/api/attachments/route.ts"
       reason: >
-        Local-only API route. file.name is used with a temp directory,
-        not user-controlled path traversal risk. Local mode only.
+        Local-only API route. sessionId is allowlist-validated, filename is
+        sanitized, content-addressed, and containment-checked under DECK_ROOT.
       expiration: "2027-03-29"
 
     - rule_id: "javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal"

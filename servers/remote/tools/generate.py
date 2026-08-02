@@ -22,7 +22,7 @@ import subprocess
 import tempfile
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from storage import Storage
 
@@ -148,6 +148,27 @@ def _prepare_workspace(
     if not slides:
         raise ValueError(f"Deck {deck_id} has no slides.")
 
+    # Materialize only immutable bundle artifacts referenced by active slide JSON.
+    def _collect_import_refs(value: object) -> set[str]:
+        refs: set[str] = set()
+        if isinstance(value, str) and value.startswith("attachments/imports/"):
+            if ".." not in PurePosixPath(value).parts:
+                refs.add(value)
+        elif isinstance(value, dict):
+            for child in value.values():
+                refs.update(_collect_import_refs(child))
+        elif isinstance(value, list):
+            for child in value:
+                refs.update(_collect_import_refs(child))
+        return refs
+
+    for relative in _collect_import_refs(slides):
+        destination = tmpdir / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(
+            storage.download_file_from_pptx_bucket(f"decks/{deck_id}/{relative}")
+        )
+
     # Download includes
     for key in storage.list_files(prefix=f"decks/{deck_id}/includes/", bucket=storage.pptx_bucket):
         rel = key.replace(f"decks/{deck_id}/", "")
@@ -200,10 +221,16 @@ def _prepare_workspace(
     template_key = ""
     template_path = tmpdir / "template.pptx"
     tmpl_name = presentation.get("template", "")
-    # Deck-local placeholder template (PPTX-derived; copied by import_attachment).
-    # When deck.json["template"] == "template.pptx", read decks/{deck_id}/template.pptx
-    # from the deck workspace bucket instead of treating it as a sdpm template name.
-    if tmpl_name == "template.pptx":
+    # New imports reference the immutable bundle template directly.
+    if isinstance(tmpl_name, str) and tmpl_name.startswith("attachments/imports/"):
+        if ".." in PurePosixPath(tmpl_name).parts or not tmpl_name.endswith("/deck/template.pptx"):
+            raise ValueError(f"Invalid imported template path: {tmpl_name}")
+        template_path.write_bytes(
+            storage.download_file_from_pptx_bucket(f"decks/{deck_id}/{tmpl_name}")
+        )
+        tmpl_name = ""
+    # Existing decks may still use their historical deck-root template.
+    elif tmpl_name == "template.pptx":
         deck_template_key = f"decks/{deck_id}/template.pptx"
         try:
             template_path.write_bytes(

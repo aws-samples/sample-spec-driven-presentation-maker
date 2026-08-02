@@ -20,7 +20,11 @@
 - Do not pre-assign version numbers to refactoring themes in roadmaps —
   name them "Theme N" and decide the tag at release time (a tag gated on
   e.g. E2E can be overtaken by the next theme, breaking the numbering)
-- Breaking changes must always bump MAJOR
+- Breaking changes bump MAJOR once 1.0.0 is reached; while in 0.x they may
+  ship in a MINOR release (consistent with the SemVer section above)
+- While in 0.x, tool/API removals may ship without a deprecation period —
+  breaking changes are announced in the CHANGELOG (with migration notes),
+  not via in-product deprecation warnings. Revisit this policy at 1.0.0
 - No release needed for internal-only refactoring
 - Git tag format: `v{MAJOR}.{MINOR}.{PATCH}` (e.g., `v0.1.0`)
 

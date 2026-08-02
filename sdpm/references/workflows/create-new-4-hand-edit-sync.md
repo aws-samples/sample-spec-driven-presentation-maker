@@ -39,8 +39,8 @@ Read the diff output and apply the hand-edit changes to the deck's slide JSON.
 
 - **Modified elements**: Read property diffs and edit the deck's `slides/*.json` directly
 - **Added slides/elements**: The diff output is a summary only. For actual data, run
-  `uv run python3 scripts/pptx_to_json.py {edited_pptx} -o {tmp_dir}` (or the `pptx_to_json`
-  MCP tool) — it writes the roundtrip deck structure (`{tmp_dir}/slides/slide-NN.json` +
+  `uv run python3 scripts/pptx_to_json.py {edited_pptx} -o {tmp_dir}` (CLI only;
+  the MCP path uses `import_attachment` for import-and-commit) — it writes the roundtrip deck structure (`{tmp_dir}/slides/slide-NN.json` +
   `{tmp_dir}/images/`) — then copy the relevant parts into the deck's slide JSON
 - **Added images**: Copy them from `{tmp_dir}/images/` into the deck's `images/` and reference via `src`
 - **Reordered slides**: Reorder `specs/outline.md` (deck) or the slide array (single JSON)

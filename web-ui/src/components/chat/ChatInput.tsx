@@ -63,7 +63,7 @@ export interface ChatInputHandle {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, deckId, children, stopTitle, onInputChange, textareaOverlay, textareaClassName },
+  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, children, stopTitle, onInputChange, textareaOverlay, textareaClassName },
   ref,
 ) {
   const t = useTranslations("chatInput")
@@ -156,17 +156,26 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
     // Upload pending attachments
     const uploadedFiles: UploadedFile[] = []
+    let uploadFailed = false
     for (const att of attachments) {
       if (att.status === "pending") {
         try {
           setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "uploading" as const } : a)))
-          const result = await uploadFile(att.file, idToken ?? "", sessionId ?? "", deckId !== "new" ? deckId : undefined)
+          const result = await uploadFile(att.file, idToken ?? "", sessionId ?? "")
           uploadedFiles.push(result)
-          setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "completed" as const, uploadId: result.uploadId } : a)))
+          setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "completed" as const, source: result.source } : a)))
         } catch {
+          uploadFailed = true
           setAttachments((prev) => prev.map((a) => (a.id === att.id ? { ...a, status: "failed" as const, error: t("uploadFailed") } : a)))
         }
       }
+    }
+
+    // Do not send a message that silently drops attachments the user meant
+    // to include — keep input and failed attachments so they can retry.
+    if (uploadFailed) {
+      toast.error(t("uploadFailed"))
+      return
     }
 
     const sentSnippets = snippets.map((s) => ({ label: t("textSnippet"), text: s.text }))

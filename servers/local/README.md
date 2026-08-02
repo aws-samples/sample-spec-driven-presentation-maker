@@ -33,9 +33,9 @@ uv run python server.py
 | `init_presentation` | Initialize workspace with template and fonts |
 | `analyze_template` | Analyze a PPTX template (layouts, colors, fonts) |
 | `generate_pptx` | Generate PPTX from JSON |
-| `measure_slides` | Measure text bounding boxes (requires LibreOffice) |
-| `search_assets` | Search icons by keyword |
-| `list_asset_sources` | List available asset sources |
+| `read_attachment` | Read content from an attached file with byte-offset paging |
+| `import_attachment` | Import attached files into the deck workspace |
+| `search_assets` | Search icons by keyword (empty query = discovery mode) |
 | `list_templates` | List available templates |
 | `list_styles` | List design styles |
 | `read_examples` | Read design pattern and component examples |
@@ -49,5 +49,5 @@ uv run python server.py
 ## Requirements
 
 - Python 3.10+
-- LibreOffice (for `run_python` preview generation and `measure_slides` tools)
+- LibreOffice (for `run_python` preview generation and text measurement)
 - poppler-utils (`pdftoppm`) for PNG conversion

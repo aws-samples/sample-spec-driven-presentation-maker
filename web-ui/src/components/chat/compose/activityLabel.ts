@@ -38,8 +38,6 @@ export function activityCategory(tool: string): ActivityCategory {
     case "list_guides":
     case "list_workflows":
     case "list_templates":
-    case "list_asset_sources":
-    case "read_uploaded_file":
     case "analyze_template":
       return "explore"
     default:
@@ -86,8 +84,6 @@ export function activityLabel(tool: string, input?: Record<string, unknown>, t?:
     case "list_guides": return tr("listingGuides", "Listing guides")
     case "list_workflows": return tr("listingWorkflows", "Listing workflows")
     case "list_templates": return tr("listingTemplates", "Listing templates")
-    case "list_asset_sources": return tr("listingAssetSources", "Listing asset sources")
-    case "read_uploaded_file": return tr("readingUpload", "Reading upload")
     case "init_presentation": return tr("initializingDeck", "Initializing deck")
     default: return tr("thinking", "Thinking")
   }

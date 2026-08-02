@@ -1,14 +1,12 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Tests for PPTX import → deck structure conversion + upload integration.
+"""Tests for PPTX import → deck structure conversion.
 
-Covers T8 from .kiro/specs/pptx-import-edit/tasks.md:
+Covers:
 - pptx_to_json output: deck.json + slides/slide-NN.json
 - shared/ingest._convert_pptx: ConversionResult with deck_structure / theme_hints
-- servers/local/upload_tools: guide/guideInstruction in response
-- servers/local/upload_tools.read_uploaded_file: deck text summary
-- servers/local/upload_tools._import_from_upload: slides/ recursive copy + shortId
 - pptx_builder.py CLI: accepts deck directory
+- Engine deck_text_summary: slide-by-slide text extraction
 - Non-regression: PDF/DOCX/XLSX import unchanged
 """
 
@@ -234,165 +232,6 @@ class TestDeckTextSummaryEngine:
         assert "Nested" in out and "H1" in out and "Item A" in out
         assert "--- Slide 3 ---" in out
 
-    def test_local_and_cloud_wrappers_delegate_to_engine(self) -> None:
-        """Guard against re-duplication: neither consumer defines the logic."""
-        local_src = (_REPO_ROOT / "servers" / "local" / "upload_tools.py").read_text(encoding="utf-8")
-        cloud_src = (_REPO_ROOT / "servers" / "remote" / "tools" / "upload.py").read_text(encoding="utf-8")
-        for src, name in ((local_src, "servers/local"), (cloud_src, "servers/remote")):
-            assert "deck_text_summary" in src, f"{name} must use the engine helper"
-            assert "def _collect_text" not in src, f"{name} re-duplicates _collect_text"
-            assert "def _extract_title" not in src, f"{name} re-duplicates _extract_title"
-
-
-# ---------------------------------------------------------------------------
-# T3: Local upload_file returns guide/guideInstruction for PPTX
-# ---------------------------------------------------------------------------
-
-
-class TestUploadFileGuideInstruction:
-    """Local upload_file must return guide, guideInstruction, suggestedName, slideCount, themeHints."""
-
-    def _upload_pptx(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
-        """Helper: upload the fixture PPTX via servers/local/upload_tools.upload_file."""
-        # Route SDPM_DECK_ROOT so session storage lives under tmp_path
-        monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
-        from upload_tools import upload_file
-
-        # Copy fixture to tmp_path so the temp upload path is stable
-        src = tmp_path / "input.pptx"
-        shutil.copy2(_FIXTURE_PPTX, src)
-
-        raw = upload_file("test-session", str(src), "input.pptx")
-        return json.loads(raw)
-
-    def test_upload_file_returns_guide_for_pptx(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        resp = self._upload_pptx(tmp_path, monkeypatch)
-        assert resp.get("status") == "converted"
-        assert resp.get("guide") == "import-pptx"
-        assert "guideInstruction" in resp
-        assert resp.get("suggestedName") == "input"
-        assert isinstance(resp.get("slideCount"), int)
-        assert resp.get("slideCount") > 0
-        theme = resp.get("themeHints")
-        assert theme is not None
-        assert "backgroundLuminance" in theme
-        assert "accentColors" in theme
-        assert "fonts" in theme
-
-    def test_upload_file_does_not_include_head_text_or_slide_titles(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Per spec: headText / slideTitles must NOT be in the response."""
-        resp = self._upload_pptx(tmp_path, monkeypatch)
-        assert "headText" not in resp
-        assert "slideTitles" not in resp
-
-    def test_guide_instruction_contains_intent_branching(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """guideInstruction must mention edit / reference / hearing branching."""
-        resp = self._upload_pptx(tmp_path, monkeypatch)
-        instruction = resp["guideInstruction"].lower()
-        assert "edit" in instruction
-        assert "reference" in instruction
-        assert "hearing" in instruction
-
-
-# ---------------------------------------------------------------------------
-# T3b: Local read_uploaded_file returns deck text summary
-# ---------------------------------------------------------------------------
-
-
-class TestReadUploadedFileTextSummary:
-    def test_read_uploaded_file_returns_text_summary(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
-        from upload_tools import read_uploaded_file, upload_file
-
-        src = tmp_path / "input.pptx"
-        shutil.copy2(_FIXTURE_PPTX, src)
-        raw = upload_file("test-session", str(src), "input.pptx")
-        upload_id = json.loads(raw)["uploadId"]
-
-        result = read_uploaded_file(upload_id)
-        # Must contain a markdown-style summary with "--- Slide N" section markers
-        text_parts = [r for r in result if isinstance(r, str)]
-        joined = "\n".join(text_parts)
-        assert "--- Slide 1" in joined or "Slide 1" in joined, \
-            f"Expected slide section markers, got: {joined[:500]}"
-
-
-# ---------------------------------------------------------------------------
-# T3c: import_attachment recursive slides/ copy + shortId in result
-# ---------------------------------------------------------------------------
-
-
-class TestImportAttachmentSlidesDir:
-    def test_import_attachment_copies_slides_dir_and_returns_short_id(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
-        from upload_tools import import_attachment, upload_file
-
-        src = tmp_path / "input.pptx"
-        shutil.copy2(_FIXTURE_PPTX, src)
-        raw = upload_file("test-session", str(src), "input.pptx")
-        upload_id = json.loads(raw)["uploadId"]
-
-        # Create a deck dir
-        deck_dir = tmp_path / "deck"
-        deck_dir.mkdir()
-
-        result_raw = import_attachment(source=upload_id, deck_id=str(deck_dir))
-        result = json.loads(result_raw)
-
-        assert "shortId" in result, "import_attachment must return shortId"
-        short_id = result["shortId"]
-        assert re.match(r"^[0-9a-f]{8}$", short_id)
-
-        # attachments/{shortId}/slides/slide-NN.json must exist
-        slides_dir = deck_dir / "attachments" / short_id / "slides"
-        assert slides_dir.is_dir(), f"expected {slides_dir} to exist"
-        slide_files = list(slides_dir.glob("slide-*.json"))
-        assert len(slide_files) > 0
-
-        # deckJson path should be recorded in the result
-        assert "deckJson" in result
-
-    def test_import_attachment_copies_template_pptx_to_deck_root(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Placeholder template lives at deck/template.pptx (deck-local path)."""
-        monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "deck_root"))
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
-        from upload_tools import import_attachment, upload_file
-
-        src = tmp_path / "input.pptx"
-        shutil.copy2(_FIXTURE_PPTX, src)
-        raw = upload_file("test-session", str(src), "input.pptx")
-        upload_id = json.loads(raw)["uploadId"]
-
-        deck_dir = tmp_path / "deck"
-        deck_dir.mkdir()
-
-        result_raw = import_attachment(source=upload_id, deck_id=str(deck_dir))
-        result = json.loads(result_raw)
-
-        assert result.get("templatePath") == "template.pptx"
-        assert (deck_dir / "template.pptx").is_file(), \
-            "template.pptx must land at deck/template.pptx"
-        # And NOT under attachments/
-        attachments_dir = deck_dir / "attachments"
-        if attachments_dir.exists():
-            stray = list(attachments_dir.glob("*template.pptx"))
-            assert not stray, f"template.pptx must not be placed under attachments/: {stray}"
-
 
 # ---------------------------------------------------------------------------
 # T18 (Cloud): _import_converted copies template.pptx to deck/template.pptx
@@ -400,58 +239,14 @@ class TestImportAttachmentSlidesDir:
 
 
 class TestCloudImportConvertedCopiesTemplate:
-    """servers/remote/tools/attachment._import_converted handles template.pptx specially."""
+    """REMOVED: _import_converted no longer exists — replaced by stateless attachment pipeline.
 
-    def test_import_converted_copies_template_to_deck_root(
-        self, monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        import types
-        from unittest.mock import MagicMock
+    The new remote/tools/attachment.py uses the core import_attachment_core
+    pipeline which commits immutable bundles. Template handling is verified
+    by test_attachment_pipeline.py::TestImportAttachmentContract.
+    """
 
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "remote"))
-        # mcp-server has its own dependency set; stub the modules that the
-        # attachment module imports at top level so we can import it under
-        # the local-test venv. monkeypatch.setitem reverts after this test so
-        # the stubs cannot leak into other tests (import-order hazard).
-        if "requests" not in sys.modules:
-            monkeypatch.setitem(sys.modules, "requests", types.ModuleType("requests"))
-        if "storage" not in sys.modules:
-            stg_mod = types.ModuleType("storage")
-            stg_mod.Storage = object  # type stub
-            monkeypatch.setitem(sys.modules, "storage", stg_mod)
-        from tools.attachment import _import_converted
-
-        converted_prefix = "uploads/u1/up1/converted"
-        deck_id = "deck1"
-        short_id = "abcd1234"
-        # Storage stub: list_files returns a few converted files including template.pptx
-        storage = MagicMock()
-        storage.pptx_bucket = "test-bucket"
-        files_in_prefix = [
-            f"{converted_prefix}/deck.json",
-            f"{converted_prefix}/template.pptx",
-            f"{converted_prefix}/slides/slide-01.json",
-        ]
-        storage.list_files.return_value = files_in_prefix
-        storage.download_file_from_pptx_bucket.return_value = b"PPTX_BYTES"
-
-        result = json.loads(_import_converted(
-            converted_prefix, deck_id, "u1", storage, "input.pptx", "", short_id,
-            {"source": "up1", "files": [], "image_mapping": {}, "shortId": short_id},
-        ))
-
-        # templatePath in result, files list contains "template.pptx"
-        assert result.get("templatePath") == "template.pptx"
-        assert "template.pptx" in result.get("files", [])
-
-        # storage.upload_file was called with deck-local key for the template
-        upload_keys = [c.kwargs["key"] for c in storage.upload_file.call_args_list]
-        assert f"decks/{deck_id}/template.pptx" in upload_keys, \
-            f"expected deck-local template key in upload_keys, got: {upload_keys}"
-        # And NOT under attachments/
-        for k in upload_keys:
-            if k.endswith("template.pptx"):
-                assert "attachments" not in k, f"template ended up under attachments: {k}"
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -489,49 +284,6 @@ class TestPptxBuilderCliAcceptsDeckDir:
         )
         assert proc.returncode == 0, f"pptx_builder.py generate failed:\nSTDOUT: {proc.stdout}\nSTDERR: {proc.stderr}"
         assert output_pptx.exists()
-
-
-# ---------------------------------------------------------------------------
-# Non-regression: PDF/DOCX/XLSX conversion still works (old flow)
-# ---------------------------------------------------------------------------
-
-
-class TestDeckRootEnvHandling:
-    """Protect against Path('') being truthy — a silent fallback bug.
-
-    Prior to pptx-import-edit hardening, `Path(os.environ.get("SDPM_DECK_ROOT", ""))`
-    evaluated to `Path('.')` when the env var was unset, silently writing
-    sessions to the process cwd instead of the user's home directory.
-    """
-
-    def test_deck_root_falls_back_to_home_when_env_empty(
-        self, monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        monkeypatch.delenv("SDPM_DECK_ROOT", raising=False)
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
-        from upload_tools import _deck_root
-
-        root = _deck_root()
-        assert root == Path.home() / "Documents" / "SDPM-Presentations", \
-            f"expected home fallback, got {root}"
-
-    def test_deck_root_respects_env(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path / "custom"))
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
-        from upload_tools import _deck_root
-
-        assert _deck_root() == tmp_path / "custom"
-
-    def test_deck_root_ignores_whitespace_only_env(
-        self, monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        monkeypatch.setenv("SDPM_DECK_ROOT", "   ")
-        monkeypatch.syspath_prepend(str(_REPO_ROOT / "servers" / "local"))
-        from upload_tools import _deck_root
-
-        assert _deck_root() == Path.home() / "Documents" / "SDPM-Presentations"
 
 
 # ---------------------------------------------------------------------------

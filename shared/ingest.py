@@ -28,8 +28,7 @@ logger = logging.getLogger(__name__)
 # PDF page limit — pages beyond this are skipped with a warning.
 _PDF_MAX_PAGES = 100
 
-# File types that need no conversion (caller copies as-is). Public — used by callers
-# (api/index.py, servers/local/upload_tools.py) to detect passthrough files.
+# File types that need no conversion (the attachment pipeline keeps raw sources).
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 TEXT_EXTS = {".csv", ".json", ".txt", ".md", ".html"}
 PASSTHROUGH_EXTS = IMAGE_EXTS | TEXT_EXTS
@@ -38,21 +37,6 @@ PASSTHROUGH_EXTS = IMAGE_EXTS | TEXT_EXTS
 _IMAGE_EXTS = IMAGE_EXTS
 _TEXT_EXTS = TEXT_EXTS
 _PASSTHROUGH_EXTS = PASSTHROUGH_EXTS
-
-# Agent-facing hint returned with PPTX uploads (deck-structure conversions).
-# Single source shared by the Cloud upload path (api/index.py) and the Local
-# upload path (servers/local/upload_tools.py) — keep intent-branching wording
-# identical across modes.
-PPTX_GUIDE_INSTRUCTION = (
-    "This PPTX can either be converted into an editable deck, or used as "
-    "reference material for a new deck. "
-    "If the user's intent is to edit this PPTX, call read_guides(['import-pptx']) "
-    "and follow it exactly. "
-    "If the intent is to use as reference, proceed with the normal briefing flow "
-    "and call read_uploaded_file to access content. "
-    "If the user's intent is ambiguous, use the `hearing` tool once to clarify "
-    "before choosing."
-)
 
 
 @dataclass
@@ -135,6 +119,12 @@ def _convert_pdf(file_path: Path, output_dir: Path, images_dir: Path) -> Convers
     except Exception as e:
         return ConversionResult(status="error", error=f"pdfplumber cannot open PDF: {e}")
 
+    # Document-level decode cache: XObject indirect-object id → written filename.
+    # Some producers (e.g. LibreOffice PDF export) put every image of the
+    # document into a resource dict shared by all pages; without this cache
+    # each page would re-decode every image (pages × images decodes).
+    image_cache: dict[object, str] = {}
+
     for page_idx in range(process_pages):
         page_num = page_idx + 1
         pb_page = pdf.pages[page_idx]
@@ -176,34 +166,45 @@ def _convert_pdf(file_path: Path, output_dir: Path, images_dir: Path) -> Convers
         except Exception:
             pass
 
-        # --- Image positions (pdfplumber) + binaries (pypdf) ---
+        # --- Images: positions from pdfplumber (actually drawn on the page),
+        # binaries from pypdf, matched by resource name. Decode results are
+        # cached document-wide by indirect-object id, so images reused across
+        # pages (shared resource dicts, repeated logos) are decoded once. ---
         try:
             pb_images = pb_page.images or []
-            pypdf_images = pypdf_page.images or []
+            if pb_images:
+                images_dir.mkdir(parents=True, exist_ok=True)
+            for pb_img in pb_images:
+                res_name = pb_img.get("name")  # e.g. "Im117"
+                y_pos = pb_img.get("top", float("inf"))
+                if not res_name:
+                    warnings.append(
+                        f"Page {page_num}: unnamed (inline) image skipped."
+                    )
+                    continue
+                key = f"/{res_name}"
+                try:
+                    xobjects = pypdf_page["/Resources"]["/XObject"].get_object()
+                    ref = xobjects.raw_get(key)
+                    cache_key = getattr(ref, "idnum", None) or (page_num, key)
+                except Exception:
+                    cache_key = (page_num, key)
 
-            if len(pb_images) != len(pypdf_images):
-                warnings.append(
-                    f"Page {page_num}: image count mismatch "
-                    f"(position={len(pb_images)}, binary={len(pypdf_images)}). "
-                    "Images listed at end of page."
-                )
-                # Fallback: save binaries without position interleaving
-                images_dir.mkdir(parents=True, exist_ok=True)
-                for img_idx, img in enumerate(pypdf_images):
-                    ext = img.name.rsplit(".", 1)[-1] if "." in img.name else "png"
-                    img_name = f"pdf_p{page_num}_img{img_idx + 1}.{ext}"
-                    (images_dir / img_name).write_bytes(img.data)
-                    images.append(img_name)
-                    fragments.append((float("inf"), f"![{img_name}]({img_name})"))
-            else:
-                images_dir.mkdir(parents=True, exist_ok=True)
-                for img_idx, (pb_img, pypdf_img) in enumerate(zip(pb_images, pypdf_images)):
+                img_name = image_cache.get(cache_key)
+                if img_name is None:
+                    try:
+                        pypdf_img = pypdf_page.images[key]
+                    except Exception as e:
+                        warnings.append(
+                            f"Page {page_num}: image {res_name} extraction failed: {e}"
+                        )
+                        continue
                     ext = pypdf_img.name.rsplit(".", 1)[-1] if "." in pypdf_img.name else "png"
-                    img_name = f"pdf_p{page_num}_img{img_idx + 1}.{ext}"
+                    img_name = f"pdf_p{page_num}_{res_name}.{ext}"
                     (images_dir / img_name).write_bytes(pypdf_img.data)
                     images.append(img_name)
-                    y_pos = pb_img["top"]
-                    fragments.append((y_pos, f"![{img_name}]({img_name})"))
+                    image_cache[cache_key] = img_name
+                fragments.append((y_pos, f"![{img_name}]({img_name})"))
         except Exception as e:
             warnings.append(f"Page {page_num}: image extraction failed: {e}")
 
