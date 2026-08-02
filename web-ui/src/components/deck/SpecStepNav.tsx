@@ -19,8 +19,9 @@ import { Layers } from "lucide-react"
 import type { SpecFiles } from "@/services/deckService"
 import { useTranslations } from "next-intl"
 
-// Re-exported for existing consumers (SlideCarousel imports both from here).
-export { SpecMarkdownPreview, renderColorSwatches } from "./SpecMarkdownPreview"
+// Re-exported for existing consumers (SlideCarousel imports from here).
+export { SpecMarkdownPreview } from "./SpecMarkdownPreview"
+export { renderColorSwatches } from "./colorSwatches"
 
 /** Tab key union type for spec viewer navigation. */
 export type SpecTab = "brief" | "outline" | "artDirection" | "slides"

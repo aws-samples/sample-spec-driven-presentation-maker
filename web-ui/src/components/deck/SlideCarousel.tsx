@@ -477,6 +477,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
           onTemplateSelect={specTab === "artDirection" ? onTemplateSelect : undefined}
           currentTemplate={specTab === "artDirection" ? currentTemplate : undefined}
           idToken={specTab === "artDirection" ? idToken : undefined}
+          outlineExists={specTab === "brief" ? (specs?.outline != null) : undefined}
         />
       )}
     </div>

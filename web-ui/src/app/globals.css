@@ -693,6 +693,11 @@ body {
   margin: 2rem 0;
 }
 
+/* ── Brief document — materials table enhancement ── */
+.brief-materials-table td:first-child {
+  font-weight: 500;
+}
+
 /* ── Outline timeline ── */
 
 /* Flow line draws top-to-bottom on mount */

@@ -256,6 +256,13 @@
     "structuringOutline": "Structuring the outline…",
     "composingArtDirection": "Composing art direction…"
   },
+  "briefDocument": {
+    "filePath": "specs/brief.md",
+    "approved": "Approved",
+    "pending": "Pending approval",
+    "approvedAria": "Brief has been approved — outline exists",
+    "pendingAria": "Brief is pending approval — no outline yet"
+  },
   "decksPage": {
     "removeFromFavorites": "Remove from favorites",
     "addToFavorites": "Add to favorites",

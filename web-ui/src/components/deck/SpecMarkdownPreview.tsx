@@ -27,35 +27,9 @@ import { StyleSlidePreview } from "@/components/StyleSlidePreview"
 import { StyleCard } from "./StyleCard"
 import { TemplatePickerSection } from "./TemplatePickerSection"
 import { BriefWaiting, OutlineWaiting, ArtDirectionWaiting } from "./SpecWaiting"
+import { BriefDocumentView } from "./BriefDocumentView"
+import { renderColorSwatches } from "./colorSwatches"
 import { useTranslations } from "next-intl"
-
-/** Regex matching HEX color codes in text. */
-const HEX_RE = /(#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3}))\b/g
-
-/**
- * Render inline color swatches next to HEX codes in text.
- *
- * @param text - Raw text that may contain HEX color codes
- * @returns Array of string and JSX elements with color swatches
- */
-export function renderColorSwatches(text: string): (string | React.ReactElement)[] {
-  const parts = text.split(HEX_RE)
-  return parts.map((part, i) => {
-    if (/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(part)) {
-      return (
-        <span key={i} className="inline-flex items-center gap-1">
-          <span
-            className="inline-block w-3 h-3 rounded-full border border-white/20 flex-none"
-            style={{ backgroundColor: part }}
-            aria-label={`Color ${part}`}
-          />
-          <code className="text-xs px-1 py-0.5 rounded bg-white/5">{part}</code>
-        </span>
-      )
-    }
-    return part
-  })
-}
 
 /**
  * Shared markdown components for spec rendering — adds HEX color swatches.
@@ -89,7 +63,7 @@ const specComponents = {
   },
 }
 
-export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, onTemplateSelect, currentTemplate, idToken }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; onTemplateSelect?: (name: string, isChange: boolean) => void; currentTemplate?: string | null; idToken?: string }) {
+export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outlineExists }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; onTemplateSelect?: (name: string, isChange: boolean) => void; currentTemplate?: string | null; idToken?: string; outlineExists?: boolean }) {
   const t = useTranslations("stylePicker")
   // Hooks must be called unconditionally — before any early returns.
 
@@ -370,6 +344,16 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
           </>
         )}
       </div>
+    )
+  }
+
+  // Brief tab: use the contract-document metaphor with approval status
+  if (specKey === "brief") {
+    return (
+      <BriefDocumentView
+        content={content}
+        outlineExists={outlineExists ?? false}
+      />
     )
   }
 

@@ -20,7 +20,7 @@ import { useEffect, useRef, useMemo } from "react"
 import { FileText, BarChart3, Palette, StickyNote } from "lucide-react"
 import { parseOutline, resolveStates } from "./outlineParser"
 import type { OutlineSlide, OutlineSubItem, SlideState, SubItemKey } from "./outlineParser"
-import { renderColorSwatches } from "./SpecStepNav"
+import { renderColorSwatches } from "./colorSwatches"
 import { useTranslations } from "next-intl"
 
 /** Icon and label key for each sub-item key (excluding what_to_say which has no label). */

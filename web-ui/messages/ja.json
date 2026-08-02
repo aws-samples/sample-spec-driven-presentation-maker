@@ -256,6 +256,13 @@
     "structuringOutline": "アウトラインを構成中…",
     "composingArtDirection": "アートディレクションを構成中…"
   },
+  "briefDocument": {
+    "filePath": "specs/brief.md",
+    "approved": "承認済み",
+    "pending": "承認待ち",
+    "approvedAria": "ブリーフは承認済み — アウトラインが存在",
+    "pendingAria": "ブリーフは承認待ち — アウトラインはまだ未作成"
+  },
   "decksPage": {
     "removeFromFavorites": "お気に入りから削除",
     "addToFavorites": "お気に入りに追加",
