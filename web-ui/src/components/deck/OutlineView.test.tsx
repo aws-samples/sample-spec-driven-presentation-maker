@@ -1,8 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * OutlineView tests — light table / detail view rendering, section/prose display,
- * slide card content, state frames, auto-scroll, and empty state.
+ * OutlineView v5 tests — slide narrative layout:
+ * number rail + card, skeleton/enriched structure, spec sheet,
+ * section/prose display, state frames, auto-scroll, empty state.
+ * No light-table mode, no clipping structures.
  */
 
 import { describe, it, expect, afterEach } from "vitest"
@@ -25,56 +27,91 @@ describe("OutlineView", () => {
     })
 
     it("does not crash on whitespace-only content", () => {
-      // Whitespace content may render as prose (not discarded) — 
-      // this is the "nothing invented, nothing discarded" principle.
       const { container } = renderWithIntl(<OutlineView content={"\n\n\n"} />)
-      // It should not throw and should render something
       expect(container.firstChild).toBeTruthy()
     })
   })
 
-  describe("light table mode (all slides skeleton)", () => {
-    const skeletonMd = [
-      "## Introduction",
+  describe("number rail structure", () => {
+    const md = [
       "- [cover] Cover slide",
       "- [agenda] Agenda",
       "- [overview] Product overview",
     ].join("\n")
 
-    it("renders a 3-column grid", () => {
-      const { container } = renderWithIntl(<OutlineView content={skeletonMd} />)
-      const grid = container.querySelector("[data-view='light-table']")
-      expect(grid).toBeTruthy()
+    it("renders slide entries with number rail grid (36px + 1fr)", () => {
+      const { container } = renderWithIntl(<OutlineView content={md} />)
+      const slideRows = container.querySelectorAll("[data-slide-slug]")
+      expect(slideRows.length).toBe(3)
+      // Each row uses inline grid-template-columns
+      slideRows.forEach((row) => {
+        expect((row as HTMLElement).style.gridTemplateColumns).toBe("36px 1fr")
+      })
     })
 
-    it("renders section headings full-width", () => {
-      const { container } = renderWithIntl(<OutlineView content={skeletonMd} />)
-      const section = container.querySelector("[data-entry-type='section']")
-      expect(section).toBeTruthy()
-      expect(section?.classList.contains("col-span-full")).toBe(true)
+    it("renders sequential slide numbers", () => {
+      renderWithIntl(<OutlineView content={md} />)
+      expect(screen.getByText("1")).toBeTruthy()
+      expect(screen.getByText("2")).toBeTruthy()
+      expect(screen.getByText("3")).toBeTruthy()
     })
 
-    it("renders all slide cards with dashed borders (skeleton state)", () => {
-      const { container } = renderWithIntl(<OutlineView content={skeletonMd} />)
-      const cards = container.querySelectorAll("[data-state='skeleton']")
-      expect(cards.length).toBe(3)
+    it("number rail uses tabular-nums", () => {
+      const { container } = renderWithIntl(<OutlineView content={md} />)
+      const numberSpans = container.querySelectorAll("[data-slide-slug] > span:first-child")
+      numberSpans.forEach((span) => {
+        expect(span.className).toContain("tabular-nums")
+      })
     })
 
-    it("displays slide messages", () => {
-      renderWithIntl(<OutlineView content={skeletonMd} />)
-      expect(screen.getByText("Cover slide")).toBeTruthy()
-      expect(screen.getByText("Agenda")).toBeTruthy()
-      expect(screen.getByText("Product overview")).toBeTruthy()
+    it("active slide number is inverted (bg-foreground text-background)", () => {
+      const md = "- [s1] A\n  - what_to_say: Hello"
+      const { container } = renderWithIntl(<OutlineView content={md} />)
+      const active = container.querySelector("[data-state='active']")
+      const numSpan = active?.querySelector(":scope > span:first-child")
+      expect(numSpan?.className).toContain("bg-foreground")
+      expect(numSpan?.className).toContain("text-background")
     })
 
-    it("displays slide slugs", () => {
-      renderWithIntl(<OutlineView content={skeletonMd} />)
-      expect(screen.getByText("cover")).toBeTruthy()
-      expect(screen.getByText("agenda")).toBeTruthy()
+    it("skeleton slide numbers are muted (not inverted)", () => {
+      const md = "- [s1] A\n- [s2] B"
+      const { container } = renderWithIntl(<OutlineView content={md} />)
+      const skeleton = container.querySelector("[data-state='skeleton']")
+      const numSpan = skeleton?.querySelector(":scope > span:first-child")
+      expect(numSpan?.className).not.toContain("bg-foreground")
+      expect(numSpan?.className).toContain("text-foreground-secondary")
     })
   })
 
-  describe("detail mode (enriched slides)", () => {
+  describe("skeleton slide (slim dashed card)", () => {
+    const md = "- [cover] Cover slide\n- [agenda] Agenda items"
+
+    it("renders with dashed border", () => {
+      const { container } = renderWithIntl(<OutlineView content={md} />)
+      const cards = container.querySelectorAll("[data-state='skeleton']")
+      expect(cards.length).toBe(2)
+      // Each skeleton card contains a dashed-border div
+      cards.forEach((card) => {
+        const dashedDiv = card.querySelector(".border-dashed")
+        expect(dashedDiv).toBeTruthy()
+      })
+    })
+
+    it("displays slug as eyebrow in mono font", () => {
+      const { container } = renderWithIntl(<OutlineView content={md} />)
+      const eyebrows = container.querySelectorAll(".font-mono.text-\\[11px\\]")
+      expect(eyebrows.length).toBeGreaterThanOrEqual(2)
+      expect(eyebrows[0].textContent).toBe("cover")
+    })
+
+    it("displays message text", () => {
+      renderWithIntl(<OutlineView content={md} />)
+      expect(screen.getByText("Cover slide")).toBeTruthy()
+      expect(screen.getByText("Agenda items")).toBeTruthy()
+    })
+  })
+
+  describe("enriched slide (solid border face)", () => {
     const enrichedMd = [
       "## Opening",
       "- [intro] Welcome to our presentation",
@@ -85,58 +122,90 @@ describe("OutlineView", () => {
       "- [next-steps] What comes next",
     ].join("\n")
 
-    it("renders full-width layout (no 3-col grid)", () => {
+    it("renders enriched slide with solid border (no dashed)", () => {
       const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
-      const grid = container.querySelector("[data-view='light-table']")
-      expect(grid).toBeNull()
+      const active = container.querySelector("[data-state='active']")
+      expect(active).toBeTruthy()
+      // The card inside should have border-solid
+      const face = active?.querySelector(".border-solid")
+      expect(face).toBeTruthy()
     })
 
-    it("renders the what_to_say as a blockquote lead", () => {
-      renderWithIntl(<OutlineView content={enrichedMd} />)
-      const bq = screen.getByText(/Thank you for being here today/i)
-      expect(bq.closest("blockquote")).toBeTruthy()
+    it("renders accent rule bar", () => {
+      const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
+      const rules = container.querySelectorAll("[aria-hidden='true'].bg-foreground\\/85")
+      expect(rules.length).toBeGreaterThanOrEqual(1)
     })
 
-    it("renders Evidence on the slide face", () => {
+    it("renders what_to_say with curly quotes (not italic, not blockquote)", () => {
+      const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
+      // Should have the quote text
+      expect(screen.getByText(/Thank you for being here today/)).toBeTruthy()
+      // Should NOT be in a blockquote element
+      const quoteEl = screen.getByText(/Thank you for being here today/)
+      expect(quoteEl.closest("blockquote")).toBeNull()
+      // Should NOT have italic class
+      expect(quoteEl.className).not.toContain("italic")
+    })
+
+    it("renders spec sheet with Evidence label and content", () => {
       renderWithIntl(<OutlineView content={enrichedMd} />)
       expect(screen.getByText("Evidence")).toBeTruthy()
       expect(screen.getByText(/Survey results from Q3/)).toBeTruthy()
     })
 
-    it("renders Visual on the slide face", () => {
+    it("renders spec sheet with Visual label and content", () => {
       renderWithIntl(<OutlineView content={enrichedMd} />)
       expect(screen.getByText("Visual")).toBeTruthy()
       expect(screen.getByText(/Bar chart comparing quarters/)).toBeTruthy()
     })
 
-    it("renders notes as a separate band below the slide", () => {
+    it("spec sheet uses 92px label column grid", () => {
+      const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
+      const specRows = container.querySelectorAll(".grid-cols-\\[92px_1fr\\]")
+      expect(specRows.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it("renders notes band outside the slide face", () => {
       renderWithIntl(<OutlineView content={enrichedMd} />)
       expect(screen.getByText("Notes")).toBeTruthy()
       expect(screen.getByText(/Pause after the chart reveal/)).toBeTruthy()
     })
 
-    it("renders slide number and slug as page chrome", () => {
+    it("renders slide number and slug", () => {
       renderWithIntl(<OutlineView content={enrichedMd} />)
       expect(screen.getByText("intro")).toBeTruthy()
-      // Slide number 1
       expect(screen.getByText("1")).toBeTruthy()
-    })
-
-    it("marks the last enriched slide as active", () => {
-      const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
-      const activeCard = container.querySelector("[data-state='active']")
-      expect(activeCard).toBeTruthy()
-      expect(activeCard?.getAttribute("data-slide-slug")).toBe("intro")
-    })
-
-    it("marks skeleton slides without sub-items", () => {
-      const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
-      const skeletonCards = container.querySelectorAll("[data-state='skeleton']")
-      expect(skeletonCards.length).toBe(1) // next-steps
     })
   })
 
-  describe("section and prose rendering in detail mode", () => {
+  describe("no clipping structures", () => {
+    const md = "- [s1] A long message\n  - what_to_say: Details\n  - evidence: Data"
+
+    it("does not use aspect-ratio forcing", () => {
+      const { container } = renderWithIntl(<OutlineView content={md} />)
+      const allElements = container.querySelectorAll("*")
+      allElements.forEach((el) => {
+        const style = (el as HTMLElement).style
+        expect(style.aspectRatio).toBeFalsy()
+      })
+    })
+
+    it("does not use overflow-hidden on content areas", () => {
+      const { container } = renderWithIntl(<OutlineView content={md} />)
+      // The only overflow-y-auto is the outer scroll container
+      const overflowHidden = container.querySelectorAll(".overflow-hidden")
+      expect(overflowHidden.length).toBe(0)
+    })
+
+    it("does not use absolute inset for content", () => {
+      const { container } = renderWithIntl(<OutlineView content={md} />)
+      const absoluteEls = container.querySelectorAll(".absolute")
+      expect(absoluteEls.length).toBe(0)
+    })
+  })
+
+  describe("section and prose rendering", () => {
     const mixedMd = [
       "This is introductory prose.",
       "## Section One",
@@ -178,10 +247,9 @@ describe("OutlineView", () => {
     it("renders [TBD] as a dashed ink chip (not amber)", () => {
       const md = "- [s1] Slide\n  - evidence: [TBD] data pending"
       const { container } = renderWithIntl(<OutlineView content={md} />)
-      const tbd = container.querySelector("[class*='border-dashed']")
+      const tbd = container.querySelector("[class*='border-dashed'][class*='border-foreground']")
       expect(tbd).toBeTruthy()
       expect(tbd?.textContent).toContain("TBD")
-      // Should NOT have amber/brand-amber styling
       expect(tbd?.className).not.toContain("brand-amber")
     })
 
@@ -193,21 +261,21 @@ describe("OutlineView", () => {
   })
 
   describe("frame states", () => {
-    it("skeleton slides have dashed border", () => {
+    it("skeleton slides have data-state=skeleton", () => {
       const md = "- [s1] A\n- [s2] B"
       const { container } = renderWithIntl(<OutlineView content={md} />)
       const cards = container.querySelectorAll("[data-state='skeleton']")
       expect(cards.length).toBe(2)
     })
 
-    it("active slide has solid border with shadow", () => {
+    it("active slide has data-state=active", () => {
       const md = "- [s1] A\n  - what_to_say: X"
       const { container } = renderWithIntl(<OutlineView content={md} />)
       const active = container.querySelector("[data-state='active']")
       expect(active).toBeTruthy()
     })
 
-    it("done slides have quiet solid border", () => {
+    it("done slides have data-state=done", () => {
       const md = "- [s1] A\n  - what_to_say: X\n- [s2] B\n  - what_to_say: Y"
       const { container } = renderWithIntl(<OutlineView content={md} />)
       const done = container.querySelectorAll("[data-state='done']")
@@ -216,25 +284,30 @@ describe("OutlineView", () => {
   })
 
   describe("document surface class", () => {
-    it("applies document-surface class for Fraunces headings", () => {
+    it("applies document-surface class for section heading font scoping", () => {
       const md = "- [s1] A\n  - what_to_say: Text"
       const { container } = renderWithIntl(<OutlineView content={md} />)
       expect(container.querySelector(".document-surface")).toBeTruthy()
     })
   })
 
-  describe("automatic view switching", () => {
-    it("uses light table for all-skeleton and detail for enriched", () => {
-      // All skeleton => light table
+  describe("no light-table mode (v5: single view)", () => {
+    it("uses same single-column layout for all-skeleton slides", () => {
       const skeletonMd = "- [s1] A\n- [s2] B"
       const { container } = renderWithIntl(<OutlineView content={skeletonMd} />)
-      expect(container.querySelector("[data-view='light-table']")).toBeTruthy()
+      // No light-table grid
+      expect(container.querySelector("[data-view='light-table']")).toBeNull()
+      // Uses the number-rail grid structure
+      const slideRows = container.querySelectorAll("[data-slide-slug]")
+      expect(slideRows.length).toBe(2)
     })
 
-    it("uses detail mode when any slide has sub-items", () => {
+    it("uses same layout when any slide has sub-items", () => {
       const enrichedMd = "- [s1] A\n  - what_to_say: Hello\n- [s2] B"
       const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
       expect(container.querySelector("[data-view='light-table']")).toBeNull()
+      const slideRows = container.querySelectorAll("[data-slide-slug]")
+      expect(slideRows.length).toBe(2)
     })
   })
 })

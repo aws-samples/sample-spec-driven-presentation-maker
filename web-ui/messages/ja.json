@@ -117,8 +117,8 @@
   },
   "outline": {
     "evidence": "根拠",
-    "visual": "ビジュアル",
-    "notes": "メモ",
+    "visual": "見せ方",
+    "notes": "ノート",
     "emptyState": "エージェントがアウトラインを書くとここに表示されます。"
   },
   "chatInput": {

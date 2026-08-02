@@ -10,7 +10,6 @@ import {
   parseOutline,
   resolveStates,
   getSlideEntries,
-  isLightTableMode,
 } from "./outlineParser"
 import type { OutlineEntry, SlideEntry, SectionEntry, ProseEntry } from "./outlineParser"
 
@@ -273,42 +272,6 @@ describe("outlineParser", () => {
       const entries = parseOutline(md)
       const slides = getSlideEntries(entries)
       expect(slides).toHaveLength(0)
-    })
-  })
-
-  describe("isLightTableMode — view derivation", () => {
-    it("returns true when all slides have zero sub-items", () => {
-      const md = "- [s1] A\n- [s2] B\n- [s3] C"
-      const entries = parseOutline(md)
-      expect(isLightTableMode(entries)).toBe(true)
-    })
-
-    it("returns false when any slide has sub-items", () => {
-      const md = "- [s1] A\n- [s2] B\n  - what_to_say: Hello\n- [s3] C"
-      const entries = parseOutline(md)
-      expect(isLightTableMode(entries)).toBe(false)
-    })
-
-    it("returns false for empty entries", () => {
-      expect(isLightTableMode([])).toBe(false)
-    })
-
-    it("returns true even with sections and prose present (only slides matter)", () => {
-      const md = "## Section\nProse\n- [s1] A\n- [s2] B"
-      const entries = parseOutline(md)
-      expect(isLightTableMode(entries)).toBe(true)
-    })
-
-    it("a single enriched slide flips to detail mode", () => {
-      const md = [
-        "- [s1] A",
-        "- [s2] B",
-        "  - evidence: Some data",
-        "- [s3] C",
-        "- [s4] D",
-      ].join("\n")
-      const entries = parseOutline(md)
-      expect(isLightTableMode(entries)).toBe(false)
     })
   })
 

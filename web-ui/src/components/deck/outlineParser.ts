@@ -203,9 +203,4 @@ export function getSlideEntries(entries: OutlineEntry[]): SlideEntry[] {
   return entries.filter((e): e is SlideEntry => e.type === "slide")
 }
 
-/** Check if the outline is in light-table mode (all slides have zero sub-items). */
-export function isLightTableMode(entries: OutlineEntry[]): boolean {
-  const slides = getSlideEntries(entries)
-  if (slides.length === 0) return false
-  return slides.every((s) => s.subItems.length === 0)
-}
+

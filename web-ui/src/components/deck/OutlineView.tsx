@@ -1,15 +1,19 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * OutlineView — Slide-first outline renderer.
+ * OutlineView v5 — "Slide Narrative" renderer.
  *
- * Two adaptive modes:
- * - Light table (3-column slide sorter): when every slide has zero sub-items
- * - Detail view (full-width 16:9 slide cards): when any slide is enriched
+ * Single-column vertical stack. Each slide entry is a grid row:
+ * number rail (36px) + card body.
  *
- * Design language: achromatic/Fraunces headings, ink frames with state-driven borders.
- * Frame states: skeleton=dashed, active=solid+shadow+inverted number, done=quiet.
- * TBD is dashed ink chip (not amber — amber is Data's agent color).
+ * Card states:
+ * - skeleton: dashed-border slim card (eyebrow slug + message only)
+ * - enriched (active/done): solid border + shadow face with eyebrow, message,
+ *   accent rule, what_to_say quote lead, and spec sheet (evidence / visual)
+ * - active: inverted number chip in the rail
+ *
+ * No clipping: no aspect-ratio forcing, no absolute inset, no overflow-hidden.
+ * All content flows naturally and grows with its content.
  *
  * @param props.content - Raw outline markdown string (null = empty state)
  */
@@ -18,8 +22,8 @@
 
 import { useEffect, useRef, useMemo } from "react"
 import { FileText } from "lucide-react"
-import { parseOutline, resolveStates, isLightTableMode, getSlideEntries } from "./outlineParser"
-import type { OutlineEntry, SlideEntry, SectionEntry, ProseEntry, OutlineSubItem, SlideState, SubItemKey } from "./outlineParser"
+import { parseOutline, resolveStates } from "./outlineParser"
+import type { OutlineEntry, SlideEntry, SectionEntry, ProseEntry, SlideState } from "./outlineParser"
 import { renderColorSwatches } from "./colorSwatches"
 import { useTranslations } from "next-intl"
 
@@ -56,18 +60,53 @@ function renderValue(value: string): (string | React.ReactElement)[] {
 }
 
 // ---------------------------------------------------------------------------
-// Slide Card (detail view)
+// Mini SVG icons for spec sheet labels
 // ---------------------------------------------------------------------------
 
-/**
- * A full-width 16:9-proportioned slide card.
- * Face: title/message, what_to_say lead quote, Evidence, Visual, number+slug chrome.
- * Below: speaker notes band (notes sub-item).
- */
-function SlideCard({ slide, state, slideNumber }: {
+function EvidenceIcon(): React.ReactElement {
+  return (
+    <svg className="w-3 h-3 stroke-current opacity-75" fill="none" strokeWidth="1.4" strokeLinecap="round" viewBox="0 0 16 16">
+      <path d="M2 13h12M4 9l3 3 5-7" />
+    </svg>
+  )
+}
+
+function VisualIcon(): React.ReactElement {
+  return (
+    <svg className="w-3 h-3 stroke-current opacity-75" fill="none" strokeWidth="1.4" strokeLinecap="round" viewBox="0 0 16 16">
+      <rect x="2" y="3" width="12" height="10" rx="2" />
+      <circle cx="5.5" cy="6.5" r="1.2" />
+      <path d="M14 10l-3-3-5 5" />
+    </svg>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton Slide (dashed slim card)
+// ---------------------------------------------------------------------------
+
+function SkeletonSlide({ slide }: { slide: SlideEntry }): React.ReactElement {
+  return (
+    <div className="rounded-lg border border-dashed border-foreground/20 px-4 py-3 flex flex-col gap-1">
+      {/* Eyebrow: slug */}
+      <span className="font-mono text-[11px] tracking-[0.08em] text-foreground-secondary/60">
+        {slide.slug}
+      </span>
+      {/* Message */}
+      <p className="text-base font-medium leading-[1.65] text-foreground">
+        {slide.message || slide.slug}
+      </p>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Enriched Slide (solid border + shadow face)
+// ---------------------------------------------------------------------------
+
+function EnrichedSlide({ slide, state }: {
   slide: SlideEntry
   state: SlideState
-  slideNumber: number
 }): React.ReactElement {
   const t = useTranslations("outline")
   const whatToSay = slide.subItems.find((s) => s.key === "what_to_say")
@@ -75,92 +114,68 @@ function SlideCard({ slide, state, slideNumber }: {
   const visual = slide.subItems.find((s) => s.key === "what_to_show")
   const notes = slide.subItems.find((s) => s.key === "notes")
 
-  const frameClasses = {
-    skeleton: "border-dashed border-foreground/20",
-    active: "border-solid border-foreground/60 shadow-[var(--shadow-slide)]",
-    done: "border-solid border-foreground/12",
-  }
-
-  const numberClasses = {
-    skeleton: "text-foreground/30",
-    active: "bg-foreground text-background font-semibold",
-    done: "text-foreground/40",
-  }
+  const frameClasses = state === "active"
+    ? "border-foreground/60 shadow-[0_6px_24px_oklch(0_0_0/0.14)]"
+    : "border-foreground/12"
 
   return (
-    <div
-      className="outline-node-enter"
-      style={{ "--stagger": `${slideNumber * 50}ms` } as React.CSSProperties}
-      data-state={state}
-      data-slide-slug={slide.slug}
-    >
-      {/* Slide face — 16:9 proportioned */}
-      <div
-        className={`relative rounded-lg border overflow-hidden ${frameClasses[state]}`}
-        style={{ aspectRatio: "16 / 9" }}
-      >
-        {/* Content area */}
-        <div className="absolute inset-0 flex flex-col justify-between p-5 sm:p-6">
-          {/* Title + message */}
-          <div className="space-y-2">
-            <h3
-              className="text-sm sm:text-[15px] leading-snug tracking-[-0.015em]"
-              style={{ fontWeight: "var(--document-display-weight)" } as React.CSSProperties}
-            >
-              {slide.message || slide.slug}
-            </h3>
+    <div className="flex flex-col gap-1.5">
+      {/* Slide face */}
+      <div className={`rounded-xl border border-solid ${frameClasses} bg-background px-5 py-4 flex flex-col`}>
+        {/* Eyebrow: slug */}
+        <span className="font-mono text-[11px] tracking-[0.08em] text-foreground-secondary/60">
+          {slide.slug}
+        </span>
 
-            {/* what_to_say as lead quote */}
-            {whatToSay && (
-              <blockquote className="border-l-2 border-foreground/15 pl-3 text-xs text-foreground-secondary leading-relaxed italic">
-                {renderValue(whatToSay.value)}
-              </blockquote>
+        {/* Message */}
+        <p className="mt-1 text-base font-medium leading-[1.65] text-foreground">
+          {slide.message || slide.slug}
+        </p>
+
+        {/* Accent rule */}
+        <div className="w-11 h-[3px] rounded-sm bg-foreground/85 my-3" aria-hidden="true" />
+
+        {/* what_to_say quote lead */}
+        {whatToSay && (
+          <p className="text-sm leading-relaxed text-foreground-secondary">
+            <span className="text-foreground-secondary/50" aria-hidden="true">{"\u201C"}</span>
+            {renderValue(whatToSay.value)}
+            <span className="text-foreground-secondary/50" aria-hidden="true">{"\u201D"}</span>
+          </p>
+        )}
+
+        {/* Spec sheet */}
+        {(evidence || visual) && (
+          <div className="mt-3.5 border-t border-foreground/15">
+            {evidence && (
+              <div className="grid grid-cols-[92px_1fr] gap-3 py-2 border-b border-dashed border-foreground/10 items-baseline">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground-secondary/60">
+                  <EvidenceIcon />
+                  {t("evidence")}
+                </span>
+                <p className="text-sm text-foreground leading-relaxed">
+                  {renderValue(evidence.value)}
+                </p>
+              </div>
+            )}
+            {visual && (
+              <div className="grid grid-cols-[92px_1fr] gap-3 py-2 border-b border-dashed border-foreground/10 items-baseline last:border-b-0">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground-secondary/60">
+                  <VisualIcon />
+                  {t("visual")}
+                </span>
+                <p className="text-sm text-foreground leading-relaxed">
+                  {renderValue(visual.value)}
+                </p>
+              </div>
             )}
           </div>
-
-          {/* Evidence + Visual in the mid area */}
-          {(evidence || visual) && (
-            <div className="flex-1 flex flex-col justify-center gap-2 my-3">
-              {evidence && (
-                <div className="flex items-start gap-2">
-                  <span className="text-[11px] uppercase tracking-[0.08em] text-foreground-secondary/60 font-medium flex-none w-14">
-                    {t("evidence")}
-                  </span>
-                  <p className="text-xs text-foreground/70 leading-relaxed">
-                    {renderValue(evidence.value)}
-                  </p>
-                </div>
-              )}
-              {visual && (
-                <div className="flex items-start gap-2">
-                  <span className="text-[11px] uppercase tracking-[0.08em] text-foreground-secondary/60 font-medium flex-none w-14">
-                    {t("visual")}
-                  </span>
-                  <p className="text-xs text-foreground/70 leading-relaxed">
-                    {renderValue(visual.value)}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Page chrome: number + slug */}
-          <div className="flex items-center justify-end gap-2">
-            <span className="text-[11px] text-foreground-secondary/50 tracking-wide">
-              {slide.slug}
-            </span>
-            <span
-              className={`inline-flex items-center justify-center w-5 h-5 rounded text-[11px] tabular-nums ${numberClasses[state]}`}
-            >
-              {slideNumber}
-            </span>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Speaker notes band (below the slide face) */}
+      {/* Notes band (outside the face) */}
       {notes && (
-        <div className="mt-1.5 px-4 py-2 rounded border border-foreground/6 bg-foreground/[0.02]">
+        <div className="px-4 py-2 rounded border border-foreground/6 bg-foreground/[0.02]">
           <div className="flex items-start gap-2">
             <span className="text-[11px] uppercase tracking-[0.08em] text-foreground-secondary/50 font-medium flex-none">
               {t("notes")}
@@ -176,66 +191,13 @@ function SlideCard({ slide, state, slideNumber }: {
 }
 
 // ---------------------------------------------------------------------------
-// Light Table Card (compact 3-col sorter)
-// ---------------------------------------------------------------------------
-
-function LightTableCard({ slide, state, slideNumber }: {
-  slide: SlideEntry
-  state: SlideState
-  slideNumber: number
-}): React.ReactElement {
-  const frameClasses = {
-    skeleton: "border-dashed border-foreground/20",
-    active: "border-solid border-foreground/60 shadow-[var(--shadow-card)]",
-    done: "border-solid border-foreground/12",
-  }
-
-  const numberClasses = {
-    skeleton: "text-foreground/30",
-    active: "bg-foreground text-background font-semibold",
-    done: "text-foreground/40",
-  }
-
-  return (
-    <div
-      className={`outline-node-enter rounded-lg border overflow-hidden flex flex-col ${frameClasses[state]}`}
-      style={{
-        "--stagger": `${slideNumber * 40}ms`,
-        aspectRatio: "16 / 9",
-      } as React.CSSProperties}
-      data-state={state}
-      data-slide-slug={slide.slug}
-    >
-      <div className="flex-1 flex flex-col justify-between p-3">
-        <p className="text-xs font-medium text-foreground/80 leading-snug line-clamp-2">
-          {slide.message || slide.slug}
-        </p>
-        <div className="flex items-center justify-between mt-auto pt-1">
-          <span className="text-[11px] text-foreground-secondary/40 truncate max-w-[60%]">
-            {slide.slug}
-          </span>
-          <span
-            className={`inline-flex items-center justify-center w-4 h-4 rounded text-[11px] tabular-nums ${numberClasses[state]}`}
-          >
-            {slideNumber}
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Section entry (full-width divider)
 // ---------------------------------------------------------------------------
 
 function SectionDivider({ section }: { section: SectionEntry }): React.ReactElement {
   return (
     <div className="col-span-full" data-entry-type="section">
-      <h2
-        className="text-sm font-semibold text-foreground/70 tracking-[-0.015em] border-b border-foreground/8 pb-2 mt-6 mb-2"
-        style={{ fontWeight: "var(--document-display-weight)" } as React.CSSProperties}
-      >
+      <h2 className="text-sm font-semibold text-foreground/70 tracking-[-0.015em] border-b border-foreground/8 pb-2 mt-6 mb-2">
         {section.title}
       </h2>
     </div>
@@ -269,13 +231,12 @@ export function OutlineView({ content }: OutlineViewProps): React.ReactElement {
   const activeRef = useRef<HTMLDivElement>(null)
   const prevActiveSlug = useRef<string | null>(null)
 
-  const { entries, stateMap, lightTable } = useMemo(() => {
-    if (!content) return { entries: [] as OutlineEntry[], stateMap: new Map<number, SlideState>(), lightTable: false }
+  const { entries, stateMap } = useMemo(() => {
+    if (!content) return { entries: [] as OutlineEntry[], stateMap: new Map<number, SlideState>() }
     const parsed = parseOutline(content)
     return {
       entries: parsed,
       stateMap: resolveStates(parsed),
-      lightTable: isLightTableMode(parsed),
     }
   }, [content])
 
@@ -318,46 +279,9 @@ export function OutlineView({ content }: OutlineViewProps): React.ReactElement {
   // Track slide numbering across all entries
   let slideCounter = 0
 
-  // Light-table mode: 3-column grid with section headings full-width
-  if (lightTable) {
-    return (
-      <div className="document-surface flex-1 overflow-y-auto px-6 sm:px-8 py-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" data-view="light-table">
-            {entries.map((entry, i) => {
-              if (entry.type === "section") {
-                return <SectionDivider key={`section-${i}`} section={entry} />
-              }
-              if (entry.type === "prose") {
-                return <ProseBlock key={`prose-${i}`} entry={entry} />
-              }
-              // Slide
-              slideCounter++
-              const state = stateMap.get(i) ?? "skeleton"
-              return (
-                <div
-                  key={entry.slug}
-                  ref={state === "active" ? activeRef : undefined}
-                >
-                  <LightTableCard
-                    slide={entry}
-                    state={state}
-                    slideNumber={slideCounter}
-                  />
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Detail mode: full-width slide cards
-  slideCounter = 0
   return (
     <div className="document-surface flex-1 overflow-y-auto px-6 sm:px-8 py-6">
-      <div className="max-w-2xl mx-auto space-y-4">
+      <div className="max-w-2xl mx-auto flex flex-col gap-2.5">
         {entries.map((entry, i) => {
           if (entry.type === "section") {
             return <SectionDivider key={`section-${i}`} section={entry} />
@@ -365,19 +289,42 @@ export function OutlineView({ content }: OutlineViewProps): React.ReactElement {
           if (entry.type === "prose") {
             return <ProseBlock key={`prose-${i}`} entry={entry} />
           }
-          // Slide
+
+          // Slide entry
           slideCounter++
           const state = stateMap.get(i) ?? "skeleton"
+          const isActive = state === "active"
+          const currentNumber = slideCounter
+
           return (
             <div
               key={entry.slug}
-              ref={state === "active" ? activeRef : undefined}
+              ref={isActive ? activeRef : undefined}
+              className="outline-node-enter grid items-start gap-2.5"
+              style={{
+                gridTemplateColumns: "36px 1fr",
+                "--stagger": `${currentNumber * 50}ms`,
+              } as React.CSSProperties}
+              data-state={state}
+              data-slide-slug={entry.slug}
             >
-              <SlideCard
-                slide={entry}
-                state={state}
-                slideNumber={slideCounter}
-              />
+              {/* Number rail */}
+              <span
+                className={`text-right tabular-nums text-lg font-semibold pt-3 ${
+                  isActive
+                    ? "bg-foreground text-background rounded px-2 py-0.5 justify-self-end"
+                    : "text-foreground-secondary/40"
+                }`}
+              >
+                {currentNumber}
+              </span>
+
+              {/* Card body */}
+              {state === "skeleton" ? (
+                <SkeletonSlide slide={entry} />
+              ) : (
+                <EnrichedSlide slide={entry} state={state} />
+              )}
             </div>
           )
         })}
