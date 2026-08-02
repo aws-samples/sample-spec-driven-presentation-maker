@@ -25,6 +25,7 @@ from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConfig
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
+from botocore.config import Config as BotoConfig
 from authz import authorize
 from chat_history import (
     cap_messages_size,
@@ -96,7 +97,7 @@ logger = Logger()
 metrics = Metrics()
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
-s3_client = boto3.client("s3")
+s3_client = boto3.client("s3", config=BotoConfig(signature_version="s3v4"))
 app = APIGatewayHttpResolver(cors=cors_config)
 
 # --- KB (optional) ---
