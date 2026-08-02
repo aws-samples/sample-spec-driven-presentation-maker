@@ -248,6 +248,7 @@ def fetch_url(
             if scheme == "https":
                 # Create SSL context with hostname verification
                 ctx = ssl.create_default_context()
+                ctx.minimum_version = ssl.TLSVersion.TLSv1_2
                 # HTTPConnection supplies HTTP framing; the socket is explicitly
                 # pinned and TLS-wrapped here so DNS cannot be resolved again.
                 conn = HTTPConnection(target_ip, port, timeout=connect_timeout)
