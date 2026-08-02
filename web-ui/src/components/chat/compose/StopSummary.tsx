@@ -22,7 +22,10 @@ export function StopSummary({ notice, summaries }: { notice?: string; summaries?
   return (
     <div
       className="mx-3 mb-3 rounded-lg p-3 flex flex-col gap-2"
-      style={{ background: `${STATE.retry}10`, boxShadow: `inset 0 0 0 1px ${STATE.retry}30` }}
+      style={{
+        background: `color-mix(in oklch, ${STATE.retry} 6%, transparent)`,
+        boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${STATE.retry} 18%, transparent)`,
+      }}
     >
       {notice && (
         <div className="flex items-start gap-1.5">
@@ -38,7 +41,7 @@ export function StopSummary({ notice, summaries }: { notice?: string; summaries?
             type="button"
             onClick={() => setOpen(!open)}
             aria-expanded={open}
-            className="inline-flex items-center gap-1 text-[10.5px] font-medium uppercase hover:opacity-80 transition-opacity"
+            className="inline-flex items-center gap-1 text-[11px] font-medium uppercase hover:opacity-80 transition-opacity"
             style={{ color: C.smallLabel, letterSpacing: "0.14em" }}
           >
             <ChevronRight
@@ -55,7 +58,7 @@ export function StopSummary({ notice, summaries }: { notice?: string; summaries?
                     {group}
                   </div>
                   <div
-                    className="text-[11.5px] leading-relaxed whitespace-pre-wrap break-words"
+                    className="text-[11px] leading-relaxed whitespace-pre-wrap break-words"
                     style={{ color: C.fgDim }}
                   >
                     {text}

@@ -1,23 +1,22 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * ComposeCard — Tool card for compose_slides, showing parallel composer agents.
+ * ComposeCard v2 — "Curtain rises" design.
  *
- * Design principles:
- *   - ToolCard-consistent outer shell (produce violet bg + border)
- *   - Two-line always-visible AgentCard (identity / current activity)
- *   - Inline accordion (chevron toggle) for instruction + full activity history
- *   - Activity timeline prioritizes "what the agent did" (icons + category color)
- *   - Minimal motion: breathing for active/retry only, no 3D tilt / hue offsets
+ * Achromatic shell with a 2px team-gradient curtain line at top.
+ * Interior uses the same work-ledger grammar as ToolCard.
+ * Each group i maps to one of five agent identities cyclically (i mod 5).
+ *
+ * Preserves all real behavior: error auto-expand, retry/rushed badges,
+ * stop button, n/m progress, StopSummary, aria-expanded, status semantics.
  */
 
 "use client"
 
 import { useState, useMemo } from "react"
 import { useTranslations } from "next-intl"
-import { Package, Check, AlertCircle, RefreshCw, X } from "lucide-react"
+import { Check, AlertCircle, RefreshCw, X } from "lucide-react"
 import { parseComposeState, type ComposeState } from "./parseComposeState"
-import { CAT } from "../toolPalette"
 import { stopComposeSlides } from "@/services/agentCoreService"
 import { STATE, C, MONO } from "./composeTokens"
 import { AgentCard } from "./AgentCard"
@@ -72,26 +71,26 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
   const existingSlugs = new Set(deckSlugs)
   const totalSlides = state.agents.reduce((sum, a) => sum + a.slugs.length, 0)
 
-  const shellBg = hasError
-    ? "oklch(0.65 0.2 25 / 6%)"
-    : stopping && isActive
-    ? `${STATE.retry}0f`
-    : CAT.produce.bg
-  const shellBorder = hasError
-    ? "oklch(0.65 0.2 25 / 18%)"
-    : stopping && isActive
-    ? `${STATE.retry}40`
-    : CAT.produce.border
-
   return (
     <section
       aria-label={t("composingAria")}
-      className="tool-card-enter relative rounded-xl"
+      className="compose-card tool-card-enter relative rounded-xl overflow-hidden"
       style={{
-        background: shellBg,
-        boxShadow: `inset 0 0 0 1px ${shellBorder}`,
+        background: hasError
+          ? "color-mix(in oklch, var(--state-error) 4%, var(--surface-subtle))"
+          : "var(--surface-subtle)",
+        boxShadow: hasError
+          ? "inset 0 0 0 1px color-mix(in oklch, var(--state-error) 15%, transparent)"
+          : "inset 0 0 0 1px oklch(1 0 0 / 6%)",
       }}
     >
+      {/* 2px team-gradient curtain line at top */}
+      <div
+        className="compose-curtain absolute inset-x-0 top-0 h-0.5"
+        style={{ background: "var(--team-gradient)" }}
+        aria-hidden="true"
+      />
+
       <Header
         state={state}
         isDone={isDone}
@@ -109,7 +108,7 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
         }}
         stopping={stopping}
       />
-      <div className="px-3 pb-3 flex flex-col gap-2">
+      <div className="px-3 pb-3 flex flex-col gap-0.5">
         {state.agents.map((agent, i) => (
           <AgentCard
             key={agent.groupIndex}
@@ -176,43 +175,49 @@ function Header({
     ? STATE.retry
     : isStopped
     ? C.fgMuted
-    : CAT.produce.accent
+    : C.fgLabel
 
   return (
-    <header className="flex items-center gap-2.5 px-3 pt-3 pb-2">
+    <header className="flex items-center gap-2.5 px-3 pt-3.5 pb-2">
       <div
-        className="flex-none w-7 h-7 rounded-lg flex items-center justify-center relative"
-        style={{ background: `${accent}18` }}
+        className="flex-none w-6 h-6 rounded-md flex items-center justify-center relative"
+        style={{ background: `color-mix(in oklch, ${hasError ? STATE.error : "var(--foreground)"} 8%, transparent)` }}
       >
         {isActive && !isFinished ? (
-          <svg className="absolute inset-0 w-7 h-7" viewBox="0 0 28 28">
+          <svg className="absolute inset-0 w-6 h-6" viewBox="0 0 24 24">
             <circle
-              cx="14" cy="14" r="12"
-              fill="none" stroke={accent} strokeWidth="1.5"
-              strokeDasharray="20 56" strokeLinecap="round"
+              cx="12" cy="12" r="9.5"
+              fill="none" stroke={hasError ? STATE.error : "var(--foreground-muted)"} strokeWidth="1.5"
+              strokeDasharray="16 44" strokeLinecap="round"
               style={{ animation: "tool-spinner 1.2s linear infinite" }}
             />
           </svg>
         ) : null}
         {hasError && !isActive ? (
-          <AlertCircle className="h-3.5 w-3.5" style={{ color: accent }} />
+          <AlertCircle className="h-3.5 w-3.5" style={{ color: STATE.error }} />
         ) : isDone ? (
-          <Check className="h-3.5 w-3.5" style={{ color: accent }} />
-        ) : (
-          <Package className="h-3.5 w-3.5" style={{ color: accent }} />
-        )}
+          <Check className="h-3.5 w-3.5" style={{ color: "var(--foreground-secondary)" }} />
+        ) : null}
       </div>
       <span
-        className="flex-1 min-w-0 text-[12.5px] font-medium tracking-[-0.01em] truncate"
+        className="flex-1 min-w-0 text-xs font-medium tracking-[-0.01em] truncate"
         style={{ color: accent }}
         aria-live="polite"
       >
         {label}
       </span>
+      {hasAgents && !isStopping && (
+        <span
+          className="flex-none text-[11px] tabular-nums"
+          style={{ color: C.fgMuted, fontFamily: MONO }}
+        >
+          {state.doneGroupCount}/{state.totalGroups}
+        </span>
+      )}
       {rushedCount > 0 && !isStopping && (
         <span
-          className="flex-none inline-flex items-center rounded-md px-1.5 py-0.5 text-[10.5px] font-medium"
-          style={{ color: STATE.retry, background: `${STATE.retry}14`, fontFamily: MONO }}
+          className="flex-none inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium"
+          style={{ color: STATE.retry, background: `color-mix(in oklch, ${STATE.retry} 10%, transparent)`, fontFamily: MONO }}
           title={t("rushedBadgeTitle", { count: rushedCount })}
         >
           {t("rushedBadge", { count: rushedCount })}
@@ -220,8 +225,8 @@ function Header({
       )}
       {isStopping ? (
         <span
-          className="flex-none inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium"
-          style={{ color: accent, background: `${accent}14` }}
+          className="flex-none inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium"
+          style={{ color: STATE.retry, background: `color-mix(in oklch, ${STATE.retry} 10%, transparent)` }}
           aria-label={t("cancelRequestedAria")}
         >
           <RefreshCw
@@ -234,7 +239,7 @@ function Header({
         <button
           type="button"
           onClick={onCancel}
-          className="flex-none inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-foreground/70 hover:text-foreground/95 hover:bg-white/5 transition-colors"
+          className="flex-none inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-foreground/70 hover:text-foreground/95 hover:bg-white/5 transition-colors"
           aria-label={t("cancelAria")}
         >
           <X className="h-3 w-3" />
