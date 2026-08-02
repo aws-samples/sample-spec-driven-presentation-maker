@@ -19,7 +19,7 @@ import socket
 import ssl
 import time
 from dataclasses import dataclass
-from http.client import HTTPConnection, HTTPSConnection, HTTPResponse
+from http.client import HTTPConnection, HTTPResponse
 from typing import BinaryIO
 from urllib.parse import urlparse
 
@@ -248,21 +248,9 @@ def fetch_url(
             if scheme == "https":
                 # Create SSL context with hostname verification
                 ctx = ssl.create_default_context()
-                # Connect to the validated IP but verify TLS against the hostname.
-                # HTTPSConnection with server_hostname handles SNI correctly
-                # without a double-wrap.
-                conn = HTTPSConnection(
-                    target_ip, port,
-                    timeout=connect_timeout,
-                    context=ctx,
-                )
-                # Override the Host header target but keep TLS SNI on hostname
-                conn._http_vsn_str = "HTTP/1.1"  # type: ignore[attr-defined]
-                # Patch the internal host used for SNI to the real hostname
-                # before connect() is called (HTTPSConnection uses this for SNI)
-                conn._context = ctx  # type: ignore[attr-defined]
-                conn.sock = None  # type: ignore[assignment]
-                # Create raw socket to the pinned IP, then wrap with TLS
+                # HTTPConnection supplies HTTP framing; the socket is explicitly
+                # pinned and TLS-wrapped here so DNS cannot be resolved again.
+                conn = HTTPConnection(target_ip, port, timeout=connect_timeout)
                 import socket as _socket
                 raw_sock = _socket.create_connection(
                     (target_ip, port), timeout=connect_timeout

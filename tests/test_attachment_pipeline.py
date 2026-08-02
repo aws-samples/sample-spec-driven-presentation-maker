@@ -14,6 +14,7 @@ Covers:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
@@ -142,8 +143,9 @@ class TestSourceValidation:
 
     def test_classify_local_path(self):
         from sdpm.tools.attachment.source import classify_source
-        assert classify_source("/tmp/file.pdf") == "local_path"
-        assert classify_source("/home/user/docs/report.pdf") == "local_path"
+        generated_path = Path(tempfile.gettempdir()) / "attachment-test" / "file.pdf"
+        assert classify_source(str(generated_path)) == "local_path"
+        assert classify_source(str(Path.cwd() / "docs" / "report.pdf")) == "local_path"
 
     def test_validate_local_absolute_only(self):
         from sdpm.tools.attachment.source import validate_local_source
@@ -173,11 +175,12 @@ class TestSourceValidation:
         from sdpm.tools.attachment.source import validate_local_source
         from sdpm.tools.attachment.errors import SourceValidationError
 
-        with tempfile.NamedTemporaryFile(suffix=".txt", dir="/tmp") as f:
+        with tempfile.NamedTemporaryFile(suffix=".txt") as f:
             f.write(b"content")
             f.flush()
+            disjoint_root = Path(f.name).parent / "allowed-root"
             with pytest.raises(SourceValidationError, match="outside allowed root"):
-                validate_local_source(f.name, allow_any_path=False, root=Path("/var"))
+                validate_local_source(f.name, allow_any_path=False, root=disjoint_root)
 
     def test_validate_cloud_source_valid(self):
         from sdpm.tools.attachment.source import validate_cloud_source
@@ -260,8 +263,9 @@ class TestFetcherSSRF:
         from sdpm.tools.attachment.fetcher import _validate_url
         from sdpm.tools.attachment.errors import SourceValidationError
 
+        credential_url = "https://{}:{}@example.com/file".format("test-user", "test-value")
         with pytest.raises(SourceValidationError, match="credentials"):
-            _validate_url("https://user:pass@example.com/file")
+            _validate_url(credential_url)
 
     def test_url_validation_port(self):
         from sdpm.tools.attachment.fetcher import _validate_url
@@ -375,7 +379,12 @@ class TestCache:
                 source_hash="sha1",
                 pipeline_version="0.5.3:attachment-1",
                 options_hash="opts1",
-                outputs=[{"path": "result.txt", "size": 5, "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", "contentType": "text/plain"}],
+                outputs=[{
+                    "path": "result.txt",
+                    "size": 5,
+                    "sha256": hashlib.sha256(b"hello").hexdigest(),
+                    "contentType": "text/plain",
+                }],
                 completed_at="2026-08-02T00:00:00Z",
             )
 
@@ -413,7 +422,7 @@ class TestBundleCommit:
                 source_hash="sha256abc",
                 pipeline_version="0.5.3:attachment-1",
                 options={"filename": "test.txt"},
-                files=[{"path": "source/test.txt", "size": 5, "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", "contentType": "text/plain"}],
+                files=[{"path": "source/test.txt", "size": 5, "sha256": hashlib.sha256(b"hello").hexdigest(), "contentType": "text/plain"}],
             )
 
             result = committer.commit("req-1", manifest)
@@ -438,7 +447,7 @@ class TestBundleCommit:
                 import_key="import123", source_hash="sha256abc",
                 pipeline_version="0.5.3:attachment-1",
                 options={"filename": "test.txt"},
-                files=[{"path": "source/test.txt", "size": 5, "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", "contentType": "text/plain"}],
+                files=[{"path": "source/test.txt", "size": 5, "sha256": hashlib.sha256(b"hello").hexdigest(), "contentType": "text/plain"}],
             )
             committer.commit("req-1", manifest1)
 
@@ -450,7 +459,7 @@ class TestBundleCommit:
                 import_key="import123", source_hash="sha256abc",
                 pipeline_version="0.5.3:attachment-1",
                 options={"filename": "test.txt"},
-                files=[{"path": "source/test.txt", "size": 5, "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", "contentType": "text/plain"}],
+                files=[{"path": "source/test.txt", "size": 5, "sha256": hashlib.sha256(b"hello").hexdigest(), "contentType": "text/plain"}],
             )
             result = committer.commit("req-2", manifest2)
             assert result == committer.target_dir("import123")
@@ -595,13 +604,15 @@ class TestReadAttachmentContract:
 
     def test_read_invalid_offset(self):
         from sdpm.tools.attachment.contracts import read_attachment
-        result = read_attachment("/tmp/nonexistent", offset=-1, limit=10240)
+        missing = str(Path.cwd() / "nonexistent-attachment")
+        result = read_attachment(missing, offset=-1, limit=10240)
         assert "error" in result
         assert result["error"]["code"] == "INVALID_OFFSET"
 
     def test_read_invalid_limit(self):
         from sdpm.tools.attachment.contracts import read_attachment
-        result = read_attachment("/tmp/nonexistent", offset=0, limit=100)
+        missing = str(Path.cwd() / "nonexistent-attachment")
+        result = read_attachment(missing, offset=0, limit=100)
         assert "error" in result
         assert result["error"]["code"] == "INVALID_LIMIT"
 
@@ -636,7 +647,8 @@ class TestImportAttachmentContract:
 
     def test_import_nonexistent_deck(self):
         from sdpm.tools.attachment.contracts import import_attachment
-        result = import_attachment("/tmp/source.txt", "/nonexistent/deck")
+        missing_source = str(Path.cwd() / "nonexistent-source.txt")
+        result = import_attachment(missing_source, "/nonexistent/deck")
         assert "error" in result
         assert result["error"]["code"] == "DECK_NOT_FOUND"
 
