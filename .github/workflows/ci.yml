@@ -104,6 +104,38 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
         working-directory: infra
+      # cdk synth catches template-level errors that tsc cannot (e.g. invalid
+      # lifecycle rule combinations only fail at CloudFormation/S3 API time,
+      # but synth at least validates construct-level constraints and config).
+      - name: Synth
+        run: npx cdk synth --all --quiet
+        working-directory: infra
+
+  # Deploy-surface guard: the runtime docker builds resolve Python deps with
+  # pip against committed lockfiles. CI has no docker build, so a lockfile
+  # that pip cannot satisfy (e.g. a Dependabot bump contradicting a
+  # transitive hard pin — cachetools/protobuf under aws-opentelemetry-distro,
+  # 2026-08-02) used to surface only at deploy time. Reproduce the exact
+  # docker-side installs as dry runs here.
+  container-deps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v9.0.0
+      - name: Remote server image deps resolve (mirrors servers/remote/Dockerfile)
+        run: |
+          uv venv /tmp/remote-check --python 3.13
+          VIRTUAL_ENV=/tmp/remote-check uv pip install --dry-run \
+            -c servers/remote/constraints.txt ./sdpm ./servers/remote
+      - name: Agent image deps resolve (mirrors agent/Dockerfile)
+        run: |
+          uv venv /tmp/agent-check --python 3.13
+          VIRTUAL_ENV=/tmp/agent-check uv pip install --dry-run \
+            -r agent/requirements.lock
 
   guard:
     runs-on: ubuntu-latest
