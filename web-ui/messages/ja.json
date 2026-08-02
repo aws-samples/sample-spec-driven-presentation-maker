@@ -189,15 +189,11 @@
     "submit": "送信"
   },
   "modeSelector": {
-    "vibeDescription": "資料を渡すだけでスライドに。最小限の対話で素早く変換します。",
-    "specDescription": "まず計画、それから構築。対話で要件を固めてから作成します。",
-    "greatFor": "こんな用途に",
-    "vibeFor1": "URL・記事 → スライド",
-    "vibeFor2": "論文・ドキュメント → 要約デッキ",
-    "vibeFor3": "会議メモ → プレゼン資料",
-    "specFor1": "提案書・ピッチ資料",
-    "specFor2": "構成が重要なプロジェクト",
-    "specFor3": "磨き込まれた正確なプレゼン"
+    "chooseWorkingStyle": "進め方を選択",
+    "vibePath": "すばやく作成",
+    "specPath": "確認しながら作成",
+    "vibeSummary": "ラフな素材から、まず初稿をすばやく形にします。",
+    "specSummary": "スライドを作る前に、伝えるストーリーを固めます。"
   },
   "tools": {
     "running": "実行中",

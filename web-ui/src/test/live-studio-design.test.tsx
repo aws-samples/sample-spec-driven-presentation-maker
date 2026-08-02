@@ -1,22 +1,21 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Step 8 — Peripheral unification tests.
- * Verifies agent token mapping, HearingCard structure, and team-action class.
+ * Live Design Studio design-system regression tests.
+ * Verifies agent tokens, theme behavior, primary actions, and semantic surfaces.
  */
 
 import { describe, it, expect } from "vitest"
-import { render, screen, fireEvent } from "@testing-library/react"
+import { screen, fireEvent } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { HearingCard } from "@/components/chat/HearingCard"
 import fs from "fs"
 import path from "path"
 
+const sourcePath = (...parts: string[]) => path.resolve(process.cwd(), "src", ...parts)
+
 describe("Agent token mapping (globals.css)", () => {
-  const css = fs.readFileSync(
-    path.resolve(__dirname, "./app/globals.css"),
-    "utf-8"
-  )
+  const css = fs.readFileSync(sourcePath("app/globals.css"), "utf-8")
 
   it("defines five agent tokens in :root", () => {
     expect(css).toContain("--agent-layout:")
@@ -36,6 +35,25 @@ describe("Agent token mapping (globals.css)", () => {
     expect(css).toContain(".team-action-btn")
     expect(css).toContain("conic-gradient")
     expect(css).toContain("--team-angle")
+  })
+
+  it("keeps New Deck spectrum restrained and theme-aware", () => {
+    expect(css).toContain("--entry-action-spectrum:")
+    expect(css).toContain(".team-entry-btn {")
+    expect(css).toContain("box-shadow: none")
+    expect(css).toContain("animation-duration: 7s")
+    expect(css).toContain("[data-theme=\"light\"] .team-entry-btn::before")
+    expect(css).toContain("inset: -2px")
+
+    const desktop = fs.readFileSync(sourcePath("components/deck/DeckListView.tsx"), "utf-8")
+    const mobile = fs.readFileSync(sourcePath("app/(authenticated)/decks/page.tsx"), "utf-8")
+    expect(desktop).toContain("team-action-btn team-entry-btn")
+    expect(mobile).toContain("team-action-btn team-entry-btn")
+  })
+
+  it("styles MUST NOT without striking through its text", () => {
+    expect(css).toContain(".requirement-must-not::before")
+    expect(css).toContain(".requirement-must-not::after")
   })
 
   it("disables team-action animation in reduced-motion", () => {
@@ -110,7 +128,7 @@ describe("HearingCard — achromatic + five-color spine", () => {
 describe("AnimatedSlidePreview — no hardcoded AGENTS colors", () => {
   it("source file does not contain rgba agent colors", () => {
     const src = fs.readFileSync(
-      path.resolve(__dirname, "./components/deck/AnimatedSlidePreview.tsx"),
+      sourcePath("components/deck/AnimatedSlidePreview.tsx"),
       "utf-8"
     )
     // Old hardcoded values should be gone
@@ -122,6 +140,14 @@ describe("AnimatedSlidePreview — no hardcoded AGENTS colors", () => {
     // Should use CSS variable approach
     expect(src).toContain("--agent-layout")
     expect(src).toContain("resolveAgents")
+  })
+})
+
+describe("Document typography cleanup", () => {
+  it("lets document-surface own Outline font family", () => {
+    const src = fs.readFileSync(sourcePath("components/deck/OutlineView.tsx"), "utf-8")
+    expect(src).not.toContain("font-[var(--font-document)]")
+    expect(src).toContain("document-surface")
   })
 })
 
@@ -142,7 +168,7 @@ describe("Light/Dark theme audit — no hardcoded white chrome", () => {
 
   chromeFiles.forEach((file) => {
     it(`${file} has no border-white/[...] in chrome`, () => {
-      const src = fs.readFileSync(path.resolve(__dirname, file), "utf-8")
+      const src = fs.readFileSync(sourcePath(file), "utf-8")
       // Should not have hardcoded white borders (use border-border or border-border-hover)
       const matches = src.match(/border-white\/\[/g) || []
       expect(matches).toHaveLength(0)
@@ -151,7 +177,7 @@ describe("Light/Dark theme audit — no hardcoded white chrome", () => {
 
   it("ConfirmDialog uses bg-popover instead of hardcoded oklch bg", () => {
     const src = fs.readFileSync(
-      path.resolve(__dirname, "components/ConfirmDialog.tsx"),
+      sourcePath("components/ConfirmDialog.tsx"),
       "utf-8"
     )
     expect(src).toContain("bg-popover")
@@ -160,7 +186,7 @@ describe("Light/Dark theme audit — no hardcoded white chrome", () => {
 
   it("styles/page popover menu uses bg-popover", () => {
     const src = fs.readFileSync(
-      path.resolve(__dirname, "app/(authenticated)/styles/page.tsx"),
+      sourcePath("app/(authenticated)/styles/page.tsx"),
       "utf-8"
     )
     expect(src).not.toContain("oklch(0.14 0.005 260 / 98%)")
@@ -169,7 +195,7 @@ describe("Light/Dark theme audit — no hardcoded white chrome", () => {
 
   it("templates/page upload dialog uses bg-popover", () => {
     const src = fs.readFileSync(
-      path.resolve(__dirname, "app/(authenticated)/templates/page.tsx"),
+      sourcePath("app/(authenticated)/templates/page.tsx"),
       "utf-8"
     )
     expect(src).not.toContain("oklch(0.14 0.005 260)")

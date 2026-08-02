@@ -189,15 +189,11 @@
     "submit": "Submit"
   },
   "modeSelector": {
-    "vibeDescription": "Drop materials, get slides. Minimal interaction for quick conversions.",
-    "specDescription": "Plan first, then build. Refine requirements through dialogue before composing.",
-    "greatFor": "Great for",
-    "vibeFor1": "URLs & articles → slides",
-    "vibeFor2": "Papers & docs → summary deck",
-    "vibeFor3": "Meeting notes → presentation",
-    "specFor1": "Proposals & pitch decks",
-    "specFor2": "Projects needing structure",
-    "specFor3": "Polished, precise presentations"
+    "chooseWorkingStyle": "Choose your working style",
+    "vibePath": "Fast path",
+    "specPath": "Review path",
+    "vibeSummary": "Start rough. See a first draft sooner.",
+    "specSummary": "Decide the story before the slides."
   },
   "tools": {
     "running": "Running",

@@ -70,6 +70,15 @@
   --agent-decorator: oklch(0.72 0.16 330);
   --agent-neutral: oklch(0.55 0 0);
   --team-gradient: linear-gradient(90deg, var(--agent-layout), var(--agent-content), var(--agent-visual), var(--agent-data), var(--agent-decorator));
+  --entry-action-spectrum: conic-gradient(
+    from var(--team-angle, 0deg),
+    var(--agent-layout),
+    var(--agent-content),
+    var(--agent-visual),
+    var(--agent-data),
+    var(--agent-decorator),
+    var(--agent-layout)
+  );
 
   /* Red is reserved for real errors; normal workflow never borrows it. */
   --state-error: oklch(0.65 0.2 25);
@@ -118,6 +127,20 @@
   --agent-data: oklch(0.48 0.14 70);
   --agent-decorator: oklch(0.48 0.20 330);
   --agent-neutral: oklch(0.45 0 0);
+  --entry-action-spectrum: conic-gradient(
+    from var(--team-angle, 0deg),
+    oklch(0.60 0.22 262) 0deg,
+    oklch(0.64 0.17 165) 36deg,
+    oklch(0.70 0.17 70) 72deg,
+    oklch(0.62 0.22 340) 108deg,
+    oklch(0.60 0.23 300) 144deg,
+    oklch(0.60 0.22 262) 180deg,
+    oklch(0.64 0.17 165) 216deg,
+    oklch(0.70 0.17 70) 252deg,
+    oklch(0.62 0.22 340) 288deg,
+    oklch(0.60 0.23 300) 324deg,
+    oklch(0.60 0.22 262) 360deg
+  );
   --surface-subtle: oklch(0.2 0.01 260 / 3%);
   --surface-stage: oklch(0.93 0.008 85);
   --shadow-card: 0 1px 2px oklch(0.2 0.02 260 / 8%), 0 8px 24px oklch(0.2 0.02 260 / 8%);
@@ -178,6 +201,17 @@
 
 /* 11px absolute floor remains intact when the user selects 90% text scale. */
 .text-xs { font-size: max(11px, 0.75rem); }
+
+/* MUST NOT stays readable: an outline plus split rule, never text strike-through. */
+.requirement-must-not::before,
+.requirement-must-not::after {
+  content: "";
+  width: 0.3rem;
+  height: 1px;
+  flex: none;
+  background: currentColor;
+  opacity: 0.55;
+}
 
 /* ── Noise texture overlay ── */
 body {
@@ -601,6 +635,24 @@ body {
 }
 .team-action-btn:hover::before {
   animation-duration: 1.8s;
+}
+/* New Deck is an entry point, not active orchestration: keep the spectrum quiet. */
+.team-entry-btn {
+  border-width: 1px;
+  box-shadow: none;
+}
+.team-entry-btn::before {
+  inset: -1px;
+  padding: 1px;
+  background: var(--entry-action-spectrum);
+  animation-duration: 7s;
+}
+.team-entry-btn:hover::before {
+  animation-duration: 4s;
+}
+[data-theme="light"] .team-entry-btn::before {
+  inset: -2px;
+  padding: 2px;
 }
 .team-action-btn:focus-visible {
   outline: 2px solid var(--ring);

@@ -64,12 +64,15 @@ describe("BriefDocumentView", () => {
       expect(chip.className).not.toContain("line-through")
     })
 
-    it("renders [MUST NOT] as a struck-through chip", () => {
+    it("renders [MUST NOT] as an outlined chip with a readable split rule", () => {
       const md = "You [MUST NOT] use Comic Sans."
       renderWithIntl(<BriefDocumentView content={md} outlineExists={false} />)
       const chip = screen.getByRole("img", { name: "MUST NOT" })
       expect(chip).toBeTruthy()
-      expect(chip.className).toContain("line-through")
+      expect(chip.className).toContain("requirement-must-not")
+      expect(chip.className).toContain("border-foreground/60")
+      expect(chip.className).not.toContain("line-through")
+      expect(chip.className).not.toContain("bg-foreground/90")
     })
 
     it("renders [PREFER] as a dashed-border chip", () => {

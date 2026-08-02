@@ -265,7 +265,7 @@ export default function DecksPage() {
               <div className="absolute bottom-16 right-0 z-40 flex flex-col gap-2 items-end">
                 <button
                   onClick={() => { setFabOpen(false); ws.setChatOpen(true); ws.setChatTab("new") }}
-                  className="team-action-btn flex items-center gap-2 min-h-11 px-4 py-2.5 rounded-full shadow-lg text-sm font-medium animate-card-in"
+                  className="team-action-btn team-entry-btn flex items-center gap-2 min-h-11 px-4 py-2.5 rounded-full text-sm font-medium animate-card-in"
                 >
                   <Plus className="h-4 w-4" />
                   {t("newDeck")}

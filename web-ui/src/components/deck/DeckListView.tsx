@@ -95,7 +95,7 @@ export function DeckListView({
         <div className="hidden sm:flex items-center gap-2">
           <button
             onClick={onNewDeck}
-            className="team-action-btn inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg transition-all hover:brightness-110"
+            className="team-action-btn team-entry-btn inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg transition-all"
           >
             <Plus className="h-3.5 w-3.5" />
             {t("newDeck")}

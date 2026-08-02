@@ -104,7 +104,7 @@ function SlideCard({ slide, state, slideNumber }: {
           {/* Title + message */}
           <div className="space-y-2">
             <h3
-              className="font-[var(--font-document)] text-sm sm:text-[15px] leading-snug tracking-[-0.015em]"
+              className="text-sm sm:text-[15px] leading-snug tracking-[-0.015em]"
               style={{ fontWeight: "var(--document-display-weight)" } as React.CSSProperties}
             >
               {slide.message || slide.slug}
@@ -233,7 +233,7 @@ function SectionDivider({ section }: { section: SectionEntry }): React.ReactElem
   return (
     <div className="col-span-full" data-entry-type="section">
       <h2
-        className="font-[var(--font-document)] text-sm font-semibold text-foreground/70 tracking-[-0.015em] border-b border-foreground/8 pb-2 mt-6 mb-2"
+        className="text-sm font-semibold text-foreground/70 tracking-[-0.015em] border-b border-foreground/8 pb-2 mt-6 mb-2"
         style={{ fontWeight: "var(--document-display-weight)" } as React.CSSProperties}
       >
         {section.title}

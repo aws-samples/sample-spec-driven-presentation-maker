@@ -34,7 +34,7 @@ const REQUIREMENT_RE = /\[(MUST NOT|MUST|PREFER)\]/g
 /** Chip style variants for requirement markers. */
 const CHIP_STYLES: Record<string, string> = {
   MUST: "bg-foreground/90 text-background font-semibold",
-  "MUST NOT": "bg-foreground/90 text-background font-semibold line-through decoration-2",
+  "MUST NOT": "requirement-must-not bg-transparent text-foreground font-semibold border border-foreground/60",
   PREFER: "bg-transparent text-foreground/80 font-medium border border-dashed border-foreground/40",
 }
 
