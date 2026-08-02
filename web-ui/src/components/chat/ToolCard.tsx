@@ -1,19 +1,25 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * ToolCard — Premium activity card for tool executions in chat.
+ * ToolCard — Work ledger row for tool executions in chat.
  *
- * Three visual states with smooth transitions:
- * - Active: Animated gradient border + spinner + pulse glow
- * - Success: Accent check + result summary slide-in
- * - Error: Red accent + error message
+ * Redesigned as a single vertical rail with ledger rows (commit log style).
+ * Color answers only "who is working" via a left marker; state is communicated
+ * through shape (dot = done, cursor arrow + name tag = active, muted dot = past).
  *
- * Tool categories determine the accent color:
- * - build: teal (creating/modifying)
- * - explore: amber (reading/searching)
- * - produce: violet (generating output)
- * - compute: cyan (code execution)
- * - other: neutral
+ * Four visual states:
+ * - Active: cursor arrow marker + agent name tag + detail line
+ * - Success: colored dot marker + result summary
+ * - Error: red dot marker + error message (red reserved for real errors only)
+ * - Compact: small muted dot + inline label
+ *
+ * Tool categories determine the agent color (who):
+ * - compute → Layout (blue)
+ * - build → Content (green)
+ * - produce → Visual (purple)
+ * - explore → Data (amber)
+ * - hearing → Decorator (pink)
+ * - other → neutral
  *
  * @param props.name - Tool function name
  * @param props.input - Tool input parameters
@@ -43,7 +49,17 @@ interface ToolMeta {
 }
 
 
-const ERR = { accent: "oklch(0.65 0.2 25)", bg: "oklch(0.65 0.2 25 / 6%)", border: "oklch(0.65 0.2 25 / 18%)" }
+const ERR = { accent: "var(--state-error)", bg: "color-mix(in oklch, var(--state-error) 6%, transparent)", border: "color-mix(in oklch, var(--state-error) 18%, transparent)" }
+
+/** Agent display names keyed by category (for active cursor name tag). */
+const AGENT_NAMES: Record<ToolCategory, string> = {
+  compute: "Layout",
+  build: "Content",
+  produce: "Visual",
+  explore: "Data",
+  hearing: "Decorator",
+  other: "Agent",
+}
 
 /** Icon, label, and category per tool name. */
 export const TOOL_META: Record<string, ToolMeta> = {
@@ -199,105 +215,93 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
   const colors = isError ? { ...CAT.other, accent: ERR.accent, bg: ERR.bg, border: ERR.border } : CAT[meta.category]
   const detail = getDetail(name, input)
   const summary = isComplete ? getResultSummary(name, result, status) : ""
-  const { Icon } = meta
+  const agentName = AGENT_NAMES[meta.category]
 
   return (
     <div
-      className="tool-card-enter group/tool relative flex items-center gap-2.5 pl-3 pr-3.5 py-2 rounded-xl transition-all duration-500"
-      style={{
-        background: isActive ? colors.bg : isComplete ? colors.bg : "transparent",
-        boxShadow: isActive ? `0 0 20px ${colors.glow}, inset 0 0 0 1px ${colors.border}` : isComplete ? `inset 0 0 0 1px ${colors.border}` : "inset 0 0 0 1px oklch(1 0 0 / 4%)",
-      }}
+      className="ledger-row tool-card-enter group/tool relative flex items-start gap-2.5 py-1.5"
       role="status"
       aria-label={`${isActive ? t("running") : isError ? t("failed") : t("completed")}: ${label}${detail ? ` — ${detail}` : ""}${summary ? ` — ${summary}` : ""}`}
       aria-live={isComplete ? "polite" : undefined}
     >
-      {/* Animated gradient border for active state */}
-      {isActive && (
-        <div
-          className="absolute inset-0 rounded-xl pointer-events-none"
-          style={{
-            background: `linear-gradient(135deg, ${colors.accent}15, transparent 40%, ${colors.accent}08)`,
-            animation: "tool-active-shimmer 2s ease-in-out infinite",
-          }}
-        />
-      )}
-
-      {/* Icon container with state transitions */}
-      <div
-        className="relative flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-300"
-        style={{
-          background: isActive ? `${colors.accent}18` : isComplete ? `${colors.accent}12` : "oklch(1 0 0 / 4%)",
-        }}
-      >
+      {/* Left rail marker — color answers "who" */}
+      <div className="ledger-marker flex-none flex flex-col items-center pt-1.5">
         {isActive ? (
-          /* Spinning ring — custom SVG for premium feel */
-          <svg className="absolute inset-0 w-7 h-7" viewBox="0 0 28 28">
-            <circle
-              cx="14" cy="14" r="12"
+          /* Cursor arrow + agent name tag = active */
+          <div className="flex items-center gap-1">
+            <svg
+              className="w-2.5 h-2.5 ledger-cursor"
+              viewBox="0 0 10 10"
               fill="none"
-              stroke={colors.accent}
-              strokeWidth="1.5"
-              strokeDasharray="20 56"
-              strokeLinecap="round"
-              style={{ animation: "tool-spinner 1.2s linear infinite" }}
-            />
-          </svg>
-        ) : isComplete ? (
-          /* Success/error indicator ring */
-          <svg className="absolute inset-0 w-7 h-7 tool-ring-enter" viewBox="0 0 28 28">
-            <circle
-              cx="14" cy="14" r="12"
-              fill="none"
-              stroke={colors.accent}
-              strokeWidth="1.5"
-              strokeDasharray="75.4"
-              strokeDashoffset="0"
-              strokeLinecap="round"
-              opacity="0.3"
-            />
-          </svg>
-        ) : null}
-
-        {/* Center icon */}
-        {isComplete && !isError ? (
-          <Check
-            className="h-3 w-3 tool-check-enter"
-            style={{ color: colors.accent }}
+              aria-hidden="true"
+            >
+              <path d="M1 1 L9 5 L5 5.8 L3.5 9.5 Z" fill={colors.accent} />
+            </svg>
+            <span
+              className="text-[11px] font-medium leading-none px-1 py-0.5 rounded-sm"
+              style={{ color: colors.accent, background: `color-mix(in oklch, ${colors.accent} 10%, transparent)` }}
+            >
+              {agentName}
+            </span>
+          </div>
+        ) : isError ? (
+          /* Red dot = error */
+          <div
+            className="w-2 h-2 rounded-full tool-check-enter"
+            style={{ background: ERR.accent }}
+            aria-hidden="true"
           />
-        ) : isComplete && isError ? (
-          <AlertCircle
-            className="h-3 w-3 tool-check-enter"
-            style={{ color: ERR.accent }}
+        ) : isComplete ? (
+          /* Colored dot = done */
+          <div
+            className="w-2 h-2 rounded-full tool-check-enter"
+            style={{ background: colors.accent }}
+            aria-hidden="true"
           />
         ) : (
-          <Icon
-            className="h-3 w-3 transition-colors duration-300"
-            style={{ color: isActive ? colors.accent : "oklch(0.50 0 0)" }}
+          /* Muted dot = queued/idle */
+          <div
+            className="w-1.5 h-1.5 rounded-full"
+            style={{ background: "var(--foreground-muted)", opacity: 0.4 }}
+            aria-hidden="true"
           />
         )}
       </div>
 
       {/* Content */}
-      <div className="relative flex-1 min-w-0">
+      <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span
             className="text-xs font-medium tracking-[-0.01em] transition-colors duration-300"
-            style={{ color: isActive ? colors.accent : isComplete ? colors.accent : "oklch(0.50 0 0)" }}
+            style={{ color: isActive ? colors.accent : isError ? ERR.accent : isComplete ? "var(--foreground-secondary)" : "var(--foreground-muted)" }}
           >
             {label}
           </span>
+          {/* Active spinner inline */}
+          {isActive && (
+            <svg className="w-3 h-3 flex-none" viewBox="0 0 12 12" aria-hidden="true">
+              <circle
+                cx="6" cy="6" r="4.5"
+                fill="none"
+                stroke={colors.accent}
+                strokeWidth="1"
+                strokeDasharray="8 20"
+                strokeLinecap="round"
+                style={{ animation: "tool-spinner 1.2s linear infinite" }}
+              />
+            </svg>
+          )}
         </div>
-        {/* Detail line: input params or result summary */}
+        {/* Detail line: input params → result summary transition */}
         {(detail || summary) && (
           <p
             className="text-[11px] truncate mt-0.5 leading-tight transition-all duration-300"
-            style={{ color: isComplete ? `${colors.accent}99` : "oklch(1 0 0 / 25%)" }}
+            style={{ color: isError ? ERR.accent : isComplete ? "var(--foreground-muted)" : "var(--foreground-muted)" }}
           >
             {summary || detail}
           </p>
         )}
-        {/* Streaming progress — sub-tool activity feed */}
+        {/* Streaming progress — grouped sub-tool feed (nested rail) */}
         {isActive && streamMessages && streamMessages.length > 0 && (() => {
           // Group events by group number for parallel display
           const groupMap = new Map<number, { status?: Record<string, unknown>; tools: Record<string, unknown>[] }>()
@@ -317,8 +321,8 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
               if (entry.status?.status === "retrying") entry.status = undefined
             }
             else if (ev.toolResult) {
-              const t = entry.tools.find((t) => t.toolUseId === ev.toolResult)
-              if (t) t.toolStatus = ev.toolStatus
+              const tl = entry.tools.find((tl) => tl.toolUseId === ev.toolResult)
+              if (tl) tl.toolStatus = ev.toolStatus
             }
           }
 
@@ -326,9 +330,9 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
           const statusMsg = ungrouped.filter((e) => e.message).pop()
 
           return (
-            <div className="mt-1.5 space-y-1.5">
+            <div className="mt-1.5 space-y-1">
               {statusMsg && (
-                <p className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: `${colors.accent}cc` }}>
+                <p className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: colors.accent }}>
                   {String(statusMsg.message)}
                 </p>
               )}
@@ -342,55 +346,55 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
                 const groupAccent = isErr ? ERR.accent : colors.accent
 
                 return (
-                  <div key={g} className="rounded-lg px-2 py-1.5 transition-all duration-300" style={{ background: `${groupAccent}08` }}>
-                    {/* Group header */}
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <div className="flex-none w-3.5 h-3.5 rounded flex items-center justify-center" style={{ background: `${groupAccent}15` }}>
+                  <div key={g} className="ledger-sub relative pl-3 border-l transition-colors duration-300" style={{ borderColor: `color-mix(in oklch, ${groupAccent} 20%, transparent)` }}>
+                    {/* Group header with nested marker */}
+                    <div className="flex items-center gap-1.5 py-0.5">
+                      {/* Sub-marker */}
+                      <div className="absolute left-0 -translate-x-1/2 flex-none">
                         {isDone ? (
-                          <Check className="h-2 w-2" style={{ color: groupAccent }} />
+                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: groupAccent, opacity: 0.6 }} />
                         ) : isErr ? (
-                          <AlertCircle className="h-2 w-2" style={{ color: ERR.accent }} />
+                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: ERR.accent }} />
                         ) : isRetrying ? (
-                          <RefreshCw className="h-2 w-2" style={{ color: groupAccent, animation: "tool-spinner 1s linear infinite" }} />
+                          <RefreshCw className="w-2.5 h-2.5" style={{ color: groupAccent, animation: "tool-spinner 1s linear infinite" }} />
                         ) : (
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 14 14">
-                            <circle cx="7" cy="7" r="4.5" fill="none" stroke={groupAccent} strokeWidth="1" strokeDasharray="8 20" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
+                          <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" aria-hidden="true">
+                            <circle cx="5" cy="5" r="3.5" fill="none" stroke={groupAccent} strokeWidth="1" strokeDasharray="6 16" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
                           </svg>
                         )}
                       </div>
-                      <span className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: `${groupAccent}cc` }}>
+                      <span className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: `color-mix(in oklch, ${groupAccent} 80%, transparent)` }}>
                         {isRetrying ? `Retrying (${retryAttempt})` : `Group ${g}/${totalGroups}`} · {String(slugs)}
                         {isRetrying && !!gStatus?.error && (
                           <span className="ml-1 opacity-60" title={String(gStatus.error)}>— {String(gStatus.error).slice(0, 300)}</span>
                         )}
                       </span>
                     </div>
-                    {/* Sub-tool list — show last 3 per group */}
+                    {/* Sub-tool list — show last 3 per group, old items faded */}
                     {!isDone && tools.slice(-3).map((ev, i) => {
                       const toolName = stripPrefix(String(ev.tool))
                       const sub = TOOL_META[toolName] || { Icon: Wrench, label: toolName.replace(/_/g, " "), category: "other" as ToolCategory }
                       const isToolErr = ev.toolStatus === "error"
                       const isToolDone = !!ev.toolStatus
-                      const subColors = isToolErr ? ERR : CAT[sub.category]
+                      const subColors = isToolErr ? { accent: ERR.accent } : CAT[sub.category]
                       const subDetail = getDetail(toolName, ev.input as Record<string, unknown> | undefined)
                       const isLast = i === Math.min(tools.length, 3) - 1
                       const showSpinner = isLast && !isToolDone
                       return (
-                        <div key={`${g}-${ev.tool}-${i}`} className="flex items-center gap-1.5 py-0.5 ml-5" style={{ opacity: isLast ? 1 : 0.4 }}>
-                          <div className="flex-none w-3.5 h-3.5 rounded flex items-center justify-center" style={{ background: `${subColors.accent}10` }}>
+                        <div key={`${g}-${ev.tool}-${i}`} className="flex items-center gap-1.5 py-0.5 ml-1" style={{ opacity: isLast ? 1 : 0.4 }}>
+                          {/* Sub-tool marker */}
+                          <div className="flex-none w-1.5 h-1.5 flex items-center justify-center">
                             {showSpinner ? (
-                              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14">
-                                <circle cx="7" cy="7" r="4.5" fill="none" stroke={subColors.accent} strokeWidth="1" strokeDasharray="8 20" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
-                              </svg>
+                              <div className="w-1 h-1 rounded-full" style={{ background: subColors.accent, animation: "tool-pulse 1.5s ease-in-out infinite" }} />
                             ) : isToolErr ? (
-                              <AlertCircle className="h-2 w-2" style={{ color: ERR.accent }} />
+                              <div className="w-1.5 h-1.5 rounded-full" style={{ background: ERR.accent }} />
                             ) : isToolDone ? (
-                              <Check className="h-2 w-2" style={{ color: subColors.accent }} />
+                              <div className="w-1 h-1 rounded-full" style={{ background: subColors.accent, opacity: 0.6 }} />
                             ) : (
-                              <sub.Icon className="h-2 w-2" style={{ color: `${subColors.accent}80` }} />
+                              <div className="w-1 h-1 rounded-full" style={{ background: subColors.accent, opacity: 0.3 }} />
                             )}
                           </div>
-                          <span className="text-[11px] truncate" style={{ color: isLast ? subColors.accent : `${subColors.accent}88` }}>
+                          <span className="text-[11px] truncate" style={{ color: isLast ? "var(--foreground-secondary)" : "var(--foreground-muted)" }}>
                             {sub.label}{subDetail ? ` · ${subDetail}` : ""}
                           </span>
                         </div>
@@ -403,27 +407,13 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
           )
         })()}
       </div>
-
-      {/* Right-side status dot */}
-      <div className="flex-none">
-        {isActive ? (
-          <div
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ background: colors.accent, animation: "tool-pulse 1.5s ease-in-out infinite" }}
-          />
-        ) : isComplete ? (
-          <div
-            className="w-1.5 h-1.5 rounded-full tool-check-enter"
-            style={{ background: isError ? ERR.accent : colors.accent, opacity: 0.6 }}
-          />
-        ) : null}
-      </div>
     </div>
   )
 }
 
 /**
  * ToolCardCompact — Minimal inline display for collapsed older tools.
+ * Shows a small muted dot + label (past/compact state in the ledger).
  *
  * @param props.name - Tool function name
  * @param props.input - Tool input parameters
@@ -436,8 +426,13 @@ export function ToolCardCompact({ name, input }: { name: string; input?: Record<
   const detail = getDetail(name, input)
 
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] text-foreground/30 py-0.5">
-      <meta.Icon className="h-2.5 w-2.5" style={{ color: `${colors.accent}80` }} />
+    <span className="ledger-compact inline-flex items-center gap-1.5 text-[11px] text-foreground/30 py-0.5">
+      {/* Small muted dot marker */}
+      <span
+        className="flex-none w-1 h-1 rounded-full"
+        style={{ background: colors.accent, opacity: 0.4 }}
+        aria-hidden="true"
+      />
       <span>{label}</span>
       {detail && <span className="opacity-60 truncate max-w-[150px]">{detail}</span>}
     </span>

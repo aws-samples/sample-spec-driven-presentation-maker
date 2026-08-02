@@ -1,58 +1,18 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * ToolIndicator — Compact status line for a tool execution.
- * Uses Lucide icons instead of emoji for a polished look.
+ * ToolIndicator — Compact status line for a tool execution in the ledger.
+ * Shows a left marker dot and label, consistent with the ledger row language.
  *
  * @param name - Tool function name
  * @param input - Tool input parameters (used to derive detail text)
  * @param isActive - Whether the tool is currently running
  */
 
-import {
-  BookOpen, List, Search, FolderPlus, Pencil, Image,
-  Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench, Loader2,
-  FileText, Download, Play, Code, Palette, LayoutTemplate,
-} from "lucide-react"
-import type { LucideIcon } from "lucide-react"
+import { Wrench } from "lucide-react"
 import { useTranslations } from "next-intl"
-
-/** Icon component and base label per tool name. */
-const TOOL_META: Record<string, { Icon: LucideIcon; label: string }> = {
-  // Native agent tools
-  read_reference:     { Icon: BookOpen,        label: "Reading" },
-  list_references:    { Icon: List,            label: "Listing patterns" },
-  search_icons:       { Icon: Search,          label: "Searching icons" },
-  create_deck:        { Icon: FolderPlus,      label: "Creating deck" },
-  write_slide:        { Icon: Pencil,          label: "Writing slide" },
-  generate_pptx:      { Icon: Download,        label: "Generating PPTX" },
-  generate_preview:   { Icon: Image,           label: "Generating preview" },
-  remove_slide:       { Icon: Trash2,          label: "Removing slide" },
-  reorder_slides:     { Icon: ArrowUpDown,     label: "Reordering" },
-  get_deck:           { Icon: FolderOpen,      label: "Loading deck" },
-  search_slides:      { Icon: Search,          label: "Searching slides" },
-  clone_deck:         { Icon: Copy,            label: "Cloning deck" },
-  clone_slide:        { Icon: Copy,            label: "Cloning slide" },
-  web_search:         { Icon: Globe,           label: "Searching" },
-  web_fetch:          { Icon: FileText,        label: "Fetching page" },
-  // MCP Server tools
-  init_presentation:  { Icon: FolderPlus,      label: "Initializing deck" },
-  analyze_template:   { Icon: LayoutTemplate,  label: "Analyzing template" },
-  start_presentation: { Icon: Play,            label: "Starting workflow" },
-  list_templates:     { Icon: LayoutTemplate,  label: "Listing templates" },
-  list_styles:        { Icon: List,            label: "Listing styles" },
-  apply_style:        { Icon: Palette,         label: "Applying style" },
-  read_examples:      { Icon: BookOpen,        label: "Reading example" },
-  list_workflows:     { Icon: List,            label: "Listing workflows" },
-  read_workflows:     { Icon: BookOpen,        label: "Reading workflow" },
-  list_guides:        { Icon: List,            label: "Listing guides" },
-  read_guides:        { Icon: BookOpen,        label: "Reading guide" },
-  search_assets:      { Icon: Search,          label: "Searching assets" },
-  get_preview:        { Icon: Image,           label: "Getting preview" },
-  run_python:         { Icon: Code,            label: "Running code" },
-  code_to_slide:      { Icon: Code,            label: "Code to slide" },
-  grid:               { Icon: LayoutTemplate,  label: "Computing layout" },
-}
+import { TOOL_META, stripPrefix } from "./ToolCard"
+import { CAT } from "./toolPalette"
 
 /**
  * Extract a short detail string from tool input for display.
@@ -78,22 +38,32 @@ interface ToolIndicatorProps {
 
 export function ToolIndicator({ name, input, isActive = false }: ToolIndicatorProps) {
   const t = useTranslations("tools")
-  const meta = TOOL_META[name] || { Icon: Wrench, label: name.replace(/_/g, " ") }
-  const { Icon } = meta
+  const meta = TOOL_META[stripPrefix(name)] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" }
+  const category = "category" in meta ? meta.category : "other"
+  const colors = CAT[category as keyof typeof CAT] || CAT.other
   // Known tools resolve via messages; unknown tools fall back to the derived label
-  const label = t.has(name) ? t(name) : meta.label
+  const label = t.has(stripPrefix(name)) ? t(stripPrefix(name)) : meta.label
   const detail = getDetail(name, input)
 
   return (
     <span
-      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5"
+      className="ledger-indicator inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5"
       role="status"
       aria-label={`${isActive ? t("running") : t("completed")}: ${label}${detail ? ` — ${detail}` : ""}`}
     >
+      {/* Left marker: active = pulsing dot, done = muted dot */}
       {isActive ? (
-        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/60" />
+        <span
+          className="flex-none w-1.5 h-1.5 rounded-full"
+          style={{ background: colors.accent, animation: "tool-pulse 1.5s ease-in-out infinite" }}
+          aria-hidden="true"
+        />
       ) : (
-        <Icon className="h-3 w-3 text-muted-foreground/60" />
+        <span
+          className="flex-none w-1.5 h-1.5 rounded-full"
+          style={{ background: colors.accent, opacity: 0.4 }}
+          aria-hidden="true"
+        />
       )}
       <span>{label}</span>
       {detail && <span className="text-muted-foreground/50 truncate max-w-[200px]">{detail}</span>}
