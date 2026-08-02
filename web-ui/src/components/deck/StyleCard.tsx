@@ -46,7 +46,7 @@ export function StyleCard({ style, index, onClick, onPin }: { style: StyleEntry;
       tabIndex={0}
       onClick={() => onClick(style.name)}
       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(style.name) } }}
-      className="group text-left rounded-xl border border-white/[0.06] overflow-hidden transition-all duration-300 hover:border-brand-teal/30 hover:shadow-[0_0_24px_oklch(0.75_0.14_185/10%)] focus:outline-none focus:ring-2 focus:ring-brand-teal/40 animate-[card-in_0.5s_ease_both] cursor-pointer"
+      className="group text-left rounded-xl border border-border overflow-hidden transition-all duration-300 hover:border-border-hover hover:-translate-y-[2px] hover:shadow-[var(--shadow-lift)] motion-reduce:hover:translate-y-0 focus:outline-none focus:ring-2 focus:ring-ring animate-[card-in_0.5s_ease_both] cursor-pointer"
       style={{ animationDelay: `${index * 60}ms` }}
       aria-label={t("previewStyleAria", { name: style.name })}
     >
@@ -88,7 +88,7 @@ export function StyleCard({ style, index, onClick, onPin }: { style: StyleEntry;
           </button>
         )}
       </div>
-      <div className="px-3 py-2.5 border-t border-white/[0.04]">
+      <div className="px-3 py-2.5 border-t border-border">
         <div className="flex items-center gap-1.5">
           <p className="text-sm font-medium text-foreground group-hover:text-brand-teal transition-colors truncate">{style.name}</p>
           {style.source === "user" && (

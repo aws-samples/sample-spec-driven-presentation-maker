@@ -95,7 +95,7 @@ export function DeckListView({
         <div className="hidden sm:flex items-center gap-2">
           <button
             onClick={onNewDeck}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg bg-brand-teal text-primary-foreground transition-all hover:brightness-110"
+            className="team-action-btn inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg transition-all hover:brightness-110"
           >
             <Plus className="h-3.5 w-3.5" />
             {t("newDeck")}
@@ -149,9 +149,8 @@ export function DeckListView({
                 <tab.icon className="h-3 w-3" />
                 {t(`tabs.${tab.labelKey}`)}
                 <span
-                  className="absolute bottom-0 left-0 right-0 h-[2px] transition-transform duration-300 origin-left"
+                  className="absolute bottom-0 left-0 right-0 h-[2px] transition-transform duration-300 origin-left bg-foreground"
                   style={{
-                    background: "oklch(0.75 0.14 185)",
                     transform: activeTab === tab.key ? "scaleX(1)" : "scaleX(0)",
                   }}
                 />

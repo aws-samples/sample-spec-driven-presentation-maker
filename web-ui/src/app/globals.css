@@ -107,7 +107,7 @@
   --border: oklch(1 0 0 / 6%);
   --border-hover: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 8%);
-  --ring: oklch(0.75 0.14 185 / 40%);
+  --ring: oklch(0.65 0 0 / 40%);
 }
 
 [data-theme="light"] {
@@ -180,8 +180,6 @@
 body {
   position: relative;
 }
-
-/* ── Ambient teal glow ── */
 
 /* Safe area utilities */
 .safe-top { padding-top: env(safe-area-inset-top); }
@@ -311,23 +309,6 @@ body {
   animation-delay: var(--delay, 0ms);
 }
 
-/* ── Card hover glow (teal edge) ── */
-.card-glow {
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(160deg, transparent 30%, oklch(0.75 0.14 185 / 25%) 100%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  pointer-events: none;
-}
-.group:hover .card-glow { opacity: 1; }
-
 /* ── Chat panel transition ── */
 /* Mobile: fixed overlay with slide-in */
 @media (max-width: 639px) {
@@ -379,17 +360,17 @@ body {
   transition: background 0.2s ease, height 0.2s ease;
 }
 .chat-resize-handle:hover::after {
-  background: oklch(0.75 0.14 185 / 40%);
+  background: var(--border-hover);
   height: 64px;
 }
 .chat-resize-handle:active::after {
-  background: oklch(0.75 0.14 185 / 60%);
+  background: var(--foreground-muted);
 }
 
 /* ── Chat toggle pulse (first-visit only) ── */
 @keyframes chat-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 oklch(0.75 0.14 185 / 30%); }
-  50% { box-shadow: 0 0 0 6px oklch(0.75 0.14 185 / 0%); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--border-hover); }
+  50% { box-shadow: 0 0 0 6px transparent; }
 }
 .chat-toggle-pulse {
   animation: chat-pulse 3s ease-in-out infinite;
@@ -421,7 +402,7 @@ body {
 .header-glass {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  background: oklch(0.11 0.005 260 / 80%);
+  background: color-mix(in oklch, var(--background) 80%, transparent);
 }
 
 /* ── Search glow on focus ── */
@@ -429,8 +410,8 @@ body {
   transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
 .search-glow:focus-within {
-  border-color: oklch(0.75 0.14 185 / 25%);
-  box-shadow: 0 0 0 1px oklch(0.75 0.14 185 / 20%), 0 0 24px oklch(0.75 0.14 185 / 6%);
+  border-color: var(--border-hover);
+  box-shadow: 0 0 0 1px var(--border-hover), 0 0 24px color-mix(in oklch, var(--foreground) 4%, transparent);
 }
 
 /* ── Tab underline ── */
@@ -444,7 +425,7 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: oklch(0.75 0.14 185);
+  background: var(--foreground);
   transform: scaleX(0);
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   transform-origin: left;
@@ -526,7 +507,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, oklch(0.75 0.14 185 / 8%), transparent);
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 6%), transparent);
   animation: slide-shimmer 1.8s ease-in-out infinite;
 }
 
@@ -546,7 +527,7 @@ body {
 
 /* ── Slide update glow highlight ── */
 @keyframes slide-update-glow {
-  0%   { box-shadow: 0 0 0 1px oklch(0.75 0.14 185 / 60%), 0 0 16px oklch(0.75 0.14 185 / 25%); }
+  0%   { box-shadow: 0 0 0 1px color-mix(in oklch, var(--agent-layout) 60%, transparent), 0 0 16px color-mix(in oklch, var(--agent-layout) 25%, transparent); }
   100% { box-shadow: 0 0 0 1px transparent, 0 0 0 transparent; }
 }
 .slide-updated {
@@ -571,8 +552,63 @@ body {
   animation: thinking-dots 1.2s steps(1) infinite;
 }
 
+/* ── Team action button — conic gradient border rotation ── */
+/* @property enables smooth angle interpolation in supporting browsers.
+   Non-supporting browsers get a static gradient border (graceful fallback). */
+@property --team-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes team-rotate {
+  to { --team-angle: 360deg; }
+}
+.team-action-btn {
+  position: relative;
+  color: var(--foreground);
+  background: var(--card);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  box-shadow: 0 0 12px -4px color-mix(in oklch, var(--agent-layout) 25%, transparent);
+}
+.team-action-btn::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--team-angle, 0deg),
+    var(--agent-layout),
+    var(--agent-content),
+    var(--agent-visual),
+    var(--agent-data),
+    var(--agent-decorator),
+    var(--agent-layout)
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: team-rotate 3.5s linear infinite;
+  pointer-events: none;
+}
+.team-action-btn:hover::before {
+  animation-duration: 1.8s;
+}
+.team-action-btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.team-action-btn:disabled::before {
+  opacity: 0.3;
+  animation: none;
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
+  .team-action-btn::before { animation: none; }
+  .animate-card-in { animation: none; opacity: 1; transform: none; }
   .tool-card-enter,
   .tool-check-enter,
   .tool-ring-enter,
@@ -607,7 +643,7 @@ body {
   font-size: 0.875rem; /* 14px base for chat readability */
   --tw-prose-body: oklch(0.85 0 0);
   --tw-prose-headings: oklch(0.95 0 0);
-  --tw-prose-links: oklch(0.75 0.14 185);
+  --tw-prose-links: var(--foreground-secondary);
   --tw-prose-bold: oklch(0.92 0 0);
   --tw-prose-code: oklch(0.82 0.08 185);
   --tw-prose-pre-bg: oklch(0.10 0.005 260);
@@ -645,14 +681,14 @@ body {
 }
 .prose.prose-invert a {
   text-decoration: none;
-  border-bottom: 1px solid oklch(0.75 0.14 185 / 30%);
+  border-bottom: 1px solid var(--border-hover);
   transition: border-color 0.2s;
 }
 .prose.prose-invert a:hover {
-  border-bottom-color: oklch(0.75 0.14 185);
+  border-bottom-color: var(--foreground-secondary);
 }
 .prose.prose-invert blockquote {
-  border-left-color: oklch(0.75 0.14 185 / 30%);
+  border-left-color: var(--border-hover);
   color: oklch(0.70 0 0);
 }
 
@@ -675,10 +711,10 @@ body {
 }
 .spec-prose h3 {
   font-size: 0.9375rem; /* 15px */
-  color: oklch(0.75 0.14 185);
+  color: var(--foreground-secondary);
 }
 .spec-prose li::marker {
-  color: oklch(0.75 0.14 185 / 60%);
+  color: var(--foreground-muted);
 }
 .spec-prose hr {
   border-color: oklch(1 0 0 / 6%);
@@ -713,8 +749,8 @@ body {
 
 /* Active node pulse ring */
 @keyframes outline-node-pulse {
-  0%, 100% { box-shadow: 0 0 0 4px oklch(0.75 0.14 185 / 10%); }
-  50%      { box-shadow: 0 0 0 6px oklch(0.75 0.14 185 / 18%); }
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in oklch, var(--foreground) 10%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in oklch, var(--foreground) 18%, transparent); }
 }
 .outline-node-pulse {
   animation: outline-node-pulse 2.5s ease-in-out infinite;
@@ -744,7 +780,7 @@ body {
 .streaming-cursor::after {
   content: "▍";
   animation: cursor-blink 1s step-end infinite;
-  color: oklch(0.75 0.14 185);
+  color: var(--foreground-secondary);
   font-weight: 300;
   margin-left: 1px;
 }

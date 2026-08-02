@@ -138,7 +138,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
           {IS_LOCAL && agentDefs.length > 0 && (
             <section
               aria-labelledby="agent-heading"
-              className="rounded-xl border border-white/[0.06] bg-card/40 p-4"
+              className="rounded-xl border border-border bg-card/40 p-4"
             >
               <div className="mb-3">
                 <h3
@@ -202,7 +202,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
           {allowed.length > 0 && (
             <section
               aria-labelledby="model-heading"
-              className="rounded-xl border border-white/[0.06] bg-card/40 p-4"
+              className="rounded-xl border border-border bg-card/40 p-4"
             >
               <div className="mb-3">
                 <h3
@@ -233,7 +233,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                     triggerId="chat-model"
                     ariaLabel="Select chat model"
                   />
-                  <p className="mt-1 text-[11px] text-muted-foreground/80">
+                  <p className="mt-1 text-xs text-muted-foreground/80">
                     Conversations and planning.
                   </p>
                 </div>
@@ -254,7 +254,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                     triggerId="create-model"
                     ariaLabel="Select create model"
                   />
-                  <p className="mt-1 text-[11px] text-muted-foreground/80">
+                  <p className="mt-1 text-xs text-muted-foreground/80">
                     Slides, styles, and other artifacts. Needs a capable model.
                   </p>
                 </div>
@@ -339,7 +339,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
           {/* ── Language ── */}
           <section
             aria-labelledby="language-heading"
-            className="rounded-xl border border-white/[0.06] bg-card/40 p-4"
+            className="rounded-xl border border-border bg-card/40 p-4"
           >
             <div className="mb-3">
               <h3
@@ -363,7 +363,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                     locale === value
                       ? "border-primary/50 bg-primary/10 text-foreground"
-                      : "border-white/[0.06] bg-card/40 text-muted-foreground hover:text-foreground"
+                      : "border-border bg-card/40 text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {label}
@@ -375,7 +375,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
           {/* ── Chat ── */}
           <section
             aria-labelledby="chat-heading"
-            className="rounded-xl border border-white/[0.06] bg-card/40 p-4"
+            className="rounded-xl border border-border bg-card/40 p-4"
           >
             <h3
               id="chat-heading"

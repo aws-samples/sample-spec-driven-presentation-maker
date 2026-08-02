@@ -71,7 +71,7 @@ export function TemplatePickerSection({ idToken, currentTemplate, onTemplateSele
   const sorted = [...templates].sort((a, b) => rank(a) - rank(b))
 
   return (
-    <section className="px-6 pt-4 pb-4 border-b border-white/[0.06]">
+    <section className="px-6 pt-4 pb-4 border-b border-border">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">{t("sectionTitle")}</h3>
         {current && (
@@ -84,7 +84,7 @@ export function TemplatePickerSection({ idToken, currentTemplate, onTemplateSele
       {loading ? (
         <div className="flex gap-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="w-[180px] h-[68px] shrink-0 rounded-xl bg-white/[0.03] animate-pulse" />
+            <div key={i} className="w-[180px] h-[68px] shrink-0 rounded-xl bg-foreground/[0.03] animate-pulse" />
           ))}
         </div>
       ) : (
@@ -129,7 +129,7 @@ function TemplatePickCard({ template, isCurrent, pulsing, onClick }: {
       className={`group relative w-[180px] shrink-0 rounded-xl border text-left overflow-hidden transition-all duration-200 cursor-pointer ${
         isCurrent
           ? "border-brand-teal ring-1 ring-brand-teal/50 bg-brand-teal/[0.06]"
-          : "border-white/[0.06] hover:border-white/[0.16] bg-white/[0.02]"
+          : "border-border hover:border-border-hover bg-foreground/[0.02]"
       } ${pulsing ? "ring-2 ring-brand-teal/50" : ""}`}
     >
       {/* Theme strip — background + text color identity + palette */}

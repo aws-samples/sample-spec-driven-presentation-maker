@@ -90,7 +90,7 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
                 ${active
                   ? isSlides
                     ? "bg-brand-amber-soft text-brand-amber"
-                    : "bg-brand-teal-soft text-brand-teal"
+                    : "bg-foreground/[8%] text-foreground"
                   : enabled
                     ? "text-foreground-secondary hover:text-foreground hover:bg-background-hover"
                     : "text-foreground-muted/40 cursor-not-allowed"
@@ -105,7 +105,7 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
                   inline-flex items-center justify-center w-4 h-4 rounded-full text-[11px] font-semibold leading-none
                   transition-all duration-300
                   ${active
-                    ? "bg-brand-teal text-primary-foreground"
+                    ? "bg-foreground text-background"
                     : enabled
                       ? "bg-foreground-muted/15 text-foreground-secondary"
                       : "bg-foreground-muted/8 text-foreground-muted/30"
@@ -127,7 +127,7 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
               {/* Active indicator dot */}
               {active && (
                 <span className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${
-                  isSlides ? "bg-brand-amber" : "bg-brand-teal"
+                  isSlides ? "bg-brand-amber" : "bg-foreground"
                 }`} />
               )}
             </button>

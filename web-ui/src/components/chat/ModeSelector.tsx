@@ -56,8 +56,8 @@ export function ModeSelector({ value, onChange }: ModeSelectorProps) {
               onClick={() => onChange(m.key)}
               className={`flex-1 text-left rounded-xl p-3.5 transition-all cursor-pointer ${
                 active
-                  ? "bg-brand-teal-soft border border-brand-teal/40 shadow-[0_0_12px_oklch(0.75_0.14_185_/_8%)]"
-                  : "bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.05]"
+                  ? "bg-brand-teal-soft border border-brand-teal/40 shadow-[0_0_12px_var(--border-hover)]"
+                  : "bg-foreground/[0.03] border border-border hover:border-border-hover hover:bg-foreground/[0.05]"
               }`}
             >
               <div className="flex items-center gap-2 mb-2">

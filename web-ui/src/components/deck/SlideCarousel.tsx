@@ -247,7 +247,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
               <p className="text-sm font-medium text-foreground">{t("buildingSlides")}</p>
               <p className="text-xs text-foreground-secondary mt-1">{t("buildingHint")}</p>
             </div>
-            <div className="w-48 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+            <div className="w-48 h-1.5 rounded-full bg-foreground/[0.06] overflow-hidden">
               <div
                 className="h-full rounded-full"
                 style={{

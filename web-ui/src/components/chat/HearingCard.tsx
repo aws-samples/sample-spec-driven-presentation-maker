@@ -4,10 +4,7 @@
 
 import { useState } from "react"
 import { Lightbulb, Send } from "lucide-react"
-import { CAT } from "./toolPalette"
 import { useTranslations } from "next-intl"
-
-const P = CAT.hearing
 
 interface Question {
   id: string
@@ -97,30 +94,36 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit }
       role="form"
       aria-label={t("agentQuestions")}
       aria-disabled={isDisabled}
-      className={`rounded-xl transition-all duration-300 ${isDisabled ? "opacity-50 pointer-events-none" : ""}`}
+      className={`rounded-xl transition-all duration-300 relative overflow-hidden ${isDisabled ? "opacity-50 pointer-events-none" : ""}`}
       style={{
-        border: `1px solid ${isDisabled ? "oklch(1 0 0 / 5%)" : P.border}`,
-        background: isDisabled ? "oklch(1 0 0 / 2%)" : P.bg,
-        boxShadow: isDisabled ? "none" : `0 0 30px -4px ${P.glow}`,
+        border: `1px solid ${isDisabled ? "var(--border)" : "var(--border-hover)"}`,
+        background: isDisabled ? "var(--surface-subtle)" : "var(--card)",
       }}
     >
+      {/* Five-color spine (left edge) */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
+        style={{ background: "var(--team-gradient)" }}
+        aria-hidden="true"
+      />
+
       {/* Inference */}
-      <div className="flex items-start gap-2.5 px-4 pt-3.5 pb-2">
-        <Lightbulb className="h-4 w-4 mt-0.5 flex-none" style={{ color: P.accent }} />
-        <p className="text-sm leading-relaxed" style={{ color: P.accent }}>{inference}</p>
+      <div className="flex items-start gap-2.5 px-4 pl-5 pt-3.5 pb-2">
+        <Lightbulb className="h-4 w-4 mt-0.5 flex-none text-foreground-secondary" />
+        <p className="text-sm leading-relaxed text-foreground-secondary">{inference}</p>
       </div>
 
       {/* Questions */}
-      <div className="px-4 pb-3 space-y-4" role="group">
+      <div className="px-4 pl-5 pb-3 space-y-4" role="group">
         {questions.map((q) => (
           <fieldset key={q.id} className="space-y-2.5 animate-in fade-in-0 duration-300">
             {!q.text ? (
               <div className="space-y-2">
-                <div className="h-4 w-2/3 rounded bg-white/[4%] animate-pulse" />
+                <div className="h-4 w-2/3 rounded bg-foreground/[4%] animate-pulse" />
                 <div className="flex gap-1.5">
-                  <div className="h-7 w-20 rounded-full bg-white/[3%] animate-pulse" />
-                  <div className="h-7 w-24 rounded-full bg-white/[3%] animate-pulse" />
-                  <div className="h-7 w-16 rounded-full bg-white/[3%] animate-pulse" />
+                  <div className="h-7 w-20 rounded-full bg-foreground/[3%] animate-pulse" />
+                  <div className="h-7 w-24 rounded-full bg-foreground/[3%] animate-pulse" />
+                  <div className="h-7 w-16 rounded-full bg-foreground/[3%] animate-pulse" />
                 </div>
               </div>
             ) : (
@@ -142,19 +145,16 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit }
                         role={q.type === "single_select" ? "radio" : "checkbox"}
                         aria-checked={selected}
                         onClick={() => q.type === "single_select" ? toggleSingle(q.id, opt) : toggleMulti(q.id, opt)}
-                        className="relative px-3 py-1.5 rounded-full text-xs transition-all duration-150 active:scale-[0.96] focus:outline-none"
-                        style={{
-                          background: selected ? P.border : "oklch(1 0 0 / 6%)",
-                          color: selected ? "oklch(0.95 0 0)" : "oklch(0.80 0 0)",
-                          border: `1px solid ${selected ? P.accent : "oklch(1 0 0 / 12%)"}`,
-                          boxShadow: selected ? `0 0 10px -2px ${P.glow}` : "none",
-                        }}
+                        className={`relative min-h-11 px-3 py-1.5 rounded-full text-xs transition-all duration-150 active:scale-[0.96] focus:outline-none ${
+                          selected
+                            ? "bg-foreground text-background font-medium"
+                            : "bg-foreground/[6%] text-foreground-secondary border border-border hover:border-border-hover"
+                        }`}
                       >
                         {opt}
                         {rec && !selected && (
                           <span
-                            className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
-                            style={{ background: P.accent }}
+                            className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-agent-data"
                             title={t("recommended")}
                           />
                         )}
@@ -168,13 +168,7 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit }
                   onChange={(e) => setNote(q.id, e.target.value)}
                   placeholder={t("additionalNotes")}
                   aria-label={`${q.text} — ${t("additionalNotesLabel")}`}
-                  className="w-full px-3 py-1.5 rounded-lg text-xs text-foreground/70 placeholder:text-foreground/30 focus:outline-none transition-colors duration-150"
-                  style={{
-                    background: "oklch(1 0 0 / 2%)",
-                    border: "1px solid oklch(1 0 0 / 4%)",
-                  }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = P.border }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = "oklch(1 0 0 / 4%)" }}
+                  className="w-full min-h-11 px-3 py-1.5 rounded-lg text-xs text-foreground/70 placeholder:text-foreground-muted/60 bg-foreground/[2%] border border-border focus:outline-none focus:border-border-hover transition-colors duration-150"
                 />
               </>
             )}
@@ -186,13 +180,7 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit }
                 placeholder={q.placeholder}
                 rows={2}
                 aria-label={q.text}
-                className="w-full px-3 py-2 rounded-lg text-xs text-foreground/70 placeholder:text-foreground/25 focus:outline-none resize-y min-h-[2.5rem] transition-colors duration-150"
-                style={{
-                  background: "oklch(1 0 0 / 3%)",
-                  border: "1px solid oklch(1 0 0 / 5%)",
-                }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = P.border }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = "oklch(1 0 0 / 5%)" }}
+                className="w-full px-3 py-2 rounded-lg text-xs text-foreground/70 placeholder:text-foreground-muted/50 bg-foreground/[3%] border border-border focus:outline-none focus:border-border-hover resize-y min-h-11 transition-colors duration-150"
               />
             )}
           </>
@@ -207,14 +195,7 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit }
             type="button"
             onClick={handleSubmit}
             disabled={!hasAnswer}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium active:scale-[0.97] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 focus:outline-none"
-            style={{
-              background: P.bg,
-              color: P.accent,
-              boxShadow: hasAnswer ? `0 0 12px -3px ${P.glow}` : "none",
-            }}
-            onMouseEnter={(e) => { if (hasAnswer) e.currentTarget.style.background = P.border }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = P.bg }}
+            className="team-action-btn flex items-center gap-1.5 min-h-11 px-3 py-1.5 rounded-lg text-xs font-medium active:scale-[0.97] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 focus:outline-none"
           >
             <Send className="h-3 w-3" />
             {t("submit")}

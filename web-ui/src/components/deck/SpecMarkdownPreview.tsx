@@ -51,7 +51,7 @@ const specComponents = {
       return (
         <span className="inline-flex items-center gap-1">
           <span
-            className="inline-block w-3 h-3 rounded-full border border-white/20 flex-none"
+            className="inline-block w-3 h-3 rounded-full border border-border-hover flex-none"
             style={{ backgroundColor: color }}
             aria-label={`Color ${color}`}
           />
@@ -190,7 +190,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
       return wrap(
         <div>
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-6 py-3 border-b border-border">
             <div>
               <h2 className="text-[15px] font-semibold">{t("chooseStyle")}</h2>
               <p className="text-xs text-foreground-muted mt-0.5">{t("clickToPreview")}</p>
@@ -198,7 +198,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
             {content && (
               <button
                 onClick={() => { userRequestedGallery.current = false; setAdMode("result") }}
-                className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.06] transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-border hover:bg-foreground/[0.06] transition-colors"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 {t("backToArtDirection")}
@@ -210,7 +210,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
             {stylesLoading ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 {[0, 1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="aspect-[16/10] rounded-xl bg-white/[0.03] animate-pulse" />
+                  <div key={i} className="aspect-[16/10] rounded-xl bg-foreground/[0.03] animate-pulse" />
                 ))}
               </div>
             ) : hasPins ? (
@@ -274,11 +274,11 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
       return wrap(
         <div>
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-6 py-3 border-b border-border">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => { setPreview(null); setAdMode("gallery"); }}
-                className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-foreground/[0.06] transition-colors"
                 aria-label={t("backToStylesAria")}
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -318,7 +318,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
           <div className="flex justify-end px-4 py-2">
             <button
               onClick={() => { userRequestedGallery.current = true; setAdMode("gallery") }}
-              className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.06] transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-border hover:bg-foreground/[0.06] transition-colors"
             >
               <Palette className="h-3.5 w-3.5" />
               {t("changeStyle")}

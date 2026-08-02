@@ -174,7 +174,7 @@ export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, pare
             aria-expanded={expanded}
             aria-controls={detailId}
             aria-label={expanded ? t("collapseDetails") : t("expandDetails")}
-            className="flex-none w-5 h-5 flex items-center justify-center rounded hover:bg-white/5 transition-colors"
+            className="flex-none w-5 h-5 flex items-center justify-center rounded hover:bg-foreground/5 transition-colors"
           >
             <ChevronRight
               className="h-3 w-3 transition-transform duration-200"
@@ -208,7 +208,7 @@ export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, pare
                   background: `color-mix(in oklch, ${myColor} 4%, transparent)`,
                 }}
               >
-                <div className="text-[9.5px] font-medium uppercase mb-1" style={{ color: C.smallLabel, letterSpacing: "0.14em" }}>
+                <div className="text-[11px] font-medium uppercase mb-1" style={{ color: C.smallLabel, letterSpacing: "0.14em" }}>
                   {t("instruction")}
                 </div>
                 <div
@@ -223,7 +223,7 @@ export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, pare
             {/* Activity timeline (nested rail) */}
             {agent.activity.length > 0 && (
               <div>
-                <div className="text-[9.5px] font-medium uppercase mb-1.5" style={{ color: C.smallLabel, letterSpacing: "0.14em" }}>
+                <div className="text-[11px] font-medium uppercase mb-1.5" style={{ color: C.smallLabel, letterSpacing: "0.14em" }}>
                   {t("activitySteps", { count: agent.activity.length })}
                 </div>
                 <ActivityTimeline

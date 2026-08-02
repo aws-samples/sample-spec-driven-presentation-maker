@@ -81,7 +81,7 @@ export function ComposeCard({ input, status, result, isActive, streamMessages = 
           : "var(--surface-subtle)",
         boxShadow: hasError
           ? "inset 0 0 0 1px color-mix(in oklch, var(--state-error) 15%, transparent)"
-          : "inset 0 0 0 1px oklch(1 0 0 / 6%)",
+          : "inset 0 0 0 1px var(--border)",
       }}
     >
       {/* 2px team-gradient curtain line at top */}
@@ -239,7 +239,7 @@ function Header({
         <button
           type="button"
           onClick={onCancel}
-          className="flex-none inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-foreground/70 hover:text-foreground/95 hover:bg-white/5 transition-colors"
+          className="flex-none inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-foreground/70 hover:text-foreground/95 hover:bg-foreground/5 transition-colors"
           aria-label={t("cancelAria")}
         >
           <X className="h-3 w-3" />

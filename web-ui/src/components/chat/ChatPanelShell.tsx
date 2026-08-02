@@ -311,8 +311,8 @@ export function ChatPanelShell({
               onClick={() => onChatTabChange(panelAOwnsCurrentDeck ? "deck" : "new")}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all truncate max-w-[240px] ${
                 panelAVisible
-                  ? "text-foreground bg-white/[0.07]"
-                  : "text-foreground-muted hover:text-foreground-secondary hover:bg-white/[0.03]"
+                  ? "text-foreground bg-foreground/[0.07]"
+                  : "text-foreground-muted hover:text-foreground-secondary hover:bg-foreground/[0.03]"
               }`}
             >
               {panelAOwnsCurrentDeck ? (
@@ -329,8 +329,8 @@ export function ChatPanelShell({
                 onClick={() => onChatTabChange("deck")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all truncate max-w-[240px] ${
                   panelBVisible
-                    ? "text-foreground bg-white/[0.07]"
-                    : "text-foreground-muted hover:text-foreground-secondary hover:bg-white/[0.03]"
+                    ? "text-foreground bg-foreground/[0.07]"
+                    : "text-foreground-muted hover:text-foreground-secondary hover:bg-foreground/[0.03]"
                 }`}
               >
                 <Layers className="h-3 w-3 flex-none" />
@@ -340,7 +340,7 @@ export function ChatPanelShell({
           </div>
         </div>
 
-        <div className="mx-4 mt-3 border-t border-white/[0.06]" />
+        <div className="mx-4 mt-3 border-t border-border" />
 
         {chatContent}
         </div>{/* end chat-panel-inner */}

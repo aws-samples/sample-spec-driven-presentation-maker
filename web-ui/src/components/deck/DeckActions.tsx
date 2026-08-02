@@ -135,7 +135,7 @@ export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, 
                       onMouseEnter={() => setSelectedIndex(i)}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${i === selectedIndex ? "bg-muted" : "hover:bg-muted/50"}`}
                     >
-                      <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[9px] font-medium text-primary flex-none">
+                      <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[11px] font-medium text-primary flex-none">
                         {user.alias[0]?.toUpperCase()}
                       </div>
                       <span className="text-sm">{user.alias}</span>
@@ -154,7 +154,7 @@ export function DeckActions({ visibility, onVisibilityChange, onShare, idToken, 
                   {collabList.map((sub) => (
                     <div key={sub} className="flex items-center justify-between px-2 py-1 rounded-md hover:bg-muted/30">
                       <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center text-[9px] font-medium text-blue-400 flex-none">
+                        <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center text-[11px] font-medium text-blue-400 flex-none">
                           {(collabAliases[sub] || sub)[0]?.toUpperCase()}
                         </div>
                         <span className="text-xs">{collabAliases[sub] || sub.slice(0, 8)}</span>

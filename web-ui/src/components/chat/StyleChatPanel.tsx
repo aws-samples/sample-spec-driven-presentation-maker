@@ -140,7 +140,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-teal-soft mb-5">
               <Sparkles className="h-5 w-5 text-brand-teal" />
             </div>
-            <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-3">{t("styleCreator")}</h2>
+            <h2 className="text-xl font-bold tracking-[-0.03em] text-foreground mb-3">{t("styleCreator")}</h2>
             <div className="flex flex-col gap-2 text-sm text-foreground-muted">
               <div className="flex items-center gap-2.5">
                 <MessageSquare className="h-4 w-4 text-brand-teal/70 shrink-0" />
