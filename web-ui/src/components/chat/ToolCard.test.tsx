@@ -28,8 +28,12 @@ describe("ToolCard", () => {
     expect(el.getAttribute("aria-label")).toContain("Running")
     expect(el.getAttribute("aria-label")).toContain("Writing slide")
     expect(el.getAttribute("aria-label")).toContain("intro")
-    // Active state renders the cursor arrow SVG
-    expect(container.querySelector(".ledger-cursor")).toBeTruthy()
+    // Active state renders the cursor on the continuous ledger rail.
+    expect(el.classList.contains("ledger-row")).toBe(true)
+    expect(container.querySelector(".ledger-marker")).toBeTruthy()
+    expect(container.querySelector(".ledger-cursor.ledger-cursor-active")).toBeTruthy()
+    // Concrete tool action complements the semantic category color.
+    expect(container.querySelector("svg.lucide-pencil")).toBeTruthy()
     // Agent name tag should show "Content" (build category → Content agent)
     expect(el.textContent).toContain("Content")
   })
@@ -85,6 +89,8 @@ describe("ToolCard", () => {
     )
     const el = container.querySelector("[role='status']") as HTMLElement
     expect(el.textContent).toContain("3 found")
+    expect(el.textContent).toContain("→")
+    expect(el.querySelector("p")).toBeNull()
   })
 
   it("dispatches compose_slides to ComposeCard", () => {

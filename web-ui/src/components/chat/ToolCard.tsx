@@ -219,88 +219,58 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
 
   return (
     <div
-      className="ledger-row tool-card-enter group/tool relative flex items-start gap-2.5 py-1.5"
+      className={`ledger-row tool-card-enter group/tool py-1.5 ${isComplete && !isError ? "opacity-60" : ""}`}
       role="status"
       aria-label={`${isActive ? t("running") : isError ? t("failed") : t("completed")}: ${label}${detail ? ` — ${detail}` : ""}${summary ? ` — ${summary}` : ""}`}
       aria-live={isComplete ? "polite" : undefined}
     >
-      {/* Left rail marker — color answers "who" */}
-      <div className="ledger-marker flex-none flex flex-col items-center pt-1.5">
+      <div className="ledger-marker">
         {isActive ? (
-          /* Cursor arrow + agent name tag = active */
-          <div className="flex items-center gap-1">
-            <svg
-              className="w-2.5 h-2.5 ledger-cursor"
-              viewBox="0 0 10 10"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path d="M1 1 L9 5 L5 5.8 L3.5 9.5 Z" fill={colors.accent} />
-            </svg>
-            <span
-              className="text-[11px] font-medium leading-none px-1 py-0.5 rounded-sm"
-              style={{ color: colors.accent, background: `color-mix(in oklch, ${colors.accent} 10%, transparent)` }}
-            >
-              {agentName}
-            </span>
-          </div>
+          <svg
+            className="h-3 w-3 ledger-cursor ledger-cursor-active"
+            viewBox="0 0 10 10"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path d="M1 1 L9 5 L5 5.8 L3.5 9.5 Z" fill={colors.accent} />
+          </svg>
         ) : isError ? (
-          /* Red dot = error */
-          <div
-            className="w-2 h-2 rounded-full tool-check-enter"
-            style={{ background: ERR.accent }}
-            aria-hidden="true"
-          />
+          <div className="w-2 h-2 rounded-full tool-check-enter" style={{ background: ERR.accent }} aria-hidden="true" />
         ) : isComplete ? (
-          /* Colored dot = done */
-          <div
-            className="w-2 h-2 rounded-full tool-check-enter"
-            style={{ background: colors.accent }}
-            aria-hidden="true"
-          />
+          <div className="w-1.5 h-1.5 rounded-full tool-check-enter" style={{ background: colors.accent }} aria-hidden="true" />
         ) : (
-          /* Muted dot = queued/idle */
-          <div
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ background: "var(--foreground-muted)", opacity: 0.4 }}
-            aria-hidden="true"
-          />
+          <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--foreground-muted)", opacity: 0.4 }} aria-hidden="true" />
         )}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
+      <div className="min-w-0">
+        <div className="flex min-h-5 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <meta.Icon className="h-3 w-3 flex-none" style={{ color: isError ? ERR.accent : colors.accent }} aria-hidden="true" />
           <span
             className="text-xs font-medium tracking-[-0.01em] transition-colors duration-300"
             style={{ color: isActive ? colors.accent : isError ? ERR.accent : isComplete ? "var(--foreground-secondary)" : "var(--foreground-muted)" }}
           >
             {label}
           </span>
-          {/* Active spinner inline */}
+          {detail && (
+            <span className="max-w-[180px] truncate text-[11px] text-foreground-muted" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>
+              {detail}
+            </span>
+          )}
+          {summary && (
+            <span className="max-w-[180px] truncate text-[11px] text-foreground-muted" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>
+              → {summary}
+            </span>
+          )}
           {isActive && (
-            <svg className="w-3 h-3 flex-none" viewBox="0 0 12 12" aria-hidden="true">
-              <circle
-                cx="6" cy="6" r="4.5"
-                fill="none"
-                stroke={colors.accent}
-                strokeWidth="1"
-                strokeDasharray="8 20"
-                strokeLinecap="round"
-                style={{ animation: "tool-spinner 1.2s linear infinite" }}
-              />
-            </svg>
+            <span
+              className="rounded-sm px-1.5 py-0.5 text-[11px] font-semibold leading-none"
+              style={{ color: colors.accent, background: `color-mix(in oklch, ${colors.accent} 10%, transparent)` }}
+            >
+              {agentName}
+            </span>
           )}
         </div>
-        {/* Detail line: input params → result summary transition */}
-        {(detail || summary) && (
-          <p
-            className="text-[11px] truncate mt-0.5 leading-tight transition-all duration-300"
-            style={{ color: isError ? ERR.accent : isComplete ? "var(--foreground-muted)" : "var(--foreground-muted)" }}
-          >
-            {summary || detail}
-          </p>
-        )}
         {/* Streaming progress — grouped sub-tool feed (nested rail) */}
         {isActive && streamMessages && streamMessages.length > 0 && (() => {
           // Group events by group number for parallel display

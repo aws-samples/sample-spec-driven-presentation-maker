@@ -1,192 +1,148 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-/**
- * ComposeCard.test.tsx — Tests for ComposeCard v2.
- *
- * Verifies:
- * - Agent identity mapping: group i → agent identity (i mod 5)
- * - Achromatic shell with team-gradient curtain line
- * - Ledger grammar: dot/cursor markers, slugs, latest activity, chevron
- * - Error auto-expand behavior
- * - Retry/rushed badges
- * - Stop button presence when canCancel
- * - n/m progress display
- * - StopSummary rendering on soft-stop
- * - aria-expanded semantics
- * - Status parsing (starting/working/done/error/retrying)
- */
 
-import { describe, it, expect } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
+import { cleanup, fireEvent, screen, within } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { ComposeCard } from "./ComposeCard"
-import { getAgentIdentity, AGENT_IDENTITIES } from "./composeTokens"
+import { parseComposeState } from "./parseComposeState"
+import { activityCategory } from "./activityLabel"
 
-describe("composeTokens — agent identity mapping", () => {
-  it("maps group 1-5 to the five identities in order", () => {
-    expect(getAgentIdentity(1).name).toBe("Layout")
-    expect(getAgentIdentity(2).name).toBe("Content")
-    expect(getAgentIdentity(3).name).toBe("Visual")
-    expect(getAgentIdentity(4).name).toBe("Data")
-    expect(getAgentIdentity(5).name).toBe("Decorator")
-  })
+afterEach(cleanup)
 
-  it("cycles back for groups > 5", () => {
-    expect(getAgentIdentity(6).name).toBe("Layout")
-    expect(getAgentIdentity(7).name).toBe("Content")
-    expect(getAgentIdentity(10).name).toBe("Decorator")
-  })
+const twoGroups = {
+  slide_groups: [
+    { slugs: ["intro"], instruction: "Make an intro" },
+    { slugs: ["body"], instruction: "Make the body" },
+  ],
+}
 
-  it("each identity has a valid CSS token", () => {
-    for (const id of AGENT_IDENTITIES) {
-      expect(id.token).toMatch(/^--agent-/)
-    }
-  })
-})
+const twoStarted = [
+  { group: 1, status: "starting", total_groups: 2, slugs: "intro" },
+  { group: 2, status: "starting", total_groups: 2, slugs: "body" },
+]
 
-describe("ComposeCard v2", () => {
-  it("renders achromatic shell with team-gradient curtain line", () => {
+describe("ComposeCard production board", () => {
+  it("renders the team curtain and observable production heading", () => {
     const { container } = renderWithIntl(
-      <ComposeCard
-        input={{ slide_groups: [{ slugs: ["intro"], instruction: "Make an intro" }] }}
-        isActive
-      />
+      <ComposeCard input={twoGroups} isActive streamMessages={twoStarted} />
     )
-    const section = container.querySelector("section") as HTMLElement
-    expect(section).toBeTruthy()
-    // Team-gradient curtain line
     const curtain = container.querySelector(".compose-curtain") as HTMLElement
-    expect(curtain).toBeTruthy()
     expect(curtain.style.background).toContain("var(--team-gradient)")
+    expect(container.textContent).toContain("2 slides in production")
+    expect(container.textContent).toContain("2 parallel lanes")
   })
 
-  it("shows preparing state when no stream messages", () => {
-    const { container } = renderWithIntl(
-      <ComposeCard input={{}} isActive />
-    )
+  it("shows preparing state before agents are known", () => {
+    const { container } = renderWithIntl(<ComposeCard input={{}} isActive />)
     expect(container.textContent).toContain("Preparing")
   })
 
-  it("shows n/m progress when agents are present", () => {
-    const { container } = renderWithIntl(
+  it("measures slide creation independently from tool completion", () => {
+    renderWithIntl(
       <ComposeCard
-        input={{ slide_groups: [
-          { slugs: ["intro"], instruction: "test" },
-          { slugs: ["body"], instruction: "test" },
-        ]}}
+        input={twoGroups}
         isActive
-        streamMessages={[
-          { group: 1, status: "starting", total_groups: 2, slugs: "intro" },
-          { group: 2, status: "starting", total_groups: 2, slugs: "body" },
-          { group: 1, status: "done", slugs: "intro" },
-        ]}
+        deckSlugs={["intro"]}
+        streamMessages={twoStarted}
       />
     )
-    // n/m counter: "1/2"
-    expect(container.textContent).toContain("1/2")
+    const progress = screen.getByRole("progressbar", { name: "Slide creation" })
+    expect(progress.getAttribute("aria-valuenow")).toBe("1")
+    expect(progress.getAttribute("aria-valuemax")).toBe("2")
+    expect(screen.getByText("1 / 2 created")).toBeTruthy()
   })
 
-  it("renders cancel button when canCancel conditions met", () => {
-    const { container } = renderWithIntl(
+  it("shows finishing status when all artifacts exist but the tool is active", () => {
+    renderWithIntl(
+      <ComposeCard input={twoGroups} isActive deckSlugs={["intro", "body"]} streamMessages={twoStarted} />
+    )
+    expect(screen.getByText("Finishing presentation…")).toBeTruthy()
+  })
+
+  it("renders cancel only when all credentials are present", () => {
+    const { rerender } = renderWithIntl(
+      <ComposeCard input={twoGroups} isActive streamMessages={twoStarted} />
+    )
+    expect(screen.queryByLabelText("Cancel compose slides")).toBeNull()
+
+    rerender(
       <ComposeCard
-        input={{ slide_groups: [{ slugs: ["intro"], instruction: "test" }] }}
+        input={twoGroups}
         isActive
+        streamMessages={twoStarted}
         toolUseId="tu-123"
         sessionId="sess-123"
         accessToken="token-123"
       />
     )
-    const cancelBtn = container.querySelector("[aria-label='Cancel compose slides']") as HTMLElement
-    expect(cancelBtn).toBeTruthy()
+    expect(screen.getByLabelText("Cancel compose slides")).toBeTruthy()
   })
 
-  it("does not render cancel button when missing credentials", () => {
-    const { container } = renderWithIntl(
-      <ComposeCard
-        input={{ slide_groups: [{ slugs: ["intro"], instruction: "test" }] }}
-        isActive
-      />
-    )
-    const cancelBtn = container.querySelector("[aria-label='Cancel compose slides']")
-    expect(cancelBtn).toBeNull()
-  })
-
-  it("shows rushed badge when agents hit budget", () => {
-    const { container } = renderWithIntl(
-      <ComposeCard
-        input={{ slide_groups: [{ slugs: ["intro"], instruction: "test" }] }}
-        isActive
-        streamMessages={[
-          { group: 1, status: "starting", total_groups: 1, slugs: "intro" },
-          { group: 1, status: "budget_reached", slugs: "intro" },
-        ]}
-      />
-    )
-    expect(container.textContent).toContain("rushed")
-  })
-
-  it("displays error state with red color only for real errors", () => {
+  it("shows rushed and real error states", () => {
     const { container } = renderWithIntl(
       <ComposeCard
         input={{ slide_groups: [{ slugs: ["intro"], instruction: "test" }] }}
         status="error"
         isActive={false}
         streamMessages={[
+          { group: 1, status: "starting", total_groups: 1, slugs: "intro" },
+          { group: 1, status: "budget_reached", slugs: "intro" },
           { group: 1, status: "error", error: "API timeout", slugs: "intro" },
         ]}
       />
     )
-    // Error state text
     expect(container.textContent).toContain("Failed")
-    // Shell should have error tinting
-    const section = container.querySelector("section") as HTMLElement
-    expect(section.style.background).toContain("--state-error")
+    expect(container.textContent).toContain("rushed")
+    expect((container.querySelector("section") as HTMLElement).style.background).toContain("--state-error")
   })
 
-  it("renders StopSummary on soft-stop", () => {
+  it("renders StopSummary on soft stop", () => {
     const { container } = renderWithIntl(
       <ComposeCard
         input={{ slide_groups: [{ slugs: ["intro"], instruction: "test" }] }}
         isActive={false}
         status="success"
-        result={{ stopped: true, notice: "Stopped by user", summaries: { "Group 1": "Completed intro slide" } }}
-        streamMessages={[
-          { group: 1, status: "done", slugs: "intro" },
-        ]}
+        result={{ stopped: true, notice: "Stopped by user", summaries: { "Group 1": "Completed intro" } }}
+        streamMessages={[{ group: 1, status: "done", slugs: "intro" }]}
       />
     )
     expect(container.textContent).toContain("Stopped by user")
   })
 
-  it("has aria-label on section", () => {
+  it("keeps lane order neutral and does not expose invented roles", () => {
     const { container } = renderWithIntl(
-      <ComposeCard input={{}} isActive />
+      <ComposeCard input={twoGroups} isActive streamMessages={twoStarted} />
     )
-    const section = container.querySelector("section") as HTMLElement
-    expect(section.getAttribute("aria-label")).toBe("Composing slides")
+    expect(screen.getByText("01")).toBeTruthy()
+    expect(screen.getByText("02")).toBeTruthy()
+    expect(container.textContent).not.toContain("Layout")
+    expect(container.textContent).not.toContain("Content")
   })
 
-  it("has sr-only progress announcement", () => {
-    const { container } = renderWithIntl(
-      <ComposeCard
-        input={{ slide_groups: [{ slugs: ["s1"], instruction: "a" }, { slugs: ["s2"], instruction: "b" }] }}
-        isActive
-        streamMessages={[
-          { group: 1, status: "starting", total_groups: 2, slugs: "s1" },
-          { group: 2, status: "starting", total_groups: 2, slugs: "s2" },
-        ]}
-      />
-    )
-    const srOnly = container.querySelector(".sr-only[aria-live='polite']") as HTMLElement
-    expect(srOnly).toBeTruthy()
-    expect(srOnly.textContent).toContain("0 of 2")
-  })
-})
+  it("allows exactly one manually expanded history", () => {
+    renderWithIntl(<ComposeCard input={twoGroups} isActive streamMessages={twoStarted} />)
+    const expand = screen.getAllByLabelText("Expand details")
+    fireEvent.click(expand[0])
+    expect(expand[0].getAttribute("aria-expanded")).toBe("true")
 
-describe("AgentCard within ComposeCard — ledger grammar", () => {
-  it("shows cursor+name tag for working agent", () => {
+    fireEvent.click(expand[1])
+    expect(expand[0].getAttribute("aria-expanded")).toBe("false")
+    expect(expand[1].getAttribute("aria-expanded")).toBe("true")
+  })
+
+  it("marks each existing slug with a neutral created check", () => {
+    const { container } = renderWithIntl(
+      <ComposeCard input={twoGroups} isActive deckSlugs={["intro"]} streamMessages={twoStarted} />
+    )
+    expect(container.querySelectorAll("[aria-label='Slide created']")).toHaveLength(1)
+    expect(screen.getByText("intro").className).toContain("font-semibold")
+  })
+
+  it("shows latest tool icon and semantic category color while collapsed", () => {
     const { container } = renderWithIntl(
       <ComposeCard
-        input={{ slide_groups: [{ slugs: ["intro"], instruction: "Make intro slide" }] }}
+        input={{ slide_groups: [{ slugs: ["intro"], instruction: "test" }] }}
         isActive
         streamMessages={[
           { group: 1, status: "starting", total_groups: 1, slugs: "intro" },
@@ -194,92 +150,67 @@ describe("AgentCard within ComposeCard — ledger grammar", () => {
         ]}
       />
     )
-    // Cursor arrow should be present (active agent)
-    expect(container.querySelector(".ledger-cursor")).toBeTruthy()
-    // Agent name tag — group 1 = Layout
-    expect(container.textContent).toContain("Layout")
+    expect(container.textContent).toContain("Writing slide · intro")
+    const lane = screen.getByLabelText("Expand details")
+    const latest = within(lane).getByText("Writing slide · intro").parentElement as HTMLElement
+    expect(latest.querySelector("svg")).toBeTruthy()
+    expect(latest.style.color).toContain("--agent-content")
   })
 
-  it("shows dot marker for done agent", () => {
-    const { container } = renderWithIntl(
+  it("shows compact previous failure and current retry history", () => {
+    renderWithIntl(
       <ComposeCard
-        input={{ slide_groups: [{ slugs: ["intro"], instruction: "Make intro" }] }}
-        isActive={false}
-        status="success"
-        streamMessages={[
-          { group: 1, status: "starting", total_groups: 1, slugs: "intro" },
-          { group: 1, status: "done", slugs: "intro" },
-        ]}
-      />
-    )
-    // Should not have cursor for done state
-    expect(container.querySelector(".ledger-cursor")).toBeNull()
-    // Should have dot marker (tool-check-enter)
-    expect(container.querySelector(".tool-check-enter")).toBeTruthy()
-  })
-
-  it("has chevron with aria-expanded", () => {
-    const { container } = renderWithIntl(
-      <ComposeCard
-        input={{ slide_groups: [{ slugs: ["intro"], instruction: "Make intro slide" }] }}
+        input={{ slide_groups: [{ slugs: ["forecast"], instruction: "test" }] }}
         isActive
         streamMessages={[
-          { group: 1, status: "starting", total_groups: 1, slugs: "intro" },
+          { group: 1, status: "starting", total_groups: 1, slugs: "forecast" },
+          { group: 1, tool: "run_python", toolUseId: "t1", input: {} },
+          { group: 1, status: "retrying", attempt: 2, error: "Merged heading", slugs: "forecast" },
+          { group: 1, tool: "read_reference", toolUseId: "t2", input: { path: "forecast.csv" } },
         ]}
       />
     )
-    const chevron = container.querySelector("[aria-expanded]") as HTMLElement
-    expect(chevron).toBeTruthy()
-    // Default: collapsed (not auto-expanded unless error)
-    expect(chevron.getAttribute("aria-expanded")).toBe("false")
+    fireEvent.click(screen.getByLabelText("Expand details"))
+    expect(screen.getByText("Previous attempt failed")).toBeTruthy()
+    expect(screen.getByText("Merged heading")).toBeTruthy()
+    expect(screen.getByText("Current attempt · Retry 2")).toBeTruthy()
+    expect(screen.getAllByText("Reading reference").length).toBeGreaterThan(0)
   })
 
-  it("auto-expands on error when parent is finished", () => {
+  it("announces created slide progress", () => {
     const { container } = renderWithIntl(
-      <ComposeCard
-        input={{ slide_groups: [{ slugs: ["intro"], instruction: "test" }] }}
-        isActive={false}
-        status="error"
-        streamMessages={[
-          { group: 1, status: "error", error: "Something went wrong", slugs: "intro" },
-        ]}
-      />
+      <ComposeCard input={twoGroups} isActive deckSlugs={["intro"]} streamMessages={twoStarted} />
     )
-    const chevron = container.querySelector("[aria-expanded]") as HTMLElement
-    expect(chevron.getAttribute("aria-expanded")).toBe("true")
+    const live = container.querySelector(".sr-only[aria-live='polite']") as HTMLElement
+    expect(live.textContent).toContain("1 of 2 slides created")
+  })
+})
+
+describe("observable compose state", () => {
+  it("counts repeated done events once per terminal lane", () => {
+    const state = parseComposeState([
+      { group: 1, status: "starting", total_groups: 1, slugs: "intro" },
+      { group: 1, status: "done", slugs: "intro" },
+      { group: 1, status: "done", slugs: "intro" },
+    ])
+    expect(state.doneGroupCount).toBe(1)
   })
 
-  it("maps group 2 to Content identity", () => {
-    const { container } = renderWithIntl(
-      <ComposeCard
-        input={{ slide_groups: [
-          { slugs: ["s1"], instruction: "a" },
-          { slugs: ["s2"], instruction: "b" },
-        ]}}
-        isActive
-        streamMessages={[
-          { group: 1, status: "starting", total_groups: 2, slugs: "s1" },
-          { group: 2, status: "starting", total_groups: 2, slugs: "s2" },
-          { group: 2, tool: "write_slide", toolUseId: "t1", input: { slide_id: "s2" } },
-        ]}
-      />
-    )
-    // Group 2 = Content
-    expect(container.textContent).toContain("Content")
+  it("retains only the previous retry failure summary", () => {
+    const state = parseComposeState([
+      { group: 1, status: "starting", total_groups: 1, slugs: "intro" },
+      { group: 1, tool: "run_python", toolUseId: "old", input: {} },
+      { group: 1, status: "retrying", attempt: 2, error: "First attempt failed", slugs: "intro" },
+      { group: 1, tool: "read_reference", toolUseId: "current", input: {} },
+    ])
+    expect(state.agents[0].previousAttemptError).toBe("First attempt failed")
+    expect(state.agents[0].activity.map((activity) => activity.toolUseId)).toEqual(["current"])
   })
 
-  it("shows existing slug in different color", () => {
-    const { container } = renderWithIntl(
-      <ComposeCard
-        input={{ slide_groups: [{ slugs: ["existing-slide"], instruction: "test" }] }}
-        isActive
-        deckSlugs={["existing-slide"]}
-        streamMessages={[
-          { group: 1, status: "starting", total_groups: 1, slugs: "existing-slide" },
-        ]}
-      />
-    )
-    // The slug text should be present
-    expect(container.textContent).toContain("existing-slide")
+  it("maps actual tools to semantic history colors", () => {
+    expect(activityCategory("write_slide")).toBe("build")
+    expect(activityCategory("read_reference")).toBe("explore")
+    expect(activityCategory("grid")).toBe("compute")
+    expect(activityCategory("generate_pptx")).toBe("produce")
   })
 })

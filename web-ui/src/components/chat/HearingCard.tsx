@@ -100,10 +100,10 @@ export function HearingCard({ inference, questions, disabled = false, onSubmit }
         background: isDisabled ? "var(--surface-subtle)" : "var(--card)",
       }}
     >
-      {/* Five-color spine (left edge) */}
+      {/* Five-color spine (top to bottom) */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
-        style={{ background: "var(--team-gradient)" }}
+        className="absolute left-0 top-0 bottom-0"
+        style={{ width: "3px", background: "var(--team-spine-gradient)", opacity: 0.82 }}
         aria-hidden="true"
       />
 

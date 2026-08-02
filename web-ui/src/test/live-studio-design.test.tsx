@@ -95,10 +95,11 @@ describe("HearingCard — achromatic + five-color spine", () => {
     onSubmit: () => {},
   }
 
-  it("renders five-color spine with team-gradient", () => {
+  it("renders a 3px vertical five-color spine", () => {
     const { container } = renderWithIntl(<HearingCard {...baseProps} />)
-    const spine = container.querySelector("[style*='--team-gradient']")
+    const spine = container.querySelector("[style*='--team-spine-gradient']") as HTMLElement
     expect(spine).toBeTruthy()
+    expect(spine.style.width).toBe("3px")
   })
 
   it("renders submit button with team-action-btn class", () => {
