@@ -43,8 +43,22 @@ describe("Agent token mapping (globals.css)", () => {
   })
 
   it("no longer contains hardcoded oklch(0.75 0.14 185 teal", () => {
-    // All teal references should be gone from globals.css
     expect(css).not.toContain("oklch(0.75 0.14 185)")
+  })
+
+  it("keeps prose colors theme-aware", () => {
+    expect(css).toContain("--tw-prose-body: var(--foreground-secondary)")
+    expect(css).toContain("--tw-prose-headings: var(--foreground)")
+    expect(css).not.toContain("--tw-prose-body: oklch(0.85 0 0)")
+  })
+
+  it("keeps text-xs at the 11px floor at 90% scale", () => {
+    expect(css).toContain(".text-xs { font-size: max(11px, 0.75rem); }")
+  })
+
+  it("disables content and composer entrance motion", () => {
+    expect(css).toContain(".content-enter,")
+    expect(css).toContain(".compose-agent-enter { animation: none !important")
   })
 })
 

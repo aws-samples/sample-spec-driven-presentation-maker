@@ -58,10 +58,8 @@ export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, pare
 
   return (
     <div
-      className="ledger-row relative flex items-start gap-2.5 py-1.5"
-      style={{
-        animation: `compose-card-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) ${indexDelay * 80}ms both`,
-      }}
+      className="compose-agent-enter ledger-row relative flex items-start gap-2.5 py-1.5"
+      style={{ "--compose-delay": `${indexDelay * 80}ms` } as React.CSSProperties}
     >
       {/* Left rail marker — agent-color dot/cursor */}
       <div className="ledger-marker flex-none flex flex-col items-center pt-1">
@@ -174,7 +172,7 @@ export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, pare
             aria-expanded={expanded}
             aria-controls={detailId}
             aria-label={expanded ? t("collapseDetails") : t("expandDetails")}
-            className="flex-none w-5 h-5 flex items-center justify-center rounded hover:bg-foreground/5 transition-colors"
+            className="touch-target flex-none flex items-center justify-center rounded hover:bg-foreground/5 transition-colors"
           >
             <ChevronRight
               className="h-3 w-3 transition-transform duration-200"

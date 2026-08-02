@@ -239,7 +239,7 @@ function Header({
         <button
           type="button"
           onClick={onCancel}
-          className="flex-none inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-foreground/70 hover:text-foreground/95 hover:bg-foreground/5 transition-colors"
+          className="touch-target flex-none inline-flex items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-foreground/70 hover:text-foreground/95 hover:bg-foreground/5 transition-colors"
           aria-label={t("cancelAria")}
         >
           <X className="h-3 w-3" />

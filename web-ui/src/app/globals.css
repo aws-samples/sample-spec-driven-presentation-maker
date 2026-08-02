@@ -112,11 +112,11 @@
 
 [data-theme="light"] {
   color-scheme: light;
-  --agent-layout: oklch(0.52 0.19 262);
-  --agent-content: oklch(0.55 0.14 170);
-  --agent-visual: oklch(0.53 0.21 300);
-  --agent-data: oklch(0.62 0.14 70);
-  --agent-decorator: oklch(0.55 0.20 330);
+  --agent-layout: oklch(0.48 0.19 262);
+  --agent-content: oklch(0.47 0.14 170);
+  --agent-visual: oklch(0.48 0.21 300);
+  --agent-data: oklch(0.48 0.14 70);
+  --agent-decorator: oklch(0.48 0.20 330);
   --agent-neutral: oklch(0.45 0 0);
   --surface-subtle: oklch(0.2 0.01 260 / 3%);
   --surface-stage: oklch(0.93 0.008 85);
@@ -175,6 +175,9 @@
   font-weight: var(--document-display-weight);
   letter-spacing: var(--document-display-tracking);
 }
+
+/* 11px absolute floor remains intact when the user selects 90% text scale. */
+.text-xs { font-size: max(11px, 0.75rem); }
 
 /* ── Noise texture overlay ── */
 body {
@@ -539,6 +542,9 @@ body {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+.compose-agent-enter {
+  animation: compose-card-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) var(--compose-delay, 0ms) both;
+}
 
 /* ── Thinking dots: . / .. / ... / . cycle ── */
 @keyframes thinking-dots {
@@ -608,7 +614,9 @@ body {
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .team-action-btn::before { animation: none; }
-  .animate-card-in { animation: none; opacity: 1; transform: none; }
+  .animate-card-in,
+  .content-enter,
+  .compose-agent-enter { animation: none !important; opacity: 1; transform: none; }
   .tool-card-enter,
   .tool-check-enter,
   .tool-ring-enter,
@@ -638,45 +646,45 @@ body {
   .chat-toggle-pulse { animation: none; }
 }
 
-/* ── Chat prose overrides (dark editorial) ── */
+/* ── Theme-aware prose overrides ── */
 .prose.prose-invert {
-  font-size: 0.875rem; /* 14px base for chat readability */
-  --tw-prose-body: oklch(0.85 0 0);
-  --tw-prose-headings: oklch(0.95 0 0);
+  font-size: 0.875rem;
+  --tw-prose-body: var(--foreground-secondary);
+  --tw-prose-headings: var(--foreground);
   --tw-prose-links: var(--foreground-secondary);
-  --tw-prose-bold: oklch(0.92 0 0);
-  --tw-prose-code: oklch(0.82 0.08 185);
-  --tw-prose-pre-bg: oklch(0.10 0.005 260);
-  --tw-prose-pre-code: oklch(0.80 0 0);
-  --tw-prose-th-borders: oklch(1 0 0 / 10%);
-  --tw-prose-td-borders: oklch(1 0 0 / 6%);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-code: var(--agent-content);
+  --tw-prose-pre-bg: var(--background-panel);
+  --tw-prose-pre-code: var(--foreground-secondary);
+  --tw-prose-th-borders: var(--border-hover);
+  --tw-prose-td-borders: var(--border);
 }
 .prose.prose-invert table {
   font-size: 12px;
   border-collapse: collapse;
 }
 .prose.prose-invert th {
-  background: oklch(1 0 0 / 4%);
+  background: var(--surface-subtle);
   font-weight: 600;
   text-align: left;
   padding: 6px 10px;
-  border-bottom: 1px solid oklch(1 0 0 / 10%);
+  border-bottom: 1px solid var(--border-hover);
 }
 .prose.prose-invert td {
   padding: 5px 10px;
-  border-bottom: 1px solid oklch(1 0 0 / 5%);
+  border-bottom: 1px solid var(--border);
 }
 .prose.prose-invert tr:hover td {
-  background: oklch(1 0 0 / 2%);
+  background: var(--surface-subtle);
 }
 .prose.prose-invert code:not(pre code) {
-  background: oklch(1 0 0 / 6%);
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 0.85em;
 }
 .prose.prose-invert pre {
-  border: 1px solid oklch(1 0 0 / 6%);
+  border: 1px solid var(--border);
   border-radius: 8px;
 }
 .prose.prose-invert a {
@@ -689,7 +697,7 @@ body {
 }
 .prose.prose-invert blockquote {
   border-left-color: var(--border-hover);
-  color: oklch(0.70 0 0);
+  color: var(--foreground-muted);
 }
 
 /* ── Spec prose refinements (editorial markdown preview) ── */
@@ -702,7 +710,7 @@ body {
   letter-spacing: -0.01em;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid oklch(1 0 0 / 6%);
+  border-bottom: 1px solid var(--border);
 }
 .spec-prose h2 {
   font-size: 1.125rem; /* 18px — up from 17.6px */
@@ -717,7 +725,7 @@ body {
   color: var(--foreground-muted);
 }
 .spec-prose hr {
-  border-color: oklch(1 0 0 / 6%);
+  border-color: var(--border);
   margin: 2rem 0;
 }
 
