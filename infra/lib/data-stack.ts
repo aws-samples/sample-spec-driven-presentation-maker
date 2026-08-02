@@ -82,6 +82,12 @@ export class DataStack extends cdk.Stack {
           tagFilters: { "sdpm-class": "attachment-source" },
           expiration: cdk.Duration.days(90),
           noncurrentVersionExpiration: cdk.Duration.days(7),
+        },
+        {
+          // Incomplete multipart uploads have no tags yet, so S3 forbids
+          // combining AbortIncompleteMultipartUpload with tag filters —
+          // keep it in a separate prefix-only rule.
+          prefix: "uploads/",
           abortIncompleteMultipartUploadAfter: cdk.Duration.days(1),
         },
         {
