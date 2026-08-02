@@ -108,7 +108,11 @@ jobs:
       # lifecycle rule combinations only fail at CloudFormation/S3 API time,
       # but synth at least validates construct-level constraints and config).
       - name: Synth
-        run: npx cdk synth --all --quiet
+        # config.yaml is a local deployment setting (gitignored) — synth against
+        # the committed example config.
+        run: |
+          cp config.example.yaml config.yaml
+          npx cdk synth --quiet
         working-directory: infra
 
   # Deploy-surface guard: the runtime docker builds resolve Python deps with
