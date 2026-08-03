@@ -214,7 +214,7 @@ export function AgentSettingsDialog({ open, onClose }: Props) {
           </button>
           <div className="flex gap-2">
             <button onClick={onClose} className="px-3 py-1.5 text-xs rounded hover:bg-accent">Cancel</button>
-            <button onClick={save} className="px-3 py-1.5 text-xs rounded bg-brand-teal text-white hover:bg-brand-teal/80">Save & Restart</button>
+            <button onClick={save} className="min-h-11 px-3 py-1.5 text-xs rounded bg-brand-teal text-background hover:bg-brand-teal/80">Save & Restart</button>
           </div>
         </div>
       </div>
