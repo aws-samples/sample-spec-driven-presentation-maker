@@ -21,7 +21,7 @@ import { FileText, Palette, ArrowLeft, Check, Star } from "lucide-react"
 import Markdown from "react-markdown"
 import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { fetchStyles, fetchStyleHtml, pinStyle, type StyleEntry } from "@/services/deckService"
+import { fetchStyles, pinStyle, type StyleEntry } from "@/services/deckService"
 import { OutlineView } from "./OutlineView"
 import { StyleSlidePreview, splitStyleSlides } from "@/components/StyleSlidePreview"
 import { StyleCard } from "./StyleCard"
@@ -74,7 +74,6 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
   const [stylesLoading, setStylesLoading] = useState(false)
   const stylesLoadedRef = useRef(false)
   const [preview, setPreview] = useState<{ name: string; html: string } | null>(null)
-  const [previewLoading, setPreviewLoading] = useState(false)
   const galleryScrollRef = useRef(0)
   const galleryContainerRef = useRef<HTMLDivElement>(null)
   const [allStylesOpen, setAllStylesOpen] = useState(true)
@@ -173,14 +172,10 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
       const handleCardClick = async (name: string) => {
         if (galleryContainerRef.current) galleryScrollRef.current = galleryContainerRef.current.scrollTop
         userRequestedGallery.current = false
-        setPreviewLoading(true)
-        setPreview({ name, html: "" })
+        const style = styles.find(s => s.name === name)
+        const html = style?.html || ""
+        setPreview({ name, html })
         setAdMode("preview")
-        if (idToken) {
-          const html = await fetchStyleHtml(name, idToken)
-          setPreview({ name, html })
-        }
-        setPreviewLoading(false)
       }
 
       const pinnedStyles = styles.filter(s => s.pinned)
@@ -305,7 +300,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
           </div>
           {/* Preview content */}
           <div className="p-6">
-            <StyleSlidePreview html={preview.html} loading={previewLoading} />
+            <StyleSlidePreview html={preview.html} loading={false} />
           </div>
         </div>
       )

@@ -64,6 +64,19 @@ html,body{margin:0!important;padding:0!important;zoom:1!important;overflow:hidde
   return `<!DOCTYPE html><html><head>${head}${reset}</head><body>${slideBody}</body></html>`
 }
 
+/**
+ * Build a cover document from full style HTML — splits via splitStyleSlides
+ * and returns the first slide with zoom reset. Falls back to the full HTML
+ * when no .slide markers are found.
+ */
+export function buildCoverDoc(html: string): string {
+  const split = splitStyleSlides(html)
+  if (split) {
+    return prepareSlideDoc(split.head, split.slides[0])
+  }
+  return html
+}
+
 /** Inject minimal reset into full style HTML (fallback path). */
 function prepareHtml(html: string): string {
   const reset = `<style data-preview-reset>

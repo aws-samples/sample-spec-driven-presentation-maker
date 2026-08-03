@@ -11,7 +11,7 @@
 
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useTranslations } from "next-intl"
 import { useAuth } from "@/hooks/useAuth"
 import { useStyleWorkspace } from "@/hooks/useStyleWorkspace"
@@ -19,6 +19,7 @@ import { AppShell } from "@/components/AppShell"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { fetchStyles, fetchStyleHtml, pinStyle, saveUserStyle, deleteUserStyle, renameUserStyle, type StyleEntry } from "@/services/deckService"
 import { StyleSlidePreview } from "@/components/StyleSlidePreview"
+import { buildCoverDoc } from "@/components/StyleSlidePreview"
 import { StyleChatShell } from "@/components/chat/StyleChatShell"
 import { Star, Trash2, Palette, Download, Sparkles, Copy, MessageSquare, Pencil, MoreHorizontal } from "lucide-react"
 
@@ -48,8 +49,10 @@ export default function StylesPage() {
     if (!idToken) return
     const s = await fetchStyles(idToken)
     setStyles(s)
+    ws.setStyles(s)
     setLoading(false)
-  }, [idToken])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idToken, ws.setStyles])
 
   useEffect(() => { refreshStyles() }, [refreshStyles])
 
@@ -386,6 +389,8 @@ function StyleListCard({ style, onPreview, onPin, onDelete, onExport, onRename, 
     return () => ro.disconnect()
   }, [])
 
+  const coverDoc = useMemo(() => style.html ? buildCoverDoc(style.html) : "", [style.html])
+
   return (
     <div
       ref={cardRef}
@@ -394,9 +399,9 @@ function StyleListCard({ style, onPreview, onPin, onDelete, onExport, onRename, 
     >
       {/* Cover preview */}
       <div className="relative overflow-hidden bg-black/20" style={{ height: 1080 * scale }}>
-        {style.coverHtml ? (
+        {coverDoc ? (
           <iframe
-            srcDoc={style.coverHtml}
+            srcDoc={coverDoc}
             className="pointer-events-none"
             style={{ width: 1920, height: 1080, transform: `scale(${scale})`, transformOrigin: "top left", border: "none" }}
             tabIndex={-1}

@@ -7,7 +7,7 @@
 import { describe, it, expect, afterEach, beforeAll, afterAll } from "vitest"
 import { screen, cleanup } from "@testing-library/react"
 import { render } from "@testing-library/react"
-import { splitStyleSlides, StyleSlidePreview } from "./StyleSlidePreview"
+import { splitStyleSlides, StyleSlidePreview, buildCoverDoc } from "./StyleSlidePreview"
 
 afterEach(cleanup)
 
@@ -68,6 +68,41 @@ describe("splitStyleSlides", () => {
     expect(result!.head).toContain("charset")
     expect(result!.head).toContain("h1{color:red}")
     expect(result!.head).toContain("link")
+  })
+})
+
+describe("buildCoverDoc", () => {
+  it("returns first slide only with zoom reset injected when .slide markers exist", () => {
+    const html = `<!DOCTYPE html><html><head><style>.slide{width:1920px}</style></head><body>
+<div class="slide cover">Slide 1</div>
+<div class="slide body">Slide 2</div>
+<div class="slide closing">Slide 3</div>
+</body></html>`
+
+    const result = buildCoverDoc(html)
+    expect(result).toContain("Slide 1")
+    expect(result).not.toContain("Slide 2")
+    expect(result).not.toContain("Slide 3")
+    // Zoom reset injected
+    expect(result).toContain("zoom:1!important")
+    expect(result).toContain("data-preview-reset")
+  })
+
+  it("returns full HTML as-is when no .slide markers found", () => {
+    const html = `<html><head><style>body{color:red}</style></head><body><p>No slides here</p></body></html>`
+    const result = buildCoverDoc(html)
+    expect(result).toBe(html)
+  })
+
+  it("preserves head styles in the cover document", () => {
+    const html = `<html><head><style>h1{font-size:72px}</style></head><body>
+<div class="slide cover"><h1>Title</h1></div>
+<div class="slide body">Content</div>
+</body></html>`
+
+    const result = buildCoverDoc(html)
+    expect(result).toContain("h1{font-size:72px}")
+    expect(result).toContain("<h1>Title</h1>")
   })
 })
 

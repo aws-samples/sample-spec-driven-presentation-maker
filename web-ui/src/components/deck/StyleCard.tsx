@@ -9,9 +9,10 @@
 
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Star } from "lucide-react"
 import type { StyleEntry } from "@/services/deckService"
+import { buildCoverDoc } from "@/components/StyleSlidePreview"
 import { useTranslations } from "next-intl"
 
 export function StyleCard({ style, index, onClick, onPin }: { style: StyleEntry; index: number; onClick: (name: string) => void; onPin?: (name: string) => void }) {
@@ -39,6 +40,8 @@ export function StyleCard({ style, index, onClick, onPin }: { style: StyleEntry;
     onPin?.(style.name)
   }
 
+  const coverDoc = useMemo(() => style.html ? buildCoverDoc(style.html) : "", [style.html])
+
   return (
     <div
       ref={cardRef}
@@ -51,9 +54,9 @@ export function StyleCard({ style, index, onClick, onPin }: { style: StyleEntry;
       aria-label={t("previewStyleAria", { name: style.name })}
     >
       <div className="relative overflow-hidden bg-black/20" style={{ height: iframeHeight * scale }}>
-        {style.coverHtml ? (
+        {coverDoc ? (
           <iframe
-            srcDoc={style.coverHtml}
+            srcDoc={coverDoc}
             sandbox=""
             title={style.name}
             style={{
