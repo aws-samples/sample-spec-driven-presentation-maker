@@ -324,7 +324,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     if (slidesWithPreview.length === 0) return renderSlidesEmpty()
 
     return (
-      <div ref={containerRef} className={`flex-1 overflow-y-auto px-6 py-6 ${viewMode === "grid" ? "" : "space-y-4"}`}>
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-6 py-6">
         {viewMode === "grid" ? (
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
             {slidesWithPreview.map((slide, i) => (
@@ -346,7 +346,10 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
             ))}
           </div>
         ) : (
-          slidesWithPreview.map((slide, i) => (
+          /* Full view: cap width so one slide always fits the viewport height
+             (100vh minus header + paddings, converted to width at 16:9). */
+          <div className="mx-auto w-full max-w-[calc((100vh-170px)*16/9)] space-y-4">
+          {slidesWithPreview.map((slide, i) => (
             slide.composeUrl && defsUrl ? (
               <AnimatedSlidePreview
                 key={slide.slug}
@@ -379,7 +382,8 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
               />
             )
-          ))
+          ))}
+          </div>
         )}
       </div>
     )
