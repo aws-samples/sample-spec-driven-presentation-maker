@@ -247,7 +247,7 @@ def _extract_cover_html(html: str) -> str:
         end = len(html)
     return (
         html[: head_end + 7]
-        + '\n<body style="margin:0;padding:0;background:transparent;overflow:hidden">\n'
+        + '\n<body style="margin:0;padding:0;overflow:hidden">\n'
         + html[first_slide:end].strip()
         + "\n</body></html>"
     )

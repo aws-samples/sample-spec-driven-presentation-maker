@@ -58,7 +58,7 @@ export function splitStyleSlides(html: string): { head: string; slides: string[]
 /** Inject minimal reset into a single-slide HTML document. */
 function prepareSlideDoc(head: string, slideBody: string): string {
   const reset = `<style data-preview-reset>
-html,body{margin:0!important;padding:0!important;background:transparent!important;zoom:1!important;overflow:hidden!important}
+html,body{margin:0!important;padding:0!important;zoom:1!important;overflow:hidden!important}
 .slide{margin:0 auto!important}
 </style>`
   return `<!DOCTYPE html><html><head>${head}${reset}</head><body>${slideBody}</body></html>`
@@ -67,7 +67,7 @@ html,body{margin:0!important;padding:0!important;background:transparent!importan
 /** Inject minimal reset into full style HTML (fallback path). */
 function prepareHtml(html: string): string {
   const reset = `<style data-preview-reset>
-html,body{margin:0!important;padding:0!important;background:transparent!important;zoom:1!important;overflow:visible!important}
+html,body{margin:0!important;padding:0!important;zoom:1!important;overflow:visible!important}
 .slide{margin:0 auto 8px!important}
 </style>`
   if (html.includes("</head>")) {

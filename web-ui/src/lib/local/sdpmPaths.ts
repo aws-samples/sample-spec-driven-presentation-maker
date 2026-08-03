@@ -70,7 +70,7 @@ export function listStylesFromDir(dir: string): Array<{ name: string; descriptio
       // Build standalone doc with head styles + body padding reset
       const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i)
       const head = headMatch ? headMatch[1] : ""
-      const coverHtml = `<!DOCTYPE html><html><head>${head}<style>body{margin:0!important;padding:0!important;background:transparent!important;overflow:hidden!important;zoom:1!important}.slide{margin:0 auto!important}</style></head><body>${slideHtml}</body></html>`
+      const coverHtml = `<!DOCTYPE html><html><head>${head}<style>body{margin:0!important;padding:0!important;overflow:hidden!important;zoom:1!important}.slide{margin:0 auto!important}</style></head><body>${slideHtml}</body></html>`
       return { name, description, coverHtml }
     })
 }
