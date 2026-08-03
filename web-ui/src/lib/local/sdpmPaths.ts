@@ -57,6 +57,9 @@ export function listStylesFromDir(dir: string): Array<{ name: string; descriptio
     .sort()
     .map(f => {
       const name = f.replace(/\.html$/, "")
+      // `dir` is a server-side constant (bundled/user styles dir) and `f` comes
+      // from readdirSync filtered to *.html — no user input reaches this join.
+      // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
       const html = fs.readFileSync(path.join(dir, f), "utf-8")
       const titleMatch = html.match(/<title>(.*?)<\/title>/i)
       const description = titleMatch ? titleMatch[1].trim() : ""
