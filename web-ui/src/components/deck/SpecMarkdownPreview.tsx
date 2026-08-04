@@ -21,41 +21,15 @@ import { FileText, Palette, ArrowLeft, Check, Star } from "lucide-react"
 import Markdown from "react-markdown"
 import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { fetchStyles, fetchStyleHtml, pinStyle, type StyleEntry } from "@/services/deckService"
+import { fetchStyles, pinStyle, type StyleEntry } from "@/services/deckService"
 import { OutlineView } from "./OutlineView"
-import { StyleSlidePreview } from "@/components/StyleSlidePreview"
+import { StyleSlidePreview, splitStyleSlides } from "@/components/StyleSlidePreview"
 import { StyleCard } from "./StyleCard"
 import { TemplatePickerSection } from "./TemplatePickerSection"
 import { BriefWaiting, OutlineWaiting, ArtDirectionWaiting } from "./SpecWaiting"
+import { BriefDocumentView } from "./BriefDocumentView"
+import { renderColorSwatches } from "./colorSwatches"
 import { useTranslations } from "next-intl"
-
-/** Regex matching HEX color codes in text. */
-const HEX_RE = /(#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3}))\b/g
-
-/**
- * Render inline color swatches next to HEX codes in text.
- *
- * @param text - Raw text that may contain HEX color codes
- * @returns Array of string and JSX elements with color swatches
- */
-export function renderColorSwatches(text: string): (string | React.ReactElement)[] {
-  const parts = text.split(HEX_RE)
-  return parts.map((part, i) => {
-    if (/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(part)) {
-      return (
-        <span key={i} className="inline-flex items-center gap-1">
-          <span
-            className="inline-block w-3 h-3 rounded-full border border-white/20 flex-none"
-            style={{ backgroundColor: part }}
-            aria-label={`Color ${part}`}
-          />
-          <code className="text-xs px-1 py-0.5 rounded bg-white/5">{part}</code>
-        </span>
-      )
-    }
-    return part
-  })
-}
 
 /**
  * Shared markdown components for spec rendering — adds HEX color swatches.
@@ -77,7 +51,7 @@ const specComponents = {
       return (
         <span className="inline-flex items-center gap-1">
           <span
-            className="inline-block w-3 h-3 rounded-full border border-white/20 flex-none"
+            className="inline-block w-3 h-3 rounded-full border border-border-hover flex-none"
             style={{ backgroundColor: color }}
             aria-label={`Color ${color}`}
           />
@@ -89,7 +63,7 @@ const specComponents = {
   },
 }
 
-export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, onTemplateSelect, currentTemplate, idToken }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; onTemplateSelect?: (name: string, isChange: boolean) => void; currentTemplate?: string | null; idToken?: string }) {
+export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outlineExists }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; onTemplateSelect?: (name: string, isChange: boolean) => void; currentTemplate?: string | null; idToken?: string; outlineExists?: boolean }) {
   const t = useTranslations("stylePicker")
   // Hooks must be called unconditionally — before any early returns.
 
@@ -100,7 +74,6 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
   const [stylesLoading, setStylesLoading] = useState(false)
   const stylesLoadedRef = useRef(false)
   const [preview, setPreview] = useState<{ name: string; html: string } | null>(null)
-  const [previewLoading, setPreviewLoading] = useState(false)
   const galleryScrollRef = useRef(0)
   const galleryContainerRef = useRef<HTMLDivElement>(null)
   const [allStylesOpen, setAllStylesOpen] = useState(true)
@@ -199,14 +172,10 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
       const handleCardClick = async (name: string) => {
         if (galleryContainerRef.current) galleryScrollRef.current = galleryContainerRef.current.scrollTop
         userRequestedGallery.current = false
-        setPreviewLoading(true)
-        setPreview({ name, html: "" })
+        const style = styles.find(s => s.name === name)
+        const html = style?.html || ""
+        setPreview({ name, html })
         setAdMode("preview")
-        if (idToken) {
-          const html = await fetchStyleHtml(name, idToken)
-          setPreview({ name, html })
-        }
-        setPreviewLoading(false)
       }
 
       const pinnedStyles = styles.filter(s => s.pinned)
@@ -216,7 +185,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
       return wrap(
         <div>
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-6 py-3 border-b border-border">
             <div>
               <h2 className="text-[15px] font-semibold">{t("chooseStyle")}</h2>
               <p className="text-xs text-foreground-muted mt-0.5">{t("clickToPreview")}</p>
@@ -224,7 +193,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
             {content && (
               <button
                 onClick={() => { userRequestedGallery.current = false; setAdMode("result") }}
-                className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.06] transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-border hover:bg-foreground/[0.06] transition-colors"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 {t("backToArtDirection")}
@@ -236,7 +205,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
             {stylesLoading ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 {[0, 1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="aspect-[16/10] rounded-xl bg-white/[0.03] animate-pulse" />
+                  <div key={i} className="aspect-[16/10] rounded-xl bg-foreground/[0.03] animate-pulse" />
                 ))}
               </div>
             ) : hasPins ? (
@@ -300,11 +269,11 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
       return wrap(
         <div>
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-6 py-3 border-b border-border">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => { setPreview(null); setAdMode("gallery"); }}
-                className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-foreground/[0.06] transition-colors"
                 aria-label={t("backToStylesAria")}
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -331,28 +300,47 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
           </div>
           {/* Preview content */}
           <div className="p-6">
-            <StyleSlidePreview html={preview.html} loading={previewLoading} />
+            <StyleSlidePreview html={preview.html} loading={false} />
           </div>
         </div>
       )
     }
 
     // RESULT state (default when content exists)
+    const isHtml = content!.trim().startsWith("<")
+    const sampleCount = isHtml ? (splitStyleSlides(content!)?.slides.length ?? 0) : 0
     return wrap(
-      <div>
-        {onStyleSelect && (
-          <div className="flex justify-end px-4 py-2">
-            <button
-              onClick={() => { userRequestedGallery.current = true; setAdMode("gallery") }}
-              className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.06] transition-colors"
-            >
-              <Palette className="h-3.5 w-3.5" />
-              {t("changeStyle")}
-            </button>
+      <section className="px-6 pt-4 pb-6">
+        <div className="max-w-4xl mx-auto">
+          {/* Section header — same grammar as the template section above */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-baseline gap-2.5">
+              <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">{t("sectionTitle")}</h3>
+              {sampleCount > 0 && (
+                <span className="text-xs text-foreground-muted">{t("sampleCount", { count: sampleCount })}</span>
+              )}
+            </div>
+            {onStyleSelect && (
+              <button
+                onClick={() => { userRequestedGallery.current = true; setAdMode("gallery") }}
+                className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-border hover:bg-foreground/[0.06] transition-colors"
+              >
+                <Palette className="h-3.5 w-3.5" />
+                {t("changeStyle")}
+              </button>
+            )}
           </div>
-        )}
-        <StyleSlidePreview html={content!} loading={false} />
-      </div>
+          {isHtml ? (
+            <StyleSlidePreview html={content!} loading={false} />
+          ) : (
+            <article className="document-surface prose prose-invert prose-sm max-w-3xl spec-prose">
+              <Markdown remarkPlugins={[remarkGfm]} components={specComponents as Components}>
+                {content!}
+              </Markdown>
+            </article>
+          )}
+        </div>
+      </section>
     )
   }
 
@@ -373,9 +361,19 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     )
   }
 
+  // Brief tab: use the contract-document metaphor with approval status
+  if (specKey === "brief") {
+    return (
+      <BriefDocumentView
+        content={content}
+        outlineExists={outlineExists ?? false}
+      />
+    )
+  }
+
   return (
     <div className="content-enter flex-1 overflow-y-auto px-6 sm:px-8 py-6">
-      <article className="prose prose-invert prose-sm max-w-3xl mx-auto spec-prose">
+      <article className="document-surface prose prose-invert prose-sm max-w-3xl mx-auto spec-prose">
         <Markdown
           remarkPlugins={[remarkGfm]}
           components={specComponents as Components}

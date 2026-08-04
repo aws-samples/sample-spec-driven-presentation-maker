@@ -440,7 +440,7 @@ export async function batchGetSlidePreviewUrls(
 export interface StyleEntry {
   name: string
   description: string
-  coverHtml: string
+  html: string
   pinned: boolean
   source: "builtin" | "user"
 }

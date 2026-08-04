@@ -11,7 +11,7 @@
 
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useTranslations } from "next-intl"
 import { useAuth } from "@/hooks/useAuth"
 import { useStyleWorkspace } from "@/hooks/useStyleWorkspace"
@@ -19,6 +19,7 @@ import { AppShell } from "@/components/AppShell"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { fetchStyles, fetchStyleHtml, pinStyle, saveUserStyle, deleteUserStyle, renameUserStyle, type StyleEntry } from "@/services/deckService"
 import { StyleSlidePreview } from "@/components/StyleSlidePreview"
+import { buildCoverDoc } from "@/components/StyleSlidePreview"
 import { StyleChatShell } from "@/components/chat/StyleChatShell"
 import { Star, Trash2, Palette, Download, Sparkles, Copy, MessageSquare, Pencil, MoreHorizontal } from "lucide-react"
 
@@ -48,8 +49,10 @@ export default function StylesPage() {
     if (!idToken) return
     const s = await fetchStyles(idToken)
     setStyles(s)
+    ws.setStyles(s)
     setLoading(false)
-  }, [idToken])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idToken, ws.setStyles])
 
   useEffect(() => { refreshStyles() }, [refreshStyles])
 
@@ -174,7 +177,7 @@ export default function StylesPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {[...Array(8)].map((_, i) => (
-                <div key={i} className="aspect-[16/10] rounded-xl bg-white/[0.03] animate-pulse" />
+                <div key={i} className="aspect-[16/10] rounded-xl bg-foreground/[0.03] animate-pulse" />
               ))}
             </div>
           </div>
@@ -216,7 +219,7 @@ export default function StylesPage() {
               {currentStyle?.source === "builtin" && (
                 <button
                   onClick={() => handleCopyToMyStyles(ws.styleName!)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-foreground-muted hover:text-foreground border border-white/[0.08] hover:border-white/[0.15] transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-foreground-muted hover:text-foreground border border-border hover:border-border-hover transition-colors"
                 >
                   <Copy className="h-3 w-3" />
                   {t("copyToMyStyles")}
@@ -234,7 +237,7 @@ export default function StylesPage() {
               <p className="text-xs text-foreground-muted mb-4">{t("creatingStyle")}</p>
               <button
                 onClick={ws.navigateToList}
-                className="mt-4 px-3 py-1.5 text-xs rounded-lg border border-white/[0.08] hover:bg-white/[0.04] transition-colors"
+                className="mt-4 px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-foreground/[0.04] transition-colors"
               >
                 ← {t("backToStyles")}
               </button>
@@ -274,7 +277,7 @@ export default function StylesPage() {
                   {/* Create with AI card + Import link */}
                   <div className="flex flex-col">
                     <button
-                      className="aspect-[16/10] rounded-xl border-2 border-dashed border-white/[0.08] hover:border-brand-teal/30 bg-transparent hover:bg-brand-teal/[0.03] flex flex-col items-center justify-center gap-2 transition-all duration-200 cursor-pointer group"
+                      className="aspect-[16/10] rounded-xl border-2 border-dashed border-border hover:border-brand-teal/30 bg-transparent hover:bg-brand-teal/[0.03] flex flex-col items-center justify-center gap-2 transition-all duration-200 cursor-pointer group"
                       onClick={handleCreateStyle}
                     >
                       <Sparkles className="h-6 w-6 text-brand-teal/30 group-hover:text-brand-teal/60 transition-colors duration-200" />
@@ -386,17 +389,19 @@ function StyleListCard({ style, onPreview, onPin, onDelete, onExport, onRename, 
     return () => ro.disconnect()
   }, [])
 
+  const coverDoc = useMemo(() => style.html ? buildCoverDoc(style.html) : "", [style.html])
+
   return (
     <div
       ref={cardRef}
-      className="group relative rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] transition-all duration-200 cursor-pointer"
+      className="group relative rounded-xl overflow-hidden border border-border bg-foreground/[0.02] hover:border-border-hover transition-all duration-200 cursor-pointer"
       onClick={() => onPreview(style.name)}
     >
       {/* Cover preview */}
       <div className="relative overflow-hidden bg-black/20" style={{ height: 1080 * scale }}>
-        {style.coverHtml ? (
+        {coverDoc ? (
           <iframe
-            srcDoc={style.coverHtml}
+            srcDoc={coverDoc}
             className="pointer-events-none"
             style={{ width: 1920, height: 1080, transform: `scale(${scale})`, transformOrigin: "top left", border: "none" }}
             tabIndex={-1}
@@ -411,7 +416,7 @@ function StyleListCard({ style, onPreview, onPin, onDelete, onExport, onRename, 
       </div>
 
       {/* Info bar */}
-      <div className="px-3 py-2.5 border-t border-white/[0.06]">
+      <div className="px-3 py-2.5 border-t border-border">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium truncate flex-1 min-w-0">
             {isRenaming ? (
@@ -422,13 +427,13 @@ function StyleListCard({ style, onPreview, onPin, onDelete, onExport, onRename, 
                   onChange={e => onRenameChange?.(e.target.value)}
                   onBlur={onRenameSubmit}
                   onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); onRenameSubmit?.() } if (e.key === "Escape") onRenameCancel?.() }}
-                  className={`w-full text-sm font-medium bg-white/[0.06] rounded px-1.5 py-0.5 -ml-1.5 outline-none ring-1 transition-colors ${renameError ? "ring-red-400/60" : "ring-brand-teal/40 focus:ring-brand-teal/60"}`}
+                  className={`w-full text-sm font-medium bg-foreground/[0.06] rounded px-1.5 py-0.5 -ml-1.5 outline-none ring-1 transition-colors ${renameError ? "ring-red-400/60" : "ring-brand-teal/40 focus:ring-brand-teal/60"}`}
                 />
                 {renameError && <span className="text-[11px] text-red-400 mt-0.5">{renameError}</span>}
               </span>
             ) : (
               <span
-                className="group/name inline-flex items-center gap-1 cursor-text rounded px-1.5 py-0.5 -ml-1.5 hover:bg-white/[0.04] transition-colors"
+                className="group/name inline-flex items-center gap-1 cursor-text rounded px-1.5 py-0.5 -ml-1.5 hover:bg-foreground/[0.04] transition-colors"
                 onClick={e => { if (onRename) { e.stopPropagation(); onRename(style.name) } }}
               >
                 {style.name}
@@ -491,10 +496,10 @@ function PreviewMoreMenu({ onExport, onDelete }: { onExport: () => void; onDelet
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] py-1 rounded-lg border border-white/[0.1] shadow-[0_8px_32px_oklch(0_0_0/50%)]" style={{ background: "oklch(0.14 0.005 260 / 98%)", backdropFilter: "blur(12px)" }}>
+          <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] py-1 rounded-lg border border-border-hover bg-popover shadow-[var(--shadow-lift)] backdrop-blur-xl">
             <button
               onClick={() => { setOpen(false); onExport() }}
-              className="w-full px-3 py-2 text-left text-sm text-foreground/70 hover:text-foreground hover:bg-white/[0.06] transition-colors flex items-center gap-2"
+              className="w-full px-3 py-2 text-left text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/[0.06] transition-colors flex items-center gap-2"
             >
               <Download className="h-3.5 w-3.5" /> {t("export")}
             </button>

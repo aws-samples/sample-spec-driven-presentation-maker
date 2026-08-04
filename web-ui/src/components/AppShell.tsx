@@ -200,8 +200,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
               <div
                 role="menu"
                 aria-label={t("userMenu")}
-                className={`absolute right-0 top-full mt-1.5 w-56 rounded-xl py-1.5 z-[60] border border-white/[0.08] shadow-[0_8px_32px_oklch(0_0_0/50%)] user-menu-enter ${menuVisible ? "user-menu-visible" : ""}`}
-                style={{ background: "oklch(0.14 0.005 260 / 95%)", backdropFilter: "blur(16px)" }}
+                className={`absolute right-0 top-full mt-1.5 w-56 rounded-xl py-1.5 z-[60] border border-border bg-popover shadow-[var(--shadow-lift)] backdrop-blur-xl user-menu-enter ${menuVisible ? "user-menu-visible" : ""}`}
               >
                 {/* User info */}
                 <div className="px-3.5 py-2">
@@ -209,21 +208,21 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                   {email && <div className="text-[11px] text-foreground/30 mt-0.5 truncate">{email}</div>}
                 </div>
 
-                <div className="my-1 border-t border-white/[0.06]" />
+                <div className="my-1 border-t border-border" />
 
                 {/* Settings */}
                 <button
                   ref={el => { itemsRef.current[0] = el }}
                   role="menuitem"
                   onClick={() => { closeMenu(); setSettingsOpen(true) }}
-                  className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-foreground/70 hover:bg-white/[0.06] transition-colors menu-item-stagger"
+                  className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-foreground/70 hover:bg-foreground/[0.06] transition-colors menu-item-stagger"
                   style={{ "--stagger": "0ms" } as React.CSSProperties}
                 >
                   <SettingsIcon className="h-3.5 w-3.5" />
                   <span>{t("settings")}</span>
                 </button>
 
-                <div className="my-1 border-t border-white/[0.06]" />
+                <div className="my-1 border-t border-border" />
 
                 {/* Agent Settings — disabled (ACP supports kiro-cli only) */}
                 {/* Sign out (cloud only) */}

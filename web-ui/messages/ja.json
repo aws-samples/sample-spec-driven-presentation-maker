@@ -43,6 +43,15 @@
   },
   "settings": {
     "title": "設定",
+    "appearance": "外観",
+    "appearanceDescription": "スタジオの表示とサイズを調整します",
+    "theme": "テーマ",
+    "themeLight": "ライト",
+    "themeDark": "ダーク",
+    "themeSystem": "システム",
+    "textSize": "文字サイズ",
+    "textSizeDescription": "文字とインターフェースの間隔を拡大・縮小します",
+    "textScaleLabel": "文字サイズ {scale}%",
     "language": "言語",
     "languageDescription": "インターフェースの表示言語"
   },
@@ -108,8 +117,8 @@
   },
   "outline": {
     "evidence": "根拠",
-    "visual": "ビジュアル",
-    "notes": "メモ",
+    "visual": "見せ方",
+    "notes": "ノート",
     "emptyState": "エージェントがアウトラインを書くとここに表示されます。"
   },
   "chatInput": {
@@ -180,15 +189,11 @@
     "submit": "送信"
   },
   "modeSelector": {
-    "vibeDescription": "資料を渡すだけでスライドに。最小限の対話で素早く変換します。",
-    "specDescription": "まず計画、それから構築。対話で要件を固めてから作成します。",
-    "greatFor": "こんな用途に",
-    "vibeFor1": "URL・記事 → スライド",
-    "vibeFor2": "論文・ドキュメント → 要約デッキ",
-    "vibeFor3": "会議メモ → プレゼン資料",
-    "specFor1": "提案書・ピッチ資料",
-    "specFor2": "構成が重要なプロジェクト",
-    "specFor3": "磨き込まれた正確なプレゼン"
+    "chooseWorkingStyle": "進め方を選択",
+    "vibePath": "すばやく作成",
+    "specPath": "確認しながら作成",
+    "vibeSummary": "ラフな素材から、まず初稿をすばやく形にします。",
+    "specSummary": "スライドを作る前に、伝えるストーリーを固めます。"
   },
   "tools": {
     "running": "実行中",
@@ -246,6 +251,13 @@
     "draftingBrief": "ブリーフを作成中…",
     "structuringOutline": "アウトラインを構成中…",
     "composingArtDirection": "アートディレクションを構成中…"
+  },
+  "briefDocument": {
+    "filePath": "specs/brief.md",
+    "approved": "承認済み",
+    "pending": "承認待ち",
+    "approvedAria": "ブリーフは承認済み — アウトラインが存在",
+    "pendingAria": "ブリーフは承認待ち — アウトラインはまだ未作成"
   },
   "decksPage": {
     "removeFromFavorites": "お気に入りから削除",
@@ -317,9 +329,32 @@
       "listingWorkflows": "ワークフロー一覧を取得中",
       "listingTemplates": "テンプレート一覧を取得中",
       "initializingDeck": "デッキを初期化中",
-      "thinking": "思考中"
+      "thinking": "思考中",
+      "writingSlide": "スライドを執筆中 · {slug}",
+      "writingSlideBare": "スライドを執筆中",
+      "readingReference": "参照を読込中"
     },
-    "stoppingBare": "停止中"
+    "stoppingBare": "停止中",
+    "liveProduction": "Compose · ライブ制作",
+    "inProduction": "スライド {count} 枚を作成中",
+    "parallelLanes": "{count} レーンで並列作業中",
+    "slideCreation": "スライド作成",
+    "createdProgress": "{total} 枚中 {created} 枚を作成",
+    "composingSlides": "スライドを作成中…",
+    "finishingPresentation": "プレゼンテーションを仕上げています…",
+    "readyForReview": "レビューの準備ができました",
+    "activityHistory": "アクティビティ履歴",
+    "currentAttempt": "現在の試行",
+    "currentRetryAttempt": "現在の試行 · 再試行 {count}",
+    "previousAttemptFailed": "前回の試行に失敗しました",
+    "noActivity": "アクティビティはまだありません",
+    "slideCreated": "スライド作成済み",
+    "retryAttempt": "再試行 {count}",
+    "queued": "待機中",
+    "working": "作業中",
+    "completed": "完了",
+    "createdCount": "{total} 枚中 {created} 枚を作成",
+    "srCreationProgress": "スライド {total} 枚中 {created} 枚を作成"
   },
   "stylesPage": {
     "title": "スタイル",
@@ -388,6 +423,8 @@
     "closeAria": "チャットパネルを閉じる"
   },
   "stylePicker": {
+    "sectionTitle": "スタイル",
+    "sampleCount": "{count, plural, other {サンプル # 枚}}",
     "chooseStyle": "スタイルを選択",
     "clickToPreview": "クリックでプレビュー · ★ でお気に入りをピン留め",
     "backToArtDirection": "アートディレクションに戻る",

@@ -10,6 +10,46 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-03
+
+### Added
+
+- **Web UI: live design studio** — full visual redesign. Light/Dark/System
+  themes (default dark), 90–125% text scaling, studio color tokens (5 agent
+  work colors, ink for deliverables, red reserved for errors), and a
+  two-voice typography system (Bricolage Grotesque for UI chrome, Fraunces
+  for document surfaces).
+- **Web UI: artifact-first review surfaces** — chat tool activity as a
+  compact agent work ledger; brief as a reviewable contract document with
+  approval state; outline as single-column narrative slides (number rail,
+  slim skeleton cards, enriched slide faces with an evidence/visual/notes
+  spec sheet); art direction as per-slide style cards sharing the same rail
+  grammar, with template and style sections on one alignment axis.
+- Outline workflow now asks for `##` section headings when a deck has
+  distinct parts, so review surfaces can render the story arc as chapters.
+
+### Changed
+
+- Style cover extraction is unified client-side: both `/styles` APIs
+  (cloud and local) now serve raw style HTML (`html` field replaces
+  `coverHtml`), and the style gallery opens previews with zero additional
+  round-trips.
+- Style previews and thumbnails keep the style author's own canvas
+  background instead of forcing transparency.
+
+### Fixed
+
+- Style thumbnails rendered the first slide at 70% (standalone-viewing
+  `body zoom` was not reset in the cloud cover path), leaving gutters
+  around the cover; slides now fill thumbnails edge-to-edge.
+- Unpainted regions of style slides (rounded corners, frame decorations)
+  showed as opaque white inside the dark UI.
+- One deck slide always fits the viewport in the full-size carousel view.
+- Prose art direction (`art-direction.md`, no style selected) rendered as
+  raw markdown inside an iframe; it is now typeset as a document.
+
+## [0.6.0] - 2026-08-02
+
 ### Breaking
 
 - **Stateless attachment pipeline** — `upload_file`, `read_uploaded_file`, and
@@ -47,6 +87,21 @@ Entries before v0.5.0 were written retroactively as summaries.
   composition workflow, so architecture, system, and flow diagrams use automatic
   routing and crossing minimization instead of silently falling back to manual
   placement.
+- Attachment presigned PUTs now use Signature Version 4 — S3 rejects the
+  conditional write (`If-None-Match`) with legacy SigV2 URLs, which broke all
+  browser uploads in some regions (e.g. ap-northeast-1).
+- The Web UI no longer sends a message when an attachment upload fails: input
+  and attachments are kept for retry and the actual error (e.g. quota
+  exceeded) is shown instead of a generic failure.
+- Per-user raw attachment caps recalibrated for internal/team deployments
+  (1000 objects / 50GB, overridable via `ATTACHMENT_MAX_OBJECTS` /
+  `ATTACHMENT_MAX_BYTES`), and S3 lifecycle rules are prefix-only so
+  attachment objects from pre-0.6 releases (which carry no `sdpm-class` tag)
+  also expire. Deployments upgrading from the old upload pipeline should
+  purge leftover `uploads/` objects — they otherwise count toward the quota.
+- `servers/remote/constraints.txt` regenerated via `make lock`;
+  `cachetools` / `protobuf` are pinned by `aws-opentelemetry-distro` and are
+  now excluded from Dependabot bumps until the distro itself is upgraded.
 
 ## [0.5.3] - 2026-08-01
 
@@ -177,7 +232,10 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.3...v0.6.0
+[0.5.3]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.4.0...v0.5.0

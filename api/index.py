@@ -224,43 +224,14 @@ def _deck_summary(item: Dict, extras: Dict[str, Dict]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _extract_cover_html(html: str) -> str:
-    """Extract <head> + first <div class="slide..."> from a style HTML.
-
-    Args:
-        html: Full style HTML string.
-
-    Returns:
-        Minimal HTML with styles and first slide only.
-    """
-    head_end = html.find("</head>")
-    if head_end == -1:
-        return ""
-    # Match <div class="slide"> or <div class="slide ..."> (additional classes)
-    slide_pattern = re.compile(r'<div class="slide[\s"]')
-    matches = list(slide_pattern.finditer(html))
-    if not matches:
-        return ""
-    first_slide = matches[0].start()
-    end = matches[1].start() if len(matches) > 1 else html.find("</body>", first_slide)
-    if end == -1:
-        end = len(html)
-    return (
-        html[: head_end + 7]
-        + '\n<body style="margin:0;padding:0;background:transparent;overflow:hidden">\n'
-        + html[first_slide:end].strip()
-        + "\n</body></html>"
-    )
-
-
 @app.get("/styles")
 def list_styles() -> Dict[str, Any]:
-    """List available styles with cover slide HTML for preview.
+    """List available styles with full HTML for client-side rendering.
 
     Includes builtin styles and user styles with pin/source metadata.
 
     Returns:
-        Dict with styles list (name, description, coverHtml, pinned, source).
+        Dict with styles list (name, description, html, pinned, source).
     """
     user_id = get_user_id(app.current_event)
 
@@ -280,7 +251,7 @@ def list_styles() -> Dict[str, Any]:
             m = re.search(r"<title>(.*?)</title>", body, re.IGNORECASE)
             if m:
                 description = m.group(1).strip()
-            builtin.append({"name": name, "description": description, "coverHtml": _extract_cover_html(body), "source": "builtin"})
+            builtin.append({"name": name, "description": description, "html": body, "source": "builtin"})
         _styles_cache = builtin
 
     all_styles: List[Dict[str, Any]] = list(_styles_cache or [])
@@ -299,7 +270,7 @@ def list_styles() -> Dict[str, Any]:
             m = re.search(r"<title>(.*?)</title>", body, re.IGNORECASE)
             if m:
                 description = m.group(1).strip()
-            all_styles.append({"name": name, "description": description, "coverHtml": _extract_cover_html(body), "source": "user"})
+            all_styles.append({"name": name, "description": description, "html": body, "source": "user"})
     except Exception:
         pass
 
