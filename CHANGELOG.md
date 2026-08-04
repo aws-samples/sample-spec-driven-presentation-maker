@@ -10,6 +10,16 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Fixed
+
+- **AWS: uploaded custom templates now apply to PPTX generation** — the remote
+  server's template resolution only searched builtin templates, so a deck
+  referencing an uploaded user template silently fell back to
+  `blank-dark.pptx`. Generation now resolves user templates first (same order
+  as `analyze_template`), and an unresolvable template name raises an explicit
+  error listing available templates instead of silently using the wrong
+  design. (#206)
+
 ## [0.7.0] - 2026-08-03
 
 ### Added

@@ -27,12 +27,12 @@ def mock_storage():
     """Storage mock materializing a one-slide deck."""
     storage = MagicMock()
     storage.pptx_bucket = "pptx-bucket"
-    storage.get_deck.return_value = {
-        "deckId": "d1", "name": "Test", "templateS3Key": "templates/blank-dark.pptx",
-    }
+    storage.get_deck.return_value = {"deckId": "d1", "name": "Test"}
     storage.get_deck_json.return_value = {
         "template": "", "fonts": {"fullwidth": "", "halfwidth": ""},
     }
+    storage.get_user_template_metadata.return_value = None
+    storage.list_user_templates.return_value = []
 
     def list_files(prefix: str, bucket: str = ""):
         if prefix.endswith("/slides/"):
@@ -81,3 +81,50 @@ def test_generate_pptx_missing_deck(mock_storage):
     mock_storage.get_deck.return_value = None
     with pytest.raises(ValueError, match="not found"):
         generate_mod.generate_pptx(deck_id="dX", user_id="u1", storage=mock_storage)
+
+
+def test_prepare_workspace_resolves_user_template(mock_storage):
+    """A deck referencing an uploaded user template uses it (Issue #206)."""
+    mock_storage.get_deck_json.return_value = {
+        "template": "my-brand.pptx", "fonts": {"fullwidth": "", "halfwidth": ""},
+    }
+    mock_storage.get_user_template_metadata.return_value = {
+        "name": "my-brand", "s3Key": "user-templates/u1/my-brand.pptx",
+    }
+    mock_storage.download_user_template.return_value = _TEMPLATE.read_bytes()
+
+    tmpdir, _slides, build_kwargs = generate_mod._prepare_workspace(
+        "d1", "u1", mock_storage,
+    )
+
+    mock_storage.get_user_template_metadata.assert_called_once_with("u1", "my-brand")
+    mock_storage.download_user_template.assert_called_once_with("u1", "my-brand")
+    assert build_kwargs["template_path"].read_bytes()[:2] == b"PK"
+    # Builtin download path must not be used for the template
+    for call in mock_storage.download_file.call_args_list:
+        assert not call.kwargs.get("key", "").startswith("templates/")
+
+
+def test_prepare_workspace_unknown_template_raises(mock_storage):
+    """An unresolvable template name fails loudly instead of silently
+    falling back to blank-dark (Issue #206)."""
+    mock_storage.get_deck_json.return_value = {
+        "template": "ghost.pptx", "fonts": {"fullwidth": "", "halfwidth": ""},
+    }
+    mock_storage.list_templates.return_value = [
+        {"name": "blank-dark", "s3Key": "templates/blank-dark.pptx"},
+    ]
+    mock_storage.list_user_templates.return_value = [{"name": "my-brand"}]
+
+    with pytest.raises(ValueError, match=r"'ghost\.pptx' not found.*blank-dark.*my-brand"):
+        generate_mod._prepare_workspace("d1", "u1", mock_storage)
+
+
+def test_prepare_workspace_empty_template_defaults_to_blank_dark(mock_storage):
+    """No template specified → blank-dark default (regression guard)."""
+    tmpdir, _slides, build_kwargs = generate_mod._prepare_workspace(
+        "d1", "u1", mock_storage,
+    )
+
+    mock_storage.download_file.assert_any_call(key="templates/blank-dark.pptx")
+    assert build_kwargs["template_path"].read_bytes()[:2] == b"PK"
