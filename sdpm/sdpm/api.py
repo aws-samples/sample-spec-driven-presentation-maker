@@ -150,6 +150,7 @@ def analyze_and_store_template(template_path: Path, description: str = "") -> di
         "fonts": result.get("fonts", {}),
         "layout_count": len(result.get("layouts", [])),
         "layouts": result.get("layouts", []),
+        "slide_size": result.get("slide_size", {}),
     }
 
 
@@ -269,7 +270,6 @@ def _get_output_base_dir() -> Path:
 
 def init(
     name: str,
-    template: str | Path | None = None,
     output_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     """Initialize a presentation workspace.
@@ -278,13 +278,11 @@ def init(
 
     Args:
         name: Presentation name (used in directory name).
-        template: Template name or path. If provided, extracts fonts.
         output_dir: Explicit output directory. Auto-generated if None.
 
     Returns:
-        Dict with output_dir, deck_json, template, fonts, workspace.
+        Dict with output_dir, deck_json, workspace.
     """
-    from sdpm.engine.analyzer import extract_fonts
     from sdpm.utils.io import write_json
 
     if output_dir:
@@ -301,30 +299,6 @@ def init(
         "defaultTextColor": "",
     }
 
-    if template:
-        template_src = Path(template).expanduser()
-        if not template_src.exists():
-            found = _find_template_in_dirs(str(template), get_templates_dirs())
-            if found is not None:
-                template_src = found
-        if template_src.exists():
-            template_src = template_src.resolve()
-            deck_data["template"] = template_src.name
-            try:
-                deck_data["fonts"] = extract_fonts(template_src)
-            except Exception:
-                pass
-            # Write slideSize derived from template (new-deck only — R4)
-            try:
-                from pptx import Presentation as _Prs
-                from sdpm.engine import slide_size_px as _slide_size_px
-
-                _prs = _Prs(str(template_src))
-                w, h = _slide_size_px(int(_prs.slide_width), int(_prs.slide_height))
-                deck_data["slideSize"] = {"width": w, "height": h}
-            except Exception:
-                pass
-
     deck_json = out_dir / "deck.json"
     write_json(deck_json, deck_data, suffix="\n")
 
@@ -338,8 +312,6 @@ def init(
     return {
         "output_dir": str(out_dir),
         "deck_json": str(deck_json),
-        "template": deck_data.get("template", ""),
-        "fonts": deck_data.get("fonts", {}),
         "workspace": ["deck.json", "slides/"] + [f"specs/{s}" for s in spec_files],
     }
 

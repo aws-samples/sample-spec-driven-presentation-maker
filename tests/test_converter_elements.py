@@ -534,7 +534,7 @@ class TestPipelineContract:
             "fonts": {"halfwidth": "Calibri", "fullwidth": ""},
             "defaultTextColor": "#000000",
             "autoSpacing": False,
-            "slideSize": {"width": 1920, "height": 1080},
+            "slideSize": {"width": 1920, "height": 1080, "ptPerPx": 0.5},
         }
         assert (out_dir / "slides" / "slide-001.json").exists()
         assert sorted(p.name for p in (out_dir / "images").iterdir()) == ["slide1_image1.png"]

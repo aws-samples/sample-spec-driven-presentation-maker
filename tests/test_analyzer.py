@@ -16,7 +16,7 @@ class TestAnalyzerPin16x9:
     def test_slide_size_16x9(self, template_16x9: Path):
         """slide_size must be 1920×1080 for 16:9."""
         result = analyze_template(template_16x9)
-        assert result["slide_size"] == {"width": 1920, "height": 1080}
+        assert result["slide_size"] == {"width": 1920, "height": 1080, "ptPerPx": 0.5}
 
     def test_layouts_present(self, template_16x9: Path):
         """analyze_template returns at least one layout."""
@@ -85,9 +85,10 @@ class TestAnalyzer4x3:
 
         9144000 / 1920 = 4762.5 emu_per_px
         6858000 / 4762.5 = 1440 height
+        ptPerPx = (9144000 / 12700) / 1920 = 0.375
         """
         result = analyze_template(template_4x3)
-        assert result["slide_size"] == {"width": 1920, "height": 1440}
+        assert result["slide_size"] == {"width": 1920, "height": 1440, "ptPerPx": 0.375}
 
     def test_placeholder_px_values_4x3(self, template_4x3: Path):
         """4:3 placeholders use emu_per_px = 4762.5 (not 6350).

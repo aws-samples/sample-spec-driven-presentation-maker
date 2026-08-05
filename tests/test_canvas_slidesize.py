@@ -152,23 +152,10 @@ class TestResolveConfigHeightBoundaryWarning:
 
 
 class TestInitSlidesSize:
-    """api.init writes slideSize to deck.json when template is provided."""
+    """api.init creates a minimal deck.json without slideSize (template branch removed)."""
 
-    def test_init_16x9_template(self, template_16x9: Path, tmp_path: Path):
-        from sdpm.api import init
-
-        result = init(name="test", template=str(template_16x9), output_dir=str(tmp_path / "out"))
-        deck_json = json.loads(Path(result["deck_json"]).read_text())
-        assert deck_json["slideSize"] == {"width": 1920, "height": 1080}
-
-    def test_init_4x3_template(self, template_4x3: Path, tmp_path: Path):
-        from sdpm.api import init
-
-        result = init(name="test", template=str(template_4x3), output_dir=str(tmp_path / "out"))
-        deck_json = json.loads(Path(result["deck_json"]).read_text())
-        assert deck_json["slideSize"] == {"width": 1920, "height": 1440}
-
-    def test_init_no_template_no_slide_size(self, tmp_path: Path):
+    def test_init_no_slide_size(self, tmp_path: Path):
+        """init never writes slideSize — the agent writes it after analyze_template."""
         from sdpm.api import init
 
         result = init(name="test", output_dir=str(tmp_path / "out"))
@@ -198,7 +185,7 @@ class TestPipelineSlidesSize:
         out_dir = tmp_path / "out"
         pptx_to_json(src, output_dir=out_dir)
         deck = json.loads((out_dir / "deck.json").read_text())
-        assert deck["slideSize"] == {"width": 1920, "height": 1080}
+        assert deck["slideSize"] == {"width": 1920, "height": 1080, "ptPerPx": 0.5}
 
     def test_4x3_import(self, template_4x3: Path, tmp_path: Path):
         from sdpm.engine.converter import pptx_to_json
@@ -213,7 +200,7 @@ class TestPipelineSlidesSize:
         out_dir = tmp_path / "out"
         pptx_to_json(src, output_dir=out_dir)
         deck = json.loads((out_dir / "deck.json").read_text())
-        assert deck["slideSize"] == {"width": 1920, "height": 1440}
+        assert deck["slideSize"] == {"width": 1920, "height": 1440, "ptPerPx": 0.375}
 
 
 # ═══════════════════════════════════════════════════════════════════════

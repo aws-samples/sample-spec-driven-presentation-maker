@@ -77,9 +77,8 @@ def init_presentation(name: str) -> dict[str, Any]:
     """Initialize a presentation workspace. Creates deck.json, slides/, and specs/.
 
     Call after briefing is complete, before building slides.
-    When a template is provided, deck.json will include slideSize
-    (e.g. {"width": 1920, "height": 1080} for 16:9, {"width": 1920, "height": 1440} for 4:3)
-    derived from the template's physical dimensions.
+    slideSize is written to deck.json by the agent after calling analyze_template —
+    copy the slide_size result (width, height, ptPerPx) into deck.json's slideSize field.
 
     Args:
         name: Presentation name (e.g. "lambda-overview").
@@ -100,8 +99,10 @@ def analyze_template(template: str, layout: str = "") -> dict[str, Any]:
 
     Returns:
         Dict with layouts, theme_colors, fonts, slide_size, and optional layout_detail.
-        slide_size is {"width": 1920, "height": H} where H depends on the template's
-        aspect ratio (e.g. 1080 for 16:9, 1440 for 4:3). Width is always 1920px.
+        slide_size is {"width": 1920, "height": H, "ptPerPx": P} where H depends on
+        the template's aspect ratio (e.g. 1080 for 16:9, 1440 for 4:3). Width is
+        always 1920px. ptPerPx is the pt-to-px conversion ratio (0.5 for 16:9,
+        0.375 for 4:3) — copy it into deck.json slideSize for arch_diagram to use.
     """
     from sdpm.engine.analyzer import analyze_template as _analyze, get_layout_placeholders
     from sdpm.api import _find_template_in_dirs, get_templates_dirs
@@ -361,6 +362,7 @@ def arch_diagram(
     spec: str,
     x: int = 100, y: int = 180, width: int = 1720, height: int = 800,
     theme: str = "dark",
+    pt_per_px: float = 0.5,
 ) -> dict[str, Any]:
     """Auto-layout an architecture/flow diagram from a logical-structure JSON.
 
@@ -385,6 +387,10 @@ def arch_diagram(
         width: Target area width in px (engine scales the diagram to fit).
         height: Target area height in px.
         theme: "dark" or "light" — affects box-node text colors.
+        pt_per_px: Ratio of physical pt to virtual px. Pass deck.json's
+            slideSize.ptPerPx value here. 16:9 = 0.5, 4:3 = 0.375.
+            If you omit this on a non-16:9 template, box text will overflow
+            because the height estimate assumes 16:9 proportions.
 
     Returns:
         Dict with:
@@ -408,7 +414,7 @@ def arch_diagram(
         return {"error": f"Invalid diagram spec JSON: {e}"}
     return render_architecture(
         tree, x=x, y=y, width=width, height=height, theme=theme,
-        include_metrics=True,
+        include_metrics=True, pt_per_px=pt_per_px,
     )
 
 

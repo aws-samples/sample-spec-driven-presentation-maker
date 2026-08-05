@@ -531,10 +531,7 @@ def list_templates() -> Dict[str, Any]:
                 "s3Key": s3_key,
                 "s3ETag": etag,
                 "fonts": analysis.get("fonts", {}),
-                "analysisJson": json.dumps({
-                    "theme_colors": analysis.get("theme_colors", {}),
-                    "layouts": analysis.get("layouts", []),
-                }),
+                "analysisJson": json.dumps(analysis, ensure_ascii=False),
             }
             table.put_item(Item=item)
             # Update the placeholder in templates list
@@ -694,10 +691,7 @@ def upload_user_template() -> Dict[str, Any]:
     metadata = {
         "description": description,
         "fonts": analysis.get("fonts", {}),
-        "analysisJson": json.dumps({
-            "theme_colors": analysis.get("theme_colors", {}),
-            "layouts": analysis.get("layouts", []),
-        }),
+        "analysisJson": json.dumps(analysis, ensure_ascii=False),
     }
 
     # Store in DDB

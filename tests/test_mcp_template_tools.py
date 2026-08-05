@@ -91,3 +91,79 @@ def test_aws_storage_get_builtin_template_notes_maps_ddb_items() -> None:
         ":pk": "USER#user-123",
         ":prefix": "BUILTIN_NOTE#",
     }
+
+
+class AnalyzeTemplateStorage:
+    """Storage double for analyze_template tests with configurable analysisJson."""
+
+    def __init__(self, analysis_json: str, template_bytes: bytes | None = None) -> None:
+        self._analysis_json = analysis_json
+        self._template_bytes = template_bytes
+
+    def get_user_template_metadata(self, user_id: str, name: str) -> dict | None:
+        return None
+
+    def list_templates(self) -> list[dict]:
+        return [
+            {
+                "name": "blank-dark",
+                "description": "Dark template",
+                "fonts": {"fullwidth": "Noto Sans JP", "halfwidth": "Noto Sans"},
+                "analysisJson": self._analysis_json,
+                "s3Key": "templates/blank-dark.pptx",
+            },
+        ]
+
+    def list_user_templates(self, user_id: str) -> list[dict]:
+        return []
+
+    def download_file(self, key: str) -> bytes:
+        if self._template_bytes is None:
+            raise RuntimeError("download_file called but no template bytes configured")
+        return self._template_bytes
+
+
+def test_analyze_template_cache_hit_with_slide_size() -> None:
+    """When cached analysisJson contains slide_size, it is returned directly."""
+    import json
+    from tools.template import analyze_template
+
+    cached = json.dumps({
+        "slide_size": {"width": 1280, "height": 720},
+        "layouts": [{"name": "Blank"}],
+        "theme_colors": {"accent1": "#FF0000"},
+    })
+    storage = AnalyzeTemplateStorage(cached)
+    result = analyze_template("blank-dark", storage)
+
+    assert result["slide_size"] == {"width": 1280, "height": 720}
+    assert result["templateName"] == "blank-dark"
+
+
+def test_analyze_template_fallback_when_slide_size_missing() -> None:
+    """When cached analysisJson lacks slide_size, re-analyze from S3."""
+    import json
+    from pathlib import Path
+    from tools.template import analyze_template
+
+    # Cached data without slide_size (old format)
+    cached = json.dumps({
+        "layouts": [{"name": "Blank"}],
+        "theme_colors": {"accent1": "#FF0000"},
+    })
+
+    # Use a real template for on-the-fly analysis
+    template_path = Path(__file__).parent.parent / "sdpm" / "templates" / "blank-dark.pptx"
+    if not template_path.exists():
+        import pytest
+        pytest.skip("blank-dark.pptx not available")
+
+    template_bytes = template_path.read_bytes()
+    storage = AnalyzeTemplateStorage(cached, template_bytes)
+    result = analyze_template("blank-dark", storage)
+
+    # Should have slide_size from on-the-fly analysis
+    assert "slide_size" in result
+    assert result["slide_size"]["width"] > 0
+    assert result["slide_size"]["height"] > 0
+    assert result["templateName"] == "blank-dark"
