@@ -4,7 +4,7 @@
 
 The engine is split into cohesive submodules; this package re-exports
 every name so existing imports (``from sdpm.engine.layout import X`` and the
-``from . import X`` used by render/metrics/graph) keep working.
+``from . import X`` used by render/metrics) keep working.
 """
 
 from .ordering import (  # noqa: F401

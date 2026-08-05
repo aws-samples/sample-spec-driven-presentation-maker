@@ -72,9 +72,30 @@ def _parse_gap(value) -> tuple[int, int]:
     return int(parts[0]), int(parts[1])
 
 
+def _expand_repeat(track_str: str) -> str:
+    """Expand repeat(n, X) notation into repeated tokens.
+
+    Example: "repeat(3, 1fr)" -> "1fr 1fr 1fr"
+    """
+    def _replace(m: re.Match) -> str:
+        count = int(m.group(1))
+        value = m.group(2).strip()
+        return " ".join([value] * count)
+
+    return re.sub(r"repeat\(\s*(\d+)\s*,\s*([^)]+)\)", _replace, track_str)
+
+
 def _resolve_tracks(track_str: str, available: int, gap: int) -> list[int]:
-    """Parse track-list and resolve to pixel sizes."""
+    """Parse track-list and resolve to pixel sizes.
+
+    Supported syntax: fr (e.g. "1fr", "2fr"), px (e.g. "280px"),
+    % (e.g. "50%" — percentage of available space before gap subtraction),
+    repeat(n, X) (e.g. "repeat(3, 1fr)"), or a bare integer (equal split).
+    """
     track_str = track_str.strip()
+
+    # Expand repeat() before tokenizing
+    track_str = _expand_repeat(track_str)
 
     # Shorthand: "3" -> "1fr 1fr 1fr"
     if re.fullmatch(r"\d+", track_str):
@@ -88,12 +109,23 @@ def _resolve_tracks(track_str: str, available: int, gap: int) -> list[int]:
         if t.endswith("px"):
             fixed.append(int(float(t[:-2])))
             fr_values.append(0)
+        elif t.endswith("%"):
+            # Percentage of available space (before gap subtraction)
+            pct = float(t[:-1])
+            fixed.append(round(available * pct / 100))
+            fr_values.append(0)
         elif t.endswith("fr"):
             fixed.append(None)
             fr_values.append(float(t[:-2]))
         else:
-            fixed.append(None)
-            fr_values.append(float(t))
+            try:
+                fr_values.append(float(t))
+                fixed.append(None)
+            except ValueError:
+                raise ValueError(
+                    f"Unsupported track syntax: {t!r}. "
+                    "Use fr, px, %, repeat(n, X), or an integer."
+                )
 
     total_gaps = gap * (len(tokens) - 1)
     total_fixed = sum(v for v in fixed if v is not None)
