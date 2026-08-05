@@ -31,6 +31,15 @@ arch_diagram(spec="<logical-structure JSON string>",
              x=100, y=180, width=1720, height=800, theme="dark")
 ```
 
+Default target area (x=100, y=180, width=1720, height=800) assumes 16:9 canvas.
+For non-16:9 templates, derive height from slideSize: e.g. `height = H - 180 - 130`
+(H from `deck.json` `slideSize`; 4:3 H=1440 → height=1130).
+
+> **Known constraint (non-16:9):** The layout engine's text-to-box sizing uses a
+> fixed px-to-pt ratio calibrated for 16:9. On taller canvases (e.g. 4:3), boxes with
+> long `description` text may overflow. **Workaround:** explicitly set `"height"` on
+> boxes with multi-line descriptions instead of relying on auto-calculation.
+
 **CLI** — same engine, for SKILL.md/script hosts:
 
 ```bash

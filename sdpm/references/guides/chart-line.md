@@ -47,6 +47,8 @@ These can be set as a `style` object:
 
 ## JSON: Load test trend
 
+(Example coordinates assume 16:9 canvas H=1080. Adjust y/height for other ratios.)
+
 ```json
 {
   "slides": [
