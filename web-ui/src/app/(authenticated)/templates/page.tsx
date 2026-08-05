@@ -53,7 +53,11 @@ export default function TemplatesPage() {
 
   const handleDownload = async (name: string) => {
     if (!idToken) return
-    await downloadTemplate(name, idToken)
+    try {
+      await downloadTemplate(name, idToken)
+    } catch {
+      showToast(t("downloadFailed"), "error")
+    }
   }
 
   const handleUpdateDescription = async (name: string, description: string) => {
@@ -108,7 +112,7 @@ export default function TemplatesPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-[168px] rounded-xl bg-white/[0.03] animate-pulse" />
+                <div key={i} className="h-[168px] rounded-xl bg-foreground/[0.03] animate-pulse" />
               ))}
             </div>
           </div>
@@ -138,7 +142,7 @@ export default function TemplatesPage() {
                   ))}
                   {/* Upload card */}
                   <button
-                    className="rounded-xl border-2 border-dashed border-white/[0.08] hover:border-brand-teal/30 bg-transparent hover:bg-brand-teal/[0.03] flex flex-col items-center justify-center gap-3 transition-all duration-200 cursor-pointer group min-h-[120px]"
+                    className="rounded-xl border-2 border-dashed border-border hover:border-brand-teal/30 bg-transparent hover:bg-brand-teal/[0.03] flex flex-col items-center justify-center gap-3 transition-all duration-200 cursor-pointer group min-h-[120px]"
                     onClick={() => setUploadOpen(true)}
                   >
                     <Upload className="h-6 w-6 text-brand-teal/30 group-hover:text-brand-teal/60 transition-colors duration-200" />
@@ -244,7 +248,7 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
   }
 
   return (
-    <div className="group relative rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] transition-all duration-200 overflow-hidden">
+    <div className="group relative rounded-xl border border-border bg-foreground/[0.02] hover:border-border-hover transition-all duration-200 overflow-hidden">
       {/* Theme preview strip — shows background + text color identity */}
       {bgColor && (
         <div
@@ -283,13 +287,13 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
                     onChange={e => { setRenameValue(e.target.value); setRenameError("") }}
                     onBlur={handleRenameSubmit}
                     onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleRenameSubmit() } if (e.key === "Escape") { setRenaming(false); setRenameValue(template.name); setRenameError("") } }}
-                    className={`text-sm font-semibold bg-white/[0.06] rounded px-1.5 py-0.5 -ml-1.5 outline-none ring-1 transition-colors ${renameError ? "ring-red-400/60" : "ring-brand-teal/40 focus:ring-brand-teal/60"}`}
+                    className={`text-sm font-semibold bg-foreground/[0.06] rounded px-1.5 py-0.5 -ml-1.5 outline-none ring-1 transition-colors ${renameError ? "ring-red-400/60" : "ring-brand-teal/40 focus:ring-brand-teal/60"}`}
                   />
                   {renameError && <span className="text-[11px] text-red-400 mt-0.5">{renameError}</span>}
                 </span>
               ) : (
                 <h3
-                  className={`text-sm font-semibold truncate ${onRename ? "cursor-text rounded px-1.5 py-0.5 -ml-1.5 hover:bg-white/[0.04] transition-colors" : ""}`}
+                  className={`text-sm font-semibold truncate ${onRename ? "cursor-text rounded px-1.5 py-0.5 -ml-1.5 hover:bg-foreground/[0.04] transition-colors" : ""}`}
                   onClick={onRename ? e => { e.stopPropagation(); setRenaming(true); setRenameValue(template.name) } : undefined}
                 >
                   {template.name}
@@ -308,12 +312,12 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
                 onBlur={handleDescSubmit}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleDescSubmit() } if (e.key === "Escape") { setEditValue(template.description || ""); setEditing(false) } }}
                 rows={2}
-                className="w-full mt-1 rounded-md bg-white/[0.04] border border-brand-teal/30 focus:border-brand-teal/50 px-2 py-1 text-xs text-foreground placeholder:text-foreground/25 resize-none outline-none transition-colors"
+                className="w-full mt-1 rounded-md bg-foreground/[0.04] border border-brand-teal/30 focus:border-brand-teal/50 px-2 py-1 text-xs text-foreground placeholder:text-foreground/25 resize-none outline-none transition-colors"
                 placeholder={t("descPlaceholder")}
               />
             ) : onEditDescription ? (
               <p
-                className="text-xs text-foreground-muted mt-1 line-clamp-2 leading-relaxed cursor-text rounded px-1 -mx-1 hover:bg-white/[0.04] transition-colors"
+                className="text-xs text-foreground-muted mt-1 line-clamp-2 leading-relaxed cursor-text rounded px-1 -mx-1 hover:bg-foreground/[0.04] transition-colors"
                 onClick={e => { e.stopPropagation(); setEditing(true) }}
               >
                 {template.description || <span className="text-foreground/20 italic">{t("addDescription")}</span>}
@@ -327,7 +331,7 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
           <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
             <button
               onClick={() => onDownload(template.name)}
-              className="p-1.5 rounded-md text-foreground-muted hover:text-foreground hover:bg-white/[0.06] transition-colors"
+              className="p-1.5 rounded-md text-foreground-muted hover:text-foreground hover:bg-foreground/[0.06] transition-colors"
               aria-label={t("downloadAria", { name: template.name })}
             >
               <Download className="h-3.5 w-3.5" />
@@ -346,7 +350,7 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
 
         {/* Metadata row — only render if any metadata exists */}
         {(fontDisplay || template.layout_count > 0) && (
-        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/[0.04]">
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border">
           {/* Font */}
           {fontDisplay && (
             <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
@@ -409,15 +413,14 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="border border-white/[0.1] rounded-xl w-full max-w-md mx-4 shadow-[0_24px_64px_oklch(0_0_0/70%)] animate-in fade-in zoom-in-95 duration-150"
-        style={{ background: "oklch(0.14 0.005 260)" }}
+        className="border border-border-hover rounded-xl w-full max-w-md mx-4 bg-popover shadow-[var(--shadow-lift)] animate-in fade-in zoom-in-95 duration-150"
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="upload-title"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 id="upload-title" className="text-sm font-semibold">{t("uploadTemplate")}</h2>
           <button
             onClick={onClose}
@@ -437,7 +440,7 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
                 ? "border-brand-teal/50 bg-brand-teal/[0.05]"
                 : file
                   ? "border-brand-teal/30 bg-brand-teal/[0.03]"
-                  : "border-white/[0.1] hover:border-white/[0.2]"
+                  : "border-border-hover hover:border-foreground/20"
             } p-6 text-center cursor-pointer`}
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
@@ -487,16 +490,16 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
               onChange={e => setDescription(e.target.value)}
               placeholder={t("descPlaceholder")}
               rows={2}
-              className="w-full rounded-lg bg-white/[0.04] border border-white/[0.08] focus:border-brand-teal/40 focus:ring-1 focus:ring-brand-teal/20 px-3 py-2 text-sm text-foreground placeholder:text-foreground/25 resize-none outline-none transition-colors"
+              className="w-full rounded-lg bg-foreground/[0.04] border border-border focus:border-brand-teal/40 focus:ring-1 focus:ring-brand-teal/20 px-3 py-2 text-sm text-foreground placeholder:text-foreground/25 resize-none outline-none transition-colors"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/[0.06]">
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-sm rounded-lg border border-white/[0.08] hover:bg-white/[0.04] transition-colors"
+            className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-foreground/[0.04] transition-colors"
           >
             {tCommon("cancel")}
           </button>

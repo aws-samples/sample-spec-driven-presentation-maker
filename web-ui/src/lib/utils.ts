@@ -33,16 +33,23 @@ export function formatDate(iso: string, locale: "en" | "ja" = "en"): string {
 
 /**
  * Generate a deterministic mesh gradient from a deck ID.
- * Combines multiple radial gradients for an organic, unique appearance.
+ * Uses the five agent hues (262/170/300/75/330) to keep the mesh
+ * derived from team colors. Preserves slide artwork colors untouched.
  *
  * @param id - Deck identifier used as seed
  * @returns CSS background value with layered gradients
  */
 export function meshGradient(id: string): string {
-  const seed = id.charCodeAt(0) * 47 + (id.charCodeAt(id.length - 1) || 0) * 31
-  const h1 = seed % 360
-  const h2 = (h1 + 60) % 360
-  const h3 = (h1 + 180) % 360
+  const agentHues = [262, 170, 300, 75, 330]
+  // Better hash: incorporate all characters
+  let hash = 0
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0
+  }
+  hash = Math.abs(hash)
+  const h1 = agentHues[hash % 5]
+  const h2 = agentHues[((hash >>> 4) + 1) % 5]
+  const h3 = agentHues[((hash >>> 8) + 2) % 5]
   return [
     `radial-gradient(ellipse at 20% 20%, oklch(0.28 0.04 ${h1}) 0%, transparent 50%)`,
     `radial-gradient(ellipse at 80% 80%, oklch(0.22 0.03 ${h2}) 0%, transparent 50%)`,

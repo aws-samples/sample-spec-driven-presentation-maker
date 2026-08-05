@@ -7,12 +7,22 @@
 
 export type ToolCategory = "build" | "explore" | "produce" | "compute" | "hearing" | "other"
 
-/** Accent palette per category — oklch for perceptual uniformity. */
+/**
+ * Tool categories map to the same five people shown on the slide stage.
+ * Color answers “who is working”; shape and copy communicate state and content.
+ */
+const agent = (token: string, alpha = { bg: 6, glow: 12, border: 18 }) => ({
+  accent: `var(${token})`,
+  bg: `color-mix(in oklch, var(${token}) ${alpha.bg}%, transparent)`,
+  glow: `color-mix(in oklch, var(${token}) ${alpha.glow}%, transparent)`,
+  border: `color-mix(in oklch, var(${token}) ${alpha.border}%, transparent)`,
+})
+
 export const CAT: Record<ToolCategory, { accent: string; bg: string; glow: string; border: string }> = {
-  build:   { accent: "oklch(0.75 0.14 185)", bg: "oklch(0.75 0.14 185 / 6%)",  glow: "oklch(0.75 0.14 185 / 12%)", border: "oklch(0.75 0.14 185 / 18%)" },
-  explore: { accent: "oklch(0.80 0.14 80)",  bg: "oklch(0.80 0.14 80 / 6%)",   glow: "oklch(0.80 0.14 80 / 12%)",  border: "oklch(0.80 0.14 80 / 18%)" },
-  produce: { accent: "oklch(0.72 0.16 300)", bg: "oklch(0.72 0.16 300 / 6%)",  glow: "oklch(0.72 0.16 300 / 12%)", border: "oklch(0.72 0.16 300 / 18%)" },
-  compute: { accent: "oklch(0.78 0.12 220)", bg: "oklch(0.78 0.12 220 / 6%)",  glow: "oklch(0.78 0.12 220 / 12%)", border: "oklch(0.78 0.12 220 / 18%)" },
-  hearing: { accent: "oklch(0.74 0.16 330)", bg: "oklch(0.74 0.16 330 / 6%)",  glow: "oklch(0.74 0.16 330 / 12%)", border: "oklch(0.74 0.16 330 / 18%)" },
-  other:   { accent: "oklch(0.55 0 0)",      bg: "oklch(0.55 0 0 / 4%)",       glow: "oklch(0.55 0 0 / 8%)",       border: "oklch(0.55 0 0 / 12%)" },
+  build: agent("--agent-content"),
+  explore: agent("--agent-data"),
+  produce: agent("--agent-visual"),
+  compute: agent("--agent-layout"),
+  hearing: agent("--agent-decorator"),
+  other: agent("--agent-neutral", { bg: 4, glow: 8, border: 12 }),
 }

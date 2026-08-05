@@ -205,7 +205,7 @@ Use these as starting points. The style HTML doesn't need to match any specific 
 exactly, but staying in this range ensures the design translates well to actual slides.
 
 **Critical rules — do NOT deviate:**
-- Coordinate system: 1920×1080 absolute positioning (same as slides.json)
+- Coordinate system: 1920×1080 absolute positioning (style demos use a fixed 16:9 canvas regardless of target template)
 - Display scaling: `body { zoom: 0.7 }`. Do NOT use `transform: scale()` (breaks background sizing)
 - Layout: `position: absolute` on all elements via `.el` class. Do NOT use flexbox or grid for slide layout (coordinates won't match slides.json)
 - Font sizes: pt units only (same as slides.json). Do NOT use px, em, or rem

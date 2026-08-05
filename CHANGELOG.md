@@ -10,6 +10,116 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Nested styled-text notation no longer leaks raw tags onto slides** —
+  agents sometimes emit `{{bold:{{#FF0000:X}}}}` instead of the canonical
+  `{{bold,#FF0000:X}}`; the parser could not see through nesting and rendered
+  the inner tag as literal text. A flatten pre-pass now normalizes nesting
+  (any depth, partial nesting included) to the comma form, with inner
+  attributes taking priority. Non-nested input is untouched. (#123)
+- **Builtin template download works from the Web UI** — downloading blank-dark /
+  blank-light did nothing: the download used a `fetch()`+blob path that requires
+  CORS, and the builtin resource bucket has no CORS configuration (user templates
+  live in a different bucket that has one). Downloads now use the same direct-link
+  navigation as deck PPTX downloads (no CORS involved), the presigned URL carries
+  `Content-Disposition: attachment`, and failures show an error toast instead of
+  silently doing nothing. (#281)
+- **`grid` tool returns actionable errors and supports `%` / `repeat()`** —
+  unsupported CSS track syntax (`auto`, `minmax()`, previously also `%` and
+  `repeat()`) crashed with an uncaught `ValueError` instead of an error message
+  the agent can react to. `%` and `repeat(n, X)` are now supported, unsupported
+  syntax returns `{"error": ...}` naming the offending token, and the supported
+  subset is documented in the tool docstring and grid guide. (#282)
+- **Live preview: icons relying on even-odd fill no longer render as solid
+  boxes** — LibreOffice's SVG export declares `fill-rule="evenodd"` only on the
+  root `<svg>`, which the per-component fragment split dropped, so multi-subpath
+  line-art icons (many AWS resource icons) lost their cutouts and appeared as
+  filled rectangles in the live preview (final PNGs were unaffected). Root
+  inheritable attributes are now propagated onto each fragment. (#288)
+
+- **Architecture diagram box auto-height now works on non-16:9 templates and
+  with CJK text** — the engine used a fixed 16:9 pt-to-px ratio for text
+  measurement, causing boxes to undersize on 4:3 and other aspect ratios, and
+  did not account for fullwidth (CJK) character width. `analyze_template` now
+  reports `ptPerPx` in `slide_size`, the agent records it in `deck.json`
+  `slideSize`, and `arch_diagram` accepts a `pt_per_px` parameter for accurate
+  calibration. (#285)
+- **Remote MCP: `analyze_template` now includes `slide_size` in cached
+  results** — the cached template analysis omitted the `slide_size` field, so
+  subsequent calls returned an incomplete response and the agent could not
+  populate `deck.json` `slideSize`. (#285)
+
+- **Custom templates with non-16:9 slide sizes (4:3 etc.) now lay out correctly** —
+  the engine's px coordinate system followed the template width but assumed a
+  fixed height of 1080, so 4:3 decks left the bottom quarter of every slide
+  empty, reported false out-of-bounds warnings, mismatched placeholder
+  coordinates, mis-measured text overflow, and rendered cropped previews in the
+  Web UI. The canvas is now derived from the template's real dimensions
+  (1920 px wide, height following the aspect ratio — 4:3 becomes 1920×1440),
+  and `analyze_template` / `deck.json` carry the canvas size so slide
+  composition uses the full slide. Behaviour for 16:9 templates is unchanged.
+  Known limitation: architecture diagram boxes with an omitted `box.height`
+  can still under-estimate text height on non-16:9 templates — specify
+  `box.height` explicitly. (#208)
+- **Live slide preview: the first few slides now animate** — animation was
+  suppressed for 3 seconds after the slides tab appeared, and because a new
+  deck switches to that tab as soon as slides arrive, the first slides were
+  always shown instantly. Suppression is now based on whether the slides
+  already existed when the view mounted, instead of a timer.
+- **Live slide preview: the PNG fallback now actually appears** — the error
+  state was reset on every 1-second poll, so the fallback was unmounted before
+  it could be seen; a failure to find the render container also marked the
+  slide as permanently processed, leaving an empty black box. Slides with
+  nothing to draw now fall back to the rendered PNG, and the fallback image
+  retries expired signed URLs.
+
+- **AWS: uploaded custom templates now apply to PPTX generation** — the remote
+  server's template resolution only searched builtin templates, so a deck
+  referencing an uploaded user template silently fell back to
+  `blank-dark.pptx`. Generation now resolves user templates first (same order
+  as `analyze_template`), and an unresolvable template name raises an explicit
+  error listing available templates instead of silently using the wrong
+  design. (#206)
+
+## [0.7.0] - 2026-08-03
+
+### Added
+
+- **Web UI: live design studio** — full visual redesign. Light/Dark/System
+  themes (default dark), 90–125% text scaling, studio color tokens (5 agent
+  work colors, ink for deliverables, red reserved for errors), and a
+  two-voice typography system (Bricolage Grotesque for UI chrome, Fraunces
+  for document surfaces).
+- **Web UI: artifact-first review surfaces** — chat tool activity as a
+  compact agent work ledger; brief as a reviewable contract document with
+  approval state; outline as single-column narrative slides (number rail,
+  slim skeleton cards, enriched slide faces with an evidence/visual/notes
+  spec sheet); art direction as per-slide style cards sharing the same rail
+  grammar, with template and style sections on one alignment axis.
+- Outline workflow now asks for `##` section headings when a deck has
+  distinct parts, so review surfaces can render the story arc as chapters.
+
+### Changed
+
+- Style cover extraction is unified client-side: both `/styles` APIs
+  (cloud and local) now serve raw style HTML (`html` field replaces
+  `coverHtml`), and the style gallery opens previews with zero additional
+  round-trips.
+- Style previews and thumbnails keep the style author's own canvas
+  background instead of forcing transparency.
+
+### Fixed
+
+- Style thumbnails rendered the first slide at 70% (standalone-viewing
+  `body zoom` was not reset in the cloud cover path), leaving gutters
+  around the cover; slides now fill thumbnails edge-to-edge.
+- Unpainted regions of style slides (rounded corners, frame decorations)
+  showed as opaque white inside the dark UI.
+- One deck slide always fits the viewport in the full-size carousel view.
+- Prose art direction (`art-direction.md`, no style selected) rendered as
+  raw markdown inside an iframe; it is now typeset as a document.
+
 ## [0.6.0] - 2026-08-02
 
 ### Breaking
@@ -194,7 +304,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.3...v0.6.0
 [0.5.3]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.5.1...v0.5.2

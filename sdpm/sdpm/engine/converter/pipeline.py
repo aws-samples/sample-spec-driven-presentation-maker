@@ -106,6 +106,11 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: boo
         deck_meta["defaultTextColor"] = result["defaultTextColor"]
     # Imported text must roundtrip verbatim — disable CJK↔Latin auto-spacing
     deck_meta["autoSpacing"] = False
+    # Write slideSize from the source pptx (new-deck only — R4)
+    from sdpm.engine import slide_size_px as _slide_size_px
+    _w, _h = _slide_size_px(int(prs.slide_width), int(prs.slide_height))
+    _pt_per_px = round((int(prs.slide_width) / 12700) / 1920, 6)
+    deck_meta["slideSize"] = {"width": _w, "height": _h, "ptPerPx": _pt_per_px}
     write_json(output_dir / "deck.json", deck_meta)
 
     # Write slides/slide-{NNN}.json (1-based, zero-padded, hyphen separator to match parse_outline_slugs).

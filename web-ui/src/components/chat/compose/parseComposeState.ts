@@ -3,8 +3,9 @@
 /**
  * parseComposeState — Pure function: streamMessages → structured state.
  *
- * Input: events from compose_slides progress_q + tool input definition.
- * Output: overall + per-agent state for ComposeCard rendering.
+ * The parser only exposes facts present in the stream. It does not infer
+ * workflow phases such as consistency review. Activity belongs to the current
+ * attempt; on retry, only the previous failure reason is retained.
  */
 
 import { activityLabel, activityCategory, type ActivityCategory, type ActivityTranslator } from "./activityLabel"
@@ -20,12 +21,13 @@ export interface ComposeActivity {
 export type AgentStatus = "starting" | "working" | "retrying" | "done" | "error"
 
 export interface AgentState {
-  groupIndex: number        // 1-based
+  groupIndex: number
   slugs: string[]
   instruction: string
   status: AgentStatus
   retryAttempt: number
   errorMsg?: string
+  previousAttemptError?: string
   budgetReached?: boolean
   activity: ComposeActivity[]
 }
@@ -55,11 +57,8 @@ export function parseComposeState(
       ? (() => { try { const p = JSON.parse(rawGroups); return Array.isArray(p) ? p : [] } catch { return [] } })()
       : []
 
-  // Discover agents from either input (if already present) or stream events.
-  // Key by groupIndex (authoritative from backend); slugs may be missing on some events.
   const byGroup = new Map<number, AgentState>()
 
-  // Seed from input if available
   slideGroups.forEach((g, i) => {
     byGroup.set(i + 1, {
       groupIndex: i + 1,
@@ -71,101 +70,99 @@ export function parseComposeState(
     })
   })
 
-  // Helper: ensure an agent entry exists for a given group.
-  function ensureAgent(g: number, slugsLabel: string): AgentState {
-    let a = byGroup.get(g)
-    if (!a) {
-      a = {
-        groupIndex: g,
+  function ensureAgent(group: number, slugsLabel: string): AgentState {
+    let agent = byGroup.get(group)
+    if (!agent) {
+      agent = {
+        groupIndex: group,
         slugs: slugsLabel ? slugsLabel.split(", ").map((s) => s.trim()).filter(Boolean) : [],
         instruction: "",
         status: "starting",
         retryAttempt: 0,
         activity: [],
       }
-      byGroup.set(g, a)
-    } else if (!a.slugs.length && slugsLabel) {
-      a.slugs = slugsLabel.split(", ").map((s) => s.trim()).filter(Boolean)
+      byGroup.set(group, agent)
+    } else if (!agent.slugs.length && slugsLabel) {
+      agent.slugs = slugsLabel.split(", ").map((s) => s.trim()).filter(Boolean)
     }
-    return a
+    return agent
   }
 
   let phase: ComposeState["phase"] = "running"
   let statusMessage: string | null = null
   let totalGroupsFromStream = 0
-  let doneGroupCount = 0
 
-  for (const ev of streamMessages) {
-    const g = typeof ev.group === "number" ? ev.group : 0
+  for (const event of streamMessages) {
+    const group = typeof event.group === "number" ? event.group : 0
 
-    // Global status events
-    if (g === 0) {
-      if (ev.status === "prefetching") { phase = "prefetching"; statusMessage = typeof ev.message === "string" ? ev.message : null }
-      else if (ev.status === "building") { phase = "building"; statusMessage = typeof ev.message === "string" ? ev.message : null }
+    if (group === 0) {
+      if (event.status === "prefetching") {
+        phase = "prefetching"
+        statusMessage = typeof event.message === "string" ? event.message : null
+      } else if (event.status === "building") {
+        phase = "building"
+        statusMessage = typeof event.message === "string" ? event.message : null
+      }
       continue
     }
 
-    if (typeof ev.total_groups === "number" && ev.total_groups > totalGroupsFromStream) {
-      totalGroupsFromStream = ev.total_groups
+    if (typeof event.total_groups === "number" && event.total_groups > totalGroupsFromStream) {
+      totalGroupsFromStream = event.total_groups
     }
 
-    const slugsLabel = typeof ev.slugs === "string" ? ev.slugs : ""
-    const agent = ensureAgent(g, slugsLabel)
+    const slugsLabel = typeof event.slugs === "string" ? event.slugs : ""
+    const agent = ensureAgent(group, slugsLabel)
 
-    if (ev.status === "starting") {
+    if (event.status === "starting") {
       agent.status = "working"
-      // Once running, clear prefetching phase message
-      if (phase === "prefetching") { phase = "running"; statusMessage = null }
-    } else if (ev.status === "retrying") {
+      if (phase === "prefetching") {
+        phase = "running"
+        statusMessage = null
+      }
+    } else if (event.status === "retrying") {
+      const retryError = typeof event.error === "string" ? event.error : agent.errorMsg
+      if (retryError) agent.previousAttemptError = retryError
       agent.status = "retrying"
-      agent.retryAttempt = typeof ev.attempt === "number" ? ev.attempt : agent.retryAttempt + 1
-      if (typeof ev.error === "string") agent.errorMsg = ev.error
+      agent.retryAttempt = typeof event.attempt === "number" ? event.attempt : agent.retryAttempt + 1
+      agent.errorMsg = retryError
       agent.activity = []
-    } else if (ev.status === "done") {
+    } else if (event.status === "done") {
       agent.status = "done"
-      doneGroupCount++
-    } else if (ev.status === "error") {
+      agent.errorMsg = undefined
+    } else if (event.status === "error") {
       agent.status = "error"
-      if (typeof ev.error === "string") agent.errorMsg = ev.error
-    } else if (ev.status === "budget_reached") {
+      if (typeof event.error === "string") agent.errorMsg = event.error
+    } else if (event.status === "budget_reached") {
       agent.budgetReached = true
-    } else if (ev.tool) {
-      const toolName = String(ev.tool)
-      const toolUseId = String(ev.toolUseId || "")
-      const inp = (ev.input as Record<string, unknown> | undefined)
-      const evStatus = ev.status as string | undefined
-      const existing = agent.activity.find((a) => a.toolUseId === toolUseId)
+    } else if (event.tool) {
+      const toolName = String(event.tool)
+      const toolUseId = String(event.toolUseId || "")
+      const inputValue = event.input as Record<string, unknown> | undefined
+      const eventStatus = event.status as string | undefined
+      const existing = agent.activity.find((activity) => activity.toolUseId === toolUseId)
+
       if (!existing) {
         agent.activity.push({
           toolUseId,
           tool: toolName,
-          label: activityLabel(toolName, inp, t),
+          label: activityLabel(toolName, inputValue, t),
           category: activityCategory(toolName),
-          status: evStatus === "error" ? "error" : evStatus === "success" ? "success" : "active",
+          status: eventStatus === "error" ? "error" : eventStatus === "success" ? "success" : "active",
         })
       } else {
-        if (evStatus) {
-          // ChatPanel merges toolResult into the existing tool entry as status field.
-          existing.status = evStatus === "error" ? "error" : "success"
-        }
-        if (inp) {
-          // Input arrived after toolStart — refine label from generic placeholder.
-          existing.label = activityLabel(toolName, inp, t)
-        }
+        if (eventStatus) existing.status = eventStatus === "error" ? "error" : "success"
+        if (inputValue) existing.label = activityLabel(toolName, inputValue, t)
       }
-      // Recover from any non-terminal state on new activity (starting/retrying/error).
-      // A stream of tool events from the backend means the agent is actively working,
-      // even if a transient group-level error was emitted earlier.
+
       if (agent.status !== "done") agent.status = "working"
     }
   }
 
   const agents = [...byGroup.values()].sort((a, b) => a.groupIndex - b.groupIndex)
   const totalGroups = Math.max(agents.length, totalGroupsFromStream, slideGroups.length)
+  const doneGroupCount = agents.filter((agent) => agent.status === "done").length
 
-  if (phase === "running" && doneGroupCount === totalGroups && totalGroups > 0) {
-    phase = "done"
-  }
+  if (phase === "running" && doneGroupCount === totalGroups && totalGroups > 0) phase = "done"
 
   return { phase, statusMessage, totalGroups, doneGroupCount, agents }
 }

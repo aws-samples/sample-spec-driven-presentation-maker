@@ -443,8 +443,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           <div className="space-y-4 animate-pulse">
             {[0.6, 1, 0.75].map((w, i) => (
               <div key={i} className={i % 2 === 0 ? "flex justify-end" : "flex gap-2.5"}>
-                {i % 2 !== 0 && <div className="w-6 h-6 rounded-full bg-white/[0.06] flex-none" />}
-                <div className="rounded-2xl bg-white/[0.04] h-10" style={{ width: `${w * 70}%` }} />
+                {i % 2 !== 0 && <div className="w-6 h-6 rounded-full bg-foreground/[0.06] flex-none" />}
+                <div className="rounded-2xl bg-foreground/[0.04] h-10" style={{ width: `${w * 70}%` }} />
               </div>
             ))}
           </div>
@@ -453,7 +453,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-teal-soft mb-5">
               <Send className="h-5 w-5 text-brand-teal" />
             </div>
-            <h2 className="text-[22px] font-bold tracking-[-0.03em] text-brand-teal mb-1">{t("letsPresent")}</h2>
+            <h2 className="text-xl font-bold tracking-[-0.03em] text-foreground mb-1">{t("letsPresent")}</h2>
             <p className="text-sm text-foreground-muted leading-relaxed mb-6">
               {t("emptyHint")}
             </p>
@@ -532,10 +532,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               <div className="flex flex-col gap-2 pb-2 pl-1">
                 {!IS_LOCAL && (
                 <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
-                  bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
+                  bg-foreground/[0.02] hover:bg-foreground/[0.05] transition-colors">
                   <div className="flex flex-col gap-0.5 min-w-0">
                     <span className="text-xs text-foreground-secondary font-medium select-none">{t("fetchWebImages")}</span>
-                    <span className="text-[11px] text-foreground-muted select-none leading-snug">{t("fetchWebImagesDescription")}</span>
+                    <span className="text-xs text-foreground-muted select-none leading-snug">{t("fetchWebImagesDescription")}</span>
                   </div>
                   <button
                     type="button"
@@ -543,7 +543,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     aria-checked={fetchWebImages}
                     onClick={() => setFetchWebImages(!fetchWebImages)}
                     className={`relative flex-none w-9 h-5 rounded-full transition-colors duration-200 ${
-                      fetchWebImages ? "bg-brand-teal" : "bg-white/[0.1]"
+                      fetchWebImages ? "bg-brand-teal" : "bg-foreground/[0.1]"
                     }`}
                   >
                     <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
@@ -554,7 +554,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 )}
 
                 <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
-                  bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
+                  bg-foreground/[0.02] hover:bg-foreground/[0.05] transition-colors">
                   <div className="flex flex-col gap-0.5 min-w-0">
                     <span className="text-xs text-foreground-secondary font-medium select-none flex items-center gap-2">
                       {t("parallelAgents")}
@@ -563,7 +563,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                         {t("experimental")}
                       </span>
                     </span>
-                    <span className="text-[11px] text-foreground-muted select-none leading-snug">{t("parallelAgentsDescription")}</span>
+                    <span className="text-xs text-foreground-muted select-none leading-snug">{t("parallelAgentsDescription")}</span>
                   </div>
                   <button
                     type="button"
@@ -571,7 +571,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     aria-checked={parallelAgents}
                     onClick={() => setParallelAgents(!parallelAgents)}
                     className={`relative flex-none w-9 h-5 rounded-full transition-colors duration-200 ${
-                      parallelAgents ? "bg-brand-teal" : "bg-white/[0.1]"
+                      parallelAgents ? "bg-brand-teal" : "bg-foreground/[0.1]"
                     }`}
                   >
                     <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${

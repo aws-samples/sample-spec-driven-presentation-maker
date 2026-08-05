@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * DeckCard — Editorial card with mesh gradient, teal edge glow, and staggered entrance.
+ * DeckCard — Editorial card with team-derived mesh and unified hover lift.
  *
  * Uses `<div role="button">` instead of `<button>` to allow nested interactive
  * elements (favorite toggle, context menu) without HTML nesting violations.
@@ -54,11 +54,9 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
       tabIndex={0}
       onClick={() => onOpen(deck.deckId)}
       onKeyDown={(e) => { if (e.key === "Enter") onOpen(deck.deckId) }}
-      className="animate-card-in group relative rounded-xl overflow-hidden bg-card border border-border hover:border-border-hover hover:-translate-y-[3px] transition-all duration-350 cursor-pointer hover:shadow-[0_8px_40px_oklch(0_0_0/50%)]"
+      className="animate-card-in group relative rounded-xl overflow-hidden bg-card border border-border hover:border-border-hover hover:-translate-y-[3px] transition-all duration-350 cursor-pointer hover:shadow-[var(--shadow-lift)] motion-reduce:hover:translate-y-0 motion-reduce:transition-none"
       style={{ "--delay": `${index * 60}ms` } as React.CSSProperties}
     >
-      {/* Teal edge glow on hover */}
-      <div className="card-glow rounded-xl" />
 
       {/* Action buttons */}
       <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-0.5">
@@ -73,7 +71,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
           className={`p-1 transition-all flex items-center justify-center drop-shadow-[0_1px_2px_oklch(0_0_0/60%)] ${
             isFavorite
               ? "text-brand-amber"
-              : "text-white/30 sm:opacity-0 sm:group-hover:opacity-100 hover:text-brand-amber/70"
+              : "text-foreground-muted/50 sm:opacity-0 sm:group-hover:opacity-100 hover:text-brand-amber/70"
           }`}
           aria-label={isFavorite ? t("removeFromFavorites") : t("addToFavorites")}
           aria-pressed={isFavorite}
@@ -86,7 +84,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
           <DropdownMenuTrigger asChild>
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
-              className="p-1 transition-all flex items-center justify-center drop-shadow-[0_1px_2px_oklch(0_0_0/60%)] text-white/30 sm:opacity-0 sm:group-hover:opacity-100 hover:text-white/70"
+              className="p-1 transition-all flex items-center justify-center drop-shadow-[0_1px_2px_oklch(0_0_0/60%)] text-foreground-muted/50 sm:opacity-0 sm:group-hover:opacity-100 hover:text-foreground/70"
               aria-label={t("deckActions")}
             >
               <MoreHorizontal className="h-3.5 w-3.5" />
@@ -94,8 +92,7 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="w-44"
-            style={{ background: "oklch(0.14 0.005 260 / 95%)", backdropFilter: "blur(16px)" }}
+            className="w-44 bg-popover/95 backdrop-blur-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <DropdownMenuItem

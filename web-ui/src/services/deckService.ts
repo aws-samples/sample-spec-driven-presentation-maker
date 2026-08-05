@@ -440,7 +440,7 @@ export async function batchGetSlidePreviewUrls(
 export interface StyleEntry {
   name: string
   description: string
-  coverHtml: string
+  html: string
   pinned: boolean
   source: "builtin" | "user"
 }
@@ -566,24 +566,22 @@ export async function fetchTemplates(idToken: string): Promise<TemplateEntry[]> 
   return (data.templates || []) as TemplateEntry[]
 }
 
-/** Download a template .pptx file. */
+/** Download a template .pptx file via direct navigation (no CORS dependency). */
 export async function downloadTemplate(name: string, idToken: string): Promise<void> {
   const base = await getApiBaseUrl()
   const res = await fetch(`${base}templates/${encodeURIComponent(name)}`, {
     headers: { Authorization: `Bearer ${idToken}` },
   })
-  if (!res.ok) return
-  const { downloadUrl } = await res.json()
-  if (!downloadUrl) return
-  const fileRes = await fetch(downloadUrl)
-  if (!fileRes.ok) return
-  const blob = await fileRes.blob()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = `${name}.pptx`
-  a.click()
-  URL.revokeObjectURL(url)
+  if (!res.ok) {
+    throw new Error(`Failed to get download URL: ${res.status}`)
+  }
+  const data = await res.json()
+  if (data.error || !data.downloadUrl) {
+    throw new Error(data.error || "No download URL returned")
+  }
+  // Direct navigation — Content-Disposition on the presigned URL triggers download.
+  // Same approach as deck PPTX download (WorkspaceView.tsx), no CORS needed.
+  window.location.href = data.downloadUrl
 }
 
 /** Upload a user template. */

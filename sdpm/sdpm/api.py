@@ -150,6 +150,7 @@ def analyze_and_store_template(template_path: Path, description: str = "") -> di
         "fonts": result.get("fonts", {}),
         "layout_count": len(result.get("layouts", [])),
         "layouts": result.get("layouts", []),
+        "slide_size": result.get("slide_size", {}),
     }
 
 
@@ -269,7 +270,6 @@ def _get_output_base_dir() -> Path:
 
 def init(
     name: str,
-    template: str | Path | None = None,
     output_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     """Initialize a presentation workspace.
@@ -278,13 +278,11 @@ def init(
 
     Args:
         name: Presentation name (used in directory name).
-        template: Template name or path. If provided, extracts fonts.
         output_dir: Explicit output directory. Auto-generated if None.
 
     Returns:
-        Dict with output_dir, deck_json, template, fonts, workspace.
+        Dict with output_dir, deck_json, workspace.
     """
-    from sdpm.engine.analyzer import extract_fonts
     from sdpm.utils.io import write_json
 
     if output_dir:
@@ -301,20 +299,6 @@ def init(
         "defaultTextColor": "",
     }
 
-    if template:
-        template_src = Path(template).expanduser()
-        if not template_src.exists():
-            found = _find_template_in_dirs(str(template), get_templates_dirs())
-            if found is not None:
-                template_src = found
-        if template_src.exists():
-            template_src = template_src.resolve()
-            deck_data["template"] = template_src.name
-            try:
-                deck_data["fonts"] = extract_fonts(template_src)
-            except Exception:
-                pass
-
     deck_json = out_dir / "deck.json"
     write_json(deck_json, deck_data, suffix="\n")
 
@@ -328,8 +312,6 @@ def init(
     return {
         "output_dir": str(out_dir),
         "deck_json": str(deck_json),
-        "template": deck_data.get("template", ""),
-        "fonts": deck_data.get("fonts", {}),
         "workspace": ["deck.json", "slides/"] + [f"specs/{s}" for s in spec_files],
     }
 
@@ -462,6 +444,36 @@ def _resolve_config(
         _, is_dark = _extract_theme_colors_raw(template_file)
         dtc = "#FFFFFF" if is_dark else "#333333"
         warnings.append(f"defaultTextColor auto-set to {dtc}")
+
+    # slideSize validation — compare deck.json cache with template reality
+    from pptx import Presentation as _Prs
+    from sdpm.engine import slide_size_px as _slide_size_px
+
+    _prs = _Prs(str(template_file))
+    actual_size = _slide_size_px(int(_prs.slide_width), int(_prs.slide_height))
+
+    deck_slide_size = data.get("slideSize")
+    if deck_slide_size:
+        cached = (deck_slide_size.get("width"), deck_slide_size.get("height"))
+        if cached != actual_size:
+            warnings.append(
+                f"slideSize mismatch: deck.json has {dict(deck_slide_size)}, "
+                f'template actual is {{"width": {actual_size[0]}, "height": {actual_size[1]}}}. '
+                f"Please update deck.json slideSize."
+            )
+
+    # Height boundary warning (moved from lint — requires template reality)
+    actual_height = actual_size[1]
+    for si, slide in enumerate(data.get("slides", []), 1):
+        for ei, elem in enumerate(slide.get("elements", []), 1):
+            ey = elem.get("y")
+            eh = elem.get("height")
+            if isinstance(ey, (int, float)) and isinstance(eh, (int, float)):
+                if ey + eh > actual_height:
+                    warnings.append(
+                        f"slide {si} element {ei}: y({ey}) + height({eh}) = {ey + eh} "
+                        f"exceeds slide height {actual_height}."
+                    )
 
     # Lint
     from sdpm.engine.schema.lint import lint as lint_slides
@@ -763,7 +775,9 @@ def _apply_grid_overlay(png_paths: list[str]) -> None:
         draw = ImageDraw.Draw(overlay)
         for pct in range(5, 100, 5):
             x, y = int(w * pct / 100), int(h * pct / 100)
-            px_x, px_y = int(1920 * pct / 100), int(1080 * pct / 100)
+            px_x = int(1920 * pct / 100)
+            # Derive px_y from image aspect ratio (no Presentation needed)
+            px_y = round(1920 * h / w * pct / 100)
             draw.line([(x, 0), (x, h)], fill=color, width=1)
             draw.line([(0, y), (w, y)], fill=color, width=1)
             if pct % 10 == 0:

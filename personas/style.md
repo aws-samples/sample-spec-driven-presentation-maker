@@ -55,7 +55,7 @@ Write incrementally via `run_style_python`:
 - All colors via `var()` references, never hardcoded in elements
 - Text style classes (`.t-title`, `.t-body`, etc.) reference CSS variables
 - Inline style only for position/size (`left`, `top`, `width`, `height`)
-- Coordinate system: 1920×1080 absolute positioning
+- Coordinate system: 1920×1080 absolute positioning (style demos always use 16:9 fixed canvas)
 - Font sizes: pt units only
 - `body { zoom: 0.7; }` for display scaling
 - 5–6 slides maximum (cover + design areas)

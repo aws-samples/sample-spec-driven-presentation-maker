@@ -55,8 +55,8 @@ export function ConfirmDialog({
           className={cn(
             "fixed top-[50%] left-[50%] z-50 translate-x-[-50%] translate-y-[-50%]",
             "w-full max-w-[384px] mx-4 p-6 rounded-xl",
-            "bg-[oklch(0.16_0.005_260)] border border-white/[0.08]",
-            "shadow-[0_0_0_1px_oklch(1_0_0/0.04),0_8px_24px_oklch(0_0_0/0.4),0_2px_8px_oklch(0_0_0/0.3)]",
+            "bg-popover border border-border",
+            "shadow-[var(--shadow-lift)]",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
             "data-[state=open]:zoom-in-[0.97] data-[state=closed]:zoom-out-[0.97]",
@@ -73,8 +73,8 @@ export function ConfirmDialog({
             <AlertDialogPrimitive.Cancel
               className={cn(
                 "px-3 py-1.5 text-sm rounded-lg transition-colors",
-                "border border-white/[0.08] text-foreground-secondary",
-                "hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
+                "border border-border text-foreground-secondary",
+                "hover:bg-foreground/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               )}
             >
               {cancelText}
@@ -92,9 +92,9 @@ export function ConfirmDialog({
                   "focus-visible:ring-red-500/30",
                 ],
                 variant === "default" && [
-                  "bg-white/10 text-foreground border border-white/[0.12]",
-                  "hover:bg-white/[0.14]",
-                  "focus-visible:ring-white/20",
+                  "bg-foreground/10 text-foreground border border-border-hover",
+                  "hover:bg-foreground/[0.14]",
+                  "focus-visible:ring-ring",
                 ],
               )}
             >

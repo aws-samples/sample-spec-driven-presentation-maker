@@ -56,6 +56,9 @@ Once the structure is confirmed, derive the full slide list from the brief and w
 **Each line = 1 slide = 1 message** — what it changes in the audience and how.
 `[slug]` — slug is a short kebab-case identifier that becomes the slide filename (`slides/{slug}.json`).
 
+Group slides into chapters with `## Heading` lines when the deck has distinct parts —
+the headings carry the story arc, and review surfaces render them as section breaks.
+
 When multiple slides share the same visual base, give them the same slug prefix.
 The stable base lets the audience focus on what changed, not re-read the whole slide.
 Typical cases:
@@ -65,8 +68,11 @@ Typical cases:
 - Swapping content in the same frame — identical layout makes differences stand out (case studies, comparisons, options)
 
 ```markdown
+## Section heading
 - [title] What it changes in the audience and how
 - [current-state] What it changes in the audience and how
+
+## Next section heading
 - [feature-a] What it changes in the audience and how
 ```
 

@@ -3,15 +3,18 @@
 "use client"
 
 import { Toaster as Sonner, type ToasterProps } from "sonner"
+import { useTheme } from "next-themes"
 
 /**
- * Toaster — sonner toast provider configured for dark editorial theme.
+ * Toaster — sonner toast provider synchronized with the studio theme.
  * Place once in the root layout.
  */
 const Toaster = (props: ToasterProps) => {
+  const { resolvedTheme } = useTheme()
+
   return (
     <Sonner
-      theme="dark"
+      theme={resolvedTheme === "light" ? "light" : "dark"}
       className="toaster group"
       style={
         {

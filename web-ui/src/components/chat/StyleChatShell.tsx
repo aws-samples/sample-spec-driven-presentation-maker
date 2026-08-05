@@ -135,7 +135,7 @@ export function StyleChatShell({ open, onClose, styleId, styleName, onStyleWritt
             </div>
           </div>
 
-          <div className="mx-4 border-t border-white/[0.06]" />
+          <div className="mx-4 border-t border-border" />
 
           <div className="flex-1 overflow-hidden">
             <div className="h-full">

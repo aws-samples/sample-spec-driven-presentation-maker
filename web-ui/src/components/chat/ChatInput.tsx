@@ -225,7 +225,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         initialText={editingSnippetId ? snippets.find((s) => s.id === editingSnippetId)?.text : undefined}
       />
       <div className="flex-none px-3 pb-6 pt-2 safe-bottom">
-        <form onSubmit={handleSubmit} className="rounded-xl border border-white/[0.08] bg-background-raised search-glow">
+        <form onSubmit={handleSubmit} className="rounded-xl border border-border bg-background-raised search-glow">
           <AttachmentPreview
             attachments={attachments}
             snippets={snippets}
@@ -265,7 +265,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 type="button"
                 onClick={onStop}
                 title={stopTitle ?? t("stopGeneration")}
-                className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-white/10 hover:bg-white/20"
+                className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-foreground/10 hover:bg-foreground/20"
                 aria-label={stopTitle ?? t("stopGeneration")}
               >
                 <Square className="h-3 w-3 fill-current" />

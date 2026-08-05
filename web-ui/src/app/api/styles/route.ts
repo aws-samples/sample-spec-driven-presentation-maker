@@ -10,7 +10,7 @@ export async function GET() {
 
   // Merge: user-local first (shadows bundled with same name)
   const seen = new Set<string>()
-  const merged: Array<{ name: string; description: string; coverHtml: string; pinned: boolean; source: "builtin" | "user" }> = []
+  const merged: Array<{ name: string; description: string; html: string; pinned: boolean; source: "builtin" | "user" }> = []
 
   for (const s of listStylesFromDir(userDir)) {
     seen.add(s.name)

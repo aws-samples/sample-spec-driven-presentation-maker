@@ -20,13 +20,36 @@ const TYPE_DURATION_MS = 800
 const MIN_CHAR_MS = 15
 const MAX_CHAR_MS = 50
 
+/**
+ * Agent identities share five CSS tokens defined in globals.css.
+ * color/glow/bg are derived from the same --agent-* variable for each persona.
+ * At runtime, getComputedStyle reads the resolved token value (theme-aware).
+ */
 const AGENTS = [
-  { name: "Layout", color: "rgba(100,150,255,0.55)", glow: "rgba(100,150,255,0.1)", bg: "#3b6cf0" },
-  { name: "Content", color: "rgba(80,210,180,0.55)", glow: "rgba(80,210,180,0.1)", bg: "#2ba882" },
-  { name: "Visual", color: "rgba(170,120,255,0.55)", glow: "rgba(170,120,255,0.1)", bg: "#8b5cf6" },
-  { name: "Data", color: "rgba(245,180,70,0.55)", glow: "rgba(245,180,70,0.1)", bg: "#d97706" },
-  { name: "Decorator", color: "rgba(240,100,130,0.55)", glow: "rgba(240,100,130,0.1)", bg: "#e04070" },
+  { name: "Layout", token: "--agent-layout" },
+  { name: "Content", token: "--agent-content" },
+  { name: "Visual", token: "--agent-visual" },
+  { name: "Data", token: "--agent-data" },
+  { name: "Decorator", token: "--agent-decorator" },
 ] as const
+
+type ResolvedAgent = { name: string; color: string; glow: string; bg: string }
+
+/** Resolve CSS variable tokens into usable color strings (theme-aware). */
+function resolveAgents(): ResolvedAgent[] {
+  const root = typeof document !== "undefined" ? document.documentElement : null
+  return AGENTS.map((a) => {
+    const raw = root ? getComputedStyle(root).getPropertyValue(a.token).trim() : ""
+    // Fallback: use oklch representation directly if computation available, else neutral gray
+    const base = raw || "oklch(0.6 0 0)"
+    return {
+      name: a.name,
+      color: `color-mix(in oklch, ${base} 55%, transparent)`,
+      glow: `color-mix(in oklch, ${base} 10%, transparent)`,
+      bg: base,
+    }
+  })
+}
 
 interface ComposeComponent {
   class: string
@@ -57,25 +80,27 @@ interface AnimatedSlidePreviewProps {
   knownUrl?: string | null
   onAnimate?: () => void
   onComplete?: () => void
+  onAspectRatio?: (ratio: number) => void
   fallback?: React.ReactNode
 }
 
-function assignAgent(comp: ComposeComponent) {
+function assignAgent(comp: ComposeComponent, agents: ResolvedAgent[]) {
   const cls = comp.class || ""
-  if (cls === "TitleText" || cls === "SubtitleText") return AGENTS[0]
-  if (comp.text.length > 20) return AGENTS[1]
-  if (cls === "Graphic" || cls.includes("image")) return AGENTS[2]
-  if (cls.includes("ConnectorShape") || cls.includes("line")) return AGENTS[3]
-  return AGENTS[4]
+  if (cls === "TitleText" || cls === "SubtitleText") return agents[0]
+  if (comp.text.length > 20) return agents[1]
+  if (cls === "Graphic" || cls.includes("image")) return agents[2]
+  if (cls.includes("ConnectorShape") || cls.includes("line")) return agents[3]
+  return agents[4]
 }
 
-export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, knownUrl, onAnimate, onComplete, fallback }: AnimatedSlidePreviewProps) {
+export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, knownUrl, onAnimate, onComplete, onAspectRatio, fallback }: AnimatedSlidePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const intervalsRef = useRef<number[]>([])
   const lastComposeUrlRef = useRef("")
   const animatingRef = useRef(false)
   const [error, setError] = useState(false)
+  const [aspectRatio, setAspectRatio] = useState("16/9")
   const reducedMotion = useRef(
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
   )
@@ -111,7 +136,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       if (animatingRef.current) return  // defer until animation completes
       const skipThisUpdate = skipRef.current || compUrlBase === knownUrlRef.current
       lastComposeUrlRef.current = compUrlBase
-      setError(false)
 
       ;(async () => {
         try {
@@ -134,8 +158,18 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             setError(true); return
           }
 
+          // Empty content = nothing to render → treat as failure (fallback to PNG)
+          if (!data.bgSvg && data.components.length === 0) {
+            lastComposeUrlRef.current = ""
+            setError(true); return
+          }
+
           const container = containerRef.current
-          if (!container || cancelled) return
+          if (!container || cancelled) {
+            // Container not mounted — reset so polling can retry once mounted
+            lastComposeUrlRef.current = ""
+            return
+          }
 
           cleanup()
           setError(false)
@@ -156,8 +190,15 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           animatingRef.current = true
         }
 
+        // Resolve agent tokens once per animation cycle (theme-aware)
+        const resolvedAgents = resolveAgents()
+
         // --- Build SVG ---
         const vb = data.viewBox.split(" ").map(Number)
+        if (vb[2] > 0 && vb[3] > 0) {
+          setAspectRatio(`${vb[2]}/${vb[3]}`)
+          onAspectRatio?.(vb[2] / vb[3])
+        }
         container.innerHTML = ""
         container.parentElement?.querySelectorAll(".asp-overlay").forEach(el => el.remove())
 
@@ -210,7 +251,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
         data.components.forEach((comp, i) => {
           if (!animTargets.has(i) || !comp.bbox) return
           const si = staggerIdx++
-          const agent = assignAgent(comp)
+          const agent = assignAgent(comp, resolvedAgents)
 
           const pctL = (comp.bbox.x / vb[2]) * 100
           const pctT = (comp.bbox.y / vb[3]) * 100
@@ -222,7 +263,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             const cursor = document.createElement("div")
             cursor.className = "absolute transition-all duration-300"
             cursor.style.cssText = `left:${pctL}%;top:${Math.max(0, pctT - 5)}%;opacity:0;z-index:20;`
-            cursor.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2.5 7L5 3z" fill="${agent.bg}" stroke="rgba(0,0,0,0.4)" stroke-width="1.5"/></svg><span style="position:absolute;left:12px;top:12px;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;background:${agent.bg};color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.3)">${agent.name}</span>`
+            cursor.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2.5 7L5 3z" fill="${agent.bg}" stroke="color-mix(in oklch, var(--background) 60%, transparent)" stroke-width="1.5"/></svg><span style="position:absolute;left:12px;top:12px;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;background:${agent.bg};color:var(--background);box-shadow:var(--shadow-card)">${agent.name}</span>`
             overlayContainer.appendChild(cursor)
             requestAnimationFrame(() => {
               cursor.style.opacity = "1"
@@ -296,7 +337,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   }, [composeUrl])
 
   return (
-    <div data-slide-id={slug} className="aspect-[16/9] relative overflow-hidden rounded-lg bg-black">
+    <div data-slide-id={slug} className="relative overflow-hidden rounded-lg bg-black" style={{ aspectRatio }}>
       <div ref={containerRef} className="absolute inset-0" data-slide-id={slug} />
       {error && fallback && <div data-fallback className="absolute inset-0">{fallback}</div>}
     </div>

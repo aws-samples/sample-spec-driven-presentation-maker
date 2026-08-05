@@ -5,12 +5,17 @@
  *
  * Mirrors useWorkspace (decks) but much simpler: no polling, no deck state.
  * Hash values: "" (list), "#create" (new style), "#{name}" (preview).
+ *
+ * Preview HTML is resolved from the preloaded styles array (passed via
+ * setStyles) to eliminate the /styles/{name} fetch round-trip. Falls back to
+ * fetchStyleHtml only when the style is not in the preloaded set (e.g.
+ * direct navigation via URL hash before the list has loaded).
  */
 
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { fetchStyleHtml } from "@/services/deckService"
+import { useEffect, useState, useCallback, useRef } from "react"
+import { fetchStyleHtml, type StyleEntry } from "@/services/deckService"
 
 export type StyleView = { mode: "list" } | { mode: "preview"; name: string } | { mode: "create" }
 
@@ -28,6 +33,12 @@ export function useStyleWorkspace(idToken: string | undefined) {
   const [previewHtml, setPreviewHtml] = useState("")
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewVersion, setPreviewVersion] = useState(0)
+  const stylesRef = useRef<StyleEntry[]>([])
+
+  /** Provide the preloaded styles array so preview can resolve locally. */
+  const setStyles = useCallback((styles: StyleEntry[]) => {
+    stylesRef.current = styles
+  }, [])
 
   // Sync hash → state
   useEffect(() => {
@@ -36,9 +47,19 @@ export function useStyleWorkspace(idToken: string | undefined) {
     return () => window.removeEventListener("hashchange", onHashChange)
   }, [])
 
-  // Load HTML when entering preview or when refreshPreview is called
+  // Resolve preview HTML: prefer preloaded styles, fall back to fetch.
   useEffect(() => {
     if (view.mode !== "preview" || !idToken) { setPreviewHtml(""); return }
+
+    // Try resolving from preloaded styles (instant, no round-trip)
+    const cached = stylesRef.current.find(s => s.name === view.name)
+    if (cached?.html) {
+      setPreviewHtml(cached.html)
+      setPreviewLoading(false)
+      return
+    }
+
+    // Fallback: fetch from server (e.g. direct URL navigation before list loaded)
     let cancelled = false
     setPreviewLoading(true)
     fetchStyleHtml(view.name, idToken).then(html => {
@@ -70,6 +91,7 @@ export function useStyleWorkspace(idToken: string | undefined) {
     previewHtml,
     previewLoading,
     refreshPreview,
+    setStyles,
     isWorkspace: view.mode !== "list",
     styleName: view.mode === "preview" ? view.name : null,
     navigateToList,

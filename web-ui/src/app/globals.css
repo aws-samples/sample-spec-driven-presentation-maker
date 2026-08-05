@@ -3,7 +3,7 @@
 
 @plugin "@tailwindcss/typography";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
   --color-background: var(--background);
@@ -13,12 +13,20 @@
   --color-foreground: var(--foreground);
   --color-foreground-secondary: var(--foreground-secondary);
   --color-foreground-muted: var(--foreground-muted);
-  --font-sans: var(--font-geist);
-  --font-mono: var(--font-geist);
-  --color-brand-teal: oklch(0.75 0.14 185);
-  --color-brand-teal-soft: oklch(0.75 0.14 185 / 12%);
-  --color-brand-amber: oklch(0.82 0.16 75);
-  --color-brand-amber-soft: oklch(0.82 0.16 75 / 15%);
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-geist-mono);
+  /* Compatibility names are achromatic now; color belongs to the agents. */
+  --color-brand-teal: var(--brand);
+  --color-brand-teal-bright: var(--foreground);
+  --color-brand-teal-soft: var(--brand-soft);
+  --color-brand-amber: var(--agent-data);
+  --color-brand-amber-soft: color-mix(in oklch, var(--agent-data) 15%, transparent);
+  --color-agent-layout: var(--agent-layout);
+  --color-agent-content: var(--agent-content);
+  --color-agent-visual: var(--agent-visual);
+  --color-agent-data: var(--agent-data);
+  --color-agent-decorator: var(--agent-decorator);
+  --color-state-error: var(--state-error);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -42,17 +50,46 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Dark Editorial × Minimal Luxury palette */
+/* Live Design Studio — dark is the default studio experience. */
 :root {
+  color-scheme: dark;
   --radius: 0.75rem;
-  --wait-teal: oklch(0.75 0.14 185);
-  --wait-teal-dim: oklch(0.75 0.14 185 / 30%);
-  --wait-amber: oklch(0.82 0.16 75);
-  --wait-amber-dim: oklch(0.82 0.16 75 / 30%);
-  --wait-magenta: oklch(0.70 0.18 330);
-  --wait-magenta-dim: oklch(0.70 0.18 330 / 30%);
-  --wait-green: oklch(0.78 0.15 145);
-  --wait-green-dim: oklch(0.78 0.15 145 / 30%);
+  --font-ui: var(--font-bricolage), "Noto Sans JP", "Yu Gothic", sans-serif;
+  --font-display: var(--font-bricolage), "Noto Sans JP", "Yu Gothic", sans-serif;
+  --font-document: var(--font-fraunces), "Noto Serif JP", "Yu Mincho", serif;
+  --display-weight: 600;
+  --display-tracking: -0.03em;
+  --document-display-weight: 550;
+  --document-display-tracking: -0.015em;
+
+  /* Color answers “who”: the five agents share these identities everywhere. */
+  --agent-layout: oklch(0.68 0.16 262);
+  --agent-content: oklch(0.74 0.13 170);
+  --agent-visual: oklch(0.71 0.17 300);
+  --agent-data: oklch(0.79 0.14 75);
+  --agent-decorator: oklch(0.72 0.16 330);
+  --agent-neutral: oklch(0.55 0 0);
+  --team-gradient: linear-gradient(90deg, var(--agent-layout), var(--agent-content), var(--agent-visual), var(--agent-data), var(--agent-decorator));
+  --team-spine-gradient: linear-gradient(180deg, var(--agent-layout), var(--agent-content), var(--agent-visual), var(--agent-data), var(--agent-decorator));
+  --entry-action-spectrum: conic-gradient(
+    from var(--team-angle, 0deg),
+    var(--agent-layout),
+    var(--agent-content),
+    var(--agent-visual),
+    var(--agent-data),
+    var(--agent-decorator),
+    var(--agent-layout)
+  );
+
+  /* Red is reserved for real errors; normal workflow never borrows it. */
+  --state-error: oklch(0.65 0.2 25);
+  --surface-subtle: oklch(1 0 0 / 3%);
+  --surface-stage: oklch(0.13 0.006 260);
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 30%), 0 8px 24px oklch(0 0 0 / 25%);
+  --shadow-lift: 0 2px 4px oklch(0 0 0 / 35%), 0 16px 48px oklch(0 0 0 / 40%);
+  --shadow-slide: 0 4px 24px oklch(0 0 0 / 45%), 0 0 0 1px oklch(1 0 0 / 6%);
+
+  /* Agent identity tokens are used directly; no waiting-color aliases needed. */
   --background: oklch(0.11 0.005 260);
   --background-raised: oklch(0.14 0.005 260);
   --background-hover: oklch(0.16 0.005 260);
@@ -60,6 +97,10 @@
   --foreground: oklch(0.95 0 0);
   --foreground-secondary: oklch(0.75 0 0);
   --foreground-muted: oklch(0.65 0 0);
+  --brand: oklch(0.95 0 0);
+  --brand-soft: oklch(1 0 0 / 8%);
+  --glow: radial-gradient(ellipse at 30% -10%, oklch(1 0 0 / 2.5%) 0%, transparent 55%);
+  --noise-opacity: 0.025;
   --card: oklch(0.14 0.005 260);
   --card-foreground: oklch(0.95 0 0);
   --popover: oklch(0.14 0.005 260);
@@ -76,7 +117,64 @@
   --border: oklch(1 0 0 / 6%);
   --border-hover: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 8%);
-  --ring: oklch(0.75 0.14 185 / 40%);
+  --ring: oklch(0.65 0 0 / 40%);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --agent-layout: oklch(0.48 0.19 262);
+  --agent-content: oklch(0.47 0.14 170);
+  --agent-visual: oklch(0.48 0.21 300);
+  --agent-data: oklch(0.48 0.14 70);
+  --agent-decorator: oklch(0.48 0.20 330);
+  --agent-neutral: oklch(0.45 0 0);
+  --entry-action-spectrum: conic-gradient(
+    from var(--team-angle, 0deg),
+    oklch(0.60 0.22 262) 0deg,
+    oklch(0.64 0.17 165) 36deg,
+    oklch(0.70 0.17 70) 72deg,
+    oklch(0.62 0.22 340) 108deg,
+    oklch(0.60 0.23 300) 144deg,
+    oklch(0.60 0.22 262) 180deg,
+    oklch(0.64 0.17 165) 216deg,
+    oklch(0.70 0.17 70) 252deg,
+    oklch(0.62 0.22 340) 288deg,
+    oklch(0.60 0.23 300) 324deg,
+    oklch(0.60 0.22 262) 360deg
+  );
+  --surface-subtle: oklch(0.2 0.01 260 / 3%);
+  --surface-stage: oklch(0.93 0.008 85);
+  --shadow-card: 0 1px 2px oklch(0.2 0.02 260 / 8%), 0 8px 24px oklch(0.2 0.02 260 / 8%);
+  --shadow-lift: 0 2px 4px oklch(0.2 0.02 260 / 10%), 0 16px 48px oklch(0.2 0.02 260 / 14%);
+  --shadow-slide: 0 6px 28px oklch(0.2 0.02 260 / 18%), 0 0 0 1px oklch(0.2 0.02 260 / 6%);
+  --background: oklch(0.975 0.004 85);
+  --background-raised: oklch(0.995 0.002 85);
+  --background-hover: oklch(0.955 0.005 85);
+  --background-panel: oklch(0.945 0.006 85);
+  --foreground: oklch(0.22 0.01 260);
+  --foreground-secondary: oklch(0.42 0.008 260);
+  --foreground-muted: oklch(0.55 0.006 260);
+  --brand: oklch(0.22 0.01 260);
+  --brand-soft: oklch(0.2 0.01 260 / 7%);
+  --glow: radial-gradient(ellipse at 30% -10%, oklch(0.2 0.02 260 / 2%) 0%, transparent 55%);
+  --noise-opacity: 0.018;
+  --card: oklch(0.995 0.002 85);
+  --card-foreground: oklch(0.22 0.01 260);
+  --popover: oklch(0.995 0.002 85);
+  --popover-foreground: oklch(0.22 0.01 260);
+  --primary: oklch(0.22 0.01 260);
+  --primary-foreground: oklch(0.995 0.002 85);
+  --secondary: oklch(0.92 0.006 85);
+  --secondary-foreground: oklch(0.28 0.01 260);
+  --muted: oklch(0.94 0.006 85);
+  --muted-foreground: oklch(0.48 0.008 260);
+  --accent: oklch(0.92 0.006 85);
+  --accent-foreground: oklch(0.22 0.01 260);
+  --destructive: oklch(0.55 0.2 25);
+  --border: oklch(0.2 0.01 260 / 9%);
+  --border-hover: oklch(0.2 0.01 260 / 18%);
+  --input: oklch(0.2 0.01 260 / 12%);
+  --ring: oklch(0.22 0.01 260 / 40%);
 }
 
 @layer base {
@@ -86,14 +184,40 @@
   body {
     @apply bg-background text-foreground;
   }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    letter-spacing: var(--display-tracking);
+  }
+}
+
+.document-surface h1,
+.document-surface h2,
+.document-surface h3,
+.document-surface .document-title {
+  font-family: var(--font-document);
+  font-weight: var(--document-display-weight);
+  letter-spacing: var(--document-display-tracking);
+}
+
+/* 11px absolute floor remains intact when the user selects 90% text scale. */
+.text-xs { font-size: max(11px, 0.75rem); }
+
+/* MUST NOT stays readable: an outline plus split rule, never text strike-through. */
+.requirement-must-not::before,
+.requirement-must-not::after {
+  content: "";
+  width: 0.3rem;
+  height: 1px;
+  flex: none;
+  background: currentColor;
+  opacity: 0.55;
 }
 
 /* ── Noise texture overlay ── */
 body {
   position: relative;
 }
-
-/* ── Ambient teal glow ── */
 
 /* Safe area utilities */
 .safe-top { padding-top: env(safe-area-inset-top); }
@@ -106,11 +230,9 @@ body {
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Slide shadow — makes previews pop against dark bg */
+/* Slide shadow keeps white previews distinct in both studio themes. */
 .slide-shadow {
-  box-shadow:
-    0 4px 24px oklch(0 0 0 / 40%),
-    0 0 0 1px oklch(1 0 0 / 5%);
+  box-shadow: var(--shadow-slide);
 }
 
 /* ── Spec waiting states ── */
@@ -132,7 +254,7 @@ body {
 }
 .brief-waiting { animation: brief-page-in 0.6s ease-out both; }
 .brief-waiting:hover .brief-cursor-glow {
-  box-shadow: 0 0 20px var(--wait-teal), 0 0 40px var(--wait-teal-dim);
+  box-shadow: 0 0 20px var(--agent-layout), 0 0 40px color-mix(in oklch, var(--agent-layout) 30%, transparent);
 }
 .brief-waiting:hover .brief-line-el { animation-duration: 2s; }
 
@@ -225,23 +347,6 @@ body {
   animation-delay: var(--delay, 0ms);
 }
 
-/* ── Card hover glow (teal edge) ── */
-.card-glow {
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(160deg, transparent 30%, oklch(0.75 0.14 185 / 25%) 100%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  pointer-events: none;
-}
-.group:hover .card-glow { opacity: 1; }
-
 /* ── Chat panel transition ── */
 /* Mobile: fixed overlay with slide-in */
 @media (max-width: 639px) {
@@ -293,17 +398,17 @@ body {
   transition: background 0.2s ease, height 0.2s ease;
 }
 .chat-resize-handle:hover::after {
-  background: oklch(0.75 0.14 185 / 40%);
+  background: var(--border-hover);
   height: 64px;
 }
 .chat-resize-handle:active::after {
-  background: oklch(0.75 0.14 185 / 60%);
+  background: var(--foreground-muted);
 }
 
 /* ── Chat toggle pulse (first-visit only) ── */
 @keyframes chat-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 oklch(0.75 0.14 185 / 30%); }
-  50% { box-shadow: 0 0 0 6px oklch(0.75 0.14 185 / 0%); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--border-hover); }
+  50% { box-shadow: 0 0 0 6px transparent; }
 }
 .chat-toggle-pulse {
   animation: chat-pulse 3s ease-in-out infinite;
@@ -335,7 +440,7 @@ body {
 .header-glass {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  background: oklch(0.11 0.005 260 / 80%);
+  background: color-mix(in oklch, var(--background) 80%, transparent);
 }
 
 /* ── Search glow on focus ── */
@@ -343,8 +448,8 @@ body {
   transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
 .search-glow:focus-within {
-  border-color: oklch(0.75 0.14 185 / 25%);
-  box-shadow: 0 0 0 1px oklch(0.75 0.14 185 / 20%), 0 0 24px oklch(0.75 0.14 185 / 6%);
+  border-color: var(--border-hover);
+  box-shadow: 0 0 0 1px var(--border-hover), 0 0 24px color-mix(in oklch, var(--foreground) 4%, transparent);
 }
 
 /* ── Tab underline ── */
@@ -358,7 +463,7 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: oklch(0.75 0.14 185);
+  background: var(--foreground);
   transform: scaleX(0);
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   transform-origin: left;
@@ -382,6 +487,54 @@ body {
 }
 .tool-card-enter {
   animation: tool-card-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A continuous work-ledger rail across adjacent tool rows. */
+.ledger-row {
+  position: relative;
+  padding-left: 1.5rem;
+}
+.ledger-row::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: -0.375rem;
+  bottom: -0.375rem;
+  width: 1.5px;
+  border-radius: 1px;
+  background: var(--border-hover);
+  pointer-events: none;
+}
+.ledger-marker {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+/* ── Ledger cursor arrow (active tool marker) ── */
+@keyframes ledger-cursor-arrive {
+  from { opacity: 0; transform: translateX(-4px) scale(0.7); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+.ledger-cursor {
+  animation: ledger-cursor-arrive 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes ledger-cursor-work {
+  0%, 100% { transform: translate(0, 0); }
+  35% { transform: translate(1px, -1px); }
+  70% { transform: translate(-1px, 1px); }
+}
+.ledger-cursor-active {
+  animation:
+    ledger-cursor-arrive 0.25s cubic-bezier(0.22, 1, 0.36, 1) both,
+    ledger-cursor-work 1.65s ease-in-out 0.25s infinite;
 }
 
 /* ── Tool check mark entrance (spring overshoot) ── */
@@ -431,7 +584,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, oklch(0.75 0.14 185 / 8%), transparent);
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 6%), transparent);
   animation: slide-shimmer 1.8s ease-in-out infinite;
 }
 
@@ -451,7 +604,7 @@ body {
 
 /* ── Slide update glow highlight ── */
 @keyframes slide-update-glow {
-  0%   { box-shadow: 0 0 0 1px oklch(0.75 0.14 185 / 60%), 0 0 16px oklch(0.75 0.14 185 / 25%); }
+  0%   { box-shadow: 0 0 0 1px color-mix(in oklch, var(--agent-layout) 60%, transparent), 0 0 16px color-mix(in oklch, var(--agent-layout) 25%, transparent); }
   100% { box-shadow: 0 0 0 1px transparent, 0 0 0 transparent; }
 }
 .slide-updated {
@@ -462,6 +615,9 @@ body {
 @keyframes compose-card-enter {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.compose-agent-enter {
+  animation: compose-card-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) var(--compose-delay, 0ms) both;
 }
 
 /* ── Thinking dots: . / .. / ... / . cycle ── */
@@ -476,11 +632,88 @@ body {
   animation: thinking-dots 1.2s steps(1) infinite;
 }
 
+/* ── Team action button — conic gradient border rotation ── */
+/* @property enables smooth angle interpolation in supporting browsers.
+   Non-supporting browsers get a static gradient border (graceful fallback). */
+@property --team-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes team-rotate {
+  to { --team-angle: 360deg; }
+}
+.team-action-btn {
+  position: relative;
+  color: var(--foreground);
+  background: var(--card);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  box-shadow: 0 0 12px -4px color-mix(in oklch, var(--agent-layout) 25%, transparent);
+}
+.team-action-btn::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--team-angle, 0deg),
+    var(--agent-layout),
+    var(--agent-content),
+    var(--agent-visual),
+    var(--agent-data),
+    var(--agent-decorator),
+    var(--agent-layout)
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: team-rotate 3.5s linear infinite;
+  pointer-events: none;
+}
+.team-action-btn:hover::before {
+  animation-duration: 1.8s;
+}
+/* New Deck is an entry point, not active orchestration: keep the spectrum quiet. */
+.team-entry-btn {
+  border-width: 1px;
+  box-shadow: none;
+}
+.team-entry-btn::before {
+  inset: -1px;
+  padding: 1px;
+  background: var(--entry-action-spectrum);
+  animation-duration: 7s;
+}
+.team-entry-btn:hover::before {
+  animation-duration: 4s;
+}
+[data-theme="light"] .team-entry-btn::before {
+  inset: -2px;
+  padding: 2px;
+}
+.team-action-btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.team-action-btn:disabled::before {
+  opacity: 0.3;
+  animation: none;
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
+  .team-action-btn::before { animation: none; }
+  .animate-card-in,
+  .content-enter,
+  .compose-agent-enter { animation: none !important; opacity: 1; transform: none; }
   .tool-card-enter,
   .tool-check-enter,
-  .tool-ring-enter { animation: none; }
+  .tool-ring-enter,
+  .ledger-cursor,
+  .ledger-cursor-active { animation: none; }
   @keyframes tool-spinner { to { transform: rotate(360deg); } }
   @keyframes tool-active-shimmer { 0%, 100% { opacity: 0.8; } }
   @keyframes tool-pulse { 0%, 100% { opacity: 0.6; } }
@@ -506,58 +739,58 @@ body {
   .chat-toggle-pulse { animation: none; }
 }
 
-/* ── Chat prose overrides (dark editorial) ── */
+/* ── Theme-aware prose overrides ── */
 .prose.prose-invert {
-  font-size: 0.875rem; /* 14px base for chat readability */
-  --tw-prose-body: oklch(0.85 0 0);
-  --tw-prose-headings: oklch(0.95 0 0);
-  --tw-prose-links: oklch(0.75 0.14 185);
-  --tw-prose-bold: oklch(0.92 0 0);
-  --tw-prose-code: oklch(0.82 0.08 185);
-  --tw-prose-pre-bg: oklch(0.10 0.005 260);
-  --tw-prose-pre-code: oklch(0.80 0 0);
-  --tw-prose-th-borders: oklch(1 0 0 / 10%);
-  --tw-prose-td-borders: oklch(1 0 0 / 6%);
+  font-size: 0.875rem;
+  --tw-prose-body: var(--foreground-secondary);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-links: var(--foreground-secondary);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-code: var(--agent-content);
+  --tw-prose-pre-bg: var(--background-panel);
+  --tw-prose-pre-code: var(--foreground-secondary);
+  --tw-prose-th-borders: var(--border-hover);
+  --tw-prose-td-borders: var(--border);
 }
 .prose.prose-invert table {
   font-size: 12px;
   border-collapse: collapse;
 }
 .prose.prose-invert th {
-  background: oklch(1 0 0 / 4%);
+  background: var(--surface-subtle);
   font-weight: 600;
   text-align: left;
   padding: 6px 10px;
-  border-bottom: 1px solid oklch(1 0 0 / 10%);
+  border-bottom: 1px solid var(--border-hover);
 }
 .prose.prose-invert td {
   padding: 5px 10px;
-  border-bottom: 1px solid oklch(1 0 0 / 5%);
+  border-bottom: 1px solid var(--border);
 }
 .prose.prose-invert tr:hover td {
-  background: oklch(1 0 0 / 2%);
+  background: var(--surface-subtle);
 }
 .prose.prose-invert code:not(pre code) {
-  background: oklch(1 0 0 / 6%);
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 0.85em;
 }
 .prose.prose-invert pre {
-  border: 1px solid oklch(1 0 0 / 6%);
+  border: 1px solid var(--border);
   border-radius: 8px;
 }
 .prose.prose-invert a {
   text-decoration: none;
-  border-bottom: 1px solid oklch(0.75 0.14 185 / 30%);
+  border-bottom: 1px solid var(--border-hover);
   transition: border-color 0.2s;
 }
 .prose.prose-invert a:hover {
-  border-bottom-color: oklch(0.75 0.14 185);
+  border-bottom-color: var(--foreground-secondary);
 }
 .prose.prose-invert blockquote {
-  border-left-color: oklch(0.75 0.14 185 / 30%);
-  color: oklch(0.70 0 0);
+  border-left-color: var(--border-hover);
+  color: var(--foreground-muted);
 }
 
 /* ── Spec prose refinements (editorial markdown preview) ── */
@@ -570,7 +803,7 @@ body {
   letter-spacing: -0.01em;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid oklch(1 0 0 / 6%);
+  border-bottom: 1px solid var(--border);
 }
 .spec-prose h2 {
   font-size: 1.125rem; /* 18px — up from 17.6px */
@@ -579,14 +812,19 @@ body {
 }
 .spec-prose h3 {
   font-size: 0.9375rem; /* 15px */
-  color: oklch(0.75 0.14 185);
+  color: var(--foreground-secondary);
 }
 .spec-prose li::marker {
-  color: oklch(0.75 0.14 185 / 60%);
+  color: var(--foreground-muted);
 }
 .spec-prose hr {
-  border-color: oklch(1 0 0 / 6%);
+  border-color: var(--border);
   margin: 2rem 0;
+}
+
+/* ── Brief document — materials table enhancement ── */
+.brief-materials-table td:first-child {
+  font-weight: 500;
 }
 
 /* ── Outline timeline ── */
@@ -612,8 +850,8 @@ body {
 
 /* Active node pulse ring */
 @keyframes outline-node-pulse {
-  0%, 100% { box-shadow: 0 0 0 4px oklch(0.75 0.14 185 / 10%); }
-  50%      { box-shadow: 0 0 0 6px oklch(0.75 0.14 185 / 18%); }
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in oklch, var(--foreground) 10%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in oklch, var(--foreground) 18%, transparent); }
 }
 .outline-node-pulse {
   animation: outline-node-pulse 2.5s ease-in-out infinite;
@@ -643,7 +881,7 @@ body {
 .streaming-cursor::after {
   content: "▍";
   animation: cursor-blink 1s step-end infinite;
-  color: oklch(0.75 0.14 185);
+  color: var(--foreground-secondary);
   font-weight: 300;
   margin-left: 1px;
 }

@@ -1,13 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * ModeSelector — Kiro-inspired Vibe/Spec mode selection cards.
+ * ModeSelector — Editorial Vibe/Spec working-style selector.
  * Shown on the initial chat screen before any messages are sent.
  */
 
 "use client"
 
-import { MessageCircle, ClipboardList, Link, FileText, Mic, Target, LayoutTemplate, Sparkles } from "lucide-react"
+import { useId } from "react"
+import { Check } from "lucide-react"
 import { useTranslations } from "next-intl"
 
 interface ModeSelectorProps {
@@ -15,78 +16,86 @@ interface ModeSelectorProps {
   onChange: (mode: "spec" | "vibe") => void
 }
 
-// Labels ("Vibe"/"Spec") are product names, not translated; descriptions resolve via modeSelector.*
+// Labels ("Vibe"/"Spec") are product names; supporting copy is localized.
 const modes = [
   {
     key: "vibe" as const,
     label: "Vibe",
-    icon: MessageCircle,
-    greatFor: [
-      { icon: Link, textKey: "vibeFor1" },
-      { icon: FileText, textKey: "vibeFor2" },
-      { icon: Mic, textKey: "vibeFor3" },
-    ] as const,
-    accentSide: "left" as const,
+    pathKey: "vibePath",
+    summaryKey: "vibeSummary",
   },
   {
     key: "spec" as const,
     label: "Spec",
-    icon: ClipboardList,
-    greatFor: [
-      { icon: Target, textKey: "specFor1" },
-      { icon: LayoutTemplate, textKey: "specFor2" },
-      { icon: Sparkles, textKey: "specFor3" },
-    ] as const,
-    accentSide: "right" as const,
+    pathKey: "specPath",
+    summaryKey: "specSummary",
   },
 ] as const
 
 export function ModeSelector({ value, onChange }: ModeSelectorProps) {
   const t = useTranslations("modeSelector")
-  const selected = modes.find((m) => m.key === value)!
+  const labelId = useId()
 
   return (
-    <div className="w-full max-w-[340px] space-y-5">
-      <div className="flex gap-3">
-        {modes.map((m) => {
-          const active = value === m.key
+    <div className="w-full max-w-[340px]">
+      <p
+        id={labelId}
+        className="mb-3 text-xs font-medium uppercase tracking-[0.08em] text-foreground-muted"
+      >
+        {t("chooseWorkingStyle")}
+      </p>
+      <div
+        role="group"
+        aria-labelledby={labelId}
+        className="overflow-hidden rounded-xl border border-border"
+      >
+        {modes.map((mode, index) => {
+          const active = value === mode.key
           return (
             <button
-              key={m.key}
-              onClick={() => onChange(m.key)}
-              className={`flex-1 text-left rounded-xl p-3.5 transition-all cursor-pointer ${
+              key={mode.key}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(mode.key)}
+              className={`relative grid min-h-[82px] w-full grid-cols-[92px_minmax(0,1fr)_44px] items-center gap-3 px-3.5 py-3 text-left transition-colors ${
+                index > 0 ? "border-t border-border" : ""
+              } ${
                 active
-                  ? "bg-brand-teal-soft border border-brand-teal/40 shadow-[0_0_12px_oklch(0.75_0.14_185_/_8%)]"
-                  : "bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.05]"
+                  ? "bg-foreground/[0.06]"
+                  : "bg-transparent hover:bg-foreground/[0.035]"
               }`}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <m.icon className={`h-4 w-4 ${active ? "text-brand-teal" : "text-foreground-muted"}`} />
-                <span className={`text-sm font-semibold ${active ? "text-brand-teal" : "text-foreground-muted"}`}>
-                  {m.label}
+              {active && (
+                <span
+                  className="absolute inset-y-0 left-0 w-[3px] bg-foreground"
+                  aria-hidden="true"
+                />
+              )}
+              <span className="flex flex-col items-start gap-1">
+                <span className="text-lg font-semibold leading-none tracking-[-0.025em] text-foreground">
+                  {mode.label}
                 </span>
-              </div>
-              <p className={`text-xs leading-relaxed ${active ? "text-foreground-secondary" : "text-foreground-muted"}`}>
-                {t(`${m.key}Description`)}
-              </p>
+                <span className="text-xs font-medium uppercase tracking-[0.08em] text-foreground-muted">
+                  {t(mode.pathKey)}
+                </span>
+              </span>
+              <span className="text-sm leading-snug text-foreground-secondary">
+                {t(mode.summaryKey)}
+              </span>
+              <span className="touch-target flex items-center justify-end" aria-hidden="true">
+                <span
+                  className={`grid h-5 w-5 place-items-center rounded-full border ${
+                    active
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border-hover text-transparent"
+                  }`}
+                >
+                  <Check className="h-3 w-3" />
+                </span>
+              </span>
             </button>
           )
         })}
-      </div>
-
-      {/* Great for — accent line on left for Vibe, right for Spec */}
-      <div className={`py-1 space-y-2 pl-4 ${
-        selected.accentSide === "left"
-          ? "border-l-2 border-brand-teal/40"
-          : "border-r-2 border-brand-teal/40"
-      }`}>
-        <p className="text-xs font-medium text-foreground-muted tracking-wide uppercase mb-2">{t("greatFor")}</p>
-        {selected.greatFor.map((item, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <item.icon className="h-3 w-3 text-brand-teal flex-none" />
-            <span className="text-xs text-foreground-secondary">{t(item.textKey)}</span>
-          </div>
-        ))}
       </div>
     </div>
   )

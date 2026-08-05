@@ -116,18 +116,15 @@ def _lint_common(si: int, ei: int, elem: dict) -> list[dict]:
         results.append(_diag(si, ei, "invalid-verticalAlign",
                              f"verticalAlign '{va}' is not valid. Allowed: {sorted(_VALIGN_VALUES)}"))
     # out-of-bounds (bbox elements)
+    # Width is a D1 constant (always 1920 px). Height is template-dependent
+    # and validated at generate time with the real slide dimensions instead.
     etype = elem.get("type", "")
     if etype in ("shape", "textbox", "image", "chart", "table", "video", "freeform"):
         x = elem.get("x", 0)
-        y = elem.get("y", 0)
         w = elem.get("width", 0)
-        h = elem.get("height", 0)
         if isinstance(x, (int, float)) and isinstance(w, (int, float)) and x + w > 1920:
             results.append(_diag(si, ei, "out-of-bounds",
                                  f"x({x}) + width({w}) = {x+w} exceeds slide width 1920."))
-        if isinstance(y, (int, float)) and isinstance(h, (int, float)) and y + h > 1080:
-            results.append(_diag(si, ei, "out-of-bounds",
-                                 f"y({y}) + height({h}) = {y+h} exceeds slide height 1080."))
     return results
 
 

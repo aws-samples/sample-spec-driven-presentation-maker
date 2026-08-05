@@ -1,231 +1,174 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * AgentCard — One composer agent inside ComposeCard.
+ * One observable composer lane inside ComposeCard.
  *
- * Two always-visible rows (identity / current activity) plus an inline
- * accordion with the instruction and full activity timeline.
+ * Lane numbers are neutral. Tool icon/color communicates the latest action;
+ * status is communicated by shape and copy. Expanded history contains only
+ * events received from the stream, plus one compact previous-attempt error.
  */
 
 "use client"
 
-import { useState } from "react"
+import { AlertCircle, Check, ChevronRight, RefreshCw, Sparkles } from "lucide-react"
 import { useTranslations } from "next-intl"
-import { ChevronRight, Check, AlertCircle, RefreshCw, Sparkles } from "lucide-react"
 import type { AgentState } from "./parseComposeState"
-import { CAT } from "../toolPalette"
 import { STATE, C, MONO, getToolMeta } from "./composeTokens"
+import { CAT } from "../toolPalette"
 
 interface AgentCardProps {
   agent: AgentState
   existingSlugs: Set<string>
   indexDelay: number
-  parentActive: boolean
   parentStopped: boolean
   parentStopping: boolean
+  expanded: boolean
+  onToggle: () => void
 }
 
-export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, parentStopped, parentStopping }: AgentCardProps) {
+export function AgentCard({
+  agent,
+  existingSlugs,
+  indexDelay,
+  parentStopped,
+  parentStopping,
+  expanded,
+  onToggle,
+}: AgentCardProps) {
   const t = useTranslations("compose")
-  const [userToggled, setUserToggled] = useState<boolean | null>(null)
-  // Default expansion: expand only when the parent compose is finished AND this
-  // agent ended in error. Mid-run transient errors (the agent recovers and keeps
-  // working) should not auto-open the detail panel.
-  const expanded = userToggled ?? (!parentActive && agent.status === "error")
-
-  // Stopped: parent card determined this compose was stopped and this agent
-  // never reached a terminal state. Treat as done-but-incomplete; suppress spinners.
   const isStopped = parentStopped && agent.status !== "done" && agent.status !== "error"
-  // Stopping-in-flight: parent asked us to stop but this agent is still working.
-  // Indicates "cancellation in progress" — amber accent instead of violet.
   const isStoppingInFlight = parentStopping && agent.status !== "done" && agent.status !== "error"
   const isWorking = agent.status === "working" && !isStopped
   const isRetrying = agent.status === "retrying" && !isStopped
-  const isDone = agent.status === "done"
   const isError = agent.status === "error"
-  const isStarting = agent.status === "starting" && !isStopped
-
-  const latestActivity = agent.activity.length
-    ? agent.activity[agent.activity.length - 1]
-    : null
-
-  const detailId = `compose-agent-${agent.groupIndex}-detail`
-
-  // State dot/icon
-  const markerColor = isError
+  const latestActivity = agent.activity.at(-1) ?? null
+  const latestColor = isError
     ? STATE.error
-    : isStoppingInFlight
-    ? STATE.retry
-    : isRetrying
-    ? STATE.retry
-    : STATE.working
+    : isRetrying || isStoppingInFlight
+      ? STATE.retry
+      : latestActivity
+        ? CAT[latestActivity.category].accent
+        : C.fgDim
+  const detailId = `compose-agent-${agent.groupIndex}-detail`
+  const createdCount = agent.slugs.filter((slug) => existingSlugs.has(slug)).length
 
   return (
     <div
-      className="relative rounded-lg"
+      className="compose-agent-enter rounded-lg transition-colors duration-200"
       style={{
-        background: "oklch(0.14 0.005 280 / 50%)",
-        boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 5%)",
-        animation: `compose-card-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) ${indexDelay * 80}ms both`,
-      }}
+        "--compose-delay": `${indexDelay * 55}ms`,
+        background: expanded ? `color-mix(in oklch, ${latestColor} 5%, transparent)` : "transparent",
+        boxShadow: expanded ? `inset 2px 0 0 ${latestColor}` : "none",
+      } as React.CSSProperties}
     >
-      {/* Row 1 */}
-      <div className="flex items-center gap-2.5 px-3 py-2">
-        {/* State marker */}
-        {isDone ? (
-          <Check
-            aria-hidden="true"
-            className="flex-none h-3 w-3"
-            style={{ color: STATE.working }}
-          />
-        ) : isWorking || isRetrying ? (
-          <svg
-            aria-hidden="true"
-            className="flex-none h-3 w-3"
-            viewBox="0 0 14 14"
-          >
-            <circle
-              cx="7" cy="7" r="5.5"
-              fill="none"
-              stroke={markerColor}
-              strokeWidth="1.5"
-              strokeDasharray="10 28"
-              strokeLinecap="round"
-              style={{ animation: "tool-spinner 1.1s linear infinite" }}
-            />
-          </svg>
-        ) : (
-          <span
-            aria-hidden="true"
-            className="relative flex-none w-2 h-2 rounded-full"
-            style={{
-              background: markerColor,
-              opacity: isStarting ? 0.5 : 1,
-            }}
-          />
-        )}
-
-        {/* Slugs */}
-        <span className="flex-1 min-w-0 text-sm font-medium tracking-[-0.015em] truncate">
-          {agent.slugs.map((slug, i) => (
-            <span key={slug}>
-              <span style={{ color: existingSlugs.has(slug) ? C.existing : C.fgStrong }}>
-                {slug}
-              </span>
-              {i < agent.slugs.length - 1 && <span style={{ color: C.fgMuted }}>, </span>}
-            </span>
-          ))}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        aria-controls={detailId}
+        aria-label={expanded ? t("collapseDetails") : t("expandDetails")}
+        className="w-full min-h-11 grid grid-cols-[24px_minmax(0,1fr)_minmax(105px,34%)_44px] items-center gap-2 px-1 rounded-lg text-left hover:bg-foreground/[3%] transition-colors"
+      >
+        <span className="text-[11px] font-medium tabular-nums" style={{ color: C.fgDim, fontFamily: MONO }}>
+          {String(agent.groupIndex).padStart(2, "0")}
         </span>
 
-        {/* Retry badge */}
-        {isRetrying && (
-          <span
-            className="text-[10.5px] tabular-nums flex-none px-1.5 py-0.5 rounded"
-            style={{
-              color: STATE.retry,
-              background: `${STATE.retry}14`,
-              fontFamily: MONO,
-            }}
-          >
-            {t("retryBadge", { count: agent.retryAttempt })}
-          </span>
-        )}
+        <span className="min-w-0 truncate text-[11px]">
+          {agent.slugs.map((slug, index) => {
+            const created = existingSlugs.has(slug)
+            return (
+              <span key={slug} className="whitespace-nowrap">
+                <span className={created ? "text-foreground font-semibold" : "text-foreground-muted"}>
+                  {slug}
+                  {created && (
+                    <span
+                      className="ml-1 inline-flex h-3 w-3 items-center justify-center rounded-full border border-border-hover align-middle text-foreground-secondary"
+                      aria-label={t("slideCreated")}
+                    >
+                      <Check className="h-2 w-2" aria-hidden="true" />
+                    </span>
+                  )}
+                </span>
+                {index < agent.slugs.length - 1 && <span className="mx-1 text-foreground-muted">·</span>}
+              </span>
+            )
+          })}
+        </span>
 
-        {/* Budget nudge badge — this composer hit the time budget and was asked to wrap up */}
-        {agent.budgetReached && (
-          <span
-            role="status"
-            aria-live="polite"
-            className="text-[10.5px] flex-none px-1.5 py-0.5 rounded animate-in fade-in slide-in-from-right-1 duration-300"
-            style={{
-              color: STATE.retry,
-              background: `${STATE.retry}14`,
-              fontFamily: MONO,
-            }}
-            title={t("rushedAgentTitle")}
-          >
-            {t("rushedAgent")}
-          </span>
-        )}
+        <span className="min-w-0">
+          <LatestActivityInline
+            agent={agent}
+            latestActivity={latestActivity}
+            isStopped={isStopped}
+            isStoppingInFlight={isStoppingInFlight}
+            createdCount={createdCount}
+          />
+        </span>
 
-        {/* Chevron toggle */}
-        <button
-          type="button"
-          onClick={() => setUserToggled(!expanded)}
-          aria-expanded={expanded}
-          aria-controls={detailId}
-          aria-label={expanded ? t("collapseDetails") : t("expandDetails")}
-          className="flex-none w-5 h-5 flex items-center justify-center rounded hover:bg-white/5 transition-colors"
-        >
+        <span className="touch-target flex items-center justify-center rounded-md" aria-hidden="true">
           <ChevronRight
             className="h-3 w-3 transition-transform duration-200"
-            style={{
-              color: C.fgDim,
-              transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
-            }}
+            style={{ color: expanded ? latestColor : C.fgDim, transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
           />
-        </button>
-      </div>
+        </span>
+      </button>
 
-      {/* Row 2: latest activity (or error/retry message) */}
-      {!isStarting && (
-        <LatestActivityRow
-          agent={agent}
-          latestActivity={latestActivity}
-          isStopped={isStopped}
-          isStoppingInFlight={isStoppingInFlight}
-        />
-      )}
-
-      {/* Expanded detail */}
       <div
         id={detailId}
         role="region"
         aria-label={t("agentDetails")}
         className="overflow-hidden transition-all ease-out"
-        style={{
-          maxHeight: expanded ? "1200px" : "0",
-          opacity: expanded ? 1 : 0,
-          transitionDuration: "220ms",
-        }}
+        style={{ maxHeight: expanded ? "1400px" : "0", opacity: expanded ? 1 : 0, transitionDuration: "220ms" }}
       >
-        <div
-          className="mx-3 mb-3 mt-1 p-3 rounded-lg flex flex-col gap-3"
-          style={{ background: C.detailZone }}
-        >
-          {agent.instruction && (
-            <Section label={t("instruction")}>
-              <div
-                className="text-xs leading-relaxed whitespace-pre-wrap break-words"
-                style={{ color: C.fgLabel }}
-              >
-                {agent.instruction}
+        <div className="mx-7 mb-3 ml-9 rounded-lg border border-border bg-background/35 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-foreground">{t("activityHistory")}</span>
+            <span className="text-[11px] uppercase text-foreground-muted" style={{ fontFamily: MONO }}>
+              {agent.retryAttempt > 0 ? t("retryAttempt", { count: agent.retryAttempt }) : t("activitySteps", { count: agent.activity.length })}
+            </span>
+          </div>
+
+          {agent.previousAttemptError && (
+            <div className="mb-3 flex items-start gap-2 rounded-r-md border-l-2 border-state-error bg-state-error/[6%] px-2.5 py-2">
+              <AlertCircle className="mt-0.5 h-3 w-3 flex-none text-state-error" aria-hidden="true" />
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold text-state-error">{t("previousAttemptFailed")}</div>
+                <div className="mt-0.5 break-words text-[11px] leading-relaxed text-foreground-muted">{agent.previousAttemptError}</div>
               </div>
-            </Section>
+            </div>
           )}
 
-          {agent.activity.length > 0 && (
-            <Section
-              label={t("activitySteps", { count: agent.activity.length })}
-            >
-              <ActivityTimeline
-                activity={agent.activity}
-                showThinking={
-                  !isStopped &&
-                  (isWorking || isRetrying) &&
-                  agent.activity[agent.activity.length - 1]?.status !== "active"
-                }
-              />
-            </Section>
+          <div className="mb-2 flex items-center justify-between gap-2 text-[11px]" style={{ fontFamily: MONO }}>
+            <span className="text-foreground-secondary">
+              {agent.retryAttempt > 0 ? t("currentRetryAttempt", { count: agent.retryAttempt }) : t("currentAttempt")}
+            </span>
+            <span className="text-foreground-muted">{statusLabel(agent, isStopped, isStoppingInFlight, t)}</span>
+          </div>
+
+          {agent.instruction && (
+            <div className="mb-3 border-l-2 border-foreground/25 pl-3">
+              <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-foreground-muted">{t("instruction")}</div>
+              <div className="whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground-secondary">{agent.instruction}</div>
+            </div>
+          )}
+
+          {agent.activity.length > 0 ? (
+            <ActivityTimeline
+              activity={agent.activity}
+              showThinking={!isStopped && (isWorking || isRetrying) && agent.activity.at(-1)?.status !== "active"}
+            />
+          ) : (
+            <div className="text-[11px] text-foreground-muted">{t("noActivity")}</div>
           )}
 
           {isError && agent.errorMsg && (
-            <div
-              className="text-[11.5px] p-2.5 rounded-md leading-relaxed"
-              style={{ background: `${STATE.error}14`, color: STATE.error }}
-            >
+            <div className="mt-2 rounded-md bg-state-error/[8%] p-2.5 text-[11px] leading-relaxed text-state-error">
               {agent.errorMsg}
             </div>
+          )}
+
+          {agent.budgetReached && (
+            <div className="mt-2 text-[11px] text-agent-data" title={t("rushedAgentTitle")}>{t("rushedAgent")}</div>
           )}
         </div>
       </div>
@@ -233,199 +176,111 @@ export function AgentCard({ agent, existingSlugs, indexDelay, parentActive, pare
   )
 }
 
-// --- Row 2: Latest activity / state message --------------------------------
+function statusLabel(
+  agent: AgentState,
+  isStopped: boolean,
+  isStopping: boolean,
+  t: ReturnType<typeof useTranslations<"compose">>,
+): string {
+  if (isStopping) return t("stoppingBare")
+  if (isStopped) return t("stopped")
+  if (agent.status === "error") return t("agentFailed")
+  if (agent.status === "retrying") return t("retrying", { count: agent.retryAttempt })
+  if (agent.status === "done") return t("completed")
+  if (agent.status === "starting") return t("queued")
+  return t("working")
+}
 
-function LatestActivityRow({
+function LatestActivityInline({
   agent,
   latestActivity,
   isStopped,
   isStoppingInFlight,
+  createdCount,
 }: {
   agent: AgentState
   latestActivity: AgentState["activity"][number] | null
   isStopped: boolean
   isStoppingInFlight: boolean
+  createdCount: number
 }) {
   const t = useTranslations("compose")
-  // Stopped by user: show static "Stopped" label, no spinner
-  if (isStopped) {
-    return (
-      <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
-        <span className="flex-none w-2 h-2 rounded-full" style={{ background: C.fgMuted }} />
-        <span className="text-[11.5px] truncate tracking-[-0.005em]" style={{ color: C.fgMuted }}>
-          {t("stopped")}
-        </span>
-      </div>
-    )
-  }
 
-  // Stopping-in-flight: parent requested cancel but this agent hasn't wrapped
-  // up yet. Show amber "Stopping…" so the user sees cancellation is propagating.
-  if (isStoppingInFlight) {
-    return (
-      <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
-        <RefreshCw
-          className="flex-none h-3 w-3"
-          style={{ color: STATE.retry, animation: "tool-spinner 1.2s linear infinite" }}
-        />
-        <span
-          className="text-[11.5px] truncate tracking-[-0.005em]"
-          style={{ color: STATE.retry }}
-        >
-          {t("stoppingBare")}<span className="thinking-dots" aria-hidden="true" />
-        </span>
-      </div>
-    )
-  }
+  if (isStopped) return <StateActivity icon={AlertCircle} label={t("stopped")} color={C.fgMuted} />
+  if (isStoppingInFlight) return <StateActivity icon={RefreshCw} label={t("stoppingBare")} color={STATE.retry} spin />
+  if (agent.status === "error") return <StateActivity icon={AlertCircle} label={agent.errorMsg || t("agentFailed")} color={STATE.error} />
+  if (agent.status === "retrying") return <StateActivity icon={RefreshCw} label={t("retrying", { count: agent.retryAttempt })} color={STATE.retry} spin />
 
-  // Error: show error message truncated, red
-  if (agent.status === "error") {
-    return (
-      <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
-        <AlertCircle className="flex-none h-3 w-3" style={{ color: STATE.error }} />
-        <span
-          className="text-[11.5px] truncate tracking-[-0.005em]"
-          style={{ color: STATE.error }}
-        >
-          {agent.errorMsg || t("agentFailed")}
-        </span>
-      </div>
-    )
-  }
-
-  // Retrying: show retry reason, amber
-  if (agent.status === "retrying") {
-    return (
-      <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
-        <RefreshCw
-          className="flex-none h-3 w-3"
-          style={{ color: STATE.retry, animation: "tool-spinner 1.2s linear infinite" }}
-        />
-        <span
-          className="text-[11.5px] truncate tracking-[-0.005em]"
-          style={{ color: STATE.retry }}
-        >
-          {agent.errorMsg || t("retrying", { count: agent.retryAttempt })}
-        </span>
-      </div>
-    )
-  }
-
-  // Done: show the last activity (no Thinking, no dots)
-  if (agent.status === "done") {
-    if (!latestActivity) return null
-    const catColor = CAT[latestActivity.category].accent
+  if (latestActivity) {
     const meta = getToolMeta(latestActivity.tool)
-    const labelColor = `color-mix(in oklch, ${catColor} 55%, ${C.fgDim})`
+    const color = CAT[latestActivity.category].accent
+    const active = latestActivity.status === "active"
     return (
-      <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
-        <meta.Icon className="flex-none h-3 w-3" style={{ color: catColor }} />
-        <span
-          className="text-[11.5px] truncate tracking-[-0.005em]"
-          style={{ color: labelColor }}
-        >
-          {latestActivity.label}
-        </span>
-      </div>
-    )
-  }
-
-  // No activity yet, or last activity already finished → Thinking
-  const isThinking = !latestActivity || latestActivity.status !== "active"
-  if (isThinking) {
-    return (
-      <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
-        <Sparkles className="flex-none h-3 w-3" style={{ color: C.fgDim }} />
-        <span className="text-[11.5px] truncate tracking-[-0.005em]" style={{ color: C.fgDim }}>
-          {t("thinking")}<span className="thinking-dots" aria-hidden="true" />
-        </span>
-      </div>
-    )
-  }
-
-  const isErrStep = latestActivity.status === "error"
-  const catColor = CAT[latestActivity.category].accent
-  const meta = getToolMeta(latestActivity.tool)
-
-  const iconColor = isErrStep ? STATE.error : catColor
-  const labelColor = isErrStep
-    ? STATE.error
-    : `color-mix(in oklch, ${catColor} 85%, white 15%)`
-
-  return (
-    <div className="pl-[38px] pr-3 pb-2 flex items-center gap-1.5">
-      <meta.Icon
-        className="flex-none h-3 w-3"
-        style={{ color: iconColor }}
-      />
       <span
-        className="text-[11.5px] truncate tracking-[-0.005em]"
-        style={{ color: labelColor }}
+        className="flex min-w-0 items-center justify-end gap-1.5 truncate text-[11px]"
+        style={{ color: active ? `color-mix(in oklch, ${color} 82%, var(--foreground))` : `color-mix(in oklch, ${color} 58%, var(--foreground-secondary))` }}
       >
-        {latestActivity.label}
-        <span className="thinking-dots" aria-hidden="true" />
-        {isErrStep ? "  ✗" : ""}
+        <meta.Icon className="h-3 w-3 flex-none" aria-hidden="true" />
+        <span className="truncate">{latestActivity.label}{active && <span className="thinking-dots" aria-hidden="true" />}</span>
       </span>
-    </div>
-  )
+    )
+  }
+
+  if (agent.status === "done") return <StateActivity icon={Check} label={t("createdCount", { created: createdCount, total: agent.slugs.length })} color={C.fgMuted} />
+  if (agent.status === "starting") return <StateActivity icon={Sparkles} label={t("queued")} color={C.fgDim} />
+  return <StateActivity icon={Sparkles} label={t("thinking")} color={C.fgDim} />
 }
 
-// --- Section (uppercase label + children) ----------------------------------
-
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function StateActivity({ icon: Icon, label, color, spin = false }: { icon: typeof Check; label: string; color: string; spin?: boolean }) {
   return (
-    <div>
-      <div
-        className="text-[9.5px] font-medium uppercase mb-1.5"
-        style={{ color: C.smallLabel, letterSpacing: "0.14em" }}
-      >
-        {label}
-      </div>
-      {children}
-    </div>
+    <span className="flex min-w-0 items-center justify-end gap-1.5 truncate text-[11px]" style={{ color }}>
+      <Icon className="h-3 w-3 flex-none" style={spin ? { animation: "tool-spinner 1.2s linear infinite" } : undefined} aria-hidden="true" />
+      <span className="truncate">{label}</span>
+    </span>
   )
 }
-
-// --- ActivityTimeline ------------------------------------------------------
 
 function ActivityTimeline({ activity, showThinking }: { activity: AgentState["activity"]; showThinking: boolean }) {
   const t = useTranslations("compose")
   return (
-    <ol className="flex flex-col gap-1">
-      {activity.map((a) => {
-        const catColor = CAT[a.category].accent
-        const meta = getToolMeta(a.tool)
-        const isActive = a.status === "active"
-        const isErr = a.status === "error"
-
-        const iconColor = isErr ? STATE.error : catColor
-        const labelColor = isErr
+    <ol className="flex flex-col gap-0.5 border-l border-border-hover pl-3">
+      {activity.map((entry) => {
+        const color = CAT[entry.category].accent
+        const meta = getToolMeta(entry.tool)
+        const active = entry.status === "active"
+        const error = entry.status === "error"
+        const eventColor = error ? STATE.error : color
+        const labelColor = error
           ? STATE.error
-          : `color-mix(in oklch, ${catColor} 75%, white 25%)`
+          : active
+            ? `color-mix(in oklch, ${color} 82%, var(--foreground))`
+            : `color-mix(in oklch, ${color} 58%, var(--foreground-secondary))`
 
         return (
-          <li key={a.toolUseId} className="flex items-center gap-2">
-            <meta.Icon
-              className="flex-none h-3 w-3"
-              style={{ color: iconColor }}
-            />
-            <span
-              className="text-[11.5px] truncate tracking-[-0.005em]"
-              style={{ color: labelColor }}
-            >
-              {a.label}
-              {isActive && <span className="thinking-dots" aria-hidden="true" />}
-              {isErr ? "  ✗" : ""}
+          <li key={entry.toolUseId} className="relative flex min-h-7 items-center gap-2 py-0.5">
+            <span className="absolute left-0 -ml-3 flex -translate-x-1/2 items-center justify-center bg-background" aria-hidden="true">
+              {error ? (
+                <span className="h-1.5 w-1.5 rounded-full bg-state-error" />
+              ) : active ? (
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: color, animation: "tool-pulse 1.5s ease-in-out infinite" }} />
+              ) : (
+                <span className="flex h-3 w-3 items-center justify-center rounded-full border border-border-hover" style={{ color }}>
+                  <Check className="h-2 w-2" />
+                </span>
+              )}
+            </span>
+            <meta.Icon className="h-3 w-3 flex-none" style={{ color: eventColor }} aria-hidden="true" />
+            <span className="truncate text-[11px] tracking-[-0.005em]" style={{ color: labelColor }}>
+              {entry.label}{active && <span className="thinking-dots" aria-hidden="true" />}{error ? "  ✗" : ""}
             </span>
           </li>
         )
       })}
       {showThinking && (
-        <li className="flex items-center gap-2">
-          <Sparkles className="flex-none h-3 w-3" style={{ color: C.fgDim }} />
-          <span className="text-[11.5px] truncate tracking-[-0.005em]" style={{ color: C.fgDim }}>
-            {t("thinking")}<span className="thinking-dots" aria-hidden="true" />
-          </span>
+        <li className="relative flex min-h-7 items-center gap-2 py-0.5">
+          <span className="absolute left-0 -ml-3 h-1 w-1 -translate-x-1/2 rounded-full bg-foreground-muted" style={{ animation: "tool-pulse 1.5s ease-in-out infinite" }} />
+          <Sparkles className="h-3 w-3 flex-none text-foreground-muted" aria-hidden="true" />
+          <span className="truncate text-[11px] text-foreground-muted">{t("thinking")}<span className="thinking-dots" aria-hidden="true" /></span>
         </li>
       )}
     </ol>

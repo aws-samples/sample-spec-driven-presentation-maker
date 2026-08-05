@@ -203,20 +203,24 @@ Note: `notes` omitted for brevity. In actual slides, write them before `elements
 ## Positioning
 
 - Coordinates and sizes are in pixels (px)
-- Sample template: 1920×1080 basis, recommended drawing area x=58–1862, y=173–950
-- Custom templates: use slide size and placeholder positions from `analyze-template`
+- Canvas width is always 1920px. Height depends on the template's aspect ratio
+  (check `deck.json` `slideSize` or `analyze-template` `slide_size`)
+- Recommended drawing area: x=58–1862, y = title bottom + margin to H−130
+  (H = slide height from slideSize; for 16:9 H=1080 → y=173–950)
 - Bottom-most element: aim for `y + height ≥ 80% of slide height`
 
-### Coordinate quick reference
+### Coordinate quick reference (16:9 example, H=1080)
 
-| % | x (horizontal) | y (vertical) |
-|---|----------------|--------------|
+| % | x (horizontal) | y (vertical, 16:9) |
+|---|----------------|---------------------|
 | 5 | 96 | 54 |
 | 10 | 192 | 108 |
 | 25 | 480 | 270 |
 | 50 | 960 | 540 |
 | 75 | 1440 | 810 |
 | 100 | 1920 | 1080 |
+
+For other aspect ratios, y values scale with H (e.g. 4:3 H=1440: 100% y=1440).
 
 **Common sizes**: card width 400–600px, 2-column 900px each, 3-column 600px each, 4-column 450px each. Icon size is relative to context — see design-rules.
 
@@ -298,11 +302,12 @@ Height includes the language label (22px). Code body height is `height - 22`.
 | 28pt | 70px | 140px | 210px | Heading |
 | 32pt | 80px | 160px | 240px | Large heading |
 
-**Width guide**: fullwidth = `pt × 2 × char count`, halfwidth = `pt × 1 × char count`
+**Width guide**: fullwidth px = `fontSize ÷ ptPerPx × char count`, halfwidth = half that.
+  `ptPerPx` is in `deck.json` `slideSize.ptPerPx` (16:9 = 0.5 → ×2, 4:3 = 0.375 → ×2.67)
 - `autoWidth`: true → word_wrap disabled (width fits text)
 - `line`: border color. Omit or `"none"` for no border
 - `lineWidth`: border thickness (pt, default 1)
-- `margin*`: px (same 1920×1080 basis as other coordinates)
+- `margin*`: px (same 1920-wide canvas basis as other coordinates)
 - `verticalAlign`: `top`, `middle`, `bottom` (default: top for textbox)
 - **Line breaks**: `\n` creates a line break (internally split into paragraphs)
 
@@ -675,6 +680,11 @@ Native PPTX chart (editable in PowerPoint).
 {{font=Lucida Console:Code font}}
 {{link:https://example.com:Link text}}
 ```
+
+> NOTE: Combine styles with commas (`{{bold,#FF0000:x}}`), not by nesting.
+> Nested tags (`{{bold:{{#FF0000:x}}}}`) are tolerated by the engine — they
+> are normalized to the comma form with inner attributes taking priority —
+> but the comma form is the canonical syntax. Nesting `link` is not supported.
 
 ## Placeholder (for user editing)
 
