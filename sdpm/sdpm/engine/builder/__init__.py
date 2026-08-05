@@ -103,7 +103,8 @@ class PPTXBuilder(
         self.theme_colors, self.is_dark = self._extract_theme_colors(template_path)
         self.theme_colors["text"] = default_text_color
         self.master_idx = 0
-        self.EMU_PER_PX = int(self.prs.slide_width) / 1920
+        from sdpm.engine import emu_per_px as _emu_per_px
+        self.EMU_PER_PX = _emu_per_px(int(self.prs.slide_width))
         self.custom_template = custom_template
         self.fonts = fonts
         self.auto_spacing = auto_spacing  # CJK↔Latin spacing; False = keep source text verbatim

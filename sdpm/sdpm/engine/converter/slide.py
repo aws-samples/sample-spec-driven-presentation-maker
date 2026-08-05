@@ -62,8 +62,9 @@ def detect_layout(slide):
             pass
         # Check for left accent line (content layout marker)
         for shape in slide.shapes:
-            if not shape.is_placeholder and shape.left < 50 * 6350:
-                if shape.width < 20 * 6350 and shape.height > 500 * 6350:
+            emu_px = get_emu_per_px()
+            if not shape.is_placeholder and shape.left < 50 * emu_px:
+                if shape.width < 20 * emu_px and shape.height > 500 * emu_px:
                     return "content"
         return "title_only"
 

@@ -77,6 +77,9 @@ def init_presentation(name: str) -> dict[str, Any]:
     """Initialize a presentation workspace. Creates deck.json, slides/, and specs/.
 
     Call after briefing is complete, before building slides.
+    When a template is provided, deck.json will include slideSize
+    (e.g. {"width": 1920, "height": 1080} for 16:9, {"width": 1920, "height": 1440} for 4:3)
+    derived from the template's physical dimensions.
 
     Args:
         name: Presentation name (e.g. "lambda-overview").
@@ -96,7 +99,9 @@ def analyze_template(template: str, layout: str = "") -> dict[str, Any]:
         layout: Optional layout name for detailed placeholder info.
 
     Returns:
-        Dict with layouts, theme_colors, fonts, and optional layout_detail.
+        Dict with layouts, theme_colors, fonts, slide_size, and optional layout_detail.
+        slide_size is {"width": 1920, "height": H} where H depends on the template's
+        aspect ratio (e.g. 1080 for 16:9, 1440 for 4:3). Width is always 1920px.
     """
     from sdpm.engine.analyzer import analyze_template as _analyze, get_layout_placeholders
     from sdpm.api import _find_template_in_dirs, get_templates_dirs
