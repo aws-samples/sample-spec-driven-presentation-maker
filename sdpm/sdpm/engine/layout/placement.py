@@ -4,9 +4,37 @@
 geometry computed from the logical structure tree.
 """
 
+import math
+
+# ---------------------------------------------------------------------------
+# pt-based calibration constants (true values derived from template metrics)
+# ---------------------------------------------------------------------------
+_LINE_PT = 13.2       # line height = 1.2 × 11pt font
+_PAD_PT = 20.0        # total vertical padding (top + bottom) for box
+_HALFWIDTH_PT = 5.0   # average half-width glyph width in pt (≈ 0.455em at 11pt)
+_FULLWIDTH_PT = 11.0  # full-width CJK glyph = 1em at 11pt
+
+# Icon label constants (in pt, derived from current px values as true values)
+_LABEL_CHAR_PT = 4.0        # 8px × 0.5 = 4pt per half-width char
+_LABEL_FULLWIDTH_PT = 8.8   # full-width char ≈ 2.2× half-width in label font (8pt)
+_LABEL_HEIGHT_PT = 17.5     # first line height: 35px × 0.5 = 17.5pt
+_LABEL_EXTRA_LINE_PT = 9.0  # additional line height: 18px × 0.5 = 9pt
 
 
-def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_scale_h=1.0, spacing_scale_v=1.0):
+def _text_width_pt(s: str) -> float:
+    """Estimate text width in pt for an 11pt font.
+
+    CJK detection: ord > 0x2E80 (covers CJK Unified Ideographs and related).
+    """
+    return sum(_FULLWIDTH_PT if ord(c) > 0x2E80 else _HALFWIDTH_PT for c in s)
+
+
+def _label_width_pt(s: str) -> float:
+    """Estimate label text width in pt (label uses ~8pt effective size)."""
+    return sum(_LABEL_FULLWIDTH_PT if ord(c) > 0x2E80 else _LABEL_CHAR_PT for c in s)
+
+
+def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_scale_h=1.0, spacing_scale_v=1.0, pt_per_px=0.5):
     """Recursive layout engine. Calculates bindings (x, y, width, height) for each node bottom-up."""
     children = node.get("children", [])
     direction = node.get("direction", parent_dir)
@@ -40,24 +68,29 @@ def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_
             if "height" in box:
                 bh = box["height"]
             else:
-                char_per_line = max(1, bw // 10)
+                # pt-based line estimation: each line wraps when text width
+                # exceeds the box width converted to pt.
+                available_pt = bw * pt_per_px
                 lines = 0
                 for field in [box.get("sublabel"), box.get("title", node.get("id", "")), box.get("description")]:
                     if field:
                         for paragraph in str(field).split("\n"):
-                            lines += max(1, -(-len(paragraph) // char_per_line))
-                bh = lines * 24 + 40
+                            width_pt = _text_width_pt(paragraph)
+                            lines += max(1, math.ceil(width_pt / available_pt))
+                bh = math.ceil(lines * _LINE_PT / pt_per_px) + round(_PAD_PT / pt_per_px)
             margin = node.get("margin", {"top": sv(20), "right": sh(20), "bottom": sv(20), "left": sh(20)})
             padding = {"top": 0, "right": 0, "bottom": 0, "left": 0}
             node["_bindings"] = [0, 0, bw, bh]
             node["_margin"] = margin
             node["_padding"] = padding
             return
-        label_h = sv(35)
+        # Icon label sizing (pt-based with CJK support)
         raw_label = node.get("label", "")
         label_lines = raw_label.replace("\\n", "\n").split("\n")
-        label_w = max((len(line) * 8 for line in label_lines), default=0)
-        label_h = sv(35) + (len(label_lines) - 1) * sv(18)
+        label_w = max((round(_label_width_pt(line) / pt_per_px) for line in label_lines), default=0)
+        label_h = round(_LABEL_HEIGHT_PT / pt_per_px * spacing_scale_v) + (len(label_lines) - 1) * round(_LABEL_EXTRA_LINE_PT / pt_per_px * spacing_scale_v)
+        # Ensure minimum via sv() for consistency with spacing scale
+        label_h = max(label_h, sv(35) + (len(label_lines) - 1) * sv(18)) if spacing_scale_v != 1.0 else label_h
         half_label_overhang = max(0, (label_w - icon_size) // 2)
         margin = node.get("margin", {"top": sv(20), "right": max(sh(20), half_label_overhang + 5), "bottom": label_h + sv(10), "left": max(sh(20), half_label_overhang + 5)})
         padding = {"top": 0, "right": 0, "bottom": 0, "left": 0}
@@ -67,7 +100,7 @@ def _layout_scale(node, parent_dir="horizontal", parent_align="center", spacing_
         return
 
     for child in children:
-        _layout_scale(child, direction, align, spacing_scale_h, spacing_scale_v)
+        _layout_scale(child, direction, align, spacing_scale_h, spacing_scale_v, pt_per_px)
 
     reverse = node.get("reverse", False)
     ordered = list(reversed(children)) if reverse else children

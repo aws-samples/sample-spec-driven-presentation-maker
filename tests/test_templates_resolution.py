@@ -178,3 +178,9 @@ def test_analyze_and_store_template() -> None:
     assert isinstance(result["fonts"], dict)
     assert result["layout_count"] > 0
     assert len(result["layouts"]) == result["layout_count"]
+    # slide_size must be present (regression: was previously omitted)
+    assert "slide_size" in result
+    assert "width" in result["slide_size"]
+    assert "height" in result["slide_size"]
+    assert result["slide_size"]["width"] > 0
+    assert result["slide_size"]["height"] > 0

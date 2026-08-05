@@ -142,6 +142,17 @@ style's `:root` (`--fs-*`, color vars) in `specs/art-direction.html`. The style 
 FROZEN for you — if a needed token genuinely doesn't exist, report it in your summary
 rather than inventing an ad-hoc value.
 
+### Canvas dimensions
+
+The canvas is **width 1920px fixed, height variable** depending on the template.
+Always read `deck.json` `slideSize` to determine the actual slide height (H)
+and `ptPerPx` (the pt-to-px conversion rate used for text width budgeting and
+`arch_diagram`'s box sizing).
+- Content area: y = title bottom + margin to H−130
+- For 16:9 (H=1080, ptPerPx=0.5): y=173–950. For 4:3 (H=1440, ptPerPx=0.375): y=173–1310
+- Never assume H=1080 — derive from `slideSize`
+- Pass `slideSize.ptPerPx` to `arch_diagram` as `pt_per_px` for correct box sizing
+
 ## Consistency Review Mode
 
 If the instruction is `"Consistency review."` (or asks for a consistency review), you

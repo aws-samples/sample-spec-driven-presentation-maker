@@ -248,13 +248,31 @@ def _prepare_workspace(
         tmpl_name = ""  # signal: resolved
     if tmpl_name:
         normalized = tmpl_name.removesuffix(".pptx")
-        for t in storage.list_templates():
-            if t.get("name") == normalized:
-                template_key = t.get("s3Key", "")
-                break
+        # User templates take precedence (same order as analyze_template).
+        if storage.get_user_template_metadata(user_id, normalized):
+            template_path.write_bytes(
+                storage.download_user_template(user_id, normalized)
+            )
+        else:
+            for t in storage.list_templates():
+                if t.get("name") == normalized:
+                    template_key = t.get("s3Key", "")
+                    break
+            if not template_key:
+                # Do NOT silently fall back to a stock template: the deck
+                # explicitly references a template, so building with a
+                # different one would silently produce the wrong design.
+                available = [t.get("name", "") for t in storage.list_templates()]
+                available += [
+                    t.get("name", "") for t in storage.list_user_templates(user_id)
+                ]
+                raise ValueError(
+                    f"Template '{tmpl_name}' not found. "
+                    f"Available: {', '.join(available)}"
+                )
     if not template_path.exists():
         if not template_key:
-            template_key = deck.get("templateS3Key", "templates/blank-dark.pptx")
+            template_key = "templates/blank-dark.pptx"
         template_path.write_bytes(storage.download_file(key=template_key))
 
     # Fonts

@@ -13,6 +13,7 @@
 
 "use client"
 
+import { useState } from "react"
 import { DeckDetail } from "@/services/deckService"
 import { Share2, Download, Layers } from "lucide-react"
 import { PreviewImage } from "@/components/ui/PreviewImage"
@@ -74,31 +75,14 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
         {slideCount > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 max-w-5xl">
             {deck.slides.map((slide, i) => (
-              <div
+              <WorkspaceSlideCard
                 key={slide.slug}
-                className="animate-card-in rounded-xl overflow-hidden border border-border bg-card cursor-pointer group hover:-translate-y-[2px] hover:border-border-hover hover:shadow-[0_6px_24px_oklch(0_0_0/40%)] transition-all duration-300"
-                style={{ "--delay": `${i * 50}ms` } as React.CSSProperties}
-              >
-                <div className="aspect-[16/9] relative bg-muted/30">
-                  {slide.previewUrl ? (
-                    <PreviewImage
-                      src={slide.previewUrl}
-                      deckId={deck.deckId}
-                      slug={slide.slug}
-                      idToken={auth.user?.id_token}
-                      alt={t("slideAlt", { number: i + 1 })}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Layers className="h-6 w-6 text-foreground-muted/20" />
-                    </div>
-                  )}
-                  <div className="absolute bottom-2 right-2.5 text-[11px] font-medium text-white/20">
-                    {i + 1}
-                  </div>
-                </div>
-              </div>
+                slide={slide}
+                index={i}
+                deckId={deck.deckId}
+                idToken={auth.user?.id_token}
+                t={t}
+              />
             ))}
           </div>
         ) : (
@@ -109,6 +93,51 @@ export function WorkspaceView({ deck, onShare, onDownload }: WorkspaceViewProps)
             </p>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+/** Per-slide card that detects natural image dimensions for aspect ratio. */
+function WorkspaceSlideCard({ slide, index, deckId, idToken, t }: {
+  slide: { slug: string; previewUrl?: string | null }
+  index: number
+  deckId: string
+  idToken?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: any
+}) {
+  const [aspectRatio, setAspectRatio] = useState("16/9")
+
+  return (
+    <div
+      className="animate-card-in rounded-xl overflow-hidden border border-border bg-card cursor-pointer group hover:-translate-y-[2px] hover:border-border-hover hover:shadow-[0_6px_24px_oklch(0_0_0/40%)] transition-all duration-300"
+      style={{ "--delay": `${index * 50}ms` } as React.CSSProperties}
+    >
+      <div className="relative bg-muted/30" style={{ aspectRatio }}>
+        {slide.previewUrl ? (
+          <PreviewImage
+            src={slide.previewUrl}
+            deckId={deckId}
+            slug={slide.slug}
+            idToken={idToken}
+            alt={t("slideAlt", { number: index + 1 })}
+            className="absolute inset-0 w-full h-full object-contain"
+            onLoad={(e: React.SyntheticEvent<HTMLImageElement>) => {
+              const img = e.currentTarget
+              if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                setAspectRatio(`${img.naturalWidth}/${img.naturalHeight}`)
+              }
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Layers className="h-6 w-6 text-foreground-muted/20" />
+          </div>
+        )}
+        <div className="absolute bottom-2 right-2.5 text-[11px] font-medium text-white/20">
+          {index + 1}
+        </div>
       </div>
     </div>
   )

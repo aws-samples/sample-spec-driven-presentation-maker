@@ -59,6 +59,17 @@ def extract_optimized_defs(svg_path: Path) -> dict:
     return {"version": 1, "defs": _convert_images(defs_svg)}
 
 
+_INHERITABLE_ATTRS = ("fill-rule", "stroke-width", "stroke-linejoin")
+"""Presentation attributes that LibreOffice sets once on root <svg> and children inherit."""
+
+
+def _propagate_root_attrs(element: etree._Element, root_attrs: dict) -> None:
+    """Copy inheritable root attrs onto element if not already present."""
+    for attr, value in root_attrs.items():
+        if element.get(attr) is None:
+            element.set(attr, value)
+
+
 def split_slide_components(svg_path: Path, slide_num: int) -> dict:
     """Split one slide into component fragments with metadata (defs excluded).
 
@@ -68,6 +79,13 @@ def split_slide_components(svg_path: Path, slide_num: int) -> dict:
     tree = etree.parse(str(svg_path))
     root = tree.getroot()
     view_box = root.get("viewBox", "0 0 33867 19050")
+
+    # Collect inheritable presentation attributes from root <svg>
+    root_attrs = {}
+    for attr in _INHERITABLE_ATTRS:
+        val = root.get(attr)
+        if val is not None:
+            root_attrs[attr] = val
 
     slides = root.findall(f".//{{{SVG_NS}}}g[@class='Slide']")
     if slide_num >= len(slides):
@@ -88,6 +106,7 @@ def split_slide_components(svg_path: Path, slide_num: int) -> dict:
         for child in slide_bg_defs:
             cls = child.get("class", "")
             if cls in ("Background", "BackgroundObjects"):
+                _propagate_root_attrs(child, root_attrs)
                 parts.append(etree.tostring(child, encoding="unicode"))
                 if cls == "Background":
                     for el in child.iter():
@@ -111,6 +130,7 @@ def split_slide_components(svg_path: Path, slide_num: int) -> dict:
                         parts = []
                         bg_g = master_g.find(f"{{{SVG_NS}}}g[@class='Background']")
                         if bg_g is not None:
+                            _propagate_root_attrs(bg_g, root_attrs)
                             parts.append(etree.tostring(bg_g, encoding="unicode"))
                             for el in bg_g.iter():
                                 f = el.get("fill")
@@ -121,6 +141,7 @@ def split_slide_components(svg_path: Path, slide_num: int) -> dict:
                         if bo_g is not None:
                             for child in bo_g:
                                 if child.get("visibility") != "hidden":
+                                    _propagate_root_attrs(child, root_attrs)
                                     parts.append(etree.tostring(child, encoding="unicode"))
                         if parts:
                             bg_svg = _convert_images("\n".join(parts))
@@ -144,6 +165,7 @@ def split_slide_components(svg_path: Path, slide_num: int) -> dict:
         text = ""
         if text_el is not None:
             text = "".join(text_el.itertext()).strip()[:80]
+        _propagate_root_attrs(shape_g, root_attrs)
         components.append({
             "class": cls,
             "bbox": bbox,

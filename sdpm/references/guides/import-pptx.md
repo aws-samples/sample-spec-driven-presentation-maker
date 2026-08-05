@@ -64,11 +64,8 @@ user to re-upload.
 Call `init_presentation(name=<suggestedName>)` — **do NOT pass a template
 argument**.
 
-- Cloud `init_presentation` has no template parameter, and Local's
-  template parameter would pre-populate fonts that Step 4 immediately
-  overwrites with PPTX-derived fonts. Skipping the argument keeps Local
-  and Cloud symmetric.
-- The bundle template path, fonts, and `defaultTextColor` are assigned to
+- Neither Cloud nor Local `init_presentation` accepts a template parameter.
+  The bundle template path, fonts, and `defaultTextColor` are assigned to
   `deck.json` in Step 4; the immutable bundle itself is not modified.
 - Returns the new `deck_id` (directory path in Local, deckId in Cloud).
 

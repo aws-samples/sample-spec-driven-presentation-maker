@@ -45,12 +45,13 @@ def measure_from_svg(
     # Read viewBox for coordinate conversion
     vb = root.get("viewBox", "").split()
     if len(vb) == 4:
-        vb_w, vb_h = float(vb[2]), float(vb[3])
+        vb_w = float(vb[2])
     else:
-        vb_w, vb_h = 25400.0, 19050.0
+        vb_w = 25400.0
 
-    scale_x = 1920.0 / vb_w
-    scale_y = 1080.0 / vb_h
+    # Equal-aspect scale: SVG viewBox preserves the template's aspect ratio,
+    # so a single width-based scale is correct for all aspect ratios.
+    scale_x = scale_y = 1920.0 / vb_w
 
     # Find all Slide groups (skip index 0 = dummy)
     slides_g = root.findall(f".//{{{SVG_NS}}}g[@class='Slide']")

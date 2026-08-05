@@ -35,6 +35,8 @@ These can be set as a `style` object:
 
 ## JSON: Cost breakdown
 
+(Example coordinates assume 16:9 canvas H=1080. Adjust y/height for other ratios.)
+
 ```json
 {
   "slides": [

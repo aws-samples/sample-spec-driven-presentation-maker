@@ -66,6 +66,125 @@ def normalize_spacing(text):
     return ''.join(result)
 
 
+def _flatten_nested_styles(text):
+    """Flatten nested {{attrs:...}} notation into comma-separated attrs form.
+
+    Agents sometimes emit nested styled text (issue #123):
+
+        {{bold:{{#FF0000:X}}}}      ->  {{bold,#FF0000:X}}
+        {{bold:a{{#FF0000:b}}c}}    ->  {{bold:a}}{{bold,#FF0000:b}}{{bold:c}}
+
+    The regex-based parser cannot handle nesting (``[^}]`` excludes the inner
+    ``}}``), which leaked raw tag text onto slides. This pre-pass rewrites
+    nested tags into the canonical comma-separated form. Merge order is
+    ``outer,inner`` — the parser applies attrs last-wins, so inner attributes
+    take priority naturally (boolean attrs like bold cannot be negated).
+
+    Guarantees:
+    - Non-nested input is returned byte-identical (tags copied verbatim).
+    - Tag starts trigger only on a ``{{`` two-char sequence; bare ``{`` / ``}``
+      (e.g. in highlight_code output) pass through untouched.
+    - link tags are opaque: never flattened, never merged.
+    - Unbalanced input falls back to the original text, so the parser behaves
+      exactly as it did before this pre-pass existed.
+    - Idempotent: flattened output contains no nested tags.
+    """
+    if '{{' not in text:
+        return text
+    try:
+        out = []
+        i = 0
+        while i < len(text):
+            if text.startswith('{{', i):
+                scanned = _scan_styled_tag(text, i)
+                if scanned is not None:
+                    end, attrs, parts, has_nest = scanned
+                    out.append(_emit_flat_tag(attrs, parts) if has_nest else text[i:end])
+                    i = end
+                    continue
+            out.append(text[i])
+            i += 1
+        return ''.join(out)
+    except RecursionError:
+        # Pathologically deep nesting (adversarial input): fall back to the
+        # original text, consistent with the unbalanced-input guarantee.
+        return text
+
+
+def _is_link_attrs(attrs):
+    return 'link' in [a.strip() for a in attrs.split(',')]
+
+
+def _scan_styled_tag(text, start):
+    """Scan one ``{{attrs:body}}`` tag at ``start`` (must point at ``{{``).
+
+    Returns ``(end_index, attrs, parts, has_nest)`` where parts is a list of
+    ``('plain', str)`` / ``('tag', attrs, parts, has_nest)`` items, or None
+    if no well-formed tag starts here.
+    """
+    m = re.match(r'\{\{([^:}]+):', text[start:])
+    if not m:
+        return None
+    attrs = m.group(1)
+    j = start + m.end()
+    if _is_link_attrs(attrs):
+        # Link content cannot contain '}' (mirrors the link regex): opaque.
+        close = text.find('}}', j)
+        if close == -1:
+            return None
+        return (close + 2, attrs, [('plain', text[j:close])], False)
+    parts = []
+    buf = []
+    has_nest = False
+    while j < len(text):
+        if text.startswith('\\}', j):
+            buf.append('\\}')
+            j += 2
+        elif text.startswith('}}', j):
+            if buf:
+                parts.append(('plain', ''.join(buf)))
+            return (j + 2, attrs, parts, has_nest)
+        elif text[j] == '}':
+            return None  # unescaped single '}' — malformed, fall back
+        elif text.startswith('{{', j):
+            inner = _scan_styled_tag(text, j)
+            if inner is None:
+                buf.append(text[j])
+                j += 1
+                continue
+            in_end, in_attrs, in_parts, in_nest = inner
+            if _is_link_attrs(in_attrs):
+                buf.append(text[j:in_end])  # nested links stay verbatim
+            else:
+                if buf:
+                    parts.append(('plain', ''.join(buf)))
+                    buf = []
+                parts.append(('tag', in_attrs, in_parts, in_nest))
+                has_nest = True
+            j = in_end
+        else:
+            buf.append(text[j])
+            j += 1
+    return None  # ran out of text before '}}'
+
+
+def _emit_flat_tag(attrs, parts):
+    """Emit flattened tags for a scanned nested tag."""
+    out = []
+    for part in parts:
+        if part[0] == 'plain':
+            # Split on newlines so each line carries a complete tag (mirrors
+            # _expand_styled_newlines; avoids emitting an empty {{attrs:}}
+            # which the parser would leak as literal text).
+            lines = part[1].split('\n')
+            tagged = [f'{{{{{attrs}:{line}}}}}' if line else '' for line in lines]
+            out.append('\n'.join(tagged))
+        else:
+            _, in_attrs, in_parts, _ = part
+            out.append(_emit_flat_tag(attrs + ',' + in_attrs, in_parts))
+    return ''.join(out)
+
+
 def parse_styled_text(text, auto_spacing=True):
     """Parse {{attrs:text}} syntax into styled segments.
 
@@ -81,6 +200,7 @@ def parse_styled_text(text, auto_spacing=True):
             (typography for AI-authored decks). Pass False to preserve the
             source text verbatim (e.g. decks imported from existing PPTX).
     """
+    text = _flatten_nested_styles(text)
     link_pattern = r'\{\{(?:(\d+pt),)?link:([^}]+)\}\}'
     segments = []
     last_end = 0
@@ -209,6 +329,10 @@ def _parse_non_link_styles(text, auto_spacing=True):
 
 def _expand_styled_newlines(text):
     """Expand \\n inside styled tags so each line gets its own complete tag."""
+    # Flatten nesting first: builders call this before splitting on newlines,
+    # and the expand regex below (``[^}]``) cannot see through nested tags —
+    # without this, split("\n") would cut a nested tag in half (issue #123).
+    text = _flatten_nested_styles(text)
     def expand_match(m):
         attrs = m.group(1)
         content = m.group(2)
