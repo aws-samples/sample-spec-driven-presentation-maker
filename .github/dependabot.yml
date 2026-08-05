@@ -64,6 +64,12 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    ignore:
+      # mcp 2.0 removes mcp.server.fastmcp (FastMCP) — the server fails at
+      # import. Requires migration to mcp.server.mcpserver.MCPServer,
+      # tracked in #301. Remove this once migrated.
+      - dependency-name: mcp
+        versions: [">=2"]
   - package-ecosystem: pip
     directory: /servers/remote
     schedule:
@@ -84,6 +90,10 @@ updates:
       # image unresolvable (PR #271 broke main; caught by container-deps).
       # It moves automatically when pydantic itself is bumped via `make lock`.
       - dependency-name: pydantic-core
+      # mcp 2.0 removes mcp.server.fastmcp (FastMCP) — see /servers/local
+      # entry above. Migration tracked in #301.
+      - dependency-name: mcp
+        versions: [">=2"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
