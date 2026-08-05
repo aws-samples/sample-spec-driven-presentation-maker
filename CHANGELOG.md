@@ -12,6 +12,30 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **Custom templates with non-16:9 slide sizes (4:3 etc.) now lay out correctly** —
+  the engine's px coordinate system followed the template width but assumed a
+  fixed height of 1080, so 4:3 decks left the bottom quarter of every slide
+  empty, reported false out-of-bounds warnings, mismatched placeholder
+  coordinates, mis-measured text overflow, and rendered cropped previews in the
+  Web UI. The canvas is now derived from the template's real dimensions
+  (1920 px wide, height following the aspect ratio — 4:3 becomes 1920×1440),
+  and `analyze_template` / `deck.json` carry the canvas size so slide
+  composition uses the full slide. Behaviour for 16:9 templates is unchanged.
+  Known limitation: architecture diagram boxes with an omitted `box.height`
+  can still under-estimate text height on non-16:9 templates — specify
+  `box.height` explicitly. (#208)
+- **Live slide preview: the first few slides now animate** — animation was
+  suppressed for 3 seconds after the slides tab appeared, and because a new
+  deck switches to that tab as soon as slides arrive, the first slides were
+  always shown instantly. Suppression is now based on whether the slides
+  already existed when the view mounted, instead of a timer.
+- **Live slide preview: the PNG fallback now actually appears** — the error
+  state was reset on every 1-second poll, so the fallback was unmounted before
+  it could be seen; a failure to find the render container also marked the
+  slide as permanently processed, leaving an empty black box. Slides with
+  nothing to draw now fall back to the rendered PNG, and the fallback image
+  retries expired signed URLs.
+
 - **AWS: uploaded custom templates now apply to PPTX generation** — the remote
   server's template resolution only searched builtin templates, so a deck
   referencing an uploaded user template silently fell back to
