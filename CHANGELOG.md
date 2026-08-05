@@ -12,6 +12,12 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **Nested styled-text notation no longer leaks raw tags onto slides** —
+  agents sometimes emit `{{bold:{{#FF0000:X}}}}` instead of the canonical
+  `{{bold,#FF0000:X}}`; the parser could not see through nesting and rendered
+  the inner tag as literal text. A flatten pre-pass now normalizes nesting
+  (any depth, partial nesting included) to the comma form, with inner
+  attributes taking priority. Non-nested input is untouched. (#123)
 - **Builtin template download works from the Web UI** — downloading blank-dark /
   blank-light did nothing: the download used a `fetch()`+blob path that requires
   CORS, and the builtin resource bucket has no CORS configuration (user templates
