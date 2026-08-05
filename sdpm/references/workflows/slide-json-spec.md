@@ -302,7 +302,8 @@ Height includes the language label (22px). Code body height is `height - 22`.
 | 28pt | 70px | 140px | 210px | Heading |
 | 32pt | 80px | 160px | 240px | Large heading |
 
-**Width guide**: fullwidth = `pt × 2 × char count`, halfwidth = `pt × 1 × char count`
+**Width guide**: fullwidth px = `fontSize ÷ ptPerPx × char count`, halfwidth = half that.
+  `ptPerPx` is in `deck.json` `slideSize.ptPerPx` (16:9 = 0.5 → ×2, 4:3 = 0.375 → ×2.67)
 - `autoWidth`: true → word_wrap disabled (width fits text)
 - `line`: border color. Omit or `"none"` for no border
 - `lineWidth`: border thickness (pt, default 1)
