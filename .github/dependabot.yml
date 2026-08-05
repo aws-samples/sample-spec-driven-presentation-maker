@@ -78,6 +78,11 @@ updates:
       # when aws-opentelemetry-distro is bumped, then run `make lock`.
       - dependency-name: cachetools
       - dependency-name: protobuf
+      # pydantic-core is hard-pinned by pydantic (mcp -> pydantic==X pins
+      # pydantic-core==Y exactly). Bumping it alone makes the container
+      # image unresolvable (PR #271 broke main; caught by container-deps).
+      # It moves automatically when pydantic itself is bumped via `make lock`.
+      - dependency-name: pydantic-core
   - package-ecosystem: github-actions
     directory: /
     schedule:
