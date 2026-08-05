@@ -1,16 +1,18 @@
 {
   "name": "sdpm-infra",
   "version": "0.1.0",
-  "bin": { "infra": "bin/infra.js" },
+  "bin": {
+    "infra": "bin/infra.js"
+  },
   "scripts": {
     "build": "tsc",
     "cdk": "cdk"
   },
   "devDependencies": {
+    "@types/node": "^26.1.2",
     "aws-cdk": "^2.1133.0",
-    "typescript": "~5.9.3",
     "ts-node": "^10.9.0",
-    "@types/node": "^22.20.1"
+    "typescript": "~5.9.3"
   },
   "dependencies": {
     "aws-cdk-lib": "^2.262.1",
