@@ -339,14 +339,17 @@ def grid(purpose: str, spec: str) -> dict[str, Any]:
         purpose: Brief description (e.g. '3-column icon layout'). Shown in UI.
         spec: JSON string with grid spec. Keys:
             area: {"x", "y", "w", "h"} (required)
-            columns: track-list string, e.g. "1fr 2fr" (default "1fr")
-            rows: track-list string (default "1fr")
+            columns: track-list string, e.g. "1fr 2fr" (default "1fr").
+                Supported syntax: fr, px, %, repeat(n, X), or bare integer.
+                auto and minmax() are NOT supported.
+            rows: track-list string (default "1fr"). Same syntax as columns.
             gap: str or int, e.g. "20" or "20 40" (row-gap col-gap)
             areas: 2D list of area names (optional)
             items: dict of item overrides (optional)
 
     Returns:
-        Dict with named rectangles containing x, y, w, h coordinates.
+        Dict with named rectangles containing x, y, w, h coordinates,
+        or {"error": "..."} if the spec is invalid.
     """
     import json
     from sdpm.engine.layout.grid import compute_grid
@@ -355,7 +358,10 @@ def grid(purpose: str, spec: str) -> dict[str, Any]:
         grid_spec = json.loads(spec)
     except (json.JSONDecodeError, TypeError) as e:
         return {"error": f"Invalid grid spec JSON: {e}"}
-    return compute_grid(grid_spec)
+    try:
+        return compute_grid(grid_spec)
+    except (ValueError, KeyError) as e:
+        return {"error": str(e)}
 
 
 def arch_diagram(
