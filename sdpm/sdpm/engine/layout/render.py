@@ -36,7 +36,7 @@ from . import (
 _FIT_ITERATIONS = 8
 
 
-def build_layout(tree, x=None, y=None, width=None, height=None, optimize=True):
+def build_layout(tree, x=None, y=None, width=None, height=None, optimize=True, pt_per_px=0.5):
     """Run the placement pipeline on a logical-structure ``tree``.
 
     Returns ``(nodes, groups, edges, root_bindings, cum_h, cum_v)`` where
@@ -49,6 +49,10 @@ def build_layout(tree, x=None, y=None, width=None, height=None, optimize=True):
     ``optimize=False`` skips the order-optimization pre-pass. The tile-pool
     reflow inside ``optimize_order`` uses this to score candidate arrangements
     by real routing without recursing back into itself.
+
+    ``pt_per_px`` is the ratio of physical pt to virtual px (default 0.5 for
+    16:9 at 1920px logical width). Controls box height estimation accuracy
+    across different template aspect ratios.
     """
     tree = copy.deepcopy(tree)
     direction = tree.get("direction", "horizontal")
@@ -69,7 +73,7 @@ def build_layout(tree, x=None, y=None, width=None, height=None, optimize=True):
 
     # Pass 1: natural size.
     root = build_root()
-    _layout_scale(root, direction, align)
+    _layout_scale(root, direction, align, pt_per_px=pt_per_px)
 
     # Record each top-level group's NATURAL cross-axis size so we can later tell
     # which groups fit on their own (before any global squash).
@@ -87,14 +91,14 @@ def build_layout(tree, x=None, y=None, width=None, height=None, optimize=True):
             cum_h *= sx
             cum_v *= sy
             root = build_root()
-            _layout_scale(root, direction, align, cum_h, cum_v)
+            _layout_scale(root, direction, align, cum_h, cum_v, pt_per_px=pt_per_px)
         # A single oversized group forces a global cross-axis squash that would
         # crush short siblings. Cancel that squash on the groups that already
         # fit (the slide may overflow — that's the oversized group's problem,
         # flagged by a warning — but the groups that fit stay readable).
         if cancel_cross_axis_squash(tree, natural_sizes, cum_h, cum_v, width, height):
             root = build_root()
-            _layout_scale(root, direction, align, cum_h, cum_v)
+            _layout_scale(root, direction, align, cum_h, cum_v, pt_per_px=pt_per_px)
 
     rb = root["_bindings"]
     ox = (x or 0) - rb[0]
@@ -432,7 +436,7 @@ def _build_warnings(nodes_out, groups_out, edges_out, rb,
 
 
 def render_architecture(tree, x=None, y=None, width=None, height=None,
-                        theme="dark", include_metrics=True):
+                        theme="dark", include_metrics=True, pt_per_px=0.5):
     """Render a logical-structure ``tree`` to placed sdpm elements.
 
     Returns a dict with:
@@ -444,6 +448,10 @@ def render_architecture(tree, x=None, y=None, width=None, height=None,
 
     ``targetArea`` inside the tree (``{x, y, width, height}``) overrides the
     corresponding argument when that argument is falsy.
+
+    ``pt_per_px`` is the ratio of physical pt to virtual px (default 0.5 for
+    16:9 at 1920px logical width). Pass ``slideSize.ptPerPx`` from the deck
+    JSON when targeting non-16:9 templates.
     """
     target_area = tree.get("targetArea", {})
     if target_area:
@@ -457,7 +465,7 @@ def render_architecture(tree, x=None, y=None, width=None, height=None,
             height = target_area["height"]
 
     nodes_out, groups_out, edges_out, rb, cum_h, cum_v = build_layout(
-        tree, x, y, width, height)
+        tree, x, y, width, height, pt_per_px=pt_per_px)
 
     is_dark = theme == "dark"
     elements = _build_elements(tree, nodes_out, groups_out, edges_out, is_dark)

@@ -82,6 +82,16 @@ def analyze_template(template_name: str, storage: Storage, user_id: str = "") ->
             analysis_raw = user_meta.get("analysisJson", "")
             if analysis_raw and analysis_raw != "{}":
                 analysis = json.loads(analysis_raw) if isinstance(analysis_raw, str) else analysis_raw
+                # Fallback for old cached entries missing slide_size
+                if "slide_size" not in analysis:
+                    import tempfile
+                    from pathlib import Path
+                    from sdpm.engine.analyzer import analyze_template as _analyze
+                    data = storage.download_user_template(user_id, normalized)
+                    tmp = Path(tempfile.mkdtemp())
+                    tpl_path = tmp / "template.pptx"
+                    tpl_path.write_bytes(data)
+                    analysis = _analyze(tpl_path)
             else:
                 # Analyze on the fly
                 import tempfile
@@ -128,6 +138,19 @@ def analyze_template(template_name: str, storage: Storage, user_id: str = "") ->
         analysis = _analyze(tpl_path)
     else:
         analysis = json.loads(analysis_raw) if isinstance(analysis_raw, str) else analysis_raw
+        # Fallback for old cached entries missing slide_size
+        if "slide_size" not in analysis:
+            import tempfile
+            from pathlib import Path
+            from sdpm.engine.analyzer import analyze_template as _analyze
+
+            s3_key = tmpl.get("s3Key", "")
+            if s3_key:
+                data = storage.download_file(key=s3_key)
+                tmp = Path(tempfile.mkdtemp())
+                tpl_path = tmp / "template.pptx"
+                tpl_path.write_bytes(data)
+                analysis = _analyze(tpl_path)
     analysis["fonts"] = tmpl.get("fonts", {})
     analysis["templateName"] = template_name
     return analysis

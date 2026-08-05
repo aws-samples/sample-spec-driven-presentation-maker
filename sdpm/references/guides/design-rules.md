@@ -80,7 +80,8 @@ Let the distance between elements reflect their relationship — related items c
 ## Layout Balance
 
 Balance elements vertically within the content area. Do not cluster at the top unless intentional (e.g. hero title).
-Sample template (1920×1080): content area y=143–950.
+Content area: y = title bottom + margin to H−130 (H = slide height from `slideSize`).
+For 16:9 (H=1080): content area y=143–950.
 Custom templates: refer to slide size and placeholder positions from `analyze-template`.
 
 

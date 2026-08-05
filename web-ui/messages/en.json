@@ -408,7 +408,8 @@
     "optional": "(optional)",
     "upload": "Upload",
     "analyzing": "Analyzing…",
-    "uploadFailed": "Failed to upload template"
+    "uploadFailed": "Failed to upload template",
+    "downloadFailed": "Failed to download template"
   },
   "styleChat": {
     "styleCreator": "Style Creator",
