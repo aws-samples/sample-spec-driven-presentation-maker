@@ -63,9 +63,14 @@ class TestFlattenNestedStyles:
             "{{#d6deeb:foo}}{{{#c792ea:bar}}",  # bare { adjacent to tag start
             "{ }",
             "{{#c792ea:f}}({{#d6deeb:x}})",
+            "{{#d6deeb:func}}({{#c792ea:{}}})",  # bare brace inside tag body
         ]
         for s in cases:
             assert _flatten_nested_styles(s) == s
+
+    def test_pathological_depth_falls_back_without_crash(self):
+        deep = "{{bold:" * 2000 + "x" + "}}" * 2000
+        assert _flatten_nested_styles(deep) == deep  # RecursionError guard
 
     def test_unbalanced_falls_back_to_original(self):
         cases = [

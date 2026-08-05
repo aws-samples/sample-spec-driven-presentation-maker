@@ -91,23 +91,28 @@ def _flatten_nested_styles(text):
     """
     if '{{' not in text:
         return text
-    out = []
-    i = 0
-    while i < len(text):
-        if text.startswith('{{', i):
-            scanned = _scan_styled_tag(text, i)
-            if scanned is not None:
-                end, attrs, parts, has_nest = scanned
-                out.append(_emit_flat_tag(attrs, parts) if has_nest else text[i:end])
-                i = end
-                continue
-        out.append(text[i])
-        i += 1
-    return ''.join(out)
+    try:
+        out = []
+        i = 0
+        while i < len(text):
+            if text.startswith('{{', i):
+                scanned = _scan_styled_tag(text, i)
+                if scanned is not None:
+                    end, attrs, parts, has_nest = scanned
+                    out.append(_emit_flat_tag(attrs, parts) if has_nest else text[i:end])
+                    i = end
+                    continue
+            out.append(text[i])
+            i += 1
+        return ''.join(out)
+    except RecursionError:
+        # Pathologically deep nesting (adversarial input): fall back to the
+        # original text, consistent with the unbalanced-input guarantee.
+        return text
 
 
 def _is_link_attrs(attrs):
-    return 'link' in (a.strip() for a in attrs.split(','))
+    return 'link' in [a.strip() for a in attrs.split(',')]
 
 
 def _scan_styled_tag(text, start):
