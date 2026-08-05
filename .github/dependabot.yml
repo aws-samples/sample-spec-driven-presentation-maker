@@ -36,14 +36,15 @@ updates:
     cooldown:
       default-days: 7
     # Known-blocked majors (same policy as /web-ui above):
-    # - typescript >=7: TS 7 (native, Go-based) fails `tsc --noEmit` for the
-    #   CDK app — node globals/type resolution breaks repo-wide (TS2591
-    #   "Cannot find name 'process'/'fs'/'path'", TS2304 __dirname, even with
-    #   @types/node 26). Re-evaluate when the CDK toolchain and @types/node
-    #   support TS 7 (see PR #258 CI failure for the full log).
+    # - typescript >=6: TS 6/7 fail `tsc --noEmit` for the CDK app — node
+    #   globals/type resolution breaks repo-wide (TS2591 "Cannot find name
+    #   'process'/'fs'/'path'", TS2304 __dirname). Isolated locally: fails
+    #   with both @types/node 22 and 26, while TS 5.9 + @types/node 26 is
+    #   clean — so the blocker is the compiler, not the types. Re-evaluate
+    #   when the CDK toolchain supports TS >=6 (PR #258 / #298 CI logs).
     ignore:
       - dependency-name: "typescript"
-        versions: [">=7"]
+        versions: [">=6"]
     groups:
       infra-deps:
         patterns: ["*"]
