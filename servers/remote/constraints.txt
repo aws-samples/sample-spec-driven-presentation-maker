@@ -81,7 +81,7 @@ lxml==6.1.1
     #   sdpm-skill
 markdown-it-py==4.2.0
     # via rich
-mcp==1.29.0
+mcp==2.0.0
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
 mdurl==0.1.2
     # via markdown-it-py
