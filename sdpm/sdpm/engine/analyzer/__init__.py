@@ -44,10 +44,9 @@ def analyze_template(template_path: Path):
     theme_colors = extract_theme_colors(template_path)
     fonts = extract_fonts(template_path)
     color_usage = _load_color_usage_cache(template_path)
-    slide_size = {
-        "width": slide_size_px(prs.slide_width, prs.slide_height)[0],
-        "height": slide_size_px(prs.slide_width, prs.slide_height)[1],
-    }
+    _w, _h = slide_size_px(prs.slide_width, prs.slide_height)
+    _pt_per_px = round((int(prs.slide_width) / 12700) / 1920, 6)
+    slide_size = {"width": _w, "height": _h, "ptPerPx": _pt_per_px}
 
     return {
         "slide_size": slide_size,

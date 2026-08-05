@@ -77,10 +77,10 @@ it in `deck.json` as `slideSize` so that slide composition uses the full canvas.
 
 Known limitations for non-16:9 templates:
 
-- **Architecture diagram boxes** — when `box.height` is omitted, the engine
-  estimates it from the text, and that estimate is calibrated for 16:9. On other
-  aspect ratios it can be up to ~25% too small, causing text to overflow.
-  Specify `box.height` explicitly to avoid this.
+- **Architecture diagram boxes** — fixed in #285. Box auto-height is now
+  calibrated using `slideSize.ptPerPx` (the pt-to-px conversion rate reported
+  by `analyze_template` and stored in `deck.json`). Explicit `box.height` is
+  still accepted for manual fine-tuning.
 - **Style demos** — the bundled style gallery HTML files use a fixed 16:9 canvas.
   This does not affect generated slides (only the design tokens are consumed).
 - **Deck list thumbnails** — the Web UI deck list crops thumbnails to a fixed

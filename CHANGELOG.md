@@ -12,6 +12,18 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **Architecture diagram box auto-height now works on non-16:9 templates and
+  with CJK text** — the engine used a fixed 16:9 pt-to-px ratio for text
+  measurement, causing boxes to undersize on 4:3 and other aspect ratios, and
+  did not account for fullwidth (CJK) character width. `analyze_template` now
+  reports `ptPerPx` in `slide_size`, the agent records it in `deck.json`
+  `slideSize`, and `arch_diagram` accepts a `pt_per_px` parameter for accurate
+  calibration. (#285)
+- **Remote MCP: `analyze_template` now includes `slide_size` in cached
+  results** — the cached template analysis omitted the `slide_size` field, so
+  subsequent calls returned an incomplete response and the agent could not
+  populate `deck.json` `slideSize`. (#285)
+
 - **Custom templates with non-16:9 slide sizes (4:3 etc.) now lay out correctly** —
   the engine's px coordinate system followed the template width but assumed a
   fixed height of 1080, so 4:3 decks left the bottom quarter of every slide
