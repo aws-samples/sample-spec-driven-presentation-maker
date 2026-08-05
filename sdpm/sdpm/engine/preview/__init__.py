@@ -7,6 +7,8 @@ from pathlib import Path
 
 from pptx import Presentation
 
+from sdpm.engine import emu_per_px as _emu_per_px
+
 from .backend import detect_backend, get_work_dir  # noqa: F401
 
 
@@ -34,9 +36,9 @@ def check_layout_imbalance_data(pptx_path, slide_defs=None):
     """Detect slides where bbox centroid deviates from content area center."""
     _THRESHOLD = 0.03
     prs = Presentation(str(pptx_path))
-    _SW = int(prs.slide_width / 6350)
-    _SH = int(prs.slide_height / 6350)
-    emu = 6350
+    emu = _emu_per_px(prs.slide_width)
+    _SW = int(prs.slide_width / emu)
+    _SH = int(prs.slide_height / emu)
     _TITLE_BOTTOM = int(_SH * 0.13)
     _CONTENT_BOTTOM = int(_SH * 0.88)
     _CY = (_TITLE_BOTTOM + _CONTENT_BOTTOM) / 2

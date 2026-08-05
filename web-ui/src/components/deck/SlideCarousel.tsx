@@ -71,10 +71,20 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
 
+  /* ── Aspect ratio reported by the first child (deck is uniform) ── */
+  const [deckAr, setDeckAr] = useState(16 / 9)
+  const arReported = useRef(false)
+  const handleAspectRatio = useCallback((ratio: number) => {
+    if (!arReported.current && ratio > 0) {
+      arReported.current = true
+      setDeckAr(ratio)
+    }
+  }, [])
+
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
   const scrollTargetRef = useRef<string | null | undefined>(undefined)
-  const [hadSlidesOnMount] = useState(slides.length > 0)
+  const hadSlidesOnMount = useRef(slides.length > 0)
   const [firstComposeSeen, setFirstComposeSeen] = useState(false)
   const [knownComposeUrls, setKnownComposeUrls] = useState<Map<string, string>>(new Map())
 
@@ -89,7 +99,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     }
     // Mark first compose seen (skip animation for existing decks)
     if (!firstComposeSeen && slides.some(s => s.composeUrl)) {
-      if (hadSlidesOnMount) {
+      if (hadSlidesOnMount.current) {
         // Existing deck: suppress animation for this first batch
         anyChanged = false
       }
@@ -97,6 +107,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     }
     if (anyChanged) scrollTargetRef.current = null // arm scroll for next onAnimate
     setKnownComposeUrls(new Map(prevComposeKeys.current))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slides])
 
   const handleAnimate = useCallback((slug: string) => {
@@ -137,13 +148,6 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /* ── Spec tab state + auto-focus ── */
   const [specTab, setSpecTab] = useState<SpecTab>("brief")
   const prevSpecsRef = useRef<SpecFiles | null | undefined>(null)
-  // Suppress animation for 3s after slides tab becomes visible
-  const [settled, setSettled] = useState(false)
-  useEffect(() => {
-    if (specTab !== "slides") { setSettled(false); return }
-    const t = setTimeout(() => setSettled(true), 3000)
-    return () => clearTimeout(t)
-  }, [specTab])
 
   /**
    * Auto-focus: when a spec file transitions from null to non-null,
@@ -346,9 +350,10 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
             ))}
           </div>
         ) : (
-          /* Full view: cap width so one slide always fits the viewport height
-             (100vh minus header + paddings, converted to width at 16:9). */
-          <div className="mx-auto w-full max-w-[calc((100vh-170px)*16/9)] space-y-4">
+          /* Full view: cap height so one slide always fits the viewport
+             (100vh minus header + paddings). Width follows aspect ratio. */
+          <div className="mx-auto w-full space-y-4"
+               style={{ maxWidth: `calc((100vh - 170px) * ${deckAr})` }}>
           {slidesWithPreview.map((slide, i) => (
             slide.composeUrl && defsUrl ? (
               <AnimatedSlidePreview
@@ -356,9 +361,10 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 defsUrl={defsUrl}
                 composeUrl={slide.composeUrl}
                 slug={slide.slug}
-                skipAnimation={!settled}
-                knownUrl={knownComposeUrls.get(slide.slug) || null}
+                skipAnimation={hadSlidesOnMount.current && !firstComposeSeen}
+                knownUrl={hadSlidesOnMount.current ? (knownComposeUrls.get(slide.slug) || null) : null}
                 onAnimate={() => handleAnimate(slide.slug)}
+                onAspectRatio={handleAspectRatio}
                 fallback={
                   <SlideThumbnail
                     src={slide.previewUrl}
@@ -366,6 +372,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                     index={i}
                     slug={slide.slug}
                     onClick={() => onSlideClick?.(i + 1)}
+                    onAspectRatio={handleAspectRatio}
                     className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
                   />
                 }
@@ -379,6 +386,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 slug={slide.slug}
                 onClick={() => onSlideClick?.(i + 1)}
                 updated={updatedIds.has(slide.slug)}
+                onAspectRatio={handleAspectRatio}
                 className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
               />
             )

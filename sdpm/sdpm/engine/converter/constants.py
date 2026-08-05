@@ -40,7 +40,8 @@ def conversion_scale(slide_width_emu):
     exception, or nested use — so error paths and reentrant conversions
     cannot poison later conversions in the same process.
     """
-    token = _CURRENT_EMU_PER_PX.set(slide_width_emu / 1920)
+    from sdpm.engine import emu_per_px as _emu_per_px
+    token = _CURRENT_EMU_PER_PX.set(_emu_per_px(slide_width_emu))
     try:
         yield
     finally:

@@ -45,8 +45,8 @@ Choose scale based on architecture complexity:
 ## Drawing Area
 
 ```
-Slide: 1920 x 1080px
-Recommended area: x=60–1860, y=200–900 (title_only layout)
+Slide: 1920 x H px (H = slide height from slideSize; 1080 for 16:9, 1440 for 4:3)
+Recommended area: x=60–1860, y=200–(H−180) (title_only layout)
 ```
 
 ---

@@ -8,6 +8,7 @@ from lxml import etree
 from pptx import Presentation
 
 from sdpm.config import CACHE_DIR
+from sdpm.engine import emu_per_px, slide_size_px
 from sdpm.utils.io import write_json, read_json
 
 
@@ -20,7 +21,6 @@ def analyze_template(template_path: Path):
     cache_color_usage() if missing.
     """
     prs = Presentation(str(template_path))
-    emu = 6350
 
     # Build layout→notes mapping from slides
     layout_notes = {}
@@ -45,8 +45,8 @@ def analyze_template(template_path: Path):
     fonts = extract_fonts(template_path)
     color_usage = _load_color_usage_cache(template_path)
     slide_size = {
-        "width": int(prs.slide_width / emu),
-        "height": int(prs.slide_height / emu),
+        "width": slide_size_px(prs.slide_width, prs.slide_height)[0],
+        "height": slide_size_px(prs.slide_width, prs.slide_height)[1],
     }
 
     return {
@@ -61,7 +61,7 @@ def analyze_template(template_path: Path):
 def get_layout_placeholders(template_path: Path, layout_name: str):
     """Get placeholder details and notes for a layout directly from pptx."""
     prs = Presentation(str(template_path))
-    emu = 6350
+    emu = emu_per_px(prs.slide_width)
 
     # Find layout
     layout_obj = None

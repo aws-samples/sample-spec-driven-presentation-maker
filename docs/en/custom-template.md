@@ -59,6 +59,34 @@ Design your template in PowerPoint, Google Slides, or Keynote (export as .pptx):
 - Ensure background-to-text color contrast ratio of at least 4.5:1
 - Test your template by running `analyze_template` and reviewing the output
 
+### Slide size (aspect ratio)
+
+Any slide size works — 16:9, 4:3, 16:10, and other ratios are all supported.
+The engine derives the drawing canvas from your template's actual dimensions.
+
+The coordinate system is **1920 px wide, with height following the aspect ratio**:
+
+| Template slide size | Canvas in slide JSON |
+|---|---|
+| 16:9 (13.33 × 7.5 in) | 1920 × 1080 px |
+| 4:3 (10 × 7.5 in) | 1920 × 1440 px |
+| 16:10 | 1920 × 1200 px |
+
+`analyze_template` reports the canvas size as `slide_size`, and the agent records
+it in `deck.json` as `slideSize` so that slide composition uses the full canvas.
+
+Known limitations for non-16:9 templates:
+
+- **Architecture diagram boxes** — when `box.height` is omitted, the engine
+  estimates it from the text, and that estimate is calibrated for 16:9. On other
+  aspect ratios it can be up to ~25% too small, causing text to overflow.
+  Specify `box.height` explicitly to avoid this.
+- **Style demos** — the bundled style gallery HTML files use a fixed 16:9 canvas.
+  This does not affect generated slides (only the design tokens are consumed).
+- **Deck list thumbnails** — the Web UI deck list crops thumbnails to a fixed
+  ratio so that card heights stay aligned in the grid. Slide previews
+  (workspace, carousel) follow the real aspect ratio.
+
 ---
 
 ## Analyzing a Template
