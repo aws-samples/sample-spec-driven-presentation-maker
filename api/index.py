@@ -568,12 +568,20 @@ def download_template(name: str) -> Any:
     """Download a template .pptx file. Searches user templates first, then builtin."""
     user_id = get_user_id(app.current_event)
 
+    disposition = f'attachment; filename="{name}.pptx"'
+
     # Try user template
     user_key = f"user-templates/{user_id}/{name}.pptx"
     try:
         s3_client.head_object(Bucket=BUCKET_NAME, Key=user_key)
         url = s3_client.generate_presigned_url(
-            "get_object", Params={"Bucket": BUCKET_NAME, "Key": user_key}, ExpiresIn=300
+            "get_object",
+            Params={
+                "Bucket": BUCKET_NAME,
+                "Key": user_key,
+                "ResponseContentDisposition": disposition,
+            },
+            ExpiresIn=300,
         )
         return {"downloadUrl": url}
     except Exception:
@@ -584,7 +592,13 @@ def download_template(name: str) -> Any:
     try:
         s3_client.head_object(Bucket=RESOURCE_BUCKET, Key=builtin_key)
         url = s3_client.generate_presigned_url(
-            "get_object", Params={"Bucket": RESOURCE_BUCKET, "Key": builtin_key}, ExpiresIn=300
+            "get_object",
+            Params={
+                "Bucket": RESOURCE_BUCKET,
+                "Key": builtin_key,
+                "ResponseContentDisposition": disposition,
+            },
+            ExpiresIn=300,
         )
         return {"downloadUrl": url}
     except Exception:
