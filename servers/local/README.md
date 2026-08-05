@@ -30,7 +30,7 @@ uv run python server.py
 
 | Tool | Description |
 |------|-------------|
-| `init_presentation` | Initialize workspace with template and fonts |
+| `init_presentation` | Initialize a new deck workspace |
 | `analyze_template` | Analyze a PPTX template (layouts, colors, fonts) |
 | `generate_pptx` | Generate PPTX from JSON |
 | `read_attachment` | Read content from an attached file with byte-offset paging |

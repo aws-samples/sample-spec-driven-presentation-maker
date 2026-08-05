@@ -28,17 +28,24 @@ fix the structure without a second command:
 
 ```
 arch_diagram(spec="<logical-structure JSON string>",
-             x=100, y=180, width=1720, height=800, theme="dark")
+             x=100, y=180, width=1720, height=800, theme="dark",
+             pt_per_px=0.5)
 ```
 
 Default target area (x=100, y=180, width=1720, height=800) assumes 16:9 canvas.
 For non-16:9 templates, derive height from slideSize: e.g. `height = H - 180 - 130`
 (H from `deck.json` `slideSize`; 4:3 H=1440 → height=1130).
 
-> **Known constraint (non-16:9):** The layout engine's text-to-box sizing uses a
-> fixed px-to-pt ratio calibrated for 16:9. On taller canvases (e.g. 4:3), boxes with
-> long `description` text may overflow. **Workaround:** explicitly set `"height"` on
-> boxes with multi-line descriptions instead of relying on auto-calculation.
+**`pt_per_px`** — the pt-to-px conversion rate from `deck.json`
+`slideSize.ptPerPx`. Defaults to 0.5 (16:9). For non-16:9 templates, pass the
+value reported by `analyze_template` (e.g. 4:3 = 0.375). The engine uses this
+to calculate box auto-height from text content, so passing the correct value
+ensures boxes are sized accurately regardless of aspect ratio.
+
+> **Box auto-height (fixed in #285):** Text-to-box sizing now uses the
+> `pt_per_px` parameter for calibration, so non-16:9 templates produce
+> correctly-sized boxes. Explicit `"height"` on box nodes is still supported
+> for manual fine-tuning.
 
 **CLI** — same engine, for SKILL.md/script hosts:
 

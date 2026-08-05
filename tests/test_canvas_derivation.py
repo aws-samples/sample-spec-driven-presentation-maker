@@ -60,11 +60,11 @@ class TestAnalyzerPin16x9:
 
     def test_slide_size(self, template_16x9: Path):
         result = analyze_template(template_16x9)
-        assert result["slide_size"] == {"width": 1920, "height": 1080}
+        assert result["slide_size"] == {"width": 1920, "height": 1080, "ptPerPx": 0.5}
 
     def test_slide_size_keys(self, template_16x9: Path):
         result = analyze_template(template_16x9)
-        assert set(result["slide_size"].keys()) == {"width", "height"}
+        assert set(result["slide_size"].keys()) == {"width", "height", "ptPerPx"}
 
 
 class TestLayoutPlaceholdersPin16x9:

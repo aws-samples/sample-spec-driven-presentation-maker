@@ -12,6 +12,44 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **Nested styled-text notation no longer leaks raw tags onto slides** —
+  agents sometimes emit `{{bold:{{#FF0000:X}}}}` instead of the canonical
+  `{{bold,#FF0000:X}}`; the parser could not see through nesting and rendered
+  the inner tag as literal text. A flatten pre-pass now normalizes nesting
+  (any depth, partial nesting included) to the comma form, with inner
+  attributes taking priority. Non-nested input is untouched. (#123)
+- **Builtin template download works from the Web UI** — downloading blank-dark /
+  blank-light did nothing: the download used a `fetch()`+blob path that requires
+  CORS, and the builtin resource bucket has no CORS configuration (user templates
+  live in a different bucket that has one). Downloads now use the same direct-link
+  navigation as deck PPTX downloads (no CORS involved), the presigned URL carries
+  `Content-Disposition: attachment`, and failures show an error toast instead of
+  silently doing nothing. (#281)
+- **`grid` tool returns actionable errors and supports `%` / `repeat()`** —
+  unsupported CSS track syntax (`auto`, `minmax()`, previously also `%` and
+  `repeat()`) crashed with an uncaught `ValueError` instead of an error message
+  the agent can react to. `%` and `repeat(n, X)` are now supported, unsupported
+  syntax returns `{"error": ...}` naming the offending token, and the supported
+  subset is documented in the tool docstring and grid guide. (#282)
+- **Live preview: icons relying on even-odd fill no longer render as solid
+  boxes** — LibreOffice's SVG export declares `fill-rule="evenodd"` only on the
+  root `<svg>`, which the per-component fragment split dropped, so multi-subpath
+  line-art icons (many AWS resource icons) lost their cutouts and appeared as
+  filled rectangles in the live preview (final PNGs were unaffected). Root
+  inheritable attributes are now propagated onto each fragment. (#288)
+
+- **Architecture diagram box auto-height now works on non-16:9 templates and
+  with CJK text** — the engine used a fixed 16:9 pt-to-px ratio for text
+  measurement, causing boxes to undersize on 4:3 and other aspect ratios, and
+  did not account for fullwidth (CJK) character width. `analyze_template` now
+  reports `ptPerPx` in `slide_size`, the agent records it in `deck.json`
+  `slideSize`, and `arch_diagram` accepts a `pt_per_px` parameter for accurate
+  calibration. (#285)
+- **Remote MCP: `analyze_template` now includes `slide_size` in cached
+  results** — the cached template analysis omitted the `slide_size` field, so
+  subsequent calls returned an incomplete response and the agent could not
+  populate `deck.json` `slideSize`. (#285)
+
 - **Custom templates with non-16:9 slide sizes (4:3 etc.) now lay out correctly** —
   the engine's px coordinate system followed the template width but assumed a
   fixed height of 1080, so 4:3 decks left the bottom quarter of every slide

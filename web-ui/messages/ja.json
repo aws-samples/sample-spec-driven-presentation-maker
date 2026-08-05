@@ -408,7 +408,8 @@
     "optional": "（任意）",
     "upload": "アップロード",
     "analyzing": "解析中…",
-    "uploadFailed": "テンプレートをアップロードできませんでした"
+    "uploadFailed": "テンプレートをアップロードできませんでした",
+    "downloadFailed": "テンプレートをダウンロードできませんでした"
   },
   "styleChat": {
     "styleCreator": "スタイルクリエイター",

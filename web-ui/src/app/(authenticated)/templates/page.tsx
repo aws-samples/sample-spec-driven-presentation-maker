@@ -53,7 +53,11 @@ export default function TemplatesPage() {
 
   const handleDownload = async (name: string) => {
     if (!idToken) return
-    await downloadTemplate(name, idToken)
+    try {
+      await downloadTemplate(name, idToken)
+    } catch {
+      showToast(t("downloadFailed"), "error")
+    }
   }
 
   const handleUpdateDescription = async (name: string, description: string) => {

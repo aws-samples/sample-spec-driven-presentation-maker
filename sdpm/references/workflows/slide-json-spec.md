@@ -302,7 +302,8 @@ Height includes the language label (22px). Code body height is `height - 22`.
 | 28pt | 70px | 140px | 210px | Heading |
 | 32pt | 80px | 160px | 240px | Large heading |
 
-**Width guide**: fullwidth = `pt × 2 × char count`, halfwidth = `pt × 1 × char count`
+**Width guide**: fullwidth px = `fontSize ÷ ptPerPx × char count`, halfwidth = half that.
+  `ptPerPx` is in `deck.json` `slideSize.ptPerPx` (16:9 = 0.5 → ×2, 4:3 = 0.375 → ×2.67)
 - `autoWidth`: true → word_wrap disabled (width fits text)
 - `line`: border color. Omit or `"none"` for no border
 - `lineWidth`: border thickness (pt, default 1)
@@ -679,6 +680,11 @@ Native PPTX chart (editable in PowerPoint).
 {{font=Lucida Console:Code font}}
 {{link:https://example.com:Link text}}
 ```
+
+> NOTE: Combine styles with commas (`{{bold,#FF0000:x}}`), not by nesting.
+> Nested tags (`{{bold:{{#FF0000:x}}}}`) are tolerated by the engine — they
+> are normalized to the comma form with inner attributes taking priority —
+> but the comma form is the canonical syntax. Nesting `link` is not supported.
 
 ## Placeholder (for user editing)
 

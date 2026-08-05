@@ -48,9 +48,13 @@ echo '{ ... }' | uv run python3 scripts/pptx_builder.py grid -
 | Equal shorthand | `"3"` | Split into 3 equal parts |
 | fr ratio | `"2fr 3fr"` | Distribute remainder at 2:3 |
 | px fixed | `"280px 1fr"` | 280px fixed + all remaining |
+| % percentage | `"30% 70%"` | Percentage of the area's width/height |
+| repeat() | `"repeat(3, 1fr)"` | Expand into 3 × 1fr |
 | Mixed | `"280px 1fr 300px"` | Both ends fixed + center flexible |
 
-Calculation: Reserve fixed (px) → subtract gaps → distribute remainder by fr ratio.
+Calculation: Reserve fixed (px, %) → subtract gaps → distribute remainder by fr ratio.
+
+**Not supported:** `auto`, `minmax()` — these require content measurement which is unavailable in a coordinate calculator. Use fr or px instead.
 
 ### Output
 

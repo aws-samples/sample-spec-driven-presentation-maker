@@ -96,14 +96,14 @@ Rules:
 5. Read `specs/art-direction.html` via `run_python` (`read_text("specs/art-direction.html")`),
    extract the `:root` CSS variables, then update `deck.json` via `write_json`.
    Also record the template's `slideSize` — call `analyze_template(template)` to get
-   `slide_size`, or use the known default `{"width": 1920, "height": 1080}` for standard
-   16:9 templates:
+   `slide_size`, or use the known default `{"width": 1920, "height": 1080, "ptPerPx": 0.5}`
+   for standard 16:9 templates:
    ```json
    {
      "template": "{template}.pptx",
      "fonts": {"fullwidth": "{fullwidth font}", "halfwidth": "{halfwidth font}"},
      "defaultTextColor": "{--color-text value}",
-     "slideSize": {"width": 1920, "height": (from analyze_template or 1080 for 16:9)}
+     "slideSize": {"width": 1920, "height": (from analyze_template or 1080 for 16:9), "ptPerPx": (from analyze_template or 0.5 for 16:9)}
    }
    ```
 

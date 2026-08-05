@@ -63,13 +63,14 @@ Update `deck.json` with the template name and fonts from the analyze output.
 When `specs/art-direction.html` exists, read `:root` CSS variables and use `--color-text` as `defaultTextColor`.
 If the style HTML specifies font-family, ask the user which to use — the style's fonts or the template's fonts.
 
-Also record the template's slide size — check the `slide_size` field from the analyze output:
+Also record the template's slide size — check the `slide_size` field from the analyze output
+and copy it verbatim (it includes `ptPerPx`, the pt-to-px conversion rate):
 ```json
 {
   "template": "{selected_template}.pptx",
   "fonts": {"fullwidth": "(style or template)", "halfwidth": "(style or template)"},
   "defaultTextColor": "(use --color-text from art-direction.html :root)",
-  "slideSize": {"width": 1920, "height": (from analyze_template slide_size)}
+  "slideSize": {"width": 1920, "height": (from analyze_template slide_size), "ptPerPx": (from analyze_template slide_size)}
 }
 ```
 
