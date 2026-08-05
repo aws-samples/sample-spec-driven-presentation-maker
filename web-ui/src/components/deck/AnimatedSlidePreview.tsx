@@ -80,6 +80,7 @@ interface AnimatedSlidePreviewProps {
   knownUrl?: string | null
   onAnimate?: () => void
   onComplete?: () => void
+  onAspectRatio?: (ratio: number) => void
   fallback?: React.ReactNode
 }
 
@@ -92,13 +93,14 @@ function assignAgent(comp: ComposeComponent, agents: ResolvedAgent[]) {
   return agents[4]
 }
 
-export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, knownUrl, onAnimate, onComplete, fallback }: AnimatedSlidePreviewProps) {
+export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, knownUrl, onAnimate, onComplete, onAspectRatio, fallback }: AnimatedSlidePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const intervalsRef = useRef<number[]>([])
   const lastComposeUrlRef = useRef("")
   const animatingRef = useRef(false)
   const [error, setError] = useState(false)
+  const [aspectRatio, setAspectRatio] = useState("16/9")
   const reducedMotion = useRef(
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
   )
@@ -134,7 +136,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       if (animatingRef.current) return  // defer until animation completes
       const skipThisUpdate = skipRef.current || compUrlBase === knownUrlRef.current
       lastComposeUrlRef.current = compUrlBase
-      setError(false)
 
       ;(async () => {
         try {
@@ -157,8 +158,18 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             setError(true); return
           }
 
+          // Empty content = nothing to render → treat as failure (fallback to PNG)
+          if (!data.bgSvg && data.components.length === 0) {
+            lastComposeUrlRef.current = ""
+            setError(true); return
+          }
+
           const container = containerRef.current
-          if (!container || cancelled) return
+          if (!container || cancelled) {
+            // Container not mounted — reset so polling can retry once mounted
+            lastComposeUrlRef.current = ""
+            return
+          }
 
           cleanup()
           setError(false)
@@ -184,6 +195,10 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
 
         // --- Build SVG ---
         const vb = data.viewBox.split(" ").map(Number)
+        if (vb[2] > 0 && vb[3] > 0) {
+          setAspectRatio(`${vb[2]}/${vb[3]}`)
+          onAspectRatio?.(vb[2] / vb[3])
+        }
         container.innerHTML = ""
         container.parentElement?.querySelectorAll(".asp-overlay").forEach(el => el.remove())
 
@@ -322,7 +337,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   }, [composeUrl])
 
   return (
-    <div data-slide-id={slug} className="aspect-[16/9] relative overflow-hidden rounded-lg bg-black">
+    <div data-slide-id={slug} className="relative overflow-hidden rounded-lg bg-black" style={{ aspectRatio }}>
       <div ref={containerRef} className="absolute inset-0" data-slide-id={slug} />
       {error && fallback && <div data-fallback className="absolute inset-0">{fallback}</div>}
     </div>
