@@ -681,6 +681,11 @@ Native PPTX chart (editable in PowerPoint).
 {{link:https://example.com:Link text}}
 ```
 
+> NOTE: Combine styles with commas (`{{bold,#FF0000:x}}`), not by nesting.
+> Nested tags (`{{bold:{{#FF0000:x}}}}`) are tolerated by the engine — they
+> are normalized to the comma form with inner attributes taking priority —
+> but the comma form is the canonical syntax. Nesting `link` is not supported.
+
 ## Placeholder (for user editing)
 
 ```json
