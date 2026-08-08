@@ -10,6 +10,55 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Added
+
+- **Mode entry points are back, as thin dispatchers** — `skills/sdpm-vibe`,
+  `skills/sdpm-spec` and `skills/sdpm-style` let users pick a mode explicitly
+  (`/sdpm-vibe` and friends in clients that expose skills as slash commands).
+  v0.5.0 removed `skills/` because each file had grown a full copy of the mode
+  behavior that then drifted; these are ~20 lines each and contain no behavior
+  text. They call `start_presentation(mode=...)` and stop, so `personas/*.md`
+  remains the only definition. A test fails if any substantial persona line
+  reappears in an entry point.
+- **The repository root is an Agent Plugins 1.0.0 package** — `plugin.json` and
+  `mcp.json` make it loadable by Kiro (as a Power), Cursor, GitHub Copilot and
+  VS Code without a client-specific installer. `mcp.json` points `uv` at
+  `${PLUGIN_ROOT}/servers/local` and puts the virtualenv under
+  `${PLUGIN_DATA}`, because clients copy the plugin into an install cache that
+  may be read-only and is replaced on update.
+- **Codex support** — `.codex-plugin/plugin.json`, a bundled MCP server
+  definition in `.mcp.json`, and a repo marketplace at
+  `.agents/plugins/marketplace.json`, so `codex plugin marketplace add ./` is
+  enough to install the checkout locally. Codex was previously limited to the
+  Layer 1 CLI path.
+- **Claude Code exposes the same entry points** — `.claude-plugin/plugin.json`
+  gained `skills` (bumped to 0.3.0). Its `agents` and `mcpServers` blocks are
+  unchanged.
+- `clients/kiro/install.py` gained `--mode {auto,legacy,power}`, `--kiro-home`
+  and `--replace-existing`.
+
+### Fixed
+
+- **`make install-kiro` no longer hijacks another checkout's Kiro setup** —
+  the MCP registration was re-registered with `--force` whenever the existing
+  `sdpm` entry pointed elsewhere, and the composer-agent cleanup deliberately
+  deleted configs generated for any checkout. Running the installer from a
+  second clone therefore repointed a working install. Every artifact the
+  installer can write (MCP registration, skill symlinks, legacy composer agent)
+  is now classified as own / stale / foreign / unknown against the current
+  checkout; only own, stale and absent are written, foreign requires
+  `--replace-existing`, and unknown is never touched. Conflicts exit non-zero
+  with a report instead of succeeding quietly.
+  Behavior change: a leftover pointing at a checkout that still exists is now
+  left alone. One pointing at a *moved* checkout is still repaired, which was
+  the staleness that cleanup existed for.
+- **`clients/kiro/install.py` honours `KIRO_HOME`** — it hardcoded `~/.kiro`,
+  so installs into a non-default Kiro profile silently wrote to the wrong one.
+  `KIRO_HOME` is now also exported to the `kiro-cli` child process, since
+  `mcp add --scope global` resolves "global" itself. Powers are global-scope
+  only, so a separate profile is the only way to keep a Kiro CLI install and a
+  Power install from colliding.
+
 ## [0.7.1] - 2026-08-05
 
 ### Fixed
