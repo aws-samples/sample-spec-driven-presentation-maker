@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "sdpm": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--directory", "${PLUGIN_ROOT}/servers/local", "python", "server.py"],
+      "env": {
+        "UV_PROJECT_ENVIRONMENT": "${PLUGIN_DATA}/venv"
+      }
+    }
+  }
+}
