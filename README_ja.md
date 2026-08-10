@@ -39,16 +39,26 @@
 ## クイックスタート
 
 統合面は MCP サーバー 1 つだけです。エージェントを接続してスライド作成を頼むだけ —
-モードの振る舞いはサーバー自身が `start_presentation` ツールで配信するため、
-**skill ファイルのインストールは不要**です。
+モードの振る舞いはサーバー自身が `start_presentation` ツールで配信します。
+リポジトリ自体が [Agent Plugins](https://agent-plugins.org) 準拠のポータブルパッケージ
+なので、この形式に対応したクライアントは MCP サーバーとモード入口をまとめて読み込めます。
 
 | 環境 | セットアップ |
 |---|---|
 | Claude Code | `/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker` → `/plugin install sdpm@sdpm` |
 | Kiro CLI | このリポジトリを `git clone` して `make install-kiro` |
+| Kiro IDE（Powers） | このチェックアウトを Power として導入 — Agent Plugins パッケージです |
+| Codex | チェックアウトで `codex plugin marketplace add ./` → ChatGPT デスクトップアプリから導入 |
 | Claude Desktop / 任意の MCP クライアント | `servers/local` を stdio MCP サーバーとして登録 — [はじめに](docs/ja/getting-started.md) 参照 |
-| MCP なし（Codex CLI, Cursor など） | エージェントに [`sdpm/SKILL.md`](sdpm/SKILL.md) を読ませる — CLI を直接駆動します |
+| MCP なし | エージェントに [`sdpm/SKILL.md`](sdpm/SKILL.md) を読ませる — CLI を直接駆動します |
 | チーム利用 / リモート MCP / Web UI（AWS） | [デプロイ手順](docs/en/deploy-cloudshell.md) |
+
+**モードの選び方.** 「スライドにして」と頼むだけで十分です（エージェントが
+`start_presentation` を呼んで選びます）。明示的に選ぶなら入口を使ってください:
+`sdpm-vibe`（手元の素材から高速生成）、`sdpm-spec`（対話設計・各ステップで承認）、
+`sdpm-style`（再利用できるスタイルガイド作成）。skill をスラッシュコマンドにする
+クライアントでは `/sdpm-vibe` `/sdpm-spec` `/sdpm-style` として使えます。入口は該当
+ペルソナをサーバーから読み込むだけで、振る舞いの実体は `personas/` の 1 箇所のままです。
 
 **ローカル利用の前提:** [`uv`](https://docs.astral.sh/uv/) が `PATH` にあること。
 スライドプレビュー（PNG 描画）には **LibreOffice** と **poppler** も必要です。
@@ -87,14 +97,17 @@
 ```
 sdpm/        エンジン（json <-> pptx）+ ナレッジ（references, assets, templates）
 personas/    モードの振る舞い — start_presentation(mode=...) で全 MCP クライアントに配信
+skills/      モードの入口 — ペルソナをサーバーから読み込むだけの薄いディスパッチャ
+plugin.json  Agent Plugins マニフェスト（+ mcp.json）— ルートをポータブルプラグインにする
 servers/     local（stdio, AWS 不要）/ remote（HTTP, S3 + DynamoDB）— 単一ツールコントラクトの薄い bind
-clients/     クライアント別の配線（Claude Code plugin エージェント、Kiro インストーラ）
+clients/     クライアント別の配線（Claude Code / Codex マニフェスト、Kiro インストーラ）
 agent/ api/ infra/ web-ui/   オプションの AWS クラウドスタック（Strands Agent, REST API, CDK, React UI）
 ```
 
 エージェントに必要なもの — ツール・ワークフロー・ガイド・モードの振る舞い — はすべて
-MCP サーバーが配信します。クライアント側のファイルは最小限の配線（composer サブエージェント登録）
-だけです。全体像は [Architecture](docs/en/architecture.md) を参照してください。
+MCP サーバーが配信します。クライアント側のファイルは最小限の配線（クライアント別マニフェストと、
+何をするかは書かずモード名だけを指す入口）だけです。
+全体像は [Architecture](docs/en/architecture.md) を参照してください。
 
 ---
 
