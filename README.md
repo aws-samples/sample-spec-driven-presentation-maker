@@ -36,16 +36,27 @@ Spec-driven presentation applies the concept of Spec-Driven Development from sof
 ## Quick Start
 
 One MCP server is the single integration surface. Connect your agent to it and ask for
-slides — the server itself delivers the mode behavior via the `start_presentation` tool,
-so there are **no skill files to install**.
+slides — the server itself delivers the mode behavior via the `start_presentation` tool.
+The repository is also a portable [Agent Plugins](https://agent-plugins.org) package, so
+clients that support that format load the MCP server and the mode entry points together.
 
 | Environment | Setup |
 |---|---|
 | Claude Code | `/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker` then `/plugin install sdpm@sdpm` |
 | Kiro CLI | `git clone` this repo, then `make install-kiro` |
+| Kiro IDE (Powers) | Install this checkout as a Power — it is an Agent Plugins package |
+| Codex | `codex plugin marketplace add ./` in the checkout, then install from the ChatGPT desktop app |
 | Claude Desktop / any MCP client | Register `servers/local` as a stdio MCP server — see [Getting Started](docs/en/getting-started.md) |
-| No MCP at all (Codex CLI, Cursor, ...) | Point your agent at [`sdpm/SKILL.md`](sdpm/SKILL.md) — it drives the CLI directly |
+| No MCP at all | Point your agent at [`sdpm/SKILL.md`](sdpm/SKILL.md) — it drives the CLI directly |
 | Team / remote MCP / Web UI (AWS) | [Deploy Guide](docs/en/deploy-cloudshell.md) |
+
+**Picking a mode.** Just asking for slides is enough — the agent calls
+`start_presentation` and picks. To choose explicitly, use the entry points:
+`sdpm-vibe` (fast, from material you already have), `sdpm-spec` (dialogue-driven, with
+approval at each step), `sdpm-style` (build a reusable style guide). In clients that turn
+skills into slash commands, those are `/sdpm-vibe`, `/sdpm-spec`, `/sdpm-style`. Each one
+only loads the matching persona from the server — the behavior itself still lives in
+`personas/`, in one place.
 
 **Prerequisites for local use:** [`uv`](https://docs.astral.sh/uv/) on your `PATH`, plus
 **LibreOffice** and **poppler** for slide previews (PNG rendering).
@@ -84,13 +95,16 @@ A hands-on workshop is available with sample data for various real-world scenari
 ```
 sdpm/        Engine (json <-> pptx) + Knowledge (references, assets, templates)
 personas/    Mode behaviors — served to any MCP client via start_presentation(mode=...)
+skills/      Mode entry points — thin dispatchers that load a persona from the server
+plugin.json  Agent Plugins manifest (+ mcp.json) — makes the root a portable plugin
 servers/     local (stdio, no AWS) / remote (HTTP, S3 + DynamoDB) — thin binds of one tool contract
-clients/     Per-client wiring (Claude Code plugin agent, Kiro installer)
+clients/     Per-client wiring (Claude Code / Codex manifests, Kiro installer)
 agent/ api/ infra/ web-ui/   Optional AWS cloud stack (Strands Agent, REST API, CDK, React UI)
 ```
 
 Everything an agent needs — tools, workflows, guides, and mode behavior — is served by
-the MCP server; client-side files are minimal wiring (composer sub-agent registration).
+the MCP server. Client-side files are minimal wiring: per-client manifests and entry
+points that name a mode without restating what it does.
 See [Architecture](docs/en/architecture.md) for the full picture.
 
 ---
