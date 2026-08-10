@@ -11,7 +11,10 @@
   "mcpServers": {
     "sdpm": {
       "command": "uv",
-      "args": ["run", "--directory", "${CLAUDE_PLUGIN_ROOT}/servers/local", "python", "server.py"]
+      "args": ["run", "--directory", "${CLAUDE_PLUGIN_ROOT}/servers/local", "python", "server.py"],
+      "env": {
+        "UV_PROJECT_ENVIRONMENT": "${CLAUDE_PLUGIN_DATA}/venv"
+      }
     }
   }
 }
