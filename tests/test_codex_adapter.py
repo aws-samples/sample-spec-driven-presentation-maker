@@ -88,14 +88,47 @@ class TestCodexManifest:
 
 
 class TestNoDriftBetweenMcpConfigs:
-    """The portable mcp.json and Codex's .mcp.json must describe the same server."""
+    """The portable mcp.json and Codex's .mcp.json must describe the same server.
+
+    The two files cannot be byte-identical: Codex (verified on 0.146.1) does
+    not expand ``${PLUGIN_ROOT}`` / ``${PLUGIN_DATA}`` in ``.mcp.json`` args or
+    env — an unexpanded ``${PLUGIN_ROOT}`` in args makes ``uv`` fail with
+    "No such file or directory", and an unexpanded ``${PLUGIN_DATA}`` in env
+    creates a literal ``${PLUGIN_DATA}`` directory. Relative *args* paths
+    resolve against the session workdir (unstable), but a relative ``cwd``
+    resolves against the plugin cache root (stable). So ``.mcp.json`` uses
+    ``cwd`` while the portable ``mcp.json`` keeps ``${PLUGIN_ROOT}`` — that
+    placeholder is guaranteed by the Agent Plugins 1.0.0 spec itself.
+
+    Drift is therefore checked on the *effective* server: same names, same
+    command, same server directory (plugin-root relative), same script.
+    """
+
+    @staticmethod
+    def _effective_server(server: dict) -> tuple:
+        """Normalize a server definition to (command, server_dir, tail_args)."""
+        args = list(server.get("args", []))
+        cwd = server.get("cwd")
+        if "--directory" in args:
+            i = args.index("--directory")
+            directory = args[i + 1]
+            tail = args[:i] + args[i + 2 :]
+        else:
+            directory = cwd or "."
+            tail = args
+        # Portable form uses the spec-guaranteed placeholder; strip it to the
+        # plugin-root-relative path for comparison.
+        directory = directory.removeprefix("${PLUGIN_ROOT}/").removeprefix("${PLUGIN_ROOT}")
+        return (server.get("command"), directory.strip("/"), tuple(tail))
 
     def test_same_server_names(self, codex_mcp, portable_mcp):
         assert set(codex_mcp["mcpServers"]) == set(portable_mcp["mcpServers"])
 
-    def test_same_server_definitions(self, codex_mcp, portable_mcp):
+    def test_same_effective_server_definitions(self, codex_mcp, portable_mcp):
         for name, portable_server in portable_mcp["mcpServers"].items():
-            assert codex_mcp["mcpServers"][name] == portable_server, (
+            assert self._effective_server(
+                codex_mcp["mcpServers"][name]
+            ) == self._effective_server(portable_server), (
                 f"'{name}' differs between mcp.json and .mcp.json — update both "
                 "or Codex will run a stale server definition"
             )
@@ -105,12 +138,25 @@ class TestNoDriftBetweenMcpConfigs:
         # would be a false assertion about which spec validates it.
         assert "$schema" not in codex_mcp
 
-    def test_uv_virtualenv_lives_outside_the_install_cache(self, codex_mcp):
-        # Codex installs into ~/.codex/plugins/cache/<marketplace>/<plugin>/<version>/
-        # and reloads from there, so a .venv created in place is discarded on
-        # every upgrade.
-        env = codex_mcp["mcpServers"]["sdpm"]["env"]
-        assert env["UV_PROJECT_ENVIRONMENT"].startswith("${PLUGIN_DATA}/")
+    def test_codex_config_has_no_unexpanded_placeholders(self, codex_mcp):
+        # Verified on Codex 0.146.1: ${PLUGIN_ROOT} / ${PLUGIN_DATA} are NOT
+        # expanded in .mcp.json args or env. A literal ${PLUGIN_ROOT} in args
+        # breaks server startup; a literal ${PLUGIN_DATA} in env creates a
+        # directory named '${PLUGIN_DATA}'.
+        text = json.dumps(codex_mcp)
+        assert "${PLUGIN_ROOT}" not in text
+        assert "${PLUGIN_DATA}" not in text
+
+    def test_codex_server_cwd_is_plugin_relative_and_contained(self, codex_mcp):
+        # A relative cwd resolves against the plugin cache root (verified),
+        # which is the only workdir-independent anchor Codex offers here.
+        for name, server in codex_mcp["mcpServers"].items():
+            cwd = server.get("cwd")
+            assert cwd, f"'{name}' must pin cwd to survive arbitrary session workdirs"
+            assert not cwd.startswith("/"), f"'{name}' cwd must be plugin-relative"
+            target = (_REPO / cwd).resolve()
+            assert target.is_dir(), f"'{name}' cwd points at a missing dir: {cwd}"
+            assert target.is_relative_to(_REPO)
 
 
 @pytest.fixture(scope="module")

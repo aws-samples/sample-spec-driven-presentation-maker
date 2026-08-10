@@ -3,10 +3,8 @@
     "sdpm": {
       "type": "stdio",
       "command": "uv",
-      "args": ["run", "--directory", "${PLUGIN_ROOT}/servers/local", "python", "server.py"],
-      "env": {
-        "UV_PROJECT_ENVIRONMENT": "${PLUGIN_DATA}/venv"
-      }
+      "args": ["run", "python", "server.py"],
+      "cwd": "servers/local"
     }
   }
 }
