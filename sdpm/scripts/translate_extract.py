@@ -104,12 +104,16 @@ def _collect(node: object, out: dict[str, None], skip_short: int) -> None:
                     for cell in value:
                         if isinstance(cell, str) and _is_translatable_string(cell, skip_short):
                             out.setdefault(cell, None)
+                        elif isinstance(cell, dict):
+                            _collect(cell, out, skip_short)
                 elif key == "rows":
                     for row in value:
                         if isinstance(row, list):
                             for cell in row:
                                 if isinstance(cell, str) and _is_translatable_string(cell, skip_short):
                                     out.setdefault(cell, None)
+                                elif isinstance(cell, dict):
+                                    _collect(cell, out, skip_short)
                 else:
                     for child in value:
                         _collect(child, out, skip_short)
@@ -203,7 +207,9 @@ def main() -> int:
         tsv.write("text\n")
         for text in collected:
             # TSV: single column, preserve tabs/newlines as literal escapes for review.
-            tsv.write(text.replace("\t", "\\t").replace("\n", "\\n") + "\n")
+            tsv.write(
+                text.replace("\t", "\\t").replace("\n", "\\n").replace("\x0b", "\\v") + "\n"
+            )
 
     print(f"Derived deck created: {dst}")
     print(f"  translate/translation_map.json ({len(dictionary)} entries)")

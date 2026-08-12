@@ -108,20 +108,11 @@ What the script does NOT handle (keep in mind):
   (LLM-assisted or by hand).
 - Text rendered inside images. Swap the image or add speaker notes if
   the image has critical translated content.
-- **Table cells in dict form.** ``headers`` / ``rows`` entries that are plain
-  strings ARE extracted, but rich cells (dict with ``text`` + styling) are
-  not walked. After filling the dictionary, check every ``table`` element in
-  ``slides/*.json`` and translate missed cells by editing the JSON directly.
 
-### Matching keys programmatically — do NOT use texts.tsv
-
-``texts.tsv`` is for human review only. Control characters make it unusable
-for key matching: ``\x0b`` (vertical tab) becomes invisible in the TSV while
-``\n`` is escaped, so TSV text will NOT equal the JSON dictionary key. When
-filling the dictionary mechanically, read the keys from
-``translation_map.json`` itself; if you need fuzzy matching (e.g. against
-source text from elsewhere), normalise both sides by stripping ``\x0b``
-before comparing — never edit the keys.
+``texts.tsv`` is an escaped review copy for humans (``\t``, ``\n`` and the
+``\x0b`` vertical tab are shown as escape sequences). When filling the
+dictionary programmatically, read the keys from ``translation_map.json``
+itself — never reconstruct them from the TSV, and never edit the keys.
 
 ---
 

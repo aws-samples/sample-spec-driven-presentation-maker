@@ -107,7 +107,8 @@ def _apply(
                 elif key == "headers":
                     node[key] = [
                         _translate_string(cell, dictionary, counter)
-                        if isinstance(cell, str) else cell
+                        if isinstance(cell, str)
+                        else _apply(cell, dictionary, counter) if isinstance(cell, dict) else cell
                         for cell in value
                     ]
                 elif key == "rows":
@@ -116,7 +117,8 @@ def _apply(
                         if isinstance(row, list):
                             new_rows.append([
                                 _translate_string(cell, dictionary, counter)
-                                if isinstance(cell, str) else cell
+                                if isinstance(cell, str)
+                                else _apply(cell, dictionary, counter) if isinstance(cell, dict) else cell
                                 for cell in row
                             ])
                         else:

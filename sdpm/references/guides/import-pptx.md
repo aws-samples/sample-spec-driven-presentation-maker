@@ -506,15 +506,13 @@ The PPTX→JSON converter has known limitations:
 - Connectors are rendered as straight lines.
 - Arrow-head styles are not preserved.
 - Complex gradients may render differently.
-- Light-fill shapes sometimes come out with `fontColor: #FFFFFF` even though
-  the original text was dark (white-on-white). After the first rebuild,
-  render the ORIGINAL pptx (LibreOffice → PNG) and compare side by side —
-  `measure` alone cannot tell a real regression from a false alarm. A safe
-  mechanical fix: for elements whose `fill` is light and `fontColor` is
-  white, darken the font color.
 - Some strings are emitted TWICE: once in the slide's `placeholders` dict and
   once as a `textbox` element carrying `_phIdx`. Both point at the same
   placeholder — edit one representation, not both, or the text doubles.
+
+After the first rebuild, render the ORIGINAL pptx (LibreOffice → PNG) and
+compare slide by slide — visual regressions are the ground truth; `measure`
+warnings alone cannot confirm or rule them out.
 
 ### Placeholder z-order (decorative images covering titles)
 
@@ -532,17 +530,8 @@ slide JSON. To bring a placeholder in front of an image:
 
 When translating or otherwise lengthening text later, apply this preventively
 to EVERY slide that mixes placeholders with decorative images — text that fit
-beside an image in one language may extend under it in another.
-
-### Lint/measure noise on imported decks
-
-- `shape-unknown-name` warnings (e.g. `round2SameRect`) are harmless in the
-  output PPTX and appear in bulk on imported decks — treat as noise.
-- `measure` contrast checks produce false positives on unknown shapes (white
-  text on a colored fill may be reported as white-on-white). True and false
-  positives share the same warning text, so pair `measure` with a visual
-  preview pass. Conversely, "image covers the title" is NOT detected by
-  `measure` at all.
+beside an image in one language may extend under it in another. `measure`
+does not detect covered text; check the preview visually.
 
 Do NOT proactively warn the user about this — the converter is tracked
 for improvement separately. Address specific visual regressions only
