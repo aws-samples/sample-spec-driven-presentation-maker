@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_EXTRACT_CLI = _REPO_ROOT / "scripts" / "translate_extract.py"
-_APPLY_CLI = _REPO_ROOT / "scripts" / "translate_apply.py"
+_EXTRACT_CLI = _REPO_ROOT / "sdpm" / "scripts" / "translate_extract.py"
+_APPLY_CLI = _REPO_ROOT / "sdpm" / "scripts" / "translate_apply.py"
 
 
 def _make_minimal_deck(deck_dir: Path) -> None:

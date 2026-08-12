@@ -17,6 +17,11 @@ original deck is untouched — translation is written to a sibling directory
   import it via the edit flow (see ``guides/import-pptx.md``).
 - ``{deck_dir}/deck.json`` has ``template`` set to the original PPTX so
   the derived deck's PPTX build finds the same layouts.
+- Script paths below are relative to the **skill root** (the directory
+  containing ``scripts/pptx_builder.py``), same as every other workflow.
+  On MCP clients there is no translate tool — run the two translate
+  scripts with your shell tool from the sdpm checkout (the ``--directory``
+  registered in your MCP server config points into it).
 
 ---
 

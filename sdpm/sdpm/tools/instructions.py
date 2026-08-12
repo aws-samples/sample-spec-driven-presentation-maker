@@ -22,6 +22,7 @@ A. New presentation — create slides from scratch
 B. Edit existing PPTX — modify a provided file
 C. Hand-edit sync — continue from a user-edited PPTX
 D. Create style — build a reusable style guide
+E. Translate deck — create a language variant of an existing deck
 
 ## Workflow A: New Presentation
 
@@ -45,4 +46,11 @@ When the user hand-edits the generated PPTX in PowerPoint and then asks for furt
 
 When the user wants to create a new reusable style guide.
 → Read `read_workflows(["create-style"])` to start.
+
+## Workflow E: Translate Deck
+
+When the user wants an existing deck in another language (e.g. "translate this deck
+to English"). The translation is written to a derived sibling deck — the original
+stays untouched. If only the source PPTX exists, import it first (Workflow B).
+→ Read `read_workflows(["translate-pptx"])` to start.
 """

@@ -10,6 +10,19 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The deck-translation workflow is reachable again** — `translate-pptx`
+  existed as a workflow document but nothing routed to it: the MCP server
+  instructions menu stopped at D and no persona mentioned it, so an agent
+  asked to translate a deck could only find it by spontaneously calling
+  `list_workflows`. It is now Workflow E in the server instructions, with
+  routing lines in the vibe and single personas. The translate scripts also
+  moved from the repo-root `scripts/` (deploy helpers, not shipped with the
+  skill) to `sdpm/scripts/` next to `pptx_builder.py`, so the workflow's
+  `scripts/translate_extract.py` commands resolve relative to the skill root
+  like every other workflow — and Layer 1 skill installs actually get them.
+
 ### Added
 
 - **Mode entry points are back, as thin dispatchers** — `skills/sdpm-vibe`,

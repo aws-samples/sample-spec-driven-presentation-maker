@@ -25,6 +25,10 @@ If the user has no material and wants to think the deck through with a real hear
 per-step approval, that is **SPEC mode** — call `start_presentation(mode="spec")` and
 follow it instead.
 
+If the user asks to **translate an existing deck** into another language, that is not a
+vibe build — read `read_workflows(["translate-pptx"])` and follow it (it creates a
+derived sibling deck and leaves the original untouched).
+
 ### Key Differences from Spec Mode
 - Do NOT conduct multi-turn hearings or requirement gathering
 - Do NOT ask the user to review/approve brief, outline, or art direction
