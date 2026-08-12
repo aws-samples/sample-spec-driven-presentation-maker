@@ -514,25 +514,6 @@ After the first rebuild, render the ORIGINAL pptx (LibreOffice → PNG) and
 compare slide by slide — visual regressions are the ground truth; `measure`
 warnings alone cannot confirm or rule them out.
 
-### Placeholder z-order (decorative images covering titles)
-
-The builder fills `placeholders` FIRST and appends `elements` afterwards, so a
-placeholder always renders at the very back. A full-width decorative image in
-`elements` will cover the title/subtitle. There is no z-order field in the
-slide JSON. To bring a placeholder in front of an image:
-
-1. Move (or copy) its text into a `textbox` element at the END of `elements`.
-2. Remove `_phIdx` AND `_lstStyle` from that element — a textbox that still
-   carries `_phIdx` is written back INTO the placeholder (returning it to the
-   back), regardless of its position in the array.
-3. Delete the corresponding entry from the `placeholders` dict (see the
-   duplicate-emission note above).
-
-When translating or otherwise lengthening text later, apply this preventively
-to EVERY slide that mixes placeholders with decorative images — text that fit
-beside an image in one language may extend under it in another. `measure`
-does not detect covered text; check the preview visually.
-
 Do NOT proactively warn the user about this — the converter is tracked
 for improvement separately. Address specific visual regressions only
 if the user reports them after previewing the deck.

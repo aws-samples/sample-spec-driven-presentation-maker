@@ -133,20 +133,8 @@ translating EN → JA because Japanese characters are wider):
 - Widen the containing element (``width`` / ``height``).
 - Insert explicit line breaks (``\n``) where auto-wrap produces awkward
   splits.
-- **Z-order hiding on imported decks**: longer translated titles can extend
-  UNDER decorative images even on slides that looked fine in the source
-  language — placeholders always render behind ``elements``. Check every
-  slide that mixes placeholders with full-width images, and fix via the
-  placeholder z-order procedure in ``guides/import-pptx.md``. ``measure``
-  does not detect this; preview visually.
 - Re-run measure after each fix; iterate until the overflow warnings
   clear.
-
-Note on CLI preview output: ``pptx_builder.py preview`` writes PNGs under a
-temporary ``_work/tmp*/`` directory (path printed on stdout) and overlays a
-red positioning grid — it does NOT populate ``{deck_dir}/preview/``. The
-grid is a positioning aid, not part of the deck. The MCP ``generate_pptx``
-tool's ``preview_files`` behave differently (no grid, deck-local paths).
 
 ---
 
