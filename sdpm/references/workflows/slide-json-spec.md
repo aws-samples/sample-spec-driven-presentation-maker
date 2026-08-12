@@ -444,6 +444,7 @@ Height includes the language label (22px). Code body height is `height - 22`.
 - `verticalAlign`: `top`, `middle`, `bottom` (default: middle for shape)
 - `rotation`: rotation angle (degrees, clockwise)
 - `gradient.angle`: gradient angle, clockwise from right. 0°=left→right, 90°=top→bottom, 180°=right→left, 270°=bottom→top. Same convention as block_arc/pie shapes
+- `sendToBack`: render this element BEHIND template placeholders (title/subtitle). Elements normally stack in array order, all in front of placeholders — use this on full-bleed decorative shapes/images that must not cover the title. Works on any element type
 - `circle`: alias for oval. Squared using min(width, height)
 - `arrow_circular` / `arrow_circular_left` / `arrow_circular_left_right`: arc arrows for cycle diagrams
 - `arrow_curved_*`: thick curved arrows

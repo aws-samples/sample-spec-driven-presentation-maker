@@ -246,7 +246,22 @@ class PPTXBuilder(
                     expanded.extend(inc_elements)
             else:
                 expanded.append(elem)
+        # Z-order: OOXML renders spTree children in document order, and
+        # placeholders (from the layout) always precede appended elements.
+        # sendToBack moves an element BEFORE the placeholders so e.g. a
+        # full-width decorative image no longer covers the title. Multiple
+        # sendToBack elements keep their relative order.
+        sp_tree = slide.shapes._spTree
+        back_cursor = 0
+        for child in sp_tree:
+            tag = child.tag.split('}')[-1]
+            if tag in ('nvGrpSpPr', 'grpSpPr'):
+                back_cursor += 1
+            else:
+                break
+
         for elem in expanded:
+            n_before = len(sp_tree)
             elem_type = elem.get("type")
             if elem_type == "group":
                 self._add_group(slide, elem)
@@ -327,6 +342,13 @@ class PPTXBuilder(
                 import sys as _sys
                 print(f"Warning: unknown element type {elem_type!r} skipped "
                       f"(slide {slide_def.get('id', '?')})", file=_sys.stderr)
+
+            if elem.get("sendToBack"):
+                new_nodes = list(sp_tree)[n_before:]
+                for node in new_nodes:
+                    sp_tree.remove(node)
+                    sp_tree.insert(back_cursor, node)
+                    back_cursor += 1
 
         if "notes" in slide_def:
             notes_frame = slide.notes_slide.notes_text_frame

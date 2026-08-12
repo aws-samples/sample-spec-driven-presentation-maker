@@ -60,7 +60,10 @@ def _build_grad_fill_element(gradient: dict):
     else:
         lin = etree.SubElement(grad_fill, qn('a:lin'))
         lin.set('ang', str(_gradient_angle_to_ooxml(gradient.get("angle", 90))))
-        lin.set('scaled', '1')
+        # scaled=1: angle is stretched to the fill region (PowerPoint UI
+        # behavior, historical default here). scaled=False in the JSON keeps
+        # the true geometric angle — imported decks rely on this.
+        lin.set('scaled', '0' if gradient.get("scaled") is False else '1')
 
     return grad_fill
 

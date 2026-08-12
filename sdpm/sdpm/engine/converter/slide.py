@@ -480,8 +480,19 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
     
     # Extract non-placeholder elements
     # img_counter continues from placeholder images
+    # Z-order: the builder fills placeholders first and appends elements
+    # after, so a non-placeholder shape that came BEFORE a placeholder in the
+    # original spTree would jump in front of it. Mark those sendToBack so the
+    # builder restores the original stacking (e.g. a full-width decorative
+    # image behind the title).
+    _seen_placeholder = False
+    _has_used_placeholder = any(
+        s.is_placeholder and s.has_text_frame and s.text.strip()
+        for s in slide.shapes
+    )
     for shape in slide.shapes:
         if shape.is_placeholder:
+            _seen_placeholder = True
             continue
         
         try:
@@ -493,6 +504,8 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                     dy = abs(elem.get("y2", 0) - elem.get("y1", 0))
                     if dx <= 30 and dy <= 30:
                         continue
+                if _has_used_placeholder and not _seen_placeholder:
+                    elem["sendToBack"] = True
                 elements.append(elem)
         except Exception as e:
             print(f"Warning: Failed to extract shape {shape.name}: {e}", file=sys.stderr)

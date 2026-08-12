@@ -40,6 +40,58 @@ def _title_slide(prs):
     raise AssertionError("no layout with title placeholder in template")
 
 
+class TestSendToBack:
+    def test_send_to_back_moves_element_before_placeholders(self, tmp_path):
+        from sdpm.engine.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
+        b.add_slide({
+            "layout": "Title Slide",
+            "placeholders": {"0": "Hello"},
+            "elements": [
+                {"type": "shape", "shape": "rectangle", "x": 0, "y": 0,
+                 "width": 1920, "height": 1080, "fill": "#FF0000",
+                 "sendToBack": True},
+                {"type": "shape", "shape": "rectangle", "x": 0, "y": 0,
+                 "width": 100, "height": 100, "fill": "#00FF00"},
+            ],
+        })
+        slide = b.prs.slides[0]
+        sp_tree = slide.shapes._spTree
+        order = []
+        for child in sp_tree:
+            tag = child.tag.split('}')[-1]
+            if tag == 'sp':
+                is_ph = child.find('.//{http://schemas.openxmlformats.org/presentationml/2006/main}ph') is not None
+                order.append('ph' if is_ph else 'elem')
+        # sendToBack element renders first (before placeholders); normal
+        # element stays after them
+        assert order[0] == 'elem'
+        assert 'ph' in order
+        assert order.index('ph') < len(order) - 1 or order[-1] == 'ph'
+
+    def test_import_marks_pre_placeholder_shapes(self, tmp_path):
+        # A decorative shape placed BEFORE the title in the source spTree
+        # must come back with sendToBack so the rebuild keeps it behind.
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E
+        prs = Presentation(str(_template()))
+        slide = _title_slide(prs)
+        slide.shapes.title.text = "Title text"
+        sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, E(0), E(0), E(914400), E(457200))
+        sp.text_frame.text = "backdrop"
+        # Move the shape before the title placeholder in the spTree
+        sp_tree = slide.shapes._spTree
+        el = sp._element
+        sp_tree.remove(el)
+        sp_tree.insert(2, el)
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        elems = [e for s in result["slides"] for e in s["elements"]]
+        backdrop = next(e for e in elems if "backdrop" in str(e.get("text", "")))
+        assert backdrop.get("sendToBack") is True
+
+
 class TestMinimalStripNonStrKeys:
     def test_int_keys_do_not_crash(self):
         slide = {
@@ -1268,6 +1320,36 @@ class TestPowerPointStrictness:
         assert el.get("fontColor", "").startswith("#")
         # No color tag baked into the run text
         assert "#" not in str(el["text"]).replace(el.get("fontColor"), "")
+
+    def test_fontref_yields_to_shape_lststyle_color(self, tmp_path):
+        # OOXML precedence: an explicit defRPr solidFill in the shape's own
+        # txBody lstStyle beats the style fontRef. Adopting fontRef here used
+        # to bake white onto light-fill cards whose lstStyle renders dark
+        # text (the white-on-white import bug).
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E
+        from lxml import etree
+        from pptx.oxml.ns import qn
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, E(0), E(0), E(914400), E(457200))
+        sp.text_frame.text = "header"
+        fr = sp._element.find(qn('p:style') + '/' + qn('a:fontRef'))
+        for child in list(fr):
+            fr.remove(child)
+        etree.SubElement(fr, qn('a:schemeClr')).set('val', 'lt1')
+        lst = sp._element.find(qn('p:txBody') + '/' + qn('a:lstStyle'))
+        lvl1 = etree.SubElement(lst, qn('a:lvl1pPr'))
+        defr = etree.SubElement(lvl1, qn('a:defRPr'))
+        fill = etree.SubElement(defr, qn('a:solidFill'))
+        etree.SubElement(fill, qn('a:srgbClr')).set('val', '232F3E')
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if "header" in str(e.get("text", "")))
+        # fontRef's white must NOT be adopted — lstStyle wins in PowerPoint
+        assert el.get("fontColor") is None
 
     def test_pattern_fill_schema_order(self, tmp_path):
         # PowerPoint ignores fills that appear after a:ln in spPr.

@@ -206,8 +206,24 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
             if prst_geom is not None:
                 prst = prst_geom.get('prst')
                 mask_rmap = {"ellipse": "circle", "roundRect": "rounded_rectangle", "hexagon": "hexagon", "diamond": "diamond", "triangle": "triangle", "pentagon": "pentagon", "star5": "star_5_point", "heart": "heart", "trapezoid": "trapezoid"}
-                if prst and prst != 'rect' and prst in mask_rmap:
-                    effects["mask"] = mask_rmap[prst]
+                if prst and prst != 'rect':
+                    # Friendly name when we have one; otherwise pass the raw
+                    # OOXML preset through (builder replays unknown presets
+                    # verbatim — e.g. round1Rect, snip2SameRect).
+                    effects["mask"] = mask_rmap.get(prst, prst)
+                    av_lst = prst_geom.find(f'{{{_NS["a"]}}}avLst')
+                    if av_lst is not None:
+                        adjs = []
+                        for gd in av_lst.findall(f'{{{_NS["a"]}}}gd'):
+                            fmla = gd.get('fmla', '')
+                            if fmla.startswith('val '):
+                                raw = int(fmla.split()[1])
+                                # roundRect JSON semantics are 0–1 of full
+                                # rounding (builder writes *50000); other
+                                # presets carry the raw fraction (*100000).
+                                adjs.append(raw / 50000 if prst == 'roundRect' else raw / 100000)
+                        if adjs:
+                            effects["maskAdjustments"] = adjs
             # Visual effects
             effects.update(_extract_visual_effects(sp_pr, theme_colors, color_mapping))
 

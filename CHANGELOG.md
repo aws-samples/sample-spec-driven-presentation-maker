@@ -12,6 +12,53 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **`sendToBack` element key — z-order control over placeholders** — elements
+  normally render in front of template placeholders (the builder fills
+  placeholders first), so a full-bleed decorative image always covered the
+  title with no recourse. `"sendToBack": true` moves an element behind the
+  placeholders; multiple marked elements keep their relative order. The
+  PPTX importer now emits it automatically for shapes that preceded the
+  first used placeholder in the source slide, so imported decks keep their
+  original stacking. (#316)
+- **`pptx_builder.py preview -o/--output-dir`** — the CLI preview can now
+  write PNGs to a chosen directory (e.g. `{deck_dir}/preview`) instead of
+  always using a temporary `_work/` folder; `--no-grid` already existed.
+  `sdpm.api.preview` gains the matching `output_dir` parameter. (#316)
+- **`repr` and `__name__` in the `run_python` sandbox** — agent code using
+  `repr()` or the `__main__` idiom no longer needs rewriting. (#316)
+
+### Fixed
+
+- **Importer: white text baked onto light cards (white-on-white)** — the
+  converter adopted the shape style's `fontRef` color even when the shape's
+  own `lstStyle` carried an explicit text color, which outranks `fontRef`
+  in OOXML. Decks whose light-fill cards define dark text via `lstStyle`
+  came back with `fontColor: #FFFFFF`. (#316)
+- **Importer/builder: arrowheads lost their size** — `tailEnd`/`headEnd`
+  `w`/`len` attributes are now round-tripped (`arrowEndWidth`,
+  `arrowEndLength`, `arrowStartWidth`, `arrowStartLength`), so a large
+  arrowhead no longer comes back as the small default.
+- **Importer/builder: gradient direction distorted on non-square shapes** —
+  the `scaled` attribute of linear gradients was dropped on import and
+  forced to `1` on build. A `scaled="0"` gradient (true geometric angle) on
+  a wide bar now renders at its original angle.
+- **Importer/builder: partially-rounded rectangles on pictures** — image
+  masks were limited to a 9-name allowlist and dropped their adjustment
+  values. Any OOXML preset now passes through (`round1Rect`,
+  `round2SameRect`, …) with its `avLst` preserved, so e.g. a picture panel
+  with one rounded corner survives the round trip.
+- **measure: white-on-white false positives over gradient shapes** — the
+  contrast judge only recognized gradients written as `style="fill:url(…)"`;
+  LibreOffice sometimes emits `fill="url(…)"` as an attribute, making the
+  background "unknown" and falling back to the white slide background. Both
+  forms are now treated as unknowable background (contrast check skipped).
+  (#316)
+- **lint: `shape-unknown-name` noise on imported decks** — camelCase raw
+  OOXML presets (which the builder renders verbatim) are no longer flagged;
+  pure-lowercase typos still are. (#316)
+
+### Added
+
 - **Mode entry points are back, as thin dispatchers** — `skills/sdpm-vibe`,
   `skills/sdpm-spec` and `skills/sdpm-style` let users pick a mode explicitly
   (`/sdpm-vibe` and friends in clients that expose skills as slash commands).
