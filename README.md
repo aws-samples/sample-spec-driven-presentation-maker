@@ -31,6 +31,19 @@ Spec-driven presentation applies the concept of Spec-Driven Development from sof
 
 ![workflow](./docs/assets/workflow-en.png)
 
+### What you can ask for
+
+Beyond creating a new deck from scratch, the agent is routed to these workflows
+automatically — just describe what you want:
+
+| Ask | What happens |
+|---|---|
+| "Make slides about …" | New presentation (briefing → outline → art direction → compose → review) |
+| "Edit this PPTX" | Imports an existing PPTX into an editable deck |
+| "I hand-edited the PPTX, continue from it" | Syncs your PowerPoint edits back into the deck |
+| "Create a style like …" | Builds a reusable style guide (colors, typography, decoration) |
+| "Translate this deck to English" | Creates a language-variant deck next to the original (source deck untouched) |
+
 ---
 
 ## Quick Start
