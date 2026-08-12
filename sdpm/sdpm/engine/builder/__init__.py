@@ -343,6 +343,14 @@ class PPTXBuilder(
                 print(f"Warning: unknown element type {elem_type!r} skipped "
                       f"(slide {slide_def.get('id', '?')})", file=_sys.stderr)
 
+            # PowerPoint drops out-of-order spPr children (e.g. a:ln after
+            # a:effectLst) — normalize every new node to schema order.
+            from sdpm.engine.builder.formatting import normalize_sppr_order
+            for node in list(sp_tree)[n_before:]:
+                for sp_pr_el in node.iter():
+                    if sp_pr_el.tag.split('}')[-1] == 'spPr':
+                        normalize_sppr_order(sp_pr_el)
+
             if elem.get("sendToBack"):
                 new_nodes = list(sp_tree)[n_before:]
                 for node in new_nodes:

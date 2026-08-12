@@ -41,6 +41,34 @@ def _title_slide(prs):
 
 
 class TestSendToBack:
+    def test_sppr_children_follow_schema_order(self):
+        # PowerPoint silently drops out-of-order spPr children: a line whose
+        # a:ln lands after a:effectLst loses its color, width and arrowheads
+        # there (LibreOffice renders it fine, masking the bug).
+        from sdpm.engine.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
+        b.add_slide({
+            "layout": "Blank",
+            "elements": [{
+                "type": "line", "x1": 0, "y1": 100, "x2": 500, "y2": 100,
+                "color": "#AD5CFF", "lineWidth": 1.5,
+                "arrowEnd": "triangle", "arrowEndWidth": "lg", "arrowEndLength": "med",
+                "_noEffects": True,
+            }],
+        })
+        slide = b.prs.slides[0]
+        ns_a = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
+        checked = 0
+        for sh in slide.shapes:
+            sp_pr = sh._element.spPr
+            tags = [c.tag.split('}')[-1] for c in sp_pr]
+            if 'ln' in tags and 'effectLst' in tags:
+                assert tags.index('ln') < tags.index('effectLst'), tags
+                ln = sp_pr.find(f'{ns_a}ln')
+                assert ln.find(f'{ns_a}tailEnd') is not None
+                checked += 1
+        assert checked >= 1
+
     def test_send_to_back_moves_element_before_placeholders(self, tmp_path):
         from sdpm.engine.builder import PPTXBuilder
         b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
