@@ -26,8 +26,8 @@ per-step approval, that is **SPEC mode** — call `start_presentation(mode="spec
 follow it instead.
 
 If the user asks to **translate an existing deck** into another language, that is not a
-vibe build — read `read_workflows(["translate-pptx"])` and follow it (it creates a
-derived sibling deck and leaves the original untouched).
+vibe build — call `start_presentation(mode="translate")` and follow it instead (it
+creates a derived sibling deck and leaves the original untouched).
 
 ### Key Differences from Spec Mode
 - Do NOT conduct multi-turn hearings or requirement gathering

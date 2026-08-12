@@ -77,7 +77,7 @@ kiro-cli chat   # あとは「〜のスライドを作って」と頼むだけ
 
 `sdpm` ローカル MCP サーバーを `<KIRO_HOME>/settings/mcp.json`（既定は `~/.kiro`）に登録し、
 モードの入口を `<KIRO_HOME>/skills/` に symlink します。これにより `/sdpm-vibe` `/sdpm-spec`
-`/sdpm-style` でモードを明示的に選べます。振る舞いの実体は MCP サーバーが
+`/sdpm-style` `/sdpm-translate` でモードを明示的に選べます。振る舞いの実体は MCP サーバーが
 `start_presentation(mode=...)` で配信し、入口はモード名を指すだけです。
 前提: [`uv`](https://docs.astral.sh/uv/) が `PATH` にあること、プレビュー用に
 **LibreOffice** と **poppler**。

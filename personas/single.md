@@ -18,4 +18,4 @@ spec-driven-presentation-maker: AI-powered PowerPoint generation from JSON.
 ## Workflow: Translate Deck
 
 When the user wants an existing deck in another language.
-→ Read `read_workflows(["translate-pptx"])` to start. The translation is written to a derived sibling deck — the original stays untouched.
+→ Call `start_presentation(mode="translate")` and follow the returned instructions. The translation is written to a derived sibling deck — the original stays untouched.

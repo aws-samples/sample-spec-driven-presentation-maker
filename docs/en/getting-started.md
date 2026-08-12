@@ -77,7 +77,7 @@ kiro-cli chat   # then just ask: "make slides about ..."
 
 This registers the `sdpm` local MCP server in `<KIRO_HOME>/settings/mcp.json` (default
 `~/.kiro`) and symlinks the mode entry points into `<KIRO_HOME>/skills/`, so you can also
-run `/sdpm-vibe`, `/sdpm-spec` or `/sdpm-style` to pick a mode explicitly. The behavior
+run `/sdpm-vibe`, `/sdpm-spec`, `/sdpm-style` or `/sdpm-translate` to pick a mode explicitly. The behavior
 itself is still served by the MCP server via `start_presentation(mode=...)`; the entry
 points only name the mode. Prerequisites: [`uv`](https://docs.astral.sh/uv/) on your
 `PATH`, plus **LibreOffice** and **poppler** for slide previews.

@@ -10,14 +10,25 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Added
+
+- **`translate` mode with a `/sdpm-translate` entry point** — deck translation
+  is now a first-class mode: `start_presentation(mode="translate")` serves
+  `personas/translate.md`, and a fourth thin skill entry point
+  (`skills/sdpm-translate`) exposes it as a slash command in every client
+  that maps skills, alongside vibe/spec/style. The persona drives the
+  existing `translate-pptx` workflow (extract → dictionary → apply → build)
+  and makes the agent itself fill the translation dictionary.
+
 ### Fixed
 
 - **The deck-translation workflow is reachable again** — `translate-pptx`
   existed as a workflow document but nothing routed to it: the MCP server
   instructions menu stopped at D and no persona mentioned it, so an agent
   asked to translate a deck could only find it by spontaneously calling
-  `list_workflows`. It is now Workflow E in the server instructions, with
-  routing lines in the vibe and single personas. The translate scripts also
+  `list_workflows`. It is now Workflow E in the server instructions
+  (pointing at the new translate mode), with routing lines in the vibe and
+  single personas. The translate scripts also
   moved from the repo-root `scripts/` (deploy helpers, not shipped with the
   skill) to `sdpm/scripts/` next to `pptx_builder.py`, so the workflow's
   `scripts/translate_extract.py` commands resolve relative to the skill root

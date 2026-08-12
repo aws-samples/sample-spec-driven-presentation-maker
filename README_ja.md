@@ -69,8 +69,9 @@
 **モードの選び方.** 「スライドにして」と頼むだけで十分です（エージェントが
 `start_presentation` を呼んで選びます）。明示的に選ぶなら入口を使ってください:
 `sdpm-vibe`（手元の素材から高速生成）、`sdpm-spec`（対話設計・各ステップで承認）、
-`sdpm-style`（再利用できるスタイルガイド作成）。skill をスラッシュコマンドにする
-クライアントでは `/sdpm-vibe` `/sdpm-spec` `/sdpm-style` として使えます。入口は該当
+`sdpm-style`（再利用できるスタイルガイド作成）、`sdpm-translate`（既存デッキの他言語翻訳）。
+skill をスラッシュコマンドにする
+クライアントでは `/sdpm-vibe` `/sdpm-spec` `/sdpm-style` `/sdpm-translate` として使えます。入口は該当
 ペルソナをサーバーから読み込むだけで、振る舞いの実体は `personas/` の 1 箇所のままです。
 
 **ローカル利用の前提:** [`uv`](https://docs.astral.sh/uv/) が `PATH` にあること。
