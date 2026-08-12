@@ -129,10 +129,17 @@ uv run python3 scripts/pptx_builder.py preview {deck_dir}-ja -p 1,3,5
 Common post-translation fixes (layout breakage is typical when
 translating EN → JA because Japanese characters are wider):
 
-- Reduce ``fontSize`` on overflowing elements.
-- Widen the containing element (``width`` / ``height``).
-- Insert explicit line breaks (``\n``) where auto-wrap produces awkward
-  splits.
+- **Pick the fix per element — your judgment.** Prefer, in order:
+  1. Enlarge the container (``width`` / ``height``) when surrounding space
+     allows — letting a 2-line text become 3 lines is a perfectly good fix
+     if the box can grow.
+  2. Insert explicit line breaks (``\n``) to move the wrap point.
+  3. Reduce ``fontSize`` as the LAST resort — it carries semantic weight
+     (hierarchy) and readability.
+- **Check line-break naturalness, not just overflow.** Auto-wrap can split
+  mid-word / mid-phrase (e.g. a Japanese compound broken after its first
+  kanji, or a product name split across lines). measure does not flag
+  these — scan the preview and fix with ``\n`` or a width tweak.
 - Re-run measure after each fix; iterate until the overflow warnings
   clear.
 
