@@ -20,8 +20,12 @@ original deck is untouched — translation is written to a sibling directory
 - Script paths below are relative to the **skill root** (the directory
   containing ``scripts/pptx_builder.py``), same as every other workflow.
   On MCP clients there is no translate tool — run the two translate
-  scripts with your shell tool from the sdpm checkout (the ``--directory``
-  registered in your MCP server config points into it).
+  scripts with your shell tool from the sdpm checkout. To locate it: your
+  MCP server registration's ``--directory`` points at a server directory
+  *inside* the checkout (e.g. ``<checkout>/servers/local``), not at the
+  skill root itself — go up to the checkout root and find the directory
+  that contains ``scripts/pptx_builder.py`` (its name varies by layout,
+  e.g. ``sdpm/`` or ``skill/``).
 
 ---
 
@@ -104,6 +108,20 @@ What the script does NOT handle (keep in mind):
   (LLM-assisted or by hand).
 - Text rendered inside images. Swap the image or add speaker notes if
   the image has critical translated content.
+- **Table cells in dict form.** ``headers`` / ``rows`` entries that are plain
+  strings ARE extracted, but rich cells (dict with ``text`` + styling) are
+  not walked. After filling the dictionary, check every ``table`` element in
+  ``slides/*.json`` and translate missed cells by editing the JSON directly.
+
+### Matching keys programmatically — do NOT use texts.tsv
+
+``texts.tsv`` is for human review only. Control characters make it unusable
+for key matching: ``\x0b`` (vertical tab) becomes invisible in the TSV while
+``\n`` is escaped, so TSV text will NOT equal the JSON dictionary key. When
+filling the dictionary mechanically, read the keys from
+``translation_map.json`` itself; if you need fuzzy matching (e.g. against
+source text from elsewhere), normalise both sides by stripping ``\x0b``
+before comparing — never edit the keys.
 
 ---
 
@@ -124,8 +142,20 @@ translating EN → JA because Japanese characters are wider):
 - Widen the containing element (``width`` / ``height``).
 - Insert explicit line breaks (``\n``) where auto-wrap produces awkward
   splits.
+- **Z-order hiding on imported decks**: longer translated titles can extend
+  UNDER decorative images even on slides that looked fine in the source
+  language — placeholders always render behind ``elements``. Check every
+  slide that mixes placeholders with full-width images, and fix via the
+  placeholder z-order procedure in ``guides/import-pptx.md``. ``measure``
+  does not detect this; preview visually.
 - Re-run measure after each fix; iterate until the overflow warnings
   clear.
+
+Note on CLI preview output: ``pptx_builder.py preview`` writes PNGs under a
+temporary ``_work/tmp*/`` directory (path printed on stdout) and overlays a
+red positioning grid — it does NOT populate ``{deck_dir}/preview/``. The
+grid is a positioning aid, not part of the deck. The MCP ``generate_pptx``
+tool's ``preview_files`` behave differently (no grid, deck-local paths).
 
 ---
 

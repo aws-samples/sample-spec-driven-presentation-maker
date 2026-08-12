@@ -506,6 +506,43 @@ The PPTX→JSON converter has known limitations:
 - Connectors are rendered as straight lines.
 - Arrow-head styles are not preserved.
 - Complex gradients may render differently.
+- Light-fill shapes sometimes come out with `fontColor: #FFFFFF` even though
+  the original text was dark (white-on-white). After the first rebuild,
+  render the ORIGINAL pptx (LibreOffice → PNG) and compare side by side —
+  `measure` alone cannot tell a real regression from a false alarm. A safe
+  mechanical fix: for elements whose `fill` is light and `fontColor` is
+  white, darken the font color.
+- Some strings are emitted TWICE: once in the slide's `placeholders` dict and
+  once as a `textbox` element carrying `_phIdx`. Both point at the same
+  placeholder — edit one representation, not both, or the text doubles.
+
+### Placeholder z-order (decorative images covering titles)
+
+The builder fills `placeholders` FIRST and appends `elements` afterwards, so a
+placeholder always renders at the very back. A full-width decorative image in
+`elements` will cover the title/subtitle. There is no z-order field in the
+slide JSON. To bring a placeholder in front of an image:
+
+1. Move (or copy) its text into a `textbox` element at the END of `elements`.
+2. Remove `_phIdx` AND `_lstStyle` from that element — a textbox that still
+   carries `_phIdx` is written back INTO the placeholder (returning it to the
+   back), regardless of its position in the array.
+3. Delete the corresponding entry from the `placeholders` dict (see the
+   duplicate-emission note above).
+
+When translating or otherwise lengthening text later, apply this preventively
+to EVERY slide that mixes placeholders with decorative images — text that fit
+beside an image in one language may extend under it in another.
+
+### Lint/measure noise on imported decks
+
+- `shape-unknown-name` warnings (e.g. `round2SameRect`) are harmless in the
+  output PPTX and appear in bulk on imported decks — treat as noise.
+- `measure` contrast checks produce false positives on unknown shapes (white
+  text on a colored fill may be reported as white-on-white). True and false
+  positives share the same warning text, so pair `measure` with a visual
+  preview pass. Conversely, "image covers the title" is NOT detected by
+  `measure` at all.
 
 Do NOT proactively warn the user about this — the converter is tracked
 for improvement separately. Address specific visual regressions only
