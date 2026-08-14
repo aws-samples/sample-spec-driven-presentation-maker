@@ -21,7 +21,7 @@ from sdpm.config import PERSONAS_DIR as _PERSONAS_DIR
 from sdpm.config import REFERENCES_DIR as _REFERENCES_DIR
 from sdpm.tools.instructions import INSTRUCTIONS as _INSTRUCTIONS
 
-_MODES = ("vibe", "spec", "style", "composer", "single")
+_MODES = ("vibe", "spec", "style", "translate", "composer", "single")
 
 
 def start_presentation(mode: str = "") -> str:
@@ -41,6 +41,9 @@ def start_presentation(mode: str = "") -> str:
               through conversation, or wants to edit an existing PPTX / create a style
               via the guided menu.
             - "style": create a reusable style guide (HTML design tokens) through dialogue.
+            - "translate": translate an existing deck into another language as a derived
+              deck (the source deck stays untouched). Use when the user says "translate
+              this deck" / "make an English version".
             - "composer": silent slide composition from approved specs. Used by composer
               sub-agents, or by the orchestrator itself when no sub-agent mechanism exists.
               If you were dispatched with deck_id + assigned_slugs (+ task_instruction),

@@ -31,6 +31,19 @@ Spec-driven presentation applies the concept of Spec-Driven Development from sof
 
 ![workflow](./docs/assets/workflow-en.png)
 
+### What you can ask for
+
+Beyond creating a new deck from scratch, the agent is routed to these workflows
+automatically — just describe what you want:
+
+| Ask | What happens |
+|---|---|
+| "Make slides about …" | New presentation (briefing → outline → art direction → compose → review) |
+| "Edit this PPTX" | Imports an existing PPTX into an editable deck |
+| "I hand-edited the PPTX, continue from it" | Syncs your PowerPoint edits back into the deck |
+| "Create a style like …" | Builds a reusable style guide (colors, typography, decoration) |
+| "Translate this deck to English" | Creates a language-variant deck next to the original (source deck untouched) |
+
 ---
 
 ## Quick Start
@@ -53,8 +66,10 @@ clients that support that format load the MCP server and the mode entry points t
 **Picking a mode.** Just asking for slides is enough — the agent calls
 `start_presentation` and picks. To choose explicitly, use the entry points:
 `sdpm-vibe` (fast, from material you already have), `sdpm-spec` (dialogue-driven, with
-approval at each step), `sdpm-style` (build a reusable style guide). In clients that turn
-skills into slash commands, those are `/sdpm-vibe`, `/sdpm-spec`, `/sdpm-style`. Each one
+approval at each step), `sdpm-style` (build a reusable style guide), `sdpm-translate`
+(translate an existing deck into another language). In clients that turn
+skills into slash commands, those are `/sdpm-vibe`, `/sdpm-spec`, `/sdpm-style`,
+`/sdpm-translate`. Each one
 only loads the matching persona from the server — the behavior itself still lives in
 `personas/`, in one place.
 
