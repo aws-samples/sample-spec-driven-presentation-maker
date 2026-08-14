@@ -241,10 +241,17 @@ def _extract_shape_text(shape, elem, theme_colors, color_mapping=None, builder_t
     # accent-filled bar) inherit their text color from the style, not from
     # run properties. Resolve it so the builder doesn't paint them with the
     # deck default.
+    # OOXML precedence: the fontRef color is the LAST resort — an explicit
+    # color in the shape's own txBody lstStyle (defRPr solidFill) beats it.
+    # Adopting fontRef in that case bakes e.g. white onto a light-fill card
+    # whose lstStyle actually renders dark text (white-on-white bug).
     font_ref = shape._element.find(f'{{{_NS["p"]}}}style/{{{_NS["a"]}}}fontRef')
     if font_ref is not None and theme_colors:
+        lst_style_color = shape._element.find(
+            f'{{{_NS["p"]}}}txBody/{{{_NS["a"]}}}lstStyle//{{{_NS["a"]}}}defRPr/{{{_NS["a"]}}}solidFill'
+        )
         scheme_el = font_ref.find(f'{{{_NS["a"]}}}schemeClr')
-        if scheme_el is not None:
+        if scheme_el is not None and lst_style_color is None:
             from .color import _resolve_color_with_transforms
             ref_color = _resolve_color_with_transforms(scheme_el, theme_colors, color_mapping)
             if ref_color and ref_color.lower() != (default_text_color or '').lower():

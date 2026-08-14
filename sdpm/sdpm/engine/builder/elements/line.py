@@ -95,9 +95,17 @@ class LineMixin:
         if arrow_end:
             te = etree.SubElement(ln, f'{{{ns_a}}}tailEnd')
             te.set('type', arrow_end)
+            if elem.get("arrowEndWidth"):
+                te.set('w', elem["arrowEndWidth"])
+            if elem.get("arrowEndLength"):
+                te.set('len', elem["arrowEndLength"])
         if arrow_start:
             he = etree.SubElement(ln, f'{{{ns_a}}}headEnd')
             he.set('type', arrow_start)
+            if elem.get("arrowStartWidth"):
+                he.set('w', elem["arrowStartWidth"])
+            if elem.get("arrowStartLength"):
+                he.set('len', elem["arrowStartLength"])
     
     def _add_line(self, slide, elem):
         """Add line/connector to slide."""
@@ -230,10 +238,18 @@ class LineMixin:
             if arrow_start:
                 head_elem = etree.SubElement(ln, '{http://schemas.openxmlformats.org/drawingml/2006/main}headEnd')
                 head_elem.set('type', arrow_start)
+                if elem.get("arrowStartWidth"):
+                    head_elem.set('w', elem["arrowStartWidth"])
+                if elem.get("arrowStartLength"):
+                    head_elem.set('len', elem["arrowStartLength"])
 
             if arrow_end:
                 tail_elem = etree.SubElement(ln, '{http://schemas.openxmlformats.org/drawingml/2006/main}tailEnd')
                 tail_elem.set('type', arrow_end)
+                if elem.get("arrowEndWidth"):
+                    tail_elem.set('w', elem["arrowEndWidth"])
+                if elem.get("arrowEndLength"):
+                    tail_elem.set('len', elem["arrowEndLength"])
 
         # Apply line color or gradient
         line_gradient = elem.get("lineGradient")

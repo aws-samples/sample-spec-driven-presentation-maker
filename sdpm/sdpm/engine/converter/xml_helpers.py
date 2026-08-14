@@ -333,6 +333,10 @@ def _extract_fill_from_xml(sp_pr, theme_colors=None, color_mapping=None):
                 xml_angle = round(int(lin_el.get('ang', '0')) / 60000, 1)
                 grad_info["angle"] = xml_angle
                 grad_info["type"] = "linear"
+                if lin_el.get('scaled', '0') != '1':
+                    # True geometric angle (not scaled to the fill region).
+                    # Builder default is scaled=1, so record the difference.
+                    grad_info["scaled"] = False
             elif path_el is not None:
                 grad_info["type"] = path_el.get('path', 'circle')  # circle, rect, shape
                 fill_to = path_el.find('a:fillToRect', _NS)

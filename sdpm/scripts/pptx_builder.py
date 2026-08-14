@@ -157,6 +157,7 @@ def cmd_preview(args):
             json_path=args.input,
             pages=pages_list,
             grid=not args.no_grid,
+            output_dir=args.output_dir,
         )
     except (FileNotFoundError, RuntimeError) as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -626,6 +627,11 @@ def main():
     p_prev.add_argument("input", help="Input JSON file")
     p_prev.add_argument("-p", "--pages", help="Pages to export (e.g. 1,3,5)")
     p_prev.add_argument("--no-grid", action="store_true", help="Disable 5%% grid overlay")
+    p_prev.add_argument(
+        "-o", "--output-dir",
+        help="Directory for the PNG files (e.g. {deck_dir}/preview). "
+             "Default: a fresh temporary directory under _work/",
+    )
 
     p_meas = subparsers.add_parser("measure", help="Measure text bounding boxes from slides JSON")
     p_meas.add_argument("input", help="Input JSON file")

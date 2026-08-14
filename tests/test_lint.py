@@ -74,6 +74,15 @@ class TestLintShape:
         ]}])
         assert any(d["rule"] == "shape-unknown-name" for d in diags)
 
+    def test_raw_ooxml_preset_is_not_flagged(self):
+        # The builder passes camelCase OOXML presets through verbatim
+        # (imported decks are full of them) — no noise for those.
+        diags = lint([{"elements": [
+            {"type": "shape", "shape": "round2SameRect", "x": 0, "y": 0, "width": 100, "height": 50},
+            {"type": "shape", "shape": "snip1Rect", "x": 0, "y": 0, "width": 100, "height": 50},
+        ]}])
+        assert not any(d["rule"] == "shape-unknown-name" for d in diags)
+
     def test_missing_position(self):
         diags = lint([{"elements": [{"type": "shape", "shape": "rectangle", "width": 100}]}])
         assert any("missing 'x'" in d["message"] for d in diags)
