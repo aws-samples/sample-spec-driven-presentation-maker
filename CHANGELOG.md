@@ -20,21 +20,19 @@ Entries before v0.5.0 were written retroactively as summaries.
   existing `translate-pptx` workflow (extract → dictionary → apply → build)
   and makes the agent itself fill the translation dictionary.
 
-### Fixed
-
-- **The deck-translation workflow is reachable again** — `translate-pptx`
-  existed as a workflow document but nothing routed to it: the MCP server
-  instructions menu stopped at D and no persona mentioned it, so an agent
-  asked to translate a deck could only find it by spontaneously calling
-  `list_workflows`. It is now Workflow E in the server instructions
-  (pointing at the new translate mode), with routing lines in the vibe and
-  single personas. The translate scripts also
-  moved from the repo-root `scripts/` (deploy helpers, not shipped with the
-  skill) to `sdpm/scripts/` next to `pptx_builder.py`, so the workflow's
-  `scripts/translate_extract.py` commands resolve relative to the skill root
-  like every other workflow — and Layer 1 skill installs actually get them.
-
-### Added
+- **`make install-kiro` generates a dedicated composer agent again** —
+  `<KIRO_HOME>/agents/sdpm-composer.json` gives parallel compose workers the
+  sdpm MCP server only, with pre-approved tools and a generous startup
+  timeout. Without it, workers fall back to a general-purpose agent that
+  cold-starts every MCP server in the profile per worker; on MCP-heavy
+  profiles this made some parallel composers miss the sdpm server
+  nondeterministically (observed with 30+ registered servers). The generated
+  config is a thin pointer — its prompt is a `file://` reference into
+  `personas/composer.md`, never inline behavior — and it is lifecycle-managed
+  by the same ownership audit as the rest of the wiring (own/stale are
+  regenerated, foreign/unknown are never touched; power mode still removes
+  it). v0.5.3 dropped generation because the old installer could not manage
+  the file safely across checkouts; the ownership audit removed that reason.
 
 - **Mode entry points are back, as thin dispatchers** — `skills/sdpm-vibe`,
   `skills/sdpm-spec` and `skills/sdpm-style` let users pick a mode explicitly
@@ -62,6 +60,18 @@ Entries before v0.5.0 were written retroactively as summaries.
   and `--replace-existing`.
 
 ### Fixed
+
+- **The deck-translation workflow is reachable again** — `translate-pptx`
+  existed as a workflow document but nothing routed to it: the MCP server
+  instructions menu stopped at D and no persona mentioned it, so an agent
+  asked to translate a deck could only find it by spontaneously calling
+  `list_workflows`. It is now Workflow E in the server instructions
+  (pointing at the new translate mode), with routing lines in the vibe and
+  single personas. The translate scripts also
+  moved from the repo-root `scripts/` (deploy helpers, not shipped with the
+  skill) to `sdpm/scripts/` next to `pptx_builder.py`, so the workflow's
+  `scripts/translate_extract.py` commands resolve relative to the skill root
+  like every other workflow — and Layer 1 skill installs actually get them.
 
 - **`make install-kiro` no longer hijacks another checkout's Kiro setup** —
   the MCP registration was re-registered with `--force` whenever the existing
