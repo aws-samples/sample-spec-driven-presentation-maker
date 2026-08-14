@@ -76,7 +76,8 @@ kiro-cli chat   # then just ask: "make slides about ..."
 
 This registers the `sdpm` local MCP server in `<KIRO_HOME>/settings/mcp.json` (default
 `~/.kiro`), symlinks the mode entry points into `<KIRO_HOME>/skills/` (so you can also
-run `/sdpm-vibe`, `/sdpm-spec` or `/sdpm-style` to pick a mode explicitly), and generates
+run `/sdpm-vibe`, `/sdpm-spec`, `/sdpm-style` or `/sdpm-translate` to pick a mode
+explicitly), and generates
 a composer agent at `<KIRO_HOME>/agents/sdpm-composer.json` — a thin pointer that gives
 compose workers the sdpm server only, instead of cold-starting every MCP server in your
 profile per worker. The behavior itself is still served by the MCP server via

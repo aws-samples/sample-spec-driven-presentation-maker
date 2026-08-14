@@ -76,7 +76,7 @@ kiro-cli chat   # あとは「〜のスライドを作って」と頼むだけ
 
 `sdpm` ローカル MCP サーバーを `<KIRO_HOME>/settings/mcp.json`（既定は `~/.kiro`）に登録し、
 モードの入口を `<KIRO_HOME>/skills/` に symlink します。これにより `/sdpm-vibe` `/sdpm-spec`
-`/sdpm-style` でモードを明示的に選べます。加えて composer エージェントを
+`/sdpm-style` `/sdpm-translate` でモードを明示的に選べます。加えて composer エージェントを
 `<KIRO_HOME>/agents/sdpm-composer.json` に生成します — compose ワーカーに sdpm サーバー
 だけを持たせる薄いポインタで、ワーカーごとにプロファイル内の全 MCP サーバーを
 コールドスタートするのを防ぎます。振る舞いの実体は MCP サーバーが
