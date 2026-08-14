@@ -506,6 +506,13 @@ The PPTX→JSON converter has known limitations:
 - Connectors are rendered as straight lines.
 - Arrow-head styles are not preserved.
 - Complex gradients may render differently.
+- Some strings are emitted TWICE: once in the slide's `placeholders` dict and
+  once as a `textbox` element carrying `_phIdx`. Both point at the same
+  placeholder — edit one representation, not both, or the text doubles.
+
+After the first rebuild, render the ORIGINAL pptx (LibreOffice → PNG) and
+compare slide by slide — visual regressions are the ground truth; `measure`
+warnings alone cannot confirm or rule them out.
 
 Do NOT proactively warn the user about this — the converter is tracked
 for improvement separately. Address specific visual regressions only

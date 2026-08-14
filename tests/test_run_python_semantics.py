@@ -126,6 +126,16 @@ class TestLocalRunPython:
         assert (deck_dir / "specs" / "brief.md").read_text() == "# Brief"
         assert calls == []
 
+    def test_repr_and_dunder_name_are_available(self, deck_dir: Path, monkeypatch):
+        self._patch_generate(monkeypatch)
+        out = json.loads(sandbox_tools.run_python(
+            purpose="use repr and __name__",
+            code='print(repr("a\\x0bb")); print(__name__)',
+            deck_id=str(deck_dir),
+        ))
+        assert "'a\\x0bb'" in out["output"]
+        assert "__main__" in out["output"]
+
 
     def test_committed_import_bundle_is_read_only(self, deck_dir: Path, monkeypatch):
         calls = self._patch_generate(monkeypatch)

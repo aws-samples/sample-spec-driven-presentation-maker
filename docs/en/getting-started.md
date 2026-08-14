@@ -38,8 +38,8 @@ directory into your agent's skills directory. The agent calls the engine through
 `scripts/pptx_builder.py` — no MCP server involved.
 
 > **Kiro CLI users:** you probably want [Layer 2](#layer-2-local-mcp-server) instead —
-> `make install-kiro` sets up the local MCP server (mode behavior included); composer
-> sub-agents for parallel slide generation are self-spawned, nothing extra to install.
+> `make install-kiro` sets up the local MCP server (mode behavior included) and a
+> dedicated composer agent for reliable parallel slide generation.
 
 ```bash
 # Install dependencies
@@ -65,8 +65,7 @@ Connect spec-driven-presentation-maker to any MCP-compatible client. No AWS acco
 ### Kiro CLI — one make target (recommended)
 
 Kiro CLI users get everything from a single target — the MCP server carries the mode
-behavior, and composer sub-agents are self-spawned at compose time (no agent files
-to install):
+behavior, and a dedicated `sdpm-composer` agent handles parallel slide generation:
 
 ```bash
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
@@ -76,16 +75,18 @@ kiro-cli chat   # then just ask: "make slides about ..."
 ```
 
 This registers the `sdpm` local MCP server in `<KIRO_HOME>/settings/mcp.json` (default
-`~/.kiro`) and symlinks the mode entry points into `<KIRO_HOME>/skills/`, so you can also
-run `/sdpm-vibe`, `/sdpm-spec` or `/sdpm-style` to pick a mode explicitly. The behavior
-itself is still served by the MCP server via `start_presentation(mode=...)`; the entry
-points only name the mode. Prerequisites: [`uv`](https://docs.astral.sh/uv/) on your
+`~/.kiro`), symlinks the mode entry points into `<KIRO_HOME>/skills/` (so you can also
+run `/sdpm-vibe`, `/sdpm-spec`, `/sdpm-style` or `/sdpm-translate` to pick a mode
+explicitly), and generates
+a composer agent at `<KIRO_HOME>/agents/sdpm-composer.json` — a thin pointer that gives
+compose workers the sdpm server only, instead of cold-starting every MCP server in your
+profile per worker. The behavior itself is still served by the MCP server via
+`start_presentation(mode=...)`; the entry points and the composer agent only name it.
+Prerequisites: [`uv`](https://docs.astral.sh/uv/) on your
 `PATH`, plus **LibreOffice** and **poppler** for slide previews.
 
 Keep the checkout where it is — the MCP server runs from it. `git pull` is enough to
-update. Re-run `make install-kiro` only if you move the checkout (upgrading from
-v0.5.2 or earlier, re-run it once — it also removes the now-unneeded
-`~/.kiro/agents/sdpm-composer.json` that older installers generated).
+update. Re-run `make install-kiro` only if you move the checkout.
 
 Useful flags — call the script directly, since `make` does not forward arguments:
 

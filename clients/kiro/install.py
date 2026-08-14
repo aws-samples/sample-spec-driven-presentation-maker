@@ -10,13 +10,14 @@ Kiro can consume sdpm two ways, and they must not both be active:
   Kiro IDE; this script never installs one. It only audits that no legacy
   wiring is left behind to shadow it.
 * **legacy** — Kiro v2 has no plugin mechanism, so the skills are symlinked
-  into ``<KIRO_HOME>/skills/`` and the MCP server is registered in
-  ``<KIRO_HOME>/settings/mcp.json``.
+  into ``<KIRO_HOME>/skills/``, a dedicated composer agent is generated at
+  ``<KIRO_HOME>/agents/sdpm-composer.json``, and the MCP server is registered
+  in ``<KIRO_HOME>/settings/mcp.json``.
 
 Everything this script writes is *owned*: it records nothing outside
 ``KIRO_HOME`` and it refuses to touch wiring that belongs to a different
 checkout. If another checkout owns the ``sdpm`` MCP registration, a skill
-symlink, or the legacy composer agent, the run fails with a report instead of
+symlink, or the composer agent, the run fails with a report instead of
 overwriting it — pass ``--replace-existing`` to take it over deliberately.
 
 Set ``KIRO_HOME`` (or pass ``--kiro-home``) to target a profile other than
@@ -25,8 +26,10 @@ from colliding, because Powers are global-scope only.
 
 The repository stays the single source of truth: mode behavior lives in
 ``personas/*.md`` and is served by the MCP server via
-``start_presentation(mode=...)``, and composer sub-agents are self-spawned by
-the orchestrating agent. ``git pull`` updates take effect without re-running
+``start_presentation(mode=...)``. The generated composer agent carries no
+behavior either — its prompt is a ``file://`` pointer into
+``personas/composer.md`` (self-spawn remains the documented fallback for
+environments without it). ``git pull`` updates take effect without re-running
 this script. Re-run only if you move the checkout.
 """
 
@@ -178,10 +181,20 @@ def audit_skill_link(link: Path, repo_root: Path = REPO_ROOT) -> Finding:
 
 
 def _expected_composer_config(checkout: Path) -> dict:
-    """The exact object the old installer (v0.5.0–v0.5.2) generated.
+    """The composer agent config this installer generates for ``checkout``.
 
-    This is the deleted ``sdpm-composer.json.tmpl`` with ``{{CHECKOUT}}``
-    resolved — kept here verbatim so cleanup can require FULL equality.
+    Same object the v0.5.0–v0.5.2 installers wrote (the deleted
+    ``sdpm-composer.json.tmpl`` with ``{{CHECKOUT}}`` resolved), kept verbatim
+    so ownership classification can require FULL equality across versions.
+
+    Why a dedicated agent: compose is a fan-out workload (up to 10 parallel
+    workers). The persona's self-spawn fallback works, but a general-purpose
+    worker inherits every MCP server in the profile — each worker cold-starts
+    all of them, and under parallel load the sdpm server can miss its init
+    timeout on some workers (observed in practice). This agent gives workers
+    the sdpm server only, with a generous timeout and pre-approved tools, and
+    carries no behavior text: the prompt is a ``file://`` pointer into
+    ``personas/composer.md``.
     """
     return {
         "name": "sdpm-composer",
@@ -234,12 +247,12 @@ def generated_composer_checkout(data: object) -> Path | None:
 
 
 def audit_composer(agents_dest: Path, repo_root: Path = REPO_ROOT) -> Finding:
-    """Classify the legacy generated ``sdpm-composer.json``.
+    """Classify the generated ``sdpm-composer.json``.
 
-    Composer sub-agents are self-spawned since v0.5.3, so this file is never
-    wanted. It is only removed when THIS checkout generated it: a config
-    belonging to another checkout is that checkout's business, even though it
-    matches a form we recognise.
+    Legacy mode (re)generates this file; power mode removes it. Either way the
+    decision is ownership-gated: a config belonging to another checkout is that
+    checkout's business, even though it matches a form we recognise, and a
+    user-edited one is never touched.
     """
     legacy = agents_dest / "sdpm-composer.json"
     if not legacy.exists():
@@ -323,18 +336,46 @@ def link_skills(kiro_home: Path, findings: list[Finding], repo_root: Path = REPO
 
 
 def remove_owned_composer_agent(findings: list[Finding]) -> None:
-    """Delete the legacy composer agent config, but only if we generated it."""
+    """Delete the composer agent config, but only if we generated it.
+
+    Used in power mode: the Power supersedes all legacy v2 wiring, including
+    the composer agent.
+    """
     for f in findings:
         if f.kind != "composer":
             continue
         if f.status in (OWN, STALE):
             f.target.unlink()
-            info(f"{f.target} (removed legacy composer agent — composers are now self-spawned)")
+            info(f"{f.target} (removed composer agent — the Power supersedes it)")
         elif f.status == UNKNOWN:
             warn(
                 f"{f.target} {f.detail} — left in place (it may be user-edited). "
-                "It is no longer needed for sdpm compose; remove it manually when convenient."
+                "Remove it manually when convenient."
             )
+
+
+def write_composer_agent(findings: list[Finding], repo_root: Path = REPO_ROOT) -> None:
+    """(Re)generate ``sdpm-composer.json`` for this checkout (idempotent).
+
+    A registered ``sdpm-composer`` agent is the persona's preferred worker for
+    parallel compose; without it, workers fall back to a general-purpose agent
+    that cold-starts every MCP server in the profile per worker (see
+    ``_expected_composer_config`` for the failure mode this avoids).
+    """
+    for f in findings:
+        if f.kind != "composer":
+            continue
+        if f.status == OWN:
+            info(f"{f.target} (already up to date)")
+            continue
+        if f.status in BLOCKING:
+            continue  # reported by the caller; never overwritten here
+        f.target.parent.mkdir(parents=True, exist_ok=True)
+        f.target.write_text(
+            json.dumps(_expected_composer_config(repo_root), indent=2) + "\n",
+            encoding="utf-8",
+        )
+        info(f"{f.target} ({'regenerated' if f.status == STALE else 'generated'})")
 
 
 def _kiro_env(kiro_home: Path) -> dict[str, str]:
@@ -527,8 +568,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"[1/3] Linking skills into {kiro_home / 'skills'}")
     link_skills(kiro_home, findings, REPO_ROOT)
-    print("[2/3] Cleaning up superseded artifacts")
-    remove_owned_composer_agent(findings)
+    print(f"[2/3] Registering the composer agent in {kiro_home / 'agents'}")
+    write_composer_agent(findings, REPO_ROOT)
     print(f"[3/3] Registering MCP server '{MCP_SERVER_NAME}' in {mcp_finding.target}")
     register_mcp_server(kiro_cli, mcp_finding, opts.agent, kiro_home, REPO_ROOT)
 

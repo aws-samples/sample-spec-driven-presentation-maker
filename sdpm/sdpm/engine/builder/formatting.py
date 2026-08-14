@@ -6,6 +6,28 @@ from pptx.util import Emu, Pt
 from sdpm.engine.schema.defaults import GRADIENT_DEFAULTS
 from sdpm.utils.text import is_fullwidth, parse_styled_text
 
+# CT_ShapeProperties child order per the OOXML schema. PowerPoint silently
+# IGNORES children that appear out of sequence (LibreOffice is lenient, so
+# the breakage only shows up in PowerPoint — e.g. an <a:ln> appended after
+# <a:effectLst/> loses its color, width and arrowheads there).
+_SPPR_ORDER = [
+    'xfrm', 'custGeom', 'prstGeom',
+    'noFill', 'solidFill', 'gradFill', 'blipFill', 'pattFill', 'grpFill',
+    'ln', 'effectLst', 'effectDag', 'scene3d', 'sp3d', 'extLst',
+]
+
+
+def normalize_sppr_order(sp_pr) -> None:
+    """Reorder spPr children into schema sequence (stable within a tag)."""
+    rank = {tag: i for i, tag in enumerate(_SPPR_ORDER)}
+    children = list(sp_pr)
+    ordered = sorted(children, key=lambda c: rank.get(c.tag.split('}')[-1], len(rank)))
+    if ordered != children:
+        for c in children:
+            sp_pr.remove(c)
+        for c in ordered:
+            sp_pr.append(c)
+
 
 def _gradient_angle_to_ooxml(angle_deg: float) -> int:
     """Convert JSON gradient angle (degrees) to OOXML angle units.
@@ -60,7 +82,10 @@ def _build_grad_fill_element(gradient: dict):
     else:
         lin = etree.SubElement(grad_fill, qn('a:lin'))
         lin.set('ang', str(_gradient_angle_to_ooxml(gradient.get("angle", 90))))
-        lin.set('scaled', '1')
+        # scaled=1: angle is stretched to the fill region (PowerPoint UI
+        # behavior, historical default here). scaled=False in the JSON keeps
+        # the true geometric angle — imported decks rely on this.
+        lin.set('scaled', '0' if gradient.get("scaled") is False else '1')
 
     return grad_fill
 

@@ -14,3 +14,8 @@ spec-driven-presentation-maker: AI-powered PowerPoint generation from JSON.
 ## Workflow: New Presentation
 
 → Read `read_workflows(["create-new-1-briefing"])` to start. Follow each file's Next Step from there.
+
+## Workflow: Translate Deck
+
+When the user wants an existing deck in another language.
+→ Call `start_presentation(mode="translate")` and follow the returned instructions. The translation is written to a derived sibling deck — the original stays untouched.

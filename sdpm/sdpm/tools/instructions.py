@@ -12,7 +12,8 @@ INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generati
 **Mode shortcuts:** if the user's intent is already clear, skip this menu and call
 `start_presentation(mode=...)` — `"vibe"` for fast generation from existing material
 (minimal questions), `"spec"` for dialogue-driven design with hearings and approvals,
-`"style"` for creating a reusable style guide. The returned instructions replace this menu.
+`"style"` for creating a reusable style guide, `"translate"` for translating an existing
+deck into another language. The returned instructions replace this menu.
 
 **Critical constraint:** Do NOT make any decisions about slide structure, content, design, or layout before loading the workflow. The workflow files contain the full process including briefing, outline, and art direction. Wait until the workflow is loaded and follow it step by step.
 
@@ -22,6 +23,7 @@ A. New presentation — create slides from scratch
 B. Edit existing PPTX — modify a provided file
 C. Hand-edit sync — continue from a user-edited PPTX
 D. Create style — build a reusable style guide
+E. Translate deck — create a language variant of an existing deck
 
 ## Workflow A: New Presentation
 
@@ -45,4 +47,11 @@ When the user hand-edits the generated PPTX in PowerPoint and then asks for furt
 
 When the user wants to create a new reusable style guide.
 → Read `read_workflows(["create-style"])` to start.
+
+## Workflow E: Translate Deck
+
+When the user wants an existing deck in another language (e.g. "translate this deck
+to English"). The translation is written to a derived sibling deck — the original
+stays untouched. If only the source PPTX exists, import it first (Workflow B).
+→ Call `start_presentation(mode="translate")` and follow the returned instructions.
 """
