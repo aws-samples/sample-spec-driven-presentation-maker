@@ -41,38 +41,6 @@ Entries before v0.5.0 were written retroactively as summaries.
   it). v0.5.3 dropped generation because the old installer could not manage
   the file safely across checkouts; the ownership audit removed that reason.
 
-### Fixed
-
-- **Importer: white text baked onto light cards (white-on-white)** — the
-  converter adopted the shape style's `fontRef` color even when the shape's
-  own `lstStyle` carried an explicit text color, which outranks `fontRef`
-  in OOXML. Decks whose light-fill cards define dark text via `lstStyle`
-  came back with `fontColor: #FFFFFF`. (#316)
-- **Importer/builder: arrowheads lost their size** — `tailEnd`/`headEnd`
-  `w`/`len` attributes are now round-tripped (`arrowEndWidth`,
-  `arrowEndLength`, `arrowStartWidth`, `arrowStartLength`), so a large
-  arrowhead no longer comes back as the small default.
-- **Importer/builder: gradient direction distorted on non-square shapes** —
-  the `scaled` attribute of linear gradients was dropped on import and
-  forced to `1` on build. A `scaled="0"` gradient (true geometric angle) on
-  a wide bar now renders at its original angle.
-- **Importer/builder: partially-rounded rectangles on pictures** — image
-  masks were limited to a 9-name allowlist and dropped their adjustment
-  values. Any OOXML preset now passes through (`round1Rect`,
-  `round2SameRect`, …) with its `avLst` preserved, so e.g. a picture panel
-  with one rounded corner survives the round trip.
-- **measure: white-on-white false positives over gradient shapes** — the
-  contrast judge only recognized gradients written as `style="fill:url(…)"`;
-  LibreOffice sometimes emits `fill="url(…)"` as an attribute, making the
-  background "unknown" and falling back to the white slide background. Both
-  forms are now treated as unknowable background (contrast check skipped).
-  (#316)
-- **lint: `shape-unknown-name` noise on imported decks** — camelCase raw
-  OOXML presets (which the builder renders verbatim) are no longer flagged;
-  pure-lowercase typos still are. (#316)
-
-### Added
-
 - **Mode entry points are back, as thin dispatchers** — `skills/sdpm-vibe`,
   `skills/sdpm-spec` and `skills/sdpm-style` let users pick a mode explicitly
   (`/sdpm-vibe` and friends in clients that expose skills as slash commands).
@@ -119,6 +87,34 @@ Entries before v0.5.0 were written retroactively as summaries.
   `mcp add --scope global` resolves "global" itself. Powers are global-scope
   only, so a separate profile is the only way to keep a Kiro CLI install and a
   Power install from colliding.
+
+- **Importer: white text baked onto light cards (white-on-white)** — the
+  converter adopted the shape style's `fontRef` color even when the shape's
+  own `lstStyle` carried an explicit text color, which outranks `fontRef`
+  in OOXML. Decks whose light-fill cards define dark text via `lstStyle`
+  came back with `fontColor: #FFFFFF`. (#316)
+- **Importer/builder: arrowheads lost their size** — `tailEnd`/`headEnd`
+  `w`/`len` attributes are now round-tripped (`arrowEndWidth`,
+  `arrowEndLength`, `arrowStartWidth`, `arrowStartLength`), so a large
+  arrowhead no longer comes back as the small default.
+- **Importer/builder: gradient direction distorted on non-square shapes** —
+  the `scaled` attribute of linear gradients was dropped on import and
+  forced to `1` on build. A `scaled="0"` gradient (true geometric angle) on
+  a wide bar now renders at its original angle.
+- **Importer/builder: partially-rounded rectangles on pictures** — image
+  masks were limited to a 9-name allowlist and dropped their adjustment
+  values. Any OOXML preset now passes through (`round1Rect`,
+  `round2SameRect`, …) with its `avLst` preserved, so e.g. a picture panel
+  with one rounded corner survives the round trip.
+- **measure: white-on-white false positives over gradient shapes** — the
+  contrast judge only recognized gradients written as `style="fill:url(…)"`;
+  LibreOffice sometimes emits `fill="url(…)"` as an attribute, making the
+  background "unknown" and falling back to the white slide background. Both
+  forms are now treated as unknowable background (contrast check skipped).
+  (#316)
+- **lint: `shape-unknown-name` noise on imported decks** — camelCase raw
+  OOXML presets (which the builder renders verbatim) are no longer flagged;
+  pure-lowercase typos still are. (#316)
 
 ## [0.7.1] - 2026-08-05
 
