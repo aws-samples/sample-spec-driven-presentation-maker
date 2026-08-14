@@ -12,6 +12,20 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **`make install-kiro` generates a dedicated composer agent again** —
+  `<KIRO_HOME>/agents/sdpm-composer.json` gives parallel compose workers the
+  sdpm MCP server only, with pre-approved tools and a generous startup
+  timeout. Without it, workers fall back to a general-purpose agent that
+  cold-starts every MCP server in the profile per worker; on MCP-heavy
+  profiles this made some parallel composers miss the sdpm server
+  nondeterministically (observed with 30+ registered servers). The generated
+  config is a thin pointer — its prompt is a `file://` reference into
+  `personas/composer.md`, never inline behavior — and it is lifecycle-managed
+  by the same ownership audit as the rest of the wiring (own/stale are
+  regenerated, foreign/unknown are never touched; power mode still removes
+  it). v0.5.3 dropped generation because the old installer could not manage
+  the file safely across checkouts; the ownership audit removed that reason.
+
 - **Mode entry points are back, as thin dispatchers** — `skills/sdpm-vibe`,
   `skills/sdpm-spec` and `skills/sdpm-style` let users pick a mode explicitly
   (`/sdpm-vibe` and friends in clients that expose skills as slash commands).

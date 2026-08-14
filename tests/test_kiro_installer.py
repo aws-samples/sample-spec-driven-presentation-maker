@@ -199,8 +199,8 @@ class TestAuditSkillLink:
 
 
 class TestAuditComposer:
-    """The legacy composer agent is superseded by self-spawn, but removing it
-    is still an ownership decision."""
+    """Legacy mode (re)generates the composer agent, power mode removes it —
+    both are ownership decisions driven by this classification."""
 
     def test_absent(self, kiro_home):
         assert kiro_install.audit_composer(kiro_home / "agents").status == ABSENT
@@ -336,12 +336,44 @@ class TestMainLegacyMode:
         assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "legacy"]) == 0
         assert link.resolve() == (REPO_ROOT / "skills" / "sdpm-vibe").resolve()
 
-    def test_removes_only_our_own_legacy_composer_agent(self, kiro_home, no_kiro_cli):
-        composer = _write_composer(
-            kiro_home / "agents", kiro_install._expected_composer_config(REPO_ROOT)
-        )
+    def test_generates_the_composer_agent(self, kiro_home, no_kiro_cli):
         assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "legacy"]) == 0
-        assert not composer.exists()
+        composer = kiro_home / "agents" / "sdpm-composer.json"
+        assert composer.exists()
+        data = json.loads(composer.read_text(encoding="utf-8"))
+        assert data == kiro_install._expected_composer_config(REPO_ROOT)
+        # The generated config is a thin pointer: sdpm MCP only, behavior
+        # served from personas/ — never inline.
+        assert set(data["mcpServers"]) == {"sdpm"}
+        assert data["prompt"].startswith("file://")
+        assert data["prompt"].endswith("/personas/composer.md")
+
+    def test_composer_generation_is_idempotent(self, kiro_home, no_kiro_cli):
+        assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "legacy"]) == 0
+        composer = kiro_home / "agents" / "sdpm-composer.json"
+        first = composer.read_text(encoding="utf-8")
+        assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "legacy"]) == 0
+        assert composer.read_text(encoding="utf-8") == first
+
+    def test_repairs_a_composer_agent_from_a_moved_checkout(
+        self, kiro_home, no_kiro_cli, tmp_path
+    ):
+        gone = tmp_path / "moved-away"
+        _write_composer(kiro_home / "agents", kiro_install._expected_composer_config(gone))
+
+        assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "legacy"]) == 0
+        data = json.loads(
+            (kiro_home / "agents" / "sdpm-composer.json").read_text(encoding="utf-8")
+        )
+        assert data == kiro_install._expected_composer_config(REPO_ROOT)
+
+    def test_never_overwrites_a_user_edited_composer_agent(self, kiro_home, no_kiro_cli):
+        cfg = kiro_install._expected_composer_config(REPO_ROOT)
+        cfg["tools"] = ["*"]  # user customisation -> unknown
+        composer = _write_composer(kiro_home / "agents", cfg)
+
+        assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "legacy"]) == 1
+        assert json.loads(composer.read_text(encoding="utf-8")) == cfg
 
     def test_registers_mcp_with_this_checkouts_directory(self, kiro_home, monkeypatch):
         calls = []
