@@ -17,6 +17,15 @@ original deck is untouched — translation is written to a sibling directory
   import it via the edit flow (see ``guides/import-pptx.md``).
 - ``{deck_dir}/deck.json`` has ``template`` set to the original PPTX so
   the derived deck's PPTX build finds the same layouts.
+- Script paths below are relative to the **skill root** (the directory
+  containing ``scripts/pptx_builder.py``), same as every other workflow.
+  On MCP clients there is no translate tool — run the two translate
+  scripts with your shell tool from the sdpm checkout. To locate it: your
+  MCP server registration's ``--directory`` points at a server directory
+  *inside* the checkout (e.g. ``<checkout>/servers/local``), not at the
+  skill root itself — go up to the checkout root and find the directory
+  that contains ``scripts/pptx_builder.py`` (its name varies by layout,
+  e.g. ``sdpm/`` or ``skill/``).
 
 ---
 
@@ -100,6 +109,11 @@ What the script does NOT handle (keep in mind):
 - Text rendered inside images. Swap the image or add speaker notes if
   the image has critical translated content.
 
+``texts.tsv`` is an escaped review copy for humans (``\t``, ``\n`` and the
+``\x0b`` vertical tab are shown as escape sequences). When filling the
+dictionary programmatically, read the keys from ``translation_map.json``
+itself — never reconstruct them from the TSV, and never edit the keys.
+
 ---
 
 ## Step 4 — Build the derived deck
@@ -115,10 +129,17 @@ uv run python3 scripts/pptx_builder.py preview {deck_dir}-ja -p 1,3,5
 Common post-translation fixes (layout breakage is typical when
 translating EN → JA because Japanese characters are wider):
 
-- Reduce ``fontSize`` on overflowing elements.
-- Widen the containing element (``width`` / ``height``).
-- Insert explicit line breaks (``\n``) where auto-wrap produces awkward
-  splits.
+- **Pick the fix per element — your judgment.** Prefer, in order:
+  1. Enlarge the container (``width`` / ``height``) when surrounding space
+     allows — letting a 2-line text become 3 lines is a perfectly good fix
+     if the box can grow.
+  2. Insert explicit line breaks (``\n``) to move the wrap point.
+  3. Reduce ``fontSize`` as the LAST resort — it carries semantic weight
+     (hierarchy) and readability.
+- **Check line-break naturalness, not just overflow.** Auto-wrap can split
+  mid-word / mid-phrase (e.g. a Japanese compound broken after its first
+  kanji, or a product name split across lines). measure does not flag
+  these — scan the preview and fix with ``\n`` or a width tweak.
 - Re-run measure after each fix; iterate until the overflow warnings
   clear.
 

@@ -76,10 +76,21 @@ def apply_image_effects(pic_element, elem_def):
             geom = etree.SubElement(sp_pr, qn('a:prstGeom'))
             geom.set('prst', prst)
             av_lst = etree.SubElement(geom, qn('a:avLst'))
-            if mask_adj and prst == "roundRect":
-                gd = etree.SubElement(av_lst, qn('a:gd'))
-                gd.set('name', 'adj')
-                gd.set('fmla', f'val {int(mask_adj[0] * 50000)}')
+            if mask_adj:
+                if prst == "roundRect":
+                    # Historical JSON semantics: 0–1 of full rounding.
+                    gd = etree.SubElement(av_lst, qn('a:gd'))
+                    gd.set('name', 'adj')
+                    gd.set('fmla', f'val {int(mask_adj[0] * 50000)}')
+                else:
+                    # Generic presets: raw OOXML fractions (val = adj*100000).
+                    # Single-adjust presets (round1Rect, …) use gd name 'adj';
+                    # multi-adjust presets (round2SameRect, snip2SameRect, …)
+                    # use adj1..adjN.
+                    for i, val in enumerate(mask_adj):
+                        gd = etree.SubElement(av_lst, qn('a:gd'))
+                        gd.set('name', 'adj' if len(mask_adj) == 1 else f'adj{i + 1}')
+                        gd.set('fmla', f'val {int(val * 100000)}')
 
     if brightness is not None or contrast is not None:
         blip_fill = pic_element.find(qn('p:blipFill'))

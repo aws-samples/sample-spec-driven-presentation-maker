@@ -183,7 +183,11 @@ def _collect(page_g, slide_bg):
         fill_known = True
         for p in shape_g.iter(f"{{{SVG_NS}}}path"):
             f = p.get("fill")
-            is_gradient = "fill:url(" in p.get("style", "")
+            # Gradient fills appear as style="fill:url(#…)" or fill="url(#…)"
+            # depending on the LibreOffice version — treat both as unknown-
+            # color background (never fall through to the slide background,
+            # which fabricates white-on-white false positives).
+            is_gradient = "fill:url(" in p.get("style", "") or (f or "").startswith("url(")
             if (not f or f == "none") and not is_gradient:
                 continue  # stroke-only path (borders)
             if _in_shadow_group(p, shape_g):

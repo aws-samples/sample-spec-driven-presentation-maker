@@ -154,12 +154,20 @@ def extract_line_element(shape, theme_colors=None, color_mapping=None, theme_sty
                     head_type = head_end.get('type')
                     if head_type:
                         elem["arrowStart"] = head_type
-                
+                        if head_end.get('w'):
+                            elem["arrowStartWidth"] = head_end.get('w')
+                        if head_end.get('len'):
+                            elem["arrowStartLength"] = head_end.get('len')
+
                 tail_end = ln.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}tailEnd')
                 if tail_end is not None:
                     tail_type = tail_end.get('type')
                     if tail_type:
                         elem["arrowEnd"] = tail_type
+                        if tail_end.get('w'):
+                            elem["arrowEndWidth"] = tail_end.get('w')
+                        if tail_end.get('len'):
+                            elem["arrowEndLength"] = tail_end.get('len')
         except Exception:
             pass
         
