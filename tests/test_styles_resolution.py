@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from sdpm.api import _find_style_in_dirs, get_styles_dirs
-from sdpm.reference import BUNDLED_STYLES_DIR, list_styles, list_styles_merged
+from sdpm.knowledge.reference import BUNDLED_STYLES_DIR, list_styles, list_styles_merged
 
 
 @pytest.fixture
@@ -156,7 +156,7 @@ def test_list_styles_single_dir_still_works(temp_styles_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-from sdpm.reference import filter_styles
+from sdpm.knowledge.reference import filter_styles
 
 
 def test_filter_styles_adds_pinned_metadata() -> None:

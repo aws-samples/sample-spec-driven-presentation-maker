@@ -1,0 +1,88 @@
+{
+  "name": "sdpm-vibe",
+  "description": "VIBE agent for spec-driven-presentation-maker. Rapid slide generation from source material with minimal user interaction.",
+  "mcpServers": {
+    "sdpm": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "server_acp.py"
+      ],
+      "timeout": 120000
+    }
+  },
+  "prompt": "file://../../../../personas/vibe.md",
+  "tools": [
+    "@sdpm/analyze_template",
+    "@sdpm/apply_style",
+    "@sdpm/arch_diagram",
+    "@sdpm/code_to_slide",
+    "@sdpm/diff_pptx",
+    "@sdpm/generate_pptx",
+    "@sdpm/grid",
+    "@sdpm/hearing",
+    "@sdpm/import_attachment",
+    "@sdpm/init_presentation",
+    "@sdpm/list_guides",
+    "@sdpm/list_styles",
+    "@sdpm/list_templates",
+    "@sdpm/list_workflows",
+    "@sdpm/read_attachment",
+    "@sdpm/read_examples",
+    "@sdpm/read_guides",
+    "@sdpm/read_workflows",
+    "@sdpm/run_python",
+    "@sdpm/search_assets",
+    "use_subagent",
+    "read",
+    "glob",
+    "grep",
+    "web_search",
+    "web_fetch"
+  ],
+  "allowedTools": [
+    "@sdpm/analyze_template",
+    "@sdpm/apply_style",
+    "@sdpm/arch_diagram",
+    "@sdpm/code_to_slide",
+    "@sdpm/diff_pptx",
+    "@sdpm/generate_pptx",
+    "@sdpm/grid",
+    "@sdpm/hearing",
+    "@sdpm/import_attachment",
+    "@sdpm/init_presentation",
+    "@sdpm/list_guides",
+    "@sdpm/list_styles",
+    "@sdpm/list_templates",
+    "@sdpm/list_workflows",
+    "@sdpm/read_attachment",
+    "@sdpm/read_examples",
+    "@sdpm/read_guides",
+    "@sdpm/read_workflows",
+    "@sdpm/run_python",
+    "@sdpm/search_assets",
+    "read",
+    "glob",
+    "grep",
+    "web_fetch",
+    "web_search",
+    "use_subagent"
+  ],
+  "toolsSettings": {
+    "subagent": {
+      "availableAgents": [
+        "sdpm-composer"
+      ],
+      "trustedAgents": [
+        "sdpm-composer"
+      ]
+    }
+  },
+  "welcomeMessage": "Drop a URL, paste text, or describe what you want — I'll turn it into slides.",
+  "resources": [
+    "file://../../../../sdpm/references/workflows/create-new-1-briefing.md",
+    "file://../../../../sdpm/references/workflows/create-new-1-outline.md",
+    "file://../../../../sdpm/references/workflows/create-new-1-art-direction.md"
+  ]
+}

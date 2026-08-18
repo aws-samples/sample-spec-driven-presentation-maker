@@ -19,12 +19,12 @@ from pathlib import Path
 from pptx import Presentation
 from pptx.util import Emu
 
-from sdpm.converter.pipeline import pptx_to_json
-from sdpm.schema.minimal import _strip_internal_keys
+from sdpm.engine.converter.pipeline import pptx_to_json
+from sdpm.engine.schema.minimal import _strip_internal_keys
 
 
 def _template() -> Path:
-    return Path(__file__).parent.parent / "skill" / "templates" / "blank-dark.pptx"
+    return Path(__file__).parent.parent / "sdpm" / "templates" / "blank-dark.pptx"
 
 
 def _title_slide(prs):
@@ -38,6 +38,86 @@ def _title_slide(prs):
             return slide
         # remove unusable slide? keep simple: continue scanning
     raise AssertionError("no layout with title placeholder in template")
+
+
+class TestSendToBack:
+    def test_sppr_children_follow_schema_order(self):
+        # PowerPoint silently drops out-of-order spPr children: a line whose
+        # a:ln lands after a:effectLst loses its color, width and arrowheads
+        # there (LibreOffice renders it fine, masking the bug).
+        from sdpm.engine.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
+        b.add_slide({
+            "layout": "Blank",
+            "elements": [{
+                "type": "line", "x1": 0, "y1": 100, "x2": 500, "y2": 100,
+                "color": "#AD5CFF", "lineWidth": 1.5,
+                "arrowEnd": "triangle", "arrowEndWidth": "lg", "arrowEndLength": "med",
+                "_noEffects": True,
+            }],
+        })
+        slide = b.prs.slides[0]
+        ns_a = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
+        checked = 0
+        for sh in slide.shapes:
+            sp_pr = sh._element.spPr
+            tags = [c.tag.split('}')[-1] for c in sp_pr]
+            if 'ln' in tags and 'effectLst' in tags:
+                assert tags.index('ln') < tags.index('effectLst'), tags
+                ln = sp_pr.find(f'{ns_a}ln')
+                assert ln.find(f'{ns_a}tailEnd') is not None
+                checked += 1
+        assert checked >= 1
+
+    def test_send_to_back_moves_element_before_placeholders(self, tmp_path):
+        from sdpm.engine.builder import PPTXBuilder
+        b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
+        b.add_slide({
+            "layout": "Title Slide",
+            "placeholders": {"0": "Hello"},
+            "elements": [
+                {"type": "shape", "shape": "rectangle", "x": 0, "y": 0,
+                 "width": 1920, "height": 1080, "fill": "#FF0000",
+                 "sendToBack": True},
+                {"type": "shape", "shape": "rectangle", "x": 0, "y": 0,
+                 "width": 100, "height": 100, "fill": "#00FF00"},
+            ],
+        })
+        slide = b.prs.slides[0]
+        sp_tree = slide.shapes._spTree
+        order = []
+        for child in sp_tree:
+            tag = child.tag.split('}')[-1]
+            if tag == 'sp':
+                is_ph = child.find('.//{http://schemas.openxmlformats.org/presentationml/2006/main}ph') is not None
+                order.append('ph' if is_ph else 'elem')
+        # sendToBack element renders first (before placeholders); normal
+        # element stays after them
+        assert order[0] == 'elem'
+        assert 'ph' in order
+        assert order.index('ph') < len(order) - 1 or order[-1] == 'ph'
+
+    def test_import_marks_pre_placeholder_shapes(self, tmp_path):
+        # A decorative shape placed BEFORE the title in the source spTree
+        # must come back with sendToBack so the rebuild keeps it behind.
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E
+        prs = Presentation(str(_template()))
+        slide = _title_slide(prs)
+        slide.shapes.title.text = "Title text"
+        sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, E(0), E(0), E(914400), E(457200))
+        sp.text_frame.text = "backdrop"
+        # Move the shape before the title placeholder in the spTree
+        sp_tree = slide.shapes._spTree
+        el = sp._element
+        sp_tree.remove(el)
+        sp_tree.insert(2, el)
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        elems = [e for s in result["slides"] for e in s["elements"]]
+        backdrop = next(e for e in elems if "backdrop" in str(e.get("text", "")))
+        assert backdrop.get("sendToBack") is True
 
 
 class TestMinimalStripNonStrKeys:
@@ -155,7 +235,7 @@ class TestHiddenSlides:
         assert hidden_flags[-2] is not True
 
         # Builder restores the flag
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         builder = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
         builder.add_slide({"layout": builder_first_layout(builder)})
         builder.add_slide({"layout": builder_first_layout(builder), "hidden": True})
@@ -173,7 +253,7 @@ def builder_first_layout(builder) -> str:
 
 class TestDiffDetectsPlaceholderEdits:
     def test_title_placeholder_edit_is_reported(self, tmp_path):
-        from sdpm.diff import diff_report
+        from sdpm.api import diff_report
 
         base = {"slides": [{"layout": "L", "placeholders": {"0": "original title"}, "elements": []}]}
         edit = {"slides": [{"layout": "L", "placeholders": {"0": "edited title"}, "elements": []}]}
@@ -357,7 +437,7 @@ class TestHideMasterShapes:
         assert result["slides"][-1].get("hideMasterShapes") is True, \
             "showMasterSp=0 not extracted"
 
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         builder = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
         builder.add_slide({"layout": builder_first_layout(builder), "hideMasterShapes": True})
         out = tmp_path / "rebuilt.pptx"
@@ -373,7 +453,7 @@ class TestSrgbColorTransforms:
         color — dropping the transform rendered strong blue instead of the
         original muted tone."""
         from lxml import etree
-        from sdpm.converter.color import apply_element_transforms
+        from sdpm.engine.converter.color import apply_element_transforms
 
         ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
         el = etree.fromstring(
@@ -454,7 +534,7 @@ class TestRawShapePassthrough:
         assert raws and "textArchUp" in raws[0].get("_shapeXml", ""), "WordArt not captured as rawShape"
 
         # builder injects it back
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         builder = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
         builder.add_slide({"layout": builder_first_layout(builder), "elements": [raws[0]]})
         out = tmp_path / "rebuilt.pptx"
@@ -666,18 +746,18 @@ class TestSrgbTintSemantics:
     """
 
     def test_full_tint_is_identity(self):
-        from sdpm.converter.xml_helpers import _apply_srgb_transforms
+        from sdpm.engine.converter.xml_helpers import _apply_srgb_transforms
         assert _apply_srgb_transforms("#B22600", {"tint": "100000"}) == "#B22600"
 
     def test_partial_tint_mixes_toward_white(self):
-        from sdpm.converter.xml_helpers import _apply_srgb_transforms
+        from sdpm.engine.converter.xml_helpers import _apply_srgb_transforms
         out = _apply_srgb_transforms("#B22600", {"tint": "50000"})
         r, g, b = int(out[1:3], 16), int(out[3:5], 16), int(out[5:7], 16)
         assert r > 0xB2 and g > 0x26 and b > 0x00  # lighter than input
         assert out != "#FFFFFF"
 
     def test_satmod_boosts_saturation(self):
-        from sdpm.converter.xml_helpers import _apply_srgb_transforms
+        from sdpm.engine.converter.xml_helpers import _apply_srgb_transforms
         out = _apply_srgb_transforms("#996666", {"satMod": "300000"})
         r, g, b = int(out[1:3], 16), int(out[3:5], 16), int(out[5:7], 16)
         assert r > g and r > b  # pushed toward pure red
@@ -770,7 +850,7 @@ class TestTextSizingAndWrap:
             assert el.get("autoWidth") is True
             el["_noAutofit"] = True  # coexists with autoWidth on real decks
             # Rebuild and confirm wrap=none survives
-            from sdpm.builder import PPTXBuilder
+            from sdpm.engine.builder import PPTXBuilder
             b = PPTXBuilder(_template(), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"},
                             default_text_color="#000000")
             b.add_slide({"layout": "Blank", "elements": [el]})
@@ -888,7 +968,7 @@ class TestTableCellFidelity:
         assert [p.get("bullet") for p in paras] == ["•", "•"]
         assert [p.get("marL") for p in paras] == [93663, 93663]
         # Rebuild: builder must emit real buChar bullets on each a:p
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         b = PPTXBuilder(_template(), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"},
                         default_text_color="#000000", auto_spacing=False)
         b.add_slide({"layout": "Blank", "elements": [t]})
@@ -941,7 +1021,7 @@ class TestNoEffectsSuppression:
     def test_builder_suppresses_theme_shadow(self):
         import tempfile
 
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         b = PPTXBuilder(_template(), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"},
                         default_text_color="#000000")
         b.add_slide({"layout": "Blank", "elements": [
@@ -973,7 +1053,7 @@ class TestOleSanitization:
     def test_ole_graphicframe_replaced_by_fallback_pic(self):
         from lxml import etree
 
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         ns_p = "http://schemas.openxmlformats.org/presentationml/2006/main"
         ns_a = "http://schemas.openxmlformats.org/drawingml/2006/main"
         ns_r = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -1116,7 +1196,7 @@ class TestPictureFlip:
         assert el.get("flipH") is True
 
         # Builder applies it back
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
         out_slide = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
         el["src"] = str((tmp_path / "out" / el["src"]).resolve())
@@ -1269,9 +1349,39 @@ class TestPowerPointStrictness:
         # No color tag baked into the run text
         assert "#" not in str(el["text"]).replace(el.get("fontColor"), "")
 
+    def test_fontref_yields_to_shape_lststyle_color(self, tmp_path):
+        # OOXML precedence: an explicit defRPr solidFill in the shape's own
+        # txBody lstStyle beats the style fontRef. Adopting fontRef here used
+        # to bake white onto light-fill cards whose lstStyle renders dark
+        # text (the white-on-white import bug).
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Emu as E
+        from lxml import etree
+        from pptx.oxml.ns import qn
+        prs = Presentation(str(_template()))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, E(0), E(0), E(914400), E(457200))
+        sp.text_frame.text = "header"
+        fr = sp._element.find(qn('p:style') + '/' + qn('a:fontRef'))
+        for child in list(fr):
+            fr.remove(child)
+        etree.SubElement(fr, qn('a:schemeClr')).set('val', 'lt1')
+        lst = sp._element.find(qn('p:txBody') + '/' + qn('a:lstStyle'))
+        lvl1 = etree.SubElement(lst, qn('a:lvl1pPr'))
+        defr = etree.SubElement(lvl1, qn('a:defRPr'))
+        fill = etree.SubElement(defr, qn('a:solidFill'))
+        etree.SubElement(fill, qn('a:srgbClr')).set('val', '232F3E')
+        src = tmp_path / "t.pptx"
+        prs.save(src)
+        result = pptx_to_json(src, tmp_path / "out")
+        el = next(e for s in result["slides"] for e in s["elements"]
+                  if "header" in str(e.get("text", "")))
+        # fontRef's white must NOT be adopted — lstStyle wins in PowerPoint
+        assert el.get("fontColor") is None
+
     def test_pattern_fill_schema_order(self, tmp_path):
         # PowerPoint ignores fills that appear after a:ln in spPr.
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         from pptx.oxml.ns import qn
         b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
         slide = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
@@ -1338,7 +1448,7 @@ class TestSalesDeckFixes:
     def test_gradient_fill_schema_order(self, tmp_path):
         # PowerPoint ignores gradFill placed after a:ln (LibreOffice renders
         # it, hiding the bug) — the p1 fade shape vanished in PowerPoint.
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#FFFFFF")
         slide = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
         b._add_shape(slide, {
@@ -1374,7 +1484,7 @@ class TestPowerPointTextLayout:
                   if "title" in str(e.get("text", "")))
         assert el.get("_spAutoFit") is True
 
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
         out = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
         b._add_textbox(out, el)
@@ -1384,7 +1494,7 @@ class TestPowerPointTextLayout:
 
     def test_japanese_runs_get_lang(self):
         # Kinsoku / trailing-punctuation compression keys off run lang.
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
         slide = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
         b._add_textbox(slide, {"type": "textbox", "x": 0, "y": 0, "width": 500, "height": 100,
@@ -1423,7 +1533,7 @@ class TestEndParaRPrLineHeight:
                   if "01" in str(e.get("text", "")))
         assert el.get("_endParaSize") == 80.0
 
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
         out = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
         b._add_textbox(out, el)
@@ -1456,7 +1566,7 @@ class TestTextHighlight:
         assert "highlight=#336600" in el["text"]
 
         # Builder writes a:highlight before a:latin (schema order)
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
         out = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
         b._add_textbox(out, el)
@@ -1505,7 +1615,7 @@ class TestQcDeckFixes:
     def test_line_gradient_ln_before_effectlst(self):
         # a:ln appended after a:effectLst is ignored by PowerPoint —
         # white circles lost their gradient outlines and vanished.
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
         slide = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
         b._add_shape(slide, {
@@ -1524,7 +1634,7 @@ class TestQcDeckFixes:
     def test_connector_noeffects_drops_style(self):
         # python-pptx's default connector style (effectRef idx=1) painted a
         # theme shadow under plain lines.
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         from pptx.oxml.ns import qn
         b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
         slide = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
@@ -1561,7 +1671,7 @@ class TestArcAdjustments:
         assert abs(sweep - ((234.112 - 270) % 360)) < 0.01
 
         # Builder converts back to the original raw angles
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
         out = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
         b._add_shape(out, el)
@@ -1595,7 +1705,7 @@ class TestLineCap:
                   if e.get("shape") == "arc")
         assert el.get("_lineCap") == "rnd"
 
-        from sdpm.builder import PPTXBuilder
+        from sdpm.engine.builder import PPTXBuilder
         b = PPTXBuilder(str(_template()), fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"}, default_text_color="#000000")
         out = b.prs.slides.add_slide(b.prs.slide_layouts[-1])
         b._add_shape(out, el)

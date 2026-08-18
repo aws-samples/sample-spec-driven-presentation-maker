@@ -3,6 +3,7 @@
 # Spec-Driven Presentation Maker
 
 [![License: MIT-0](https://img.shields.io/badge/License-MIT--0-yellow.svg)](LICENSE)
+[![CI](https://github.com/aws-samples/sample-spec-driven-presentation-maker/actions/workflows/ci.yml/badge.svg)](https://github.com/aws-samples/sample-spec-driven-presentation-maker/actions/workflows/ci.yml)
 
 An open-source toolkit for creating presentations using a spec-driven approach.
 Design "what to communicate" first, then let AI build "how to present it."
@@ -28,80 +29,63 @@ Spec-driven presentation applies the concept of Spec-Driven Development from sof
 
 ### Workflow
 
-
 ![workflow](./docs/assets/workflow-en.png)
+
+### What you can ask for
+
+Beyond creating a new deck from scratch, the agent is routed to these workflows
+automatically — just describe what you want:
+
+| Ask | What happens |
+|---|---|
+| "Make slides about …" | New presentation (briefing → outline → art direction → compose → review) |
+| "Edit this PPTX" | Imports an existing PPTX into an editable deck |
+| "I hand-edited the PPTX, continue from it" | Syncs your PowerPoint edits back into the deck |
+| "Create a style like …" | Builds a reusable style guide (colors, typography, decoration) |
+| "Translate this deck to English" | Creates a language-variant deck next to the original (source deck untouched) |
 
 ---
 
 ## Quick Start
 
-Choose your environment and follow the setup guide:
+One MCP server is the single integration surface. Connect your agent to it and ask for
+slides — the server itself delivers the mode behavior via the `start_presentation` tool.
+The repository is also a portable [Agent Plugins](https://agent-plugins.org) package, so
+clients that support that format load the MCP server and the mode entry points together.
 
 | Environment | Setup |
 |---|---|
-| Agent skill, no MCP (Claude Code, Codex CLI, Cursor, Copilot) | [Getting Started — Layer 1](docs/en/getting-started.md#layer-1-agent-skill-no-mcp) |
-| Kiro CLI (MCP + skills, one command) | [`make install-kiro`](#-kiro-cli-setup-mcp-server--skills--parallel-compose-sub-agents) |
-| Local MCP client (Claude Desktop, Claude Cowork) | [Getting Started — Layer 2](docs/en/getting-started.md#layer-2-local-mcp-server) |
-| Remote MCP / Web UI (AWS deployment) | [Deploy Guide](docs/en/deploy-cloudshell.md) |
+| Claude Code | `/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker` then `/plugin install sdpm@sdpm` |
+| Kiro CLI | `git clone` this repo, then `make install-kiro` |
+| Kiro IDE (Powers) | Install this checkout as a Power — it is an Agent Plugins package |
+| Codex | `codex plugin marketplace add ./` in the checkout, then install from the ChatGPT desktop app |
+| Claude Desktop / any MCP client | Register `servers/local` as a stdio MCP server — see [Getting Started](docs/en/getting-started.md) |
+| No MCP at all | Point your agent at [`sdpm/SKILL.md`](sdpm/SKILL.md) — it drives the CLI directly |
+| Team / remote MCP / Web UI (AWS) | [Deploy Guide](docs/en/deploy-cloudshell.md) |
 
-### 🧩 Claude Code Plugin (one-command install)
+**Picking a mode.** Just asking for slides is enough — the agent calls
+`start_presentation` and picks. To choose explicitly, use the entry points:
+`sdpm-vibe` (fast, from material you already have), `sdpm-spec` (dialogue-driven, with
+approval at each step), `sdpm-style` (build a reusable style guide), `sdpm-translate`
+(translate an existing deck into another language). In clients that turn
+skills into slash commands, those are `/sdpm-vibe`, `/sdpm-spec`, `/sdpm-style`,
+`/sdpm-translate`. Each one
+only loads the matching persona from the server — the behavior itself still lives in
+`personas/`, in one place.
 
-Claude Code users can install everything with a plugin — no manual MCP config. The plugin
-registers the **local MCP server**, an **orchestrator skill**, and a **compose sub-agent**
-that builds slides in parallel.
+**Prerequisites for local use:** [`uv`](https://docs.astral.sh/uv/) on your `PATH`, plus
+**LibreOffice** and **poppler** for slide previews (PNG rendering).
 
-**Prerequisites (install once, not bundled with the plugin):**
+**Keep the checkout in place** for Claude Code / Kiro / local MCP: the server runs from it
+(`uv run --directory <checkout>/servers/local`). Updating is `git pull` — persona and
+knowledge files are read live from the checkout.
 
-- [`uv`](https://docs.astral.sh/uv/) on your `PATH` — runs the local MCP server and resolves
-  its Python dependencies on first launch (cold start takes a few tens of seconds).
-- **LibreOffice** and **poppler** — required to render slide previews (HTML/SVG → PNG).
+> **Upgrading from v0.4?** Directory layout and install flows changed — see the
+> [v0.5 migration notes](docs/en/migration-v0.5.md).
 
-**Install (automatic — downloads this repo, registers MCP + skill + sub-agent):**
+---
 
-```bash
-# In Claude Code:
-/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker
-/plugin install sdpm@sdpm
-```
-
-`/plugin install` clones the repo (so `mcp-local/` and `skill/` come with it), auto-starts
-the `sdpm` MCP server via `uv`, and registers the `sdpm` skill and the `sdpm:sdpm-composer`
-sub-agent. Verify with `/plugin list`, `/mcp` (expect `sdpm` connected), and `/agents`
-(expect `sdpm:sdpm-composer`). Then just ask Claude Code to "make slides about ..." — the
-skill drives briefing → outline → art direction, then delegates Phase 2 (compose) to parallel
-composer sub-agents, and finishes with review.
-
-> **Which entry point?** **Kiro CLI** → `make install-kiro` (next section). **Claude Desktop /
-> other MCP clients** → use the Layer 2 local MCP server. **Claude Code** → use this plugin (it
-> wraps the same Layer 2 MCP server with a CC-native skill + parallel compose sub-agent).
-
-### 🛠 Kiro CLI setup (MCP server + skills + parallel compose sub-agents)
-
-Kiro CLI users get the same flow — the `sdpm-vibe` skill drives Phase 1, then dispatches
-parallel `sdpm-composer` sub-agents for Phase 2 — via one make target. The same
-prerequisites apply: [`uv`](https://docs.astral.sh/uv/) on your `PATH`, plus **LibreOffice**
-and **poppler** for slide previews.
-
-```bash
-git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
-cd sample-spec-driven-presentation-maker
-make install-kiro
-kiro-cli chat   # then just ask: "make slides about ..."
-```
-
-`make install-kiro` symlinks the skills into `~/.kiro/skills/`, generates the composer
-agent config at `~/.kiro/agents/sdpm-composer.json`, and registers the `sdpm` local MCP
-server in the global `~/.kiro/settings/mcp.json` (pass `--agent NAME` to
-`clients/kiro/install.py` to target a specific agent config instead). It is safe to re-run.
-
-**Keep the checkout in place:** the local MCP server runs from it (`uv run --directory
-<checkout>/mcp-local`), so deleting or moving the clone breaks the sdpm tools in Kiro.
-
-**Updating:** `git pull` in the checkout is enough — skills are symlinks and the composer
-prompt is a `file://` reference into the checkout, so no reinstall is needed. Re-run
-`make install-kiro` only if you move the checkout to a different path.
-
-### 🚀 One-Click Deploy — Just an AWS Account to Get Started
+## One-Click Deploy — Just an AWS Account to Get Started
 
 | Region | Launch |
 |--------|--------|
@@ -123,16 +107,20 @@ A hands-on workshop is available with sample data for various real-world scenari
 
 ## Architecture
 
-Built on a 4-layer architecture. Each layer is a thin wrapper around the previous one. Use only the layers you need.
+```
+sdpm/        Engine (json <-> pptx) + Knowledge (references, assets, templates)
+personas/    Mode behaviors — served to any MCP client via start_presentation(mode=...)
+skills/      Mode entry points — thin dispatchers that load a persona from the server
+plugin.json  Agent Plugins manifest (+ mcp.json) — makes the root a portable plugin
+servers/     local (stdio, no AWS) / remote (HTTP, S3 + DynamoDB) — thin binds of one tool contract
+clients/     Per-client wiring (Claude Code / Codex manifests, Kiro installer)
+agent/ api/ infra/ web-ui/   Optional AWS cloud stack (Strands Agent, REST API, CDK, React UI)
+```
 
-| Use Case | Layer | AWS |
-|---|---|:---:|
-| Agent skill only (no MCP) | Layer 1: `skill/` | Not required |
-| Local MCP (Kiro CLI, Claude Desktop, VS Code) | Layer 2: `skill/` + `mcp-local/` | Not required |
-| Team deployment | Layer 3: + `mcp-server/` + `infra/` | Required |
-| Full stack | Layer 4: + `agent/` + `api/` + `web-ui/` | Required |
-
-See [Architecture](docs/en/architecture.md) for details.
+Everything an agent needs — tools, workflows, guides, and mode behavior — is served by
+the MCP server. Client-side files are minimal wiring: per-client manifests and entry
+points that name a mode without restating what it does.
+See [Architecture](docs/en/architecture.md) for the full picture.
 
 ---
 
@@ -140,34 +128,16 @@ See [Architecture](docs/en/architecture.md) for details.
 
 | Document | Description |
 |---|---|
-| [Architecture](docs/en/architecture.md) | 4-layer design, data flow, auth model, MCP tool reference |
-| [Getting Started](docs/en/getting-started.md) | Setup and deployment for Layer 1–4 |
-| [Recommended Deploy](docs/en/deploy-cloudshell.md) | Recommended path for AWS deployments (CloudShell or any local Linux/macOS/WSL, no CDK/Docker required) |
+| [Getting Started](docs/en/getting-started.md) | Setup for every environment, from bare CLI to full AWS stack |
+| [Architecture](docs/en/architecture.md) | Layer design, data flow, auth model, MCP tool reference |
+| [Migration to v0.5](docs/en/migration-v0.5.md) | Upgrading from v0.4 (paths, skills removal) |
+| [Recommended Deploy](docs/en/deploy-cloudshell.md) | AWS deployment via CloudShell (no CDK/Docker required) |
 | [Connecting Agents](docs/en/add-to-gateway.md) | MCP client connection guide |
 | [Teams & Slack Integration](docs/en/teams-slack-integration.md) | Chat platform integration |
 | [Custom Templates & Assets](docs/en/custom-template.md) | Adding custom templates and icons |
 | [Cost Estimates](docs/en/cost.md) | Monthly cost breakdown and optimisation tips |
 | [Uninstall](docs/en/uninstall.md) | Clean up deployed AWS resources |
 | [Web UI (Local Mode — experimental)](web-ui/README.md#local-mode) | Run the Web UI locally against a Kiro CLI ACP backend (no AWS) |
-
----
-
-## Directory Structure
-
-```
-spec-driven-presentation-maker/
-├── skill/            Layer 1 — Engine, references, templates
-├── mcp-local/        Layer 2 — Local stdio MCP server
-├── mcp-server/       Layer 3 — Streamable HTTP MCP server (LibreOffice built-in)
-├── infra/            Layer 3-4 — CDK stacks
-├── agent/            Layer 4 — Strands Agent
-├── api/              Layer 4 — Unified REST API Lambda
-├── web-ui/           Layer 4 — React Web UI
-├── shared/           Shared modules (authorization, schema)
-├── scripts/          Deployment and operations helpers
-├── tests/            Unit tests
-└── docs/             Documentation
-```
 
 ---
 

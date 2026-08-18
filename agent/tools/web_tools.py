@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: MIT-0
 """Strands Agent tool for fetching web pages, PDFs, and images."""
 
-import io
-import re
 
 import html2text
 import requests

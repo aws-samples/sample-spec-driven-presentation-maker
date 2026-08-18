@@ -1,8 +1,8 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Tests for sdpm.schema.lint_outline."""
+"""Tests for sdpm.engine.schema.lint_outline."""
 
-from sdpm.schema.lint_outline import lint_outline
+from sdpm.engine.schema.lint_outline import lint_outline
 
 
 class TestBasicOutline:

@@ -22,7 +22,7 @@ def isolated_user_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Pat
     monkeypatch.setenv("APPDATA", str(tmp_path))
 
     # Invalidate caches so this test sees the overridden env
-    from sdpm.assets import invalidate_manifest_cache
+    from sdpm.knowledge.assets import invalidate_manifest_cache
     invalidate_manifest_cache()
     yield tmp_path / "sdpm"
     # Cleanup: invalidate again so subsequent tests start clean
@@ -38,7 +38,7 @@ def test_user_local_asset_is_discovered(
     isolated_user_config: Path, tmp_path: Path
 ) -> None:
     """Manifest under ~/.config/sdpm/assets/{source}/ is auto-discovered."""
-    from sdpm.assets import _load_manifests
+    from sdpm.knowledge.assets import _load_manifests
 
     source_dir = isolated_user_config / "assets" / "my-company"
     _write_manifest(
@@ -56,7 +56,7 @@ def test_user_local_asset_file_is_resolved(
     isolated_user_config: Path,
 ) -> None:
     """Resolve an asset file from user-local source via assets:source/name."""
-    from sdpm.assets import resolve_asset_path
+    from sdpm.knowledge.assets import resolve_asset_path
 
     source_dir = isolated_user_config / "assets" / "my-company"
     _write_manifest(
@@ -79,7 +79,7 @@ def test_invalidate_manifest_cache_picks_up_new_source(
     isolated_user_config: Path,
 ) -> None:
     """A newly added user-local source is visible after invalidate."""
-    from sdpm.assets import _load_manifests, invalidate_manifest_cache
+    from sdpm.knowledge.assets import _load_manifests, invalidate_manifest_cache
 
     # Initial load: no user-local sources
     before = _load_manifests()
@@ -108,7 +108,7 @@ def test_invalidate_also_clears_config_cache(
     isolated_user_config: Path,
 ) -> None:
     """invalidate_manifest_cache also clears the config cache."""
-    from sdpm.assets import invalidate_manifest_cache
+    from sdpm.knowledge.assets import invalidate_manifest_cache
     from sdpm.config import get_config, get_user_config_dir
 
     # Prime cache with defaults
@@ -137,7 +137,7 @@ def test_extra_sources_shadow_user_local_same_name(
 ) -> None:
     """When an extra_source and user-local source define the same asset name,
     extra_sources wins (it appears first in the manifest list)."""
-    from sdpm.assets import _load_manifests, invalidate_manifest_cache
+    from sdpm.knowledge.assets import _load_manifests, invalidate_manifest_cache
 
     # User-local source
     user_source = isolated_user_config / "assets" / "shared"
@@ -177,7 +177,7 @@ def test_user_local_coexists_with_builtin(
     isolated_user_config: Path,
 ) -> None:
     """User-local and built-in sources both appear in the merged manifest."""
-    from sdpm.assets import _load_manifests
+    from sdpm.knowledge.assets import _load_manifests
 
     # User-local source
     source_dir = isolated_user_config / "assets" / "my-company"
@@ -204,7 +204,7 @@ def test_list_sources_includes_user_local_description(
     isolated_user_config: Path,
 ) -> None:
     """list_sources picks up description from user-local manifest (bug fix)."""
-    from sdpm.assets import invalidate_manifest_cache, list_sources
+    from sdpm.knowledge.assets import invalidate_manifest_cache, list_sources
 
     source_dir = isolated_user_config / "assets" / "my-team"
     _write_manifest(
@@ -230,7 +230,7 @@ def test_list_sources_includes_extra_source(
     isolated_user_config: Path, tmp_path: Path
 ) -> None:
     """list_sources picks up extra_sources via get_extra_sources (not _EXTRA_SOURCES)."""
-    from sdpm.assets import invalidate_manifest_cache, list_sources
+    from sdpm.knowledge.assets import invalidate_manifest_cache, list_sources
 
     extra_source = tmp_path / "extra" / "my-extra"
     extra_source.mkdir(parents=True)

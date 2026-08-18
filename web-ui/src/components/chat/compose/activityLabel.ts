@@ -1,13 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-/**
- * activityLabel — Convert tool invocation to natural English verb phrase.
- *
- * Priority:
- *   1. input.purpose (agent's own words — highest signal)
- *   2. tool-specific natural phrase
- *   3. "Thinking" fallback
- */
+/** Convert compose tool invocations to observable labels and semantic categories. */
 
 export function stripPrefix(name: string): string {
   return name.replace(/^spec_driven_presentation_maker_/, "")
@@ -15,7 +8,6 @@ export function stripPrefix(name: string): string {
 
 export type ActivityCategory = "build" | "explore" | "produce" | "compute" | "other"
 
-/** Map a tool (without MCP prefix) to its category for color coding. */
 export function activityCategory(tool: string): ActivityCategory {
   const name = stripPrefix(tool)
   switch (name) {
@@ -23,13 +15,28 @@ export function activityCategory(tool: string): ActivityCategory {
     case "grid":
       return "compute"
     case "generate_pptx":
+    case "generate_preview":
     case "code_to_slide":
     case "get_preview":
-    case "import_attachment":
       return "produce"
+    case "create_deck":
+    case "write_slide":
+    case "remove_slide":
+    case "reorder_slides":
+    case "clone_deck":
+    case "clone_slide":
     case "apply_style":
     case "init_presentation":
+    case "import_attachment":
+    case "run_style_python":
       return "build"
+    case "read_reference":
+    case "list_references":
+    case "search_icons":
+    case "search_slides":
+    case "get_deck":
+    case "web_search":
+    case "web_fetch":
     case "search_assets":
     case "read_examples":
     case "read_guides":
@@ -38,8 +45,6 @@ export function activityCategory(tool: string): ActivityCategory {
     case "list_guides":
     case "list_workflows":
     case "list_templates":
-    case "list_asset_sources":
-    case "read_uploaded_file":
     case "analyze_template":
       return "explore"
     default:
@@ -47,19 +52,22 @@ export function activityCategory(tool: string): ActivityCategory {
   }
 }
 
-/** Minimal translator shape (subset of next-intl's useTranslations return). */
 export type ActivityTranslator = (key: string, values?: Record<string, string | number>) => string
 
 export function activityLabel(tool: string, input?: Record<string, unknown>, t?: ActivityTranslator): string {
   const name = stripPrefix(tool)
-
   const purpose = input?.purpose
   if (typeof purpose === "string" && purpose.trim()) return purpose.trim()
 
-  // Message keys live under compose.activity.* — fall back to English when no translator.
   const tr = (key: string, en: string, values?: Record<string, string | number>) => (t ? t(`activity.${key}`, values) : en)
 
   switch (name) {
+    case "write_slide": {
+      const slug = input?.slide_id
+      return typeof slug === "string" && slug
+        ? tr("writingSlide", `Writing slide · ${slug}`, { slug })
+        : tr("writingSlideBare", "Writing slide")
+    }
     case "run_python": {
       const slugs = input?.measure_slides
       return Array.isArray(slugs) && slugs.length
@@ -67,17 +75,20 @@ export function activityLabel(tool: string, input?: Record<string, unknown>, t?:
         : tr("working", "Working")
     }
     case "grid": return tr("planningLayout", "Planning layout")
-    case "search_assets": {
-      const q = input?.query
-      return typeof q === "string" && q
-        ? tr("searchingIconsQuery", `Searching icons: "${q}"`, { query: q })
+    case "search_assets":
+    case "search_icons": {
+      const query = input?.query ?? input?.keyword
+      return typeof query === "string" && query
+        ? tr("searchingIconsQuery", `Searching icons: "${query}"`, { query })
         : tr("searchingIcons", "Searching icons")
     }
+    case "read_reference": return tr("readingReference", "Reading reference")
     case "read_examples": return tr("reviewingExamples", "Reviewing examples")
     case "read_guides": return tr("consultingGuide", "Consulting guide")
     case "read_workflows": return tr("consultingWorkflow", "Consulting workflow")
     case "apply_style": return tr("applyingStyle", "Applying style")
-    case "get_preview": return tr("previewingSlides", "Previewing slides")
+    case "get_preview":
+    case "generate_preview": return tr("previewingSlides", "Previewing slides")
     case "generate_pptx": return tr("assemblingDeck", "Assembling deck")
     case "code_to_slide": return tr("formattingCode", "Formatting code")
     case "import_attachment": return tr("importingFile", "Importing file")
@@ -86,8 +97,6 @@ export function activityLabel(tool: string, input?: Record<string, unknown>, t?:
     case "list_guides": return tr("listingGuides", "Listing guides")
     case "list_workflows": return tr("listingWorkflows", "Listing workflows")
     case "list_templates": return tr("listingTemplates", "Listing templates")
-    case "list_asset_sources": return tr("listingAssetSources", "Listing asset sources")
-    case "read_uploaded_file": return tr("readingUpload", "Reading upload")
     case "init_presentation": return tr("initializingDeck", "Initializing deck")
     default: return tr("thinking", "Thinking")
   }

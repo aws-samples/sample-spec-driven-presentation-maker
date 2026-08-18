@@ -1,19 +1,25 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * ToolCard — Premium activity card for tool executions in chat.
+ * ToolCard — Work ledger row for tool executions in chat.
  *
- * Three visual states with smooth transitions:
- * - Active: Animated gradient border + spinner + pulse glow
- * - Success: Accent check + result summary slide-in
- * - Error: Red accent + error message
+ * Redesigned as a single vertical rail with ledger rows (commit log style).
+ * Color answers only "who is working" via a left marker; state is communicated
+ * through shape (dot = done, cursor arrow + name tag = active, muted dot = past).
  *
- * Tool categories determine the accent color:
- * - build: teal (creating/modifying)
- * - explore: amber (reading/searching)
- * - produce: violet (generating output)
- * - compute: cyan (code execution)
- * - other: neutral
+ * Four visual states:
+ * - Active: cursor arrow marker + agent name tag + detail line
+ * - Success: colored dot marker + result summary
+ * - Error: red dot marker + error message (red reserved for real errors only)
+ * - Compact: small muted dot + inline label
+ *
+ * Tool categories determine the agent color (who):
+ * - compute → Layout (blue)
+ * - build → Content (green)
+ * - produce → Visual (purple)
+ * - explore → Data (amber)
+ * - hearing → Decorator (pink)
+ * - other → neutral
  *
  * @param props.name - Tool function name
  * @param props.input - Tool input parameters
@@ -28,7 +34,7 @@ import {
   BookOpen, List, Search, FolderPlus, Pencil, Image,
   Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench,
   Check, FileText, Download, Play, Code, Palette,
-  LayoutTemplate, Package, AlertCircle, Ruler, RefreshCw,
+  LayoutTemplate, Package, AlertCircle, RefreshCw,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { useTranslations } from "next-intl"
@@ -43,7 +49,17 @@ interface ToolMeta {
 }
 
 
-const ERR = { accent: "oklch(0.65 0.2 25)", bg: "oklch(0.65 0.2 25 / 6%)", border: "oklch(0.65 0.2 25 / 18%)" }
+const ERR = { accent: "var(--state-error)", bg: "color-mix(in oklch, var(--state-error) 6%, transparent)", border: "color-mix(in oklch, var(--state-error) 18%, transparent)" }
+
+/** Agent display names keyed by category (for active cursor name tag). */
+const AGENT_NAMES: Record<ToolCategory, string> = {
+  compute: "Layout",
+  build: "Content",
+  produce: "Visual",
+  explore: "Data",
+  hearing: "Decorator",
+  other: "Agent",
+}
 
 /** Icon, label, and category per tool name. */
 export const TOOL_META: Record<string, ToolMeta> = {
@@ -61,11 +77,9 @@ export const TOOL_META: Record<string, ToolMeta> = {
   get_deck:           { Icon: FolderOpen,      label: "Loading deck",           category: "explore" },
   web_search:         { Icon: Globe,           label: "Web search",             category: "explore" },
   web_fetch:          { Icon: FileText,        label: "Fetching page",          category: "explore" },
-  read_uploaded_file: { Icon: FileText,        label: "Reading file",           category: "explore" },
   import_attachment:  { Icon: Download,        label: "Importing file",         category: "build" },
   generate_pptx:      { Icon: Download,        label: "Generating PPTX",        category: "produce" },
   generate_preview:   { Icon: Image,           label: "Generating preview",     category: "produce" },
-  measure_slides:     { Icon: Ruler,           label: "Measuring slides",       category: "produce" },
   // MCP Server tools
   init_presentation:  { Icon: FolderPlus,      label: "Initializing deck",      category: "build" },
   analyze_template:   { Icon: LayoutTemplate,  label: "Analyzing template",     category: "explore" },
@@ -79,13 +93,11 @@ export const TOOL_META: Record<string, ToolMeta> = {
   list_guides:        { Icon: List,            label: "Listing guides",         category: "explore" },
   read_guides:        { Icon: BookOpen,        label: "Reading guide",          category: "explore" },
   search_assets:      { Icon: Search,          label: "Searching assets",       category: "explore" },
-  list_asset_sources: { Icon: Package,         label: "Listing asset sources",  category: "explore" },
   get_preview:        { Icon: Image,           label: "Getting preview",        category: "produce" },
   run_python:         { Icon: Code,            label: "Running code",           category: "compute" },
   run_style_python:   { Icon: Code,            label: "Building style",         category: "build" },
   grid:               { Icon: LayoutTemplate,  label: "Computing layout",       category: "compute" },
   code_to_slide:      { Icon: Code,            label: "Code to slide",          category: "build" },
-  pptx_to_json:       { Icon: FileText,        label: "Converting PPTX",        category: "explore" },
   // MCP prefixed tools (Strands adds prefix from MCPClient)
   hearing:            { Icon: BookOpen,        label: "Asking questions",       category: "hearing" },
   spec_driven_presentation_maker_init_presentation:  { Icon: FolderPlus,     label: "Initializing deck",     category: "build" },
@@ -100,14 +112,11 @@ export const TOOL_META: Record<string, ToolMeta> = {
   spec_driven_presentation_maker_list_guides:        { Icon: List,           label: "Listing guides",        category: "explore" },
   spec_driven_presentation_maker_read_guides:        { Icon: BookOpen,       label: "Reading guide",         category: "explore" },
   spec_driven_presentation_maker_search_assets:      { Icon: Search,         label: "Searching assets",      category: "explore" },
-  spec_driven_presentation_maker_list_asset_sources: { Icon: Package,        label: "Listing asset sources", category: "explore" },
   spec_driven_presentation_maker_get_preview:        { Icon: Image,          label: "Getting preview",       category: "produce" },
   spec_driven_presentation_maker_generate_pptx:      { Icon: Download,       label: "Generating PPTX",       category: "produce" },
-  spec_driven_presentation_maker_measure_slides:     { Icon: Ruler,          label: "Measuring slides",      category: "produce" },
   spec_driven_presentation_maker_run_python:         { Icon: Code,           label: "Running code",          category: "compute" },
   spec_driven_presentation_maker_run_style_python:   { Icon: Code,           label: "Building style",        category: "build" },
   spec_driven_presentation_maker_code_to_slide:      { Icon: Code,           label: "Code to slide",         category: "build" },
-  spec_driven_presentation_maker_pptx_to_json:       { Icon: FileText,       label: "Converting PPTX",       category: "explore" },
   spec_driven_presentation_maker_grid:               { Icon: LayoutTemplate, label: "Computing layout",      category: "compute" },
   // Agent tools
   compose_slides:     { Icon: Package,         label: "Composing slides",       category: "produce" },
@@ -124,11 +133,6 @@ function getDetail(name: string, input?: Record<string, unknown>): string {
   if (!input || Object.keys(input).length === 0) return ""
   if ((name === "write_slide" || name.endsWith("_write_slide")) && input.slide_id) return String(input.slide_id)
   if ((name === "create_deck" || name.endsWith("_init_presentation")) && input.name) return String(input.name)
-  if ((name === "measure_slides" || name.endsWith("_measure_slides")) && input.slide_numbers) {
-    const nums = input.slide_numbers as number[]
-    return `Pages ${nums.join(", ")}`
-  }
-  if ((name === "measure_slides" || name.endsWith("_measure_slides")) && !input.slide_numbers) return "All slides"
   if (input.purpose) { const p = String(input.purpose); return p.length > 40 ? p.slice(0, 40) + "…" : p }
   if (input.path) { const p = String(input.path); return basename(p) }
   if (input.template) return String(input.template)
@@ -154,13 +158,6 @@ function getResultSummary(name: string, result?: Record<string, unknown>, status
     return "Failed"
   }
   if (!result) return ""
-  if ((name === "measure_slides" || name.endsWith("_measure_slides")) && Array.isArray(result.slides)) {
-    const overflows = (result.slides as Record<string, unknown>[]).filter((s) => {
-      const els = s.overflow_elements
-      return Array.isArray(els) && els.length > 0
-    }).length
-    return overflows > 0 ? `${overflows} overflow${overflows > 1 ? "s" : ""} detected` : "All clear"
-  }
   if (result.deckId) return `deck ${String(result.deckId).slice(0, 8)}`
   if (Array.isArray(result.results)) return `${result.results.length} found`
   if (Array.isArray(result.layouts)) return `${result.layouts.length} layouts`
@@ -218,105 +215,63 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
   const colors = isError ? { ...CAT.other, accent: ERR.accent, bg: ERR.bg, border: ERR.border } : CAT[meta.category]
   const detail = getDetail(name, input)
   const summary = isComplete ? getResultSummary(name, result, status) : ""
-  const { Icon } = meta
+  const agentName = AGENT_NAMES[meta.category]
 
   return (
     <div
-      className="tool-card-enter group/tool relative flex items-center gap-2.5 pl-3 pr-3.5 py-2 rounded-xl transition-all duration-500"
-      style={{
-        background: isActive ? colors.bg : isComplete ? colors.bg : "transparent",
-        boxShadow: isActive ? `0 0 20px ${colors.glow}, inset 0 0 0 1px ${colors.border}` : isComplete ? `inset 0 0 0 1px ${colors.border}` : "inset 0 0 0 1px oklch(1 0 0 / 4%)",
-      }}
+      className={`ledger-row tool-card-enter group/tool py-1.5 ${isComplete && !isError ? "opacity-60" : ""}`}
       role="status"
       aria-label={`${isActive ? t("running") : isError ? t("failed") : t("completed")}: ${label}${detail ? ` — ${detail}` : ""}${summary ? ` — ${summary}` : ""}`}
       aria-live={isComplete ? "polite" : undefined}
     >
-      {/* Animated gradient border for active state */}
-      {isActive && (
-        <div
-          className="absolute inset-0 rounded-xl pointer-events-none"
-          style={{
-            background: `linear-gradient(135deg, ${colors.accent}15, transparent 40%, ${colors.accent}08)`,
-            animation: "tool-active-shimmer 2s ease-in-out infinite",
-          }}
-        />
-      )}
-
-      {/* Icon container with state transitions */}
-      <div
-        className="relative flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-300"
-        style={{
-          background: isActive ? `${colors.accent}18` : isComplete ? `${colors.accent}12` : "oklch(1 0 0 / 4%)",
-        }}
-      >
+      <div className="ledger-marker">
         {isActive ? (
-          /* Spinning ring — custom SVG for premium feel */
-          <svg className="absolute inset-0 w-7 h-7" viewBox="0 0 28 28">
-            <circle
-              cx="14" cy="14" r="12"
-              fill="none"
-              stroke={colors.accent}
-              strokeWidth="1.5"
-              strokeDasharray="20 56"
-              strokeLinecap="round"
-              style={{ animation: "tool-spinner 1.2s linear infinite" }}
-            />
+          <svg
+            className="h-3 w-3 ledger-cursor ledger-cursor-active"
+            viewBox="0 0 10 10"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path d="M1 1 L9 5 L5 5.8 L3.5 9.5 Z" fill={colors.accent} />
           </svg>
+        ) : isError ? (
+          <div className="w-2 h-2 rounded-full tool-check-enter" style={{ background: ERR.accent }} aria-hidden="true" />
         ) : isComplete ? (
-          /* Success/error indicator ring */
-          <svg className="absolute inset-0 w-7 h-7 tool-ring-enter" viewBox="0 0 28 28">
-            <circle
-              cx="14" cy="14" r="12"
-              fill="none"
-              stroke={colors.accent}
-              strokeWidth="1.5"
-              strokeDasharray="75.4"
-              strokeDashoffset="0"
-              strokeLinecap="round"
-              opacity="0.3"
-            />
-          </svg>
-        ) : null}
-
-        {/* Center icon */}
-        {isComplete && !isError ? (
-          <Check
-            className="h-3 w-3 tool-check-enter"
-            style={{ color: colors.accent }}
-          />
-        ) : isComplete && isError ? (
-          <AlertCircle
-            className="h-3 w-3 tool-check-enter"
-            style={{ color: ERR.accent }}
-          />
+          <div className="w-1.5 h-1.5 rounded-full tool-check-enter" style={{ background: colors.accent }} aria-hidden="true" />
         ) : (
-          <Icon
-            className="h-3 w-3 transition-colors duration-300"
-            style={{ color: isActive ? colors.accent : "oklch(0.50 0 0)" }}
-          />
+          <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--foreground-muted)", opacity: 0.4 }} aria-hidden="true" />
         )}
       </div>
 
-      {/* Content */}
-      <div className="relative flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
+      <div className="min-w-0">
+        <div className="flex min-h-5 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <meta.Icon className="h-3 w-3 flex-none" style={{ color: isError ? ERR.accent : colors.accent }} aria-hidden="true" />
           <span
             className="text-xs font-medium tracking-[-0.01em] transition-colors duration-300"
-            style={{ color: isActive ? colors.accent : isComplete ? colors.accent : "oklch(0.50 0 0)" }}
+            style={{ color: isActive ? colors.accent : isError ? ERR.accent : isComplete ? "var(--foreground-secondary)" : "var(--foreground-muted)" }}
           >
             {label}
           </span>
+          {detail && (
+            <span className="max-w-[180px] truncate text-[11px] text-foreground-muted" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>
+              {detail}
+            </span>
+          )}
+          {summary && (
+            <span className="max-w-[180px] truncate text-[11px] text-foreground-muted" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>
+              → {summary}
+            </span>
+          )}
+          {isActive && (
+            <span
+              className="rounded-sm px-1.5 py-0.5 text-[11px] font-semibold leading-none"
+              style={{ color: colors.accent, background: `color-mix(in oklch, ${colors.accent} 10%, transparent)` }}
+            >
+              {agentName}
+            </span>
+          )}
         </div>
-        {/* Detail line: input params or result summary */}
-        {(detail || summary) && (
-          <p
-            className="text-[11px] truncate mt-0.5 leading-tight transition-all duration-300"
-            style={{ color: isComplete ? `${colors.accent}99` : "oklch(1 0 0 / 25%)" }}
-          >
-            {summary || detail}
-          </p>
-        )}
-        {/* Streaming progress — sub-tool activity feed */}
+        {/* Streaming progress — grouped sub-tool feed (nested rail) */}
         {isActive && streamMessages && streamMessages.length > 0 && (() => {
           // Group events by group number for parallel display
           const groupMap = new Map<number, { status?: Record<string, unknown>; tools: Record<string, unknown>[] }>()
@@ -336,8 +291,8 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
               if (entry.status?.status === "retrying") entry.status = undefined
             }
             else if (ev.toolResult) {
-              const t = entry.tools.find((t) => t.toolUseId === ev.toolResult)
-              if (t) t.toolStatus = ev.toolStatus
+              const tl = entry.tools.find((tl) => tl.toolUseId === ev.toolResult)
+              if (tl) tl.toolStatus = ev.toolStatus
             }
           }
 
@@ -345,9 +300,9 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
           const statusMsg = ungrouped.filter((e) => e.message).pop()
 
           return (
-            <div className="mt-1.5 space-y-1.5">
+            <div className="mt-1.5 space-y-1">
               {statusMsg && (
-                <p className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: `${colors.accent}cc` }}>
+                <p className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: colors.accent }}>
                   {String(statusMsg.message)}
                 </p>
               )}
@@ -361,55 +316,55 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
                 const groupAccent = isErr ? ERR.accent : colors.accent
 
                 return (
-                  <div key={g} className="rounded-lg px-2 py-1.5 transition-all duration-300" style={{ background: `${groupAccent}08` }}>
-                    {/* Group header */}
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <div className="flex-none w-3.5 h-3.5 rounded flex items-center justify-center" style={{ background: `${groupAccent}15` }}>
+                  <div key={g} className="ledger-sub relative pl-3 border-l transition-colors duration-300" style={{ borderColor: `color-mix(in oklch, ${groupAccent} 20%, transparent)` }}>
+                    {/* Group header with nested marker */}
+                    <div className="flex items-center gap-1.5 py-0.5">
+                      {/* Sub-marker */}
+                      <div className="absolute left-0 -translate-x-1/2 flex-none">
                         {isDone ? (
-                          <Check className="h-2 w-2" style={{ color: groupAccent }} />
+                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: groupAccent, opacity: 0.6 }} />
                         ) : isErr ? (
-                          <AlertCircle className="h-2 w-2" style={{ color: ERR.accent }} />
+                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: ERR.accent }} />
                         ) : isRetrying ? (
-                          <RefreshCw className="h-2 w-2" style={{ color: groupAccent, animation: "tool-spinner 1s linear infinite" }} />
+                          <RefreshCw className="w-2.5 h-2.5" style={{ color: groupAccent, animation: "tool-spinner 1s linear infinite" }} />
                         ) : (
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 14 14">
-                            <circle cx="7" cy="7" r="4.5" fill="none" stroke={groupAccent} strokeWidth="1" strokeDasharray="8 20" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
+                          <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" aria-hidden="true">
+                            <circle cx="5" cy="5" r="3.5" fill="none" stroke={groupAccent} strokeWidth="1" strokeDasharray="6 16" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
                           </svg>
                         )}
                       </div>
-                      <span className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: `${groupAccent}cc` }}>
+                      <span className="text-[11px] font-medium tracking-[-0.01em]" style={{ color: `color-mix(in oklch, ${groupAccent} 80%, transparent)` }}>
                         {isRetrying ? `Retrying (${retryAttempt})` : `Group ${g}/${totalGroups}`} · {String(slugs)}
                         {isRetrying && !!gStatus?.error && (
                           <span className="ml-1 opacity-60" title={String(gStatus.error)}>— {String(gStatus.error).slice(0, 300)}</span>
                         )}
                       </span>
                     </div>
-                    {/* Sub-tool list — show last 3 per group */}
+                    {/* Sub-tool list — show last 3 per group, old items faded */}
                     {!isDone && tools.slice(-3).map((ev, i) => {
                       const toolName = stripPrefix(String(ev.tool))
                       const sub = TOOL_META[toolName] || { Icon: Wrench, label: toolName.replace(/_/g, " "), category: "other" as ToolCategory }
                       const isToolErr = ev.toolStatus === "error"
                       const isToolDone = !!ev.toolStatus
-                      const subColors = isToolErr ? ERR : CAT[sub.category]
+                      const subColors = isToolErr ? { accent: ERR.accent } : CAT[sub.category]
                       const subDetail = getDetail(toolName, ev.input as Record<string, unknown> | undefined)
                       const isLast = i === Math.min(tools.length, 3) - 1
                       const showSpinner = isLast && !isToolDone
                       return (
-                        <div key={`${g}-${ev.tool}-${i}`} className="flex items-center gap-1.5 py-0.5 ml-5" style={{ opacity: isLast ? 1 : 0.4 }}>
-                          <div className="flex-none w-3.5 h-3.5 rounded flex items-center justify-center" style={{ background: `${subColors.accent}10` }}>
+                        <div key={`${g}-${ev.tool}-${i}`} className="flex items-center gap-1.5 py-0.5 ml-1" style={{ opacity: isLast ? 1 : 0.4 }}>
+                          {/* Sub-tool marker */}
+                          <div className="flex-none w-1.5 h-1.5 flex items-center justify-center">
                             {showSpinner ? (
-                              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14">
-                                <circle cx="7" cy="7" r="4.5" fill="none" stroke={subColors.accent} strokeWidth="1" strokeDasharray="8 20" strokeLinecap="round" style={{ animation: "tool-spinner 1s linear infinite" }} />
-                              </svg>
+                              <div className="w-1 h-1 rounded-full" style={{ background: subColors.accent, animation: "tool-pulse 1.5s ease-in-out infinite" }} />
                             ) : isToolErr ? (
-                              <AlertCircle className="h-2 w-2" style={{ color: ERR.accent }} />
+                              <div className="w-1.5 h-1.5 rounded-full" style={{ background: ERR.accent }} />
                             ) : isToolDone ? (
-                              <Check className="h-2 w-2" style={{ color: subColors.accent }} />
+                              <div className="w-1 h-1 rounded-full" style={{ background: subColors.accent, opacity: 0.6 }} />
                             ) : (
-                              <sub.Icon className="h-2 w-2" style={{ color: `${subColors.accent}80` }} />
+                              <div className="w-1 h-1 rounded-full" style={{ background: subColors.accent, opacity: 0.3 }} />
                             )}
                           </div>
-                          <span className="text-[11px] truncate" style={{ color: isLast ? subColors.accent : `${subColors.accent}88` }}>
+                          <span className="text-[11px] truncate" style={{ color: isLast ? "var(--foreground-secondary)" : "var(--foreground-muted)" }}>
                             {sub.label}{subDetail ? ` · ${subDetail}` : ""}
                           </span>
                         </div>
@@ -422,27 +377,13 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
           )
         })()}
       </div>
-
-      {/* Right-side status dot */}
-      <div className="flex-none">
-        {isActive ? (
-          <div
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ background: colors.accent, animation: "tool-pulse 1.5s ease-in-out infinite" }}
-          />
-        ) : isComplete ? (
-          <div
-            className="w-1.5 h-1.5 rounded-full tool-check-enter"
-            style={{ background: isError ? ERR.accent : colors.accent, opacity: 0.6 }}
-          />
-        ) : null}
-      </div>
     </div>
   )
 }
 
 /**
  * ToolCardCompact — Minimal inline display for collapsed older tools.
+ * Shows a small muted dot + label (past/compact state in the ledger).
  *
  * @param props.name - Tool function name
  * @param props.input - Tool input parameters
@@ -455,8 +396,13 @@ export function ToolCardCompact({ name, input }: { name: string; input?: Record<
   const detail = getDetail(name, input)
 
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] text-foreground/30 py-0.5">
-      <meta.Icon className="h-2.5 w-2.5" style={{ color: `${colors.accent}80` }} />
+    <span className="ledger-compact inline-flex items-center gap-1.5 text-[11px] text-foreground/30 py-0.5">
+      {/* Small muted dot marker */}
+      <span
+        className="flex-none w-1 h-1 rounded-full"
+        style={{ background: colors.accent, opacity: 0.4 }}
+        aria-hidden="true"
+      />
       <span>{label}</span>
       {detail && <span className="opacity-60 truncate max-w-[150px]">{detail}</span>}
     </span>

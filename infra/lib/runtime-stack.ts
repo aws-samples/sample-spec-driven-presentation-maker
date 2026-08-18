@@ -62,7 +62,7 @@ export class RuntimeStack extends cdk.Stack {
     // --- Docker image → ECR ---
     const image = new ecr_assets.DockerImageAsset(this, "RuntimeImage", {
       directory: path.join(__dirname, "../.."),
-      file: "mcp-server/Dockerfile",
+      file: "servers/remote/Dockerfile",
       platform: ecr_assets.Platform.LINUX_ARM64,
     });
 

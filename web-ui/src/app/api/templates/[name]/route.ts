@@ -3,9 +3,7 @@
 /** Local Template Download API — serves .pptx file by name. */
 import fs from "fs"
 import path from "path"
-import { getUserConfigDir } from "@/lib/local/sdpmPaths"
-
-const BUNDLED_TEMPLATES_DIR = path.resolve(process.cwd(), "..", "skill", "templates")
+import { getUserConfigDir, BUNDLED_TEMPLATES_DIR } from "@/lib/local/sdpmPaths"
 
 function findTemplate(name: string): string | null {
   const filename = name.endsWith(".pptx") ? name : `${name}.pptx`

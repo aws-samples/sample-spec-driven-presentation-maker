@@ -79,11 +79,11 @@ function highlightMentions(text: string): (string | React.JSX.Element)[] {
       return (
         <span key={i} className="inline-flex items-center gap-1">
           <span
-            className="inline-block w-3 h-3 rounded-full border border-white/20 flex-none"
+            className="inline-block w-3 h-3 rounded-full border border-border-hover flex-none"
             style={{ backgroundColor: part }}
             aria-label={`Color ${part}`}
           />
-          <code className="text-xs px-1 py-0.5 rounded bg-white/5">{part}</code>
+          <code className="text-xs px-1 py-0.5 rounded bg-foreground/5">{part}</code>
         </span>
       )
     }
@@ -112,7 +112,7 @@ const markdownComponents = {
       return (
         <span className="inline-flex items-center gap-1">
           <span
-            className="inline-block w-3 h-3 rounded-full border border-white/20 flex-none"
+            className="inline-block w-3 h-3 rounded-full border border-border-hover flex-none"
             style={{ backgroundColor: color }}
             aria-label={`Color ${color}`}
           />
@@ -183,7 +183,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
   if (inlineSnippets.length > 0) {
     cleanContent = content.replace(/\n*---snippet---\n[\s\S]*?---\/snippet---/g, "").trim()
   }
-  // Strip [Attached: ...] markers from display text
+  // Strip compact v1 attachment markers from display text
   cleanContent = cleanContent.replace(/\[Attached:\s*[^\]]+\]\n*/g, "").trim()
   const allSnippets = [...inlineSnippets, ...snippets]
 
@@ -235,8 +235,8 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
     <div className={`flex ${isUser ? "justify-end msg-user-enter" : "gap-2.5 msg-assistant-enter"}`}>
       {/* AI avatar */}
       {!isUser && (
-        <div className="flex-none w-6 h-6 rounded-full flex items-center justify-center mt-0.5" style={{ background: "oklch(0.75 0.14 185 / 15%)" }}>
-          <Sparkles className="h-3 w-3" style={{ color: "oklch(0.75 0.14 185)" }} />
+        <div className="flex-none w-6 h-6 rounded-full flex items-center justify-center mt-0.5 bg-foreground/[8%]">
+          <Sparkles className="h-3 w-3 text-foreground-secondary" />
         </div>
       )}
       <div className={isUser ? "max-w-[85%]" : "flex-1 min-w-0"}>

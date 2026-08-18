@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_EXTRACT_CLI = _REPO_ROOT / "scripts" / "translate_extract.py"
-_APPLY_CLI = _REPO_ROOT / "scripts" / "translate_apply.py"
+_EXTRACT_CLI = _REPO_ROOT / "sdpm" / "scripts" / "translate_extract.py"
+_APPLY_CLI = _REPO_ROOT / "sdpm" / "scripts" / "translate_apply.py"
 
 
 def _make_minimal_deck(deck_dir: Path) -> None:
@@ -54,8 +54,11 @@ def _make_minimal_deck(deck_dir: Path) -> None:
             },
             {
                 "type": "table",
-                "headers": ["Name", "Value"],
-                "rows": [["Alpha", "1"], ["Beta", "2"]],
+                "headers": ["Name", {"text": "Rich Header", "fontColor": "#FF0000"}],
+                "rows": [
+                    ["Alpha", "1"],
+                    ["Beta", {"text": "Rich Cell", "fill": "#EEEEEE"}],
+                ],
             },
             {
                 "type": "group",
@@ -175,11 +178,11 @@ class TestTranslateExtract:
             "Item A",
             "Item B",
             "Name",
-            "Value",
+            "Rich Header",
             "Alpha",
             "Beta",
             "1",
-            "2",
+            "Rich Cell",
             "Inside group",
             "{{bold:Styled}} text here",
             "speaker note text",
@@ -191,6 +194,21 @@ class TestTranslateExtract:
         assert "images/foo.png" not in dictionary  # src
         assert "https://example.com" not in dictionary  # URL
         assert "#FFFFFF" not in dictionary  # fontColor / defaultTextColor
+
+    def test_tsv_escapes_control_characters(self, tmp_path: Path) -> None:
+        deck = tmp_path / "mydeck"
+        _make_minimal_deck(deck)
+        proc = _run_extract(str(deck), "--target-lang", "ja")
+        assert proc.returncode == 0
+
+        tsv = (tmp_path / "mydeck-ja" / "translate" / "texts.tsv").read_text(encoding="utf-8")
+        assert "\x0b" not in tsv  # vertical tab must be escaped, not invisible
+        assert "Vertical\\vtab preserved" in tsv
+        # ...while the JSON dictionary keeps the raw control character as key
+        dictionary = json.loads(
+            (tmp_path / "mydeck-ja" / "translate" / "translation_map.json").read_text(encoding="utf-8")
+        )
+        assert "Vertical\x0btab preserved" in dictionary
 
     def test_skip_short_option(self, tmp_path: Path) -> None:
         deck = tmp_path / "mydeck"
@@ -239,6 +257,21 @@ class TestTranslateApply:
             json.dumps(dictionary, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         return derived
+
+    def test_translates_dict_table_cells(self, tmp_path: Path) -> None:
+        derived = self._prepare_derived(tmp_path, {
+            "Rich Header": "リッチ見出し",
+            "Rich Cell": "リッチセル",
+        })
+        proc = _run_apply(str(derived))
+        assert proc.returncode == 0, f"failed: {proc.stderr}"
+
+        slide = json.loads((derived / "slides" / "slide-01.json").read_text(encoding="utf-8"))
+        table = next(e for e in slide["elements"] if e.get("type") == "table")
+        assert table["headers"][1]["text"] == "リッチ見出し"
+        assert table["headers"][1]["fontColor"] == "#FF0000"  # styling preserved
+        assert table["rows"][1][1]["text"] == "リッチセル"
+        assert table["rows"][1][1]["fill"] == "#EEEEEE"
 
     def test_apply_in_place(self, tmp_path: Path) -> None:
         derived = self._prepare_derived(tmp_path, {

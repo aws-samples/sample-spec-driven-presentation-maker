@@ -1,8 +1,8 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Tests for sdpm.schema.lint."""
+"""Tests for sdpm.engine.schema.lint."""
 
-from sdpm.schema.lint import lint
+from sdpm.engine.schema.lint import lint
 
 
 # ===================================================================
@@ -73,6 +73,15 @@ class TestLintShape:
             {"type": "shape", "shape": "banana", "x": 0, "y": 0}
         ]}])
         assert any(d["rule"] == "shape-unknown-name" for d in diags)
+
+    def test_raw_ooxml_preset_is_not_flagged(self):
+        # The builder passes camelCase OOXML presets through verbatim
+        # (imported decks are full of them) — no noise for those.
+        diags = lint([{"elements": [
+            {"type": "shape", "shape": "round2SameRect", "x": 0, "y": 0, "width": 100, "height": 50},
+            {"type": "shape", "shape": "snip1Rect", "x": 0, "y": 0, "width": 100, "height": 50},
+        ]}])
+        assert not any(d["rule"] == "shape-unknown-name" for d in diags)
 
     def test_missing_position(self):
         diags = lint([{"elements": [{"type": "shape", "shape": "rectangle", "width": 100}]}])
@@ -369,15 +378,25 @@ class TestLintCommon:
         ]}])
         assert any(d["rule"] == "out-of-bounds" for d in diags)
 
-    def test_out_of_bounds_y(self):
+    def test_height_not_checked(self):
+        """Height OOB is not checked by lint — it is template-dependent and
+        validated at generate time with real slide dimensions (R2/D2)."""
         diags = lint([{"elements": [
-            {"type": "shape", "shape": "rectangle", "x": 0, "y": 1000, "width": 100, "height": 100}
+            {"type": "shape", "shape": "rectangle", "x": 0, "y": 1000, "width": 100, "height": 500}
         ]}])
-        assert any(d["rule"] == "out-of-bounds" for d in diags)
+        assert not any(d["rule"] == "out-of-bounds" for d in diags)
 
     def test_within_bounds(self):
         diags = lint([{"elements": [
             {"type": "shape", "shape": "rectangle", "x": 0, "y": 0, "width": 1920, "height": 1080}
+        ]}])
+        assert not any(d["rule"] == "out-of-bounds" for d in diags)
+
+    def test_height_exceeds_4x3_no_warning(self):
+        """A 4:3 canvas is 1920x1440 — elements beyond 1080 should NOT trigger
+        out-of-bounds since lint is slide-size agnostic."""
+        diags = lint([{"elements": [
+            {"type": "shape", "shape": "rectangle", "x": 0, "y": 1100, "width": 800, "height": 300}
         ]}])
         assert not any(d["rule"] == "out-of-bounds" for d in diags)
 

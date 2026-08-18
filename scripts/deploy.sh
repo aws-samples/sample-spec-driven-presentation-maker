@@ -49,7 +49,7 @@ if [ -f "${CONFIG_FILE}" ]; then
   _search=$(grep -E "^\s*searchSlides:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
   if [ -n "${_search}" ]; then
     echo "⚠️  Notice: \`features.searchSlides\` has been removed. Semantic slide search is now always enabled." >&2
-    echo "   Please remove this option from ${CONFIG_FILE}. See docs/ja/cost.md or docs/en/cost.md for cost estimates." >&2
+    echo "   Please remove this option from ${CONFIG_FILE}. See docs/en/cost.md for cost estimates." >&2
   fi
 
   # Read enableInvocationLogging (new key), falling back to legacy `observability`
@@ -100,7 +100,7 @@ Options:
 Note:
   Semantic slide search (Bedrock KB + S3 Vectors) is always enabled.
   The previous --search flag and features.searchSlides option have been removed.
-  See docs/ja/cost.md or docs/en/cost.md for cost estimates.
+  See docs/en/cost.md for cost estimates.
 EOF
   exit 0
 }
@@ -206,8 +206,8 @@ zip -r "${SOURCE_ZIP}" . \
   -x "web-ui/node_modules/*" \
   -x "web-ui/.next/*" \
   -x "web-ui/build/*" \
-  -x "skill/assets/aws/*" \
-  -x "skill/assets/material/*" \
+  -x "sdpm/assets/aws/*" \
+  -x "sdpm/assets/material/*" \
   -x ".ruff_cache/*" \
   -x ".pytest_cache/*" \
   -x ".DS_Store" \

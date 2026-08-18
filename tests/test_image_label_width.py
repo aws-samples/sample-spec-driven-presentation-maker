@@ -1,10 +1,10 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Tests for icon label width estimation in sdpm.builder.elements.image."""
+"""Tests for icon label width estimation in sdpm.engine.builder.elements.image."""
 
 from __future__ import annotations
 
-from sdpm.builder.elements.image import _label_line_em, _plain_label_text
+from sdpm.engine.builder.elements.image import _label_line_em, _plain_label_text
 
 
 def test_plain_text_strips_style_markup():

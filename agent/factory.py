@@ -22,7 +22,7 @@ from mcp_clients import (
 from composition import resolve_parts
 from model_profiles import build_model_kwargs, MODEL_PROFILES, MANTLE_MODELS, resolve_mantle_region
 from modes import MODES
-from modes.separated.composer import make_compose_slides
+from modes.composer import make_compose_slides
 from resilience import LoopGuard
 from session import fix_excess_tool_results
 from tools.hearing_tool import hearing

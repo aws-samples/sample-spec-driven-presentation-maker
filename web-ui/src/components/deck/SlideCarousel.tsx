@@ -21,6 +21,7 @@ import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
 import { IS_LOCAL } from "@/lib/mode"
 import { notifyError } from "@/lib/errors"
 import { useTranslations } from "next-intl"
+import { AGENT_WAIT_COLORS } from "@/components/deck/SpecWaiting"
 
 
 interface SlideCarouselProps {
@@ -70,10 +71,20 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
 
+  /* ── Aspect ratio reported by the first child (deck is uniform) ── */
+  const [deckAr, setDeckAr] = useState(16 / 9)
+  const arReported = useRef(false)
+  const handleAspectRatio = useCallback((ratio: number) => {
+    if (!arReported.current && ratio > 0) {
+      arReported.current = true
+      setDeckAr(ratio)
+    }
+  }, [])
+
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
   const scrollTargetRef = useRef<string | null | undefined>(undefined)
-  const [hadSlidesOnMount] = useState(slides.length > 0)
+  const hadSlidesOnMount = useRef(slides.length > 0)
   const [firstComposeSeen, setFirstComposeSeen] = useState(false)
   const [knownComposeUrls, setKnownComposeUrls] = useState<Map<string, string>>(new Map())
 
@@ -88,7 +99,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     }
     // Mark first compose seen (skip animation for existing decks)
     if (!firstComposeSeen && slides.some(s => s.composeUrl)) {
-      if (hadSlidesOnMount) {
+      if (hadSlidesOnMount.current) {
         // Existing deck: suppress animation for this first batch
         anyChanged = false
       }
@@ -96,6 +107,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     }
     if (anyChanged) scrollTargetRef.current = null // arm scroll for next onAnimate
     setKnownComposeUrls(new Map(prevComposeKeys.current))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slides])
 
   const handleAnimate = useCallback((slug: string) => {
@@ -136,13 +148,6 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /* ── Spec tab state + auto-focus ── */
   const [specTab, setSpecTab] = useState<SpecTab>("brief")
   const prevSpecsRef = useRef<SpecFiles | null | undefined>(null)
-  // Suppress animation for 3s after slides tab becomes visible
-  const [settled, setSettled] = useState(false)
-  useEffect(() => {
-    if (specTab !== "slides") { setSettled(false); return }
-    const t = setTimeout(() => setSettled(true), 3000)
-    return () => clearTimeout(t)
-  }, [specTab])
 
   /**
    * Auto-focus: when a spec file transitions from null to non-null,
@@ -208,10 +213,8 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
    *
    * @returns JSX element for the empty slides state
    */
-  const WAIT_COLORS = [
-    "oklch(0.75 0.14 185)", "oklch(0.82 0.16 75)",
-    "oklch(0.70 0.18 330)", "oklch(0.78 0.15 145)",
-  ]
+  // Use the shared five agent identity colors for waiting animations.
+  const WAIT_COLORS = AGENT_WAIT_COLORS.map((c) => c.css)
 
   function renderSlidesEmpty(): React.ReactNode {
     if (isLoading) {
@@ -236,7 +239,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                   <div
                     className="build-shimmer-el absolute inset-0"
                     style={{
-                      background: `linear-gradient(90deg, transparent, ${WAIT_COLORS[i]}40, transparent)`,
+                      background: `linear-gradient(90deg, transparent, color-mix(in oklch, ${WAIT_COLORS[i]} 25%, transparent), transparent)`,
                       opacity: 0.35,
                       animation: `build-shimmer 2.8s ease-in-out ${i * 0.3}s infinite`,
                     }}
@@ -248,7 +251,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
               <p className="text-sm font-medium text-foreground">{t("buildingSlides")}</p>
               <p className="text-xs text-foreground-secondary mt-1">{t("buildingHint")}</p>
             </div>
-            <div className="w-48 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+            <div className="w-48 h-1.5 rounded-full bg-foreground/[0.06] overflow-hidden">
               <div
                 className="h-full rounded-full"
                 style={{
@@ -279,7 +282,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                       "--fan-r": `${(i - 1.5) * 8}deg`,
                       border: `1.5px solid ${color}`,
                       background: `oklch(0.14 0.01 260 / ${0.8 - i * 0.1})`,
-                      boxShadow: `0 0 12px ${color}30`,
+                      boxShadow: `0 0 12px color-mix(in oklch, ${color} 19%, transparent)`,
                       animation: `compose-fan 2.4s ease-in-out ${i * 0.15}s infinite`,
                     } as React.CSSProperties}
                   >
@@ -325,7 +328,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     if (slidesWithPreview.length === 0) return renderSlidesEmpty()
 
     return (
-      <div ref={containerRef} className={`flex-1 overflow-y-auto px-6 py-6 ${viewMode === "grid" ? "" : "space-y-4"}`}>
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-6 py-6">
         {viewMode === "grid" ? (
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
             {slidesWithPreview.map((slide, i) => (
@@ -347,16 +350,21 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
             ))}
           </div>
         ) : (
-          slidesWithPreview.map((slide, i) => (
+          /* Full view: cap height so one slide always fits the viewport
+             (100vh minus header + paddings). Width follows aspect ratio. */
+          <div className="mx-auto w-full space-y-4"
+               style={{ maxWidth: `calc((100vh - 170px) * ${deckAr})` }}>
+          {slidesWithPreview.map((slide, i) => (
             slide.composeUrl && defsUrl ? (
               <AnimatedSlidePreview
                 key={slide.slug}
                 defsUrl={defsUrl}
                 composeUrl={slide.composeUrl}
                 slug={slide.slug}
-                skipAnimation={!settled}
-                knownUrl={knownComposeUrls.get(slide.slug) || null}
+                skipAnimation={hadSlidesOnMount.current && !firstComposeSeen}
+                knownUrl={hadSlidesOnMount.current ? (knownComposeUrls.get(slide.slug) || null) : null}
                 onAnimate={() => handleAnimate(slide.slug)}
+                onAspectRatio={handleAspectRatio}
                 fallback={
                   <SlideThumbnail
                     src={slide.previewUrl}
@@ -364,6 +372,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                     index={i}
                     slug={slide.slug}
                     onClick={() => onSlideClick?.(i + 1)}
+                    onAspectRatio={handleAspectRatio}
                     className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
                   />
                 }
@@ -377,10 +386,12 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 slug={slide.slug}
                 onClick={() => onSlideClick?.(i + 1)}
                 updated={updatedIds.has(slide.slug)}
+                onAspectRatio={handleAspectRatio}
                 className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
               />
             )
-          ))
+          ))}
+          </div>
         )}
       </div>
     )
@@ -477,6 +488,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
           onTemplateSelect={specTab === "artDirection" ? onTemplateSelect : undefined}
           currentTemplate={specTab === "artDirection" ? currentTemplate : undefined}
           idToken={specTab === "artDirection" ? idToken : undefined}
+          outlineExists={specTab === "brief" ? (specs?.outline != null) : undefined}
         />
       )}
     </div>

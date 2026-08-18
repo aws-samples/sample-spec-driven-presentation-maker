@@ -1,0 +1,20 @@
+{
+  "name": "sdpm",
+  "interface": {
+    "displayName": "Spec-Driven Presentation Maker"
+  },
+  "plugins": [
+    {
+      "name": "spec-driven-presentation-maker",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

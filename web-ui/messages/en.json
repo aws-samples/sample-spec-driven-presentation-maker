@@ -43,6 +43,15 @@
   },
   "settings": {
     "title": "Settings",
+    "appearance": "Appearance",
+    "appearanceDescription": "Choose how the studio looks and scales",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "textSize": "Text size",
+    "textSizeDescription": "Scale text and interface spacing",
+    "textScaleLabel": "{scale}% text size",
     "language": "Language",
     "languageDescription": "Display language for the interface"
   },
@@ -180,15 +189,11 @@
     "submit": "Submit"
   },
   "modeSelector": {
-    "vibeDescription": "Drop materials, get slides. Minimal interaction for quick conversions.",
-    "specDescription": "Plan first, then build. Refine requirements through dialogue before composing.",
-    "greatFor": "Great for",
-    "vibeFor1": "URLs & articles → slides",
-    "vibeFor2": "Papers & docs → summary deck",
-    "vibeFor3": "Meeting notes → presentation",
-    "specFor1": "Proposals & pitch decks",
-    "specFor2": "Projects needing structure",
-    "specFor3": "Polished, precise presentations"
+    "chooseWorkingStyle": "Choose your working style",
+    "vibePath": "Fast path",
+    "specPath": "Review path",
+    "vibeSummary": "Start rough. See a first draft sooner.",
+    "specSummary": "Decide the story before the slides."
   },
   "tools": {
     "running": "Running",
@@ -207,11 +212,9 @@
     "get_deck": "Loading deck",
     "web_search": "Web search",
     "web_fetch": "Fetching page",
-    "read_uploaded_file": "Reading file",
     "import_attachment": "Importing file",
     "generate_pptx": "Generating PPTX",
     "generate_preview": "Generating preview",
-    "measure_slides": "Measuring slides",
     "init_presentation": "Initializing deck",
     "analyze_template": "Analyzing template",
     "start_presentation": "Starting workflow",
@@ -224,13 +227,11 @@
     "list_guides": "Listing guides",
     "read_guides": "Reading guide",
     "search_assets": "Searching assets",
-    "list_asset_sources": "Listing asset sources",
     "get_preview": "Getting preview",
     "run_python": "Running code",
     "run_style_python": "Building style",
     "grid": "Computing layout",
     "code_to_slide": "Code to slide",
-    "pptx_to_json": "Converting PPTX",
     "hearing": "Asking questions",
     "compose_slides": "Composing slides"
   },
@@ -250,6 +251,13 @@
     "draftingBrief": "Drafting the brief…",
     "structuringOutline": "Structuring the outline…",
     "composingArtDirection": "Composing art direction…"
+  },
+  "briefDocument": {
+    "filePath": "specs/brief.md",
+    "approved": "Approved",
+    "pending": "Pending approval",
+    "approvedAria": "Brief has been approved — outline exists",
+    "pendingAria": "Brief is pending approval — no outline yet"
   },
   "decksPage": {
     "removeFromFavorites": "Remove from favorites",
@@ -320,12 +328,33 @@
       "listingGuides": "Listing guides",
       "listingWorkflows": "Listing workflows",
       "listingTemplates": "Listing templates",
-      "listingAssetSources": "Listing asset sources",
-      "readingUpload": "Reading upload",
       "initializingDeck": "Initializing deck",
-      "thinking": "Thinking"
+      "thinking": "Thinking",
+      "writingSlide": "Writing slide · {slug}",
+      "writingSlideBare": "Writing slide",
+      "readingReference": "Reading reference"
     },
-    "stoppingBare": "Stopping"
+    "stoppingBare": "Stopping",
+    "liveProduction": "Compose · live production",
+    "inProduction": "{count} slides in production",
+    "parallelLanes": "{count, plural, one {# parallel lane} other {# parallel lanes}}",
+    "slideCreation": "Slide creation",
+    "createdProgress": "{created} / {total} created",
+    "composingSlides": "Composing slides…",
+    "finishingPresentation": "Finishing presentation…",
+    "readyForReview": "Ready for review",
+    "activityHistory": "Activity history",
+    "currentAttempt": "Current attempt",
+    "currentRetryAttempt": "Current attempt · Retry {count}",
+    "previousAttemptFailed": "Previous attempt failed",
+    "noActivity": "No activity yet",
+    "slideCreated": "Slide created",
+    "retryAttempt": "Retry {count}",
+    "queued": "Queued",
+    "working": "Working",
+    "completed": "Completed",
+    "createdCount": "{created}/{total} created",
+    "srCreationProgress": "{created} of {total} slides created"
   },
   "stylesPage": {
     "title": "Styles",
@@ -379,7 +408,8 @@
     "optional": "(optional)",
     "upload": "Upload",
     "analyzing": "Analyzing…",
-    "uploadFailed": "Failed to upload template"
+    "uploadFailed": "Failed to upload template",
+    "downloadFailed": "Failed to download template"
   },
   "styleChat": {
     "styleCreator": "Style Creator",
@@ -394,6 +424,8 @@
     "closeAria": "Close chat panel"
   },
   "stylePicker": {
+    "sectionTitle": "Style",
+    "sampleCount": "{count, plural, one {# sample slide} other {# sample slides}}",
     "chooseStyle": "Choose a Style",
     "clickToPreview": "Click to preview · ★ to pin favorites",
     "backToArtDirection": "Back to Art Direction",

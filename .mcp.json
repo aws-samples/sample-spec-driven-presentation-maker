@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "sdpm": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "python", "server.py"],
+      "cwd": "servers/local"
+    }
+  }
+}

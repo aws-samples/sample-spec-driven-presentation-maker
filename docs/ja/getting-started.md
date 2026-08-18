@@ -4,9 +4,9 @@
 
 spec-driven-presentation-maker をローカル利用から AWS デプロイまで、段階的にセットアップする手順を説明します。
 
-> **🤖 手動で読み進める必要はありません。** このリポジトリには [`AGENTS.md`](../../AGENTS.md) と [`CLAUDE.md`](../../CLAUDE.md) を同梱しています。お使いのコーディングエージェント（Claude Code, Codex CLI, Cursor, Kiro, VS Code の GitHub Copilot 等）に、例えば「このリポジトリをセットアップして」「AWS にデプロイして」「Layer 2 として Claude Desktop から使えるようにして」と話しかけてください。エージェントが AGENTS.md を読み取り、適切なレイヤーとコマンドを自動で選んで進めます。
+> **🤖 手動で読み進める必要はありません。** このリポジトリには [`AGENTS.md`](../../AGENTS.md) を同梱しています。お使いのコーディングエージェント（Claude Code, Codex CLI, Cursor, Kiro, VS Code の GitHub Copilot 等）に、例えば「このリポジトリをセットアップして」「AWS にデプロイして」「Layer 2 として Claude Desktop から使えるようにして」と話しかけてください。エージェントが AGENTS.md を読み取り、適切なレイヤーとコマンドを自動で選んで進めます。
 
-> **🚀 AWS へのデプロイだけを行いたい場合:** [ワンクリックデプロイ](deploy-cloudshell.md#ワンクリックデプロイ推奨) が最も簡単です。AWS コンソールにログインし、Launch Stack ボタンを押してパラメータを入力するだけで完了します。外部 IdP 連携や WAF 設定など高度なカスタマイズが必要な場合は [CloudShell を使ったデプロイ](deploy-cloudshell.md#cloudshell-を使ったデプロイ) を参照してください。本ページは、Layer 1〜2 のローカル利用や、ローカル CDK を使った開発・デバッグ向けの手順を含みます。
+> **🚀 AWS へのデプロイだけを行いたい場合:** [ワンクリックデプロイ](../en/deploy-cloudshell.md#one-click-deploy-recommended) が最も簡単です。AWS コンソールにログインし、Launch Stack ボタンを押してパラメータを入力するだけで完了します。外部 IdP 連携や WAF 設定など高度なカスタマイズが必要な場合は [CloudShell を使ったデプロイ](../en/deploy-cloudshell.md#deploy-using-cloudshell) を参照してください。本ページは、Layer 1〜2 のローカル利用や、ローカル CDK を使った開発・デバッグ向けの手順を含みます。
 
 ## どのレイヤーを使うべきか
 
@@ -33,17 +33,17 @@ Layer 3〜4 を **ローカル CDK で直接デプロイする場合** は追加
 
 ## Layer 1: エージェントスキル（MCP なし）
 
-最もシンプルな使い方です。`skill/` ディレクトリをエージェントのスキルディレクトリにコピーまたは
+最もシンプルな使い方です。`sdpm/` ディレクトリをエージェントのスキルディレクトリにコピーまたは
 symlink します。エージェントは `scripts/pptx_builder.py` 経由でエンジンを呼び出すため、MCP
 サーバーは不要です。
 
 > **Kiro CLI ユーザーの方:** [Layer 2](#layer-2-ローカル-mcp-サーバー) をご覧ください —
-> `make install-kiro` でローカル MCP サーバーと、それを駆動する skill（並列 composer
-> サブエージェントを含む）が一度に設定されます。
+> `make install-kiro` でローカル MCP サーバー（モードの振る舞い込み）と、
+> 並列スライド生成用の専用 composer エージェントが設定されます。
 
 ```bash
 # 依存関係のインストール
-cd skill
+cd sdpm
 uv sync
 
 # アイコンのダウンロード（任意、推奨）
@@ -64,8 +64,8 @@ spec-driven-presentation-maker を MCP 対応の任意のクライアントに�
 
 ### Kiro CLI — make ターゲット 1 つ（推奨）
 
-Kiro CLI では、MCP サーバーとそれを駆動する skill（並列 composer サブエージェントを含む）が
-1 つのターゲットで設定できます。
+Kiro CLI では make ターゲット 1 つで完了します — モードの振る舞いは MCP サーバーが配信し、
+並列スライド生成は専用の `sdpm-composer` エージェントが担当します。
 
 ```bash
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
@@ -74,21 +74,68 @@ make install-kiro
 kiro-cli chat   # あとは「〜のスライドを作って」と頼むだけ
 ```
 
-`sdpm` ローカル MCP サーバーを `~/.kiro/settings/mcp.json` に登録し、skill を
-`~/.kiro/skills/` へ symlink し、composer エージェント設定を
-`~/.kiro/agents/sdpm-composer.json` に生成します。前提: [`uv`](https://docs.astral.sh/uv/) が
-`PATH` にあること、プレビュー用に **LibreOffice** と **poppler**。
+`sdpm` ローカル MCP サーバーを `<KIRO_HOME>/settings/mcp.json`（既定は `~/.kiro`）に登録し、
+モードの入口を `<KIRO_HOME>/skills/` に symlink します。これにより `/sdpm-vibe` `/sdpm-spec`
+`/sdpm-style` `/sdpm-translate` でモードを明示的に選べます。加えて composer エージェントを
+`<KIRO_HOME>/agents/sdpm-composer.json` に生成します — compose ワーカーに sdpm サーバー
+だけを持たせる薄いポインタで、ワーカーごとにプロファイル内の全 MCP サーバーを
+コールドスタートするのを防ぎます。振る舞いの実体は MCP サーバーが
+`start_presentation(mode=...)` で配信し、入口も composer エージェントもモード名を指すだけです。
+前提: [`uv`](https://docs.astral.sh/uv/) が `PATH` にあること、プレビュー用に
+**LibreOffice** と **poppler**。
 
 MCP サーバーはこの clone 先から起動するため、**ディレクトリはそのまま置いておいてください**。
-更新は `git pull` だけで十分です（skill は symlink、composer プロンプトは `file://` 参照）。
+更新は `git pull` だけで十分です。
 別パスへ移動した場合のみ `make install-kiro` を再実行してください。
+
+`make` は引数を渡さないので、オプションを使うときはスクリプトを直接呼びます:
+
+```bash
+uv run python3 clients/kiro/install.py --agent NAME       # 特定のエージェント設定に登録
+uv run python3 clients/kiro/install.py --mode legacy      # Power 自動判定を使わない
+KIRO_HOME=~/.kiro-sdpm-dev make install-kiro              # 別プロファイルに導入
+```
+
+`sdpm` の MCP 登録や skill symlink を**別のチェックアウトが所有している**場合、
+インストーラーは動いている設定を書き換えず、検出内容を一覧表示して停止します。
+別の `KIRO_HOME` に入れる、他方の配線を自分で削除する、あるいは意図的に奪うなら
+`--replace-existing` を指定してください。
+
+### Kiro IDE — Power として導入
+
+リポジトリのルートは [Agent Plugins](https://agent-plugins.org) パッケージ
+（`plugin.json` + `mcp.json` + `skills/`）で、これは Kiro Powers が使う形式そのものです。
+Kiro IDE からこのチェックアウトを Power として導入してください。Powers はグローバル
+スコープで、同梱 MCP サーバーは Kiro が内部管理するため `~/.kiro/settings/mcp.json` への
+書き込みは不要です。
+
+Power と上記の Kiro CLI 配線は同じパッケージへの 2 経路で、同時に有効にすべきではありません。
+Powers にはプロジェクトスコープが無いため、分離はプロファイルで行います — CLI インストーラーは
+Power を入れた `KIRO_HOME` とは別のプロファイルで実行してください。Power が既に在る
+プロファイルで `make install-kiro` を実行すると、インストーラーは追加ではなく
+自分が作った旧配線の削除を行います。
+
+### Codex — プラグインとして導入
+
+チェックアウトには Codex 用マニフェスト（`.codex-plugin/plugin.json`）、同梱 MCP サーバー
+定義（`.mcp.json`）、リポジトリ marketplace（`.agents/plugins/marketplace.json`）が含まれる
+ため、`config.toml` を手で編集せずに導入できます:
+
+```bash
+codex plugin marketplace add ./     # チェックアウト内で実行
+```
+
+そのあと ChatGPT デスクトップアプリでこの marketplace から
+`spec-driven-presentation-maker` を導入し、新しい会話を開始してください。Codex は
+プラグインを `~/.codex/plugins/cache/…` にコピーするため、MCP サーバーの Python 環境は
+チェックアウト内ではなくプラグインの書き込み可能データディレクトリに作られます。
 
 ### その他の MCP クライアント — 手動セットアップ
 
 #### サーバーの起動
 
 ```bash
-cd mcp-local
+cd servers/local
 uv sync
 uv run python server.py
 ```
@@ -102,7 +149,7 @@ uv run python server.py
   "mcpServers": {
     "spec-driven-presentation-maker": {
       "command": "uv",
-      "args": ["run", "--directory", "/absolute/path/to/mcp-local", "python", "server.py"]
+      "args": ["run", "--directory", "/absolute/path/to/servers/local", "python", "server.py"]
     }
   }
 }
@@ -118,7 +165,7 @@ uv run python server.py
 4. スライドを 1 枚ずつ構築
 5. PPTX を生成し、プレビューを表示
 
-利用可能なツールの一覧は[アーキテクチャ — MCP ツール一覧](architecture.md#mcp-ツール一覧)を参照してください。
+利用可能なツールの一覧は[アーキテクチャ — MCP ツール一覧](../en/architecture.md#mcp-tool-reference)を参照してください。
 
 ---
 
@@ -126,7 +173,7 @@ uv run python server.py
 
 spec-driven-presentation-maker を Amazon Bedrock AgentCore Runtime 上のリモート MCP サーバーとしてデプロイします。
 
-> **💡 AWS へのデプロイは [推奨デプロイ手順](deploy-cloudshell.md) を推奨します。**
+> **💡 AWS へのデプロイは [推奨デプロイ手順](../en/deploy-cloudshell.md) を推奨します。**
 > `scripts/deploy.sh` は CloudShell と任意のローカル Linux/macOS から実行でき、CodeBuild 経由でデプロイされるため CDK/Docker のローカルインストールが不要です。本ページ以降の手順はローカル CDK を直接使う開発・デバッグ向けフローです。
 
 ### 設定
@@ -192,7 +239,7 @@ npx cdk deploy --all --context modelId=global.anthropic.claude-opus-4-6-v1
 ### テンプレートの登録
 
 CDK はテンプレートファイルを S3 にデプロイしますが、`list_templates` で表示するには Amazon DynamoDB への登録が必要です。
-詳細は[カスタムテンプレート — テンプレートの登録（Layer 3）](custom-template.md#layer-3リモート-mcp)を参照してください。
+詳細は[カスタムテンプレート — テンプレートの登録（Layer 3）](../en/custom-template.md#layer-3-remote-mcp)を参照してください。
 
 ### デプロイの確認
 
@@ -228,7 +275,7 @@ curl -X POST \
 
 ## Layer 4: フルスタック（AWS）
 
-> **💡 推奨:** Layer 4 のデプロイは [推奨デプロイ手順](deploy-cloudshell.md) を利用してください（CloudShell と任意のローカル Linux/macOS で動作）。`./scripts/deploy.sh --region us-east-1` を実行するだけで、CDK/Docker のローカルインストールは不要です。
+> **💡 推奨:** Layer 4 のデプロイは [推奨デプロイ手順](../en/deploy-cloudshell.md) を利用してください（CloudShell と任意のローカル Linux/macOS で動作）。`./scripts/deploy.sh --region us-east-1` を実行するだけで、CDK/Docker のローカルインストールは不要です。
 
 `config.yaml` で `agent` と `webUi` を有効にしてデプロイすると、以下が追加されます。
 
@@ -267,7 +314,7 @@ npx cdk deploy --all
 
 `agent` または `webUi` を有効にすると、CDK が Amazon Cognito User Pool（ホスト UI 付き）を自動作成します。ユーザーは Web UI からサインインし、JWT がスタック全体に伝播されます。
 
-認証・認可モデルの設計詳細は[アーキテクチャ — 認証・認可モデル](architecture.md#認証認可モデル)を参照してください。
+認証・認可モデルの設計詳細は[アーキテクチャ — 認証・認可モデル](../en/architecture.md#authentication-and-authorization-model)を参照してください。
 
 #### 外部 OIDC IdP
 
@@ -330,7 +377,7 @@ Amazon Bedrock Knowledge Bases と Amazon S3 Vectors を用いた、デッキ横
 
 ### カスタムテンプレート・アセット
 
-独自の .pptx テンプレートやアイコンの追加方法は[カスタムテンプレートとアセット](custom-template.md)を参照してください。
+独自の .pptx テンプレートやアイコンの追加方法は[カスタムテンプレートとアセット](../en/custom-template.md)を参照してください。
 
 ---
 
@@ -338,7 +385,7 @@ Amazon Bedrock Knowledge Bases と Amazon S3 Vectors を用いた、デッキ横
 
 ### コスト
 
-コストの詳細は[コスト試算](cost.md)を参照してください。開発・検証が終わったら `npx cdk destroy --all` でリソースを削除してください。
+コストの詳細は[コスト試算](../en/cost.md)を参照してください。開発・検証が終わったら `npx cdk destroy --all` でリソースを削除してください。
 
 ### データ保持
 
@@ -387,6 +434,6 @@ bash scripts/deploy_webui.sh
 
 ## 関連ドキュメント
 
-- [アーキテクチャ](architecture.md) — 4 層構成、データフロー、認証モデル
-- [カスタムテンプレート](custom-template.md) — テンプレートとアセットの追加
-- [エージェント接続](add-to-gateway.md) — MCP クライアントの接続方法
+- [アーキテクチャ](../en/architecture.md) — 4 層構成、データフロー、認証モデル
+- [カスタムテンプレート](../en/custom-template.md) — テンプレートとアセットの追加
+- [エージェント接続](../en/add-to-gateway.md) — MCP クライアントの接続方法

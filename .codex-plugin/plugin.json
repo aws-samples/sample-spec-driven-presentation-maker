@@ -1,0 +1,21 @@
+{
+  "name": "spec-driven-presentation-maker",
+  "version": "0.7.1",
+  "description": "Spec-driven PowerPoint generation — design what to communicate first, then let the agent build the slides from templates.",
+  "author": {
+    "name": "aws-samples",
+    "url": "https://github.com/aws-samples/sample-spec-driven-presentation-maker"
+  },
+  "homepage": "https://github.com/aws-samples/sample-spec-driven-presentation-maker",
+  "repository": "https://github.com/aws-samples/sample-spec-driven-presentation-maker",
+  "license": "MIT-0",
+  "keywords": [
+    "presentation",
+    "slides",
+    "powerpoint",
+    "pptx",
+    "deck"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}

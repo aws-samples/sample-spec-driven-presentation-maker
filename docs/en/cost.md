@@ -1,4 +1,4 @@
-[EN](../en/cost.md) | [JA](../ja/cost.md)
+[EN](../en/cost.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
 
 # Cost Estimates
 

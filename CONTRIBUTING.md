@@ -60,7 +60,7 @@ CI runs the same scan with `--fail-on-findings`, so local failures will also fai
 
 ## Which layer to modify
 
-The engine in `skill/sdpm/` is the single source of truth for business logic. Prefer extending the engine over duplicating logic in `mcp-local/`, `mcp-server/`, or `agent/`. See [AGENTS.md](AGENTS.md) and the layering rules for details.
+The engine in `sdpm/sdpm/` is the single source of truth for business logic. Prefer extending the engine over duplicating logic in `servers/local/`, `servers/remote/`, or `agent/`. See [AGENTS.md](AGENTS.md) and the layering rules for details.
 
 ## Reporting bugs / feature requests
 

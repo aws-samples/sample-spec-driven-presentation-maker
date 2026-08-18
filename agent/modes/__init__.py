@@ -30,11 +30,25 @@ class ModeConfig:
 # Shared parts — referenced by multiple modes
 _COMMON_LANGUAGE = Part(Source.file("common/language"), target="system")
 _COMMON_ATTACHMENTS = Part(Source.file("common/attachments"), target="system")
-_WF_CANCELLATION = Part(Source.file("workflow/cancellation"), target="system")
-_WF_POST_COMPOSE = Part(Source.file("workflow/post_compose"), target="system")
-_WF_SLIDE_GROUPS = Part(Source.file("workflow/slide_groups"), target="system",
-                        cache_point=True)
+_WIRING_COMPOSE_REPORT = Part(Source.file("wiring/compose_report"), target="system",
+                              cache_point=True)
 _NOW = Part(Source.file("common/now"), target="system")
+
+
+def _persona(mode: str) -> Part:
+    """Fetch canonical mode behavior from the personas port.
+
+    Persona text lives only in personas/*.md and is served by the MCP server
+    via start_presentation(mode=...) — the same port every other client uses.
+    tool_filters do not apply to call_tool_sync, so this works regardless of
+    the mode's allowed_tools list.
+    """
+    return Part(
+        Source.mcp("start_presentation", {"mode": mode}),
+        target="system",
+        label=f"persona:{mode}",
+    )
+
 
 _PREFETCH_BRIEFING = Part(
     Source.mcp("read_workflows", {"names": ["create-new-1-briefing"]}),
@@ -46,38 +60,37 @@ _PREFETCH_BRIEFING = Part(
 # Tool allowlists — explicit control over which MCP tools each mode can use.
 # run_style_python is only available to style_creator.
 _DECK_TOOLS = [
-    "init_presentation", "analyze_template", "read_uploaded_file",
+    "init_presentation", "analyze_template", "read_attachment",
     "list_styles", "apply_style", "read_examples", "list_workflows",
     "read_workflows", "list_guides", "read_guides", "search_assets",
-    "list_asset_sources", "list_templates",
+    "list_templates",
     "run_python", "generate_pptx", "get_preview", "code_to_slide",
-    "grid", "import_attachment",
+    "grid", "arch_diagram", "import_attachment", "diff_pptx",
 ]
 
 _STYLE_TOOLS = [
-    "run_style_python", "list_styles", "analyze_template", "read_uploaded_file",
+    "run_style_python", "list_styles", "analyze_template", "read_attachment",
 ]
 
 
 MODES: dict[str, ModeConfig] = {
+    # Mode IDs are wire-compatible ("separated" = spec persona).
+    # Behavior text comes from personas/*.md via the start_presentation port;
+    # only L4 wiring (attachment wire format, compose_slides report format)
+    # is defined here as local files.
     "separated": ModeConfig(parts=[
         _COMMON_LANGUAGE,
-        Part(Source.file("role/spec_agent"), target="system"),
+        _persona("spec"),
         _COMMON_ATTACHMENTS,
-        _WF_CANCELLATION,
-        _WF_POST_COMPOSE,
-        _WF_SLIDE_GROUPS,
+        _WIRING_COMPOSE_REPORT,
         _NOW,
         _PREFETCH_BRIEFING,
     ], allowed_tools=_DECK_TOOLS),
     "vibe": ModeConfig(parts=[
         _COMMON_LANGUAGE,
-        Part(Source.file("role/vibe_agent"), target="system"),
+        _persona("vibe"),
         _COMMON_ATTACHMENTS,
-        Part(Source.file("workflow/vibe"), target="system"),
-        _WF_CANCELLATION,
-        _WF_POST_COMPOSE,
-        _WF_SLIDE_GROUPS,
+        _WIRING_COMPOSE_REPORT,
         _NOW,
     ], allowed_tools=_DECK_TOOLS),
     "single": ModeConfig(
@@ -93,10 +106,12 @@ MODES: dict[str, ModeConfig] = {
     ),
     # Composer is a sub-agent invoked by compose_slides; ModeConfig is used
     # by compose_slides to build its prompt via the same resolve_parts path.
+    # The persona's "Step 1 — Load references" is skip-if-already-loaded, so
+    # prefetching them here is compatible and saves per-group round trips.
     # Dynamic parts (deck specs, template analysis) are added at runtime.
     "composer": ModeConfig(
         parts=[
-            Part(Source.file("role/composer"), target="system"),
+            _persona("composer"),
             Part(
                 Source.mcp("read_workflows", {"names": ["create-new-2-compose"]}),
                 target="system", label="create-new-2-compose",
@@ -118,7 +133,10 @@ MODES: dict[str, ModeConfig] = {
     "style_creator": ModeConfig(
         parts=[
             _COMMON_LANGUAGE,
-            Part(Source.file("role/style_creator"), target="system"),
+            _persona("style"),
+            # Remote's run_style_python has different sandbox I/O than the
+            # local server the persona documents (no read_style/write_style)
+            Part(Source.file("wiring/style_remote"), target="system"),
             _NOW,
             Part(
                 Source.mcp("read_workflows", {"names": ["create-style"]}),

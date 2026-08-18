@@ -77,6 +77,23 @@ export class DataStack extends cdk.Stack {
       ],
       lifecycleRules: [
         {
+          // Raw user attachment sources are temporary; committed import bundles
+          // live under decks/. Prefix-only (no tag filter) so that objects from
+          // older releases — which carry no sdpm-class tag — also expire, and
+          // so the abort-multipart setting can live in the same rule (S3 forbids
+          // combining it with tag filters).
+          prefix: "uploads/",
+          expiration: cdk.Duration.days(90),
+          noncurrentVersionExpiration: cdk.Duration.days(7),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(1),
+        },
+        {
+          // Rebuildable attachment conversion cache.
+          prefix: "attachment-cache/v1/",
+          expiration: cdk.Duration.days(7),
+          noncurrentVersionExpiration: cdk.Duration.days(7),
+        },
+        {
           // Clean up old PPTX versions after 90 days
           prefix: "pptx/",
           expiration: cdk.Duration.days(90),
@@ -118,7 +135,7 @@ export class DataStack extends cdk.Stack {
     // --- Deploy default resources to S3 ---
     new s3deploy.BucketDeployment(this, "DeployReferences", {
       sources: [
-        s3deploy.Source.asset(path.join(__dirname, "../../skill/references")),
+        s3deploy.Source.asset(path.join(__dirname, "../../sdpm/references")),
       ],
       destinationBucket: this.resourceBucket,
       destinationKeyPrefix: "references/",
@@ -126,15 +143,15 @@ export class DataStack extends cdk.Stack {
 
     new s3deploy.BucketDeployment(this, "DeployAssets", {
       sources: [
-        s3deploy.Source.asset(path.join(__dirname, "../../skill/templates")),
+        s3deploy.Source.asset(path.join(__dirname, "../../sdpm/templates")),
       ],
       destinationBucket: this.resourceBucket,
       destinationKeyPrefix: "templates/",
     });
 
     // Deploy asset icons — auto-download if not present
-    const assetsDir = path.join(__dirname, "../../skill/assets");
-    const scriptsDir = path.join(__dirname, "../../skill/scripts");
+    const assetsDir = path.join(__dirname, "../../sdpm/assets");
+    const scriptsDir = path.join(__dirname, "../../sdpm/scripts");
     new s3deploy.BucketDeployment(this, "DeployIcons", {
       sources: [
         s3deploy.Source.asset(scriptsDir, {

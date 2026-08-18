@@ -1,4 +1,4 @@
-[EN](../en/custom-template.md) | [JA](../ja/custom-template.md)
+[EN](../en/custom-template.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
 
 # Custom Templates, Styles, and Assets
 
@@ -59,6 +59,34 @@ Design your template in PowerPoint, Google Slides, or Keynote (export as .pptx):
 - Ensure background-to-text color contrast ratio of at least 4.5:1
 - Test your template by running `analyze_template` and reviewing the output
 
+### Slide size (aspect ratio)
+
+Any slide size works — 16:9, 4:3, 16:10, and other ratios are all supported.
+The engine derives the drawing canvas from your template's actual dimensions.
+
+The coordinate system is **1920 px wide, with height following the aspect ratio**:
+
+| Template slide size | Canvas in slide JSON |
+|---|---|
+| 16:9 (13.33 × 7.5 in) | 1920 × 1080 px |
+| 4:3 (10 × 7.5 in) | 1920 × 1440 px |
+| 16:10 | 1920 × 1200 px |
+
+`analyze_template` reports the canvas size as `slide_size`, and the agent records
+it in `deck.json` as `slideSize` so that slide composition uses the full canvas.
+
+Known limitations for non-16:9 templates:
+
+- **Architecture diagram boxes** — fixed in #285. Box auto-height is now
+  calibrated using `slideSize.ptPerPx` (the pt-to-px conversion rate reported
+  by `analyze_template` and stored in `deck.json`). Explicit `box.height` is
+  still accepted for manual fine-tuning.
+- **Style demos** — the bundled style gallery HTML files use a fixed 16:9 canvas.
+  This does not affect generated slides (only the design tokens are consumed).
+- **Deck list thumbnails** — the Web UI deck list crops thumbnails to a fixed
+  ratio so that card heights stay aligned in the grid. Slide previews
+  (workspace, carousel) follow the real aspect ratio.
+
 ---
 
 ## Analyzing a Template
@@ -102,12 +130,12 @@ Place your .pptx file anywhere accessible and specify the path when initializing
 
 Or simply tell the agent: "Use my-template.pptx for this presentation."
 
-Place templates in `skill/templates/` to have them appear in `list_templates` automatically.
+Place templates in `sdpm/templates/` to have them appear in `list_templates` automatically.
 
 Included sample templates:
 
 ```
-skill/templates/
+sdpm/templates/
 ├── sample_template_dark.pptx
 └── sample_template_light.pptx
 ```
@@ -121,7 +149,7 @@ searches the following locations in order and merges the results in
 
 1. Directories listed in `$SDPM_TEMPLATES_DIR` (platform path separator: `:` on Unix, `;` on Windows — same semantics as `PATH`)
 2. `<user-config>/templates/` — see **User-local directory layout** below
-3. `skill/templates/` (package-bundled)
+3. `sdpm/templates/` (package-bundled)
 
 A user-local template shadows a bundled one with the same file name, which
 makes it easy to override sample templates without editing the repository.
@@ -192,7 +220,7 @@ You can also copy an existing style manually:
 
 ```bash
 mkdir -p ~/.config/sdpm/styles
-cp skill/references/examples/styles/elegant-dark.html \
+cp sdpm/references/examples/styles/elegant-dark.html \
    ~/.config/sdpm/styles/my-style.html
 ```
 
@@ -200,7 +228,7 @@ Search order (first match wins on same file name):
 
 1. Directories listed in `$SDPM_STYLES_DIR` (platform path separator, like `PATH`)
 2. `<user-config>/styles/`
-3. `skill/references/examples/styles/` (package-bundled samples)
+3. `sdpm/references/examples/styles/` (package-bundled samples)
 
 The styles gallery (opened by `list_styles` or the CLI `examples styles` command)
 scans all three locations and displays them in a single list. User-local styles
@@ -221,10 +249,10 @@ uv run python3 scripts/download_aws_icons.py
 uv run python3 scripts/download_material_icons.py
 ```
 
-Icons are stored in `skill/assets/` with a `manifest.json` per source:
+Icons are stored in `sdpm/assets/` with a `manifest.json` per source:
 
 ```
-skill/assets/
+sdpm/assets/
 ├── config.json          # Optional: user settings (gitignored, see config.example.json)
 ├── config.example.json  # Example config (git-managed)
 ├── aws/
@@ -306,7 +334,7 @@ When an asset name appears in multiple sources, the earlier source wins:
 
 1. `extra_sources` from `config.json` — explicit override
 2. `<user-config>/assets/` — auto-discovered user-local sources
-3. `skill/assets/` — built-in sources (aws, material)
+3. `sdpm/assets/` — built-in sources (aws, material)
 4. Legacy `icons/` directory (only if present)
 
 This lets `extra_sources` override user-local sources, which in turn override
@@ -335,7 +363,7 @@ Full schema with defaults:
   `$SDPM_OUTPUT_DIR`.
 - `extra_sources` — Additional asset manifests (see **Option B** above).
 
-The previously-shipped `skill/assets/config.json` is no longer read — it was
+The previously-shipped `sdpm/assets/config.json` is no longer read — it was
 lost on `pip install --upgrade` and is replaced entirely by the user-local
 path above.
 

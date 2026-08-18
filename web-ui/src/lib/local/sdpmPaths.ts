@@ -5,8 +5,14 @@ import fs from "fs"
 import path from "path"
 import os from "os"
 
-/** Bundled styles directory (skill/references/examples/styles/). */
-export const BUNDLED_STYLES_DIR = path.resolve(process.cwd(), "..", "skill", "references", "examples", "styles")
+/** Skill distribution root (repo's sdpm/ — engine package + references + templates). */
+export const SDPM_ROOT = path.resolve(process.cwd(), "..", "sdpm")
+
+/** Bundled templates directory (sdpm/templates/). */
+export const BUNDLED_TEMPLATES_DIR = path.join(SDPM_ROOT, "templates")
+
+/** Bundled styles directory (sdpm/references/examples/styles/). */
+export const BUNDLED_STYLES_DIR = path.join(SDPM_ROOT, "references", "examples", "styles")
 
 /** User config directory (~/.config/sdpm on macOS/Linux, %APPDATA%/sdpm on Windows). */
 export function getUserConfigDir(): string {
@@ -43,28 +49,20 @@ export function updateState(key: string, value: unknown): void {
   fs.writeFileSync(p, JSON.stringify(state, null, 2))
 }
 
-/** List style HTML files from a directory. Returns [{name, description, coverHtml}]. */
-export function listStylesFromDir(dir: string): Array<{ name: string; description: string; coverHtml: string }> {
+/** List style HTML files from a directory. Returns [{name, description, html}]. */
+export function listStylesFromDir(dir: string): Array<{ name: string; description: string; html: string }> {
   if (!fs.existsSync(dir)) return []
   return fs.readdirSync(dir)
     .filter(f => f.endsWith(".html") && !f.startsWith("."))
     .sort()
     .map(f => {
       const name = f.replace(/\.html$/, "")
+      // `dir` is a server-side constant (bundled/user styles dir) and `f` comes
+      // from readdirSync filtered to *.html — no user input reaches this join.
+      // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
       const html = fs.readFileSync(path.join(dir, f), "utf-8")
       const titleMatch = html.match(/<title>(.*?)<\/title>/i)
       const description = titleMatch ? titleMatch[1].trim() : ""
-      // Extract first slide as cover: find first <div class="slide..."> to second
-      const slideRegex = /<div class="slide[\s"]/g
-      const firstMatch = slideRegex.exec(html)
-      if (!firstMatch) return { name, description, coverHtml: html }
-      const first = firstMatch.index
-      const secondMatch = slideRegex.exec(html)
-      const slideHtml = secondMatch ? html.slice(first, secondMatch.index) : html.slice(first, html.indexOf("</body", first) || undefined)
-      // Build standalone doc with head styles + body padding reset
-      const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i)
-      const head = headMatch ? headMatch[1] : ""
-      const coverHtml = `<!DOCTYPE html><html><head>${head}<style>body{margin:0!important;padding:0!important;background:transparent!important;overflow:hidden!important;zoom:1!important}.slide{margin:0 auto!important}</style></head><body>${slideHtml}</body></html>`
-      return { name, description, coverHtml }
+      return { name, description, html }
     })
 }

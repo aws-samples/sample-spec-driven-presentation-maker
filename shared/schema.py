@@ -6,7 +6,7 @@ Security: AWS manages infrastructure security. You manage access control,
 data classification, and IAM policies. See SECURITY.md for details.
 
 Single source of truth for PK/SK patterns and GSI configuration.
-All DDB access in api/ and mcp-server/ should use these helpers
+All DDB access in api/ and servers/remote/ should use these helpers
 instead of hardcoding key strings.
 """
 
@@ -76,18 +76,6 @@ def template_pk(template_id: str) -> str:
     return f"TEMPLATE#{template_id}"
 
 
-def upload_sk(upload_id: str) -> str:
-    """Sort key for an upload record.
-
-    Args:
-        upload_id: Upload identifier.
-
-    Returns:
-        SK string in format UPLOAD#{upload_id}.
-    """
-    return f"UPLOAD#{upload_id}"
-
-
 # ---------------------------------------------------------------------------
 # Key prefix constants (for begins_with queries)
 # ---------------------------------------------------------------------------
@@ -95,7 +83,6 @@ def upload_sk(upload_id: str) -> str:
 DECK_SK_PREFIX = "DECK#"
 FAV_SK_PREFIX = "FAV#"
 TEMPLATE_PK_PREFIX = "TEMPLATE#"
-UPLOAD_SK_PREFIX = "UPLOAD#"
 
 
 # ---------------------------------------------------------------------------

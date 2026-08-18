@@ -4,13 +4,10 @@
 import fs from "fs"
 import path from "path"
 import { execFileSync } from "child_process"
-import { getUserConfigDir, getState, updateState } from "@/lib/local/sdpmPaths"
+import { getUserConfigDir, getState, updateState, SDPM_ROOT, BUNDLED_TEMPLATES_DIR } from "@/lib/local/sdpmPaths"
 
-/** Bundled templates directory. */
-const BUNDLED_TEMPLATES_DIR = path.resolve(process.cwd(), "..", "skill", "templates")
-
-/** mcp-local directory (uv-managed venv with sdpm deps). */
-const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "mcp-local")
+/** servers/local directory (uv-managed venv with sdpm deps). */
+const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
 
 /** User-local templates directory. */
 function getUserTemplatesDir(): string {
@@ -27,11 +24,11 @@ export async function GET() {
   const seen = new Set<string>()
   const templates: Array<Record<string, unknown>> = []
 
-  const skillDir = path.resolve(process.cwd(), "..", "skill")
+  const skillDir = SDPM_ROOT
 
   function analyzeAndCache(templatePath: string, name: string): Record<string, unknown> {
     try {
-      const script = `import sys; sys.path.insert(0, sys.argv[1]); import json; from sdpm.analyzer import analyze_template; r=analyze_template(__import__('pathlib').Path(sys.argv[2])); print(json.dumps({'theme_colors':r.get('theme_colors',{}),'fonts':r.get('fonts',{}),'layout_count':len(r.get('layouts',[]))}))`
+      const script = `import sys; sys.path.insert(0, sys.argv[1]); import json; from sdpm.engine.analyzer import analyze_template; r=analyze_template(__import__('pathlib').Path(sys.argv[2])); print(json.dumps({'theme_colors':r.get('theme_colors',{}),'fonts':r.get('fonts',{}),'layout_count':len(r.get('layouts',[]))}))`
       const result = execFileSync("uv", ["run", "--directory", MCP_LOCAL_DIR, "python", "-c", script, skillDir, templatePath], {
         encoding: "utf-8",
         timeout: 10000,

@@ -1,12 +1,12 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Tests for sdpm.checks.includes."""
+"""Tests for sdpm.engine.checks.includes."""
 
 from __future__ import annotations
 
 import json
 
-from sdpm.checks.includes import check_includes
+from sdpm.engine.checks.includes import check_includes
 
 
 def _slides(elements):

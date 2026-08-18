@@ -1,0 +1,68 @@
+{
+  "name": "sdpm-composer",
+  "description": "Composer agent for spec-driven-presentation-maker. Writes slide JSON, builds PPTX, measures, and polishes autonomously. No user interaction.",
+  "tools": [
+    "@sdpm/analyze_template",
+    "@sdpm/apply_style",
+    "@sdpm/arch_diagram",
+    "@sdpm/code_to_slide",
+    "@sdpm/generate_pptx",
+    "@sdpm/grid",
+    "@sdpm/import_attachment",
+    "@sdpm/init_presentation",
+    "@sdpm/list_guides",
+    "@sdpm/list_styles",
+    "@sdpm/list_templates",
+    "@sdpm/list_workflows",
+    "@sdpm/read_attachment",
+    "@sdpm/read_examples",
+    "@sdpm/read_guides",
+    "@sdpm/read_workflows",
+    "@sdpm/run_python",
+    "@sdpm/search_assets",
+    "read",
+    "glob",
+    "grep"
+  ],
+  "allowedTools": [
+    "@sdpm/analyze_template",
+    "@sdpm/apply_style",
+    "@sdpm/arch_diagram",
+    "@sdpm/code_to_slide",
+    "@sdpm/generate_pptx",
+    "@sdpm/grid",
+    "@sdpm/import_attachment",
+    "@sdpm/init_presentation",
+    "@sdpm/list_guides",
+    "@sdpm/list_styles",
+    "@sdpm/list_templates",
+    "@sdpm/list_workflows",
+    "@sdpm/read_attachment",
+    "@sdpm/read_examples",
+    "@sdpm/read_guides",
+    "@sdpm/read_workflows",
+    "@sdpm/run_python",
+    "@sdpm/search_assets",
+    "read",
+    "glob",
+    "grep"
+  ],
+  "mcpServers": {
+    "sdpm": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "server_acp.py"
+      ],
+      "timeout": 120000
+    }
+  },
+  "prompt": "file://../../../../personas/composer.md",
+  "resources": [
+    "file://../../../../sdpm/references/workflows/create-new-2-compose.md",
+    "file://../../../../sdpm/references/workflows/create-new-3-review.md",
+    "file://../../../../sdpm/references/workflows/slide-json-spec.md",
+    "file://../../../../sdpm/references/guides/grid.md"
+  ]
+}

@@ -1,4 +1,4 @@
-[EN](../en/architecture.md) | [JA](../ja/architecture.md)
+[EN](../en/architecture.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
 
 # Architecture
 
@@ -22,14 +22,17 @@ Dependencies always flow top-down.
 
 ---
 
-## Layer 1: Skill (Engine)
+## Layer 1: Engine + Knowledge (`sdpm/`)
 
 The core presentation engine. No network, no AWS, no MCP — just Python.
 
-- **sdpm/** — Builder, layout engine, analyzer, converter, asset resolver
-- **references/** — Examples (slide patterns), workflows (phase instructions), guides (design rules)
-- **templates/** — Sample .pptx templates (dark/light)
-- **scripts/** — CLI entry point (`pptx_builder.py`), asset download scripts
+- **sdpm/sdpm/engine/** — json↔pptx conversion: builder, converter, layout engine, schema lint, preview, checks, diff, analyzer
+- **sdpm/sdpm/knowledge/** — knowledge retrieval: references (guides/workflows/examples) and asset search
+- **sdpm/sdpm/tools/** — the MCP tool contract: every tool's name, schema, docstring, and logic defined once; both servers register these functions directly
+- **sdpm/references/** — Examples (slide patterns), workflows (phase instructions), guides (design rules)
+- **sdpm/templates/** — Sample .pptx templates (dark/light)
+- **sdpm/scripts/** — CLI entry point (`pptx_builder.py`), asset download scripts
+- **personas/** (repo root) — canonical mode behaviors (vibe / spec / style / composer), served to MCP clients via `start_presentation(mode=...)`
 
 Key capabilities:
 - Analyze any .pptx template (layouts, colors, fonts, placeholders)
@@ -40,19 +43,19 @@ Key capabilities:
 
 ---
 
-## Layer 2: Local MCP Server
+## Layer 2: Local MCP Server (`servers/local/`)
 
-A thin MCP protocol wrapper around Layer 1. Runs as a stdio server.
+A thin bind of the `sdpm.tools` contract. Runs as a stdio server (plus an ACP variant for the local Web UI).
 
-- Exposes 17 tools via FastMCP
-- **MCP Server Instructions** — The server returns workflow constraints; compatible MCP hosts inject them into the system prompt automatically. Agents follow the spec-driven process without additional configuration.
+- Registers the contract tools via FastMCP — no tool logic of its own
+- **Mode behavior via `start_presentation(mode=...)`** — any MCP client (including ones with no skill/sub-agent mechanism, e.g. Claude Desktop) receives the vibe/spec/style/composer behavior as a tool response. Clients that read MCP Server Instructions also get the workflow menu automatically.
 - No AWS required — all files stored locally
 
 ---
 
 ## Layer 3: Remote MCP Server
 
-Layer 2 with storage swapped to Amazon DynamoDB + S3, plus authentication and authorization.
+The same `sdpm.tools` contract bound to an HTTP transport, with storage swapped to Amazon DynamoDB + S3 plus authentication and authorization. Bundled knowledge (references, templates, personas) is baked into the container image; only user data (decks, uploads, user templates/styles) lives in S3/DynamoDB.
 
 ```
 MCP Client → AgentCore Runtime → MCP Server Container
@@ -64,8 +67,8 @@ MCP Client → AgentCore Runtime → MCP Server Container
 ```
 
 Additional tools over Layer 2:
-- `read_uploaded_file` — Read pre-converted content from a user-uploaded file (PDF, DOCX, XLSX, PPTX, text, images)
-- `import_attachment` — Import uploaded files or web images into the deck workspace
+- `read_attachment` — Read content from an attached file (PDF, DOCX, XLSX, PPTX, text, images) with byte-offset paging
+- `import_attachment` — Import attached files into the deck workspace
 - `apply_style` — Apply a named style preset to a deck
 - `run_python` — Execute Python in Amazon Bedrock AgentCore Code Interpreter sandbox (edit deck workspace, analyze data)
 - `search_slides` — Semantic slide search via Amazon Bedrock Knowledge Base (optional)
@@ -93,8 +96,8 @@ S3 (resource bucket):
 
 ### Deck Workspace
 
-Using `run_python(deck_id=..., save=True)` loads the entire deck workspace into the sandbox.
-The agent can read and write files using standard Python file I/O (`open`, `json.load`, etc.), and `save=True` writes changes back to S3.
+Using `run_python(deck_id=...)` loads the entire deck workspace into the sandbox.
+The agent can read and write files using standard Python file I/O (`open`, `json.load`, etc.); modified files are written back to S3 automatically after every execution.
 
 ```
 deck.json           — deck metadata (template, fonts, defaultTextColor)
@@ -134,7 +137,7 @@ The compose pipeline (step 6–7) extracts optimized SVG components per slide an
 
 ### Text Measurement
 
-The `measure_slides` tool uses LibreOffice SVG export to measure text bounding boxes,
+The `run_python(measure_slides=[...])` parameter triggers LibreOffice SVG export to measure text bounding boxes,
 enabling overflow detection during the Build loop without visual review.
 
 ---
@@ -221,8 +224,8 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Category | Tool | Description |
 |----------|------|-------------|
 | Workflow | `init_presentation`, `analyze_template` | Initialize deck, analyze template |
-| Generation | `generate_pptx`, `get_preview`, `measure_slides` | Generate PPTX, get preview, measure text bbox |
-| Assets | `search_assets`, `list_asset_sources`, `list_templates` | Search icons, list sources, list templates |
+| Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview |
+| Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
 | References | `list_styles`, `read_examples` | Slide style examples |
 | References | `list_workflows`, `read_workflows` | Phase workflow instructions |
 | References | `list_guides`, `read_guides` | Design rules and guides |
@@ -233,8 +236,8 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 
 | Tool | Description |
 |------|-------------|
-| `import_attachment` | Import uploaded files or web images into the deck workspace |
-| `read_uploaded_file` | Read content from a user-uploaded file (PDF, PPTX, text) |
+| `read_attachment` | Read content from an attached file with byte-offset paging |
+| `import_attachment` | Import attached files into the deck workspace |
 | `apply_style` | Apply a named style preset to a deck |
 | `run_python` | Execute Python in Code Interpreter sandbox |
 | `search_slides` | Semantic slide search (optional, requires Amazon Bedrock KB) |
@@ -244,6 +247,29 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Tool | Description |
 |------|-------------|
 | `web_fetch` | Fetch a URL and convert to Markdown (supports HTML, PDF, images) |
+
+### Tool Surface Design Notes
+
+Deliberate asymmetries between surfaces — these are design decisions, not gaps:
+
+- **`hearing` is ACP-only (Local) / agent-level (Cloud).** Interactive hearing
+  depends on a client-side UI (the ACP session prompt on Local, the Strands
+  agent loop on Cloud). Plain MCP has no interaction channel, so `hearing` is
+  intentionally not part of the `sdpm.tools` contract — it is a
+  transport-specific addition, which the local server is allowed to carry.
+- **ACP agents have no `start_presentation`.** `start_presentation(mode=...)`
+  exists for clients where the mode is decided *in conversation*. ACP agents
+  are spawned with a fixed persona (definitions re-derived from `acp-agents/`
+  at spawn), so the mode is already known at the entry point and a mode-fetch
+  tool would be dead weight.
+- **The CLI surface is kept even where MCP tools overlap.** The CLI +
+  `sdpm/SKILL.md` form the no-MCP adapter (Layer 1). CLI subcommands cost no
+  MCP schema tokens and are the only operability for agents without MCP
+  support, so overlap with MCP tools is acceptable — they are two adapters
+  over the same engine.
+- **`search_slides` redesign is deferred.** The KB-backed search tool is kept
+  as-is on Layer 3; rethinking it (scope, index lifecycle) is a separate
+  theme, tracked outside the attachment/tool-cleanup work.
 
 ---
 

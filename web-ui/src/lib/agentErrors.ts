@@ -15,6 +15,7 @@ export type AgentErrorCode =
   | "service_unavailable"
   | "auth"
   | "bad_input"
+  | "max_output"
   | "internal"
 
 const MESSAGES: Record<AgentErrorCode, string> = {
@@ -25,6 +26,7 @@ const MESSAGES: Record<AgentErrorCode, string> = {
   service_unavailable: "The service is temporarily unavailable. Please try again later.",
   auth: "Your session has expired or is not authorized. Please sign in again.",
   bad_input: "The request could not be processed. Please adjust your input and try again.",
+  max_output: "The response hit the model's output limit. Ask for a smaller step and try again.",
   internal: "Sorry, something went wrong. Please try again.",
 }
 
@@ -36,6 +38,7 @@ const PATTERNS: [string[], AgentErrorCode][] = [
   [["ServiceUnavailable"], "service_unavailable"],
   [["ExpiredToken", "AccessDenied", "UnrecognizedClient", "invalid_token"], "auth"],
   [["ValidationException"], "bad_input"],
+  [["MaxTokensReachedException", "maximum token limit"], "max_output"],
 ]
 
 /** Classify a raw error message into a stable code (fallback path). */

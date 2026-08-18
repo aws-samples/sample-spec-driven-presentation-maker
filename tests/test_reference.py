@@ -1,71 +1,92 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Tests for tools.reference — Reference document access via Storage ABC."""
+"""Tests for the shared tool contract (sdpm.tools) reference access
+and the remote-specific style listing (tools.reference)."""
 
 import pytest
 from unittest.mock import MagicMock
-from tools.reference import (
-    list_styles, read_examples,
-    list_workflows, read_workflows,
-    list_guides, read_guides,
-    _cache,
-)
+
+from sdpm import tools as contract
+from tools.reference import list_styles as remote_list_styles
 
 
-@pytest.fixture
-def mock_storage():
-    """Create a mock Storage backend."""
-    storage = MagicMock()
-    storage.download_file.return_value = b"---\ndescription: Test doc\n---\n# Content"
-    storage.list_files.return_value = [
-        "references/examples/hero-title.md",
-        "references/examples/component-catalog.md",
-    ]
-    return storage
+class TestContractReference:
+    """Contract reference tools read bundled data from the local filesystem."""
 
+    def test_list_workflows(self):
+        result = contract.list_workflows()
+        names = [i["name"] for i in result["items"]]
+        assert "create-new-1-briefing" in names
 
-@pytest.fixture(autouse=True)
-def clear_cache():
-    """Clear reference cache before each test."""
-    _cache.clear()
-
-
-class TestListStyles:
-    def test_lists_html_styles(self, mock_storage):
-        mock_storage.list_files.return_value = [
-            "references/examples/styles/elegant-dark.html",
-            "references/examples/styles/tech-cyber.html",
-        ]
-        mock_storage.download_file.return_value = b"<html><head><title>Elegant Dark</title></head></html>"
-        result = list_styles(storage=mock_storage)
-        assert len(result["styles"]) == 2
-        assert result["styles"][0]["name"] == "elegant-dark"
-        assert result["styles"][0]["description"] == "Elegant Dark"
-
-
-class TestReadExamples:
-    def test_reads_file(self, mock_storage):
-        result = read_examples(names=["hero-title"], storage=mock_storage)
+    def test_read_workflows(self):
+        result = contract.read_workflows(["create-new-1-briefing"])
         assert len(result["documents"]) == 1
-        assert "Content" in result["documents"][0]["content"]
+        assert result["documents"][0]["content"]
 
-    def test_rejects_missing(self, mock_storage):
-        mock_storage.download_file.side_effect = Exception("not found")
+    def test_list_guides(self):
+        result = contract.list_guides()
+        names = [i["name"] for i in result["items"]]
+        assert "design-rules" in names
+
+    def test_read_guides(self):
+        result = contract.read_guides(["design-rules"])
+        assert len(result["documents"]) == 1
+        assert result["documents"][0]["content"]
+
+    def test_read_examples_rejects_missing(self):
         with pytest.raises(FileNotFoundError, match="not found"):
-            read_examples(names=["nonexistent"], storage=mock_storage)
+            contract.read_examples(["nonexistent-doc-xyz"])
+
+    def test_start_presentation_returns_instructions(self):
+        text = contract.start_presentation()
+        assert "read_workflows" in text
+        assert "create-new-1-briefing" in text
+
+    @pytest.mark.parametrize("mode,needle", [
+        ("vibe", "Vibe Workflow"),
+        ("spec", "Phase 1 Flow"),
+        ("style", "run_style_python"),
+        ("composer", "assigned slugs"),
+        ("single", "Workflow: New Presentation"),
+    ])
+    def test_start_presentation_modes(self, mode, needle):
+        text = contract.start_presentation(mode=mode)
+        assert needle in text
+
+    def test_every_persona_file_is_served(self):
+        # personas/*.md and _MODES must stay in sync (a persona no one can
+        # request is dead content; a mode without a file raises at runtime)
+        from sdpm.config import PERSONAS_DIR
+        files = {p.stem for p in PERSONAS_DIR.glob("*.md")}
+        assert files == set(contract._MODES)
+
+    def test_start_presentation_unknown_mode(self):
+        text = contract.start_presentation(mode="bogus")
+        assert "Unknown mode" in text
+        assert "vibe" in text
 
 
-class TestListWorkflows:
-    def test_lists_files(self, mock_storage):
-        mock_storage.list_files.return_value = [
-            "references/workflows/create-new-1a-hearing.md",
-        ]
-        result = list_workflows(storage=mock_storage)
-        assert len(result["items"]) == 1
-        assert result["items"][0]["name"] == "create-new-1a-hearing"
+class TestRemoteListStyles:
+    """Remote list_styles merges bundled styles with user styles from storage."""
 
+    def test_bundled_styles_no_user(self):
+        storage = MagicMock()
+        result = remote_list_styles(storage=storage, user_id="", include_all=True)
+        assert len(result["styles"]) > 0
+        assert all(s["source"] == "builtin" for s in result["styles"])
+        # No user_id → storage must not be touched
+        storage.list_files.assert_not_called()
 
-class TestReadGuides:
-    def test_reads_file(self, mock_storage):
-        result = read_guides(names=["design-rules"], storage=mock_storage)
-        assert len(result["documents"]) == 1
+    def test_user_styles_merged(self):
+        storage = MagicMock()
+        storage.pptx_bucket = "bucket"
+        storage.list_files.return_value = ["user-styles/u1/my-style.html"]
+        storage.download_file_from_pptx_bucket.return_value = (
+            b"<html><head><title>My Style</title></head></html>"
+        )
+        storage.get_style_pins.return_value = []
+        result = remote_list_styles(storage=storage, user_id="u1", include_all=True)
+        user = [s for s in result["styles"] if s["source"] == "user"]
+        assert len(user) == 1
+        assert user[0]["name"] == "my-style"
+        assert user[0]["description"] == "My Style"

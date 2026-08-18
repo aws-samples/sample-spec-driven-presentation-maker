@@ -20,7 +20,7 @@ def temp_template_dir(tmp_path: Path) -> Path:
 
 def test_templates_dir_includes_bundled() -> None:
     dirs = get_templates_dirs()
-    bundled = Path(__file__).resolve().parent.parent / "skill" / "templates"
+    bundled = Path(__file__).resolve().parent.parent / "sdpm" / "templates"
     assert bundled in dirs
 
 
@@ -167,7 +167,7 @@ def test_list_templates_with_metadata_builtin_prefix_not_used_for_user(tmp_path:
 
 
 def test_analyze_and_store_template() -> None:
-    template_path = Path(__file__).parent.parent / "skill" / "templates" / "blank-dark.pptx"
+    template_path = Path(__file__).parent.parent / "sdpm" / "templates" / "blank-dark.pptx"
     if not template_path.exists():
         pytest.skip("blank-dark.pptx not available")
 
@@ -178,3 +178,9 @@ def test_analyze_and_store_template() -> None:
     assert isinstance(result["fonts"], dict)
     assert result["layout_count"] > 0
     assert len(result["layouts"]) == result["layout_count"]
+    # slide_size must be present (regression: was previously omitted)
+    assert "slide_size" in result
+    assert "width" in result["slide_size"]
+    assert "height" in result["slide_size"]
+    assert result["slide_size"]["width"] > 0
+    assert result["slide_size"]["height"] > 0
