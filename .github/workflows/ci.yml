@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@v9.0.0
+      - uses: astral-sh/setup-uv@v10.0.1
       - name: Lint
         run: uv run ruff check sdpm/ servers/ shared/ api/ agent/
       - name: Test
@@ -34,7 +34,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@v9.0.0
+      - uses: astral-sh/setup-uv@v10.0.1
       - name: Smoke test local MCP server
         run: uv run python scripts/smoke_local.py
 
@@ -129,7 +129,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - uses: astral-sh/setup-uv@v9.0.0
+      - uses: astral-sh/setup-uv@v10.0.1
       - name: Remote server image deps resolve (mirrors servers/remote/Dockerfile)
         run: |
           uv venv /tmp/remote-check --python 3.13
