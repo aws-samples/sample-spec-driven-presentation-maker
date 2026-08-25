@@ -86,7 +86,9 @@ if (config.features?.observability !== undefined) {
   }
 }
 
-const data = new DataStack(app, "SdpmData", { env, enableInvocationLogging, description: "Spec-Driven Presentation Maker - Data (uksb-ynuz0lkrea)(tag:data)" });
+const enableTransactionSearch = config.features?.enableTransactionSearch === true;
+
+const data = new DataStack(app, "SdpmData", { env, enableInvocationLogging, enableTransactionSearch, description: "Spec-Driven Presentation Maker - Data (uksb-ynuz0lkrea)(tag:data)" });
 
 const runtime = new RuntimeStack(app, "SdpmRuntime", {
   env,

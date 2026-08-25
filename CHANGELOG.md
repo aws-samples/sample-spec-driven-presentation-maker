@@ -12,6 +12,14 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **Per-user usage measurement** (#326) — Bedrock usage logs (`bedrock_usage`)
+  now carry `user_id` / `session_id` / `deck_id` (composer invocations
+  included), and new structured events count slides per user:
+  `slides_composed` (per compose_slides call) and `slides_built` (per
+  successful PPTX build). A new opt-in flag `features.enableTransactionSearch`
+  (or `deploy.sh --enable-transaction-search`) enables CloudWatch Transaction
+  Search for span-level per-user token queries and the GenAI Observability
+  dashboard. See [Measuring Usage](docs/en/usage-measurement.md).
 - **`sendToBack` element key — z-order control over placeholders** — elements
   normally render in front of template placeholders (the builder fills
   placeholders first), so a full-bleed decorative image always covered the
@@ -75,6 +83,11 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **Bedrock invocation-logging custom resource is now idempotent** — it
+  previously overwrote an existing account-level logging configuration on
+  deploy; it now checks first and skips if logging is already configured to a
+  different destination (matching the documented "skipped if already
+  configured" behavior). (#326)
 - **The deck-translation workflow is reachable again** — `translate-pptx`
   existed as a workflow document but nothing routed to it: the MCP server
   instructions menu stopped at D and no persona mentioned it, so an agent
