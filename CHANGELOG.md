@@ -20,6 +20,66 @@ Entries before v0.5.0 were written retroactively as summaries.
   (or `deploy.sh --enable-transaction-search`) enables CloudWatch Transaction
   Search for span-level per-user token queries and the GenAI Observability
   dashboard. See [Measuring Usage](docs/en/usage-measurement.md).
+- **`sendToBack` element key — z-order control over placeholders** — elements
+  normally render in front of template placeholders (the builder fills
+  placeholders first), so a full-bleed decorative image always covered the
+  title with no recourse. `"sendToBack": true` moves an element behind the
+  placeholders; multiple marked elements keep their relative order. The
+  PPTX importer now emits it automatically for shapes that preceded the
+  first used placeholder in the source slide, so imported decks keep their
+  original stacking. (#316)
+- **`pptx_builder.py preview -o/--output-dir`** — the CLI preview can now
+  write PNGs to a chosen directory (e.g. `{deck_dir}/preview`) instead of
+  always using a temporary `_work/` folder; `--no-grid` already existed.
+  `sdpm.api.preview` gains the matching `output_dir` parameter. (#316)
+- **`repr` and `__name__` in the `run_python` sandbox** — agent code using
+  `repr()` or the `__main__` idiom no longer needs rewriting. (#316)
+- **`translate` mode with a `/sdpm-translate` entry point** — deck translation
+  is now a first-class mode: `start_presentation(mode="translate")` serves
+  `personas/translate.md`, and a fourth thin skill entry point
+  (`skills/sdpm-translate`) exposes it as a slash command in every client
+  that maps skills, alongside vibe/spec/style. The persona drives the
+  existing `translate-pptx` workflow (extract → dictionary → apply → build)
+  and makes the agent itself fill the translation dictionary.
+
+- **`make install-kiro` generates a dedicated composer agent again** —
+  `<KIRO_HOME>/agents/sdpm-composer.json` gives parallel compose workers the
+  sdpm MCP server only, with pre-approved tools and a generous startup
+  timeout. Without it, workers fall back to a general-purpose agent that
+  cold-starts every MCP server in the profile per worker; on MCP-heavy
+  profiles this made some parallel composers miss the sdpm server
+  nondeterministically (observed with 30+ registered servers). The generated
+  config is a thin pointer — its prompt is a `file://` reference into
+  `personas/composer.md`, never inline behavior — and it is lifecycle-managed
+  by the same ownership audit as the rest of the wiring (own/stale are
+  regenerated, foreign/unknown are never touched; power mode still removes
+  it). v0.5.3 dropped generation because the old installer could not manage
+  the file safely across checkouts; the ownership audit removed that reason.
+
+- **Mode entry points are back, as thin dispatchers** — `skills/sdpm-vibe`,
+  `skills/sdpm-spec` and `skills/sdpm-style` let users pick a mode explicitly
+  (`/sdpm-vibe` and friends in clients that expose skills as slash commands).
+  v0.5.0 removed `skills/` because each file had grown a full copy of the mode
+  behavior that then drifted; these are ~20 lines each and contain no behavior
+  text. They call `start_presentation(mode=...)` and stop, so `personas/*.md`
+  remains the only definition. A test fails if any substantial persona line
+  reappears in an entry point.
+- **The repository root is an Agent Plugins 1.0.0 package** — `plugin.json` and
+  `mcp.json` make it loadable by Kiro (as a Power), Cursor, GitHub Copilot and
+  VS Code without a client-specific installer. `mcp.json` points `uv` at
+  `${PLUGIN_ROOT}/servers/local` and puts the virtualenv under
+  `${PLUGIN_DATA}`, because clients copy the plugin into an install cache that
+  may be read-only and is replaced on update.
+- **Codex support** — `.codex-plugin/plugin.json`, a bundled MCP server
+  definition in `.mcp.json`, and a repo marketplace at
+  `.agents/plugins/marketplace.json`, so `codex plugin marketplace add ./` is
+  enough to install the checkout locally. Codex was previously limited to the
+  Layer 1 CLI path.
+- **Claude Code exposes the same entry points** — `.claude-plugin/plugin.json`
+  gained `skills` (bumped to 0.3.0). Its `agents` and `mcpServers` blocks are
+  unchanged.
+- `clients/kiro/install.py` gained `--mode {auto,legacy,power}`, `--kiro-home`
+  and `--replace-existing`.
 
 ### Fixed
 
@@ -27,7 +87,66 @@ Entries before v0.5.0 were written retroactively as summaries.
   previously overwrote an existing account-level logging configuration on
   deploy; it now checks first and skips if logging is already configured to a
   different destination (matching the documented "skipped if already
-  configured" behavior).
+  configured" behavior). (#326)
+- **The deck-translation workflow is reachable again** — `translate-pptx`
+  existed as a workflow document but nothing routed to it: the MCP server
+  instructions menu stopped at D and no persona mentioned it, so an agent
+  asked to translate a deck could only find it by spontaneously calling
+  `list_workflows`. It is now Workflow E in the server instructions
+  (pointing at the new translate mode), with routing lines in the vibe and
+  single personas. The translate scripts also
+  moved from the repo-root `scripts/` (deploy helpers, not shipped with the
+  skill) to `sdpm/scripts/` next to `pptx_builder.py`, so the workflow's
+  `scripts/translate_extract.py` commands resolve relative to the skill root
+  like every other workflow — and Layer 1 skill installs actually get them.
+
+- **`make install-kiro` no longer hijacks another checkout's Kiro setup** —
+  the MCP registration was re-registered with `--force` whenever the existing
+  `sdpm` entry pointed elsewhere, and the composer-agent cleanup deliberately
+  deleted configs generated for any checkout. Running the installer from a
+  second clone therefore repointed a working install. Every artifact the
+  installer can write (MCP registration, skill symlinks, legacy composer agent)
+  is now classified as own / stale / foreign / unknown against the current
+  checkout; only own, stale and absent are written, foreign requires
+  `--replace-existing`, and unknown is never touched. Conflicts exit non-zero
+  with a report instead of succeeding quietly.
+  Behavior change: a leftover pointing at a checkout that still exists is now
+  left alone. One pointing at a *moved* checkout is still repaired, which was
+  the staleness that cleanup existed for.
+- **`clients/kiro/install.py` honours `KIRO_HOME`** — it hardcoded `~/.kiro`,
+  so installs into a non-default Kiro profile silently wrote to the wrong one.
+  `KIRO_HOME` is now also exported to the `kiro-cli` child process, since
+  `mcp add --scope global` resolves "global" itself. Powers are global-scope
+  only, so a separate profile is the only way to keep a Kiro CLI install and a
+  Power install from colliding.
+
+- **Importer: white text baked onto light cards (white-on-white)** — the
+  converter adopted the shape style's `fontRef` color even when the shape's
+  own `lstStyle` carried an explicit text color, which outranks `fontRef`
+  in OOXML. Decks whose light-fill cards define dark text via `lstStyle`
+  came back with `fontColor: #FFFFFF`. (#316)
+- **Importer/builder: arrowheads lost their size** — `tailEnd`/`headEnd`
+  `w`/`len` attributes are now round-tripped (`arrowEndWidth`,
+  `arrowEndLength`, `arrowStartWidth`, `arrowStartLength`), so a large
+  arrowhead no longer comes back as the small default.
+- **Importer/builder: gradient direction distorted on non-square shapes** —
+  the `scaled` attribute of linear gradients was dropped on import and
+  forced to `1` on build. A `scaled="0"` gradient (true geometric angle) on
+  a wide bar now renders at its original angle.
+- **Importer/builder: partially-rounded rectangles on pictures** — image
+  masks were limited to a 9-name allowlist and dropped their adjustment
+  values. Any OOXML preset now passes through (`round1Rect`,
+  `round2SameRect`, …) with its `avLst` preserved, so e.g. a picture panel
+  with one rounded corner survives the round trip.
+- **measure: white-on-white false positives over gradient shapes** — the
+  contrast judge only recognized gradients written as `style="fill:url(…)"`;
+  LibreOffice sometimes emits `fill="url(…)"` as an attribute, making the
+  background "unknown" and falling back to the white slide background. Both
+  forms are now treated as unknowable background (contrast check skipped).
+  (#316)
+- **lint: `shape-unknown-name` noise on imported decks** — camelCase raw
+  OOXML presets (which the builder renders verbatim) are no longer flagged;
+  pure-lowercase typos still are. (#316)
 
 ## [0.7.1] - 2026-08-05
 

@@ -216,8 +216,15 @@ def _lint_shape(si: int, ei: int, elem: dict) -> list[dict]:
                              "shape element requires 'shape' (e.g. 'rectangle'). "
                              "Without it the element is silently dropped from the PPTX."))
     elif shape not in _SHAPE_NAMES:
-        results.append(_diag(si, ei, "shape-unknown-name",
-                             f"shape name '{shape}' is not recognized."))
+        if re.fullmatch(r"[a-z][a-zA-Z0-9]*", shape) and re.search(r"[A-Z0-9]", shape):
+            # camelCase = raw OOXML preset (round2SameRect, snip1Rect, …).
+            # The builder passes these through verbatim, so they render
+            # correctly — common in imported decks. Not worth a warning.
+            # (Pure-lowercase typos like 'rectangel' still get flagged.)
+            pass
+        else:
+            results.append(_diag(si, ei, "shape-unknown-name",
+                                 f"shape name '{shape}' is not recognized."))
     results.extend(_lint_bbox_required(si, ei, elem, "shape"))
     return results
 

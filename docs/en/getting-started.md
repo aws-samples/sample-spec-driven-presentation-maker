@@ -38,8 +38,8 @@ directory into your agent's skills directory. The agent calls the engine through
 `scripts/pptx_builder.py` — no MCP server involved.
 
 > **Kiro CLI users:** you probably want [Layer 2](#layer-2-local-mcp-server) instead —
-> `make install-kiro` sets up the local MCP server (mode behavior included); composer
-> sub-agents for parallel slide generation are self-spawned, nothing extra to install.
+> `make install-kiro` sets up the local MCP server (mode behavior included) and a
+> dedicated composer agent for reliable parallel slide generation.
 
 ```bash
 # Install dependencies
@@ -65,8 +65,7 @@ Connect spec-driven-presentation-maker to any MCP-compatible client. No AWS acco
 ### Kiro CLI — one make target (recommended)
 
 Kiro CLI users get everything from a single target — the MCP server carries the mode
-behavior, and composer sub-agents are self-spawned at compose time (no agent files
-to install):
+behavior, and a dedicated `sdpm-composer` agent handles parallel slide generation:
 
 ```bash
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
@@ -75,15 +74,61 @@ make install-kiro
 kiro-cli chat   # then just ask: "make slides about ..."
 ```
 
-This registers the `sdpm` local MCP server in `~/.kiro/settings/mcp.json`. Mode behavior
-(vibe / spec / style) is served by the MCP server itself via `start_presentation(mode=...)`
-— nothing else to install. Prerequisites: [`uv`](https://docs.astral.sh/uv/) on
-your `PATH`, plus **LibreOffice** and **poppler** for slide previews.
+This registers the `sdpm` local MCP server in `<KIRO_HOME>/settings/mcp.json` (default
+`~/.kiro`), symlinks the mode entry points into `<KIRO_HOME>/skills/` (so you can also
+run `/sdpm-vibe`, `/sdpm-spec`, `/sdpm-style` or `/sdpm-translate` to pick a mode
+explicitly), and generates
+a composer agent at `<KIRO_HOME>/agents/sdpm-composer.json` — a thin pointer that gives
+compose workers the sdpm server only, instead of cold-starting every MCP server in your
+profile per worker. The behavior itself is still served by the MCP server via
+`start_presentation(mode=...)`; the entry points and the composer agent only name it.
+Prerequisites: [`uv`](https://docs.astral.sh/uv/) on your
+`PATH`, plus **LibreOffice** and **poppler** for slide previews.
 
 Keep the checkout where it is — the MCP server runs from it. `git pull` is enough to
-update. Re-run `make install-kiro` only if you move the checkout (upgrading from
-v0.5.2 or earlier, re-run it once — it also removes the now-unneeded
-`~/.kiro/agents/sdpm-composer.json` that older installers generated).
+update. Re-run `make install-kiro` only if you move the checkout.
+
+Useful flags — call the script directly, since `make` does not forward arguments:
+
+```bash
+uv run python3 clients/kiro/install.py --agent NAME       # register into one agent config
+uv run python3 clients/kiro/install.py --mode legacy      # skip Power auto-detection
+KIRO_HOME=~/.kiro-sdpm-dev make install-kiro              # install into a separate profile
+```
+
+If another checkout already owns the `sdpm` MCP registration or the skill symlinks, the
+installer stops and lists what it found instead of repointing a working setup. Either
+install into a separate `KIRO_HOME`, remove the other checkout's wiring yourself, or pass
+`--replace-existing` to take it over deliberately.
+
+### Kiro IDE — install as a Power
+
+The repository root is an [Agent Plugins](https://agent-plugins.org) package
+(`plugin.json` + `mcp.json` + `skills/`), which is the format Kiro Powers use. Install the
+checkout as a Power from the Kiro IDE; Powers are global-scope and Kiro manages the
+bundled MCP server itself, so nothing needs to be written into
+`~/.kiro/settings/mcp.json`.
+
+Powers and the Kiro CLI wiring above are two paths to the same package and should not both
+be active. Because Powers have no project scope, keep them apart with separate profiles:
+run the CLI installer under a different `KIRO_HOME` than the one your Power is installed
+into. Running `make install-kiro` in a profile where the Power is already present makes
+the installer remove its own legacy wiring instead of adding to it.
+
+### Codex — install as a plugin
+
+The checkout ships a Codex manifest (`.codex-plugin/plugin.json`), a bundled MCP server
+definition (`.mcp.json`) and a repo marketplace (`.agents/plugins/marketplace.json`), so
+it can be installed without hand-editing `config.toml`:
+
+```bash
+codex plugin marketplace add ./     # from inside the checkout
+```
+
+Then install `spec-driven-presentation-maker` from that marketplace in the ChatGPT desktop
+app and start a new conversation. Codex copies the plugin into
+`~/.codex/plugins/cache/…`, so the MCP server's Python environment is created under the
+plugin's writable data directory rather than inside the checkout.
 
 ### Other MCP clients — manual setup
 

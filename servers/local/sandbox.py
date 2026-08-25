@@ -85,11 +85,12 @@ _safe_builtins = {
     "list": list, "dict": dict, "tuple": tuple, "set": set,
     "min": min, "max": max, "sum": sum, "abs": abs, "round": round,
     "any": any, "all": all, "zip": zip, "map": map, "filter": filter,
-    "reversed": reversed, "True": True, "False": False, "None": None,
+    "reversed": reversed, "repr": repr,
+    "True": True, "False": False, "None": None,
 }
 
 code = sys.stdin.read()
-exec(code, {"__builtins__": _safe_builtins,
+exec(code, {"__builtins__": _safe_builtins, "__name__": "__main__",
      "read_json": read_json, "write_json": write_json,
      "read_text": read_text, "write_text": write_text,
      "list_files": list_files})
@@ -105,11 +106,12 @@ _safe_builtins = {
     "list": list, "dict": dict, "tuple": tuple, "set": set,
     "min": min, "max": max, "sum": sum, "abs": abs, "round": round,
     "any": any, "all": all, "zip": zip, "map": map, "filter": filter,
-    "reversed": reversed, "True": True, "False": False, "None": None,
+    "reversed": reversed, "repr": repr,
+    "True": True, "False": False, "None": None,
 }
 
 code = sys.stdin.read()
-exec(code, {"__builtins__": _safe_builtins})
+exec(code, {"__builtins__": _safe_builtins, "__name__": "__main__"})
 '''
 
 
@@ -166,13 +168,14 @@ _safe_builtins = {
     "list": list, "dict": dict, "tuple": tuple, "set": set,
     "min": min, "max": max, "sum": sum, "abs": abs, "round": round,
     "any": any, "all": all, "zip": zip, "map": map, "filter": filter,
-    "reversed": reversed, "True": True, "False": False, "None": None,
+    "reversed": reversed, "repr": repr,
+    "True": True, "False": False, "None": None,
     "ValueError": ValueError, "PermissionError": PermissionError,
     "FileNotFoundError": FileNotFoundError, "Exception": Exception,
 }
 
 code = sys.stdin.read()
-exec(code, {"__builtins__": _safe_builtins,
+exec(code, {"__builtins__": _safe_builtins, "__name__": "__main__",
      "read_style": read_style, "write_style": write_style})
 '''
 

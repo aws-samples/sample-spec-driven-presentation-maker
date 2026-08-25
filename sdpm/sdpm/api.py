@@ -664,6 +664,7 @@ def preview(
     output_path: str | Path | None = None,
     pages: list[int] | None = None,
     grid: bool = False,
+    output_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     """Build PPTX from JSON and export slides as PNG images.
 
@@ -672,6 +673,8 @@ def preview(
         output_path: Output .pptx path. Auto-generated if None.
         pages: Page numbers to export. None for all.
         grid: Add grid overlay to PNGs.
+        output_dir: Directory for the PNG files. Defaults to a fresh
+            temporary directory under the project-local ``_work/``.
 
     Returns:
         Dict with preview_dir, files list, and output_path.
@@ -697,10 +700,15 @@ def preview(
 
     _build(config, out)
 
-    # Preview dir — use project-local _work/ to avoid macOS EDR/DLP blocking system temp
+    # Preview dir — user-chosen, or project-local _work/ to avoid macOS
+    # EDR/DLP blocking system temp
     from sdpm.engine.preview import get_work_dir
     work_dir = get_work_dir(input_path.parent if input_path.is_dir() else input_path.resolve().parent)
-    out_dir = Path(tempfile.mkdtemp(dir=work_dir))
+    if output_dir:
+        out_dir = Path(output_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        out_dir = Path(tempfile.mkdtemp(dir=work_dir))
 
     pages_set = set(pages) if pages else None
 

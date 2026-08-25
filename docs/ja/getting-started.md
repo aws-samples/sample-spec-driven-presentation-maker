@@ -38,8 +38,8 @@ symlink します。エージェントは `scripts/pptx_builder.py` 経由でエ
 サーバーは不要です。
 
 > **Kiro CLI ユーザーの方:** [Layer 2](#layer-2-ローカル-mcp-サーバー) をご覧ください —
-> `make install-kiro` でローカル MCP サーバー（モードの振る舞い込み）が設定されます。
-> 並列スライド生成の composer サブエージェントは self-spawn されるため、追加のインストールは不要です。
+> `make install-kiro` でローカル MCP サーバー（モードの振る舞い込み）と、
+> 並列スライド生成用の専用 composer エージェントが設定されます。
 
 ```bash
 # 依存関係のインストール
@@ -65,8 +65,7 @@ spec-driven-presentation-maker を MCP 対応の任意のクライアントに�
 ### Kiro CLI — make ターゲット 1 つ（推奨）
 
 Kiro CLI では make ターゲット 1 つで完了します — モードの振る舞いは MCP サーバーが配信し、
-composer サブエージェントは compose 時にエージェント自身が self-spawn します
-（エージェントファイルのインストールは不要）。
+並列スライド生成は専用の `sdpm-composer` エージェントが担当します。
 
 ```bash
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
@@ -75,12 +74,61 @@ make install-kiro
 kiro-cli chat   # あとは「〜のスライドを作って」と頼むだけ
 ```
 
-`sdpm` ローカル MCP サーバーを `~/.kiro/settings/mcp.json` に登録します。前提: [`uv`](https://docs.astral.sh/uv/) が
-`PATH` にあること、プレビュー用に **LibreOffice** と **poppler**。
+`sdpm` ローカル MCP サーバーを `<KIRO_HOME>/settings/mcp.json`（既定は `~/.kiro`）に登録し、
+モードの入口を `<KIRO_HOME>/skills/` に symlink します。これにより `/sdpm-vibe` `/sdpm-spec`
+`/sdpm-style` `/sdpm-translate` でモードを明示的に選べます。加えて composer エージェントを
+`<KIRO_HOME>/agents/sdpm-composer.json` に生成します — compose ワーカーに sdpm サーバー
+だけを持たせる薄いポインタで、ワーカーごとにプロファイル内の全 MCP サーバーを
+コールドスタートするのを防ぎます。振る舞いの実体は MCP サーバーが
+`start_presentation(mode=...)` で配信し、入口も composer エージェントもモード名を指すだけです。
+前提: [`uv`](https://docs.astral.sh/uv/) が `PATH` にあること、プレビュー用に
+**LibreOffice** と **poppler**。
 
 MCP サーバーはこの clone 先から起動するため、**ディレクトリはそのまま置いておいてください**。
-更新は `git pull` だけで十分です。モードの振る舞い（vibe / spec / style）は MCP サーバー自身が `start_presentation(mode=...)` で配信します。
-別パスへ移動した場合のみ `make install-kiro` を再実行してください（v0.5.2 以前からのアップグレード時は一度再実行してください — 旧インストーラーが生成した不要な `~/.kiro/agents/sdpm-composer.json` も削除されます）。
+更新は `git pull` だけで十分です。
+別パスへ移動した場合のみ `make install-kiro` を再実行してください。
+
+`make` は引数を渡さないので、オプションを使うときはスクリプトを直接呼びます:
+
+```bash
+uv run python3 clients/kiro/install.py --agent NAME       # 特定のエージェント設定に登録
+uv run python3 clients/kiro/install.py --mode legacy      # Power 自動判定を使わない
+KIRO_HOME=~/.kiro-sdpm-dev make install-kiro              # 別プロファイルに導入
+```
+
+`sdpm` の MCP 登録や skill symlink を**別のチェックアウトが所有している**場合、
+インストーラーは動いている設定を書き換えず、検出内容を一覧表示して停止します。
+別の `KIRO_HOME` に入れる、他方の配線を自分で削除する、あるいは意図的に奪うなら
+`--replace-existing` を指定してください。
+
+### Kiro IDE — Power として導入
+
+リポジトリのルートは [Agent Plugins](https://agent-plugins.org) パッケージ
+（`plugin.json` + `mcp.json` + `skills/`）で、これは Kiro Powers が使う形式そのものです。
+Kiro IDE からこのチェックアウトを Power として導入してください。Powers はグローバル
+スコープで、同梱 MCP サーバーは Kiro が内部管理するため `~/.kiro/settings/mcp.json` への
+書き込みは不要です。
+
+Power と上記の Kiro CLI 配線は同じパッケージへの 2 経路で、同時に有効にすべきではありません。
+Powers にはプロジェクトスコープが無いため、分離はプロファイルで行います — CLI インストーラーは
+Power を入れた `KIRO_HOME` とは別のプロファイルで実行してください。Power が既に在る
+プロファイルで `make install-kiro` を実行すると、インストーラーは追加ではなく
+自分が作った旧配線の削除を行います。
+
+### Codex — プラグインとして導入
+
+チェックアウトには Codex 用マニフェスト（`.codex-plugin/plugin.json`）、同梱 MCP サーバー
+定義（`.mcp.json`）、リポジトリ marketplace（`.agents/plugins/marketplace.json`）が含まれる
+ため、`config.toml` を手で編集せずに導入できます:
+
+```bash
+codex plugin marketplace add ./     # チェックアウト内で実行
+```
+
+そのあと ChatGPT デスクトップアプリでこの marketplace から
+`spec-driven-presentation-maker` を導入し、新しい会話を開始してください。Codex は
+プラグインを `~/.codex/plugins/cache/…` にコピーするため、MCP サーバーの Python 環境は
+チェックアウト内ではなくプラグインの書き込み可能データディレクトリに作られます。
 
 ### その他の MCP クライアント — 手動セットアップ
 
