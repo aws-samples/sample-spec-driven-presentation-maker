@@ -18,7 +18,8 @@ Do NOT advance to Phase 3 (review). Do NOT ask the user anything.
 The orchestrator passes you:
 - **deck_id**: absolute path to the deck directory (contains `deck.json`, `specs/`, `slides/`)
 - **assigned slide slugs**: exactly which slides you own and must build
-- **task_instruction**: what to do with them — initial compose, `"Consistency review."`
+- **task_instruction**: what to do with them — initial compose, `"Scaffold pass."`
+  (see Scaffold Pass Mode below), `"Consistency review."`
   (see Consistency Review Mode below), or a targeted fix request
 
 You write ONLY your assigned slugs. Other slugs belong to sibling composers running in
@@ -95,10 +96,38 @@ the slugs you measured. Do not write deck files through any other mechanism (no
 client-native Write/Edit) — `run_python` must stay the single writer. Inside the
 sandbox use `read_json` / `read_text` / `list_files`; `open()` is blocked.
 
+### Scaffolded slides — read first, build on the chrome
+
+If `slides/{slug}.json` ALREADY EXISTS when you start (a scaffold pass ran before you),
+read it before writing — never write a fresh object blind. Its elements are the deck's
+shared chrome (decoration written identically across slides). In the common case, keep
+them as-is and append your content:
+
+```
+run_python(
+  purpose="append content to scaffolded slide '{slug}'",
+  code='''
+data = read_json("slides/{slug}.json")
+data["notes"] = "..."
+data["elements"] += [ ... ]   # your content elements, per slide-json-spec
+write_json("slides/{slug}.json", data)
+''',
+  deck_id="<absolute deck path>",
+  measure_slides=["{slug}"],
+)
+```
+
+Consistency is the chrome's whole point — keep it by default and lay your content out
+around it (it already occupies space — check the preview). If this slide's design
+genuinely requires deviating (e.g. a full-bleed visual the chrome would break), you may
+adjust or drop individual chrome elements — do it deliberately, and note the deviation
+in your summary so the consistency review can weigh it.
+
 ### Per-slide write loop (MANDATORY)
 
 Write **one slide at a time** — never batch-write multiple `slides/*.json` in a
-single call (risks output truncation). Per slug:
+single call (risks output truncation). The only exception is Scaffold Pass Mode
+(see below), which writes identical chrome via a small programmatic loop. Per slug:
 
 **write → `run_python(measure_slides=["{slug}"])` → inspect returned
 `preview_files` + `warnings` → fix if needed → next slug.**
@@ -152,6 +181,61 @@ and `ptPerPx` (the pt-to-px conversion rate used for text width budgeting and
 - For 16:9 (H=1080, ptPerPx=0.5): y=173–950. For 4:3 (H=1440, ptPerPx=0.375): y=173–1310
 - Never assume H=1080 — derive from `slideSize`
 - Pass `slideSize.ptPerPx` to `arch_diagram` as `pt_per_px` for correct box sizing
+
+## Scaffold Pass Mode
+
+If the instruction is `"Scaffold pass."`, you run BEFORE the content composers: you own
+**every** slide in the deck and create the initial `slides/*.json` files containing only
+the shared, content-free decoration ("chrome") — accent bars, footer, page-number chip,
+title band, background accents. Content composers build on top of what you write, so
+cross-slide decoration stays consistent by construction (deviations are deliberate,
+per-slide decisions on their side).
+
+Procedure:
+
+1. Read `specs/outline.md`, `specs/art-direction.html` (design tokens + decoration
+   language), and `deck.json` (`slideSize`).
+2. Decide the chrome per slide role (e.g. title / section divider / content). Slides
+   with the same role get IDENTICAL chrome — same element types, coordinates, tokens.
+3. **Override groups**: slugs sharing a prefix (e.g. `demo-1`, `demo-2`) are built with
+   override inheritance by their composer — write chrome ONLY to the first slug of the
+   group and do NOT create files for the derived slugs (they inherit the base's
+   elements; writing chrome to them would draw it twice).
+4. Write all target slides in ONE `run_python` call using a Python loop — this is the
+   explicit exception to the per-slide write rule (the loop code is small, so there is
+   no output-truncation risk; emitting identical JSON once per slide is exactly the
+   waste this mode exists to avoid):
+
+   ```
+   run_python(
+     purpose="scaffold chrome across all slides",
+     code='''
+   chrome = {
+     "title":   [ ...elements... ],
+     "section": [ ...elements... ],
+     "content": [ ...elements... ],
+   }
+   roles = [("intro", "title"), ("agenda", "content"), ...]  # per outline
+   for slug, role in roles:
+       write_json(f"slides/{slug}.json", {"notes": "", "elements": list(chrome[role])})
+   ''',
+     deck_id="<absolute deck path>",
+     measure_slides=["<one representative slug per role>"],
+   )
+   ```
+
+5. Check the returned previews for the representative slugs — chrome must stay out of
+   the content area (y = title bottom + margin to H−130) and match the style's
+   decoration language.
+
+Constraints:
+- Chrome only — do NOT write content elements (body text, diagrams, charts, images).
+- Token discipline applies as always — every fontSize / hex color from the active
+  style's `:root`.
+- Do NOT continue into content composition — scaffold, verify, return.
+
+Return: which slugs you scaffolded (element count each), which derived slugs you
+skipped and why, and anything content composers must know (e.g. reserved regions).
 
 ## Consistency Review Mode
 
