@@ -100,8 +100,11 @@ sandbox use `read_json` / `read_text` / `list_files`; `open()` is blocked.
 
 If `slides/{slug}.json` ALREADY EXISTS when you start (a scaffold pass ran before you),
 read it before writing — never write a fresh object blind. Its elements are the deck's
-shared chrome (decoration written identically across slides). In the common case, keep
-them as-is and append your content:
+shared frame: everything whose structure repeats across slides — decoration placed
+consistently, plus parameterized common elements (a drafted title, a section label,
+etc.). In the common case, keep them as-is and append your content (refining drafted
+text such as title wording to match your composed content is fine — keep the structure
+and style):
 
 ```
 run_python(
@@ -188,7 +191,7 @@ If the instruction is `"Scaffold pass."`, you run BEFORE the content composers: 
 **every** slide in the deck and create the initial `slides/*.json` files carrying the
 deck's shared visual frame ("chrome"). This is a **design task, not placeholder
 filling**: you translate the art direction's decoration language into concrete,
-consistently placed elements — accent bars, footer, page-number chip, title band,
+consistently placed elements — accent bars, footer, title band,
 background accents — and the layout foundation they imply (where the title sits, where
 the content area begins). Content composers build on top of what you write, so
 cross-slide decoration stays consistent by construction (deviations are deliberate,
@@ -204,42 +207,67 @@ tone and slide roles, and `deck.json` for `slideSize`.
 Procedure:
 
 1. Complete Step 1 (references) and Step 2 (context) as usual.
-2. Design the chrome per slide role (e.g. title / section divider / content), derived
-   from the style's decoration language. Slides with the same role get IDENTICAL
-   chrome — same element types, coordinates, tokens.
+2. Design the shared frame per slide role (e.g. title / section divider / content),
+   derived from the style's decoration language. **The test for what belongs in the
+   scaffold is commonality, not element kind**: if the same structure repeats across
+   slides, the scaffold places it — decoration, layout framework, or text alike.
+   Two degrees of commonality:
+   - **Identical** — same element, same coordinates, same tokens on every slide of
+     the role (e.g. accent bars, footer, background accents).
+   - **Parameterized** — same structure, style, and coordinates with per-slide
+     values (e.g. a title/subtitle drafted from the outline's message, a section
+     label, a recurring decorative motif that varies by section color). Content
+     differing while structure repeats is not a reason to leave it to the content
+     composers — placing it once programmatically is faster and more consistent
+     than letting each composer re-derive it.
+   - **Page numbers are PROHIBITED as elements** — never draw them as
+     textbox/shape objects. Slide numbering is a native PowerPoint feature and
+     comes from the template's slide-number placeholder.
 3. **Override groups**: slugs sharing a prefix (e.g. `demo-1`, `demo-2`) are built with
    override inheritance by their composer — write chrome ONLY to the first slug of the
    group and do NOT create files for the derived slugs (they inherit the base's
    elements; writing chrome to them would draw it twice).
 4. Write all target slides in ONE `run_python` call using a Python loop — this is the
    explicit exception to the per-slide write rule (the loop code is small, so there is
-   no output-truncation risk; emitting identical JSON once per slide is exactly the
-   waste this mode exists to avoid):
+   no output-truncation risk; emitting near-identical JSON once per slide is exactly
+   the waste this mode exists to avoid):
 
    ```
    run_python(
-     purpose="scaffold chrome across all slides",
+     purpose="scaffold chrome and common elements across all slides",
      code='''
    chrome = {
      "title":   [ ...elements... ],
      "section": [ ...elements... ],
      "content": [ ...elements... ],
    }
-   roles = [("intro", "title"), ("agenda", "content"), ...]  # per outline
-   for slug, role in roles:
-       write_json(f"slides/{slug}.json", {"notes": "", "elements": list(chrome[role])})
+   def common(title, subtitle):
+       return [ ...same structure, parameterized text... ]
+   # per outline: (slug, role, title, subtitle)
+   plan = [("intro", "title", "...", "..."), ("agenda", "content", "...", "..."), ...]
+   for slug, role, title, subtitle in plan:
+       write_json(f"slides/{slug}.json",
+                  {"notes": "", "elements": list(chrome[role]) + common(title, subtitle)})
    ''',
      deck_id="<absolute deck path>",
      measure_slides=["<one representative slug per role>"],
    )
    ```
 
+   Titles may also go through the template's `layout` + `placeholders` instead of
+   explicit elements — follow whichever the style/template calls for.
+
 5. Check the returned previews for the representative slugs — judge them as designs:
-   does the chrome express the style's decoration language? Does it stay out of the
-   content area (y = title bottom + margin to H−130)? Iterate until it does.
+   does the frame express the style's decoration language? Do the longest titles fit?
+   Does it stay out of the content area (y = title bottom + margin to H−130)?
+   Iterate until it does.
 
 Constraints:
-- Chrome only — do NOT write content elements (body text, diagrams, charts, images).
+- Shared frame only — do NOT write slide-specific body content (body text, diagrams,
+  charts, images unique to one slide). Anything whose structure repeats across slides
+  is fair game, identical or parameterized.
+- Never draw page numbers as elements — they come from the template's native
+  slide-number placeholder.
 - Token discipline applies as always — every fontSize / hex color from the active
   style's `:root`.
 - Do NOT continue into content composition — scaffold, verify, return.
