@@ -12,6 +12,23 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **Scaffold pass in the compose workflow** — before the parallel content
+  composers fan out, the orchestrator now dispatches one composer with
+  `task_instruction: "Scaffold pass."` (a new composer mode alongside
+  `"Consistency review."`). It batch-writes the style- and role-derived
+  elements every slide shares — decoration from the art direction (accent
+  bars, footer, title band) and role elements with per-slide parameters
+  (titles/subtitles drafted from the outline, section labels) — into every
+  `slides/*.json` via a single programmatic `run_python` for-loop (no
+  individual slide edits in this mode). Elements that require imagining a
+  slide's content stay with the content composers. Page numbers are
+  explicitly forbidden as elements — they come from the template's native
+  slide-number placeholder. Content composers then read the existing JSON
+  and build on the frame instead of rewriting whole files. Cross-slide
+  decoration consistency moves from post-hoc review fixes to
+  by-construction, and near-identical JSON is no longer re-emitted per
+  slide (token savings). Persona-only change (`personas/composer.md`,
+  `vibe.md`, `spec.md`).
 - **Per-user usage measurement** (#326) — Bedrock usage logs (`bedrock_usage`)
   now carry `user_id` / `session_id` / `deck_id` (composer invocations
   included), and new structured events count slides per user:

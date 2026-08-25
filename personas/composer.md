@@ -18,7 +18,8 @@ Do NOT advance to Phase 3 (review). Do NOT ask the user anything.
 The orchestrator passes you:
 - **deck_id**: absolute path to the deck directory (contains `deck.json`, `specs/`, `slides/`)
 - **assigned slide slugs**: exactly which slides you own and must build
-- **task_instruction**: what to do with them — initial compose, `"Consistency review."`
+- **task_instruction**: what to do with them — initial compose, `"Scaffold pass."`
+  (see Scaffold Pass Mode below), `"Consistency review."`
   (see Consistency Review Mode below), or a targeted fix request
 
 You write ONLY your assigned slugs. Other slugs belong to sibling composers running in
@@ -95,10 +96,41 @@ the slugs you measured. Do not write deck files through any other mechanism (no
 client-native Write/Edit) — `run_python` must stay the single writer. Inside the
 sandbox use `read_json` / `read_text` / `list_files`; `open()` is blocked.
 
+### Scaffolded slides — read first, build on the chrome
+
+If `slides/{slug}.json` ALREADY EXISTS when you start (a scaffold pass ran before you),
+read it before writing — never write a fresh object blind. Its elements are the deck's
+shared frame: everything whose structure repeats across slides — decoration placed
+consistently, plus parameterized common elements (a drafted title, a section label,
+etc.). In the common case, keep them as-is and append your content (refining drafted
+text such as title wording to match your composed content is fine — keep the structure
+and style):
+
+```
+run_python(
+  purpose="append content to scaffolded slide '{slug}'",
+  code='''
+data = read_json("slides/{slug}.json")
+data["notes"] = "..."
+data["elements"] += [ ... ]   # your content elements, per slide-json-spec
+write_json("slides/{slug}.json", data)
+''',
+  deck_id="<absolute deck path>",
+  measure_slides=["{slug}"],
+)
+```
+
+Consistency is the chrome's whole point — keep it by default and lay your content out
+around it (it already occupies space — check the preview). If this slide's design
+genuinely requires deviating (e.g. a full-bleed visual the chrome would break), you may
+adjust or drop individual chrome elements — do it deliberately, and note the deviation
+in your summary so the consistency review can weigh it.
+
 ### Per-slide write loop (MANDATORY)
 
 Write **one slide at a time** — never batch-write multiple `slides/*.json` in a
-single call (risks output truncation). Per slug:
+single call (risks output truncation). The only exception is Scaffold Pass Mode
+(see below), which writes identical chrome via a small programmatic loop. Per slug:
 
 **write → `run_python(measure_slides=["{slug}"])` → inspect returned
 `preview_files` + `warnings` → fix if needed → next slug.**
@@ -152,6 +184,108 @@ and `ptPerPx` (the pt-to-px conversion rate used for text width budgeting and
 - For 16:9 (H=1080, ptPerPx=0.5): y=173–950. For 4:3 (H=1440, ptPerPx=0.375): y=173–1310
 - Never assume H=1080 — derive from `slideSize`
 - Pass `slideSize.ptPerPx` to `arch_diagram` as `pt_per_px` for correct box sizing
+
+## Scaffold Pass Mode
+
+If the instruction is `"Scaffold pass."`, you run BEFORE the content composers: you own
+**every** slide in the deck and MUST create an initial `slides/{slug}.json` for **every
+assigned slug**, each carrying the deck's shared visual frame ("chrome"). This is a
+**design task, not placeholder filling**: you translate the art direction's decoration
+language into concrete,
+consistently placed elements — accent bars, footer, title band,
+background accents — and the layout foundation they imply (where the title sits, where
+the content area begins). Content composers build on top of what you write, so
+cross-slide decoration stays consistent by construction (deviations are deliberate,
+per-slide decisions on their side).
+
+**Steps 1 and 2 apply in full.** You need the slide JSON schema, the grid math, and
+the component/pattern vocabulary just like a content composer — without them your
+chrome cannot express the style. Read `specs/art-direction.html` especially closely:
+its decoration guidance (shapes, weights, placement principles — not just the `:root`
+tokens) is what you are realizing. Read `specs/brief.md` and `specs/outline.md` for
+tone and slide roles, and `deck.json` for `slideSize`.
+
+Procedure:
+
+1. Complete Step 1 (references) and Step 2 (context) as usual.
+2. Design the shared frame per slide role (e.g. title / section divider / content),
+   derived from the style's decoration language. **The scaffold owns exactly the
+   elements derivable from the STYLE and the slide's ROLE alone**: decoration from
+   the art direction, and role elements every slide necessarily has (title band,
+   subtitle, section label). The test: if you must imagine a slide's CONTENT to
+   decide an element's structure or placement, it is NOT scaffold material — leave
+   it to the content composers.
+   Scaffold elements come in two degrees:
+   - **Identical** — same element, same coordinates, same tokens on every slide of
+     the role (e.g. accent bars, footer, background accents).
+   - **Parameterized** — same structure, style, and coordinates with per-slide
+     values (e.g. a title/subtitle drafted from the outline's message, a section
+     label, a motif colored per section).
+   Either way, this decides which ELEMENTS the scaffold owns — NEVER which slides
+   get a file: every slide gets one, even if its role's frame is minimal.
+   **Page numbers are PROHIBITED as elements** — never draw them as
+   textbox/shape objects. Slide numbering is a native PowerPoint feature and
+   comes from the template's slide-number placeholder.
+3. Write ALL slides in ONE `run_python` call using a **Python for loop — always**.
+   Never write or edit slides individually in this mode. This is the explicit
+   exception to the per-slide write rule (the loop code is small, so there is
+   no output-truncation risk; emitting near-identical JSON once per slide is exactly
+   the waste this mode exists to avoid):
+
+   ```
+   run_python(
+     purpose="scaffold chrome and common elements across all slides",
+     code='''
+   chrome = {
+     "title":   [ ...elements... ],
+     "section": [ ...elements... ],
+     "content": [ ...elements... ],
+   }
+   def common(title, subtitle):
+       return [ ...same structure, parameterized text... ]
+   # per outline: (slug, role, title, subtitle)
+   plan = [("intro", "title", "...", "..."), ("agenda", "content", "...", "..."), ...]
+   for slug, role, title, subtitle in plan:
+       write_json(f"slides/{slug}.json",
+                  {"notes": "", "elements": list(chrome[role]) + common(title, subtitle)})
+   ''',
+     deck_id="<absolute deck path>",
+     measure_slides=["<one representative slug per role>"],
+   )
+   ```
+
+   Titles may also go through the template's `layout` + `placeholders` instead of
+   explicit elements — follow whichever the style/template calls for.
+   The `plan` list MUST cover every assigned slug. A slide whose role has little
+   shared structure still gets its file — with whatever minimal frame its role
+   defines.
+
+4. **Completeness check (MANDATORY)**: run `list_files("slides")` and verify a
+   `{slug}.json` exists for every assigned slug. If any are missing, write them
+   before proceeding.
+
+5. Check the returned previews for the representative slugs — judge them as designs:
+   does the frame express the style's decoration language? Do the longest titles fit?
+   Does it stay out of the content area (y = title bottom + margin to H−130)?
+   If not, fix the `chrome` / `plan` definitions and **re-run the batch loop** —
+   never patch individual slides.
+
+Constraints:
+- Create a file for EVERY assigned slug. Scaffolding only "the slides with common
+  elements" is a failure mode — content composers rely on every file existing.
+- Batch only — every write goes through the Python for loop over the full plan.
+  Individual slide edits do not exist in this mode.
+- Shared frame only — do NOT write slide-specific body content (body text, diagrams,
+  charts, images unique to one slide). If deciding an element requires imagining a
+  slide's content, it belongs to the content composers, not you.
+- Never draw page numbers as elements — they come from the template's native
+  slide-number placeholder.
+- Token discipline applies as always — every fontSize / hex color from the active
+  style's `:root`.
+- Do NOT continue into content composition — scaffold, verify, return.
+
+Return: which slugs you scaffolded (element count each) and anything content
+composers must know (e.g. reserved regions).
 
 ## Consistency Review Mode
 
