@@ -396,7 +396,7 @@ opentelemetry-util-http==0.65b0
     #   opentelemetry-instrumentation-urllib
     #   opentelemetry-instrumentation-urllib3
     #   opentelemetry-instrumentation-wsgi
-packaging==26.2
+packaging==26.3
     # via
     #   opentelemetry-instrumentation
     #   opentelemetry-instrumentation-falcon
