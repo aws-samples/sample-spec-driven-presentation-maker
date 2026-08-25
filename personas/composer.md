@@ -209,25 +209,26 @@ Procedure:
 
 1. Complete Step 1 (references) and Step 2 (context) as usual.
 2. Design the shared frame per slide role (e.g. title / section divider / content),
-   derived from the style's decoration language. **The test for what belongs in the
-   scaffold is commonality, not element kind**: if the same structure repeats across
-   slides, the scaffold places it — decoration, layout framework, or text alike.
-   Commonality decides which ELEMENTS the scaffold owns — NEVER which slides get a
-   file: every slide gets one, even if its role's frame is minimal.
-   Two degrees of commonality:
+   derived from the style's decoration language. **The scaffold owns exactly the
+   elements derivable from the STYLE and the slide's ROLE alone**: decoration from
+   the art direction, and role elements every slide necessarily has (title band,
+   subtitle, section label). The test: if you must imagine a slide's CONTENT to
+   decide an element's structure or placement, it is NOT scaffold material — leave
+   it to the content composers.
+   Scaffold elements come in two degrees:
    - **Identical** — same element, same coordinates, same tokens on every slide of
      the role (e.g. accent bars, footer, background accents).
    - **Parameterized** — same structure, style, and coordinates with per-slide
      values (e.g. a title/subtitle drafted from the outline's message, a section
-     label, a recurring decorative motif that varies by section color). Content
-     differing while structure repeats is not a reason to leave it to the content
-     composers — placing it once programmatically is faster and more consistent
-     than letting each composer re-derive it.
-   - **Page numbers are PROHIBITED as elements** — never draw them as
-     textbox/shape objects. Slide numbering is a native PowerPoint feature and
-     comes from the template's slide-number placeholder.
-3. Write all target slides in ONE `run_python` call using a Python loop — this is the
-   explicit exception to the per-slide write rule (the loop code is small, so there is
+     label, a motif colored per section).
+   Either way, this decides which ELEMENTS the scaffold owns — NEVER which slides
+   get a file: every slide gets one, even if its role's frame is minimal.
+   **Page numbers are PROHIBITED as elements** — never draw them as
+   textbox/shape objects. Slide numbering is a native PowerPoint feature and
+   comes from the template's slide-number placeholder.
+3. Write ALL slides in ONE `run_python` call using a **Python for loop — always**.
+   Never write or edit slides individually in this mode. This is the explicit
+   exception to the per-slide write rule (the loop code is small, so there is
    no output-truncation risk; emitting near-identical JSON once per slide is exactly
    the waste this mode exists to avoid):
 
@@ -266,14 +267,17 @@ Procedure:
 5. Check the returned previews for the representative slugs — judge them as designs:
    does the frame express the style's decoration language? Do the longest titles fit?
    Does it stay out of the content area (y = title bottom + margin to H−130)?
-   Iterate until it does.
+   If not, fix the `chrome` / `plan` definitions and **re-run the batch loop** —
+   never patch individual slides.
 
 Constraints:
 - Create a file for EVERY assigned slug. Scaffolding only "the slides with common
   elements" is a failure mode — content composers rely on every file existing.
+- Batch only — every write goes through the Python for loop over the full plan.
+  Individual slide edits do not exist in this mode.
 - Shared frame only — do NOT write slide-specific body content (body text, diagrams,
-  charts, images unique to one slide). Anything whose structure repeats across slides
-  is fair game, identical or parameterized.
+  charts, images unique to one slide). If deciding an element requires imagining a
+  slide's content, it belongs to the content composers, not you.
 - Never draw page numbers as elements — they come from the template's native
   slide-number placeholder.
 - Token discipline applies as always — every fontSize / hex color from the active

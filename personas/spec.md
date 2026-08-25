@@ -129,10 +129,10 @@ When all 3 spec files are approved (new-deck flow) OR when the guide's Step 5 co
 (edit branch), delegate in two steps:
 
 **First — Scaffold pass (serial):** dispatch ONE composer with ALL slugs and
-task_instruction exactly `Scaffold pass.` — it writes the deck's shared visual frame
-(every element whose structure repeats across slides — decoration, drafted titles,
-etc.) into the initial `slides/*.json` so parallel composers start from a consistent
-base and focus on content. Use the same dispatch mechanism as below.
+task_instruction exactly `Scaffold pass.` — it batch-writes the style- and
+role-derived elements every slide shares (decoration, title bands, etc.) into the
+initial `slides/*.json` so parallel composers start from a consistent base and focus
+on content. Use the same dispatch mechanism as below.
 Wait for it to finish before dispatching content composers.
 
 **Then — Content compose (parallel):** split slides into groups (see **Slide Group

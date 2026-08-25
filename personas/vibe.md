@@ -118,10 +118,10 @@ After Step 5, **`specs/art-direction.html` and `deck.json` are FROZEN.**
 Prerequisite: Steps 2–5 complete.
 
 **Step 6a — Scaffold pass (serial, run first):** dispatch ONE composer with ALL slugs
-and task_instruction exactly `Scaffold pass.` — it writes the deck's shared visual
-frame (every element whose structure repeats across slides — decoration, drafted
-titles, etc.) into the initial `slides/*.json` so parallel composers start from a
-consistent base and focus on content. Use the same dispatch mechanism as Step 6b
+and task_instruction exactly `Scaffold pass.` — it batch-writes the style- and
+role-derived elements every slide shares (decoration, title bands, etc.) into the
+initial `slides/*.json` so parallel composers start from a consistent base and focus
+on content. Use the same dispatch mechanism as Step 6b
 below (whichever your environment provides). Wait for it to finish before dispatching
 content composers.
 
