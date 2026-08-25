@@ -511,7 +511,7 @@ urllib3==2.7.0
     #   aws-opentelemetry-distro
     #   botocore
     #   requests
-uvicorn==0.52.0
+uvicorn==0.52.1
     # via mcp
 wrapt==2.3.0
     # via

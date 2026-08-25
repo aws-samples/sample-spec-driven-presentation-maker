@@ -24,6 +24,9 @@ def log_usage(event: AfterInvocationEvent) -> None:
     logger.info(json.dumps({
         "kind": "bedrock_usage",
         "agent": event.agent.name,
+        "user_id": attrs.get("user.id"),
+        "session_id": attrs.get("session.id"),
+        "deck_id": attrs.get("deck.id"),
         "model_id": attrs.get("model.id"),
         "purpose": attrs.get("purpose"),
         "group_index": attrs.get("group.index"),
@@ -32,4 +35,29 @@ def log_usage(event: AfterInvocationEvent) -> None:
         "output": usage.get("outputTokens", 0),
         "cache_read": usage.get("cacheReadInputTokens", 0),
         "cache_write": usage.get("cacheWriteInputTokens", 0),
+    }))
+
+
+def log_slides_composed(
+    user_id: str,
+    session_id: str,
+    deck_id: str,
+    generated: int,
+    total: int,
+    status: str,
+) -> None:
+    """Log a per-user slide composition event (source for usage measurement).
+
+    Emitted once per compose_slides call after the report is assembled.
+    ``generated`` counts successfully composed slides (rewrites included);
+    ``status`` is the compose report status (completed/partial/failed/cancelled).
+    """
+    logger.info(json.dumps({
+        "kind": "slides_composed",
+        "user_id": user_id,
+        "session_id": session_id,
+        "deck_id": deck_id,
+        "generated": generated,
+        "total": total,
+        "status": status,
     }))

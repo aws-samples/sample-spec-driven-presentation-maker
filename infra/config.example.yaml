@@ -15,6 +15,7 @@ stacks:
 
 features:
   enableInvocationLogging: false  # Bedrock Model Invocation Logging (account-level, skipped if already configured)
+  enableTransactionSearch: false  # CloudWatch Transaction Search — per-user token queries via aws/spans (account-level, skipped if already enabled)
 
 # Model configuration for the Agent (Layer 4).
 # Use inference profile IDs for cross-region routing.

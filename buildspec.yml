@@ -25,6 +25,7 @@ phases:
           webUi: ${STACK_WEB_UI:-false}
         features:
           enableInvocationLogging: ${FEATURE_ENABLE_INVOCATION_LOGGING:-false}
+          enableTransactionSearch: ${FEATURE_ENABLE_TRANSACTION_SEARCH:-false}
         EOF
           sed -i 's/^        //' infra/config.yaml
           if [ -n "${WAF_IPV4}" ] || [ -n "${WAF_IPV6}" ]; then
