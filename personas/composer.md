@@ -189,10 +189,9 @@ and `ptPerPx` (the pt-to-px conversion rate used for text width budgeting and
 
 If the instruction is `"Scaffold pass."`, you run BEFORE the content composers: you own
 **every** slide in the deck and MUST create an initial `slides/{slug}.json` for **every
-assigned slug** (sole exception: derived slugs of override groups — see Procedure 3),
-each carrying the deck's shared visual frame ("chrome"). This is a **design task, not
-placeholder filling**: you translate the art direction's decoration language into
-concrete,
+assigned slug**, each carrying the deck's shared visual frame ("chrome"). This is a
+**design task, not placeholder filling**: you translate the art direction's decoration
+language into concrete,
 consistently placed elements — accent bars, footer, title band,
 background accents — and the layout foundation they imply (where the title sits, where
 the content area begins). Content composers build on top of what you write, so
@@ -227,11 +226,7 @@ Procedure:
    - **Page numbers are PROHIBITED as elements** — never draw them as
      textbox/shape objects. Slide numbering is a native PowerPoint feature and
      comes from the template's slide-number placeholder.
-3. **Override groups**: slugs sharing a prefix (e.g. `demo-1`, `demo-2`) are built with
-   override inheritance by their composer — write chrome ONLY to the first slug of the
-   group and do NOT create files for the derived slugs (they inherit the base's
-   elements; writing chrome to them would draw it twice).
-4. Write all target slides in ONE `run_python` call using a Python loop — this is the
+3. Write all target slides in ONE `run_python` call using a Python loop — this is the
    explicit exception to the per-slide write rule (the loop code is small, so there is
    no output-truncation risk; emitting near-identical JSON once per slide is exactly
    the waste this mode exists to avoid):
@@ -260,23 +255,22 @@ Procedure:
 
    Titles may also go through the template's `layout` + `placeholders` instead of
    explicit elements — follow whichever the style/template calls for.
-   The `plan` list MUST cover every assigned slug (minus skipped override-derived
-   slugs). A slide whose role has little shared structure still gets its file —
-   with whatever minimal frame its role defines.
+   The `plan` list MUST cover every assigned slug. A slide whose role has little
+   shared structure still gets its file — with whatever minimal frame its role
+   defines.
 
-5. **Completeness check (MANDATORY)**: run `list_files("slides")` and verify a
-   `{slug}.json` exists for every assigned slug (minus skipped override-derived
-   slugs). If any are missing, write them before proceeding.
+4. **Completeness check (MANDATORY)**: run `list_files("slides")` and verify a
+   `{slug}.json` exists for every assigned slug. If any are missing, write them
+   before proceeding.
 
-6. Check the returned previews for the representative slugs — judge them as designs:
+5. Check the returned previews for the representative slugs — judge them as designs:
    does the frame express the style's decoration language? Do the longest titles fit?
    Does it stay out of the content area (y = title bottom + margin to H−130)?
    Iterate until it does.
 
 Constraints:
-- Create a file for EVERY assigned slug (sole exception: derived slugs of override
-  groups). Scaffolding only "the slides with common elements" is a failure mode —
-  content composers rely on every file existing.
+- Create a file for EVERY assigned slug. Scaffolding only "the slides with common
+  elements" is a failure mode — content composers rely on every file existing.
 - Shared frame only — do NOT write slide-specific body content (body text, diagrams,
   charts, images unique to one slide). Anything whose structure repeats across slides
   is fair game, identical or parameterized.
@@ -286,8 +280,8 @@ Constraints:
   style's `:root`.
 - Do NOT continue into content composition — scaffold, verify, return.
 
-Return: which slugs you scaffolded (element count each), which derived slugs you
-skipped and why, and anything content composers must know (e.g. reserved regions).
+Return: which slugs you scaffolded (element count each) and anything content
+composers must know (e.g. reserved regions).
 
 ## Consistency Review Mode
 
