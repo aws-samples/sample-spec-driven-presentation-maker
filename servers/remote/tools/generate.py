@@ -382,6 +382,14 @@ def generate_pptx(
         "slideCount": gen_result["slide_count"],
         "slides": gen_result["slides"],
     }
+    # Structured usage event: source for per-user slide-build measurement
+    # (Logs Insights: filter kind = "slides_built" | stats sum(slide_count) by user_id)
+    logger.info(json.dumps({
+        "kind": "slides_built",
+        "user_id": user_id,
+        "deck_id": deck_id,
+        "slide_count": gen_result["slide_count"],
+    }))
     warnings: dict = {}
     if kb_error:
         warnings["kbSyncFailed"] = kb_error
