@@ -15,12 +15,16 @@ Entries before v0.5.0 were written retroactively as summaries.
 - **Scaffold pass in the compose workflow** — before the parallel content
   composers fan out, the orchestrator now dispatches one composer with
   `task_instruction: "Scaffold pass."` (a new composer mode alongside
-  `"Consistency review."`). It writes the shared, content-free decoration
-  (chrome: accent bars, footer, page-number chip, title band) into every
-  `slides/*.json` in a single programmatic `run_python` loop; content
-  composers then read-modify-append instead of rewriting whole files.
-  Cross-slide decoration consistency is guaranteed by construction and
-  identical chrome JSON is no longer re-emitted per slide (token savings).
+  `"Consistency review."`). It writes the deck's shared visual frame into
+  every `slides/*.json` in a single programmatic `run_python` loop — every
+  element whose structure repeats across slides, identical (accent bars,
+  footer, title band) or parameterized per slide (titles/subtitles drafted
+  from the outline, section labels). Page numbers are explicitly forbidden
+  as elements — they come from the template's native slide-number
+  placeholder. Content composers then read the existing JSON and build on
+  the frame instead of rewriting whole files. Cross-slide decoration
+  consistency moves from post-hoc review fixes to by-construction, and
+  near-identical JSON is no longer re-emitted per slide (token savings).
   Persona-only change (`personas/composer.md`, `vibe.md`, `spec.md`).
 - **Per-user usage measurement** (#326) — Bedrock usage logs (`bedrock_usage`)
   now carry `user_id` / `session_id` / `deck_id` (composer invocations
