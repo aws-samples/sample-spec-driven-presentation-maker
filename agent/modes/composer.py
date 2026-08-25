@@ -15,7 +15,7 @@ from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent, Befor
 from strands.types.tools import ToolContext
 
 from composition import resolve_parts
-from cost_logger import log_usage
+from cost_logger import log_slides_composed, log_usage
 from modes import MODES  # imported lazily in compose_slides if needed
 from resilience import call_tool_with_retry
 
@@ -128,7 +128,7 @@ def _build_deck_context(sections: list[str]) -> str:
     return "# Deck-Specific References\n\n" + "\n\n---\n\n".join(sections)
 
 
-def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, extra_tools=None, model_id: str = ""):
+def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, extra_tools=None, model_id: str = "", user_id: str = "", session_id: str = ""):
     """Create compose_slides tool with closed-over MCP servers and model.
 
     Args:
@@ -138,9 +138,9 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
             prefetch/per-group isolation. If None, falls back to mcp_servers[0]
             (legacy shared-client behavior).
         extra_tools: Optional list of additional tools (e.g. web_fetch) to give composers.
-
-    Returns:
-        A @tool-decorated async generator function.
+        user_id: Cognito user ID, propagated to composer trace attributes and
+            usage logs for per-user measurement.
+        session_id: Runtime session ID, propagated alongside user_id.
     """
     _extra_tools = extra_tools or []
     mcp_client = mcp_servers[0] if mcp_servers else None
@@ -406,6 +406,9 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                     model=model,
                     callback_handler=_on_event,
                     trace_attributes={
+                        "user.id": user_id,
+                        "session.id": session_id,
+                        "deck.id": deck_id,
                         "group.index": gi,
                         "group.slugs": ",".join(group["slugs"]),
                         "model.id": model_id,
@@ -581,6 +584,10 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
             "partial": partial,
             "summaries": summaries,
         }
+        log_slides_composed(
+            user_id=user_id, session_id=session_id, deck_id=deck_id,
+            generated=len(generated), total=total, status=report["status"],
+        )
         if cancelled:
             report["notice"] = (
                 "Stopped by user cancellation. Do NOT retry automatically — "

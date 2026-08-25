@@ -140,6 +140,7 @@ MCP サーバーが配信します。クライアント側のファイルは最�
 | [Teams & Slack Integration](docs/en/teams-slack-integration.md) | チャットプラットフォーム連携 |
 | [Custom Templates & Assets](docs/en/custom-template.md) | カスタムテンプレートとアセットの追加 |
 | [Cost Estimates](docs/en/cost.md) | 月額コストの内訳と最適化 |
+| [使用量の計測](docs/ja/usage-measurement.md) | PoC 運営者向けのユーザー別トークン・スライド数計測 |
 | [Uninstall](docs/en/uninstall.md) | デプロイ済み AWS リソースの削除 |
 | [Web UI（ローカルモード — 実験的機能）](web-ui/README_ja.md#local-mode) | Kiro CLI ACP をバックエンドにローカル環境で Web UI を動作させる（AWS 不要） |
 
