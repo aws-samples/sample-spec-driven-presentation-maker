@@ -60,6 +60,18 @@ def _enable_model_invocation_logging(props: dict) -> None:
     s3_prefix = props.get("S3Prefix", "bedrock-logs")
     role_arn = props["BedrockRoleArn"]
 
+    # Idempotency: this is an account-level setting — if logging is already
+    # configured to a different destination, skip instead of clobbering it
+    # (matches the "skipped if already configured" contract in config.yaml).
+    existing = client.get_model_invocation_logging_configuration().get("loggingConfig")
+    existing_log_group = ((existing or {}).get("cloudWatchConfig") or {}).get("logGroupName")
+    if existing and existing_log_group != log_group_name:
+        logger.info(
+            "Model invocation logging already configured (log_group=%s) — skipping",
+            existing_log_group,
+        )
+        return
+
     config = {
         "cloudWatchConfig": {
             "logGroupName": log_group_name,

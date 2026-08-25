@@ -27,6 +27,7 @@ REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 PROFILE=""
 LAYER="4"
 ENABLE_INVOCATION_LOGGING="false"
+ENABLE_TRANSACTION_SEARCH="false"
 OIDC_URL=""
 ALLOWED_CLIENTS=""
 WAF_IPV4=""
@@ -62,6 +63,12 @@ if [ -f "${CONFIG_FILE}" ]; then
     ENABLE_INVOCATION_LOGGING="${_obs}"
   fi
 
+  # Read enableTransactionSearch (CloudWatch Transaction Search — per-user token queries)
+  _ets=$(grep -E "^\s*enableTransactionSearch:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
+  if [ -n "${_ets}" ]; then
+    ENABLE_TRANSACTION_SEARCH="${_ets}"
+  fi
+
   # WAF IPv4/IPv6: collect list items under each key
   WAF_IPV4=$(awk '/allowedIpV4AddressRanges:/{f=1;next} f && /^[[:space:]]*-/{gsub(/["]/,"",$2); printf "%s,", $2; next} f && !/^[[:space:]]*-/{f=0}' "${CONFIG_FILE}" | sed 's/,$//')
   WAF_IPV6=$(awk '/allowedIpV6AddressRanges:/{f=1;next} f && /^[[:space:]]*-/{gsub(/["]/,"",$2); printf "%s,", $2; next} f && !/^[[:space:]]*-/{f=0}' "${CONFIG_FILE}" | sed 's/,$//')
@@ -83,6 +90,7 @@ Options:
   --layer3                 Layer 3 only — MCP Server (no Agent, no Web UI)
   --layer4                 Layer 4 full stack — Agent + Web UI (default)
   --enable-invocation-logging  Enable Bedrock Model Invocation Logging
+  --enable-transaction-search  Enable CloudWatch Transaction Search (per-user token queries)
   --observability          (Deprecated) Alias for --enable-invocation-logging
 
   --oidc-url URL           External IdP OIDC Discovery URL
@@ -116,6 +124,8 @@ while [[ $# -gt 0 ]]; do
       shift ;;
     --enable-invocation-logging)
       ENABLE_INVOCATION_LOGGING="true"; shift ;;
+    --enable-transaction-search)
+      ENABLE_TRANSACTION_SEARCH="true"; shift ;;
     --observability)
       echo "⚠️  Notice: --observability is deprecated. Use --enable-invocation-logging instead." >&2
       ENABLE_INVOCATION_LOGGING="true"; shift ;;
@@ -266,6 +276,7 @@ ENV_VARS_JSON=$(cat <<EOF
   {"name":"STACK_AGENT",                      "value":"${STACK_AGENT}",                  "type":"PLAINTEXT"},
   {"name":"STACK_WEB_UI",                     "value":"${STACK_WEB_UI}",                 "type":"PLAINTEXT"},
   {"name":"FEATURE_ENABLE_INVOCATION_LOGGING","value":"${ENABLE_INVOCATION_LOGGING}",    "type":"PLAINTEXT"},
+  {"name":"FEATURE_ENABLE_TRANSACTION_SEARCH","value":"${ENABLE_TRANSACTION_SEARCH}",    "type":"PLAINTEXT"},
   {"name":"AUTH_OIDC_URL",                    "value":"${OIDC_URL}",                     "type":"PLAINTEXT"},
   {"name":"AUTH_ALLOWED_CLIENTS",             "value":"${ALLOWED_CLIENTS}",              "type":"PLAINTEXT"},
   {"name":"WAF_IPV4",                         "value":"${WAF_IPV4}",                     "type":"PLAINTEXT"},
