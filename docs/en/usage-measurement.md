@@ -22,28 +22,25 @@ build (rebuilds count again). Pick the semantics that fit your report.
 
 ## Per-user token usage (Logs Insights)
 
-Select the **agent runtime** log group in CloudWatch Logs Insights:
-
-```
-filter kind = "bedrock_usage"
-| stats sum(input) as inputTokens,
-        sum(output) as outputTokens,
-        sum(cache_read) as cacheReadTokens,
-        sum(cache_write) as cacheWriteTokens,
-        count(*) as invocations
-  by user_id, model_id
-| sort inputTokens desc
-```
-
-If the JSON fields are not auto-discovered (log lines wrapped by another
-formatter), parse them explicitly:
+Select the **agent runtime** log group in CloudWatch Logs Insights.
+The runtime wraps log lines with a logger prefix, so JSON fields are not
+auto-discovered — parse them explicitly (verified working):
 
 ```
 filter @message like /"kind": "bedrock_usage"/
 | parse @message '"user_id": "*"' as user_id
-| parse @message '"input": *,' as input
-| parse @message '"output": *,' as output
-| stats sum(input), sum(output), count(*) by user_id
+| parse @message '"model_id": "*"' as model_id
+| parse @message '"input": *,' as input_tokens
+| parse @message '"output": *,' as output_tokens
+| parse @message '"cache_read": *,' as cache_read_tokens
+| parse @message '"cache_write": *' as cache_write_tokens
+| stats sum(input_tokens) as inputTokens,
+        sum(output_tokens) as outputTokens,
+        sum(cache_read_tokens) as cacheReadTokens,
+        sum(cache_write_tokens) as cacheWriteTokens,
+        count(*) as invocations
+  by user_id, model_id
+| sort inputTokens desc
 ```
 
 ## Per-user slide counts
@@ -51,14 +48,18 @@ filter @message like /"kind": "bedrock_usage"/
 Agent runtime log group (slides composed):
 
 ```
-filter kind = "slides_composed"
+filter @message like /"kind": "slides_composed"/
+| parse @message '"user_id": "*"' as user_id
+| parse @message '"generated": *,' as generated
 | stats sum(generated) as slidesComposed, count(*) as composeRuns by user_id
 ```
 
 MCP runtime log group (PPTX builds):
 
 ```
-filter kind = "slides_built"
+filter @message like /"kind": "slides_built"/
+| parse @message '"user_id": "*"' as user_id
+| parse @message '"slide_count": *' as slide_count
 | stats sum(slide_count) as slidesBuilt, count(*) as builds by user_id
 ```
 
@@ -81,10 +82,12 @@ features:
 
 or `bash scripts/deploy.sh --enable-transaction-search`.
 
-Then query `aws/spans`:
+Then query `aws/spans`. Filter on model-invocation spans
+(`gen_ai.operation.name = "chat"`) — token usage also appears on the parent
+`invoke_agent` span, so without this filter every token is counted twice:
 
 ```
-filter ispresent(attributes.gen_ai.usage.input_tokens) and attributes.user.id != ""
+filter attributes.gen_ai.operation.name = "chat" and attributes.user.id != ""
 | stats sum(attributes.gen_ai.usage.input_tokens) as inputTokens,
         sum(attributes.gen_ai.usage.output_tokens) as outputTokens
   by attributes.user.id

@@ -22,27 +22,25 @@ PoC 運営者向けに、ユーザーごとの Bedrock トークン消費量と�
 
 ## ユーザー別トークン使用量（Logs Insights）
 
-CloudWatch Logs Insights で **Agent ランタイム**のロググループを選択:
-
-```
-filter kind = "bedrock_usage"
-| stats sum(input) as inputTokens,
-        sum(output) as outputTokens,
-        sum(cache_read) as cacheReadTokens,
-        sum(cache_write) as cacheWriteTokens,
-        count(*) as invocations
-  by user_id, model_id
-| sort inputTokens desc
-```
-
-JSON フィールドが自動検出されない場合は明示的にパースします:
+CloudWatch Logs Insights で **Agent ランタイム**のロググループを選択します。
+ランタイムのログ行にはロガーのプレフィックスが付くため JSON フィールドの
+自動検出は効きません — 明示的にパースします（動作確認済み）:
 
 ```
 filter @message like /"kind": "bedrock_usage"/
 | parse @message '"user_id": "*"' as user_id
-| parse @message '"input": *,' as input
-| parse @message '"output": *,' as output
-| stats sum(input), sum(output), count(*) by user_id
+| parse @message '"model_id": "*"' as model_id
+| parse @message '"input": *,' as input_tokens
+| parse @message '"output": *,' as output_tokens
+| parse @message '"cache_read": *,' as cache_read_tokens
+| parse @message '"cache_write": *' as cache_write_tokens
+| stats sum(input_tokens) as inputTokens,
+        sum(output_tokens) as outputTokens,
+        sum(cache_read_tokens) as cacheReadTokens,
+        sum(cache_write_tokens) as cacheWriteTokens,
+        count(*) as invocations
+  by user_id, model_id
+| sort inputTokens desc
 ```
 
 ## ユーザー別スライド作成数
@@ -50,14 +48,18 @@ filter @message like /"kind": "bedrock_usage"/
 Agent ランタイムのロググループ（コンポーズ枚数）:
 
 ```
-filter kind = "slides_composed"
+filter @message like /"kind": "slides_composed"/
+| parse @message '"user_id": "*"' as user_id
+| parse @message '"generated": *,' as generated
 | stats sum(generated) as slidesComposed, count(*) as composeRuns by user_id
 ```
 
 MCP ランタイムのロググループ（PPTX ビルド枚数）:
 
 ```
-filter kind = "slides_built"
+filter @message like /"kind": "slides_built"/
+| parse @message '"user_id": "*"' as user_id
+| parse @message '"slide_count": *' as slide_count
 | stats sum(slide_count) as slidesBuilt, count(*) as builds by user_id
 ```
 
@@ -80,10 +82,12 @@ features:
 
 または `bash scripts/deploy.sh --enable-transaction-search`。
 
-`aws/spans` へのクエリ:
+`aws/spans` へのクエリ。モデル呼び出しスパン（`gen_ai.operation.name = "chat"`）
+に絞ります — トークン使用量は親の `invoke_agent` スパンにも付くため、
+絞らないと全トークンが二重計上されます:
 
 ```
-filter ispresent(attributes.gen_ai.usage.input_tokens) and attributes.user.id != ""
+filter attributes.gen_ai.operation.name = "chat" and attributes.user.id != ""
 | stats sum(attributes.gen_ai.usage.input_tokens) as inputTokens,
         sum(attributes.gen_ai.usage.output_tokens) as outputTokens
   by attributes.user.id
