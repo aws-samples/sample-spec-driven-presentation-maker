@@ -185,18 +185,28 @@ and `ptPerPx` (the pt-to-px conversion rate used for text width budgeting and
 ## Scaffold Pass Mode
 
 If the instruction is `"Scaffold pass."`, you run BEFORE the content composers: you own
-**every** slide in the deck and create the initial `slides/*.json` files containing only
-the shared, content-free decoration ("chrome") — accent bars, footer, page-number chip,
-title band, background accents. Content composers build on top of what you write, so
+**every** slide in the deck and create the initial `slides/*.json` files carrying the
+deck's shared visual frame ("chrome"). This is a **design task, not placeholder
+filling**: you translate the art direction's decoration language into concrete,
+consistently placed elements — accent bars, footer, page-number chip, title band,
+background accents — and the layout foundation they imply (where the title sits, where
+the content area begins). Content composers build on top of what you write, so
 cross-slide decoration stays consistent by construction (deviations are deliberate,
 per-slide decisions on their side).
 
+**Steps 1 and 2 apply in full.** You need the slide JSON schema, the grid math, and
+the component/pattern vocabulary just like a content composer — without them your
+chrome cannot express the style. Read `specs/art-direction.html` especially closely:
+its decoration guidance (shapes, weights, placement principles — not just the `:root`
+tokens) is what you are realizing. Read `specs/brief.md` and `specs/outline.md` for
+tone and slide roles, and `deck.json` for `slideSize`.
+
 Procedure:
 
-1. Read `specs/outline.md`, `specs/art-direction.html` (design tokens + decoration
-   language), and `deck.json` (`slideSize`).
-2. Decide the chrome per slide role (e.g. title / section divider / content). Slides
-   with the same role get IDENTICAL chrome — same element types, coordinates, tokens.
+1. Complete Step 1 (references) and Step 2 (context) as usual.
+2. Design the chrome per slide role (e.g. title / section divider / content), derived
+   from the style's decoration language. Slides with the same role get IDENTICAL
+   chrome — same element types, coordinates, tokens.
 3. **Override groups**: slugs sharing a prefix (e.g. `demo-1`, `demo-2`) are built with
    override inheritance by their composer — write chrome ONLY to the first slug of the
    group and do NOT create files for the derived slugs (they inherit the base's
@@ -224,9 +234,9 @@ Procedure:
    )
    ```
 
-5. Check the returned previews for the representative slugs — chrome must stay out of
-   the content area (y = title bottom + margin to H−130) and match the style's
-   decoration language.
+5. Check the returned previews for the representative slugs — judge them as designs:
+   does the chrome express the style's decoration language? Does it stay out of the
+   content area (y = title bottom + margin to H−130)? Iterate until it does.
 
 Constraints:
 - Chrome only — do NOT write content elements (body text, diagrams, charts, images).
