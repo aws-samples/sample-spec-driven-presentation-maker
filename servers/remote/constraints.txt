@@ -16,7 +16,7 @@ attrs==26.1.0
     #   referencing
 aws-opentelemetry-distro==0.19.0
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
-boto3==1.43.62
+boto3==1.43.73
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
 botocore==1.43.67
     # via
