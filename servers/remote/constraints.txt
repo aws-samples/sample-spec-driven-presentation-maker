@@ -435,7 +435,7 @@ pygments==2.20.0
     #   sdpm-skill
 pyjwt==2.13.0
     # via mcp
-pypdf==6.14.2
+pypdf==6.16.1
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
 pypdfium2==5.12.1
     # via pdfplumber
