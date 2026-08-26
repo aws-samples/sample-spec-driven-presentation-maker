@@ -29,6 +29,13 @@ global_settings:
         to the pre-signed ResponseURL. Standard CFn pattern. URL is not user-controlled.
       expiration: "2027-03-29"
 
+    - rule_id: "B310"
+      path: "infra/lambdas/transaction-search/index.py"
+      reason: >
+        urllib.request.urlopen sends CloudFormation custom resource response
+        to the pre-signed ResponseURL. Standard CFn pattern. URL is not user-controlled.
+      expiration: "2027-03-29"
+
     - rule_id: "python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected"
       path: "infra/lambdas/kb-provisioner/index.py"
       reason: >
@@ -37,6 +44,12 @@ global_settings:
 
     - rule_id: "python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected"
       path: "infra/lambdas/bedrock-logging/index.py"
+      reason: >
+        Same as B310 above. CFn custom resource ResponseURL pattern.
+      expiration: "2027-03-29"
+
+    - rule_id: "python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected"
+      path: "infra/lambdas/transaction-search/index.py"
       reason: >
         Same as B310 above. CFn custom resource ResponseURL pattern.
       expiration: "2027-03-29"

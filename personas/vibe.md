@@ -117,8 +117,17 @@ After Step 5, **`specs/art-direction.html` and `deck.json` are FROZEN.**
 
 Prerequisite: Steps 2–5 complete.
 
-Split slides into groups (see **Slide Group Assignment**), then dispatch depending on
-what your environment provides — check your tool list in this order:
+**Step 6a — Scaffold pass (serial, run first):** dispatch ONE composer with ALL slugs
+and task_instruction exactly `Scaffold pass.` — it batch-writes the style- and
+role-derived elements every slide shares (decoration, title bands, etc.) into the
+initial `slides/*.json` so parallel composers start from a consistent base and focus
+on content. Use the same dispatch mechanism as Step 6b
+below (whichever your environment provides). Wait for it to finish before dispatching
+content composers.
+
+**Step 6b — Content compose (parallel):** split slides into groups (see **Slide Group
+Assignment**), then dispatch depending on what your environment provides — check your
+tool list in this order:
 
 1. **A `compose_slides` tool exists** → call
    `compose_slides(deck_id=..., slide_groups=[...])` and let the backend parallelize.
@@ -156,6 +165,8 @@ STEP") and load the composer behavior with `mode="composer"`; dedicated
 composer agents already carry it. Do not add instructions to the template.
 
 `{deck_id}` is the absolute deck path. `{task_instruction}` values:
+- Scaffold pass (assign ALL slugs, before content compose): `Scaffold pass.` — exactly
+  this string; it switches the composer's mode.
 - Initial compose: `Compose the assigned slides from the approved specs.`
 - Consistency review (assign ALL slugs): `Consistency review.` — exactly this string;
   it switches the composer's mode.

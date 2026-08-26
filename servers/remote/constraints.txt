@@ -18,7 +18,7 @@ aws-opentelemetry-distro==0.19.0
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
 boto3==1.43.62
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
-botocore==1.43.62
+botocore==1.43.67
     # via
     #   boto3
     #   s3transfer
@@ -396,7 +396,7 @@ opentelemetry-util-http==0.65b0
     #   opentelemetry-instrumentation-urllib
     #   opentelemetry-instrumentation-urllib3
     #   opentelemetry-instrumentation-wsgi
-packaging==26.2
+packaging==26.3
     # via
     #   opentelemetry-instrumentation
     #   opentelemetry-instrumentation-falcon
@@ -435,7 +435,7 @@ pygments==2.20.0
     #   sdpm-skill
 pyjwt==2.13.0
     # via mcp
-pypdf==6.14.2
+pypdf==6.16.1
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
 pypdfium2==5.12.1
     # via pdfplumber
@@ -511,7 +511,7 @@ urllib3==2.7.0
     #   aws-opentelemetry-distro
     #   botocore
     #   requests
-uvicorn==0.52.0
+uvicorn==0.52.1
     # via mcp
 wrapt==2.3.0
     # via

@@ -136,6 +136,7 @@ See [Architecture](docs/en/architecture.md) for the full picture.
 | [Teams & Slack Integration](docs/en/teams-slack-integration.md) | Chat platform integration |
 | [Custom Templates & Assets](docs/en/custom-template.md) | Adding custom templates and icons |
 | [Cost Estimates](docs/en/cost.md) | Monthly cost breakdown and optimisation tips |
+| [Measuring Usage](docs/en/usage-measurement.md) | Per-user token & slide-count measurement for PoC operators |
 | [Uninstall](docs/en/uninstall.md) | Clean up deployed AWS resources |
 | [Web UI (Local Mode — experimental)](web-ui/README.md#local-mode) | Run the Web UI locally against a Kiro CLI ACP backend (no AWS) |
 
