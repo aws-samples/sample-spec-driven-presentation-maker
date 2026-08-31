@@ -45,7 +45,7 @@ defusedxml==0.7.1
     # via sdpm-skill
 et-xmlfile==2.0.0
     # via openpyxl
-googleapis-common-protos==1.75.0
+googleapis-common-protos==1.75.1
     # via
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
