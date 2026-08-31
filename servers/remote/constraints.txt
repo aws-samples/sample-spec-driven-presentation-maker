@@ -437,7 +437,7 @@ pyjwt==2.13.0
     # via mcp
 pypdf==6.16.1
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
-pypdfium2==5.12.1
+pypdfium2==5.13.0
     # via pdfplumber
 python-dateutil==2.9.0.post0
     # via
