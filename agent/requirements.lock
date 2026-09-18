@@ -8,7 +8,6 @@ anyio==4.14.2
     # via
     #   httpx
     #   mcp
-    #   openai
     #   py-key-value-aio
     #   sse-starlette
     #   starlette
@@ -23,8 +22,6 @@ attrs==26.1.0
     #   referencing
 authlib==1.7.2
     # via fastmcp-slim
-aws-bedrock-token-generator==1.1.0
-    # via strands-agents
 aws-opentelemetry-distro==0.19.0
     # via -r agent/requirements.txt
 awscrt==0.36.0
@@ -43,7 +40,6 @@ boto3==1.43.62
     #   strands-agents
 botocore==1.43.62
     # via
-    #   aws-bedrock-token-generator
     #   bedrock-agentcore
     #   boto3
     #   mcp-proxy-for-aws
@@ -74,8 +70,6 @@ cryptography==50.0.0
     #   secretstorage
 cyclopts==4.22.3
     # via fastmcp-slim
-distro==1.9.0
-    # via openai
 dnspython==2.8.0
     # via email-validator
 docstring-parser==0.18.0
@@ -110,7 +104,6 @@ httpx==0.28.1
     # via
     #   fastmcp-slim
     #   mcp
-    #   openai
     #   strands-agents
 httpx-sse==0.4.3
     # via mcp
@@ -132,8 +125,6 @@ jeepney==0.9.0
     # via
     #   keyring
     #   secretstorage
-jiter==0.16.0
-    # via openai
 jmespath==1.1.0
     # via
     #   boto3
@@ -173,8 +164,6 @@ more-itertools==11.1.0
     # via
     #   jaraco-classes
     #   jaraco-functools
-openai==2.52.0
-    # via strands-agents
 openapi-pydantic==0.5.1
     # via fastmcp-slim
 opentelemetry-api==1.44.0
@@ -527,7 +516,6 @@ pydantic==2.13.4
     #   bedrock-agentcore
     #   fastmcp-slim
     #   mcp
-    #   openai
     #   openapi-pydantic
     #   pydantic-settings
     #   strands-agents
@@ -602,8 +590,6 @@ shellingham==1.5.4
     # via typer
 six==1.17.0
     # via python-dateutil
-sniffio==1.3.1
-    # via openai
 sse-starlette==3.4.6
     # via mcp
 starlette==1.3.1
@@ -616,8 +602,6 @@ strands-agents==1.50.2
     # via
     #   -r agent/requirements.txt
     #   bedrock-agentcore
-tqdm==4.70.0
-    # via openai
 typer==0.27.0
     # via mcp
 typing-extensions==4.16.0
@@ -627,7 +611,6 @@ typing-extensions==4.16.0
     #   fastmcp-slim
     #   grpcio
     #   mcp
-    #   openai
     #   opentelemetry-api
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
