@@ -52,4 +52,9 @@ export const MODEL_METADATA: Record<string, ModelMetadata> = {
     displayName: "GPT-5.6 Terra",
     description: "Balanced performance competitive with GPT-5.5 at half the cost",
   },
+  // --- Moonshot AI ---
+  "global.moonshotai.kimi-k3": {
+    displayName: "Kimi K3",
+    description: "Moonshot AI's reasoning model, fast output",
+  },
 };

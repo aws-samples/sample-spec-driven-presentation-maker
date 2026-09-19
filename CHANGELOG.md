@@ -101,6 +101,15 @@ Entries before v0.5.0 were written retroactively as summaries.
   create. Throughput is roughly a third of GPT-5.6 Terra (~25 vs ~90 output
   tokens/s measured in `ap-northeast-1`), so expect longer waits on
   compose-heavy runs.
+- **Kimi K3** (`global.moonshotai.kimi-k3`) is selectable for chat and create.
+  Its Converse constraints are identical to the GPT models' — it rejects
+  `temperature`, `topP` and Bedrock's `cachePoint`, while its own implicit
+  prompt caching is on by default — so it reuses the same invocation profile
+  and needed no new agent code. Throughput is competitive with GPT-5.6 Terra
+  (~80–175 output tokens/s measured in `ap-northeast-1`). Note it always emits
+  reasoning content, and those tokens count against the output budget: a
+  one-word answer costs ~50 output tokens where Claude spends ~5, so short
+  interactions are disproportionately expensive.
 
 ### Changed
 

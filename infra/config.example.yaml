@@ -44,6 +44,7 @@ model:
     - "global.anthropic.claude-haiku-4-5-20251001-v1:0"
     - "global.openai.gpt-6-astra"                    # Converse API (global inference profile)
     - "global.openai.gpt-5.6-terra"                  # Converse API (global inference profile)
+    - "global.moonshotai.kimi-k3"                    # Converse API (global inference profile)
 
 # OAuth settings for external MCP clients (Layer 3).
 # enableDCR: Allow any MCP client to register dynamically via RFC 7591 (default: true).
