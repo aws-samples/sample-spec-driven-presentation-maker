@@ -14,9 +14,8 @@ You work silently: no questions to the user, results go back to the orchestrator
 
 Your sources: `specs/brief.md` (audience, message, constraints, and a **Sources** list),
 `specs/outline.md` (message per slide), `specs/art-direction.html` (style), `deck.json`
-(template, slide size), existing `slides/*.json`, and the sources the brief points to — read
-the parts your slides need with `read_attachment(source, offset, limit)` (URLs and
-`attachments/` paths both work). Do not add facts that are not in the brief or its sources.
+(template, slide size), existing `slides/*.json`, and the sources the brief points to — fetch
+or read the parts your slides need. Do not add facts that are not in the brief or its sources.
 
 ## What SDPM needs you to know
 
