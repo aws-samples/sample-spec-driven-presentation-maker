@@ -278,6 +278,15 @@ def fetch_url(
             read_timeout = min(IDLE_READ_TIMEOUT_S, TOTAL_TIMEOUT_S - (time.monotonic() - start_time))
             conn.sock.settimeout(read_timeout)  # type: ignore[union-attr]
 
+            # Keep our own reference to the socket before reading the response.
+            # We send `Connection: close`, so http.client sets response.will_close
+            # and getresponse() hands the connection to the response by calling
+            # HTTPConnection.close(), which sets conn.sock = None. The socket
+            # object itself stays usable — close() defers the real close while the
+            # response's makefile() reference is outstanding — so the body reads
+            # below still need a handle to re-arm the idle timeout on.
+            body_sock = conn.sock
+
             response = conn.getresponse()
             header_bytes = sum(
                 len(name.encode("latin-1")) + len(value.encode("latin-1")) + 4
@@ -352,7 +361,14 @@ def fetch_url(
                 conn.close()
                 raise SourceValidationError(f"Total timeout ({TOTAL_TIMEOUT_S}s) exceeded during read")
 
-            conn.sock.settimeout(min(IDLE_READ_TIMEOUT_S, remaining))  # type: ignore[union-attr]
+            # Re-arm the idle timeout while the body is still streaming. Once
+            # http.client has consumed the whole body it closes the response's
+            # file object, which releases the last reference to the socket and
+            # really closes the fd — touching it then raises EBADF. A finished
+            # body makes the next read() return b"" immediately anyway, so there
+            # is nothing left to bound.
+            if body_sock is not None and not response.isclosed():
+                body_sock.settimeout(min(IDLE_READ_TIMEOUT_S, remaining))
             chunk = response.read(65536)
             if not chunk:
                 break

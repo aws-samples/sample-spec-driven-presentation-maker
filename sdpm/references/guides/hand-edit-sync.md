@@ -26,6 +26,12 @@ Call `diff_pptx(baseline={deck_dir}, edited={edited_pptx})`. The baseline
 may be a deck directory, slides JSON, or PPTX; the operation builds or converts
 to round-trip JSON internally.
 
+> **Local / CLI only.** `servers/remote` does not bind `diff_pptx`, so this step
+> is unavailable on the cloud stack (Web UI + L4 agent) and the tool is not in the
+> agent's allowlist. It is also slated for removal. On the cloud path, treat an
+> edited PPTX as an import instead: `import_attachment` commits it and you work
+> from the resulting deck rather than diffing against the old one.
+
 ---
 
 ### 2. Apply hand-edits to JSON

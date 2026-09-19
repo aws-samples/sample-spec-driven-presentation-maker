@@ -193,6 +193,7 @@ The following controls depend on your organization's environment, network topolo
 5. **S3 access logging** — log destination bucket and retention are your choice
 6. **Cognito advanced security (MFA, compromised-credentials detection)** — omitted by default to keep the demo frictionless
 7. **Bedrock model / region selection** — avoid cross-region inference profiles if data sovereignty is a concern
+8. **Snapshot-safe cryptographic libraries** — only relevant if you opt the AgentCore runtimes into `platformVersion` V2, which this stack does not do (CloudFormation and the CDK cannot set that field, so a deployment of this sample runs V1). V2 restores every instance from one snapshot, so a userspace RNG seeded before the snapshot is shared across instances. Values this stack derives from the kernel are unaffected — `uuid.uuid4()` and `secrets` read `getrandom(2)` per call, and SigV4 signing is HMAC-based and deterministic — so the exposure is limited to OpenSSL's own DRBG behind outbound TLS. If you enable V2, replace the MCP runtime's OpenSSL with a snapshot-safe build (`openssl-snapsafe-libs` on Amazon Linux 2023, which conflicts with `openssl-libs` and therefore needs `--allowerasing`), or use an AWS-provided base image that already ships one.
 
 ### Reporting Security Issues
 

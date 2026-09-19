@@ -16,6 +16,7 @@ from strands.types.tools import ToolContext
 
 from composition import resolve_parts
 from cost_logger import log_slides_composed, log_usage
+from message_hooks import LiftToolResultImages
 from modes import MODES  # imported lazily in compose_slides if needed
 from resilience import call_tool_with_retry
 
@@ -135,7 +136,9 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         mcp_servers: List of MCPClient instances exposed as composer tools.
         model: BedrockModel instance.
         composer_mcp_factory: Optional callable returning a fresh MCPClient for
-            prefetch/per-group isolation. If None, falls back to mcp_servers[0]
+            prefetch/per-group isolation. Accepts the Mcp-Session-Id to use, so
+            each group gets its own microVM while keeping that id stable across
+            composes. If None, falls back to mcp_servers[0]
             (legacy shared-client behavior).
         extra_tools: Optional list of additional tools (e.g. web_fetch) to give composers.
         user_id: Cognito user ID, propagated to composer trace attributes and
@@ -380,7 +383,15 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 # Per-group MCP isolation: create a fresh MCPClient scoped to this
                 # group so a session death cannot cascade to other groups. Started
                 # here and stopped in finally after the composer run completes.
-                _group_mcp = composer_mcp_factory() if composer_mcp_factory else None
+                #
+                # The group index is part of the Mcp-Session-Id so that AgentCore
+                # still hands each group its own microVM (sharing one id across
+                # groups would route them all to the same microVM and defeat the
+                # isolation above, while they run in parallel). Keeping the id
+                # stable per group means a repeat compose in the same user session
+                # reuses that group's microVM instead of starting a new one.
+                _group_session_id = f"{session_id}-g{gi + 1}" if session_id else ""
+                _group_mcp = composer_mcp_factory(_group_session_id) if composer_mcp_factory else None
                 _group_tools = list(mcp_servers)
                 if _group_mcp is not None:
                     _group_tools[0] = _group_mcp  # replace Presentation Maker MCP
@@ -395,6 +406,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                     tools=_group_tools,
                     model=model,
                     callback_handler=_on_event,
+                    hooks=[LiftToolResultImages()],
                     trace_attributes={
                         "user.id": user_id,
                         "session.id": session_id,

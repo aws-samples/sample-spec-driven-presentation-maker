@@ -43,23 +43,18 @@ export const MODEL_METADATA: Record<string, ModelMetadata> = {
     description: "Fast and economical",
     composable: false,
   },
-  // --- Amazon Nova ---
-  "us.amazon.nova-2-lite-v1:0": {
-    displayName: "Nova 2 Lite",
-    description: "Amazon's 2nd gen, fast and economical",
-    composable: false,
-  },
   // --- OpenAI GPT ---
-  "openai.gpt-5.6-terra": {
+  "global.openai.gpt-6-astra": {
+    displayName: "GPT-6 Astra",
+    description: "OpenAI's newest frontier model, deep reasoning (slower output)",
+  },
+  "global.openai.gpt-5.6-terra": {
     displayName: "GPT-5.6 Terra",
     description: "Balanced performance competitive with GPT-5.5 at half the cost",
   },
-  "openai.gpt-5.5": {
-    displayName: "GPT-5.5",
-    description: "OpenAI's most capable model, advanced coding and agentic tasks",
-  },
-  "openai.gpt-5.4": {
-    displayName: "GPT-5.4",
-    description: "Frontier reasoning, coding, and tool use",
+  // --- Moonshot AI ---
+  "global.moonshotai.kimi-k3": {
+    displayName: "Kimi K3",
+    description: "Moonshot AI's reasoning model, fast output",
   },
 };

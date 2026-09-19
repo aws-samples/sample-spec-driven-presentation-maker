@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: MIT-0
 """Unified agent factory: assembles MCP clients, model, tools, and prompt into a Strands Agent."""
 
+import asyncio
 import json
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 from botocore.config import Config as BotocoreConfig
 from strands import Agent
@@ -20,7 +22,8 @@ from mcp_clients import (
     mcp_aws_pricing,
 )
 from composition import resolve_parts
-from model_profiles import build_model_kwargs, MODEL_PROFILES, MANTLE_MODELS, resolve_mantle_region
+from message_hooks import LiftToolResultImages
+from model_profiles import build_model_kwargs, MODEL_PROFILES
 from modes import MODES
 from modes.composer import make_compose_slides
 from resilience import LoopGuard
@@ -56,10 +59,67 @@ def _resolve_model_id(requested: str | None, default: str) -> str:
 
 
 _MCP_FACTORIES = [
-    lambda jwt_token, tool_filters=None: mcp_agentcore_runtime(jwt_token=jwt_token, tool_filters=tool_filters),
-    lambda jwt_token, tool_filters=None: mcp_aws_knowledge(),
-    lambda jwt_token, tool_filters=None: mcp_aws_pricing(),
+    lambda jwt_token, session_id="", tool_filters=None: mcp_agentcore_runtime(jwt_token=jwt_token, session_id=session_id, tool_filters=tool_filters),
+    lambda jwt_token, session_id="", tool_filters=None: mcp_aws_knowledge(),
+    lambda jwt_token, session_id="", tool_filters=None: mcp_aws_pricing(),
 ]
+
+
+def _prewarm_mcp_clients(clients: list, names: list[str], required: list[bool]) -> tuple[list, list[dict]]:
+    """Connect the MCP clients concurrently and drop the optional ones that fail.
+
+    Strands connects MCP servers serially: `ToolRegistry.process_tools()` iterates
+    the tools list and blocks on `await provider.load_tools()` for each
+    ToolProvider in turn. With three servers — one on AgentCore and two AWS ones
+    pinned to us-east-1 — that put roughly 2.6s of cross-region handshakes on the
+    critical path of every request, in series behind each other.
+
+    `load_tools()` is the public ToolProvider entry point and caches its result in
+    the client, so calling it here first means Strands' own call is a cache hit.
+    Running those calls in a thread pool collapses the handshakes into the slowest
+    one instead of their sum.
+
+    It also makes the `required` flag in MCP_DEFS mean something. The flag was only
+    ever guarding client *construction*, which is lazy and cannot fail, so a
+    failure to reach an optional server surfaced later inside Strands as a hard
+    `ValueError` from process_tools (MCPClient defaults to
+    `continue_on_error=False`). Connecting here lets an optional server be dropped
+    with a status entry, which is what the flag always claimed to do.
+
+    Returns:
+        (clients that are usable, status entries per server)
+    """
+    results: dict[int, BaseException | None] = {}
+
+    def connect(index: int) -> None:
+        try:
+            # asyncio.run rather than Strands' run_async: that helper lives in the
+            # private strands._async module, and each worker thread here has no
+            # running loop of its own. load_tools() does its work synchronously
+            # inside (the MCP session itself runs on the client's own background
+            # thread), so a throwaway loop per thread is enough.
+            asyncio.run(clients[index].load_tools())
+            results[index] = None
+        except BaseException as e:  # noqa: BLE001 - recorded per client below
+            results[index] = e
+
+    if clients:
+        with ThreadPoolExecutor(max_workers=len(clients)) as pool:
+            list(pool.map(connect, range(len(clients))))
+
+    usable: list = []
+    status: list[dict] = []
+    for i, client in enumerate(clients):
+        error = results.get(i)
+        if error is None:
+            usable.append(client)
+            status.append({"name": names[i], "status": "ok"})
+            continue
+        logger.warning("MCP server %r failed to connect: %s", names[i], error)
+        status.append({"name": names[i], "status": "error", "error": str(error)})
+        if required[i]:
+            raise error
+    return usable, status
 
 
 # ---------------------------------------------------------------------------
@@ -96,25 +156,20 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         requested_agent = chat_model_id
         default_agent = _DEFAULT_CHAT_MODEL_ID
     resolved_agent = _resolve_model_id(requested_agent, default_agent)
-    if resolved_agent in MANTLE_MODELS:
-        from mantle_client import mantle_model
-        model = mantle_model(resolved_agent, region=resolve_mantle_region(resolved_agent, region))
-    else:
-        model = BedrockModel(**build_model_kwargs(resolved_agent))
+    model = BedrockModel(**build_model_kwargs(resolved_agent))
 
     # MCP servers
-    mcp_servers = []
-    mcp_status = []
+    # MCP servers — built lazily here, then connected concurrently below.
+    built = []
+    names = []
+    required_flags = []
     for i, ((name, required), factory_fn) in enumerate(zip(MCP_DEFS, _MCP_FACTORIES)):
-        try:
-            # Apply tool_filters only to the Presentation Maker server (index 0)
-            filters = {"allowed": cfg.allowed_tools} if (i == 0 and cfg.allowed_tools) else None
-            mcp_servers.append(factory_fn(jwt_token, tool_filters=filters))
-            mcp_status.append({"name": name, "status": "ok"})
-        except Exception as e:
-            mcp_status.append({"name": name, "status": "error", "error": str(e)})
-            if required:
-                raise
+        # Apply tool_filters only to the Presentation Maker server (index 0)
+        filters = {"allowed": cfg.allowed_tools} if (i == 0 and cfg.allowed_tools) else None
+        built.append(factory_fn(jwt_token, session_id=session_id, tool_filters=filters))
+        names.append(name)
+        required_flags.append(required)
+    mcp_servers, mcp_status = _prewarm_mcp_clients(built, names, required_flags)
 
     # Tools
     tools = [*mcp_servers, web_fetch, hearing]
@@ -125,19 +180,15 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         if profile and not profile.compose_capable:
             logger.warning("Model %r is not compose_capable; falling back to %r for create", resolved_create, _DEFAULT_CREATE_MODEL_ID)
             resolved_create = _DEFAULT_CREATE_MODEL_ID
-        if resolved_create in MANTLE_MODELS:
-            from mantle_client import mantle_model
-            composer_model = mantle_model(resolved_create, region=resolve_mantle_region(resolved_create, region))
-        else:
-            composer_model = BedrockModel(
-                **build_model_kwargs(resolved_create),
-                boto_client_config=BotocoreConfig(
-                    user_agent_extra="strands-agents",
-                    read_timeout=120,
-                    retries={"max_attempts": 5, "mode": "adaptive"},
-                ),
-            )
-        composer_mcp_factory = lambda: mcp_agentcore_runtime(jwt_token=jwt_token)  # noqa: E731
+        composer_model = BedrockModel(
+            **build_model_kwargs(resolved_create),
+            boto_client_config=BotocoreConfig(
+                user_agent_extra="strands-agents",
+                read_timeout=120,
+                retries={"max_attempts": 5, "mode": "adaptive"},
+            ),
+        )
+        composer_mcp_factory = lambda mcp_session_id="": mcp_agentcore_runtime(jwt_token=jwt_token, session_id=mcp_session_id)  # noqa: E731
         compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create, user_id=user_id, session_id=session_id)
         tools.append(compose_slides)
 
@@ -152,6 +203,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
             name=agent_name, system_prompt="", tools=tools, model=model,
             session_manager=session_manager,
             trace_attributes=agent_trace_attributes,
+            hooks=[LiftToolResultImages()],
         )
     except Exception:
         logger.warning("Agent init failed with all MCP servers, retrying with required-only")
@@ -173,6 +225,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
             name=agent_name, system_prompt="", tools=tools, model=model,
             session_manager=session_manager,
             trace_attributes=agent_trace_attributes,
+            hooks=[LiftToolResultImages()],
         )
 
     # Prompts + history (parts-based)
