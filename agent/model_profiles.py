@@ -84,21 +84,33 @@ CLAUDE_EXTENDED_THINKING = ModelProfile(temperature=None, cache_strategy="auto")
 # when reasoning is enabled; Strands handles this internally.
 CLAUDE_ADAPTIVE_THINKING = ModelProfile(temperature=1.0, cache_strategy="auto")
 
-# OpenAI GPT — temperature MUST be None. Both gpt-6-astra and gpt-5.6-terra
-# reject `temperature` on Converse/ConverseStream with
+# Third-party models that reject Bedrock's inference knobs on Converse.
+# Named after the constraint rather than a vendor because two unrelated
+# providers share it exactly: OpenAI GPT (gpt-6-astra, gpt-5.6-terra) and
+# Moonshot AI (kimi-k3).
+#
+# temperature MUST be None — these models reject `temperature` on
+# Converse/ConverseStream with
 # "ValidationException: This model doesn't support the temperature field."
 # (`topP` is rejected the same way, but to_bedrock_kwargs never emits it.)
-# Note this differs from the removed bedrock-mantle path, which accepted
+# For GPT this differs from the removed bedrock-mantle path, which accepted
 # temperature via the OpenAI Responses API — so 0.7 looked fine until the
-# migration to Converse. Verified 2026-09-10 in ap-northeast-1.
+# migration to Converse.
 #
 # cache_strategy must stay "none": Bedrock-native cachePoint (what Strands'
 # CacheConfig emits) is rejected for these models with AccessDeniedException.
 # They still benefit from caching — model-native *implicit* prompt caching is
-# on by default and needs no request parameter. Verified 2026-09-10: a
-# 1,992-token system prefix was reported as cacheWriteInputTokens, then
-# cacheReadInputTokens on subsequent calls. Do not "fix" this to "auto".
-GPT_DEFAULT = ModelProfile(temperature=None, cache_strategy="none")
+# on by default and needs no request parameter. Verified with a 1,992-token
+# system prefix (GPT) and an 813-token one (Kimi K3): reported as
+# cacheWriteInputTokens, then cacheReadInputTokens on subsequent calls.
+# Do not "fix" this to "auto".
+#
+# max_tokens must stay generous. Kimi K3 always emits reasoningContent, and
+# those tokens count against the output budget: at maxTokens=16 a one-word
+# answer returned 12 reasoning deltas, zero text and stopReason=max_tokens.
+#
+# Verified in ap-northeast-1: GPT 2026-09-10, Kimi K3 2026-09-19.
+NO_TEMPERATURE_IMPLICIT_CACHE = ModelProfile(temperature=None, cache_strategy="none")
 
 
 # Fallback profile when a model id is not explicitly registered.
@@ -121,8 +133,10 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     "global.anthropic.claude-sonnet-4-6": CLAUDE_STANDARD,
     "global.anthropic.claude-haiku-4-5-20251001-v1:0": CLAUDE_HAIKU,
     # OpenAI GPT (Converse API via global inference profile)
-    "global.openai.gpt-6-astra": GPT_DEFAULT,
-    "global.openai.gpt-5.6-terra": GPT_DEFAULT,
+    "global.openai.gpt-6-astra": NO_TEMPERATURE_IMPLICIT_CACHE,
+    "global.openai.gpt-5.6-terra": NO_TEMPERATURE_IMPLICIT_CACHE,
+    # Moonshot AI (Converse API via global inference profile)
+    "global.moonshotai.kimi-k3": NO_TEMPERATURE_IMPLICIT_CACHE,
 }
 
 
