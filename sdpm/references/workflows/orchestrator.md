@@ -31,9 +31,10 @@ the project's shared vocabulary for structure and look.
 
 ## Delegation
 
-Spawn composers with your environment's sub-agent mechanism, one per dispatch. If your
-environment registers a dedicated sdpm composer agent, spawn that one; otherwise any
-general-purpose sub-agent will do. Always use this prompt (replace only the placeholders):
+Spawn composers with your environment's sub-agent mechanism, one per dispatch. Check which
+sub-agents your environment offers; if a dedicated sdpm composer agent is among them, spawn
+that one, otherwise any general-purpose sub-agent will do. Always use this prompt (replace
+only the placeholders):
 
 ```
 Follow the `sdpm-composer` skill. If it is not available, call read_workflows(["composer"])
