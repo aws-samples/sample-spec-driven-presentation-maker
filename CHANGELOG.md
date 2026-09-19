@@ -17,7 +17,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   it calls `read_workflows(["composer"])` and stops. Dedicated composer
   agent definitions (Kiro, Claude Code) now point at this skill instead of
   a `personas/composer.md` file reference.
-- **`docs/en/migration-v0.6.md`** — breaking-change table and per-environment
+- **`docs/en/migration-role-workflows.md`** — breaking-change table and per-environment
   migration steps for the workflow consolidation below.
 
 ### Changed
@@ -47,7 +47,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   `code-block` → `code_to_slide`, `layout` → `arch_diagram`,
   `diff` → `diff_pptx`. Workflow/guide text now reads identically whether
   called as an MCP tool or a CLI subcommand. No aliases for the old names.
-  See [Migration to v0.6](docs/en/migration-v0.6.md) for the full table.
+  See [Migration: role workflows](docs/en/migration-role-workflows.md) for the full table.
 - **`slide-json-spec` moved to `sdpm/references/spec/`** — it is a fact
   document, not a role document; still resolved by `read_workflows` for
   backward compatibility. **`hand-edit-sync` moved to
@@ -64,7 +64,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   needed again, express it directly in slide JSON per
   `read_workflows(["slide-json-spec"])`.
 
-> **Migrating from v0.5?** See [Migration to v0.6](docs/en/migration-v0.6.md)
+> **Migrating from v0.5?** See [Migration: role workflows](docs/en/migration-role-workflows.md)
 > for the full breaking-change list and upgrade steps per environment.
 
 ### Added

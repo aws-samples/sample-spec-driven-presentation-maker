@@ -84,7 +84,7 @@ skill をスラッシュコマンドにする
 
 > **旧バージョンからのアップグレード:** ディレクトリ構成・ツール名・skill が変わりました —
 > [v0.5 移行ガイド](docs/en/migration-v0.5.md) と
-> [v0.6 移行ガイド](docs/en/migration-v0.6.md) を参照してください。
+> [role workflows 移行ガイド](docs/en/migration-role-workflows.md) を参照してください。
 
 ---
 
@@ -138,7 +138,7 @@ MCP サーバーが配信します。クライアント側のファイルは最�
 | [Getting Started](docs/en/getting-started.md) | Setup for every environment |
 | [Architecture](docs/en/architecture.md) | レイヤー設計、データフロー、認証モデル、MCP ツール一覧 |
 | [Migration to v0.5](docs/en/migration-v0.5.md) | v0.4 からの移行（パス変更、skills 廃止） |
-| [Migration to v0.6](docs/en/migration-v0.6.md) | v0.5 からの移行（ワークフロー統合、ツール/skill 名変更） |
+| [Migration: role workflows](docs/en/migration-role-workflows.md) | v0.5 からの移行（ワークフロー統合、ツール/skill 名変更） |
 | [Recommended Deploy](docs/en/deploy-cloudshell.md) | CloudShell からの AWS デプロイ（CDK/Docker 不要） |
 | [Connecting Agents](docs/en/add-to-gateway.md) | MCP クライアントの接続方法 |
 | [Teams & Slack Integration](docs/en/teams-slack-integration.md) | チャットプラットフォーム連携 |

@@ -80,7 +80,7 @@ serve — the behavior itself still lives in `sdpm/references/workflows/`, in on
 knowledge files are read live from the checkout.
 
 > **Upgrading from an older release?** Directory layout, tool names and skills changed —
-> see the [v0.5](docs/en/migration-v0.5.md) and [v0.6](docs/en/migration-v0.6.md)
+> see the [v0.5](docs/en/migration-v0.5.md) and [role workflows](docs/en/migration-role-workflows.md)
 > migration notes.
 
 ---
@@ -132,7 +132,7 @@ See [Architecture](docs/en/architecture.md) for the full picture.
 | [Getting Started](docs/en/getting-started.md) | Setup for every environment, from bare CLI to full AWS stack |
 | [Architecture](docs/en/architecture.md) | Layer design, data flow, auth model, MCP tool reference |
 | [Migration to v0.5](docs/en/migration-v0.5.md) | Upgrading from v0.4 (paths, skills removal) |
-| [Migration to v0.6](docs/en/migration-v0.6.md) | Upgrading from v0.5 (workflow consolidation and renamed tools/skills) |
+| [Migration: role workflows](docs/en/migration-role-workflows.md) | Upgrading from v0.5 (workflow consolidation and renamed tools/skills) |
 | [Recommended Deploy](docs/en/deploy-cloudshell.md) | AWS deployment via CloudShell (no CDK/Docker required) |
 | [Connecting Agents](docs/en/add-to-gateway.md) | MCP client connection guide |
 | [Teams & Slack Integration](docs/en/teams-slack-integration.md) | Chat platform integration |

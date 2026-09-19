@@ -1,12 +1,12 @@
-# Migrating to v0.6
+# Migration: role workflows (replacing personas and start_presentation)
 
-v0.6 consolidates mode behavior into role documents and renames tool/CLI
+This release consolidates mode behavior into role documents and renames tool/CLI
 surfaces to match. No slide JSON schema changes — **existing decks keep
 working** locally and on the cloud stack.
 
 ## What changed
 
-| v0.5 | v0.6 |
+| v0.5 | this release |
 |---|---|
 | `start_presentation(mode="vibe"\|"spec"\|"style"\|"composer"\|"translate")` | Removed — call `read_workflows(["orchestrator"\|"composer"\|"style"\|"translate"])` instead |
 | `personas/*.md` | Removed — role + procedure text now lives in `sdpm/references/workflows/{orchestrator,composer,style,translate}.md` |

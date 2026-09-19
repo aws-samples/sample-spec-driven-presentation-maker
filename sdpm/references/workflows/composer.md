@@ -31,9 +31,8 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
   `grid`, `table`, `chart-bar` / `chart-line` / `chart-pie`, `freeform`,
   `arch-layout-engine` + `arch-elements` (architecture diagrams via `arch_diagram`),
   `design-rules`.
-- Slugs sharing a prefix (`demo-1`, `demo-2`) are one override group: the first slug is the
-  base file, the others inherit from it via `override` (see the spec). Only the base slug has
-  its own chrome.
+- Slugs sharing a prefix (`demo-1`, `demo-2`) are one override group: later slides inherit
+  from the first via `override` (see the spec) — use it for progressive builds.
 - If `slides/<slug>.json` already exists it is the scaffold — keep its chrome (background,
   title treatment, footer, decoration) and build the content on top.
 - Never draw page numbers as elements; the template's slide-number placeholder provides them.
@@ -45,10 +44,12 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
 
 ## Modes
 
-`task_instruction` exactly `Scaffold pass.` — create the shared chrome from the art direction
-(background, title treatment, footer, recurring decoration) for every base slug in
-`assigned_slugs`; derived slugs of an override group get no file. No body content. This is the
-base every parallel composer builds on.
+`task_instruction` exactly `Scaffold pass.` — write an initial `slides/<slug>.json` for
+**every** assigned slug carrying the deck's shared frame: the elements derivable from the
+style and the slide's role alone (decoration, title band, section label — identical across
+slides, or parameterized per slide from the outline). If you would have to imagine a slide's
+content to place an element, it is not scaffold. Every slide gets a file, even a minimal one;
+content composers rely on that. Write them in one batch and check one preview per role.
 
 `task_instruction` exactly `Consistency review.` — read all assigned slides, fix
 cross-slide inconsistencies only (type scale, colors, spacing, terminology), leave intentional
