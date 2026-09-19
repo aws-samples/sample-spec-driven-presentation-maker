@@ -22,6 +22,9 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **Outline sub-items are now `body` / `visual` / `evidence`** — these three keys replace
+  `what_to_say` / `what_to_show` / `evidence` / `notes`. This is breaking for existing
+  enriched outlines: old-key lines are shown as prose rather than parsed as slide sub-items.
 - **Mode behavior consolidated into role documents, served via
   `read_workflows`** — `start_presentation(mode=...)` and `personas/*.md`
   are removed. Each role (orchestrator, composer, style, translate) now has

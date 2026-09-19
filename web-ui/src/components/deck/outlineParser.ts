@@ -17,11 +17,11 @@
  *
  * Slugs are kebab-case identifiers that map to slides/{slug}.json files.
  * Slide order is determined by line order in the outline.
- * Sub-item keys are fixed: what_to_say, evidence, what_to_show, notes.
+ * Sub-item keys are fixed: body, visual, evidence.
  */
 
-/** Valid sub-item key names (fixed by upstream planner-answers spec). */
-export type SubItemKey = "what_to_say" | "evidence" | "what_to_show" | "notes"
+/** Valid outline sub-item key names. */
+export type SubItemKey = "body" | "visual" | "evidence"
 
 /** A single sub-item attached to a slide. */
 export interface OutlineSubItem {
@@ -74,7 +74,7 @@ export type SlideState = "skeleton" | "active" | "done"
 const SLIDE_RE = /^-\s*\[([^\]]+)\]\s*(.*)/
 
 /** Regex matching a sub-item line: `  - key: value` */
-const SUB_ITEM_RE = /^\s+-\s*(what_to_say|evidence|what_to_show|notes):\s*(.*)/
+const SUB_ITEM_RE = /^\s+-\s*(body|visual|evidence):\s*(.*)/
 
 /** Regex matching a section heading: `## Title` */
 const SECTION_RE = /^##\s+(.+)/

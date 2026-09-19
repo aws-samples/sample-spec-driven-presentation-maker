@@ -13,9 +13,11 @@ You work silently: no questions to the user, results go back to the orchestrator
 - `task_instruction` — what to do; two exact strings switch modes (below)
 
 Your sources: `specs/brief.md` (audience, message, constraints, and a **Sources** list),
-`specs/outline.md` (one claim per slide — its headline), `specs/art-direction.html` (style), `deck.json`
-(template, slide size), existing `slides/*.json`, and the sources the brief points to — fetch
-or read the parts your slides need. Do not add facts that are not in the brief or its sources.
+`specs/outline.md` (one claim per slide plus `body` / `visual` / `evidence`),
+`specs/art-direction.html` (style), `deck.json` (template, slide size), existing
+`slides/*.json`, and the sources the brief points to — fetch or read the parts your slides need.
+Treat `body` and `visual` as the intent to realise: choose the layout, dimensions and decoration,
+and refine wording as needed. Do not add facts that are not in the brief or its sources.
 
 ## What SDPM needs you to know
 

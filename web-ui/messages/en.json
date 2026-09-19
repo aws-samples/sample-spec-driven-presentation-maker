@@ -116,9 +116,9 @@
     "slideAltFull": "Slide {number} of {total}"
   },
   "outline": {
-    "evidence": "Evidence",
+    "body": "Body",
     "visual": "Visual",
-    "notes": "Notes",
+    "evidence": "Evidence",
     "emptyState": "Outline will appear here when the agent writes it."
   },
   "chatInput": {

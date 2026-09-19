@@ -116,9 +116,9 @@
     "slideAltFull": "スライド {number} / {total}"
   },
   "outline": {
+    "body": "本文",
+    "visual": "ビジュアル",
     "evidence": "根拠",
-    "visual": "見せ方",
-    "notes": "ノート",
     "emptyState": "エージェントがアウトラインを書くとここに表示されます。"
   },
   "chatInput": {
