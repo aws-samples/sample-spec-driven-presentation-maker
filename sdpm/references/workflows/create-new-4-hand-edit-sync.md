@@ -28,8 +28,14 @@ uv run python3 scripts/pptx_builder.py diff {deck_dir} {edited_pptx}
 ```
 
 The diff command accepts a deck directory or PPTX file directly (it builds /
-converts to roundtrip JSON internally). On MCP, call
+converts to roundtrip JSON internally). On a local MCP server, call
 `diff_pptx(baseline={deck_dir}, edited={edited_pptx})` instead.
+
+> **Local / CLI only.** `servers/remote` does not bind `diff_pptx`, so this step
+> is unavailable on the cloud stack (Web UI + L4 agent) and the tool is not in the
+> agent's allowlist. It is also slated for removal. On the cloud path, treat an
+> edited PPTX as an import instead: `import_attachment` commits it and you work
+> from the resulting deck rather than diffing against the old one.
 
 ---
 
