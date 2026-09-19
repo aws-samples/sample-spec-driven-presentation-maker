@@ -20,20 +20,57 @@ Entries before v0.5.0 were written retroactively as summaries.
 - **`docs/en/migration-role-workflows.md`** — breaking-change table and per-environment
   migration steps for the workflow consolidation below.
 
-- **Scaffold pass in the compose workflow** — before the parallel content
-  composers fan out, the orchestrator now dispatches one composer with
-  `task_instruction: "Scaffold pass."` (a new composer mode alongside
-  `"Consistency review."`). It writes the deck's shared visual frame into
-  every `slides/*.json` in a single programmatic `run_python` loop — every
-  element whose structure repeats across slides, identical (accent bars,
-  footer, title band) or parameterized per slide (titles/subtitles drafted
-  from the outline, section labels). Page numbers are explicitly forbidden
-  as elements — they come from the template's native slide-number
-  placeholder. Content composers then read the existing JSON and build on
-  the frame instead of rewriting whole files. Cross-slide decoration
-  consistency moves from post-hoc review fixes to by-construction, and
-  near-identical JSON is no longer re-emitted per slide (token savings).
-  Persona-only change (`personas/composer.md`, `vibe.md`, `spec.md`).
+### Changed
+
+- **Outline sub-items are now `body` / `visual` / `evidence`** — these three keys replace
+  `what_to_say` / `what_to_show` / `evidence` / `notes`. This is breaking for existing
+  enriched outlines: old-key lines are shown as prose rather than parsed as slide sub-items.
+- **Mode behavior consolidated into role documents, served via
+  `read_workflows`** — `start_presentation(mode=...)` and `personas/*.md`
+  are removed. Each role (orchestrator, composer, style, translate) now has
+  exactly one document, `sdpm/references/workflows/<role>.md`, containing
+  both the role definition and its procedure; entry points (skills, agent
+  definitions, `SKILL.md`, server instructions) only ever name a role for
+  `read_workflows` to fetch, never restate its behavior. This removes the
+  persona/workflow duplication that v0.5's persona layer had reintroduced.
+- **`vibe` and `spec` modes merged into a single `sdpm-create` skill** —
+  the dialogue-depth distinction is gone; how much back-and-forth happens
+  is driven by the user's own wording, not a mode argument. `skills/sdpm-vibe`
+  and `skills/sdpm-spec` are replaced by `skills/sdpm-create`.
+  `skills/sdpm-style` and `skills/sdpm-translate` are unchanged in purpose,
+  now dispatching to `read_workflows(["style"])` / `read_workflows(["translate"])`.
+- **CLI subcommands renamed to match MCP tool (contract) names** — e.g.
+  `generate` → `generate_pptx`, `examples` → `read_examples`,
+  `workflows` → `read_workflows`, `guides` → `read_guides`,
+  `analyze-template` → `analyze_template`, `search-assets` → `search_assets`,
+  `list-templates` → `list_templates`, `init` → `init_presentation`,
+  `code-block` → `code_to_slide`, `layout` → `arch_diagram`,
+  `diff` → `diff_pptx`. Workflow/guide text now reads identically whether
+  called as an MCP tool or a CLI subcommand. No aliases for the old names.
+  See [Migration: role workflows](docs/en/migration-role-workflows.md) for the full table.
+- **`slide-json-spec` moved to `sdpm/references/spec/`** — it is a fact
+  document, not a role document; still resolved by `read_workflows` for
+  backward compatibility. **`hand-edit-sync` moved to
+  `sdpm/references/guides/`** — it is an occasional-need procedure, not a
+  role.
+
+### Removed
+
+- **`sdpm/references/examples/patterns.pptx` and the `search-patterns`
+  CLI/tool** — an audit of all 18 cataloged patterns found their techniques
+  either duplicated in `components/all` or not measurably improving output
+  versus letting the model reason from the style HTML and component
+  vocabulary directly. No migration path; if a specific technique is
+  needed again, express it directly in slide JSON per
+  `read_workflows(["slide-json-spec"])`.
+
+> **Migrating from v0.5?** See [Migration: role workflows](docs/en/migration-role-workflows.md)
+> for the full breaking-change list and upgrade steps per environment.
+
+## [0.8.0] - 2026-09-20
+
+### Added
+
 - **Scaffold pass in the compose workflow** — before the parallel content
   composers fan out, the orchestrator now dispatches one composer with
   `task_instruction: "Scaffold pass."` (a new composer mode alongside
@@ -135,38 +172,6 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
-- **Outline sub-items are now `body` / `visual` / `evidence`** — these three keys replace
-  `what_to_say` / `what_to_show` / `evidence` / `notes`. This is breaking for existing
-  enriched outlines: old-key lines are shown as prose rather than parsed as slide sub-items.
-- **Mode behavior consolidated into role documents, served via
-  `read_workflows`** — `start_presentation(mode=...)` and `personas/*.md`
-  are removed. Each role (orchestrator, composer, style, translate) now has
-  exactly one document, `sdpm/references/workflows/<role>.md`, containing
-  both the role definition and its procedure; entry points (skills, agent
-  definitions, `SKILL.md`, server instructions) only ever name a role for
-  `read_workflows` to fetch, never restate its behavior. This removes the
-  persona/workflow duplication that v0.5's persona layer had reintroduced.
-- **`vibe` and `spec` modes merged into a single `sdpm-create` skill** —
-  the dialogue-depth distinction is gone; how much back-and-forth happens
-  is driven by the user's own wording, not a mode argument. `skills/sdpm-vibe`
-  and `skills/sdpm-spec` are replaced by `skills/sdpm-create`.
-  `skills/sdpm-style` and `skills/sdpm-translate` are unchanged in purpose,
-  now dispatching to `read_workflows(["style"])` / `read_workflows(["translate"])`.
-- **CLI subcommands renamed to match MCP tool (contract) names** — e.g.
-  `generate` → `generate_pptx`, `examples` → `read_examples`,
-  `workflows` → `read_workflows`, `guides` → `read_guides`,
-  `analyze-template` → `analyze_template`, `search-assets` → `search_assets`,
-  `list-templates` → `list_templates`, `init` → `init_presentation`,
-  `code-block` → `code_to_slide`, `layout` → `arch_diagram`,
-  `diff` → `diff_pptx`. Workflow/guide text now reads identically whether
-  called as an MCP tool or a CLI subcommand. No aliases for the old names.
-  See [Migration: role workflows](docs/en/migration-role-workflows.md) for the full table.
-- **`slide-json-spec` moved to `sdpm/references/spec/`** — it is a fact
-  document, not a role document; still resolved by `read_workflows` for
-  backward compatibility. **`hand-edit-sync` moved to
-  `sdpm/references/guides/`** — it is an occasional-need procedure, not a
-  role.
-
 - **MCP servers connect concurrently instead of one after another** — Strands
   connects them serially: `ToolRegistry.process_tools()` iterates the tools list
   and blocks on `await provider.load_tools()` for each ToolProvider in turn. With
@@ -198,17 +203,6 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Removed
 
-- **`sdpm/references/examples/patterns.pptx` and the `search-patterns`
-  CLI/tool** — an audit of all 18 cataloged patterns found their techniques
-  either duplicated in `components/all` or not measurably improving output
-  versus letting the model reason from the style HTML and component
-  vocabulary directly. No migration path; if a specific technique is
-  needed again, express it directly in slide JSON per
-  `read_workflows(["slide-json-spec"])`.
-
-> **Migrating from v0.5?** See [Migration: role workflows](docs/en/migration-role-workflows.md)
-> for the full breaking-change list and upgrade steps per environment.
-
 - **GPT-5.5 and GPT-5.4** — not available as Bedrock foundation models, so they
   cannot be reached over the Converse API. They were only ever callable through
   the removed `bedrock-mantle` path.
@@ -218,6 +212,13 @@ Entries before v0.5.0 were written retroactively as summaries.
   model identifier is invalid`.
 
 ### Fixed
+
+- **The Claude Code plugin manifest tracks the engine version again** —
+  `.claude-plugin/plugin.json` sat at `0.3.0` while the engine reached `0.7.1`.
+  `plugin.json` and `.codex-plugin/plugin.json` each had a test asserting they
+  follow `sdpm.__version__`; this manifest had none, so the drift went unnoticed
+  across several releases. It now carries the same guard.
+
 
 - **The knowledge base id is resolved per request instead of at import** — the
   remote MCP server read `KB_SSM_PARAM` from SSM at module import and built its
