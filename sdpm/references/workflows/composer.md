@@ -22,6 +22,9 @@ not in the brief or attachments.
 - `read_workflows(["slide-json-spec"])` is the slide format — read it before writing JSON.
 - `read_examples(["components/all"])` is the component vocabulary; `specs/art-direction.html`
   is the style. Design = style × components, expressed in the spec's JSON.
+- `grid(purpose, spec)` computes exact coordinates for row × column layouts from a CSS-Grid
+  style spec — use it for rectangular arrangements instead of hand-placing; compute
+  non-rectangular positions (arcs, radial, curves) yourself.
 - Guides exist for specific needs, load only when a slide calls for one:
   `grid`, `table`, `chart-bar` / `chart-line` / `chart-pie`, `freeform`,
   `arch-layout-engine` + `arch-elements` (architecture diagrams via `arch_diagram`),
