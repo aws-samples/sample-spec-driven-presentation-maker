@@ -20,7 +20,8 @@ from mcp_clients import (
     mcp_aws_pricing,
 )
 from composition import resolve_parts
-from model_profiles import build_model_kwargs, MODEL_PROFILES, MANTLE_MODELS, resolve_mantle_region
+from message_hooks import LiftToolResultImages
+from model_profiles import build_model_kwargs, MODEL_PROFILES
 from modes import MODES
 from modes.composer import make_compose_slides
 from resilience import LoopGuard
@@ -96,11 +97,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         requested_agent = chat_model_id
         default_agent = _DEFAULT_CHAT_MODEL_ID
     resolved_agent = _resolve_model_id(requested_agent, default_agent)
-    if resolved_agent in MANTLE_MODELS:
-        from mantle_client import mantle_model
-        model = mantle_model(resolved_agent, region=resolve_mantle_region(resolved_agent, region))
-    else:
-        model = BedrockModel(**build_model_kwargs(resolved_agent))
+    model = BedrockModel(**build_model_kwargs(resolved_agent))
 
     # MCP servers
     mcp_servers = []
@@ -125,18 +122,14 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         if profile and not profile.compose_capable:
             logger.warning("Model %r is not compose_capable; falling back to %r for create", resolved_create, _DEFAULT_CREATE_MODEL_ID)
             resolved_create = _DEFAULT_CREATE_MODEL_ID
-        if resolved_create in MANTLE_MODELS:
-            from mantle_client import mantle_model
-            composer_model = mantle_model(resolved_create, region=resolve_mantle_region(resolved_create, region))
-        else:
-            composer_model = BedrockModel(
-                **build_model_kwargs(resolved_create),
-                boto_client_config=BotocoreConfig(
-                    user_agent_extra="strands-agents",
-                    read_timeout=120,
-                    retries={"max_attempts": 5, "mode": "adaptive"},
-                ),
-            )
+        composer_model = BedrockModel(
+            **build_model_kwargs(resolved_create),
+            boto_client_config=BotocoreConfig(
+                user_agent_extra="strands-agents",
+                read_timeout=120,
+                retries={"max_attempts": 5, "mode": "adaptive"},
+            ),
+        )
         composer_mcp_factory = lambda: mcp_agentcore_runtime(jwt_token=jwt_token)  # noqa: E731
         compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create, user_id=user_id, session_id=session_id)
         tools.append(compose_slides)
@@ -152,6 +145,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
             name=agent_name, system_prompt="", tools=tools, model=model,
             session_manager=session_manager,
             trace_attributes=agent_trace_attributes,
+            hooks=[LiftToolResultImages()],
         )
     except Exception:
         logger.warning("Agent init failed with all MCP servers, retrying with required-only")
@@ -173,6 +167,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
             name=agent_name, system_prompt="", tools=tools, model=model,
             session_manager=session_manager,
             trace_attributes=agent_trace_attributes,
+            hooks=[LiftToolResultImages()],
         )
 
     # Prompts + history (parts-based)

@@ -16,6 +16,7 @@ from strands.types.tools import ToolContext
 
 from composition import resolve_parts
 from cost_logger import log_slides_composed, log_usage
+from message_hooks import LiftToolResultImages
 from modes import MODES  # imported lazily in compose_slides if needed
 from resilience import call_tool_with_retry
 
@@ -405,6 +406,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                     tools=_group_tools,
                     model=model,
                     callback_handler=_on_event,
+                    hooks=[LiftToolResultImages()],
                     trace_attributes={
                         "user.id": user_id,
                         "session.id": session_id,
