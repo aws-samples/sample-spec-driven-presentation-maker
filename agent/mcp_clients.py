@@ -19,17 +19,41 @@ MCP_DEFS: list[tuple[str, bool]] = [
 ]
 
 
-def mcp_agentcore_runtime(jwt_token: str, tool_filters: dict | None = None) -> MCPClient:
+def mcp_agentcore_runtime(
+    jwt_token: str,
+    session_id: str = "",
+    tool_filters: dict | None = None,
+) -> MCPClient:
     """Pattern 1: Amazon Bedrock AgentCore Runtime MCP Server with JWT Bearer authentication.
 
     Args:
         jwt_token: JWT access token from the caller (without "Bearer " prefix).
+        session_id: Caller's session id, sent as ``Mcp-Session-Id``. AgentCore
+            routes by that header, so omitting it makes every request land on a
+            new microVM — see the note below. Empty string disables the header.
         tool_filters: Optional tool filter dict (e.g. {"allowed": ["tool1", "tool2"]}).
     """
     region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
     runtime_arn = os.environ["MCP_RUNTIME_ARN"]
     encoded_arn = urllib.parse.quote(runtime_arn, safe="")
     url = f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{encoded_arn}/invocations?qualifier=DEFAULT"
+
+    headers = {"Authorization": f"Bearer {jwt_token}"}
+    if session_id:
+        # microVM stickiness: AgentCore routes MCP requests to a microVM by this
+        # header. Without it the platform mints a fresh session id per request,
+        # so every agent turn pays a new-session start on the MCP runtime. That
+        # runtime's image is large (LibreOffice), and its cold start was measured
+        # at 17.6-19.7s in ap-northeast-1 when no warm capacity was available,
+        # versus 0.18-0.20s once requests carry a consistent id.
+        #
+        # An expired id is safe to keep sending: measured 2026-09-19, replaying an
+        # id after the 900s idle timeout returns HTTP 200 (the platform treats it
+        # like any unknown id and starts a session for it) and the call right
+        # after is back to 0.18s. No re-initialize fallback is needed. This holds
+        # for the stateless server we run (`stateless_http=True` in
+        # servers/remote/server.py); stateful MCP is documented to 404 instead.
+        headers["Mcp-Session-Id"] = session_id
 
     kwargs: dict = {}
     if tool_filters:
@@ -38,7 +62,7 @@ def mcp_agentcore_runtime(jwt_token: str, tool_filters: dict | None = None) -> M
     return MCPClient(
         lambda: streamablehttp_client(
             url=url,
-            headers={"Authorization": f"Bearer {jwt_token}"},
+            headers=headers,
             timeout=120,
             terminate_on_close=False,
         ),

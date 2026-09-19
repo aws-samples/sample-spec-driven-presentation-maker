@@ -136,6 +136,20 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **MCP requests no longer start a new microVM on every agent turn** — the agent
+  connected to the Presentation Maker MCP server on AgentCore Runtime without
+  sending `Mcp-Session-Id`. AgentCore routes MCP requests to a microVM by that
+  header and mints a fresh session id for any request arriving without one, so
+  each agent turn — plus each composer slide group, which builds its own client —
+  paid a new-session start on a 630 MiB image. The caller's session id is now
+  forwarded, and composer groups use `{session_id}-g{n}` so they keep the
+  per-group isolation they were written for while still reusing their own microVM
+  across composes. Measured in `ap-northeast-1`: 0.18-0.20s with a consistent id,
+  0.59s without one when warm capacity happened to be available, and 17.6-19.7s
+  without one when it was not. Replaying an id after the 900s idle timeout returns
+  HTTP 200 and re-establishes the session, so no re-initialize path is needed
+  (verified for the stateless MCP server this project runs).
+
 - **Tool results carrying images work on GPT models** — OpenAI GPT models on
   Bedrock Converse reject an `image` block nested inside a `toolResult`
   (`ValidationException: This model doesn't support the image field for user
