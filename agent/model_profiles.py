@@ -84,57 +84,25 @@ CLAUDE_EXTENDED_THINKING = ModelProfile(temperature=None, cache_strategy="auto")
 # when reasoning is enabled; Strands handles this internally.
 CLAUDE_ADAPTIVE_THINKING = ModelProfile(temperature=1.0, cache_strategy="auto")
 
-# Amazon Nova 2 — supports prompt caching.
-NOVA_2_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="auto", compose_capable=False,
-                              max_tokens=8192)
-
-# DeepSeek — prompt caching not supported on Bedrock at time of writing.
-DEEPSEEK_DEFAULT = ModelProfile(temperature=0.6, cache_strategy="none", compose_capable=False,
-                                max_tokens=8192)
-
-# Qwen — prompt caching not supported on Bedrock at time of writing.
-QWEN_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="none", compose_capable=False,
-                            max_tokens=8192)
-
-# Moonshot Kimi — prompt caching not supported on Bedrock at time of writing.
-KIMI_DEFAULT = ModelProfile(temperature=0.6, cache_strategy="none", compose_capable=False,
-                            max_tokens=8192)
-
-# OpenAI GPT — bedrock-mantle only (Responses API endpoint).
-GPT_DEFAULT = ModelProfile(temperature=0.7, cache_strategy="none")
+# OpenAI GPT — temperature MUST be None. Both gpt-6-astra and gpt-5.6-terra
+# reject `temperature` on Converse/ConverseStream with
+# "ValidationException: This model doesn't support the temperature field."
+# (`topP` is rejected the same way, but to_bedrock_kwargs never emits it.)
+# Note this differs from the removed bedrock-mantle path, which accepted
+# temperature via the OpenAI Responses API — so 0.7 looked fine until the
+# migration to Converse. Verified 2026-09-10 in ap-northeast-1.
+#
+# cache_strategy must stay "none": Bedrock-native cachePoint (what Strands'
+# CacheConfig emits) is rejected for these models with AccessDeniedException.
+# They still benefit from caching — model-native *implicit* prompt caching is
+# on by default and needs no request parameter. Verified 2026-09-10: a
+# 1,992-token system prefix was reported as cacheWriteInputTokens, then
+# cacheReadInputTokens on subsequent calls. Do not "fix" this to "auto".
+GPT_DEFAULT = ModelProfile(temperature=None, cache_strategy="none")
 
 
 # Fallback profile when a model id is not explicitly registered.
 _DEFAULT = CLAUDE_STANDARD
-
-# Models served via bedrock-mantle (OpenAI-compatible endpoint, not Converse API).
-# model_id → list of supported regions (first entry is the fallback).
-MANTLE_MODELS: dict[str, list[str]] = {
-    "openai.gpt-5.6-terra": ["us-east-1", "us-east-2", "us-west-2"],
-    "openai.gpt-5.5": ["us-east-1", "us-east-2"],
-    "openai.gpt-5.4": ["us-east-1", "us-east-2", "us-west-2"],
-}
-
-# Mantle models that only support the Responses API (no Chat Completions).
-# GPT-5.6 model cards: Responses ✅ / Chat Completions ❌ — calling
-# /chat/completions returns 400 Bad Request.
-MANTLE_RESPONSES_MODELS: set[str] = {
-    "openai.gpt-5.6-terra",
-}
-
-
-def resolve_mantle_region(model_id: str, deploy_region: str | None = None) -> str:
-    """Resolve the best mantle region for a model.
-
-    If the deploy region is in the model's supported list, use it (lowest latency).
-    Otherwise fall back to the first region in the list.
-    """
-    regions = MANTLE_MODELS.get(model_id, [])
-    if not regions:
-        return deploy_region or "us-east-1"
-    if deploy_region and deploy_region in regions:
-        return deploy_region
-    return regions[0]
 
 
 # ---------------------------------------------------------------------------
@@ -152,12 +120,9 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     "global.anthropic.claude-opus-4-6-v1": CLAUDE_ADAPTIVE_THINKING,
     "global.anthropic.claude-sonnet-4-6": CLAUDE_STANDARD,
     "global.anthropic.claude-haiku-4-5-20251001-v1:0": CLAUDE_HAIKU,
-    # Amazon Nova
-    "us.amazon.nova-2-lite-v1:0": NOVA_2_DEFAULT,
-    # OpenAI GPT (bedrock-mantle)
-    "openai.gpt-5.6-terra": GPT_DEFAULT,
-    "openai.gpt-5.5": GPT_DEFAULT,
-    "openai.gpt-5.4": GPT_DEFAULT,
+    # OpenAI GPT (Converse API via global inference profile)
+    "global.openai.gpt-6-astra": GPT_DEFAULT,
+    "global.openai.gpt-5.6-terra": GPT_DEFAULT,
 }
 
 

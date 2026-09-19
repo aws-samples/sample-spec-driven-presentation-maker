@@ -12,6 +12,23 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **Scaffold pass in the compose workflow** — before the parallel content
+  composers fan out, the orchestrator now dispatches one composer with
+  `task_instruction: "Scaffold pass."` (a new composer mode alongside
+  `"Consistency review."`). It batch-writes the style- and role-derived
+  elements every slide shares — decoration from the art direction (accent
+  bars, footer, title band) and role elements with per-slide parameters
+  (titles/subtitles drafted from the outline, section labels) — into every
+  `slides/*.json` via a single programmatic `run_python` for-loop (no
+  individual slide edits in this mode). Elements that require imagining a
+  slide's content stay with the content composers. Page numbers are
+  explicitly forbidden as elements — they come from the template's native
+  slide-number placeholder. Content composers then read the existing JSON
+  and build on the frame instead of rewriting whole files. Cross-slide
+  decoration consistency moves from post-hoc review fixes to
+  by-construction, and near-identical JSON is no longer re-emitted per
+  slide (token savings). Persona-only change (`personas/composer.md`,
+  `vibe.md`, `spec.md`).
 - **Per-user usage measurement** (#326) — Bedrock usage logs (`bedrock_usage`)
   now carry `user_id` / `session_id` / `deck_id` (composer invocations
   included), and new structured events count slides per user:
@@ -80,8 +97,50 @@ Entries before v0.5.0 were written retroactively as summaries.
   unchanged.
 - `clients/kiro/install.py` gained `--mode {auto,legacy,power}`, `--kiro-home`
   and `--replace-existing`.
+- **GPT-6 Astra** (`global.openai.gpt-6-astra`) is selectable for chat and
+  create. Throughput is roughly a third of GPT-5.6 Terra (~25 vs ~90 output
+  tokens/s measured in `ap-northeast-1`), so expect longer waits on
+  compose-heavy runs.
+
+### Changed
+
+- **OpenAI GPT models are served through the Converse API** instead of
+  `bedrock-mantle`. They are now registered under their global inference
+  profile ids (`global.openai.gpt-5.6-terra`, `global.openai.gpt-6-astra`) and
+  go through the same `BedrockModel` path as every other model. This removes
+  `agent/mantle_client.py`, the `MANTLE_MODELS` / `MANTLE_RESPONSES_MODELS`
+  tables and their region-resolution helper, the OpenAI SDK dependency
+  (`strands-agents[openai]`), and the `bedrock-mantle:CreateInference` /
+  `bedrock-mantle:CallWithBearerToken` IAM grants on the agent role.
+  Prompt caching still applies: these models do not accept Bedrock's
+  `cachePoint` block, but their own implicit prompt caching is on by default.
+
+### Removed
+
+- **GPT-5.5 and GPT-5.4** — not available as Bedrock foundation models, so they
+  cannot be reached over the Converse API. They were only ever callable through
+  the removed `bedrock-mantle` path.
+- **Nova 2 Lite** — it was registered as `us.amazon.nova-2-lite-v1:0`, a
+  US-only cross-region inference profile that does not exist in the deployment
+  region, so selecting it always failed with `ValidationException: The provided
+  model identifier is invalid`.
 
 ### Fixed
+
+- **Tool results carrying images work on GPT models** — OpenAI GPT models on
+  Bedrock Converse reject an `image` block nested inside a `toolResult`
+  (`ValidationException: This model doesn't support the image field for user
+  messages`), which broke slide-preview review in compose and `web_fetch` on
+  image URLs. A `BeforeModelCallEvent` hook (`agent/message_hooks.py`) now
+  moves such images up to sit beside the `toolResult` in the same user message
+  — a shape both GPT and Claude accept, so it is applied to every model rather
+  than gated per model. The image still reaches the model, so vision is
+  preserved. It runs before every model call (not on message-added), so it also
+  normalizes pre-seeded composer history and restored sessions.
+- **GPT models no longer send `temperature`** — both GPT-6 Astra and GPT-5.6
+  Terra reject the field on Converse (`This model doesn't support the
+  temperature field`). The removed `bedrock-mantle` path had accepted it, so
+  the profile carried `temperature=0.7` until the migration.
 
 - **Bedrock invocation-logging custom resource is now idempotent** — it
   previously overwrote an existing account-level logging configuration on
