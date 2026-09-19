@@ -59,13 +59,19 @@ _PREFETCH_BRIEFING = Part(
 
 # Tool allowlists — explicit control over which MCP tools each mode can use.
 # run_style_python is only available to style_creator.
+#
+# diff_pptx is deliberately absent: the hand-edit sync workflow is a local/CLI
+# capability, and servers/remote does not bind the tool. Listing it here only
+# produced a "not found on MCP server" warning on every request. The tool is
+# slated for removal, so the workflow document carries the same note rather than
+# the cloud path growing an implementation.
 _DECK_TOOLS = [
     "init_presentation", "analyze_template", "read_attachment",
     "list_styles", "apply_style", "read_examples", "list_workflows",
     "read_workflows", "list_guides", "read_guides", "search_assets",
     "list_templates",
     "run_python", "generate_pptx", "get_preview", "code_to_slide",
-    "grid", "arch_diagram", "import_attachment", "diff_pptx",
+    "grid", "arch_diagram", "import_attachment",
 ]
 
 _STYLE_TOOLS = [

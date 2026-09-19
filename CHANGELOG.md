@@ -113,6 +113,24 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **MCP servers connect concurrently instead of one after another** — Strands
+  connects them serially: `ToolRegistry.process_tools()` iterates the tools list
+  and blocks on `await provider.load_tools()` for each ToolProvider in turn. With
+  three servers — the Presentation Maker one on AgentCore plus two AWS servers
+  pinned to `us-east-1` — that put their handshakes on the critical path back to
+  back, and a profile attributed roughly 2.6s to the two AWS ones alone. They are
+  now connected up front in a thread pool; `load_tools()` caches its result, so
+  Strands' own call is a cache hit. Measured on the dev stack: agent setup went
+  from 7.72s to **5.14s**. As a side effect the `required` flag in `MCP_DEFS` now
+  does what it always claimed — it was only guarding client construction, which is
+  lazy and cannot fail, so an unreachable optional server used to surface as a hard
+  failure inside Strands (`MCPClient` defaults to `continue_on_error=False`).
+  An optional server that cannot be reached is now dropped with a status entry.
+- **`diff_pptx` is no longer offered on the cloud path** — `servers/remote` does not
+  bind it, so listing it in the agent's tool allowlist produced a "not found on MCP
+  server" warning on every request. The hand-edit sync workflow stays a local/CLI
+  capability and the workflow document says so; the tool is slated for removal.
+
 - **OpenAI GPT models are served through the Converse API** instead of
   `bedrock-mantle`. They are now registered under their global inference
   profile ids (`global.openai.gpt-5.6-terra`, `global.openai.gpt-6-astra`) and
