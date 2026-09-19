@@ -15,12 +15,27 @@ import json
 from pathlib import Path
 
 import pytest
+import sdpm
 
 _REPO = Path(__file__).resolve().parent.parent
 _MANIFEST = _REPO / ".claude-plugin" / "plugin.json"
 
 
 class TestPluginManifest:
+    def test_version_tracks_the_engine_version(self):
+        """The Claude Code manifest must follow sdpm/sdpm/__init__.py.
+
+        `plugin.json` and `.codex-plugin/plugin.json` already had this guard; this
+        one did not, and the manifest sat at 0.3.0 while the engine reached 0.7.1.
+        A release that bumps the engine has to bump every client manifest, so all
+        three are checked the same way.
+        """
+        manifest = json.loads(_MANIFEST.read_text(encoding="utf-8"))
+        assert manifest["version"] == sdpm.__version__, (
+            f".claude-plugin/plugin.json is at {manifest['version']} but the engine "
+            f"is at {sdpm.__version__} — bump the manifest in the release change."
+        )
+
     def test_agent_references_exist(self):
         manifest = json.loads(_MANIFEST.read_text(encoding="utf-8"))
         for ref in manifest.get("agents", []):
