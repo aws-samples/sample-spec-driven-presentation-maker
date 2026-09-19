@@ -23,7 +23,7 @@ hand edits back → `read_guides(["hand-edit-sync"])`; translating a deck →
 | File | What it is |
 |---|---|
 | `specs/brief.md` | Goal, audience, message, tone, constraints — and every fact, number and quote from the material, with citations. Anything left out cannot appear on a slide. |
-| `specs/outline.md` | One line per slide: `- [slug] message`. Optional sub-items `what_to_say` / `evidence` / `what_to_show` / `notes` (exact keys — the web UI parses them). Slugs sharing a visual base share a prefix (`demo-1`, `demo-2`). |
+| `specs/outline.md` | Parsed by the web UI, so the format is fixed: `## Heading` for a chapter, `- [slug] message` for a slide (kebab-case slug → `slides/<slug>.json`), optional indented `  - key: value` sub-items with exactly the keys `what_to_say` / `evidence` / `what_to_show` / `notes`; `[TBD]` marks missing evidence. Slugs sharing a visual base share a prefix (`demo-1`, `demo-2`). |
 | `specs/art-direction.html` + `deck.json` | Choose a template (`list_templates()`, `analyze_template(...)`) and a style (`list_styles()`), then `apply_style(deck_id, style, template)` — it writes both files. Frozen afterwards: parallel composers depend on them. |
 
 `read_guides(["storytelling-vocabulary", "design-vocabulary"])` are available when you want
@@ -54,8 +54,9 @@ Passes, each waiting for the previous one to finish:
    that needs to agree. Instruction: compose the assigned slides from the approved specs.
 3. **Consistency review** — one composer, all slugs, `task_instruction: Consistency review.`
    (exact string).
-4. **Fixes** (as needed) — one composer per affected slug; describe the observed problem, not
-   the solution.
+4. **Fixes** (as needed) — composer output is not visible to you, so look at
+   `<deck>/preview/<slug>.png` yourself first; then one composer per affected slug, describing
+   the observed problem, not the solution.
 
 If a composer fails or is cancelled, stop the sequence and ask the user rather than retrying.
 Later edit requests go the same way as pass 4.

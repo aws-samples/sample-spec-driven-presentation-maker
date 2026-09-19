@@ -35,6 +35,9 @@ not in the brief or attachments.
 - If `slides/<slug>.json` already exists it is the scaffold — keep its chrome (background,
   title treatment, footer, decoration) and build the content on top.
 - Never draw page numbers as elements; the template's slide-number placeholder provides them.
+- Font sizes and colors come from the `:root` tokens of `specs/art-direction.html`. Off-token
+  font sizes only warn at build time and off-token colors are not checked at all, so keep to
+  the tokens yourself. No emoji in slide text — the renderer has no emoji fonts.
 - After writing a slide, build and measure it and look at the preview; fix overflow and
   overlap before moving to the next slug. Text overflow is only visible through measurement.
 
