@@ -350,7 +350,7 @@ def generate_pptx(deck_id: str) -> str:
     try:
         result = generate.generate_pptx(
             deck_id=deck_id, user_id=_get_user_id(), storage=_storage,
-            kb_sync=_kb_sync,
+            kb_sync=_get_kb_sync(),
         )
         logger.info("generate_pptx completed: deck=%s slides=%s", deck_id, result.get("slideCount"))
         return json.dumps(result)
@@ -1207,25 +1207,65 @@ def _load_style_html(user_id: str, name: str) -> str | None:
 # --- Search + KB Sync (optional, requires KB) ---
 
 _kb_sync = None
+_kb_sync_resolved_at = 0.0
+_KB_ID_TTL_S = 300
 
-if _kb_ssm_param and _vector_bucket_name:
-    # Resolve KB ID from SSM at startup
-    try:
-        _ssm_client = boto3.client("ssm", region_name=_region)
-        _kb_id = _ssm_client.get_parameter(Name=_kb_ssm_param)["Parameter"]["Value"]
-    except Exception as e:
-        logger.warning("Could not resolve KB ID from SSM %s: %s", _kb_ssm_param, e)
-        _kb_id = ""
+# The KB id is resolved on first use, not at import.
+#
+# Under AgentCore Runtime platformVersion V2 the process is snapshotted once its
+# initialization completes, and every restored instance inherits that memory
+# state. Anything read at import time is therefore frozen for the life of the
+# snapshot — which is exactly wrong for an SSM parameter, since SSM exists so the
+# value can change without a redeploy. Reading it at import pinned the runtime to
+# a stale KB id until the next runtime update (on V1 the ~40-minute container
+# recycling hid this by re-reading on its own).
+#
+# Registration of search_slides below is gated on configuration rather than on a
+# successful read, so a transient SSM failure no longer removes the tool for the
+# life of the process.
+_kb_configured = bool((_kb_id or _kb_ssm_param) and _vector_bucket_name and _vector_index_name)
 
-if _kb_id and _vector_bucket_name and _vector_index_name:
+
+def _get_kb_sync():
+    """Return a KBSync bound to the current KB id, or None if unavailable.
+
+    Resolves the id from SSM on first use and refreshes it every
+    ``_KB_ID_TTL_S`` seconds. Wall-clock time is used deliberately:
+    ``time.monotonic()`` does not advance across a snapshot restore, so a
+    duration measured against it can silently be wrong under V2.
+    """
+    global _kb_sync, _kb_sync_resolved_at
+    if not _kb_configured:
+        return None
+    now = time.time()
+    if _kb_sync is not None and (now - _kb_sync_resolved_at) < _KB_ID_TTL_S:
+        return _kb_sync
+
+    kb_id = _kb_id
+    if not kb_id and _kb_ssm_param:
+        try:
+            kb_id = boto3.client("ssm", region_name=_region).get_parameter(
+                Name=_kb_ssm_param
+            )["Parameter"]["Value"]
+        except Exception as e:
+            logger.warning("Could not resolve KB ID from SSM %s: %s", _kb_ssm_param, e)
+            return _kb_sync  # keep serving the previous value if we had one
+    if not kb_id:
+        return None
+
     from tools.kb_sync import KBSync  # noqa: E402
 
     _kb_sync = KBSync(
-        kb_id=_kb_id,
+        kb_id=kb_id,
         vector_bucket_name=_vector_bucket_name,
         vector_index_name=_vector_index_name,
         region=_region,
     )
+    _kb_sync_resolved_at = now
+    return _kb_sync
+
+
+if _kb_configured:
 
     @mcp.tool()
     def search_slides(
@@ -1247,8 +1287,10 @@ if _kb_id and _vector_bucket_name and _vector_index_name:
         Returns:
             JSON with matching slides.
         """
-        assert _kb_sync is not None
-        results = _kb_sync.search(
+        kb = _get_kb_sync()
+        if kb is None:
+            return json.dumps({"error": "Knowledge base is not available"})
+        results = kb.search(
             query=query,
             user_id=_get_user_id(),
             scope=scope,
