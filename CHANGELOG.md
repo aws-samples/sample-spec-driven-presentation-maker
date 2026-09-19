@@ -150,6 +150,19 @@ Entries before v0.5.0 were written retroactively as summaries.
   HTTP 200 and re-establishes the session, so no re-initialize path is needed
   (verified for the stateless MCP server this project runs).
 
+- **Importing an attachment from a URL works again** — `fetch_url` sends
+  `Connection: close`, which makes `http.client` set `response.will_close`, and
+  `getresponse()` then hands the connection to the response by calling
+  `HTTPConnection.close()` — setting `conn.sock` to `None` before a single byte of
+  the body is read. The body loop re-armed its idle read timeout on that socket
+  every iteration, so every URL fetch died with `AttributeError: 'NoneType'
+  object has no attribute 'settimeout'` and the agent reported the failure as a
+  sandbox networking problem. The loop now re-arms the timeout on a socket
+  reference captured before `getresponse()`, and stops once the body is closed
+  (the fd is really gone by then). The idle read timeout is preserved rather than
+  dropped: it is still bounded by both `IDLE_READ_TIMEOUT_S` and the remaining
+  total budget on every read.
+
 - **Tool results carrying images work on GPT models** — OpenAI GPT models on
   Bedrock Converse reject an `image` block nested inside a `toolResult`
   (`ValidationException: This model doesn't support the image field for user
