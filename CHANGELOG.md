@@ -136,6 +136,19 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **The knowledge base id is resolved per request instead of at import** — the
+  remote MCP server read `KB_SSM_PARAM` from SSM at module import and built its
+  `KBSync` from the result. SSM exists so that value can change without a
+  redeploy, so caching it at startup pinned the runtime to whatever the id was
+  when the process began. It is now resolved on first use and refreshed every
+  300s. This also matters on AgentCore Runtime `platformVersion` V2, which
+  snapshots the process after initialization and shares that memory state with
+  every restored instance: a value read at import is frozen for the life of the
+  snapshot, where V1's periodic container recycling used to re-read it. Tool
+  registration for `search_slides` now depends on configuration rather than on a
+  successful read, so a transient SSM failure no longer removes the tool for the
+  life of the process.
+
 - **Tool results carrying images work on GPT models** — OpenAI GPT models on
   Bedrock Converse reject an `image` block nested inside a `toolResult`
   (`ValidationException: This model doesn't support the image field for user
