@@ -193,6 +193,7 @@ This project has adopted the [Amazon Open Source Code of Conduct](https://aws.gi
 5. **S3 アクセスログ** — 保管先バケットと保持期間は利用者の選択
 6. **Cognito 高度なセキュリティ（MFA、漏洩認証情報検出）** — デモ利用の摩擦を減らすためデフォルト無効
 7. **Bedrock モデル・リージョン選定** — データ主権要件がある場合はクロスリージョン推論プロファイルを避ける
+8. **スナップショット安全な暗号ライブラリ** — AgentCore ランタイムを `platformVersion` V2 にする場合のみ関係します。本スタックは V2 にしません（CloudFormation と CDK がこのフィールドを設定できないため、本サンプルをデプロイすると V1 で動きます）。V2 は 1 つのスナップショットから全インスタンスを復元するため、スナップショット取得前にシードされたユーザ空間の乱数生成器がインスタンス間で共有されます。本スタックがカーネルから得ている値は影響を受けません（`uuid.uuid4()` と `secrets` は呼び出しごとに `getrandom(2)` を読み、SigV4 署名は HMAC ベースで決定的）。したがって影響は送信 TLS の裏側にある OpenSSL の DRBG に限られます。V2 を有効にする場合は、MCP ランタイムの OpenSSL をスナップショット安全なビルドに置き換えてください（Amazon Linux 2023 の `openssl-snapsafe-libs`。`openssl-libs` と競合するため `--allowerasing` が必要）。あるいは、それを同梱する AWS 提供のベースイメージを使ってください。
 
 ### 脆弱性の報告
 
