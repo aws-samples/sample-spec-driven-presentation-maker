@@ -44,24 +44,34 @@ Three connection patterns are supported. Each returns an `MCPClient` instance ad
 
 ### Pattern 1: AgentCore Runtime + JWT Bearer
 
-For MCP servers deployed on Amazon Bedrock AgentCore Runtime. The caller's JWT is forwarded as-is for authentication and user_id propagation.
+For MCP servers deployed on Amazon Bedrock AgentCore Runtime. The caller's JWT is forwarded as-is for authentication and user_id propagation, and the caller's session id is forwarded as `Mcp-Session-Id` so that AgentCore routes the requests of one session to the same microVM.
 
 ```python
-def _mcp_agentcore_runtime(jwt_token: str) -> MCPClient:
+def _mcp_agentcore_runtime(jwt_token: str, session_id: str = "") -> MCPClient:
     region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
     runtime_arn = os.environ["MCP_RUNTIME_ARN"]
     encoded_arn = urllib.parse.quote(runtime_arn, safe="")
     url = f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{encoded_arn}/invocations?qualifier=DEFAULT"
 
+    headers = {"Authorization": f"Bearer {jwt_token}"}
+    if session_id:
+        headers["Mcp-Session-Id"] = session_id
+
     return MCPClient(
         lambda: streamablehttp_client(
             url=url,
-            headers={"Authorization": f"Bearer {jwt_token}"},
+            headers=headers,
             timeout=120,
             terminate_on_close=False,
         ),
     )
 ```
+
+> Do not omit `Mcp-Session-Id`. AgentCore mints a fresh session id for any request
+> that arrives without one, which puts every request on a new microVM and makes it
+> pay a new-session start. Measured against this project's MCP runtime in
+> `ap-northeast-1`: 0.18-0.20s with a consistent id, versus 17.6-19.7s with no id
+> when no warm capacity was available.
 
 ### Pattern 2: Public Remote MCP (no auth)
 
