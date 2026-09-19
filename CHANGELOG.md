@@ -22,6 +22,12 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **Web UI Spec / Vibe and "Parallel agents" keep their behaviour without personas** —
+  the orchestrator workflow defines two tokens, `Interaction mode: dialogue` (confirm
+  brief → outline → art direction) and `Interaction mode: fast` (build from material);
+  the cloud agent passes the token as a one-line system part and the local ACP route
+  prepends it to a session's first prompt. `single` (parallel agents off) is the same
+  workflow with no composer sub-agents, composing slides itself.
 - **Outline sub-items are now `body` / `visual` / `evidence`** — these three keys replace
   `what_to_say` / `what_to_show` / `evidence` / `notes`. This is breaking for existing
   enriched outlines: old-key lines are shown as prose rather than parsed as slide sub-items.

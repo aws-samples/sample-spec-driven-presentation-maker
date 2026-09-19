@@ -78,3 +78,10 @@ AWS_DEFAULT_REGION=<region> bash scripts/deploy_webui.sh
 Drop the `personas/` copy step — see the updated
 [Connecting Agents](add-to-gateway.md#step-1-copy-sdpm-files-into-the-genu-agentcore-runtime-directory)
 instructions; role documents now ship inside `sdpm/references/workflows/`.
+
+## Web UI behaviour
+
+Nothing to migrate: the Spec / Vibe selector and the "Parallel agents" setting keep
+their behaviour. They now reach the orchestrator as a one-line `Interaction mode:
+dialogue|fast` token (defined in `workflows/orchestrator.md`) instead of selecting a
+persona file.

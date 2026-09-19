@@ -5,6 +5,7 @@
  */
 import { sendPrompt, createNewProcessFor, hasProcess, getOrCreateProcess, saveSessionToDeck } from "@/lib/local/acp-process"
 import { createSSEStream } from "@/lib/local/sse-bridge"
+import { withInteractionMode } from "@/lib/local/interaction-mode"
 
 const MODE_TO_AGENT: Record<string, string> = {
   vibe: "sdpm-orchestrator",
@@ -20,6 +21,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: Request) {
   const { query, mode, deckId, sessionId: clientSessionId } = await req.json()
   const agentName = MODE_TO_AGENT[mode || "spec"] || "sdpm-orchestrator"
+  let isFirstPrompt = false
 
   // Ensure a process exists for this clientSessionId
   if (clientSessionId && !hasProcess(clientSessionId)) {
@@ -29,13 +31,17 @@ export async function POST(req: Request) {
     } else {
       // Fresh session — spawn new process, register under client's sessionId
       await createNewProcessFor(clientSessionId, agentName)
+      isFirstPrompt = true
     }
   } else if (!clientSessionId) {
     // No sessionId at all (shouldn't happen, but handle gracefully)
     await createNewProcessFor(crypto.randomUUID(), agentName)
+    isFirstPrompt = true
   }
 
-  const { sessionId, subscribe, send } = await sendPrompt(clientSessionId!, query, agentName)
+  // Spec / Vibe pick → one-line token defined by the orchestrator workflow
+  const prompt = withInteractionMode(query, mode, isFirstPrompt)
+  const { sessionId, subscribe, send } = await sendPrompt(clientSessionId!, prompt, agentName)
 
   const stream = createSSEStream({
     sessionId,

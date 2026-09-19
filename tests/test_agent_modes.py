@@ -23,6 +23,10 @@ from sdpm import tools as contract  # noqa: E402
 _PROMPTS_DIR = _AGENT_DIR / "prompts"
 _WORKFLOW_BY_MODE = {
     "orchestrator": "orchestrator",
+    "vibe": "orchestrator",
+    "spec": "orchestrator",
+    "separated": "orchestrator",
+    "single": "orchestrator",
     "composer": "composer",
     "style_creator": "style",
 }
@@ -51,9 +55,40 @@ def test_mode_fetches_workflow_via_port(mode, workflow):
     assert workflow_parts[0].target == "system"
 
 
-@pytest.mark.parametrize("legacy", ["vibe", "spec", "separated", "single"])
-def test_legacy_create_modes_map_to_orchestrator(legacy):
-    assert MODES[legacy] is MODES["orchestrator"]
+def _file_parts(mode):
+    return [str(p.source.value) for p in MODES[mode].parts if p.source.type == "file"]
+
+
+@pytest.mark.parametrize("mode,token", [
+    ("vibe", "wiring/interaction_fast"),
+    ("spec", "wiring/interaction_dialogue"),
+    ("separated", "wiring/interaction_dialogue"),
+    ("single", "wiring/interaction_dialogue"),
+])
+def test_ui_modes_pass_interaction_token_only(mode, token):
+    """Spec/Vibe differ from the plain orchestrator by exactly one token part."""
+    assert token in _file_parts(mode)
+    assert "wiring/interaction_fast" not in _file_parts("orchestrator")
+    assert "wiring/interaction_dialogue" not in _file_parts("orchestrator")
+
+
+def test_interaction_tokens_are_bare_lines_defined_by_the_workflow():
+    for name in ("interaction_dialogue", "interaction_fast"):
+        text = (_PROMPTS_DIR / "wiring" / f"{name}.md").read_text().strip()
+        assert text.startswith("Interaction mode: ")
+        assert "\n" not in text
+    workflow = contract.read_workflows(["orchestrator"])["documents"][0]["content"]
+    assert "`Interaction mode: dialogue`" in workflow
+    assert "`Interaction mode: fast`" in workflow
+
+
+def test_single_mode_composes_without_composer_agents():
+    single = MODES["single"]
+    assert single.use_composer is False
+    assert single.agent_model == "create"
+    assert "wiring/no_composers" in _file_parts("single")
+    assert "wiring/compose_report" not in _file_parts("single")
+    assert MODES["separated"].use_composer is True
 
 
 def test_no_mode_uses_local_role_files():

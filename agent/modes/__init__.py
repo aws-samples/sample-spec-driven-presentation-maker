@@ -57,15 +57,36 @@ _STYLE_TOOLS = [
     "read_workflows",
 ]
 
-_ORCHESTRATOR = ModeConfig(
-    parts=[
-        _COMMON_LANGUAGE,
-        _workflow("orchestrator"),
-        _COMMON_ATTACHMENTS,
-        _WIRING_COMPOSE_REPORT,
-        _NOW,
-    ],
-    allowed_tools=_DECK_TOOLS,
+_INTERACTION_DIALOGUE = Part(Source.file("wiring/interaction_dialogue"), target="system")
+_INTERACTION_FAST = Part(Source.file("wiring/interaction_fast"), target="system")
+_NO_COMPOSERS = Part(Source.file("wiring/no_composers"), target="system")
+
+
+def _orchestrator(*wiring: Part, use_composer: bool = True, **overrides) -> ModeConfig:
+    """Orchestrator workflow plus environment facts the UI decided (interaction depth)."""
+    return ModeConfig(
+        parts=[
+            _COMMON_LANGUAGE,
+            _workflow("orchestrator"),
+            *wiring,
+            _COMMON_ATTACHMENTS,
+            *([_WIRING_COMPOSE_REPORT] if use_composer else []),
+            _NOW,
+        ],
+        use_composer=use_composer,
+        allowed_tools=_DECK_TOOLS,
+        **overrides,
+    )
+
+
+_ORCHESTRATOR = _orchestrator()
+# Web UI "Spec" (dialogue, approvals) / "Vibe" (fast, from material) — the pick is an
+# environment fact the workflow cannot know, so it is passed as a one-line token.
+_ORCHESTRATOR_DIALOGUE = _orchestrator(_INTERACTION_DIALOGUE)
+_ORCHESTRATOR_FAST = _orchestrator(_INTERACTION_FAST)
+# Web UI "Parallel agents" off: no compose_slides tool; the agent composes itself.
+_SINGLE = _orchestrator(
+    _INTERACTION_DIALOGUE, _NO_COMPOSERS, use_composer=False, agent_model="create",
 )
 
 _COMPOSER = ModeConfig(
@@ -86,14 +107,14 @@ _STYLE_CREATOR = ModeConfig(
     allowed_tools=_STYLE_TOOLS,
 )
 
-# Legacy wire values still arrive from API/Web UI. They intentionally resolve
-# to the exact same orchestrator config; interaction depth is no longer a mode.
+# Wire values from API/Web UI. "spec"/"separated" and "vibe" share the orchestrator
+# workflow and differ only in the interaction-mode token; "single" also drops composers.
 MODES: dict[str, ModeConfig] = {
     "orchestrator": _ORCHESTRATOR,
-    "vibe": _ORCHESTRATOR,
-    "spec": _ORCHESTRATOR,
-    "separated": _ORCHESTRATOR,
-    "single": _ORCHESTRATOR,
+    "vibe": _ORCHESTRATOR_FAST,
+    "spec": _ORCHESTRATOR_DIALOGUE,
+    "separated": _ORCHESTRATOR_DIALOGUE,
+    "single": _SINGLE,
     "composer": _COMPOSER,
     "style_creator": _STYLE_CREATOR,
 }
