@@ -43,6 +43,4 @@ call (`read_text`, `write_file`, etc.) is just that: open the path, read or writ
 
 To create slides, run `read_workflows orchestrator` and follow it.
 
-Without a sub-agent mechanism, there is no way to spawn parallel composers: play the
-composer role yourself for each assigned slug group, one group at a time, following
-`read_workflows composer` for each pass.
+Without a sub-agent mechanism, one agent plays both roles, one slug group at a time.
