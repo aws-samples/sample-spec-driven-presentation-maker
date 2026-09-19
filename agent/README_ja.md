@@ -32,24 +32,33 @@ User → AgentCore Runtime → Agent
 
 ### Pattern 1: AgentCore Runtime + JWT Bearer
 
-AgentCore Runtime 上の MCP サーバーに JWT を転送して接続する。
+AgentCore Runtime 上の MCP サーバーに JWT を転送して接続する。あわせて呼び出し元のセッション ID を `Mcp-Session-Id` として転送し、同一セッションのリクエストが同じ microVM に routing されるようにする。
 
 ```python
-def _mcp_agentcore_runtime(jwt_token: str) -> MCPClient:
+def _mcp_agentcore_runtime(jwt_token: str, session_id: str = "") -> MCPClient:
     region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
     runtime_arn = os.environ["MCP_RUNTIME_ARN"]
     encoded_arn = urllib.parse.quote(runtime_arn, safe="")
     url = f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{encoded_arn}/invocations?qualifier=DEFAULT"
 
+    headers = {"Authorization": f"Bearer {jwt_token}"}
+    if session_id:
+        headers["Mcp-Session-Id"] = session_id
+
     return MCPClient(
         lambda: streamablehttp_client(
             url=url,
-            headers={"Authorization": f"Bearer {jwt_token}"},
+            headers=headers,
             timeout=120,
             terminate_on_close=False,
         ),
     )
 ```
+
+> `Mcp-Session-Id` を省略してはいけない。AgentCore はヘッダーのないリクエストごとに
+> 新しいセッション ID を発行するため、毎回新しい microVM に載り新セッション起動の
+> コストを払う。本プロジェクトの MCP ランタイムを `ap-northeast-1` で実測した値は、
+> 一貫した ID ありで 0.18〜0.20 秒、ID なしでウォーム容量がない場合 17.6〜19.7 秒。
 
 ### Pattern 2: Public Remote MCP（認証なし）
 
