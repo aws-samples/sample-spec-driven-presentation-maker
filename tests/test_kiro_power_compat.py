@@ -61,7 +61,7 @@ class TestActivationKeywords:
 
     @pytest.mark.parametrize("trigger", _EXPECTED_JA_TRIGGERS)
     def test_covers_japanese_triggers(self, manifest, trigger):
-        # The personas and the workflow menu are bilingual, so activation has
+        # The role workflows and workflow menu are bilingual, so activation has
         # to work for Japanese prompts too.
         assert trigger in manifest["keywords"]
 

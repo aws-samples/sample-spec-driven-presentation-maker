@@ -734,7 +734,7 @@ class TestRemovedToolsRegression:
              str(repo_root / "sdpm" / "SKILL.md"),
              str(repo_root / "servers" / "local"),
              str(repo_root / "servers" / "remote" / "server.py"),
-             str(repo_root / "personas"),
+             str(repo_root / "sdpm" / "references" / "workflows"),
              ],
             capture_output=True, text=True, cwd=str(repo_root),
         )
@@ -854,7 +854,7 @@ class TestRemovedToolsRegression:
 
     def test_v1_marker_format_only(self):
         """Attachment markers must use v1 JSON format only."""
-        # Verify the marker format in personas/instructions contains v1
+        # Verify the marker format in workflow instructions contains v1
         repo_root = Path(__file__).resolve().parent.parent
         instructions = (repo_root / "sdpm" / "sdpm" / "tools" / "instructions.py").read_text()
         # Should not contain old uploadId-style markers

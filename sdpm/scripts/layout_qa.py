@@ -3,7 +3,7 @@
 """Layout QA harness: objective quality metrics for the layout engine.
 
 Runs the REAL engine pipeline (``sdpm.engine.layout.render.build_layout``, the same
-one used by ``pptx_builder.py layout``) on a logical structure JSON, then
+one used by ``pptx_builder.py arch_diagram``) on a logical structure JSON, then
 measures geometric quality:
   - crossings   : pairs of edge segments that intersect
   - pierces     : edge segments passing through a non-endpoint node icon

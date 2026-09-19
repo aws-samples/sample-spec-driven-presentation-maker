@@ -169,61 +169,6 @@ new ResizeObserver(fit).observe(document.getElementById('main'));
     return out
 
 
-def search_patterns(query: str, limit: int = 0) -> list[dict]:
-    """Search pattern notes by keywords.
-
-    Searches speaker notes across all pptx files in references/examples/
-    and md files in references/examples/styles/.
-    Returns matching entries with their 1st-line description.
-    limit=0 means no limit (return all matches).
-    """
-    import re
-
-    from pptx import Presentation
-
-    examples_dir = REFERENCES_DIR / "examples"
-    if not examples_dir.exists():
-        return []
-
-    queries = query.lower().split()
-    pats = [re.compile(r'\b' + re.escape(q) + r'\b') for q in queries]
-    results: list[tuple[int, str, int, str]] = []
-
-    # Search pptx files (patterns only)
-    patterns_pptx = examples_dir / "patterns.pptx"
-    if patterns_pptx.exists():
-        try:
-            prs = Presentation(str(patterns_pptx))
-        except Exception:
-            prs = None
-        if prs:
-            for si, slide in enumerate(prs.slides):
-                if not slide.has_notes_slide:
-                    continue
-                notes = slide.notes_slide.notes_text_frame.text.replace('\x0B', '\n')
-                if not notes.strip():
-                    continue
-                notes_lower = notes.lower()
-                match_count = sum(1 for p in pats if p.search(notes_lower))
-                if match_count == 0:
-                    continue
-                desc = ""
-                for line in notes.splitlines():
-                    if line.strip():
-                        desc = line.strip()
-                        break
-                results.append((match_count, "patterns", si + 1, desc))
-
-    results.sort(key=lambda x: (-x[0], x[1], x[2]))
-    out = []
-    for r in results:
-        entry: dict = {"path": r[1], "description": r[3]}
-        if r[2] > 0:
-            entry["page"] = r[2]
-        out.append(entry)
-    return out[:limit] if limit else out
-
-
 def list_pptx_descriptions(pptx_path):
     """List all slide descriptions (speaker notes line 1) from a pptx file."""
     from pptx import Presentation

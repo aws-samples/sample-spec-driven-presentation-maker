@@ -10,12 +10,7 @@ description: >-
 
 # sdpm-translate
 
-Call `start_presentation(mode="translate")` on the **sdpm** MCP server **before any other
-tool**, then follow the returned instructions for the rest of the conversation.
+Call `read_workflows(["translate"])` on the **sdpm** MCP server before any other tool,
+then follow it.
 
-Do **not** improvise a translation pipeline before those instructions are loaded — the
-derived-deck procedure (extract → dictionary → apply → build) is defined there.
-
-If the sdpm MCP server is unavailable, stop and tell the user that the sdpm MCP server is
-not reachable, and that they should check their MCP configuration. Do not improvise: the
-behavior definition lives on the server side, not in this file.
+If the sdpm MCP server is unavailable, stop and tell the user that it is unavailable.

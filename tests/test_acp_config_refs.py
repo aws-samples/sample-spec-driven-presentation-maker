@@ -30,10 +30,9 @@ def test_expected_config_set():
     names = [p.name for p in _CONFIG_FILES]
     assert names == [
         "sdpm-composer.json",
-        "sdpm-single.json",
-        "sdpm-spec.json",
+        "sdpm-orchestrator.json",
         "sdpm-style.json",
-        "sdpm-vibe.json",
+        "sdpm-translate.json",
     ], f"acp-agents/ contents changed — update this list intentionally: {names}"
 
 

@@ -36,7 +36,7 @@ Metadata only. Do NOT put slides here.
 - `"fonts"`: **Required**. Font configuration for text rendering.
   - `"fullwidth"`: Font for fullwidth characters (e.g. Japanese, Chinese)
   - `"halfwidth"`: Font for halfwidth characters (e.g. English, numbers)
-  - Run `analyze-template` to detect fonts from your template.
+  - Call `analyze_template(template)` to detect fonts from your template.
 - `"defaultTextColor"`: **Required**. Default color for text and icons (e.g. `"#FFFFFF"` for dark backgrounds, `"#000000"` for light). Overridden per element by `fontColor` / `iconColor`.
 - Line color, table color, and chart color are auto-resolved from the template's theme colors.
 
@@ -128,14 +128,14 @@ Notes are speaker notes (presentation script). Write as words spoken to the audi
 
 ## Slide Layouts
 
-Use the template's actual layout names. Check with `analyze-template`.
+Use the template's actual layout names. Check with `analyze_template(template)`.
 
 Specify `"0": ""` in placeholders to delete the title placeholder.
 
 ## Placeholders
 
 All placeholder content is specified via the `placeholders` dict, keyed by placeholder index (as string).
-Run `analyze-template --layout <name>` to see available indices and their descriptions for each layout.
+Call `analyze_template(template, layout="<name>")` to see available indices and their descriptions for each layout.
 
 ```json
 "placeholders": {
@@ -204,7 +204,7 @@ Note: `notes` omitted for brevity. In actual slides, write them before `elements
 
 - Coordinates and sizes are in pixels (px)
 - Canvas width is always 1920px. Height depends on the template's aspect ratio
-  (check `deck.json` `slideSize` or `analyze-template` `slide_size`)
+  (check `deck.json` `slideSize` or `analyze_template(template)` `slide_size`)
 - Recommended drawing area: x=58–1862, y = title bottom + margin to H−130
   (H = slide height from slideSize; for 16:9 H=1080 → y=173–950)
 - Bottom-most element: aim for `y + height ≥ 80% of slide height`
@@ -233,7 +233,7 @@ Expands an external JSON file's elements array. Draw order is controlled by posi
 ```
 - `src`: path to a JSON file containing an elements array (relative to the slide JSON)
 - Expanded elements are inserted at the include's position (drawn above preceding elements)
-- Can use `layout` command output directly
+- Can use `arch_diagram(...)` output directly
 - Multiple includes can be placed
 
 ### textbox
@@ -263,14 +263,11 @@ Expands an external JSON file's elements array. Draw order is controlled by posi
 
 **Code blocks (syntax highlighting)**:
 
-Generate elements with the `code-block` command and include them:
+Generate an include with the contract call:
 
-```bash
-# From file
-uv run python3 scripts/pptx_builder.py code-block main.py -l python --x 480 --y 100 --width 500 --height 200 -o code.json
-
-# From stdin
-echo 'const client = new S3Client();' | uv run python3 scripts/pptx_builder.py code-block - -l typescript --x 480 --y 100 --width 500 --height 200 -o code.json
+```text
+code_to_slide(deck_id="{deck_dir}", code="<source>", name="code",
+              language="python", x=480, y=100, width=500, height=200)
 ```
 
 Include in slide JSON:
@@ -335,7 +332,7 @@ Height includes the language label (22px). Code body height is `height - 22`.
 ### table
 
 `"type": "table"` — CSS-style cascade styling with `style`, `columnStyles`, `cellOverrides`.
-- Read `guides table` for structure, cascade, CSS properties, and styled samples.
+- Call `read_guides(["table"])` for structure, cascade, CSS properties, and styled samples.
 
 ### image
 ```json
@@ -614,7 +611,7 @@ Effects applicable to shape, textbox, and image.
 - Supports `fill`, `line`, `lineWidth`, `lineGradient`, `lineOpacity`, `dashStyle`, `opacity`, effects
 - `headEnd`/`tailEnd`: arrow heads on open paths (`"triangle"`, `"arrow"`, `"stealth"`, etc.)
 - `text`, `items`, `fontSize`, `align`, `verticalAlign`, `marginLeft/Top/Right/Bottom`: text inside freeform
-- For command details, control points, multi-path, fill mode, and coordinate system, see `guides freeform`
+- For command details, control points, multi-path, fill mode, and coordinate system, call `read_guides(["freeform"])`
 
 ### group
 ```json
@@ -652,9 +649,9 @@ Native PPTX chart (editable in PowerPoint).
 - Colors, gridlines, and fonts are auto-adjusted from the theme
 - `stacked`/`horizontal`: bar variations. `smooth`/`markers`: line variations. `holeSize`: donut only
 - For details, variations, axis control, and style overrides, read the relevant guide:
-  - `guides chart-bar` — bar/column charts
-  - `guides chart-line` — line/trend charts
-  - `guides chart-pie` — pie/donut charts
+  - `read_guides(["chart-bar"])` — bar/column charts
+  - `read_guides(["chart-line"])` — line/trend charts
+  - `read_guides(["chart-pie"])` — pie/donut charts
 
 ### video
 
@@ -699,4 +696,4 @@ Native PPTX chart (editable in PowerPoint).
 
 ## Complete Reference
 
-For the full list of all supported properties (including video, polyline, arch-group, radial gradients, axis control, and more), see `guides json-full-reference`.
+For the full list of all supported properties (including video, polyline, arch-group, radial gradients, axis control, and more), call `read_guides(["json-full-reference"])`.

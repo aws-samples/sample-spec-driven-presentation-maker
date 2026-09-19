@@ -27,10 +27,10 @@ const PRESETS: AgentConfig[] = [
     id: "kiro-cli",
     displayName: "Kiro CLI",
     path: "kiro-cli",
-    args: ["acp", "--agent", "sdpm-spec"],
+    args: ["acp", "--agent", "sdpm-orchestrator"],
     env: {},
     subagentTool: "use_subagent",
-    subagentInstruction: 'Use `use_subagent` with `subagents: [{"query": "deck_id=... slides: slug1, slug2", "agent_name": "sdpm-composer"}, ...]` (max 4 parallel). ASCII-only queries.',
+    subagentInstruction: "Use `use_subagent` with agent_name `sdpm-composer` and pass the orchestrator's delegation prompt unchanged as `query`.",
     restartOnNewChat: true,
     subagentQueryField: "query",
   },
@@ -41,7 +41,7 @@ const PRESETS: AgentConfig[] = [
     args: ["--acp"],
     env: {},
     subagentTool: "Task",
-    subagentInstruction: 'Use `Task` tool with `subagent_type: "sdpm-composer"`, `description: "<brief>"`, `prompt: "deck_id=... slides: slug1, slug2"`. Invoke multiple Task calls in parallel (max 4).',
+    subagentInstruction: "Use `Task` with subagent_type `sdpm-composer` and pass the orchestrator's delegation prompt unchanged as `prompt`.",
     restartOnNewChat: false,
     subagentQueryField: "prompt",
   },
@@ -177,7 +177,7 @@ export function AgentSettingsDialog({ open, onClose }: Props) {
                 <input className="bg-transparent border border-border rounded px-2 py-1" value={a.path} onChange={e => update(i, { path: e.target.value })} placeholder="kiro-cli or /usr/local/bin/claude" />
 
                 <label className="text-foreground-muted self-start pt-1">Arguments</label>
-                <textarea className="bg-transparent border border-border rounded px-2 py-1 font-mono text-[11px]" rows={2} value={a.args.join("\n")} onChange={e => update(i, { args: e.target.value.split("\n").filter(Boolean) })} placeholder="acp&#10;--agent&#10;sdpm-spec" />
+                <textarea className="bg-transparent border border-border rounded px-2 py-1 font-mono text-[11px]" rows={2} value={a.args.join("\n")} onChange={e => update(i, { args: e.target.value.split("\n").filter(Boolean) })} placeholder="acp&#10;--agent&#10;sdpm-orchestrator" />
 
                 <label className="text-foreground-muted self-start pt-1">Env</label>
                 <textarea className="bg-transparent border border-border rounded px-2 py-1 font-mono text-[11px]" rows={2} value={Object.entries(a.env || {}).map(([k, v]) => `${k}=${v}`).join("\n")} onChange={e => {

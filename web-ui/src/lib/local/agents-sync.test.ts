@@ -13,7 +13,7 @@ import {
   type SyncDirs,
 } from "./agents-sync"
 
-const ROLES = ["sdpm-spec", "sdpm-vibe", "sdpm-composer", "sdpm-single", "sdpm-style"]
+const ROLES = ["sdpm-orchestrator", "sdpm-composer", "sdpm-style", "sdpm-translate"]
 
 let tmp: string
 let dirs: SyncDirs
@@ -42,7 +42,7 @@ afterEach(() => {
 })
 
 describe("syncToAgentsDir", () => {
-  it("derives all five roles (including style) plus the README marker", () => {
+  it("derives all four roles plus the README marker", () => {
     syncToAgentsDir(readSelection(dirs), dirs)
     const files = fs.readdirSync(dirs.agentsDir).sort()
     expect(files).toEqual([...ROLES.map((r) => `${r}.json`), "README.md"].sort())
@@ -52,65 +52,65 @@ describe("syncToAgentsDir", () => {
 
   it("applies the selected model, and removes it when unset", () => {
     syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "claude-x" }, dirs)
-    let agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-spec.json"), "utf-8"))
+    let agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-orchestrator.json"), "utf-8"))
     expect(agent.model).toBe("claude-x")
 
     syncToAgentsDir({ ...SELECTION_DEFAULTS }, dirs)
-    agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-spec.json"), "utf-8"))
+    agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-orchestrator.json"), "utf-8"))
     expect(agent.model).toBeUndefined()
   })
 
   it("re-derivation picks up catalog changes (the git-pull staleness fix)", () => {
     syncToAgentsDir(readSelection(dirs), dirs)
     // Simulate `git pull` updating the catalog
-    writeCatalogAgent("sdpm-vibe", { tools: ["read", "glob"] })
+    writeCatalogAgent("sdpm-translate", { tools: ["read", "glob"] })
     syncToAgentsDir(readSelection(dirs), dirs)
-    const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-vibe.json"), "utf-8"))
+    const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-translate.json"), "utf-8"))
     expect(agent.tools).toEqual(["read", "glob"])
   })
 
   it("overwrites hand-edits in agents/ (generated dir semantics)", () => {
     syncToAgentsDir(readSelection(dirs), dirs)
-    fs.writeFileSync(path.join(dirs.agentsDir, "sdpm-spec.json"), "{\"hacked\": true}")
+    fs.writeFileSync(path.join(dirs.agentsDir, "sdpm-orchestrator.json"), "{\"hacked\": true}")
     syncToAgentsDir(readSelection(dirs), dirs)
-    const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-spec.json"), "utf-8"))
+    const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-orchestrator.json"), "utf-8"))
     expect(agent.hacked).toBeUndefined()
-    expect(agent.name).toBe("sdpm-spec")
+    expect(agent.name).toBe("sdpm-orchestrator")
   })
 
   it("writes the selected alternative under the fixed role file name", () => {
-    writeCatalogAgent("my-custom-vibe")
-    syncToAgentsDir({ ...SELECTION_DEFAULTS, vibe: "my-custom-vibe.json" }, dirs)
-    const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-vibe.json"), "utf-8"))
-    expect(agent.name).toBe("my-custom-vibe")
+    writeCatalogAgent("my-custom-translate")
+    syncToAgentsDir({ ...SELECTION_DEFAULTS, translate: "my-custom-translate.json" }, dirs)
+    const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-translate.json"), "utf-8"))
+    expect(agent.name).toBe("my-custom-translate")
   })
 
   it("throws on unsafe selection names and missing catalog entries — output untouched", () => {
     syncToAgentsDir(readSelection(dirs), dirs)
     const before = fs.readdirSync(dirs.agentsDir).sort()
 
-    expect(() => syncToAgentsDir({ ...SELECTION_DEFAULTS, vibe: "../evil.json" }, dirs))
+    expect(() => syncToAgentsDir({ ...SELECTION_DEFAULTS, translate: "../evil.json" }, dirs))
       .toThrow(/invalid agent selection/)
-    expect(() => syncToAgentsDir({ ...SELECTION_DEFAULTS, spec: "missing.json" }, dirs))
+    expect(() => syncToAgentsDir({ ...SELECTION_DEFAULTS, orchestrator: "missing.json" }, dirs))
       .toThrow(/missing from catalog/)
     expect(fs.readdirSync(dirs.agentsDir).sort()).toEqual(before)
   })
 
   it("catalog source removed after a prior derivation: fails and keeps the old output intact", () => {
     syncToAgentsDir(readSelection(dirs), dirs)
-    fs.rmSync(path.join(dirs.acpAgentsDir, "sdpm-spec.json"))
+    fs.rmSync(path.join(dirs.acpAgentsDir, "sdpm-orchestrator.json"))
     expect(() => syncToAgentsDir(readSelection(dirs), dirs)).toThrow(/missing from catalog/)
     // The stale file is still readable (caller decides to fail the spawn),
     // and no partial new generation was written
-    const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-spec.json"), "utf-8"))
-    expect(agent.name).toBe("sdpm-spec")
+    const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-orchestrator.json"), "utf-8"))
+    expect(agent.name).toBe("sdpm-orchestrator")
   })
 
   it("malformed catalog JSON: throws before any write — no mixed generations", () => {
     syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "old-model" }, dirs)
-    // sdpm-vibe (iterated after spec) becomes malformed; change the model so
+    // sdpm-translate (iterated after orchestrator) becomes malformed; change the model so
     // a partial write would be detectable on the earlier files
-    fs.writeFileSync(path.join(dirs.acpAgentsDir, "sdpm-vibe.json"), "{broken")
+    fs.writeFileSync(path.join(dirs.acpAgentsDir, "sdpm-translate.json"), "{broken")
     expect(() => syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "new-model" }, dirs))
       .toThrow(/malformed agent definition/)
     for (const r of ROLES) {
@@ -162,10 +162,10 @@ describe("syncToAgentsDir", () => {
 
 describe("selection persistence", () => {
   it("round-trips and merges over defaults", () => {
-    writeSelection({ ...SELECTION_DEFAULTS, vibe: "my-custom-vibe.json", model: "m1" }, dirs)
+    writeSelection({ ...SELECTION_DEFAULTS, translate: "my-custom-translate.json", model: "m1" }, dirs)
     const sel = readSelection(dirs)
-    expect(sel.vibe).toBe("my-custom-vibe.json")
-    expect(sel.spec).toBe("sdpm-spec.json")
+    expect(sel.translate).toBe("my-custom-translate.json")
+    expect(sel.orchestrator).toBe("sdpm-orchestrator.json")
     expect(sel.style).toBe("sdpm-style.json")
     expect(sel.model).toBe("m1")
   })

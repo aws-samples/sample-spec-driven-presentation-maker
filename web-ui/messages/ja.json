@@ -217,7 +217,6 @@
     "generate_preview": "プレビューを生成中",
     "init_presentation": "デッキを初期化中",
     "analyze_template": "テンプレートを分析中",
-    "start_presentation": "ワークフローを開始中",
     "list_templates": "テンプレート一覧を取得中",
     "list_styles": "スタイル一覧を取得中",
     "apply_style": "スタイルを適用中",

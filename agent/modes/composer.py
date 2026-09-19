@@ -211,7 +211,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
     async def compose_slides(deck_id: str, slide_groups: list, tool_context: ToolContext):
         """Compose slides by delegating to composer agents.
 
-        Prefetches all Phase 2 references once, then injects into composer prompt.
+        Loads the canonical composer workflow, then injects deck-specific context.
         Runs groups in parallel. Async generator: yields progress dicts, then returns final result str.
         """
         # LLM sometimes passes slide_groups as a JSON string instead of a list
@@ -253,20 +253,10 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
 
             if missing_files:
                 # Map missing files to their workflow (phase order)
-                workflow_map = {
-                    "specs/brief.md": "create-new-1-briefing",
-                    "specs/outline.md": "create-new-1-outline",
-                    "specs/art-direction": "create-new-1-art-direction",
-                    "deck.json": "create-new-1-art-direction",
-                }
-                workflows_needed = dict.fromkeys(
-                    workflow_map[f] for f in missing_files if f in workflow_map
-                )
-                steps = " → ".join(f"`{w}`" for w in workflows_needed)
                 instruction = (
                     f"Cannot compose: missing {missing_files}. "
-                    f"Complete these workflows in order: {steps}. "
-                    "Do NOT call compose_slides again until ALL spec files exist."
+                    "Return to the orchestrator workflow and complete the deck specs "
+                    "before calling compose_slides again."
                 )
                 yield json.dumps({"status": "error", "missing_files": missing_files, "instruction": instruction})
                 return

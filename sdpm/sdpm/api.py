@@ -8,6 +8,7 @@ mcp-local and other consumers should call these instead of assembling low-level 
 
 import os
 import tempfile
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -154,19 +155,88 @@ def analyze_and_store_template(template_path: Path, description: str = "") -> di
     }
 
 
-def apply_style(deck_dir: str | Path, style: str) -> dict[str, Any]:
-    """Apply a named style to a deck's art-direction.
+def merge_style_metadata(
+    html_text: str,
+    template_analysis: dict[str, Any] | None,
+    deck_json: dict[str, Any],
+) -> dict[str, Any]:
+    """Merge style and template facts into deck metadata without mutating inputs.
 
-    Copies the style HTML to {deck_dir}/specs/art-direction.html.
+    The style's ``--color-text`` always becomes ``defaultTextColor``. Template
+    analysis fills only empty font and slide-size fields.
+    """
+    import re
+
+    merged = deepcopy(deck_json)
+    root_match = re.search(r":root\s*\{(?P<body>.*?)\}", html_text, re.DOTALL | re.IGNORECASE)
+    if root_match:
+        color_match = re.search(
+            r"--color-text\s*:\s*(?P<value>[^;}]+)",
+            root_match.group("body"),
+            re.IGNORECASE,
+        )
+        if color_match:
+            merged["defaultTextColor"] = color_match.group("value").strip()
+
+    if not template_analysis:
+        return merged
+
+    analyzed_fonts = template_analysis.get("fonts") or {}
+    if analyzed_fonts:
+        fonts = merged.get("fonts")
+        if not isinstance(fonts, dict):
+            fonts = {}
+        else:
+            fonts = dict(fonts)
+        for key, value in analyzed_fonts.items():
+            if value and not fonts.get(key):
+                fonts[key] = value
+        merged["fonts"] = fonts
+
+    analyzed_size = template_analysis.get("slide_size") or template_analysis.get("slideSize") or {}
+    if analyzed_size:
+        slide_size = merged.get("slideSize")
+        if not isinstance(slide_size, dict):
+            slide_size = {}
+        else:
+            slide_size = dict(slide_size)
+        for key, value in analyzed_size.items():
+            if value is not None and not slide_size.get(key):
+                slide_size[key] = value
+        merged["slideSize"] = slide_size
+
+    return merged
+
+
+def _changed_style_fields(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    """Return style-managed metadata fields whose values changed."""
+    return {
+        key: after[key]
+        for key in ("template", "defaultTextColor", "fonts", "slideSize")
+        if after.get(key) != before.get(key) and key in after
+    }
+
+
+def apply_style(
+    deck_dir: str | Path,
+    style: str,
+    template: str = "",
+) -> dict[str, Any]:
+    """Apply a named style and optional template to a deck.
+
+    Writes specs/art-direction.html and completes deck.json (template, defaultTextColor, fonts, slideSize).
 
     Args:
         deck_dir: Deck output directory path.
         style: Style name (e.g. "elegant-dark").
+        template: Optional template name, with or without the .pptx extension.
 
     Returns:
-        Dict with status, path, style. Or error key if not found.
+        Dict with status, path, style, and changed deck.json fields under updated.
     """
     import shutil
+
+    from sdpm.utils.io import read_json, write_json
 
     styles_dirs = get_styles_dirs()
     src = _find_style_in_dirs(style, styles_dirs)
@@ -176,10 +246,40 @@ def apply_style(deck_dir: str | Path, style: str) -> dict[str, Any]:
     deck_path = Path(deck_dir)
     if not deck_path.is_dir():
         return {"error": f"Deck directory not found: {deck_dir}"}
+    deck_json_path = deck_path / "deck.json"
+    if not deck_json_path.exists():
+        return {"error": f"deck.json not found in {deck_dir}"}
+    deck_data = read_json(deck_json_path)
+
+    completed = deepcopy(deck_data)
+    if template:
+        completed["template"] = template
+
+    template_analysis = None
+    if completed.get("template"):
+        from sdpm.engine.analyzer import analyze_template as _analyze
+
+        template_path, _ = _resolve_template(completed, deck_path, get_templates_dirs())
+        template_analysis = _analyze(template_path)
+
+    merged = merge_style_metadata(
+        src.read_text(encoding="utf-8"),
+        template_analysis,
+        completed,
+    )
+    updated = _changed_style_fields(deck_data, merged)
+
     dest = deck_path / "specs" / "art-direction.html"
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dest)
-    return {"status": "ok", "path": str(dest), "style": style}
+    if updated:
+        write_json(deck_json_path, merged, suffix="\n")
+    return {
+        "status": "ok",
+        "path": str(dest),
+        "style": style,
+        "updated": updated,
+    }
 
 
 def _find_style_in_dirs(name: str, styles_dirs: list[Path]) -> Path | None:
@@ -595,8 +695,7 @@ def generate(
     }
     if invalid_layouts:
         result["invalid_layouts"] = [
-            {"slug": e["slug"], "attempted": e["attempted"], "used": e["used"]}
-            for e in invalid_layouts
+            {"slug": e["slug"], "attempted": e["attempted"], "used": e["used"]} for e in invalid_layouts
         ]
     if config.lint_diagnostics:
         result["errors"] = {"lintDiagnostics": config.lint_diagnostics}
@@ -655,6 +754,7 @@ def measure(
             return format_measure_report(results, page_to_slug=page_to_slug)
         finally:
             import shutil
+
             if svg_path:
                 shutil.rmtree(svg_path.parent, ignore_errors=True)
 
@@ -703,6 +803,7 @@ def preview(
     # Preview dir — user-chosen, or project-local _work/ to avoid macOS
     # EDR/DLP blocking system temp
     from sdpm.engine.preview import get_work_dir
+
     work_dir = get_work_dir(input_path.parent if input_path.is_dir() else input_path.resolve().parent)
     if output_dir:
         out_dir = Path(output_dir)
@@ -758,7 +859,7 @@ def _extract_slide_titles(prs) -> dict[int, str]:
             title = slide.shapes.title.text.strip().replace("\n", " ")[:30]
         # Sanitise for filenames: drop reserved chars, collapse whitespace, trim.
         title = re.sub(r'[\\/:*?"<>|]', "", title)
-        title = re.sub(r'\s+', "_", title).strip("_")
+        title = re.sub(r"\s+", "_", title).strip("_")
         titles[i] = title or "notitle"
     return titles
 
@@ -879,6 +980,7 @@ def code_block(
 # Diff — load/build both sides, then delegate to the pure engine comparison
 # ---------------------------------------------------------------------------
 
+
 def _load_deck_as_roundtrip(deck_dir: Path) -> dict:
     """Load deck-structure output (deck.json + slides/*.json) as a single roundtrip dict.
 
@@ -927,14 +1029,18 @@ def load_slides_json_or_pptx(path) -> dict:
             rt_dir = Path(tmpdir) / "rt"
             subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
                 [sys.executable, str(SCRIPTS_DIR / "pptx_to_json.py"), str(tmp_pptx), "-o", str(rt_dir)],
-                capture_output=True, text=True, check=True,
+                capture_output=True,
+                text=True,
+                check=True,
             )
             return _load_deck_as_roundtrip(rt_dir)
     if str(path).endswith(".pptx"):
         with tempfile.TemporaryDirectory() as tmpdir:
             subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
                 [sys.executable, str(SCRIPTS_DIR / "pptx_to_json.py"), path, "-o", tmpdir],
-                capture_output=True, text=True, check=True,
+                capture_output=True,
+                text=True,
+                check=True,
             )
             # New deck-structure output: deck.json + slides/slide-NN.json
             return _load_deck_as_roundtrip(Path(tmpdir))
@@ -951,14 +1057,14 @@ def load_slides_json_or_pptx(path) -> dict:
     # Also treat as source if slides have layout/title but no elements (title, agenda, section, etc.)
     if not is_source:
         is_source = any(
-            s.get("layout") in ("title", "agenda", "section", "subsection", "thankyou")
-            and not s.get("elements")
+            s.get("layout") in ("title", "agenda", "section", "subsection", "thankyou") and not s.get("elements")
             for s in data.get("slides", [])
         )
     if is_source:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_pptx = Path(tmpdir) / "tmp.pptx"
             from sdpm.engine.builder import PPTXBuilder, resolve_override
+
             tpl_name = data.get("template")
             if not tpl_name:
                 raise ValueError('No "template" specified in JSON. Cannot build for diff.')
@@ -971,15 +1077,21 @@ def load_slides_json_or_pptx(path) -> dict:
                     raise FileNotFoundError(
                         f"Template not found: '{tpl_name}'. Use list_templates to see available templates."
                     )
-            builder = PPTXBuilder(template, fonts=data.get("fonts"), base_dir=Path(path).parent,
-                                  default_text_color=data.get("defaultTextColor", "#FFFFFF"))
+            builder = PPTXBuilder(
+                template,
+                fonts=data.get("fonts"),
+                base_dir=Path(path).parent,
+                default_text_color=data.get("defaultTextColor", "#FFFFFF"),
+            )
             id_map = {s["id"]: s for s in data.get("slides", []) if "id" in s}
             for slide_def in data.get("slides", []):
                 builder.add_slide(resolve_override(slide_def, id_map))
             builder.save(tmp_pptx)
             subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
                 [sys.executable, str(SCRIPTS_DIR / "pptx_to_json.py"), str(tmp_pptx), "-o", tmpdir],
-                capture_output=True, text=True, check=True,
+                capture_output=True,
+                text=True,
+                check=True,
             )
             return _load_deck_as_roundtrip(Path(tmpdir))
     return data
@@ -988,7 +1100,7 @@ def load_slides_json_or_pptx(path) -> dict:
 def diff_report(baseline, edited) -> dict:
     """Compare two decks/JSONs/PPTXs and return a hand-edit diff report.
 
-    The canonical implementation behind ``pptx_builder.py diff`` and the
+    The canonical implementation behind ``pptx_builder.py diff_pptx`` and the
     MCP ``diff_pptx`` tool. Loads/builds both sides, then delegates the
     comparison to :func:`sdpm.engine.diff.diff_slides`.
 

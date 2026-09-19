@@ -64,7 +64,7 @@ npm run dev:local
 
 ### 動作の仕組み
 
-`NEXT_PUBLIC_MODE=local` が設定され、`src/app/api/` 以下の Next.js API Routes が有効化され、アクティブなデッキごとに `kiro-cli acp --agent sdpm-spec` を子プロセスとして起動します。Agent 定義は [`servers/local/.kiro/agents/`](../servers/local/.kiro/agents/) に、MCP ツールは [`servers/local/server_acp.py`](../servers/local/server_acp.py) に格納されています。
+`NEXT_PUBLIC_MODE=local` が設定されると、`src/app/api/` 以下の Next.js API Routes が有効になり、アクティブなデッキごとに `kiro-cli acp --agent sdpm-orchestrator` を子プロセスとして起動します。正規の Agent 定義は [`servers/local/.kiro/acp-agents/`](../servers/local/.kiro/acp-agents/) に、MCP ツールは [`servers/local/server_acp.py`](../servers/local/server_acp.py) に格納されています。
 
 ---
 

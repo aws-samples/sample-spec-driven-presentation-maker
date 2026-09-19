@@ -3,7 +3,7 @@
 Verifies that every `fontSize` in a slide JSON corresponds to a `--fs-*`
 token defined in the project's active style (specs/art-direction.html).
 
-Per the Token Discipline rule (workflows/create-new-2-compose.md):
+Per the Token Discipline rule in the composer workflow:
 > Every fontSize in presentation.json must come from a token defined in
 > the active style's :root. No ad-hoc values.
 

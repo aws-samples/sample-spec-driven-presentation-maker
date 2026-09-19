@@ -12,6 +12,60 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **`sdpm-composer` skill entry point** — a fourth thin dispatcher
+  (`skills/sdpm-composer`) for the role a spawned composer sub-agent plays;
+  it calls `read_workflows(["composer"])` and stops. Dedicated composer
+  agent definitions (Kiro, Claude Code) now point at this skill instead of
+  a `personas/composer.md` file reference.
+- **`docs/en/migration-v0.6.md`** — breaking-change table and per-environment
+  migration steps for the workflow consolidation below.
+
+### Changed
+
+- **Mode behavior consolidated into role documents, served via
+  `read_workflows`** — `start_presentation(mode=...)` and `personas/*.md`
+  are removed. Each role (orchestrator, composer, style, translate) now has
+  exactly one document, `sdpm/references/workflows/<role>.md`, containing
+  both the role definition and its procedure; entry points (skills, agent
+  definitions, `SKILL.md`, server instructions) only ever name a role for
+  `read_workflows` to fetch, never restate its behavior. This removes the
+  persona/workflow duplication that v0.5's persona layer had reintroduced.
+- **`vibe` and `spec` modes merged into a single `sdpm-create` skill** —
+  the dialogue-depth distinction is gone; how much back-and-forth happens
+  is driven by the user's own wording, not a mode argument. `skills/sdpm-vibe`
+  and `skills/sdpm-spec` are replaced by `skills/sdpm-create`.
+  `skills/sdpm-style` and `skills/sdpm-translate` are unchanged in purpose,
+  now dispatching to `read_workflows(["style"])` / `read_workflows(["translate"])`.
+- **CLI subcommands renamed to match MCP tool (contract) names** — e.g.
+  `generate` → `generate_pptx`, `examples` → `read_examples`,
+  `workflows` → `read_workflows`, `guides` → `read_guides`,
+  `analyze-template` → `analyze_template`, `search-assets` → `search_assets`,
+  `list-templates` → `list_templates`, `init` → `init_presentation`,
+  `code-block` → `code_to_slide`, `layout` → `arch_diagram`,
+  `diff` → `diff_pptx`. Workflow/guide text now reads identically whether
+  called as an MCP tool or a CLI subcommand. No aliases for the old names.
+  See [Migration to v0.6](docs/en/migration-v0.6.md) for the full table.
+- **`slide-json-spec` moved to `sdpm/references/spec/`** — it is a fact
+  document, not a role document; still resolved by `read_workflows` for
+  backward compatibility. **`hand-edit-sync` moved to
+  `sdpm/references/guides/`** — it is an occasional-need procedure, not a
+  role.
+
+### Removed
+
+- **`sdpm/references/examples/patterns.pptx` and the `search-patterns`
+  CLI/tool** — an audit of all 18 cataloged patterns found their techniques
+  either duplicated in `components/all` or not measurably improving output
+  versus letting the model reason from the style HTML and component
+  vocabulary directly. No migration path; if a specific technique is
+  needed again, express it directly in slide JSON per
+  `read_workflows(["slide-json-spec"])`.
+
+> **Migrating from v0.5?** See [Migration to v0.6](docs/en/migration-v0.6.md)
+> for the full breaking-change list and upgrade steps per environment.
+
+### Added
+
 - **Scaffold pass in the compose workflow** — before the parallel content
   composers fan out, the orchestrator now dispatches one composer with
   `task_instruction: "Scaffold pass."` (a new composer mode alongside

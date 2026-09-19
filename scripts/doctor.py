@@ -58,7 +58,7 @@ def main() -> int:
         "SKILL_ROOT": config.SKILL_ROOT,
         "REFERENCES_DIR": config.REFERENCES_DIR,
         "TEMPLATES_DIR": config.TEMPLATES_DIR,
-        "PERSONAS_DIR": config.PERSONAS_DIR,
+        "WORKFLOWS_DIR": config.REFERENCES_DIR / "workflows",
     }
     for name, path in anchors.items():
         if path.is_dir():

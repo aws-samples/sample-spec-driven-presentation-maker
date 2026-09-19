@@ -7,18 +7,19 @@ import { sendPrompt, createNewProcessFor, hasProcess, getOrCreateProcess, saveSe
 import { createSSEStream } from "@/lib/local/sse-bridge"
 
 const MODE_TO_AGENT: Record<string, string> = {
-  vibe: "sdpm-vibe",
-  spec: "sdpm-spec",
-  separated: "sdpm-spec",
-  single: "sdpm-single",
+  vibe: "sdpm-orchestrator",
+  spec: "sdpm-orchestrator",
+  separated: "sdpm-orchestrator",
+  single: "sdpm-orchestrator",
   style_creator: "sdpm-style",
+  translate: "sdpm-translate",
 }
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   const { query, mode, deckId, sessionId: clientSessionId } = await req.json()
-  const agentName = MODE_TO_AGENT[mode || "spec"] || "sdpm-spec"
+  const agentName = MODE_TO_AGENT[mode || "spec"] || "sdpm-orchestrator"
 
   // Ensure a process exists for this clientSessionId
   if (clientSessionId && !hasProcess(clientSessionId)) {

@@ -17,71 +17,14 @@ their own infrastructure-specific variants.
 from pathlib import Path
 from typing import Any
 
-from sdpm.config import PERSONAS_DIR as _PERSONAS_DIR
 from sdpm.config import REFERENCES_DIR as _REFERENCES_DIR
-from sdpm.tools.instructions import INSTRUCTIONS as _INSTRUCTIONS
-
-_MODES = ("vibe", "spec", "style", "translate", "composer", "single")
-
-
-def start_presentation(mode: str = "") -> str:
-    """REQUIRED FIRST STEP for creating any PowerPoint/presentation/slide deck.
-    Call this before using any other tool when the user wants to create, edit, or modify slides.
-
-    Returns the behavior instructions for the requested mode — follow them for the rest
-    of the conversation.
-
-    Args:
-        mode: Which behavior to load.
-            - "vibe": fast, autonomous generation from source material the user already
-              has (URL, paper, transcript, pasted text). Minimal questions, no per-step
-              approval. Use when the user says "turn this into slides" / "quick deck".
-            - "spec": dialogue-driven design — real hearing, structured requirements,
-              user approval at each step. Use when the user wants to shape the deck
-              through conversation, or wants to edit an existing PPTX / create a style
-              via the guided menu.
-            - "style": create a reusable style guide (HTML design tokens) through dialogue.
-            - "translate": translate an existing deck into another language as a derived
-              deck (the source deck stays untouched). Use when the user says "translate
-              this deck" / "make an English version".
-            - "composer": silent slide composition from approved specs. Used by composer
-              sub-agents, or by the orchestrator itself when no sub-agent mechanism exists.
-              If you were dispatched with deck_id + assigned_slugs (+ task_instruction),
-              you are a composer sub-agent — call this with mode="composer" FIRST,
-              before any other tool.
-            - "single": one agent does everything end-to-end (dialogue + composition,
-              no sub-agents). Used by single-agent deployments (e.g. chat integrations).
-            - "" (omitted): the interactive workflow menu (choose A-D with the user).
-
-    Returns:
-        Markdown instructions for the selected mode.
-    """
-    if not mode:
-        return _INSTRUCTIONS
-    if mode not in _MODES:
-        return (
-            f"Unknown mode: {mode!r}. Valid modes: {', '.join(_MODES)}, "
-            "or call without arguments for the workflow menu."
-        )
-    persona_path = _PERSONAS_DIR / f"{mode}.md"
-    if not persona_path.exists():
-        raise FileNotFoundError(
-            f"Persona file not found: {persona_path}. "
-            "The personas/ directory must ship alongside the skill root. "
-            "If you moved or renamed the checkout, your MCP client config may "
-            "still point at the old path — re-register the server (e.g. "
-            "`make install-kiro`) or set SDPM_SKILL_ROOT. Run `make doctor` "
-            "in the checkout to diagnose."
-        )
-    return persona_path.read_text(encoding="utf-8")
 
 
 def init_presentation(name: str) -> dict[str, Any]:
     """Initialize a presentation workspace. Creates deck.json, slides/, and specs/.
 
-    Call after briefing is complete, before building slides.
-    slideSize is written to deck.json by the agent after calling analyze_template —
-    copy the slide_size result (width, height, ptPerPx) into deck.json's slideSize field.
+    Call after briefing is complete, before applying a template and style with
+    apply_style and building slides.
 
     Args:
         name: Presentation name (e.g. "lambda-overview").
@@ -90,6 +33,7 @@ def init_presentation(name: str) -> dict[str, Any]:
         Dict with output_dir, deck_json path, and workspace file list.
     """
     from sdpm.api import init
+
     return init(name=name)
 
 
@@ -143,6 +87,7 @@ def generate_pptx(deck_id: str) -> dict[str, Any]:
     """
     from sdpm.api import generate
     from sdpm.knowledge.assets import invalidate_manifest_cache
+
     invalidate_manifest_cache()
     return generate(
         json_path=deck_id,
@@ -150,10 +95,12 @@ def generate_pptx(deck_id: str) -> dict[str, Any]:
     )
 
 
-
 def search_assets(
-    query: str = "", limit: int = 20,
-    source_filter: str = "", type_filter: str = "", theme_filter: str = "",
+    query: str = "",
+    limit: int = 20,
+    source_filter: str = "",
+    type_filter: str = "",
+    theme_filter: str = "",
 ) -> dict[str, Any]:
     """Search assets (icons, images) by keyword, or discover available sources.
 
@@ -173,6 +120,7 @@ def search_assets(
         {query: "", sources: [{name, count, types, themes}]}.
     """
     from sdpm.knowledge.assets import invalidate_manifest_cache, search_assets as _search, list_sources
+
     invalidate_manifest_cache()
 
     if not query.strip():
@@ -181,7 +129,8 @@ def search_assets(
     return {
         "query": query,
         "results": _search(
-            query, limit=limit,
+            query,
+            limit=limit,
             source_filter=source_filter or None,
             type_filter=type_filter or None,
             theme_filter=theme_filter or None,
@@ -200,25 +149,32 @@ def list_styles(include_all: bool = False) -> dict[str, Any]:
     """
     from sdpm.api import get_styles_dirs, list_styles_filtered
     from sdpm.config import get_state
+
     styles_dirs = get_styles_dirs()
     pinned = get_state().get("pinned_styles", [])
     return {"styles": list_styles_filtered(styles_dirs, pinned, include_all)}
 
 
-def apply_style(deck_id: str, style: str) -> dict[str, Any]:
-    """Apply a named style to a deck's art-direction.
+def apply_style(
+    deck_id: str,
+    style: str,
+    template: str = "",
+) -> dict[str, Any]:
+    """Apply a named style and optional template to a deck.
 
-    Copies the style HTML to {deck_id}/specs/art-direction.html.
+    Writes specs/art-direction.html and completes deck.json (template, defaultTextColor, fonts, slideSize).
 
     Args:
         deck_id: Deck directory path.
         style: Style name (e.g. "elegant-dark").
+        template: Optional template name, with or without the .pptx extension.
 
     Returns:
-        Dict with status, path, style. Or error key if not found.
+        Dict with status, path, style, and changed deck.json fields under updated.
     """
     from sdpm.api import apply_style as _apply_style
-    return _apply_style(deck_dir=deck_id, style=style)
+
+    return _apply_style(deck_dir=deck_id, style=style, template=template)
 
 
 def list_templates() -> dict[str, Any]:
@@ -229,13 +185,14 @@ def list_templates() -> dict[str, Any]:
     """
     from sdpm.api import get_templates_dirs, list_templates_with_metadata
     from sdpm.config import get_state
+
     templates_dirs = get_templates_dirs()
     metadata = get_state().get("template_metadata", {})
     return {"templates": list_templates_with_metadata(templates_dirs, metadata)}
 
 
 def read_examples(names: list[str]) -> dict[str, Any]:
-    """Read design examples (components/patterns).
+    """Read design examples (components and styles).
 
     Without specifier returns a listing of slide descriptions.
 
@@ -246,30 +203,55 @@ def read_examples(names: list[str]) -> dict[str, Any]:
         Dict with documents list.
     """
     from sdpm.knowledge.reference import read_docs
+
     return {"documents": read_docs(_REFERENCES_DIR / "examples", names)}
 
 
 def list_workflows() -> dict[str, Any]:
-    """List all workflow documents.
+    """List all role workflow and presentation specification documents.
 
     Returns:
         Dict with items list (name, description).
     """
     from sdpm.knowledge.reference import list_category
-    return {"items": list_category(_REFERENCES_DIR / "workflows")}
+
+    items = list_category(_REFERENCES_DIR / "workflows")
+    seen = {item["name"] for item in items}
+    items.extend(item for item in list_category(_REFERENCES_DIR / "spec") if item["name"] not in seen)
+    return {"items": items}
 
 
 def read_workflows(names: list[str]) -> dict[str, Any]:
-    """Read workflow documents.
+    """Read role workflows and presentation specifications.
+
+    To create slides, read orchestrator first.
+
+    - orchestrator: build a deck from material or dialogue.
+    - composer: write assigned slides from approved specs.
+    - style: create a reusable style guide.
+    - translate: derive a translated deck.
 
     Args:
-        names: List of workflow names to read.
+        names: List of workflow or specification names to read.
 
     Returns:
         Dict with documents list.
     """
     from sdpm.knowledge.reference import read_docs
-    return {"documents": read_docs(_REFERENCES_DIR / "workflows", names)}
+
+    documents = []
+    directories = (_REFERENCES_DIR / "workflows", _REFERENCES_DIR / "spec")
+    for name in names:
+        errors = []
+        for directory in directories:
+            try:
+                documents.extend(read_docs(directory, [name]))
+                break
+            except FileNotFoundError as error:
+                errors.append(error)
+        else:
+            raise errors[0]
+    return {"documents": documents}
 
 
 def list_guides() -> dict[str, Any]:
@@ -279,6 +261,7 @@ def list_guides() -> dict[str, Any]:
         Dict with items list (name, description).
     """
     from sdpm.knowledge.reference import list_category
+
     return {"items": list_category(_REFERENCES_DIR / "guides")}
 
 
@@ -292,13 +275,20 @@ def read_guides(names: list[str]) -> dict[str, Any]:
         Dict with documents list.
     """
     from sdpm.knowledge.reference import read_docs
+
     return {"documents": read_docs(_REFERENCES_DIR / "guides", names)}
 
 
 def code_to_slide(
-    deck_id: str, code: str, name: str,
-    language: str = "python", theme: str = "dark",
-    x: int = 0, y: int = 0, width: int = 800, height: int = 300,
+    deck_id: str,
+    code: str,
+    name: str,
+    language: str = "python",
+    theme: str = "dark",
+    x: int = 0,
+    y: int = 0,
+    width: int = 800,
+    height: int = 300,
 ) -> dict[str, Any]:
     """Generate a syntax-highlighted code block and save to deck/includes/{name}.json.
 
@@ -320,11 +310,13 @@ def code_to_slide(
         Dict with include_path for use in slide JSON.
     """
     from sdpm.api import code_block as _code_block
+
     elements = _code_block(code=code, language=language, theme=theme, x=x, y=y, width=width, height=height)
     includes_dir = Path(deck_id) / "includes"
     includes_dir.mkdir(parents=True, exist_ok=True)
     include_path = includes_dir / f"{name}.json"
     import json
+
     include_path.write_text(json.dumps(elements, ensure_ascii=False), encoding="utf-8")
     return {
         "include_path": f"includes/{name}.json",
@@ -369,7 +361,10 @@ def grid(purpose: str, spec: str) -> dict[str, Any]:
 
 def arch_diagram(
     spec: str,
-    x: int = 100, y: int = 180, width: int = 1720, height: int = 800,
+    x: int = 100,
+    y: int = 180,
+    width: int = 1720,
+    height: int = 800,
     theme: str = "dark",
     pt_per_px: float = 0.5,
 ) -> dict[str, Any]:
@@ -422,10 +417,15 @@ def arch_diagram(
     except (json.JSONDecodeError, TypeError) as e:
         return {"error": f"Invalid diagram spec JSON: {e}"}
     return render_architecture(
-        tree, x=x, y=y, width=width, height=height, theme=theme,
-        include_metrics=True, pt_per_px=pt_per_px,
+        tree,
+        x=x,
+        y=y,
+        width=width,
+        height=height,
+        theme=theme,
+        include_metrics=True,
+        pt_per_px=pt_per_px,
     )
-
 
 
 def diff_pptx(baseline: str, edited: str) -> dict[str, Any]:
@@ -445,6 +445,7 @@ def diff_pptx(baseline: str, edited: str) -> dict[str, Any]:
         removed elements and properties).
     """
     from sdpm.api import diff_report
+
     for p in (baseline, edited):
         if not Path(p).exists():
             raise FileNotFoundError(f"Not found: {p}")

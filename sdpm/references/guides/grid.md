@@ -4,21 +4,16 @@ description: "Coordinate calculation via CSS Grid — read before placing elemen
 category: guide
 ---
 
-# Grid Command
+# Grid Contract
 
 Divide any rectangular area using CSS Grid track-list syntax and compute coordinates.
 Works for splitting an entire slide or subdividing the inside of a component.
 
-**Constraints:**
-- You MUST read this guide before first use of grid command in a session
-
-```bash
-echo '{ ... }' | uv run python3 scripts/pptx_builder.py grid -
-```
+Call `grid(purpose="<description>", spec="<JSON string>")` to calculate coordinates.
 
 ---
 
-## Command Reference
+## Contract Reference
 
 ### Input
 
@@ -101,18 +96,19 @@ When `items` is specified, matched cells get an additional `"item"` key with cen
 
 The starting point of grid is "which region to divide." This decision determines layout quality.
 
-- **Full slide**: Use analyze-template to get the title bottom edge and calculate the content area.
+- **Full slide**: Use `analyze_template(template)` to get the title bottom edge and calculate the content area.
   Content area = title.y2 + margin to H−130 (H = slide height from `slideSize`).
 - **Output from a parent grid**: First split the slide coarsely, then use the output coordinates as the next area
 - **Inside a component**: Use a card or section's coordinates as the area and subdivide its contents
 - **Partial region**: You don't have to use the full area — reserve space above for description text, below for a flow diagram, etc. Narrow the area to fit the content
 
-```bash
-# Calculate content area for Title Only layout
-uv run python3 scripts/pptx_builder.py analyze-template template.pptx --layout "Title Only"
-# → TITLE: {x:64, y:47, w:1803, h:95, y2:142, ...}
-# → area_y = title.y2 + margin = 142 + 31 = 173
-# → area_h = H - 130 - area_y  (H from slideSize; 16:9 H=1080 → h=777)
+Call `analyze_template("template.pptx", layout="Title Only")` and calculate
+from the returned placeholder coordinates:
+
+```text
+TITLE: {x:64, y:47, w:1803, h:95, y2:142, ...}
+area_y = title.y2 + margin = 142 + 31 = 173
+area_h = H - 130 - area_y  (H from slideSize; 16:9 H=1080 → h=777)
 ```
 
 ### Step 2: Divide with grid
@@ -186,7 +182,7 @@ The combinations of columns/rows/gap/areas are open-ended — invent freely to m
 > Task names on the left, timeline bars on the right.
 >
 > **Step 1: Decide the area**
-> A Gantt chart uses the full slide. Check the content area with analyze-template.
+> A Gantt chart uses the full slide. Check the content area with `analyze_template(template)`.
 > area: {x:96, y:173, w:1728, h:777}
 >
 > **Step 2: Split the main frame**

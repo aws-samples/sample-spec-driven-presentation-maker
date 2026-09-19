@@ -20,12 +20,12 @@ Layer 4 hosts the Strands Agent (SPEC agent + composer agents) and the React Web
 The SPEC agent handles user dialogue (Phase 1). Composer agents handle slide generation
 (Phase 2+3) via the `compose_slides` tool (Agents as Tools pattern).
 
-Mode behavior (vibe / spec / style / composer) lives in `personas/*.md` and is
-served to MCP clients via `start_presentation(mode=...)`. Client-side files are thin
-wiring (composer sub-agent registration). The L4 agent fetches personas through the
-same port (`Source.mcp("start_presentation", ...)` in `agent/modes/`); only
-transport-specific wiring (attachment wire format, compose_slides report format)
-lives in `agent/prompts/`.
+Role and procedure text lives in `sdpm/references/workflows/<role>.md` (orchestrator,
+composer, style, translate) and is served to MCP clients via `read_workflows`.
+Client-side files are thin wiring (composer sub-agent registration) that name a role
+document without restating it. The L4 agent fetches role documents through the same
+port (`Source.mcp("read_workflows", ...)` in `agent/modes/`); only transport-specific
+wiring (attachment wire format, compose_slides report format) lives in `agent/prompts/`.
 
 ## Design Philosophy — Ports and Adapters
 
@@ -52,32 +52,22 @@ Rules that follow from this:
    abstraction; S3/DynamoDB live entirely inside `servers/remote`. This trades
    hexagonal purity for one less abstraction — acceptable while there is a
    single cloud backend. Revisit only if a second backend appears.
-4. **Personas are content, not client config** ("server-driven behavior").
-   Behavior is served through the port via `start_presentation(mode=...)`,
-   so client-side files stay minimal wiring and never duplicate behavior text.
+4. **Role documents are content, not client config** ("server-driven behavior").
+   Each role (orchestrator, composer, style, translate) has exactly one document,
+   `sdpm/references/workflows/<role>.md`, served through the port via
+   `read_workflows([...])`. Entry points (skills, agent definitions, `SKILL.md`,
+   server instructions) only ever name a role document — they never restate or
+   duplicate its content.
 
-   Deciding *how* a client obtains a persona is a two-axis judgement:
-
-   - **When is the mode known?** If it is only decided in conversation
-     (user picks vibe/spec/style), the agent must fetch via
-     `start_presentation` — the default. If the mode is fixed at the
-     entry point (a dedicated composer sub-agent, the L4 agent's modes),
-     the persona may be embedded into the system prompt — but only when
-     it is **re-derived at reference/build time from `personas/`**
-     (never a hand-maintained copy).
-   - **Does the definition cross a distribution boundary?** Anything
-     copied into user-owned locations (`~/.kiro/agents/`, plugin files)
-     drifts silently after `git pull`. Prefer definitions that resolve
-     the persona live from the checkout / server; treat boundary-crossing
-     copies as generated artifacts that must be re-derivable.
-
-   Two orthogonal follow-ons: *delivery* (through the port vs. file read)
-   and *placement* (system prompt vs. task prompt) are independent choices —
-   picking one does not constrain the other. Tool docstrings (e.g.
-   `start_presentation`'s mode list) are the discovery layer — the
-   equivalent of skill frontmatter; do not create skill stubs for modes.
+   Role assignment is a dispatch-time decision, not a discovery-time one: a
+   spawner (the orchestrator delegating to a composer, a skill dispatching a
+   role, a client picking a mode) tells the spawned agent which role to load in
+   its first instruction. The agent then calls `read_workflows(["<role>"])`
+   itself. There is no docstring heuristic to infer role from arguments, and no
+   case where a role's text is embedded into a system prompt instead of fetched
+   — every consumer, including the L4 agent, fetches live.
 5. **Change-locality goal** — the structure is optimised so that:
-   prompt changes touch only `personas/`; engine changes touch only
+   prompt changes touch only `sdpm/references/workflows/`; engine changes touch only
    `sdpm/sdpm/engine/`; a new client touches only `clients/`; a new tool
    touches only `sdpm/sdpm/tools/`.
 
@@ -110,8 +100,8 @@ Every MCP tool is defined once here: name, signature, docstring, and logic
 functions directly (`mcp.tool()(tools.xxx)`) — never redefine a tool body
 in a server.
 
-`start_presentation(mode=...)` is part of the contract and serves
-`personas/*.md` to any MCP client.
+`read_workflows(names)` is part of the contract and serves
+`sdpm/references/workflows/<role>.md` documents to any MCP client.
 
 ## Local server (`servers/local/`) — Layer 2
 
@@ -130,8 +120,8 @@ HTTP MCP server running on AWS with S3/DynamoDB dependencies.
 - However, use Engine logic when equivalent functionality exists
 - Server instructions are a deliberate divergence: Local serves the shared
   interactive menu (`sdpm.tools.instructions`); Remote serves a short
-  agent-facing form (its client is the L4 agent, which already carries the
-  persona) — see the comment above `_INSTRUCTIONS` in `servers/remote/server.py`
+  agent-facing form (its client is the L4 agent, which already knows its
+  role) — see the comment above `_INSTRUCTIONS` in `servers/remote/server.py`
 
 ## Logic Sharing Principles
 

@@ -42,42 +42,14 @@ logger = logging.getLogger("sdpm.mcp")
 
 # --- MCP Server Instructions ---
 #
-# DELIBERATE DIVERGENCE from sdpm.tools.instructions (do not "unify"):
-# the shared instructions are an interactive workflow menu (choose A-D)
-# for human-driven MCP clients. On Cloud, the client is the L4 agent —
-# mode behavior arrives through its prompt (personas via
-# start_presentation), so the menu would only waste tokens and conflict
-# with the already-loaded persona. This short version states just the
-# architecture split (run_python vs MCP tools) and the entry workflow.
-# Design note: "Local = shared contract instructions, Remote = this
-# agent-facing short form" (v0.5 review round 3).
-
+# Cloud clients already carry transport-specific wiring, so this entry stays
+# shorter than the interactive local instructions.
 _INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generation from JSON.
 
-## Architecture
-- The agent edits workspace files via `run_python(deck_id=...)` using normal file I/O (writes always persist)
-- MCP tools handle: workflow guidance, initialization, PPTX generation, preview, references
-- MCP tools do NOT handle: slide editing, spec writing (agent responsibility via run_python)
-
-**Critical constraint:** Do NOT make any decisions about slide structure, content, design, or layout before loading the workflow. The workflow files contain the full process including briefing, outline, and art direction. Wait until the workflow is loaded and follow it step by step.
-
-## Workflow: New Presentation
-
-→ Read `read_workflows(["create-new-1-briefing"])` to start. Follow each file's Next Step from there.
+The agent edits deck files through `run_python`; MCP tools handle workflows,
+initialization, generation, previews, and references.
+To create or edit slides, read `read_workflows(["orchestrator"])` first.
 """
-
-# Edit-existing-PPTX flow on Cloud is driven by read_attachment returning
-# guide/guideInstruction in the response header — the spec agent follows
-# that pointer instead of a hard-coded workflow name here.
-#
-# TODO: Add these workflows when web UI supports them
-# ## Workflow C: Hand-Edit Sync
-# When the user hand-edits the generated PPTX in PowerPoint and then asks for further changes.
-# → Read `read_workflows(["create-new-4-hand-edit-sync"])` to start.
-#
-# ## Workflow D: Create Style
-# When the user wants to create a new reusable style guide.
-# → Read `read_workflows(["create-style"])` to start.
 
 mcp = FastMCP(
     "spec-driven-presentation-maker",
@@ -115,6 +87,7 @@ class _CaptureHeadersMiddleware:
                 _current_request_headers.reset(token)
         else:
             await self.app(scope, receive, send)
+
 
 # --- Storage backend (swap this to use a custom implementation) ---
 
@@ -211,7 +184,8 @@ def init_presentation(name: str) -> str:
     """
     return json.dumps(
         init_mod.init_presentation(
-            name=name.strip(), user_id=_get_user_id(),
+            name=name.strip(),
+            user_id=_get_user_id(),
             storage=_storage,
         ),
         ensure_ascii=False,
@@ -246,6 +220,7 @@ def analyze_template(template: str, deck_id: str = "") -> str:
             import tempfile
             from pathlib import Path
             from sdpm.engine.analyzer import analyze_template as _analyze
+
             template_key = template
             data = _storage.download_file_from_pptx_bucket(f"decks/{deck_id}/{template_key}")
             # TemporaryDirectory (not mkdtemp): this server is long-running,
@@ -326,7 +301,6 @@ def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
     )
 
 
-
 # --- Generation Tools ---
 
 
@@ -347,9 +321,12 @@ def generate_pptx(deck_id: str) -> str:
     """
     _check_deck_access(deck_id, action="generate_pptx")
     import traceback
+
     try:
         result = generate.generate_pptx(
-            deck_id=deck_id, user_id=_get_user_id(), storage=_storage,
+            deck_id=deck_id,
+            user_id=_get_user_id(),
+            storage=_storage,
             kb_sync=_kb_sync,
         )
         logger.info("generate_pptx completed: deck=%s slides=%s", deck_id, result.get("slideCount"))
@@ -384,13 +361,18 @@ def get_preview(deck_id: str, slugs: list[str], quality: str = "high") -> list:
         quality = "high"
     try:
         return preview.get_preview(
-            deck_id=deck_id, slugs=slugs, storage=_storage, quality=quality,
+            deck_id=deck_id,
+            slugs=slugs,
+            storage=_storage,
+            quality=quality,
         )
     except _storage._s3.exceptions.NoSuchKey:
-        return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first."}]
+        return [{"type": "text", "text": f'Preview not available yet. Run generate_pptx(deck_id="{deck_id}") first.'}]
     except Exception as e:
         if "NoSuchKey" in str(e):
-            return [{"type": "text", "text": f"Preview not available yet. Run generate_pptx(deck_id=\"{deck_id}\") first."}]
+            return [
+                {"type": "text", "text": f'Preview not available yet. Run generate_pptx(deck_id="{deck_id}") first.'}
+            ]
         raise
 
 
@@ -413,17 +395,23 @@ def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> tuple[P
 def _export_svg(tmpdir: Path, pptx_path: Path) -> Path:
     """PPTX → SVG via LibreOffice. Returns svg_path."""
     import subprocess
+
     env = os.environ.copy()
     env["HOME"] = str(tmpdir)
     subprocess.run(
         ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
-        env=env, capture_output=True, text=True, timeout=120, check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=True,
     )
     return tmpdir / "measure.svg"
 
 
-def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int],
-                 page_to_slug: dict[int, str] | None = None) -> str:
+def _run_measure(
+    tmpdir: Path, pptx_path: Path, slide_numbers: list[int], page_to_slug: dict[int, str] | None = None
+) -> str:
     """PPTX → SVG → bbox measurement → report string."""
     from sdpm.engine.preview.measure import measure_from_svg, format_measure_report
 
@@ -439,8 +427,9 @@ def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int],
 
 
 @mcp.tool()
-def search_assets(query: str = "", source_filter: str = "", limit: int = 20,
-                       type_filter: str = "", theme_filter: str = "") -> str:
+def search_assets(
+    query: str = "", source_filter: str = "", limit: int = 20, type_filter: str = "", theme_filter: str = ""
+) -> str:
     """Search icons and assets by keyword, or discover available sources.
 
     Discovery mode: call with query="" (empty string) to get a listing of all
@@ -459,11 +448,14 @@ def search_assets(query: str = "", source_filter: str = "", limit: int = 20,
     """
     return json.dumps(
         assets.search_assets(
-            query=query, storage=_storage, source_filter=source_filter, limit=limit,
-            type_filter=type_filter, theme_filter=theme_filter,
+            query=query,
+            storage=_storage,
+            source_filter=source_filter,
+            limit=limit,
+            type_filter=type_filter,
+            theme_filter=theme_filter,
         ),
     )
-
 
 
 # --- Reference Tools ---
@@ -486,19 +478,21 @@ def list_styles(include_all: bool = False) -> str:
 
 
 @mcp.tool()
-def apply_style(deck_id: str, style: str) -> str:
-    """Copy a style as the deck's art direction. Call during Art Direction phase.
+def apply_style(deck_id: str, style: str, template: str = "") -> str:
+    """Apply a named style and optional template to a deck.
 
-    Searches user styles first, then builtin styles.
+    Writes specs/art-direction.html and completes deck.json (template, defaultTextColor, fonts, slideSize).
+    Searches user resources first, then builtin resources.
 
     Args:
         deck_id: Deck ID.
         style: Style name from list_styles (e.g. "elegant-dark").
+        template: Optional template name, with or without the .pptx extension.
 
     Returns:
-        JSON confirmation.
+        JSON confirmation with changed deck.json fields under updated.
     """
-    _check_deck_access(deck_id)
+    _check_deck_access(deck_id, action="edit_slide")
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", style):
         raise ValueError("Invalid style name")
 
@@ -515,19 +509,47 @@ def apply_style(deck_id: str, style: str) -> str:
     # Fall back to builtin (bundled in the image)
     if html_bytes is None:
         from sdpm.knowledge.reference import BUNDLED_STYLES_DIR
+
         builtin_path = BUNDLED_STYLES_DIR / f"{style}.html"
         if not builtin_path.exists():
             raise FileNotFoundError(f"Style not found: {style}")
         html_bytes = builtin_path.read_bytes()
 
+    from sdpm.api import _changed_style_fields, merge_style_metadata
+
+    deck_data = _storage.get_deck_json(deck_id)
+    completed = dict(deck_data)
+    if template:
+        completed["template"] = template
+
+    template_analysis = None
+    selected_template = completed.get("template")
+    if selected_template:
+        template_analysis = json.loads(analyze_template(template=selected_template, deck_id=deck_id))
+        if template_analysis.get("error"):
+            raise ValueError(template_analysis["error"])
+    merged = merge_style_metadata(
+        html_bytes.decode("utf-8"),
+        template_analysis,
+        completed,
+    )
+    updated = _changed_style_fields(deck_data, merged)
+
     dest_key = f"decks/{deck_id}/specs/art-direction.html"
     _storage.upload_file(key=dest_key, data=html_bytes, content_type="text/html")
-    return json.dumps({"applied": style, "path": "specs/art-direction.html"})
+    if updated:
+        _storage.put_deck_json(deck_id, merged)
+    return json.dumps(
+        {
+            "applied": style,
+            "path": "specs/art-direction.html",
+            "updated": updated,
+        }
+    )
 
 
 # --- Reference tools (bound from the shared contract; bundled data baked into the image) ---
 
-mcp.tool()(contract.start_presentation)
 mcp.tool()(contract.read_examples)
 mcp.tool()(contract.list_workflows)
 mcp.tool()(contract.read_workflows)
@@ -551,10 +573,17 @@ def list_templates() -> str:
 
 
 @mcp.tool()
-def code_to_slide(deck_id: str, code: str, name: str,
-                       language: str = "python", theme: str = "dark",
-                       x: int = 0, y: int = 0,
-                       width: int = 800, height: int = 300) -> str:
+def code_to_slide(
+    deck_id: str,
+    code: str,
+    name: str,
+    language: str = "python",
+    theme: str = "dark",
+    x: int = 0,
+    y: int = 0,
+    width: int = 800,
+    height: int = 300,
+) -> str:
     """Generate syntax-highlighted code block and save as include file in S3.
     Returns the include path to use in presentation.json:
     {"type": "include", "src": "<returned include_path>"}
@@ -576,9 +605,16 @@ def code_to_slide(deck_id: str, code: str, name: str,
     _check_deck_access(deck_id, action="edit_slide")
     return json.dumps(
         code_block_mod.code_block_to_include(
-            deck_id=deck_id, code=code, name=name, storage=_storage,
-            language=language, theme=theme,
-            x=x, y=y, width=width, height=height,
+            deck_id=deck_id,
+            code=code,
+            name=name,
+            storage=_storage,
+            language=language,
+            theme=theme,
+            x=x,
+            y=y,
+            width=width,
+            height=height,
         ),
     )
 
@@ -588,14 +624,10 @@ def code_to_slide(deck_id: str, code: str, name: str,
 
 def _build_relevant(p: str) -> bool:
     """True if a workspace path affects the built PPTX artifact."""
-    return (
-        p in ("deck.json", "presentation.json", "specs/outline.md")
-        or p.startswith(("slides/", "includes/"))
-    )
+    return p in ("deck.json", "presentation.json", "specs/outline.md") or p.startswith(("slides/", "includes/"))
 
 
-def _post_processing_plan(deck_changed: bool,
-                          measure_slides: list[str] | None) -> dict[str, bool]:
+def _post_processing_plan(deck_changed: bool, measure_slides: list[str] | None) -> dict[str, bool]:
     """Decide run_python post-processing actions (the unified contract).
 
     - build:    cheap python-pptx build — prerequisite for both the artifact
@@ -619,8 +651,7 @@ def _post_processing_plan(deck_changed: bool,
 
 
 @mcp.tool()
-def run_python(purpose: str, code: str, deck_id: str | None = None,
-               measure_slides: list[str] | None = None) -> str:
+def run_python(purpose: str, code: str, deck_id: str | None = None, measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a secure sandbox.
 
     Use this tool to edit the deck workspace or for general computation.
@@ -716,10 +747,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
         except ValueError:
             _check_deck_access(deck_id, action="read")
             persist_writes = False
-            result["readOnly"] = (
-                "You have read-only access to this deck: file writes were "
-                "not persisted."
-            )
+            result["readOnly"] = "You have read-only access to this deck: file writes were not persisted."
 
     output, outline_warnings, lint_diagnostics, changed_paths = sandbox_mod.execute_in_sandbox(
         code=code,
@@ -733,8 +761,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
 
     if outline_warnings:
         result.setdefault("warnings", {})["outline"] = (
-            "outline.md format violation. "
-            "Read workflow `create-new-1-outline` for the correct format."
+            "outline.md format violation. Read workflow `orchestrator` for the outline format."
         )
 
     if lint_diagnostics:
@@ -782,7 +809,12 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                 # Layout bias (filter to measured slides; bias uses 1-based)
                 try:
                     from sdpm.engine.preview import check_layout_imbalance_data
-                    layout_bias = [b for b in check_layout_imbalance_data(pptx_path, slide_defs=slides) if b.get("slide") in set(page_numbers)]
+
+                    layout_bias = [
+                        b
+                        for b in check_layout_imbalance_data(pptx_path, slide_defs=slides)
+                        if b.get("slide") in set(page_numbers)
+                    ]
                     if layout_bias:
                         result["warnings"] = {"layoutBias": layout_bias}
                 except Exception as e:
@@ -812,17 +844,16 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                 try:
                     import uuid as _uuid
                     from datetime import datetime as _dt, timezone as _tz
+
                     _pptx_key = f"pptx/{deck_id}/{_uuid.uuid4()}.pptx"
                     _storage.upload_file(
                         key=_pptx_key,
                         data=Path(pptx_path).read_bytes(),
-                        content_type=(
-                            "application/vnd.openxmlformats-officedocument"
-                            ".presentationml.presentation"
-                        ),
+                        content_type=("application/vnd.openxmlformats-officedocument.presentationml.presentation"),
                     )
                     _old = _storage.update_deck(
-                        deck_id=deck_id, user_id=user_id,
+                        deck_id=deck_id,
+                        user_id=user_id,
                         updates={
                             "pptxS3Key": _pptx_key,
                             "updatedAt": _dt.now(_tz.utc).isoformat(),
@@ -837,7 +868,8 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                     if _old_key and _old_key != _pptx_key:
                         try:
                             _storage._s3.delete_object(
-                                Bucket=_storage.pptx_bucket, Key=_old_key,
+                                Bucket=_storage.pptx_bucket,
+                                Key=_old_key,
                             )
                         except Exception:
                             pass
@@ -853,7 +885,8 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                         # succeeded — delete the orphaned object (best effort).
                         try:
                             _storage._s3.delete_object(
-                                Bucket=_storage.pptx_bucket, Key=_pptx_key,
+                                Bucket=_storage.pptx_bucket,
+                                Key=_pptx_key,
                             )
                         except Exception:
                             pass
@@ -866,12 +899,14 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                 try:
                     from tools.compose import extract_optimized_defs, split_slide_components
                     import hashlib as _hashlib
+
                     svg_path = tmpdir / "measure.svg"
                     if not svg_path.exists():
                         _export_svg(tmpdir, pptx_path)
                     if svg_path.exists():
                         import json as _json
                         import re as _re
+
                         compose_prefix = f"decks/{deck_id}/compose/"
 
                         # List existing compose keys (for prev data + cleanup)
@@ -941,10 +976,14 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                                 comp_data = split_slide_components(svg_path, pn)
 
                                 # sourceHash from slide JSON (content-based diff)
-                                src_hash = _hashlib.md5(
-                                    _json.dumps(slides[pn - 1], sort_keys=True, ensure_ascii=False).encode(),
-                                    usedforsecurity=False,
-                                ).hexdigest() if pn <= len(slides) else ""
+                                src_hash = (
+                                    _hashlib.md5(
+                                        _json.dumps(slides[pn - 1], sort_keys=True, ensure_ascii=False).encode(),
+                                        usedforsecurity=False,
+                                    ).hexdigest()
+                                    if pn <= len(slides)
+                                    else ""
+                                )
                                 comp_data["sourceHash"] = src_hash
 
                                 # Diff against previous compose for same slug
@@ -981,7 +1020,9 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
 
                                 # Cleanup old compose for this slug only
                                 for k in old_keys:
-                                    if k.startswith(f"{compose_prefix}{slug}_") and not k.endswith(f"{slug}_{_prepare_epoch}.json"):
+                                    if k.startswith(f"{compose_prefix}{slug}_") and not k.endswith(
+                                        f"{slug}_{_prepare_epoch}.json"
+                                    ):
                                         try:
                                             _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
                                         except Exception:
@@ -997,6 +1038,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                 if measure_slides:
                     try:
                         from tools.generate import generate_previews
+
                         preview_dir = tmpdir / "preview_out"
                         preview_dir.mkdir(exist_ok=True)
                         webp_files = generate_previews(pptx_path, preview_dir)
@@ -1013,7 +1055,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                         if uploaded:
                             result["previewHint"] = (
                                 f"Preview images generated for {', '.join(uploaded)}. "
-                                f"Call get_preview(deck_id=\"{deck_id}\", slugs=[...]) to view."
+                                f'Call get_preview(deck_id="{deck_id}", slugs=[...]) to view.'
                             )
                     except Exception:
                         logger.warning("preview generation failed", exc_info=True)
@@ -1033,10 +1075,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                 if plan["verify"]:
                     result["measure"] = json.dumps({"error": msg, "traceback": traceback.format_exc()})
                 else:
-                    result["pptx_error"] = (
-                        f"PPTX build failed — the downloadable PPTX may be "
-                        f"stale: {msg}"
-                    )
+                    result["pptx_error"] = f"PPTX build failed — the downloadable PPTX may be stale: {msg}"
 
     return json.dumps(result, ensure_ascii=False)
 
@@ -1051,8 +1090,9 @@ mcp.tool()(contract.arch_diagram)
 
 
 @mcp.tool()
-def run_style_python(purpose: str, code: str, style_name: str | None = None,
-                     ref_styles: list[str] | None = None) -> str:
+def run_style_python(
+    purpose: str, code: str, style_name: str | None = None, ref_styles: list[str] | None = None
+) -> str:
     """Execute Python code in a secure sandbox for style creation/editing.
 
     If style_name is provided, the style HTML is loaded as style.html.
@@ -1121,7 +1161,8 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
         setup_code = "import os\nos.makedirs('ref', exist_ok=True)\n"
         client.invoke_code_interpreter(
             codeInterpreterIdentifier="aws.codeinterpreter.v1",
-            sessionId=session_id, name="executeCode",
+            sessionId=session_id,
+            name="executeCode",
             arguments={"language": "python", "code": setup_code},
         )
 
@@ -1129,14 +1170,16 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
         if file_contents:
             client.invoke_code_interpreter(
                 codeInterpreterIdentifier="aws.codeinterpreter.v1",
-                sessionId=session_id, name="writeFiles",
+                sessionId=session_id,
+                name="writeFiles",
                 arguments={"content": file_contents},
             )
 
         # Execute user code
         response = client.invoke_code_interpreter(
             codeInterpreterIdentifier="aws.codeinterpreter.v1",
-            sessionId=session_id, name="executeCode",
+            sessionId=session_id,
+            name="executeCode",
             arguments={"language": "python", "code": code},
         )
         output = sandbox_mod._collect_stream(response)
@@ -1148,7 +1191,8 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
             read_code = "import sys\ntry:\n    print(open('style.html').read())\nexcept FileNotFoundError:\n    print('__NOT_FOUND__')\n"
             read_resp = client.invoke_code_interpreter(
                 codeInterpreterIdentifier="aws.codeinterpreter.v1",
-                sessionId=session_id, name="executeCode",
+                sessionId=session_id,
+                name="executeCode",
                 arguments={"language": "python", "code": read_code},
             )
             style_html = sandbox_mod._collect_stream(read_resp)
@@ -1166,9 +1210,9 @@ def run_style_python(purpose: str, code: str, style_name: str | None = None,
             # style.html anyway, that would be silent data loss — surface it.
             exists_resp = client.invoke_code_interpreter(
                 codeInterpreterIdentifier="aws.codeinterpreter.v1",
-                sessionId=session_id, name="executeCode",
-                arguments={"language": "python",
-                           "code": "import os\nprint(os.path.exists('style.html'))\n"},
+                sessionId=session_id,
+                name="executeCode",
+                arguments={"language": "python", "code": "import os\nprint(os.path.exists('style.html'))\n"},
             )
             if sandbox_mod._collect_stream(exists_resp).strip() == "True":
                 result["warning"] = (
@@ -1261,6 +1305,7 @@ if _kb_id and _vector_bucket_name and _vector_index_name:
 
 if __name__ == "__main__":
     import uvicorn  # noqa: E402
+
     app = mcp.streamable_http_app()
     app.add_middleware(_CaptureHeadersMiddleware)
     uvicorn.run(app, host="0.0.0.0", port=8000)

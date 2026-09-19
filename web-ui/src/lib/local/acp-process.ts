@@ -210,7 +210,7 @@ export function hasProcess(sessionId: string): boolean {
 }
 
 /** Get or create a process for a sessionId. Restores context if existingSessionId provided. */
-export async function getOrCreateProcess(sessionId: string, agentName: string = "sdpm-spec"): Promise<ProcessState> {
+export async function getOrCreateProcess(sessionId: string, agentName: string = "sdpm-orchestrator"): Promise<ProcessState> {
   let ps = processes.get(sessionId)
   if (ps) {
     ps.lastActivity = Date.now()
@@ -224,7 +224,7 @@ export async function getOrCreateProcess(sessionId: string, agentName: string = 
 }
 
 /** Spawn a brand-new process (no existing session). Returns the new sessionId. */
-export async function createNewProcess(agentName: string = "sdpm-spec"): Promise<ProcessState> {
+export async function createNewProcess(agentName: string = "sdpm-orchestrator"): Promise<ProcessState> {
   await evictIfNeeded()
   const ps = await spawnProcess(agentName)
   processes.set(ps.sessionId!, ps)
@@ -232,7 +232,7 @@ export async function createNewProcess(agentName: string = "sdpm-spec"): Promise
 }
 
 /** Spawn a new process and register it under a client-provided key. */
-export async function createNewProcessFor(clientSessionId: string, agentName: string = "sdpm-spec"): Promise<ProcessState> {
+export async function createNewProcessFor(clientSessionId: string, agentName: string = "sdpm-orchestrator"): Promise<ProcessState> {
   await evictIfNeeded()
   const ps = await spawnProcess(agentName)
   processes.set(clientSessionId, ps)
@@ -241,7 +241,7 @@ export async function createNewProcessFor(clientSessionId: string, agentName: st
 
 /** Send a prompt to a session's process. */
 export async function sendPrompt(sessionId: string, text: string, agentName?: string): Promise<{ sessionId: string; subscribe: (fn: NotifyListener) => () => void; send: () => void }> {
-  const ps = await getOrCreateProcess(sessionId, agentName || "sdpm-spec")
+  const ps = await getOrCreateProcess(sessionId, agentName || "sdpm-orchestrator")
   ps.running = true
   ps.notifications = []; ps.eventIdCounter = 0
   ps.lastActivity = Date.now()

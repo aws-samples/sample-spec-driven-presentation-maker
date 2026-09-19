@@ -9,7 +9,7 @@ Upload a PowerPoint template to S3 and register in DynamoDB.
 # Security: AWS manages infrastructure security. You manage access control,
 # data classification, and IAM policies. See SECURITY.md for details.
 
-Runs analyze-template automatically and stores results in DDB.
+Runs analyze_template automatically and stores results in DDB.
 
 Usage:
     uv run python scripts/upload_template.py \
@@ -50,7 +50,7 @@ def main() -> None:
     print(f"Uploading {args.file} to s3://{args.bucket}/{s3_key}")
     s3.upload_file(args.file, args.bucket, s3_key)
 
-    # Run analyze-template and extract fonts if available
+    # Run analyze_template and extract fonts if available
     analysis_json = "{}"
     fonts = {"fullwidth": None, "halfwidth": None}
     try:

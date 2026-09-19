@@ -87,18 +87,19 @@ class TestLocalRunPython:
             return {"output_path": str(output_path), "warnings": [], "errors": {}}
 
         import sdpm.api
+
         monkeypatch.setattr(sdpm.api, "generate", fake_generate)
         return calls
 
-    def test_write_persists_and_triggers_build_without_any_flag(
-        self, deck_dir: Path, monkeypatch
-    ):
+    def test_write_persists_and_triggers_build_without_any_flag(self, deck_dir: Path, monkeypatch):
         calls = self._patch_generate(monkeypatch)
-        out = json.loads(sandbox_tools.run_python(
-            purpose="write brief-independent slide",
-            code='write_json("slides/added.json", {"elements": []})',
-            deck_id=str(deck_dir),
-        ))
+        out = json.loads(
+            sandbox_tools.run_python(
+                purpose="write brief-independent slide",
+                code='write_json("slides/added.json", {"elements": []})',
+                deck_id=str(deck_dir),
+            )
+        )
         # Persistence is unconditional
         assert (deck_dir / "slides" / "added.json").exists()
         # Build followed the change automatically
@@ -107,35 +108,40 @@ class TestLocalRunPython:
 
     def test_readonly_run_does_not_build(self, deck_dir: Path, monkeypatch):
         calls = self._patch_generate(monkeypatch)
-        out = json.loads(sandbox_tools.run_python(
-            purpose="read deck",
-            code='print(read_json("deck.json")["template"])',
-            deck_id=str(deck_dir),
-        ))
+        out = json.loads(
+            sandbox_tools.run_python(
+                purpose="read deck",
+                code='print(read_json("deck.json")["template"])',
+                deck_id=str(deck_dir),
+            )
+        )
         assert "t.pptx" in out["output"]
         assert calls == []
         assert "pptx" not in out
 
     def test_non_build_write_persists_without_build(self, deck_dir: Path, monkeypatch):
         calls = self._patch_generate(monkeypatch)
-        json.loads(sandbox_tools.run_python(
-            purpose="write brief",
-            code='write_text("specs/brief.md", "# Brief")',
-            deck_id=str(deck_dir),
-        ))
+        json.loads(
+            sandbox_tools.run_python(
+                purpose="write brief",
+                code='write_text("specs/brief.md", "# Brief")',
+                deck_id=str(deck_dir),
+            )
+        )
         assert (deck_dir / "specs" / "brief.md").read_text() == "# Brief"
         assert calls == []
 
     def test_repr_and_dunder_name_are_available(self, deck_dir: Path, monkeypatch):
         self._patch_generate(monkeypatch)
-        out = json.loads(sandbox_tools.run_python(
-            purpose="use repr and __name__",
-            code='print(repr("a\\x0bb")); print(__name__)',
-            deck_id=str(deck_dir),
-        ))
+        out = json.loads(
+            sandbox_tools.run_python(
+                purpose="use repr and __name__",
+                code='print(repr("a\\x0bb")); print(__name__)',
+                deck_id=str(deck_dir),
+            )
+        )
         assert "'a\\x0bb'" in out["output"]
         assert "__main__" in out["output"]
-
 
     def test_committed_import_bundle_is_read_only(self, deck_dir: Path, monkeypatch):
         calls = self._patch_generate(monkeypatch)
@@ -143,15 +149,18 @@ class TestLocalRunPython:
         bundle_file.parent.mkdir(parents=True)
         bundle_file.write_text('{"name":"original"}')
 
-        out = json.loads(sandbox_tools.run_python(
-            purpose="attempt bundle mutation",
-            code='write_json("attachments/imports/key/deck/deck.json", {"name": "changed"})',
-            deck_id=str(deck_dir),
-        ))
+        out = json.loads(
+            sandbox_tools.run_python(
+                purpose="attempt bundle mutation",
+                code='write_json("attachments/imports/key/deck/deck.json", {"name": "changed"})',
+                deck_id=str(deck_dir),
+            )
+        )
 
         assert "read-only" in out["output"]
         assert json.loads(bundle_file.read_text()) == {"name": "original"}
         assert calls == []
+
 
 class TestLocalLintRewriteGuard:
     """Regression: the lint pass must not rewrite files whose sanitized
@@ -161,46 +170,47 @@ class TestLocalLintRewriteGuard:
 
     _patch_generate = TestLocalRunPython._patch_generate
 
-    def test_diagnostics_only_no_rewrite_no_rebuild(
-        self, deck_dir: Path, monkeypatch
-    ):
+    def test_diagnostics_only_no_rewrite_no_rebuild(self, deck_dir: Path, monkeypatch):
         # "missing-type" produces a diagnostic but sanitize changes nothing
         bad = deck_dir / "slides" / "bad.json"
         bad.write_text('{"elements": [{"x": 1}]}')
         mtime = bad.stat().st_mtime_ns
         calls = self._patch_generate(monkeypatch)
 
-        out = json.loads(sandbox_tools.run_python(
-            purpose="read only",
-            code='print("noop")',
-            deck_id=str(deck_dir),
-        ))
+        out = json.loads(
+            sandbox_tools.run_python(
+                purpose="read only",
+                code='print("noop")',
+                deck_id=str(deck_dir),
+            )
+        )
         # Diagnostics are reported...
         assert out.get("errors", {}).get("lintDiagnostics")
         # ...but the file is untouched and no build was triggered
         assert bad.stat().st_mtime_ns == mtime
         assert calls == []
 
-    def test_sanitization_rewrites_and_rebuilds_once(
-        self, deck_dir: Path, monkeypatch
-    ):
+    def test_sanitization_rewrites_and_rebuilds_once(self, deck_dir: Path, monkeypatch):
         # _spAutoFit is deprecated — sanitize removes it (content change)
         auto = deck_dir / "slides" / "auto.json"
-        auto.write_text(json.dumps({"elements": [
-            {"type": "textbox", "text": "t", "x": 1, "y": 1, "w": 10, "h": 10,
-             "_spAutoFit": True},
-        ]}))
+        auto.write_text(
+            json.dumps(
+                {
+                    "elements": [
+                        {"type": "textbox", "text": "t", "x": 1, "y": 1, "w": 10, "h": 10, "_spAutoFit": True},
+                    ]
+                }
+            )
+        )
         calls = self._patch_generate(monkeypatch)
 
-        json.loads(sandbox_tools.run_python(
-            purpose="read only", code='print("noop")', deck_id=str(deck_dir)))
+        json.loads(sandbox_tools.run_python(purpose="read only", code='print("noop")', deck_id=str(deck_dir)))
         # Sanitization changed the file → rewrite + rebuild
         assert "_spAutoFit" not in auto.read_text()
         assert len(calls) == 1
 
         # Second read-only run: content now stable → no further rebuild
-        json.loads(sandbox_tools.run_python(
-            purpose="read only", code='print("noop")', deck_id=str(deck_dir)))
+        json.loads(sandbox_tools.run_python(purpose="read only", code='print("noop")', deck_id=str(deck_dir)))
         assert len(calls) == 1
 
 
@@ -225,19 +235,22 @@ class TestRemoteSaveWorkspace:
         storage = _FakeStorage()
         # _save_deck_workspace reads the sandbox via _collect_stream(response)
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(remote_sandbox, "_collect_stream",
-                       lambda _resp: json.dumps(sandbox_files))
+            mp.setattr(remote_sandbox, "_collect_stream", lambda _resp: json.dumps(sandbox_files))
             warnings, lint, changed = remote_sandbox._save_deck_workspace(
-                client, "session", storage, "deckX", baseline=baseline,
+                client,
+                "session",
+                storage,
+                "deckX",
+                baseline=baseline,
             )
         return storage, changed
 
     def test_only_changed_files_written_back(self):
         baseline = {"specs/brief.md": "old", "deck.json": "{}"}
         sandbox_files = {
-            "specs/brief.md": "new",       # changed
-            "deck.json": "{}",             # unchanged
-            "specs/notes.md": "created",   # new
+            "specs/brief.md": "new",  # changed
+            "deck.json": "{}",  # unchanged
+            "specs/notes.md": "created",  # new
         }
         storage, changed = self._run(sandbox_files, baseline)
         assert changed == ["specs/brief.md", "specs/notes.md"]
@@ -257,8 +270,7 @@ class TestRemoteSaveWorkspace:
         # written back byte-identical (pretty formatting preserved) —
         # mirrors the Local lint rewrite guard.
         pretty = '{\n  "elements": [\n    {\n      "x": 1\n    }\n  ]\n}'
-        storage, changed = self._run(
-            {"slides/bad.json": pretty}, {"slides/bad.json": "old"})
+        storage, changed = self._run({"slides/bad.json": pretty}, {"slides/bad.json": "old"})
         assert changed == ["slides/bad.json"]
         assert storage.uploads["decks/deckX/slides/bad.json"] == pretty.encode()
 
@@ -275,17 +287,15 @@ class TestRemoteSaveWorkspace:
 class TestRemoteContractShape:
     def test_execute_in_sandbox_has_no_save_gate(self):
         import inspect
+
         sig = inspect.signature(remote_sandbox.execute_in_sandbox)
-        assert "save" not in sig.parameters, (
-            "execute_in_sandbox must not gate persistence on a save flag"
-        )
+        assert "save" not in sig.parameters, "execute_in_sandbox must not gate persistence on a save flag"
         assert sig.parameters["persist_writes"].default is True
 
 
 # ---------------------------------------------------------------------------
 # Remote: staged files must not shadow the persisted workspace
 # ---------------------------------------------------------------------------
-
 
 
 # ---------------------------------------------------------------------------
@@ -301,7 +311,8 @@ os.environ.setdefault("RESOURCE_BUCKET", "test-resource")
 import importlib.util  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location(
-    "remote_server_under_test", _root / "servers" / "remote" / "server.py",
+    "remote_server_under_test",
+    _root / "servers" / "remote" / "server.py",
 )
 remote_server = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(remote_server)
@@ -310,12 +321,15 @@ _spec.loader.exec_module(remote_server)
 class TestPostProcessingPlan:
     """The contract matrix, as a pure decision table."""
 
-    @pytest.mark.parametrize("changed,measure,expected", [
-        (False, None, {"build": False, "artifact": False, "verify": False}),
-        (True, None, {"build": True, "artifact": True, "verify": False}),
-        (False, ["a"], {"build": True, "artifact": False, "verify": True}),
-        (True, ["a"], {"build": True, "artifact": True, "verify": True}),
-    ])
+    @pytest.mark.parametrize(
+        "changed,measure,expected",
+        [
+            (False, None, {"build": False, "artifact": False, "verify": False}),
+            (True, None, {"build": True, "artifact": True, "verify": False}),
+            (False, ["a"], {"build": True, "artifact": False, "verify": True}),
+            (True, ["a"], {"build": True, "artifact": True, "verify": True}),
+        ],
+    )
     def test_matrix(self, changed, measure, expected):
         assert remote_server._post_processing_plan(changed, measure) == expected
 
@@ -326,6 +340,88 @@ class TestPostProcessingPlan:
         assert remote_server._build_relevant("specs/outline.md")
         assert not remote_server._build_relevant("specs/brief.md")
         assert not remote_server._build_relevant("attachments/x/data.csv")
+
+
+class TestRemoteApplyStyle:
+    def test_updates_text_color_in_deck_json(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        storage = MagicMock()
+        storage.download_file_from_pptx_bucket.return_value = b"<style>:root { --color-text: #A1B2C3; }</style>"
+        storage.get_deck_json.return_value = {
+            "template": "",
+            "fonts": {"fullwidth": "", "halfwidth": ""},
+            "defaultTextColor": "",
+        }
+        monkeypatch.setattr(remote_server, "_storage", storage)
+        monkeypatch.setattr(remote_server, "_check_deck_access", lambda *args, **kwargs: None)
+        monkeypatch.setattr(remote_server, "_get_user_id", lambda: "user1")
+
+        result = json.loads(remote_server.apply_style("deck1", "custom"))
+
+        assert result["updated"] == {"defaultTextColor": "#A1B2C3"}
+        storage.put_deck_json.assert_called_once()
+        saved = storage.put_deck_json.call_args.args[1]
+        assert saved["defaultTextColor"] == "#A1B2C3"
+
+    @pytest.mark.parametrize("template", ["blank-dark", "blank-dark.pptx"])
+    def test_persists_template_before_upload(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        template: str,
+    ) -> None:
+        storage = MagicMock()
+        storage.download_file_from_pptx_bucket.return_value = b"<style>:root { --color-text: #A1B2C3; }</style>"
+        storage.get_deck_json.return_value = {
+            "template": "",
+            "fonts": {"fullwidth": "", "halfwidth": ""},
+            "defaultTextColor": "",
+        }
+        monkeypatch.setattr(remote_server, "_storage", storage)
+        monkeypatch.setattr(remote_server, "_check_deck_access", lambda *args, **kwargs: None)
+        monkeypatch.setattr(remote_server, "_get_user_id", lambda: "user1")
+        monkeypatch.setattr(
+            remote_server,
+            "analyze_template",
+            lambda template, deck_id="": json.dumps(
+                {
+                    "fonts": {"fullwidth": "JP", "halfwidth": "Latin"},
+                    "slide_size": {"width": 1920, "height": 1080, "ptPerPx": 0.5},
+                }
+            ),
+        )
+
+        result = json.loads(remote_server.apply_style("deck1", "custom", template))
+
+        assert result["updated"]["template"] == template
+        saved = storage.put_deck_json.call_args.args[1]
+        assert saved["template"] == template
+        assert saved["fonts"] == {"fullwidth": "JP", "halfwidth": "Latin"}
+        assert saved["slideSize"]["height"] == 1080
+        storage.upload_file.assert_called_once()
+
+    def test_template_validation_failure_uploads_nothing(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        storage = MagicMock()
+        storage.download_file_from_pptx_bucket.return_value = b"<style></style>"
+        storage.get_deck_json.return_value = {"template": ""}
+        monkeypatch.setattr(remote_server, "_storage", storage)
+        monkeypatch.setattr(remote_server, "_check_deck_access", lambda *args, **kwargs: None)
+        monkeypatch.setattr(remote_server, "_get_user_id", lambda: "user1")
+        monkeypatch.setattr(
+            remote_server,
+            "analyze_template",
+            lambda template, deck_id="": json.dumps({"error": "Template not found"}),
+        )
+
+        with pytest.raises(ValueError, match="Template not found"):
+            remote_server.apply_style("deck1", "custom", "missing")
+
+        storage.upload_file.assert_not_called()
+        storage.put_deck_json.assert_not_called()
 
 
 class _ArtifactStorage(_FakeStorage):
@@ -354,9 +450,9 @@ def remote_rig(monkeypatch, tmp_path):
     calls = {"prepare": 0, "build": 0, "measure": 0, "export_svg": 0}
     storage = _ArtifactStorage()
 
-    def fake_execute(code, storage, region, deck_id=None,
-                     persist_writes=True, files=None):
+    def fake_execute(code, storage, region, deck_id=None, persist_writes=True, files=None):
         return ("ok", [], [], fake_execute.changed_paths)
+
     fake_execute.changed_paths = []
 
     def fake_prepare(deck_id, user_id, storage):
@@ -378,9 +474,9 @@ def remote_rig(monkeypatch, tmp_path):
         return tmp_path / "measure.svg"  # never created → compose skipped
 
     import tools.generate as gen_mod
+
     monkeypatch.setattr(gen_mod, "_prepare_workspace", fake_prepare)
-    monkeypatch.setattr(gen_mod, "generate_previews",
-                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lo")))
+    monkeypatch.setattr(gen_mod, "generate_previews", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lo")))
     monkeypatch.setattr(remote_server, "_build_pptx", fake_build)
     monkeypatch.setattr(remote_server, "_run_measure", fake_measure)
     monkeypatch.setattr(remote_server, "_export_svg", fake_export_svg)
@@ -395,10 +491,14 @@ class TestRemoteRunPythonBranching:
     """Exercise the REAL run_python wiring for the 4-pattern contract matrix."""
 
     def _run(self, measure_slides=None):
-        return json.loads(remote_server.run_python(
-            purpose="t", code="print(1)", deck_id="d1",
-            measure_slides=measure_slides,
-        ))
+        return json.loads(
+            remote_server.run_python(
+                purpose="t",
+                code="print(1)",
+                deck_id="d1",
+                measure_slides=measure_slides,
+            )
+        )
 
     def test_no_change_no_measure_does_nothing(self, remote_rig):
         fake_execute, storage, calls = remote_rig
@@ -452,8 +552,7 @@ class TestRemoteRunPythonBranching:
         out = self._run()
         assert "pptx_error" not in out
         # Auto-refresh must not accumulate orphaned PPTX objects
-        storage._s3.delete_object.assert_called_once_with(
-            Bucket="test-pptx", Key="pptx/d1/old-artifact.pptx")
+        storage._s3.delete_object.assert_called_once_with(Bucket="test-pptx", Key="pptx/d1/old-artifact.pptx")
 
     def test_first_artifact_deletes_nothing(self, remote_rig):
         fake_execute, storage, calls = remote_rig

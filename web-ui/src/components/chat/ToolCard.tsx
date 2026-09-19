@@ -33,7 +33,7 @@
 import {
   BookOpen, List, Search, FolderPlus, Pencil, Image,
   Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench,
-  Check, FileText, Download, Play, Code, Palette,
+  Check, FileText, Download, Code, Palette,
   LayoutTemplate, Package, AlertCircle, RefreshCw,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
@@ -83,7 +83,6 @@ export const TOOL_META: Record<string, ToolMeta> = {
   // MCP Server tools
   init_presentation:  { Icon: FolderPlus,      label: "Initializing deck",      category: "build" },
   analyze_template:   { Icon: LayoutTemplate,  label: "Analyzing template",     category: "explore" },
-  start_presentation: { Icon: Play,            label: "Starting workflow",       category: "explore" },
   list_templates:     { Icon: LayoutTemplate,  label: "Listing templates",      category: "explore" },
   list_styles:        { Icon: List,            label: "Listing styles",         category: "explore" },
   apply_style:        { Icon: Palette,         label: "Applying style",         category: "build" },
@@ -102,7 +101,6 @@ export const TOOL_META: Record<string, ToolMeta> = {
   hearing:            { Icon: BookOpen,        label: "Asking questions",       category: "hearing" },
   spec_driven_presentation_maker_init_presentation:  { Icon: FolderPlus,     label: "Initializing deck",     category: "build" },
   spec_driven_presentation_maker_analyze_template:   { Icon: LayoutTemplate, label: "Analyzing template",    category: "explore" },
-  spec_driven_presentation_maker_start_presentation: { Icon: Play,           label: "Starting workflow",      category: "explore" },
   spec_driven_presentation_maker_list_templates:     { Icon: LayoutTemplate, label: "Listing templates",     category: "explore" },
   spec_driven_presentation_maker_list_styles:      { Icon: List,           label: "Listing styles",        category: "explore" },
   spec_driven_presentation_maker_apply_style:      { Icon: Palette,        label: "Applying style",        category: "build" },

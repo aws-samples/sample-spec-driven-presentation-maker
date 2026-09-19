@@ -181,7 +181,7 @@ Audience: Developers
         if lint_outline(outline_path.read_text(encoding="utf-8")):
             result.setdefault("warnings", {})["outline"] = (
                 "outline.md format violation. "
-                "Read workflow `create-new-1-outline` for the correct format."
+                "Read workflow `orchestrator` for the outline format."
             )
 
     # Lint and sanitize slide JSON

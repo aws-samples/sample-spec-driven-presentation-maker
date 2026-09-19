@@ -91,7 +91,7 @@ class PPTXBuilder(
             raise ValueError(
                 "'fonts' is required. Set 'fonts' in presentation.json "
                 '(e.g. {"fullwidth": "メイリオ", "halfwidth": "Calibri"}). '
-                "Run analyze-template to detect fonts from your template."
+                "Run analyze_template to detect fonts from your template."
             )
         if default_text_color is None:
             raise ValueError(
