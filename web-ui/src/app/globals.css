@@ -88,6 +88,12 @@
   --shadow-card: 0 1px 2px oklch(0 0 0 / 30%), 0 8px 24px oklch(0 0 0 / 25%);
   --shadow-lift: 0 2px 4px oklch(0 0 0 / 35%), 0 16px 48px oklch(0 0 0 / 40%);
   --shadow-slide: 0 4px 24px oklch(0 0 0 / 45%), 0 0 0 1px oklch(1 0 0 / 6%);
+  --storyboard-paper: oklch(0.245 0.006 260);
+  --storyboard-ink: oklch(0.95 0 0);
+  --storyboard-ink-2: oklch(0.78 0 0);
+  --storyboard-ink-3: oklch(0.62 0 0);
+  --storyboard-rule: oklch(1 0 0 / 10%);
+  --storyboard-shadow: 0 4px 24px oklch(0 0 0 / 55%), 0 0 0 1px oklch(1 0 0 / 10%);
 
   /* Agent identity tokens are used directly; no waiting-color aliases needed. */
   --background: oklch(0.11 0.005 260);
@@ -147,6 +153,12 @@
   --shadow-card: 0 1px 2px oklch(0.2 0.02 260 / 8%), 0 8px 24px oklch(0.2 0.02 260 / 8%);
   --shadow-lift: 0 2px 4px oklch(0.2 0.02 260 / 10%), 0 16px 48px oklch(0.2 0.02 260 / 14%);
   --shadow-slide: 0 6px 28px oklch(0.2 0.02 260 / 18%), 0 0 0 1px oklch(0.2 0.02 260 / 6%);
+  --storyboard-paper: var(--card);
+  --storyboard-ink: oklch(0.22 0.01 260);
+  --storyboard-ink-2: oklch(0.42 0.008 260);
+  --storyboard-ink-3: oklch(0.55 0.006 260);
+  --storyboard-rule: oklch(0.2 0.01 260 / 10%);
+  --storyboard-shadow: var(--shadow-slide);
   --background: oklch(0.975 0.004 85);
   --background-raised: oklch(0.995 0.002 85);
   --background-hover: oklch(0.955 0.005 85);
@@ -233,6 +245,238 @@ body {
 /* Slide shadow keeps white previews distinct in both studio themes. */
 .slide-shadow {
   box-shadow: var(--shadow-slide);
+}
+
+/* ── Outline storyboard ── */
+.storyboard-view {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px 28px 120px;
+}
+.storyboard-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 6px 0 26px;
+}
+.storyboard-title-block h1 {
+  margin: 0;
+  color: var(--foreground);
+  font-family: var(--font-document);
+  font-size: 28px;
+  font-weight: 550;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+.storyboard-title-block p {
+  margin: 8px 0 0;
+  color: var(--foreground-muted);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+}
+.storyboard-layout-toggle {
+  display: inline-flex;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 500;
+}
+.storyboard-layout-toggle button {
+  padding: 6px 12px;
+  color: var(--foreground-secondary);
+  cursor: pointer;
+}
+.storyboard-layout-toggle button[aria-pressed="true"] {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+.storyboard-layout-toggle button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.storyboard-chapter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 16px;
+  margin: 38px 0 16px;
+}
+.storyboard-header + .storyboard-chapter {
+  margin-top: 0;
+}
+.storyboard-chapter-number,
+.storyboard-chapter-count {
+  color: var(--foreground-muted);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+}
+.storyboard-chapter-number {
+  font-weight: 500;
+  letter-spacing: 0.1em;
+}
+.storyboard-chapter-count {
+  font-size: 11px;
+}
+.storyboard-chapter h2 {
+  min-width: 2em;
+  margin: 0;
+  color: var(--foreground);
+  font-family: var(--font-document);
+  font-size: 17px;
+  font-weight: 550;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+.storyboard-chapter-rule {
+  grid-column: 1 / -1;
+  height: 1px;
+  margin-top: 6px;
+  background: var(--border);
+}
+.storyboard-slides {
+  display: grid;
+  gap: 26px 22px;
+  align-items: stretch;
+}
+.storyboard-layout-grid .storyboard-slides {
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+}
+.storyboard-layout-column .storyboard-slides {
+  grid-template-columns: minmax(0, 760px);
+  justify-content: center;
+}
+.storyboard-layout-column .storyboard-header,
+.storyboard-layout-column .storyboard-chapter,
+.storyboard-layout-column .storyboard-prose {
+  max-width: 760px;
+  margin-right: auto;
+  margin-left: auto;
+}
+.storyboard-slide {
+  position: relative;
+  container-type: inline-size;
+}
+.storyboard-paper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: calc(100cqw * 9 / 16);
+  padding: 6cqw 6.5cqw 5cqw;
+  color: var(--storyboard-ink);
+  background: var(--storyboard-paper);
+  border-radius: var(--radius);
+  box-shadow: var(--storyboard-shadow);
+}
+.storyboard-slide-number {
+  position: absolute;
+  z-index: 1;
+  top: -10px;
+  left: -10px;
+  width: 28px;
+  height: 28px;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border-radius: 50%;
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 28px;
+  text-align: center;
+  user-select: none;
+}
+.storyboard-slide-number[data-active="true"] {
+  box-shadow: var(--shadow-card), 0 0 0 3px var(--background), 0 0 0 5px var(--storyboard-ink-3);
+}
+.storyboard-slug {
+  margin-bottom: 2.6cqw;
+  color: var(--storyboard-ink-3);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 2.2cqw;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+.storyboard-slide-title {
+  margin: 0 0 3cqw;
+  color: var(--storyboard-ink);
+  font-family: var(--font-document);
+  font-size: 4.8cqw;
+  font-weight: 550;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+.storyboard-body {
+  min-height: 1.6em;
+  margin: 0 0 4cqw;
+  color: var(--storyboard-ink-2);
+  font-family: var(--font-ui);
+  font-size: 2.7cqw;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.storyboard-footer {
+  display: grid;
+  gap: 1.2cqw;
+  margin-top: auto;
+  padding-top: 2.2cqw;
+  color: var(--storyboard-ink-3);
+  border-top: 1px solid var(--storyboard-rule);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 1.9cqw;
+  font-weight: 400;
+  line-height: 1.45;
+}
+.storyboard-footer div {
+  display: grid;
+  grid-template-columns: 8cqw minmax(0, 1fr);
+  gap: 1.6cqw;
+}
+.storyboard-footer b {
+  color: var(--storyboard-ink-3);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.storyboard-tbd {
+  display: inline-block;
+  padding: 0 0.4em;
+  margin: 0 0.15em;
+  color: var(--storyboard-ink);
+  border: 1px solid color-mix(in oklch, var(--storyboard-ink) 28%, transparent);
+  border-radius: 4px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+.storyboard-prose {
+  max-width: 760px;
+  color: var(--foreground-muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.storyboard-prose p {
+  margin: 16px 0;
+}
+@media (max-width: 639px) {
+  .storyboard-view {
+    padding: 22px 20px 96px;
+  }
+  .storyboard-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .storyboard-layout-grid .storyboard-slides {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ── Spec waiting states ── */

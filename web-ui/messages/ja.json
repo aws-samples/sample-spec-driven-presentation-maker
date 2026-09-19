@@ -119,7 +119,12 @@
     "body": "本文",
     "visual": "ビジュアル",
     "evidence": "根拠",
-    "emptyState": "エージェントがアウトラインを書くとここに表示されます。"
+    "emptyState": "エージェントがアウトラインを書くとここに表示されます。",
+    "layoutLabel": "絵コンテのレイアウト",
+    "gridLayout": "グリッド",
+    "columnLayout": "カラム",
+    "slideCount": "{count, plural, other {スライド # 枚}}",
+    "chapterCount": "{count, plural, other {# 章}}"
   },
   "chatInput": {
     "maxFilesError": "一度に添付できるファイルは 5 つまでです。",

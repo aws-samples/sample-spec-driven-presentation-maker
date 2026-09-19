@@ -1,303 +1,146 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-/**
- * OutlineView v5 tests — slide narrative layout:
- * number rail + card, skeleton/enriched structure, spec sheet,
- * section/prose display, state frames, auto-scroll, empty state.
- * No light-table mode, no clipping structures.
- */
 
-import { describe, it, expect, afterEach } from "vitest"
-import { screen, cleanup } from "@testing-library/react"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { OutlineView } from "./OutlineView"
 
-afterEach(cleanup)
+beforeEach(() => localStorage.clear())
+afterEach(() => {
+  cleanup()
+  localStorage.clear()
+})
+
+const storyboard = [
+  "# Product strategy",
+  "Introductory context.",
+  "## Opening",
+  "- [welcome] Welcome to the presentation",
+  "  - body: The full opening message",
+  "  - visual: Hero image with #123456 background",
+  "  - evidence: Customer study",
+  "- [agenda] Today’s agenda",
+  "## Decision",
+  "- [recommendation] Choose the focused option",
+  "  - body: First supporting point.",
+  "  - body: Second supporting point.",
+  "  - visual: [TBD: comparison chart]",
+  "  - evidence: Decision memo",
+].join("\n")
 
 describe("OutlineView", () => {
   describe("empty state", () => {
-    it("shows empty state for null content", () => {
-      renderWithIntl(<OutlineView content={null} />)
+    it.each([null, "", "\n\n\n"])("shows the empty state for empty content", (content) => {
+      renderWithIntl(<OutlineView content={content} />)
       expect(screen.getByText(/outline will appear/i)).toBeTruthy()
     })
-
-    it("shows empty state for empty string", () => {
-      renderWithIntl(<OutlineView content="" />)
-      expect(screen.getByText(/outline will appear/i)).toBeTruthy()
-    })
-
-    it("does not crash on whitespace-only content", () => {
-      const { container } = renderWithIntl(<OutlineView content={"\n\n\n"} />)
-      expect(container.firstChild).toBeTruthy()
-    })
   })
 
-  describe("number rail structure", () => {
-    const md = [
-      "- [cover] Cover slide",
-      "- [agenda] Agenda",
-      "- [overview] Product overview",
-    ].join("\n")
+  it("renders the deck title and translated document counts", () => {
+    renderWithIntl(<OutlineView content={storyboard} />)
 
-    it("renders slide entries with number rail grid (36px + 1fr)", () => {
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      const slideRows = container.querySelectorAll("[data-slide-slug]")
-      expect(slideRows.length).toBe(3)
-      // Each row uses inline grid-template-columns
-      slideRows.forEach((row) => {
-        expect((row as HTMLElement).style.gridTemplateColumns).toBe("36px 1fr")
-      })
-    })
-
-    it("renders sequential slide numbers", () => {
-      renderWithIntl(<OutlineView content={md} />)
-      expect(screen.getByText("1")).toBeTruthy()
-      expect(screen.getByText("2")).toBeTruthy()
-      expect(screen.getByText("3")).toBeTruthy()
-    })
-
-    it("number rail uses tabular-nums", () => {
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      const numberSpans = container.querySelectorAll("[data-slide-slug] > span:first-child")
-      numberSpans.forEach((span) => {
-        expect(span.className).toContain("tabular-nums")
-      })
-    })
-
-    it("active slide number is inverted (bg-foreground text-background)", () => {
-      const md = "- [s1] A\n  - body: Hello"
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      const active = container.querySelector("[data-state='active']")
-      const numSpan = active?.querySelector(":scope > span:first-child")
-      expect(numSpan?.className).toContain("bg-foreground")
-      expect(numSpan?.className).toContain("text-background")
-    })
-
-    it("skeleton slide numbers are muted (not inverted)", () => {
-      const md = "- [s1] A\n- [s2] B"
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      const skeleton = container.querySelector("[data-state='skeleton']")
-      const numSpan = skeleton?.querySelector(":scope > span:first-child")
-      expect(numSpan?.className).not.toContain("bg-foreground")
-      expect(numSpan?.className).toContain("text-foreground-secondary")
-    })
+    expect(screen.getByRole("heading", { level: 1, name: "Product strategy" })).toBeTruthy()
+    expect(screen.getByText(/3 slides/)).toBeTruthy()
+    expect(screen.getByText(/2 chapters/)).toBeTruthy()
+    expect(screen.queryByText("# Product strategy")).toBeNull()
   })
 
-  describe("skeleton slide (slim dashed card)", () => {
-    const md = "- [cover] Cover slide\n- [agenda] Agenda items"
+  it("renders chapter indices, headings, slide counts, and rules", () => {
+    const { container } = renderWithIntl(<OutlineView content={storyboard} />)
+    const chapters = container.querySelectorAll("[data-entry-type='section']")
 
-    it("renders with dashed border", () => {
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      const cards = container.querySelectorAll("[data-state='skeleton']")
-      expect(cards.length).toBe(2)
-      // Each skeleton card contains a dashed-border div
-      cards.forEach((card) => {
-        const dashedDiv = card.querySelector(".border-dashed")
-        expect(dashedDiv).toBeTruthy()
-      })
-    })
-
-    it("displays slug as eyebrow in mono font", () => {
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      const eyebrows = container.querySelectorAll(".font-mono.text-\\[11px\\]")
-      expect(eyebrows.length).toBeGreaterThanOrEqual(2)
-      expect(eyebrows[0].textContent).toBe("cover")
-    })
-
-    it("displays message text", () => {
-      renderWithIntl(<OutlineView content={md} />)
-      expect(screen.getByText("Cover slide")).toBeTruthy()
-      expect(screen.getByText("Agenda items")).toBeTruthy()
-    })
+    expect(chapters).toHaveLength(2)
+    expect(chapters[0].querySelector(".storyboard-chapter-number")?.textContent).toBe("01")
+    expect(chapters[1].querySelector(".storyboard-chapter-number")?.textContent).toBe("02")
+    expect(screen.getByRole("heading", { level: 2, name: "Opening" })).toBeTruthy()
+    expect(screen.getByRole("heading", { level: 2, name: "Decision" })).toBeTruthy()
+    expect(chapters[0].textContent).toContain("2 slides")
+    expect(chapters[1].textContent).toContain("1 slide")
+    expect(container.querySelectorAll(".storyboard-chapter-rule")).toHaveLength(2)
   })
 
-  describe("enriched slide (solid border face)", () => {
-    const enrichedMd = [
-      "## Opening",
-      "- [intro] Welcome to our presentation",
-      "  - body: Thank you for being here today",
-      "  - evidence: Survey results from Q3",
-      "  - visual: Bar chart comparing quarters",
-      "- [next-steps] What comes next",
-    ].join("\n")
+  it("renders slides in source order with sequential number badges", () => {
+    const { container } = renderWithIntl(<OutlineView content={storyboard} />)
+    const slides = [...container.querySelectorAll<HTMLElement>("[data-slide-slug]")]
 
-    it("renders enriched slide with solid border (no dashed)", () => {
-      const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
-      const active = container.querySelector("[data-state='active']")
-      expect(active).toBeTruthy()
-      // The card inside should have border-solid
-      const face = active?.querySelector(".border-solid")
-      expect(face).toBeTruthy()
-    })
-
-    it("renders accent rule bar", () => {
-      const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
-      const rules = container.querySelectorAll("[aria-hidden='true'].bg-foreground\\/85")
-      expect(rules.length).toBeGreaterThanOrEqual(1)
-    })
-
-    it("renders body as plain prose without quotes", () => {
-      renderWithIntl(<OutlineView content={enrichedMd} />)
-      const body = screen.getByText(/Thank you for being here today/)
-      expect(body.closest("blockquote")).toBeNull()
-      expect(body.className).not.toContain("italic")
-      expect(body.textContent).toBe("Thank you for being here today")
-    })
-
-    it("renders spec sheet with Evidence label and content", () => {
-      renderWithIntl(<OutlineView content={enrichedMd} />)
-      expect(screen.getByText("Evidence")).toBeTruthy()
-      expect(screen.getByText(/Survey results from Q3/)).toBeTruthy()
-    })
-
-    it("renders spec sheet with Visual label and content", () => {
-      renderWithIntl(<OutlineView content={enrichedMd} />)
-      expect(screen.getByText("Visual")).toBeTruthy()
-      expect(screen.getByText(/Bar chart comparing quarters/)).toBeTruthy()
-    })
-
-    it("spec sheet uses 92px label column grid", () => {
-      const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
-      const specRows = container.querySelectorAll(".grid-cols-\\[92px_1fr\\]")
-      expect(specRows.length).toBeGreaterThanOrEqual(2)
-    })
-
-    it("renders slide number and slug", () => {
-      renderWithIntl(<OutlineView content={enrichedMd} />)
-      expect(screen.getByText("intro")).toBeTruthy()
-      expect(screen.getByText("1")).toBeTruthy()
-    })
+    expect(slides.map((slide) => slide.dataset.slideSlug)).toEqual([
+      "welcome",
+      "agenda",
+      "recommendation",
+    ])
+    expect(slides.map((slide) => slide.querySelector(".storyboard-slide-number")?.textContent)).toEqual([
+      "1",
+      "2",
+      "3",
+    ])
   })
 
-  describe("no clipping structures", () => {
-    const md = "- [s1] A long message\n  - body: Details\n  - evidence: Data"
+  it("shows the title, complete body, visual, and evidence", () => {
+    renderWithIntl(<OutlineView content={storyboard} />)
 
-    it("does not use aspect-ratio forcing", () => {
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      const allElements = container.querySelectorAll("*")
-      allElements.forEach((el) => {
-        const style = (el as HTMLElement).style
-        expect(style.aspectRatio).toBeFalsy()
-      })
-    })
-
-    it("does not use overflow-hidden on content areas", () => {
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      // The only overflow-y-auto is the outer scroll container
-      const overflowHidden = container.querySelectorAll(".overflow-hidden")
-      expect(overflowHidden.length).toBe(0)
-    })
-
-    it("does not use absolute inset for content", () => {
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      const absoluteEls = container.querySelectorAll(".absolute")
-      expect(absoluteEls.length).toBe(0)
-    })
+    expect(screen.getByRole("heading", { level: 3, name: "Welcome to the presentation" })).toBeTruthy()
+    expect(screen.getByText("The full opening message")).toBeTruthy()
+    expect(screen.getByText("First supporting point. Second supporting point.")).toBeTruthy()
+    expect(screen.getAllByText("VISUAL")).toHaveLength(2)
+    expect(screen.getAllByText("SRC")).toHaveLength(2)
+    expect(screen.getByText(/Hero image with/)).toBeTruthy()
+    expect(screen.getByText("Customer study")).toBeTruthy()
   })
 
-  describe("section and prose rendering", () => {
-    const mixedMd = [
-      "This is introductory prose.",
-      "## Section One",
-      "- [s1] First slide",
-      "  - body: Hello",
-      "More prose after the slide.",
-      "## Section Two",
-      "- [s2] Second slide",
-    ].join("\n")
+  it("uses the same paper card for a skeleton without rendering a footer", () => {
+    const { container } = renderWithIntl(<OutlineView content={storyboard} />)
+    const skeleton = container.querySelector<HTMLElement>("[data-slide-slug='agenda']")
 
-    it("renders prose entries", () => {
-      renderWithIntl(<OutlineView content={mixedMd} />)
-      expect(screen.getByText("This is introductory prose.")).toBeTruthy()
-      expect(screen.getByText("More prose after the slide.")).toBeTruthy()
-    })
-
-    it("renders section headings as h2", () => {
-      renderWithIntl(<OutlineView content={mixedMd} />)
-      const headings = screen.getAllByRole("heading", { level: 2 })
-      expect(headings.length).toBe(2)
-      expect(headings[0].textContent).toContain("Section One")
-      expect(headings[1].textContent).toContain("Section Two")
-    })
-
-    it("section entries have data-entry-type=section", () => {
-      const { container } = renderWithIntl(<OutlineView content={mixedMd} />)
-      const sections = container.querySelectorAll("[data-entry-type='section']")
-      expect(sections.length).toBe(2)
-    })
-
-    it("prose entries have data-entry-type=prose", () => {
-      const { container } = renderWithIntl(<OutlineView content={mixedMd} />)
-      const proseBlocks = container.querySelectorAll("[data-entry-type='prose']")
-      expect(proseBlocks.length).toBe(2)
-    })
+    expect(skeleton?.dataset.state).toBe("skeleton")
+    expect(skeleton?.querySelector(".storyboard-paper")).toBeTruthy()
+    expect(skeleton?.querySelector(".storyboard-footer")).toBeNull()
+    expect(skeleton?.querySelector(".border-dashed")).toBeNull()
   })
 
-  describe("TBD badges", () => {
-    it("renders [TBD] as a dashed ink chip (not amber)", () => {
-      const md = "- [s1] Slide\n  - evidence: [TBD] data pending"
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      const tbd = container.querySelector("[class*='border-dashed'][class*='border-foreground']")
-      expect(tbd).toBeTruthy()
-      expect(tbd?.textContent).toContain("TBD")
-      expect(tbd?.className).not.toContain("brand-amber")
-    })
+  it("renders TBD detail as an outlined mono chip", () => {
+    const { container } = renderWithIntl(<OutlineView content={storyboard} />)
+    const chip = screen.getByText("TBD: comparison chart")
 
-    it("renders [TBD: detail] with detail text", () => {
-      const md = "- [s1] Slide\n  - visual: [TBD: need screenshot]"
-      renderWithIntl(<OutlineView content={md} />)
-      expect(screen.getByText(/TBD: need screenshot/)).toBeTruthy()
-    })
+    expect(chip.className).toContain("storyboard-tbd")
+    expect(container.querySelectorAll(".storyboard-tbd")).toHaveLength(1)
   })
 
-  describe("frame states", () => {
-    it("skeleton slides have data-state=skeleton", () => {
-      const md = "- [s1] A\n- [s2] B"
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      const cards = container.querySelectorAll("[data-state='skeleton']")
-      expect(cards.length).toBe(2)
-    })
+  it("retains active, done, and skeleton state semantics", () => {
+    const { container } = renderWithIntl(<OutlineView content={storyboard} />)
 
-    it("active slide has data-state=active", () => {
-      const md = "- [s1] A\n  - body: X"
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      const active = container.querySelector("[data-state='active']")
-      expect(active).toBeTruthy()
-    })
-
-    it("done slides have data-state=done", () => {
-      const md = "- [s1] A\n  - body: X\n- [s2] B\n  - body: Y"
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      const done = container.querySelectorAll("[data-state='done']")
-      expect(done.length).toBe(1)
-    })
+    expect(container.querySelectorAll("[data-state='done']")).toHaveLength(1)
+    expect(container.querySelectorAll("[data-state='active']")).toHaveLength(1)
+    expect(container.querySelectorAll("[data-state='skeleton']")).toHaveLength(1)
+    expect(
+      container.querySelector("[data-state='active'] .storyboard-slide-number")?.getAttribute("data-active")
+    ).toBe("true")
   })
 
-  describe("document surface class", () => {
-    it("applies document-surface class for section heading font scoping", () => {
-      const md = "- [s1] A\n  - body: Text"
-      const { container } = renderWithIntl(<OutlineView content={md} />)
-      expect(container.querySelector(".document-surface")).toBeTruthy()
+  it("switches layout classes and persists the selected layout", async () => {
+    const firstRender = renderWithIntl(<OutlineView content={storyboard} />)
+    const view = firstRender.container.querySelector(".storyboard-view")
+
+    expect(view?.className).toContain("storyboard-layout-grid")
+    fireEvent.click(screen.getByRole("button", { name: "Column" }))
+    expect(view?.className).toContain("storyboard-layout-column")
+    expect(localStorage.getItem("sdpm-outline-layout")).toBe("column")
+
+    firstRender.unmount()
+    const secondRender = renderWithIntl(<OutlineView content={storyboard} />)
+    await waitFor(() => {
+      expect(secondRender.container.querySelector(".storyboard-view")?.className).toContain(
+        "storyboard-layout-column"
+      )
     })
+    expect(screen.getByRole("button", { name: "Column" }).getAttribute("aria-pressed")).toBe("true")
   })
 
-  describe("no light-table mode (v5: single view)", () => {
-    it("uses same single-column layout for all-skeleton slides", () => {
-      const skeletonMd = "- [s1] A\n- [s2] B"
-      const { container } = renderWithIntl(<OutlineView content={skeletonMd} />)
-      // No light-table grid
-      expect(container.querySelector("[data-view='light-table']")).toBeNull()
-      // Uses the number-rail grid structure
-      const slideRows = container.querySelectorAll("[data-slide-slug]")
-      expect(slideRows.length).toBe(2)
-    })
+  it("renders non-title prose entries as muted prose blocks", () => {
+    const { container } = renderWithIntl(<OutlineView content={storyboard} />)
 
-    it("uses same layout when any slide has sub-items", () => {
-      const enrichedMd = "- [s1] A\n  - body: Hello\n- [s2] B"
-      const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
-      expect(container.querySelector("[data-view='light-table']")).toBeNull()
-      const slideRows = container.querySelectorAll("[data-slide-slug]")
-      expect(slideRows.length).toBe(2)
-    })
+    expect(screen.getByText("Introductory context.")).toBeTruthy()
+    expect(container.querySelectorAll("[data-entry-type='prose']")).toHaveLength(1)
+    expect(container.querySelector(".storyboard-prose")?.textContent).toBe("Introductory context.")
   })
 })

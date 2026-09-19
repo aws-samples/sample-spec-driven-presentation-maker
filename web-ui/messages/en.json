@@ -119,7 +119,12 @@
     "body": "Body",
     "visual": "Visual",
     "evidence": "Evidence",
-    "emptyState": "Outline will appear here when the agent writes it."
+    "emptyState": "Outline will appear here when the agent writes it.",
+    "layoutLabel": "Storyboard layout",
+    "gridLayout": "Grid",
+    "columnLayout": "Column",
+    "slideCount": "{count, plural, one {# slide} other {# slides}}",
+    "chapterCount": "{count, plural, one {# chapter} other {# chapters}}"
   },
   "chatInput": {
     "maxFilesError": "Maximum 5 files can be attached at once.",
