@@ -80,7 +80,7 @@ def _orchestrator(*wiring: Part, use_composer: bool = True, **overrides) -> Mode
 
 
 _ORCHESTRATOR = _orchestrator()
-# Web UI "Spec" (dialogue, approvals) / "Vibe" (fast, from material) — the pick is an
+# Web UI "Spec" (dialogue) / "Vibe" (fast, from material) — the pick is an
 # environment fact the workflow cannot know, so it is passed as a one-line token.
 _ORCHESTRATOR_DIALOGUE = _orchestrator(_INTERACTION_DIALOGUE)
 _ORCHESTRATOR_FAST = _orchestrator(_INTERACTION_FAST)

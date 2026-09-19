@@ -23,8 +23,8 @@ Entries before v0.5.0 were written retroactively as summaries.
 ### Changed
 
 - **Web UI Spec / Vibe and "Parallel agents" keep their behaviour without personas** —
-  the orchestrator workflow defines two tokens, `Interaction mode: dialogue` (confirm
-  brief → outline → art direction) and `Interaction mode: fast` (build from material);
+  the orchestrator workflow defines two tokens, `Interaction mode: dialogue` (the user
+  wants to shape the deck in conversation) and `Interaction mode: fast` (build from material);
   the cloud agent passes the token as a one-line system part and the local ACP route
   prepends it to a session's first prompt. `single` (parallel agents off) is the same
   workflow with no composer sub-agents, composing slides itself.
