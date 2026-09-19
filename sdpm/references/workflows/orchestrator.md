@@ -16,13 +16,13 @@ hand edits back → `read_guides(["hand-edit-sync"])`; translating a deck →
 
 ## The deck
 
-`init_presentation(name)` creates the deck (`deck.json`, `specs/`). Supplied files come in via
-`import_attachment(...)` and land under `attachments/`. Composers see only the deck directory —
-`specs/`, `deck.json`, `attachments/` — so everything they need must be there:
+`init_presentation(name)` creates the deck (`deck.json`, `specs/`). Files the user supplies
+come in via `import_attachment(...)` and land under `attachments/`; URLs need no import.
+Composers see only the deck directory and what `specs/` points them to:
 
 | File | What it is |
 |---|---|
-| `specs/brief.md` | Goal, audience, message, tone, constraints — and every fact, number and quote from the material, with citations. Anything left out cannot appear on a slide. |
+| `specs/brief.md` | The agreement on who the audience is, what they should believe or do afterwards, and why — outline, art direction and composers are all judged against it. Do not transcribe the material: list each source under **Sources** with its URL or `attachments/` path, what it contains, and which slides need which part (section, page range). Composers read those themselves with `read_attachment` (URLs work directly, paged). Write out only what has no source to point at — pasted text, the user's answers, constraints — and the few numbers and quotes the message hinges on. |
 | `specs/outline.md` | Parsed by the web UI, so the format is fixed: `## Heading` for a chapter, `- [slug] message` for a slide (kebab-case slug → `slides/<slug>.json`), optional indented `  - key: value` sub-items with exactly the keys `what_to_say` / `evidence` / `what_to_show` / `notes`; `[TBD]` marks missing evidence. Slugs sharing a visual base share a prefix (`demo-1`, `demo-2`). |
 | `specs/art-direction.html` + `deck.json` | Choose a template (`list_templates()`, `analyze_template(...)`) and a style (`list_styles()`), then `apply_style(deck_id, style, template)` — it writes both files. Frozen afterwards: parallel composers depend on them. |
 
