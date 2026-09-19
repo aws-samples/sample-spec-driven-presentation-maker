@@ -5,7 +5,10 @@
 ## Engine Version
 - Single source of truth: `__version__` in `sdpm/sdpm/__init__.py`
 - `sdpm/pyproject.toml` uses dynamic version, auto-read from `__init__.py`
-- When changing version, edit `__init__.py` only
+- When changing version, edit `__init__.py` — **and the three client manifests**,
+  which carry their own copy and are guarded by tests:
+  `plugin.json`, `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`
+  (the Claude Code one had no guard until v0.8.0 and had drifted to 0.3.0)
 
 ## SemVer
 - MAJOR: Breaking changes to Engine API (e.g., existing JSON no longer works)

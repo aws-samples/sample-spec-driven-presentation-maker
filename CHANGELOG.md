@@ -10,6 +10,8 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-20
+
 ### Added
 
 - **Scaffold pass in the compose workflow** — before the parallel content
@@ -153,6 +155,12 @@ Entries before v0.5.0 were written retroactively as summaries.
   model identifier is invalid`.
 
 ### Fixed
+
+- **The Claude Code plugin manifest tracks the engine version again** —
+  `.claude-plugin/plugin.json` sat at `0.3.0` while the engine reached `0.7.1`.
+  `plugin.json` and `.codex-plugin/plugin.json` each had a test asserting they
+  follow `sdpm.__version__`; this manifest had none, so the drift went unnoticed
+  across several releases. It now carries the same guard.
 
 
 - **The knowledge base id is resolved per request instead of at import** — the
