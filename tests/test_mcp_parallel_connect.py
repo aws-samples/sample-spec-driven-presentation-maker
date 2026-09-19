@@ -32,41 +32,19 @@ if str(AGENT_DIR) not in sys.path:
 
 
 def _factory():
-    """Load just `_prewarm_mcp_clients` out of agent/factory.py.
+    """Import agent/factory.py, skipping unless its runtime deps are present.
 
-    Importing the whole module pulls the agent's runtime dependency tree
-    (html2text, the MCP clients, the modes package), which is not installed for
-    the unit test run. The function under test only needs asyncio, a thread pool
-    and a logger, so the module source is compiled in a namespace holding exactly
-    those. That keeps the test honest — it exercises the real source rather than a
-    copy — without requiring the deployment dependencies.
+    Mirrors tests/test_message_hooks.py: a bare importorskip on `strands` is not
+    enough, because a stale editable install can leave it importable as an empty
+    namespace package. The module also pulls html2text via tools.web_tools. CI
+    installs agent/requirements.lock, so these tests run there; a bare local
+    `python` may not have them.
     """
-    import ast
-    import asyncio
-    import logging
-    from concurrent.futures import ThreadPoolExecutor
-
-    source = (AGENT_DIR / "factory.py").read_text()
-    tree = ast.parse(source)
-    func = next(
-        (n for n in tree.body
-         if isinstance(n, ast.FunctionDef) and n.name == "_prewarm_mcp_clients"),
-        None,
-    )
-    assert func is not None, "_prewarm_mcp_clients is gone from agent/factory.py"
-
-    namespace: dict = {
-        "asyncio": asyncio,
-        "ThreadPoolExecutor": ThreadPoolExecutor,
-        "logger": logging.getLogger("test.factory"),
-        "BaseException": BaseException,
-    }
-    exec(compile(ast.Module(body=[func], type_ignores=[]), "factory.py", "exec"), namespace)
-
-    class _Ns:
-        _prewarm_mcp_clients = staticmethod(namespace["_prewarm_mcp_clients"])
-
-    return _Ns
+    strands = pytest.importorskip("strands")
+    if not hasattr(strands, "Agent"):
+        pytest.skip("strands does not provide Agent (stale install)")
+    pytest.importorskip("html2text")
+    return pytest.importorskip("factory")
 
 
 class _FakeClient:
