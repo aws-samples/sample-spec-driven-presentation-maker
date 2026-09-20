@@ -627,3 +627,54 @@ class TestRemoteRunPythonBranching:
         storage.previous_pptx_key = None
         self._run()
         assert not storage._s3.delete_object.called
+
+
+
+def test_remote_compose_output_includes_regions(remote_rig, monkeypatch, tmp_path):
+    fake_execute, storage, calls = remote_rig
+    fake_execute.changed_paths = ["specs/brief.md"]
+    slide = {
+        "id": "a",
+        "elements": [
+            {"_comment": "content region", "x": 80, "y": 90, "width": 1200, "height": 800},
+        ],
+    }
+
+    import tools.compose as compose_mod
+    import tools.generate as generate_mod
+
+    def fake_prepare(deck_id, user_id, storage):
+        calls["prepare"] += 1
+        return tmp_path, [slide], {}
+
+    monkeypatch.setattr(generate_mod, "_prepare_workspace", fake_prepare)
+    monkeypatch.setattr(compose_mod, "extract_optimized_defs", lambda path: {"version": 1, "defs": ""})
+    monkeypatch.setattr(
+        compose_mod,
+        "split_slide_components",
+        lambda path, slide_num: {
+            "version": 1,
+            "viewBox": "0 0 1920 1080",
+            "bgFill": "#000",
+            "bgSvg": None,
+            "components": [],
+        },
+    )
+    (tmp_path / "measure.svg").write_text("<svg />", encoding="utf-8")
+
+    remote_server.run_python(
+        purpose="verify a",
+        code='print("ok")',
+        deck_id="d1",
+        measure_slides=["a"],
+    )
+
+    compose_keys = [
+        key for key in storage.uploads
+        if key.startswith("decks/d1/compose/a_")
+    ]
+    assert len(compose_keys) == 1
+    payload = json.loads(storage.uploads[compose_keys[0]])
+    assert payload["regions"] == [
+        {"name": "content", "x": 80, "y": 90, "w": 1200, "h": 800},
+    ]

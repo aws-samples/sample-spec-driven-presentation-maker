@@ -6,6 +6,7 @@ from sdpm.engine.schema.deck_spec import (
     complete_deck_skeleton,
     validate_specs,
 )
+from sdpm.engine.schema.regions import extract_regions
 
-__all__ = ["DECK_JSON_SKELETON", "complete_deck_skeleton", "validate_specs"]
+__all__ = ["DECK_JSON_SKELETON", "complete_deck_skeleton", "extract_regions", "validate_specs"]
 

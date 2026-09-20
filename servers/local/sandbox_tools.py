@@ -272,6 +272,14 @@ def run_python(purpose: str, code: str, deck_id: str,
                                 continue
                             try:
                                 comp_data = split_slide_components(svg_path, sn)
+                                from sdpm.engine.schema import extract_regions
+
+                                slide_path = deck_dir / "slides" / f"{slug}.json"
+                                try:
+                                    slide = json.loads(slide_path.read_text(encoding="utf-8"))
+                                except (OSError, json.JSONDecodeError, TypeError):
+                                    slide = {}
+                                comp_data["regions"] = extract_regions(slide)
                                 print(f"[compose] svg slide {sn} → slug {slug}", file=sys.stderr)
                                 prev_file = prev_by_slug.get(slug)
                                 if prev_file and prev_file.exists():

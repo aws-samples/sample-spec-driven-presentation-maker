@@ -971,6 +971,10 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                                 continue
                             try:
                                 comp_data = split_slide_components(svg_path, pn)
+                                from sdpm.engine.schema import extract_regions
+
+                                slide = slides[pn - 1] if pn <= len(slides) else {}
+                                comp_data["regions"] = extract_regions(slide)
 
                                 # sourceHash from slide JSON (content-based diff)
                                 src_hash = (
