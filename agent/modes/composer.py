@@ -153,10 +153,11 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         name="compose_slides",
         context=True,
         description=(
-            "Delegate slide generation to parallel composer agents. Each group "
-            "is handled by an independent composer that writes slides/<slug>.json. "
+            "Dispatch composer agents for the groups given — one independent composer "
+            "per group, writing slides/<slug>.json. Runs only what you pass: scaffold, "
+            "content and consistency review are separate calls. "
             f"Up to {max_concurrency} groups run concurrently. "
-            "Use this once Phase 1 (dialogue) is complete and outline.md is finalized.\n\n"
+            "Use this once outline.md is finalized.\n\n"
             "The composer reads specs/ (brief, outline, art-direction) for all content "
             "and design decisions. The instruction only needs to specify which slides "
             "to compose. Add user requests or review feedback if applicable, but do NOT "
@@ -193,7 +194,9 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                                     "type": "string",
                                     "description": (
                                         "Instruction for the composer. Keep minimal:\n"
-                                        "  • Initial generation: 'Compose these slides following specs/'\n"
+                                        "  • Scaffold pass (first call, one group, all slugs): 'Scaffold pass.'\n"
+                                        "  • Content: 'Compose these slides following specs/'\n"
+                                        "  • Consistency review (one group, all slugs): 'Consistency review.'\n"
                                         "  • User requests: pass through the user's words as-is\n"
                                         "  • Review fixes: describe the problem, not the solution "
                                         "(e.g. 'slides X and Y lack visual consistency' not 'use timeline layout')\n"
