@@ -35,7 +35,10 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
   from the first via `override` (see the spec) — use it for progressive builds.
 - If `slides/<slug>.json` already exists, the layout pass wrote it: keep its frame elements and
   realize your content inside the regions it left (`_comment` elements with `x`, `y`, `w`, `h`).
-  If the content genuinely needs otherwise, deviate and say so in your summary.
+  Leave those region elements in place with their coordinates — the Web UI draws them as the
+  slide fills in; a region comment without coordinates is a lint warning. If the content
+  genuinely needs a different region, change its coordinates rather than dropping them, and say
+  so in your summary.
 - Page numbers and footers are the template's: never draw them as elements.
 - Font sizes and colors come from the `:root` tokens of `specs/art-direction.html`. Off-token
   font sizes only warn at build time and off-token colors are not checked at all, so keep to
