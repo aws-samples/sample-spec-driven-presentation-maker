@@ -10,6 +10,35 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Remote MCP server no longer stalls or dies during long tool calls.**
+  FastMCP ran synchronous tools on the event loop, so a minute in
+  LibreOffice blocked AgentCore's `/ping` and the session was terminated
+  mid-run. Every remote tool now runs in a worker thread (`offloaded_tool`);
+  the WebP background task does too.
+- **AgentCore Runtime platform V2: first S3 call after restore no longer
+  hangs.** boto3 clients built at import carried connection state into the
+  V2 snapshot; the first call on a restored microVM could block for minutes
+  (observed: `list_templates` unanswered after 9 min). Clients are now built
+  on first use, with bounded botocore timeouts (connect 5s / read 30s /
+  3 attempts / TCP keepalive).
+- **AgentCore Runtime platform V2: LibreOffice's first run per microVM
+  (~60s) is warmed in the background.** The restored root filesystem is
+  lazily fetched, so the first `soffice` run paid ~60s of first-touch disk
+  reads (3s thereafter). The server now converts a blank template in the
+  background when an MCP session starts, before the composer reaches its
+  first `run_python`. Measured: layout-pass `run_python` 85s → 14s.
+
+### Changed
+
+- **`run_python` returns as soon as measure is done.** The live-preview
+  JSON (compose) and the measured slugs' WebP finish in a background thread;
+  `previewHint` now says the images are being generated. Previews render
+  only the measured pages, the LibreOffice SVG is parsed once, and per-slug
+  compose runs in a thread pool. Phase timings (`prepare_s3`, `build`,
+  `measure`, `artifact_s3`, background compose) are logged at INFO.
+
 ## [0.8.0] - 2026-09-20
 
 ### Added

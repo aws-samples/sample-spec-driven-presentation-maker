@@ -10,6 +10,8 @@ Deck metadata in DDB, presentation JSON + includes in S3.
 """
 
 import json
+import threading
+from collections.abc import Callable
 from typing import Any, Optional
 
 from storage import Storage
@@ -27,15 +29,48 @@ class AwsStorage(Storage):
 
     def __init__(
         self,
-        table: Any,
-        s3_client: Any,
-        pptx_bucket: str,
-        resource_bucket: str,
+        table: Any = None,
+        s3_client: Any = None,
+        pptx_bucket: str = "",
+        resource_bucket: str = "",
+        *,
+        table_factory: Callable[[], Any] | None = None,
+        s3_factory: Callable[[], Any] | None = None,
     ) -> None:
-        self._table = table
-        self._s3 = s3_client
+        if table is None and table_factory is None:
+            raise ValueError("table or table_factory is required")
+        if s3_client is None and s3_factory is None:
+            raise ValueError("s3_client or s3_factory is required")
+        self._table_obj = table
+        self._s3_obj = s3_client
+        self._table_factory = table_factory
+        self._s3_factory = s3_factory
+        self._lock = threading.Lock()
         self._pptx_bucket = pptx_bucket
         self._resource_bucket = resource_bucket
+
+    # Clients are created on first use, not at construction time. On AgentCore
+    # Runtime platform V2 the process is snapshotted right after startup and every
+    # microVM is restored from that snapshot; a client built before the snapshot
+    # carries a connection pool whose sockets are dead after restore, and the
+    # first call on it stalled for minutes in practice (2026-09-20). Building the
+    # client inside the first request keeps the snapshot free of network state.
+
+    @property
+    def _table(self) -> Any:
+        if self._table_obj is None:
+            with self._lock:
+                if self._table_obj is None:
+                    self._table_obj = self._table_factory()  # type: ignore[misc]
+        return self._table_obj
+
+    @property
+    def _s3(self) -> Any:
+        if self._s3_obj is None:
+            with self._lock:
+                if self._s3_obj is None:
+                    self._s3_obj = self._s3_factory()  # type: ignore[misc]
+        return self._s3_obj
 
     @property
     def pptx_bucket(self) -> str:

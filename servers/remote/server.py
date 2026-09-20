@@ -15,6 +15,7 @@ To use a custom backend, replace AwsStorage with your Storage ABC implementation
 import json
 import logging
 import os
+import threading
 import re
 import sys
 import time
@@ -25,6 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "sdpm"))
 
 import boto3  # noqa: E402
+from botocore.config import Config as BotoConfig  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from shared.authz import authorize  # noqa: E402
@@ -86,8 +88,105 @@ mcp = FastMCP(
     instructions=_INSTRUCTIONS,
 )
 
+
+def _run_in_background(target, *, name: str) -> None:
+    """Start ``target`` on a daemon thread. Tests patch this to run inline."""
+    threading.Thread(target=target, name=name, daemon=True).start()
+
+
+def offloaded_tool(fn):
+    """Register ``fn`` as an MCP tool that runs in a worker thread.
+
+    FastMCP calls synchronous tool functions directly on the event loop, so a
+    tool that spends a minute in LibreOffice stalls every other request on
+    this server — including AgentCore's ``/ping`` health check, which then
+    marks the session unhealthy and terminates it mid-run. Offloading keeps
+    the loop free. ``asyncio.to_thread`` copies the current contextvars, so
+    the per-request headers (user id) remain visible inside the tool.
+
+    The original function is returned unchanged so it stays callable (and
+    testable) as a plain function.
+    """
+    import asyncio
+    import functools
+    import inspect
+
+    async def _runner(**kwargs):
+        return await asyncio.to_thread(functools.partial(fn, **kwargs))
+
+    _runner.__name__ = fn.__name__
+    _runner.__qualname__ = fn.__qualname__
+    _runner.__doc__ = fn.__doc__
+    _runner.__signature__ = inspect.signature(fn)  # FastMCP reads the schema from this
+    _runner.__annotations__ = dict(getattr(fn, "__annotations__", {}))
+    mcp.tool()(_runner)
+    return fn
+
 # --- HTTP Request ContextVar (for extracting user_id from Runtime header) ---
 _current_request_headers: ContextVar[dict] = ContextVar("_current_request_headers", default={})
+
+
+# --- LibreOffice warm-up per MCP session ---
+#
+# AgentCore Runtime platform V2 restores every microVM from a snapshot, and the
+# restored root filesystem is lazily fetched: the first read of each file is
+# slow (measured 2026-09-20: reading LibreOffice's 166 MB of .so took 2-16 s,
+# the first `soffice --version` 13.5 s, the first conversion 20 s more — about
+# 60 s in total; the second run 3 s). Warming before the snapshot does not help
+# because the page cache is not restored. So the warm-up runs after restore:
+# each MCP session maps to one microVM, and the session's `initialize` request
+# (the only POST /mcp without an Mcp-Session-Id header) is the earliest moment
+# we know the microVM is in use. One background conversion of a blank template
+# touches exactly the files a real conversion needs, well before the composer
+# reaches its first run_python.
+
+_warmup_lock = threading.Lock()
+_warmup_running = False
+_warmup_last_done = 0.0
+_WARMUP_MIN_INTERVAL_S = 300.0
+
+
+def _soffice_warm_up() -> None:
+    global _warmup_running, _warmup_last_done
+    import shutil
+    import subprocess
+    import tempfile
+
+    try:
+        if not shutil.which("soffice"):
+            return
+        from sdpm.config import TEMPLATES_DIR
+
+        sample = TEMPLATES_DIR / "blank-light.pptx"
+        if not sample.exists():
+            return
+        t0 = time.monotonic()
+        with tempfile.TemporaryDirectory() as tmp:
+            env = os.environ.copy()
+            env["HOME"] = tmp
+            r = subprocess.run(
+                ["soffice", "--headless", "--convert-to", "pdf", "--outdir", tmp, str(sample)],
+                capture_output=True, timeout=180, env=env, check=False,
+            )
+        logger.info("soffice warm-up took %.1fs rc=%s", time.monotonic() - t0, r.returncode)
+        _warmup_last_done = time.time()
+    except Exception as e:  # noqa: BLE001 - best effort, never affects requests
+        logger.warning("soffice warm-up failed: %s", e)
+    finally:
+        with _warmup_lock:
+            _warmup_running = False
+
+
+def _maybe_start_soffice_warm_up() -> None:
+    """Start a background warm-up unless one is running or recently finished."""
+    global _warmup_running
+    if os.environ.get("SDPM_SKIP_SOFFICE_WARMUP"):
+        return
+    with _warmup_lock:
+        if _warmup_running or time.time() - _warmup_last_done < _WARMUP_MIN_INTERVAL_S:
+            return
+        _warmup_running = True
+    threading.Thread(target=_soffice_warm_up, name="soffice-warmup", daemon=True).start()
 
 
 class _CaptureHeadersMiddleware:
@@ -108,6 +207,9 @@ class _CaptureHeadersMiddleware:
         """Capture headers from HTTP requests into ContextVar."""
         if scope["type"] == "http":
             headers = {k.decode(): v.decode() for k, v in scope.get("headers", [])}
+            if scope.get("method") == "POST" and "mcp-session-id" not in headers:
+                # A new MCP session is being initialized on this microVM.
+                _maybe_start_soffice_warm_up()
             token = _current_request_headers.set(headers)
             try:
                 await self.app(scope, receive, send)
@@ -134,9 +236,20 @@ if not _pptx_bucket:
 if not _resource_bucket:
     raise ValueError("RESOURCE_BUCKET environment variable is required")
 
+# Bounded timeouts so a dead connection fails fast instead of holding a tool
+# call for the default 60s read timeout per attempt.
+_BOTO_CONFIG = BotoConfig(
+    connect_timeout=5,
+    read_timeout=30,
+    retries={"mode": "standard", "max_attempts": 3},
+    tcp_keepalive=True,
+)
+
+# Clients are built lazily inside the first request (see AwsStorage) so the
+# platform V2 snapshot taken after startup holds no boto3 connection state.
 _storage = AwsStorage(
-    table=boto3.resource("dynamodb", region_name=_region).Table(_table_name),
-    s3_client=boto3.client("s3", region_name=_region),
+    table_factory=lambda: boto3.resource("dynamodb", region_name=_region, config=_BOTO_CONFIG).Table(_table_name),
+    s3_factory=lambda: boto3.client("s3", region_name=_region, config=_BOTO_CONFIG),
     pptx_bucket=_pptx_bucket,
     resource_bucket=_resource_bucket,
 )
@@ -196,7 +309,7 @@ def _check_deck_access(deck_id: str, action: str = "read") -> None:
 # --- Workflow Tools ---
 
 
-@mcp.tool()
+@offloaded_tool
 def init_presentation(name: str) -> str:
     """Initialize a presentation. Creates a deck and empty workspace in S3.
     Call after Phase 1 hearing, before building slides.
@@ -218,7 +331,7 @@ def init_presentation(name: str) -> str:
     )
 
 
-@mcp.tool()
+@offloaded_tool
 def analyze_template(template: str, deck_id: str = "") -> str:
     """Get pre-analyzed template information — layouts, theme colors, fonts.
     Call this to understand what layouts are available before building slides.
@@ -269,7 +382,7 @@ def analyze_template(template: str, deck_id: str = "") -> str:
 # --- Attachment Tools ---
 
 
-@mcp.tool()
+@offloaded_tool
 def read_attachment(source: str, offset: int = 0, limit: int = 10240) -> dict:
     """Read the content of an attached file (text projection with paging).
 
@@ -298,7 +411,7 @@ def read_attachment(source: str, offset: int = 0, limit: int = 10240) -> dict:
     )
 
 
-@mcp.tool()
+@offloaded_tool
 def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
     """Import a file into the deck workspace for use in slides.
 
@@ -330,7 +443,7 @@ def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
 # --- Generation Tools ---
 
 
-@mcp.tool()
+@offloaded_tool
 def generate_pptx(deck_id: str) -> str:
     """Generate final PPTX — the explicit finalize/handoff step.
 
@@ -359,7 +472,7 @@ def generate_pptx(deck_id: str) -> str:
         return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
 
 
-@mcp.tool()
+@offloaded_tool
 def get_preview(deck_id: str, slugs: list[str], quality: str = "high") -> list:
     """Get PNG preview images for visual review by the agent.
 
@@ -415,10 +528,12 @@ def _export_svg(tmpdir: Path, pptx_path: Path) -> Path:
     import subprocess
     env = os.environ.copy()
     env["HOME"] = str(tmpdir)
+    t0 = time.monotonic()
     subprocess.run(
         ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
         env=env, capture_output=True, text=True, timeout=120, check=True,
     )
+    logger.info("soffice svg export took %.1fs (%s)", time.monotonic() - t0, pptx_path.name)
     return tmpdir / "measure.svg"
 
 
@@ -438,7 +553,7 @@ def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int],
 # --- Asset Tools ---
 
 
-@mcp.tool()
+@offloaded_tool
 def search_assets(query: str = "", source_filter: str = "", limit: int = 20,
                        type_filter: str = "", theme_filter: str = "") -> str:
     """Search icons and assets by keyword, or discover available sources.
@@ -469,7 +584,7 @@ def search_assets(query: str = "", source_filter: str = "", limit: int = 20,
 # --- Reference Tools ---
 
 
-@mcp.tool()
+@offloaded_tool
 def list_styles(include_all: bool = False) -> str:
     """List available design styles for presentations.
 
@@ -485,7 +600,7 @@ def list_styles(include_all: bool = False) -> str:
     )
 
 
-@mcp.tool()
+@offloaded_tool
 def apply_style(deck_id: str, style: str) -> str:
     """Copy a style as the deck's art direction. Call during Art Direction phase.
 
@@ -527,18 +642,18 @@ def apply_style(deck_id: str, style: str) -> str:
 
 # --- Reference tools (bound from the shared contract; bundled data baked into the image) ---
 
-mcp.tool()(contract.start_presentation)
-mcp.tool()(contract.read_examples)
-mcp.tool()(contract.list_workflows)
-mcp.tool()(contract.read_workflows)
-mcp.tool()(contract.list_guides)
-mcp.tool()(contract.read_guides)
+offloaded_tool(contract.start_presentation)
+offloaded_tool(contract.read_examples)
+offloaded_tool(contract.list_workflows)
+offloaded_tool(contract.read_workflows)
+offloaded_tool(contract.list_guides)
+offloaded_tool(contract.read_guides)
 
 
 # --- Utility Tools ---
 
 
-@mcp.tool()
+@offloaded_tool
 def list_templates() -> str:
     """List all available templates with name, source, and description.
 
@@ -550,7 +665,7 @@ def list_templates() -> str:
     )
 
 
-@mcp.tool()
+@offloaded_tool
 def code_to_slide(deck_id: str, code: str, name: str,
                        language: str = "python", theme: str = "dark",
                        x: int = 0, y: int = 0,
@@ -618,7 +733,7 @@ def _post_processing_plan(deck_changed: bool,
     }
 
 
-@mcp.tool()
+@offloaded_tool
 def run_python(purpose: str, code: str, deck_id: str | None = None,
                measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a secure sandbox.
@@ -755,8 +870,13 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
 
             user_id = _get_user_id()
             _prepare_epoch = int(time.time())
+            _phase: dict[str, float] = {}
+            _t = time.monotonic()
             tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
+            _phase["prepare_s3"] = time.monotonic() - _t
+            _t = time.monotonic()
             pptx_path, invalid_layouts = _build_pptx(tmpdir, slides, build_kwargs)
+            _phase["build"] = time.monotonic() - _t
             invalid_slug_set = {e["slug"] for e in invalid_layouts if e.get("slug")}
 
             # Build slug → page number mapping
@@ -772,7 +892,9 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                 # Measure
                 try:
                     if page_numbers:
+                        _t = time.monotonic()
                         measure_result = _run_measure(tmpdir, pptx_path, page_numbers, page_to_slug=page_to_slug)
+                        _phase["measure"] = time.monotonic() - _t
                         result["measure"] = measure_result
                     else:
                         result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})
@@ -801,6 +923,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                             "available": e["available"],
                         }
 
+            _t = time.monotonic()
             if plan["artifact"]:
                 # Refresh the download artifact — the deck's PPTX follows deck
                 # changes automatically (same upload/record shape as
@@ -858,168 +981,200 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                         except Exception:
                             pass
 
+            _phase["artifact_s3"] = time.monotonic() - _t
             if plan["verify"]:
-                # Compose: SVG → optimized JSON for WebUI animation
-                # Only generates compose for measure_slides slugs (parallel-safe).
-                # Uses _prepare_epoch (snapshot time) so the composer with the
-                # newest slides/ snapshot wins on defs via epoch comparison.
-                try:
-                    from tools.compose import extract_optimized_defs, split_slide_components
-                    import hashlib as _hashlib
-                    svg_path = tmpdir / "measure.svg"
-                    if not svg_path.exists():
-                        _export_svg(tmpdir, pptx_path)
-                    if svg_path.exists():
-                        import json as _json
-                        import re as _re
-                        compose_prefix = f"decks/{deck_id}/compose/"
+                # Everything the composer needs is in `result` now. The live
+                # preview JSON (compose) and the measured slugs' WebP are for
+                # the Web UI / the next get_preview, and take 5-10s; finish them
+                # in the background so the tool returns after measure.
+                # The task owns tmpdir and removes it when done.
+                _bg_t0 = time.monotonic()
+                _bg_slugs = list(measure_slides or [])
 
-                        # List existing compose keys (for prev data + cleanup)
-                        old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
+                def _finish_compose_and_previews() -> None:
+                    try:
+                        # Only generates compose for measure_slides slugs (parallel-safe).
+                        # Uses _prepare_epoch (snapshot time) so the composer with the
+                        # newest slides/ snapshot wins on defs via epoch comparison.
+                        try:
+                            from tools.compose import extract_optimized_defs, load_svg, split_slide_components
+                            import hashlib as _hashlib
 
-                        def _latest_key(prefix: str) -> str | None:
-                            best_ep, best_k = -1, None
-                            for k in old_keys:
-                                if not k.startswith(prefix):
-                                    continue
-                                m = _re.search(r"_(\d+)\.json$", k)
-                                ep = int(m.group(1)) if m else 0
-                                if ep > best_ep:
-                                    best_ep, best_k = ep, k
-                            return best_k
+                            svg_path = tmpdir / "measure.svg"
+                            if not svg_path.exists():
+                                _export_svg(tmpdir, pptx_path)
+                            if svg_path.exists():
+                                import json as _json
+                                import re as _re
 
-                        # Component-level diff helpers
-                        def _mk(c: dict) -> str:
-                            b = c.get("bbox")
-                            return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
+                                compose_prefix = f"decks/{deck_id}/compose/"
 
-                        def _fp(c: dict) -> str:
-                            return f"{c['class']}|{c.get('text', '')}"
+                                # List existing compose keys (for prev data + cleanup)
+                                old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
 
-                        # Determine which slugs to generate compose for
-                        # Always include slugs that have no existing compose (migration + first build)
-                        # Verify-gated: measure_slides is always set here
-                        compose_slugs = set(measure_slides)
-                        for s in slug_to_page:
-                            if not _latest_key(f"{compose_prefix}{s}_"):
-                                compose_slugs.add(s)
+                                def _latest_key(prefix: str) -> str | None:
+                                    best_ep, best_k = -1, None
+                                    for k in old_keys:
+                                        if not k.startswith(prefix):
+                                            continue
+                                        m = _re.search(r"_(\d+)\.json$", k)
+                                        ep = int(m.group(1)) if m else 0
+                                        if ep > best_ep:
+                                            best_ep, best_k = ep, k
+                                    return best_k
 
-                        # Upload defs (prepare epoch — newest snapshot wins)
-                        defs_data = extract_optimized_defs(svg_path)
-                        _storage.upload_file(
-                            key=f"{compose_prefix}defs_{_prepare_epoch}.json",
-                            data=_json.dumps(defs_data, ensure_ascii=False).encode(),
-                            content_type="application/json",
-                        )
-                        # Cleanup old defs (only delete defs older than our epoch)
-                        # Also remove legacy slide_{N}_*.json files
-                        for k in old_keys:
-                            if "/defs_" in k:
-                                m = _re.search(r"_(\d+)\.json$", k)
-                                if m and int(m.group(1)) < _prepare_epoch:
-                                    try:
-                                        _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
-                                    except Exception:
-                                        pass
-                            elif _re.search(r"/slide_\d+_\d+\.json$", k):
-                                try:
-                                    _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
-                                except Exception:
-                                    pass
+                                # Component-level diff helpers
+                                def _mk(c: dict) -> str:
+                                    b = c.get("bbox")
+                                    return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
 
-                        # Generate compose for each measured slug
-                        for slug in compose_slugs:
-                            if slug in invalid_slug_set:
-                                # Do not surface a fallback-rendered slide as a
-                                # live-preview artifact. The composer for this
-                                # slug will see the error and fix the layout.
-                                continue
-                            pn = slug_to_page.get(slug)
-                            if not pn:
-                                continue
-                            try:
-                                comp_data = split_slide_components(svg_path, pn)
+                                def _fp(c: dict) -> str:
+                                    return f"{c['class']}|{c.get('text', '')}"
 
-                                # sourceHash from slide JSON (content-based diff)
-                                src_hash = _hashlib.md5(
-                                    _json.dumps(slides[pn - 1], sort_keys=True, ensure_ascii=False).encode(),
-                                    usedforsecurity=False,
-                                ).hexdigest() if pn <= len(slides) else ""
-                                comp_data["sourceHash"] = src_hash
+                                # Determine which slugs to generate compose for
+                                # Always include slugs that have no existing compose (migration + first build)
+                                # Verify-gated: measure_slides is always set here
+                                compose_slugs = set(measure_slides)
+                                for s in slug_to_page:
+                                    if not _latest_key(f"{compose_prefix}{s}_"):
+                                        compose_slugs.add(s)
 
-                                # Diff against previous compose for same slug
-                                prev_key = _latest_key(f"{compose_prefix}{slug}_")
-                                prev_comps = None
-                                prev_hash = None
-                                if prev_key:
-                                    try:
-                                        raw = _storage.download_file_from_pptx_bucket(prev_key)
-                                        prev_data = _json.loads(raw)
-                                        prev_comps = prev_data.get("components")
-                                        prev_hash = prev_data.get("sourceHash")
-                                    except Exception:
-                                        pass
-
-                                # If sourceHash unchanged, all components are unchanged
-                                if prev_comps is not None and prev_hash == src_hash and src_hash:
-                                    for c in comp_data["components"]:
-                                        c["changed"] = False
-                                elif prev_comps is not None:
-                                    prev_map = {_mk(c): _fp(c) for c in prev_comps}
-                                    for c in comp_data["components"]:
-                                        k = _mk(c)
-                                        c["changed"] = k not in prev_map or prev_map[k] != _fp(c)
-                                else:
-                                    for c in comp_data["components"]:
-                                        c["changed"] = True
-
+                                # Upload defs (prepare epoch — newest snapshot wins)
+                                svg_tree = load_svg(svg_path)
+                                defs_data = extract_optimized_defs(svg_tree)
                                 _storage.upload_file(
-                                    key=f"{compose_prefix}{slug}_{_prepare_epoch}.json",
-                                    data=_json.dumps(comp_data, ensure_ascii=False).encode(),
+                                    key=f"{compose_prefix}defs_{_prepare_epoch}.json",
+                                    data=_json.dumps(defs_data, ensure_ascii=False).encode(),
                                     content_type="application/json",
                                 )
-
-                                # Cleanup old compose for this slug only
+                                # Cleanup old defs (only delete defs older than our epoch)
+                                # Also remove legacy slide_{N}_*.json files
                                 for k in old_keys:
-                                    if k.startswith(f"{compose_prefix}{slug}_") and not k.endswith(f"{slug}_{_prepare_epoch}.json"):
+                                    if "/defs_" in k:
+                                        m = _re.search(r"_(\d+)\.json$", k)
+                                        if m and int(m.group(1)) < _prepare_epoch:
+                                            try:
+                                                _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                                            except Exception:
+                                                pass
+                                    elif _re.search(r"/slide_\d+_\d+\.json$", k):
                                         try:
                                             _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
                                         except Exception:
                                             pass
+
+                                # Generate compose for each measured slug
+                                def _compose_one(slug: str) -> None:
+                                    if slug in invalid_slug_set:
+                                        # Do not surface a fallback-rendered slide as a
+                                        # live-preview artifact. The composer for this
+                                        # slug will see the error and fix the layout.
+                                        return
+                                    pn = slug_to_page.get(slug)
+                                    if not pn:
+                                        return
+                                    try:
+                                        comp_data = split_slide_components(svg_tree, pn)
+
+                                        # sourceHash from slide JSON (content-based diff)
+                                        src_hash = (
+                                            _hashlib.md5(
+                                                _json.dumps(slides[pn - 1], sort_keys=True, ensure_ascii=False).encode(),
+                                                usedforsecurity=False,
+                                            ).hexdigest()
+                                            if pn <= len(slides)
+                                            else ""
+                                        )
+                                        comp_data["sourceHash"] = src_hash
+
+                                        # Diff against previous compose for same slug
+                                        prev_key = _latest_key(f"{compose_prefix}{slug}_")
+                                        prev_comps = None
+                                        prev_hash = None
+                                        if prev_key:
+                                            try:
+                                                raw = _storage.download_file_from_pptx_bucket(prev_key)
+                                                prev_data = _json.loads(raw)
+                                                prev_comps = prev_data.get("components")
+                                                prev_hash = prev_data.get("sourceHash")
+                                            except Exception:
+                                                pass
+
+                                        # If sourceHash unchanged, all components are unchanged
+                                        if prev_comps is not None and prev_hash == src_hash and src_hash:
+                                            for c in comp_data["components"]:
+                                                c["changed"] = False
+                                        elif prev_comps is not None:
+                                            prev_map = {_mk(c): _fp(c) for c in prev_comps}
+                                            for c in comp_data["components"]:
+                                                k = _mk(c)
+                                                c["changed"] = k not in prev_map or prev_map[k] != _fp(c)
+                                        else:
+                                            for c in comp_data["components"]:
+                                                c["changed"] = True
+
+                                        _storage.upload_file(
+                                            key=f"{compose_prefix}{slug}_{_prepare_epoch}.json",
+                                            data=_json.dumps(comp_data, ensure_ascii=False).encode(),
+                                            content_type="application/json",
+                                        )
+
+                                        # Cleanup old compose for this slug only
+                                        for k in old_keys:
+                                            _m = _re.search(r"_(\d+)\.json$", k)
+                                            if k.startswith(f"{compose_prefix}{slug}_") and _m and int(_m.group(1)) < _prepare_epoch:
+                                                try:
+                                                    _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                                                except Exception:
+                                                    pass
+                                    except Exception:
+                                        logger.error("compose failed for slug %s", slug, exc_info=True)
+
+                                # Each slug is independent (own S3 keys); the S3 round
+                                # trips dominate, so run them side by side.
+                                from concurrent.futures import ThreadPoolExecutor
+                                with ThreadPoolExecutor(max_workers=8) as pool:
+                                    list(pool.map(_compose_one, sorted(compose_slugs)))
+                        except Exception:
+                            logger.error("compose failed", exc_info=True)
+
+                        # Preview: sync WebP generation so composer can immediately view
+                        # via get_preview(slugs=[...]) — lowers the barrier from a
+                        # 2-step (generate_pptx → get_preview) to 1-step feedback loop.
+                        if measure_slides:
+                            try:
+                                from tools.generate import generate_previews_for_pages
+
+                                preview_dir = tmpdir / "preview_out"
+                                preview_dir.mkdir(exist_ok=True)
+                                wanted = {s: slug_to_page[s] for s in measure_slides if slug_to_page.get(s)}
+                                webp_by_page = generate_previews_for_pages(pptx_path, preview_dir, list(wanted.values()))
+                                uploaded = []
+                                for slug, page in wanted.items():
+                                    if page in webp_by_page:
+                                        _storage.upload_file(
+                                            key=f"previews/{deck_id}/{slug}_{_prepare_epoch}.webp",
+                                            data=webp_by_page[page].read_bytes(),
+                                            content_type="image/webp",
+                                        )
+                                        uploaded.append(slug)
+                                logger.info("previews uploaded for %s: %s", deck_id, ", ".join(uploaded))
                             except Exception:
-                                logger.error("compose failed for slug %s", slug, exc_info=True)
-                except Exception:
-                    logger.error("compose failed", exc_info=True)
+                                logger.warning("preview generation failed", exc_info=True)
 
-                # Preview: sync WebP generation so composer can immediately view
-                # via get_preview(slugs=[...]) — lowers the barrier from a
-                # 2-step (generate_pptx → get_preview) to 1-step feedback loop.
-                if measure_slides:
-                    try:
-                        from tools.generate import generate_previews
-                        preview_dir = tmpdir / "preview_out"
-                        preview_dir.mkdir(exist_ok=True)
-                        webp_files = generate_previews(pptx_path, preview_dir)
-                        uploaded = []
-                        for slug in measure_slides:
-                            page = slug_to_page.get(slug)
-                            if page and page <= len(webp_files):
-                                _storage.upload_file(
-                                    key=f"previews/{deck_id}/{slug}_{_prepare_epoch}.webp",
-                                    data=webp_files[page - 1].read_bytes(),
-                                    content_type="image/webp",
-                                )
-                                uploaded.append(slug)
-                        if uploaded:
-                            result["previewHint"] = (
-                                f"Preview images generated for {', '.join(uploaded)}. "
-                                f"Call get_preview(deck_id=\"{deck_id}\", slugs=[...]) to view."
-                            )
-                    except Exception:
-                        logger.warning("preview generation failed", exc_info=True)
+                    finally:
+                        shutil.rmtree(tmpdir, ignore_errors=True)
+                        logger.info(
+                            "run_python background compose/previews for deck %s took %.1fs",
+                            deck_id, time.monotonic() - _bg_t0,
+                        )
 
-                # tmpdir cleanup (WebP generation only in generate_pptx)
-                shutil.rmtree(tmpdir, ignore_errors=True)
+                if _bg_slugs:
+                    result["previewHint"] = (
+                        f"Preview images are being generated for {', '.join(_bg_slugs)} "
+                        f"(ready within seconds). Call get_preview(deck_id=\"{deck_id}\", slugs=[...]) to view."
+                    )
+                _run_in_background(_finish_compose_and_previews, name=f"compose-{deck_id}")
             else:
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as e:
@@ -1038,19 +1193,24 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
                         f"stale: {msg}"
                     )
 
+    if "_phase" in locals():
+        logger.info(
+            "run_python post-processing for deck %s: %s",
+            deck_id, " ".join(f"{k}={v:.1f}s" for k, v in _phase.items()),
+        )
     return json.dumps(result, ensure_ascii=False)
 
 
 # --- Layout tools (bound from the shared contract) ---
 
-mcp.tool()(contract.grid)
-mcp.tool()(contract.arch_diagram)
+offloaded_tool(contract.grid)
+offloaded_tool(contract.arch_diagram)
 
 
 # --- Style Execution (Code Interpreter) ---
 
 
-@mcp.tool()
+@offloaded_tool
 def run_style_python(purpose: str, code: str, style_name: str | None = None,
                      ref_styles: list[str] | None = None) -> str:
     """Execute Python code in a secure sandbox for style creation/editing.
@@ -1267,7 +1427,7 @@ def _get_kb_sync():
 
 if _kb_configured:
 
-    @mcp.tool()
+    @offloaded_tool
     def search_slides(
         query: str,
         scope: str = "mine",
@@ -1303,6 +1463,7 @@ if _kb_configured:
 
 if __name__ == "__main__":
     import uvicorn  # noqa: E402
+
     app = mcp.streamable_http_app()
     app.add_middleware(_CaptureHeadersMiddleware)
     uvicorn.run(app, host="0.0.0.0", port=8000)
