@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: MIT-0
 """Shared server utilities for background tasks."""
 
-import asyncio
+import threading
+import time
 import logging
 import shutil
 import tempfile
@@ -13,7 +14,7 @@ from storage import Storage
 logger = logging.getLogger("sdpm.mcp")
 
 
-async def _generate_webp_background(
+def _generate_webp_background(
     deck_id: str, pptx_path: Path, tmpdir: Path, storage: Storage, slugs: list[str],
     user_id: str = "",
 ) -> None:
@@ -24,17 +25,17 @@ async def _generate_webp_background(
         preview_dir = Path(tempfile.mkdtemp())
         try:
             old_keys = storage.list_files(prefix=f"previews/{deck_id}/", bucket=storage.pptx_bucket)
-            epoch = int(__import__("time").time())
-            t0 = __import__("time").monotonic()
-            # LibreOffice + pdftoppm take tens of seconds: never on the event loop.
-            webp_files = await asyncio.to_thread(generate_previews, pptx_path, preview_dir)
-            logger.info("webp previews rendered in %.1fs for deck %s", __import__("time").monotonic() - t0, deck_id)
-            t1 = __import__("time").monotonic()
+            epoch = int(time.time())
+            t0 = time.monotonic()
+            # Runs on its own thread — LibreOffice + pdftoppm take tens of seconds.
+            webp_files = generate_previews(pptx_path, preview_dir)
+            logger.info("webp previews rendered in %.1fs for deck %s", time.monotonic() - t0, deck_id)
+            t1 = time.monotonic()
             for i, webp_path in enumerate(webp_files):
                 slug = slugs[i] if i < len(slugs) else f"slide_{i + 1:02d}"
                 s3_key = f"previews/{deck_id}/{slug}_{epoch}.webp"
                 storage.upload_file(key=s3_key, data=webp_path.read_bytes(), content_type="image/webp")
-            logger.info("webp upload of %d files took %.1fs for deck %s", len(webp_files), __import__("time").monotonic() - t1, deck_id)
+            logger.info("webp upload of %d files took %.1fs for deck %s", len(webp_files), time.monotonic() - t1, deck_id)
             for key in old_keys:
                 try:
                     storage._s3.delete_object(Bucket=storage.pptx_bucket, Key=key)
@@ -72,10 +73,21 @@ def schedule_webp_background(
     deck_id: str, pptx_path: Path, tmpdir: Path, storage: Storage, slugs: list[str],
     user_id: str = "",
 ) -> None:
-    """Schedule background WebP generation. Falls back to tmpdir cleanup on error."""
+    """Run WebP preview generation on a daemon thread.
+
+    Tools execute on worker threads (no event loop), so this must not depend
+    on asyncio — an earlier ``get_event_loop().create_task`` version silently
+    produced no previews and no thumbnail once tools were offloaded.
+    Falls back to tmpdir cleanup if the thread cannot be started.
+    """
     try:
-        asyncio.get_event_loop().create_task(
-            _generate_webp_background(deck_id, pptx_path, tmpdir, storage, slugs, user_id=user_id)
-        )
+        threading.Thread(
+            target=_generate_webp_background,
+            args=(deck_id, pptx_path, tmpdir, storage, slugs),
+            kwargs={"user_id": user_id},
+            name=f"webp-{deck_id}",
+            daemon=True,
+        ).start()
     except Exception:
+        logger.warning("could not start WebP background thread for deck %s", deck_id, exc_info=True)
         shutil.rmtree(tmpdir, ignore_errors=True)
