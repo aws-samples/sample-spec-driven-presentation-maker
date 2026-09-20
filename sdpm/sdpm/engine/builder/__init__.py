@@ -261,6 +261,8 @@ class PPTXBuilder(
                 break
 
         for elem in expanded:
+            if "_comment" in elem:
+                continue  # comments (incl. layout regions) are not elements
             n_before = len(sp_tree)
             elem_type = elem.get("type")
             if elem_type == "group":
