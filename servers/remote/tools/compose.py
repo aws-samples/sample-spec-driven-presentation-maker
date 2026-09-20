@@ -45,12 +45,22 @@ def count_slides(svg_path: Path) -> int:
     return len(root.findall(f".//{{{SVG_NS}}}g[@class='Slide']"))
 
 
-def extract_optimized_defs(svg_path: Path) -> dict:
+def load_svg(svg_path: Path) -> etree._ElementTree:
+    """Parse a LibreOffice SVG once so several extractions can share the tree."""
+    return etree.parse(str(svg_path))
+
+
+def _as_tree(svg: "Path | etree._ElementTree") -> etree._ElementTree:
+    return svg if isinstance(svg, etree._ElementTree) else etree.parse(str(svg))
+
+
+def extract_optimized_defs(svg_path: "Path | etree._ElementTree") -> dict:
     """Extract shared defs: strip SVG fonts, convert PNG→WebP.
 
+    Accepts a path or a tree from :func:`load_svg`.
     Returns {"version": 1, "defs": str}.
     """
-    tree = etree.parse(str(svg_path))
+    tree = _as_tree(svg_path)
     root = tree.getroot()
     defs_elements = root.findall(f"{{{SVG_NS}}}defs")
     for d in defs_elements:
@@ -70,13 +80,16 @@ def _propagate_root_attrs(element: etree._Element, root_attrs: dict) -> None:
             element.set(attr, value)
 
 
-def split_slide_components(svg_path: Path, slide_num: int) -> dict:
+def split_slide_components(svg_path: "Path | etree._ElementTree", slide_num: int) -> dict:
     """Split one slide into component fragments with metadata (defs excluded).
 
+    Accepts a path or a tree from :func:`load_svg`; the tree is only read
+    (attributes are propagated onto the slide's own elements), so one parse
+    can serve every slide.
     Returns {"version": 1, "viewBox": str, "bgFill": str,
              "bgSvg": str|None, "components": [...]}.
     """
-    tree = etree.parse(str(svg_path))
+    tree = _as_tree(svg_path)
     root = tree.getroot()
     view_box = root.get("viewBox", "0 0 33867 19050")
 

@@ -544,6 +544,9 @@ def remote_rig(monkeypatch, tmp_path):
 
     monkeypatch.setattr(gen_mod, "_prepare_workspace", fake_prepare)
     monkeypatch.setattr(gen_mod, "generate_previews", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lo")))
+    monkeypatch.setattr(
+        gen_mod, "generate_previews_for_pages", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lo"))
+    )
     monkeypatch.setattr(remote_server, "_build_pptx", fake_build)
     monkeypatch.setattr(remote_server, "_run_measure", fake_measure)
     monkeypatch.setattr(remote_server, "_export_svg", fake_export_svg)

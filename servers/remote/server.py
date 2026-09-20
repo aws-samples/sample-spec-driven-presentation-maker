@@ -1014,7 +1014,7 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                 # Uses _prepare_epoch (snapshot time) so the composer with the
                 # newest slides/ snapshot wins on defs via epoch comparison.
                 try:
-                    from tools.compose import extract_optimized_defs, split_slide_components
+                    from tools.compose import extract_optimized_defs, load_svg, split_slide_components
                     import hashlib as _hashlib
 
                     svg_path = tmpdir / "measure.svg"
@@ -1057,7 +1057,8 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                                 compose_slugs.add(s)
 
                         # Upload defs (prepare epoch — newest snapshot wins)
-                        defs_data = extract_optimized_defs(svg_path)
+                        svg_tree = load_svg(svg_path)
+                        defs_data = extract_optimized_defs(svg_tree)
                         _storage.upload_file(
                             key=f"{compose_prefix}defs_{_prepare_epoch}.json",
                             data=_json.dumps(defs_data, ensure_ascii=False).encode(),
@@ -1080,17 +1081,17 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                                     pass
 
                         # Generate compose for each measured slug
-                        for slug in compose_slugs:
+                        def _compose_one(slug: str) -> None:
                             if slug in invalid_slug_set:
                                 # Do not surface a fallback-rendered slide as a
                                 # live-preview artifact. The composer for this
                                 # slug will see the error and fix the layout.
-                                continue
+                                return
                             pn = slug_to_page.get(slug)
                             if not pn:
-                                continue
+                                return
                             try:
-                                comp_data = split_slide_components(svg_path, pn)
+                                comp_data = split_slide_components(svg_tree, pn)
                                 from sdpm.engine.schema import extract_regions
 
                                 slide = slides[pn - 1] if pn <= len(slides) else {}
@@ -1150,6 +1151,12 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                                             pass
                             except Exception:
                                 logger.error("compose failed for slug %s", slug, exc_info=True)
+
+                        # Each slug is independent (own S3 keys); the S3 round
+                        # trips dominate, so run them side by side.
+                        from concurrent.futures import ThreadPoolExecutor
+                        with ThreadPoolExecutor(max_workers=8) as pool:
+                            list(pool.map(_compose_one, sorted(compose_slugs)))
                 except Exception:
                     logger.error("compose failed", exc_info=True)
 
@@ -1158,18 +1165,18 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                 # 2-step (generate_pptx → get_preview) to 1-step feedback loop.
                 if measure_slides:
                     try:
-                        from tools.generate import generate_previews
+                        from tools.generate import generate_previews_for_pages
 
                         preview_dir = tmpdir / "preview_out"
                         preview_dir.mkdir(exist_ok=True)
-                        webp_files = generate_previews(pptx_path, preview_dir)
+                        wanted = {s: slug_to_page[s] for s in measure_slides if slug_to_page.get(s)}
+                        webp_by_page = generate_previews_for_pages(pptx_path, preview_dir, list(wanted.values()))
                         uploaded = []
-                        for slug in measure_slides:
-                            page = slug_to_page.get(slug)
-                            if page and page <= len(webp_files):
+                        for slug, page in wanted.items():
+                            if page in webp_by_page:
                                 _storage.upload_file(
                                     key=f"previews/{deck_id}/{slug}_{_prepare_epoch}.webp",
-                                    data=webp_files[page - 1].read_bytes(),
+                                    data=webp_by_page[page].read_bytes(),
                                     content_type="image/webp",
                                 )
                                 uploaded.append(slug)
