@@ -44,12 +44,14 @@ class KBSync:
     ) -> None:
         import boto3
 
+        from boto_config import SHORT_API
+
         self._kb_id = kb_id
         self._vector_bucket_name = vector_bucket_name
         self._vector_index_name = vector_index_name
-        self._bedrock_runtime = boto3.client("bedrock-runtime", region_name=region)
-        self._bedrock_agent = boto3.client("bedrock-agent-runtime", region_name=region)
-        self._s3vectors = boto3.client("s3vectors", region_name=region)
+        self._bedrock_runtime = boto3.client("bedrock-runtime", region_name=region, config=SHORT_API)
+        self._bedrock_agent = boto3.client("bedrock-agent-runtime", region_name=region, config=SHORT_API)
+        self._s3vectors = boto3.client("s3vectors", region_name=region, config=SHORT_API)
 
     def _embed(self, text: str) -> list[float]:
         """Generate embedding vector using Amazon Titan Text Embeddings V2.
