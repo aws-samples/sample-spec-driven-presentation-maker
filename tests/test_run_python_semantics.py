@@ -342,6 +342,35 @@ class TestPostProcessingPlan:
         assert not remote_server._build_relevant("attachments/x/data.csv")
 
 
+class TestRemoteCheckSpecs:
+    def test_validates_s3_backed_specs(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        storage = MagicMock()
+        storage.get_deck_json.return_value = {
+            "template": "blank-dark",
+            "fonts": {"fullwidth": "Noto Sans JP", "halfwidth": "Amazon Ember"},
+            "defaultTextColor": "#FFFFFF",
+            "slideSize": {"width": 1920, "height": 1080, "ptPerPx": 0.5},
+        }
+        storage.download_file_from_pptx_bucket.return_value = (
+            b"- [intro] Claim\n"
+            b"  - body: Main point.\n"
+            b"  - visual: Diagram.\n"
+            b"  - evidence: Source 1.\n"
+        )
+        access_check = MagicMock()
+        monkeypatch.setattr(remote_server, "_storage", storage)
+        monkeypatch.setattr(remote_server, "_check_deck_access", access_check)
+
+        result = json.loads(remote_server.check_specs("deck1", ["intro"]))
+
+        assert result == {"ok": True, "errors": [], "warnings": [], "slugs": ["intro"]}
+        access_check.assert_called_once_with("deck1", action="generate_pptx")
+        storage.get_deck_json.assert_called_once_with("deck1")
+        storage.download_file_from_pptx_bucket.assert_called_once_with(
+            key="decks/deck1/specs/outline.md"
+        )
+
+
 class TestRemoteApplyStyle:
     def test_updates_text_color_in_deck_json(
         self,
@@ -360,7 +389,7 @@ class TestRemoteApplyStyle:
 
         result = json.loads(remote_server.apply_style("deck1", "custom"))
 
-        assert result["updated"] == {"defaultTextColor": "#A1B2C3"}
+        assert result["updated"] == {"defaultTextColor": "#A1B2C3", "slideSize": {}}
         storage.put_deck_json.assert_called_once()
         saved = storage.put_deck_json.call_args.args[1]
         assert saved["defaultTextColor"] == "#A1B2C3"

@@ -328,10 +328,10 @@ def test_apply_style_without_template_updates_only_text_color(
     result = apply_style(deck, "custom")
     metadata = __import__("json").loads(deck_json.read_text(encoding="utf-8"))
 
-    assert result["updated"] == {"defaultTextColor": "#123456"}
+    assert result["updated"] == {"defaultTextColor": "#123456", "slideSize": {}}
     assert metadata["defaultTextColor"] == "#123456"
     assert metadata["fonts"] == {"fullwidth": "", "halfwidth": ""}
-    assert "slideSize" not in metadata
+    assert metadata["slideSize"] == {}
     assert (deck / "specs" / "art-direction.html").exists()
 
 
@@ -460,4 +460,4 @@ def test_missing_deck_fields_flags_unfilled_text_color() -> None:
     assert merge_style_metadata(dual, themed, deck)["defaultTextColor"] == "#FFFFFF"
     assert merge_style_metadata(single, themed, deck)["defaultTextColor"] == "#123456"
     assert missing_deck_fields(merge_style_metadata(single, analysis, deck)) == []
-    assert missing_deck_fields({}) == ["template", "defaultTextColor", "fonts", "slideSize"]
+    assert missing_deck_fields({}) == ["template", "fonts", "defaultTextColor", "slideSize"]

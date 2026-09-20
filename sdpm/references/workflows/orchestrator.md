@@ -49,6 +49,8 @@ assigned_slugs: {slugs}
 task_instruction: {task_instruction}
 ```
 
+`check_specs(deck_id)` validates deck.json and outline.md; compose only when it returns ok (on the cloud stack compose_slides runs it itself).
+
 Passes, each waiting for the previous one to finish:
 
 1. **Scaffold** — one composer, all slugs, `task_instruction: Scaffold pass.` (exact string).

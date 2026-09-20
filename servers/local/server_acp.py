@@ -70,6 +70,7 @@ mcp = FastMCP("sdpm-acp")
 # ---------------------------------------------------------------------------
 
 mcp.tool()(tools.init_presentation)
+mcp.tool()(tools.check_specs)
 mcp.tool()(tools.analyze_template)
 mcp.tool()(tools.generate_pptx)
 mcp.tool()(tools.search_assets)

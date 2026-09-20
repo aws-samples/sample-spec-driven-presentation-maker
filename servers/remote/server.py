@@ -191,6 +191,39 @@ def init_presentation(name: str) -> str:
 
 
 @mcp.tool()
+def check_specs(
+    deck_id: str,
+    assigned_slugs: list[str] | None = None,
+) -> str:
+    """Validate deck.json and specs/outline.md before composing."""
+    _check_deck_access(deck_id, action="generate_pptx")
+
+    errors: list[str] = []
+    try:
+        deck_json = _storage.get_deck_json(deck_id)
+    except Exception:
+        errors.append("deck.json is missing")
+        deck_json = {}
+
+    outline_key = f"decks/{deck_id}/specs/outline.md"
+    try:
+        outline_text = _storage.download_file_from_pptx_bucket(key=outline_key).decode("utf-8")
+    except Exception:
+        errors.append("specs/outline.md is missing")
+        outline_text = ""
+
+    if errors:
+        return json.dumps({"ok": False, "errors": errors, "warnings": [], "slugs": []})
+
+    from sdpm.engine.schema import validate_specs
+
+    return json.dumps(
+        validate_specs(deck_json, outline_text, assigned_slugs),
+        ensure_ascii=False,
+    )
+
+
+@mcp.tool()
 def analyze_template(template: str, deck_id: str = "") -> str:
     """Get pre-analyzed template information — layouts, theme colors, fonts.
     Call this to understand what layouts are available before building slides.

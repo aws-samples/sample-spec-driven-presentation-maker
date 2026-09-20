@@ -10,6 +10,8 @@ workflow refers to:
 - consistency review — one group, all slugs, `instruction: "Consistency review."`
 - fixes — one group per affected slug
 
+Before dispatch, `compose_slides` validates deck.json and outline.md and returns `status: "error"` with `errors` when validation fails.
+
 It returns a JSON report:
 
 - `status`: `"completed"` / `"partial"` / `"failed"` / `"cancelled"`

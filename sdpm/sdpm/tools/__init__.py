@@ -37,6 +37,19 @@ def init_presentation(name: str) -> dict[str, Any]:
     return init(name=name)
 
 
+def check_specs(
+    deck_id: str,
+    assigned_slugs: list[str] | None = None,
+) -> dict[str, Any]:
+    """Validate deck.json and specs/outline.md before composing; ok=false means composers must not be dispatched.
+
+    Checks required deck metadata, outline format and fields, TBD markers, and assigned slugs.
+    """
+    from sdpm.api import check_specs as _check_specs
+
+    return _check_specs(deck_dir=deck_id, assigned_slugs=assigned_slugs)
+
+
 def analyze_template(template: str, layout: str = "") -> dict[str, Any]:
     """Analyze a PPTX template — extract layouts, theme colors, fonts.
 

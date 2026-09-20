@@ -47,7 +47,7 @@ _DECK_TOOLS = [
     "init_presentation", "analyze_template", "read_attachment",
     "list_styles", "apply_style", "read_examples", "list_workflows",
     "read_workflows", "list_guides", "read_guides", "search_assets",
-    "list_templates",
+    "list_templates", "check_specs",
     "run_python", "generate_pptx", "get_preview", "code_to_slide",
     "grid", "arch_diagram", "import_attachment",
 ]

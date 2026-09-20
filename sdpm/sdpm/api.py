@@ -168,7 +168,9 @@ def merge_style_metadata(
     """
     import re
 
-    merged = deepcopy(deck_json)
+    from sdpm.engine.schema import complete_deck_skeleton
+
+    merged = complete_deck_skeleton(deck_json)
     sources: dict[str, str] = {}
     merged["_sources"] = sources  # popped by style_field_sources()
     root_match = re.search(r":root\s*\{(?P<body>.*?)\}", html_text, re.DOTALL | re.IGNORECASE)
@@ -226,18 +228,23 @@ def style_field_sources(merged: dict[str, Any]) -> dict[str, str]:
 
 
 def missing_deck_fields(deck_json: dict[str, Any]) -> list[str]:
-    """Return the deck.json fields apply_style manages that are still empty.
+    """Return the still-empty fields defined by the deck.json skeleton."""
+    from sdpm.engine.schema import DECK_JSON_SKELETON
 
-    Normally empty: ``defaultTextColor`` comes from the style's ``--color-text``
-    or, failing that, the template theme's text colour.
-    """
-    missing = [key for key in ("template", "defaultTextColor") if not deck_json.get(key)]
-    fonts = deck_json.get("fonts") or {}
-    if not isinstance(fonts, dict) or not any(fonts.values()):
-        missing.append("fonts")
-    size = deck_json.get("slideSize") or {}
-    if not isinstance(size, dict) or not size.get("width") or not size.get("height"):
-        missing.append("slideSize")
+    missing: list[str] = []
+    for key in DECK_JSON_SKELETON:
+        if key in ("template", "defaultTextColor") and not deck_json.get(key):
+            missing.append(key)
+        elif key == "fonts":
+            fonts = deck_json.get(key)
+            if not isinstance(fonts, dict) or not any(
+                isinstance(value, str) and value.strip() for value in fonts.values()
+            ):
+                missing.append(key)
+        elif key == "slideSize":
+            size = deck_json.get(key)
+            if not isinstance(size, dict) or not size.get("width") or not size.get("height"):
+                missing.append(key)
     return missing
 
 
@@ -436,11 +443,9 @@ def init(
         out_dir = _get_output_base_dir() / dir_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    deck_data: dict[str, Any] = {
-        "template": "",
-        "fonts": {"fullwidth": "", "halfwidth": ""},
-        "defaultTextColor": "",
-    }
+    from sdpm.engine.schema import DECK_JSON_SKELETON, complete_deck_skeleton
+
+    deck_data: dict[str, Any] = complete_deck_skeleton(DECK_JSON_SKELETON)
 
     deck_json = out_dir / "deck.json"
     write_json(deck_json, deck_data, suffix="\n")
@@ -510,6 +515,56 @@ def _assemble_slides_from_dir(
         slides.append(slide)
 
     return deck_meta, slides
+
+
+def check_specs(
+    deck_dir: str | Path,
+    assigned_slugs: list[str] | None = None,
+) -> dict:
+    """Validate a deck workspace's deck.json and specs/outline.md."""
+    import json
+
+    from sdpm.engine.schema import validate_specs
+
+    deck_path = Path(deck_dir)
+    deck_json_path = deck_path / "deck.json"
+    outline_path = deck_path / "specs" / "outline.md"
+    errors: list[str] = []
+
+    if not deck_json_path.is_file():
+        errors.append("deck.json is missing")
+    if not outline_path.is_file():
+        errors.append("specs/outline.md is missing")
+    if errors:
+        return {"ok": False, "errors": errors, "warnings": [], "slugs": []}
+
+    try:
+        deck_json = json.loads(deck_json_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return {
+            "ok": False,
+            "errors": ["deck.json is invalid JSON"],
+            "warnings": [],
+            "slugs": [],
+        }
+    if not isinstance(deck_json, dict):
+        return {
+            "ok": False,
+            "errors": ["deck.json must contain an object"],
+            "warnings": [],
+            "slugs": [],
+        }
+
+    try:
+        outline_text = outline_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return {
+            "ok": False,
+            "errors": ["specs/outline.md is not valid UTF-8"],
+            "warnings": [],
+            "slugs": [],
+        }
+    return validate_specs(deck_json, outline_text, assigned_slugs)
 
 
 def parse_outline_slugs(outline_path: Path) -> list[str]:

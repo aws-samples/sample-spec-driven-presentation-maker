@@ -22,6 +22,7 @@ _FULL_ORCHESTRATOR = {
     "@sdpm/analyze_template",
     "@sdpm/apply_style",
     "@sdpm/arch_diagram",
+    "@sdpm/check_specs",
     "@sdpm/code_to_slide",
     "@sdpm/diff_pptx",
     "@sdpm/generate_pptx",
@@ -50,7 +51,7 @@ _COMPOSER = _FULL_ORCHESTRATOR - {
 _EXPECTED_TOOLS = {
     "sdpm-orchestrator": _FULL_ORCHESTRATOR,
     "sdpm-composer": _COMPOSER,
-    "sdpm-translate": _COMPOSER,
+    "sdpm-translate": _COMPOSER - {"@sdpm/check_specs"},
     "sdpm-style": {
         "read",
         "glob",
