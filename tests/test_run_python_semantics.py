@@ -429,9 +429,15 @@ class TestRemoteApplyStyle:
 
         result = json.loads(remote_server.apply_style("deck1", "dual", "blank-dark"))
 
-        # No --color-text in the style: the template theme's text colour fills it.
+        # No --color-text in the style: the template theme's text colour fills it,
+        # and the report says so next to the resulting deck.json.
         assert result["updated"]["defaultTextColor"] == "#FFFFFF"
         assert result["missing"] == []
+        assert result["sources"]["defaultTextColor"].startswith("template theme")
+        assert result["sources"]["template"] == "argument"
+        assert result["files"]["deck.json"]["content"]["defaultTextColor"] == "#FFFFFF"
+        assert "_sources" not in result["files"]["deck.json"]["content"]
+        assert result["files"]["specs/art-direction.html"]["bytes"] > 0
 
     def test_template_validation_failure_uploads_nothing(
         self,

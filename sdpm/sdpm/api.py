@@ -169,6 +169,8 @@ def merge_style_metadata(
     import re
 
     merged = deepcopy(deck_json)
+    sources: dict[str, str] = {}
+    merged["_sources"] = sources  # popped by style_field_sources()
     root_match = re.search(r":root\s*\{(?P<body>.*?)\}", html_text, re.DOTALL | re.IGNORECASE)
     if root_match:
         color_match = re.search(
@@ -178,6 +180,7 @@ def merge_style_metadata(
         )
         if color_match:
             merged["defaultTextColor"] = color_match.group("value").strip()
+            sources["defaultTextColor"] = "style --color-text"
 
     if not template_analysis:
         return merged
@@ -186,6 +189,7 @@ def merge_style_metadata(
         theme_text = (template_analysis.get("theme_colors") or {}).get("text")
         if theme_text:
             merged["defaultTextColor"] = theme_text
+            sources["defaultTextColor"] = "template theme text colour (style has no --color-text)"
 
     analyzed_fonts = template_analysis.get("fonts") or {}
     if analyzed_fonts:
@@ -197,6 +201,7 @@ def merge_style_metadata(
         for key, value in analyzed_fonts.items():
             if value and not fonts.get(key):
                 fonts[key] = value
+                sources["fonts"] = "template"
         merged["fonts"] = fonts
 
     analyzed_size = template_analysis.get("slide_size") or template_analysis.get("slideSize") or {}
@@ -209,9 +214,15 @@ def merge_style_metadata(
         for key, value in analyzed_size.items():
             if value is not None and not slide_size.get(key):
                 slide_size[key] = value
+                sources["slideSize"] = "template"
         merged["slideSize"] = slide_size
 
     return merged
+
+
+def style_field_sources(merged: dict[str, Any]) -> dict[str, str]:
+    """Pop and return where merge_style_metadata took each filled field from."""
+    return merged.pop("_sources", {})
 
 
 def missing_deck_fields(deck_json: dict[str, Any]) -> list[str]:
@@ -254,8 +265,9 @@ def apply_style(
         template: Optional template name, with or without the .pptx extension.
 
     Returns:
-        Dict with status, path, style, changed deck.json fields under updated, and
-        missing — deck.json fields the style/template could not fill (set them yourself).
+        Dict with status, style, files (paths written; deck.json with its content),
+        updated (changed deck.json fields), sources (where each filled field came from)
+        and missing (fields neither the style nor the template could fill).
     """
     import shutil
 
@@ -290,6 +302,9 @@ def apply_style(
         template_analysis,
         completed,
     )
+    sources = style_field_sources(merged)
+    if template:
+        sources["template"] = "argument"
     updated = _changed_style_fields(deck_data, merged)
 
     dest = deck_path / "specs" / "art-direction.html"
@@ -299,9 +314,13 @@ def apply_style(
         write_json(deck_json_path, merged, suffix="\n")
     return {
         "status": "ok",
-        "path": str(dest),
         "style": style,
+        "files": {
+            "specs/art-direction.html": {"path": str(dest), "bytes": dest.stat().st_size},
+            "deck.json": {"path": str(deck_json_path), "content": merged},
+        },
         "updated": updated,
+        "sources": sources,
         "missing": missing_deck_fields(merged),
     }
 

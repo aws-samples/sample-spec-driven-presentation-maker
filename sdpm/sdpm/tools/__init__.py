@@ -170,9 +170,11 @@ def apply_style(
         template: Optional template name, with or without the .pptx extension.
 
     Returns:
-        Dict with status, path, style, changed deck.json fields under updated, and
-        missing — deck.json fields neither the style nor the template could fill; set them
-        yourself before composing (normally empty).
+        Dict with files written (specs/art-direction.html path; deck.json path and
+        content), updated (changed deck.json fields), sources (where each filled field
+        came from — style token, template theme/analysis, argument) and missing (fields
+        neither could fill). Review deck.json and edit it with run_python if the
+        derived values are not what the deck needs.
     """
     from sdpm.api import apply_style as _apply_style
 

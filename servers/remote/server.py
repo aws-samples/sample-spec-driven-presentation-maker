@@ -486,9 +486,11 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
         template: Optional template name, with or without the .pptx extension.
 
     Returns:
-        JSON with changed deck.json fields under updated, and missing — deck.json
-        fields neither the style nor the template could fill; set them yourself
-        before composing (normally empty).
+        JSON with files written (specs/art-direction.html; deck.json with its content),
+        updated (changed deck.json fields), sources (where each filled field came from)
+        and missing (fields neither the style nor the template could fill). Review
+        deck.json and edit it with run_python if the derived values are not what the
+        deck needs.
     """
     _check_deck_access(deck_id, action="edit_slide")
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", style):
@@ -513,7 +515,7 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
             raise FileNotFoundError(f"Style not found: {style}")
         html_bytes = builtin_path.read_bytes()
 
-    from sdpm.api import _changed_style_fields, merge_style_metadata, missing_deck_fields
+    from sdpm.api import _changed_style_fields, merge_style_metadata, missing_deck_fields, style_field_sources
 
     deck_data = _storage.get_deck_json(deck_id)
     completed = dict(deck_data)
@@ -531,6 +533,9 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
         template_analysis,
         completed,
     )
+    sources = style_field_sources(merged)
+    if template:
+        sources["template"] = "argument"
     updated = _changed_style_fields(deck_data, merged)
 
     dest_key = f"decks/{deck_id}/specs/art-direction.html"
@@ -540,8 +545,12 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
     return json.dumps(
         {
             "applied": style,
-            "path": "specs/art-direction.html",
+            "files": {
+                "specs/art-direction.html": {"path": "specs/art-direction.html", "bytes": len(html_bytes)},
+                "deck.json": {"path": "deck.json", "content": merged},
+            },
             "updated": updated,
+            "sources": sources,
             "missing": missing_deck_fields(merged),
         }
     )
