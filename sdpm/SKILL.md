@@ -5,42 +5,42 @@ description: "Generate PowerPoint presentations from JSON. Use when user wants t
 
 # PPTX Maker
 
-Generate PowerPoint from JSON using corporate templates.
-All paths in this file are relative to this SKILL.md. `cd` to this directory before running commands.
+Generate PowerPoint from JSON using corporate templates. This is the Layer 1 (no-MCP)
+environment adapter: it tells you how to run the engine, not what to do — role and
+procedure live in `read_workflows`.
 
-## CLI
+All paths in this file are relative to this SKILL.md. `cd` to this directory before
+running commands.
+
+## Running the engine
 
 ```bash
-uv run python3 scripts/pptx_builder.py {command} [args]
+uv run python3 scripts/pptx_builder.py {contract_name} [args]
 ```
 
-**Critical constraint:** Do NOT make any decisions about slide structure, content, design, or layout before loading the workflow. The workflow files contain the full process including briefing, outline, and art direction. Wait until the workflow is loaded and follow it step by step.
+Subcommand names match the MCP tool names (`generate_pptx`, `read_workflows`,
+`read_guides`, `read_examples`, `init_presentation`, `analyze_template`, `search_assets`,
+`list_templates`, `code_to_slide`, `diff_pptx`, `arch_diagram`, `grid`), so workflow text
+that calls a tool applies verbatim here. `--help` on any subcommand shows its arguments.
 
-**After loading:** Present the options and ask which to do:
+CLI-only operations without a contract name:
 
-A. New presentation — create slides from scratch
-B. Edit existing PPTX — modify a provided file
-C. Hand-edit sync — continue from a user-edited PPTX
-D. Create style — build a reusable style guide
+| Operation | Command |
+|---|---|
+| Preview slides as PNG | `scripts/pptx_builder.py preview` |
+| Measure text bounding boxes | `scripts/pptx_builder.py measure` |
+| Import an existing PPTX to JSON | `scripts/pptx_to_json.py` |
+| Start a deck translation | `scripts/translate_extract.py <deck> --target-lang <lang>` |
+| Apply filled translations | `scripts/translate_apply.py <deck>-<lang>` |
 
-## Workflow A: New Presentation
+## Files, not tool calls
 
-When no existing PPTX is provided.
-→ Run `uv run python3 scripts/pptx_builder.py workflows create-new-1-briefing` to start. Follow each file's Next Step from there.
+There is no MCP session here — deck files (`deck.json`, `specs/`, `slides/`) are read
+and written directly with normal file I/O. Everything the workflows describe as a tool
+call (`read_text`, `write_file`, etc.) is just that: open the path, read or write it.
 
-## Workflow B: Edit Existing PPTX
+## Start here
 
-When an existing PPTX is provided. `read_attachment` returns
-`guideInstruction: "read_guides([\"import-pptx\"])"` in its header
-when the source is a PPTX. For CLI flows, run
-`uv run python3 scripts/pptx_builder.py guides import-pptx` to start.
+To create slides, run `read_workflows orchestrator` and follow it.
 
-## Workflow C: Hand-Edit Sync
-
-When the user hand-edits the generated PPTX in PowerPoint and then asks for further changes.
-→ Run `uv run python3 scripts/pptx_builder.py workflows create-new-4-hand-edit-sync` to start.
-
-## Workflow D: Create Style
-
-When the user wants to create a new reusable style guide.
-→ Run `uv run python3 scripts/pptx_builder.py workflows create-style` to start.
+Without a sub-agent mechanism, one agent plays both roles, one slug group at a time.

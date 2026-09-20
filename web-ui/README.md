@@ -67,7 +67,7 @@ Open [http://localhost:3000](http://localhost:3000) (Next.js picks the next free
 
 ### How it works
 
-Setting `NEXT_PUBLIC_MODE=local` enables the Next.js API Routes under `src/app/api/` and spawns `kiro-cli acp --agent sdpm-spec` per active deck. The agent definitions live under [`servers/local/.kiro/agents/`](../servers/local/.kiro/agents/) and share the MCP toolset from [`servers/local/server_acp.py`](../servers/local/server_acp.py).
+Setting `NEXT_PUBLIC_MODE=local` enables the Next.js API Routes under `src/app/api/` and spawns `kiro-cli acp --agent sdpm-orchestrator` per active deck. The canonical agent definitions live under [`servers/local/.kiro/acp-agents/`](../servers/local/.kiro/acp-agents/) and share the MCP toolset from [`servers/local/server_acp.py`](../servers/local/server_acp.py).
 
 ---
 

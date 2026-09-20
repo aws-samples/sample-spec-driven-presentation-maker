@@ -20,9 +20,7 @@ connections. Hand-placement is for fine-tuning or non-flow art.
 
 ## How to run it
 
-Two equivalent front-ends call the same engine. Use whichever your host offers.
-
-**MCP tool (`arch_diagram`)** — preferred when available. Returns the routed
+Call `arch_diagram(...)` to use the engine. Returns the routed
 layout AND the QA metrics in one call, so you can render, read the numbers, and
 fix the structure without a second command:
 
@@ -47,18 +45,17 @@ ensures boxes are sized accurately regardless of aspect ratio.
 > correctly-sized boxes. Explicit `"height"` on box nodes is still supported
 > for manual fine-tuning.
 
-**CLI** — same engine, for SKILL.md/script hosts:
+**CLI example** — same engine for script hosts:
 
 ```bash
-python3 scripts/pptx_builder.py layout input.json \
+uv run python3 scripts/pptx_builder.py arch_diagram input.json \
   --x 100 --y 180 --width 1720 --height 800 -o elements.json
 ```
 
 - Input: one logical-structure JSON (see below).
 - Output: `{ "elements": [...], "bbox": {...}, "warnings": [...] }`. The MCP tool
   additionally returns `"metrics"` (crossings / pierces / group_pierces /
-  overflow / score — see "Reading the output"); the CLI omits it (run
-  `layout_qa.py` for the CLI path).
+  overflow / score — see "Reading the output"); the CLI omits it; measure the resulting geometry with the QA harness.
 - Drop the `elements` array straight into a slide, or reference the whole file
   with `{"type": "include", "src": "elements.json"}`.
 - `targetArea` in the JSON (`{x, y, width, height}`) overrides the x/y/width/
@@ -66,10 +63,9 @@ python3 scripts/pptx_builder.py layout input.json \
 - The engine scales the whole diagram to fit the target box, so author at any
   scale — relationships matter, absolute sizes don't.
 - The `metrics`/`warnings` catch geometry, but a wrong-looking label or awkward
-  bend only shows in the render. In the normal slide flow the review step
-  (`create-new-3-review`) previews every slide as a PNG, so the diagram gets
-  eyeballed there — no separate preview needed. Outside that flow, drop the
-  elements into a one-slide deck and run `pptx_builder.py preview <deck-dir>`.
+  bend only shows in the render. In the normal slide flow renders every slide for review, so the diagram gets
+  eyeballed there. Outside that flow, drop the elements into a one-slide deck
+  and render a preview.
 
 ---
 
@@ -260,7 +256,7 @@ element). If you need the cluster named, keep a `groupType`.
 4. **Mark genuine bundles `fan: "merge"`** (technique 2).
 5. **Wrap degree-1 auxiliaries (fallback, auth, cache-aside) in an invisible
    perpendicular group** with their anchor (technique 3).
-6. Run `layout`, read `warnings`, and check crossings/pierces. Iterate on
+6. Call `arch_diagram(...)`, read `warnings`, and check crossings/pierces. Iterate on
    structure — not coordinates — if defects remain.
 
 ### Worked examples (all reach 0 crossings / 0 pierces)
@@ -346,12 +342,8 @@ framed groups do.
   "tall/wide group" hint is advisory only: if `overflow` is 0 the layout fits,
   so don't restructure just to silence it.
 - `bbox`: final bounding box after scale-to-fit.
-- `metrics`: objective QA numbers, returned inline by the `arch_diagram` MCP
-  tool. For the CLI, get the same numbers from the QA harness:
-
-  ```bash
-  python3 scripts/layout_qa.py input.json --width 1720 --height 800
-  ```
+- `metrics`: objective QA numbers returned inline by `arch_diagram(...)`.
+  For the CLI path, measure the same numbers with the QA harness.
 
   - `crossings` — edge segments that intersect.
   - `pierces` — a line through a non-endpoint **icon**.

@@ -5,7 +5,7 @@
 Fixtures are minimal SVG documents mirroring real LibreOffice 26.x export
 structure (Slide/Page groups, TextPosition tspans with textLength,
 BoundingBox rects, shadow groups, fill-opacity). Calibration against the
-official reference decks (components.pptx / patterns.pptx) is a local-only
+official component reference deck is a local-only
 step recorded in the spec notes; these tests pin the judgment logic.
 """
 

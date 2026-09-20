@@ -83,3 +83,4 @@ class LiftToolResultImages(HookProvider):
 
     def _on_before_model_call(self, event: BeforeModelCallEvent) -> None:
         lift_tool_result_images(event.agent.messages)
+

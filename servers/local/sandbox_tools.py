@@ -15,24 +15,15 @@ from pathlib import Path
 from typing import Any
 
 
-def _rejection_message(violations: list[str], has_deck: bool) -> str:
+def _rejection_message(violations: list[str]) -> str:
     """Build an error message that helps the LLM rewrite rejected code."""
     lines = ["Code rejected by sandbox:"]
     lines.extend(f"  {v}" for v in violations)
-    if has_deck:
-        lines.append("")
-        lines.append("Use sandbox functions instead:")
-        lines.append("  read_json(path) → dict    write_json(path, data)")
-        lines.append("  read_text(path) → str     write_text(path, text)")
-        lines.append('  list_files(subdir=".") → list[str]')
-        lines.append("")
-        lines.append("Example:")
-        lines.append('  data = read_json("slides/title.json")')
-        lines.append('  data["elements"][0]["text"] = "New Title"')
-        lines.append('  write_json("slides/title.json", data)')
-    else:
-        lines.append("")
-        lines.append("Only print and built-in functions are available (no file I/O).")
+    lines.append("")
+    lines.append("Use sandbox functions instead:")
+    lines.append("  read_json(path) → dict    write_json(path, data)")
+    lines.append("  read_text(path) → str     write_text(path, text)")
+    lines.append('  list_files(subdir=".") → list[str]')
     return "\n".join(lines)
 
 
@@ -58,102 +49,54 @@ def _build_snapshot(deck_dir: Path) -> dict[str, tuple[int, int]]:
     return snap
 
 
-def run_python(purpose: str, code: str, deck_id: str = "",
+def run_python(purpose: str, code: str, deck_id: str,
                measure_slides: list[str] | None = None) -> str:
-    """Execute Python code in a sandboxed environment.
+    """Execute Python code in a restricted sandbox whose working directory is the deck.
 
-    Code runs in a restricted subprocess. `import` statements and direct file
-    access (`open()`) are NOT available. Use the provided sandbox functions instead.
+    `import` and `open()` are not available; standard builtins (print, len, range,
+    sorted, min/max, zip, …) are. Helpers, with paths relative to the deck directory
+    (access outside it is denied):
+        read_json(path), write_json(path, data), read_text(path), write_text(path, text),
+        list_files(subdir=".")
 
-    ## Sandbox functions (available when deck_id is provided)
+    Writes persist immediately. output.pptx rebuilds automatically when deck.json,
+    slides/, includes/ or specs/outline.md changed. measure_slides runs the verification
+    pass (render, text overflow measurement, preview PNGs) for those slugs only — pass
+    the slugs you edited.
 
-        read_json(path)          → dict/list   Read a JSON file
-        write_json(path, data)   → None        Write data as JSON
-        read_text(path)          → str         Read a text file
-        write_text(path, text)   → None        Write a text file
-        list_files(subdir=".")   → list[str]   List filenames in a subdirectory
-
-    All paths are relative to the deck directory (e.g. "slides/title.json").
-    Access outside the deck directory is denied.
-
-    ## Built-in functions available
-
-    print, len, range, enumerate, sorted, isinstance, type, str, int, float,
-    bool, list, dict, tuple, set, min, max, sum, abs, round, any, all, zip,
-    map, filter, reversed
-
-    ## When deck_id is NOT provided (general computation)
-
-    Only print and built-in functions above are available.
-    No file operations.
-
-    ## Examples
-
-        # Read and edit a slide
-        data = read_json("slides/title.json")
-        data["elements"][0]["text"] = "New Title"
-        write_json("slides/title.json", data)
-
-        # Write a spec file
-        content = \"\"\"# Brief
-
-Topic: AI-powered presentation tool
-Audience: Developers
-\"\"\"
-        write_text("specs/brief.md", content)
-
-        # Read deck metadata
-        deck = read_json("deck.json")
-        print(deck["template"])
-
-        # Read a spec file
-        outline = read_text("specs/outline.md")
-        print(outline)
-
-        # List slide files
-        files = list_files("slides")
-        print(files)
-
-        # General computation (no deck_id)
-        print(2 ** 100)
-
-    **Always specify measure_slides when editing slides.**
-
-    ## Persistence & build (no flags needed)
-
-    - File writes always persist — anything written via write_json/write_text
-      is saved immediately. There is no "unsaved" state.
-    - output.pptx rebuilds automatically whenever the deck changed
-      (deck.json / slides/ / includes/ / specs/outline.md).
-    - measure_slides triggers the expensive verification pass (render + text
-      overflow measurement + preview PNGs) for the given slugs only.
+    Example: run_python(purpose="Fix the title", code=..., deck_id="/path/to/deck",
+    measure_slides=["title"])
 
     Args:
         purpose: Brief user-facing description of what this code does. Shown in UI.
-        code: Python code to execute (no import statements allowed).
-        deck_id: Deck output_dir path. Optional.
+        code: Python code to execute (no import statements).
+        deck_id: Deck output_dir path (from init_presentation).
         measure_slides: Slide slugs to measure after execution (e.g. ["title", "feature-a"]).
 
     Returns:
         JSON: {"output", "measure"?, "pptx"?, "preview"?, "compose"?}
     """
     result: dict[str, Any] = {}
-    cwd = deck_id if deck_id and Path(deck_id).is_dir() else None
+    if not deck_id or not Path(deck_id).is_dir():
+        result["error"] = (
+            f"deck directory not found: {deck_id!r}. run_python runs inside a deck "
+            "workspace — pass the output_dir returned by init_presentation."
+        )
+        return json.dumps(result, ensure_ascii=False)
+    cwd = deck_id
 
     from sandbox import check_code, make_runner
 
     violations = check_code(code)
     if violations:
-        result["output"] = _rejection_message(violations, has_deck=bool(cwd))
+        result["output"] = _rejection_message(violations)
         return json.dumps(result, ensure_ascii=False)
 
-    pre_snap = _build_snapshot(Path(cwd)) if cwd else {}
+    pre_snap = _build_snapshot(Path(cwd))
 
     try:
-        runner = make_runner(deck_id if cwd else "")
-        args = [sys.executable, "-c", runner]
-        if cwd:
-            args.append(deck_id)
+        runner = make_runner(deck_id)
+        args = [sys.executable, "-c", runner, deck_id]
         proc = subprocess.run(
             args, input=code,
             capture_output=True, text=True, timeout=120, cwd=cwd,
@@ -181,7 +124,7 @@ Audience: Developers
         if lint_outline(outline_path.read_text(encoding="utf-8")):
             result.setdefault("warnings", {})["outline"] = (
                 "outline.md format violation. "
-                "Read workflow `create-new-1-outline` for the correct format."
+                "Read workflow `orchestrator` for the outline format."
             )
 
     # Lint and sanitize slide JSON
@@ -329,6 +272,14 @@ Audience: Developers
                                 continue
                             try:
                                 comp_data = split_slide_components(svg_path, sn)
+                                from sdpm.engine.schema import extract_regions
+
+                                slide_path = deck_dir / "slides" / f"{slug}.json"
+                                try:
+                                    slide = json.loads(slide_path.read_text(encoding="utf-8"))
+                                except (OSError, json.JSONDecodeError, TypeError):
+                                    slide = {}
+                                comp_data["regions"] = extract_regions(slide)
                                 print(f"[compose] svg slide {sn} → slug {slug}", file=sys.stderr)
                                 prev_file = prev_by_slug.get(slug)
                                 if prev_file and prev_file.exists():

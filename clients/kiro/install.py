@@ -24,13 +24,12 @@ Set ``KIRO_HOME`` (or pass ``--kiro-home``) to target a profile other than
 ``~/.kiro``; that is the only way to keep a v2 install and a v3 Power install
 from colliding, because Powers are global-scope only.
 
-The repository stays the single source of truth: mode behavior lives in
-``personas/*.md`` and is served by the MCP server via
-``start_presentation(mode=...)``. The generated composer agent carries no
-behavior either — its prompt is a ``file://`` pointer into
-``personas/composer.md`` (self-spawn remains the documented fallback for
-environments without it). ``git pull`` updates take effect without re-running
-this script. Re-run only if you move the checkout.
+The repository stays the single source of truth: role behavior lives in
+``sdpm/references/workflows/*.md`` and skills dispatch to it through
+``read_workflows(...)``. The generated composer agent carries no behavior — its
+prompt is a ``file://`` pointer to ``skills/sdpm-composer/SKILL.md``. ``git pull``
+updates take effect without re-running this script. Re-run only if you move the
+checkout.
 """
 
 from __future__ import annotations
@@ -183,27 +182,27 @@ def audit_skill_link(link: Path, repo_root: Path = REPO_ROOT) -> Finding:
 def _expected_composer_config(checkout: Path) -> dict:
     """The composer agent config this installer generates for ``checkout``.
 
-    Same object the v0.5.0–v0.5.2 installers wrote (the deleted
-    ``sdpm-composer.json.tmpl`` with ``{{CHECKOUT}}`` resolved), kept verbatim
-    so ownership classification can require FULL equality across versions.
+    The complete object is the canonical generated form. Ownership
+    classification requires full equality so prompt and MCP paths must point
+    at the same checkout and any user edit remains untouched.
 
     Why a dedicated agent: compose is a fan-out workload (up to 10 parallel
-    workers). The persona's self-spawn fallback works, but a general-purpose
+    workers). The orchestrator's self-spawn fallback works, but a general-purpose
     worker inherits every MCP server in the profile — each worker cold-starts
     all of them, and under parallel load the sdpm server can miss its init
     timeout on some workers (observed in practice). This agent gives workers
     the sdpm server only, with a generous timeout and pre-approved tools, and
     carries no behavior text: the prompt is a ``file://`` pointer into
-    ``personas/composer.md``.
+    ``skills/sdpm-composer/SKILL.md``.
     """
     return {
         "name": "sdpm-composer",
         "description": (
-            "sdpm slide composer (dispatched by the sdpm-vibe skill). "
+            "sdpm slide composer (dispatched by the presentation orchestrator). "
             "Composes assigned slides from approved specs via the sdpm MCP server. "
             "No user interaction."
         ),
-        "prompt": f"file://{checkout}/personas/composer.md",
+        "prompt": f"file://{checkout}/skills/sdpm-composer/SKILL.md",
         "mcpServers": {
             "sdpm": {
                 "command": "uv",
@@ -223,27 +222,45 @@ def _expected_composer_config(checkout: Path) -> dict:
     }
 
 
-def generated_composer_checkout(data: object) -> Path | None:
-    """Checkout that ``data`` was generated for, or ``None`` if we did not write it.
+def _legacy_composer_config(checkout: Path) -> dict:
+    """Exact composer config generated before workflows replaced personas."""
+    config = _expected_composer_config(checkout)
+    config["description"] = (
+        "sdpm slide composer (dispatched by the sdpm-"
+        "vibe skill). "
+        "Composes assigned slides from approved specs via the sdpm MCP server. "
+        "No user interaction."
+    )
+    config["prompt"] = f"file://{checkout}/" + "personas" + "/composer.md"
+    return config
+
+
+def generated_composer_checkout(data: object) -> tuple[Path, bool] | None:
+    """Return the generated checkout and whether the config is legacy.
 
     The checkout root is recovered from the ``prompt`` field, then the whole
-    object must equal the known generated form for that root (prompt and MCP
-    args therefore must point at the SAME root). Any user edit — description,
-    timeout, tools, extra fields — breaks equality, so the file is treated as
-    unknown and left alone.
+    object must equal a known generated form for that root. Any user edit breaks
+    equality, so the file remains unknown and untouched.
     """
     if not isinstance(data, dict):
         return None
     prompt = data.get("prompt")
     if not isinstance(prompt, str):
         return None
-    prefix, suffix = "file://", "/personas/composer.md"
-    if not (prompt.startswith(prefix) and prompt.endswith(suffix)):
-        return None
-    checkout = Path(prompt[len(prefix) : -len(suffix)])
-    if not checkout.is_absolute():
-        return None
-    return checkout if data == _expected_composer_config(checkout) else None
+    prefix = "file://"
+    suffixes = (
+        ("/skills/sdpm-composer/SKILL.md", False),
+        ("/" + "personas" + "/composer.md", True),
+    )
+    for suffix, legacy in suffixes:
+        if not (prompt.startswith(prefix) and prompt.endswith(suffix)):
+            continue
+        checkout = Path(prompt[len(prefix) : -len(suffix)])
+        if not checkout.is_absolute():
+            return None
+        expected = _legacy_composer_config(checkout) if legacy else _expected_composer_config(checkout)
+        return (checkout, legacy) if data == expected else None
+    return None
 
 
 def audit_composer(agents_dest: Path, repo_root: Path = REPO_ROOT) -> Finding:
@@ -261,10 +278,13 @@ def audit_composer(agents_dest: Path, repo_root: Path = REPO_ROOT) -> Finding:
         data = json.loads(legacy.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return Finding("composer", legacy, UNKNOWN, "not readable as JSON")
-    checkout = generated_composer_checkout(data)
-    if checkout is None:
+    generated = generated_composer_checkout(data)
+    if generated is None:
         return Finding("composer", legacy, UNKNOWN, "does not match the known generated form")
+    checkout, legacy_format = generated
     if checkout == repo_root:
+        if legacy_format:
+            return Finding("composer", legacy, STALE, "legacy generated form")
         return Finding("composer", legacy, OWN)
     if checkout.exists():
         return Finding("composer", legacy, FOREIGN, f"generated for a live checkout at {checkout}")
@@ -348,16 +368,13 @@ def remove_owned_composer_agent(findings: list[Finding]) -> None:
             f.target.unlink()
             info(f"{f.target} (removed composer agent — the Power supersedes it)")
         elif f.status == UNKNOWN:
-            warn(
-                f"{f.target} {f.detail} — left in place (it may be user-edited). "
-                "Remove it manually when convenient."
-            )
+            warn(f"{f.target} {f.detail} — left in place (it may be user-edited). Remove it manually when convenient.")
 
 
 def write_composer_agent(findings: list[Finding], repo_root: Path = REPO_ROOT) -> None:
     """(Re)generate ``sdpm-composer.json`` for this checkout (idempotent).
 
-    A registered ``sdpm-composer`` agent is the persona's preferred worker for
+    A registered ``sdpm-composer`` agent is the orchestrator's preferred worker for
     parallel compose; without it, workers fall back to a general-purpose agent
     that cold-starts every MCP server in the profile per worker (see
     ``_expected_composer_config`` for the failure mode this avoids).
@@ -376,6 +393,17 @@ def write_composer_agent(findings: list[Finding], repo_root: Path = REPO_ROOT) -
             encoding="utf-8",
         )
         info(f"{f.target} ({'regenerated' if f.status == STALE else 'generated'})")
+
+
+def unlink_retired_skill_links(kiro_home: Path, repo_root: Path = REPO_ROOT) -> None:
+    """Remove retired skill links owned by this checkout, leaving all others alone."""
+    skills_dest = kiro_home / "skills"
+    for name in ("sdpm-" + "vibe", "sdpm-" + "spec"):
+        link = skills_dest / name
+        expected = (repo_root / "skills" / name).resolve()
+        if link.is_symlink() and link.resolve() == expected:
+            link.unlink()
+            info(f"{link} (removed retired skill link)")
 
 
 def _kiro_env(kiro_home: Path) -> dict[str, str]:
@@ -402,10 +430,7 @@ def register_mcp_server(
     if finding.status in BLOCKING:
         return  # reported by the caller
     if kiro_cli is None:
-        warn(
-            "kiro-cli not found on PATH — skipped MCP registration. "
-            "Install Kiro CLI and re-run `make install-kiro`."
-        )
+        warn("kiro-cli not found on PATH — skipped MCP registration. Install Kiro CLI and re-run `make install-kiro`.")
         return
 
     replacing = finding.status != ABSENT
@@ -546,12 +571,13 @@ def main(argv: list[str] | None = None) -> int:
     if opts.replace_existing:
         conflicts = [f for f in conflicts if f.status != FOREIGN]
         findings = [
-            Finding(f.kind, f.target, STALE, f"taken over ({f.detail})") if f.status == FOREIGN else f
-            for f in findings
+            Finding(f.kind, f.target, STALE, f"taken over ({f.detail})") if f.status == FOREIGN else f for f in findings
         ]
     if conflicts:
         report_conflicts(conflicts, opts.replace_existing)
         return 1
+
+    unlink_retired_skill_links(kiro_home, REPO_ROOT)
 
     mcp_finding = next(f for f in findings if f.kind == "mcp")
     if mode == "power":
@@ -577,8 +603,8 @@ def main(argv: list[str] | None = None) -> int:
         "\nDone. Usage:\n"
         "  1. Make sure `uv` and LibreOffice/poppler are installed (previews need them).\n"
         "  2. Start a NEW session: kiro-cli chat\n"
-        '  3. Ask for slides, e.g. "このURLをスライドにして https://..." — or run /sdpm-vibe,\n'
-        "     /sdpm-spec, /sdpm-style to pick a mode explicitly.\n"
+        '  3. Ask for slides, e.g. "このURLをスライドにして https://..." — or run /sdpm-create,\n'
+        "     /sdpm-style, or /sdpm-translate for an explicit entry point.\n"
         "\n"
         "Updates: `git pull` in this checkout is enough. Re-run `make install-kiro`\n"
         "only if you move the checkout."

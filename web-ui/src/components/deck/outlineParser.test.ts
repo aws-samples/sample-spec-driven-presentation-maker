@@ -57,7 +57,7 @@ describe("outlineParser", () => {
         "Some context about this section.",
         "",
         "- [slide-1] First slide",
-        "  - what_to_say: Hello world",
+        "  - body: Hello world",
         "",
         "## Part Two",
         "",
@@ -100,34 +100,38 @@ describe("outlineParser", () => {
     it("attaches sub-items to the preceding slide entry", () => {
       const md = [
         "- [slide-1] My Slide",
-        "  - what_to_say: This is what I say",
+        "  - body: This is what I say",
+        "  - visual: Bar chart",
         "  - evidence: Data shows X",
-        "  - what_to_show: Bar chart",
-        "  - notes: Remember to emphasize Y",
       ].join("\n")
       const entries = parseOutline(md)
       expect(entries).toHaveLength(1)
       const slide = entries[0] as SlideEntry
-      expect(slide.subItems).toHaveLength(4)
-      expect(slide.subItems[0]).toEqual({ key: "what_to_say", value: "This is what I say" })
-      expect(slide.subItems[1]).toEqual({ key: "evidence", value: "Data shows X" })
-      expect(slide.subItems[2]).toEqual({ key: "what_to_show", value: "Bar chart" })
-      expect(slide.subItems[3]).toEqual({ key: "notes", value: "Remember to emphasize Y" })
+      expect(slide.subItems).toHaveLength(3)
+      expect(slide.subItems[0]).toEqual({ key: "body", value: "This is what I say" })
+      expect(slide.subItems[1]).toEqual({ key: "visual", value: "Bar chart" })
+      expect(slide.subItems[2]).toEqual({ key: "evidence", value: "Data shows X" })
     })
 
     it("sub-items without a preceding slide become prose", () => {
-      const md = "  - what_to_say: orphan sub-item"
+      const md = "  - body: orphan sub-item"
       const entries = parseOutline(md)
       // The sub-item regex won't match without a current slide, treated as prose
       expect(entries).toHaveLength(1)
       expect(entries[0].type).toBe("prose")
     })
 
+    it("preserves legacy sub-item keys as prose", () => {
+      const entries = parseOutline("- [s1] Slide\n  - what_to_say: Legacy detail")
+      expect((entries[0] as SlideEntry).subItems).toHaveLength(0)
+      expect(entries[1]).toEqual({ type: "prose", text: "  - what_to_say: Legacy detail" })
+    })
+
     it("section heading breaks sub-item attachment context", () => {
       const md = [
         "- [s1] Slide",
         "## New Section",
-        "  - what_to_say: This should not attach to s1",
+        "  - body: This should not attach to s1",
       ].join("\n")
       const entries = parseOutline(md)
       expect(entries).toHaveLength(3)
@@ -193,7 +197,7 @@ describe("outlineParser", () => {
     it("marks the last enriched slide as active", () => {
       const md = [
         "- [s1] A",
-        "  - what_to_say: Hello",
+        "  - body: Hello",
         "- [s2] B",
         "  - evidence: Data",
         "- [s3] C",
@@ -208,11 +212,11 @@ describe("outlineParser", () => {
     it("marks earlier enriched slides as done", () => {
       const md = [
         "- [s1] A",
-        "  - what_to_say: X",
+        "  - body: X",
         "- [s2] B",
-        "  - what_to_say: Y",
+        "  - body: Y",
         "- [s3] C",
-        "  - what_to_say: Z",
+        "  - body: Z",
       ].join("\n")
       const entries = parseOutline(md)
       const states = resolveStates(entries)
@@ -222,7 +226,7 @@ describe("outlineParser", () => {
     })
 
     it("does not assign states to non-slide entries", () => {
-      const md = "## Section\n- [s1] Slide\n  - what_to_say: Hello\nSome prose"
+      const md = "## Section\n- [s1] Slide\n  - body: Hello\nSome prose"
       const entries = parseOutline(md)
       const states = resolveStates(entries)
       // Only the slide entry (index 1) gets a state
@@ -236,7 +240,7 @@ describe("outlineParser", () => {
       const md = [
         "## Part 1",
         "- [s1] A",
-        "  - what_to_say: Done",
+        "  - body: Done",
         "## Part 2",
         "- [s2] B",
         "  - evidence: Active",
@@ -251,7 +255,7 @@ describe("outlineParser", () => {
     })
 
     it("preserves backward compatibility: single enriched slide is active", () => {
-      const entries = parseOutline("- [only] Single\n  - what_to_say: Hello")
+      const entries = parseOutline("- [only] Single\n  - body: Hello")
       const states = resolveStates(entries)
       expect(states.get(0)).toBe("active")
     })
@@ -277,7 +281,7 @@ describe("outlineParser", () => {
 
   describe("backward compatibility — old OutlineSlide[] consumers", () => {
     it("slide entries have all fields expected by legacy consumers", () => {
-      const md = "- [intro] Welcome\n  - what_to_say: Hello\n  - evidence: Data"
+      const md = "- [intro] Welcome\n  - body: Hello\n  - evidence: Data"
       const entries = parseOutline(md)
       const slides = getSlideEntries(entries)
       const slide = slides[0]

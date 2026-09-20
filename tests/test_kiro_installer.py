@@ -57,9 +57,8 @@ def live_checkout(tmp_path):
     """A different checkout that exists on disk (so it counts as ``foreign``)."""
     other = tmp_path / "other-checkout"
     (other / "servers" / "local").mkdir(parents=True)
-    for name in ("sdpm-vibe", "sdpm-spec", "sdpm-style"):
+    for name in ("sdpm-create", "sdpm-composer", "sdpm-style", "sdpm-translate"):
         (other / "skills" / name).mkdir(parents=True)
-    (other / "personas").mkdir()
     return other
 
 
@@ -158,11 +157,11 @@ class TestAuditMcp:
 
 class TestAuditSkillLink:
     def test_absent(self, kiro_home):
-        assert kiro_install.audit_skill_link(kiro_home / "skills" / "sdpm-vibe").status == ABSENT
+        assert kiro_install.audit_skill_link(kiro_home / "skills" / "sdpm-create").status == ABSENT
 
     def test_own(self, kiro_home):
-        link = kiro_home / "skills" / "sdpm-vibe"
-        link.symlink_to(REPO_ROOT / "skills" / "sdpm-vibe")
+        link = kiro_home / "skills" / "sdpm-create"
+        link.symlink_to(REPO_ROOT / "skills" / "sdpm-create")
         assert kiro_install.audit_skill_link(link).status == OWN
 
     def test_own_through_a_symlinked_home(self, kiro_home, tmp_path):
@@ -170,30 +169,30 @@ class TestAuditSkillLink:
         # resolved paths or every link looks foreign.
         alias = tmp_path / "alias"
         alias.symlink_to(REPO_ROOT)
-        link = kiro_home / "skills" / "sdpm-vibe"
-        link.symlink_to(alias / "skills" / "sdpm-vibe")
+        link = kiro_home / "skills" / "sdpm-create"
+        link.symlink_to(alias / "skills" / "sdpm-create")
         assert kiro_install.audit_skill_link(link).status == OWN
 
     def test_foreign_when_linked_into_a_live_checkout(self, kiro_home, live_checkout):
-        link = kiro_home / "skills" / "sdpm-vibe"
-        link.symlink_to(live_checkout / "skills" / "sdpm-vibe")
+        link = kiro_home / "skills" / "sdpm-create"
+        link.symlink_to(live_checkout / "skills" / "sdpm-create")
         assert kiro_install.audit_skill_link(link).status == FOREIGN
 
     def test_stale_when_dangling(self, kiro_home, tmp_path):
-        link = kiro_home / "skills" / "sdpm-vibe"
-        link.symlink_to(tmp_path / "gone" / "skills" / "sdpm-vibe")
+        link = kiro_home / "skills" / "sdpm-create"
+        link.symlink_to(tmp_path / "gone" / "skills" / "sdpm-create")
         assert kiro_install.audit_skill_link(link).status == STALE
 
     def test_unknown_when_a_real_directory(self, kiro_home):
-        d = kiro_home / "skills" / "sdpm-vibe"
+        d = kiro_home / "skills" / "sdpm-create"
         d.mkdir()
-        (d / "SKILL.md").write_text("---\nname: sdpm-vibe\n---\n", encoding="utf-8")
+        (d / "SKILL.md").write_text("---\nname: sdpm-create\n---\n", encoding="utf-8")
         assert kiro_install.audit_skill_link(d).status == UNKNOWN
 
     def test_unknown_when_linked_somewhere_unrelated(self, kiro_home, tmp_path):
         target = tmp_path / "elsewhere"
         target.mkdir()
-        link = kiro_home / "skills" / "sdpm-vibe"
+        link = kiro_home / "skills" / "sdpm-create"
         link.symlink_to(target)
         assert kiro_install.audit_skill_link(link).status == UNKNOWN
 
@@ -208,6 +207,12 @@ class TestAuditComposer:
     def test_own_for_this_checkout(self, kiro_home):
         _write_composer(kiro_home / "agents", kiro_install._expected_composer_config(REPO_ROOT))
         assert kiro_install.audit_composer(kiro_home / "agents").status == OWN
+
+    def test_legacy_form_for_this_checkout_is_stale(self, kiro_home):
+        _write_composer(kiro_home / "agents", kiro_install._legacy_composer_config(REPO_ROOT))
+        finding = kiro_install.audit_composer(kiro_home / "agents")
+        assert finding.status == STALE
+        assert "legacy generated form" in finding.detail
 
     def test_formatting_differences_do_not_matter(self, kiro_home):
         p = kiro_home / "agents" / "sdpm-composer.json"
@@ -244,7 +249,7 @@ class TestAuditComposer:
 
     def test_unknown_when_prompt_and_mcp_roots_disagree(self, kiro_home, tmp_path):
         cfg = kiro_install._expected_composer_config(REPO_ROOT)
-        cfg["prompt"] = f"file://{tmp_path}/other/personas/composer.md"
+        cfg["prompt"] = f"file://{tmp_path}/other/skills/sdpm-composer/SKILL.md"
         _write_composer(kiro_home / "agents", cfg)
         assert kiro_install.audit_composer(kiro_home / "agents").status == UNKNOWN
 
@@ -286,28 +291,26 @@ class TestMainRefusesForeignWiring:
         cfg = kiro_home / "settings" / "mcp.json"
         _write_mcp(cfg, live_checkout / "servers" / "local")
         before = cfg.read_bytes()
-        link = kiro_home / "skills" / "sdpm-vibe"
-        link.symlink_to(live_checkout / "skills" / "sdpm-vibe")
-        composer = _write_composer(
-            kiro_home / "agents", kiro_install._expected_composer_config(live_checkout)
-        )
+        link = kiro_home / "skills" / "sdpm-create"
+        link.symlink_to(live_checkout / "skills" / "sdpm-create")
+        composer = _write_composer(kiro_home / "agents", kiro_install._expected_composer_config(live_checkout))
 
         assert kiro_install.main(["--kiro-home", str(kiro_home)]) == 1
 
         assert cfg.read_bytes() == before
-        assert link.resolve() == (live_checkout / "skills" / "sdpm-vibe").resolve()
+        assert link.resolve() == (live_checkout / "skills" / "sdpm-create").resolve()
         assert composer.exists()
         assert "Refusing to continue" in capsys.readouterr().out
 
     def test_replace_existing_takes_over_foreign_only(self, kiro_home, live_checkout, no_kiro_cli):
-        link = kiro_home / "skills" / "sdpm-vibe"
-        link.symlink_to(live_checkout / "skills" / "sdpm-vibe")
+        link = kiro_home / "skills" / "sdpm-create"
+        link.symlink_to(live_checkout / "skills" / "sdpm-create")
 
         assert kiro_install.main(["--kiro-home", str(kiro_home), "--replace-existing"]) == 0
-        assert link.resolve() == (REPO_ROOT / "skills" / "sdpm-vibe").resolve()
+        assert link.resolve() == (REPO_ROOT / "skills" / "sdpm-create").resolve()
 
     def test_replace_existing_never_takes_over_unknown(self, kiro_home, no_kiro_cli):
-        d = kiro_home / "skills" / "sdpm-vibe"
+        d = kiro_home / "skills" / "sdpm-create"
         d.mkdir()
         (d / "SKILL.md").write_text("hand written", encoding="utf-8")
 
@@ -330,11 +333,11 @@ class TestMainLegacyMode:
             assert (kiro_home / "skills" / name).is_symlink()
 
     def test_repairs_a_dangling_link_from_a_moved_checkout(self, kiro_home, no_kiro_cli, tmp_path):
-        link = kiro_home / "skills" / "sdpm-vibe"
-        link.symlink_to(tmp_path / "gone" / "skills" / "sdpm-vibe")
+        link = kiro_home / "skills" / "sdpm-create"
+        link.symlink_to(tmp_path / "gone" / "skills" / "sdpm-create")
 
         assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "legacy"]) == 0
-        assert link.resolve() == (REPO_ROOT / "skills" / "sdpm-vibe").resolve()
+        assert link.resolve() == (REPO_ROOT / "skills" / "sdpm-create").resolve()
 
     def test_generates_the_composer_agent(self, kiro_home, no_kiro_cli):
         assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "legacy"]) == 0
@@ -343,10 +346,10 @@ class TestMainLegacyMode:
         data = json.loads(composer.read_text(encoding="utf-8"))
         assert data == kiro_install._expected_composer_config(REPO_ROOT)
         # The generated config is a thin pointer: sdpm MCP only, behavior
-        # served from personas/ — never inline.
+        # loaded from the canonical skill — never inline.
         assert set(data["mcpServers"]) == {"sdpm"}
         assert data["prompt"].startswith("file://")
-        assert data["prompt"].endswith("/personas/composer.md")
+        assert data["prompt"].endswith("/skills/sdpm-composer/SKILL.md")
 
     def test_composer_generation_is_idempotent(self, kiro_home, no_kiro_cli):
         assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "legacy"]) == 0
@@ -355,16 +358,12 @@ class TestMainLegacyMode:
         assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "legacy"]) == 0
         assert composer.read_text(encoding="utf-8") == first
 
-    def test_repairs_a_composer_agent_from_a_moved_checkout(
-        self, kiro_home, no_kiro_cli, tmp_path
-    ):
+    def test_repairs_a_composer_agent_from_a_moved_checkout(self, kiro_home, no_kiro_cli, tmp_path):
         gone = tmp_path / "moved-away"
         _write_composer(kiro_home / "agents", kiro_install._expected_composer_config(gone))
 
         assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "legacy"]) == 0
-        data = json.loads(
-            (kiro_home / "agents" / "sdpm-composer.json").read_text(encoding="utf-8")
-        )
+        data = json.loads((kiro_home / "agents" / "sdpm-composer.json").read_text(encoding="utf-8"))
         assert data == kiro_install._expected_composer_config(REPO_ROOT)
 
     def test_never_overwrites_a_user_edited_composer_agent(self, kiro_home, no_kiro_cli):
@@ -405,6 +404,49 @@ class TestMainLegacyMode:
         # process must inherit the profile we were asked to install into.
         assert kwargs["env"]["KIRO_HOME"] == str(kiro_home)
 
+    def test_upgrades_legacy_composer_without_replace_existing(
+        self,
+        kiro_home,
+        no_kiro_cli,
+    ):
+        _write_composer(kiro_home / "agents", kiro_install._legacy_composer_config(REPO_ROOT))
+
+        assert (
+            kiro_install.main(
+                [
+                    "--kiro-home",
+                    str(kiro_home),
+                    "--mode",
+                    "legacy",
+                ]
+            )
+            == 0
+        )
+        data = json.loads((kiro_home / "agents" / "sdpm-composer.json").read_text(encoding="utf-8"))
+        assert data == kiro_install._expected_composer_config(REPO_ROOT)
+
+    def test_removes_retired_skill_links_from_this_checkout(
+        self,
+        kiro_home,
+        no_kiro_cli,
+    ):
+        retired = [kiro_home / "skills" / name for name in ("sdpm-vibe", "sdpm-spec")]
+        for link in retired:
+            link.symlink_to(REPO_ROOT / "skills" / link.name)
+
+        assert (
+            kiro_install.main(
+                [
+                    "--kiro-home",
+                    str(kiro_home),
+                    "--mode",
+                    "legacy",
+                ]
+            )
+            == 0
+        )
+        assert all(not link.is_symlink() for link in retired)
+
 
 class TestMainPowerMode:
     def test_does_not_create_legacy_wiring(self, kiro_home, no_kiro_cli):
@@ -413,29 +455,25 @@ class TestMainPowerMode:
         assert not (kiro_home / "settings" / "mcp.json").exists()
 
     def test_removes_our_own_legacy_wiring(self, kiro_home, no_kiro_cli):
-        link = kiro_home / "skills" / "sdpm-vibe"
-        link.symlink_to(REPO_ROOT / "skills" / "sdpm-vibe")
-        composer = _write_composer(
-            kiro_home / "agents", kiro_install._expected_composer_config(REPO_ROOT)
-        )
+        link = kiro_home / "skills" / "sdpm-create"
+        link.symlink_to(REPO_ROOT / "skills" / "sdpm-create")
+        composer = _write_composer(kiro_home / "agents", kiro_install._expected_composer_config(REPO_ROOT))
 
         assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "power"]) == 0
         assert not link.is_symlink()
         assert not composer.exists()
 
     def test_leaves_another_checkouts_wiring_alone_and_fails(self, kiro_home, live_checkout, no_kiro_cli):
-        link = kiro_home / "skills" / "sdpm-vibe"
-        link.symlink_to(live_checkout / "skills" / "sdpm-vibe")
+        link = kiro_home / "skills" / "sdpm-create"
+        link.symlink_to(live_checkout / "skills" / "sdpm-create")
 
         assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "power"]) == 1
-        assert link.resolve() == (live_checkout / "skills" / "sdpm-vibe").resolve()
+        assert link.resolve() == (live_checkout / "skills" / "sdpm-create").resolve()
 
     def test_auto_selects_power_when_a_manifest_is_installed(self, kiro_home, no_kiro_cli, capsys):
         d = kiro_home / "powers" / "installed-sdpm"
         d.mkdir(parents=True)
-        (d / "plugin.json").write_text(
-            json.dumps({"name": kiro_install.plugin_name()}), encoding="utf-8"
-        )
+        (d / "plugin.json").write_text(json.dumps({"name": kiro_install.plugin_name()}), encoding="utf-8")
 
         assert kiro_install.main(["--kiro-home", str(kiro_home)]) == 0
         out = capsys.readouterr().out
@@ -446,22 +484,32 @@ class TestMainPowerMode:
 
 
 class TestNoWritesOutsideTheRequestedProfile:
-    def test_real_kiro_home_env_is_not_consulted_when_flag_is_given(self, kiro_home, no_kiro_cli, monkeypatch, tmp_path):
+    def test_real_kiro_home_env_is_not_consulted_when_flag_is_given(
+        self, kiro_home, no_kiro_cli, monkeypatch, tmp_path
+    ):
         decoy = tmp_path / "decoy"
         decoy.mkdir()
         monkeypatch.setenv("KIRO_HOME", str(decoy))
 
         assert kiro_install.main(["--kiro-home", str(kiro_home), "--mode", "legacy"]) == 0
         assert not list(decoy.iterdir())
-        assert (kiro_home / "skills" / "sdpm-vibe").is_symlink()
+        assert (kiro_home / "skills" / "sdpm-create").is_symlink()
 
     def test_env_var_is_used_when_no_flag_is_given(self, kiro_home, no_kiro_cli, monkeypatch):
         monkeypatch.setenv("KIRO_HOME", str(kiro_home))
         assert kiro_install.main(["--mode", "legacy"]) == 0
-        assert (kiro_home / "skills" / "sdpm-vibe").is_symlink()
+        assert (kiro_home / "skills" / "sdpm-create").is_symlink()
 
 
 class TestInstallerShape:
+    def test_repo_skills_are_the_four_canonical_roles(self):
+        assert kiro_install.repo_skill_names() == [
+            "sdpm-composer",
+            "sdpm-create",
+            "sdpm-style",
+            "sdpm-translate",
+        ]
+
     def test_render_composer_agent_is_gone(self):
         assert not hasattr(kiro_install, "render_composer_agent")
 

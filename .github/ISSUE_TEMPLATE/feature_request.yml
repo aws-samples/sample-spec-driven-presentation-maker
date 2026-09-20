@@ -21,7 +21,7 @@ body:
       label: Which area?
       options:
         - Slide generation / engine (layouts, elements, charts)
-        - Agent behavior / personas (hearing, workflows)
+        - Agent behavior / workflows (hearing, orchestration)
         - MCP servers / client integration
         - Web UI / cloud stack
         - Templates / styles / assets

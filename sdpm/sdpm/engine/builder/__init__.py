@@ -91,7 +91,7 @@ class PPTXBuilder(
             raise ValueError(
                 "'fonts' is required. Set 'fonts' in presentation.json "
                 '(e.g. {"fullwidth": "メイリオ", "halfwidth": "Calibri"}). '
-                "Run analyze-template to detect fonts from your template."
+                "Run analyze_template to detect fonts from your template."
             )
         if default_text_color is None:
             raise ValueError(
@@ -261,6 +261,8 @@ class PPTXBuilder(
                 break
 
         for elem in expanded:
+            if "_comment" in elem:
+                continue  # comments (incl. layout regions) are not elements
             n_before = len(sp_tree)
             elem_type = elem.get("type")
             if elem_type == "group":

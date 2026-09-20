@@ -30,7 +30,6 @@ RUN python3.13 -m pip install --no-cache-dir -c servers/remote/constraints.txt .
 # Bundled knowledge data (references / templates) — served by the shared tool
 # contract via SDPM_SKILL_ROOT. Assets stay on S3 (user-extensible, 36MB).
 COPY sdpm/references/ sdpm/references/
-COPY personas/ personas/
 COPY sdpm/templates/ sdpm/templates/
 ENV SDPM_SKILL_ROOT=/app/sdpm
 

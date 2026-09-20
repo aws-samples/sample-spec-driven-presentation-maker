@@ -418,3 +418,15 @@ class TestLintCommon:
     def test_empty(self):
         assert lint([]) == []
         assert lint({"slides": []}) == []
+
+
+def test_region_comment_without_coordinates_warns() -> None:
+    from sdpm.engine.schema.lint import lint
+
+    slides = [{"elements": [
+        {"_comment": "region: body"},
+        {"_comment": "region: aside", "x": 1500, "y": 940, "w": 324, "h": 90},
+        {"_comment": "--- section ---"},
+    ]}]
+    rules = [d["rule"] for d in lint(slides)]
+    assert rules.count("region-missing-coords") == 1

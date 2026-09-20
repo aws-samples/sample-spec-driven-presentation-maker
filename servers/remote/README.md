@@ -7,7 +7,7 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 ### Workflow
 | Tool | Description |
 |------|-------------|
-| `start_presentation` | Start creating — returns design rules + Phase 1a workflow |
+| `read_workflows` | Load role instructions (`orchestrator`, `composer`, `style`, or `translate`) |
 | `init_presentation` | Create deck + associate template |
 | `analyze_template` | Get pre-analyzed template info (layouts, colors, fonts) |
 
@@ -34,14 +34,14 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 | Tool | Description |
 |------|-------------|
 | `list_examples` / `read_examples` | Design pattern and component examples |
-| `list_workflows` / `read_workflows` | Phase-by-phase workflow instructions |
+| `list_workflows` / `read_workflows` | Role workflows and slide JSON specification |
 | `list_guides` / `read_guides` | Design rules and review checklists |
 
 ### Utility
 | Tool | Description |
 |------|-------------|
 | `list_templates` | List available templates |
-| `code_block` | Generate syntax-highlighted code block JSON |
+| `code_to_slide` | Generate syntax-highlighted code block JSON |
 | `read_attachment` | Read content from an attached file with byte-offset paging |
 | `import_attachment` | Import file into deck workspace |
 | `search_slides` | Semantic slide search (optional, requires Amazon Bedrock KB) |

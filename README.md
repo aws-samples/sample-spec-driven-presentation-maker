@@ -38,7 +38,7 @@ automatically — just describe what you want:
 
 | Ask | What happens |
 |---|---|
-| "Make slides about …" | New presentation (briefing → outline → art direction → compose → review) |
+| "Make slides about …" | New presentation (brief → outline → art direction → parallel slide composition → review) |
 | "Edit this PPTX" | Imports an existing PPTX into an editable deck |
 | "I hand-edited the PPTX, continue from it" | Syncs your PowerPoint edits back into the deck |
 | "Create a style like …" | Builds a reusable style guide (colors, typography, decoration) |
@@ -49,9 +49,10 @@ automatically — just describe what you want:
 ## Quick Start
 
 One MCP server is the single integration surface. Connect your agent to it and ask for
-slides — the server itself delivers the mode behavior via the `start_presentation` tool.
-The repository is also a portable [Agent Plugins](https://agent-plugins.org) package, so
-clients that support that format load the MCP server and the mode entry points together.
+slides — the server delivers the role documents that drive the work via the
+`read_workflows` tool. The repository is also a portable
+[Agent Plugins](https://agent-plugins.org) package, so clients that support that format
+load the MCP server and the skill entry points together.
 
 | Environment | Setup |
 |---|---|
@@ -63,25 +64,24 @@ clients that support that format load the MCP server and the mode entry points t
 | No MCP at all | Point your agent at [`sdpm/SKILL.md`](sdpm/SKILL.md) — it drives the CLI directly |
 | Team / remote MCP / Web UI (AWS) | [Deploy Guide](docs/en/deploy-cloudshell.md) |
 
-**Picking a mode.** Just asking for slides is enough — the agent calls
-`start_presentation` and picks. To choose explicitly, use the entry points:
-`sdpm-vibe` (fast, from material you already have), `sdpm-spec` (dialogue-driven, with
-approval at each step), `sdpm-style` (build a reusable style guide), `sdpm-translate`
-(translate an existing deck into another language). In clients that turn
-skills into slash commands, those are `/sdpm-vibe`, `/sdpm-spec`, `/sdpm-style`,
-`/sdpm-translate`. Each one
-only loads the matching persona from the server — the behavior itself still lives in
-`personas/`, in one place.
+**Picking a mode.** Just asking for slides is enough — the agent calls `read_workflows`
+and picks. To choose explicitly, use the entry points: `sdpm-create` (build a
+presentation; how much dialogue happens is up to how you phrase the request), `sdpm-style`
+(build a reusable style guide), `sdpm-translate` (translate an existing deck into another
+language). In clients that turn skills into slash commands, those are `/sdpm-create`,
+`/sdpm-style`, `/sdpm-translate`. Each one only names a role document for the server to
+serve — the behavior itself still lives in `sdpm/references/workflows/`, in one place.
 
 **Prerequisites for local use:** [`uv`](https://docs.astral.sh/uv/) on your `PATH`, plus
 **LibreOffice** and **poppler** for slide previews (PNG rendering).
 
 **Keep the checkout in place** for Claude Code / Kiro / local MCP: the server runs from it
-(`uv run --directory <checkout>/servers/local`). Updating is `git pull` — persona and
+(`uv run --directory <checkout>/servers/local`). Updating is `git pull` — workflow and
 knowledge files are read live from the checkout.
 
-> **Upgrading from v0.4?** Directory layout and install flows changed — see the
-> [v0.5 migration notes](docs/en/migration-v0.5.md).
+> **Upgrading from an older release?** Directory layout, tool names and skills changed —
+> see the [v0.5](docs/en/migration-v0.5.md) and [role workflows](docs/en/migration-role-workflows.md)
+> migration notes.
 
 ---
 
@@ -109,17 +109,18 @@ A hands-on workshop is available with sample data for various real-world scenari
 
 ```
 sdpm/        Engine (json <-> pptx) + Knowledge (references, assets, templates)
-personas/    Mode behaviors — served to any MCP client via start_presentation(mode=...)
-skills/      Mode entry points — thin dispatchers that load a persona from the server
+             references/workflows/ — role documents (orchestrator, composer, style,
+             translate), served to any MCP client via read_workflows
+skills/      Mode entry points — thin dispatchers that call read_workflows
 plugin.json  Agent Plugins manifest (+ mcp.json) — makes the root a portable plugin
 servers/     local (stdio, no AWS) / remote (HTTP, S3 + DynamoDB) — thin binds of one tool contract
 clients/     Per-client wiring (Claude Code / Codex manifests, Kiro installer)
 agent/ api/ infra/ web-ui/   Optional AWS cloud stack (Strands Agent, REST API, CDK, React UI)
 ```
 
-Everything an agent needs — tools, workflows, guides, and mode behavior — is served by
+Everything an agent needs — tools, workflows, guides, and role behavior — is served by
 the MCP server. Client-side files are minimal wiring: per-client manifests and entry
-points that name a mode without restating what it does.
+points that name a role document without restating what it does.
 See [Architecture](docs/en/architecture.md) for the full picture.
 
 ---
@@ -131,6 +132,7 @@ See [Architecture](docs/en/architecture.md) for the full picture.
 | [Getting Started](docs/en/getting-started.md) | Setup for every environment, from bare CLI to full AWS stack |
 | [Architecture](docs/en/architecture.md) | Layer design, data flow, auth model, MCP tool reference |
 | [Migration to v0.5](docs/en/migration-v0.5.md) | Upgrading from v0.4 (paths, skills removal) |
+| [Migration: role workflows](docs/en/migration-role-workflows.md) | Upgrading from v0.5 (workflow consolidation and renamed tools/skills) |
 | [Recommended Deploy](docs/en/deploy-cloudshell.md) | AWS deployment via CloudShell (no CDK/Docker required) |
 | [Connecting Agents](docs/en/add-to-gateway.md) | MCP client connection guide |
 | [Teams & Slack Integration](docs/en/teams-slack-integration.md) | Chat platform integration |

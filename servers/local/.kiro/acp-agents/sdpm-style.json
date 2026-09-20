@@ -12,11 +12,15 @@
       "timeout": 120000
     }
   },
-  "prompt": "file://../../../../personas/style.md",
+  "prompt": "file://../../../../sdpm/references/workflows/style.md",
   "tools": [
     "@sdpm/run_style_python",
     "@sdpm/list_styles",
+    "@sdpm/apply_style",
     "@sdpm/analyze_template",
+    "@sdpm/read_guides",
+    "@sdpm/read_examples",
+    "@sdpm/generate_pptx",
     "@sdpm/hearing",
     "read",
     "glob",
@@ -27,7 +31,11 @@
   "allowedTools": [
     "@sdpm/run_style_python",
     "@sdpm/list_styles",
+    "@sdpm/apply_style",
     "@sdpm/analyze_template",
+    "@sdpm/read_guides",
+    "@sdpm/read_examples",
+    "@sdpm/generate_pptx",
     "@sdpm/hearing",
     "read",
     "glob",
@@ -35,8 +43,6 @@
     "web_fetch",
     "web_search"
   ],
-  "resources": [
-    "file://../../../../sdpm/references/workflows/create-style.md"
-  ],
+  "resources": [],
   "welcomeMessage": "What style would you like to create?"
 }

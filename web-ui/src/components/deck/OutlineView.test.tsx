@@ -65,7 +65,7 @@ describe("OutlineView", () => {
     })
 
     it("active slide number is inverted (bg-foreground text-background)", () => {
-      const md = "- [s1] A\n  - what_to_say: Hello"
+      const md = "- [s1] A\n  - body: Hello"
       const { container } = renderWithIntl(<OutlineView content={md} />)
       const active = container.querySelector("[data-state='active']")
       const numSpan = active?.querySelector(":scope > span:first-child")
@@ -115,10 +115,9 @@ describe("OutlineView", () => {
     const enrichedMd = [
       "## Opening",
       "- [intro] Welcome to our presentation",
-      "  - what_to_say: Thank you for being here today",
+      "  - body: Thank you for being here today",
       "  - evidence: Survey results from Q3",
-      "  - what_to_show: Bar chart comparing quarters",
-      "  - notes: Pause after the chart reveal",
+      "  - visual: Bar chart comparing quarters",
       "- [next-steps] What comes next",
     ].join("\n")
 
@@ -137,15 +136,12 @@ describe("OutlineView", () => {
       expect(rules.length).toBeGreaterThanOrEqual(1)
     })
 
-    it("renders what_to_say with curly quotes (not italic, not blockquote)", () => {
-      const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
-      // Should have the quote text
-      expect(screen.getByText(/Thank you for being here today/)).toBeTruthy()
-      // Should NOT be in a blockquote element
-      const quoteEl = screen.getByText(/Thank you for being here today/)
-      expect(quoteEl.closest("blockquote")).toBeNull()
-      // Should NOT have italic class
-      expect(quoteEl.className).not.toContain("italic")
+    it("renders body as plain prose without quotes", () => {
+      renderWithIntl(<OutlineView content={enrichedMd} />)
+      const body = screen.getByText(/Thank you for being here today/)
+      expect(body.closest("blockquote")).toBeNull()
+      expect(body.className).not.toContain("italic")
+      expect(body.textContent).toBe("Thank you for being here today")
     })
 
     it("renders spec sheet with Evidence label and content", () => {
@@ -166,12 +162,6 @@ describe("OutlineView", () => {
       expect(specRows.length).toBeGreaterThanOrEqual(2)
     })
 
-    it("renders notes band outside the slide face", () => {
-      renderWithIntl(<OutlineView content={enrichedMd} />)
-      expect(screen.getByText("Notes")).toBeTruthy()
-      expect(screen.getByText(/Pause after the chart reveal/)).toBeTruthy()
-    })
-
     it("renders slide number and slug", () => {
       renderWithIntl(<OutlineView content={enrichedMd} />)
       expect(screen.getByText("intro")).toBeTruthy()
@@ -180,7 +170,7 @@ describe("OutlineView", () => {
   })
 
   describe("no clipping structures", () => {
-    const md = "- [s1] A long message\n  - what_to_say: Details\n  - evidence: Data"
+    const md = "- [s1] A long message\n  - body: Details\n  - evidence: Data"
 
     it("does not use aspect-ratio forcing", () => {
       const { container } = renderWithIntl(<OutlineView content={md} />)
@@ -210,7 +200,7 @@ describe("OutlineView", () => {
       "This is introductory prose.",
       "## Section One",
       "- [s1] First slide",
-      "  - what_to_say: Hello",
+      "  - body: Hello",
       "More prose after the slide.",
       "## Section Two",
       "- [s2] Second slide",
@@ -254,7 +244,7 @@ describe("OutlineView", () => {
     })
 
     it("renders [TBD: detail] with detail text", () => {
-      const md = "- [s1] Slide\n  - what_to_show: [TBD: need screenshot]"
+      const md = "- [s1] Slide\n  - visual: [TBD: need screenshot]"
       renderWithIntl(<OutlineView content={md} />)
       expect(screen.getByText(/TBD: need screenshot/)).toBeTruthy()
     })
@@ -269,14 +259,14 @@ describe("OutlineView", () => {
     })
 
     it("active slide has data-state=active", () => {
-      const md = "- [s1] A\n  - what_to_say: X"
+      const md = "- [s1] A\n  - body: X"
       const { container } = renderWithIntl(<OutlineView content={md} />)
       const active = container.querySelector("[data-state='active']")
       expect(active).toBeTruthy()
     })
 
     it("done slides have data-state=done", () => {
-      const md = "- [s1] A\n  - what_to_say: X\n- [s2] B\n  - what_to_say: Y"
+      const md = "- [s1] A\n  - body: X\n- [s2] B\n  - body: Y"
       const { container } = renderWithIntl(<OutlineView content={md} />)
       const done = container.querySelectorAll("[data-state='done']")
       expect(done.length).toBe(1)
@@ -285,7 +275,7 @@ describe("OutlineView", () => {
 
   describe("document surface class", () => {
     it("applies document-surface class for section heading font scoping", () => {
-      const md = "- [s1] A\n  - what_to_say: Text"
+      const md = "- [s1] A\n  - body: Text"
       const { container } = renderWithIntl(<OutlineView content={md} />)
       expect(container.querySelector(".document-surface")).toBeTruthy()
     })
@@ -303,7 +293,7 @@ describe("OutlineView", () => {
     })
 
     it("uses same layout when any slide has sub-items", () => {
-      const enrichedMd = "- [s1] A\n  - what_to_say: Hello\n- [s2] B"
+      const enrichedMd = "- [s1] A\n  - body: Hello\n- [s2] B"
       const { container } = renderWithIntl(<OutlineView content={enrichedMd} />)
       expect(container.querySelector("[data-view='light-table']")).toBeNull()
       const slideRows = container.querySelectorAll("[data-slide-slug]")

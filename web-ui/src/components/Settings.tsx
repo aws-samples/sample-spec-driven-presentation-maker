@@ -42,9 +42,9 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
 
   // ── Local: agent definition selection ──
   interface AgentDef { fileName: string; name: string; description: string }
-  interface AgentSelection { spec: string; vibe: string; composer: string; single: string; model?: string }
+  interface AgentSelection { orchestrator: string; composer: string; style: string; translate: string; model?: string }
   const [agentDefs, setAgentDefs] = useState<AgentDef[]>([])
-  const [agentSelection, setAgentSelection] = useState<AgentSelection>({ spec: "", vibe: "", composer: "", single: "" })
+  const [agentSelection, setAgentSelection] = useState<AgentSelection>({ orchestrator: "", composer: "", style: "", translate: "" })
   const [localModels, setLocalModels] = useState<{ modelId: string; displayName: string; description?: string }[]>([])
 
   useEffect(() => {
@@ -152,7 +152,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                 </p>
               </div>
               <div className="flex flex-col gap-3">
-                {(["spec", "vibe", "composer", "single"] as const).map((role) => {
+                {(["orchestrator", "composer", "style", "translate"] as const).map((role) => {
                   const models = agentDefs.map((a) => ({
                     modelId: a.fileName,
                     displayName: a.name,

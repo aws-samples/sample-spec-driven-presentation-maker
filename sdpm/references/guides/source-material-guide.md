@@ -11,15 +11,9 @@ Reference this when existing PPTX is provided during Phase 1 (art direction).
 
 Run the following for each PPTX (`{name}` is the filename without extension):
 
-1. Convert the existing PPTX to JSON to get structural data
-   ```bash
-   uv run python3 scripts/pptx_to_json.py {input_pptx} -o /tmp/sdpm/{name}/{name}.json
-   ```
-2. Generate previews to see all slides visually
-   ```bash
-   uv run python3 scripts/pptx_builder.py preview {input_pptx} --no-grid
-   ```
-3. Read all preview images to understand each slide's content
+1. Convert the existing PPTX to JSON under `/tmp/sdpm/{name}/` to get structural data.
+2. Render previews of all slides without a grid overlay.
+3. Read all preview images to understand each slide's content.
 
 ## Reuse assessment
 

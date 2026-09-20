@@ -6,7 +6,7 @@ description: "Visual design principles (color, typography, effects, layout) — 
 
 ## Color
 
-Theme colors are the foundation. Check them via analyze-template's Theme Colors output.
+Theme colors are the foundation. Check them via analyze_template's Theme Colors output.
 Use theme colors as the base, extending with accent or emphasis colors as needed.
 Colors that clash with the theme break the template's visual coherence.
 
@@ -16,7 +16,7 @@ Keep the number of colors beyond background and text to the minimum needed to di
 
 Contrast ratios follow WCAG: 4.5:1 for normal text, 3:1 for large text (18pt+).
 Dark background → white text. Light background → black text.
-Theme detection: if the background color from analyze-template has low brightness, it's dark (white text); high brightness means light (black text).
+Theme detection: if the background color from analyze_template has low brightness, it's dark (white text); high brightness means light (black text).
 Don't rely on color alone to convey information — consider color vision diversity.
 
 **Constraints:**
@@ -82,6 +82,6 @@ Let the distance between elements reflect their relationship — related items c
 Balance elements vertically within the content area. Do not cluster at the top unless intentional (e.g. hero title).
 Content area: y = title bottom + margin to H−130 (H = slide height from `slideSize`).
 For 16:9 (H=1080): content area y=143–950.
-Custom templates: refer to slide size and placeholder positions from `analyze-template`.
+Custom templates: refer to slide size and placeholder positions from `analyze_template(template)`.
 
 

@@ -70,6 +70,7 @@ mcp = FastMCP("sdpm-acp")
 # ---------------------------------------------------------------------------
 
 mcp.tool()(tools.init_presentation)
+mcp.tool()(tools.check_specs)
 mcp.tool()(tools.analyze_template)
 mcp.tool()(tools.generate_pptx)
 mcp.tool()(tools.search_assets)
@@ -108,23 +109,14 @@ def hearing(
     q3: dict | None = None,
     q4: dict | None = None,
 ) -> str:
-    """Present structured questions to the user via a rich UI card.
+    """Show the user a card of up to five structured questions and collect the answers.
 
-    ALWAYS use this tool when you need the user to make a choice or
-    judgment — not just for initial interviews but also for mid-workflow
-    decisions, confirmations with options, and next-step selections.
-    Only skip this tool for simple yes/no confirmations.
-
-    Always include your reasoning or hypothesis in the inference field
-    to help the user think — never ask blank questions.
-    Limit to 5 questions per call. If you need more, call again after
-    the user responds.
+    The card shows `inference` above the questions; the answers arrive in the user's
+    next message. For more than five questions, call again after the reply.
 
     Args:
-        inference: Your reasoning or hypothesis to share with the user.
-            This is displayed prominently above the questions to provide
-            context and stimulate the user's thinking.
-        q0: First question object with keys:
+        inference: Your reasoning or hypothesis, shown above the questions.
+        q0: Question object with keys:
             - type (str): "single_select", "multi_select", or "free_text"
             - text (str): The question text
             - options (list[str], optional): Choices for select types
@@ -136,8 +128,7 @@ def hearing(
         q4: Fifth question (optional, same schema as q0).
 
     Returns:
-        Confirmation that the questions were displayed. Wait for the
-        user's response in the next message.
+        Confirmation that the questions were displayed.
     """
     return "Questions displayed to user. Wait for their response."
 

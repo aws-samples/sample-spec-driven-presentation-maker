@@ -9,7 +9,7 @@
  * Card states:
  * - skeleton: dashed-border slim card (eyebrow slug + message only)
  * - enriched (active/done): solid border + shadow face with eyebrow, message,
- *   accent rule, what_to_say quote lead, and spec sheet (evidence / visual)
+ *   accent rule, body prose lead, and spec sheet (visual / evidence)
  * - active: inverted number chip in the rail
  *
  * No clipping: no aspect-ratio forcing, no absolute inset, no overflow-hidden.
@@ -109,10 +109,9 @@ function EnrichedSlide({ slide, state }: {
   state: SlideState
 }): React.ReactElement {
   const t = useTranslations("outline")
-  const whatToSay = slide.subItems.find((s) => s.key === "what_to_say")
+  const body = slide.subItems.find((s) => s.key === "body")
+  const visual = slide.subItems.find((s) => s.key === "visual")
   const evidence = slide.subItems.find((s) => s.key === "evidence")
-  const visual = slide.subItems.find((s) => s.key === "what_to_show")
-  const notes = slide.subItems.find((s) => s.key === "notes")
 
   const frameClasses = state === "active"
     ? "border-foreground/60 shadow-[0_6px_24px_oklch(0_0_0/0.14)]"
@@ -135,31 +134,18 @@ function EnrichedSlide({ slide, state }: {
         {/* Accent rule */}
         <div className="w-11 h-[3px] rounded-sm bg-foreground/85 my-3" aria-hidden="true" />
 
-        {/* what_to_say quote lead */}
-        {whatToSay && (
+        {/* Body prose lead */}
+        {body && (
           <p className="text-sm leading-relaxed text-foreground-secondary">
-            <span className="text-foreground-secondary/50" aria-hidden="true">{"\u201C"}</span>
-            {renderValue(whatToSay.value)}
-            <span className="text-foreground-secondary/50" aria-hidden="true">{"\u201D"}</span>
+            {renderValue(body.value)}
           </p>
         )}
 
         {/* Spec sheet */}
-        {(evidence || visual) && (
+        {(visual || evidence) && (
           <div className="mt-3.5 border-t border-foreground/15">
-            {evidence && (
-              <div className="grid grid-cols-[92px_1fr] gap-3 py-2 border-b border-dashed border-foreground/10 items-baseline">
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground-secondary/60">
-                  <EvidenceIcon />
-                  {t("evidence")}
-                </span>
-                <p className="text-sm text-foreground leading-relaxed">
-                  {renderValue(evidence.value)}
-                </p>
-              </div>
-            )}
             {visual && (
-              <div className="grid grid-cols-[92px_1fr] gap-3 py-2 border-b border-dashed border-foreground/10 items-baseline last:border-b-0">
+              <div className="grid grid-cols-[92px_1fr] gap-3 py-2 border-b border-dashed border-foreground/10 items-baseline">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground-secondary/60">
                   <VisualIcon />
                   {t("visual")}
@@ -169,23 +155,20 @@ function EnrichedSlide({ slide, state }: {
                 </p>
               </div>
             )}
+            {evidence && (
+              <div className="grid grid-cols-[92px_1fr] gap-3 py-2 border-b border-dashed border-foreground/10 items-baseline last:border-b-0">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground-secondary/60">
+                  <EvidenceIcon />
+                  {t("evidence")}
+                </span>
+                <p className="text-sm text-foreground leading-relaxed">
+                  {renderValue(evidence.value)}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
-
-      {/* Notes band (outside the face) */}
-      {notes && (
-        <div className="px-4 py-2 rounded border border-foreground/6 bg-foreground/[0.02]">
-          <div className="flex items-start gap-2">
-            <span className="text-[11px] uppercase tracking-[0.08em] text-foreground-secondary/50 font-medium flex-none">
-              {t("notes")}
-            </span>
-            <p className="text-xs text-foreground-secondary leading-relaxed">
-              {renderValue(notes.value)}
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

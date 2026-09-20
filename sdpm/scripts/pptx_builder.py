@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-"""PPTX Builder CLI - backward compatible entry point.
+"""PPTX Builder CLI - contract-aligned entry point.
 
 All core logic lives in sdpm package.
 This file provides the CLI interface only.
@@ -255,20 +255,8 @@ def cmd_list_templates(args):
         print(f"  {t['name']:<24} [{t['source']}]  {paths[t['name']]}{desc}")
 
 
-def cmd_search_patterns(args):
-    """Search patterns by keywords."""
-    from sdpm.knowledge.reference import search_patterns
-    results = search_patterns(args.query, limit=args.limit)
-    if not results:
-        print("No matches found.")
-        return
-    for r in results:
-        page = f"/{r['page']}" if r.get('page') else ""
-        print(f"  {r['path']}{page}  {r['description']}")
-
-
 def cmd_examples(args):
-    """List or show design examples (components/patterns/styles)."""
+    """List or show design examples (components/styles)."""
     from sdpm.knowledge.reference import open_styles_gallery, read_docs
 
     examples_dir = Path(__file__).parent.parent / "references" / "examples"
@@ -278,7 +266,7 @@ def cmd_examples(args):
 
     names = args.names
     if not names:
-        print("Usage: examples <category> or <category/name>", file=sys.stderr)
+        print("Usage: read_examples <category> or <category/name>", file=sys.stderr)
         return
 
     for name in names:
@@ -305,7 +293,7 @@ def cmd_examples(args):
                     print(f"# cp {src} specs/art-direction.html")
             continue
 
-        # pptx files (components, patterns)
+        # PPTX component examples
         query = f"{base}/{sub}" if sub else base
         try:
             docs = read_docs(examples_dir, [query])
@@ -324,16 +312,16 @@ def cmd_examples(args):
 
 
 def cmd_workflows(args):
-    """List or show workflow documents."""
-    from sdpm.knowledge.reference import list_category, read_docs
-    d = Path(__file__).parent.parent / "references" / "workflows"
+    """List or show workflow and specification documents."""
+    from sdpm import tools
+
     if not args.names:
         print("# Workflows")
-        for item in list_category(d):
+        for item in tools.list_workflows()["items"]:
             print(f"  {item['name']:<36} {item['description']}")
     else:
         try:
-            for doc in read_docs(d, args.names):
+            for doc in tools.read_workflows(args.names)["documents"]:
                 print(doc["content"])
                 print()
         except FileNotFoundError as e:
@@ -618,7 +606,7 @@ def main():
     parser = argparse.ArgumentParser(description="PPTX Builder")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    p_gen = subparsers.add_parser("generate", help="Generate PPTX from JSON")
+    p_gen = subparsers.add_parser("generate_pptx", help="Generate PPTX from JSON")
     p_gen.add_argument("input", nargs="?", help="Input JSON file (or - for stdin)")
     p_gen.add_argument("-o", "--output", required=True, help="Output PPTX path")
     p_gen.add_argument("--keep-empty-placeholders", action="store_true", help="Keep empty placeholders visible")
@@ -637,7 +625,7 @@ def main():
     p_meas.add_argument("input", help="Input JSON file")
     p_meas.add_argument("-p", "--pages", help="Slide numbers to measure (e.g. 1,3,5)")
 
-    p_search = subparsers.add_parser("search-assets", help="Search assets (icons, images, etc.)")
+    p_search = subparsers.add_parser("search_assets", help="Search assets (icons, images, etc.)")
     p_search.add_argument("query", help="Search keywords (space-separated)")
     p_search.add_argument("-n", "--limit", type=int, default=20, help="Max results (default: 20)")
     p_search.add_argument("-s", "--source", help="Filter by source (e.g. aws, material)")
@@ -647,29 +635,25 @@ def main():
     # Backward-compatible alias removed (icon-search was alias for search-assets)
 
     subparsers.add_parser("list-asset-sources", help="List available asset sources")
-    subparsers.add_parser("list-templates", help="List available PPTX templates")
+    subparsers.add_parser("list_templates", help="List available PPTX templates")
 
-    p_ex = subparsers.add_parser("examples", help="List or show design pattern/component examples")
+    p_ex = subparsers.add_parser("read_examples", help="List or show design pattern/component examples")
     p_ex.add_argument("names", nargs="*", help="Example names to show (multiple allowed)")
     p_ex.add_argument("--no-browse", action="store_true", help="Don't open browser for styles")
 
-    p_exs = subparsers.add_parser("search-patterns", help="Search patterns by keywords")
-    p_exs.add_argument("query", help="Search keywords (space-separated)")
-    p_exs.add_argument("-n", "--limit", type=int, default=5, help="Max results")
-
-    p_wf = subparsers.add_parser("workflows", help="List or show workflow documents")
+    p_wf = subparsers.add_parser("read_workflows", help="List or show workflow documents")
     p_wf.add_argument("names", nargs="*", help="Workflow names to show (multiple allowed)")
 
-    p_gd = subparsers.add_parser("guides", help="List or show guide documents")
+    p_gd = subparsers.add_parser("read_guides", help="List or show guide documents")
     p_gd.add_argument("names", nargs="*", help="Guide names to show (multiple allowed)")
 
-    p_init = subparsers.add_parser("init", help="Initialize output directory with empty presentation JSON")
+    p_init = subparsers.add_parser("init_presentation", help="Initialize output directory with empty presentation JSON")
     p_init.add_argument("name", nargs="?", help="Presentation name (e.g. 'my-proposal')")
     p_init.add_argument("-o", "--output", help="Output directory (overrides default)")
 
-    p_layout = subparsers.add_parser("layout", help="Compute layout coordinates from logical structure JSON")
+    p_layout = subparsers.add_parser("arch_diagram", help="Compute layout coordinates from logical structure JSON")
 
-    p_code = subparsers.add_parser("code-block", help="Generate elements JSON for syntax-highlighted code block")
+    p_code = subparsers.add_parser("code_to_slide", help="Generate elements JSON for syntax-highlighted code block")
     p_code.add_argument("input", help="Source code file (or - for stdin)")
     p_code.add_argument("-o", "--output", help="Output elements JSON file (default: stdout)")
     p_code.add_argument("--language", "-l", default="text", help="Language for highlighting (default: text)")
@@ -689,11 +673,11 @@ def main():
     p_layout.add_argument("--height", type=int, default=None, help="Target area height (px)")
     p_layout.add_argument("--theme", choices=["dark", "light"], default="dark", help="Theme for box text colors (default: dark)")
 
-    p_diff = subparsers.add_parser("diff", help="Compare two decks/JSONs/PPTXs and show changes (for manual edit detection)")
+    p_diff = subparsers.add_parser("diff_pptx", help="Compare two decks/JSONs/PPTXs and show changes (for manual edit detection)")
     p_diff.add_argument("baseline", help="Baseline deck directory, slides JSON, or PPTX (original)")
     p_diff.add_argument("edited", help="Edited deck directory, slides JSON, or PPTX (manually edited)")
 
-    p_analyze = subparsers.add_parser("analyze-template", help="Analyze PPTX template: extract layouts and theme")
+    p_analyze = subparsers.add_parser("analyze_template", help="Analyze PPTX template: extract layouts and theme")
     p_analyze.add_argument("input", help="Template PPTX file path")
     p_analyze.add_argument("--layout", help="Show placeholder details for a specific layout name")
 
@@ -709,35 +693,33 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "generate":
+    if args.command == "generate_pptx":
         cmd_generate(args)
     elif args.command == "preview":
         cmd_preview(args)
     elif args.command == "measure":
         cmd_measure(args)
-    elif args.command == "search-assets":
+    elif args.command == "search_assets":
         cmd_search_assets(args)
     elif args.command == "list-asset-sources":
         cmd_list_asset_sources(args)
-    elif args.command == "list-templates":
+    elif args.command == "list_templates":
         cmd_list_templates(args)
-    elif args.command == "examples":
+    elif args.command == "read_examples":
         cmd_examples(args)
-    elif args.command == "search-patterns":
-        cmd_search_patterns(args)
-    elif args.command == "workflows":
+    elif args.command == "read_workflows":
         cmd_workflows(args)
-    elif args.command == "guides":
+    elif args.command == "read_guides":
         cmd_guides(args)
-    elif args.command == "init":
+    elif args.command == "init_presentation":
         cmd_init(args)
-    elif args.command == "layout":
+    elif args.command == "arch_diagram":
         cmd_layout(args)
-    elif args.command == "code-block":
+    elif args.command == "code_to_slide":
         cmd_code_block(args)
-    elif args.command == "diff":
+    elif args.command == "diff_pptx":
         cmd_diff(args)
-    elif args.command == "analyze-template":
+    elif args.command == "analyze_template":
         cmd_analyze_template(args)
     elif args.command == "image-size":
         cmd_image_size(args)

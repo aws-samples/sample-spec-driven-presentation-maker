@@ -10,6 +10,83 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Added
+
+- **`sdpm-composer` skill entry point** — a fourth thin dispatcher
+  (`skills/sdpm-composer`) for the role a spawned composer sub-agent plays;
+  it calls `read_workflows(["composer"])` and stops. Dedicated composer
+  agent definitions (Kiro, Claude Code) now point at this skill instead of
+  a `personas/composer.md` file reference.
+- **`docs/en/migration-role-workflows.md`** — breaking-change table and per-environment
+  migration steps for the workflow consolidation below.
+
+### Changed
+
+- **Compose is two passes: layout, then content** — the scaffold pass becomes the
+  **layout pass** (`task_instruction: "Layout pass."`): one composer sees every slide and
+  decides each slide's template layout, frame elements and named content regions
+  (`_comment` elements with x/y/w/h, invisible in output), derived from one grid, written
+  in one batched `run_python` call. Content composers realize their slides inside those
+  regions. The consistency-review and fixes passes are gone: layout consistency is now
+  by construction, and the orchestrator looks at previews and re-dispatches a composer
+  per slide that needs a change.
+- **`run_python` requires `deck_id`** — the sandbox always runs inside a deck
+  workspace. The workspace-less "calculation" mode is gone: on the cloud it accepted
+  file writes and discarded them silently (a composer lost a whole scaffold pass this
+  way), on the local server it could not write at all. Create the deck with
+  `init_presentation` first, then compute. Also new: `check_specs` validates
+  deck.json and outline.md before composing (`compose_slides` runs it first).
+- **Web UI Spec / Vibe and "Parallel agents" keep their behaviour without personas** —
+  the orchestrator workflow defines two tokens, `Interaction mode: dialogue` (the user
+  wants to shape the deck in conversation) and `Interaction mode: fast` (build from material);
+  the cloud agent passes the token as a one-line system part and the local ACP route
+  prepends it to a session's first prompt. `single` (parallel agents off) is the same
+  workflow with no composer sub-agents, composing slides itself.
+- **Outline sub-items are now `body` / `visual` / `evidence`** — these three keys replace
+  `what_to_say` / `what_to_show` / `evidence` / `notes`. This is breaking for existing
+  enriched outlines: old-key lines are shown as prose rather than parsed as slide sub-items.
+- **Mode behavior consolidated into role documents, served via
+  `read_workflows`** — `start_presentation(mode=...)` and `personas/*.md`
+  are removed. Each role (orchestrator, composer, style, translate) now has
+  exactly one document, `sdpm/references/workflows/<role>.md`, containing
+  both the role definition and its procedure; entry points (skills, agent
+  definitions, `SKILL.md`, server instructions) only ever name a role for
+  `read_workflows` to fetch, never restate its behavior. This removes the
+  persona/workflow duplication that v0.5's persona layer had reintroduced.
+- **`vibe` and `spec` modes merged into a single `sdpm-create` skill** —
+  the dialogue-depth distinction is gone; how much back-and-forth happens
+  is driven by the user's own wording, not a mode argument. `skills/sdpm-vibe`
+  and `skills/sdpm-spec` are replaced by `skills/sdpm-create`.
+  `skills/sdpm-style` and `skills/sdpm-translate` are unchanged in purpose,
+  now dispatching to `read_workflows(["style"])` / `read_workflows(["translate"])`.
+- **CLI subcommands renamed to match MCP tool (contract) names** — e.g.
+  `generate` → `generate_pptx`, `examples` → `read_examples`,
+  `workflows` → `read_workflows`, `guides` → `read_guides`,
+  `analyze-template` → `analyze_template`, `search-assets` → `search_assets`,
+  `list-templates` → `list_templates`, `init` → `init_presentation`,
+  `code-block` → `code_to_slide`, `layout` → `arch_diagram`,
+  `diff` → `diff_pptx`. Workflow/guide text now reads identically whether
+  called as an MCP tool or a CLI subcommand. No aliases for the old names.
+  See [Migration: role workflows](docs/en/migration-role-workflows.md) for the full table.
+- **`slide-json-spec` moved to `sdpm/references/spec/`** — it is a fact
+  document, not a role document; still resolved by `read_workflows` for
+  backward compatibility. **`hand-edit-sync` moved to
+  `sdpm/references/guides/`** — it is an occasional-need procedure, not a
+  role.
+
+### Removed
+
+- **`sdpm/references/examples/patterns.pptx` and the `search-patterns`
+  CLI/tool** — an audit of all 18 cataloged patterns found their techniques
+  either duplicated in `components/all` or not measurably improving output
+  versus letting the model reason from the style HTML and component
+  vocabulary directly. No migration path; if a specific technique is
+  needed again, express it directly in slide JSON per
+  `read_workflows(["slide-json-spec"])`.
+
+> **Migrating from v0.5?** See [Migration: role workflows](docs/en/migration-role-workflows.md)
+> for the full breaking-change list and upgrade steps per environment.
+
 ## [0.8.2] - 2026-09-21
 
 ### Fixed

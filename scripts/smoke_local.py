@@ -6,7 +6,7 @@ Starts servers/local over real stdio (no mocks) and verifies that
 filesystem-anchored resolution works end to end:
 - the server boots and lists its tools,
 - list_templates finds bundled templates,
-- start_presentation(mode=...) serves the personas files.
+- read_workflows serves the canonical orchestrator workflow.
 
 This is the CI guard for the local-only surface (the v0.5 reviews found
 that local-facing regressions slip through the mocked unit suite).
@@ -40,22 +40,23 @@ async def main() -> None:
 
             listed = await session.list_tools()
             names = sorted(t.name for t in listed.tools)
-            for required in ("list_templates", "start_presentation", "run_python", "generate_pptx"):
+            for required in ("list_templates", "read_workflows", "run_python", "generate_pptx", "check_specs"):
                 assert required in names, f"tool missing: {required} (got {names})"
 
             # Real filesystem resolution: bundled templates must be found
             templates = json.loads(_text(await session.call_tool("list_templates", {})))
             assert templates.get("templates"), f"no templates resolved: {templates}"
 
-            # Personas served through the port (mode + menu)
-            spec = _text(await session.call_tool("start_presentation", {"mode": "spec"}))
-            assert "SPEC mode" in spec, "start_presentation(mode='spec') did not return the persona"
-            menu = _text(await session.call_tool("start_presentation", {}))
-            assert menu.strip(), "start_presentation() menu is empty"
+            # Canonical role workflow served through the port
+            workflow = json.loads(_text(await session.call_tool(
+                "read_workflows", {"names": ["orchestrator"]},
+            )))
+            documents = workflow.get("documents", [])
+            assert documents and documents[0].get("content"), "orchestrator workflow is empty"
 
             print(
                 f"OK: {len(names)} tools, {len(templates['templates'])} templates, "
-                f"persona 'spec' served ({len(spec)} chars)"
+                f"orchestrator workflow served ({len(documents[0]['content'])} chars)"
             )
 
 

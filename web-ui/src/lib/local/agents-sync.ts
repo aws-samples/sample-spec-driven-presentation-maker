@@ -32,29 +32,26 @@ export const DEFAULT_DIRS: SyncDirs = {
 
 /** Role → which agent JSON file is selected */
 export interface AgentSelection {
-  spec: string
-  vibe: string
+  orchestrator: string
   composer: string
-  single: string
   style: string
+  translate: string
   model?: string
 }
 
 export const SELECTION_DEFAULTS: AgentSelection = {
-  spec: "sdpm-spec.json",
-  vibe: "sdpm-vibe.json",
+  orchestrator: "sdpm-orchestrator.json",
   composer: "sdpm-composer.json",
-  single: "sdpm-single.json",
   style: "sdpm-style.json",
+  translate: "sdpm-translate.json",
 }
 
 /** Role → the fixed file name the ACP layer spawns (invoke route contract). */
 const ROLE_TO_FIXED: Record<string, string> = {
-  spec: "sdpm-spec.json",
-  vibe: "sdpm-vibe.json",
+  orchestrator: "sdpm-orchestrator.json",
   composer: "sdpm-composer.json",
-  single: "sdpm-single.json",
   style: "sdpm-style.json",
+  translate: "sdpm-translate.json",
 }
 
 const README_MARKER = `# Generated directory — do not hand-edit
@@ -63,7 +60,7 @@ Files here are re-derived from \`../acp-agents/\` (the catalog) combined with
 \`.sdpm/acp-agent-selection.json\` (your Settings selection + model) on every
 agent spawn and on Settings save. Any manual change is overwritten.
 
-To change agent behavior, edit \`personas/*.md\`; to change wiring, edit the
+To change agent behavior, edit \`sdpm/references/workflows/*.md\`; to change wiring, edit the
 catalog in \`../acp-agents/\`; to switch agents or model, use Settings.
 `
 

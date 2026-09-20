@@ -95,10 +95,10 @@ Known limitations for non-16:9 templates:
 
 ```bash
 # List all layouts
-uv run python3 scripts/pptx_builder.py analyze-template my-template.pptx
+uv run python3 scripts/pptx_builder.py analyze_template my-template.pptx
 
 # Show specific layout details
-uv run python3 scripts/pptx_builder.py analyze-template my-template.pptx --layout "Content"
+uv run python3 scripts/pptx_builder.py analyze_template my-template.pptx --layout "Content"
 ```
 
 ### Layer 2 (MCP)

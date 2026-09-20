@@ -5,10 +5,9 @@
 1. The Claude Code plugin manifest must only reference files that exist —
    deleting an agent definition without updating ``.claude-plugin/plugin.json``
    breaks plugin install/load.
-2. Residue guard: since v0.5.x, generic environments (Kiro CLI, plain MCP)
-   need NO pre-installed composer agent (composers are self-spawned via the
-   persona's spawn template). Stale "install the composer agent" wording in
-   personas or docs would send users to a removed flow.
+2. Residue guard: generic environments (Kiro CLI, plain MCP) do not require a
+   manually pre-installed composer agent because delegation includes a workflow fallback.
+   Stale installation wording in workflows or docs would send users to a removed flow.
 """
 
 import json
@@ -58,7 +57,7 @@ class TestPluginManifest:
 
 
 # Wording that implies a generic-environment user must pre-install a composer
-# agent. personas/ is served to every MCP client; getting-started is the
+# agent. workflows/ is the behavior source for every MCP client; getting-started is the
 # install path — neither may point at the removed flow.
 _FORBIDDEN = [
     "tell the user to install it",
@@ -69,7 +68,7 @@ _FORBIDDEN = [
 ]
 
 _GUARDED_FILES = [
-    *sorted((_REPO / "personas").glob("*.md")),
+    *sorted((_REPO / "sdpm" / "references" / "workflows").glob("*.md")),
     _REPO / "docs" / "en" / "getting-started.md",
     _REPO / "docs" / "ja" / "getting-started.md",
     _REPO / "README.md",

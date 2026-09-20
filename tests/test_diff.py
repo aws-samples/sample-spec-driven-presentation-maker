@@ -137,7 +137,7 @@ class TestDiffSourceJsonBaseline:
     def test_source_json_baseline_diff_detects_edit(
         self, source_json: Path, tmp_path: Path,
     ) -> None:
-        """End-to-end: pptx_builder.py diff <source.json> <edited.pptx>."""
+        """End-to-end: pptx_builder.py diff_pptx <source.json> <edited.pptx>."""
         from sdpm.api import _find_template_in_dirs, get_templates_dirs
         from sdpm.engine.builder import PPTXBuilder
 

@@ -29,10 +29,10 @@ The core presentation engine. No network, no AWS, no MCP — just Python.
 - **sdpm/sdpm/engine/** — json↔pptx conversion: builder, converter, layout engine, schema lint, preview, checks, diff, analyzer
 - **sdpm/sdpm/knowledge/** — knowledge retrieval: references (guides/workflows/examples) and asset search
 - **sdpm/sdpm/tools/** — the MCP tool contract: every tool's name, schema, docstring, and logic defined once; both servers register these functions directly
-- **sdpm/references/** — Examples (slide patterns), workflows (phase instructions), guides (design rules)
+- **sdpm/references/** — workflows (role documents: orchestrator/composer/style/translate),
+  spec (slide JSON schema), guides (design rules), examples (components/styles)
 - **sdpm/templates/** — Sample .pptx templates (dark/light)
 - **sdpm/scripts/** — CLI entry point (`pptx_builder.py`), asset download scripts
-- **personas/** (repo root) — canonical mode behaviors (vibe / spec / style / composer), served to MCP clients via `start_presentation(mode=...)`
 
 Key capabilities:
 - Analyze any .pptx template (layouts, colors, fonts, placeholders)
@@ -48,14 +48,14 @@ Key capabilities:
 A thin bind of the `sdpm.tools` contract. Runs as a stdio server (plus an ACP variant for the local Web UI).
 
 - Registers the contract tools via FastMCP — no tool logic of its own
-- **Mode behavior via `start_presentation(mode=...)`** — any MCP client (including ones with no skill/sub-agent mechanism, e.g. Claude Desktop) receives the vibe/spec/style/composer behavior as a tool response. Clients that read MCP Server Instructions also get the workflow menu automatically.
+- **Role documents via `read_workflows(names)`** — any MCP client (including ones with no skill/sub-agent mechanism, e.g. Claude Desktop) receives the orchestrator/composer/style/translate role document as a tool response. Clients that read MCP Server Instructions also get the workflow menu automatically.
 - No AWS required — all files stored locally
 
 ---
 
 ## Layer 3: Remote MCP Server
 
-The same `sdpm.tools` contract bound to an HTTP transport, with storage swapped to Amazon DynamoDB + S3 plus authentication and authorization. Bundled knowledge (references, templates, personas) is baked into the container image; only user data (decks, uploads, user templates/styles) lives in S3/DynamoDB.
+The same `sdpm.tools` contract bound to an HTTP transport, with storage swapped to Amazon DynamoDB + S3 plus authentication and authorization. Bundled knowledge (references, templates) is baked into the container image; only user data (decks, uploads, user templates/styles) lives in S3/DynamoDB.
 
 ```
 MCP Client → AgentCore Runtime → MCP Server Container
@@ -227,7 +227,7 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview |
 | Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
 | References | `list_styles`, `read_examples` | Slide style examples |
-| References | `list_workflows`, `read_workflows` | Phase workflow instructions |
+| References | `list_workflows`, `read_workflows` | Role documents (orchestrator, composer, style, translate) |
 | References | `list_guides`, `read_guides` | Design rules and guides |
 | Layout | `grid` | CSS Grid coordinate calculation |
 | Utility | `code_to_slide` | Code highlighting |
@@ -257,11 +257,7 @@ Deliberate asymmetries between surfaces — these are design decisions, not gaps
   agent loop on Cloud). Plain MCP has no interaction channel, so `hearing` is
   intentionally not part of the `sdpm.tools` contract — it is a
   transport-specific addition, which the local server is allowed to carry.
-- **ACP agents have no `start_presentation`.** `start_presentation(mode=...)`
-  exists for clients where the mode is decided *in conversation*. ACP agents
-  are spawned with a fixed persona (definitions re-derived from `acp-agents/`
-  at spawn), so the mode is already known at the entry point and a mode-fetch
-  tool would be dead weight.
+- **ACP agents load fixed-role workflows directly.** Each canonical definition in `servers/local/.kiro/acp-agents/` points its `prompt` at `file://../../../../sdpm/references/workflows/<role>.md`, so the role is fixed without embedding or fetching a second copy.
 - **The CLI surface is kept even where MCP tools overlap.** The CLI +
   `sdpm/SKILL.md` form the no-MCP adapter (Layer 1). CLI subcommands cost no
   MCP schema tokens and are the only operability for agents without MCP

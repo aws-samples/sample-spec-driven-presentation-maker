@@ -114,7 +114,7 @@ def execute_in_sandbox(
 
     session = client.start_code_interpreter_session(
         codeInterpreterIdentifier="aws.codeinterpreter.v1",
-        name=f"pptx-{deck_id or 'calc'}",
+        name=f"pptx-{deck_id}",
         sessionTimeoutSeconds=300,
     )
     session_id = session["sessionId"]

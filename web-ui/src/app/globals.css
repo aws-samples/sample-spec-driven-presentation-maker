@@ -907,3 +907,62 @@ body {
   0%   { clip-path: inset(0 100% 100% 0); }
   100% { clip-path: inset(0 0 0 0); }
 }
+
+
+/* live preview regions */
+@keyframes asp-region-dash {
+  to { stroke-dashoffset: -240; }
+}
+/* The region layer is drawn above the slide content; it must never take
+   pointer events (a filled rect would otherwise block text selection). */
+.asp-region, .asp-region-rect {
+  pointer-events: none;
+}
+.asp-region-rect {
+  fill: color-mix(in oklch, var(--agent-layout) 8%, transparent);
+  stroke: var(--agent-layout);
+  stroke-width: 2.2;
+  stroke-dasharray: 14 10;
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+.asp-region-on .asp-region-rect {
+  opacity: 1;
+}
+.asp-region-drawn .asp-region-rect {
+  animation: asp-region-dash 12s linear infinite;
+}
+.asp-region-filled .asp-region-rect {
+  opacity: 0;
+  transition: opacity 0.6s 0.15s;
+}
+.asp-region-label {
+  position: absolute;
+  transform: translate(6px, 4px);
+  padding: 1px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+  color: var(--agent-layout);
+  background: color-mix(in oklch, var(--background) 70%, transparent);
+  font: 500 11px var(--font-geist-mono), ui-monospace, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+.asp-region-label.asp-region-on {
+  opacity: 1;
+}
+.asp-region-label.asp-region-label-hidden {
+  display: none;
+}
+.asp-region-label.asp-region-filled {
+  opacity: 0;
+  transition: opacity 0.6s 0.15s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .asp-region-drawn .asp-region-rect { animation: none; }
+  .asp-region-rect, .asp-region-label { transition: none; }
+}

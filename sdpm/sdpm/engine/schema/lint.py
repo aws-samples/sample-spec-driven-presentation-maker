@@ -65,6 +65,14 @@ def _diag(slide: int, element: int, rule: str, message: str) -> dict:
 
 def _lint_element(si: int, ei: int, elem: dict) -> list[dict]:
     if "_comment" in elem:
+        comment = elem.get("_comment")
+        if isinstance(comment, str) and comment.strip().lower().startswith("region"):
+            from sdpm.engine.schema.regions import extract_regions
+
+            if not extract_regions({"elements": [elem]}):
+                return [_diag(si, ei, "region-missing-coords",
+                              f"region comment {comment!r} has no x/y/w/h — the layout pass "
+                              "wrote coordinates; keep them (the Web UI draws them)")]
         return []
     etype = elem.get("type")
     if etype is None:

@@ -1,7 +1,17 @@
-## compose_slides — report format (this environment)
+## compose_slides — dispatch and report (this environment)
 
-In this environment, dispatch composers via the `compose_slides` tool (dispatch
-method 1 in your behavior instructions). It returns a JSON report:
+Composers are dispatched with `compose_slides(deck_id, slide_groups=[{slugs, instruction}])`.
+It runs exactly the groups you pass, once, in parallel — nothing else happens inside it. Each
+pass of your workflow is therefore one call, and `instruction` is the `task_instruction` the
+workflow refers to:
+
+- layout — one group, all slugs, `instruction: "Layout pass."`
+- content — several groups
+- a change to one slide — one group with that slug
+
+Before dispatch, `compose_slides` validates deck.json and outline.md and returns `status: "error"` with `errors` when validation fails.
+
+It returns a JSON report:
 
 - `status`: `"completed"` / `"partial"` / `"failed"` / `"cancelled"`
 - `generated_slides`: slugs successfully written
@@ -14,14 +24,11 @@ method 1 in your behavior instructions). It returns a JSON report:
 - `notice`: harness guidance for the current status — follow it
 
 `status: "cancelled"` means the user intentionally stopped the run: relay
-`notice` and `summaries` in plain text, do NOT retry or call further tools,
-and skip the Post-Compose Workflow (per your Cancellation instructions).
+`notice` and `summaries` in plain text, do NOT retry or call further tools.
 
 ### Post-compose verification (this environment)
 
 You cannot see the composers' own tool results (their `preview_files` stay
-inside each composer). After the consistency-review pass completes, call
+inside each composer). After the content call returns, call
 `get_preview(deck_id, slugs=[...all slugs...])` yourself to see the
-post-review rendering — this is the one exception to "do not call preview
-tools directly", and it is how you perform the Verification step of your
-Post-Compose Workflow before deciding on a per-slide fix pass.
+rendering — this is how you look before deciding whether any slide needs another composer.

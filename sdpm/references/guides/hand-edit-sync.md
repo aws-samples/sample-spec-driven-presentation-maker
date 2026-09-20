@@ -1,5 +1,5 @@
 ---
-name: new-phase-4-hand-edit-sync
+name: hand-edit-sync
 description: "Phase 4: Sync after hand-editing (only when requested)"
 category: workflow
 ---
@@ -7,13 +7,13 @@ category: workflow
 # Phase 4: Sync After Hand-Editing
 
 Run this when the user has hand-edited the PPTX in PowerPoint and then asks the agent for further changes.
-The agent always edits output_json, so hand-edits must be synced to output_json first — otherwise they are lost on regeneration.
+The agent always edits the deck's source JSON, so hand-edits must be synced there first — otherwise they are lost on regeneration.
 
 ---
 
 ### 0. Review available guides
 
-Run `guides` to review available guides. Read any that are relevant to the upcoming edits.
+Call `list_guides()` and use `read_guides([...])` for guides relevant to the upcoming edits.
 
 **Constraints:**
 - You MUST complete Steps 1-2 BEFORE making any additional edits because hand-edits will be lost on regeneration
@@ -22,14 +22,9 @@ Run `guides` to review available guides. Read any that are relevant to the upcom
 
 ### 1. Run diff
 
-```bash
-# baseline is the deck directory (deck.json + slides/) or a slides JSON
-uv run python3 scripts/pptx_builder.py diff {deck_dir} {edited_pptx}
-```
-
-The diff command accepts a deck directory or PPTX file directly (it builds /
-converts to roundtrip JSON internally). On a local MCP server, call
-`diff_pptx(baseline={deck_dir}, edited={edited_pptx})` instead.
+Call `diff_pptx(baseline={deck_dir}, edited={edited_pptx})`. The baseline
+may be a deck directory, slides JSON, or PPTX; the operation builds or converts
+to round-trip JSON internally.
 
 > **Local / CLI only.** `servers/remote` does not bind `diff_pptx`, so this step
 > is unavailable on the cloud stack (Web UI + L4 agent) and the tool is not in the
@@ -44,10 +39,10 @@ converts to roundtrip JSON internally). On a local MCP server, call
 Read the diff output and apply the hand-edit changes to the deck's slide JSON.
 
 - **Modified elements**: Read property diffs and edit the deck's `slides/*.json` directly
-- **Added slides/elements**: The diff output is a summary only. For actual data, run
-  `uv run python3 scripts/pptx_to_json.py {edited_pptx} -o {tmp_dir}` (CLI only;
-  the MCP path uses `import_attachment` for import-and-commit) — it writes the roundtrip deck structure (`{tmp_dir}/slides/slide-NN.json` +
-  `{tmp_dir}/images/`) — then copy the relevant parts into the deck's slide JSON
+- **Added slides/elements**: The diff output is a summary only. Convert the
+  edited PPTX to a temporary round-trip deck structure (or use `import_attachment`
+  where available), then copy the relevant parts from `slides/slide-NN.json` and
+  `images/` into the deck's source JSON.
 - **Added images**: Copy them from `{tmp_dir}/images/` into the deck's `images/` and reference via `src`
 - **Reordered slides**: Reorder `specs/outline.md` (deck) or the slide array (single JSON)
 

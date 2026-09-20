@@ -152,15 +152,15 @@ class TestResolveConfigHeightBoundaryWarning:
 
 
 class TestInitSlidesSize:
-    """api.init creates a minimal deck.json without slideSize (template branch removed)."""
+    """api.init creates the deck.json skeleton with an empty slideSize."""
 
-    def test_init_no_slide_size(self, tmp_path: Path):
-        """init never writes slideSize — the agent writes it after analyze_template."""
+    def test_init_empty_slide_size(self, tmp_path: Path):
+        """init writes slideSize as an empty object until template analysis fills it."""
         from sdpm.api import init
 
         result = init(name="test", output_dir=str(tmp_path / "out"))
         deck_json = json.loads(Path(result["deck_json"]).read_text())
-        assert "slideSize" not in deck_json
+        assert deck_json["slideSize"] == {}
 
 
 # ═══════════════════════════════════════════════════════════════════════

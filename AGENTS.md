@@ -20,12 +20,11 @@ sdpm/        Engine + knowledge (single source of business logic)
 ├─ sdpm/engine/      json <-> pptx conversion
 ├─ sdpm/knowledge/   references / assets retrieval
 ├─ sdpm/tools/       MCP tool contract (single definition for all servers)
-├─ references/       guides, workflows, examples (data)
+├─ references/       workflows (role documents), guides, spec, examples (data)
 ├─ templates/        bundled .pptx templates (data)
 └─ SKILL.md          L1 entry (agents without MCP drive the CLI directly)
-personas/    Canonical mode behaviors (vibe / spec / style / composer / single)
-             — served to MCP clients via the start_presentation(mode=...) tool
-skills/      Mode entry points (vibe / spec / style) — thin dispatchers, no behavior text
+skills/      Mode entry points (sdpm-create / sdpm-composer / sdpm-style / sdpm-translate)
+             — thin dispatchers, no behavior text
 plugin.json  Agent Plugins 1.0.0 manifest; mcp.json declares the bundled MCP server
 servers/
 ├─ local/    stdio MCP + ACP server (no AWS)
@@ -44,21 +43,22 @@ docs/        Documentation
 
 `sdpm.engine` (pure json↔pptx) and `sdpm.knowledge` (reference/asset retrieval)
 are peers. `sdpm.tools` defines every MCP tool once — names, schemas,
-docstrings, logic — and both servers register those functions directly. Mode
-behavior (personas) is content, not client config: `start_presentation(mode=...)`
-returns it to any MCP client, so the files under `skills/` are entry points only
-— they name a mode and never restate what it does.
+docstrings, logic — and both servers register those functions directly. Role and
+procedure text is content, not client config: `sdpm/references/workflows/<role>.md`
+(orchestrator, composer, style, translate) is the single definition for each role,
+served to any MCP client via `read_workflows`, so the files under `skills/` are entry
+points only — they name a workflow and never restate what it does.
 See [Architecture](docs/en/architecture.md).
 
 ## Conventions
 
 - Engine source of truth: `sdpm/sdpm/` — servers must stay thin binds of `sdpm.tools`
-- Persona text lives only in `personas/*.md` — all layers including the L4 agent fetch
-  it via `start_presentation(mode=...)`; client/agent-side files are thin wiring
-  (a Kiro/CC composer definition should never duplicate behavior text)
-- `skills/*/SKILL.md` may only dispatch to `start_presentation(mode=...)`; copying
-  persona prose into a skill is what forced their removal in v0.5.0 and is now guarded
-  by `tests/test_skill_entrypoints.py`
+- Role + procedure text lives only in `sdpm/references/workflows/<role>.md`; skills,
+  client agent definitions, `SKILL.md` and server instructions are dispatch/environment
+  only (guarded by `tests/test_skill_entrypoints.py`)
+- `skills/*/SKILL.md` may only dispatch to `read_workflows([...])`; copying workflow
+  prose into a skill is what forced the v0.5.0 skill removal and is now guarded by
+  `tests/test_skill_entrypoints.py`
 - Client manifests: `plugin.json` + `mcp.json` (portable, Agent Plugins 1.0.0),
   `.codex-plugin/plugin.json` + `.mcp.json` (Codex), `.claude-plugin/plugin.json`
   (Claude Code). All must keep pointing at the same `servers/local` definition —

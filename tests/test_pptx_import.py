@@ -256,7 +256,7 @@ class TestCloudImportConvertedCopiesTemplate:
 
 class TestPptxBuilderCliAcceptsDeckDir:
     def test_pptx_builder_cli_generate_on_deck_dir(self, fixture_pptx: Path, tmp_path: Path) -> None:
-        """Convert PPTX → deck structure → pptx_builder.py generate should work on the directory."""
+        """Convert PPTX → deck structure → pptx_builder.py generate_pptx should work on the directory."""
         from sdpm.engine.converter import pptx_to_json
 
         deck_dir = tmp_path / "deck"
@@ -275,14 +275,14 @@ class TestPptxBuilderCliAcceptsDeckDir:
         outline_lines = [f"- [{f.stem}] Slide {f.stem}" for f in slide_files]
         (specs_dir / "outline.md").write_text("\n".join(outline_lines), encoding="utf-8")
 
-        # CLI: pptx_builder.py generate {deck_dir} -o {output}
+        # CLI: pptx_builder.py generate_pptx {deck_dir} -o {output}
         output_pptx = tmp_path / "out.pptx"
         cli = _REPO_ROOT / "sdpm" / "scripts" / "pptx_builder.py"
         proc = subprocess.run(
-            [sys.executable, str(cli), "generate", str(deck_dir), "-o", str(output_pptx)],
+            [sys.executable, str(cli), "generate_pptx", str(deck_dir), "-o", str(output_pptx)],
             capture_output=True, text=True, timeout=120,
         )
-        assert proc.returncode == 0, f"pptx_builder.py generate failed:\nSTDOUT: {proc.stdout}\nSTDERR: {proc.stderr}"
+        assert proc.returncode == 0, f"pptx_builder.py generate_pptx failed:\nSTDOUT: {proc.stdout}\nSTDERR: {proc.stderr}"
         assert output_pptx.exists()
 
 
@@ -474,11 +474,11 @@ class TestConvertPptxOutputsTemplate:
         output_pptx = tmp_path / "out.pptx"
         cli = _REPO_ROOT / "sdpm" / "scripts" / "pptx_builder.py"
         proc = subprocess.run(
-            [sys.executable, str(cli), "generate", str(deck_dir), "-o", str(output_pptx)],
+            [sys.executable, str(cli), "generate_pptx", str(deck_dir), "-o", str(output_pptx)],
             capture_output=True, text=True, timeout=180,
         )
         assert proc.returncode == 0, (
-            f"pptx_builder.py generate failed:\nSTDOUT: {proc.stdout}\nSTDERR: {proc.stderr}"
+            f"pptx_builder.py generate_pptx failed:\nSTDOUT: {proc.stdout}\nSTDERR: {proc.stderr}"
         )
         assert output_pptx.exists()
 

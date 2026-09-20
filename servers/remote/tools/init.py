@@ -36,8 +36,10 @@ def init_presentation(
     deck = create_deck(name=name, user_id=user_id, storage=storage)
     deck_id = deck["deckId"]
 
-    # Write empty deck.json to S3
-    deck_json: dict[str, Any] = {}
+    # Write the shared deck.json skeleton to S3.
+    from sdpm.engine.schema import DECK_JSON_SKELETON, complete_deck_skeleton
+
+    deck_json: dict[str, Any] = complete_deck_skeleton(DECK_JSON_SKELETON)
     storage.put_deck_json(deck_id=deck_id, data=deck_json)
 
     workspace = ["deck.json"]

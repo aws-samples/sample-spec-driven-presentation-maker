@@ -79,7 +79,7 @@ class TestGenerateOnlySlugs:
         assert Path(result["output_path"]).exists()
 
     def test_generate_multiple_slugs(self, tmp_path):
-        """Task 9: multiple slug batch (Consistency review scenario)."""
+        """Task 9: multiple slug batch (multi-slug group scenario)."""
         deck = _make_multi_slide_deck(tmp_path, ["title", "intro", "details", "closing"])
         out_pptx = tmp_path / "out.pptx"
         result = generate(deck, output_path=out_pptx, only_slugs={"title", "details", "closing"})

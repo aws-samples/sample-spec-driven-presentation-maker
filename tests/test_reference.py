@@ -4,6 +4,7 @@
 and the remote-specific style listing (tools.reference)."""
 
 import pytest
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from sdpm import tools as contract
@@ -13,23 +14,28 @@ from tools.reference import list_styles as remote_list_styles
 class TestContractReference:
     """Contract reference tools read bundled data from the local filesystem."""
 
-    def test_list_workflows(self):
+    def test_list_workflows_includes_roles_and_spec(self):
         result = contract.list_workflows()
-        names = [i["name"] for i in result["items"]]
-        assert "create-new-1-briefing" in names
+        names = {item["name"] for item in result["items"]}
+        assert {"orchestrator", "composer", "style", "translate"} <= names
+        assert "slide-json-spec" in names
 
-    def test_read_workflows(self):
-        result = contract.read_workflows(["create-new-1-briefing"])
+    @pytest.mark.parametrize("name", [
+        "orchestrator", "composer", "style", "translate", "slide-json-spec",
+    ])
+    def test_read_workflows_resolves_roles_and_spec(self, name):
+        result = contract.read_workflows([name])
         assert len(result["documents"]) == 1
         assert result["documents"][0]["content"]
 
     def test_list_guides(self):
         result = contract.list_guides()
-        names = [i["name"] for i in result["items"]]
+        names = [item["name"] for item in result["items"]]
         assert "design-rules" in names
+        assert "hand-edit-sync" in names
 
     def test_read_guides(self):
-        result = contract.read_guides(["design-rules"])
+        result = contract.read_guides(["hand-edit-sync"])
         assert len(result["documents"]) == 1
         assert result["documents"][0]["content"]
 
@@ -37,33 +43,34 @@ class TestContractReference:
         with pytest.raises(FileNotFoundError, match="not found"):
             contract.read_examples(["nonexistent-doc-xyz"])
 
-    def test_start_presentation_returns_instructions(self):
-        text = contract.start_presentation()
-        assert "read_workflows" in text
-        assert "create-new-1-briefing" in text
+    def test_patterns_are_not_available(self):
+        with pytest.raises(FileNotFoundError, match="patterns.*not found"):
+            contract.read_examples(["patterns"])
 
-    @pytest.mark.parametrize("mode,needle", [
-        ("vibe", "Vibe Workflow"),
-        ("spec", "Phase 1 Flow"),
-        ("style", "run_style_python"),
-        ("composer", "assigned slugs"),
-        ("single", "Workflow: New Presentation"),
-    ])
-    def test_start_presentation_modes(self, mode, needle):
-        text = contract.start_presentation(mode=mode)
-        assert needle in text
 
-    def test_every_persona_file_is_served(self):
-        # personas/*.md and _MODES must stay in sync (a persona no one can
-        # request is dead content; a mode without a file raises at runtime)
-        from sdpm.config import PERSONAS_DIR
-        files = {p.stem for p in PERSONAS_DIR.glob("*.md")}
-        assert files == set(contract._MODES)
+def test_reference_vocabulary_is_environment_neutral():
+    """Role/fact docs use contract vocabulary, apart from documented CLI setup."""
+    references = Path(__file__).parents[1] / "sdpm" / "references"
+    roots = [references / name for name in ("workflows", "guides", "spec")]
+    allowed_cli = {
+        references / "guides" / "setup.md",
+        references / "guides" / "arch-layout-engine.md",
+    }
+    banned = ("pptx_builder.py", "uv run", "start_presentation")
 
-    def test_start_presentation_unknown_mode(self):
-        text = contract.start_presentation(mode="bogus")
-        assert "Unknown mode" in text
-        assert "vibe" in text
+    offenders = []
+    for base in roots:
+        for path in base.glob("*.md"):
+            if path in allowed_cli:
+                continue
+            found = [token for token in banned if token in path.read_text(encoding="utf-8")]
+            if found:
+                offenders.append((str(path.relative_to(references)), found))
+    assert not offenders
+
+    arch = (references / "guides" / "arch-layout-engine.md").read_text(encoding="utf-8")
+    assert arch.count("pptx_builder.py") == 1
+    assert "start_presentation" not in arch
 
 
 class TestRemoteListStyles:

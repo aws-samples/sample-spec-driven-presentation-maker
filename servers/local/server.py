@@ -7,9 +7,8 @@ data classification, and IAM policies. See SECURITY.md for details.
 
 stdio transport for local MCP clients (Claude Desktop, VS Code, Goose, etc.).
 Thin bind of the shared tool contract (:mod:`sdpm.tools`) — all file I/O is
-local filesystem. Workflow instructions are exposed both as MCP Server
-Instructions and via the ``start_presentation`` tool, so clients that do not
-read Server Instructions work too.
+local filesystem. Workflow discovery is exposed through MCP Server Instructions;
+role workflows are read through the shared ``read_workflows`` contract.
 
 Usage:
     python server.py
@@ -43,8 +42,8 @@ mcp = FastMCP(
 # Contract tools (1-line registration from sdpm.tools)
 # ---------------------------------------------------------------------------
 
-mcp.tool()(tools.start_presentation)
 mcp.tool()(tools.init_presentation)
+mcp.tool()(tools.check_specs)
 mcp.tool()(tools.analyze_template)
 mcp.tool()(tools.generate_pptx)
 mcp.tool()(tools.search_assets)

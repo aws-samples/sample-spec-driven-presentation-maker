@@ -153,10 +153,11 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         name="compose_slides",
         context=True,
         description=(
-            "Delegate slide generation to parallel composer agents. Each group "
-            "is handled by an independent composer that writes slides/<slug>.json. "
+            "Dispatch composer agents for the groups given — one independent composer "
+            "per group, writing slides/<slug>.json. Runs only what you pass: the layout "
+            "pass and the content pass are separate calls. "
             f"Up to {max_concurrency} groups run concurrently. "
-            "Use this once Phase 1 (dialogue) is complete and outline.md is finalized.\n\n"
+            "Use this once outline.md is finalized.\n\n"
             "The composer reads specs/ (brief, outline, art-direction) for all content "
             "and design decisions. The instruction only needs to specify which slides "
             "to compose. Add user requests or review feedback if applicable, but do NOT "
@@ -193,7 +194,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                                     "type": "string",
                                     "description": (
                                         "Instruction for the composer. Keep minimal:\n"
-                                        "  • Initial generation: 'Compose these slides following specs/'\n"
+                                        "  • Layout pass (first call, one group, all slugs): 'Layout pass.'\n"
+                                        "  • Content: 'Compose these slides following specs/'\n"
                                         "  • User requests: pass through the user's words as-is\n"
                                         "  • Review fixes: describe the problem, not the solution "
                                         "(e.g. 'slides X and Y lack visual consistency' not 'use timeline layout')\n"
@@ -214,7 +216,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
     async def compose_slides(deck_id: str, slide_groups: list, tool_context: ToolContext):
         """Compose slides by delegating to composer agents.
 
-        Prefetches all Phase 2 references once, then injects into composer prompt.
+        Loads the canonical composer workflow, then injects deck-specific context.
         Runs groups in parallel. Async generator: yields progress dicts, then returns final result str.
         """
         # LLM sometimes passes slide_groups as a JSON string instead of a list
@@ -222,56 +224,45 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
             slide_groups = json.loads(slide_groups)
         parent_tool_use_id = tool_context.tool_use["toolUseId"]
 
-        # Pre-check: verify required spec files exist before launching composers.
-        # Missing files indicate an incomplete Phase 1 — return the earliest
-        # workflow instruction so the SPEC agent resumes from the right sub-phase.
+        # Validate the deck specification once before launching composers.
+        spec_warnings: list[str] = []
+        outline_slugs: list[str] = []
         if mcp_client:
-            check_code = (
-                "import os, json\n"
-                "files = ['specs/brief.md', 'specs/outline.md', 'deck.json']\n"
-                "art = 'specs/art-direction.html' if os.path.exists('specs/art-direction.html') "
-                "else ('specs/art-direction.md' if os.path.exists('specs/art-direction.md') else None)\n"
-                "missing = [f for f in files if not os.path.exists(f)]\n"
-                "if art is None:\n"
-                "    missing.append('specs/art-direction')\n"
-                "print(json.dumps(missing))\n"
-            )
+            assigned_slugs = [slug for group in slide_groups for slug in group["slugs"]]
             check_result = call_tool_with_retry(
                 mcp_client,
                 tool_use_id=f"precheck-{uuid.uuid4().hex[:8]}",
-                name="run_python",
-                arguments={"code": check_code, "deck_id": deck_id, "purpose": "spec file existence check"},
+                name="check_specs",
+                arguments={"deck_id": deck_id, "assigned_slugs": assigned_slugs},
             )
-            missing_files: list[str] = []
+            spec_result: dict = {
+                "ok": False,
+                "errors": ["check_specs returned no validation result"],
+                "warnings": [],
+                "slugs": [],
+            }
             for item in check_result.get("content", []):
                 if isinstance(item, dict) and "text" in item:
                     try:
-                        out = json.loads(item["text"])
-                        if isinstance(out, dict) and "output" in out:
-                            missing_files = json.loads(out["output"])
-                        elif isinstance(out, list):
-                            missing_files = out
+                        parsed = json.loads(item["text"])
                     except (json.JSONDecodeError, TypeError):
-                        pass
+                        continue
+                    if isinstance(parsed, dict):
+                        spec_result = parsed
+                        break
 
-            if missing_files:
-                # Map missing files to their workflow (phase order)
-                workflow_map = {
-                    "specs/brief.md": "create-new-1-briefing",
-                    "specs/outline.md": "create-new-1-outline",
-                    "specs/art-direction": "create-new-1-art-direction",
-                    "deck.json": "create-new-1-art-direction",
-                }
-                workflows_needed = dict.fromkeys(
-                    workflow_map[f] for f in missing_files if f in workflow_map
-                )
-                steps = " → ".join(f"`{w}`" for w in workflows_needed)
-                instruction = (
-                    f"Cannot compose: missing {missing_files}. "
-                    f"Complete these workflows in order: {steps}. "
-                    "Do NOT call compose_slides again until ALL spec files exist."
-                )
-                yield json.dumps({"status": "error", "missing_files": missing_files, "instruction": instruction})
+            spec_warnings = list(spec_result.get("warnings") or [])
+            outline_slugs = list(spec_result.get("slugs") or [])
+            if not spec_result.get("ok"):
+                yield json.dumps({
+                    "status": "error",
+                    "errors": list(spec_result.get("errors") or []),
+                    "warnings": spec_warnings,
+                    "instruction": (
+                        "Cannot compose: fix the listed spec problems, then call "
+                        "compose_slides again."
+                    ),
+                })
                 return
 
         generated = []
@@ -596,6 +587,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
             "partial": partial,
             "summaries": summaries,
         }
+        if spec_warnings:
+            report["spec_warnings"] = spec_warnings
         log_slides_composed(
             user_id=user_id, session_id=session_id, deck_id=deck_id,
             generated=len(generated), total=total, status=report["status"],
@@ -632,37 +625,14 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
             except Exception as e:
                 report["build_error"] = str(e)
 
-            # Outline check
-            try:
-                outline_result = mcp_client.call_tool_sync(
-                    tool_use_id=f"outline-{uuid.uuid4().hex[:8]}",
-                    name="run_python",
-                    arguments={
-                        "code": (
-                            "import json, re\n"
-                            "outline = open('specs/outline.md').read()\n"
-                            "slugs = re.findall(r'^-\\s*\\[([a-z0-9-]+)\\]', outline, re.MULTILINE)\n"
-                            "print(json.dumps(slugs))"
-                        ),
-                        "deck_id": deck_id,
-                        "purpose": "read outline slugs",
-                    },
-                )
-                for item in outline_result.get("content", []):
-                    if isinstance(item, dict) and "text" in item:
-                        try:
-                            output = json.loads(item["text"])
-                            if isinstance(output, dict) and "output" in output:
-                                expected = json.loads(output["output"])
-                            else:
-                                expected = output
-                            missing = [s for s in expected if s not in generated]
-                            extra = [s for s in generated if s not in expected]
-                            report["outline_check"] = {"expected": expected, "missing": missing, "extra": extra}
-                        except json.JSONDecodeError:
-                            pass
-            except Exception:
-                pass
+            # Compare generated slides with the already-validated outline slugs.
+            missing = [slug for slug in outline_slugs if slug not in generated]
+            extra = [slug for slug in generated if slug not in outline_slugs]
+            report["outline_check"] = {
+                "expected": outline_slugs,
+                "missing": missing,
+                "extra": extra,
+            }
 
         yield json.dumps(report)
 

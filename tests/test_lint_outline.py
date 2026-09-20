@@ -50,17 +50,16 @@ class TestDetailedOutline:
     def test_sub_items_valid(self):
         text = (
             "- [title] Audience knows the topic\n"
-            "  - what_to_say: The key point\n"
+            "  - body: The key point\n"
+            "  - visual: Screenshot of the feature\n"
             "  - evidence: Data supporting the claim\n"
-            "  - what_to_show: Screenshot of the feature\n"
-            "  - notes: Anticipated questions\n"
         )
         assert lint_outline(text) == []
 
     def test_partial_sub_items(self):
         text = (
             "- [title] Audience knows the topic\n"
-            "  - what_to_say: Only this one\n"
+            "  - body: Only this one\n"
             "- [next] Another slide\n"
         )
         assert lint_outline(text) == []
@@ -68,7 +67,7 @@ class TestDetailedOutline:
     def test_mixed_skeleton_and_detailed(self):
         text = (
             "- [title] Audience knows the topic\n"
-            "  - what_to_say: Key point\n"
+            "  - body: Key point\n"
             "- [overview] No details here\n"
             "- [deep-dive] Has details\n"
             "  - evidence: Some data [TBD]\n"
@@ -78,6 +77,6 @@ class TestDetailedOutline:
     def test_tab_indented_sub_items(self):
         text = (
             "- [title] Topic\n"
-            "\t- what_to_say: Key point\n"
+            "\t- body: Key point\n"
         )
         assert lint_outline(text) == []
