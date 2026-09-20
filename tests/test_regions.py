@@ -48,13 +48,15 @@ def test_builder_skips_region_comments_silently(tmp_path, capsys) -> None:
 
     from sdpm import api, tools
 
+    from pathlib import Path
+
     r = tools.init_presentation(str(tmp_path / "deck"))
-    deck = r.get("output_dir", str(tmp_path / "deck"))
+    deck = Path(r.get("output_dir", str(tmp_path / "deck")))
     api.apply_style(deck, "elegant-dark", "blank-dark")
-    (tmp_path / "deck" / "specs" / "outline.md").write_text(
+    (deck / "specs" / "outline.md").write_text(
         "# O\n\n## A\n- [one] T\n  - body: b\n  - visual: v\n  - evidence: e\n"
     )
-    (tmp_path / "deck" / "slides" / "one.json").write_text(json.dumps({
+    (deck / "slides" / "one.json").write_text(json.dumps({
         "layout": "Title Only", "placeholders": {"title": "Hello"}, "notes": "",
         "elements": [{"_comment": "region: body", "x": 96, "y": 210, "w": 1728, "h": 640},
                      {"_comment": "--- section ---"}],
