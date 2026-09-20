@@ -125,7 +125,7 @@ def execute_in_sandbox(
 
         # Inject shared sandbox helpers (read_json / write_json / ...) so user
         # code can use the same API on Local and Cloud.
-        _inject_helpers(client, session_id)
+        _inject_helpers(client, session_id, has_workspace=bool(deck_id))
 
         # Execute user code (prefixed with helper import so agents can use
         # read_json / write_json / ... without an explicit import).
@@ -324,14 +324,29 @@ def _save_deck_workspace(
     return outline_warnings, lint_diagnostics, sorted(file_map.keys())
 
 
-def _inject_helpers(client: Any, session_id: str) -> None:
+_NO_WORKSPACE_GUARD = '''
+
+def _no_workspace(*_args, **_kwargs):
+    raise RuntimeError(
+        "No deck workspace is loaded (run_python was called without deck_id); "
+        "file writes here are discarded. Pass deck_id to persist files."
+    )
+
+write_json = _no_workspace
+write_text = _no_workspace
+'''
+
+
+def _inject_helpers(client: Any, session_id: str, has_workspace: bool = True) -> None:
     """Write the shared helper module into the sandbox cwd.
 
     Runs after _upload_deck_workspace so `_sdpm_helpers.py` sits alongside
     the deck files. User code gets these helpers via the `_HELPERS_IMPORT`
-    prefix prepended to every invocation in `execute_in_sandbox`.
+    prefix prepended to every invocation in `execute_in_sandbox`. Without a
+    workspace the write helpers raise instead of writing into the void.
     """
-    _write_files(client, session_id, [{"path": "_sdpm_helpers.py", "text": _HELPERS_PY}])
+    text = _HELPERS_PY if has_workspace else _HELPERS_PY + _NO_WORKSPACE_GUARD
+    _write_files(client, session_id, [{"path": "_sdpm_helpers.py", "text": text}])
 
 
 def _write_files(client: Any, session_id: str, content: list[dict[str, str]]) -> None:
