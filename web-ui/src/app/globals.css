@@ -940,11 +940,18 @@ body {
   color: var(--agent-layout);
   background: color-mix(in oklch, var(--background) 70%, transparent);
   font: 500 11px var(--font-geist-mono), ui-monospace, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
   opacity: 0;
   transition: opacity 0.35s;
 }
 .asp-region-label.asp-region-on {
   opacity: 1;
+}
+.asp-region-label.asp-region-label-hidden {
+  display: none;
 }
 .asp-region-label.asp-region-filled {
   opacity: 0;

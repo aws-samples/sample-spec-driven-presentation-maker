@@ -51,19 +51,21 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
 **Layout pass** — `task_instruction` exactly `Layout pass.`
 You are the only composer that sees every slide; the deck's layout is decided here, once, and
 the content composers work inside it. From the outline (headline, `body`, `visual` of every
-slide) and `specs/art-direction.html`, decide for each slide its `layout`, the frame elements
-the style calls for, and the regions its content will occupy — one body area, two columns,
-three steps, media beside text — written as named `_comment` elements
-(`{"_comment": "region: <name>", "x", "y", "w", "h"}`) at the head of `elements`. Derive all
-coordinates from one grid (margins, gutters — the `grid` tool computes them), so the same kind
-of expression gets the same region set across the deck. Do not write content — text, images,
-charts belong to the content composers.
+slide) and `specs/art-direction.html`, write for each slide its `layout`, the frame — every
+element the style repeats across slides (decoration, title band, section label) with the
+slide's title and section taken from the outline — and the regions its content will occupy —
+one body area, two columns, three steps, media beside text — as named `_comment` elements
+(`{"_comment": "region: body", "x": 96, "y": 210, "w": 1728, "h": 640}`) at the head of
+`elements`. The name is shown as a label in the Web UI: a short identifier (`body`, `step-1`,
+`media`), nothing else. Derive all coordinates from one grid (margins, gutters — the `grid`
+tool computes them), so the same kind of expression gets the same region set across the deck.
+The body — text, images, charts, tables — belongs to the content composers.
 Write every slide in one `run_python` call: a few layout functions and a plan list, looped —
-the JSON is emitted once, not per slide. Regions are invisible in previews; what a preview
-shows at this stage is the frame, and the frame is identical within a layout, so
-`measure_slides` with one slug per layout is enough. If the frame is wrong, change the
-functions and re-run the loop. Per-slide adjustments — a title that runs long, a tight fit —
-are the content composer's, not yours. Every assigned slug gets a file.
+the JSON is emitted once, not per slide. Regions are invisible in previews; a preview shows
+the frame elements only, and the frame is identical within a layout, so `measure_slides` with
+one slug per layout is enough. If the frame is wrong, change the functions and re-run the
+loop. Per-slide adjustments — a title that runs long, a tight fit — are the content
+composer's, not yours. Every assigned slug gets a file.
 
 Anything else is an instruction to compose or fix the assigned slides.
 

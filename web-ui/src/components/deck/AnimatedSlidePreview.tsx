@@ -301,6 +301,10 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             label.textContent = region.name
             label.style.left = `${(region.x * regionScale / vb[2]) * 100}%`
             label.style.top = `${(region.y * regionScale / vb[3]) * 100}%`
+            // Clamp to the region so long names never spill into neighbours; skip the
+            // label entirely when the region is too small to hold one line.
+            label.style.maxWidth = `calc(${(region.w * regionScale / vb[2]) * 100}% - 12px)`
+            if (region.w < 120 || region.h < 40) label.classList.add("asp-region-label-hidden")
             regionOverlay.appendChild(label)
 
             if (!regionAnimTargets.has(i) || reducedMotion.current) {

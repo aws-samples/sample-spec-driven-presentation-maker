@@ -69,6 +69,30 @@ describe("AnimatedSlidePreview layout regions", () => {
     expect(hero?.querySelector("rect")?.getAttribute("vector-effect")).toBe("non-scaling-stroke")
   })
 
+  it("clamps labels to the region width and hides them for tiny regions", async () => {
+    mockFetch({
+      version: 1,
+      viewBox: "0 0 1920 1080",
+      bgFill: "#000",
+      bgSvg: null,
+      components: [],
+      regions: [
+        { name: "a-very-long-region-name-that-would-spill-over", x: 96, y: 200, w: 480, h: 300 },
+        { name: "tiny", x: 1500, y: 900, w: 60, h: 20 },
+      ],
+    })
+
+    const { container } = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose.json" />
+    )
+
+    await waitFor(() => expect(container.querySelectorAll(".asp-region-label")).toHaveLength(2))
+    const long = container.querySelector('.asp-region-label[data-region-name^="a-very"]') as HTMLElement
+    expect(long.style.maxWidth).toBe("calc(25% - 12px)")
+    const tiny = container.querySelector('.asp-region-label[data-region-name="tiny"]') as HTMLElement
+    expect(tiny.classList.contains("asp-region-label-hidden")).toBe(true)
+  })
+
   it("renders no region layer when compose data omits regions", async () => {
     mockFetch({
       version: 1,
