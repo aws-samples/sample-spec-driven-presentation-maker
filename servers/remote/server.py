@@ -692,10 +692,10 @@ def _post_processing_plan(deck_changed: bool, measure_slides: list[str] | None) 
 
 
 @mcp.tool()
-def run_python(purpose: str, code: str, deck_id: str | None = None, measure_slides: list[str] | None = None) -> str:
+def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a sandbox whose working directory is the deck workspace.
 
-    Workspace (when deck_id is given):
+    Workspace:
         deck.json                 — template, fonts, defaultTextColor, slideSize
         slides/{slug}.json        — one file per slide
         specs/brief.md            — brief
@@ -715,31 +715,36 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, measure_slid
     overflow measurement, lint, layout bias, live preview) for those slugs only — pass the
     slugs you edited.
 
+    Example: run_python(purpose="Fix the title", code=..., deck_id="abc12345",
+    measure_slides=["title"])
+
     Args:
         code: Python code to execute.
-        deck_id: Deck ID. Optional; without it the code runs with no workspace.
-        measure_slides: Slugs to measure after execution. Requires deck_id.
+        deck_id: Deck ID (from init_presentation).
+        measure_slides: Slugs to measure after execution.
         purpose: Brief user-facing description of what this code does,
             written in the user's language. Shown in the UI.
 
     Returns:
         JSON string: {"output", "measure"?, "errors"?, "warnings"?}
     """
-    if measure_slides and not deck_id:
-        return json.dumps({"error": "measure_slides requires deck_id"})
+    if not deck_id:
+        return json.dumps({
+            "error": "deck_id is required: run_python runs inside a deck workspace "
+                     "(create one with init_presentation first)."
+        })
 
     result: dict = {}
 
     # Writes persist by default. If the user only has read access, run the
     # sandbox without write-back instead of failing (read-only analysis).
     persist_writes = True
-    if deck_id:
-        try:
-            _check_deck_access(deck_id, action="edit_slide")
-        except ValueError:
-            _check_deck_access(deck_id, action="read")
-            persist_writes = False
-            result["readOnly"] = "You have read-only access to this deck: file writes were not persisted."
+    try:
+        _check_deck_access(deck_id, action="edit_slide")
+    except ValueError:
+        _check_deck_access(deck_id, action="read")
+        persist_writes = False
+        result["readOnly"] = "You have read-only access to this deck: file writes were not persisted."
 
     output, outline_warnings, lint_diagnostics, changed_paths = sandbox_mod.execute_in_sandbox(
         code=code,
@@ -765,7 +770,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, measure_slid
     # (and ONLY measure_slides) triggers the expensive verification pass.
     deck_changed = any(_build_relevant(p) for p in changed_paths)
     plan = _post_processing_plan(deck_changed, measure_slides)
-    if deck_id and plan["build"]:
+    if plan["build"]:
         import shutil
         import traceback
 

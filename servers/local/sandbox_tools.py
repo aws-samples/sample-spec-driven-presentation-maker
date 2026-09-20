@@ -15,24 +15,15 @@ from pathlib import Path
 from typing import Any
 
 
-def _rejection_message(violations: list[str], has_deck: bool) -> str:
+def _rejection_message(violations: list[str]) -> str:
     """Build an error message that helps the LLM rewrite rejected code."""
     lines = ["Code rejected by sandbox:"]
     lines.extend(f"  {v}" for v in violations)
-    if has_deck:
-        lines.append("")
-        lines.append("Use sandbox functions instead:")
-        lines.append("  read_json(path) → dict    write_json(path, data)")
-        lines.append("  read_text(path) → str     write_text(path, text)")
-        lines.append('  list_files(subdir=".") → list[str]')
-        lines.append("")
-        lines.append("Example:")
-        lines.append('  data = read_json("slides/title.json")')
-        lines.append('  data["elements"][0]["text"] = "New Title"')
-        lines.append('  write_json("slides/title.json", data)')
-    else:
-        lines.append("")
-        lines.append("Only print and built-in functions are available (no file I/O).")
+    lines.append("")
+    lines.append("Use sandbox functions instead:")
+    lines.append("  read_json(path) → dict    write_json(path, data)")
+    lines.append("  read_text(path) → str     write_text(path, text)")
+    lines.append('  list_files(subdir=".") → list[str]')
     return "\n".join(lines)
 
 
@@ -58,48 +49,54 @@ def _build_snapshot(deck_dir: Path) -> dict[str, tuple[int, int]]:
     return snap
 
 
-def run_python(purpose: str, code: str, deck_id: str = "",
+def run_python(purpose: str, code: str, deck_id: str,
                measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a restricted sandbox whose working directory is the deck.
 
     `import` and `open()` are not available; standard builtins (print, len, range,
-    sorted, min/max, zip, …) are. With deck_id, these helpers are available and paths
-    are relative to the deck directory (access outside it is denied):
+    sorted, min/max, zip, …) are. Helpers, with paths relative to the deck directory
+    (access outside it is denied):
         read_json(path), write_json(path, data), read_text(path), write_text(path, text),
         list_files(subdir=".")
-    Without deck_id only computation and print are possible.
 
     Writes persist immediately. output.pptx rebuilds automatically when deck.json,
     slides/, includes/ or specs/outline.md changed. measure_slides runs the verification
     pass (render, text overflow measurement, preview PNGs) for those slugs only — pass
     the slugs you edited.
 
+    Example: run_python(purpose="Fix the title", code=..., deck_id="/path/to/deck",
+    measure_slides=["title"])
+
     Args:
         purpose: Brief user-facing description of what this code does. Shown in UI.
         code: Python code to execute (no import statements).
-        deck_id: Deck output_dir path. Optional.
+        deck_id: Deck output_dir path (from init_presentation).
         measure_slides: Slide slugs to measure after execution (e.g. ["title", "feature-a"]).
 
     Returns:
         JSON: {"output", "measure"?, "pptx"?, "preview"?, "compose"?}
     """
     result: dict[str, Any] = {}
-    cwd = deck_id if deck_id and Path(deck_id).is_dir() else None
+    if not deck_id or not Path(deck_id).is_dir():
+        result["error"] = (
+            f"deck directory not found: {deck_id!r}. run_python runs inside a deck "
+            "workspace — pass the output_dir returned by init_presentation."
+        )
+        return json.dumps(result, ensure_ascii=False)
+    cwd = deck_id
 
     from sandbox import check_code, make_runner
 
     violations = check_code(code)
     if violations:
-        result["output"] = _rejection_message(violations, has_deck=bool(cwd))
+        result["output"] = _rejection_message(violations)
         return json.dumps(result, ensure_ascii=False)
 
-    pre_snap = _build_snapshot(Path(cwd)) if cwd else {}
+    pre_snap = _build_snapshot(Path(cwd))
 
     try:
-        runner = make_runner(deck_id if cwd else "")
-        args = [sys.executable, "-c", runner]
-        if cwd:
-            args.append(deck_id)
+        runner = make_runner(deck_id)
+        args = [sys.executable, "-c", runner, deck_id]
         proc = subprocess.run(
             args, input=code,
             capture_output=True, text=True, timeout=120, cwd=cwd,

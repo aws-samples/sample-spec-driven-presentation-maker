@@ -11,7 +11,7 @@ flag — one shape for every model.
 
 from typing import Any
 
-from strands.hooks import BeforeModelCallEvent, BeforeToolCallEvent, HookProvider, HookRegistry
+from strands.hooks import BeforeModelCallEvent, HookProvider, HookRegistry
 
 _PLACEHOLDER = "(image returned by the tool; see the attached image below)"
 
@@ -84,39 +84,3 @@ class LiftToolResultImages(HookProvider):
     def _on_before_model_call(self, event: BeforeModelCallEvent) -> None:
         lift_tool_result_images(event.agent.messages)
 
-
-# Tools whose deck_id must be the deck the composer was dispatched for.
-DECK_SCOPED_TOOLS = frozenset({
-    "run_python", "generate_pptx", "get_preview", "check_specs",
-    "code_to_slide", "import_attachment", "apply_style",
-})
-
-
-def pin_deck_id(tool_use: dict[str, Any], deck_id: str, names: frozenset[str] = DECK_SCOPED_TOOLS) -> bool:
-    """Force ``deck_id`` on a deck-scoped tool call; return True when it was changed.
-
-    A composer that omits deck_id on run_python gets a sandbox with no workspace and
-    its writes vanish silently, so the harness pins the value it already knows.
-    """
-    if tool_use.get("name") not in names:
-        return False
-    params = tool_use.setdefault("input", {})
-    if not isinstance(params, dict):
-        return False
-    if params.get("deck_id") == deck_id:
-        return False
-    params["deck_id"] = deck_id
-    return True
-
-
-class PinDeckId(HookProvider):
-    """Pin the dispatched deck_id on every deck-scoped tool call of a composer."""
-
-    def __init__(self, deck_id: str) -> None:
-        self._deck_id = deck_id
-
-    def register_hooks(self, registry: HookRegistry, **kwargs: Any) -> None:
-        registry.add_callback(BeforeToolCallEvent, self._on_before_tool_call)
-
-    def _on_before_tool_call(self, event: BeforeToolCallEvent) -> None:
-        pin_deck_id(event.tool_use, self._deck_id)

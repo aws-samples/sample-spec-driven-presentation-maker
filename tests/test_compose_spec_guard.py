@@ -44,7 +44,7 @@ def _load_composer(monkeypatch):
         log_slides_composed=lambda **_kwargs: None,
         log_usage=lambda **_kwargs: None,
     )
-    _stub_module(monkeypatch, "message_hooks", LiftToolResultImages=object, PinDeckId=lambda deck_id: deck_id)
+    _stub_module(monkeypatch, "message_hooks", LiftToolResultImages=object)
     _stub_module(monkeypatch, "modes", MODES={})
     _stub_module(
         monkeypatch,

@@ -22,6 +22,12 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **`run_python` requires `deck_id`** — the sandbox always runs inside a deck
+  workspace. The workspace-less "calculation" mode is gone: on the cloud it accepted
+  file writes and discarded them silently (a composer lost a whole scaffold pass this
+  way), on the local server it could not write at all. Create the deck with
+  `init_presentation` first, then compute. Also new: `check_specs` validates
+  deck.json and outline.md before composing (`compose_slides` runs it first).
 - **Web UI Spec / Vibe and "Parallel agents" keep their behaviour without personas** —
   the orchestrator workflow defines two tokens, `Interaction mode: dialogue` (the user
   wants to shape the deck in conversation) and `Interaction mode: fast` (build from material);

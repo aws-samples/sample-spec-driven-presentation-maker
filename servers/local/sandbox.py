@@ -96,28 +96,12 @@ exec(code, {"__builtins__": _safe_builtins, "__name__": "__main__",
      "list_files": list_files})
 '''
 
-_RUNNER_NO_DECK = '''\
-import sys
-
-_safe_builtins = {
-    "print": print, "len": len, "range": range, "enumerate": enumerate,
-    "sorted": sorted, "isinstance": isinstance, "type": type,
-    "str": str, "int": int, "float": float, "bool": bool,
-    "list": list, "dict": dict, "tuple": tuple, "set": set,
-    "min": min, "max": max, "sum": sum, "abs": abs, "round": round,
-    "any": any, "all": all, "zip": zip, "map": map, "filter": filter,
-    "reversed": reversed, "repr": repr,
-    "True": True, "False": False, "None": None,
-}
-
-code = sys.stdin.read()
-exec(code, {"__builtins__": _safe_builtins, "__name__": "__main__"})
-'''
 
 
 def make_runner(deck_id: str) -> str:
     """Return the runner script. Static template — code comes via stdin."""
-    return _RUNNER_WITH_DECK if deck_id else _RUNNER_NO_DECK
+    del deck_id  # one runner: code always runs inside a deck workspace
+    return _RUNNER_WITH_DECK
 
 
 # --- Style runner ---
