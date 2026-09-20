@@ -172,9 +172,7 @@ def _check_deck_access(deck_id: str, action: str = "read") -> None:
 @mcp.tool()
 def init_presentation(name: str) -> str:
     """Initialize a presentation. Creates a deck and empty workspace in S3.
-    Call after Phase 1 hearing, before building slides.
-
-    Workflow equivalent: ``init {name}``
+    Call after the brief is written, before apply_style and slide composition.
 
     Args:
         name: Presentation name (e.g. "lambda-overview").
@@ -659,7 +657,7 @@ def run_python(purpose: str, code: str, deck_id: str | None = None, measure_slid
         slides/{slug}.json  — per-slide data
         specs/brief.md      — briefing document
         specs/art-direction.html — design direction (HTML)
-        specs/outline.md    — slide outline (1 line = 1 slide = 1 message)
+        specs/outline.md    — slide outline (chapters; one line per slide with body / visual / evidence)
         includes/           — code block JSON files (created by code_to_slide)
         attachments/        — imported files (CSV, JSON, Markdown) via import_attachment
 

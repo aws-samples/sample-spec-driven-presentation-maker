@@ -226,8 +226,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         parent_tool_use_id = tool_context.tool_use["toolUseId"]
 
         # Pre-check: verify required spec files exist before launching composers.
-        # Missing files indicate an incomplete Phase 1 — return the earliest
-        # workflow instruction so the SPEC agent resumes from the right sub-phase.
+        # Missing files mean the specs are incomplete — tell the orchestrator
+        # what is missing so it finishes them before composing.
         if mcp_client:
             check_code = (
                 "import os, json\n"

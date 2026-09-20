@@ -194,7 +194,7 @@ def list_templates() -> dict[str, Any]:
 def read_examples(names: list[str]) -> dict[str, Any]:
     """Read design examples (components and styles).
 
-    Without specifier returns a listing of slide descriptions.
+    Names: "components/all" (the component vocabulary) or "styles/<style-name>".
 
     Args:
         names: List of example names to read.
@@ -431,7 +431,7 @@ def arch_diagram(
 def diff_pptx(baseline: str, edited: str) -> dict[str, Any]:
     """Compare a deck with a hand-edited PPTX and report the changes.
 
-    Use for hand-edit sync (Workflow C): the user edited the generated PPTX
+    Use for hand-edit sync (guide `hand-edit-sync`): the user edited the generated PPTX
     in PowerPoint and asks for further changes. Apply the reported hand-edits
     to the deck's slide JSON before editing/regenerating — otherwise they are
     lost on the next generate_pptx.
