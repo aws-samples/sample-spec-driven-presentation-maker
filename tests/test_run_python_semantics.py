@@ -743,3 +743,29 @@ def test_remote_tools_run_off_the_event_loop():
     run_python = next(t for t in tools if t.name == "run_python")
     assert set(run_python.parameters["properties"]) == {"purpose", "code", "deck_id", "measure_slides"}
     assert "deck_id" in run_python.parameters["required"]
+
+
+def test_get_preview_waits_for_pending_background_previews(monkeypatch):
+    """A composer calling get_preview right after run_python blocks until the
+    background preview task for that deck has finished (same process)."""
+    import threading
+    import time as _time
+
+    order = []
+    ev = remote_server._register_pending_preview("d9")
+
+    def finish_later():
+        _time.sleep(0.2)
+        order.append("bg-done")
+        remote_server._clear_pending_preview("d9", ev)
+
+    threading.Thread(target=finish_later, daemon=True).start()
+    t0 = _time.monotonic()
+    remote_server._wait_for_pending_previews("d9", timeout=5)
+    order.append("waited")
+    assert order == ["bg-done", "waited"]
+    assert _time.monotonic() - t0 >= 0.2
+    # nothing pending → returns immediately
+    t1 = _time.monotonic()
+    remote_server._wait_for_pending_previews("d9", timeout=5)
+    assert _time.monotonic() - t1 < 0.05

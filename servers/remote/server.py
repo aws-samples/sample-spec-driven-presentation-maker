@@ -66,6 +66,46 @@ def _run_in_background(target, *, name: str) -> None:
     threading.Thread(target=target, name=name, daemon=True).start()
 
 
+# Background work that get_preview may need to wait for. Keyed by deck so a
+# composer asking for previews right after run_python (same session, same
+# process) blocks until its previews are on S3 instead of seeing a stale or
+# missing image. Entries are removed when the task finishes.
+_pending_previews: dict[str, set[threading.Event]] = {}
+_pending_lock = threading.Lock()
+
+
+def _register_pending_preview(deck_id: str) -> threading.Event:
+    ev = threading.Event()
+    with _pending_lock:
+        _pending_previews.setdefault(deck_id, set()).add(ev)
+    return ev
+
+
+def _clear_pending_preview(deck_id: str, ev: threading.Event) -> None:
+    ev.set()
+    with _pending_lock:
+        evs = _pending_previews.get(deck_id)
+        if evs:
+            evs.discard(ev)
+            if not evs:
+                _pending_previews.pop(deck_id, None)
+
+
+def _wait_for_pending_previews(deck_id: str, timeout: float = 90.0) -> None:
+    deadline = time.monotonic() + timeout
+    while True:
+        with _pending_lock:
+            evs = list(_pending_previews.get(deck_id, ()))
+        if not evs:
+            return
+        for ev in evs:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                logger.warning("get_preview: background previews for %s still running after %.0fs", deck_id, timeout)
+                return
+            ev.wait(remaining)
+
+
 def offloaded_tool(fn):
     """Register ``fn`` as an MCP tool that runs in a worker thread.
 
@@ -490,6 +530,7 @@ def get_preview(deck_id: str, slugs: list[str], quality: str = "high") -> list:
     _check_deck_access(deck_id, action="preview")
     if not slugs:
         return [{"type": "text", "text": "Error: slugs must not be empty"}]
+    _wait_for_pending_previews(deck_id)
     if quality not in ("low", "high"):
         quality = "high"
     try:
@@ -1011,9 +1052,35 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                 # The task owns tmpdir and removes it when done.
                 _bg_t0 = time.monotonic()
                 _bg_slugs = list(measure_slides or [])
+                _pending_event = _register_pending_preview(deck_id)
 
                 def _finish_compose_and_previews() -> None:
                     try:
+                        # Previews first: the composer's next get_preview waits on
+                        # _pending_event, so the images must be on S3 as early as
+                        # possible; compose (Web UI) follows.
+                        if measure_slides:
+                            try:
+                                from tools.generate import generate_previews_for_pages
+
+                                preview_dir = tmpdir / "preview_out"
+                                preview_dir.mkdir(exist_ok=True)
+                                wanted = {s: slug_to_page[s] for s in measure_slides if slug_to_page.get(s)}
+                                webp_by_page = generate_previews_for_pages(pptx_path, preview_dir, list(wanted.values()))
+                                uploaded = []
+                                for slug, page in wanted.items():
+                                    if page in webp_by_page:
+                                        _storage.upload_file(
+                                            key=f"previews/{deck_id}/{slug}_{_prepare_epoch}.webp",
+                                            data=webp_by_page[page].read_bytes(),
+                                            content_type="image/webp",
+                                        )
+                                        uploaded.append(slug)
+                                logger.info("previews uploaded for %s: %s", deck_id, ", ".join(uploaded))
+                            except Exception:
+                                logger.warning("preview generation failed", exc_info=True)
+                        _clear_pending_preview(deck_id, _pending_event)
+
                         # Only generates compose for measure_slides slugs (parallel-safe).
                         # Uses _prepare_epoch (snapshot time) so the composer with the
                         # newest slides/ snapshot wins on defs via epoch comparison.
@@ -1163,31 +1230,8 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                         except Exception:
                             logger.error("compose failed", exc_info=True)
 
-                        # Preview: sync WebP generation so composer can immediately view
-                        # via get_preview(slugs=[...]) — lowers the barrier from a
-                        # 2-step (generate_pptx → get_preview) to 1-step feedback loop.
-                        if measure_slides:
-                            try:
-                                from tools.generate import generate_previews_for_pages
-
-                                preview_dir = tmpdir / "preview_out"
-                                preview_dir.mkdir(exist_ok=True)
-                                wanted = {s: slug_to_page[s] for s in measure_slides if slug_to_page.get(s)}
-                                webp_by_page = generate_previews_for_pages(pptx_path, preview_dir, list(wanted.values()))
-                                uploaded = []
-                                for slug, page in wanted.items():
-                                    if page in webp_by_page:
-                                        _storage.upload_file(
-                                            key=f"previews/{deck_id}/{slug}_{_prepare_epoch}.webp",
-                                            data=webp_by_page[page].read_bytes(),
-                                            content_type="image/webp",
-                                        )
-                                        uploaded.append(slug)
-                                logger.info("previews uploaded for %s: %s", deck_id, ", ".join(uploaded))
-                            except Exception:
-                                logger.warning("preview generation failed", exc_info=True)
-
                     finally:
+                        _clear_pending_preview(deck_id, _pending_event)
                         shutil.rmtree(tmpdir, ignore_errors=True)
                         logger.info(
                             "run_python background compose/previews for deck %s took %.1fs",
