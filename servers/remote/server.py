@@ -15,7 +15,7 @@ To use a custom backend, replace AwsStorage with your Storage ABC implementation
 import json
 import logging
 import os
-import pathlib
+import threading
 import re
 import sys
 import time
@@ -61,68 +61,6 @@ mcp = FastMCP(
 )
 
 
-_diag_done = False
-_diag_lock = __import__("threading").Lock()
-
-
-def _first_call_diagnostics() -> None:
-    """TEMPORARY (2026-09-20): time the pieces of a LibreOffice start once per
-    process, on the first tool call after a V2 restore. Remove after the
-    first-run 60s is understood."""
-    global _diag_done
-    with _diag_lock:
-        if _diag_done:
-            return
-        _diag_done = True
-    import shutil
-    import socket
-    import subprocess
-    import tempfile
-
-    if not shutil.which("soffice"):
-        return
-    out = []
-
-    def timed(label, fn):
-        t0 = time.monotonic()
-        try:
-            r = fn()
-        except Exception as e:  # noqa: BLE001
-            r = f"ERR {type(e).__name__}: {e}"
-        out.append(f"{label}={time.monotonic() - t0:.1f}s({str(r)[:60]})")
-
-    timed("gethostname", socket.gethostname)
-    timed("resolve_hostname", lambda: socket.gethostbyname(socket.gethostname()))
-    timed("resolve_localhost", lambda: socket.gethostbyname("localhost"))
-
-    def read_program_dir():
-        prog = pathlib.Path(shutil.which("soffice")).resolve().parent
-        n = 0
-        for f in prog.glob("*.so*"):
-            n += len(f.read_bytes())
-        return f"{n / 1e6:.0f}MB"
-
-    import pathlib
-    timed("read_program_dir", read_program_dir)
-
-    with tempfile.TemporaryDirectory() as tmp:
-        env = os.environ.copy()
-        env["HOME"] = tmp
-        timed("soffice_version", lambda: subprocess.run(
-            ["soffice", "--headless", "--version"], capture_output=True, timeout=180, env=env,
-        ).stdout.decode(errors="replace").strip())
-        timed("soffice_version_again", lambda: subprocess.run(
-            ["soffice", "--headless", "--version"], capture_output=True, timeout=180, env=env,
-        ).returncode)
-        from sdpm.config import TEMPLATES_DIR
-        sample = TEMPLATES_DIR / "blank-light.pptx"
-        timed("convert_blank_pdf", lambda: subprocess.run(
-            ["soffice", "--headless", "--convert-to", "pdf", "--outdir", tmp, str(sample)],
-            capture_output=True, timeout=180, env=env,
-        ).returncode)
-    logger.info("post-restore diagnostics: %s", " ".join(out))
-
-
 def offloaded_tool(fn):
     """Register ``fn`` as an MCP tool that runs in a worker thread.
 
@@ -141,7 +79,6 @@ def offloaded_tool(fn):
     import inspect
 
     async def _runner(**kwargs):
-        await asyncio.to_thread(_first_call_diagnostics)
         return await asyncio.to_thread(functools.partial(fn, **kwargs))
 
     _runner.__name__ = fn.__name__
@@ -154,6 +91,69 @@ def offloaded_tool(fn):
 
 # --- HTTP Request ContextVar (for extracting user_id from Runtime header) ---
 _current_request_headers: ContextVar[dict] = ContextVar("_current_request_headers", default={})
+
+
+# --- LibreOffice warm-up per MCP session ---
+#
+# AgentCore Runtime platform V2 restores every microVM from a snapshot, and the
+# restored root filesystem is lazily fetched: the first read of each file is
+# slow (measured 2026-09-20: reading LibreOffice's 166 MB of .so took 2-16 s,
+# the first `soffice --version` 13.5 s, the first conversion 20 s more — about
+# 60 s in total; the second run 3 s). Warming before the snapshot does not help
+# because the page cache is not restored. So the warm-up runs after restore:
+# each MCP session maps to one microVM, and the session's `initialize` request
+# (the only POST /mcp without an Mcp-Session-Id header) is the earliest moment
+# we know the microVM is in use. One background conversion of a blank template
+# touches exactly the files a real conversion needs, well before the composer
+# reaches its first run_python.
+
+_warmup_lock = threading.Lock()
+_warmup_running = False
+_warmup_last_done = 0.0
+_WARMUP_MIN_INTERVAL_S = 300.0
+
+
+def _soffice_warm_up() -> None:
+    global _warmup_running, _warmup_last_done
+    import shutil
+    import subprocess
+    import tempfile
+
+    try:
+        if not shutil.which("soffice"):
+            return
+        from sdpm.config import TEMPLATES_DIR
+
+        sample = TEMPLATES_DIR / "blank-light.pptx"
+        if not sample.exists():
+            return
+        t0 = time.monotonic()
+        with tempfile.TemporaryDirectory() as tmp:
+            env = os.environ.copy()
+            env["HOME"] = tmp
+            r = subprocess.run(
+                ["soffice", "--headless", "--convert-to", "pdf", "--outdir", tmp, str(sample)],
+                capture_output=True, timeout=180, env=env, check=False,
+            )
+        logger.info("soffice warm-up took %.1fs rc=%s", time.monotonic() - t0, r.returncode)
+        _warmup_last_done = time.time()
+    except Exception as e:  # noqa: BLE001 - best effort, never affects requests
+        logger.warning("soffice warm-up failed: %s", e)
+    finally:
+        with _warmup_lock:
+            _warmup_running = False
+
+
+def _maybe_start_soffice_warm_up() -> None:
+    """Start a background warm-up unless one is running or recently finished."""
+    global _warmup_running
+    if os.environ.get("SDPM_SKIP_SOFFICE_WARMUP"):
+        return
+    with _warmup_lock:
+        if _warmup_running or time.time() - _warmup_last_done < _WARMUP_MIN_INTERVAL_S:
+            return
+        _warmup_running = True
+    threading.Thread(target=_soffice_warm_up, name="soffice-warmup", daemon=True).start()
 
 
 class _CaptureHeadersMiddleware:
@@ -174,6 +174,9 @@ class _CaptureHeadersMiddleware:
         """Capture headers from HTTP requests into ContextVar."""
         if scope["type"] == "http":
             headers = {k.decode(): v.decode() for k, v in scope.get("headers", [])}
+            if scope.get("method") == "POST" and "mcp-session-id" not in headers:
+                # A new MCP session is being initialized on this microVM.
+                _maybe_start_soffice_warm_up()
             token = _current_request_headers.set(headers)
             try:
                 await self.app(scope, receive, send)
@@ -1453,52 +1456,9 @@ if _kb_configured:
         return json.dumps({"results": results}, ensure_ascii=False)
 
 
-def _warm_up_soffice() -> None:
-    """Run one LibreOffice conversion before the server starts listening.
-
-    On AgentCore Runtime platform V2 the snapshot is taken at the first healthy
-    ping, and every microVM is restored from it. Measured 2026-09-20: the first
-    soffice run in a restored microVM took 63s, the second 3s (the same deck
-    took 11-19s on V1). Loading LibreOffice once here puts its pages into the
-    snapshot so restored instances start warm. Must finish well inside V2's
-    120s startup budget; a blank template converts in a few seconds.
-    """
-    import shutil
-    import subprocess
-    import tempfile
-
-    if os.environ.get("SDPM_SKIP_SOFFICE_WARMUP"):
-        return
-    if not shutil.which("soffice"):
-        return
-    from sdpm.config import TEMPLATES_DIR
-
-    sample = TEMPLATES_DIR / "blank-light.pptx"
-    if not sample.exists():
-        return
-    t0 = time.monotonic()
-    with tempfile.TemporaryDirectory() as tmp:
-        env = os.environ.copy()
-        env["HOME"] = tmp
-        try:
-            r = subprocess.run(
-                ["soffice", "--headless", "--convert-to", "pdf", "--outdir", tmp, str(sample)],
-                capture_output=True, timeout=90, env=env, check=False,
-            )
-        except (subprocess.TimeoutExpired, OSError) as e:
-            logger.warning("soffice warm-up failed: %s", e)
-            return
-        produced = (pathlib.Path(tmp) / "blank-light.pdf").exists()
-    logger.info(
-        "soffice warm-up took %.1fs rc=%s produced=%s stderr=%s",
-        time.monotonic() - t0, r.returncode, produced, r.stderr.decode(errors="replace")[-200:].strip(),
-    )
-
-
 if __name__ == "__main__":
     import uvicorn  # noqa: E402
 
-    _warm_up_soffice()
     app = mcp.streamable_http_app()
     app.add_middleware(_CaptureHeadersMiddleware)
     uvicorn.run(app, host="0.0.0.0", port=8000)
