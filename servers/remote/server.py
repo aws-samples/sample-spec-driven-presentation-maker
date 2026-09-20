@@ -810,8 +810,13 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
 
             user_id = _get_user_id()
             _prepare_epoch = int(time.time())
+            _phase: dict[str, float] = {}
+            _t = time.monotonic()
             tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
+            _phase["prepare_s3"] = time.monotonic() - _t
+            _t = time.monotonic()
             pptx_path, invalid_layouts = _build_pptx(tmpdir, slides, build_kwargs)
+            _phase["build"] = time.monotonic() - _t
             invalid_slug_set = {e["slug"] for e in invalid_layouts if e.get("slug")}
 
             # Build slug → page number mapping
@@ -827,7 +832,9 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                 # Measure
                 try:
                     if page_numbers:
+                        _t = time.monotonic()
                         measure_result = _run_measure(tmpdir, pptx_path, page_numbers, page_to_slug=page_to_slug)
+                        _phase["measure"] = time.monotonic() - _t
                         result["measure"] = measure_result
                     else:
                         result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})
@@ -861,6 +868,7 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                             "available": e["available"],
                         }
 
+            _t = time.monotonic()
             if plan["artifact"]:
                 # Refresh the download artifact — the deck's PPTX follows deck
                 # changes automatically (same upload/record shape as
@@ -919,6 +927,8 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                         except Exception:
                             pass
 
+            _phase["artifact_s3"] = time.monotonic() - _t
+            _t = time.monotonic()
             if plan["verify"]:
                 # Compose: SVG → optimized JSON for WebUI animation
                 # Only generates compose for measure_slides slugs (parallel-safe).
@@ -1109,6 +1119,12 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                 else:
                     result["pptx_error"] = f"PPTX build failed — the downloadable PPTX may be stale: {msg}"
 
+    if "_phase" in locals():
+        _phase["compose_and_previews"] = time.monotonic() - _t
+        logger.info(
+            "run_python post-processing for deck %s: %s",
+            deck_id, " ".join(f"{k}={v:.1f}s" for k, v in _phase.items()),
+        )
     return json.dumps(result, ensure_ascii=False)
 
 

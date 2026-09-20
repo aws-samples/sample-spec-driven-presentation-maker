@@ -320,7 +320,9 @@ def generate_pptx(
     """
     from sdpm.api import generate as api_generate
 
+    _t0 = time.monotonic()
     tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, storage)
+    _t_prepare = time.monotonic() - _t0
     try:
         # Rewrite deck.json so api.generate resolves exactly what the
         # workspace materialized (template file, fonts, text color).
@@ -360,6 +362,10 @@ def generate_pptx(
 
         # Preview: epoch-keyed WebP (background)
         slugs = [s.get("id") or f"slide_{i + 1:02d}" for i, s in enumerate(slides)]
+        logger.info(
+            "generate_pptx timing for deck %s: prepare_s3=%.1fs build+upload=%.1fs",
+            deck_id, _t_prepare, time.monotonic() - _t0 - _t_prepare,
+        )
         from server_utils import schedule_webp_background
         schedule_webp_background(deck_id, out, tmpdir, storage, slugs, user_id=user_id)
     except Exception:
