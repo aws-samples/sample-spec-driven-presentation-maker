@@ -25,6 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "sdpm"))
 
 import boto3  # noqa: E402
+from botocore.config import Config as BotoConfig  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from shared.authz import authorize  # noqa: E402
@@ -136,9 +137,20 @@ if not _pptx_bucket:
 if not _resource_bucket:
     raise ValueError("RESOURCE_BUCKET environment variable is required")
 
+# Bounded timeouts so a dead connection fails fast instead of holding a tool
+# call for the default 60s read timeout per attempt.
+_BOTO_CONFIG = BotoConfig(
+    connect_timeout=5,
+    read_timeout=30,
+    retries={"mode": "standard", "max_attempts": 3},
+    tcp_keepalive=True,
+)
+
+# Clients are built lazily inside the first request (see AwsStorage) so the
+# platform V2 snapshot taken after startup holds no boto3 connection state.
 _storage = AwsStorage(
-    table=boto3.resource("dynamodb", region_name=_region).Table(_table_name),
-    s3_client=boto3.client("s3", region_name=_region),
+    table_factory=lambda: boto3.resource("dynamodb", region_name=_region, config=_BOTO_CONFIG).Table(_table_name),
+    s3_factory=lambda: boto3.client("s3", region_name=_region, config=_BOTO_CONFIG),
     pptx_bucket=_pptx_bucket,
     resource_bucket=_resource_bucket,
 )
