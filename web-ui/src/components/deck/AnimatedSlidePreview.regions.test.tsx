@@ -144,4 +144,12 @@ describe("AnimatedSlidePreview layout regions", () => {
     const region = await renderRegions([picture])
     expect(region.classList.contains("asp-region-filled")).toBe(true)
   })
+
+  it("keeps the region layer pointer-transparent so slide content stays selectable", async () => {
+    const region = await renderRegions([{ ...component, text: "Body", changed: false }])
+    expect(region.getAttribute("class")).toContain("asp-region")
+    // Structural guard: the region <g> and its rect carry the classes that
+    // globals.css maps to pointer-events: none.
+    expect(region.querySelector("rect")?.getAttribute("class")).toBe("asp-region-rect")
+  })
 })
