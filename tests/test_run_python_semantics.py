@@ -505,3 +505,29 @@ def test_remote_compose_is_deferred_until_background_task_runs(remote_rig, monke
     assert len(deferred) == 1
     deferred[0]()
     assert [k for k in storage.uploads if k.startswith("decks/d1/compose/a_")]
+
+
+def test_get_preview_waits_for_pending_background_previews(monkeypatch):
+    """A composer calling get_preview right after run_python blocks until the
+    background preview task for that deck has finished (same process)."""
+    import threading
+    import time as _time
+
+    order = []
+    ev = remote_server._register_pending_preview("d9")
+
+    def finish_later():
+        _time.sleep(0.2)
+        order.append("bg-done")
+        remote_server._clear_pending_preview("d9", ev)
+
+    threading.Thread(target=finish_later, daemon=True).start()
+    t0 = _time.monotonic()
+    remote_server._wait_for_pending_previews("d9", timeout=5)
+    order.append("waited")
+    assert order == ["bg-done", "waited"]
+    assert _time.monotonic() - t0 >= 0.2
+    # nothing pending → returns immediately
+    t1 = _time.monotonic()
+    remote_server._wait_for_pending_previews("d9", timeout=5)
+    assert _time.monotonic() - t1 < 0.05
