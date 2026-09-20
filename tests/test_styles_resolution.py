@@ -453,8 +453,11 @@ def test_missing_deck_fields_flags_unfilled_text_color() -> None:
 
     deck = {"template": "blank-dark", "fonts": {"halfwidth": "", "fullwidth": ""}, "defaultTextColor": ""}
     analysis = {"fonts": {"halfwidth": "Latin", "fullwidth": "JP"}, "slide_size": {"width": 1920, "height": 1080}}
+    themed = {**analysis, "theme_colors": {"text": "#FFFFFF"}}
     dual = "<style>:root { --dark-text: #FFF; --light-text: #000; }</style>"
     single = "<style>:root { --color-text: #123456; }</style>"
     assert missing_deck_fields(merge_style_metadata(dual, analysis, deck)) == ["defaultTextColor"]
+    assert merge_style_metadata(dual, themed, deck)["defaultTextColor"] == "#FFFFFF"
+    assert merge_style_metadata(single, themed, deck)["defaultTextColor"] == "#123456"
     assert missing_deck_fields(merge_style_metadata(single, analysis, deck)) == []
     assert missing_deck_fields({}) == ["template", "defaultTextColor", "fonts", "slideSize"]

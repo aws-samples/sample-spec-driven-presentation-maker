@@ -171,8 +171,8 @@ def apply_style(
 
     Returns:
         Dict with status, path, style, changed deck.json fields under updated, and
-        missing — deck.json fields the style/template could not fill (e.g. defaultTextColor
-        when the style has no --color-text); set them yourself before composing.
+        missing — deck.json fields neither the style nor the template could fill; set them
+        yourself before composing (normally empty).
     """
     from sdpm.api import apply_style as _apply_style
 

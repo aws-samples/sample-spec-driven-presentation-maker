@@ -162,7 +162,8 @@ def merge_style_metadata(
 ) -> dict[str, Any]:
     """Merge style and template facts into deck metadata without mutating inputs.
 
-    The style's ``--color-text`` always becomes ``defaultTextColor``. Template
+    The style's ``--color-text`` always becomes ``defaultTextColor``; without it,
+    the template theme's text colour fills an empty ``defaultTextColor``. Template
     analysis fills only empty font and slide-size fields.
     """
     import re
@@ -180,6 +181,11 @@ def merge_style_metadata(
 
     if not template_analysis:
         return merged
+
+    if not merged.get("defaultTextColor"):
+        theme_text = (template_analysis.get("theme_colors") or {}).get("text")
+        if theme_text:
+            merged["defaultTextColor"] = theme_text
 
     analyzed_fonts = template_analysis.get("fonts") or {}
     if analyzed_fonts:
@@ -211,9 +217,8 @@ def merge_style_metadata(
 def missing_deck_fields(deck_json: dict[str, Any]) -> list[str]:
     """Return the deck.json fields apply_style manages that are still empty.
 
-    ``defaultTextColor`` stays empty when the style declares no ``--color-text``
-    (dual-theme styles use ``--dark-text`` / ``--light-text``), so the caller
-    must set it.
+    Normally empty: ``defaultTextColor`` comes from the style's ``--color-text``
+    or, failing that, the template theme's text colour.
     """
     missing = [key for key in ("template", "defaultTextColor") if not deck_json.get(key)]
     fonts = deck_json.get("fonts") or {}

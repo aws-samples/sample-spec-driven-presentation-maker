@@ -487,8 +487,8 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
 
     Returns:
         JSON with changed deck.json fields under updated, and missing — deck.json
-        fields the style/template could not fill (e.g. defaultTextColor when the
-        style has no --color-text); set them yourself before composing.
+        fields neither the style nor the template could fill; set them yourself
+        before composing (normally empty).
     """
     _check_deck_access(deck_id, action="edit_slide")
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", style):

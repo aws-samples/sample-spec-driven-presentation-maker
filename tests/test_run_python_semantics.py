@@ -401,7 +401,7 @@ class TestRemoteApplyStyle:
         assert saved["slideSize"]["height"] == 1080
         storage.upload_file.assert_called_once()
 
-    def test_reports_missing_text_color_for_dual_theme_style(
+    def test_dual_theme_style_takes_text_color_from_template(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -422,14 +422,16 @@ class TestRemoteApplyStyle:
             "analyze_template",
             lambda template, deck_id="": json.dumps(
                 {"fonts": {"fullwidth": "JP", "halfwidth": "Latin"},
+                 "theme_colors": {"text": "#FFFFFF", "background": "#000000"},
                  "slide_size": {"width": 1920, "height": 1080, "ptPerPx": 0.5}}
             ),
         )
 
         result = json.loads(remote_server.apply_style("deck1", "dual", "blank-dark"))
 
-        assert result["missing"] == ["defaultTextColor"]
-        assert "defaultTextColor" not in result["updated"]
+        # No --color-text in the style: the template theme's text colour fills it.
+        assert result["updated"]["defaultTextColor"] == "#FFFFFF"
+        assert result["missing"] == []
 
     def test_template_validation_failure_uploads_nothing(
         self,
