@@ -15,6 +15,7 @@ To use a custom backend, replace AwsStorage with your Storage ABC implementation
 import json
 import logging
 import os
+import pathlib
 import re
 import sys
 import time
@@ -60,6 +61,68 @@ mcp = FastMCP(
 )
 
 
+_diag_done = False
+_diag_lock = __import__("threading").Lock()
+
+
+def _first_call_diagnostics() -> None:
+    """TEMPORARY (2026-09-20): time the pieces of a LibreOffice start once per
+    process, on the first tool call after a V2 restore. Remove after the
+    first-run 60s is understood."""
+    global _diag_done
+    with _diag_lock:
+        if _diag_done:
+            return
+        _diag_done = True
+    import shutil
+    import socket
+    import subprocess
+    import tempfile
+
+    if not shutil.which("soffice"):
+        return
+    out = []
+
+    def timed(label, fn):
+        t0 = time.monotonic()
+        try:
+            r = fn()
+        except Exception as e:  # noqa: BLE001
+            r = f"ERR {type(e).__name__}: {e}"
+        out.append(f"{label}={time.monotonic() - t0:.1f}s({str(r)[:60]})")
+
+    timed("gethostname", socket.gethostname)
+    timed("resolve_hostname", lambda: socket.gethostbyname(socket.gethostname()))
+    timed("resolve_localhost", lambda: socket.gethostbyname("localhost"))
+
+    def read_program_dir():
+        prog = pathlib.Path(shutil.which("soffice")).resolve().parent
+        n = 0
+        for f in prog.glob("*.so*"):
+            n += len(f.read_bytes())
+        return f"{n / 1e6:.0f}MB"
+
+    import pathlib
+    timed("read_program_dir", read_program_dir)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        env = os.environ.copy()
+        env["HOME"] = tmp
+        timed("soffice_version", lambda: subprocess.run(
+            ["soffice", "--headless", "--version"], capture_output=True, timeout=180, env=env,
+        ).stdout.decode(errors="replace").strip())
+        timed("soffice_version_again", lambda: subprocess.run(
+            ["soffice", "--headless", "--version"], capture_output=True, timeout=180, env=env,
+        ).returncode)
+        from sdpm.config import TEMPLATES_DIR
+        sample = TEMPLATES_DIR / "blank-light.pptx"
+        timed("convert_blank_pdf", lambda: subprocess.run(
+            ["soffice", "--headless", "--convert-to", "pdf", "--outdir", tmp, str(sample)],
+            capture_output=True, timeout=180, env=env,
+        ).returncode)
+    logger.info("post-restore diagnostics: %s", " ".join(out))
+
+
 def offloaded_tool(fn):
     """Register ``fn`` as an MCP tool that runs in a worker thread.
 
@@ -78,6 +141,7 @@ def offloaded_tool(fn):
     import inspect
 
     async def _runner(**kwargs):
+        await asyncio.to_thread(_first_call_diagnostics)
         return await asyncio.to_thread(functools.partial(fn, **kwargs))
 
     _runner.__name__ = fn.__name__
@@ -1417,14 +1481,18 @@ def _warm_up_soffice() -> None:
         env = os.environ.copy()
         env["HOME"] = tmp
         try:
-            subprocess.run(
+            r = subprocess.run(
                 ["soffice", "--headless", "--convert-to", "pdf", "--outdir", tmp, str(sample)],
                 capture_output=True, timeout=90, env=env, check=False,
             )
         except (subprocess.TimeoutExpired, OSError) as e:
             logger.warning("soffice warm-up failed: %s", e)
             return
-    logger.info("soffice warm-up took %.1fs", time.monotonic() - t0)
+        produced = (pathlib.Path(tmp) / "blank-light.pdf").exists()
+    logger.info(
+        "soffice warm-up took %.1fs rc=%s produced=%s stderr=%s",
+        time.monotonic() - t0, r.returncode, produced, r.stderr.decode(errors="replace")[-200:].strip(),
+    )
 
 
 if __name__ == "__main__":
