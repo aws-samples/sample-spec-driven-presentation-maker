@@ -87,6 +87,22 @@ Entries before v0.5.0 were written retroactively as summaries.
 > **Migrating from v0.5?** See [Migration: role workflows](docs/en/migration-role-workflows.md)
 > for the full breaking-change list and upgrade steps per environment.
 
+### Fixed
+
+- **WebP previews and deck thumbnails were not generated after v0.8.1.**
+  `schedule_webp_background` relied on an asyncio event loop; tools now run on
+  worker threads, so the task silently never started and `generate_pptx`
+  produced no slide previews and no thumbnail. It runs on a daemon thread now.
+- **`get_preview` right after `run_python` could see a missing or stale image.**
+  v0.8.1 moved preview generation into a background task; `get_preview` now
+  waits for that task (per deck, up to 90s), and the task renders the
+  measured slugs' WebP before the live-preview JSON.
+- **Code Interpreter session start could stall for minutes on AgentCore V2.**
+  Every AWS client now uses a 5s connect timeout. Prompt APIs (S3, DynamoDB,
+  SSM, session start/stop, embeddings) get read 30s / 3 attempts; the user-code
+  `invoke_code_interpreter` gets read 600s and a single attempt so a stall can
+  never execute the code twice.
+
 ## [0.8.1] - 2026-09-20
 
 ### Fixed
