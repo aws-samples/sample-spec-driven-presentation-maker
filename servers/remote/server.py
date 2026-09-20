@@ -1389,9 +1389,48 @@ if _kb_configured:
         return json.dumps({"results": results}, ensure_ascii=False)
 
 
+def _warm_up_soffice() -> None:
+    """Run one LibreOffice conversion before the server starts listening.
+
+    On AgentCore Runtime platform V2 the snapshot is taken at the first healthy
+    ping, and every microVM is restored from it. Measured 2026-09-20: the first
+    soffice run in a restored microVM took 63s, the second 3s (the same deck
+    took 11-19s on V1). Loading LibreOffice once here puts its pages into the
+    snapshot so restored instances start warm. Must finish well inside V2's
+    120s startup budget; a blank template converts in a few seconds.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    if os.environ.get("SDPM_SKIP_SOFFICE_WARMUP"):
+        return
+    if not shutil.which("soffice"):
+        return
+    from sdpm.config import TEMPLATES_DIR
+
+    sample = TEMPLATES_DIR / "blank-light.pptx"
+    if not sample.exists():
+        return
+    t0 = time.monotonic()
+    with tempfile.TemporaryDirectory() as tmp:
+        env = os.environ.copy()
+        env["HOME"] = tmp
+        try:
+            subprocess.run(
+                ["soffice", "--headless", "--convert-to", "pdf", "--outdir", tmp, str(sample)],
+                capture_output=True, timeout=90, env=env, check=False,
+            )
+        except (subprocess.TimeoutExpired, OSError) as e:
+            logger.warning("soffice warm-up failed: %s", e)
+            return
+    logger.info("soffice warm-up took %.1fs", time.monotonic() - t0)
+
+
 if __name__ == "__main__":
     import uvicorn  # noqa: E402
 
+    _warm_up_soffice()
     app = mcp.streamable_http_app()
     app.add_middleware(_CaptureHeadersMiddleware)
     uvicorn.run(app, host="0.0.0.0", port=8000)
