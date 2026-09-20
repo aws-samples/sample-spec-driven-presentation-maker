@@ -19,6 +19,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -45,10 +46,12 @@ def generate_previews(pptx_path: Path, output_dir: Path) -> list[Path]:
     env["HOME"] = str(output_dir)
 
     # PPTX → PDF
+    t0 = time.monotonic()
     subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
         ["soffice", "--headless", "--convert-to", "pdf", "--outdir", str(output_dir), str(pptx_path)],
         env=env, capture_output=True, text=True, timeout=120, check=True,
     )
+    logger.info("soffice pdf export took %.1fs (%s)", time.monotonic() - t0, pptx_path.name)
     pdf_path = output_dir / pptx_path.with_suffix(".pdf").name
     if not pdf_path.exists():
         raise FileNotFoundError("LibreOffice did not produce PDF")
@@ -66,6 +69,46 @@ def generate_previews(pptx_path: Path, output_dir: Path) -> list[Path]:
         Image.open(png_path).save(webp_path, "WEBP", quality=85)
         webp_files.append(webp_path)
     return webp_files
+
+
+def generate_previews_for_pages(pptx_path: Path, output_dir: Path, pages: list[int]) -> dict[int, Path]:
+    """Render only ``pages`` (1-based) to WebP.
+
+    LibreOffice still exports the whole deck to PDF (there is no page
+    selection), but pdftoppm and the WebP encode run per requested page
+    instead of for every slide — for a 13-slide deck with 2 measured slugs
+    that is 1s instead of 9s locally.
+
+    Returns {page: webp_path}; pages beyond the PDF are skipped.
+    """
+    from PIL import Image
+
+    env = os.environ.copy()
+    env["HOME"] = str(output_dir)
+    t0 = time.monotonic()
+    subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+        ["soffice", "--headless", "--convert-to", "pdf", "--outdir", str(output_dir), str(pptx_path)],
+        env=env, capture_output=True, text=True, timeout=120, check=True,
+    )
+    logger.info("soffice pdf export took %.1fs (%s)", time.monotonic() - t0, pptx_path.name)
+    pdf_path = output_dir / pptx_path.with_suffix(".pdf").name
+    if not pdf_path.exists():
+        raise FileNotFoundError("LibreOffice did not produce PDF")
+
+    out: dict[int, Path] = {}
+    for page in sorted(set(pages)):
+        stem = output_dir / f"slide-{page}"
+        r = subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+            ["pdftoppm", "-png", "-r", "200", "-f", str(page), "-l", str(page), "-singlefile", str(pdf_path), str(stem)],
+            capture_output=True, text=True, timeout=120, check=False,
+        )
+        png_path = stem.with_suffix(".png")
+        if r.returncode != 0 or not png_path.exists():
+            continue  # page out of range
+        webp_path = png_path.with_suffix(".webp")
+        Image.open(png_path).save(webp_path, "WEBP", quality=85)
+        out[page] = webp_path
+    return out
 
 
 def _assemble_slides(tmpdir: Path) -> list[dict]:
@@ -317,7 +360,9 @@ def generate_pptx(
     """
     from sdpm.api import generate as api_generate
 
+    _t0 = time.monotonic()
     tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, storage)
+    _t_prepare = time.monotonic() - _t0
     try:
         # Rewrite deck.json so api.generate resolves exactly what the
         # workspace materialized (template file, fonts, text color).
@@ -357,6 +402,10 @@ def generate_pptx(
 
         # Preview: epoch-keyed WebP (background)
         slugs = [s.get("id") or f"slide_{i + 1:02d}" for i, s in enumerate(slides)]
+        logger.info(
+            "generate_pptx timing for deck %s: prepare_s3=%.1fs build+upload=%.1fs",
+            deck_id, _t_prepare, time.monotonic() - _t0 - _t_prepare,
+        )
         from server_utils import schedule_webp_background
         schedule_webp_background(deck_id, out, tmpdir, storage, slugs, user_id=user_id)
     except Exception:
