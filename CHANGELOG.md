@@ -10,6 +10,8 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-09-21
+
 ### Fixed
 
 - **WebP previews and deck thumbnails were not generated after v0.8.1.**
@@ -623,7 +625,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.7.0...v0.7.1

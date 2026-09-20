@@ -1,6 +1,6 @@
 {
   "name": "sdpm",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Spec-driven PowerPoint generation with a compose sub-agent (Claude Code).",
   "author": {
     "name": "aws-samples",
