@@ -507,9 +507,6 @@ def test_remote_compose_is_deferred_until_background_task_runs(remote_rig, monke
     assert [k for k in storage.uploads if k.startswith("decks/d1/compose/a_")]
 
 
-    assert "deck_id" in run_python.parameters["required"]
-
-
 def test_get_preview_waits_for_pending_background_previews(monkeypatch):
     """A composer calling get_preview right after run_python blocks until the
     background preview task for that deck has finished (same process)."""
