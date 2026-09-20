@@ -75,7 +75,7 @@ describe("AnimatedSlidePreview layout regions", () => {
       viewBox: "0 0 1920 1080",
       bgFill: "#000",
       bgSvg: null,
-      components: [],
+      components: [{ ...component, changed: false }],
       regions: [
         { name: "a-very-long-region-name-that-would-spill-over", x: 96, y: 200, w: 480, h: 300 },
         { name: "tiny", x: 1500, y: 900, w: 60, h: 20 },
