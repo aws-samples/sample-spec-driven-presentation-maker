@@ -461,3 +461,12 @@ class TestRemoteRunPythonBranching:
         storage.previous_pptx_key = None
         self._run()
         assert not storage._s3.delete_object.called
+
+
+def test_remote_tools_run_off_the_event_loop():
+    """Every remote tool is registered as an async wrapper that offloads to a thread,
+    so a long LibreOffice call cannot stall /ping and get the session killed."""
+    tools = remote_server.mcp._tool_manager.list_tools()
+    assert tools and all(t.is_async for t in tools)
+    run_python = next(t for t in tools if t.name == "run_python")
+    assert set(run_python.parameters["properties"]) == {"purpose", "code", "deck_id", "measure_slides"}

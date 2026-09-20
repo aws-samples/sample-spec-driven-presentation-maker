@@ -86,6 +86,35 @@ mcp = FastMCP(
     instructions=_INSTRUCTIONS,
 )
 
+
+def offloaded_tool(fn):
+    """Register ``fn`` as an MCP tool that runs in a worker thread.
+
+    FastMCP calls synchronous tool functions directly on the event loop, so a
+    tool that spends a minute in LibreOffice stalls every other request on
+    this server — including AgentCore's ``/ping`` health check, which then
+    marks the session unhealthy and terminates it mid-run. Offloading keeps
+    the loop free. ``asyncio.to_thread`` copies the current contextvars, so
+    the per-request headers (user id) remain visible inside the tool.
+
+    The original function is returned unchanged so it stays callable (and
+    testable) as a plain function.
+    """
+    import asyncio
+    import functools
+    import inspect
+
+    async def _runner(**kwargs):
+        return await asyncio.to_thread(functools.partial(fn, **kwargs))
+
+    _runner.__name__ = fn.__name__
+    _runner.__qualname__ = fn.__qualname__
+    _runner.__doc__ = fn.__doc__
+    _runner.__signature__ = inspect.signature(fn)  # FastMCP reads the schema from this
+    _runner.__annotations__ = dict(getattr(fn, "__annotations__", {}))
+    mcp.tool()(_runner)
+    return fn
+
 # --- HTTP Request ContextVar (for extracting user_id from Runtime header) ---
 _current_request_headers: ContextVar[dict] = ContextVar("_current_request_headers", default={})
 
@@ -196,7 +225,7 @@ def _check_deck_access(deck_id: str, action: str = "read") -> None:
 # --- Workflow Tools ---
 
 
-@mcp.tool()
+@offloaded_tool
 def init_presentation(name: str) -> str:
     """Initialize a presentation. Creates a deck and empty workspace in S3.
     Call after Phase 1 hearing, before building slides.
@@ -218,7 +247,7 @@ def init_presentation(name: str) -> str:
     )
 
 
-@mcp.tool()
+@offloaded_tool
 def analyze_template(template: str, deck_id: str = "") -> str:
     """Get pre-analyzed template information — layouts, theme colors, fonts.
     Call this to understand what layouts are available before building slides.
@@ -269,7 +298,7 @@ def analyze_template(template: str, deck_id: str = "") -> str:
 # --- Attachment Tools ---
 
 
-@mcp.tool()
+@offloaded_tool
 def read_attachment(source: str, offset: int = 0, limit: int = 10240) -> dict:
     """Read the content of an attached file (text projection with paging).
 
@@ -298,7 +327,7 @@ def read_attachment(source: str, offset: int = 0, limit: int = 10240) -> dict:
     )
 
 
-@mcp.tool()
+@offloaded_tool
 def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
     """Import a file into the deck workspace for use in slides.
 
@@ -330,7 +359,7 @@ def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
 # --- Generation Tools ---
 
 
-@mcp.tool()
+@offloaded_tool
 def generate_pptx(deck_id: str) -> str:
     """Generate final PPTX — the explicit finalize/handoff step.
 
@@ -359,7 +388,7 @@ def generate_pptx(deck_id: str) -> str:
         return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
 
 
-@mcp.tool()
+@offloaded_tool
 def get_preview(deck_id: str, slugs: list[str], quality: str = "high") -> list:
     """Get PNG preview images for visual review by the agent.
 
@@ -415,10 +444,12 @@ def _export_svg(tmpdir: Path, pptx_path: Path) -> Path:
     import subprocess
     env = os.environ.copy()
     env["HOME"] = str(tmpdir)
+    t0 = time.monotonic()
     subprocess.run(
         ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
         env=env, capture_output=True, text=True, timeout=120, check=True,
     )
+    logger.info("soffice svg export took %.1fs (%s)", time.monotonic() - t0, pptx_path.name)
     return tmpdir / "measure.svg"
 
 
@@ -438,7 +469,7 @@ def _run_measure(tmpdir: Path, pptx_path: Path, slide_numbers: list[int],
 # --- Asset Tools ---
 
 
-@mcp.tool()
+@offloaded_tool
 def search_assets(query: str = "", source_filter: str = "", limit: int = 20,
                        type_filter: str = "", theme_filter: str = "") -> str:
     """Search icons and assets by keyword, or discover available sources.
@@ -469,7 +500,7 @@ def search_assets(query: str = "", source_filter: str = "", limit: int = 20,
 # --- Reference Tools ---
 
 
-@mcp.tool()
+@offloaded_tool
 def list_styles(include_all: bool = False) -> str:
     """List available design styles for presentations.
 
@@ -485,7 +516,7 @@ def list_styles(include_all: bool = False) -> str:
     )
 
 
-@mcp.tool()
+@offloaded_tool
 def apply_style(deck_id: str, style: str) -> str:
     """Copy a style as the deck's art direction. Call during Art Direction phase.
 
@@ -527,18 +558,18 @@ def apply_style(deck_id: str, style: str) -> str:
 
 # --- Reference tools (bound from the shared contract; bundled data baked into the image) ---
 
-mcp.tool()(contract.start_presentation)
-mcp.tool()(contract.read_examples)
-mcp.tool()(contract.list_workflows)
-mcp.tool()(contract.read_workflows)
-mcp.tool()(contract.list_guides)
-mcp.tool()(contract.read_guides)
+offloaded_tool(contract.start_presentation)
+offloaded_tool(contract.read_examples)
+offloaded_tool(contract.list_workflows)
+offloaded_tool(contract.read_workflows)
+offloaded_tool(contract.list_guides)
+offloaded_tool(contract.read_guides)
 
 
 # --- Utility Tools ---
 
 
-@mcp.tool()
+@offloaded_tool
 def list_templates() -> str:
     """List all available templates with name, source, and description.
 
@@ -550,7 +581,7 @@ def list_templates() -> str:
     )
 
 
-@mcp.tool()
+@offloaded_tool
 def code_to_slide(deck_id: str, code: str, name: str,
                        language: str = "python", theme: str = "dark",
                        x: int = 0, y: int = 0,
@@ -618,7 +649,7 @@ def _post_processing_plan(deck_changed: bool,
     }
 
 
-@mcp.tool()
+@offloaded_tool
 def run_python(purpose: str, code: str, deck_id: str | None = None,
                measure_slides: list[str] | None = None) -> str:
     """Execute Python code in a secure sandbox.
@@ -1043,14 +1074,14 @@ def run_python(purpose: str, code: str, deck_id: str | None = None,
 
 # --- Layout tools (bound from the shared contract) ---
 
-mcp.tool()(contract.grid)
-mcp.tool()(contract.arch_diagram)
+offloaded_tool(contract.grid)
+offloaded_tool(contract.arch_diagram)
 
 
 # --- Style Execution (Code Interpreter) ---
 
 
-@mcp.tool()
+@offloaded_tool
 def run_style_python(purpose: str, code: str, style_name: str | None = None,
                      ref_styles: list[str] | None = None) -> str:
     """Execute Python code in a secure sandbox for style creation/editing.
@@ -1267,7 +1298,7 @@ def _get_kb_sync():
 
 if _kb_configured:
 
-    @mcp.tool()
+    @offloaded_tool
     def search_slides(
         query: str,
         scope: str = "mine",
