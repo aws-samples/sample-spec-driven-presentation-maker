@@ -913,6 +913,11 @@ body {
 @keyframes asp-region-dash {
   to { stroke-dashoffset: -240; }
 }
+/* The region layer is drawn above the slide content; it must never take
+   pointer events (a filled rect would otherwise block text selection). */
+.asp-region, .asp-region-rect {
+  pointer-events: none;
+}
 .asp-region-rect {
   fill: color-mix(in oklch, var(--agent-layout) 8%, transparent);
   stroke: var(--agent-layout);
