@@ -40,6 +40,7 @@ COPY servers/remote/tools/ servers/remote/tools/
 COPY servers/remote/storage/ servers/remote/storage/
 COPY servers/remote/server.py servers/remote/server.py
 COPY servers/remote/server_utils.py servers/remote/server_utils.py
+COPY servers/remote/boto_config.py servers/remote/boto_config.py
 RUN python3.13 -m pip install --no-cache-dir -c servers/remote/constraints.txt ./servers/remote
 
 ENV PYTHONPATH=/app
