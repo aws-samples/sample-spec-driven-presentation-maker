@@ -5,10 +5,9 @@ It runs exactly the groups you pass, once, in parallel — nothing else happens 
 pass of your workflow is therefore one call, and `instruction` is the `task_instruction` the
 workflow refers to:
 
-- scaffold — one group, all slugs, `instruction: "Scaffold pass."`
+- layout — one group, all slugs, `instruction: "Layout pass."`
 - content — several groups
-- consistency review — one group, all slugs, `instruction: "Consistency review."`
-- fixes — one group per affected slug
+- a change to one slide — one group with that slug
 
 Before dispatch, `compose_slides` validates deck.json and outline.md and returns `status: "error"` with `errors` when validation fails.
 
@@ -30,6 +29,6 @@ It returns a JSON report:
 ### Post-compose verification (this environment)
 
 You cannot see the composers' own tool results (their `preview_files` stay
-inside each composer). After the consistency-review call returns, call
+inside each composer). After the content call returns, call
 `get_preview(deck_id, slugs=[...all slugs...])` yourself to see the
-post-review rendering — this is how you look before deciding on a fix pass.
+rendering — this is how you look before deciding whether any slide needs another composer.

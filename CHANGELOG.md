@@ -22,6 +22,14 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **Compose is two passes: layout, then content** — the scaffold pass becomes the
+  **layout pass** (`task_instruction: "Layout pass."`): one composer sees every slide and
+  decides each slide's template layout, frame elements and named content regions
+  (`_comment` elements with x/y/w/h, invisible in output), derived from one grid, written
+  in one batched `run_python` call. Content composers realize their slides inside those
+  regions. The consistency-review and fixes passes are gone: layout consistency is now
+  by construction, and the orchestrator looks at previews and re-dispatches a composer
+  per slide that needs a change.
 - **`run_python` requires `deck_id`** — the sandbox always runs inside a deck
   workspace. The workspace-less "calculation" mode is gone: on the cloud it accepted
   file writes and discarded them silently (a composer lost a whole scaffold pass this

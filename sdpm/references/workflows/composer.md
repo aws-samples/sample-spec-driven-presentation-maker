@@ -33,9 +33,10 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
   `design-rules`.
 - Slugs sharing a prefix (`demo-1`, `demo-2`) are one override group: later slides inherit
   from the first via `override` (see the spec) — use it for progressive builds.
-- If `slides/<slug>.json` already exists it is the scaffold — keep its chrome (background,
-  title treatment, footer, decoration) and build the content on top.
-- Never draw page numbers as elements; the template's slide-number placeholder provides them.
+- If `slides/<slug>.json` already exists, the layout pass wrote it: keep its frame elements and
+  realize your content inside the regions it left (`_comment` elements with `x`, `y`, `w`, `h`).
+  If the content genuinely needs otherwise, deviate and say so in your summary.
+- Page numbers and footers are the template's: never draw them as elements.
 - Font sizes and colors come from the `:root` tokens of `specs/art-direction.html`. Off-token
   font sizes only warn at build time and off-token colors are not checked at all, so keep to
   the tokens yourself. No emoji in slide text — the renderer has no emoji fonts.
@@ -44,16 +45,22 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
 
 ## Modes
 
-`task_instruction` exactly `Scaffold pass.` — write an initial `slides/<slug>.json` for
-**every** assigned slug carrying the deck's shared frame: the elements derivable from the
-style and the slide's role alone (decoration, title band, section label — identical across
-slides, or parameterized per slide from the outline). If you would have to imagine a slide's
-content to place an element, it is not scaffold. Every slide gets a file, even a minimal one;
-content composers rely on that. Write them in one batch and check one preview per role.
-
-`task_instruction` exactly `Consistency review.` — read all assigned slides, fix
-cross-slide inconsistencies only (type scale, colors, spacing, terminology), leave intentional
-variation alone.
+**Layout pass** — `task_instruction` exactly `Layout pass.`
+You are the only composer that sees every slide; the deck's layout is decided here, once, and
+the content composers work inside it. From the outline (headline, `body`, `visual` of every
+slide) and `specs/art-direction.html`, decide for each slide its `layout`, the frame elements
+the style calls for, and the regions its content will occupy — one body area, two columns,
+three steps, media beside text — written as named `_comment` elements
+(`{"_comment": "region: <name>", "x", "y", "w", "h"}`) at the head of `elements`. Derive all
+coordinates from one grid (margins, gutters — the `grid` tool computes them), so the same kind
+of expression gets the same region set across the deck. Do not write content — text, images,
+charts belong to the content composers.
+Write every slide in one `run_python` call: a few layout functions and a plan list, looped —
+the JSON is emitted once, not per slide. Regions are invisible in previews; what a preview
+shows at this stage is the frame, and the frame is identical within a layout, so
+`measure_slides` with one slug per layout is enough. If the frame is wrong, change the
+functions and re-run the loop. Per-slide adjustments — a title that runs long, a tight fit —
+are the content composer's, not yours. Every assigned slug gets a file.
 
 Anything else is an instruction to compose or fix the assigned slides.
 

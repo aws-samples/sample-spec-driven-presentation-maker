@@ -51,18 +51,18 @@ task_instruction: {task_instruction}
 
 `check_specs(deck_id)` validates deck.json and outline.md; compose only when it returns ok (on the cloud stack compose_slides runs it itself).
 
-Passes, each waiting for the previous one to finish:
+Passes, the second waiting for the first to finish:
 
-1. **Scaffold** — one composer, all slugs, `task_instruction: Scaffold pass.` (exact string).
-   Produces the shared chrome so parallel composers start from one base.
+1. **Layout** — one composer, all slugs, `task_instruction: Layout pass.` (exact string). It
+   decides every slide's layout, frame and content regions, so parallel composers work inside
+   one design.
 2. **Content** — several composers in parallel, disjoint slug groups (keep prefix-sharing and
    design-coupled slides together). Composers cannot see each other, so never split a group
    that needs to agree. Instruction: compose the assigned slides from the approved specs.
-3. **Consistency review** — one composer, all slugs, `task_instruction: Consistency review.`
-   (exact string).
-4. **Fixes** (as needed) — composer output is not visible to you, so look at
-   `<deck>/preview/<slug>.png` yourself first; then one composer per affected slug, describing
-   the observed problem, not the solution.
 
-If a composer fails or is cancelled, stop the sequence and ask the user rather than retrying.
-Later edit requests go the same way as pass 4.
+Composers' own tool results are not visible to you. To see the deck, look at the previews
+yourself — `get_preview(deck_id, slugs=[...])`, or `<deck>/preview/<slug>.png` where you have
+the files. To change a slide, afterwards or on any later request, dispatch a composer for that
+slug with an instruction describing what you observed.
+
+If a composer fails or is cancelled, stop and ask the user rather than retrying.

@@ -154,8 +154,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         context=True,
         description=(
             "Dispatch composer agents for the groups given — one independent composer "
-            "per group, writing slides/<slug>.json. Runs only what you pass: scaffold, "
-            "content and consistency review are separate calls. "
+            "per group, writing slides/<slug>.json. Runs only what you pass: the layout "
+            "pass and the content pass are separate calls. "
             f"Up to {max_concurrency} groups run concurrently. "
             "Use this once outline.md is finalized.\n\n"
             "The composer reads specs/ (brief, outline, art-direction) for all content "
@@ -194,9 +194,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                                     "type": "string",
                                     "description": (
                                         "Instruction for the composer. Keep minimal:\n"
-                                        "  • Scaffold pass (first call, one group, all slugs): 'Scaffold pass.'\n"
+                                        "  • Layout pass (first call, one group, all slugs): 'Layout pass.'\n"
                                         "  • Content: 'Compose these slides following specs/'\n"
-                                        "  • Consistency review (one group, all slugs): 'Consistency review.'\n"
                                         "  • User requests: pass through the user's words as-is\n"
                                         "  • Review fixes: describe the problem, not the solution "
                                         "(e.g. 'slides X and Y lack visual consistency' not 'use timeline layout')\n"

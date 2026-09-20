@@ -20,8 +20,7 @@ _DISPATCH = re.compile(r'read_workflows\(\["([a-z-]+)"\]\)')
 _WORKFLOW_PROSE = (
     "# Role",
     "## Workflow",
-    "Scaffold pass.",
-    "Consistency review.",
+    "Layout pass.",
     "specs/brief.md",
 )
 
@@ -87,7 +86,7 @@ def test_workflow_prose_is_not_duplicated_into_entry_surfaces():
                 text = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 continue
-            for phrase in ("Scaffold pass.", "Consistency review.", "specs/brief.md"):
+            for phrase in ("Layout pass.", "specs/brief.md"):
                 if phrase in text:
                     offenders.append((str(path.relative_to(_REPO)), phrase))
     assert not offenders

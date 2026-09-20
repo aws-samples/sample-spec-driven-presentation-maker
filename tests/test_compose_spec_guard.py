@@ -90,7 +90,7 @@ def test_compose_slides_rejects_invalid_specs_before_dispatch(monkeypatch) -> No
             async for item in compose_slides(
                 deck_id="deck-1",
                 slide_groups=[
-                    {"slugs": ["intro"], "instruction": "Scaffold pass."},
+                    {"slugs": ["intro"], "instruction": "Layout pass."},
                     {"slugs": ["detail"], "instruction": "Compose content."},
                 ],
                 tool_context=tool_context,
