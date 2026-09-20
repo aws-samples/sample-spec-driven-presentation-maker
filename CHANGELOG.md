@@ -12,6 +12,11 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **Outline view as a slide storyboard** — the Web UI's outline tab shows
+  each slide as a 16:9 card: the claim as headline, the body in full, visual
+  and evidence small at the bottom; chapters (`##`) divide the deck. Grid by
+  default with a persisted column alternative. Text never drops below the
+  11px floor. Read-only for now.
 - **`sdpm-composer` skill entry point** — a fourth thin dispatcher
   (`skills/sdpm-composer`) for the role a spawned composer sub-agent plays;
   it calls `read_workflows(["composer"])` and stops. Dedicated composer
