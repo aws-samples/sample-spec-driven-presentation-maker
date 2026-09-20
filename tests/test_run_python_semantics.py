@@ -401,6 +401,36 @@ class TestRemoteApplyStyle:
         assert saved["slideSize"]["height"] == 1080
         storage.upload_file.assert_called_once()
 
+    def test_reports_missing_text_color_for_dual_theme_style(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        storage = MagicMock()
+        storage.download_file_from_pptx_bucket.return_value = (
+            b"<style>:root { --dark-text: #FFFFFF; --light-text: #000000; }</style>"
+        )
+        storage.get_deck_json.return_value = {
+            "template": "",
+            "fonts": {"fullwidth": "", "halfwidth": ""},
+            "defaultTextColor": "",
+        }
+        monkeypatch.setattr(remote_server, "_storage", storage)
+        monkeypatch.setattr(remote_server, "_check_deck_access", lambda *args, **kwargs: None)
+        monkeypatch.setattr(remote_server, "_get_user_id", lambda: "user1")
+        monkeypatch.setattr(
+            remote_server,
+            "analyze_template",
+            lambda template, deck_id="": json.dumps(
+                {"fonts": {"fullwidth": "JP", "halfwidth": "Latin"},
+                 "slide_size": {"width": 1920, "height": 1080, "ptPerPx": 0.5}}
+            ),
+        )
+
+        result = json.loads(remote_server.apply_style("deck1", "dual", "blank-dark"))
+
+        assert result["missing"] == ["defaultTextColor"]
+        assert "defaultTextColor" not in result["updated"]
+
     def test_template_validation_failure_uploads_nothing(
         self,
         monkeypatch: pytest.MonkeyPatch,

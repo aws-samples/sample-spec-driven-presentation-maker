@@ -486,7 +486,9 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
         template: Optional template name, with or without the .pptx extension.
 
     Returns:
-        JSON confirmation with changed deck.json fields under updated.
+        JSON with changed deck.json fields under updated, and missing — deck.json
+        fields the style/template could not fill (e.g. defaultTextColor when the
+        style has no --color-text); set them yourself before composing.
     """
     _check_deck_access(deck_id, action="edit_slide")
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", style):
@@ -511,7 +513,7 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
             raise FileNotFoundError(f"Style not found: {style}")
         html_bytes = builtin_path.read_bytes()
 
-    from sdpm.api import _changed_style_fields, merge_style_metadata
+    from sdpm.api import _changed_style_fields, merge_style_metadata, missing_deck_fields
 
     deck_data = _storage.get_deck_json(deck_id)
     completed = dict(deck_data)
@@ -540,6 +542,7 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
             "applied": style,
             "path": "specs/art-direction.html",
             "updated": updated,
+            "missing": missing_deck_fields(merged),
         }
     )
 

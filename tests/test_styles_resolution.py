@@ -446,3 +446,15 @@ def test_tools_apply_style_persists_template_and_analysis(
         "height": 1080,
         "ptPerPx": 0.5,
     }
+
+
+def test_missing_deck_fields_flags_unfilled_text_color() -> None:
+    from sdpm.api import merge_style_metadata, missing_deck_fields
+
+    deck = {"template": "blank-dark", "fonts": {"halfwidth": "", "fullwidth": ""}, "defaultTextColor": ""}
+    analysis = {"fonts": {"halfwidth": "Latin", "fullwidth": "JP"}, "slide_size": {"width": 1920, "height": 1080}}
+    dual = "<style>:root { --dark-text: #FFF; --light-text: #000; }</style>"
+    single = "<style>:root { --color-text: #123456; }</style>"
+    assert missing_deck_fields(merge_style_metadata(dual, analysis, deck)) == ["defaultTextColor"]
+    assert missing_deck_fields(merge_style_metadata(single, analysis, deck)) == []
+    assert missing_deck_fields({}) == ["template", "defaultTextColor", "fonts", "slideSize"]

@@ -208,6 +208,23 @@ def merge_style_metadata(
     return merged
 
 
+def missing_deck_fields(deck_json: dict[str, Any]) -> list[str]:
+    """Return the deck.json fields apply_style manages that are still empty.
+
+    ``defaultTextColor`` stays empty when the style declares no ``--color-text``
+    (dual-theme styles use ``--dark-text`` / ``--light-text``), so the caller
+    must set it.
+    """
+    missing = [key for key in ("template", "defaultTextColor") if not deck_json.get(key)]
+    fonts = deck_json.get("fonts") or {}
+    if not isinstance(fonts, dict) or not any(fonts.values()):
+        missing.append("fonts")
+    size = deck_json.get("slideSize") or {}
+    if not isinstance(size, dict) or not size.get("width") or not size.get("height"):
+        missing.append("slideSize")
+    return missing
+
+
 def _changed_style_fields(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     """Return style-managed metadata fields whose values changed."""
     return {
@@ -232,7 +249,8 @@ def apply_style(
         template: Optional template name, with or without the .pptx extension.
 
     Returns:
-        Dict with status, path, style, and changed deck.json fields under updated.
+        Dict with status, path, style, changed deck.json fields under updated, and
+        missing — deck.json fields the style/template could not fill (set them yourself).
     """
     import shutil
 
@@ -279,6 +297,7 @@ def apply_style(
         "path": str(dest),
         "style": style,
         "updated": updated,
+        "missing": missing_deck_fields(merged),
     }
 
 
