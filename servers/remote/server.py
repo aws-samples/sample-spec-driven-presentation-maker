@@ -61,6 +61,11 @@ mcp = FastMCP(
 )
 
 
+def _run_in_background(target, *, name: str) -> None:
+    """Start ``target`` on a daemon thread. Tests patch this to run inline."""
+    threading.Thread(target=target, name=name, daemon=True).start()
+
+
 def offloaded_tool(fn):
     """Register ``fn`` as an MCP tool that runs in a worker thread.
 
@@ -1007,189 +1012,203 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                             pass
 
             _phase["artifact_s3"] = time.monotonic() - _t
-            _t = time.monotonic()
             if plan["verify"]:
-                # Compose: SVG → optimized JSON for WebUI animation
-                # Only generates compose for measure_slides slugs (parallel-safe).
-                # Uses _prepare_epoch (snapshot time) so the composer with the
-                # newest slides/ snapshot wins on defs via epoch comparison.
-                try:
-                    from tools.compose import extract_optimized_defs, load_svg, split_slide_components
-                    import hashlib as _hashlib
+                # Everything the composer needs is in `result` now. The live
+                # preview JSON (compose) and the measured slugs' WebP are for
+                # the Web UI / the next get_preview, and take 5-10s; finish them
+                # in the background so the tool returns after measure.
+                # The task owns tmpdir and removes it when done.
+                _bg_t0 = time.monotonic()
+                _bg_slugs = list(measure_slides or [])
 
-                    svg_path = tmpdir / "measure.svg"
-                    if not svg_path.exists():
-                        _export_svg(tmpdir, pptx_path)
-                    if svg_path.exists():
-                        import json as _json
-                        import re as _re
+                def _finish_compose_and_previews() -> None:
+                    try:
+                        # Only generates compose for measure_slides slugs (parallel-safe).
+                        # Uses _prepare_epoch (snapshot time) so the composer with the
+                        # newest slides/ snapshot wins on defs via epoch comparison.
+                        try:
+                            from tools.compose import extract_optimized_defs, load_svg, split_slide_components
+                            import hashlib as _hashlib
 
-                        compose_prefix = f"decks/{deck_id}/compose/"
+                            svg_path = tmpdir / "measure.svg"
+                            if not svg_path.exists():
+                                _export_svg(tmpdir, pptx_path)
+                            if svg_path.exists():
+                                import json as _json
+                                import re as _re
 
-                        # List existing compose keys (for prev data + cleanup)
-                        old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
+                                compose_prefix = f"decks/{deck_id}/compose/"
 
-                        def _latest_key(prefix: str) -> str | None:
-                            best_ep, best_k = -1, None
-                            for k in old_keys:
-                                if not k.startswith(prefix):
-                                    continue
-                                m = _re.search(r"_(\d+)\.json$", k)
-                                ep = int(m.group(1)) if m else 0
-                                if ep > best_ep:
-                                    best_ep, best_k = ep, k
-                            return best_k
+                                # List existing compose keys (for prev data + cleanup)
+                                old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
 
-                        # Component-level diff helpers
-                        def _mk(c: dict) -> str:
-                            b = c.get("bbox")
-                            return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
+                                def _latest_key(prefix: str) -> str | None:
+                                    best_ep, best_k = -1, None
+                                    for k in old_keys:
+                                        if not k.startswith(prefix):
+                                            continue
+                                        m = _re.search(r"_(\d+)\.json$", k)
+                                        ep = int(m.group(1)) if m else 0
+                                        if ep > best_ep:
+                                            best_ep, best_k = ep, k
+                                    return best_k
 
-                        def _fp(c: dict) -> str:
-                            return f"{c['class']}|{c.get('text', '')}"
+                                # Component-level diff helpers
+                                def _mk(c: dict) -> str:
+                                    b = c.get("bbox")
+                                    return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
 
-                        # Determine which slugs to generate compose for
-                        # Always include slugs that have no existing compose (migration + first build)
-                        # Verify-gated: measure_slides is always set here
-                        compose_slugs = set(measure_slides)
-                        for s in slug_to_page:
-                            if not _latest_key(f"{compose_prefix}{s}_"):
-                                compose_slugs.add(s)
+                                def _fp(c: dict) -> str:
+                                    return f"{c['class']}|{c.get('text', '')}"
 
-                        # Upload defs (prepare epoch — newest snapshot wins)
-                        svg_tree = load_svg(svg_path)
-                        defs_data = extract_optimized_defs(svg_tree)
-                        _storage.upload_file(
-                            key=f"{compose_prefix}defs_{_prepare_epoch}.json",
-                            data=_json.dumps(defs_data, ensure_ascii=False).encode(),
-                            content_type="application/json",
-                        )
-                        # Cleanup old defs (only delete defs older than our epoch)
-                        # Also remove legacy slide_{N}_*.json files
-                        for k in old_keys:
-                            if "/defs_" in k:
-                                m = _re.search(r"_(\d+)\.json$", k)
-                                if m and int(m.group(1)) < _prepare_epoch:
-                                    try:
-                                        _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
-                                    except Exception:
-                                        pass
-                            elif _re.search(r"/slide_\d+_\d+\.json$", k):
-                                try:
-                                    _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
-                                except Exception:
-                                    pass
+                                # Determine which slugs to generate compose for
+                                # Always include slugs that have no existing compose (migration + first build)
+                                # Verify-gated: measure_slides is always set here
+                                compose_slugs = set(measure_slides)
+                                for s in slug_to_page:
+                                    if not _latest_key(f"{compose_prefix}{s}_"):
+                                        compose_slugs.add(s)
 
-                        # Generate compose for each measured slug
-                        def _compose_one(slug: str) -> None:
-                            if slug in invalid_slug_set:
-                                # Do not surface a fallback-rendered slide as a
-                                # live-preview artifact. The composer for this
-                                # slug will see the error and fix the layout.
-                                return
-                            pn = slug_to_page.get(slug)
-                            if not pn:
-                                return
-                            try:
-                                comp_data = split_slide_components(svg_tree, pn)
-                                from sdpm.engine.schema import extract_regions
-
-                                slide = slides[pn - 1] if pn <= len(slides) else {}
-                                comp_data["regions"] = extract_regions(slide)
-
-                                # sourceHash from slide JSON (content-based diff)
-                                src_hash = (
-                                    _hashlib.md5(
-                                        _json.dumps(slides[pn - 1], sort_keys=True, ensure_ascii=False).encode(),
-                                        usedforsecurity=False,
-                                    ).hexdigest()
-                                    if pn <= len(slides)
-                                    else ""
-                                )
-                                comp_data["sourceHash"] = src_hash
-
-                                # Diff against previous compose for same slug
-                                prev_key = _latest_key(f"{compose_prefix}{slug}_")
-                                prev_comps = None
-                                prev_hash = None
-                                if prev_key:
-                                    try:
-                                        raw = _storage.download_file_from_pptx_bucket(prev_key)
-                                        prev_data = _json.loads(raw)
-                                        prev_comps = prev_data.get("components")
-                                        prev_hash = prev_data.get("sourceHash")
-                                    except Exception:
-                                        pass
-
-                                # If sourceHash unchanged, all components are unchanged
-                                if prev_comps is not None and prev_hash == src_hash and src_hash:
-                                    for c in comp_data["components"]:
-                                        c["changed"] = False
-                                elif prev_comps is not None:
-                                    prev_map = {_mk(c): _fp(c) for c in prev_comps}
-                                    for c in comp_data["components"]:
-                                        k = _mk(c)
-                                        c["changed"] = k not in prev_map or prev_map[k] != _fp(c)
-                                else:
-                                    for c in comp_data["components"]:
-                                        c["changed"] = True
-
+                                # Upload defs (prepare epoch — newest snapshot wins)
+                                svg_tree = load_svg(svg_path)
+                                defs_data = extract_optimized_defs(svg_tree)
                                 _storage.upload_file(
-                                    key=f"{compose_prefix}{slug}_{_prepare_epoch}.json",
-                                    data=_json.dumps(comp_data, ensure_ascii=False).encode(),
+                                    key=f"{compose_prefix}defs_{_prepare_epoch}.json",
+                                    data=_json.dumps(defs_data, ensure_ascii=False).encode(),
                                     content_type="application/json",
                                 )
-
-                                # Cleanup old compose for this slug only
+                                # Cleanup old defs (only delete defs older than our epoch)
+                                # Also remove legacy slide_{N}_*.json files
                                 for k in old_keys:
-                                    if k.startswith(f"{compose_prefix}{slug}_") and not k.endswith(
-                                        f"{slug}_{_prepare_epoch}.json"
-                                    ):
+                                    if "/defs_" in k:
+                                        m = _re.search(r"_(\d+)\.json$", k)
+                                        if m and int(m.group(1)) < _prepare_epoch:
+                                            try:
+                                                _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                                            except Exception:
+                                                pass
+                                    elif _re.search(r"/slide_\d+_\d+\.json$", k):
                                         try:
                                             _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
                                         except Exception:
                                             pass
+
+                                # Generate compose for each measured slug
+                                def _compose_one(slug: str) -> None:
+                                    if slug in invalid_slug_set:
+                                        # Do not surface a fallback-rendered slide as a
+                                        # live-preview artifact. The composer for this
+                                        # slug will see the error and fix the layout.
+                                        return
+                                    pn = slug_to_page.get(slug)
+                                    if not pn:
+                                        return
+                                    try:
+                                        comp_data = split_slide_components(svg_tree, pn)
+                                        from sdpm.engine.schema import extract_regions
+
+                                        slide = slides[pn - 1] if pn <= len(slides) else {}
+                                        comp_data["regions"] = extract_regions(slide)
+
+                                        # sourceHash from slide JSON (content-based diff)
+                                        src_hash = (
+                                            _hashlib.md5(
+                                                _json.dumps(slides[pn - 1], sort_keys=True, ensure_ascii=False).encode(),
+                                                usedforsecurity=False,
+                                            ).hexdigest()
+                                            if pn <= len(slides)
+                                            else ""
+                                        )
+                                        comp_data["sourceHash"] = src_hash
+
+                                        # Diff against previous compose for same slug
+                                        prev_key = _latest_key(f"{compose_prefix}{slug}_")
+                                        prev_comps = None
+                                        prev_hash = None
+                                        if prev_key:
+                                            try:
+                                                raw = _storage.download_file_from_pptx_bucket(prev_key)
+                                                prev_data = _json.loads(raw)
+                                                prev_comps = prev_data.get("components")
+                                                prev_hash = prev_data.get("sourceHash")
+                                            except Exception:
+                                                pass
+
+                                        # If sourceHash unchanged, all components are unchanged
+                                        if prev_comps is not None and prev_hash == src_hash and src_hash:
+                                            for c in comp_data["components"]:
+                                                c["changed"] = False
+                                        elif prev_comps is not None:
+                                            prev_map = {_mk(c): _fp(c) for c in prev_comps}
+                                            for c in comp_data["components"]:
+                                                k = _mk(c)
+                                                c["changed"] = k not in prev_map or prev_map[k] != _fp(c)
+                                        else:
+                                            for c in comp_data["components"]:
+                                                c["changed"] = True
+
+                                        _storage.upload_file(
+                                            key=f"{compose_prefix}{slug}_{_prepare_epoch}.json",
+                                            data=_json.dumps(comp_data, ensure_ascii=False).encode(),
+                                            content_type="application/json",
+                                        )
+
+                                        # Cleanup old compose for this slug only
+                                        for k in old_keys:
+                                            _m = _re.search(r"_(\d+)\.json$", k)
+                                            if k.startswith(f"{compose_prefix}{slug}_") and _m and int(_m.group(1)) < _prepare_epoch:
+                                                try:
+                                                    _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
+                                                except Exception:
+                                                    pass
+                                    except Exception:
+                                        logger.error("compose failed for slug %s", slug, exc_info=True)
+
+                                # Each slug is independent (own S3 keys); the S3 round
+                                # trips dominate, so run them side by side.
+                                from concurrent.futures import ThreadPoolExecutor
+                                with ThreadPoolExecutor(max_workers=8) as pool:
+                                    list(pool.map(_compose_one, sorted(compose_slugs)))
+                        except Exception:
+                            logger.error("compose failed", exc_info=True)
+
+                        # Preview: sync WebP generation so composer can immediately view
+                        # via get_preview(slugs=[...]) — lowers the barrier from a
+                        # 2-step (generate_pptx → get_preview) to 1-step feedback loop.
+                        if measure_slides:
+                            try:
+                                from tools.generate import generate_previews_for_pages
+
+                                preview_dir = tmpdir / "preview_out"
+                                preview_dir.mkdir(exist_ok=True)
+                                wanted = {s: slug_to_page[s] for s in measure_slides if slug_to_page.get(s)}
+                                webp_by_page = generate_previews_for_pages(pptx_path, preview_dir, list(wanted.values()))
+                                uploaded = []
+                                for slug, page in wanted.items():
+                                    if page in webp_by_page:
+                                        _storage.upload_file(
+                                            key=f"previews/{deck_id}/{slug}_{_prepare_epoch}.webp",
+                                            data=webp_by_page[page].read_bytes(),
+                                            content_type="image/webp",
+                                        )
+                                        uploaded.append(slug)
+                                logger.info("previews uploaded for %s: %s", deck_id, ", ".join(uploaded))
                             except Exception:
-                                logger.error("compose failed for slug %s", slug, exc_info=True)
+                                logger.warning("preview generation failed", exc_info=True)
 
-                        # Each slug is independent (own S3 keys); the S3 round
-                        # trips dominate, so run them side by side.
-                        from concurrent.futures import ThreadPoolExecutor
-                        with ThreadPoolExecutor(max_workers=8) as pool:
-                            list(pool.map(_compose_one, sorted(compose_slugs)))
-                except Exception:
-                    logger.error("compose failed", exc_info=True)
+                    finally:
+                        shutil.rmtree(tmpdir, ignore_errors=True)
+                        logger.info(
+                            "run_python background compose/previews for deck %s took %.1fs",
+                            deck_id, time.monotonic() - _bg_t0,
+                        )
 
-                # Preview: sync WebP generation so composer can immediately view
-                # via get_preview(slugs=[...]) — lowers the barrier from a
-                # 2-step (generate_pptx → get_preview) to 1-step feedback loop.
-                if measure_slides:
-                    try:
-                        from tools.generate import generate_previews_for_pages
-
-                        preview_dir = tmpdir / "preview_out"
-                        preview_dir.mkdir(exist_ok=True)
-                        wanted = {s: slug_to_page[s] for s in measure_slides if slug_to_page.get(s)}
-                        webp_by_page = generate_previews_for_pages(pptx_path, preview_dir, list(wanted.values()))
-                        uploaded = []
-                        for slug, page in wanted.items():
-                            if page in webp_by_page:
-                                _storage.upload_file(
-                                    key=f"previews/{deck_id}/{slug}_{_prepare_epoch}.webp",
-                                    data=webp_by_page[page].read_bytes(),
-                                    content_type="image/webp",
-                                )
-                                uploaded.append(slug)
-                        if uploaded:
-                            result["previewHint"] = (
-                                f"Preview images generated for {', '.join(uploaded)}. "
-                                f'Call get_preview(deck_id="{deck_id}", slugs=[...]) to view.'
-                            )
-                    except Exception:
-                        logger.warning("preview generation failed", exc_info=True)
-
-                # tmpdir cleanup (WebP generation only in generate_pptx)
-                shutil.rmtree(tmpdir, ignore_errors=True)
+                if _bg_slugs:
+                    result["previewHint"] = (
+                        f"Preview images are being generated for {', '.join(_bg_slugs)} "
+                        f"(ready within seconds). Call get_preview(deck_id=\"{deck_id}\", slugs=[...]) to view."
+                    )
+                _run_in_background(_finish_compose_and_previews, name=f"compose-{deck_id}")
             else:
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as e:
@@ -1206,7 +1225,6 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
                     result["pptx_error"] = f"PPTX build failed — the downloadable PPTX may be stale: {msg}"
 
     if "_phase" in locals():
-        _phase["compose_and_previews"] = time.monotonic() - _t
         logger.info(
             "run_python post-processing for deck %s: %s",
             deck_id, " ".join(f"{k}={v:.1f}s" for k, v in _phase.items()),

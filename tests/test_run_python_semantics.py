@@ -634,6 +634,7 @@ class TestRemoteRunPythonBranching:
 
 
 def test_remote_compose_output_includes_regions(remote_rig, monkeypatch, tmp_path):
+    monkeypatch.setattr(remote_server, "_run_in_background", lambda target, *, name: target())
     fake_execute, storage, calls = remote_rig
     fake_execute.changed_paths = ["specs/brief.md"]
     slide = {
@@ -681,6 +682,57 @@ def test_remote_compose_output_includes_regions(remote_rig, monkeypatch, tmp_pat
     assert payload["regions"] == [
         {"name": "content", "x": 80, "y": 90, "w": 1200, "h": 800},
     ]
+
+
+def test_remote_compose_is_deferred_until_background_task_runs(remote_rig, monkeypatch, tmp_path):
+    deferred = []
+    monkeypatch.setattr(remote_server, "_run_in_background", lambda target, *, name: deferred.append(target))
+    fake_execute, storage, calls = remote_rig
+    fake_execute.changed_paths = ["specs/brief.md"]
+    slide = {
+        "id": "a",
+        "elements": [
+            {"_comment": "content region", "x": 80, "y": 90, "width": 1200, "height": 800},
+        ],
+    }
+
+    import tools.compose as compose_mod
+    import tools.generate as generate_mod
+
+    def fake_prepare(deck_id, user_id, storage):
+        calls["prepare"] += 1
+        return tmp_path, [slide], {}
+
+    monkeypatch.setattr(generate_mod, "_prepare_workspace", fake_prepare)
+    monkeypatch.setattr(compose_mod, "extract_optimized_defs", lambda path: {"version": 1, "defs": ""})
+    monkeypatch.setattr(
+        compose_mod,
+        "split_slide_components",
+        lambda path, slide_num: {
+            "version": 1,
+            "viewBox": "0 0 1920 1080",
+            "bgFill": "#000",
+            "bgSvg": None,
+            "components": [],
+        },
+    )
+    (tmp_path / "measure.svg").write_text("<svg />", encoding="utf-8")
+
+    out = json.loads(
+        remote_server.run_python(
+            purpose="verify a",
+            code='print("ok")',
+            deck_id="d1",
+            measure_slides=["a"],
+        )
+    )
+    # The tool returned with what the composer needs; compose is still pending.
+    assert "being generated" in out["previewHint"]
+    assert not [k for k in storage.uploads if k.startswith("decks/d1/compose/")]
+    assert len(deferred) == 1
+    deferred[0]()
+    assert [k for k in storage.uploads if k.startswith("decks/d1/compose/a_")]
+
 
 
 def test_remote_tools_run_off_the_event_loop():
