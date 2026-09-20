@@ -19,6 +19,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -45,10 +46,12 @@ def generate_previews(pptx_path: Path, output_dir: Path) -> list[Path]:
     env["HOME"] = str(output_dir)
 
     # PPTX → PDF
+    t0 = time.monotonic()
     subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
         ["soffice", "--headless", "--convert-to", "pdf", "--outdir", str(output_dir), str(pptx_path)],
         env=env, capture_output=True, text=True, timeout=120, check=True,
     )
+    logger.info("soffice pdf export took %.1fs (%s)", time.monotonic() - t0, pptx_path.name)
     pdf_path = output_dir / pptx_path.with_suffix(".pdf").name
     if not pdf_path.exists():
         raise FileNotFoundError("LibreOffice did not produce PDF")

@@ -25,7 +25,10 @@ async def _generate_webp_background(
         try:
             old_keys = storage.list_files(prefix=f"previews/{deck_id}/", bucket=storage.pptx_bucket)
             epoch = int(__import__("time").time())
-            webp_files = generate_previews(pptx_path, preview_dir)
+            t0 = __import__("time").monotonic()
+            # LibreOffice + pdftoppm take tens of seconds: never on the event loop.
+            webp_files = await asyncio.to_thread(generate_previews, pptx_path, preview_dir)
+            logger.info("webp previews rendered in %.1fs for deck %s", __import__("time").monotonic() - t0, deck_id)
             for i, webp_path in enumerate(webp_files):
                 slug = slugs[i] if i < len(slugs) else f"slide_{i + 1:02d}"
                 s3_key = f"previews/{deck_id}/{slug}_{epoch}.webp"

@@ -678,3 +678,13 @@ def test_remote_compose_output_includes_regions(remote_rig, monkeypatch, tmp_pat
     assert payload["regions"] == [
         {"name": "content", "x": 80, "y": 90, "w": 1200, "h": 800},
     ]
+
+
+def test_remote_tools_run_off_the_event_loop():
+    """Every remote tool is registered as an async wrapper that offloads to a thread,
+    so a long LibreOffice call cannot stall /ping and get the session killed."""
+    tools = remote_server.mcp._tool_manager.list_tools()
+    assert tools and all(t.is_async for t in tools)
+    run_python = next(t for t in tools if t.name == "run_python")
+    assert set(run_python.parameters["properties"]) == {"purpose", "code", "deck_id", "measure_slides"}
+    assert "deck_id" in run_python.parameters["required"]
