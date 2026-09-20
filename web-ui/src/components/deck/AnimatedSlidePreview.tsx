@@ -106,18 +106,37 @@ function regionKey(region: ComposeRegion) {
   return `${region.name}|${region.x},${region.y},${region.w},${region.h}`
 }
 
-function overlapsRegion(
+/**
+ * A component counts as body content when it carries text or an image (or is a
+ * table / graphic object). Bare shapes and connectors are decoration — an
+ * accent bar or card background must not mark a region as filled.
+ */
+function isContentComponent(comp: ComposeComponent) {
+  if (comp.text) return true
+  if (/<image[\s>]/i.test(comp.svg)) return true
+  return /Table|Graphic|OLE2|Media/i.test(comp.class)
+}
+
+/**
+ * A component fills a region when it sits mostly inside it (>= 50% of its own
+ * area) or covers most of it (>= 50% of the region's area). Any-overlap was
+ * too eager: LibreOffice bounding boxes include text-frame padding, so a title
+ * frame or a bar touching the region's edge used to hide it.
+ */
+function fillsRegion(
   bbox: ComposeComponent["bbox"],
   region: ComposeRegion,
   scale: number,
 ) {
-  return Boolean(
-    bbox
-    && bbox.x < (region.x + region.w) * scale
-    && bbox.x + bbox.w > region.x * scale
-    && bbox.y < (region.y + region.h) * scale
-    && bbox.y + bbox.h > region.y * scale
-  )
+  if (!bbox || bbox.w <= 0 || bbox.h <= 0) return false
+  const rx = region.x * scale, ry = region.y * scale
+  const rw = region.w * scale, rh = region.h * scale
+  if (rw <= 0 || rh <= 0) return false
+  const ix = Math.max(0, Math.min(bbox.x + bbox.w, rx + rw) - Math.max(bbox.x, rx))
+  const iy = Math.max(0, Math.min(bbox.y + bbox.h, ry + rh) - Math.max(bbox.y, ry))
+  const inter = ix * iy
+  if (inter <= 0) return false
+  return inter >= 0.5 * bbox.w * bbox.h || inter >= 0.5 * rw * rh
 }
 
 export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, knownUrl, onAnimate, onComplete, onAspectRatio, fallback }: AnimatedSlidePreviewProps) {
@@ -317,21 +336,26 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           container.appendChild(svgEl)
           if (regions.length > 0) container.parentElement?.appendChild(regionOverlay)
 
-          const markFilledRegions = (bbox: ComposeComponent["bbox"]) => {
+          const markFilledRegions = (comp: ComposeComponent) => {
+            if (!isContentComponent(comp)) return
             regionEntries.forEach(({ g, label, region }) => {
-              if (overlapsRegion(bbox, region, regionScale)) {
+              if (fillsRegion(comp.bbox, region, regionScale)) {
                 g.classList.add("asp-region-filled")
                 label.classList.add("asp-region-filled")
               }
             })
           }
+          // Fill state derives from the whole component set: content that was
+          // already there (unchanged) fills its region right away; changed
+          // components fill theirs as they land below, and a final pass at the
+          // end catches anything the timing missed.
+          const markFilledByAll = () => data.components.forEach(markFilledRegions)
+          data.components.forEach((comp, i) => {
+            if (!animTargets.has(i)) markFilledRegions(comp)
+          })
 
           if (reducedMotion.current || !hasAnimationTargets) {
-            if (reducedMotion.current && hasAnimationTargets) {
-              data.components.forEach((comp, i) => {
-                if (animTargets.has(i)) markFilledRegions(comp.bbox)
-              })
-            }
+            markFilledByAll()
             animatingRef.current = false
             onComplete?.()
             return
@@ -424,7 +448,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
                     requestAnimationFrame(() => { g.style.filter = "brightness(1) saturate(1)" })
                     typewrite(g)
                   }
-                  markFilledRegions(comp.bbox)
+                  markFilledRegions(comp)
                   const t4 = setTimeout(() => {
                     wf.style.transition = "opacity 0.4s ease-out"
                     wf.style.opacity = "0"
@@ -442,6 +466,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
 
           const totalTime = regionPhaseMs + componentStaggerIdx * STAGGER_MS + WIREFRAME_LEAD_MS + 1000
           const tDone = setTimeout(() => {
+            markFilledByAll()
             animatingRef.current = false
             overlayContainer.remove()
             onComplete?.()

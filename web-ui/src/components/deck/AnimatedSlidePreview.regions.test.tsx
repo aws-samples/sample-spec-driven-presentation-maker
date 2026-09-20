@@ -110,4 +110,38 @@ describe("AnimatedSlidePreview layout regions", () => {
     expect(container.querySelector(".asp-region")).toBeNull()
     expect(container.querySelector(".asp-region-label")).toBeNull()
   })
+
+  async function renderRegions(components: Record<string, unknown>[], region = { name: "body", x: 100, y: 100, w: 800, h: 600 }) {
+    mockFetch({ version: 1, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components, regions: [region] })
+    const { container } = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose.json" />
+    )
+    await waitFor(() => expect(container.querySelectorAll(".asp-region")).toHaveLength(1))
+    return container.querySelector(".asp-region") as SVGGElement
+  }
+
+  it("does not fill a region that a text frame merely touches at the edge", async () => {
+    // Title frame: 40px into the region's top edge — far below the 50% criterion either way.
+    const title = { ...component, text: "Title", bbox: { x: 100, y: 20, w: 800, h: 120 } }
+    const region = await renderRegions([title])
+    expect(region.classList.contains("asp-region-filled")).toBe(false)
+  })
+
+  it("fills a region from content that was already there (unchanged component)", async () => {
+    const body = { ...component, text: "Body copy", changed: false, bbox: { x: 150, y: 150, w: 500, h: 300 } }
+    const region = await renderRegions([body])
+    expect(region.classList.contains("asp-region-filled")).toBe(true)
+  })
+
+  it("ignores decoration: a bare shape with no text or image inside the region", async () => {
+    const bar = { ...component, class: "com.sun.star.drawing.CustomShape", text: "", svg: '<rect x="150" y="150" width="500" height="8" />', bbox: { x: 150, y: 150, w: 500, h: 8 } }
+    const region = await renderRegions([bar])
+    expect(region.classList.contains("asp-region-filled")).toBe(false)
+  })
+
+  it("fills a region covered by an image larger than the region", async () => {
+    const picture = { ...component, class: "com.sun.star.drawing.CustomShape", text: "", svg: '<image href="x.webp" x="0" y="0" width="1200" height="900" />', bbox: { x: 0, y: 0, w: 1200, h: 900 } }
+    const region = await renderRegions([picture])
+    expect(region.classList.contains("asp-region-filled")).toBe(true)
+  })
 })
