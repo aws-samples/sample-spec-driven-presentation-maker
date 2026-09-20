@@ -370,16 +370,9 @@ def arch_diagram(
 ) -> dict[str, Any]:
     """Auto-layout an architecture/flow diagram from a logical-structure JSON.
 
-    Turns a nested structure of groups, icons and connections into fully-placed
-    slide elements with auto-routed orthogonal arrows. You describe *what
-    connects to what*; the engine computes coordinates, clusters related icons,
-    picks arrow ports/bends, and minimizes crossings and icon pierces. Prefer
-    this over hand-placing coordinates for any diagram with more than a few
-    connections.
-
-    Read the guide `arch-layout-engine` (via read_guides) for the JSON schema
-    and the techniques that reach 0 crossings (connect to a GROUP not every
-    icon; `fan: "merge"` bundles; perpendicular branch wrappers).
+    You describe what connects to what; the engine places nodes, routes orthogonal
+    arrows and returns placed slide elements. The JSON schema is in the guide
+    `arch-layout-engine` (read_guides).
 
     Args:
         spec: JSON string. Top-level keys: `direction` ("horizontal"/"vertical"),
@@ -388,26 +381,21 @@ def arch_diagram(
             overrides x/y/width/height.
         x: Target area X offset in px.
         y: Target area Y offset in px.
-        width: Target area width in px (engine scales the diagram to fit).
+        width: Target area width in px (the diagram is scaled to fit).
         height: Target area height in px.
-        theme: "dark" or "light" — affects box-node text colors.
-        pt_per_px: Ratio of physical pt to virtual px. Pass deck.json's
-            slideSize.ptPerPx value here. 16:9 = 0.5, 4:3 = 0.375.
-            If you omit this on a non-16:9 template, box text will overflow
-            because the height estimate assumes 16:9 proportions.
+        theme: "dark" or "light" — box-node text colors.
+        pt_per_px: deck.json `slideSize.ptPerPx` (16:9 = 0.5, 4:3 = 0.375). The
+            text-height estimate assumes 16:9 when omitted.
 
     Returns:
         Dict with:
-          - `elements`: sdpm element array — drop into a slide, or write to a
+          - `elements`: sdpm element array — place in a slide directly, or write to a
             file and reference with `{"type": "include", "src": "..."}`.
           - `bbox`: final bounding box after scale-to-fit.
-          - `warnings`: human-readable facts about layout defects (facts, not
-            prescriptions) — may be absent when clean.
-          - `metrics`: objective QA numbers. `crossings` / `pierces` /
-            `group_pierces` are 0 for a clean diagram; `overflow` > 0 means the
-            layout spills off the target box; `score` is the internal judge's
-            lexicographic tuple (lower is better). Inspect these and iterate on
-            STRUCTURE (not coordinates) when defects remain.
+          - `warnings`: layout defects in words; absent when clean.
+          - `metrics`: `crossings` / `pierces` / `group_pierces` are 0 for a clean
+            diagram; `overflow` > 0 means the layout spills off the target box;
+            `score` is the judge's lexicographic tuple (lower is better).
     """
     import json
     from sdpm.engine.layout.render import render_architecture

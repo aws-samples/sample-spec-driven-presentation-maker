@@ -648,83 +648,34 @@ def _post_processing_plan(deck_changed: bool, measure_slides: list[str] | None) 
 
 @mcp.tool()
 def run_python(purpose: str, code: str, deck_id: str | None = None, measure_slides: list[str] | None = None) -> str:
-    """Execute Python code in a secure sandbox.
+    """Execute Python code in a sandbox whose working directory is the deck workspace.
 
-    Use this tool to edit the deck workspace or for general computation.
+    Workspace (when deck_id is given):
+        deck.json                 — template, fonts, defaultTextColor, slideSize
+        slides/{slug}.json        — one file per slide
+        specs/brief.md            — brief
+        specs/outline.md          — outline (chapters; one line per slide with body / visual / evidence)
+        specs/art-direction.html  — art direction
+        includes/                 — element JSON referenced by slides (code_to_slide writes here)
+        attachments/              — files imported with import_attachment
 
-    If deck_id is provided, the entire deck workspace is loaded as files:
-        deck.json           — deck metadata (template, fonts, defaultTextColor)
-        slides/{slug}.json  — per-slide data
-        specs/brief.md      — briefing document
-        specs/art-direction.html — design direction (HTML)
-        specs/outline.md    — slide outline (chapters; one line per slide with body / visual / evidence)
-        includes/           — code block JSON files (created by code_to_slide)
-        attachments/        — imported files (CSV, JSON, Markdown) via import_attachment
+    Helpers are injected (no import needed), paths relative to the deck root:
+        read_json(path), write_json(path, data), read_text(path), write_text(path, text),
+        list_files(subdir=".")
+    Plain `open()` also works here; the helpers are what runs unchanged on the local server.
 
-    Legacy decks with presentation.json are also supported (read-only compat).
-
-    ## Sandbox helpers (preferred — identical API on Local and Cloud)
-
-        read_json(path)          → dict/list   Read a JSON file
-        write_json(path, data)   → None        Write data as JSON
-        read_text(path)          → str         Read a text file
-        write_text(path, text)   → None        Write a text file
-        list_files(subdir=".")   → list[str]   List filenames in a subdirectory
-
-    All paths are relative to the deck root. The helpers are injected
-    automatically — do NOT write `from _sdpm_helpers import ...` yourself;
-    the import is prepended by the sandbox. Using the helpers keeps the
-    same code portable between Local (AST-restricted) and Cloud.
-
-    Raw `open()` / `json.load` still work on Cloud for backward compat,
-    but new code should prefer the helpers.
-
-    ## Persistence & build (no flags needed)
-
-    - File writes always persist — modified/new workspace files are written
-      back to S3 after every execution. There is no "unsaved" state.
-      (If you only have read access to the deck, writes are discarded and
-      the result notes it.)
-    - The deck's PPTX artifact refreshes automatically whenever the deck
-      changed (deck.json / slides/ / includes/ / specs/outline.md).
-    - measure_slides triggers the expensive verification pass (render + text
-      overflow measurement + live-preview compose) for the given slugs only.
-
-    **Always specify measure_slides when editing slides.** Runs validation after
-    code execution (requires deck_id):
-        - Text bbox measurement (overflow detection via LibreOffice SVG)
-        - Lint diagnostics (JSON schema validation)
-        - Layout bias detection
-    Pass the slugs of slides you edited, e.g. measure_slides=["title", "feature-a"].
-
-    Examples:
-        Edit slide:
-            data = read_json("slides/title.json")
-            data["elements"][0]["text"] = "New Title"
-            write_json("slides/title.json", data)
-            # run_python(code=<above>, deck_id="abc", measure_slides=["title"])
-
-        Edit spec:
-            write_text("specs/brief.md", "# Brief\\n\\nContents...")
-            # run_python(code=<above>, deck_id="abc")
-
-        Read deck metadata:
-            deck = read_json("deck.json")
-            print(deck.get("template"))
-
-        List slide files:
-            print(list_files("slides"))
-
-        General computation (no deck_id):
-            print(2 ** 100)
+    Writes persist after every execution (read-only decks: writes are discarded and the
+    result says so). The PPTX rebuilds automatically when deck.json, slides/, includes/ or
+    specs/outline.md changed. measure_slides runs the verification pass (render, text
+    overflow measurement, lint, layout bias, live preview) for those slugs only — pass the
+    slugs you edited.
 
     Args:
         code: Python code to execute.
-        deck_id: Deck ID to load workspace from. Optional.
-        measure_slides: List of slide slugs to measure after execution. Requires deck_id.
+        deck_id: Deck ID. Optional; without it the code runs with no workspace.
+        measure_slides: Slugs to measure after execution. Requires deck_id.
         purpose: Brief user-facing description of what this code does,
-            written in the user's language (e.g. 'Analyzing slide structure',
-            'Adding 3 comparison slides'). Shown in the UI.
+            written in the user's language. Shown in the UI.
 
     Returns:
         JSON string: {"output", "measure"?, "errors"?, "warnings"?}
@@ -1089,38 +1040,22 @@ mcp.tool()(contract.arch_diagram)
 def run_style_python(
     purpose: str, code: str, style_name: str | None = None, ref_styles: list[str] | None = None
 ) -> str:
-    """Execute Python code in a secure sandbox for style creation/editing.
+    """Execute Python code in a sandbox whose working directory is a style workspace.
 
-    If style_name is provided, the style HTML is loaded as style.html.
-    The code can read/write it via normal file I/O (open, read, write).
-    Writes always persist — if style.html changed, it is written back to the
-    user's style storage automatically. There is no "unsaved" state.
+    Workspace:
+        style.html          — the style named by style_name (read/write with normal file I/O)
+        ref/{name}.html     — the styles named in ref_styles (read-only)
 
-    If ref_styles are provided, they are downloaded and available as ref/{name}.html.
-    Use list_styles to discover available style names.
-
-    Import statements are allowed — PIL, colorsys, numpy, etc. are available
-    for color computation, palette extraction, and contrast calculation.
-
-    Workspace layout:
-        style.html          — target style (read/write; persisted when changed)
-        ref/{name}.html     — reference styles (read-only)
-
-    Examples:
-        Read reference:    run_style_python(code="html = open('ref/corporate-executive.html').read(); print(html[:200])",
-                                           ref_styles=["corporate-executive"])
-        Create new:        run_style_python(code="open('style.html','w').write('<html>...')",
-                                           style_name="style-20260506-1430")
-        Edit existing:     run_style_python(code="html = open('style.html').read(); html = html.replace('old','new'); open('style.html','w').write(html)",
-                                           style_name="style-20260506-1430")
-        Compute colors:    run_style_python(code="from colorsys import rgb_to_hls; print(rgb_to_hls(0.2, 0.4, 0.6))")
+    Writes to style.html persist to the user's style storage after every execution;
+    there is no unsaved state. Imports are allowed (PIL, colorsys, numpy are installed).
+    Style names come from list_styles.
 
     Args:
         purpose: Brief user-facing description of what this code does,
             written in the user's language. Shown in the UI.
         code: Python code to execute.
-        style_name: Style name to load as style.html. Optional.
-        ref_styles: Style names to load as ref/{name}.html. Optional.
+        style_name: Style to load as style.html. Optional.
+        ref_styles: Styles to load as ref/{name}.html. Optional.
 
     Returns:
         JSON string: {"output", "saved"?}

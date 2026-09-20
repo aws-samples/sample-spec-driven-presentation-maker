@@ -60,77 +60,23 @@ def _build_snapshot(deck_dir: Path) -> dict[str, tuple[int, int]]:
 
 def run_python(purpose: str, code: str, deck_id: str = "",
                measure_slides: list[str] | None = None) -> str:
-    """Execute Python code in a sandboxed environment.
+    """Execute Python code in a restricted sandbox whose working directory is the deck.
 
-    Code runs in a restricted subprocess. `import` statements and direct file
-    access (`open()`) are NOT available. Use the provided sandbox functions instead.
+    `import` and `open()` are not available; standard builtins (print, len, range,
+    sorted, min/max, zip, …) are. With deck_id, these helpers are available and paths
+    are relative to the deck directory (access outside it is denied):
+        read_json(path), write_json(path, data), read_text(path), write_text(path, text),
+        list_files(subdir=".")
+    Without deck_id only computation and print are possible.
 
-    ## Sandbox functions (available when deck_id is provided)
-
-        read_json(path)          → dict/list   Read a JSON file
-        write_json(path, data)   → None        Write data as JSON
-        read_text(path)          → str         Read a text file
-        write_text(path, text)   → None        Write a text file
-        list_files(subdir=".")   → list[str]   List filenames in a subdirectory
-
-    All paths are relative to the deck directory (e.g. "slides/title.json").
-    Access outside the deck directory is denied.
-
-    ## Built-in functions available
-
-    print, len, range, enumerate, sorted, isinstance, type, str, int, float,
-    bool, list, dict, tuple, set, min, max, sum, abs, round, any, all, zip,
-    map, filter, reversed
-
-    ## When deck_id is NOT provided (general computation)
-
-    Only print and built-in functions above are available.
-    No file operations.
-
-    ## Examples
-
-        # Read and edit a slide
-        data = read_json("slides/title.json")
-        data["elements"][0]["text"] = "New Title"
-        write_json("slides/title.json", data)
-
-        # Write a spec file
-        content = \"\"\"# Brief
-
-Topic: AI-powered presentation tool
-Audience: Developers
-\"\"\"
-        write_text("specs/brief.md", content)
-
-        # Read deck metadata
-        deck = read_json("deck.json")
-        print(deck["template"])
-
-        # Read a spec file
-        outline = read_text("specs/outline.md")
-        print(outline)
-
-        # List slide files
-        files = list_files("slides")
-        print(files)
-
-        # General computation (no deck_id)
-        print(2 ** 100)
-
-    **Always specify measure_slides when editing slides.**
-
-    ## Persistence & build (no flags needed)
-
-    - File writes always persist — anything written via write_json/write_text
-      is saved immediately. There is no "unsaved" state.
-    - output.pptx rebuilds automatically whenever the deck changed
-      (deck.json / slides/ / includes/ / specs/outline.md).
-    - measure_slides triggers the expensive verification pass (render + text
-      overflow measurement + preview PNGs) for the given slugs only.
+    Writes persist immediately. output.pptx rebuilds automatically when deck.json,
+    slides/, includes/ or specs/outline.md changed. measure_slides runs the verification
+    pass (render, text overflow measurement, preview PNGs) for those slugs only — pass
+    the slugs you edited.
 
     Args:
         purpose: Brief user-facing description of what this code does. Shown in UI.
-        code: Python code to execute (no import statements allowed).
+        code: Python code to execute (no import statements).
         deck_id: Deck output_dir path. Optional.
         measure_slides: Slide slugs to measure after execution (e.g. ["title", "feature-a"]).
 
