@@ -760,6 +760,11 @@ body {
   border-radius: 2px;
   animation: asp-land 500ms ease-out forwards;
 }
+
+.asp-materialize-target {
+  transform-box: fill-box;
+  transform-origin: center;
+}
 @keyframes tool-card-enter {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }

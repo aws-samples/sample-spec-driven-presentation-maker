@@ -237,4 +237,52 @@ describe("AnimatedSlidePreview performance gating", () => {
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(fetch).toHaveBeenCalledWith("/compose.json")
   })
+
+  it("accumulates unsettled changed indices across off-screen updates", async () => {
+    class OffscreenObserver implements IntersectionObserver {
+      readonly root = null
+      readonly rootMargin = "0px"
+      readonly scrollMargin = "0px"
+      readonly thresholds = [0, 0.5]
+      constructor(private callback: IntersectionObserverCallback) {}
+      observe(target: Element) {
+        this.callback([{
+          target,
+          isIntersecting: false,
+          intersectionRatio: 0,
+        } as IntersectionObserverEntry], this)
+      }
+      unobserve(): void {}
+      disconnect(): void {}
+      takeRecords(): IntersectionObserverEntry[] { return [] }
+    }
+    vi.stubGlobal("IntersectionObserver", OffscreenObserver)
+    const first = { ...component, changed: true }
+    const second = { ...component, bbox: { x: 600, y: 200, w: 300, h: 300 }, changed: false }
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
+      const url = String(input)
+      const data = url.includes("defs") ? defs : {
+        version: 1,
+        viewBox: "0 0 1920 1080",
+        bgFill: "#000",
+        bgSvg: null,
+        components: url.includes("compose-2")
+          ? [{ ...first, changed: false }, { ...second, changed: true }]
+          : [first, second],
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(data) })
+    }))
+
+    const rendered = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-1.json" />
+    )
+    await waitFor(() => expect(rendered.container.querySelector('g[data-index="0"]')?.getAttribute("data-unsettled")).toBe("true"))
+
+    rendered.rerender(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" />
+    )
+    await waitFor(() => expect(rendered.container.querySelector('g[data-index="1"]')?.getAttribute("data-unsettled")).toBe("true"))
+    expect(rendered.container.querySelector('g[data-index="0"]')?.getAttribute("data-unsettled")).toBe("true")
+    expect(rendered.container.querySelector(".asp-overlay")).toBeNull()
+  })
 })

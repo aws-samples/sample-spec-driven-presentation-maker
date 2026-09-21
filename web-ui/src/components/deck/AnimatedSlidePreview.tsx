@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import { acquire, registerTypewriter } from "./animationScheduler"
 import { useSlideVisibility } from "./useSlideVisibility"
+import { markUnsettled, settle, type MaterializeItem } from "./materialize"
 
 // --- Constants ---
 const COMPOSE_VERSION = 1
@@ -145,10 +146,21 @@ function fillsRegion(
 export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, knownUrl, onAnimate, onComplete, onAspectRatio, fallback, defsMounted }: AnimatedSlidePreviewProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const visibleRef = useSlideVisibility(wrapperRef)
+  const unsettledRef = useRef(new Set<number>())
+  const latestComponentsRef = useRef<ComposeComponent[]>([])
+  const hasBeenOffscreenRef = useRef(false)
+  const settlePendingRef = useRef<() => void>(() => {})
+  const visibleRef = useSlideVisibility(wrapperRef, 0.5, (visible) => {
+    if (!visible) {
+      hasBeenOffscreenRef.current = true
+    } else if (hasBeenOffscreenRef.current) {
+      settlePendingRef.current()
+    }
+  })
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const typewriterCancelsRef = useRef<(() => void)[]>([])
   const releaseRef = useRef<(() => void) | null>(null)
+  const materializeCancelRef = useRef<(() => void) | null>(null)
   const lastComposeUrlRef = useRef("")
   const previousRegionsRef = useRef<ComposeRegion[]>([])
   const animatingRef = useRef(false)
@@ -166,11 +178,28 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     typewriterCancelsRef.current = []
     releaseRef.current?.()
     releaseRef.current = null
+    materializeCancelRef.current?.()
+    materializeCancelRef.current = null
     const parent = containerRef.current?.parentElement
     parent?.querySelectorAll(".asp-overlay, .asp-region-overlay").forEach(el => el.remove())
   }, [])
 
   useEffect(() => () => cleanup(), [cleanup])
+
+  settlePendingRef.current = () => {
+    const container = containerRef.current
+    const slide = wrapperRef.current
+    if (!container || !slide || unsettledRef.current.size === 0) return
+    const items: MaterializeItem[] = []
+    for (const index of unsettledRef.current) {
+      const element = container.querySelector<SVGGElement>(`g[data-index="${index}"]`)
+      const component = latestComponentsRef.current[index]
+      if (element && component) items.push({ component, element })
+    }
+    unsettledRef.current.clear()
+    materializeCancelRef.current?.()
+    materializeCancelRef.current = settle(slide, items, { reducedMotion: reducedMotion.current })
+  }
 
   // Track latest props in refs so check() always reads current values
   const composeUrlRef = useRef(composeUrl)
@@ -195,7 +224,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       if (!compUrlBase) return
       if (compUrlBase === lastComposeUrlRef.current) return
       if (animatingRef.current) return  // defer until animation completes
-      const skipThisUpdate = skipRef.current || compUrlBase === knownUrlRef.current || !visibleRef.current
+      const suppressThisUpdate = skipRef.current || compUrlBase === knownUrlRef.current
       lastComposeUrlRef.current = compUrlBase
 
       ;(async () => {
@@ -240,17 +269,26 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           const fb = container.parentElement?.querySelector("[data-fallback]") as HTMLElement | null
           if (fb) fb.style.display = "none"
 
-          const animTargets = new Set<number>()
-          if (!skipThisUpdate) {
+          const visibleAtArrival = visibleRef.current
+          const skipAgentAnimation = suppressThisUpdate || !visibleAtArrival
+          const changedTargets = new Set<number>()
+          if (!suppressThisUpdate) {
             data.components.forEach((comp, i) => {
-              if (comp.changed) animTargets.add(i)
+              if (comp.changed) changedTargets.add(i)
             })
           }
+          const animTargets = visibleAtArrival ? changedTargets : new Set<number>()
+          if (!visibleAtArrival && !reducedMotion.current) {
+            changedTargets.forEach((index) => unsettledRef.current.add(index))
+          } else if (reducedMotion.current) {
+            unsettledRef.current.clear()
+          }
+          latestComponentsRef.current = data.components
 
           const regions = data.regions ?? []
           const previousRegionKeys = new Set(previousRegionsRef.current.map(regionKey))
           const regionAnimTargets = new Set<number>()
-          if (!skipThisUpdate) {
+          if (!skipAgentAnimation) {
             regions.forEach((region, i) => {
               if (!previousRegionKeys.has(regionKey(region))) regionAnimTargets.add(i)
             })
@@ -317,6 +355,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             g.dataset.index = String(i)
             g.style.opacity = (animTargets.has(i) && !reducedMotion.current) ? "0" : "1"
             svgEl.appendChild(g)
+            if (unsettledRef.current.has(i) && !reducedMotion.current) markUnsettled(g, comp)
           })
 
           // Layout regions sit above slide components; labels stay HTML-sized.
