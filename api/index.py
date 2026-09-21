@@ -38,6 +38,7 @@ from shared.schema import (
     DECK_SK_PREFIX, FAV_SK_PREFIX,
     extract_deck_id, extract_fav_id,
     GSI_PUBLIC_DECKS, public_gsi1pk,
+    validate_outline_content,
 )
 
 # Environment variables
@@ -1104,6 +1105,47 @@ def patch_deck(deck_id: str) -> Dict[str, Any]:
         ExpressionAttributeValues=expr_values,
     )
     return {"deckId": deck_id, "updated": list(body.keys())}
+
+
+@app.put("/decks/<deck_id>/specs/outline")
+def put_outline(deck_id: str) -> Dict[str, Any]:
+    """Write `specs/outline.md` from the Web UI storyboard editor.
+
+    Unconditional overwrite by design: the editor tells the agent what changed in the same
+    turn (a user message carrying the diff), so the agent — not the API — reconciles its own
+    context. Owners and collaborators may write (same permission as editing slides).
+
+    Args:
+        deck_id: Deck identifier.
+
+    Returns:
+        Dict with the number of bytes written.
+    """
+    user_id = get_user_id(app.current_event)
+    decision = authorize(user_id, deck_id, "edit_slide", table)
+    if not decision.allowed:
+        return {"error": decision.reason}, 403
+
+    body = app.current_event.json_body or {}
+    content = body.get("content")
+    error = validate_outline_content(content)
+    if error:
+        return {"error": error}, 400
+
+    data = content.encode("utf-8")
+    s3_client.put_object(
+        Bucket=BUCKET_NAME,
+        Key=f"decks/{deck_id}/specs/outline.md",
+        Body=data,
+        ContentType="text/markdown; charset=utf-8",
+    )
+    if decision.deck:
+        table.update_item(
+            Key={"PK": decision.deck["PK"], "SK": decision.deck["SK"]},
+            UpdateExpression="SET updatedAt = :t",
+            ExpressionAttributeValues={":t": now_iso()},
+        )
+    return {"bytes": len(data)}
 
 
 @app.delete("/decks/<deck_id>")

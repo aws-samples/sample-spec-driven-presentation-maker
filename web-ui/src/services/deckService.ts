@@ -143,6 +143,37 @@ export async function patchDeck(deckId: string, updates: Record<string, string>,
 }
 
 /**
+ * Write `specs/outline.md` for a deck (storyboard editor "send changes").
+ *
+ * Unconditional overwrite — the caller follows up with a chat message carrying the diff,
+ * so the agent reconciles its own context. Same URL shape in cloud (Lambda) and local
+ * (API Route) modes.
+ *
+ * @param deckId - Deck identifier
+ * @param content - Full outline.md text
+ * @param idToken - Cognito ID token (ignored in local mode)
+ * @throws Error with the server's message when the write is rejected
+ */
+export async function putOutline(deckId: string, content: string, idToken: string): Promise<void> {
+  const base = await getApiBaseUrl()
+  const response = await fetch(`${base}decks/${deckId}/specs/outline`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  })
+  if (!response.ok) {
+    let message = `HTTP ${response.status}`
+    try {
+      const data = (await response.json()) as { error?: string }
+      if (data.error) message = data.error
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new Error(message)
+  }
+}
+
+/**
  * Fetch deck with slideJson included (for JSON download).
  *
  * @param deckId - Deck identifier
