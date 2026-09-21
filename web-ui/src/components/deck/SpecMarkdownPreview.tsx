@@ -142,7 +142,7 @@ export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect,
     )
   }
   if (specKey === "outline") {
-    return <div className="content-enter flex-1"><OutlineView content={content} deckId={deckId} idToken={idToken} /></div>
+    return <div className="content-enter flex-1 min-h-0 flex flex-col"><OutlineView content={content} deckId={deckId} idToken={idToken} /></div>
   }
 
   // Art Direction: template section (persistent) + style section (3-state)

@@ -342,6 +342,7 @@ export function OutlineView({ content, deckId, idToken = "" }: OutlineViewProps)
   const [layout, setLayout] = useState<StoryboardLayout>("grid")
   const [polish, setPolish] = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const [focusedSlideId, setFocusedSlideId] = useState<string | null>(null)
   const [activeSlideId, setActiveSlideId] = useState<string | null>(null)
   const [landingId, setLandingId] = useState<string | null>(null)
@@ -648,7 +649,11 @@ export function OutlineView({ content, deckId, idToken = "" }: OutlineViewProps)
   return (
     <MotionConfig reducedMotion="user">
       <DragDropProvider onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-        <div className="document-surface storyboard-scroll flex-1 overflow-y-auto">
+        <div
+          className="document-surface storyboard-scroll flex-1 overflow-y-auto"
+          data-scrolled={scrolled || undefined}
+          onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 4)}
+        >
           <motion.main layout className={`storyboard-view storyboard-layout-${layout}`} data-layout={layout}>
             <header className="storyboard-header">
               <div className="storyboard-title-block">
@@ -663,8 +668,35 @@ export function OutlineView({ content, deckId, idToken = "" }: OutlineViewProps)
                   />
                 </h1>
                 <p>{t("slideCount", { count: slides.length })}<span aria-hidden="true"> · </span>{t("chapterCount", { count: groups.filter((group) => group.section).length })}</p>
+                {editor.dirty && chat.isLoading && <p className="storyboard-streaming-hint">{t("streamingHint")}</p>}
               </div>
               <div className="storyboard-header-actions">
+                <AnimatePresence initial={false}>
+                  {editor.dirty && (
+                    <motion.div
+                      className="storyboard-editbar"
+                      role="group"
+                      aria-label={t("unsentChanges", { count: editor.stats.added + editor.stats.deleted })}
+                      initial={{ opacity: 0, x: 12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 12 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                    >
+                      <div className="storyboard-dirty-summary"><span aria-hidden="true" />{t("unsentChanges", { count: editor.stats.added + editor.stats.deleted })}</div>
+                      <button type="button" className="storyboard-polish-toggle" role="switch" aria-checked={polish} onClick={togglePolish}>
+                        <span data-on={polish || undefined}><i /></span>{t("polish")}
+                      </button>
+                      <div className="storyboard-send-actions">
+                        <button type="button" onClick={editor.undo} disabled={!editor.canUndo} aria-label={t("undo")} title={t("undoShortcut")}><Undo2 aria-hidden="true" /></button>
+                        <button type="button" onClick={editor.redo} disabled={!editor.canRedo} aria-label={t("redo")} title={t("redoShortcut")}><Redo2 aria-hidden="true" /></button>
+                        <button type="button" className="storyboard-discard-button" onClick={editor.discard}>{t("discard")}</button>
+                        <button type="button" className="storyboard-send-button" onClick={() => void sendChanges()} disabled={sendDisabled} title={chat.isLoading ? t("sendDisabledStreaming") : undefined}>
+                          <Send aria-hidden="true" />{sending ? t("sending") : t("sendChanges")}<kbd>⌘S</kbd>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 <button type="button" className="storyboard-chrome-button" onClick={() => setDrawerOpen(true)} aria-expanded={drawerOpen}>
                   <Code2 aria-hidden="true" /> {t("markdown")}
                 </button>
@@ -692,30 +724,6 @@ export function OutlineView({ content, deckId, idToken = "" }: OutlineViewProps)
             </div>
           </motion.main>
 
-          <AnimatePresence>
-            {editor.dirty && (
-              <motion.div
-                className="storyboard-sendbar"
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 18 }}
-              >
-                <div className="storyboard-dirty-summary"><span aria-hidden="true" />{t("unsentChanges", { count: editor.stats.added + editor.stats.deleted })}</div>
-                <button type="button" className="storyboard-polish-toggle" role="switch" aria-checked={polish} onClick={togglePolish}>
-                  <span data-on={polish || undefined}><i /></span>{t("polish")}
-                </button>
-                {chat.isLoading && <p className="storyboard-streaming-hint">{t("streamingHint")}</p>}
-                <div className="storyboard-send-actions">
-                  <button type="button" onClick={editor.undo} disabled={!editor.canUndo} aria-label={t("undo")} title={t("undoShortcut")}><Undo2 aria-hidden="true" /></button>
-                  <button type="button" onClick={editor.redo} disabled={!editor.canRedo} aria-label={t("redo")} title={t("redoShortcut")}><Redo2 aria-hidden="true" /></button>
-                  <button type="button" className="storyboard-discard-button" onClick={editor.discard}>{t("discard")}</button>
-                  <button type="button" className="storyboard-send-button" onClick={() => void sendChanges()} disabled={sendDisabled} title={chat.isLoading ? t("sendDisabledStreaming") : undefined}>
-                    <Send aria-hidden="true" />{sending ? t("sending") : t("sendChanges")}<kbd>⌘S</kbd>
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
           <AnimatePresence>
             {drawerOpen && (

@@ -252,15 +252,27 @@ body {
   width: 100%;
   max-width: 1440px;
   margin: 0 auto;
-  padding: 28px 28px 120px;
+  padding: 0 28px 72px;
 }
+/* The header stays pinned while the storyboard scrolls; every control — layout, markdown,
+   and the unsent-changes cluster — lives here so nothing hides below the fold. */
 .storyboard-header {
+  position: sticky;
+  z-index: 10;
+  top: 0;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 24px;
-  margin: 6px 0 26px;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+  margin: 0 -28px 22px;
+  padding: 24px 28px 14px;
+  background: color-mix(in oklch, var(--background) 94%, transparent);
+  border-bottom: 1px solid transparent;
+  backdrop-filter: blur(14px);
+  transition: border-color 200ms ease;
 }
+.storyboard-scroll[data-scrolled="true"] .storyboard-header { border-bottom-color: var(--border); }
 .storyboard-title-block h1 {
   margin: 0;
   color: var(--foreground);
@@ -1407,24 +1419,17 @@ body {
   font-size: 11px;
   line-height: 1.8;
 }
-.storyboard-sendbar {
-  position: sticky;
-  z-index: 10;
-  bottom: 14px;
+.storyboard-editbar {
   display: flex;
   align-items: center;
-  gap: 14px;
-  width: calc(100% - 36px);
-  max-width: 1040px;
-  min-height: 54px;
-  padding: 8px 10px 8px 16px;
-  margin: -72px auto 18px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 4px 6px 4px 12px;
   color: var(--foreground-secondary);
-  background: color-mix(in oklch, var(--background-raised) 92%, transparent);
+  background: var(--background-raised);
   border: 1px solid var(--border-hover);
-  border-radius: 16px;
+  border-radius: 999px;
   box-shadow: var(--shadow-lift);
-  backdrop-filter: blur(14px);
   font-size: 12px;
 }
 .storyboard-dirty-summary { display: flex; align-items: center; gap: 8px; flex: none; font-family: var(--font-geist-mono), ui-monospace, monospace; font-weight: 500; }
@@ -1434,9 +1439,9 @@ body {
 .storyboard-polish-toggle > span[data-on="true"] { background: var(--primary); }
 .storyboard-polish-toggle i { position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; background: var(--foreground-muted); border-radius: 50%; transition: transform 180ms ease, background-color 180ms ease; }
 .storyboard-polish-toggle > span[data-on="true"] i { background: var(--primary-foreground); transform: translateX(13px); }
-.storyboard-streaming-hint { min-width: 0; margin: 0; color: var(--foreground-muted); line-height: 1.35; }
-.storyboard-send-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
-.storyboard-send-actions > button { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.storyboard-streaming-hint { min-width: 0; margin: 6px 0 0; color: var(--foreground-muted); font-size: 12px; line-height: 1.35; }
+.storyboard-send-actions { display: flex; align-items: center; gap: 4px; }
+.storyboard-send-actions > button { display: inline-flex; min-height: 30px; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
 .storyboard-send-actions > button:disabled { cursor: not-allowed; opacity: 0.42; }
 .storyboard-send-actions > button svg { width: 14px; height: 14px; }
 .storyboard-discard-button { color: var(--foreground-secondary); border: 1px solid var(--border); }
@@ -1474,7 +1479,7 @@ body {
   to { box-shadow: var(--storyboard-shadow), 0 0 0 3px transparent; }
 }
 @media (max-width: 900px) {
-  .storyboard-sendbar { flex-wrap: wrap; gap: 8px 12px; }
+  .storyboard-editbar { border-radius: 16px; }
   .storyboard-streaming-hint { order: 3; width: 100%; }
   .storyboard-send-actions { margin-left: auto; }
 }
@@ -1482,7 +1487,6 @@ body {
   .storyboard-header-actions { width: 100%; justify-content: space-between; }
   .storyboard-chapter { grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; }
   .storyboard-delete-chapter { grid-column: 2 / -1; justify-self: end; opacity: 1; }
-  .storyboard-sendbar { bottom: 8px; width: calc(100% - 20px); margin-bottom: 10px; border-radius: 14px; }
   .storyboard-dirty-summary { width: 100%; }
   .storyboard-polish-toggle { flex: 1; }
   .storyboard-send-actions { width: 100%; justify-content: flex-end; }
