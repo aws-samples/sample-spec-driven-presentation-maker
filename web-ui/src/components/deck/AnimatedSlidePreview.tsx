@@ -11,6 +11,8 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
+import { acquire, registerTypewriter } from "./animationScheduler"
+import { useSlideVisibility } from "./useSlideVisibility"
 
 // --- Constants ---
 const COMPOSE_VERSION = 1
@@ -91,6 +93,7 @@ interface AnimatedSlidePreviewProps {
   onComplete?: () => void
   onAspectRatio?: (ratio: number) => void
   fallback?: React.ReactNode
+  defsMounted?: boolean
 }
 
 function assignAgent(comp: ComposeComponent, agents: ResolvedAgent[]) {
@@ -139,14 +142,18 @@ function fillsRegion(
   return inter >= 0.5 * bbox.w * bbox.h || inter >= 0.5 * rw * rh
 }
 
-export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, knownUrl, onAnimate, onComplete, onAspectRatio, fallback }: AnimatedSlidePreviewProps) {
+export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, knownUrl, onAnimate, onComplete, onAspectRatio, fallback, defsMounted }: AnimatedSlidePreviewProps) {
+  const wrapperRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const visibleRef = useSlideVisibility(wrapperRef)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
-  const intervalsRef = useRef<number[]>([])
+  const typewriterCancelsRef = useRef<(() => void)[]>([])
+  const releaseRef = useRef<(() => void) | null>(null)
   const lastComposeUrlRef = useRef("")
   const previousRegionsRef = useRef<ComposeRegion[]>([])
   const animatingRef = useRef(false)
   const [error, setError] = useState(false)
+  const [retryTick, setRetryTick] = useState(0)
   const [aspectRatio, setAspectRatio] = useState("16/9")
   const reducedMotion = useRef(
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -155,22 +162,27 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   const cleanup = useCallback(() => {
     timersRef.current.forEach(clearTimeout)
     timersRef.current = []
-    intervalsRef.current.forEach(clearInterval)
-    intervalsRef.current = []
+    typewriterCancelsRef.current.forEach(cancel => cancel())
+    typewriterCancelsRef.current = []
+    releaseRef.current?.()
+    releaseRef.current = null
     const parent = containerRef.current?.parentElement
     parent?.querySelectorAll(".asp-overlay, .asp-region-overlay").forEach(el => el.remove())
   }, [])
 
   useEffect(() => () => cleanup(), [cleanup])
 
-  // Track latest props in refs so the interval can read them without re-triggering
+  // Track latest props in refs so check() always reads current values
   const composeUrlRef = useRef(composeUrl)
   const defsUrlRef = useRef(defsUrl)
   const skipRef = useRef(skipAnimation)
   const knownUrlRef = useRef(knownUrl?.split("?")[0] || null)
+  const defsMountedRef = useRef(defsMounted)
   composeUrlRef.current = composeUrl
   defsUrlRef.current = defsUrl
   skipRef.current = skipAnimation
+  knownUrlRef.current = knownUrl?.split("?")[0] || null
+  defsMountedRef.current = defsMounted
 
   // Expose check() via ref so the composeUrl-change effect can trigger it
   const checkRef = useRef<() => void>(() => {})
@@ -183,7 +195,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       if (!compUrlBase) return
       if (compUrlBase === lastComposeUrlRef.current) return
       if (animatingRef.current) return  // defer until animation completes
-      const skipThisUpdate = skipRef.current || compUrlBase === knownUrlRef.current
+      const skipThisUpdate = skipRef.current || compUrlBase === knownUrlRef.current || !visibleRef.current
       lastComposeUrlRef.current = compUrlBase
 
       ;(async () => {
@@ -193,17 +205,19 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           if (typeof document !== "undefined" && document.fonts?.ready) {
             try { await document.fonts.ready } catch { /* ignore */ }
           }
-          const [defsResp, compResp] = await Promise.all([fetch(defsUrlRef.current), fetch(composeUrlRef.current)])
-          if (cancelled || !defsResp.ok || !compResp.ok) {
-            // Reset so the 1s polling interval retries this URL
+          const [defsResp, compResp] = await Promise.all([
+            defsMountedRef.current ? Promise.resolve(null) : fetch(defsUrlRef.current),
+            fetch(composeUrlRef.current),
+          ])
+          if (cancelled || !compResp.ok || (defsResp && !defsResp.ok)) {
             lastComposeUrlRef.current = ""
             setError(true); return
           }
 
-          const defsData: DefsData = await defsResp.json()
+          const defsData: DefsData | null = defsResp ? await defsResp.json() : null
           const data: ComposeData = await compResp.json()
 
-          if (defsData.version !== COMPOSE_VERSION || data.version !== COMPOSE_VERSION) {
+          if ((defsData && defsData.version !== COMPOSE_VERSION) || data.version !== COMPOSE_VERSION) {
             setError(true); return
           }
 
@@ -215,7 +229,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
 
           const container = containerRef.current
           if (!container || cancelled) {
-            // Container not mounted — reset so polling can retry once mounted
+            // Container not mounted — reset so a later prop change can retry
             lastComposeUrlRef.current = ""
             return
           }
@@ -246,8 +260,15 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           const hasAnimationTargets = animTargets.size > 0 || regionAnimTargets.size > 0
           const shouldAnimate = hasAnimationTargets && !reducedMotion.current
           if (shouldAnimate) {
-            onAnimate?.()
             animatingRef.current = true
+            const release = await acquire(slug || compUrlBase)
+            if (cancelled) {
+              release()
+              animatingRef.current = false
+              return
+            }
+            releaseRef.current = release
+            onAnimate?.()
           }
 
           // Resolve agent tokens once per animation cycle (theme-aware)
@@ -281,10 +302,13 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             svgEl.appendChild(rect)
           }
 
-          // Defs
-          const defsG = document.createElementNS("http://www.w3.org/2000/svg", "g")
-          defsG.innerHTML = defsData.defs
-          while (defsG.firstChild) svgEl.appendChild(defsG.firstChild)
+          // Defs are normally hoisted once by SlideCarousel. Keep the old path
+          // for standalone consumers that do not mount DeckDefs.
+          if (defsData) {
+            const defsG = document.createElementNS("http://www.w3.org/2000/svg", "g")
+            defsG.innerHTML = defsData.defs
+            while (defsG.firstChild) svgEl.appendChild(defsG.firstChild)
+          }
 
           // Components
           data.components.forEach((comp, i) => {
@@ -443,10 +467,12 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
                   const g = svgEl.querySelector(`g[data-index="${i}"]`) as SVGGElement | null
                   if (g) {
                     g.style.opacity = "1"
-                    g.style.filter = "brightness(2) saturate(0.5)"
-                    g.style.transition = "filter 0.5s cubic-bezier(0.16,1,0.3,1)"
-                    requestAnimationFrame(() => { g.style.filter = "brightness(1) saturate(1)" })
-                    typewrite(g)
+                    const flash = document.createElement("div")
+                    flash.className = "asp-land absolute"
+                    flash.style.cssText = `left:${pctL}%;top:${pctT}%;width:${pctW}%;height:${pctH}%;background:${agent.glow};`
+                    overlayContainer.appendChild(flash)
+                    flash.addEventListener("animationend", () => flash.remove(), { once: true })
+                    typewriterCancelsRef.current.push(typewrite(g))
                   }
                   markFilledRegions(comp)
                   const t4 = setTimeout(() => {
@@ -468,6 +494,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           const tDone = setTimeout(() => {
             markFilledByAll()
             animatingRef.current = false
+            releaseRef.current?.()
+            releaseRef.current = null
             overlayContainer.remove()
             onComplete?.()
             // Check if a new composeUrl arrived during animation
@@ -476,6 +504,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           timersRef.current.push(tDone)
         } catch {
           animatingRef.current = false
+          releaseRef.current?.()
+          releaseRef.current = null
           lastComposeUrlRef.current = ""
           setError(true)
         }
@@ -484,18 +514,27 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
 
     check()
     checkRef.current = check
-    const iv = window.setInterval(check, 1000)
-    return () => { cancelled = true; clearInterval(iv); cleanup() }
+    return () => { cancelled = true; cleanup() }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
 
-  // React immediately to composeUrl prop changes (avoid 1s interval lag)
+  // React immediately to composeUrl prop changes.
   useEffect(() => {
     checkRef.current?.()
   }, [composeUrl])
 
+  // Retry only while the current compose payload is in an error state.
+  useEffect(() => {
+    if (!error) return
+    const retry = window.setTimeout(() => {
+      checkRef.current?.()
+      setRetryTick((tick) => tick + 1)
+    }, 2000)
+    return () => clearTimeout(retry)
+  }, [error, composeUrl, retryTick])
+
   return (
-    <div data-slide-id={slug} className="relative overflow-hidden rounded-lg bg-black" style={{ aspectRatio }}>
+    <div ref={wrapperRef} data-slide-id={slug} className="slide-cv slide-shadow relative overflow-hidden rounded-lg bg-black" style={{ aspectRatio }}>
       <div ref={containerRef} className="absolute inset-0" data-slide-id={slug} />
       {error && fallback && <div data-fallback className="absolute inset-0">{fallback}</div>}
     </div>
@@ -510,26 +549,13 @@ function typewrite(compEl: SVGGElement) {
     if (ts.querySelectorAll("tspan").length === 0 && ts.textContent) {
       // Strip textLength / lengthAdjust permanently — restoring them after typewriter
       // completes causes webkit to horizontally compress glyphs.
-      // Natural glyph spacing is visually acceptable.
-      for (const attr of ["textLength", "lengthAdjust"]) {
-        ts.removeAttribute(attr)
-      }
+      for (const attr of ["textLength", "lengthAdjust"]) ts.removeAttribute(attr)
       totalChars += ts.textContent.length
       leafSpans.push({ el: ts, fullText: ts.textContent })
       ts.textContent = ""
     }
   })
-  if (!leafSpans.length) return
+  if (!leafSpans.length) return () => {}
   const charMs = Math.max(MIN_CHAR_MS, Math.min(MAX_CHAR_MS, Math.floor(TYPE_DURATION_MS / totalChars)))
-  let spanIdx = 0, charIdx = 0
-  const iv = window.setInterval(() => {
-    if (spanIdx >= leafSpans.length) { clearInterval(iv); return }
-    const span = leafSpans[spanIdx]
-    charIdx++
-    span.el.textContent = span.fullText.slice(0, charIdx)
-    if (charIdx >= span.fullText.length) {
-      spanIdx++
-      charIdx = 0
-    }
-  }, charMs)
+  return registerTypewriter(leafSpans, charMs)
 }

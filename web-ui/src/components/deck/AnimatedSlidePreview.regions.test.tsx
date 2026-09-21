@@ -153,3 +153,88 @@ describe("AnimatedSlidePreview layout regions", () => {
     expect(region.querySelector("rect")?.getAttribute("class")).toBe("asp-region-rect")
   })
 })
+
+describe("AnimatedSlidePreview performance gating", () => {
+  beforeEach(() => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({
+      matches: false,
+      media: "(prefers-reduced-motion: reduce)",
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })))
+  })
+
+  it("renders off-screen updates without agent cursors", async () => {
+    class OffscreenObserver implements IntersectionObserver {
+      readonly root = null
+      readonly rootMargin = "0px"
+  readonly scrollMargin = "0px"
+      readonly thresholds = [0, 0.5]
+      constructor(private callback: IntersectionObserverCallback) {}
+      observe(target: Element) {
+        this.callback([{
+          target,
+          isIntersecting: false,
+          intersectionRatio: 0,
+        } as IntersectionObserverEntry], this)
+      }
+      unobserve(): void {}
+      disconnect(): void {}
+      takeRecords(): IntersectionObserverEntry[] { return [] }
+    }
+    vi.stubGlobal("IntersectionObserver", OffscreenObserver)
+    mockFetch({
+      version: 1,
+      viewBox: "0 0 1920 1080",
+      bgFill: "#000",
+      bgSvg: null,
+      components: [component],
+    })
+
+    const { container } = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose.json" />
+    )
+
+    await waitFor(() => expect(container.querySelector('g[data-index="0"]')).toBeTruthy())
+    expect(container.querySelector(".asp-overlay")).toBeNull()
+    expect(container.textContent).not.toContain("Visual")
+  })
+
+  it("does not install a setInterval poll on mount", async () => {
+    const intervalSpy = vi.spyOn(window, "setInterval")
+    mockFetch({
+      version: 1,
+      viewBox: "0 0 1920 1080",
+      bgFill: "#000",
+      bgSvg: null,
+      components: [{ ...component, changed: false }],
+    })
+
+    const { container } = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose.json" />
+    )
+    await waitFor(() => expect(container.querySelector('g[data-index="0"]')).toBeTruthy())
+    expect(intervalSpy.mock.calls.some(([, delay]) => delay === 1000)).toBe(false)
+  })
+
+  it("skips per-slide defs fetching when the deck mounted them", async () => {
+    mockFetch({
+      version: 1,
+      viewBox: "0 0 1920 1080",
+      bgFill: "#000",
+      bgSvg: null,
+      components: [{ ...component, changed: false }],
+    })
+
+    const { container } = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose.json" defsMounted />
+    )
+    await waitFor(() => expect(container.querySelector('g[data-index="0"]')).toBeTruthy())
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith("/compose.json")
+  })
+})

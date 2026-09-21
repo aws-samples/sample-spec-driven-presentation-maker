@@ -18,6 +18,7 @@ import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
+import { DeckDefs } from "@/components/deck/DeckDefs"
 import { IS_LOCAL } from "@/lib/mode"
 import { notifyError } from "@/lib/errors"
 import { useTranslations } from "next-intl"
@@ -328,7 +329,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     if (slidesWithPreview.length === 0) return renderSlidesEmpty()
 
     return (
-      <div ref={containerRef} className="flex-1 overflow-y-auto px-6 py-6">
+      <div ref={containerRef} data-slide-scroller className="flex-1 overflow-y-auto px-6 py-6">
         {viewMode === "grid" ? (
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
             {slidesWithPreview.map((slide, i) => (
@@ -340,7 +341,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 slug={slide.slug}
                 onClick={() => onSlideClick?.(i + 1)}
                 updated={updatedIds.has(slide.slug)}
-                className="border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 cursor-pointer group"
+                className="slide-cv border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 cursor-pointer group"
               >
 
                 <span className="absolute bottom-1.5 right-2 text-[11px] font-medium text-white/30 group-hover:text-white/50 transition-colors">
@@ -365,6 +366,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 knownUrl={hadSlidesOnMount.current ? (knownComposeUrls.get(slide.slug) || null) : null}
                 onAnimate={() => handleAnimate(slide.slug)}
                 onAspectRatio={handleAspectRatio}
+                defsMounted
                 fallback={
                   <SlideThumbnail
                     src={slide.previewUrl}
@@ -373,7 +375,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                     slug={slide.slug}
                     onClick={() => onSlideClick?.(i + 1)}
                     onAspectRatio={handleAspectRatio}
-                    className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
+                    className="slide-cv slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
                   />
                 }
               />
@@ -387,7 +389,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 onClick={() => onSlideClick?.(i + 1)}
                 updated={updatedIds.has(slide.slug)}
                 onAspectRatio={handleAspectRatio}
-                className="slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
+                className="slide-cv slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
               />
             )
           ))}
@@ -399,6 +401,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
 
   return (
     <div className="h-full flex flex-col">
+      {defsUrl && <DeckDefs defsUrl={defsUrl} />}
       {/* Spec step navigation */}
       <SpecStepNav
         specs={specs}

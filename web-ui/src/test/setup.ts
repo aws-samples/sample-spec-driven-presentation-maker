@@ -8,3 +8,16 @@ class ResizeObserverStub implements ResizeObserver {
 }
 
 globalThis.ResizeObserver = ResizeObserverStub
+
+class IntersectionObserverStub implements IntersectionObserver {
+  readonly root = null
+  readonly rootMargin = "0px"
+  readonly scrollMargin = "0px"
+  readonly thresholds = [0, 0.5]
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+  takeRecords(): IntersectionObserverEntry[] { return [] }
+}
+
+globalThis.IntersectionObserver = IntersectionObserverStub
