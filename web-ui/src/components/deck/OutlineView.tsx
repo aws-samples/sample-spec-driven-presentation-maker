@@ -655,20 +655,9 @@ export function OutlineView({ content, deckId, idToken = "" }: OutlineViewProps)
           onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 4)}
         >
           <motion.main layout className={`storyboard-view storyboard-layout-${layout}`} data-layout={layout}>
-            <header className="storyboard-header">
-              <div className="storyboard-title-block">
-                <h1>
-                  <EditableText
-                    value={deckName}
-                    onChange={editor.updateDeckName}
-                    editor={editor}
-                    ariaLabel={t("deckNameField")}
-                    placeholder={t("deckNamePlaceholder")}
-                    className="storyboard-edit storyboard-deck-title-edit"
-                  />
-                </h1>
-                <p>{t("slideCount", { count: slides.length })}<span aria-hidden="true"> · </span>{t("chapterCount", { count: groups.filter((group) => group.section).length })}</p>
-                {editor.dirty && chat.isLoading && <p className="storyboard-streaming-hint">{t("streamingHint")}</p>}
+            <header className="storyboard-toolbar">
+              <div className="storyboard-toolbar-meta">
+                <p className="storyboard-counts">{t("slideCount", { count: slides.length })}<span aria-hidden="true"> · </span>{t("chapterCount", { count: groups.filter((group) => group.section).length })}</p>
               </div>
               <div className="storyboard-header-actions">
                 <AnimatePresence initial={false}>
@@ -683,6 +672,7 @@ export function OutlineView({ content, deckId, idToken = "" }: OutlineViewProps)
                       transition={{ duration: 0.18, ease: "easeOut" }}
                     >
                       <div className="storyboard-dirty-summary"><span aria-hidden="true" />{t("unsentChanges", { count: editor.stats.added + editor.stats.deleted })}</div>
+                      {chat.isLoading && <span className="storyboard-streaming-hint">{t("streamingHint")}</span>}
                       <button type="button" className="storyboard-polish-toggle" role="switch" aria-checked={polish} onClick={togglePolish}>
                         <span data-on={polish || undefined}><i /></span>{t("polish")}
                       </button>
@@ -706,6 +696,18 @@ export function OutlineView({ content, deckId, idToken = "" }: OutlineViewProps)
                 </div>
               </div>
             </header>
+            <div className="storyboard-title-block">
+                <h1>
+                  <EditableText
+                    value={deckName}
+                    onChange={editor.updateDeckName}
+                    editor={editor}
+                    ariaLabel={t("deckNameField")}
+                    placeholder={t("deckNamePlaceholder")}
+                    className="storyboard-edit storyboard-deck-title-edit"
+                  />
+                </h1>
+            </div>
 
             {slides.length === 0 && groups.length === 0 ? (
               <div className="storyboard-empty">
