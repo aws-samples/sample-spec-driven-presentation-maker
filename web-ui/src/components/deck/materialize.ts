@@ -5,6 +5,7 @@ const SVG_NS = "http://www.w3.org/2000/svg"
 const DURATION_MS = 700
 const COMPONENT_STAGGER_MS = 90
 const LINE_STAGGER_MS = 55
+const CHILD_STAGGER_MS = 45
 const SPRING_K = 300
 const SPRING_C = 20
 const FRAME_COUNT = 40
@@ -73,15 +74,11 @@ export function settleTargets(component: MaterializeComponent, group: SVGGElemen
   return [group]
 }
 
-function preFilter(noBlur: boolean) {
-  return `${noBlur ? "" : "blur(8px) "}saturate(0.7) brightness(1.12)`
-}
-
 function markTarget(target: SVGElement, noBlur: boolean) {
   target.classList.add("asp-materialize-target")
   target.style.opacity = "0.45"
   target.style.transform = "scale(0.96)"
-  target.style.filter = preFilter(noBlur)
+  if (!noBlur) target.style.filter = "blur(8px) saturate(0.7) brightness(1.12)"
 }
 
 export function markUnsettled(group: SVGGElement, component: MaterializeComponent) {
@@ -116,13 +113,15 @@ function frames(noBlur: boolean): Keyframe[] {
     const position = index / FRAME_COUNT
     const spring = springAt(position * DURATION_MS / 1000)
     const focus = easeOutExpo(Math.min(1, position / 0.6))
-    const blur = noBlur ? "" : `blur(${lerp(8, 0, focus).toFixed(2)}px) `
-    result.push({
+    const frame: Keyframe = {
       offset: position,
       transform: `scale(${lerp(0.96, 1, spring).toFixed(4)})`,
       opacity: lerp(0.45, 1, focus).toFixed(3),
-      filter: `${blur}saturate(${lerp(0.7, 1, focus).toFixed(3)}) brightness(${lerp(1.12, 1, focus).toFixed(3)})`,
-    })
+    }
+    if (!noBlur) {
+      frame.filter = `blur(${lerp(8, 0, focus).toFixed(2)}px) saturate(${lerp(0.7, 1, focus).toFixed(3)}) brightness(${lerp(1.12, 1, easeOutExpo(position)).toFixed(3)})`
+    }
+    result.push(frame)
   }
   return result
 }
@@ -151,8 +150,10 @@ export function settle(
   items.forEach((item, itemIndex) => {
     const noBlur = /Graphic/i.test(item.component.class) && isHeavy(item.element)
     const targets = settleTargets(item.component, item.element)
-    targets.forEach((target, targetIndex) => {
-      const delay = itemIndex * COMPONENT_STAGGER_MS + targetIndex * LINE_STAGGER_MS
+    let targetOffset = 0
+    targets.forEach((target) => {
+      const delay = itemIndex * COMPONENT_STAGGER_MS + targetOffset
+      targetOffset += target.tagName.toLowerCase() === "text" ? LINE_STAGGER_MS : CHILD_STAGGER_MS
       latestDelay = Math.max(latestDelay, delay)
       if (reducedMotion || typeof target.animate !== "function") {
         clearTarget(target)

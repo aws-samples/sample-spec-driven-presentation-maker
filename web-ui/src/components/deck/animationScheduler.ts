@@ -3,8 +3,13 @@
 
 export const MAX_CONCURRENT = 2
 
-type Release = () => void
-type Waiter = { slug: string; resolve: (release: Release) => void }
+export type Release = () => void
+type Waiter = {
+  slug: string
+  signal?: AbortSignal
+  resolve: (release: Release | null) => void
+  abortWhileQueued?: () => void
+}
 
 let active = 0
 const queue: Waiter[] = []
@@ -19,18 +24,44 @@ function makeRelease(): Release {
   }
 }
 
+function grant(waiter: Waiter) {
+  waiter.signal?.removeEventListener("abort", waiter.abortWhileQueued!)
+  if (waiter.signal?.aborted) {
+    waiter.resolve(null)
+    return
+  }
+
+  active++
+  const releaseSlot = makeRelease()
+  const abortAfterGrant = () => releaseSlot()
+  waiter.signal?.addEventListener("abort", abortAfterGrant, { once: true })
+  waiter.resolve(() => {
+    waiter.signal?.removeEventListener("abort", abortAfterGrant)
+    releaseSlot()
+  })
+}
+
 function drain() {
   while (active < MAX_CONCURRENT && queue.length > 0) {
-    const next = queue.shift()!
-    active++
-    next.resolve(makeRelease())
+    grant(queue.shift()!)
   }
 }
 
 /** Acquire one of the two deck-wide animation slots in FIFO order. */
-export function acquire(slug: string): Promise<Release> {
+export function acquire(slug: string, signal?: AbortSignal): Promise<Release | null> {
   return new Promise((resolve) => {
-    queue.push({ slug, resolve })
+    if (signal?.aborted) {
+      resolve(null)
+      return
+    }
+    const waiter: Waiter = { slug, signal, resolve }
+    waiter.abortWhileQueued = () => {
+      const index = queue.indexOf(waiter)
+      if (index >= 0) queue.splice(index, 1)
+      resolve(null)
+    }
+    signal?.addEventListener("abort", waiter.abortWhileQueued, { once: true })
+    queue.push(waiter)
     drain()
   })
 }
@@ -64,7 +95,9 @@ function applyCharacterCount(writer: Typewriter, count: number) {
 export function advanceTypewriters(now: number) {
   for (const writer of typewriters) {
     const total = writer.spans.reduce((sum, span) => sum + span.fullText.length, 0)
-    const shown = Math.min(total, Math.max(0, Math.floor((now - writer.startedAt) / writer.charMs)))
+    const elapsedTarget = Math.min(total, Math.max(0, Math.floor((now - writer.startedAt) / writer.charMs)))
+    // Preserve the per-character feel after a long frame instead of dumping a word at once.
+    const shown = Math.min(elapsedTarget, writer.shown + 2)
     if (shown !== writer.shown) {
       writer.shown = shown
       applyCharacterCount(writer, shown)
@@ -95,7 +128,10 @@ export function registerTypewriter(spans: TypewriterSpan[], charMs: number): () 
 /** Test-only reset for module singleton state. */
 export function resetAnimationSchedulerForTests() {
   active = 0
-  queue.splice(0)
+  for (const waiter of queue.splice(0)) {
+    waiter.signal?.removeEventListener("abort", waiter.abortWhileQueued!)
+    waiter.resolve(null)
+  }
   typewriters.clear()
   if (frameId !== null) cancelAnimationFrame(frameId)
   frameId = null

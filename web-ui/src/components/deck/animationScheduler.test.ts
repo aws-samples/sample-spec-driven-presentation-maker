@@ -35,18 +35,34 @@ describe("animation scheduler", () => {
     await Promise.resolve()
     expect(granted).toEqual(["one", "two"])
 
-    releaseOne()
+    releaseOne!()
     const releaseThree = await third
     expect(granted).toEqual(["one", "two", "three"])
 
-    releaseTwo()
+    releaseTwo!()
     const releaseFour = await fourth
     expect(granted).toEqual(["one", "two", "three", "four"])
-    releaseThree()
-    releaseFour()
+    releaseThree!()
+    releaseFour!()
   })
 
-  it("advances all registered spans from elapsed time", () => {
+  it("removes an aborted waiter from the queue", async () => {
+    const releaseOne = await acquire("one")
+    const releaseTwo = await acquire("two")
+    const controller = new AbortController()
+    const queued = acquire("hidden", controller.signal)
+
+    controller.abort()
+    expect(await queued).toBeNull()
+
+    releaseOne!()
+    const releaseNext = await acquire("next")
+    expect(releaseNext).toBeTypeOf("function")
+    releaseTwo!()
+    releaseNext!()
+  })
+
+  it("advances all registered spans by at most two characters per frame", () => {
     const first = document.createElement("span")
     const second = document.createElement("span")
     registerTypewriter([
@@ -60,7 +76,7 @@ describe("animation scheduler", () => {
 
     advanceTypewriters(181)
     expect(first.textContent).toBe("abc")
-    expect(second.textContent).toBe("d")
+    expect(second.textContent).toBe("")
 
     advanceTypewriters(205)
     expect(second.textContent).toBe("de")

@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: MIT-0
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { cleanup, render, waitFor } from "@testing-library/react"
+import { act, cleanup, render, waitFor } from "@testing-library/react"
 import { AnimatedSlidePreview } from "./AnimatedSlidePreview"
+import { resetAnimationSchedulerForTests } from "./animationScheduler"
 
 const defs = { version: 1, defs: "<defs />" }
 const component = {
@@ -22,6 +23,7 @@ function mockFetch(compose: Record<string, unknown>) {
 }
 
 beforeEach(() => {
+  resetAnimationSchedulerForTests()
   vi.stubGlobal("matchMedia", vi.fn(() => ({
     matches: true,
     media: "(prefers-reduced-motion: reduce)",
@@ -36,6 +38,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  resetAnimationSchedulerForTests()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
@@ -238,6 +242,28 @@ describe("AnimatedSlidePreview performance gating", () => {
     expect(fetch).toHaveBeenCalledWith("/compose.json")
   })
 
+
+  it("falls back to per-slide defs when deck-level defs are unavailable", async () => {
+    mockFetch({
+      version: 1,
+      viewBox: "0 0 1920 1080",
+      bgFill: "#000",
+      bgSvg: null,
+      components: [{ ...component, changed: false }],
+    })
+
+    const rendered = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-1.json" defsMounted />
+    )
+    await waitFor(() => expect(rendered.container.querySelector('g[data-index="0"]')).toBeTruthy())
+    expect(fetch).not.toHaveBeenCalledWith("/defs.json")
+
+    rendered.rerender(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" defsMounted={false} />
+    )
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/defs.json"))
+  })
+
   it("accumulates unsettled changed indices across off-screen updates", async () => {
     class OffscreenObserver implements IntersectionObserver {
       readonly root = null
@@ -267,7 +293,7 @@ describe("AnimatedSlidePreview performance gating", () => {
         bgFill: "#000",
         bgSvg: null,
         components: url.includes("compose-2")
-          ? [{ ...first, changed: false }, { ...second, changed: true }]
+          ? [{ ...second, changed: true }, { ...first, changed: false }]
           : [first, second],
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve(data) })
@@ -281,8 +307,157 @@ describe("AnimatedSlidePreview performance gating", () => {
     rendered.rerender(
       <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" />
     )
-    await waitFor(() => expect(rendered.container.querySelector('g[data-index="1"]')?.getAttribute("data-unsettled")).toBe("true"))
-    expect(rendered.container.querySelector('g[data-index="0"]')?.getAttribute("data-unsettled")).toBe("true")
+    await waitFor(() => expect(rendered.container.querySelector('g[data-index="0"]')?.getAttribute("data-unsettled")).toBe("true"))
+    // The first component moved from index 0 to 1 but remains accumulated by identity.
+    expect(rendered.container.querySelector('g[data-index="1"]')?.getAttribute("data-unsettled")).toBe("true")
     expect(rendered.container.querySelector(".asp-overlay")).toBeNull()
+  })
+})
+
+
+class ControlledObserver implements IntersectionObserver {
+  static instances: ControlledObserver[] = []
+  readonly root = null
+  readonly rootMargin = "0px"
+  readonly scrollMargin = "0px"
+  readonly thresholds = [0, 0.5]
+  readonly targets = new Set<Element>()
+
+  constructor(private callback: IntersectionObserverCallback) {
+    ControlledObserver.instances.push(this)
+  }
+
+  observe(target: Element) { this.targets.add(target) }
+  unobserve(target: Element) { this.targets.delete(target) }
+  disconnect() { this.targets.clear() }
+  takeRecords(): IntersectionObserverEntry[] { return [] }
+
+  emit(target: Element, visible: boolean) {
+    this.callback([{
+      target,
+      isIntersecting: visible,
+      intersectionRatio: visible ? 1 : 0,
+    } as IntersectionObserverEntry], this)
+  }
+
+  static emit(target: Element, visible: boolean) {
+    const observer = ControlledObserver.instances.find((candidate) => candidate.targets.has(target))
+    if (!observer) throw new Error("No observer owns target")
+    observer.emit(target, visible)
+  }
+}
+
+describe("AnimatedSlidePreview visibility and error races", () => {
+  beforeEach(() => {
+    ControlledObserver.instances = []
+    vi.stubGlobal("IntersectionObserver", ControlledObserver)
+    vi.stubGlobal("matchMedia", vi.fn(() => ({
+      matches: false,
+      media: "(prefers-reduced-motion: reduce)",
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })))
+  })
+
+  it("waits for the first IO result, then animates a slide visible on mount without unsettling it", async () => {
+    mockFetch({
+      version: 1,
+      viewBox: "0 0 1920 1080",
+      bgFill: "#000",
+      bgSvg: null,
+      components: [component],
+    })
+    const onAnimate = vi.fn()
+    const rendered = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose.json" slug="visible" onAnimate={onAnimate} />
+    )
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+    expect(rendered.container.querySelector('g[data-index="0"]')).toBeNull()
+
+    const wrapper = rendered.container.querySelector('[data-slide-id="visible"]')!
+    act(() => ControlledObserver.emit(wrapper, true))
+
+    await waitFor(() => expect(onAnimate).toHaveBeenCalledTimes(1))
+    expect(rendered.container.querySelector('g[data-index="0"]')?.hasAttribute("data-unsettled")).toBe(false)
+  })
+
+  it("drops a queued animation when the slide becomes hidden and applies the unsettled final SVG", async () => {
+    mockFetch({
+      version: 1,
+      viewBox: "0 0 1920 1080",
+      bgFill: "#000",
+      bgSvg: null,
+      components: [component],
+    })
+    const callbacks = [vi.fn(), vi.fn(), vi.fn()]
+    const first = render(<AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/one.json" slug="one" onAnimate={callbacks[0]} />)
+    const second = render(<AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/two.json" slug="two" onAnimate={callbacks[1]} />)
+    const third = render(<AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/three.json" slug="three" onAnimate={callbacks[2]} />)
+    const wrappers = [first, second, third].map((view, index) => view.container.querySelector(`[data-slide-id="${["one", "two", "three"][index]}"]`)!)
+
+    act(() => wrappers.forEach((wrapper) => ControlledObserver.emit(wrapper, true)))
+    await waitFor(() => {
+      expect(callbacks[0]).toHaveBeenCalledTimes(1)
+      expect(callbacks[1]).toHaveBeenCalledTimes(1)
+    })
+    expect(callbacks[2]).not.toHaveBeenCalled()
+
+    act(() => ControlledObserver.emit(wrappers[2], false))
+    first.unmount()
+
+    await waitFor(() => expect(third.container.querySelector('g[data-index="0"]')).toBeTruthy())
+    const landed = third.container.querySelector('g[data-index="0"]') as SVGGElement
+    expect(callbacks[2]).not.toHaveBeenCalled()
+    expect(third.container.querySelector(".asp-overlay")).toBeNull()
+    expect(landed.style.opacity).not.toBe("0")
+    expect(landed.dataset.unsettled).toBe("true")
+  })
+
+  it("keeps the previous SVG and schedules retry for a transient 404 without showing fallback", async () => {
+    const timeoutSpy = vi.spyOn(window, "setTimeout")
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
+      const url = String(input)
+      if (url.includes("defs")) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(defs) })
+      if (url.includes("missing")) return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) })
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ version: 1, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components: [{ ...component, changed: false }] }),
+      })
+    }))
+    const rendered = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/good.json" skipAnimation fallback={<div>fallback</div>} />
+    )
+    const wrapper = rendered.container.querySelector(".slide-cv")!
+    act(() => ControlledObserver.emit(wrapper, true))
+    await waitFor(() => expect(rendered.container.querySelector('g[data-index="0"]')).toBeTruthy())
+
+    rendered.rerender(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/missing.json" skipAnimation fallback={<div>fallback</div>} />
+    )
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/missing.json"))
+    await waitFor(() => expect(timeoutSpy.mock.calls.some(([, delay]) => delay === 2000)).toBe(true))
+    expect(rendered.container.querySelector('g[data-index="0"]')).toBeTruthy()
+    expect(rendered.container.querySelector("[data-fallback]")).toBeNull()
+  })
+
+  it("shows a permanent payload error without scheduling retries until composeUrl changes", async () => {
+    const timeoutSpy = vi.spyOn(window, "setTimeout")
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
+      const data = String(input).includes("defs")
+        ? defs
+        : { version: 2, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components: [component] }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) })
+    }))
+    const rendered = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/bad-schema.json" fallback={<div>fallback</div>} />
+    )
+
+    await waitFor(() => expect(rendered.container.querySelector("[data-fallback]")).toBeTruthy())
+    expect(timeoutSpy.mock.calls.some(([, delay]) => delay === 2000)).toBe(false)
   })
 })

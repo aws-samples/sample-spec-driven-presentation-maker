@@ -18,7 +18,7 @@ import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
-import { DeckDefs } from "@/components/deck/DeckDefs"
+import { DeckDefs, type DeckDefsStatus } from "@/components/deck/DeckDefs"
 import { useFollowScroll } from "@/components/deck/useFollowScroll"
 import { IS_LOCAL } from "@/lib/mode"
 import { notifyError } from "@/lib/errors"
@@ -73,6 +73,14 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
   const followChangedSlide = useFollowScroll(containerRef)
+  const [defsState, setDefsState] = useState<{ url: string; status: DeckDefsStatus }>({
+    url: defsUrl || "",
+    status: "loading",
+  })
+  const handleDefsStatus = useCallback((status: DeckDefsStatus) => {
+    setDefsState({ url: defsUrl || "", status })
+  }, [defsUrl])
+  const deckDefsReady = Boolean(defsUrl && defsState.url === defsUrl && defsState.status === "loaded")
 
   /* ── Aspect ratio reported by the first child (deck is uniform) ── */
   const [deckAr, setDeckAr] = useState(16 / 9)
@@ -93,7 +101,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   useEffect(() => {
     let latestChangedSlug: string | null = null
     for (const slide of slides) {
-      const key = slide.composeUrl?.split("?")[0] || ""
+      const key = slide.composeUrl || ""
       const prev = prevComposeKeys.current.get(slide.slug) || ""
       if (key && prev && key !== prev) latestChangedSlug = slide.slug
       if (key && !prev && firstComposeSeen) latestChangedSlug = slide.slug
@@ -353,7 +361,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 skipAnimation={hadSlidesOnMount.current && !firstComposeSeen}
                 knownUrl={hadSlidesOnMount.current ? (knownComposeUrls.get(slide.slug) || null) : null}
                 onAspectRatio={handleAspectRatio}
-                defsMounted
+                defsMounted={deckDefsReady}
                 fallback={
                   <SlideThumbnail
                     src={slide.previewUrl}
@@ -388,7 +396,9 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
 
   return (
     <div className="h-full flex flex-col">
-      {defsUrl && <DeckDefs defsUrl={defsUrl} />}
+      {defsUrl && viewMode === "full" && specTab === "slides" && (
+        <DeckDefs defsUrl={defsUrl} onStatusChange={handleDefsStatus} />
+      )}
       {/* Spec step navigation */}
       <SpecStepNav
         specs={specs}

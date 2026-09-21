@@ -751,14 +751,16 @@ body {
   content-visibility: auto;
 }
 
-/* Compositor-friendly replacement for the SVG brightness/saturation flash. */
+/* Compositor-friendly replacement for the original SVG brightness/saturation flash. */
 @keyframes asp-land {
   from { opacity: 1; }
   to { opacity: 0; }
 }
 .asp-land {
   border-radius: 2px;
-  animation: asp-land 500ms ease-out forwards;
+  mix-blend-mode: screen;
+  will-change: opacity;
+  animation: asp-land 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .asp-materialize-target {

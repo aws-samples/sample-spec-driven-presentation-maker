@@ -36,7 +36,7 @@ const AGENTS = [
   { name: "Decorator", token: "--agent-decorator" },
 ] as const
 
-type ResolvedAgent = { name: string; color: string; glow: string; bg: string }
+type ResolvedAgent = { name: string; color: string; glow: string; landingGlow: string; bg: string }
 
 /** Resolve CSS variable tokens into usable color strings (theme-aware). */
 function resolveAgents(): ResolvedAgent[] {
@@ -49,6 +49,7 @@ function resolveAgents(): ResolvedAgent[] {
       name: a.name,
       color: `color-mix(in oklch, ${base} 55%, transparent)`,
       glow: `color-mix(in oklch, ${base} 10%, transparent)`,
+      landingGlow: `color-mix(in oklch, ${base} 35%, transparent)`,
       bg: base,
     }
   })
@@ -84,6 +85,27 @@ interface DefsData {
   defs: string
 }
 
+function isComposeData(value: unknown): value is ComposeData {
+  if (!value || typeof value !== "object") return false
+  const data = value as Partial<ComposeData>
+  return typeof data.version === "number"
+    && typeof data.viewBox === "string"
+    && typeof data.bgFill === "string"
+    && (data.bgSvg === null || typeof data.bgSvg === "string")
+    && Array.isArray(data.components)
+    && data.components.every((component) => Boolean(component)
+      && typeof component.class === "string"
+      && typeof component.text === "string"
+      && typeof component.svg === "string"
+      && typeof component.changed === "boolean")
+}
+
+function isDefsData(value: unknown): value is DefsData {
+  if (!value || typeof value !== "object") return false
+  const data = value as Partial<DefsData>
+  return typeof data.version === "number" && typeof data.defs === "string"
+}
+
 interface AnimatedSlidePreviewProps {
   defsUrl: string
   composeUrl: string
@@ -108,6 +130,25 @@ function assignAgent(comp: ComposeComponent, agents: ResolvedAgent[]) {
 
 function regionKey(region: ComposeRegion) {
   return `${region.name}|${region.x},${region.y},${region.w},${region.h}`
+}
+
+function hashIdentity(value: string) {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(36)
+}
+
+/** Stable across payload reordering; SVG IDs are preferred when LibreOffice supplied one. */
+export function composeComponentKey(component: ComposeComponent) {
+  const id = component.svg.match(/\bid\s*=\s*["']([^"']+)["']/)?.[1]
+  if (id) return `id:${id}`
+  const bbox = component.bbox
+    ? `${component.bbox.x},${component.bbox.y},${component.bbox.w},${component.bbox.h}`
+    : "none"
+  return `hash:${hashIdentity(`${component.class}|${bbox}|${component.text}`)}`
 }
 
 /**
@@ -146,14 +187,18 @@ function fillsRegion(
 export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, knownUrl, onAnimate, onComplete, onAspectRatio, fallback, defsMounted }: AnimatedSlidePreviewProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const unsettledRef = useRef(new Set<number>())
-  const latestComponentsRef = useRef<ComposeComponent[]>([])
+  const unsettledRef = useRef(new Set<string>())
+  const latestComponentsRef = useRef(new Map<string, ComposeComponent>())
   const hasBeenOffscreenRef = useRef(false)
   const settlePendingRef = useRef<() => void>(() => {})
-  const visibleRef = useSlideVisibility(wrapperRef, 0.5, (visible) => {
-    if (!visible) {
+  const visibilityWaitersRef = useRef(new Set<(visibility: "visible" | "hidden") => void>())
+  const checkRef = useRef<() => void>(() => {})
+  const visibleRef = useSlideVisibility(wrapperRef, 0.5, (visibility) => {
+    visibilityWaitersRef.current.forEach((resolve) => resolve(visibility))
+    visibilityWaitersRef.current.clear()
+    if (visibility === "hidden") {
       hasBeenOffscreenRef.current = true
-    } else if (hasBeenOffscreenRef.current) {
+    } else if (hasBeenOffscreenRef.current && unsettledRef.current.size > 0) {
       settlePendingRef.current()
     }
   })
@@ -164,7 +209,11 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   const lastComposeUrlRef = useRef("")
   const previousRegionsRef = useRef<ComposeRegion[]>([])
   const animatingRef = useRef(false)
-  const [error, setError] = useState(false)
+  const [errorKind, setErrorKind] = useState<"retryable" | "permanent" | null>(null)
+  const errorKindRef = useRef(errorKind)
+  errorKindRef.current = errorKind
+  const [showError, setShowError] = useState(false)
+  const retryFailureRef = useRef<{ url: string; startedAt: number } | null>(null)
   const [retryTick, setRetryTick] = useState(0)
   const [aspectRatio, setAspectRatio] = useState("16/9")
   const reducedMotion = useRef(
@@ -191,12 +240,16 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     const slide = wrapperRef.current
     if (!container || !slide || unsettledRef.current.size === 0) return
     const items: MaterializeItem[] = []
-    for (const index of unsettledRef.current) {
-      const element = container.querySelector<SVGGElement>(`g[data-index="${index}"]`)
-      const component = latestComponentsRef.current[index]
-      if (element && component) items.push({ component, element })
+    const elements = Array.from(container.querySelectorAll<SVGGElement>("g[data-component-key]"))
+    for (const key of unsettledRef.current) {
+      const element = elements.find((candidate) => candidate.dataset.componentKey === key)
+      const component = latestComponentsRef.current.get(key)
+      if (element && component) {
+        items.push({ component, element })
+        unsettledRef.current.delete(key)
+      }
     }
-    unsettledRef.current.clear()
+    if (items.length === 0) return
     materializeCancelRef.current?.()
     materializeCancelRef.current = settle(slide, items, { reducedMotion: reducedMotion.current })
   }
@@ -213,19 +266,47 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   knownUrlRef.current = knownUrl?.split("?")[0] || null
   defsMountedRef.current = defsMounted
 
-  // Expose check() via ref so the composeUrl-change effect can trigger it
-  const checkRef = useRef<() => void>(() => {})
-
   useEffect(() => {
     let cancelled = false
+    const acquireController = new AbortController()
+
+    const waitForFirstVisibility = () => {
+      if (visibleRef.current !== "unknown") return Promise.resolve(visibleRef.current)
+      return new Promise<"visible" | "hidden">((resolve) => {
+        visibilityWaitersRef.current.add(resolve)
+      })
+    }
+    const markPermanentError = () => {
+      if (cancelled) return
+      errorKindRef.current = "permanent"
+      setErrorKind("permanent")
+      setShowError(true)
+    }
+    const markRetryableError = (requestedUrl: string, hideTransient404: boolean) => {
+      if (cancelled || requestedUrl !== composeUrlRef.current) return
+      lastComposeUrlRef.current = ""
+      errorKindRef.current = "retryable"
+      setErrorKind("retryable")
+      if (!hideTransient404) {
+        retryFailureRef.current = null
+        setShowError(true)
+        return
+      }
+      const now = Date.now()
+      if (retryFailureRef.current?.url !== requestedUrl) {
+        retryFailureRef.current = { url: requestedUrl, startedAt: now }
+      }
+      setShowError(now - retryFailureRef.current.startedAt >= 3000)
+    }
 
     function check() {
-      const compUrlBase = composeUrlRef.current?.split("?")[0] || ""
-      if (!compUrlBase) return
-      if (compUrlBase === lastComposeUrlRef.current) return
+      const requestedUrl = composeUrlRef.current
+      const compUrlBase = requestedUrl?.split("?")[0] || ""
+      if (!requestedUrl || !compUrlBase) return
+      if (requestedUrl === lastComposeUrlRef.current) return
       if (animatingRef.current) return  // defer until animation completes
       const suppressThisUpdate = skipRef.current || compUrlBase === knownUrlRef.current
-      lastComposeUrlRef.current = compUrlBase
+      lastComposeUrlRef.current = requestedUrl
 
       ;(async () => {
         try {
@@ -236,25 +317,50 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           }
           const [defsResp, compResp] = await Promise.all([
             defsMountedRef.current ? Promise.resolve(null) : fetch(defsUrlRef.current),
-            fetch(composeUrlRef.current),
+            fetch(requestedUrl),
           ])
-          if (cancelled || !compResp.ok || (defsResp && !defsResp.ok)) {
-            lastComposeUrlRef.current = ""
-            setError(true); return
+          if (cancelled || requestedUrl !== composeUrlRef.current) return
+          if (!compResp.ok) {
+            markRetryableError(requestedUrl, compResp.status === 404)
+            return
+          }
+          if (defsResp && !defsResp.ok) {
+            markRetryableError(requestedUrl, false)
+            return
           }
 
-          const defsData: DefsData | null = defsResp ? await defsResp.json() : null
-          const data: ComposeData = await compResp.json()
-
-          if ((defsData && defsData.version !== COMPOSE_VERSION) || data.version !== COMPOSE_VERSION) {
-            setError(true); return
+          let parsedDefs: unknown = null
+          let parsedData: unknown
+          try {
+            parsedDefs = defsResp ? await defsResp.json() : null
+            parsedData = await compResp.json()
+          } catch {
+            markPermanentError()
+            return
           }
+          if (cancelled || requestedUrl !== composeUrlRef.current) return
 
-          // Empty content = nothing to render → treat as failure (fallback to PNG)
+          if (
+            (parsedDefs !== null && (!isDefsData(parsedDefs) || parsedDefs.version !== COMPOSE_VERSION))
+            || !isComposeData(parsedData)
+            || parsedData.version !== COMPOSE_VERSION
+          ) {
+            markPermanentError()
+            return
+          }
+          const defsData = parsedDefs
+          const data = parsedData
+
+          // Empty content is a permanent payload error; retry only after composeUrl changes.
           if (!data.bgSvg && data.components.length === 0) {
-            lastComposeUrlRef.current = ""
-            setError(true); return
+            markPermanentError()
+            return
           }
+
+          // Compose can resolve before IntersectionObserver's first callback. Do not
+          // classify that initial unknown state as off-screen.
+          const visibleAtArrival = await waitForFirstVisibility()
+          if (cancelled || requestedUrl !== composeUrlRef.current) return
 
           const container = containerRef.current
           if (!container || cancelled) {
@@ -264,26 +370,37 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           }
 
           cleanup()
-          setError(false)
+          errorKindRef.current = null
+          retryFailureRef.current = null
+          setErrorKind(null)
+          setShowError(false)
           // Immediately hide fallback (React re-render is async)
           const fb = container.parentElement?.querySelector("[data-fallback]") as HTMLElement | null
           if (fb) fb.style.display = "none"
 
-          const visibleAtArrival = visibleRef.current
-          const skipAgentAnimation = suppressThisUpdate || !visibleAtArrival
-          const changedTargets = new Set<number>()
+          const componentEntries = data.components.map((component, index) => ({
+            component,
+            index,
+            key: composeComponentKey(component),
+          }))
+          const currentKeys = new Set(componentEntries.map((entry) => entry.key))
+          for (const key of unsettledRef.current) {
+            if (!currentKeys.has(key)) unsettledRef.current.delete(key)
+          }
+          const skipAgentAnimation = suppressThisUpdate || visibleAtArrival !== "visible"
+          const changedTargets = new Set<string>()
           if (!suppressThisUpdate) {
-            data.components.forEach((comp, i) => {
-              if (comp.changed) changedTargets.add(i)
+            componentEntries.forEach(({ component, key }) => {
+              if (component.changed) changedTargets.add(key)
             })
           }
-          const animTargets = visibleAtArrival ? changedTargets : new Set<number>()
-          if (!visibleAtArrival && !reducedMotion.current) {
-            changedTargets.forEach((index) => unsettledRef.current.add(index))
+          const animTargets = visibleAtArrival === "visible" ? new Set(changedTargets) : new Set<string>()
+          if (visibleAtArrival === "hidden" && !reducedMotion.current) {
+            changedTargets.forEach((key) => unsettledRef.current.add(key))
           } else if (reducedMotion.current) {
             unsettledRef.current.clear()
           }
-          latestComponentsRef.current = data.components
+          latestComponentsRef.current = new Map(componentEntries.map(({ key, component }) => [key, component]))
 
           const regions = data.regions ?? []
           const previousRegionKeys = new Set(previousRegionsRef.current.map(regionKey))
@@ -295,18 +412,29 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           }
           previousRegionsRef.current = regions.map(region => ({ ...region }))
 
-          const hasAnimationTargets = animTargets.size > 0 || regionAnimTargets.size > 0
-          const shouldAnimate = hasAnimationTargets && !reducedMotion.current
-          if (shouldAnimate) {
+          let hasAnimationTargets = animTargets.size > 0 || regionAnimTargets.size > 0
+          if (hasAnimationTargets && !reducedMotion.current) {
             animatingRef.current = true
-            const release = await acquire(slug || compUrlBase)
-            if (cancelled) {
-              release()
+            const release = await acquire(slug || compUrlBase, acquireController.signal)
+            if (!release || cancelled) {
+              release?.()
               animatingRef.current = false
               return
             }
-            releaseRef.current = release
-            onAnimate?.()
+            // A queued slide may have become hidden while waiting for its slot.
+            if (visibleRef.current !== "visible") {
+              release()
+              animatingRef.current = false
+              animTargets.clear()
+              regionAnimTargets.clear()
+              hasAnimationTargets = false
+              if (visibleRef.current === "hidden") {
+                changedTargets.forEach((key) => unsettledRef.current.add(key))
+              }
+            } else {
+              releaseRef.current = release
+              onAnimate?.()
+            }
           }
 
           // Resolve agent tokens once per animation cycle (theme-aware)
@@ -349,13 +477,14 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           }
 
           // Components
-          data.components.forEach((comp, i) => {
+          componentEntries.forEach(({ component, index, key }) => {
             const g = document.createElementNS("http://www.w3.org/2000/svg", "g")
-            g.innerHTML = comp.svg
-            g.dataset.index = String(i)
-            g.style.opacity = (animTargets.has(i) && !reducedMotion.current) ? "0" : "1"
+            g.innerHTML = component.svg
+            g.dataset.index = String(index)
+            g.dataset.componentKey = key
+            g.style.opacity = (animTargets.has(key) && !reducedMotion.current) ? "0" : "1"
             svgEl.appendChild(g)
-            if (unsettledRef.current.has(i) && !reducedMotion.current) markUnsettled(g, comp)
+            if (unsettledRef.current.has(key) && !reducedMotion.current) markUnsettled(g, component)
           })
 
           // Layout regions sit above slide components; labels stay HTML-sized.
@@ -398,6 +527,9 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
 
           container.appendChild(svgEl)
           if (regions.length > 0) container.parentElement?.appendChild(regionOverlay)
+          if (visibleRef.current === "visible" && hasBeenOffscreenRef.current && unsettledRef.current.size > 0) {
+            settlePendingRef.current()
+          }
 
           const markFilledRegions = (comp: ComposeComponent) => {
             if (!isContentComponent(comp)) return
@@ -413,8 +545,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           // components fill theirs as they land below, and a final pass at the
           // end catches anything the timing missed.
           const markFilledByAll = () => data.components.forEach(markFilledRegions)
-          data.components.forEach((comp, i) => {
-            if (!animTargets.has(i)) markFilledRegions(comp)
+          componentEntries.forEach(({ component, key }) => {
+            if (!animTargets.has(key)) markFilledRegions(component)
           })
 
           if (reducedMotion.current || !hasAnimationTargets) {
@@ -471,8 +603,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             ? regionStaggerIdx * STAGGER_MS + WIREFRAME_LEAD_MS
             : 0
           let componentStaggerIdx = 0
-          data.components.forEach((comp, i) => {
-            if (!animTargets.has(i) || !comp.bbox) return
+          componentEntries.forEach(({ component: comp, index: i, key }) => {
+            if (!animTargets.has(key) || !comp.bbox) return
             const si = componentStaggerIdx++
             const agent = assignAgent(comp, resolvedAgents)
 
@@ -508,7 +640,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
                     g.style.opacity = "1"
                     const flash = document.createElement("div")
                     flash.className = "asp-land absolute"
-                    flash.style.cssText = `left:${pctL}%;top:${pctT}%;width:${pctW}%;height:${pctH}%;background:${agent.glow};`
+                    flash.style.cssText = `left:${pctL}%;top:${pctT}%;width:${pctW}%;height:${pctH}%;background:${agent.landingGlow};`
                     overlayContainer.appendChild(flash)
                     flash.addEventListener("animationend", () => flash.remove(), { once: true })
                     typewriterCancelsRef.current.push(typewrite(g))
@@ -545,37 +677,64 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           animatingRef.current = false
           releaseRef.current?.()
           releaseRef.current = null
-          lastComposeUrlRef.current = ""
-          setError(true)
+          markRetryableError(requestedUrl, false)
         }
       })()
     }
 
-    check()
     checkRef.current = check
-    return () => { cancelled = true; cleanup() }
+    return () => {
+      cancelled = true
+      acquireController.abort()
+      visibilityWaitersRef.current.clear()
+      cleanup()
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
 
-  // React immediately to composeUrl prop changes.
+  const previousComposePropRef = useRef(composeUrl)
+  const previousDefsUrlPropRef = useRef(defsUrl)
+  const previousDefsMountedPropRef = useRef(defsMounted)
+  const propsTriggeredRef = useRef(false)
+  // React to a new payload or lost/changed defs. Loading → ready needs no rebuild:
+  // the in-flight slide already fetched its own fallback defs.
   useEffect(() => {
+    const firstTrigger = !propsTriggeredRef.current
+    const composeChanged = previousComposePropRef.current !== composeUrl
+    const defsUrlChanged = previousDefsUrlPropRef.current !== defsUrl
+    const lostDeckDefs = previousDefsMountedPropRef.current === true && defsMounted !== true
+    propsTriggeredRef.current = true
+    previousComposePropRef.current = composeUrl
+    previousDefsUrlPropRef.current = defsUrl
+    previousDefsMountedPropRef.current = defsMounted
+    if (!firstTrigger && !composeChanged && !defsUrlChanged && !lostDeckDefs) return
+    if (composeChanged) {
+      retryFailureRef.current = null
+      errorKindRef.current = null
+      setErrorKind(null)
+      setShowError(false)
+      setRetryTick(0)
+    } else if (errorKindRef.current === "permanent") {
+      return
+    }
+    lastComposeUrlRef.current = ""
     checkRef.current?.()
-  }, [composeUrl])
+  }, [composeUrl, defsMounted, defsUrl])
 
-  // Retry only while the current compose payload is in an error state.
+  // Retry network/HTTP failures only. Schema/version/empty failures wait for a new URL.
   useEffect(() => {
-    if (!error) return
+    if (errorKind !== "retryable") return
     const retry = window.setTimeout(() => {
       checkRef.current?.()
       setRetryTick((tick) => tick + 1)
     }, 2000)
     return () => clearTimeout(retry)
-  }, [error, composeUrl, retryTick])
+  }, [errorKind, composeUrl, retryTick])
 
   return (
     <div ref={wrapperRef} data-slide-id={slug} className="slide-cv slide-shadow relative overflow-hidden rounded-lg bg-black" style={{ aspectRatio }}>
       <div ref={containerRef} className="absolute inset-0" data-slide-id={slug} />
-      {error && fallback && <div data-fallback className="absolute inset-0">{fallback}</div>}
+      {showError && fallback && <div data-fallback className="absolute inset-0">{fallback}</div>}
     </div>
   )
 }
