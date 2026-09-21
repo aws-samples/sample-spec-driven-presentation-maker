@@ -51,13 +51,14 @@ interface ChatPanelShellProps {
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
+  onLoadingChange?: (isLoading: boolean) => void
   chatRef?: React.RefObject<ChatPanelHandle | null>
   inline?: boolean
 }
 
 export function ChatPanelShell({
   open, onClose, chatTab, onChatTabChange,
-  deckId, deckName, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, chatRef: externalChatRef,
+  deckId, deckName, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, chatRef: externalChatRef,
   inline = false,
 }: ChatPanelShellProps) {
   const t = useTranslations("chatShell")
@@ -217,6 +218,7 @@ export function ChatPanelShell({
             onDeckCreated={handlePanelADeckCreated}
             onPreviewInvalidated={onPreviewInvalidated}
             onWorkflowPhase={onWorkflowPhase}
+            onLoadingChange={panelAVisible ? onLoadingChange : undefined}
           />
         </div>
 
@@ -232,6 +234,7 @@ export function ChatPanelShell({
               onDeckCreated={handlePanelBDeckCreated}
               onPreviewInvalidated={onPreviewInvalidated}
               onWorkflowPhase={onWorkflowPhase}
+              onLoadingChange={panelBVisible ? onLoadingChange : undefined}
             />
           </div>
         )}

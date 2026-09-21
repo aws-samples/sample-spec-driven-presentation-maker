@@ -19,7 +19,7 @@
 
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { AppShell } from "@/components/AppShell"
 import { DeckListView } from "@/components/deck/DeckListView"
@@ -36,6 +36,7 @@ import { useWorkspace } from "@/hooks/useWorkspace"
 import { Plus, MessageSquare, Image as ImageIcon, Star } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { IS_LOCAL } from "@/lib/mode"
+import { OutlineChatContext } from "@/components/deck/OutlineChatContext"
 
 export default function DecksPage() {
   const t = useTranslations("decksPage")
@@ -56,6 +57,12 @@ export default function DecksPage() {
   const [activeTab, setActiveTab] = useState<"chat" | "preview">("chat")
   const [workflowPhase, setWorkflowPhase] = useState<string | null>(null)
   const chatRef = useRef<ChatPanelHandle>(null)
+  const [agentIsLoading, setAgentIsLoading] = useState(false)
+  const outlineChatBridge = useMemo(() => ({
+    isLoading: agentIsLoading,
+    sendMessage: (text: string, options?: { displayContent?: string }) =>
+      chatRef.current?.sendMessage(text, options) ?? Promise.resolve(),
+  }), [agentIsLoading])
   const swipeRef = useSwipe(
     () => setActiveTab("preview"),
     () => setActiveTab("chat"),
@@ -81,6 +88,7 @@ export default function DecksPage() {
 
   /* ── Render ── */
   return (
+    <OutlineChatContext.Provider value={outlineChatBridge}>
     <AppShell
       deckName={ws.isWorkspace && ws.deck ? ws.deck.name : undefined}
       onBack={ws.isWorkspace ? ws.navigateToList : undefined}
@@ -132,6 +140,7 @@ export default function DecksPage() {
                     slideSlugs={ws.deck?.slides.map(s => s.slug || "") || []}
                     onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
                     onWorkflowPhase={setWorkflowPhase}
+                    onLoadingChange={setAgentIsLoading}
                     inline
                   />
                 ) : (
@@ -243,6 +252,7 @@ export default function DecksPage() {
             slideSlugs={ws.deck?.slides.map(s => s.slug || "") || []}
             onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
             onWorkflowPhase={setWorkflowPhase}
+            onLoadingChange={setAgentIsLoading}
           />
         )}
       </div>
@@ -285,5 +295,6 @@ export default function DecksPage() {
       )}
 
     </AppShell>
+    </OutlineChatContext.Provider>
   )
 }

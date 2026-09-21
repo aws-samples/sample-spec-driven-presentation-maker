@@ -162,4 +162,25 @@ def theme_hints_ddb_item(theme_hints: dict | None) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Spec files written from the Web UI
+# ---------------------------------------------------------------------------
 
+OUTLINE_MAX_BYTES = 256 * 1024
+"""Upper bound for a user-edited outline.md. Real outlines are a few KB; this only stops abuse."""
+
+
+def validate_outline_content(content: object) -> str | None:
+    """Validate an outline.md body sent from the Web UI editor.
+
+    Returns an error message, or None when the content is acceptable. The outline format
+    itself is not enforced here — the agent reads whatever the user wrote, and the Web UI
+    parser preserves unknown lines — so this only guards type, size and NUL bytes.
+    """
+    if not isinstance(content, str):
+        return "content must be a string"
+    if "\x00" in content:
+        return "content must not contain NUL bytes"
+    if len(content.encode("utf-8")) > OUTLINE_MAX_BYTES:
+        return f"content exceeds {OUTLINE_MAX_BYTES} bytes"
+    return None
