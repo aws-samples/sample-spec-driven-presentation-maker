@@ -27,6 +27,7 @@ import { ToolCard, ToolCardCompact } from "./ToolCard"
 import { HearingCard } from "./HearingCard"
 import { SnippetBlock } from "./SnippetBlock"
 import { batchGetSlidePreviewUrls } from "@/services/deckService"
+import { useTranslations } from "next-intl"
 
 type HearingQuestion = { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }
 
@@ -168,6 +169,7 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, deckSlugs, sessionId, accessToken, onSend, hearingDisabled = false }: ChatMessageProps) {
+  const t = useTranslations("chat")
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
@@ -186,6 +188,12 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
   // Strip compact v1 attachment markers from display text
   cleanContent = cleanContent.replace(/\[Attached:\s*[^\]]+\]\n*/g, "").trim()
   const allSnippets = [...inlineSnippets, ...snippets]
+  const outlineDiff = cleanContent.match(/^([^\n]+)\n\n```diff\n([\s\S]*?)\n```([\s\S]*)$/)
+  const isOutlineEdit = cleanContent.startsWith("📝") ||
+    cleanContent.startsWith("I manually edited outline.md.") ||
+    cleanContent.startsWith("I made substantial edits to outline.md") ||
+    cleanContent.startsWith("outline.md を手動で編集しました。") ||
+    cleanContent.startsWith("outline.md を大幅に編集しました")
 
   // Fetch preview URLs for [slide-preview:deckId:slug] markers
   useEffect(() => {
@@ -255,7 +263,26 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 ))}
               </div>
             )}
-            <span className="whitespace-pre-wrap">{MENTION_RE.test(cleanContent) ? highlightMentions(cleanContent) : cleanContent}</span>
+            {isOutlineEdit ? (
+              <div className="outline-chat-message">
+                <div className="flex items-center gap-2 font-medium">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-brand-teal/10 text-brand-teal" aria-hidden="true">
+                    <FileTextIcon className="h-3.5 w-3.5" />
+                  </span>
+                  <span>{outlineDiff?.[1] ?? cleanContent}</span>
+                  <span className="sr-only">{t("outlineEditLabel")}</span>
+                </div>
+                {outlineDiff && (
+                  <details className="mt-2 border-t border-brand-teal/15 pt-2">
+                    <summary className="cursor-pointer select-none text-xs text-foreground-muted hover:text-foreground">{t("outlineDiffDetails")}</summary>
+                    <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-background/50 p-2.5 text-xs leading-relaxed"><code>{outlineDiff[2]}</code></pre>
+                    {outlineDiff[3].trim() && <p className="mt-2 whitespace-pre-wrap text-xs text-foreground-secondary">{outlineDiff[3].trim()}</p>}
+                  </details>
+                )}
+              </div>
+            ) : (
+              <span className="whitespace-pre-wrap">{MENTION_RE.test(cleanContent) ? highlightMentions(cleanContent) : cleanContent}</span>
+            )}
           </div>
         ) : hasBlocks ? (
           /* Assistant: inline blocks layout */

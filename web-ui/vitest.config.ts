@@ -6,6 +6,7 @@ import path from "path"
 export default defineConfig({
   test: {
     environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
   },
   resolve: {

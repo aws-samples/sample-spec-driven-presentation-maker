@@ -37,14 +37,16 @@ interface ChatPanelProps {
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
+  onLoadingChange?: (isLoading: boolean) => void
 }
 
-/** Handle exposed to parent for inserting text at cursor position. */
+/** Handle exposed to parents for input insertion and programmatic user messages. */
 export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
+  sendMessage: (text: string, options?: { displayContent?: string }) => Promise<void>
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange }, ref) {
   const t = useTranslations("chat")
   // --- Session ---
   const [sessionId, setSessionId] = useState(() => {
@@ -167,7 +169,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     insertAtCursor(text: string) {
       chatInputRef.current?.insertAtCursor(text)
     },
-  }), [])
+    sendMessage(text: string, options?: { displayContent?: string }) {
+      return stream.sendMessage(text, undefined, undefined, undefined, options)
+    },
+  }), [stream.sendMessage])
 
   // --- Load agent config (cloud only) ---
   useEffect(() => {
@@ -420,12 +425,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // swap during it would clobber the reconnecting messages the same way.
   useEffect(() => {
     isLoadingRef.current = isLoading
+    onLoadingChange?.(isLoading)
     if (!isLoading && pendingChatSessionIdRef.current) {
       const next = pendingChatSessionIdRef.current
       pendingChatSessionIdRef.current = null
       setSessionId(next)
     }
-  }, [isLoading])
+    return () => onLoadingChange?.(false)
+  }, [isLoading, onLoadingChange])
 
   const isInitial = stream.messages.length === 0 && !historyLoading
 
