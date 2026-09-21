@@ -19,6 +19,7 @@ import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
 import { DeckDefs } from "@/components/deck/DeckDefs"
+import { useFollowScroll } from "@/components/deck/useFollowScroll"
 import { IS_LOCAL } from "@/lib/mode"
 import { notifyError } from "@/lib/errors"
 import { useTranslations } from "next-intl"
@@ -71,6 +72,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   if (dupUrls.length) console.warn("[SlideCarousel] same composeUrl used for multiple slides:", dupUrls, urlBySlug)
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
+  const followChangedSlide = useFollowScroll(containerRef)
 
   /* ── Aspect ratio reported by the first child (deck is uniform) ── */
   const [deckAr, setDeckAr] = useState(16 / 9)
@@ -84,46 +86,32 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
 
   /* ── Compose update detection → auto-scroll to changed slide ── */
   const prevComposeKeys = useRef<Map<string, string>>(new Map())
-  const scrollTargetRef = useRef<string | null | undefined>(undefined)
   const hadSlidesOnMount = useRef(slides.length > 0)
   const [firstComposeSeen, setFirstComposeSeen] = useState(false)
   const [knownComposeUrls, setKnownComposeUrls] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
-    let anyChanged = false
+    let latestChangedSlug: string | null = null
     for (const slide of slides) {
       const key = slide.composeUrl?.split("?")[0] || ""
       const prev = prevComposeKeys.current.get(slide.slug) || ""
-      if (key && prev && key !== prev) anyChanged = true
-      if (key && !prev && firstComposeSeen) anyChanged = true
+      if (key && prev && key !== prev) latestChangedSlug = slide.slug
+      if (key && !prev && firstComposeSeen) latestChangedSlug = slide.slug
       if (key) prevComposeKeys.current.set(slide.slug, key)
     }
     // Mark first compose seen (skip animation for existing decks)
     if (!firstComposeSeen && slides.some(s => s.composeUrl)) {
       if (hadSlidesOnMount.current) {
         // Existing deck: suppress animation for this first batch
-        anyChanged = false
+        latestChangedSlug = null
       }
       setFirstComposeSeen(true)
     }
-    if (anyChanged) scrollTargetRef.current = null // arm scroll for next onAnimate
+    if (latestChangedSlug) followChangedSlide(latestChangedSlug)
     setKnownComposeUrls(new Map(prevComposeKeys.current))
+  // firstComposeSeen intentionally describes the previous batch while this effect detects transitions.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slides])
-
-  const handleAnimate = useCallback((slug: string) => {
-    if (scrollTargetRef.current === null && containerRef.current) {
-      scrollTargetRef.current = slug
-      const el = containerRef.current.querySelector(`[data-slide-id="${slug}"]`)
-      if (el) {
-        const container = containerRef.current
-        const elRect = el.getBoundingClientRect()
-        const containerRect = container.getBoundingClientRect()
-        const offset = elRect.top - containerRect.top + container.scrollTop - 24
-        container.scrollTo({ top: offset, behavior: "smooth" })
-      }
-    }
-  }, [])
+  }, [slides, followChangedSlide])
 
   /* ── Slide update detection for glow highlight ── */
   const prevUrlKeys = useRef<Map<string, string>>(new Map())
@@ -364,7 +352,6 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 slug={slide.slug}
                 skipAnimation={hadSlidesOnMount.current && !firstComposeSeen}
                 knownUrl={hadSlidesOnMount.current ? (knownComposeUrls.get(slide.slug) || null) : null}
-                onAnimate={() => handleAnimate(slide.slug)}
                 onAspectRatio={handleAspectRatio}
                 defsMounted
                 fallback={
