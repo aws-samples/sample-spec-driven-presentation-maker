@@ -16,7 +16,20 @@ Entries before v0.5.0 were written retroactively as summaries.
   each slide as a 16:9 card: the claim as headline, the body in full, visual
   and evidence small at the bottom; chapters (`##`) divide the deck. Grid by
   default with a persisted column alternative. Text never drops below the
-  11px floor. Read-only for now.
+  11px floor.
+- **Edit the outline in the storyboard and send the changes** — every card
+  field, chapter heading and the deck name are editable in place; add
+  (ghost card), duplicate, delete with undo, reorder by drag (across
+  chapters, keyboard too) or ⌥↑/↓, ⌘Z/⇧⌘Z history, a markdown drawer with
+  changed lines highlighted. "Send changes" (⌘S) writes `specs/outline.md`
+  and posts a user message to the chat carrying the unified diff (with a
+  note that new `slide-N` slugs are placeholders, and — toggle, on by
+  default — a request to polish the wording), so the agent picks the edit
+  up in the same conversation. No agent-side changes: the file is written
+  unconditionally and the diff is how the agent learns what happened. New
+  API `PUT /decks/{id}/specs/outline` (cloud) and matching local route.
+  Web UI now depends on `@dnd-kit/react`, `motion` and
+  `react-textarea-autosize`.
 - **`sdpm-composer` skill entry point** — a fourth thin dispatcher
   (`skills/sdpm-composer`) for the role a spawned composer sub-agent plays;
   it calls `read_workflows(["composer"])` and stops. Dedicated composer
