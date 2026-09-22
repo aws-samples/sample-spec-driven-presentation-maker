@@ -767,6 +767,15 @@ body {
   transform-box: fill-box;
   transform-origin: center;
 }
+.asp-breath-shadow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 22px 60px oklch(0 0 0 / 55%);
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+}
 @keyframes tool-card-enter {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }

@@ -174,20 +174,38 @@ export function settle(
     delete item.element.dataset.unsettled
   })
 
+  let breathShadow: HTMLDivElement | null = null
   if (!reducedMotion && items.length > 0 && typeof slide.animate === "function") {
+    const duration = DURATION_MS + latestDelay
     const breath = slide.animate([
-      { transform: "scale(0.992)", boxShadow: "0 12px 40px oklch(0 0 0 / 45%)" },
-      { transform: "scale(1)", boxShadow: "0 22px 60px oklch(0 0 0 / 55%)", offset: 0.5 },
-      { transform: "scale(1)", boxShadow: "0 12px 40px oklch(0 0 0 / 45%)" },
+      { transform: "scale(0.992)" },
+      { transform: "scale(1)", offset: 0.5 },
+      { transform: "scale(1)" },
     ], {
-      duration: DURATION_MS + latestDelay,
+      duration,
       easing: "cubic-bezier(0.22, 1, 0.36, 1)",
     })
-    animations.push(breath)
+    breathShadow = document.createElement("div")
+    breathShadow.className = "asp-breath-shadow"
+    slide.appendChild(breathShadow)
+    const shadowBreath = slide.animate.call(breathShadow, [
+      { opacity: 0 },
+      { opacity: 1, offset: 0.5 },
+      { opacity: 0 },
+    ], {
+      duration,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    })
+    shadowBreath.onfinish = () => {
+      breathShadow?.remove()
+      breathShadow = null
+    }
+    animations.push(breath, shadowBreath)
   }
 
   return () => {
     animations.forEach((animation) => animation.cancel())
+    breathShadow?.remove()
     items.forEach((item) => settleTargets(item.component, item.element).forEach(clearTarget))
   }
 }

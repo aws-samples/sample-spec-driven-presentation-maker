@@ -80,6 +80,7 @@ interface Typewriter {
 
 const typewriters = new Set<Typewriter>()
 let frameId: number | null = null
+let typewriterFrame = 0
 
 function applyCharacterCount(writer: Typewriter, count: number) {
   let remaining = count
@@ -97,7 +98,7 @@ export function advanceTypewriters(now: number) {
     const total = writer.spans.reduce((sum, span) => sum + span.fullText.length, 0)
     const elapsedTarget = Math.min(total, Math.max(0, Math.floor((now - writer.startedAt) / writer.charMs)))
     // Preserve the per-character feel after a long frame instead of dumping a word at once.
-    const shown = Math.min(elapsedTarget, writer.shown + 2)
+    const shown = Math.min(elapsedTarget, writer.shown + 4)
     if (shown !== writer.shown) {
       writer.shown = shown
       applyCharacterCount(writer, shown)
@@ -108,7 +109,11 @@ export function advanceTypewriters(now: number) {
 
 function tick(now: number) {
   frameId = null
-  advanceTypewriters(now)
+  typewriterFrame++
+  // Limit DOM text mutations to 30 Hz while elapsed-time math preserves the
+  // configured 15–50 ms character rate (the four-character cap catches up
+  // by the same maximum amount as two characters on each 60 Hz frame).
+  if (typewriterFrame % 2 === 0) advanceTypewriters(now)
   if (typewriters.size > 0) frameId = requestAnimationFrame(tick)
 }
 
@@ -133,6 +138,7 @@ export function resetAnimationSchedulerForTests() {
     waiter.resolve(null)
   }
   typewriters.clear()
+  typewriterFrame = 0
   if (frameId !== null) cancelAnimationFrame(frameId)
   frameId = null
 }

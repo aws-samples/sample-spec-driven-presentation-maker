@@ -30,10 +30,27 @@ afterEach(() => {
 })
 
 describe("useFollowScroll", () => {
+  it("attaches manual-navigation listeners when the slides scroller mounts after the brief tab", () => {
+    const container = makeScroller()
+    const { result, rerender } = renderHook(
+      ({ specTab }: { specTab: "brief" | "slides" }) => useFollowScroll(specTab === "slides" ? container : null),
+      { initialProps: { specTab: "brief" } as { specTab: "brief" | "slides" } },
+    )
+
+    rerender({ specTab: "slides" })
+    act(() => result.current("one"))
+    container.dispatchEvent(new WheelEvent("wheel", { bubbles: true }))
+    act(() => {
+      vi.advanceTimersByTime(1)
+      result.current("two")
+    })
+
+    expect(container.scrollTo).toHaveBeenCalledTimes(1)
+  })
+
   it("follows the latest changed slide while armed", () => {
     const container = makeScroller()
-    const ref = { current: container }
-    const { result } = renderHook(() => useFollowScroll(ref))
+    const { result } = renderHook(() => useFollowScroll(container))
 
     act(() => result.current("one"))
     act(() => result.current("two"))
@@ -46,8 +63,7 @@ describe("useFollowScroll", () => {
     ["touchmove", () => new Event("touchmove", { bubbles: true })],
   ])("pauses on %s and re-arms only when a later change arrives after three seconds", (_name, event) => {
     const container = makeScroller()
-    const ref = { current: container }
-    const { result } = renderHook(() => useFollowScroll(ref))
+    const { result } = renderHook(() => useFollowScroll(container))
 
     act(() => result.current("one"))
     container.dispatchEvent(event())
@@ -60,15 +76,52 @@ describe("useFollowScroll", () => {
     expect(container.scrollTo).toHaveBeenCalledTimes(2)
   })
 
-  it("pauses for document-level navigation keys but ignores editable targets", () => {
+  it("requires both manual and change quiet periods before a new change re-arms follow", () => {
     const container = makeScroller()
-    const ref = { current: container }
-    const input = document.createElement("input")
-    document.body.appendChild(input)
-    const { result } = renderHook(() => useFollowScroll(ref))
+    const { result } = renderHook(() => useFollowScroll(container))
 
     act(() => result.current("one"))
+    container.dispatchEvent(new WheelEvent("wheel"))
+
+    act(() => {
+      vi.advanceTimersByTime(2000)
+      result.current("two")
+    })
+    act(() => {
+      vi.advanceTimersByTime(1000)
+      result.current("one")
+    })
+    expect(container.scrollTo).toHaveBeenCalledTimes(1)
+
+    act(() => vi.advanceTimersByTime(2000))
+    container.dispatchEvent(new WheelEvent("wheel"))
+    act(() => {
+      vi.advanceTimersByTime(1000)
+      result.current("two")
+    })
+    expect(container.scrollTo).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      vi.advanceTimersByTime(3000)
+      result.current("one")
+    })
+    expect(container.scrollTo).toHaveBeenCalledTimes(2)
+  })
+
+  it("pauses for document-level navigation keys but ignores editable targets", () => {
+    const container = makeScroller()
+    const input = document.createElement("input")
+    document.body.appendChild(input)
+    const { result } = renderHook(() => useFollowScroll(container))
+
+    act(() => result.current("one"))
+    const editable = document.createElement("div")
+    editable.setAttribute("contenteditable", "true")
+    const nested = document.createElement("span")
+    editable.appendChild(nested)
+    document.body.appendChild(editable)
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }))
+    nested.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown", bubbles: true }))
     act(() => result.current("two"))
     expect(container.scrollTo).toHaveBeenCalledTimes(2)
 
@@ -79,8 +132,7 @@ describe("useFollowScroll", () => {
 
   it("treats non-programmatic scroll events as manual", () => {
     const container = makeScroller()
-    const ref = { current: container }
-    const { result } = renderHook(() => useFollowScroll(ref))
+    const { result } = renderHook(() => useFollowScroll(container))
 
     act(() => result.current("one"))
     container.dispatchEvent(new Event("scroll"))

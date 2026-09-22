@@ -94,13 +94,27 @@ describe("materialize real compose fixtures", () => {
       return fakeAnimation()
     })
     const slide = document.createElement("div")
-    slide.animate = vi.fn(() => fakeAnimation())
+    const slideAnimations: { frames: Keyframe[]; options?: number | KeyframeAnimationOptions }[] = []
+    slide.animate = vi.fn((frames, options) => {
+      slideAnimations.push({ frames: Array.from(frames as Iterable<Keyframe>), options })
+      return fakeAnimation()
+    })
 
     markUnsettled(element, fixtureComponent)
     expect(element.style.filter).toBe("")
-    settle(slide, [{ component: fixtureComponent, element }])
+    const cancel = settle(slide, [{ component: fixtureComponent, element }])
 
     expect(keyframes).toHaveLength(1)
     expect(keyframes[0].every((frame) => !("filter" in frame))).toBe(true)
+    expect(slideAnimations).toHaveLength(2)
+    expect(slideAnimations.flatMap((entry) => entry.frames).every((frame) => !("boxShadow" in frame))).toBe(true)
+    expect(slide.querySelector(".asp-breath-shadow")).toBeTruthy()
+    expect(slideAnimations[1].frames).toEqual([
+      { opacity: 0 },
+      { opacity: 1, offset: 0.5 },
+      { opacity: 0 },
+    ])
+    cancel()
+    expect(slide.querySelector(".asp-breath-shadow")).toBeNull()
   })
 })

@@ -72,7 +72,12 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   if (dupUrls.length) console.warn("[SlideCarousel] same composeUrl used for multiple slides:", dupUrls, urlBySlug)
   const { viewMode, setViewMode } = usePreferences()
   const containerRef = useRef<HTMLDivElement>(null)
-  const followChangedSlide = useFollowScroll(containerRef)
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
+  const attachScrollElement = useCallback((element: HTMLDivElement | null) => {
+    containerRef.current = element
+    setScrollElement(element)
+  }, [])
+  const followChangedSlide = useFollowScroll(scrollElement)
   const [defsState, setDefsState] = useState<{ url: string; status: DeckDefsStatus }>({
     url: defsUrl || "",
     status: "loading",
@@ -325,7 +330,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     if (slidesWithPreview.length === 0) return renderSlidesEmpty()
 
     return (
-      <div ref={containerRef} data-slide-scroller className="flex-1 overflow-y-auto px-6 py-6">
+      <div ref={attachScrollElement} data-slide-scroller className="flex-1 overflow-y-auto px-6 py-6">
         {viewMode === "grid" ? (
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
             {slidesWithPreview.map((slide, i) => (

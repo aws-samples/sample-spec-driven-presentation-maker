@@ -207,6 +207,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   const releaseRef = useRef<(() => void) | null>(null)
   const materializeCancelRef = useRef<(() => void) | null>(null)
   const lastComposeUrlRef = useRef("")
+  const renderedComposeUrlRef = useRef("")
   const previousRegionsRef = useRef<ComposeRegion[]>([])
   const animatingRef = useRef(false)
   const [errorKind, setErrorKind] = useState<"retryable" | "permanent" | null>(null)
@@ -252,6 +253,23 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     if (items.length === 0) return
     materializeCancelRef.current?.()
     materializeCancelRef.current = settle(slide, items, { reducedMotion: reducedMotion.current })
+  }
+
+  const mergeSupersededHiddenChanges = (data: ComposeData) => {
+    if (visibleRef.current !== "hidden" || reducedMotion.current) return
+    const currentRenderIsReady = renderedComposeUrlRef.current === composeUrlRef.current
+    const elements = Array.from(containerRef.current?.querySelectorAll<SVGGElement>("g[data-component-key]") ?? [])
+    data.components.forEach((component) => {
+      if (!component.changed) return
+      const key = composeComponentKey(component)
+      if (currentRenderIsReady && !latestComponentsRef.current.has(key)) return
+      unsettledRef.current.add(key)
+      const element = elements.find((candidate) => candidate.dataset.componentKey === key)
+      const latestComponent = latestComponentsRef.current.get(key)
+      if (element && latestComponent && element.dataset.unsettled !== "true") {
+        markUnsettled(element, latestComponent)
+      }
+    })
   }
 
   // Track latest props in refs so check() always reads current values
@@ -319,9 +337,27 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             defsMountedRef.current ? Promise.resolve(null) : fetch(defsUrlRef.current),
             fetch(requestedUrl),
           ])
-          if (cancelled || requestedUrl !== composeUrlRef.current) return
+          if (cancelled) return
+          const superseded = requestedUrl !== composeUrlRef.current
           if (!compResp.ok) {
-            markRetryableError(requestedUrl, compResp.status === 404)
+            if (!superseded) {
+              const hasPreviousSvg = Boolean(containerRef.current?.querySelector("svg"))
+              markRetryableError(requestedUrl, compResp.status === 404 && hasPreviousSvg)
+            }
+            return
+          }
+          let parsedData: unknown
+          try {
+            parsedData = await compResp.json()
+          } catch {
+            if (!superseded) markPermanentError()
+            return
+          }
+          if (cancelled) return
+          if (superseded || requestedUrl !== composeUrlRef.current) {
+            if (isComposeData(parsedData) && parsedData.version === COMPOSE_VERSION) {
+              mergeSupersededHiddenChanges(parsedData)
+            }
             return
           }
           if (defsResp && !defsResp.ok) {
@@ -330,10 +366,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           }
 
           let parsedDefs: unknown = null
-          let parsedData: unknown
           try {
             parsedDefs = defsResp ? await defsResp.json() : null
-            parsedData = await compResp.json()
           } catch {
             markPermanentError()
             return
@@ -526,6 +560,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           })
 
           container.appendChild(svgEl)
+          renderedComposeUrlRef.current = requestedUrl
           if (regions.length > 0) container.parentElement?.appendChild(regionOverlay)
           if (visibleRef.current === "visible" && hasBeenOffscreenRef.current && unsettledRef.current.size > 0) {
             settlePendingRef.current()
@@ -732,9 +767,9 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   }, [errorKind, composeUrl, retryTick])
 
   return (
-    <div ref={wrapperRef} data-slide-id={slug} className="slide-cv slide-shadow relative overflow-hidden rounded-lg bg-black" style={{ aspectRatio }}>
-      <div ref={containerRef} className="absolute inset-0" data-slide-id={slug} />
-      {showError && fallback && <div data-fallback className="absolute inset-0">{fallback}</div>}
+    <div ref={wrapperRef} data-slide-id={slug} className="slide-cv slide-shadow relative rounded-lg bg-black" style={{ aspectRatio }}>
+      <div ref={containerRef} className="absolute inset-0 overflow-hidden rounded-lg" data-slide-id={slug} />
+      {showError && fallback && <div data-fallback className="absolute inset-0 overflow-hidden rounded-lg">{fallback}</div>}
     </div>
   )
 }

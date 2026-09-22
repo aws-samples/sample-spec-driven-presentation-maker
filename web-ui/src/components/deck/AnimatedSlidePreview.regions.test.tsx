@@ -417,6 +417,54 @@ describe("AnimatedSlidePreview visibility and error races", () => {
     expect(landed.dataset.unsettled).toBe("true")
   })
 
+  it("merges changed keys from a superseded hidden response into the current unsettled set", async () => {
+    const first = { ...component, svg: '<rect id="first" x="200" y="200" width="300" height="300" />' }
+    const second = { ...component, bbox: { x: 600, y: 200, w: 300, h: 300 }, svg: '<rect id="second" x="600" y="200" width="300" height="300" />' }
+    const pending = new Map<string, (response: { ok: boolean; status: number; json: () => Promise<unknown> }) => void>()
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => new Promise((resolve) => {
+      pending.set(String(input), resolve)
+    })))
+    const respond = (url: string, components: Record<string, unknown>[]) => {
+      pending.get(url)?.({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ version: 1, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components }),
+      })
+    }
+
+    const rendered = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-1.json" slug="rapid" defsMounted />
+    )
+    const wrapper = rendered.container.querySelector('[data-slide-id="rapid"]')!
+    act(() => ControlledObserver.emit(wrapper, false))
+    await waitFor(() => expect(pending.has("/compose-1.json")).toBe(true))
+
+    rendered.rerender(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" slug="rapid" defsMounted />
+    )
+    await waitFor(() => expect(pending.has("/compose-2.json")).toBe(true))
+    act(() => respond("/compose-2.json", [{ ...first, changed: false }, { ...second, changed: true }]))
+    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:second"]')?.getAttribute("data-unsettled")).toBe("true"))
+
+    act(() => respond("/compose-1.json", [{ ...first, changed: true }, { ...second, changed: false }]))
+    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:first"]')?.getAttribute("data-unsettled")).toBe("true"))
+    expect(rendered.container.querySelector('g[data-component-key="id:second"]')?.getAttribute("data-unsettled")).toBe("true")
+  })
+
+  it("shows the fallback immediately when an initial compose request returns 404", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({
+      ok: false,
+      status: 404,
+      json: () => Promise.resolve({}),
+    })))
+    const rendered = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/missing-initial.json" defsMounted fallback={<div>fallback</div>} />
+    )
+
+    await waitFor(() => expect(rendered.container.querySelector("[data-fallback]")).toBeTruthy())
+    expect(rendered.container.querySelector("svg")).toBeNull()
+  })
+
   it("keeps the previous SVG and schedules retry for a transient 404 without showing fallback", async () => {
     const timeoutSpy = vi.spyOn(window, "setTimeout")
     vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {

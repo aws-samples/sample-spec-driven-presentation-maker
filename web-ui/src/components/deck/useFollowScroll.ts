@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { useCallback, useEffect, useRef, type RefObject } from "react"
+import { useCallback, useEffect, useRef } from "react"
 
 const REARM_MS = 3000
 const PROGRAMMATIC_SCROLL_WINDOW_MS = 600
@@ -20,11 +20,11 @@ const SCROLL_KEYS = new Set([
 
 function isEditableTarget(target: EventTarget | null) {
   if (!(target instanceof Element)) return false
-  return target.matches("input, textarea, select, [contenteditable]:not([contenteditable='false'])")
+  return Boolean(target.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])"))
 }
 
 /** Follow compose changes until the user manually navigates the slide scroller. */
-export function useFollowScroll(containerRef: RefObject<HTMLDivElement | null>) {
+export function useFollowScroll(container: HTMLDivElement | null) {
   const followRef = useRef(true)
   const lastManualAtRef = useRef(Number.NEGATIVE_INFINITY)
   const lastChangeAtRef = useRef(Number.NEGATIVE_INFINITY)
@@ -44,7 +44,6 @@ export function useFollowScroll(containerRef: RefObject<HTMLDivElement | null>) 
   }, [clearProgrammaticScroll])
 
   useEffect(() => {
-    const container = containerRef.current
     if (!container) return
     const pauseForKey = (event: KeyboardEvent) => {
       if (SCROLL_KEYS.has(event.key) && !isEditableTarget(event.target)) pause()
@@ -52,30 +51,37 @@ export function useFollowScroll(containerRef: RefObject<HTMLDivElement | null>) 
     const pauseForScroll = () => {
       if (!programmaticScrollRef.current) pause()
     }
-    container.addEventListener("wheel", pause, { passive: true })
-    container.addEventListener("touchmove", pause, { passive: true })
+    const pauseForPointer = (event: Event) => {
+      if (!isEditableTarget(event.target)) pause()
+    }
+    container.addEventListener("wheel", pauseForPointer, { passive: true })
+    container.addEventListener("touchmove", pauseForPointer, { passive: true })
     container.addEventListener("scroll", pauseForScroll, { passive: true })
     container.addEventListener("scrollend", clearProgrammaticScroll)
     document.addEventListener("keydown", pauseForKey, true)
     return () => {
-      container.removeEventListener("wheel", pause)
-      container.removeEventListener("touchmove", pause)
+      container.removeEventListener("wheel", pauseForPointer)
+      container.removeEventListener("touchmove", pauseForPointer)
       container.removeEventListener("scroll", pauseForScroll)
       container.removeEventListener("scrollend", clearProgrammaticScroll)
       document.removeEventListener("keydown", pauseForKey, true)
       clearProgrammaticScroll()
     }
-  }, [clearProgrammaticScroll, containerRef, pause])
+  }, [clearProgrammaticScroll, container, pause])
 
   return useCallback((slug: string) => {
     const now = Date.now()
-    const isNewChange = now > lastChangeAtRef.current
+    const previousChangeAt = lastChangeAtRef.current
+    const isNewChange = now > previousChangeAt
     lastChangeAtRef.current = now
-    if (!followRef.current && isNewChange && now - lastManualAtRef.current >= REARM_MS) {
+    if (
+      !followRef.current
+      && isNewChange
+      && now - lastManualAtRef.current >= REARM_MS
+      && now - previousChangeAt >= REARM_MS
+    ) {
       followRef.current = true
     }
-
-    const container = containerRef.current
     if (!followRef.current || !container) return
     const css = (globalThis as typeof globalThis & { CSS?: { escape?: (value: string) => string } }).CSS
     const escapedSlug = css?.escape ? css.escape(slug) : slug.replaceAll('"', '\\"')
@@ -88,5 +94,5 @@ export function useFollowScroll(containerRef: RefObject<HTMLDivElement | null>) 
     if (programmaticTimerRef.current) clearTimeout(programmaticTimerRef.current)
     programmaticTimerRef.current = setTimeout(clearProgrammaticScroll, PROGRAMMATIC_SCROLL_WINDOW_MS)
     container.scrollTo({ top: offset, behavior: "smooth" })
-  }, [clearProgrammaticScroll, containerRef])
+  }, [clearProgrammaticScroll, container])
 }

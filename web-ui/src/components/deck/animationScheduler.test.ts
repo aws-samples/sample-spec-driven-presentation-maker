@@ -62,7 +62,7 @@ describe("animation scheduler", () => {
     releaseNext!()
   })
 
-  it("advances all registered spans by at most two characters per frame", () => {
+  it("advances all registered spans by at most four characters per 30 Hz write", () => {
     const first = document.createElement("span")
     const second = document.createElement("span")
     registerTypewriter([
@@ -76,9 +76,24 @@ describe("animation scheduler", () => {
 
     advanceTypewriters(181)
     expect(first.textContent).toBe("abc")
-    expect(second.textContent).toBe("")
+    expect(second.textContent).toBe("d")
 
     advanceTypewriters(205)
     expect(second.textContent).toBe("de")
+  })
+
+  it("writes typewriter text only on every second animation frame", () => {
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal("requestAnimationFrame", vi.fn((callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    }))
+    const span = document.createElement("span")
+    registerTypewriter([{ el: span, fullText: "abcd" }], 15)
+
+    frames.shift()!(116)
+    expect(span.textContent).toBe("")
+    frames.shift()!(133)
+    expect(span.textContent).toBe("ab")
   })
 })
