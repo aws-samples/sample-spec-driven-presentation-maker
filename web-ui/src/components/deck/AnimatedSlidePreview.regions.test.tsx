@@ -22,6 +22,10 @@ function mockFetch(compose: Record<string, unknown>) {
   }))
 }
 
+function wasFetched(url: string) {
+  return vi.mocked(fetch).mock.calls.some(([input]) => String(input) === url)
+}
+
 beforeEach(() => {
   resetAnimationSchedulerForTests()
   vi.stubGlobal("matchMedia", vi.fn(() => ({
@@ -239,7 +243,7 @@ describe("AnimatedSlidePreview performance gating", () => {
     )
     await waitFor(() => expect(container.querySelector('g[data-index="0"]')).toBeTruthy())
     expect(fetch).toHaveBeenCalledTimes(1)
-    expect(fetch).toHaveBeenCalledWith("/compose.json")
+    expect(wasFetched("/compose.json")).toBe(true)
   })
 
 
@@ -256,12 +260,28 @@ describe("AnimatedSlidePreview performance gating", () => {
       <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-1.json" defsMounted />
     )
     await waitFor(() => expect(rendered.container.querySelector('g[data-index="0"]')).toBeTruthy())
-    expect(fetch).not.toHaveBeenCalledWith("/defs.json")
+    expect(wasFetched("/defs.json")).toBe(false)
 
     rendered.rerender(
       <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" defsMounted={false} />
     )
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/defs.json"))
+    await waitFor(() => expect(wasFetched("/defs.json")).toBe(true))
+  })
+
+  it("aborts in-flight compose fetches on unmount", async () => {
+    let requestSignal: AbortSignal | undefined
+    vi.stubGlobal("fetch", vi.fn((_input: string | URL | Request, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined
+      return new Promise(() => {})
+    }))
+
+    const rendered = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose.json" defsMounted />
+    )
+    await waitFor(() => expect(requestSignal).toBeInstanceOf(AbortSignal))
+
+    rendered.unmount()
+    expect(requestSignal?.aborted).toBe(true)
   })
 
   it("defers DOM work for subsequent off-screen updates", async () => {
@@ -307,7 +327,7 @@ describe("AnimatedSlidePreview performance gating", () => {
     rendered.rerender(
       <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" />
     )
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/compose-2.json"))
+    await waitFor(() => expect(wasFetched("/compose-2.json")).toBe(true))
     await act(() => Promise.resolve())
 
     // The first payload remains untouched until the slide approaches the viewport.
@@ -419,7 +439,7 @@ describe("AnimatedSlidePreview visibility and error races", () => {
     rendered.rerender(
       <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" slug="lazy" defsMounted />
     )
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/compose-2.json"))
+    await waitFor(() => expect(wasFetched("/compose-2.json")).toBe(true))
     await act(() => Promise.resolve())
     expect(rendered.container.querySelector('g[data-component-key="id:old"]')).toBeTruthy()
     expect(rendered.container.querySelector('g[data-component-key="id:new"]')).toBeNull()
@@ -445,7 +465,7 @@ describe("AnimatedSlidePreview visibility and error races", () => {
       <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-1.json" slug="fold" defsMounted />
     )
     const wrapper = rendered.container.querySelector('[data-slide-id="fold"]')!
-    // Within one viewport (near) but below the settle threshold — the common case right after Follow scrolls.
+    // Within one viewport (near) but below the replay threshold — the common case right after Follow scrolls.
     act(() => ControlledObserver.emitZone(wrapper, "100% 0px", true))
     act(() => ControlledObserver.emitZone(wrapper, "0px", false))
     await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:old-fold"]')).toBeTruthy())
@@ -517,7 +537,7 @@ describe("AnimatedSlidePreview visibility and error races", () => {
     rendered.rerender(
       <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" slug="fast" defsMounted />
     )
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/compose-2.json"))
+    await waitFor(() => expect(wasFetched("/compose-2.json")).toBe(true))
     await act(() => Promise.resolve())
     expect(rendered.container.querySelector('g[data-component-key="id:new-fast"]')).toBeNull()
 
@@ -639,7 +659,7 @@ describe("AnimatedSlidePreview visibility and error races", () => {
     target.rerender(<AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/target-b.json" slug="target" defsMounted onAnimate={targetAnimate} />)
     first.unmount()
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/target-b.json"))
+    await waitFor(() => expect(wasFetched("/target-b.json")).toBe(true))
     await waitFor(() => expect(target.container.querySelector('g[data-component-key="id:target-b"]')).toBeTruthy())
     expect(target.container.querySelector('g[data-component-key="id:target-a"]')).toBeNull()
     expect(targetAnimate).toHaveBeenCalledTimes(1)
@@ -681,7 +701,7 @@ describe("AnimatedSlidePreview visibility and error races", () => {
     rendered.rerender(
       <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/missing.json" skipAnimation fallback={<div>fallback</div>} />
     )
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/missing.json"))
+    await waitFor(() => expect(wasFetched("/missing.json")).toBe(true))
     await waitFor(() => expect(timeoutSpy.mock.calls.some(([, delay]) => delay === 2000)).toBe(true))
     expect(rendered.container.querySelector('g[data-index="0"]')).toBeTruthy()
     expect(rendered.container.querySelector("[data-fallback]")).toBeNull()

@@ -37,6 +37,11 @@ export function useFollowScroll(container: HTMLDivElement | null) {
     programmaticTimerRef.current = null
   }, [])
 
+  const scheduleProgrammaticQuiescence = useCallback(() => {
+    if (programmaticTimerRef.current) clearTimeout(programmaticTimerRef.current)
+    programmaticTimerRef.current = setTimeout(clearProgrammaticScroll, SCROLL_QUIESCENCE_MS)
+  }, [clearProgrammaticScroll])
+
   const pause = useCallback(() => {
     followRef.current = false
     lastManualAtRef.current = Date.now()
@@ -46,17 +51,12 @@ export function useFollowScroll(container: HTMLDivElement | null) {
   useEffect(() => {
     if (!container) return
     const supportsScrollEnd = typeof container.onscrollend !== "undefined"
-    const scheduleProgrammaticQuiescence = () => {
-      if (supportsScrollEnd) return
-      if (programmaticTimerRef.current) clearTimeout(programmaticTimerRef.current)
-      programmaticTimerRef.current = setTimeout(clearProgrammaticScroll, SCROLL_QUIESCENCE_MS)
-    }
     const pauseForKey = (event: KeyboardEvent) => {
       if (SCROLL_KEYS.has(event.key) && !isEditableTarget(event.target)) pause()
     }
     const pauseForScroll = () => {
       if (programmaticScrollRef.current) {
-        scheduleProgrammaticQuiescence()
+        if (!supportsScrollEnd) scheduleProgrammaticQuiescence()
       } else {
         pause()
       }
@@ -77,7 +77,7 @@ export function useFollowScroll(container: HTMLDivElement | null) {
       document.removeEventListener("keydown", pauseForKey, true)
       clearProgrammaticScroll()
     }
-  }, [clearProgrammaticScroll, container, pause])
+  }, [clearProgrammaticScroll, container, pause, scheduleProgrammaticQuiescence])
 
   return useCallback((slug: string) => {
     const now = Date.now()
@@ -101,10 +101,7 @@ export function useFollowScroll(container: HTMLDivElement | null) {
     const containerRect = container.getBoundingClientRect()
     const offset = elementRect.top - containerRect.top + container.scrollTop - 24
     programmaticScrollRef.current = true
-    if (typeof container.onscrollend === "undefined") {
-      if (programmaticTimerRef.current) clearTimeout(programmaticTimerRef.current)
-      programmaticTimerRef.current = setTimeout(clearProgrammaticScroll, SCROLL_QUIESCENCE_MS)
-    }
+    if (typeof container.onscrollend === "undefined") scheduleProgrammaticQuiescence()
     container.scrollTo({ top: offset, behavior: "smooth" })
-  }, [clearProgrammaticScroll, container])
+  }, [container, scheduleProgrammaticQuiescence])
 }

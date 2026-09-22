@@ -20,8 +20,10 @@ it("reports loaded only after defs are mounted and clears them when the URL chan
 
   await waitFor(() => expect(statuses.at(-1)).toBe("loaded"))
   expect(rendered.container.querySelector("svg")?.innerHTML).toContain("/first.json")
+  const firstSignal = vi.mocked(fetch).mock.calls[0]?.[1]?.signal
 
   rendered.rerender(<DeckDefs defsUrl="/second.json" onStatusChange={(status) => statuses.push(status)} />)
+  expect(firstSignal?.aborted).toBe(true)
   await waitFor(() => expect(statuses.at(-1)).toBe("loaded"))
   expect(statuses).toContain("loading")
   expect(rendered.container.querySelector("svg")?.innerHTML).toContain("/second.json")

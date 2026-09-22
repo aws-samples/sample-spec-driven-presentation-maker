@@ -11,7 +11,14 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { acquire, registerTypewriter } from "./animationScheduler"
+import { acquire } from "./animationScheduler"
+import {
+  startAgentAnimation,
+  type AgentAnimationComponent as ComposeComponent,
+  type AgentAnimationRegion as ComposeRegion,
+  type AgentAnimationScene as Scene,
+  type AgentAnimationSession,
+} from "./agentAnimation"
 import { useSlideVisibility } from "./useSlideVisibility"
 
 // --- Constants ---
@@ -23,7 +30,6 @@ const COMPOSE_VERSION = 1
  */
 const REPLAY_VISIBLE_RATIO = 0.35
 const STAGGER_MS = 260
-const WIREFRAME_LEAD_MS = 400
 /**
  * Catch-up replay: when a slide changed while off-screen and the user reaches
  * it within CATCHUP_MAX_AGE_MS, the agent-drawing animation replays for the
@@ -33,67 +39,6 @@ const WIREFRAME_LEAD_MS = 400
  */
 const CATCHUP_STAGGER_MS = 150
 const CATCHUP_MAX_AGE_MS = 60_000
-const TYPE_DURATION_MS = 800
-const MIN_CHAR_MS = 15
-const MAX_CHAR_MS = 50
-
-/**
- * Agent identities share five CSS tokens defined in globals.css.
- * color/glow/bg are derived from the same --agent-* variable for each persona.
- * At runtime, getComputedStyle reads the resolved token value (theme-aware).
- */
-const AGENTS = [
-  { name: "Layout", token: "--agent-layout" },
-  { name: "Content", token: "--agent-content" },
-  { name: "Visual", token: "--agent-visual" },
-  { name: "Data", token: "--agent-data" },
-  { name: "Decorator", token: "--agent-decorator" },
-] as const
-
-interface Scene {
-  container: HTMLDivElement
-  svgEl: SVGSVGElement
-  vb: number[]
-  regionScale: number
-  componentEntries: { component: ComposeComponent; index: number; key: string }[]
-  regionEntries: { g: SVGGElement; label: HTMLDivElement; region: ComposeRegion }[]
-  markFilledRegions: (comp: ComposeComponent) => void
-  markFilledByAll: () => void
-}
-type ResolvedAgent = { name: string; color: string; glow: string; bg: string }
-
-/** Resolve CSS variable tokens into usable color strings (theme-aware). */
-function resolveAgents(): ResolvedAgent[] {
-  const root = typeof document !== "undefined" ? document.documentElement : null
-  return AGENTS.map((a) => {
-    const raw = root ? getComputedStyle(root).getPropertyValue(a.token).trim() : ""
-    // Fallback: use oklch representation directly if computation available, else neutral gray
-    const base = raw || "oklch(0.6 0 0)"
-    return {
-      name: a.name,
-      color: `color-mix(in oklch, ${base} 55%, transparent)`,
-      glow: `color-mix(in oklch, ${base} 10%, transparent)`,
-      bg: base,
-    }
-  })
-}
-
-interface ComposeComponent {
-  class: string
-  bbox: { x: number; y: number; w: number; h: number } | null
-  text: string
-  svg: string
-  changed: boolean
-}
-
-interface ComposeRegion {
-  name: string
-  x: number
-  y: number
-  w: number
-  h: number
-}
-
 interface ComposeData {
   version: number
   viewBox: string
@@ -142,15 +87,6 @@ interface AnimatedSlidePreviewProps {
   defsMounted?: boolean
 }
 
-function assignAgent(comp: ComposeComponent, agents: ResolvedAgent[]) {
-  const cls = comp.class || ""
-  if (cls === "TitleText" || cls === "SubtitleText") return agents[0]
-  if (comp.text.length > 20) return agents[1]
-  if (cls === "Graphic" || cls.includes("image")) return agents[2]
-  if (cls.includes("ConnectorShape") || cls.includes("line")) return agents[3]
-  return agents[4]
-}
-
 function regionKey(region: ComposeRegion) {
   return `${region.name}|${region.x},${region.y},${region.w},${region.h}`
 }
@@ -165,7 +101,7 @@ function hashIdentity(value: string) {
 }
 
 /** Stable across payload reordering; SVG IDs are preferred when LibreOffice supplied one. */
-export function composeComponentKey(component: ComposeComponent) {
+function composeComponentKey(component: ComposeComponent) {
   const id = component.svg.match(/\bid\s*=\s*["']([^"']+)["']/)?.[1]
   if (id) return `id:${id}`
   const bbox = component.bbox
@@ -212,7 +148,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   const containerRef = useRef<HTMLDivElement>(null)
   /** Changed component keys that arrived while off-screen → arrival time (ms). */
   const pendingKeysRef = useRef(new Map<string, number>())
-  const hasBeenOffscreenRef = useRef(false)
   /** Draws pending (arrived-while-away) changes on the built scene when the slide comes into view. */
   const replayPendingRef = useRef<() => void>(() => {})
   const sceneRef = useRef<{ url: string; scene: Scene } | null>(null)
@@ -225,43 +160,30 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     visibilityWaitersRef.current.clear()
     if (visibility === "visible") {
       if (pendingRef.current) applyPendingRef.current(true)
-      else if (hasBeenOffscreenRef.current && pendingKeysRef.current.size > 0) replayPendingRef.current()
-    } else {
-      // Below the threshold counts as "away" — a slide just below the fold
-      // must replay when it arrives, not only slides a full viewport away.
-      hasBeenOffscreenRef.current = true
+      else if (pendingKeysRef.current.size > 0) replayPendingRef.current()
     }
   })
   const nearRef = useSlideVisibility(wrapperRef, 0, (visibility) => {
-    if (visibility === "hidden") {
-      hasBeenOffscreenRef.current = true
-    } else if (pendingRef.current) {
+    if (visibility === "visible" && pendingRef.current) {
       applyPendingRef.current(visibleRef.current === "visible")
     }
   }, "100% 0px")
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
-  const typewriterCancelsRef = useRef<(() => void)[]>([])
+  const animationSessionRef = useRef<AgentAnimationSession | null>(null)
   const releaseRef = useRef<(() => void) | null>(null)
   const lastComposeUrlRef = useRef("")
-  const renderedComposeUrlRef = useRef("")
   const previousRegionsRef = useRef<ComposeRegion[]>([])
   const animatingRef = useRef(false)
   const [errorKind, setErrorKind] = useState<"retryable" | "permanent" | null>(null)
-  const errorKindRef = useRef(errorKind)
-  errorKindRef.current = errorKind
   const [showError, setShowError] = useState(false)
   const retryFailureRef = useRef<{ url: string; startedAt: number } | null>(null)
-  const [retryTick, setRetryTick] = useState(0)
   const [aspectRatio, setAspectRatio] = useState("16/9")
   const reducedMotion = useRef(
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
   )
 
   const cleanup = useCallback(() => {
-    timersRef.current.forEach(clearTimeout)
-    timersRef.current = []
-    typewriterCancelsRef.current.forEach(cancel => cancel())
-    typewriterCancelsRef.current = []
+    animationSessionRef.current?.cancel()
+    animationSessionRef.current = null
     releaseRef.current?.()
     releaseRef.current = null
     const parent = containerRef.current?.parentElement
@@ -307,7 +229,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
 
   useEffect(() => {
     let cancelled = false
-    const acquireController = new AbortController()
+    const lifecycleController = new AbortController()
 
     const waitForFirstVisibility = () => {
       if (visibleRef.current !== "unknown") return Promise.resolve(visibleRef.current)
@@ -317,14 +239,12 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     }
     const markPermanentError = () => {
       if (cancelled) return
-      errorKindRef.current = "permanent"
       setErrorKind("permanent")
       setShowError(true)
     }
     const markRetryableError = (requestedUrl: string, hideTransient404: boolean) => {
       if (cancelled || requestedUrl !== composeUrlRef.current) return
       lastComposeUrlRef.current = ""
-      errorKindRef.current = "retryable"
       setErrorKind("retryable")
       if (!hideTransient404) {
         retryFailureRef.current = null
@@ -343,135 +263,23 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
      * updates right after the build and by catch-up replays when a slide that
      * changed while away comes into view (no rebuild — the SVG is already there).
      */
-    const animateScene = (scene: Scene, animTargets: Set<string>, regionAnimTargets: Set<number>, stagger: number, wireframeLead: number) => {
-      const { container, svgEl, vb, regionScale, componentEntries, regionEntries, markFilledRegions, markFilledByAll } = scene
-      // Resolve agent tokens once per animation cycle (theme-aware)
-      const resolvedAgents = resolveAgents()
-      // --- Animate new regions, then changed components ---
-      const overlayContainer = document.createElement("div")
-      overlayContainer.className = "asp-overlay absolute inset-0 pointer-events-none"
-      container.parentElement?.appendChild(overlayContainer)
-
-      // Cursors move via transform (compositor thread), not left/top (layout).
-      // A typewriter write relayouts the SVG every few frames; a left/top
-      // transition would stutter with it, a transform transition does not.
-      // Percent → px once per animation; the slide box does not change mid-run.
-      const box = container.getBoundingClientRect()
-      const moveCursor = (cursor: HTMLDivElement, leftPct: number, topPct: number) => {
-        cursor.style.transform = `translate3d(${(leftPct / 100) * box.width}px, ${(topPct / 100) * box.height}px, 0)`
-      }
-      const createCursor = (agent: ResolvedAgent, left: number, top: number) => {
-        const cursor = document.createElement("div")
-        cursor.className = "absolute"
-        cursor.style.cssText = "left:0;top:0;opacity:0;z-index:20;will-change:transform,opacity;transition:transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease-out;"
-        moveCursor(cursor, left, top)
-        cursor.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2.5 7L5 3z" fill="${agent.bg}" stroke="color-mix(in oklch, var(--background) 60%, transparent)" stroke-width="1.5"/></svg><span style="position:absolute;left:12px;top:12px;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;background:${agent.bg};color:var(--background);box-shadow:var(--shadow-card)">${agent.name}</span>`
-        overlayContainer.appendChild(cursor)
-        requestAnimationFrame(() => { cursor.style.opacity = "1" })
-        return cursor
-      }
-
-      let regionStaggerIdx = 0
-      regionEntries.forEach(({ g, label, region }, i) => {
-        if (!regionAnimTargets.has(i)) return
-        const si = regionStaggerIdx++
-        const pctL = (region.x * regionScale / vb[2]) * 100
-        const pctT = (region.y * regionScale / vb[3]) * 100
-        const endL = ((region.x + region.w) * regionScale / vb[2]) * 100
-        const endT = ((region.y + region.h) * regionScale / vb[3]) * 100
-        const t1 = setTimeout(() => {
-          if (cancelled) return
-          const cursor = createCursor(resolvedAgents[0], pctL, pctT)
-          const t2 = setTimeout(() => {
-            if (cancelled) return
-            g.classList.add("asp-region-on", "asp-region-drawn")
-            label.classList.add("asp-region-on")
-            moveCursor(cursor, endL, endT)
-            const t3 = setTimeout(() => {
-              cursor.style.transition = "opacity 0.4s ease-out"
-              cursor.style.opacity = "0"
-            }, 500)
-            timersRef.current.push(t3)
-          }, 250)
-          timersRef.current.push(t2)
-        }, si * stagger)
-        timersRef.current.push(t1)
-      })
-
-      const regionPhaseMs = regionStaggerIdx > 0
-        ? regionStaggerIdx * stagger + wireframeLead
-        : 0
-      let componentStaggerIdx = 0
-      componentEntries.forEach(({ component: comp, index: i, key }) => {
-        if (!animTargets.has(key) || !comp.bbox) return
-        const si = componentStaggerIdx++
-        const agent = assignAgent(comp, resolvedAgents)
-
-        const pctL = (comp.bbox.x / vb[2]) * 100
-        const pctT = (comp.bbox.y / vb[3]) * 100
-        const pctW = (comp.bbox.w / vb[2]) * 100
-        const pctH = (comp.bbox.h / vb[3]) * 100
-
-        const t1 = setTimeout(() => {
-          if (cancelled) return
-          const cursor = createCursor(agent, pctL, Math.max(0, pctT - 5))
-          requestAnimationFrame(() => {
-            moveCursor(cursor, pctL, pctT)
-          })
-
-          const t2 = setTimeout(() => {
-            if (cancelled) return
-            const wf = document.createElement("div")
-            wf.className = "absolute"
-            wf.style.cssText = `left:${pctL}%;top:${pctT}%;width:${pctW}%;height:${pctH}%;border:1px solid ${agent.color};border-radius:2px;box-shadow:inset 0 0 16px ${agent.glow};opacity:1;clip-path:inset(0 100% 100% 0);animation:asp-wf-drag 0.35s cubic-bezier(0.16,1,0.3,1) forwards;`
-            overlayContainer.appendChild(wf)
-
-            const endL = ((comp.bbox!.x + comp.bbox!.w) / vb[2]) * 100
-            const endT = ((comp.bbox!.y + comp.bbox!.h) / vb[3]) * 100
-            moveCursor(cursor, endL, endT)
-
-            const t3 = setTimeout(() => {
-              if (cancelled) return
-              const g = svgEl.querySelector(`g[data-index="${i}"]`) as SVGGElement | null
-              if (g) {
-                g.style.opacity = "1"
-                delete g.dataset.pending
-                // Landing: the component itself lights up and settles (the original
-                // look). One component at a time on a visible slide, so the SVG
-                // filter cost stays bounded.
-                g.style.filter = "brightness(2) saturate(0.5)"
-                g.style.transition = "filter 0.5s cubic-bezier(0.16,1,0.3,1)"
-                requestAnimationFrame(() => { g.style.filter = "brightness(1) saturate(1)" })
-                typewriterCancelsRef.current.push(typewrite(g))
-              }
-              markFilledRegions(comp)
-              const t4 = setTimeout(() => {
-                wf.style.transition = "opacity 0.4s ease-out"
-                wf.style.opacity = "0"
-                cursor.style.transition = "opacity 0.4s ease-out"
-                cursor.style.opacity = "0"
-              }, 500)
-              timersRef.current.push(t4)
-            }, Math.max(0, wireframeLead - 50))
-            timersRef.current.push(t3)
-          }, 250)
-          timersRef.current.push(t2)
-        }, regionPhaseMs + si * stagger)
-        timersRef.current.push(t1)
-      })
-
-      const totalTime = regionPhaseMs + componentStaggerIdx * stagger + wireframeLead + 1000
-      const tDone = setTimeout(() => {
-        markFilledByAll()
+    const animateScene = (
+      scene: Scene,
+      componentTargets: Set<string>,
+      regionTargets: Set<number>,
+      stagger: number,
+    ) => {
+      let session: AgentAnimationSession | null = null
+      session = startAgentAnimation(scene, componentTargets, regionTargets, stagger, () => {
+        if (animationSessionRef.current !== session) return
+        animationSessionRef.current = null
         animatingRef.current = false
         releaseRef.current?.()
         releaseRef.current = null
-        overlayContainer.remove()
         onComplete?.()
-        // Check if a new composeUrl arrived during animation
         check()
-      }, totalTime)
-      timersRef.current.push(tDone)
+      })
+      animationSessionRef.current = session
     }
 
     /** Catch-up: the slide changed while away and is now in view — draw the pending changes on the existing scene. */
@@ -496,7 +304,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       pendingKeysRef.current.clear()
       if (targets.size === 0) return
       animatingRef.current = true
-      const release = await acquire(slug || current.url, acquireController.signal)
+      const release = await acquire(lifecycleController.signal)
       if (!release || cancelled) { release?.(); animatingRef.current = false; return }
       if (current !== sceneRef.current || current.url !== composeUrlRef.current) {
         release(); animatingRef.current = false; addPendingKeys(targets); check(); return
@@ -510,7 +318,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       })
       releaseRef.current = release
       onAnimate?.()
-      animateScene(scene, targets, new Set(), CATCHUP_STAGGER_MS, WIREFRAME_LEAD_MS)
+      animateScene(scene, targets, new Set(), CATCHUP_STAGGER_MS)
     }
     replayPendingRef.current = () => { void replayPending() }
 
@@ -531,8 +339,10 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             try { await document.fonts.ready } catch { /* ignore */ }
           }
           const [defsResp, compResp] = await Promise.all([
-            defsMountedRef.current ? Promise.resolve(null) : fetch(defsUrlRef.current),
-            fetch(requestedUrl),
+            defsMountedRef.current
+              ? Promise.resolve(null)
+              : fetch(defsUrlRef.current, { signal: lifecycleController.signal }),
+            fetch(requestedUrl, { signal: lifecycleController.signal }),
           ])
           if (cancelled) return
           const superseded = requestedUrl !== composeUrlRef.current
@@ -603,9 +413,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             pendingRef.current = null
 
             cleanup()
-          errorKindRef.current = null
-          retryFailureRef.current = null
-          setErrorKind(null)
+            retryFailureRef.current = null
+            setErrorKind(null)
           setShowError(false)
           // Immediately hide fallback (React re-render is async)
           const fb = container.parentElement?.querySelector("[data-fallback]") as HTMLElement | null
@@ -643,7 +452,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           }
           const skipAgentAnimation = suppressThisUpdate || !animateNow
           const stagger = catchUp ? CATCHUP_STAGGER_MS : STAGGER_MS
-          const wireframeLead = WIREFRAME_LEAD_MS
 
           const regions = data.regions ?? []
           const previousRegionKeys = new Set(previousRegionsRef.current.map(regionKey))
@@ -658,7 +466,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           let hasAnimationTargets = animTargets.size > 0 || regionAnimTargets.size > 0
           if (hasAnimationTargets && !reducedMotion.current) {
             animatingRef.current = true
-            const release = await acquire(slug || compUrlBase, acquireController.signal)
+            const release = await acquire(lifecycleController.signal)
             if (!release || cancelled) {
               release?.()
               animatingRef.current = false
@@ -772,7 +580,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           })
 
           container.appendChild(svgEl)
-          renderedComposeUrlRef.current = requestedUrl
           if (regions.length > 0) container.parentElement?.appendChild(regionOverlay)
           const markFilledRegions = (comp: ComposeComponent) => {
             if (!isContentComponent(comp)) return
@@ -801,7 +608,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             return
           }
 
-          animateScene(scene, animTargets, regionAnimTargets, stagger, wireframeLead)
+          animateScene(scene, animTargets, regionAnimTargets, stagger)
           }
 
           const hasRenderedSvg = Boolean(containerRef.current?.querySelector("svg"))
@@ -835,7 +642,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     checkRef.current = check
     return () => {
       cancelled = true
-      acquireController.abort()
+      lifecycleController.abort()
+      visibilityWaitersRef.current.forEach((resolve) => resolve("hidden"))
       visibilityWaitersRef.current.clear()
       sceneRef.current = null
       cleanup()
@@ -862,26 +670,28 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     if (composeChanged) {
       pendingRef.current = null
       retryFailureRef.current = null
-      errorKindRef.current = null
       setErrorKind(null)
       setShowError(false)
-      setRetryTick(0)
-    } else if (errorKindRef.current === "permanent") {
+    } else if (errorKind === "permanent") {
       return
     }
     lastComposeUrlRef.current = ""
     checkRef.current?.()
-  }, [composeUrl, defsMounted, defsUrl])
+  }, [composeUrl, defsMounted, defsUrl, errorKind])
 
   // Retry network/HTTP failures only. Schema/version/empty failures wait for a new URL.
   useEffect(() => {
     if (errorKind !== "retryable") return
-    const retry = window.setTimeout(() => {
-      checkRef.current?.()
-      setRetryTick((tick) => tick + 1)
-    }, 2000)
-    return () => clearTimeout(retry)
-  }, [errorKind, composeUrl, retryTick])
+    let retry = 0
+    const scheduleRetry = () => {
+      retry = window.setTimeout(() => {
+        checkRef.current?.()
+        scheduleRetry()
+      }, 2000)
+    }
+    scheduleRetry()
+    return () => window.clearTimeout(retry)
+  }, [errorKind, composeUrl])
 
   return (
     <div ref={wrapperRef} data-slide-id={slug} className="slide-cv slide-shadow relative rounded-lg bg-black" style={{ aspectRatio }}>
@@ -889,23 +699,4 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       {showError && fallback && <div data-fallback className="absolute inset-0 overflow-hidden rounded-lg">{fallback}</div>}
     </div>
   )
-}
-
-function typewrite(compEl: SVGGElement) {
-  const tspans = compEl.querySelectorAll("tspan")
-  const leafSpans: { el: Element; fullText: string }[] = []
-  let totalChars = 0
-  tspans.forEach(ts => {
-    if (ts.querySelectorAll("tspan").length === 0 && ts.textContent) {
-      // Strip textLength / lengthAdjust permanently — restoring them after typewriter
-      // completes causes webkit to horizontally compress glyphs.
-      for (const attr of ["textLength", "lengthAdjust"]) ts.removeAttribute(attr)
-      totalChars += ts.textContent.length
-      leafSpans.push({ el: ts, fullText: ts.textContent })
-      ts.textContent = ""
-    }
-  })
-  if (!leafSpans.length) return () => {}
-  const charMs = Math.max(MIN_CHAR_MS, Math.min(MAX_CHAR_MS, Math.floor(TYPE_DURATION_MS / totalChars)))
-  return registerTypewriter(leafSpans, charMs)
 }

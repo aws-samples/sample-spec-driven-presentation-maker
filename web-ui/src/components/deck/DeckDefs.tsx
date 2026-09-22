@@ -23,22 +23,22 @@ export function DeckDefs({ defsUrl, onStatusChange }: DeckDefsProps) {
   onStatusChangeRef.current = onStatusChange
 
   useEffect(() => {
-    let cancelled = false
+    const controller = new AbortController()
     setLoadedDefs({ url: defsUrl, defs: "" })
     onStatusChangeRef.current?.("loading")
-    fetch(defsUrl)
+    fetch(defsUrl, { signal: controller.signal })
       .then((response) => response.ok ? response.json() as Promise<DefsData> : Promise.reject())
       .then((data) => {
-        if (cancelled) return
+        if (controller.signal.aborted) return
         if (data.version !== 1 || !data.defs) throw new Error("Unsupported or empty deck defs")
         setLoadedDefs({ url: defsUrl, defs: data.defs })
         onStatusChangeRef.current?.("loaded")
       })
       .catch(() => {
-        if (!cancelled) onStatusChangeRef.current?.("error")
+        if (!controller.signal.aborted) onStatusChangeRef.current?.("error")
       })
     return () => {
-      cancelled = true
+      controller.abort()
       onStatusChangeRef.current?.("loading")
     }
   }, [defsUrl])

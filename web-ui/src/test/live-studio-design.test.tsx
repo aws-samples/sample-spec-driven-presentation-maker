@@ -126,10 +126,10 @@ describe("HearingCard — achromatic + five-color spine", () => {
   })
 })
 
-describe("AnimatedSlidePreview — no hardcoded AGENTS colors", () => {
+describe("agentAnimation — no hardcoded AGENTS colors", () => {
   it("source file does not contain rgba agent colors", () => {
     const src = fs.readFileSync(
-      sourcePath("components/deck/AnimatedSlidePreview.tsx"),
+      sourcePath("components/deck/agentAnimation.ts"),
       "utf-8"
     )
     // Old hardcoded values should be gone

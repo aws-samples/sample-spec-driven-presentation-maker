@@ -7,7 +7,7 @@ export type SlideVisibility = "unknown" | "visible" | "hidden"
 type VisibilityListener = (visibility: Exclude<SlideVisibility, "unknown">) => void
 interface ObserverEntry {
   observer: IntersectionObserver
-  listeners: Map<Element, Set<VisibilityListener>>
+  listeners: Map<Element, VisibilityListener>
 }
 
 const observers = new Map<Element | null, Map<string, ObserverEntry>>()
@@ -21,13 +21,13 @@ function observerFor(root: Element | null, threshold: number, rootMargin: string
   const key = `${threshold}|${rootMargin}`
   let entry = byOptions.get(key)
   if (!entry) {
-    const listeners = new Map<Element, Set<VisibilityListener>>()
+    const listeners = new Map<Element, VisibilityListener>()
     const observer = new IntersectionObserver((changes) => {
       for (const change of changes) {
         const visibility = change.isIntersecting && change.intersectionRatio >= threshold
           ? "visible"
           : "hidden"
-        listeners.get(change.target)?.forEach((listener) => listener(visibility))
+        listeners.get(change.target)?.(visibility)
       }
     }, { root, rootMargin, threshold: threshold === 0 ? [0] : [0, threshold] })
     entry = { observer, listeners }
@@ -61,17 +61,12 @@ export function useSlideVisibility<T extends Element>(
       visibilityRef.current = visibility
       onChangeRef.current?.(visibility)
     }
-    const listeners = entry.listeners.get(element) ?? new Set<VisibilityListener>()
-    listeners.add(listener)
-    entry.listeners.set(element, listeners)
+    entry.listeners.set(element, listener)
     entry.observer.observe(element)
 
     return () => {
-      listeners.delete(listener)
-      if (listeners.size === 0) {
-        entry.listeners.delete(element)
-        entry.observer.unobserve(element)
-      }
+      entry.listeners.delete(element)
+      entry.observer.unobserve(element)
       if (entry.listeners.size === 0) {
         entry.observer.disconnect()
         const byOptions = observers.get(root)

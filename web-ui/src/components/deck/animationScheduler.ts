@@ -5,7 +5,6 @@ export const MAX_CONCURRENT = 2
 
 export type Release = () => void
 type Waiter = {
-  slug: string
   signal?: AbortSignal
   resolve: (release: Release | null) => void
   abortWhileQueued?: () => void
@@ -48,13 +47,13 @@ function drain() {
 }
 
 /** Acquire one of the two deck-wide animation slots in FIFO order. */
-export function acquire(slug: string, signal?: AbortSignal): Promise<Release | null> {
+export function acquire(signal?: AbortSignal): Promise<Release | null> {
   return new Promise((resolve) => {
     if (signal?.aborted) {
       resolve(null)
       return
     }
-    const waiter: Waiter = { slug, signal, resolve }
+    const waiter: Waiter = { signal, resolve }
     waiter.abortWhileQueued = () => {
       const index = queue.indexOf(waiter)
       if (index >= 0) queue.splice(index, 1)
@@ -75,7 +74,7 @@ interface Typewriter {
   spans: TypewriterSpan[]
   charMs: number
   startedAt: number
-  lastFrameAt: number
+  total: number
   shown: number
 }
 
@@ -97,20 +96,18 @@ function applyCharacterCount(writer: Typewriter, count: number) {
 
 export function advanceTypewriters(now: number) {
   for (const writer of typewriters) {
-    const total = writer.spans.reduce((sum, span) => sum + span.fullText.length, 0)
-    const elapsedTarget = Math.min(total, Math.max(0, Math.floor((now - writer.startedAt) / writer.charMs)))
+    const elapsedTarget = Math.min(writer.total, Math.max(0, Math.floor((now - writer.startedAt) / writer.charMs)))
     // Follow the elapsed-time target exactly (this is what the original
     // setInterval(charMs) did), so cadence matches within one character.
     // Only after a stalled frame (> 4 chars behind) do we cap catch-up at 2,
     // so a long frame cannot dump a whole word at once.
     const behind = elapsedTarget - writer.shown
     const shown = behind > 4 ? writer.shown + 2 : elapsedTarget
-    writer.lastFrameAt = now
     if (shown !== writer.shown) {
       writer.shown = shown
       applyCharacterCount(writer, shown)
     }
-    if (shown >= total) typewriters.delete(writer)
+    if (shown >= writer.total) typewriters.delete(writer)
   }
 }
 
@@ -127,7 +124,7 @@ export function registerTypewriter(spans: TypewriterSpan[], charMs: number): () 
     spans,
     charMs,
     startedAt,
-    lastFrameAt: startedAt,
+    total: spans.reduce((sum, span) => sum + span.fullText.length, 0),
     shown: 0,
   }
   typewriters.add(writer)

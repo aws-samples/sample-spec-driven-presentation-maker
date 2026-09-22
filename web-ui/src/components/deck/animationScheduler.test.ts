@@ -26,10 +26,10 @@ afterEach(() => {
 describe("animation scheduler", () => {
   it("caps concurrency at two and grants queued slides FIFO", async () => {
     const granted: string[] = []
-    const first = acquire("one").then((release) => { granted.push("one"); return release })
-    const second = acquire("two").then((release) => { granted.push("two"); return release })
-    const third = acquire("three").then((release) => { granted.push("three"); return release })
-    const fourth = acquire("four").then((release) => { granted.push("four"); return release })
+    const first = acquire().then((release) => { granted.push("one"); return release })
+    const second = acquire().then((release) => { granted.push("two"); return release })
+    const third = acquire().then((release) => { granted.push("three"); return release })
+    const fourth = acquire().then((release) => { granted.push("four"); return release })
 
     const releaseOne = await first
     const releaseTwo = await second
@@ -48,16 +48,16 @@ describe("animation scheduler", () => {
   })
 
   it("removes an aborted waiter from the queue", async () => {
-    const releaseOne = await acquire("one")
-    const releaseTwo = await acquire("two")
+    const releaseOne = await acquire()
+    const releaseTwo = await acquire()
     const controller = new AbortController()
-    const queued = acquire("hidden", controller.signal)
+    const queued = acquire(controller.signal)
 
     controller.abort()
     expect(await queued).toBeNull()
 
     releaseOne!()
-    const releaseNext = await acquire("next")
+    const releaseNext = await acquire()
     expect(releaseNext).toBeTypeOf("function")
     releaseTwo!()
     releaseNext!()
