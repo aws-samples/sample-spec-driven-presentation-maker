@@ -10,6 +10,7 @@
  * are imported statically (small) and switched client-side.
  */
 
+import { MotionConfig } from "motion/react"
 import { NextIntlClientProvider } from "next-intl"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
 import en from "../../messages/en.json"
@@ -66,7 +67,8 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   return (
     <LocaleContext.Provider value={{ locale, setLocale }}>
       <NextIntlClientProvider locale={locale} messages={MESSAGES[locale]} timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}>
-        {children}
+        {/* App-wide: honour the OS reduced-motion setting for every motion component. */}
+        <MotionConfig reducedMotion="user">{children}</MotionConfig>
       </NextIntlClientProvider>
     </LocaleContext.Provider>
   )

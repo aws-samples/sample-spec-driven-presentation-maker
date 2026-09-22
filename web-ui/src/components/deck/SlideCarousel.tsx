@@ -10,6 +10,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { AnimatePresence, motion } from "motion/react"
 import { SlidePreview } from "@/services/deckService"
 import type { SpecFiles } from "@/services/deckService"
 import { Download, Layers, LayoutGrid, Rows3, FolderOpen } from "lucide-react"
@@ -25,6 +26,28 @@ import { notifyError } from "@/lib/errors"
 import { useTranslations } from "next-intl"
 import { AGENT_WAIT_COLORS } from "@/components/deck/SpecWaiting"
 
+
+/**
+ * One slide card in either view. `layoutId` is shared across grid and full view
+ * so toggling the view (or clicking a thumbnail) morphs the card into place;
+ * `layout` lets neighbours slide when a slide is inserted or removed.
+ */
+const CARD_SPRING = { type: "spring", stiffness: 500, damping: 40, mass: 0.8 } as const
+function SlideCard({ slug, children, className }: { slug: string; children: React.ReactNode; className?: string }) {
+  return (
+    <motion.div
+      layout
+      layoutId={`slide-${slug}`}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.18 } }}
+      transition={{ layout: CARD_SPRING, opacity: { duration: 0.24 }, y: CARD_SPRING }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  )
+}
 
 interface SlideCarouselProps {
   slides: SlidePreview[]
@@ -181,6 +204,23 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     }
   }, [slides.length])
 
+  // Grid thumbnail click: switch to full view and land on that slide once the
+  // shared-layout morph has run.
+  const [focusSlug, setFocusSlug] = useState<string | null>(null)
+  const openSlideInFullView = useCallback((slug: string) => {
+    setFocusSlug(slug)
+    setViewMode("full")
+  }, [setViewMode])
+  useEffect(() => {
+    if (!focusSlug || viewMode !== "full" || !scrollElement) return
+    const el = scrollElement.querySelector(`[data-slide-id="${focusSlug}"]`)
+    const timer = setTimeout(() => {
+      el?.scrollIntoView({ behavior: "smooth", block: "center" })
+      setFocusSlug(null)
+    }, 420)
+    return () => clearTimeout(timer)
+  }, [focusSlug, viewMode, scrollElement])
+
   // Scroll to target slide when navigating from search results
   useEffect(() => {
     if (!scrollToSlide || !scrollElement) return
@@ -328,33 +368,36 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
       <div ref={setScrollElement} data-slide-scroller className="flex-1 overflow-y-auto px-6 py-6">
         {viewMode === "grid" ? (
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
-            {slidesWithPreview.map((slide, i) => (
-              <SlideThumbnail
-                key={slide.slug}
-                src={slide.previewUrl}
-                alt={t("slideAltFull", { number: i + 1, total: slidesWithPreview.length }) + (deckName ? `: ${deckName}` : "")}
-                index={i}
-                slug={slide.slug}
-                onClick={() => onSlideClick?.(i + 1)}
-                updated={updatedIds.has(slide.slug)}
-                className="slide-cv border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 cursor-pointer group"
-              >
-
-                <span className="absolute bottom-1.5 right-2 text-[11px] font-medium text-white/30 group-hover:text-white/50 transition-colors">
-                  {i + 1}
-                </span>
-              </SlideThumbnail>
-            ))}
+            <AnimatePresence initial={false}>
+              {slidesWithPreview.map((slide, i) => (
+                <SlideCard key={slide.slug} slug={slide.slug}>
+                  <SlideThumbnail
+                    src={slide.previewUrl}
+                    alt={t("slideAltFull", { number: i + 1, total: slidesWithPreview.length }) + (deckName ? `: ${deckName}` : "")}
+                    index={i}
+                    slug={slide.slug}
+                    onClick={() => { openSlideInFullView(slide.slug); onSlideClick?.(i + 1) }}
+                    updated={updatedIds.has(slide.slug)}
+                    className="slide-cv border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 cursor-pointer group"
+                  >
+                    <span className="absolute bottom-1.5 right-2 text-[11px] font-medium text-white/30 group-hover:text-white/50 transition-colors">
+                      {i + 1}
+                    </span>
+                  </SlideThumbnail>
+                </SlideCard>
+              ))}
+            </AnimatePresence>
           </div>
         ) : (
           /* Full view: cap height so one slide always fits the viewport
              (100vh minus header + paddings). Width follows aspect ratio. */
           <div className="mx-auto w-full space-y-4"
                style={{ maxWidth: `calc((100vh - 170px) * ${deckAr})` }}>
+          <AnimatePresence initial={false}>
           {slidesWithPreview.map((slide, i) => (
-            slide.composeUrl && defsUrl ? (
+            <SlideCard key={slide.slug} slug={slide.slug}>
+            {slide.composeUrl && defsUrl ? (
               <AnimatedSlidePreview
-                key={slide.slug}
                 defsUrl={defsUrl}
                 composeUrl={slide.composeUrl}
                 slug={slide.slug}
@@ -376,7 +419,6 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
               />
             ) : (
               <SlideThumbnail
-                key={slide.slug}
                 src={slide.previewUrl}
                 alt={t("slideAltFull", { number: i + 1, total: slidesWithPreview.length }) + (deckName ? `: ${deckName}` : "")}
                 index={i}
@@ -386,8 +428,10 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 onAspectRatio={handleAspectRatio}
                 className="slide-cv slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
               />
-            )
+            )}
+            </SlideCard>
           ))}
+          </AnimatePresence>
           </div>
         )}
       </div>
