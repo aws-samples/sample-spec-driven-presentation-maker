@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   acquire,
   advanceTypewriters,
+  typewritersForTests as typewriters,
   registerTypewriter,
   resetAnimationSchedulerForTests,
 } from "./animationScheduler"
@@ -62,40 +63,32 @@ describe("animation scheduler", () => {
     releaseNext!()
   })
 
-  it("advances one character per frame and catches up by at most two after a long frame", () => {
-    const first = document.createElement("span")
-    const second = document.createElement("span")
-    registerTypewriter([
-      { el: first, fullText: "abc" },
-      { el: second, fullText: "de" },
-    ], 20)
-
-    advanceTypewriters(139)
-    expect(first.textContent).toBe("a")
-    expect(second.textContent).toBe("")
-
-    advanceTypewriters(181)
-    expect(first.textContent).toBe("abc")
-    expect(second.textContent).toBe("")
-
-    advanceTypewriters(205)
-    expect(second.textContent).toBe("d")
-    advanceTypewriters(226)
-    expect(second.textContent).toBe("de")
+  it("tracks the elapsed-time cadence within one character at 60 Hz and 120 Hz", () => {
+    const text = "x".repeat(60)
+    for (const frameMs of [1000 / 60, 1000 / 120]) {
+      typewriters.clear()
+      const span = document.createElement("span")
+      const startedAt = performance.now()
+      registerTypewriter([{ el: span, fullText: text }], 15)
+      for (let t = startedAt + frameMs; t <= startedAt + 800; t += frameMs) {
+        advanceTypewriters(t)
+        const target = Math.min(text.length, Math.floor((t - startedAt) / 15))
+        expect(Math.abs((span.textContent?.length ?? 0) - target)).toBeLessThanOrEqual(1)
+      }
+      // The original setInterval(15) showed 53 characters after 800 ms.
+      expect(span.textContent?.length).toBeGreaterThanOrEqual(52)
+    }
   })
 
-  it("writes one character on every animation frame", () => {
-    const frames: FrameRequestCallback[] = []
-    vi.stubGlobal("requestAnimationFrame", vi.fn((callback: FrameRequestCallback) => {
-      frames.push(callback)
-      return frames.length
-    }))
+  it("caps catch-up at two characters after a stalled frame", () => {
     const span = document.createElement("span")
-    registerTypewriter([{ el: span, fullText: "abcd" }], 15)
-
-    frames.shift()!(116)
+    const startedAt = performance.now()
+    registerTypewriter([{ el: span, fullText: "abcdefghijklmnop" }], 15)
+    advanceTypewriters(startedAt + 16)
     expect(span.textContent).toBe("a")
-    frames.shift()!(133)
-    expect(span.textContent).toBe("ab")
+    advanceTypewriters(startedAt + 216) // 200 ms stall: target is 14, show only 2 more
+    expect(span.textContent).toBe("abc")
+    advanceTypewriters(startedAt + 232)
+    expect(span.textContent).toBe("abcde")
   })
 })

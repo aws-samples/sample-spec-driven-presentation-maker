@@ -80,6 +80,8 @@ interface Typewriter {
 }
 
 const typewriters = new Set<Typewriter>()
+/** Test-only access to the live registry. */
+export const typewritersForTests = typewriters
 let frameId: number | null = null
 
 function applyCharacterCount(writer: Typewriter, count: number) {
@@ -97,9 +99,12 @@ export function advanceTypewriters(now: number) {
   for (const writer of typewriters) {
     const total = writer.spans.reduce((sum, span) => sum + span.fullText.length, 0)
     const elapsedTarget = Math.min(total, Math.max(0, Math.floor((now - writer.startedAt) / writer.charMs)))
-    const frameGap = now - writer.lastFrameAt
-    const maxAdvance = frameGap > 2 * writer.charMs ? 2 : 1
-    const shown = Math.min(elapsedTarget, writer.shown + maxAdvance)
+    // Follow the elapsed-time target exactly (this is what the original
+    // setInterval(charMs) did), so cadence matches within one character.
+    // Only after a stalled frame (> 4 chars behind) do we cap catch-up at 2,
+    // so a long frame cannot dump a whole word at once.
+    const behind = elapsedTarget - writer.shown
+    const shown = behind > 4 ? writer.shown + 2 : elapsedTarget
     writer.lastFrameAt = now
     if (shown !== writer.shown) {
       writer.shown = shown
