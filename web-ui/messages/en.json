@@ -368,7 +368,7 @@
   },
   "compose": {
     "recentSessionsHeading": "Recent kiro sessions",
-    "pickOtherSession": "Choose another session…",
+    "pickOtherSession": "See all",
     "composingAria": "Composing slides",
     "preparing": "Preparing…",
     "composing": "Composing {slides} slides · {agents} agents in parallel",

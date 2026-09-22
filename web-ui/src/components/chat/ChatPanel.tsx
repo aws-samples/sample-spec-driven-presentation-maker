@@ -558,9 +558,18 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             </p>
             {IS_LOCAL && recentSessions.length > 0 && (
               <section className="mb-6 w-full max-w-xs text-left" aria-labelledby="recent-kiro-sessions-heading">
-                <h3 id="recent-kiro-sessions-heading" className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">
-                  {tCompose("recentSessionsHeading")}
-                </h3>
+                <div className="mb-2 flex items-baseline justify-between gap-2">
+                  <h3 id="recent-kiro-sessions-heading" className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">
+                    {tCompose("recentSessionsHeading")}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setSessionPickerOpen(true)}
+                    className="-mr-2 min-h-11 rounded-lg px-2 text-xs font-medium text-brand-teal motion-safe:transition-colors hover:bg-brand-teal-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
+                  >
+                    {tCompose("pickOtherSession")}
+                  </button>
+                </div>
                 <div className="space-y-1.5">
                   {recentSessions.map((recent) => (
                     <button
@@ -579,13 +588,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     </button>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSessionPickerOpen(true)}
-                  className="mt-2 min-h-11 w-full rounded-lg px-3 text-left text-sm font-medium text-brand-teal motion-safe:transition-colors hover:bg-brand-teal-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
-                >
-                  {tCompose("pickOtherSession")}
-                </button>
               </section>
             )}
             {forkError && (
@@ -593,18 +595,21 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 {tSessionPicker("forkFailed")}
               </p>
             )}
-            <div className="flex flex-col gap-2 w-full max-w-xs mb-8">
-              {[t("example1"), t("example2"), t("example3")].map((example) => (
-                <button
-                  key={example}
-                  type="button"
-                  onClick={() => chatInputRef.current?.insertAtCursor(example)}
-                  className="text-left text-sm text-foreground-muted px-3.5 py-2.5 rounded-xl border border-border hover:border-border-hover hover:text-foreground transition-colors"
-                >
-                  {example}
-                </button>
-              ))}
-            </div>
+            {/* Example prompts are a hint for a blank slate; recent sessions are a stronger one, so show only one of the two. */}
+            {!(IS_LOCAL && recentSessions.length > 0) && (
+              <div className="flex flex-col gap-2 w-full max-w-xs mb-8">
+                {[t("example1"), t("example2"), t("example3")].map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    onClick={() => chatInputRef.current?.insertAtCursor(example)}
+                    className="text-left text-sm text-foreground-muted px-3.5 py-2.5 rounded-xl border border-border hover:border-border-hover hover:text-foreground transition-colors"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            )}
             {parallelAgents && <ModeSelector value={agentMode} onChange={setAgentMode} />}
           </div>
         ) : (

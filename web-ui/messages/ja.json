@@ -368,7 +368,7 @@
   },
   "compose": {
     "recentSessionsHeading": "最近の kiro セッション",
-    "pickOtherSession": "他のセッションを選ぶ…",
+    "pickOtherSession": "すべて見る",
     "composingAria": "スライドを作成中",
     "preparing": "準備中…",
     "composing": "スライド {slides} 枚を {agents} エージェントで並列作成中",
