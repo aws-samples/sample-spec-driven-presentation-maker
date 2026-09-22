@@ -10,6 +10,7 @@
 import fs from "fs"
 import path from "path"
 import { resolveDeckDir, DECK_ROOT } from "@/lib/local/deck-paths"
+import { readOriginFromDeck } from "@/lib/local/acp-process"
 
 function safeRead(p: string): string | null {
   try { return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : null } catch { return null }
@@ -93,6 +94,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (brief || outline || artDirection) specs = { brief, outline, artDirection }
 
   const pptxPath = path.join(dp, "output.pptx")
+  const sessionOrigin = readOriginFromDeck(deckId)
 
   return Response.json({
     deckId,
@@ -105,6 +107,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     specs,
     updatedAt: new Date().toISOString(),
     chatSessionId: safeRead(path.join(dp, ".session"))?.trim() || null,
+    ...(sessionOrigin ? { sessionOrigin } : {}),
     visibility: "private",
     isOwner: true,
     collaborators: [],

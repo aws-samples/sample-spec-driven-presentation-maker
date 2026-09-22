@@ -57,10 +57,10 @@ export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
 /**
  * Invokes the AgentCore runtime with streaming support
  */
-export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode, deckId) => {
+export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode, deckId, continuedFrom) => {
   // Local mode: proxy through Next.js API Route → kiro-cli acp
   if (IS_LOCAL) {
-    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId);
+    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom);
   }
 
   try {
@@ -233,11 +233,17 @@ export const generateSessionId = () => {
  * Reads SSE stream from /api/agent/invoke and feeds events through the same
  * strandsParser used by the cloud path, so ChatPanel works unchanged.
  */
-const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId) => {
+const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom) => {
   const response = await fetch('/api/agent/invoke', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, sessionId, mode: mode || 'spec', deckId: deckId || undefined }),
+    body: JSON.stringify({
+      query,
+      sessionId,
+      mode: mode || 'spec',
+      deckId: deckId || undefined,
+      continuedFrom: continuedFrom || undefined,
+    }),
     signal,
   });
 
@@ -265,7 +271,11 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
         buffer = lines.pop() || '';
         for (const line of lines) {
           if (line.trim()) {
-            const prev = completion;
+            if (line.startsWith('data: ')) {
+              let event;
+              try { event = JSON.parse(line.substring(6).trim()); } catch { /* parser handles malformed lines */ }
+              if (event?.status === 'error' && event.error) throw new Error(event.error);
+            }
             completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
           }
         }

@@ -14,6 +14,7 @@ interface BridgeOptions {
   subscribe: (fn: (msg: Record<string, unknown>) => void) => () => void
   onDeckId?: (deckId: string) => void
   onDone?: () => void
+  onError?: () => void
   /** Pre-buffered notifications to replay before subscribing to live events. */
   replay?: { id: number; msg: Record<string, unknown> }[]
 }
@@ -23,7 +24,7 @@ function extractSlugs(q: string): string {
   return m ? m[1].trim() : ""
 }
 
-export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, replay }: BridgeOptions): ReadableStream {
+export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, onError, replay }: BridgeOptions): ReadableStream {
   const encoder = new TextEncoder()
 
   return new ReadableStream({
@@ -58,6 +59,16 @@ export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, replay
       const unsubscribe = subscribe(processMsg)
 
       function processMsg(msg: Record<string, unknown>) {
+        if (msg.id != null && msg.error) {
+          if (!replaying) {
+            const error = msg.error as { message?: string }
+            send({ status: "error", error: error.message || "ACP request failed" })
+            onError?.()
+            close()
+          }
+          return
+        }
+
         // End turn from RPC response
         if (msg.id != null && msg.result) {
           const r = msg.result as Record<string, unknown>

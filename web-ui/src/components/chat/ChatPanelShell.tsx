@@ -30,6 +30,7 @@ import { IS_LOCAL } from "@/lib/mode"
 import { notifyError } from "@/lib/errors"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { useTranslations } from "next-intl"
+import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
 
 export type ChatTabKey = "new" | "deck"
 
@@ -47,6 +48,7 @@ interface ChatPanelShellProps {
   deckId: string | null
   deckName: string | null
   chatSessionId?: string
+  sessionOrigin?: SessionOrigin
   slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
@@ -58,7 +60,7 @@ interface ChatPanelShellProps {
 
 export function ChatPanelShell({
   open, onClose, chatTab, onChatTabChange,
-  deckId, deckName, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, chatRef: externalChatRef,
+  deckId, deckName, chatSessionId, sessionOrigin, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, chatRef: externalChatRef,
   inline = false,
 }: ChatPanelShellProps) {
   const t = useTranslations("chatShell")
@@ -230,6 +232,7 @@ export function ChatPanelShell({
               ref={panelBVisible ? chatRef : undefined}
               deckId={deckId!}
               chatSessionId={chatSessionId}
+              sessionOrigin={sessionOrigin}
               slideSlugs={slideSlugs || []}
               onDeckCreated={handlePanelBDeckCreated}
               onPreviewInvalidated={onPreviewInvalidated}

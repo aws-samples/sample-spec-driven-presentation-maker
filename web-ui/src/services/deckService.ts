@@ -7,6 +7,8 @@
  * All requests require a Cognito ID token for authorization.
  */
 
+import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
+
 export interface DeckSummary {
   deckId: string
   name: string
@@ -45,6 +47,7 @@ export interface DeckDetail {
   specs?: SpecFiles | null
   updatedAt: string
   chatSessionId?: string
+  sessionOrigin?: SessionOrigin
   visibility?: "public" | "private"
   isOwner?: boolean
   role?: "owner" | "collaborator" | "viewer"

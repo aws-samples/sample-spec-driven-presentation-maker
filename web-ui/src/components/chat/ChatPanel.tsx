@@ -22,17 +22,22 @@ import { ChatMessage, ToolUse } from "./ChatMessage"
 import { McpStatusBar } from "./McpStatusBar"
 import { FileDropZone } from "./FileDropZone"
 import { useIsMobile } from "@/hooks/UseMobile"
-import { Send, ChevronRight } from "lucide-react"
+import { Send, ChevronRight, GitBranch } from "lucide-react"
 import { ModeSelector } from "./ModeSelector"
+import { SessionPickerDialog } from "./SessionPickerDialog"
+import { ContinuedFromChip } from "./ContinuedFromChip"
 import { usePreferences } from "@/hooks/usePreferences"
 import { notifyError } from "@/lib/errors"
 import { toast } from "sonner"
 import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
+import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsService"
+import type { KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
 
 interface ChatPanelProps {
   deckId: string
   chatSessionId?: string
+  sessionOrigin?: SessionOrigin
   slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
@@ -46,14 +51,30 @@ export interface ChatPanelHandle {
   sendMessage: (text: string, options?: { displayContent?: string }) => Promise<void>
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange }, ref) {
+function formatRelativeTime(value: string, locale: string): string {
+  const deltaSeconds = Math.round((new Date(value).getTime() - Date.now()) / 1000)
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" })
+  if (Math.abs(deltaSeconds) < 60) return formatter.format(deltaSeconds, "second")
+  const minutes = Math.round(deltaSeconds / 60)
+  if (Math.abs(minutes) < 60) return formatter.format(minutes, "minute")
+  const hours = Math.round(minutes / 60)
+  if (Math.abs(hours) < 24) return formatter.format(hours, "hour")
+  return formatter.format(Math.round(hours / 24), "day")
+}
+
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange }, ref) {
   const t = useTranslations("chat")
+  const tCompose = useTranslations("compose")
+  const tSessionPicker = useTranslations("sessionPicker")
+  const locale = useLocale()
   // --- Session ---
   const [sessionId, setSessionId] = useState(() => {
     if (chatSessionId) return chatSessionId
     if (deckId === "new") return generateSessionId()
     return deckId.padEnd(36, "0")
   })
+  const sessionIdRef = useRef(sessionId)
+  sessionIdRef.current = sessionId
   // Mid-stream guard: when a deck is created while the agent is still
   // streaming (init_presentation in the import-pptx guide), the parent
   // re-renders with a fresh chatSessionId. Swapping sessionId here would
@@ -81,6 +102,28 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // --- Options ---
   const [optionsOpen, setOptionsOpen] = useState(false)
   const { fetchWebImages, setFetchWebImages, parallelAgents, setParallelAgents, agentMode, setAgentMode } = usePreferences()
+
+  // --- Local kiro session continuation ---
+  const [sessionPickerOpen, setSessionPickerOpen] = useState(false)
+  const [recentSessions, setRecentSessions] = useState<KiroSessionSummary[]>([])
+  const [forkingSession, setForkingSession] = useState<KiroSessionSummary | null>(null)
+  const [forkError, setForkError] = useState(false)
+  const [continuedOrigin, setContinuedOrigin] = useState<SessionOrigin | undefined>(sessionOrigin)
+
+  useEffect(() => {
+    setContinuedOrigin(sessionOrigin)
+  }, [sessionOrigin])
+
+  useEffect(() => {
+    if (!IS_LOCAL || deckId !== "new") return
+    const controller = new AbortController()
+    listKiroSessions(false, controller.signal)
+      .then((data) => setRecentSessions(data.recent.slice(0, 3)))
+      .catch((err: unknown) => {
+        if (!(err instanceof DOMException && err.name === "AbortError")) setRecentSessions([])
+      })
+    return () => controller.abort()
+  }, [deckId])
 
   // --- Refs ---
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -114,7 +157,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (toolUseData?.completed && toolUseData?.result?.deckId && onDeckCreated) {
       const resultDeckId = String(toolUseData.result.deckId)
       // intentional: best-effort — chat session linkage is a convenience; deck creation already succeeded
-      if (idToken) patchDeck(resultDeckId, { chatSessionId: sessionId }, idToken).catch((err) => console.error("patchDeck failed", err))
+      if (idToken) patchDeck(resultDeckId, { chatSessionId: sessionIdRef.current }, idToken).catch((err) => console.error("patchDeck failed", err))
       onDeckCreated(resultDeckId)
       saveLocalChat(resultDeckId)
     }
@@ -163,6 +206,38 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     onToolEvent: handleToolEvent,
     onSendComplete: () => saveLocalChat(),
   })
+
+  const forkAndStart = useCallback(async (summary: KiroSessionSummary) => {
+    setSessionPickerOpen(false)
+    setForkError(false)
+    setForkingSession(summary)
+    try {
+      const result = await forkKiroSession({
+        sourceSessionId: summary.sessionId,
+        clientSessionId: sessionId,
+      })
+      sessionIdRef.current = result.sessionId
+      setSessionId(result.sessionId)
+      setContinuedOrigin(result.origin)
+      await stream.sendMessage("", undefined, undefined, undefined, {
+        continuedFrom: result.origin,
+        sessionIdOverride: result.sessionId,
+        hideUserMessage: true,
+        propagateError: true,
+      })
+    } catch (err) {
+      console.error("Failed to continue from kiro session", err)
+      const freshSessionId = generateSessionId()
+      sessionIdRef.current = freshSessionId
+      setSessionId(freshSessionId)
+      setContinuedOrigin(undefined)
+      stream.setMessages([])
+      setForkError(true)
+      toast.error(tSessionPicker("forkFailed"))
+    } finally {
+      setForkingSession(null)
+    }
+  }, [sessionId, stream.sendMessage, stream.setMessages, tSessionPicker])
 
   // --- Ref handle ---
   useImperativeHandle(ref, () => ({
@@ -415,7 +490,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     return lastTool.name === "compose_slides" || lastTool.name.endsWith("_compose_slides")
   }, [stream.isLoading, stream.messages])
 
-  const isLoading = stream.isLoading || reconnectLoading
+  const isLoading = stream.isLoading || reconnectLoading || forkingSession !== null
 
   // Sync streaming flag and flush any deferred sessionId swap once
   // streaming finishes — at that point loadHistory can safely re-fetch
@@ -437,7 +512,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const isInitial = stream.messages.length === 0 && !historyLoading
 
   return (
-    <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={stream.isLoading} className="flex flex-col h-full">
+    <>
+      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading} className="flex flex-col h-full">
+      {continuedOrigin && (
+        <div className="flex-none px-4 pt-3">
+          <ContinuedFromChip origin={continuedOrigin} />
+        </div>
+      )}
       {/* Messages area */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4" role="log" aria-label={t("chatMessages")}
         onScroll={() => {
@@ -446,7 +527,18 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           shouldAutoScroll.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
         }}
       >
-        {historyLoading ? (
+        {forkingSession ? (
+          <div className="flex h-full flex-col items-center justify-center px-6 text-center" aria-live="polite">
+            <div className="mb-4 w-full max-w-xs space-y-3">
+              <div className="h-4 w-3/4 rounded bg-foreground/10 motion-safe:animate-pulse" />
+              <div className="h-4 w-full rounded bg-foreground/5 motion-safe:animate-pulse" />
+              <div className="h-4 w-2/3 rounded bg-foreground/5 motion-safe:animate-pulse" />
+            </div>
+            <p className="text-sm text-foreground-secondary">
+              {tSessionPicker("forking", { title: forkingSession.title })}
+            </p>
+          </div>
+        ) : historyLoading ? (
           <div className="space-y-4 animate-pulse">
             {[0.6, 1, 0.75].map((w, i) => (
               <div key={i} className={i % 2 === 0 ? "flex justify-end" : "flex gap-2.5"}>
@@ -464,7 +556,44 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             <p className="text-sm text-foreground-muted leading-relaxed mb-6">
               {t("emptyHint")}
             </p>
-            <div className="flex flex-col gap-2 w-full max-w-[320px] mb-8">
+            {IS_LOCAL && recentSessions.length > 0 && (
+              <section className="mb-6 w-full max-w-xs text-left" aria-labelledby="recent-kiro-sessions-heading">
+                <h3 id="recent-kiro-sessions-heading" className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">
+                  {tCompose("recentSessionsHeading")}
+                </h3>
+                <div className="space-y-1.5">
+                  {recentSessions.map((recent) => (
+                    <button
+                      key={recent.sessionId}
+                      type="button"
+                      onClick={() => void forkAndStart(recent)}
+                      className="flex min-h-14 w-full items-center gap-2.5 rounded-xl border border-border px-3 py-2 text-left motion-safe:transition-colors hover:border-border-hover hover:bg-background-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
+                    >
+                      <GitBranch className="h-4 w-4 flex-none text-brand-teal" aria-hidden="true" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-foreground">{recent.title}</span>
+                        <span className="mt-0.5 block truncate text-xs text-foreground-muted">
+                          {recent.project} · {formatRelativeTime(recent.updatedAt, locale)}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSessionPickerOpen(true)}
+                  className="mt-2 min-h-11 w-full rounded-lg px-3 text-left text-sm font-medium text-brand-teal motion-safe:transition-colors hover:bg-brand-teal-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
+                >
+                  {tCompose("pickOtherSession")}
+                </button>
+              </section>
+            )}
+            {forkError && (
+              <p role="alert" className="mb-4 text-sm text-red-600 dark:text-red-400">
+                {tSessionPicker("forkFailed")}
+              </p>
+            )}
+            <div className="flex flex-col gap-2 w-full max-w-xs mb-8">
               {[t("example1"), t("example2"), t("example3")].map((example) => (
                 <button
                   key={example}
@@ -523,6 +652,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           idToken={auth.user?.id_token}
           sessionId={sessionId}
           deckId={deckId}
+          onContinueFromSession={() => setSessionPickerOpen(true)}
+          continueFromSessionDisabled={deckId !== "new" || stream.messages.length > 0}
           stopTitle={composeInFlight ? t("forceStop") : undefined}
         >
           {/* Options expander */}
@@ -590,6 +721,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             )}
           </div>
         </ChatInput>
-    </FileDropZone>
+      </FileDropZone>
+      {IS_LOCAL && (
+        <SessionPickerDialog
+          open={sessionPickerOpen}
+          onOpenChange={setSessionPickerOpen}
+          onSelect={(summary) => void forkAndStart(summary)}
+        />
+      )}
+    </>
   )
 })

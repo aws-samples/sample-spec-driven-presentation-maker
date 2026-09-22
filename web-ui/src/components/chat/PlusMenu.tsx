@@ -6,15 +6,20 @@
 
 "use client"
 
-import { useRef, useState } from "react"
-import { Plus, Paperclip, FileText } from "lucide-react"
+import { useId, useRef, useState } from "react"
+import { Plus, Paperclip, FileText, GitBranch } from "lucide-react"
 import { useTranslations } from "next-intl"
+import { LocalOnly } from "@/lib/mode"
 
 interface PlusMenuProps {
   /** Called when user selects files via the file picker. */
   onFilesSelected: (files: FileList) => void
   /** Called when user wants to create a text snippet. */
   onSnippetRequest: () => void
+  /** Opens the Local-only kiro session picker. */
+  onContinueFromSession?: () => void
+  /** Existing messages make continuation unavailable in this chat. */
+  continueFromSessionDisabled?: boolean
   /** Whether the menu should be disabled. */
   disabled?: boolean
 }
@@ -24,10 +29,17 @@ interface PlusMenuProps {
  *
  * @param props - PlusMenuProps
  */
-export function PlusMenu({ onFilesSelected, onSnippetRequest, disabled }: PlusMenuProps) {
+export function PlusMenu({
+  onFilesSelected,
+  onSnippetRequest,
+  onContinueFromSession,
+  continueFromSessionDisabled = false,
+  disabled,
+}: PlusMenuProps) {
   const t = useTranslations("plusMenu")
   const [open, setOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const continueHintId = useId()
 
   const accept = ".txt,.md,.json,.pdf,.docx,.xlsx,.pptx,.png"
 
@@ -50,7 +62,31 @@ export function PlusMenu({ onFilesSelected, onSnippetRequest, disabled }: PlusMe
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
 
           {/* Menu */}
-          <div className="absolute bottom-full left-0 mb-2 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px]">
+          <div className="absolute bottom-full left-0 mb-2 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-48">
+            <LocalOnly>
+              {onContinueFromSession && (
+                <>
+                  <button
+                    type="button"
+                    aria-disabled={continueFromSessionDisabled}
+                    aria-describedby={continueFromSessionDisabled ? continueHintId : undefined}
+                    title={continueFromSessionDisabled ? t("continueDisabledHint") : undefined}
+                    className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm motion-safe:transition-colors hover:bg-muted aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+                    onClick={() => {
+                      if (continueFromSessionDisabled) return
+                      setOpen(false)
+                      onContinueFromSession()
+                    }}
+                  >
+                    <GitBranch className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    {t("continueFromSession")}
+                  </button>
+                  {continueFromSessionDisabled && (
+                    <span id={continueHintId} className="sr-only">{t("continueDisabledHint")}</span>
+                  )}
+                </>
+              )}
+            </LocalOnly>
             <button
               type="button"
               className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"

@@ -240,7 +240,29 @@
   "plusMenu": {
     "attachLabel": "Attach file or snippet",
     "attachFile": "Attach file",
-    "textSnippet": "Text snippet"
+    "textSnippet": "Text snippet",
+    "continueFromSession": "Continue from a kiro session",
+    "continueDisabledHint": "Available in a new chat"
+  },
+  "sessionPicker": {
+    "title": "Continue from a kiro session",
+    "description": "Choose an earlier work session to use as context for a new deck.",
+    "searchPlaceholder": "Search sessions…",
+    "showAll": "Show all",
+    "empty": "No sessions found",
+    "emptyHint": "Start a conversation with `kiro-cli chat` and it will appear here.",
+    "messages": "{count, plural, one {# message} other {# messages}}",
+    "forking": "Branching from “{title}”…",
+    "forkFailed": "Couldn’t branch from that session. Please try again.",
+    "loading": "Loading sessions",
+    "error": "Sessions couldn’t be loaded. Please try again.",
+    "keyboardHint": "↑↓ to move · Enter to select · Esc to close"
+  },
+  "continuedFrom": {
+    "chip": "Branched from “{title}”",
+    "tooltipCwd": "Working directory: {cwd}",
+    "tooltipUpdated": "Source updated: {date}",
+    "tooltipImmutable": "The original session will not be changed."
   },
   "attachments": {
     "removeFile": "Remove {name}",
@@ -345,6 +367,8 @@
     "noModelFound": "No model found."
   },
   "compose": {
+    "recentSessionsHeading": "Recent kiro sessions",
+    "pickOtherSession": "Choose another session…",
     "composingAria": "Composing slides",
     "preparing": "Preparing…",
     "composing": "Composing {slides} slides · {agents} agents in parallel",
