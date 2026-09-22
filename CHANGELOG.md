@@ -12,6 +12,9 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **Chat input height is always right** — the message box now grows with its
+  content via `react-textarea-autosize` (1–5 rows) instead of a hand-rolled
+  height calculation that could misjudge IME composition and pasted text.
 - **Compose animation is cheap again on large decks** — only slides in view
   are drawn by the agent cursors (at most two at a time); changes that land on
   a slide you are not looking at are kept undrawn and replayed with the same

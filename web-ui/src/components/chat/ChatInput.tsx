@@ -4,7 +4,7 @@
  * ChatInput — Reusable chat input area with textarea, Send/Stop, PlusMenu, attachments.
  *
  * Extracted from ChatPanel.tsx. Handles:
- * - Textarea with auto-resize and IME-safe composition
+ * - Textarea that grows with its content (react-textarea-autosize, 1–5 rows) and IME-safe composition
  * - Send/Stop button toggle
  * - PlusMenu (file attach + snippet)
  * - AttachmentPreview + SnippetInput
@@ -17,6 +17,7 @@
 "use client"
 
 import { useRef, useState, useCallback, useEffect, forwardRef, useImperativeHandle, FormEvent, KeyboardEvent, ReactNode } from "react"
+import TextareaAutosize from "react-textarea-autosize"
 import { useCompositionSafe } from "@/hooks/useCompositionSafe"
 import { useIsMobile } from "@/hooks/UseMobile"
 import { uploadFile, validateFile, canAddMoreFiles, UploadedFile } from "@/services/uploadService"
@@ -102,15 +103,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     },
     textareaRef,
   }), [input])
-
-  // Auto-resize textarea
-  useEffect(() => {
-    const ta = textareaRef.current
-    if (ta) {
-      ta.style.height = "0px"
-      ta.style.height = ta.scrollHeight + "px"
-    }
-  }, [input])
 
   const handleFiles = useCallback((files: FileList) => {
     const currentCount = attachments.length
@@ -244,8 +236,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             />
 
             <div className="flex-1 relative">
-              <textarea
+              <TextareaAutosize
                 ref={textareaRef}
+                minRows={1}
+                maxRows={5}
                 value={input}
                 onChange={(e) => { setInput(e.target.value); onInputChange?.(e.target.value) }}
                 onKeyDown={handleKeyDown}
@@ -253,8 +247,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 onCompositionEnd={onCompositionEnd}
                 placeholder={placeholder ?? (isMobile ? t("placeholderMobile") : t("placeholderDesktop"))}
                 aria-label={t("inputLabel")}
-                className={`w-full bg-transparent resize-none text-sm min-h-[24px] max-h-[120px] py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground leading-relaxed font-[inherit] tracking-[inherit] ${textareaClassName ?? ""}`}
-                rows={1}
+                className={`w-full bg-transparent resize-none text-sm py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground leading-relaxed font-[inherit] tracking-[inherit] ${textareaClassName ?? ""}`}
                 autoFocus
               />
               {textareaOverlay}
