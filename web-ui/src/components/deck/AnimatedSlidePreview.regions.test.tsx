@@ -455,10 +455,12 @@ describe("AnimatedSlidePreview visibility and error races", () => {
     )
     await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new-fold"]')?.getAttribute("data-pending")).toBe("1"))
 
+    const builtSvg = rendered.container.querySelector("svg")
     act(() => ControlledObserver.emitZone(wrapper, "0px", true))
     await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new-fold"]')?.getAttribute("data-pending")).toBeNull())
-    // The arrival replays the agent-drawing animation for the accumulated change.
+    // The arrival replays the agent-drawing animation for the accumulated change on the existing scene (no rebuild).
     await waitFor(() => expect(rendered.container.querySelector(".asp-overlay")).toBeTruthy())
+    expect(rendered.container.querySelector("svg")).toBe(builtSvg)
     expect(rendered.container.querySelector('g[data-component-key="id:new-fold"]')?.getAttribute("style")).toContain("opacity: 0")
   })
 

@@ -50,6 +50,16 @@ const AGENTS = [
   { name: "Decorator", token: "--agent-decorator" },
 ] as const
 
+interface Scene {
+  container: HTMLDivElement
+  svgEl: SVGSVGElement
+  vb: number[]
+  regionScale: number
+  componentEntries: { component: ComposeComponent; index: number; key: string }[]
+  regionEntries: { g: SVGGElement; label: HTMLDivElement; region: ComposeRegion }[]
+  markFilledRegions: (comp: ComposeComponent) => void
+  markFilledByAll: () => void
+}
 type ResolvedAgent = { name: string; color: string; glow: string; landingGlow: string; bg: string }
 
 /** Resolve CSS variable tokens into usable color strings (theme-aware). */
@@ -204,8 +214,9 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   /** Changed component keys that arrived while off-screen → arrival time (ms). */
   const pendingKeysRef = useRef(new Map<string, number>())
   const hasBeenOffscreenRef = useRef(false)
-  /** Rebuilds the current payload with the agent animation for pending keys. */
+  /** Draws pending (arrived-while-away) changes on the built scene when the slide comes into view. */
   const replayPendingRef = useRef<() => void>(() => {})
+  const sceneRef = useRef<{ url: string; scene: Scene } | null>(null)
   const pendingRef = useRef<{ url: string; apply: (animateNow: boolean) => void } | null>(null)
   const applyPendingRef = useRef<(animateNow: boolean) => void>(() => {})
   const visibilityWaitersRef = useRef(new Set<(visibility: "visible" | "hidden") => void>())
@@ -327,6 +338,175 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       }
       setShowError(now - retryFailureRef.current.startedAt >= 3000)
     }
+
+    /**
+     * Run the agent-drawing animation on an already-built scene. Used by live
+     * updates right after the build and by catch-up replays when a slide that
+     * changed while away comes into view (no rebuild — the SVG is already there).
+     */
+    const animateScene = (scene: Scene, animTargets: Set<string>, regionAnimTargets: Set<number>, stagger: number, wireframeLead: number) => {
+      const { container, svgEl, vb, regionScale, componentEntries, regionEntries, markFilledRegions, markFilledByAll } = scene
+      // Resolve agent tokens once per animation cycle (theme-aware)
+      const resolvedAgents = resolveAgents()
+      // --- Animate new regions, then changed components ---
+      const overlayContainer = document.createElement("div")
+      overlayContainer.className = "asp-overlay absolute inset-0 pointer-events-none"
+      container.parentElement?.appendChild(overlayContainer)
+
+      const createCursor = (agent: ResolvedAgent, left: number, top: number) => {
+        const cursor = document.createElement("div")
+        cursor.className = "absolute transition-all duration-300"
+        cursor.style.cssText = `left:${left}%;top:${top}%;opacity:0;z-index:20;`
+        cursor.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2.5 7L5 3z" fill="${agent.bg}" stroke="color-mix(in oklch, var(--background) 60%, transparent)" stroke-width="1.5"/></svg><span style="position:absolute;left:12px;top:12px;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;background:${agent.bg};color:var(--background);box-shadow:var(--shadow-card)">${agent.name}</span>`
+        overlayContainer.appendChild(cursor)
+        requestAnimationFrame(() => { cursor.style.opacity = "1" })
+        return cursor
+      }
+
+      let regionStaggerIdx = 0
+      regionEntries.forEach(({ g, label, region }, i) => {
+        if (!regionAnimTargets.has(i)) return
+        const si = regionStaggerIdx++
+        const pctL = (region.x * regionScale / vb[2]) * 100
+        const pctT = (region.y * regionScale / vb[3]) * 100
+        const endL = ((region.x + region.w) * regionScale / vb[2]) * 100
+        const endT = ((region.y + region.h) * regionScale / vb[3]) * 100
+        const t1 = setTimeout(() => {
+          if (cancelled) return
+          const cursor = createCursor(resolvedAgents[0], pctL, pctT)
+          const t2 = setTimeout(() => {
+            if (cancelled) return
+            g.classList.add("asp-region-on", "asp-region-drawn")
+            label.classList.add("asp-region-on")
+            cursor.style.left = `${endL}%`
+            cursor.style.top = `${endT}%`
+            const t3 = setTimeout(() => {
+              cursor.style.transition = "opacity 0.4s ease-out"
+              cursor.style.opacity = "0"
+            }, 500)
+            timersRef.current.push(t3)
+          }, 250)
+          timersRef.current.push(t2)
+        }, si * stagger)
+        timersRef.current.push(t1)
+      })
+
+      const regionPhaseMs = regionStaggerIdx > 0
+        ? regionStaggerIdx * stagger + wireframeLead
+        : 0
+      let componentStaggerIdx = 0
+      componentEntries.forEach(({ component: comp, index: i, key }) => {
+        if (!animTargets.has(key) || !comp.bbox) return
+        const si = componentStaggerIdx++
+        const agent = assignAgent(comp, resolvedAgents)
+
+        const pctL = (comp.bbox.x / vb[2]) * 100
+        const pctT = (comp.bbox.y / vb[3]) * 100
+        const pctW = (comp.bbox.w / vb[2]) * 100
+        const pctH = (comp.bbox.h / vb[3]) * 100
+
+        const t1 = setTimeout(() => {
+          if (cancelled) return
+          const cursor = createCursor(agent, pctL, Math.max(0, pctT - 5))
+          requestAnimationFrame(() => {
+            cursor.style.left = `${pctL}%`
+            cursor.style.top = `${pctT}%`
+          })
+
+          const t2 = setTimeout(() => {
+            if (cancelled) return
+            const wf = document.createElement("div")
+            wf.className = "absolute"
+            wf.style.cssText = `left:${pctL}%;top:${pctT}%;width:${pctW}%;height:${pctH}%;border:1px solid ${agent.color};border-radius:2px;box-shadow:inset 0 0 16px ${agent.glow};opacity:1;clip-path:inset(0 100% 100% 0);animation:asp-wf-drag 0.35s cubic-bezier(0.16,1,0.3,1) forwards;`
+            overlayContainer.appendChild(wf)
+
+            const endL = ((comp.bbox!.x + comp.bbox!.w) / vb[2]) * 100
+            const endT = ((comp.bbox!.y + comp.bbox!.h) / vb[3]) * 100
+            cursor.style.left = `${endL}%`
+            cursor.style.top = `${endT}%`
+
+            const t3 = setTimeout(() => {
+              if (cancelled) return
+              const g = svgEl.querySelector(`g[data-index="${i}"]`) as SVGGElement | null
+              if (g) {
+                g.style.opacity = "1"
+                delete g.dataset.pending
+                const flash = document.createElement("div")
+                flash.className = "asp-land absolute"
+                flash.style.cssText = `left:${pctL}%;top:${pctT}%;width:${pctW}%;height:${pctH}%;background:${agent.landingGlow};`
+                overlayContainer.appendChild(flash)
+                flash.addEventListener("animationend", () => flash.remove(), { once: true })
+                typewriterCancelsRef.current.push(typewrite(g))
+              }
+              markFilledRegions(comp)
+              const t4 = setTimeout(() => {
+                wf.style.transition = "opacity 0.4s ease-out"
+                wf.style.opacity = "0"
+                cursor.style.transition = "opacity 0.4s ease-out"
+                cursor.style.opacity = "0"
+              }, 500)
+              timersRef.current.push(t4)
+            }, Math.max(0, wireframeLead - 50))
+            timersRef.current.push(t3)
+          }, 250)
+          timersRef.current.push(t2)
+        }, regionPhaseMs + si * stagger)
+        timersRef.current.push(t1)
+      })
+
+      const totalTime = regionPhaseMs + componentStaggerIdx * stagger + wireframeLead + 1000
+      const tDone = setTimeout(() => {
+        markFilledByAll()
+        animatingRef.current = false
+        releaseRef.current?.()
+        releaseRef.current = null
+        overlayContainer.remove()
+        onComplete?.()
+        // Check if a new composeUrl arrived during animation
+        check()
+      }, totalTime)
+      timersRef.current.push(tDone)
+    }
+
+    /** Catch-up: the slide changed while away and is now in view — draw the pending changes on the existing scene. */
+    const replayPending = async () => {
+      const current = sceneRef.current
+      if (!current || cancelled) return
+      if (current.url !== composeUrlRef.current) { check(); return }
+      if (animatingRef.current) return
+      const { scene } = current
+      const now = performance.now()
+      const targets = new Set<string>()
+      const showNow = (key: string) => {
+        const g = scene.svgEl.querySelector(`g[data-component-key="${key}"]`) as SVGGElement | null
+        if (g) { g.style.opacity = "1"; delete g.dataset.pending }
+        const entry = scene.componentEntries.find((e) => e.key === key)
+        if (entry) scene.markFilledRegions(entry.component)
+      }
+      for (const [key, arrivedAt] of pendingKeysRef.current) {
+        if (now - arrivedAt > CATCHUP_MAX_AGE_MS || reducedMotion.current) showNow(key)
+        else targets.add(key)
+      }
+      pendingKeysRef.current.clear()
+      if (targets.size === 0) return
+      animatingRef.current = true
+      const release = await acquire(slug || current.url, acquireController.signal)
+      if (!release || cancelled) { release?.(); animatingRef.current = false; return }
+      if (current !== sceneRef.current || current.url !== composeUrlRef.current) {
+        release(); animatingRef.current = false; addPendingKeys(targets); check(); return
+      }
+      if (visibleRef.current !== "visible") {
+        release(); animatingRef.current = false; addPendingKeys(targets); return
+      }
+      targets.forEach((key) => {
+        const g = scene.svgEl.querySelector(`g[data-component-key="${key}"]`) as SVGGElement | null
+        if (g) delete g.dataset.pending
+      })
+      releaseRef.current = release
+      onAnimate?.()
+      animateScene(scene, targets, new Set(), CATCHUP_STAGGER_MS, WIREFRAME_LEAD_MS)
+    }
+    replayPendingRef.current = () => { void replayPending() }
 
     function check() {
       const requestedUrl = composeUrlRef.current
@@ -499,9 +679,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             }
           }
 
-          // Resolve agent tokens once per animation cycle (theme-aware)
-          const resolvedAgents = resolveAgents()
-
           // --- Build SVG ---
           const vb = data.viewBox.split(" ").map(Number)
           if (vb[2] > 0 && vb[3] > 0) {
@@ -591,11 +768,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           container.appendChild(svgEl)
           renderedComposeUrlRef.current = requestedUrl
           if (regions.length > 0) container.parentElement?.appendChild(regionOverlay)
-          // Built while away (pending keys hidden): arm the replay for when the slide arrives.
-          replayPendingRef.current = pendingKeysRef.current.size > 0
-            ? () => { if (requestedUrl === composeUrlRef.current) void applyPayload(true); else check() }
-            : () => {}
-
           const markFilledRegions = (comp: ComposeComponent) => {
             if (!isContentComponent(comp)) return
             regionEntries.forEach(({ g, label, region }) => {
@@ -613,6 +785,8 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           componentEntries.forEach(({ component, key }) => {
             if (!animTargets.has(key)) markFilledRegions(component)
           })
+          const scene: Scene = { container, svgEl, vb, regionScale, componentEntries, regionEntries, markFilledRegions, markFilledByAll }
+          sceneRef.current = { url: requestedUrl, scene }
 
           if (reducedMotion.current || !hasAnimationTargets) {
             markFilledByAll()
@@ -621,124 +795,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             return
           }
 
-          // --- Animate new regions, then changed components ---
-          const overlayContainer = document.createElement("div")
-          overlayContainer.className = "asp-overlay absolute inset-0 pointer-events-none"
-          container.parentElement?.appendChild(overlayContainer)
-
-          const createCursor = (agent: ResolvedAgent, left: number, top: number) => {
-            const cursor = document.createElement("div")
-            cursor.className = "absolute transition-all duration-300"
-            cursor.style.cssText = `left:${left}%;top:${top}%;opacity:0;z-index:20;`
-            cursor.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2.5 7L5 3z" fill="${agent.bg}" stroke="color-mix(in oklch, var(--background) 60%, transparent)" stroke-width="1.5"/></svg><span style="position:absolute;left:12px;top:12px;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;background:${agent.bg};color:var(--background);box-shadow:var(--shadow-card)">${agent.name}</span>`
-            overlayContainer.appendChild(cursor)
-            requestAnimationFrame(() => { cursor.style.opacity = "1" })
-            return cursor
-          }
-
-          let regionStaggerIdx = 0
-          regionEntries.forEach(({ g, label, region }, i) => {
-            if (!regionAnimTargets.has(i)) return
-            const si = regionStaggerIdx++
-            const pctL = (region.x * regionScale / vb[2]) * 100
-            const pctT = (region.y * regionScale / vb[3]) * 100
-            const endL = ((region.x + region.w) * regionScale / vb[2]) * 100
-            const endT = ((region.y + region.h) * regionScale / vb[3]) * 100
-            const t1 = setTimeout(() => {
-              if (cancelled) return
-              const cursor = createCursor(resolvedAgents[0], pctL, pctT)
-              const t2 = setTimeout(() => {
-                if (cancelled) return
-                g.classList.add("asp-region-on", "asp-region-drawn")
-                label.classList.add("asp-region-on")
-                cursor.style.left = `${endL}%`
-                cursor.style.top = `${endT}%`
-                const t3 = setTimeout(() => {
-                  cursor.style.transition = "opacity 0.4s ease-out"
-                  cursor.style.opacity = "0"
-                }, 500)
-                timersRef.current.push(t3)
-              }, 250)
-              timersRef.current.push(t2)
-            }, si * stagger)
-            timersRef.current.push(t1)
-          })
-
-          const regionPhaseMs = regionStaggerIdx > 0
-            ? regionStaggerIdx * stagger + wireframeLead
-            : 0
-          let componentStaggerIdx = 0
-          componentEntries.forEach(({ component: comp, index: i, key }) => {
-            if (!animTargets.has(key) || !comp.bbox) return
-            const si = componentStaggerIdx++
-            const agent = assignAgent(comp, resolvedAgents)
-
-            const pctL = (comp.bbox.x / vb[2]) * 100
-            const pctT = (comp.bbox.y / vb[3]) * 100
-            const pctW = (comp.bbox.w / vb[2]) * 100
-            const pctH = (comp.bbox.h / vb[3]) * 100
-
-            const t1 = setTimeout(() => {
-              if (cancelled) return
-              const cursor = createCursor(agent, pctL, Math.max(0, pctT - 5))
-              requestAnimationFrame(() => {
-                cursor.style.left = `${pctL}%`
-                cursor.style.top = `${pctT}%`
-              })
-
-              const t2 = setTimeout(() => {
-                if (cancelled) return
-                const wf = document.createElement("div")
-                wf.className = "absolute"
-                wf.style.cssText = `left:${pctL}%;top:${pctT}%;width:${pctW}%;height:${pctH}%;border:1px solid ${agent.color};border-radius:2px;box-shadow:inset 0 0 16px ${agent.glow};opacity:1;clip-path:inset(0 100% 100% 0);animation:asp-wf-drag 0.35s cubic-bezier(0.16,1,0.3,1) forwards;`
-                overlayContainer.appendChild(wf)
-
-                const endL = ((comp.bbox!.x + comp.bbox!.w) / vb[2]) * 100
-                const endT = ((comp.bbox!.y + comp.bbox!.h) / vb[3]) * 100
-                cursor.style.left = `${endL}%`
-                cursor.style.top = `${endT}%`
-
-                const t3 = setTimeout(() => {
-                  if (cancelled) return
-                  const g = svgEl.querySelector(`g[data-index="${i}"]`) as SVGGElement | null
-                  if (g) {
-                    g.style.opacity = "1"
-                    delete g.dataset.pending
-                    const flash = document.createElement("div")
-                    flash.className = "asp-land absolute"
-                    flash.style.cssText = `left:${pctL}%;top:${pctT}%;width:${pctW}%;height:${pctH}%;background:${agent.landingGlow};`
-                    overlayContainer.appendChild(flash)
-                    flash.addEventListener("animationend", () => flash.remove(), { once: true })
-                    typewriterCancelsRef.current.push(typewrite(g))
-                  }
-                  markFilledRegions(comp)
-                  const t4 = setTimeout(() => {
-                    wf.style.transition = "opacity 0.4s ease-out"
-                    wf.style.opacity = "0"
-                    cursor.style.transition = "opacity 0.4s ease-out"
-                    cursor.style.opacity = "0"
-                  }, 500)
-                  timersRef.current.push(t4)
-                }, Math.max(0, wireframeLead - 50))
-                timersRef.current.push(t3)
-              }, 250)
-              timersRef.current.push(t2)
-            }, regionPhaseMs + si * stagger)
-            timersRef.current.push(t1)
-          })
-
-          const totalTime = regionPhaseMs + componentStaggerIdx * stagger + wireframeLead + 1000
-          const tDone = setTimeout(() => {
-            markFilledByAll()
-            animatingRef.current = false
-            releaseRef.current?.()
-            releaseRef.current = null
-            overlayContainer.remove()
-            onComplete?.()
-            // Check if a new composeUrl arrived during animation
-            check()
-          }, totalTime)
-          timersRef.current.push(tDone)
+          animateScene(scene, animTargets, regionAnimTargets, stagger, wireframeLead)
           }
 
           const hasRenderedSvg = Boolean(containerRef.current?.querySelector("svg"))
@@ -774,6 +831,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       cancelled = true
       acquireController.abort()
       visibilityWaitersRef.current.clear()
+      sceneRef.current = null
       cleanup()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
