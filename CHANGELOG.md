@@ -10,6 +10,18 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Changed
+
+- **Compose animation is cheap again on large decks** — only slides in view
+  are drawn by the agent cursors (at most two at a time); changes that land on
+  a slide you are not looking at are kept undrawn and replayed with the same
+  cursor animation when you reach it (within 60 s; older changes just appear).
+  One shared frame loop drives every typewriter, defs are mounted once per
+  deck, off-screen slides skip layout and paint, and the per-slide polling is
+  gone. Main-thread work during a compose burst drops by about half and a
+  finished deck scrolls at full frame rate. The full view now follows the
+  slide being composed until you scroll yourself.
+
 ## [0.9.0] - 2026-09-22
 
 ### Added

@@ -745,6 +745,13 @@ body {
 }
 
 /* ── Tool card entrance ── */
+
+/* Compose previews skip layout/paint work until they approach the scroller. */
+.slide-cv {
+  content-visibility: auto;
+}
+
+
 @keyframes tool-card-enter {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
