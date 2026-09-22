@@ -21,7 +21,7 @@ const COMPOSE_VERSION = 1
  * Full-view slides are ~90% of the viewport tall, so 0.5 meant "half the
  * screen" before anything moved; 0.35 starts as the slide arrives.
  */
-const SETTLE_VISIBLE_RATIO = 0.35
+const REPLAY_VISIBLE_RATIO = 0.35
 const STAGGER_MS = 260
 const WIREFRAME_LEAD_MS = 400
 /**
@@ -220,7 +220,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   const applyPendingRef = useRef<(animateNow: boolean) => void>(() => {})
   const visibilityWaitersRef = useRef(new Set<(visibility: "visible" | "hidden") => void>())
   const checkRef = useRef<() => void>(() => {})
-  const visibleRef = useSlideVisibility(wrapperRef, SETTLE_VISIBLE_RATIO, (visibility) => {
+  const visibleRef = useSlideVisibility(wrapperRef, REPLAY_VISIBLE_RATIO, (visibility) => {
     visibilityWaitersRef.current.forEach((resolve) => resolve(visibility))
     visibilityWaitersRef.current.clear()
     if (visibility === "visible") {
