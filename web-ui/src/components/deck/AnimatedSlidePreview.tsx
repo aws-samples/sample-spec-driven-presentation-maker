@@ -353,10 +353,19 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       overlayContainer.className = "asp-overlay absolute inset-0 pointer-events-none"
       container.parentElement?.appendChild(overlayContainer)
 
+      // Cursors move via transform (compositor thread), not left/top (layout).
+      // A typewriter write relayouts the SVG every few frames; a left/top
+      // transition would stutter with it, a transform transition does not.
+      // Percent → px once per animation; the slide box does not change mid-run.
+      const box = container.getBoundingClientRect()
+      const moveCursor = (cursor: HTMLDivElement, leftPct: number, topPct: number) => {
+        cursor.style.transform = `translate3d(${(leftPct / 100) * box.width}px, ${(topPct / 100) * box.height}px, 0)`
+      }
       const createCursor = (agent: ResolvedAgent, left: number, top: number) => {
         const cursor = document.createElement("div")
-        cursor.className = "absolute transition-all duration-300"
-        cursor.style.cssText = `left:${left}%;top:${top}%;opacity:0;z-index:20;`
+        cursor.className = "absolute"
+        cursor.style.cssText = "left:0;top:0;opacity:0;z-index:20;will-change:transform,opacity;transition:transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease-out;"
+        moveCursor(cursor, left, top)
         cursor.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2.5 7L5 3z" fill="${agent.bg}" stroke="color-mix(in oklch, var(--background) 60%, transparent)" stroke-width="1.5"/></svg><span style="position:absolute;left:12px;top:12px;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;background:${agent.bg};color:var(--background);box-shadow:var(--shadow-card)">${agent.name}</span>`
         overlayContainer.appendChild(cursor)
         requestAnimationFrame(() => { cursor.style.opacity = "1" })
@@ -378,8 +387,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             if (cancelled) return
             g.classList.add("asp-region-on", "asp-region-drawn")
             label.classList.add("asp-region-on")
-            cursor.style.left = `${endL}%`
-            cursor.style.top = `${endT}%`
+            moveCursor(cursor, endL, endT)
             const t3 = setTimeout(() => {
               cursor.style.transition = "opacity 0.4s ease-out"
               cursor.style.opacity = "0"
@@ -409,8 +417,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           if (cancelled) return
           const cursor = createCursor(agent, pctL, Math.max(0, pctT - 5))
           requestAnimationFrame(() => {
-            cursor.style.left = `${pctL}%`
-            cursor.style.top = `${pctT}%`
+            moveCursor(cursor, pctL, pctT)
           })
 
           const t2 = setTimeout(() => {
@@ -422,8 +429,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
 
             const endL = ((comp.bbox!.x + comp.bbox!.w) / vb[2]) * 100
             const endT = ((comp.bbox!.y + comp.bbox!.h) / vb[3]) * 100
-            cursor.style.left = `${endL}%`
-            cursor.style.top = `${endT}%`
+            moveCursor(cursor, endL, endT)
 
             const t3 = setTimeout(() => {
               if (cancelled) return
