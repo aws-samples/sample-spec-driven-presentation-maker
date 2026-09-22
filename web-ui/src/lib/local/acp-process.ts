@@ -12,7 +12,7 @@ import path from "path"
 import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
 import { getActiveAgent, type AgentConfig } from "./acp-adapter"
 import { syncToAgentsDir } from "./agents-sync"
-import type { SessionOrigin } from "./kiro-sessions.types"
+import type { ForkSessionPhase, ForkSessionPhaseDetail, SessionOrigin } from "./kiro-sessions.types"
 
 export { DECK_ROOT }
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
@@ -24,6 +24,12 @@ interface PendingRequest {
   reject: (reason?: unknown) => void
 }
 type NotifyListener = (msg: Record<string, unknown>) => void
+
+interface SpawnProcessOptions {
+  setMode?: boolean
+  onPhase?: (phase: ForkSessionPhase, detail?: ForkSessionPhaseDetail) => void
+  signal?: AbortSignal
+}
 
 interface ProcessState {
   child: ChildProcess
@@ -131,9 +137,11 @@ function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, un
 async function spawnProcess(
   agentName: string,
   existingSessionId?: string,
-  opts: { setMode?: boolean } = {},
+  opts: SpawnProcessOptions = {},
   adapter?: AgentConfig,
 ): Promise<ProcessState> {
+  if (opts.signal?.aborted) throw new DOMException("Fork cancelled", "AbortError")
+  opts.onPhase?.("starting")
   // Re-derive .kiro/agents/ from the acp-agents catalog + user selection on
   // every spawn (idempotent, all-or-nothing) — a `git pull` that updates the
   // catalog takes effect on the next spawn. If the derivation fails, the
@@ -151,6 +159,8 @@ async function spawnProcess(
     stdio: ["pipe", "pipe", "pipe"],
     env: { ...process.env, ...cfg.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT },
   })
+  const abortSpawn = () => child.kill()
+  opts.signal?.addEventListener("abort", abortSpawn, { once: true })
 
   const ps: ProcessState = {
     child, deckId: "", sessionId: null, agentName,
@@ -195,11 +205,36 @@ async function spawnProcess(
 
     // Restore existing session context if provided (Obsidian agent-client pattern)
     if (existingSessionId) {
-      const loaded = await rpcRequestTo(ps, "session/load", {
-        sessionId: existingSessionId,
-        cwd: MCP_LOCAL_DIR,
-        mcpServers: [],
-      }) as { modes?: { availableModes?: { id: string }[] } }
+      let replayed = 0
+      let lastReported = 0
+      let lastReportAt = Date.now()
+      const replayListener: NotifyListener = (msg) => {
+        if (msg.method !== "session/update" && msg.method !== "_kiro.dev/session/update") return
+        const params = msg.params as Record<string, unknown> | undefined
+        if (params?.sessionId !== existingSessionId) return
+        replayed++
+        const now = Date.now()
+        if (replayed % 20 === 0 || now - lastReportAt >= 250) {
+          lastReported = replayed
+          lastReportAt = now
+          opts.onPhase?.("loading", { replayed })
+        }
+      }
+
+      opts.onPhase?.("loading", { replayed: 0 })
+      ps.listeners.add(replayListener)
+      let loaded: { modes?: { availableModes?: { id: string }[] } }
+      try {
+        loaded = await rpcRequestTo(ps, "session/load", {
+          sessionId: existingSessionId,
+          cwd: MCP_LOCAL_DIR,
+          mcpServers: [],
+        }) as { modes?: { availableModes?: { id: string }[] } }
+      } finally {
+        ps.listeners.delete(replayListener)
+      }
+      if (replayed !== lastReported) opts.onPhase?.("loading", { replayed })
+
       // After session/load, prompts must use the old sessionId
       processes.delete(ps.sessionId!)
       ps.sessionId = existingSessionId
@@ -208,6 +243,7 @@ async function spawnProcess(
         if (!available?.some((mode) => mode.id === agentName)) {
           throw new Error(`mode ${agentName} unavailable`)
         }
+        opts.onPhase?.("switching")
         await rpcRequestTo(ps, "session/set_mode", { sessionId: existingSessionId, modeId: agentName })
       }
     }
@@ -222,8 +258,10 @@ async function spawnProcess(
       }
     }
 
+    opts.signal?.removeEventListener("abort", abortSpawn)
     return ps
   } catch (error) {
+    opts.signal?.removeEventListener("abort", abortSpawn)
     child.kill()
     throw error
   }
@@ -250,11 +288,22 @@ export function hasProcess(sessionId: string): boolean {
   return processes.has(sessionId)
 }
 
+/** Kill a process and remove every map key that refers to it. */
+export function terminateProcess(sessionId: string): void {
+  const ps = processes.get(sessionId)
+    ?? Array.from(processes.values()).find((candidate) => candidate.sessionId === sessionId)
+  if (!ps) return
+  for (const [key, candidate] of processes) {
+    if (candidate === ps) processes.delete(key)
+  }
+  ps.child.kill()
+}
+
 /** Get or create a process for a sessionId. Restores context if existingSessionId provided. */
 export async function getOrCreateProcess(
   sessionId: string,
   agentName: string = "sdpm-orchestrator",
-  opts: { setMode?: boolean } = {},
+  opts: SpawnProcessOptions = {},
 ): Promise<ProcessState> {
   let ps = processes.get(sessionId)
   if (ps) {

@@ -26,13 +26,14 @@ import { Send, ChevronRight, GitBranch } from "lucide-react"
 import { ModeSelector } from "./ModeSelector"
 import { SessionPickerDialog } from "./SessionPickerDialog"
 import { ContinuedFromChip } from "./ContinuedFromChip"
+import { ForkProgressCard } from "./ForkProgressCard"
 import { usePreferences } from "@/hooks/usePreferences"
 import { notifyError } from "@/lib/errors"
 import { toast } from "sonner"
 import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
 import { useLocale, useTranslations } from "next-intl"
 import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsService"
-import type { KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
+import type { ForkSessionPhase, KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
 
 interface ChatPanelProps {
   deckId: string
@@ -107,6 +108,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false)
   const [recentSessions, setRecentSessions] = useState<KiroSessionSummary[]>([])
   const [forkingSession, setForkingSession] = useState<KiroSessionSummary | null>(null)
+  const [forkProgress, setForkProgress] = useState<{ phase: ForkSessionPhase; replayed: number }>({ phase: "copying", replayed: 0 })
+  const forkAbortControllerRef = useRef<AbortController | null>(null)
   const [forkError, setForkError] = useState(false)
   const [continuedOrigin, setContinuedOrigin] = useState<SessionOrigin | undefined>(sessionOrigin)
 
@@ -124,6 +127,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       })
     return () => controller.abort()
   }, [deckId])
+
+  useEffect(() => () => forkAbortControllerRef.current?.abort(), [])
 
   // --- Refs ---
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -207,18 +212,37 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     onSendComplete: () => saveLocalChat(),
   })
 
+  const cancelFork = useCallback(() => {
+    forkAbortControllerRef.current?.abort()
+    forkAbortControllerRef.current = null
+    setForkingSession(null)
+    setForkProgress({ phase: "copying", replayed: 0 })
+  }, [])
+
   const forkAndStart = useCallback(async (summary: KiroSessionSummary) => {
+    forkAbortControllerRef.current?.abort()
+    const controller = new AbortController()
+    forkAbortControllerRef.current = controller
     setSessionPickerOpen(false)
     setForkError(false)
     setForkingSession(summary)
+    setForkProgress({ phase: "copying", replayed: 0 })
+
     try {
       const result = await forkKiroSession({
         sourceSessionId: summary.sessionId,
         clientSessionId: sessionId,
+      }, {
+        signal: controller.signal,
+        onPhase: (phase, detail) => setForkProgress({ phase, replayed: detail?.replayed ?? 0 }),
       })
+      if (controller.signal.aborted) return
+
+      forkAbortControllerRef.current = null
       sessionIdRef.current = result.sessionId
       setSessionId(result.sessionId)
       setContinuedOrigin(result.origin)
+      setForkingSession(null)
       await stream.sendMessage("", undefined, undefined, undefined, {
         continuedFrom: result.origin,
         sessionIdOverride: result.sessionId,
@@ -226,6 +250,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         propagateError: true,
       })
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) {
+        if (forkAbortControllerRef.current === controller) setForkingSession(null)
+        return
+      }
       console.error("Failed to continue from kiro session", err)
       const freshSessionId = generateSessionId()
       sessionIdRef.current = freshSessionId
@@ -235,7 +263,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       setForkError(true)
       toast.error(tSessionPicker("forkFailed"))
     } finally {
-      setForkingSession(null)
+      if (forkAbortControllerRef.current === controller) {
+        forkAbortControllerRef.current = null
+        setForkingSession(null)
+      }
     }
   }, [sessionId, stream.sendMessage, stream.setMessages, tSessionPicker])
 
@@ -528,16 +559,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         }}
       >
         {forkingSession ? (
-          <div className="flex h-full flex-col items-center justify-center px-6 text-center" aria-live="polite">
-            <div className="mb-4 w-full max-w-xs space-y-3">
-              <div className="h-4 w-3/4 rounded bg-foreground/10 motion-safe:animate-pulse" />
-              <div className="h-4 w-full rounded bg-foreground/5 motion-safe:animate-pulse" />
-              <div className="h-4 w-2/3 rounded bg-foreground/5 motion-safe:animate-pulse" />
-            </div>
-            <p className="text-sm text-foreground-secondary">
-              {tSessionPicker("forking", { title: forkingSession.title })}
-            </p>
-          </div>
+          <ForkProgressCard
+            session={forkingSession}
+            phase={forkProgress.phase}
+            replayed={forkProgress.replayed}
+            onCancel={cancelFork}
+          />
         ) : historyLoading ? (
           <div className="space-y-4 animate-pulse">
             {[0.6, 1, 0.75].map((w, i) => (

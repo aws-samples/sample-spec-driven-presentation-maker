@@ -258,6 +258,17 @@
     "error": "Sessions couldn’t be loaded. Please try again.",
     "keyboardHint": "↑↓ to move · Enter to select · Esc to close"
   },
+  "forkProgress": {
+    "sessionMeta": "{project} · {count, plural, one {# message} other {# messages}}",
+    "stepsLabel": "Branching progress",
+    "copying": "Copy session",
+    "starting": "Start agent",
+    "loading": "Load conversation",
+    "loadingWithCount": "Loading conversation… {count} updates",
+    "switching": "Prepare slide creation",
+    "slowHint": "Long sessions can take tens of seconds to load.",
+    "cancel": "Cancel"
+  },
   "continuedFrom": {
     "chip": "Branched from “{title}”",
     "tooltipCwd": "Working directory: {cwd}",

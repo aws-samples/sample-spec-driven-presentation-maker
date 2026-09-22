@@ -59,6 +59,12 @@ export interface ForkSessionRequest {
   agentName?: string
 }
 
+export type ForkSessionPhase = "copying" | "starting" | "loading" | "switching"
+
+export interface ForkSessionPhaseDetail {
+  replayed?: number
+}
+
 export interface ForkSessionResponse {
   /** The forked session id. The client swaps its chat session id to this. */
   sessionId: string
