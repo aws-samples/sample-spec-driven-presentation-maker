@@ -66,9 +66,11 @@ function handleLine(ps: ProcessState, line: string) {
     const pending = ps.pending.get(msg.id as number)!
     ps.pending.delete(msg.id as number)
     if (msg.error) {
-      const error = msg.error as { message?: string }
+      const error = msg.error as { message?: string; data?: unknown }
+      // kiro-cli puts the actual cause in `data` ("Internal error" alone is useless in logs)
+      const detail = error.data === undefined ? "" : `: ${typeof error.data === "string" ? error.data : JSON.stringify(error.data)}`
       ps.running = false
-      pending.reject(new Error(error.message || "ACP request failed"))
+      pending.reject(new Error(`${error.message || "ACP request failed"}${detail}`))
     } else {
       pending.resolve(msg.result)
     }

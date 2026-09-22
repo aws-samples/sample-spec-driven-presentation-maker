@@ -27,6 +27,10 @@ export async function forkKiroSession(request: ForkSessionRequest): Promise<Fork
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
   })
-  if (!response.ok) throw new Error(`Failed to fork kiro session: ${response.status}`)
+  if (!response.ok) {
+    // Surface the server's reason in the console; the UI keeps its generic message.
+    const detail = await response.json().then((b: { error?: string }) => b.error).catch(() => undefined)
+    throw new Error(`Failed to fork kiro session: ${response.status}${detail ? ` — ${detail}` : ""}`)
+  }
   return response.json() as Promise<ForkSessionResponse>
 }

@@ -125,7 +125,7 @@ describe("forkSession", () => {
     expect(forkMeta).toMatchObject({
       ...meta,
       session_id: newId,
-      imported_from: { session_id: IDS.recent, forked_by: "sdpm-web-ui" },
+      imported_from: IDS.recent,
     })
     expect(fs.readFileSync(path.join(tmp, `${newId}.jsonl`))).toEqual(sourceJsonlBefore)
     expect(fs.readFileSync(path.join(tmp, `${IDS.recent}.json`))).toEqual(sourceJsonBefore)

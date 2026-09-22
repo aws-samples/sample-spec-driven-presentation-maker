@@ -187,7 +187,9 @@ export async function forkSession(
   const forkedMeta: SessionMeta = {
     ...meta,
     session_id: newId,
-    imported_from: { session_id: sourceId, forked_by: "sdpm-web-ui" },
+    // kiro-cli reads this as a plain string; an object makes `session/load` fail
+    // with "failed to parse session metadata" (the /chat load convention is the path or id).
+    imported_from: sourceId,
   }
 
   try {
