@@ -191,17 +191,25 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   const latestComponentsRef = useRef(new Map<string, ComposeComponent>())
   const hasBeenOffscreenRef = useRef(false)
   const settlePendingRef = useRef<() => void>(() => {})
+  const pendingRef = useRef<{ url: string; apply: (settleImmediately: boolean) => void } | null>(null)
+  const applyPendingRef = useRef<(settleImmediately: boolean) => void>(() => {})
   const visibilityWaitersRef = useRef(new Set<(visibility: "visible" | "hidden") => void>())
   const checkRef = useRef<() => void>(() => {})
   const visibleRef = useSlideVisibility(wrapperRef, 0.5, (visibility) => {
     visibilityWaitersRef.current.forEach((resolve) => resolve(visibility))
     visibilityWaitersRef.current.clear()
-    if (visibility === "hidden") {
-      hasBeenOffscreenRef.current = true
-    } else if (hasBeenOffscreenRef.current && unsettledRef.current.size > 0) {
-      settlePendingRef.current()
+    if (visibility === "visible") {
+      if (pendingRef.current) applyPendingRef.current(true)
+      else if (hasBeenOffscreenRef.current && unsettledRef.current.size > 0) settlePendingRef.current()
     }
   })
+  const nearRef = useSlideVisibility(wrapperRef, 0, (visibility) => {
+    if (visibility === "hidden") {
+      hasBeenOffscreenRef.current = true
+    } else if (pendingRef.current) {
+      applyPendingRef.current(visibleRef.current === "visible")
+    }
+  }, "100% 0px")
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const typewriterCancelsRef = useRef<(() => void)[]>([])
   const releaseRef = useRef<(() => void) | null>(null)
@@ -234,7 +242,21 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     parent?.querySelectorAll(".asp-overlay, .asp-region-overlay").forEach(el => el.remove())
   }, [])
 
-  useEffect(() => () => cleanup(), [cleanup])
+  applyPendingRef.current = (settleImmediately) => {
+    const pending = pendingRef.current
+    if (!pending) return
+    pendingRef.current = null
+    if (pending.url !== composeUrlRef.current) {
+      checkRef.current()
+      return
+    }
+    pending.apply(settleImmediately)
+  }
+
+  useEffect(() => () => {
+    pendingRef.current = null
+    cleanup()
+  }, [cleanup])
 
   settlePendingRef.current = () => {
     const container = containerRef.current
@@ -256,19 +278,9 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   }
 
   const mergeSupersededHiddenChanges = (data: ComposeData) => {
-    if (visibleRef.current !== "hidden" || reducedMotion.current) return
-    const currentRenderIsReady = renderedComposeUrlRef.current === composeUrlRef.current
-    const elements = Array.from(containerRef.current?.querySelectorAll<SVGGElement>("g[data-component-key]") ?? [])
+    if (nearRef.current === "visible" || reducedMotion.current) return
     data.components.forEach((component) => {
-      if (!component.changed) return
-      const key = composeComponentKey(component)
-      if (currentRenderIsReady && !latestComponentsRef.current.has(key)) return
-      unsettledRef.current.add(key)
-      const element = elements.find((candidate) => candidate.dataset.componentKey === key)
-      const latestComponent = latestComponentsRef.current.get(key)
-      if (element && latestComponent && element.dataset.unsettled !== "true") {
-        markUnsettled(element, latestComponent)
-      }
+      if (component.changed) unsettledRef.current.add(composeComponentKey(component))
     })
   }
 
@@ -396,14 +408,16 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           const visibleAtArrival = await waitForFirstVisibility()
           if (cancelled || requestedUrl !== composeUrlRef.current) return
 
-          const container = containerRef.current
-          if (!container || cancelled) {
-            // Container not mounted — reset so a later prop change can retry
-            lastComposeUrlRef.current = ""
-            return
-          }
+          const applyPayload = async (settleImmediately = false) => {
+            const container = containerRef.current
+            if (!container || cancelled) {
+              // Container not mounted — reset so a later prop change can retry
+              lastComposeUrlRef.current = ""
+              return
+            }
+            pendingRef.current = null
 
-          cleanup()
+            cleanup()
           errorKindRef.current = null
           retryFailureRef.current = null
           setErrorKind(null)
@@ -453,6 +467,12 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             if (!release || cancelled) {
               release?.()
               animatingRef.current = false
+              return
+            }
+            if (requestedUrl !== composeUrlRef.current) {
+              release()
+              animatingRef.current = false
+              check()
               return
             }
             // A queued slide may have become hidden while waiting for its slot.
@@ -562,7 +582,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           container.appendChild(svgEl)
           renderedComposeUrlRef.current = requestedUrl
           if (regions.length > 0) container.parentElement?.appendChild(regionOverlay)
-          if (visibleRef.current === "visible" && hasBeenOffscreenRef.current && unsettledRef.current.size > 0) {
+          if ((settleImmediately || visibleRef.current === "visible") && hasBeenOffscreenRef.current && unsettledRef.current.size > 0) {
             settlePendingRef.current()
           }
 
@@ -708,6 +728,27 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             check()
           }, totalTime)
           timersRef.current.push(tDone)
+          }
+
+          const hasRenderedSvg = Boolean(containerRef.current?.querySelector("svg"))
+          if (visibleAtArrival !== "visible" && nearRef.current !== "visible" && hasRenderedSvg && !reducedMotion.current) {
+            mergeSupersededHiddenChanges(data)
+            pendingRef.current = {
+              url: requestedUrl,
+              apply: (settleImmediately) => {
+                void applyPayload(settleImmediately).catch(() => {
+                  animatingRef.current = false
+                  releaseRef.current?.()
+                  releaseRef.current = null
+                  markRetryableError(requestedUrl, false)
+                })
+              },
+            }
+            onComplete?.()
+            return
+          }
+
+          await applyPayload()
         } catch {
           animatingRef.current = false
           releaseRef.current?.()
@@ -744,6 +785,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     previousDefsMountedPropRef.current = defsMounted
     if (!firstTrigger && !composeChanged && !defsUrlChanged && !lostDeckDefs) return
     if (composeChanged) {
+      pendingRef.current = null
       retryFailureRef.current = null
       errorKindRef.current = null
       setErrorKind(null)

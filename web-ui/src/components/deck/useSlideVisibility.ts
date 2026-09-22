@@ -10,15 +10,16 @@ interface ObserverEntry {
   listeners: Map<Element, Set<VisibilityListener>>
 }
 
-const observers = new Map<Element | null, Map<number, ObserverEntry>>()
+const observers = new Map<Element | null, Map<string, ObserverEntry>>()
 
-function observerFor(root: Element | null, threshold: number): ObserverEntry {
-  let byThreshold = observers.get(root)
-  if (!byThreshold) {
-    byThreshold = new Map()
-    observers.set(root, byThreshold)
+function observerFor(root: Element | null, threshold: number, rootMargin: string): ObserverEntry {
+  let byOptions = observers.get(root)
+  if (!byOptions) {
+    byOptions = new Map()
+    observers.set(root, byOptions)
   }
-  let entry = byThreshold.get(threshold)
+  const key = `${threshold}|${rootMargin}`
+  let entry = byOptions.get(key)
   if (!entry) {
     const listeners = new Map<Element, Set<VisibilityListener>>()
     const observer = new IntersectionObserver((changes) => {
@@ -28,9 +29,9 @@ function observerFor(root: Element | null, threshold: number): ObserverEntry {
           : "hidden"
         listeners.get(change.target)?.forEach((listener) => listener(visibility))
       }
-    }, { root, threshold: [0, threshold] })
+    }, { root, rootMargin, threshold: threshold === 0 ? [0] : [0, threshold] })
     entry = { observer, listeners }
-    byThreshold.set(threshold, entry)
+    byOptions.set(key, entry)
   }
   return entry
 }
@@ -40,6 +41,7 @@ export function useSlideVisibility<T extends Element>(
   ref: RefObject<T | null>,
   threshold = 0.5,
   onChange?: (visibility: Exclude<SlideVisibility, "unknown">) => void,
+  rootMargin = "0px",
 ) {
   const visibilityRef = useRef<SlideVisibility>("unknown")
   const onChangeRef = useRef(onChange)
@@ -54,7 +56,7 @@ export function useSlideVisibility<T extends Element>(
       return
     }
     const root = element.closest("[data-slide-scroller]")
-    const entry = observerFor(root, threshold)
+    const entry = observerFor(root, threshold, rootMargin)
     const listener: VisibilityListener = (visibility) => {
       visibilityRef.current = visibility
       onChangeRef.current?.(visibility)
@@ -72,12 +74,12 @@ export function useSlideVisibility<T extends Element>(
       }
       if (entry.listeners.size === 0) {
         entry.observer.disconnect()
-        const byThreshold = observers.get(root)
-        byThreshold?.delete(threshold)
-        if (byThreshold?.size === 0) observers.delete(root)
+        const byOptions = observers.get(root)
+        byOptions?.delete(`${threshold}|${rootMargin}`)
+        if (byOptions?.size === 0) observers.delete(root)
       }
     }
-  }, [ref, threshold])
+  }, [ref, rootMargin, threshold])
 
   return visibilityRef
 }
