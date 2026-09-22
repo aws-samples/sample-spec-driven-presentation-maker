@@ -69,6 +69,10 @@ Open [http://localhost:3000](http://localhost:3000) (Next.js picks the next free
 
 Setting `NEXT_PUBLIC_MODE=local` enables the Next.js API Routes under `src/app/api/` and spawns `kiro-cli acp --agent sdpm-orchestrator` per active deck. The canonical agent definitions live under [`servers/local/.kiro/acp-agents/`](../servers/local/.kiro/acp-agents/) and share the MCP toolset from [`servers/local/server_acp.py`](../servers/local/server_acp.py).
 
+### Continue from a kiro-cli session
+
+Any chat you had in `kiro-cli` on this machine can become the starting point of a deck. The empty chat shows your sessions from the last 24 hours as cards; the **+** menu → **Continue from kiro session** opens the full list grouped by project. Picking one forks the session into a new ID (the original files under `~/.kiro/sessions/cli/` are never modified), loads it into the orchestrator, and the agent immediately replies with what the work was about and one question — who the audience is and how long the talk is. A chip above the chat shows which session the deck was forked from.
+
 ---
 
 ## Authentication

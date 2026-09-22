@@ -10,6 +10,26 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Added
+
+- **Continue a deck from a kiro-cli session (Web UI Local mode)** — any chat
+  you had in `kiro-cli` on the machine can be the starting point of a deck.
+  The empty chat offers the last 24 hours of sessions as cards; the **+** menu
+  opens the full picker grouped by project (subagent children and SDPM's own
+  sessions are hidden by default). Picking one forks the session into a new ID
+  — the files under `~/.kiro/sessions/cli/` are never written — loads it over
+  ACP `session/load`, switches the agent to `sdpm-orchestrator` with
+  `session/set_mode`, and the agent replies at once with what the work was
+  about plus one question (audience and talk length). A chip above the chat
+  shows the source session. The orchestrator workflow gained a `Continued
+  from:` paragraph defining that first reply.
+
+### Fixed
+
+- **Local ACP prompt errors no longer hang the stream** — an RPC error from
+  `session/prompt` now surfaces on the SSE stream as an error event instead of
+  an unhandled rejection with the chat stuck in "thinking".
+
 ### Changed
 
 - **Slide list moves instead of jumping** — slides that appear, disappear or
