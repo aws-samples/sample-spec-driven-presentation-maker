@@ -75,12 +75,12 @@ interface Typewriter {
   spans: TypewriterSpan[]
   charMs: number
   startedAt: number
+  lastFrameAt: number
   shown: number
 }
 
 const typewriters = new Set<Typewriter>()
 let frameId: number | null = null
-let typewriterFrame = 0
 
 function applyCharacterCount(writer: Typewriter, count: number) {
   let remaining = count
@@ -97,8 +97,10 @@ export function advanceTypewriters(now: number) {
   for (const writer of typewriters) {
     const total = writer.spans.reduce((sum, span) => sum + span.fullText.length, 0)
     const elapsedTarget = Math.min(total, Math.max(0, Math.floor((now - writer.startedAt) / writer.charMs)))
-    // Preserve the per-character feel after a long frame instead of dumping a word at once.
-    const shown = Math.min(elapsedTarget, writer.shown + 4)
+    const frameGap = now - writer.lastFrameAt
+    const maxAdvance = frameGap > 2 * writer.charMs ? 2 : 1
+    const shown = Math.min(elapsedTarget, writer.shown + maxAdvance)
+    writer.lastFrameAt = now
     if (shown !== writer.shown) {
       writer.shown = shown
       applyCharacterCount(writer, shown)
@@ -109,20 +111,18 @@ export function advanceTypewriters(now: number) {
 
 function tick(now: number) {
   frameId = null
-  typewriterFrame++
-  // Limit DOM text mutations to 30 Hz while elapsed-time math preserves the
-  // configured 15–50 ms character rate (the four-character cap catches up
-  // by the same maximum amount as two characters on each 60 Hz frame).
-  if (typewriterFrame % 2 === 0) advanceTypewriters(now)
+  advanceTypewriters(now)
   if (typewriters.size > 0) frameId = requestAnimationFrame(tick)
 }
 
 /** Register text spans with the single deck-wide typewriter frame loop. */
 export function registerTypewriter(spans: TypewriterSpan[], charMs: number): () => void {
+  const startedAt = performance.now()
   const writer: Typewriter = {
     spans,
     charMs,
-    startedAt: performance.now(),
+    startedAt,
+    lastFrameAt: startedAt,
     shown: 0,
   }
   typewriters.add(writer)
@@ -138,7 +138,6 @@ export function resetAnimationSchedulerForTests() {
     waiter.resolve(null)
   }
   typewriters.clear()
-  typewriterFrame = 0
   if (frameId !== null) cancelAnimationFrame(frameId)
   frameId = null
 }

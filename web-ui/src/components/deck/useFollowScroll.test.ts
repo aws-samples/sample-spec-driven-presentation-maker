@@ -130,11 +130,14 @@ describe("useFollowScroll", () => {
     expect(container.scrollTo).toHaveBeenCalledTimes(2)
   })
 
-  it("treats non-programmatic scroll events as manual", () => {
+  it("uses scrollend to finish programmatic-scroll classification when supported", () => {
     const container = makeScroller()
+    Object.defineProperty(container, "onscrollend", { value: null, configurable: true })
     const { result } = renderHook(() => useFollowScroll(container))
 
     act(() => result.current("one"))
+    container.dispatchEvent(new Event("scroll"))
+    act(() => vi.advanceTimersByTime(1000))
     container.dispatchEvent(new Event("scroll"))
     act(() => result.current("two"))
     expect(container.scrollTo).toHaveBeenCalledTimes(2)
@@ -143,5 +146,23 @@ describe("useFollowScroll", () => {
     container.dispatchEvent(new Event("scroll"))
     act(() => result.current("one"))
     expect(container.scrollTo).toHaveBeenCalledTimes(2)
+  })
+
+  it("falls back to 150 ms of scroll-event quiescence when scrollend is unavailable", () => {
+    const container = makeScroller()
+    Object.defineProperty(container, "onscrollend", { value: undefined, configurable: true })
+    const { result } = renderHook(() => useFollowScroll(container))
+
+    act(() => result.current("one"))
+    container.dispatchEvent(new Event("scroll"))
+    act(() => vi.advanceTimersByTime(149))
+    container.dispatchEvent(new Event("scroll"))
+    act(() => vi.advanceTimersByTime(149))
+    expect(container.scrollTo).toHaveBeenCalledTimes(1)
+
+    act(() => vi.advanceTimersByTime(1))
+    container.dispatchEvent(new Event("scroll"))
+    act(() => result.current("two"))
+    expect(container.scrollTo).toHaveBeenCalledTimes(1)
   })
 })

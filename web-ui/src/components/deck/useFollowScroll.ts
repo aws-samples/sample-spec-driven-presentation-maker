@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef } from "react"
 
 const REARM_MS = 3000
-const PROGRAMMATIC_SCROLL_WINDOW_MS = 600
+const SCROLL_QUIESCENCE_MS = 150
 const SCROLL_KEYS = new Set([
   "ArrowUp",
   "ArrowDown",
@@ -45,11 +45,21 @@ export function useFollowScroll(container: HTMLDivElement | null) {
 
   useEffect(() => {
     if (!container) return
+    const supportsScrollEnd = typeof container.onscrollend !== "undefined"
+    const scheduleProgrammaticQuiescence = () => {
+      if (supportsScrollEnd) return
+      if (programmaticTimerRef.current) clearTimeout(programmaticTimerRef.current)
+      programmaticTimerRef.current = setTimeout(clearProgrammaticScroll, SCROLL_QUIESCENCE_MS)
+    }
     const pauseForKey = (event: KeyboardEvent) => {
       if (SCROLL_KEYS.has(event.key) && !isEditableTarget(event.target)) pause()
     }
     const pauseForScroll = () => {
-      if (!programmaticScrollRef.current) pause()
+      if (programmaticScrollRef.current) {
+        scheduleProgrammaticQuiescence()
+      } else {
+        pause()
+      }
     }
     const pauseForPointer = (event: Event) => {
       if (!isEditableTarget(event.target)) pause()
@@ -57,13 +67,13 @@ export function useFollowScroll(container: HTMLDivElement | null) {
     container.addEventListener("wheel", pauseForPointer, { passive: true })
     container.addEventListener("touchmove", pauseForPointer, { passive: true })
     container.addEventListener("scroll", pauseForScroll, { passive: true })
-    container.addEventListener("scrollend", clearProgrammaticScroll)
+    if (supportsScrollEnd) container.addEventListener("scrollend", clearProgrammaticScroll)
     document.addEventListener("keydown", pauseForKey, true)
     return () => {
       container.removeEventListener("wheel", pauseForPointer)
       container.removeEventListener("touchmove", pauseForPointer)
       container.removeEventListener("scroll", pauseForScroll)
-      container.removeEventListener("scrollend", clearProgrammaticScroll)
+      if (supportsScrollEnd) container.removeEventListener("scrollend", clearProgrammaticScroll)
       document.removeEventListener("keydown", pauseForKey, true)
       clearProgrammaticScroll()
     }
@@ -91,8 +101,10 @@ export function useFollowScroll(container: HTMLDivElement | null) {
     const containerRect = container.getBoundingClientRect()
     const offset = elementRect.top - containerRect.top + container.scrollTop - 24
     programmaticScrollRef.current = true
-    if (programmaticTimerRef.current) clearTimeout(programmaticTimerRef.current)
-    programmaticTimerRef.current = setTimeout(clearProgrammaticScroll, PROGRAMMATIC_SCROLL_WINDOW_MS)
+    if (typeof container.onscrollend === "undefined") {
+      if (programmaticTimerRef.current) clearTimeout(programmaticTimerRef.current)
+      programmaticTimerRef.current = setTimeout(clearProgrammaticScroll, SCROLL_QUIESCENCE_MS)
+    }
     container.scrollTo({ top: offset, behavior: "smooth" })
   }, [clearProgrammaticScroll, container])
 }
