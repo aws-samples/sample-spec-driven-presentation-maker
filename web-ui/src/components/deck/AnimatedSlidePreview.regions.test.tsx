@@ -431,6 +431,34 @@ describe("AnimatedSlidePreview visibility and error races", () => {
     await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new"]')?.getAttribute("data-unsettled")).toBeNull())
   })
 
+  it("settles a slide that was only just below the fold (never a full viewport away)", async () => {
+    const oldComponent = { ...component, changed: false, svg: '<rect id="old-fold" x="200" y="200" width="300" height="300" />' }
+    const newComponent = { ...component, svg: '<rect id="new-fold" x="600" y="200" width="300" height="300" />' }
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
+      const data = String(input).includes("compose-2")
+        ? { version: 1, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components: [newComponent] }
+        : { version: 1, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components: [oldComponent] }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) })
+    }))
+
+    const rendered = render(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-1.json" slug="fold" defsMounted />
+    )
+    const wrapper = rendered.container.querySelector('[data-slide-id="fold"]')!
+    // Within one viewport (near) but below the settle threshold — the common case right after Follow scrolls.
+    act(() => ControlledObserver.emitZone(wrapper, "100% 0px", true))
+    act(() => ControlledObserver.emitZone(wrapper, "0px", false))
+    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:old-fold"]')).toBeTruthy())
+
+    rendered.rerender(
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" slug="fold" defsMounted />
+    )
+    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new-fold"]')?.getAttribute("data-unsettled")).toBe("true"))
+
+    act(() => ControlledObserver.emitZone(wrapper, "0px", true))
+    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new-fold"]')?.getAttribute("data-unsettled")).toBeNull())
+  })
+
   it("builds and settles immediately when a hidden slide jumps straight to visible", async () => {
     const oldComponent = { ...component, changed: false, svg: '<rect id="old-fast" x="200" y="200" width="300" height="300" />' }
     const newComponent = { ...component, svg: '<rect id="new-fast" x="600" y="200" width="300" height="300" />' }

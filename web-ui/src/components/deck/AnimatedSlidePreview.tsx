@@ -17,6 +17,13 @@ import { markUnsettled, settle, type MaterializeItem } from "./materialize"
 
 // --- Constants ---
 const COMPOSE_VERSION = 1
+/**
+ * Share of a slide that must be in view before an unseen update settles.
+ * Full-view slides are ~90% of the viewport tall, so 0.5 meant "half the
+ * screen is already the blurred slide"; 0.35 starts as the slide arrives
+ * (the mock used 0.5 on 60vh cards — same on-screen amount).
+ */
+const SETTLE_VISIBLE_RATIO = 0.35
 const STAGGER_MS = 260
 const WIREFRAME_LEAD_MS = 400
 const TYPE_DURATION_MS = 800
@@ -195,12 +202,16 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   const applyPendingRef = useRef<(settleImmediately: boolean) => void>(() => {})
   const visibilityWaitersRef = useRef(new Set<(visibility: "visible" | "hidden") => void>())
   const checkRef = useRef<() => void>(() => {})
-  const visibleRef = useSlideVisibility(wrapperRef, 0.5, (visibility) => {
+  const visibleRef = useSlideVisibility(wrapperRef, SETTLE_VISIBLE_RATIO, (visibility) => {
     visibilityWaitersRef.current.forEach((resolve) => resolve(visibility))
     visibilityWaitersRef.current.clear()
     if (visibility === "visible") {
       if (pendingRef.current) applyPendingRef.current(true)
       else if (hasBeenOffscreenRef.current && unsettledRef.current.size > 0) settlePendingRef.current()
+    } else {
+      // Below the settle threshold counts as "away" — a slide just below the
+      // fold must settle when it arrives, not only slides a full viewport away.
+      hasBeenOffscreenRef.current = true
     }
   })
   const nearRef = useSlideVisibility(wrapperRef, 0, (visibility) => {
