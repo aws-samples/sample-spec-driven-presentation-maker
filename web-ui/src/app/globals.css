@@ -751,17 +751,6 @@ body {
   content-visibility: auto;
 }
 
-/* Compositor-friendly replacement for the original SVG brightness/saturation flash. */
-@keyframes asp-land {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-.asp-land {
-  border-radius: 2px;
-  mix-blend-mode: screen;
-  will-change: opacity;
-  animation: asp-land 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
 
 @keyframes tool-card-enter {
   from { opacity: 0; transform: translateY(6px); }

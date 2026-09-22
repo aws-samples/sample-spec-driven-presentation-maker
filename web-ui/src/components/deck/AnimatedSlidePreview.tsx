@@ -60,7 +60,7 @@ interface Scene {
   markFilledRegions: (comp: ComposeComponent) => void
   markFilledByAll: () => void
 }
-type ResolvedAgent = { name: string; color: string; glow: string; landingGlow: string; bg: string }
+type ResolvedAgent = { name: string; color: string; glow: string; bg: string }
 
 /** Resolve CSS variable tokens into usable color strings (theme-aware). */
 function resolveAgents(): ResolvedAgent[] {
@@ -73,7 +73,6 @@ function resolveAgents(): ResolvedAgent[] {
       name: a.name,
       color: `color-mix(in oklch, ${base} 55%, transparent)`,
       glow: `color-mix(in oklch, ${base} 10%, transparent)`,
-      landingGlow: `color-mix(in oklch, ${base} 35%, transparent)`,
       bg: base,
     }
   })
@@ -437,11 +436,12 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
               if (g) {
                 g.style.opacity = "1"
                 delete g.dataset.pending
-                const flash = document.createElement("div")
-                flash.className = "asp-land absolute"
-                flash.style.cssText = `left:${pctL}%;top:${pctT}%;width:${pctW}%;height:${pctH}%;background:${agent.landingGlow};`
-                overlayContainer.appendChild(flash)
-                flash.addEventListener("animationend", () => flash.remove(), { once: true })
+                // Landing: the component itself lights up and settles (the original
+                // look). One component at a time on a visible slide, so the SVG
+                // filter cost stays bounded.
+                g.style.filter = "brightness(2) saturate(0.5)"
+                g.style.transition = "filter 0.5s cubic-bezier(0.16,1,0.3,1)"
+                requestAnimationFrame(() => { g.style.filter = "brightness(1) saturate(1)" })
                 typewriterCancelsRef.current.push(typewrite(g))
               }
               markFilledRegions(comp)
