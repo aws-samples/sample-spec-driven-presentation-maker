@@ -27,8 +27,9 @@ const WIREFRAME_LEAD_MS = 400
 /**
  * Catch-up replay: when a slide changed while off-screen and the user reaches
  * it within CATCHUP_MAX_AGE_MS, the agent-drawing animation replays for the
- * accumulated changes in a compressed form (no wireframe lead, tighter stagger).
- * Older changes are simply shown.
+ * accumulated changes with a tighter stagger. The wireframe lead stays: without
+ * it the frame, the element and the landing flash appear in the same frame and
+ * the landing reads as a sudden flash. Older changes are simply shown.
  */
 const CATCHUP_STAGGER_MS = 150
 const CATCHUP_MAX_AGE_MS = 60_000
@@ -456,7 +457,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           }
           const skipAgentAnimation = suppressThisUpdate || !animateNow
           const stagger = catchUp ? CATCHUP_STAGGER_MS : STAGGER_MS
-          const wireframeLead = catchUp ? 0 : WIREFRAME_LEAD_MS
+          const wireframeLead = WIREFRAME_LEAD_MS
 
           const regions = data.regions ?? []
           const previousRegionKeys = new Set(previousRegionsRef.current.map(regionKey))
