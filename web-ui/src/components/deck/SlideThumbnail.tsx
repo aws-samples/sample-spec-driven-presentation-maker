@@ -15,7 +15,7 @@
 
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 
 interface SlideThumbnailProps {
   src: string | null
@@ -34,21 +34,48 @@ interface SlideThumbnailProps {
 }
 
 export function SlideThumbnail({ src, alt, index, onClick, className, updated, slug, onAspectRatio, onError, children }: SlideThumbnailProps) {
-  const [loaded, setLoaded] = useState(false)
   const [aspectRatio, setAspectRatio] = useState<string>("16/9")
-  const prevSrc = useRef(src)
+  // `shown` is the image currently on screen; `incoming` is a newer src still
+  // loading. The old image stays until the new one is ready, then they crossfade,
+  // so a regenerate never flashes the skeleton.
+  const [shown, setShown] = useState<{ src: string; loaded: boolean } | null>(src ? { src, loaded: false } : null)
+  const [incoming, setIncoming] = useState<string | null>(null)
+  const [outgoing, setOutgoing] = useState<string | null>(null)
 
-  // Reset loaded state when src changes (triggers skeleton re-display)
   useEffect(() => {
-    if (src !== prevSrc.current) {
-      setLoaded(false)
-      prevSrc.current = src
-    }
+    if (!src) { setShown(null); setIncoming(null); return }
+    if (!shown) { setShown({ src, loaded: false }); return }
+    if (src !== shown.src) setIncoming(src)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src])
+
+  useEffect(() => {
+    if (!outgoing) return
+    const timer = setTimeout(() => setOutgoing(null), 300)
+    return () => clearTimeout(timer)
+  }, [outgoing])
+  // The update glow runs when the new image is actually on screen, not when
+  // its URL changed (the file may still be loading then).
+  const [glow, setGlow] = useState(false)
+  useEffect(() => {
+    if (!glow) return
+    const timer = setTimeout(() => setGlow(false), 1500)
+    return () => clearTimeout(timer)
+  }, [glow])
+
+  const readAspect = (img: HTMLImageElement) => {
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      setAspectRatio(`${img.naturalWidth}/${img.naturalHeight}`)
+      onAspectRatio?.(img.naturalWidth / img.naturalHeight)
+    }
+  }
+  // Reveal stagger only for the first screenful; a 30-slide deck must not make
+  // its last slide wait 1.8 s after it has loaded.
+  const revealDelay = `${Math.min(index, 6) * 60}ms`
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg ${updated ? "slide-updated" : ""} ${className || ""}`}
+      className={`relative overflow-hidden rounded-lg ${updated || glow ? "slide-updated" : ""} ${className || ""}`}
       style={{ aspectRatio }}
       onClick={onClick}
       role={onClick ? "button" : undefined}
@@ -56,8 +83,8 @@ export function SlideThumbnail({ src, alt, index, onClick, className, updated, s
       onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick() } } : undefined}
       data-slide-id={slug}
     >
-      {/* Skeleton layer — shown only while loading an actual src */}
-      {!loaded && src && <div className="slide-skeleton absolute inset-0" />}
+      {/* Skeleton layer — only before the first image has ever loaded */}
+      {shown && !shown.loaded && <div className="slide-skeleton absolute inset-0" />}
 
       {/* Explicit placeholder when no src is available */}
       {!src && (
@@ -66,23 +93,43 @@ export function SlideThumbnail({ src, alt, index, onClick, className, updated, s
         </div>
       )}
 
-      {/* Image layer */}
-      {src && (
+      {/* Previous image, fading out under the new one */}
+      {outgoing && (
+        <img src={outgoing} alt="" aria-hidden className="absolute inset-0 w-full h-full object-contain slide-swap-out" data-outgoing />
+      )}
+
+      {/* Image on screen */}
+      {shown && (
         <img
-          src={src}
+          key={shown.src}
+          src={shown.src}
           alt={alt}
-          onLoad={(e) => {
-            const img = e.currentTarget
-            if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-              setAspectRatio(`${img.naturalWidth}/${img.naturalHeight}`)
-              onAspectRatio?.(img.naturalWidth / img.naturalHeight)
-            }
-            setLoaded(true)
-          }}
+          onLoad={(e) => { readAspect(e.currentTarget); setShown((s) => (s && s.src === shown.src ? { ...s, loaded: true } : s)) }}
           onError={() => onError?.()}
-          className="absolute inset-0 w-full h-full object-contain slide-reveal"
-          style={{ "--reveal-delay": `${index * 60}ms` } as React.CSSProperties}
-          data-loaded={loaded}
+          className={`absolute inset-0 w-full h-full object-contain ${outgoing ? "slide-swap-in" : "slide-reveal"}`}
+          style={{ "--reveal-delay": revealDelay } as React.CSSProperties}
+          data-loaded={shown.loaded}
+          data-shown
+        />
+      )}
+
+      {/* Newer image loading off-screen; swaps in once ready */}
+      {incoming && (
+        <img
+          src={incoming}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 w-full h-full object-contain opacity-0 pointer-events-none"
+          data-incoming
+          onLoad={(e) => {
+            readAspect(e.currentTarget)
+            const next = incoming
+            setOutgoing(shown?.src ?? null)
+            setShown({ src: next, loaded: true })
+            setGlow(true)
+            setIncoming((cur) => (cur === next ? null : cur))
+          }}
+          onError={() => { setIncoming(null); onError?.() }}
         />
       )}
 

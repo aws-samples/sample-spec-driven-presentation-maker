@@ -122,4 +122,29 @@ describe("SlideThumbnail — aspect ratio agnostic", () => {
     fireEvent.error(img)
     expect(onError).toHaveBeenCalledTimes(1)
   })
+
+  it("keeps the old image on screen while a new src loads, then crossfades", () => {
+    const { container, rerender } = render(<SlideThumbnail src="/a.png" alt="" index={0} slug="s" />)
+    const first = container.querySelector("img[data-shown]") as HTMLImageElement
+    fireEvent.load(first)
+    expect(container.querySelector(".slide-skeleton")).toBeNull()
+
+    rerender(<SlideThumbnail src="/b.png" alt="" index={0} slug="s" />)
+    // Old image still shown, no skeleton, new one loading hidden
+    expect((container.querySelector("img[data-shown]") as HTMLImageElement).getAttribute("src")).toBe("/a.png")
+    expect(container.querySelector(".slide-skeleton")).toBeNull()
+    const incoming = container.querySelector("img[data-incoming]") as HTMLImageElement
+    expect(incoming.getAttribute("src")).toBe("/b.png")
+
+    fireEvent.load(incoming)
+    expect((container.querySelector("img[data-shown]") as HTMLImageElement).getAttribute("src")).toBe("/b.png")
+    expect((container.querySelector("img[data-outgoing]") as HTMLImageElement).getAttribute("src")).toBe("/a.png")
+    expect(container.firstElementChild?.className).toContain("slide-updated")
+  })
+
+  it("caps the reveal stagger so late slides do not wait", () => {
+    const { container } = render(<SlideThumbnail src="/a.png" alt="" index={30} slug="s" />)
+    const img = container.querySelector("img[data-shown]") as HTMLImageElement
+    expect(img.style.getPropertyValue("--reveal-delay")).toBe("360ms")
+  })
 })

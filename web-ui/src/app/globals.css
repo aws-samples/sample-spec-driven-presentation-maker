@@ -873,6 +873,12 @@ body {
   to   { opacity: 1; transform: scale(1); }
 }
 
+/* ── Slide swap (regenerate): old image fades under the new one ── */
+.slide-swap-in { animation: slide-swap-in 260ms ease-out both; }
+.slide-swap-out { animation: slide-swap-out 260ms ease-out both; }
+@keyframes slide-swap-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slide-swap-out { from { opacity: 1; } to { opacity: 0; } }
+
 /* ── Slide update glow highlight ── */
 @keyframes slide-update-glow {
   0%   { box-shadow: 0 0 0 1px color-mix(in oklch, var(--agent-layout) 60%, transparent), 0 0 16px color-mix(in oklch, var(--agent-layout) 25%, transparent); }

@@ -12,6 +12,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **Slide list moves instead of jumping** — slides that appear, disappear or
+  move in the Slides tab slide into place (both grid and full view); a
+  regenerated preview crossfades over the old image instead of flashing a
+  skeleton, and its glow starts when the new image is actually on screen.
+  Clicking a thumbnail in grid view opens the full view at that slide (the card
+  grows into place). Reveal stagger is capped so the last slide of a long deck
+  no longer waits. All motion honours the OS reduced-motion setting.
 - **Chat input height is always right** — the message box now grows with its
   content via `react-textarea-autosize` (1–5 rows) instead of a hand-rolled
   height calculation that could misjudge IME composition and pasted text.
