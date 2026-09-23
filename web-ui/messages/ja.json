@@ -184,12 +184,24 @@
     "messageOverwritten": "（送信前にあなたも outline.md を更新していましたが、私の版で上書きしました）",
     "messageDisplay": "📝 outline を編集して送信しました（+{added} 行 / −{deleted} 行）"
   },
+  "slashPicker": {
+    "sectionTemplate": "テンプレート",
+    "sectionStyle": "スタイル",
+    "noMatch": "該当なし",
+    "loading": "読み込み中…",
+    "keyHint": "↑↓ 移動  ↵ 挿入  Esc 閉じる",
+    "listLabel": "テンプレート / スタイルの候補",
+    "previewAlt": "{name} のプレビュー",
+    "unknownName": "このテンプレートまたはスタイルは利用できません",
+    "removeToken": "{kind}「{name}」を削除",
+    "layouts": "{count} レイアウト"
+  },
   "chatInput": {
     "maxFilesError": "一度に添付できるファイルは 5 つまでです。",
     "uploadFailed": "アップロード失敗",
     "textSnippet": "テキストスニペット",
     "placeholderMobile": "なんでも聞いてください…",
-    "placeholderDesktop": "なんでも聞いてください…  ⌘↵ で送信",
+    "placeholderDesktop": "なんでも聞いてください…  / でテンプレート・スタイル  ⌘↵ で送信",
     "inputLabel": "チャットメッセージ入力",
     "stopGeneration": "生成を停止",
     "sendMessage": "メッセージを送信"
@@ -216,7 +228,7 @@
     "example3": "これから説明するテーマで 5 分の技術トークを作って",
     "chatMessages": "チャットメッセージ",
     "placeholderMobile": "なんでも聞いてください…",
-    "placeholderDesktop": "なんでも聞いてください…  ⌘↵ で送信",
+    "placeholderDesktop": "なんでも聞いてください…  / でテンプレート・スタイル  ⌘↵ で送信",
     "forceStop": "強制停止 — 進行中のレポートが失われる可能性があります",
     "mentionSuggestions": "メンション候補",
     "errorSwitchModel": "モデルを切り替えられませんでした",

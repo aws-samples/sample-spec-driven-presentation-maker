@@ -17,6 +17,7 @@ import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
 import { getChatHistory, patchDeck } from "@/services/deckService"
 import type { UploadedFile } from "@/services/uploadService"
 import { useChatStream, type ToolUseCallbackData } from "@/hooks/useChatStream"
+import { useSlashPickerItems } from "@/hooks/useSlashPickerItems"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage, ToolUse } from "./ChatMessage"
 import { McpStatusBar } from "./McpStatusBar"
@@ -141,6 +142,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   const auth = useAuth()
   const isMobile = useIsMobile()
+  const slashPickerItems = useSlashPickerItems(auth.user?.id_token)
 
   /** Persist chat messages to disk (Local mode only). */
   const saveLocalChat = useCallback((overrideDeckId?: string) => {
@@ -687,6 +689,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           onContinueFromSession={() => setSessionPickerOpen(true)}
           continueFromSessionDisabled={deckId !== "new" || stream.messages.length > 0}
           stopTitle={composeInFlight ? t("forceStop") : undefined}
+          slashItems={slashPickerItems.items}
+          slashLoading={slashPickerItems.loading}
+          onSlashOpen={slashPickerItems.ensure}
+          onTextareaFocus={slashPickerItems.ensure}
         >
           {/* Options expander */}
           <div className="px-2">

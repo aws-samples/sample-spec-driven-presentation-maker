@@ -26,6 +26,17 @@ Entries before v0.5.0 were written retroactively as summaries.
   each group follows `allowedModelIds`). Without the key the list stays flat.
   Both defaults must be in the recommended list — `cdk synth` fails otherwise.
   The badge on the default model now reads "Default" instead of "Recommended".
+- **`/` picker for template and style in the chat input** — typing `/` at the
+  start of a line or after whitespace opens an inline popup to pick a
+  template or style without leaving the compose flow; Enter/Tab/click inserts
+  an `@template:<name>` or `@style:<name>` token (quoted when the name has
+  spaces) at the cursor. The existing Art Direction pane pickers (template
+  cards, style cards) now insert the same tokens instead of a fixed English
+  sentence. Sent messages highlight the tokens like existing `@Page N`
+  mentions. The orchestrator treats these tokens as explicit choices — it
+  uses them as given, in fast mode too, and asks rather than substituting if
+  the named template or style does not exist.
+
 - **Continue a deck from a kiro-cli session (Web UI Local mode)** — any chat
   you had in `kiro-cli` on the machine can be the starting point of a deck.
   The empty chat offers the last 24 hours of sessions as cards; the **+** menu

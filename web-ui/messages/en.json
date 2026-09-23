@@ -184,12 +184,24 @@
     "messageOverwritten": "(You also updated outline.md before I sent this, but I overwrote it with my version.)",
     "messageDisplay": "📝 Edited and sent outline (+{added} lines / −{deleted} lines)"
   },
+  "slashPicker": {
+    "sectionTemplate": "Template",
+    "sectionStyle": "Style",
+    "noMatch": "No matches",
+    "loading": "Loading…",
+    "keyHint": "↑↓ move  ↵ insert  Esc close",
+    "listLabel": "Template and style suggestions",
+    "previewAlt": "Preview of {name}",
+    "unknownName": "This template or style is unavailable",
+    "removeToken": "Remove {kind} {name}",
+    "layouts": "{count, plural, one {# layout} other {# layouts}}"
+  },
   "chatInput": {
     "maxFilesError": "Maximum 5 files can be attached at once.",
     "uploadFailed": "Upload failed",
     "textSnippet": "Text snippet",
     "placeholderMobile": "Ask anything…",
-    "placeholderDesktop": "Ask anything…  ⌘↵ send",
+    "placeholderDesktop": "Ask anything…  / template · style  ⌘↵ send",
     "inputLabel": "Chat message input",
     "stopGeneration": "Stop generation",
     "sendMessage": "Send message"
@@ -216,7 +228,7 @@
     "example3": "Make a 5-minute tech talk about a topic I'll describe",
     "chatMessages": "Chat messages",
     "placeholderMobile": "Ask anything…",
-    "placeholderDesktop": "Ask anything…  ⌘↵ send",
+    "placeholderDesktop": "Ask anything…  / template · style  ⌘↵ send",
     "forceStop": "Force stop — partial report may be lost",
     "mentionSuggestions": "Mention suggestions",
     "errorSwitchModel": "Failed to switch model",

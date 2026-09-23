@@ -32,7 +32,7 @@ export function TemplatePickerSection({ idToken, currentTemplate, onTemplateSele
   idToken?: string
   /** Raw template value from deck.json (e.g. "corporate.pptx"), null when unconfirmed. */
   currentTemplate?: string | null
-  onTemplateSelect: (name: string, isChange: boolean) => void
+  onTemplateSelect: (name: string) => void
 }) {
   const t = useTranslations("templatePicker")
   const [templates, setTemplates] = useState<TemplateEntry[]>([])
@@ -57,7 +57,7 @@ export function TemplatePickerSection({ idToken, currentTemplate, onTemplateSele
   useEffect(() => () => { if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current) }, [])
 
   const handleClick = (name: string) => {
-    onTemplateSelect(name, current != null)
+    onTemplateSelect(name)
     setPulsing(name)
     if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current)
     pulseTimerRef.current = setTimeout(() => setPulsing(null), PULSE_MS)
