@@ -16,9 +16,9 @@ attrs==26.1.0
     #   referencing
 aws-opentelemetry-distro==0.19.0
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
-boto3==1.43.62
+boto3==1.43.100
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
-botocore==1.43.67
+botocore==1.43.100
     # via
     #   boto3
     #   s3transfer
@@ -29,9 +29,9 @@ certifi==2026.7.22
     #   httpcore
     #   httpx
     #   requests
-cffi==2.1.0
+cffi==2.1.1
     # via cryptography
-charset-normalizer==3.4.9
+charset-normalizer==3.5.1
     # via
     #   pdfminer-six
     #   requests
@@ -45,7 +45,7 @@ defusedxml==0.7.1
     # via sdpm-skill
 et-xmlfile==2.0.0
     # via openpyxl
-googleapis-common-protos==1.75.0
+googleapis-common-protos==1.75.3
     # via
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
@@ -437,7 +437,7 @@ pyjwt==2.13.0
     # via mcp
 pypdf==6.16.1
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
-pypdfium2==5.12.1
+pypdfium2==5.13.0
     # via pdfplumber
 python-dateutil==2.9.0.post0
     # via

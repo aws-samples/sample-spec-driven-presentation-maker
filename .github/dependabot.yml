@@ -94,6 +94,14 @@ updates:
       # entry above. Migration tracked in #301.
       - dependency-name: mcp
         versions: [">=2"]
+    groups:
+      # One PR per week for the whole constraints.txt tree instead of one per
+      # pin — each merge to main rebases every other open PR and re-runs CI.
+      # boto3/botocore must move together (botocore is range-pinned by boto3),
+      # which single-package PRs cannot do (#322 failed container-deps).
+      remote-deps:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
