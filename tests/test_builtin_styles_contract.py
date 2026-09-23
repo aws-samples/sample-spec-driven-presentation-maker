@@ -21,7 +21,10 @@ from sdpm.engine.checks.font_size import _FS_TOKEN_RE
 from sdpm.knowledge.reference import BUNDLED_STYLES_DIR
 
 BUNDLED = sorted(p for p in BUNDLED_STYLES_DIR.glob("*.html"))
-EXPECTED_NAMES = {"consulting", "keynote", "facilitation", "engineering", "lecture", "report"}
+EXPECTED_NAMES = {
+    "consulting", "keynote", "facilitation", "engineering", "lecture", "report",
+    "briefing", "aws-light", "aws-dark",
+}
 
 REQUIRED_TOKENS = ("--color-text", "--color-bg", "--fs-cover-title", "--fs-slide-title", "--fs-body")
 PART_MARKERS = tuple(f"Part {n}" for n in range(1, 8))
@@ -80,7 +83,10 @@ class TestStyleContract:
 
     def test_describes_by_design_not_brand(self, path: Path) -> None:
         html = path.read_text(encoding="utf-8")
-        for word in BRAND_WORDS:
+        words = BRAND_WORDS
+        if path.stem.startswith("aws-"):  # AWS-themed styles may name AWS — this is an AWS repository
+            words = tuple(w for w in words if w not in ("Amazon", "AWS"))
+        for word in words:
             assert not re.search(rf"\b{word}\b", html), f"{path.stem}: names '{word}'"
         assert not re.search(r"\bAI\b", html.split("<body", 1)[-1]), f"{path.stem}: defines itself against 'AI'"
 
