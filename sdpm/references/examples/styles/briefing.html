@@ -35,8 +35,8 @@
   --shadow-sm:none;
   --margin-x:120px;
   --content-w:1680px;
-  --content-top:330px;
-  --bar-h:260px}
+  --content-top:350px;
+  --bar-h:240px}
 * {
   box-sizing:border-box}
 body {
@@ -838,1518 +838,377 @@ body {
 .palette-rules li {
   font-size:calc(var(--fs-caption)*1.5);
   line-height:1.35}
+
+.el.check-item,.el.dont-item,.el.para,.el.sec-head,.el.gauge,.el.donut,.el.hbar,.el.divider-label,.el.key-band,.el.col-card,.el.col-band,.el.effect-band,.el.topbar,.el.row-item { position:absolute}
+.tc-1 { width:480px; padding-left:24px}
+.tc { width:400px}
+.gauge-42 { --val:42}
+.h300 { height:300px}
+.h258 { height:258px}
+.h350 { height:350px}
 </style>
 </head>
 <body>
-<!-- Part 0: This metadata identifies the briefing style and states the design decisions that govern the entire document. -->
-<!-- Part 1: This section introduces the style with a cover that demonstrates its dark ground, sharp edge, and restrained teal accent. -->
-<!-- Type: cover. The cover uses one vertical accent rule, a short title, and generous open space so structure—not decoration—sets the tone. -->
+
+<!-- Part 1: Cover -->
+<!-- Slide type: cover — a 3 px accent bar at the left edge, a small label, the deck title and one line of intent. Nothing else; the cover states the system by restraint. -->
 <div class="slide slide-dark">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:1080px;">
-  </div>
-  <div class="el t-label c-accent" style="left:120px;top:330px;width:1000px;height:36px;">BUNDLED STYLE
-  </div>
-  <div class="el t-cover-title" style="left:120px;top:390px;width:1500px;height:135px;">Briefing
-  </div>
-  <div class="el t-body c-muted" style="left:120px;top:560px;width:1250px;height:130px;">A dark style that speaks through spacing and rules.<br>Structure the information; do not decorate it.
-  </div>
-  <div class="el t-caption" style="left:120px;top:920px;width:1200px;height:45px;">Dark ground / one teal accent / direct claims / no shadows
-  </div>
+  <div class="el frame-accent" style="left:0px; top:0px; width:3px; height:1080px;"></div>
+  <div class="el t-label c-accent" style="left:120px; top:380px; width:800px; height:36px;">Bundled style</div>
+  <div class="el t-cover-title" style="left:120px; top:430px; width:1400px; height:130px;">Briefing</div>
+  <div class="el lead c-muted" style="left:120px; top:590px; width:1400px; height:120px;">A dark style that speaks through spacing and rules. Structure the information; do not decorate it.</div>
+  <div class="el t-caption" style="left:120px; top:920px; width:1400px; height:50px;">Dark ground · one teal accent · noun-phrase titles with a topic sentence · no cards</div>
 </div>
-<!-- Part 2: This section gives the composer the highest-priority rules for preserving the style and explains why each rule matters. -->
-<!-- Type: rules. The two columns separate required practices from prohibited practices, while the plain-text closing states the style philosophy without enclosing it. -->
+
+<!-- Part 2: Rules -->
+<!-- Slide type: design decision and the rules that follow — read first. Two open columns divided by a hairline; each rule carries its reason so a composer can decide unlisted cases the same way. -->
 <div class="slide slide-dark">
-  <div class="el t-slide-title" style="left:120px;top:55px;width:1680px;height:192px;">Core rules of this style
-  </div>
-  <div class="el frame-accent" style="left:120px;top:255px;width:120px;height:3px;">
-  </div>
-  <!-- The left column states the practices that make each claim readable at presentation distance. -->
-  <div class="el label-head accent" style="left:120px;top:310px;width:760px;height:55px;">DO — because the room must scan the claim
-  </div>
-  <div class="el" style="left:120px;top:385px;width:760px;height:595px;">
-    <div class="check-item t-body">State the claim directly below the title.
-    </div>
-    <div class="check-item t-body">Separate fields with rules, labels, and space.
-    </div>
-    <div class="check-item t-body">Lead with concise icon-and-text rows.
-    </div>
-    <div class="check-item t-body">Set numbers large and units small.
-    </div>
-    <div class="check-item t-body">Use one accent in one or two places.
-    </div>
-    <div class="check-item t-body">Whitespace is structure; remove content to keep 5% margins.
-    </div>
-  </div>
-  <!-- The vertical rule separates the two lists without enclosing either one in a card. -->
-  <div class="el rule-h" style="left:960px;top:310px;width:1px;height:660px;">
-  </div>
-  <!-- The right column prohibits signals that compete with the title-topic pair or weaken the visual hierarchy. -->
-  <div class="el label-head c-danger" style="left:1040px;top:310px;width:760px;height:55px;">DO NOT — because extra signals dilute order
-  </div>
-  <div class="el" style="left:1040px;top:385px;width:760px;height:595px;">
-    <div class="dont-item t-body">Never show a label without its claim.
-    </div>
-    <div class="dont-item t-body">Do not rely on cards; use bands, rules, washed panels, and space.
-    </div>
-    <div class="dont-item t-body">Use neither emoji nor shadows.
-    </div>
-    <div class="dont-item t-body">Keep titles short and fields open.
-    </div>
-    <div class="dont-item t-body">Vary each slide’s composition.
-    </div>
-    <div class="dont-item t-body">Use direct terms, not metaphor.
-    </div>
-  </div>
-  <!-- The closing philosophy remains plain text below a rule because the style does not box its final implication. -->
-  <div class="el rule-h" style="left:120px;top:990px;width:1680px;height:1px;">
-  </div>
-  <div class="el t-body c-muted" style="left:120px;top:1005px;width:1680px;height:70px;">Do not enclose—<b class="c-accent">separate</b>. Do not pack—<b class="c-accent">open space</b>. Do not decorate—<b class="c-accent">align</b>.
-  </div>
-  <div class="el source-line" style="left:600px;top:260px;width:1200px;height:32px;">Contrast: 4.5:1 for text; 3:1 at 18pt and above.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">01</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Rules · read first</div><div class="tb-title">Core rules of this style</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">The speaker explains; the slide states the claim and shows the evidence.</div>
+  <div class="el label-head" style="left:120px; top:350px; width:790px; height:44px;">Do — because the room scans before it reads</div>
+  <div class="el check-item t-body" style="left:120px; top:410px; width:790px; height:176px;">Put the claim under the title.<span class="sub-line">A re-reader gets the point without the speaker.</span></div>
+  <div class="el check-item t-body" style="left:120px; top:580px; width:790px; height:176px;">Separate with rules and space.<span class="sub-line">Structure comes from alignment, not from boxes.</span></div>
+  <div class="el check-item t-body" style="left:120px; top:750px; width:790px; height:176px;">Numbers large, units small.<span class="sub-line">The value is read from the back row; the unit up close.</span></div>
+  <div class="el rule-h" style="left:960px; top:350px; width:1px; height:560px;"></div>
+  <div class="el label-head" style="left:1010px; top:350px; width:790px; height:44px;">Do not — because extra signals dilute the order</div>
+  <div class="el dont-item t-body" style="left:1010px; top:410px; width:790px; height:176px;">No cards; bands, rules, space.<span class="sub-line">Cards fragment one argument into tiles read out of order.</span></div>
+  <div class="el dont-item t-body" style="left:1010px; top:580px; width:790px; height:176px;">No 2nd accent, shadows, emoji.<span class="sub-line">Dark grounds muddy depth effects; one accent means one focus.</span></div>
+  <div class="el dont-item t-body" style="left:1010px; top:750px; width:790px; height:176px;">No topic labels or questions.<span class="sub-line">A decision room is given positions, not prompts.</span></div>
+  <div class="el rule-h" style="left:120px; top:930px; width:1680px; height:1px;"></div>
+  <div class="el t-body" style="left:120px; top:950px; width:1680px; height:62px;">Do not enclose — <span class="em-accent">separate</span>. Do not pack — <span class="em-accent">leave space</span>. Do not decorate — <span class="em-accent">align</span>.</div>
 </div>
-<!-- Part 3: This section defines message discipline, title grammar, spoken-versus-printed language, and the outline contract used before composition. -->
-<!-- Type: message 1/3. This slide uses three unboxed columns in a fact-to-consequence sequence, then closes with a centred plain-text assertion and one highlight. -->
+
+<!-- Part 3: Message & Outline -->
+<!-- Slide type: message discipline — three columns in lime's "fact → ▼ → implication" form: the rule above, its consequence below, the closing line as plain centred text with one highlighted phrase. -->
 <div class="slide slide-dark">
-  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">One-direction message depth
-  </div>
-  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
-  </div>
-  <div class="el lead" style="left:120px;top:265px;width:1680px;height:120px;">Every slide has a title and topic sentence, begins with facts, and ends with an implication.
-  </div>
-  <!-- Three unboxed columns move from the reason for each discipline through a downward arrow to its practical consequence. -->
-  <div class="el rule-h" style="left:670px;top:385px;width:1px;height:555px;">
-  </div>
-  <div class="el rule-h" style="left:1250px;top:385px;width:1px;height:555px;">
-  </div>
-  <!-- The first column explains why a noun label needs a complete topic sentence directly beneath it. -->
-  <div class="el t-label c-accent" style="left:120px;top:385px;width:520px;height:38px;">RULE 1 — STATE THE CLAIM
-  </div>
-  <div class="el t-body" style="left:120px;top:445px;width:520px;height:250px;">A short title label states no claim, so the reader must supply “so what?”
-  </div>
-  <div class="el arrow-v" style="left:360px;top:710px;width:24px;height:14px;">
-  </div>
-  <div class="el t-body" style="left:120px;top:750px;width:520px;height:190px;">Put a subject-and-predicate claim below the title; never make a label-only slide.
-  </div>
-  <div class="el t-label c-accent" style="left:700px;top:385px;width:520px;height:38px;">RULE 2 — ORDER BY DEPTH
-  </div>
-  <div class="el t-body" style="left:700px;top:445px;width:520px;height:250px;">Place facts above and interpretation below, so depth increases down the page.
-  </div>
-  <div class="el arrow-v" style="left:940px;top:710px;width:24px;height:14px;">
-  </div>
-  <div class="el t-body" style="left:700px;top:750px;width:520px;height:190px;">Do not state an implication without visible evidence above to support it.
-  </div>
-  <div class="el t-label c-accent" style="left:1280px;top:385px;width:520px;height:38px;">RULE 3 — COMPRESS
-  </div>
-  <div class="el t-body" style="left:1280px;top:445px;width:520px;height:250px;">Lead with the conclusion, cut dispensable words, and never repeat a point.
-  </div>
-  <div class="el arrow-v" style="left:1520px;top:710px;width:24px;height:14px;">
-  </div>
-  <div class="el t-body" style="left:1280px;top:750px;width:520px;height:190px;">A sentence that wraps because it carries two claims is a signal to split the slide.
-  </div>
-  <!-- The slide closes with a centred plain statement and a single highlight instead of a conclusion band. -->
-  <div class="el rule-h" style="left:520px;top:960px;width:880px;height:1px;">
-  </div>
-  <div class="el t-heading text-center" style="left:120px;top:980px;width:1680px;height:80px;">Read only the topic sentences in order; they must form
-    <span class="em-mark">one continuous argument</span>.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">02</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Message discipline</div><div class="tb-title">One-direction message depth</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Title, topic sentence, facts, one implication — read top-left to bottom-right.</div>
+  <div class="el label-head" style="left:120px; top:360px; width:520px; height:44px;">Rule 1 — state the claim</div>
+  <div class="el t-body" style="left:120px; top:430px; width:520px; height:186px;">A title alone names a topic. The topic sentence says what to conclude.</div>
+  <div class="el varrow" style="left:370px; top:640px; width:20px; height:12px;"></div>
+  <div class="el t-body c-muted" style="left:120px; top:680px; width:520px; height:186px;">Never ship a label-only slide. If there is no claim, there is no slide.</div>
+  <div class="el label-head" style="left:700px; top:360px; width:520px; height:44px;">Rule 2 — order by depth</div>
+  <div class="el t-body" style="left:700px; top:430px; width:520px; height:186px;">Facts first, interpretation below. Depth grows down the page, never sideways.</div>
+  <div class="el varrow" style="left:950px; top:640px; width:20px; height:12px;"></div>
+  <div class="el t-body c-muted" style="left:700px; top:680px; width:520px; height:186px;">An implication without visible evidence above it is a claim the room cannot check.</div>
+  <div class="el label-head" style="left:1280px; top:360px; width:520px; height:44px;">Rule 3 — compress</div>
+  <div class="el t-body" style="left:1280px; top:430px; width:520px; height:186px;">Lead with the conclusion, cut dispensable words, never repeat a point.</div>
+  <div class="el varrow" style="left:1530px; top:640px; width:20px; height:12px;"></div>
+  <div class="el t-body c-muted" style="left:1280px; top:680px; width:520px; height:186px;">A sentence that wraps because it carries two claims is a signal to split the slide.</div>
+  <div class="el t-heading text-center" style="left:120px; top:910px; width:1680px; height:60px;">Read only the topic sentences in order; they must form <span class="em-mark">one continuous argument</span>.</div>
 </div>
-<!-- Type: message 2/3. This slide uses bordered label heads over two aligned panels, then resolves the rule through two dark chips between plain-text statements. -->
+
+<!-- Slide type: wording discipline — noun-phrase titles, spoken versus written register. Solid-border panel = adopted, dashed danger border = rejected (lime's × / 採用 pairing). -->
 <div class="slide slide-dark">
-  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">Emphasis through colour and voice
-  </div>
-  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
-  </div>
-  <div class="el lead" style="left:120px;top:265px;width:1680px;height:120px;">Write the most important sentence in the most readable colour; keep spoken prompts off the page.
-  </div>
-  <!-- The two aligned panels pair bordered label heads with explanatory text so colour and voice can be compared without cards. -->
-  <div class="el rule-h" style="left:960px;top:385px;width:1px;height:330px;">
-  </div>
-  <div class="el sec-head bd-accent" style="left:120px;top:385px;width:760px;height:70px;">The topic sentence uses
-  </div>
-  <div class="el t-body" style="left:120px;top:485px;width:760px;height:220px;">
-    <span class="em">the full text colour</span>. Use muted text only for a qualifying phrase; muting the whole claim makes it disappear.
-  </div>
-  <div class="el sec-head bd-accent" style="left:1040px;top:385px;width:760px;height:70px;">The printed voice uses
-  </div>
-  <div class="el t-body" style="left:1040px;top:485px;width:760px;height:220px;">formal written language. Questions and invitations belong in notes; the page carries a direct statement.
-  </div>
-  <!-- The closing sequence places two outcomes in restrained dark chips between plain-text setup and qualification. -->
-  <div class="el t-body text-center" style="left:120px;top:755px;width:1680px;height:68px;">This discipline keeps
-  </div>
-  <div class="el bg-surface t-body bold text-center flex items-center justify-center" style="left:160px;top:825px;width:780px;height:80px;">the conclusion visible first
-  </div>
-  <div class="el bg-surface t-body bold text-center flex items-center justify-center" style="left:980px;top:825px;width:780px;height:80px;">the reading path unambiguous
-  </div>
-  <div class="el t-body text-center" style="left:120px;top:935px;width:1680px;height:75px;">Qualify uncertainty directly with “the evidence indicates” rather than vague emphasis.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">03</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Wording discipline</div><div class="tb-title">Title grammar and register</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Titles are formal noun phrases. The claim lives in the topic sentence, not in the title.</div>
+  <div class="el bd-danger" style="left:120px; top:360px; width:800px; height:340px;"></div>
+  <div class="el t-label c-danger" style="left:150px; top:385px; width:740px; height:36px;">Not used as titles</div>
+  <div class="el t-body c-muted" style="left:150px; top:440px; width:740px; height:250px;">"Should we migrate this quarter?"<br>"Let's talk about cost"<br>"Some thoughts on the roadmap"</div>
+  <div class="el bd-accent" style="left:1000px; top:360px; width:800px; height:340px;"></div>
+  <div class="el t-label c-accent" style="left:1030px; top:385px; width:740px; height:36px;">Adopted</div>
+  <div class="el t-body" style="left:1030px; top:440px; width:740px; height:250px;">Migration timing<br>Operating cost structure after migration<br>Roadmap priorities for the next two quarters</div>
+  <div class="el label-head" style="left:120px; top:740px; width:800px; height:44px;">Spoken register (default)</div>
+  <div class="el t-body" style="left:120px; top:805px; width:800px; height:124px;">Short lines; the voice carries detail. ≤ 40 words per slide.</div>
+  <div class="el label-head" style="left:1000px; top:740px; width:800px; height:44px;">Written register (read alone)</div>
+  <div class="el t-body" style="left:1000px; top:805px; width:800px; height:124px;">Fuller sentences and notes; ≤ 90 words. Same frame, same patterns.</div>
+  <div class="el t-heading text-center" style="left:120px; top:955px; width:1680px; height:60px;">What is said out loud is <span class="em-mark">not printed</span>; what is printed must stand without the speaker.</div>
 </div>
-<!-- Type: message 3/3. A solid panel marks language to use, a dashed panel marks language to reject, and a plain-text close reinforces the unambiguous choice. -->
+
+<!-- Slide type: outline contract for the orchestrator — deck length, density and how the one-sentence outline maps onto noun-phrase titles. Read before writing specs/outline.md. -->
 <div class="slide slide-dark">
-  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">Direct nouns and unambiguous statements
-  </div>
-  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
-  </div>
-  <div class="el lead" style="left:120px;top:265px;width:1680px;height:85px;">The slide is a document the audience may revisit, not a transcript of the presenter.
-  </div>
-  <!-- The solid upper panel marks direct language that names the subject itself and is approved for the page. -->
-  <div class="el bd-accent" style="left:120px;top:380px;width:1680px;height:240px;">
-  </div>
-  <div class="el t-heading" style="left:180px;top:415px;width:1560px;height:60px;">Write about
-    <span class="em-sub">the subject itself</span>.
-  </div>
-  <div class="el t-body c-accent" style="left:180px;top:495px;width:1560px;height:190px;">• One distribution or coordination decision<br>• Working flow demonstration<br>• Implementation issues and mitigations
-  </div>
-  <!-- The dashed lower panel marks meeting narration and metaphor that must be kept off the printed slide. -->
-  <div class="el bd-danger" style="left:120px;top:655px;width:1680px;height:230px;">
-  </div>
-  <div class="el t-heading" style="left:180px;top:690px;width:1560px;height:60px;">Do
-    <span class="em-danger">not</span> narrate the meeting or use metaphor.
-  </div>
-  <div class="el t-body c-muted" style="left:180px;top:765px;width:760px;height:150px;">• Today is for finding a direction<br>• Experience the demonstration
-  </div>
-  <div class="el t-body c-muted" style="left:1000px;top:765px;width:740px;height:150px;">• Hidden traps or silver bullets<br>• Gravity, foundations, or iron rules
-  </div>
-  <!-- The final plain-text sentence states the selection test and highlights only the required property. -->
-  <div class="el t-heading text-center" style="left:120px;top:925px;width:1680px;height:85px;">Choose direct words that retain
-    <span class="em-mark">one meaning when read later</span>.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">04</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Outline contract</div><div class="tb-title">Deck shape for this style</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Outline claims stay one sentence; the composer adds a noun-phrase title above each.</div>
+  <div class="el t-metric c-accent" style="left:120px; top:370px; width:400px; height:84px;">10–16</div>
+  <div class="el t-caption" style="left:120px; top:464px; width:400px; height:150px;">slides for a 20-minute briefing, one claim each</div>
+  <div class="el t-metric c-accent" style="left:600px; top:370px; width:400px; height:84px;">≤ 40 / 90</div>
+  <div class="el t-caption" style="left:600px; top:464px; width:400px; height:150px;">words per slide, spoken / written register</div>
+  <div class="el t-metric c-accent" style="left:1080px; top:370px; width:700px; height:84px;">1 sentence</div>
+  <div class="el t-caption" style="left:1080px; top:464px; width:700px; height:150px;">topic sentence: subject + verb + implication, one line</div>
+  <div class="el rule-h" style="left:120px; top:640px; width:1680px; height:1px;"></div>
+  <div class="el t-body" style="left:120px; top:670px; width:800px; height:250px;"><span class="em-accent">Chapter shape.</span> Open with the strongest claim, not an agenda. A divider with an oversized number marks each section. Close on one plain-text implication.</div>
+  <div class="el t-body" style="left:1000px; top:670px; width:800px; height:250px;"><span class="em-accent">Visual forms.</span> Numbers: problem → outcome. Comparison: two halves. Process: chevrons. Relationship: cycle or stages. Text: paragraph bars.</div>
+  <div class="el source-line" style="left:120px; top:985px; width:1400px; height:30px;">Outline format is unchanged (`- [slug] claim`); only the rendering of the title row differs in this style.</div>
 </div>
-<!-- Type: wording 1/2. Three title conditions lead to a dashed avoid panel and a solid use panel, followed by a plain-text conclusion with one highlight. -->
+
+<!-- Part 4: Palette -->
+<!-- Slide type: palette with usage rules — six swatches, three text-on-fill pairs, and the rule for when the two meaning colours may appear. Only these colours exist in this style. -->
 <div class="slide slide-dark">
-  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">Title grammar standards
-  </div>
-  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
-  </div>
-  <div class="el lead" style="left:120px;top:265px;width:1680px;height:116px;">A display title is a formal noun phrase derived from the outline claim, not a copied question or conversational sentence.
-  </div>
-  <!-- Three unboxed columns define the complete title grammar before the avoid-and-use examples appear. -->
-  <div class="el t-heading" style="left:120px;top:375px;width:500px;height:80px;">
-    <span class="em-accent">1</span> Noun phrase
-  </div>
-  <div class="el t-caption" style="left:120px;top:455px;width:500px;height:100px;">Use a noun phrase so no question or invitation is printed.
-  </div>
-  <div class="el rule-h" style="left:660px;top:375px;width:1px;height:140px;">
-  </div>
-  <div class="el t-heading" style="left:700px;top:375px;width:500px;height:80px;">
-    <span class="em-accent">2</span> Formal vocabulary
-  </div>
-  <div class="el t-caption" style="left:700px;top:455px;width:500px;height:100px;">Use formal terms that name the model, role, or condition.
-  </div>
-  <div class="el rule-h" style="left:1240px;top:375px;width:1px;height:140px;">
-  </div>
-  <div class="el t-heading" style="left:1280px;top:375px;width:520px;height:80px;">
-    <span class="em-accent">3</span> No rhetoric
-  </div>
-  <div class="el t-caption" style="left:1280px;top:455px;width:520px;height:100px;">Remove rhetoric and suspense punctuation from the title.
-  </div>
-  <!-- The dashed left panel shows outline questions and conversational language that must not be copied into display titles. -->
-  <div class="el bd-danger" style="left:120px;top:550px;width:810px;height:300px;">
-  </div>
-  <div class="el t-heading" style="left:170px;top:585px;width:710px;height:60px;">
-    <span class="em-danger">Avoid</span> — copied outline language
-  </div>
-  <div class="el t-body c-muted" style="left:170px;top:670px;width:710px;height:190px;">Can we reduce review time?<br>Let us compare the two options<br>What does this mean for delivery?
-  </div>
-  <!-- The solid right panel translates the same issues into formal noun phrases suitable for display titles. -->
-  <div class="el bd-accent" style="left:990px;top:550px;width:810px;height:300px;">
-  </div>
-  <div class="el t-heading" style="left:1040px;top:585px;width:710px;height:60px;">
-    <span class="em-sub">Use</span> — a formal noun phrase
-  </div>
-  <div class="el t-body c-accent" style="left:1040px;top:670px;width:710px;height:190px;">Measured reduction in review time<br>Comparison of operating options<br>Delivery implications and conditions
-  </div>
-  <div class="el t-heading text-center" style="left:120px;top:910px;width:1680px;height:90px;">The title names the issue; the topic sentence
-    <span class="em-mark">states its claim</span>.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">05</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Palette</div><div class="tb-title">Neutral scale plus one teal accent</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Teal takes one role per slide; success and danger only for a stated outcome or risk.</div>
+  <div class="el bg-accent" style="left:120px; top:360px; width:260px; height:110px;"></div>
+  <div class="el t-caption" style="left:120px; top:480px; width:260px; height:150px;">Accent<br>#11A497<br>one role</div>
+  <div class="el bg-surface" style="left:404px; top:360px; width:260px; height:110px;"></div>
+  <div class="el t-caption" style="left:404px; top:480px; width:260px; height:150px;">Surface<br>#161B22<br>bands, panels</div>
+  <div class="el wash-accent" style="left:688px; top:360px; width:260px; height:110px;"></div>
+  <div class="el t-caption" style="left:688px; top:480px; width:260px; height:150px;">Wash<br>#1C222B<br>key metric</div>
+  <div class="el bd-accent" style="left:972px; top:360px; width:260px; height:110px;"></div>
+  <div class="el t-caption" style="left:972px; top:480px; width:260px; height:150px;">Text #E6EDF3<br>Muted #8B949E<br>Border #30363D</div>
+  <div class="el c-success t-metric" style="left:1256px; top:370px; width:260px; height:84px;">■</div>
+  <div class="el t-caption" style="left:1256px; top:480px; width:260px; height:150px;">Success<br>#5BC455<br>stated outcome</div>
+  <div class="el c-danger t-metric" style="left:1540px; top:370px; width:260px; height:84px;">■</div>
+  <div class="el t-caption" style="left:1540px; top:480px; width:260px; height:150px;">Danger<br>#FF7E5B<br>stated risk</div>
+  <div class="el rule-h" style="left:120px; top:660px; width:1680px; height:1px;"></div>
+  <div class="el bg-accent t-body text-center" style="left:120px; top:700px; width:380px; height:80px;">Dark text on accent</div>
+  <div class="el bg-surface t-body text-center" style="left:530px; top:700px; width:380px; height:80px;">Light text on surface</div>
+  <div class="el t-body" style="left:1000px; top:700px; width:800px; height:250px;">The accent goes to one of: the section number, a filled header band, one metric, the current item. Never muted text on a coloured fill.</div>
 </div>
-<!-- Type: wording 2/2. The dashed upper panel holds language that must remain spoken, while the solid lower panel pairs printable wording with speaker-note prompts. -->
+
+<!-- Part 5: Typography -->
+<!-- Slide type: type ramp at real slide size — each row shows the size as it will appear in the PPTX, with token, pt and line height. Composers pick from these tokens only. -->
 <div class="slide slide-dark">
-  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">Separation of printed and spoken language
-  </div>
-  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
-  </div>
-  <div class="el lead" style="left:120px;top:265px;width:1680px;height:120px;">A hypothesis may be asked aloud, but the slide records the precise subject and current position.
-  </div>
-  <!-- The dashed upper panel contains questions and calls to the room that belong in live speech, not on the page. -->
-  <div class="el bd-danger" style="left:120px;top:380px;width:1680px;height:210px;">
-  </div>
-  <div class="el t-heading" style="left:180px;top:415px;width:1560px;height:60px;">Do
-    <span class="em-danger">not print</span> questions or calls to the room.
-  </div>
-  <div class="el t-body c-muted" style="left:180px;top:495px;width:1560px;height:80px;">“Would this handoff work here?” / “How much could this role own?” / “Any reactions?”
-  </div>
-  <!-- The solid lower panel pairs printable noun phrases with conversational prompts that belong in speaker notes. -->
-  <div class="el bd-accent" style="left:120px;top:625px;width:1680px;height:250px;">
-  </div>
-  <div class="el t-heading" style="left:180px;top:660px;width:1560px;height:60px;">Print a
-    <span class="em-sub">noun phrase or short assertion</span>; place the question in speaker notes.
-  </div>
-  <div class="el t-body c-accent" style="left:180px;top:745px;width:760px;height:130px;">Printed: expected operating model<br>Printed: ownership after handoff
-  </div>
-  <div class="el t-body c-muted" style="left:1000px;top:745px;width:740px;height:130px;">Notes: “Would this work here?”<br>Notes: “How much could this role own?”
-  </div>
-  <!-- The closing sentence states that the printed page survives alone while dialogue remains spoken. -->
-  <div class="el t-heading text-center" style="left:120px;top:930px;width:1680px;height:80px;">The printed page works alone;
-    <span class="em-mark">dialogue remains spoken</span>.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">06</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Typography</div><div class="tb-title">Five sizes carry the hierarchy</div></div></div>
+  <div class="el t-slide-title" style="left:120px; top:300px; width:1100px; height:96px;">Slide title in a noun phrase</div>
+  <div class="el t-caption mono" style="left:1300px; top:320px; width:500px; height:50px;">--fs-slide-title 40pt</div>
+  <div class="el t-heading" style="left:120px; top:420px; width:1100px; height:60px;">Heading or topic sentence, semibold</div>
+  <div class="el t-caption mono" style="left:1300px; top:426px; width:500px; height:50px;">--fs-heading 20pt</div>
+  <div class="el t-body" style="left:120px; top:500px; width:1100px; height:62px;">Body text, short lines, generous leading.</div>
+  <div class="el t-caption mono" style="left:1300px; top:506px; width:500px; height:50px;">--fs-body 20pt</div>
+  <div class="el t-caption" style="left:120px; top:585px; width:1100px; height:50px;">Caption and supporting detail, muted.</div>
+  <div class="el t-caption mono" style="left:1300px; top:585px; width:500px; height:50px;">--fs-caption 17pt</div>
+  <div class="el t-label c-accent" style="left:120px; top:660px; width:1100px; height:36px;">Label, uppercase, tracked</div>
+  <div class="el t-caption mono" style="left:1300px; top:654px; width:500px; height:50px;">--fs-label 12pt</div>
+  <div class="el rule-h" style="left:120px; top:730px; width:1680px; height:1px;"></div>
+  <div class="el t-metric-lg c-accent" style="left:120px; top:770px; width:420px; height:120px;">-67%</div>
+  <div class="el t-caption mono" style="left:1300px; top:790px; width:500px; height:100px;">--fs-metric-lg 56pt<br>--fs-metric 40pt</div>
+  <div class="el source-line" style="left:120px; top:985px; width:1400px; height:30px;">Line heights: title 1.2 · heading 1.4 · body 1.55 · caption 1.45. Never shrink to fit — edit, split, or change the form.</div>
 </div>
-<!-- Type: outline. This instruction slide tells the orchestrator how to shape a 20-minute deck and tells the composer how to preserve each claim in the title-topic pair. -->
+
+<!-- Part 6: Frame -->
+<!-- Slide type: the standard frame — topbar (accent bar, section number, label, two-line title zone), topic sentence, content region, source line. Page numbers belong to the template and are never drawn. -->
 <div class="slide slide-dark">
-  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">Outline claims become title-topic pairs
-  </div>
-  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
-  </div>
-  <div class="el lead" style="left:120px;top:265px;width:1680px;height:120px;">The orchestrator keeps each outline entry as one sentence claim; the composer splits its display without changing meaning.
-  </div>
-  <!-- The left column gives the orchestrator a complete chapter shape, slide range, and title-topic transformation contract. -->
-  <div class="el label-head accent" style="left:120px;top:390px;width:790px;height:55px;">STRUCTURE
-  </div>
-  <div class="el t-body" style="left:120px;top:465px;width:790px;height:430px;">A 20-minute talk uses 10–16 slides in two to four chapters.<br>Open with context and close with implication; add a divider and mini map for three chapters.<br>Keep each outline as one claim; display it as a noun title and topic sentence.
-  </div>
-  <div class="el rule-h" style="left:960px;top:390px;width:1px;height:500px;">
-  </div>
-  <!-- The right column distinguishes spoken and read-alone density and maps each reasoning need to a preferred visual form. -->
-  <div class="el label-head accent" style="left:1040px;top:390px;width:760px;height:55px;">DENSITY AND VISUALS
-  </div>
-  <div class="el t-caption" style="left:1040px;top:465px;width:760px;height:430px;">Spoken decks use 25–45 words and notes; read-alone decks use 60–90 words and larger boxes.<br>Use direct metrics for numbers, matched halves for comparisons, chevrons for process, and swimlanes for ownership.<br>Use cycles for recurrence and prose for chronology; avoid decorative networks and empty grids.
-  </div>
-  <!-- The vertical test verifies that the sequence of title-topic pairs forms one argument before composition begins. -->
-  <div class="el effect-band" style="left:120px;top:920px;width:1680px;height:145px;">
-    <div class="eb-label">VERTICAL TEST
-    </div>
-    <div class="eb-item t-body">Read every title-topic pair in order; together they must form one continuous argument.
-    </div>
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">07</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Frame</div><div class="tb-title">Title band, topic sentence, content, source</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">The topic sentence sits here, at y = 262, one line. Content starts at y = 350 on every slide.</div>
+  <div class="el bd-accent" style="left:120px; top:350px; width:1680px; height:600px;"></div>
+  <div class="el t-label c-accent" style="left:150px; top:380px; width:800px; height:36px;">Content region · x 120–1800 · y 350–950</div>
+  <div class="el t-body" style="left:150px; top:440px; width:760px; height:250px;">Topbar: 0–240 px; the title box holds two lines at 40pt (192 px). One-line titles leave the second line empty — content never moves up.</div>
+  <div class="el t-body" style="left:960px; top:440px; width:800px; height:250px;">Divide this region with hairlines and filled header bands. Columns: 2 × 800 (rule at x 960), 3 × 520 (gap 60), 4 × 390 (gap 40).</div>
+  <div class="el t-body c-muted" style="left:150px; top:740px; width:1600px; height:124px;">The source line is content: draw it at y = 985 when the slide cites something. The page number is the template's — leave the bottom-right corner empty.</div>
+  <div class="el source-line" style="left:120px; top:985px; width:1400px; height:30px;">Source: where the facts on this slide come from</div>
 </div>
-<!-- Part 4: This section assigns every colour a semantic role and limits accents so the reading order remains deliberate. -->
-<!-- Type: palette. The swatch row defines approved roles, and the three rule columns explain permitted use, prohibited multiplication, and contrast-safe text pairs. -->
+
+<!-- Part 7: Patterns -->
+<!-- Pattern: numbers — WHY: the problem is stated in numbers on the left, the outcome in larger numbers on the right, so the eye moves from cause to result in one sweep. The outcome field is wider because it is the claim; the problem is context. Vary the values and labels, never the left-to-right direction or the size hierarchy. -->
 <div class="slide slide-dark">
-  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">Colour palette
-  </div>
-  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
-  </div>
-  <div class="el lead" style="left:120px;top:265px;width:1680px;height:120px;">Teal is the single main accent. Green and coral appear only when success or danger is part of the meaning.
-  </div>
-  <!-- The swatch band combines one teal accent, two semantic colours, and a neutral scale for text, fields, rules, and ground. -->
-  <div class="el flex" style="left:120px;top:390px;width:1680px;height:190px;">
-    <div class="row-item">
-      <div>
-        <div class="icon bg-accent">
-        </div>
-        <div class="t-label">ACCENT
-        </div>
-        <div class="t-caption mono">#11A497
-        </div>
-      </div>
-      <div>
-        <div class="icon c-success">
-        </div>
-        <div class="t-label">SUCCESS
-        </div>
-        <div class="t-caption mono">#5BC455
-        </div>
-      </div>
-      <div>
-        <div class="icon c-danger">
-        </div>
-        <div class="t-label">DANGER
-        </div>
-        <div class="t-caption mono">#FF7E5B
-        </div>
-      </div>
-      <div>
-        <div class="icon">
-        </div>
-        <div class="t-label">TEXT
-        </div>
-        <div class="t-caption mono">#E6EDF3
-        </div>
-      </div>
-      <div>
-        <div class="icon">
-        </div>
-        <div class="t-label">MUTED
-        </div>
-        <div class="t-caption mono">#8B949E
-        </div>
-      </div>
-      <div>
-        <div class="icon">
-        </div>
-        <div class="t-label">SURFACE
-        </div>
-        <div class="t-caption mono">#161B22
-        </div>
-      </div>
-      <div>
-        <div class="icon">
-        </div>
-        <div class="t-label">WASH
-        </div>
-        <div class="t-caption mono">#1C222B
-        </div>
-      </div>
-      <div>
-        <div class="icon">
-        </div>
-        <div class="t-label">GROUND
-        </div>
-        <div class="t-caption mono">#0D1117
-        </div>
-      </div>
-    </div>
-  </div>
-  <!-- Three rule columns explain permitted roles, prohibited colour multiplication, and contrast-safe text pairs. -->
-  <div class="el sec-head-fill" style="left:120px;top:585px;width:500px;height:70px;">Use only these roles
-  </div>
-  <ul class="el bullets palette-rules" style="left:145px;top:680px;width:475px;height:250px;">
-    <li>Teal marks one decisive role.
-    </li>
-    <li>Neutrals build fields and text.
-    </li>
-    <li>Accent fill: one header or result.
-    </li>
-  </ul>
-  <div class="el rule-h" style="left:660px;top:585px;width:1px;height:285px;">
-  </div>
-  <div class="el sec-head-fill c-danger" style="left:700px;top:585px;width:500px;height:70px;">Do not multiply colour
-  </div>
-  <ul class="el bullets dash palette-rules" style="left:725px;top:680px;width:475px;height:250px;">
-    <li>Use one accent role.
-    </li>
-    <li>Green means stated success.
-    </li>
-    <li>Coral means risk or rejection.
-    </li>
-  </ul>
-  <div class="el rule-h" style="left:1240px;top:585px;width:1px;height:285px;">
-  </div>
-  <div class="el sec-head-fill" style="left:1280px;top:585px;width:520px;height:70px;">Approved text pairs
-  </div>
-  <div class="el t-body" style="left:1280px;top:680px;width:520px;height:250px;">Teal → dark text<br>Success → dark text<br>Danger → dark text<br>Surface / wash → light text
-  </div>
-  <!-- The final contrast rule applies to every rendered slide, not merely to the palette specimen. -->
-  <div class="el t-caption" style="left:120px;top:955px;width:1680px;height:105px;">Never put muted text on a coloured fill. Beyond ground and text, use only the minimum colour needed to distinguish content.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">08</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · numbers</div><div class="tb-title">Operating cost after the change</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Manual effort fell by two thirds; the freed hours went into improvement.</div>
+  <div class="el sec-head-fill" style="left:120px; top:360px; width:300px; height:70px;">Before</div>
+  <div class="el t-metric c-muted" style="left:120px; top:470px; width:600px; height:84px;">120 h</div>
+  <div class="el t-caption" style="left:120px; top:564px; width:600px; height:50px;">manual operations per month</div>
+  <div class="el t-metric c-muted" style="left:120px; top:660px; width:600px; height:84px;">9%</div>
+  <div class="el t-caption" style="left:120px; top:754px; width:600px; height:50px;">requests lost</div>
+  <div class="el rule-h" style="left:840px; top:360px; width:1px; height:480px;"></div>
+  <div class="el sec-head-fill" style="left:920px; top:360px; width:300px; height:70px;">After</div>
+  <div class="el wash-accent" style="left:920px; top:460px; width:880px; height:420px;"></div>
+  <div class="el t-metric-lg c-accent" style="left:960px; top:500px; width:400px; height:120px;">-67%</div>
+  <div class="el t-caption" style="left:960px; top:630px; width:400px; height:98px;">manual effort · 40 h / month</div>
+  <div class="el t-metric-lg c-accent" style="left:1400px; top:500px; width:380px; height:120px;">0</div>
+  <div class="el t-caption" style="left:1400px; top:630px; width:380px; height:98px;">requests lost</div>
+  <div class="el t-body" style="left:960px; top:740px; width:800px; height:124px;">Same twelve weeks, same request volume, same team.</div>
+  <div class="el t-body" style="left:120px; top:900px; width:1680px; height:60px;">The saving comes from <span class="em-accent">one shared procedure</span>, not from automation.</div>
 </div>
-<!-- Part 5: This section demonstrates the fixed typographic hierarchy at actual size and explains when each role carries the reading load. -->
-<!-- Type: typography. Full-size specimens align with their token names and measurements so the composer can reproduce the hierarchy without inventing intermediate sizes. -->
+
+<!-- Pattern: comparison 2-way — WHY: two halves share one vertical rule and identical row order, so the reader compares like with like without a table grid. Filled sub-heads name the sides; nothing is boxed. Vary the criteria, never the row order or the side that carries the accent. -->
 <div class="slide slide-dark">
-  <div class="el t-slide-title" style="left:120px;top:35px;width:1680px;height:192px;">Typography
-  </div>
-  <div class="el frame-accent" style="left:120px;top:235px;width:120px;height:3px;">
-  </div>
-  <div class="el lead" style="left:120px;top:255px;width:1680px;height:80px;">The fixed hierarchy is 40 / 20 / 17 / 14 / 12pt, with larger roles only for cover titles and metrics.
-  </div>
-  <!-- Each specimen appears at actual size on the left, while its token and measurement appear in a consistent right column. -->
-  <div class="el t-slide-title" style="left:120px;top:350px;width:1150px;height:105px;">Slide title 40
-  </div>
-  <div class="el t-caption mono" style="left:1300px;top:375px;width:500px;height:55px;">--fs-slide-title / 40pt
-  </div>
-  <div class="el rule-h" style="left:120px;top:455px;width:1680px;height:1px;">
-  </div>
-  <div class="el t-body" style="left:120px;top:475px;width:1150px;height:75px;"><b>Heading 20</b> / Body text 20 carries the reading load.
-  </div>
-  <div class="el t-caption mono" style="left:1300px;top:485px;width:500px;height:55px;">body / heading: 20pt
-  </div>
-  <div class="el rule-h" style="left:120px;top:560px;width:1680px;height:1px;">
-  </div>
-  <div class="el t-caption" style="left:120px;top:580px;width:1150px;height:60px;">Caption 17 qualifies evidence without competing with the claim.
-  </div>
-  <div class="el t-caption mono" style="left:1300px;top:580px;width:500px;height:55px;">--fs-caption / 17pt
-  </div>
-  <div class="el rule-h" style="left:120px;top:650px;width:1680px;height:1px;">
-  </div>
-  <div class="el t-label" style="left:120px;top:675px;width:1150px;height:50px;">UTILITY LABEL 12 / compact node text uses 14
-  </div>
-  <div class="el t-caption mono" style="left:1300px;top:675px;width:500px;height:55px;">label 12pt / mid 14pt
-  </div>
-  <div class="el rule-h" style="left:120px;top:745px;width:1680px;height:1px;">
-  </div>
-  <!-- The metric row demonstrates the only larger type roles permitted beyond the cover and standard hierarchy. -->
-  <div class="el flex items-center" style="left:120px;top:780px;width:1000px;height:130px;">
-    <span class="t-metric-lg c-accent">1,500</span>
-    <span class="t-metric c-accent">42%</span>
-    <span class="t-num c-accent">03</span>
-  </div>
-  <div class="el t-caption mono" style="left:1300px;top:790px;width:500px;height:110px;">metric-lg 56pt<br>metric 40pt / num 32pt
-  </div>
-  <!-- The final rule requires editing, enlarging the box, or splitting the slide instead of shrinking type. -->
-  <div class="el rule-h" style="left:120px;top:915px;width:1680px;height:1px;">
-  </div>
-  <div class="el t-body c-muted" style="left:120px;top:930px;width:1680px;height:125px;">Never shrink to fit: edit, enlarge, or split. Titles use at most two lines in 192px.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">09</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · comparison</div><div class="tb-title">Two operating models</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Shared ownership keeps one standard while leaving execution close to the work.</div>
+  <div class="el pill-head" style="left:120px; top:360px; width:520px; height:70px;">Central team</div>
+  <div class="el pill-head accent" style="left:1000px; top:360px; width:520px; height:70px;">Shared ownership</div>
+  <div class="el rule-h" style="left:960px; top:360px; width:1px; height:520px;"></div>
+  <div class="el t-caption" style="left:120px; top:470px; width:800px; height:50px;">Time to start</div>
+  <div class="el t-body" style="left:120px; top:520px; width:800px; height:62px;">4–6 weeks</div>
+  <div class="el t-body" style="left:1000px; top:520px; width:800px; height:62px;"><span class="em-accent">2–3 weeks</span></div>
+  <div class="el t-caption" style="left:120px; top:620px; width:800px; height:50px;">Local ownership</div>
+  <div class="el t-body" style="left:120px; top:670px; width:800px; height:62px;">Low</div>
+  <div class="el t-body" style="left:1000px; top:670px; width:800px; height:62px;"><span class="em-accent">Medium–high</span></div>
+  <div class="el t-caption" style="left:120px; top:770px; width:800px; height:50px;">Main trade-off</div>
+  <div class="el t-body" style="left:120px; top:820px; width:800px; height:62px;">Queue risk</div>
+  <div class="el t-body" style="left:1000px; top:820px; width:800px; height:62px;">Coordination load</div>
+  <div class="el t-body" style="left:120px; top:920px; width:1680px; height:60px;">Choose the right-hand model and name the coordinating owner in the meeting.</div>
 </div>
-<!-- Part 6: This section defines the production frame that every standard content slide must reproduce before selecting a content pattern. -->
-<!-- Type: frame. The fixed two-line title zone, stable content start, and footer contract keep evidence aligned even when a title occupies only one line. -->
+
+<!-- Pattern: process — WHY: a continuous chevron band shows irreversible order; the expected-effect band underneath ties each step to what it produces, so the process is read as a means, not a ritual. Vary the number of steps (3–5) and their labels; keep the band unbroken and the last chevron in the accent. -->
 <div class="slide slide-dark">
-  <!-- The topbar reserves the same number, rule, section label, and two-line title zone on every standard content slide. -->
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">06
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">SECTION / FRAME
-      </div>
-      <div class="tb-title">Two-line title zone preserves a fixed<br>content start on every page
-      </div>
-    </div>
-  </div>
-  <!-- The topic sentence begins below the fixed title zone and never rises to consume an unused title line. -->
-  <div class="el lead" style="left:120px;top:290px;width:1680px;height:80px;">A one-line title leaves the second line empty; evidence never moves upward to fill it.
-  </div>
-  <!-- The outlined specimen marks the safe content region and demonstrates the fixed geometry in complete sentences. -->
-  <div class="el bd-accent" style="left:120px;top:400px;width:1680px;height:480px;">
-  </div>
-  <div class="el t-label c-accent" style="left:160px;top:435px;width:900px;height:35px;">CONTENT REGION / X 120–1800 / Y 330–970
-  </div>
-  <div class="el sec-head" style="left:160px;top:515px;width:700px;height:65px;">Fixed production geometry
-  </div>
-  <div class="el t-body" style="left:160px;top:605px;width:700px;height:310px;">Draw a 3px left accent.<br>Reserve 260px for the topbar.<br>Set the 40pt title in a 192px zone.<br>Use at most two title lines.<br>Start content at y=330 or below.
-  </div>
-  <div class="el rule-h" style="left:960px;top:515px;width:1px;height:310px;">
-  </div>
-  <div class="el sec-head sub" style="left:1040px;top:515px;width:700px;height:65px;">Footer contract
-  </div>
-  <div class="el t-body" style="left:1040px;top:605px;width:700px;height:250px;">Place an optional source at lower left. The template supplies page numbers, so never draw them as slide elements.
-  </div>
-  <!-- A source line is optional content at the lower left, while page numbers remain the responsibility of the template. -->
-  <div class="el source-line" style="left:120px;top:1005px;width:1200px;height:28px;">Source: frame geometry specimen
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">10</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · process</div><div class="tb-title">Department onboarding in four steps</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Every department follows the same four weeks; the plan repeats and the risk is known.</div>
+  <div class="el flex" style="left:120px; top:400px; width:1680px; height:86px;"><div class="chevron first">1 · Configure</div><div class="chevron">2 · Migrate</div><div class="chevron">3 · Train</div><div class="chevron is-last">4 · Switch over</div></div>
+  <div class="el t-caption" style="left:120px; top:510px; width:400px; height:150px;">Week 1 — approval chains and fields set up with the department lead.</div>
+  <div class="el t-caption" style="left:540px; top:510px; width:400px; height:150px;">Week 2 — open records moved; spreadsheets kept read-only.</div>
+  <div class="el t-caption" style="left:960px; top:510px; width:400px; height:150px;">Week 3 — two sessions per team; the department runs both systems.</div>
+  <div class="el t-caption" style="left:1380px; top:510px; width:420px; height:150px;">Week 4 — new requests only in the tool; old ones close out.</div>
+  <div class="el effect-band" style="left:120px; top:690px; width:1680px; height:170px;"><div class="eb-label">Expected effect</div><div class="eb-sep"></div><div class="eb-item t-body">No lost requests from week 4</div><div class="eb-sep"></div><div class="eb-item t-body">Turnaround visible per department</div><div class="eb-sep"></div><div class="eb-item t-body">One procedure across five teams</div></div>
+  <div class="el t-body" style="left:120px; top:900px; width:1680px; height:62px;">Fund the first two departments now; release the rest when <span class="em-accent">week-4 measures</span> hold.</div>
 </div>
-<!-- Part 7: This section provides complete pattern slides that solve recurring communication problems while preserving one recognisable briefing system. -->
-<!-- Pattern: numbers — WHY: The 3:7 split gives outcome measures the dominant field, so the room reads the result before the supporting losses. Vary the values and labels, but keep the unequal fields, direct labels, and oversized-number hierarchy. -->
+
+<!-- Pattern: swimlane — WHY: roles form rows and phases form columns, so every hand-off is a visible crossing; the active phase is filled, the rest stay in outline. This is the most complex relationship the style draws — nothing is added to it. Vary lanes and labels, never the grid. -->
 <div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">01
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">PATTERN / NUMBERS
-      </div>
-      <div class="tb-title">Problem and outcome measures
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:290px;width:1680px;height:70px;">Set both problem and outcome as oversized values; give the outcome the wider 70% field.
-  </div>
-  <!-- The narrow left field stacks problem measures vertically so they remain supporting evidence. -->
-  <div class="el label-head" style="left:120px;top:395px;width:500px;height:55px;">CURRENT LOSS
-  </div>
-  <div class="el" style="left:120px;top:475px;width:500px;height:300px;">
-    <div class="row-item">
-      <span class="t-metric c-accent">18</span>
-      <span class="t-caption">minutes per search</span>
-    </div>
-    <div class="rule-h">
-    </div>
-    <div class="row-item">
-      <span class="t-metric c-accent">41%</span>
-      <span class="t-caption">cannot identify the current version</span>
-    </div>
-    <div class="rule-h">
-    </div>
-    <div class="row-item">
-      <span class="t-metric c-accent">34%</span>
-      <span class="t-caption">of work is repeated</span>
-    </div>
-  </div>
-  <div class="el leftbar" style="left:120px;top:800px;width:500px;height:150px;">
-    <div class="t-caption">Fragmented information slows retrieval.<br>Prior work is difficult to reuse.
-    </div>
-  </div>
-  <div class="el rule-h" style="left:672px;top:395px;width:1px;height:515px;">
-  </div>
-  <!-- The broad right field gives the outcome one hero measure followed by directly labelled supporting measures. -->
-  <div class="el label-head accent" style="left:744px;top:395px;width:1056px;height:55px;">TARGET OUTCOME
-  </div>
-  <div class="el flex items-center" style="left:744px;top:475px;width:1056px;height:130px;">
-    <span class="t-metric-lg c-accent">1,500</span>
-    <span class="t-slide-title">records available</span>
-  </div>
-  <div class="el t-body c-muted" style="left:744px;top:620px;width:1056px;height:80px;">Comparable items use one operating definition.
-  </div>
-  <div class="el flex" style="left:744px;top:720px;width:1056px;height:175px;">
-    <div class="leftbar">
-      <div class="t-caption">Cycle time
-      </div>
-      <div class="t-metric c-accent">42%
-      </div>
-    </div>
-    <div class="leftbar">
-      <div class="t-caption">Decision rate
-      </div>
-      <div class="t-metric c-accent">32%
-      </div>
-    </div>
-    <div class="leftbar">
-      <div class="t-caption">Quality score
-      </div>
-      <div class="t-metric c-success">85
-      </div>
-    </div>
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">11</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · swimlane</div><div class="tb-title">Ownership across the rollout</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Accountability changes hands exactly once, at the switch-over gate.</div>
+  <div class="el stage-label" style="left:380px; top:360px; width:340px; height:60px;">Configure</div>
+  <div class="el stage-label on" style="left:740px; top:360px; width:340px; height:60px;">Migrate</div>
+  <div class="el stage-label" style="left:1100px; top:360px; width:340px; height:60px;">Train</div>
+  <div class="el stage-label" style="left:1460px; top:360px; width:340px; height:60px;">Switch over</div>
+  <div class="el stage-track on" style="left:740px; top:430px; width:340px; height:420px;"></div>
+  <div class="el lane-label" style="left:120px; top:440px; width:240px; height:120px;">Project team</div>
+  <div class="el lane-label" style="left:120px; top:580px; width:240px; height:120px;">Department lead</div>
+  <div class="el lane-label" style="left:120px; top:720px; width:240px; height:120px;">Support desk</div>
+  <div class="el data-node t-caption" style="left:400px; top:470px; width:300px; height:60px;">set up fields</div>
+  <div class="el data-node done t-caption" style="left:760px; top:470px; width:300px; height:60px;">move records</div>
+  <div class="el data-node t-caption" style="left:1120px; top:610px; width:300px; height:60px;">run sessions</div>
+  <div class="el data-node t-caption" style="left:1480px; top:610px; width:300px; height:60px;">own the queue</div>
+  <div class="el rule-h" style="left:380px; top:570px; width:1420px; height:1px;"></div>
+  <div class="el rule-h" style="left:380px; top:710px; width:1420px; height:1px;"></div>
+  <div class="el t-body" style="left:120px; top:900px; width:1680px; height:60px;">The department lead owns the queue from switch-over; the project team steps back.</div>
 </div>
-<!-- Pattern: comparison — WHY: Matched halves align unlike approaches on the same criteria, making differences visible without implying a winner through area. Vary the criteria and evidence, but keep their order, widths, and typographic hierarchy matched. -->
+
+<!-- Pattern: relationship — WHY: a cycle has no first element, so it is drawn as nodes on a ring with one accent node for the step that matters; a staged relationship has an order, so it is drawn left to right with connectors. The page is split to show that the two must never be confused. Vary labels, never the form. -->
 <div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">02
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">PATTERN / COMPARISON
-      </div>
-      <div class="tb-title">Two operating approaches
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:290px;width:1680px;height:116px;">Align unlike approaches symmetrically so the differences are visible without implying a winner by size.
-  </div>
-  <!-- Both approaches use the same rows, order, widths, and type so only their evidence changes. -->
-  <div class="el text-center" style="left:120px;top:420px;width:792px;height:60px;">
-    <span class="pill sub">DISTRIBUTED</span>
-  </div>
-  <div class="el" style="left:120px;top:510px;width:792px;height:400px;">
-    <div class="t-body text-center c-muted">Local teams collect and interpret evidence independently.
-    </div>
-    <div class="row-item">
-      <div class="t-body c-accent">Strength
-      </div>
-      <div class="t-body">Fast local response
-      </div>
-    </div>
-    <div class="row-item">
-      <div class="t-body c-accent">Method
-      </div>
-      <div class="t-body">Separate records and reviews
-      </div>
-    </div>
-    <div class="row-item">
-      <div class="t-body c-accent">Effect
-      </div>
-      <div class="t-metric">+25%
-      </div>
-    </div>
-  </div>
-  <!-- A central rule and multiplication sign separate the approaches without enclosing either half. -->
-  <div class="el rule-h" style="left:960px;top:420px;width:1px;height:490px;">
-  </div>
-  <div class="el t-metric c-accent text-center" style="left:925px;top:650px;width:70px;height:90px;">×
-  </div>
-  <div class="el text-center" style="left:1032px;top:420px;width:792px;height:60px;">
-    <span class="pill">COORDINATED</span>
-  </div>
-  <div class="el" style="left:1032px;top:510px;width:792px;height:400px;">
-    <div class="t-body text-center c-muted">One model coordinates evidence and ownership.
-    </div>
-    <div class="row-item">
-      <div class="t-body c-accent">Strength
-      </div>
-      <div class="t-body">Comparable decisions
-      </div>
-    </div>
-    <div class="row-item">
-      <div class="t-body c-accent">Method
-      </div>
-      <div class="t-body">Shared definitions and gates
-      </div>
-    </div>
-    <div class="row-item">
-      <div class="t-body c-accent">Effect
-      </div>
-      <div class="t-metric">+40%
-      </div>
-    </div>
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">12</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · relationship</div><div class="tb-title">Request lifecycle and rollout stages</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Review is what stops lost requests; the stages carry it to every team.</div>
+  <div class="el label-head" style="left:120px; top:360px; width:760px; height:44px;">No order — cycle</div>
+  <div class="el node" style="left:400px; top:430px; width:200px; height:70px;">Logged</div>
+  <div class="el node" style="left:620px; top:560px; width:200px; height:70px;">Routed</div>
+  <div class="el node" style="left:400px; top:690px; width:200px; height:70px;">Resolved</div>
+  <div class="el node node-strong" style="left:180px; top:560px; width:200px; height:70px;">Reviewed</div>
+  <div class="el conn" style="left:499px; top:500px; width:1px; height:60px;"></div>
+  <div class="el conn" style="left:499px; top:630px; width:1px; height:60px;"></div>
+  <div class="el conn" style="left:380px; top:595px; width:20px; height:1px;"></div>
+  <div class="el conn" style="left:600px; top:595px; width:20px; height:1px;"></div>
+  <div class="el rule-h" style="left:960px; top:360px; width:1px; height:520px;"></div>
+  <div class="el label-head" style="left:1000px; top:360px; width:800px; height:44px;">Order — stages</div>
+  <div class="el stage-circle stage-before t-caption" style="left:1040px; top:520px; width:120px; height:120px;">Pilot</div>
+  <div class="el conn" style="left:1160px; top:580px; width:110px; height:1px;"></div>
+  <div class="el stage-circle stage-step" style="left:1270px; top:520px; width:120px; height:120px;">Q1</div>
+  <div class="el conn conn-accent" style="left:1390px; top:580px; width:110px; height:1px;"></div>
+  <div class="el stage-circle stage-step" style="left:1500px; top:520px; width:120px; height:120px;">Q2</div>
+  <div class="el t-caption text-center" style="left:1000px; top:680px; width:800px; height:98px;">Support done · Finance and HR · Operations and Sales</div>
+  <div class="el t-body" style="left:120px; top:900px; width:1680px; height:60px;">Review is the loop's only new step — and the one the stages exist to spread.</div>
 </div>
-<!-- Pattern: process — WHY: A chevron chain makes prerequisite order visible, while the open icon-and-text row explains each stage without turning it into a card. Vary the sequence from three to five stages, but keep one accent hue and the left-to-right order. -->
+
+<!-- Pattern: section heading + bullets — WHY: for reading rather than looking. Filled section heads organise the page into two or three blocks; bullets stay one line each. Written register only. Vary the number of sections (2–3) and bullets (≤ 4 each); never nest bullets. -->
 <div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">03
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">PATTERN / PROCESS
-      </div>
-      <div class="tb-title">Standard delivery sequence
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:290px;width:1680px;height:70px;">Use chevrons when each stage must finish before the next begins.
-  </div>
-  <!-- The chevron band makes the prerequisite order of three to five stages immediately visible. -->
-  <div class="el flex" style="left:120px;top:410px;width:1680px;height:86px;">
-    <div class="chevron first">01 Define
-    </div>
-    <div class="chevron">02 Structure
-    </div>
-    <div class="chevron">03 Build
-    </div>
-    <div class="chevron">04 Review
-    </div>
-    <div class="chevron is-last">05 Release
-    </div>
-  </div>
-  <!-- An open icon-and-text row explains each stage without creating five independent cards. -->
-  <div class="el flex" style="left:120px;top:535px;width:1680px;height:150px;">
-    <div class="row-item">
-      <div class="ico ico-search accent">
-      </div>
-      <div class="ri-desc">Gather comparable evidence
-      </div>
-    </div>
-    <div class="row-item">
-      <div class="ico ico-doc accent">
-      </div>
-      <div class="ri-desc">Choose the reasoning frame
-      </div>
-    </div>
-    <div class="row-item">
-      <div class="ico ico-check accent">
-      </div>
-      <div class="ri-desc">Build from the standard
-      </div>
-    </div>
-    <div class="row-item">
-      <div class="ico ico-chart accent">
-      </div>
-      <div class="ri-desc">Test against the gate
-      </div>
-    </div>
-    <div class="row-item">
-      <div class="ico ico-cloud accent">
-      </div>
-      <div class="ri-desc">Transfer to one owner
-      </div>
-    </div>
-  </div>
-  <div class="el rule-h" style="left:120px;top:715px;width:1680px;height:1px;">
-  </div>
-  <div class="el label-head accent" style="left:120px;top:755px;width:1680px;height:68px;">EXPECTED EFFECT
-  </div>
-  <div class="el effect-band" style="left:120px;top:835px;width:1680px;height:130px;">
-    <div class="eb-item">
-      <div class="t-caption">Cycle time
-      </div>
-      <div class="t-heading c-accent">42% shorter
-      </div>
-    </div>
-    <div class="eb-sep">
-    </div>
-    <div class="eb-item">
-      <div class="t-caption">Quality score
-      </div>
-      <div class="t-heading c-accent">85 points
-      </div>
-    </div>
-    <div class="eb-sep">
-    </div>
-    <div class="eb-item">
-      <div class="t-caption">Rework rate
-      </div>
-      <div class="t-heading c-accent">8%
-      </div>
-    </div>
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">13</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · section heads and bullets</div><div class="tb-title">Known risks and their mitigations</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Both risks are bounded by a decision already taken, not by hope.</div>
+  <div class="el sec-head-fill" style="left:120px; top:360px; width:800px; height:70px;">Historical records</div>
+  <div class="el bullets" style="left:120px; top:460px; width:800px; height:320px;"><ul class="bullets"><li>Spreadsheets stay read-only for twelve months.</li><li>Only open requests are migrated.</li><li>Lookups fall back to the old file by link.</li></ul></div>
+  <div class="el sec-head-fill" style="left:1000px; top:360px; width:800px; height:70px;">Custom approval chains</div>
+  <div class="el bullets" style="left:1000px; top:460px; width:800px; height:320px;"><ul class="bullets"><li>Two departments keep their chains, configured in week 1.</li><li>Chains are reviewed at the switch-over gate.</li><li>No exceptions after go-live.</li></ul></div>
+  <div class="el rule-h" style="left:120px; top:800px; width:1680px; height:1px;"></div>
+  <div class="el t-body" style="left:120px; top:830px; width:1680px; height:124px;">Neither risk delays the first two departments. Both are reviewed once, at the gate, by the department lead.</div>
 </div>
-<!-- Pattern: swimlane — WHY: Rows identify who acts and columns identify when, while the single return branch exposes the consequential exception. Vary role, phase, and action labels, but preserve aligned lanes and connector paths that state ownership and causality. -->
+
+<!-- Pattern: paragraph bars — WHY: when the argument needs prose, each paragraph gets a thin left bar (accent on the paragraph that carries the turn) so the eye finds the structure without headings; the conclusion is a plain line, not a box. Written register. Vary paragraph count (2–3), never box the close. -->
 <div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">04
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">PATTERN / SWIMLANE
-      </div>
-      <div class="tb-title">Ownership across phases
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Rows show who acts; columns show when; the branch shows the one exception that returns.
-  </div>
-  <!-- Phase chevrons establish columns, while role labels establish rows. -->
-  <div class="el flex" style="left:380px;top:375px;width:1398px;height:86px;">
-    <div class="chevron first">1 Assess
-    </div>
-    <div class="chevron">2 Decide
-    </div>
-    <div class="chevron is-last">3 Release
-    </div>
-  </div>
-  <div class="el lane-label" style="left:120px;top:485px;width:240px;height:80px;">Sponsor
-  </div>
-  <div class="el lane-label" style="left:120px;top:575px;width:240px;height:80px;">Review team
-  </div>
-  <div class="el lane-label" style="left:120px;top:665px;width:240px;height:80px;">Planning
-  </div>
-  <div class="el lane-row-bg" style="left:356px;top:575px;width:1468px;height:80px;">
-  </div>
-  <div class="el lane-label" style="left:120px;top:755px;width:240px;height:80px;">Operations
-  </div>
-  <div class="el lane-row-bg" style="left:356px;top:755px;width:1468px;height:80px;">
-  </div>
-  <!-- Action nodes occupy the responsible role and phase, and the diamond alone represents a decision. -->
-  <div class="el node node-strong" style="left:400px;top:490px;width:280px;height:60px;">Set threshold
-  </div>
-  <div class="el node node-sub" style="left:400px;top:585px;width:280px;height:60px;">Measure evidence
-  </div>
-  <div class="el node" style="left:820px;top:585px;width:260px;height:60px;">Test condition
-  </div>
-  <div class="el node" style="left:400px;top:675px;width:280px;height:60px;">Refine scope
-  </div>
-  <div class="el node" style="left:820px;top:675px;width:260px;height:60px;">Assess risk
-  </div>
-  <div class="el diamond flex items-center justify-center" style="left:865px;top:765px;width:90px;height:90px;">
-    <span>Gate<br>met?</span>
-  </div>
-  <div class="el node" style="left:1320px;top:490px;width:300px;height:60px;">Confirm owner
-  </div>
-  <div class="el node" style="left:1320px;top:585px;width:300px;height:60px;">Release briefing
-  </div>
-  <div class="el node" style="left:1320px;top:765px;width:300px;height:60px;">Record handoff
-  </div>
-  <!-- Connectors state consequence and preserve the one return path when the decision requires revision. -->
-  <div class="el conn" style="left:540px;top:550px;width:2px;height:35px;">
-  </div>
-  <div class="el conn" style="left:680px;top:615px;width:140px;height:2px;">
-  </div>
-  <div class="el arrow-h" style="left:810px;top:608px;width:10px;height:14px;">
-  </div>
-  <div class="el conn" style="left:950px;top:645px;width:2px;height:85px;">
-  </div>
-  <div class="el conn conn-accent" style="left:955px;top:775px;width:365px;height:2px;">
-  </div>
-  <div class="el arrow-h" style="left:1310px;top:768px;width:10px;height:14px;">
-  </div>
-  <div class="el conn" style="left:1470px;top:550px;width:2px;height:35px;">
-  </div>
-  <div class="el t-label c-accent" style="left:1100px;top:740px;width:100px;height:30px;">YES
-  </div>
-  <div class="el t-label c-muted" style="left:700px;top:785px;width:100px;height:30px;">REVISE
-  </div>
-  <div class="el t-caption" style="left:120px;top:900px;width:1680px;height:105px;">Node = action, diamond = decision, arrow = consequence. Use this only when ownership changes across phases.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">14</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · paragraphs</div><div class="tb-title">The case for a bounded start</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">The evidence supports a first phase now; expansion should wait for measured adoption.</div>
+  <div class="el para" style="left:120px; top:370px; width:1680px; height:186px;">The pilot cleared the economic threshold and removed the operational hand-offs that produced lost requests. Its scope — one department, twelve weeks — is exactly what the first phase repeats.</div>
+  <div class="el para accent" style="left:120px; top:590px; width:1680px; height:186px;">Adoption has not yet been shown outside the pilot team. Expansion funding should therefore depend on a measured gate, a named owner and a review date rather than on a single approval today.</div>
+  <div class="el t-heading" style="left:120px; top:860px; width:1680px; height:60px;">Approve the first phase; make expansion <span class="em-accent">conditional on adoption</span>.</div>
 </div>
-<!-- Pattern: composition — WHY: The sequence forces the composer to decide the claim before regions and whitespace, preventing components from dictating the argument. Vary region ratios according to information volume, but do not change this reasoning order or fill empty space. -->
+
+<!-- Pattern: pill sections + full-bleed band — WHY: pill labels group two short columns without boxes, and the full-width key band at the bottom carries the one message the slide exists for. The band is the only element allowed to span the page. Vary the pills and text; keep one band. -->
 <div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">05
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">GUIDANCE / COMPOSITION
-      </div>
-      <div class="tb-title">How to compose one page
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Do not start with components; decide message, region split, then whitespace.
-  </div>
-  <!-- The chain requires message, then region split, then whitespace; components never come first. -->
-  <div class="el flex" style="left:120px;top:385px;width:1680px;height:90px;">
-    <div class="node">
-      <span><b>1 Message</b> — write one claim</span>
-    </div>
-    <div class="arrow-h">
-    </div>
-    <div class="node">
-      <span><b>2 Regions</b> — split by meaning</span>
-    </div>
-    <div class="arrow-h">
-    </div>
-    <div class="node">
-      <span><b>3 Space</b> — group by proximity</span>
-    </div>
-  </div>
-  <!-- Regions follow meaning and information volume, while retained margins and proximity show relationship. -->
-  <div class="el label-head accent" style="left:120px;top:525px;width:828px;height:55px;">REGION SPLIT — DIVIDE BY MEANING
-  </div>
-  <div class="el" style="left:120px;top:610px;width:828px;height:220px;">
-    <div class="check-item t-body">
-      <span class="em">Use 2–3 regions; split at four.
-    </div>
-    <div class="check-item t-body">Equal ideas get equal fields.
-    </div>
-    <div class="check-item t-body">Set 4:6 / 3:7 / 7:3 by volume.
-    </div>
-  </div>
-  <div class="el label-head accent" style="left:996px;top:525px;width:828px;height:55px;">WHITESPACE — SHOW RELATIONSHIP
-  </div>
-  <div class="el" style="left:996px;top:610px;width:828px;height:220px;">
-    <div class="check-item t-body">
-      <span class="em">Proximity means relationship.
-    </div>
-    <div class="check-item t-body">Keep margins; remove content for space.
-    </div>
-    <div class="check-item t-body">Empty space is structure.
-    </div>
-  </div>
-  <div class="el effect-band" style="left:120px;top:875px;width:1680px;height:90px;">
-    <div class="eb-label">IN SHORT
-    </div>
-    <div class="eb-item t-body">Field = meaning
-    </div>
-    <div class="eb-sep">
-    </div>
-    <div class="eb-item t-body">Size = information
-    </div>
-    <div class="eb-sep">
-    </div>
-    <div class="eb-item t-body">Distance = relationship
-    </div>
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">15</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · pills and key band</div><div class="tb-title">What the pilot proved</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Speed and reliability improved together; neither was traded for the other.</div>
+  <div class="el pill-head accent" style="left:120px; top:370px; width:300px; height:66px;">Speed</div>
+  <div class="el t-body" style="left:120px; top:460px; width:800px; height:186px;">Median turnaround fell from 6.2 to 2.1 days. Requests over ten days fell from 31% to 4%.</div>
+  <div class="el pill-head" style="left:1000px; top:370px; width:300px; height:66px;">Reliability</div>
+  <div class="el t-body" style="left:1000px; top:460px; width:800px; height:186px;">Lost requests fell from 9% to none. Satisfaction rose from 2.9 to 4.4 out of 5.</div>
+  <div class="el key-band" style="left:0px; top:740px; width:1920px; height:210px;"><div class="kb-pill">Key message</div><div class="kb-msg">A three-times faster turnaround with zero lost requests, from one shared procedure.</div></div>
 </div>
-<!-- Pattern: relationship — WHY: A cycle and a staged sequence express different logical relationships, so separate fields and different structures prevent a false equivalence. Vary labels and evidence, but keep the cycle unordered and the stages explicitly directional. -->
+
+<!-- Pattern: chapter divider — WHY: an oversized chapter number creates a pause, and the mini map beside it shows the whole deck with the current chapter lit, so the room always knows where it is. No topbar here; the divider is the only slide that breaks the frame. Vary numbers and titles only. -->
 <div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">06
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">PATTERN / RELATIONSHIP
-      </div>
-      <div class="tb-title">Recurring and staged relationships
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Split the page by meaning: a cycle has no start; a stage sequence has explicit direction.
-  </div>
-  <!-- The left field uses an open cycle because recurring elements have direction but no privileged start. -->
-  <div class="el label-head" style="left:120px;top:385px;width:760px;height:55px;">A — CYCLE / NO STARTING ORDER
-  </div>
-  <div class="el bg-accent flex items-center justify-center t-body bold text-center" style="left:310px;top:565px;width:260px;height:210px;">Reinforcing<br>cycle
-  </div>
-  <div class="el t-body bold text-center" style="left:360px;top:475px;width:180px;height:70px;">Measure
-  </div>
-  <div class="el t-body bold text-center" style="left:600px;top:635px;width:180px;height:70px;">Learn
-  </div>
-  <div class="el t-body bold text-center" style="left:360px;top:805px;width:180px;height:70px;">Adjust
-  </div>
-  <div class="el t-body bold text-center" style="left:120px;top:635px;width:180px;height:70px;">Review
-  </div>
-  <div class="el t-caption" style="left:120px;top:885px;width:760px;height:105px;">Numbers and small arrows show direction; the open field avoids turning the cycle into four cards.
-  </div>
-  <div class="el rule-h" style="left:960px;top:385px;width:1px;height:570px;">
-  </div>
-  <!-- The right field uses vertical stages and arrows because this relationship has explicit temporal direction. -->
-  <div class="el label-head accent" style="left:1000px;top:385px;width:800px;height:55px;">B — STAGES / EXPLICIT ORDER
-  </div>
-  <div class="el flex items-center" style="left:1000px;top:495px;width:800px;height:110px;">
-    <div class="stage-circle stage-before">Before
-    </div>
-    <div>
-      <div class="t-body bold c-muted">Stage 0 — local
-      </div>
-      <div class="t-caption">Work depends on individual practice.
-      </div>
-    </div>
-  </div>
-  <div class="el varrow" style="left:1040px;top:615px;width:20px;height:12px;">
-  </div>
-  <div class="el flex items-center" style="left:1000px;top:655px;width:800px;height:110px;">
-    <div class="stage-circle stage-step">Step 1
-    </div>
-    <div>
-      <div class="t-body bold c-accent">Stage 1 — shared
-      </div>
-      <div class="t-caption">The team adopts one definition.
-      </div>
-    </div>
-  </div>
-  <div class="el varrow" style="left:1040px;top:775px;width:20px;height:12px;">
-  </div>
-  <div class="el flex items-center" style="left:1000px;top:815px;width:800px;height:110px;">
-    <div class="stage-circle stage-step">Step 2
-    </div>
-    <div>
-      <div class="t-body bold c-accent">Stage 2 — sustained
-      </div>
-      <div class="t-caption">The control becomes routine.
-      </div>
-    </div>
-  </div>
+  <div class="el frame-accent" style="left:0px; top:0px; width:3px; height:1080px;"></div>
+  <div class="el divider-num" style="left:120px; top:300px; width:600px; height:200px;">03</div>
+  <div class="el t-slide-title" style="left:120px; top:530px; width:800px; height:192px;">The plan</div>
+  <div class="el t-heading c-muted" style="left:120px; top:740px; width:800px; height:60px;">Three phases, one repeatable procedure.</div>
+  <div class="el agenda-mini" style="left:1080px; top:300px; width:720px; height:480px;"><div class="am-item"><span class="am-num">01</span>Opening</div><div class="am-item"><span class="am-num">02</span>The problem</div><div class="am-item now"><span class="am-num">03</span>The plan</div><div class="am-item"><span class="am-num">04</span>The case</div></div>
 </div>
-<!-- Pattern: bullets — WHY: Filled section headers and complete sentences organise evidence that needs no diagram, while whitespace carries hierarchy between sections. Vary the section names and claims, but keep bullets to two levels and avoid noun-only fragments. -->
+
+<!-- Pattern: 4-column A (cards with header band and metric footer) — WHY: four equal columns compare alternatives that each have a name, a description and one figure; the filled header band and the footer figure give every card the same skeleton so only the content differs. Vary labels and values, never widths or the header fill. -->
 <div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">07
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">PATTERN / TEXT
-      </div>
-      <div class="tb-title">Sectioned evidence summary
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:270px;width:1680px;height:116px;">Complete sentences under section headers let the audience follow evidence without a diagram.
-  </div>
-  <!-- The first section states context, evidence, and implication as separate complete claims. -->
-  <div class="el sec-head-fill" style="left:120px;top:400px;width:430px;height:70px;">Frame the issue
-  </div>
-  <div class="el t-body" style="left:120px;top:490px;width:1680px;height:130px;">Separate context, evidence, and implication into one sentence each; split a sentence that carries two claims.
-  </div>
-  <!-- The second section limits bullets to complete sentences, one emphasis per line, and two levels. -->
-  <div class="el sec-head-fill" style="left:120px;top:640px;width:430px;height:70px;">Write the evidence
-  </div>
-  <ul class="el bullets" style="left:145px;top:730px;width:1655px;height:200px;">
-    <li>Each bullet states a subject and action rather than a list of nouns.
-    </li>
-    <li>Emphasise one word per line; bolding everything removes hierarchy.
-    </li>
-    <li>Use at most two levels; a third level requires another slide.
-    </li>
-  </ul>
-  <div class="el sec-head-fill" style="left:120px;top:935px;width:430px;height:70px;">Qualify precisely
-  </div>
-  <div class="el t-caption" style="left:590px;top:940px;width:1210px;height:80px;">Place a source, exception, or limitation beside the claim in muted text.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">16</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · four columns A</div><div class="tb-title">Year-one cost by item</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Licences are the largest item; migration and training are one-off.</div>
+  <div class="el col-card" style="left:120px; top:370px; width:390px; height:460px;"><div class="cc-head"><span class="cc-num">01</span><span class="cc-title">Licences</span></div><div class="cc-body"><div class="t-body">Per-seat, all five departments</div><div class="cc-desc">recurring</div></div><div class="cc-foot"><div class="cf-label">year one</div><div class="cf-value">96k</div></div></div>
+  <div class="el col-card" style="left:550px; top:370px; width:390px; height:460px;"><div class="cc-head"><span class="cc-num">02</span><span class="cc-title">Migration</span></div><div class="cc-body"><div class="t-body">Open records, five departments</div><div class="cc-desc">one-off</div></div><div class="cc-foot"><div class="cf-label">year one</div><div class="cf-value">54k</div></div></div>
+  <div class="el col-card" style="left:980px; top:370px; width:390px; height:460px;"><div class="cc-head"><span class="cc-num">03</span><span class="cc-title">Training</span></div><div class="cc-body"><div class="t-body">Two sessions per team</div><div class="cc-desc">one-off</div></div><div class="cc-foot"><div class="cf-label">year one</div><div class="cf-value">30k</div></div></div>
+  <div class="el col-card" style="left:1410px; top:370px; width:390px; height:460px;"><div class="cc-head"><span class="cc-num">04</span><span class="cc-title">Total</span></div><div class="cc-body"><div class="t-body">Payback in month 14</div><div class="cc-desc">three-year net +345k</div></div><div class="cc-foot"><div class="cf-label">year one</div><div class="cf-value">180k</div></div></div>
+  <div class="el t-body" style="left:120px; top:880px; width:1680px; height:60px;">Approve <span class="em-accent">180k</span> for year one; years two and three carry licences only.</div>
 </div>
-<!-- Pattern: paragraphs — WHY: Left bars let a chronological argument remain prose, and the accent marks only the measured turning point so the reader follows the sequence. Vary the number and length of paragraphs, but keep the reasoning linear and the final implication concise. -->
+
+<!-- Pattern: 4-column B (one band split by dividers) — WHY: when the four items are parts of one whole rather than alternatives, a single surface band divided by hairlines keeps them together; there are no separate cards to compare. Vary labels and count (3–5), never add borders between the parts. -->
 <div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">08
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">PATTERN / PARAGRAPHS
-      </div>
-      <div class="tb-title">Narrative evidence sequence
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">When chronology matters, use paragraphs and raise only the turning point.
-  </div>
-  <!-- The opening paragraph aligns the reader on the observed condition without introducing the response too early. -->
-  <div class="el para accent" style="left:120px;top:405px;width:1680px;height:125px;">First state the
-    <span class="em">observed condition</span>: who encountered what constraint, and under which comparable scope.
-  </div>
-  <!-- The accent marks only the measured turning point, which is the central sentence of the chronology. -->
-  <div class="el para" style="left:120px;top:575px;width:1680px;height:150px;">Then state the
-    <span class="em-accent">measured turning point</span>. This is the central sentence; the preceding condition and following implication exist to make its meaning precise.
-  </div>
-  <div class="el para" style="left:120px;top:770px;width:1680px;height:125px;">Finally state the
-    <span class="em">bounded implication</span>: what changes now and which condition still limits expansion.
-  </div>
-  <div class="el summary-bar" style="left:120px;top:915px;width:1680px;height:125px;">
-    <span class="sb-label">MESSAGE</span>A diagram is a means, not a goal; use prose when prose carries the reasoning faster.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">17</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · four columns B</div><div class="tb-title">Benefits by source</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Recovered hours are the whole benefit; the four sources add up to 1,900 hours a year.</div>
+  <div class="el col-band" style="left:120px; top:380px; width:1680px; height:400px;"><div class="cb-col"><div class="t-metric c-accent">900 h</div><div class="cb-title">No duplicate entry</div><div class="cb-desc">one record per request</div></div><div class="cb-sep"></div><div class="cb-col"><div class="t-metric">500 h</div><div class="cb-title">No chasing</div><div class="cb-desc">status is visible</div></div><div class="cb-sep"></div><div class="cb-col"><div class="t-metric">300 h</div><div class="cb-title">No weekly report</div><div class="cb-desc">generated, not typed</div></div><div class="cb-sep"></div><div class="cb-col"><div class="t-metric">200 h</div><div class="cb-title">Fewer escalations</div><div class="cb-desc">nothing is lost</div></div></div>
+  <div class="el t-body" style="left:120px; top:840px; width:1680px; height:60px;">Nearly half the benefit comes from <span class="em-accent">removing duplicate entry</span> alone.</div>
 </div>
-<!-- Pattern: pills — WHY: Rounded labels create light section markers for distinct premises, while the full-width lower band reserves maximum emphasis for their resulting action. Vary the premise labels and evidence, but keep the action band singular and last. -->
+
+<!-- Pattern: before / after — WHY: the same rows in the same order on both sides isolate what changed; the "after" side carries the accent as a single role (header and changed values together). An arrow between the halves states direction once. Vary rows (3–5) and values; never reorder or change units between sides. -->
 <div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">09
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">PATTERN / PILL SECTIONS
-      </div>
-      <div class="tb-title">Premises resolved into one implication
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Rounded labels separate premises; the lower band carries only the resulting action.
-  </div>
-  <!-- The upper pill labels separate two premises lightly while their evidence remains in open fields. -->
-  <div class="el pill-head" style="left:120px;top:400px;width:260px;height:60px;">Context
-  </div>
-  <div class="el t-body" style="left:120px;top:490px;width:800px;height:190px;">Evidence is distributed across several locations, so the current version is difficult to identify when a decision is due.
-  </div>
-  <div class="el pill-head" style="left:1000px;top:400px;width:260px;height:60px;">Constraint
-  </div>
-  <div class="el t-body" style="left:1000px;top:490px;width:800px;height:190px;">Repeated search and reconstruction consume time while ownership remains unclear.
-  </div>
-  <div class="el pill-head accent" style="left:120px;top:690px;width:260px;height:60px;">Therefore
-  </div>
-  <div class="el t-body" style="left:120px;top:775px;width:1680px;height:125px;">One operating definition must connect retrieval, ownership, and review without adding another handoff.
-  </div>
-  <!-- The full-width final band is reserved for the resulting action and must not be repeated. -->
-  <div class="el key-band" style="left:0;top:900px;width:1920px;height:140px;">
-    <span class="kb-pill">ACTION</span>
-    <span class="kb-msg">Standardise the record and assign one accountable owner.</span>
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">18</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · before / after</div><div class="tb-title">Pilot results against today</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Every measure moved in the same direction, on the same request volume.</div>
+  <div class="el ba-head before" style="left:120px; top:370px; width:760px; height:80px;">Before</div>
+  <div class="el ba-arrow" style="left:923px; top:384px; width:34px; height:52px;"></div>
+  <div class="el ba-head after" style="left:1000px; top:370px; width:800px; height:80px;">After (pilot)</div>
+  <div class="el t-caption" style="left:120px; top:490px; width:760px; height:50px;">Median turnaround</div>
+  <div class="el t-heading" style="left:120px; top:540px; width:760px; height:60px;">6.2 days</div>
+  <div class="el t-heading c-accent" style="left:1000px; top:540px; width:800px; height:60px;">2.1 days</div>
+  <div class="el t-caption" style="left:120px; top:640px; width:760px; height:50px;">Requests over ten days</div>
+  <div class="el t-heading" style="left:120px; top:690px; width:760px; height:60px;">31%</div>
+  <div class="el t-heading c-accent" style="left:1000px; top:690px; width:800px; height:60px;">4%</div>
+  <div class="el t-caption" style="left:120px; top:790px; width:760px; height:50px;">Requests lost</div>
+  <div class="el t-heading" style="left:120px; top:840px; width:760px; height:60px;">9%</div>
+  <div class="el t-heading c-accent" style="left:1000px; top:840px; width:800px; height:60px;">0</div>
+  <div class="el source-line" style="left:120px; top:985px; width:1400px; height:30px;">Source: pilot, 12 weeks, 412 requests; baseline from the five departments' spreadsheets.</div>
 </div>
-<!-- Pattern: divider — WHY: Replacing the normal topbar with a large chapter number creates a deliberate pause, while the mini map shows current position without a persistent tracker. Vary chapter names and counts, but use this skeleton only for decks with at least three chapters. -->
+
+<!-- Pattern: table — WHY: when rows and columns carry the meaning, a native table with a filled header band and horizontal hairlines only; no vertical rules, no zebra, one accent cell at most. Vary columns (3–5) and rows (3–7); never enclose the table in a border. -->
 <div class="slide slide-dark">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:1080px;">
-  </div>
-  <!-- The left field uses an oversized chapter number and title to create a pause unlike the normal topbar. -->
-  <div class="el t-label c-muted" style="left:120px;top:280px;width:500px;height:35px;">SECTION
-  </div>
-  <div class="el divider-num" style="left:115px;top:340px;width:700px;height:120px;">03
-  </div>
-  <div class="el frame-accent" style="left:120px;top:505px;width:120px;height:3px;">
-  </div>
-  <div class="el t-cover-title" style="left:120px;top:535px;width:1000px;height:260px;">Decision conditions
-  </div>
-  <div class="el t-body c-muted" style="left:120px;top:815px;width:900px;height:130px;">The next section tests the conditions for a bounded decision.
-  </div>
-  <div class="el rule-h" style="left:1150px;top:240px;width:1px;height:650px;">
-  </div>
-  <!-- The right field uses a compact map to show completed, current, and remaining chapters. -->
-  <div class="el t-label c-muted" style="left:1230px;top:250px;width:570px;height:35px;">AGENDA
-  </div>
-  <div class="el agenda-mini" style="left:1230px;top:320px;width:570px;height:430px;">
-    <div class="am-item">
-      <span class="am-num">01</span>Context
-      <span class="am-check">done</span>
-    </div>
-    <div class="am-item">
-      <span class="am-num">02</span>Evidence
-      <span class="am-check">done</span>
-    </div>
-    <div class="am-item now">
-      <span class="am-num">03</span>Decision conditions
-    </div>
-    <div class="am-item">
-      <span class="am-num">04</span>Action
-    </div>
-  </div>
-  <div class="el t-caption" style="left:120px;top:955px;width:1680px;height:75px;">Use this only for three or more chapters; the mini map replaces any persistent agenda tracker.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">19</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · table</div><div class="tb-title">Rollout schedule by department</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Five departments, three phases, one owner each.</div>
+  <div class="el bg-accent flex items-center" style="left:120px; top:370px; width:1680px; height:70px;"><div class="t-body bold tc-1">Department</div><div class="t-body bold tc">Phase</div><div class="t-body bold tc">Switch-over</div><div class="t-body bold tc">Owner</div></div>
+  <div class="el flex items-center" style="left:120px; top:440px; width:1680px; height:80px;"><div class="t-body tc-1">Support</div><div class="t-body tc">1 (done)</div><div class="t-body tc">completed</div><div class="t-body tc">Support lead</div></div>
+  <div class="el rule-h" style="left:120px; top:520px; width:1680px; height:1px;"></div>
+  <div class="el flex items-center" style="left:120px; top:521px; width:1680px; height:80px;"><div class="t-body tc-1">Finance</div><div class="t-body tc">2</div><div class="t-body tc">Q1 · week 8</div><div class="t-body tc">Finance lead</div></div>
+  <div class="el rule-h" style="left:120px; top:601px; width:1680px; height:1px;"></div>
+  <div class="el flex items-center" style="left:120px; top:602px; width:1680px; height:80px;"><div class="t-body tc-1">HR</div><div class="t-body tc">2</div><div class="t-body tc">Q1 · week 8</div><div class="t-body tc">HR lead</div></div>
+  <div class="el rule-h" style="left:120px; top:682px; width:1680px; height:1px;"></div>
+  <div class="el flex items-center" style="left:120px; top:683px; width:1680px; height:80px;"><div class="t-body tc-1">Operations</div><div class="t-body tc">3</div><div class="t-body tc">Q2 · week 4</div><div class="t-body tc">Operations lead</div></div>
+  <div class="el rule-h" style="left:120px; top:763px; width:1680px; height:1px;"></div>
+  <div class="el flex items-center" style="left:120px; top:764px; width:1680px; height:80px;"><div class="t-body tc-1">Sales</div><div class="t-body tc">3</div><div class="t-body tc">Q2 · week 4</div><div class="t-body tc">Sales lead</div></div>
+  <div class="el rule-h" style="left:120px; top:844px; width:1680px; height:1px;"></div>
+  <div class="el t-body" style="left:120px; top:900px; width:1680px; height:60px;">Two departments switch per phase; no phase starts before the previous gate is signed.</div>
 </div>
-<!-- Pattern: 4-column A — WHY: Equal columns make independent dimensions and their comparable metrics easy to scan without implying sequence. Vary labels, descriptions, and values, but preserve equal widths, one accent hue, and one metric footer per column. -->
+
+<!-- Pattern: proportion — WHY: a share of a whole is read fastest as a gauge (one value) or as horizontal bars (several values on one scale); neither needs a legend when the label sits next to the value. Vary values and count (≤ 5 bars); never mix a gauge with a donut on one slide. -->
 <div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">11
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">PATTERN / FOUR COLUMNS A
-      </div>
-      <div class="tb-title">Four independent operating dimensions
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Use separate columns when each dimension is independent and owns a comparable metric.
-  </div>
-  <!-- The centred label introduces four independent dimensions without implying process order. -->
-  <div class="el divider-label center" style="left:120px;top:375px;width:1680px;height:40px;">
-    <div class="dl-line">
-    </div>
-    <div class="dl-text">DIMENSIONS
-    </div>
-    <div class="dl-line">
-    </div>
-  </div>
-  <!-- Equal columns each carry one icon, one explanation, and one comparable metric footer. -->
-  <div class="el col-card" style="left:120px;top:450px;width:396px;height:520px;">
-    <div class="cc-head">
-      <span class="cc-num">01</span>
-      <span class="cc-title">Ownership</span>
-    </div>
-    <div class="cc-body">
-      <div class="ico ico-folder accent">
-      </div>
-      <div class="cc-desc">One role receives the complete outcome and names the handoff.
-      </div>
-    </div>
-    <div class="cc-foot">
-      <div class="cf-label">TARGET
-      </div>
-      <div class="cf-value">1 owner
-      </div>
-    </div>
-  </div>
-  <div class="el col-card" style="left:548px;top:450px;width:396px;height:520px;">
-    <div class="cc-head">
-      <span class="cc-num">02</span>
-      <span class="cc-title">Cadence</span>
-    </div>
-    <div class="cc-body">
-      <div class="ico ico-doc accent">
-      </div>
-      <div class="cc-desc">A fixed review interval replaces exception-driven work.
-      </div>
-    </div>
-    <div class="cc-foot">
-      <div class="cf-label">INTERVAL
-      </div>
-      <div class="cf-value">7 days
-      </div>
-    </div>
-  </div>
-  <div class="el col-card" style="left:976px;top:450px;width:396px;height:520px;">
-    <div class="cc-head">
-      <span class="cc-num">03</span>
-      <span class="cc-title">Evidence</span>
-    </div>
-    <div class="cc-body">
-      <div class="ico ico-check accent">
-      </div>
-      <div class="cc-desc">Direct measures retain one scope and comparison basis.
-      </div>
-    </div>
-    <div class="cc-foot">
-      <div class="cf-label">BASIS
-      </div>
-      <div class="cf-value">3 measures
-      </div>
-    </div>
-  </div>
-  <div class="el col-card" style="left:1404px;top:450px;width:396px;height:520px;">
-    <div class="cc-head">
-      <span class="cc-num">04</span>
-      <span class="cc-title">Escalation</span>
-    </div>
-    <div class="cc-body">
-      <div class="ico ico-chart accent">
-      </div>
-      <div class="cc-desc">A named threshold triggers review before scope expands.
-      </div>
-    </div>
-    <div class="cc-foot">
-      <div class="cf-label">FOCUS
-      </div>
-      <div class="cf-value">1 gate
-      </div>
-    </div>
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">20</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · proportion</div><div class="tb-title">Share of requests by department</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Support handles four in ten requests, which is why it piloted first.</div>
+  <div class="el gauge gauge-42" style="left:200px; top:400px; width:400px; height:400px;"><div class="g-label t-metric-lg c-accent">42%</div></div>
+  <div class="el t-caption text-center" style="left:120px; top:830px; width:560px; height:50px;">Support · share of all requests</div>
+  <div class="el rule-h" style="left:840px; top:380px; width:1px; height:500px;"></div>
+  <div class="el t-caption" style="left:940px; top:400px; width:860px; height:50px;">Finance · 21%</div>
+  <div class="el hbar" style="left:940px; top:450px; width:860px; height:30px;"><div class="hb-fill" style="--val:21"></div></div>
+  <div class="el t-caption" style="left:940px; top:510px; width:860px; height:50px;">HR · 15%</div>
+  <div class="el hbar" style="left:940px; top:560px; width:860px; height:30px;"><div class="hb-fill" style="--val:15"></div></div>
+  <div class="el t-caption" style="left:940px; top:620px; width:860px; height:50px;">Operations · 13%</div>
+  <div class="el hbar" style="left:940px; top:670px; width:860px; height:30px;"><div class="hb-fill" style="--val:13"></div></div>
+  <div class="el t-caption" style="left:940px; top:730px; width:860px; height:50px;">Sales · 9%</div>
+  <div class="el hbar" style="left:940px; top:780px; width:860px; height:30px;"><div class="hb-fill" style="--val:9"></div></div>
+  <div class="el t-body" style="left:120px; top:920px; width:1680px; height:60px;">Phase 2 covers the next <span class="em-accent">36%</span>; by Q2 the tool holds every request.</div>
 </div>
-<!-- Pattern: 4-column B — WHY: One continuous divided surface shows that peer functions or ordered stages belong to a connected system rather than four isolated cards. Vary stage labels and descriptions, but keep the shared field, divider rhythm, gaps, and fills. -->
+
+<!-- Pattern: trend — WHY: a column series shows change over time with the value on top of each bar and the current period in the accent; no gridlines, no legend, one baseline. Vary periods (4–8) and values; never add a second series without a second slide. -->
 <div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">12
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">PATTERN / FOUR COLUMNS B
-      </div>
-      <div class="tb-title">Four-stage coordinated chain
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Use one divided band when the phases operate as a single connected system.
-  </div>
-  <!-- The left-anchored label introduces a connected process rather than independent dimensions. -->
-  <div class="el divider-label" style="left:120px;top:400px;width:1680px;height:40px;">
-    <div class="dl-text">PROCESS
-    </div>
-    <div class="dl-line">
-    </div>
-  </div>
-  <!-- One field is split by vertical dividers so peer functions or ordered stages remain connected. -->
-  <div class="el col-band" style="left:120px;top:485px;width:1680px;height:380px;">
-    <div class="cb-col">
-      <div class="ico ico-search accent">
-      </div>
-      <div class="cb-title">01 Define
-      </div>
-      <div class="cb-desc">Set scope, baseline, and owner.
-      </div>
-    </div>
-    <div class="cb-sep">
-    </div>
-    <div class="cb-col">
-      <div class="ico ico-doc accent">
-      </div>
-      <div class="cb-title">02 Measure
-      </div>
-      <div class="cb-desc">Collect comparable evidence.
-      </div>
-    </div>
-    <div class="cb-sep">
-    </div>
-    <div class="cb-col">
-      <div class="ico ico-cloud accent">
-      </div>
-      <div class="cb-title">03 Decide
-      </div>
-      <div class="cb-desc">Apply the named threshold.
-      </div>
-    </div>
-    <div class="cb-sep">
-    </div>
-    <div class="cb-col">
-      <div class="ico ico-check accent">
-      </div>
-      <div class="cb-title">04 Release
-      </div>
-      <div class="cb-desc">Transfer the bounded action.
-      </div>
-    </div>
-  </div>
-  <div class="el t-caption" style="left:120px;top:900px;width:1680px;height:105px;">Pattern A isolates dimensions with their metrics; Pattern B keeps peer functions or ordered stages on one continuous field.
-  </div>
+  <div class="el topbar" style="left:0px; top:0px; width:1920px; height:240px;"><div class="tb-num">21</div><div class="tb-rule"></div><div class="tb-texts"><div class="tb-sub">Pattern · trend</div><div class="tb-title">Benefit against cost over three years</div></div></div>
+  <div class="el lead" style="left:120px; top:262px; width:1680px; height:60px;">Benefit overtakes cost in month 14 and stays above it.</div>
+  <div class="el col-chart" style="left:220px; top:380px; width:1480px; height:460px;"><div class="col-bar"><div class="cb-val">180k</div><div class="cb-fill h300"></div><div class="cb-x">Cost · year 1</div></div><div class="col-bar"><div class="cb-val">155k</div><div class="cb-fill h258"></div><div class="cb-x">Benefit · year 1</div></div><div class="col-bar on"><div class="cb-val">210k</div><div class="cb-fill h350"></div><div class="cb-x">Benefit · year 2</div></div><div class="col-bar on"><div class="cb-val">210k</div><div class="cb-fill h350"></div><div class="cb-x">Benefit · year 3</div></div></div>
+  <div class="el rule-h" style="left:220px; top:790px; width:1480px; height:1px;"></div>
+  <div class="el t-body" style="left:120px; top:900px; width:1680px; height:60px;">Three-year net <span class="em-accent">+345k</span>; licences are the only recurring cost.</div>
+  <div class="el source-line" style="left:120px; top:985px; width:1400px; height:30px;">Source: cost plan and pilot benefit measurement (1,900 staff-hours ≈ 155k).</div>
 </div>
-<!-- Pattern: before/after — WHY: Identical aligned rows isolate the changed relationship, so geometry—not extra prose—reveals the transition from fragmented to controlled. Vary stage labels and node counts, but keep row order, measurement units, and left-right scale comparable. -->
-<div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">13
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">GUIDANCE / BEFORE AND AFTER
-      </div>
-      <div class="tb-title">How to build a before-and-after page
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Change only the relationship among identical elements; aligned rows reveal the transition.
-  </div>
-  <!-- The before state uses muted fragmentation so the problem is visible in the arrangement itself. -->
-  <div class="el ba-head before" style="left:120px;top:385px;width:820px;height:65px;">BEFORE — MUTED
-  </div>
-  <!-- The after state aligns the same rows and uses teal only on the relationship that changed. -->
-  <div class="el ba-head after" style="left:1040px;top:385px;width:760px;height:65px;">AFTER — TEAL CHANGE
-  </div>
-  <div class="el stage-label" style="left:120px;top:485px;width:150px;height:100px;">Output
-  </div>
-  <div class="el stage-label" style="left:120px;top:600px;width:150px;height:100px;">Process
-  </div>
-  <div class="el stage-label" style="left:120px;top:715px;width:150px;height:100px;">Input
-  </div>
-  <div class="el stage-track" style="left:286px;top:485px;width:654px;height:100px;">
-  </div>
-  <div class="el stage-track" style="left:286px;top:600px;width:654px;height:100px;">
-  </div>
-  <div class="el data-node" style="left:360px;top:725px;width:84px;height:84px;">
-    <div class="ico ico-doc">
-    </div>
-  </div>
-  <div class="el data-node" style="left:570px;top:725px;width:84px;height:84px;">
-    <div class="ico ico-doc">
-    </div>
-  </div>
-  <div class="el data-node" style="left:780px;top:725px;width:84px;height:84px;">
-    <div class="ico ico-doc">
-    </div>
-  </div>
-  <div class="el data-node" style="left:470px;top:610px;width:84px;height:84px;">
-    <div class="ico ico-doc">
-    </div>
-  </div>
-  <div class="el data-node" style="left:680px;top:610px;width:84px;height:84px;">
-    <div class="ico ico-doc">
-    </div>
-  </div>
-  <div class="el data-node" style="left:575px;top:495px;width:84px;height:84px;">
-    <div class="ico ico-doc">
-    </div>
-  </div>
-  <div class="el t-caption c-danger" style="left:120px;top:840px;width:820px;height:105px;">Before: mute the state and show fragmentation in the geometry.
-  </div>
-  <div class="el rule-h" style="left:983px;top:385px;width:1px;height:545px;">
-  </div>
-  <div class="el ba-arrow" style="left:958px;top:650px;width:34px;height:52px;">
-  </div>
-  <div class="el stage-label" style="left:1040px;top:485px;width:150px;height:100px;">Output
-  </div>
-  <div class="el stage-label on" style="left:1040px;top:600px;width:150px;height:100px;">Unified<br>process
-  </div>
-  <div class="el stage-label" style="left:1040px;top:715px;width:150px;height:100px;">Input
-  </div>
-  <div class="el stage-track" style="left:1206px;top:485px;width:594px;height:100px;">
-  </div>
-  <div class="el stage-track on" style="left:1206px;top:600px;width:594px;height:100px;">
-  </div>
-  <div class="el data-node" style="left:1270px;top:725px;width:84px;height:84px;">
-    <div class="ico ico-doc">
-    </div>
-  </div>
-  <div class="el data-node" style="left:1478px;top:725px;width:84px;height:84px;">
-    <div class="ico ico-doc">
-    </div>
-  </div>
-  <div class="el data-node" style="left:1686px;top:725px;width:84px;height:84px;">
-    <div class="ico ico-doc">
-    </div>
-  </div>
-  <div class="el merge-band" style="left:1240px;top:602px;width:400px;height:96px;">
-    <div class="mb-bi">1
-    </div>
-    <div class="mb-text">One controlled process
-    </div>
-  </div>
-  <div class="el cond-bubble" style="left:1660px;top:620px;width:120px;height:55px;">Gate
-  </div>
-  <div class="el data-node done" style="left:1398px;top:495px;width:84px;height:84px;">
-    <div class="ico ico-doc accent">
-    </div>
-  </div>
-  <div class="el t-caption c-accent" style="left:1040px;top:840px;width:760px;height:105px;">After: align the rows and accent only the changed relationship.
-  </div>
-</div>
-<!-- Pattern: proportion — WHY: The gauge, progress bar, and donut each answer a different proportional question, while direct labels and teal shades prevent legend hunting. Vary values and category labels, but do not introduce category hues or non-informative gridlines. -->
-<div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">14
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">PATTERN / PROPORTION
-      </div>
-      <div class="tb-title">Three proportional chart forms
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Use teal shades only; make the primary percentage large and label every value directly.
-  </div>
-  <div class="el divider-label" style="left:120px;top:375px;width:1680px;height:40px;">
-    <div class="dl-text">PROPORTION
-    </div>
-    <div class="dl-line">
-    </div>
-  </div>
-  <!-- The gauge answers one completion or occupancy question by treating the ring as the whole. -->
-  <div class="el t-body bold" style="left:120px;top:445px;width:500px;height:70px;">Gauge — one share
-  </div>
-  <div class="el gauge" style="left:220px;top:520px;width:260px;height:260px;">
-    <div class="g-label">
-      <span class="t-metric">74%</span>
-    </div>
-  </div>
-  <div class="el t-caption" style="left:120px;top:805px;width:500px;height:150px;">Use for one completion or occupancy rate; the ring is the whole.
-  </div>
-  <div class="el t-body bold" style="left:660px;top:445px;width:600px;height:70px;">Horizontal bar — progress
-  </div>
-  <div class="el t-metric-lg c-accent text-center" style="left:660px;top:525px;width:600px;height:130px;">35%
-  </div>
-  <div class="el hbar" style="left:660px;top:675px;width:600px;height:30px;">
-    <div class="hb-fill">
-    </div>
-  </div>
-  <div class="el flex space-between" style="left:660px;top:730px;width:600px;height:50px;">
-    <span class="t-caption">0%</span>
-    <span class="t-caption">50%</span>
-    <span class="t-caption">100%</span>
-  </div>
-  <div class="el t-caption" style="left:660px;top:805px;width:600px;height:120px;">Use for progress to a known end point; keep only informative marks.
-  </div>
-  <!-- The donut answers composition with three to five directly labelled parts in teal shades. -->
-  <div class="el t-body bold" style="left:1300px;top:445px;width:500px;height:70px;">Donut — composition
-  </div>
-  <div class="el donut" style="left:1320px;top:520px;width:250px;height:250px;">
-    <div class="d-center">
-      <span class="t-caption">Total<br>share</span>
-    </div>
-  </div>
-  <div class="el legend-item" style="left:1600px;top:530px;width:200px;height:45px;">
-    <span class="lg-swatch bg-accent"></span>41%
-  </div>
-  <div class="el legend-item" style="left:1600px;top:590px;width:200px;height:45px;">
-    <span class="lg-swatch wash-accent"></span>32%
-  </div>
-  <div class="el legend-item" style="left:1600px;top:650px;width:200px;height:45px;">
-    <span class="lg-swatch bg-surface"></span>18%
-  </div>
-  <div class="el legend-item" style="left:1600px;top:710px;width:200px;height:45px;">
-    <span class="lg-swatch wash"></span>9%
-  </div>
-  <div class="el t-caption" style="left:1300px;top:805px;width:500px;height:120px;">Use three to five parts; order teal from strongest to weakest.
-  </div>
-  <div class="el t-caption" style="left:120px;top:950px;width:1680px;height:55px;">Charts label values directly and remove gridlines that do not carry information.
-  </div>
-</div>
-<!-- Pattern: trend — WHY: Columns reveal the path over time and same-scale endpoints isolate the decision-relevant change, with teal reserved for the final state. Vary periods and values, but retain direct labels and avoid legends or gridlines that carry no information. -->
-<div class="slide slide-dark">
-  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
-    <div class="tb-num">15
-    </div>
-    <div class="tb-rule">
-    </div>
-    <div class="tb-texts">
-      <div class="tb-sub">PATTERN / TREND
-      </div>
-      <div class="tb-title">Time series and endpoint comparison
-      </div>
-    </div>
-  </div>
-  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Use columns for the path and a matched before-to-after pair for the decision-relevant change.
-  </div>
-  <!-- The left field uses columns to trace one comparable measure and accents only the final state. -->
-  <div class="el divider-label" style="left:120px;top:375px;width:800px;height:40px;">
-    <div class="dl-text">FIVE PERIOD TREND
-    </div>
-    <div class="dl-line">
-    </div>
-  </div>
-  <div class="el col-chart" style="left:230px;top:485px;width:690px;height:360px;">
-    <div class="col-bar">
-      <div class="cb-val">42
-      </div>
-      <div class="cb-fill" style="height:100px;">
-      </div>
-      <div class="cb-x">P1
-      </div>
-    </div>
-    <div class="col-bar">
-      <div class="cb-val">51
-      </div>
-      <div class="cb-fill" style="height:150px;">
-      </div>
-      <div class="cb-x">P2
-      </div>
-    </div>
-    <div class="col-bar">
-      <div class="cb-val">63
-      </div>
-      <div class="cb-fill" style="height:205px;">
-      </div>
-      <div class="cb-x">P3
-      </div>
-    </div>
-    <div class="col-bar">
-      <div class="cb-val">74
-      </div>
-      <div class="cb-fill" style="height:260px;">
-      </div>
-      <div class="cb-x">P4
-      </div>
-    </div>
-    <div class="col-bar on">
-      <div class="cb-val">86
-      </div>
-      <div class="cb-fill" style="height:315px;">
-      </div>
-      <div class="cb-x">P5
-      </div>
-    </div>
-  </div>
-  <div class="el rule-h" style="left:983px;top:375px;width:1px;height:540px;">
-  </div>
-  <!-- The right field compares same-scale endpoints and labels the relevant difference directly. -->
-  <div class="el divider-label" style="left:1040px;top:375px;width:760px;height:40px;">
-    <div class="dl-text">SAME-SCALE ENDPOINTS
-    </div>
-    <div class="dl-line">
-    </div>
-  </div>
-  <div class="el t-metric c-muted" style="left:1120px;top:520px;width:250px;height:95px;">42
-  </div>
-  <div class="el t-caption" style="left:1120px;top:630px;width:250px;height:55px;">Before / P1
-  </div>
-  <div class="el conn conn-accent" style="left:1370px;top:565px;width:170px;height:3px;">
-  </div>
-  <div class="el arrow-h" style="left:1530px;top:558px;width:10px;height:14px;">
-  </div>
-  <div class="el t-metric c-accent" style="left:1580px;top:520px;width:220px;height:95px;">86
-  </div>
-  <div class="el t-caption" style="left:1580px;top:630px;width:220px;height:55px;">After / P5
-  </div>
-  <div class="el wash-accent" style="left:1120px;top:730px;width:680px;height:150px;">
-  </div>
-  <div class="el t-heading" style="left:1160px;top:765px;width:600px;height:60px;">+44 on the same measure
-  </div>
-  <div class="el t-caption" style="left:1160px;top:830px;width:600px;height:45px;">Direct labels remove the legend.
-  </div>
-  <div class="el t-caption" style="left:120px;top:950px;width:1680px;height:55px;">The final bar alone receives teal; all preceding bars remain quieter versions of the same hue.
-  </div>
-</div>
+
 </body>
 </html>
