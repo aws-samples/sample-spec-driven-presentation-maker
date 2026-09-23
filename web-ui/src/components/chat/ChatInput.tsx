@@ -44,6 +44,10 @@ export interface ChatInputProps {
   deckId?: string
   /** Slot for additional UI above the textarea row (e.g., Options panel, @mentions overlay). */
   children?: ReactNode
+  /** Opens the Local-only kiro session picker. */
+  onContinueFromSession?: () => void
+  /** Disabled once this chat already has messages. */
+  continueFromSessionDisabled?: boolean
   /** Stop button tooltip override. */
   stopTitle?: string
   /** Called on every input change (e.g., for @mention detection). */
@@ -64,7 +68,7 @@ export interface ChatInputHandle {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, children, stopTitle, onInputChange, textareaOverlay, textareaClassName },
+  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, children, onContinueFromSession, continueFromSessionDisabled, stopTitle, onInputChange, textareaOverlay, textareaClassName },
   ref,
 ) {
   const t = useTranslations("chatInput")
@@ -232,6 +236,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             <PlusMenu
               onFilesSelected={handleFiles}
               onSnippetRequest={handleSnippetRequest}
+              onContinueFromSession={onContinueFromSession}
+              continueFromSessionDisabled={continueFromSessionDisabled}
               disabled={isLoading}
             />
 

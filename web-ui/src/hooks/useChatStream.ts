@@ -21,6 +21,15 @@ import type { McpServerStatus } from "@/components/chat/McpStatusBar"
 import type { UploadedFile } from "@/services/uploadService"
 import { notifyError } from "@/lib/errors"
 import { agentErrorMessage, classifyAgentError } from "@/lib/agentErrors"
+import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
+
+export interface SendMessageOptions {
+  displayContent?: string
+  continuedFrom?: SessionOrigin
+  sessionIdOverride?: string
+  hideUserMessage?: boolean
+  propagateError?: boolean
+}
 
 export interface Message {
   role: "user" | "assistant"
@@ -57,7 +66,7 @@ export interface UseChatStreamReturn {
   messages: Message[]
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   isLoading: boolean
-  sendMessage: (text: string, uploadedFiles?: UploadedFile[], snippets?: { label: string; text: string }[], sentAttachments?: { fileName: string; fileType: string }[], options?: { displayContent?: string }) => Promise<void>
+  sendMessage: (text: string, uploadedFiles?: UploadedFile[], snippets?: { label: string; text: string }[], sentAttachments?: { fileName: string; fileType: string }[], options?: SendMessageOptions) => Promise<void>
   stopGeneration: () => void
   /** Ref to current messages for external reads without re-render dependency. */
   messagesRef: React.MutableRefObject<Message[]>
@@ -118,9 +127,10 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     uploadedFiles?: UploadedFile[],
     snippets?: { label: string; text: string }[],
     sentAttachments?: { fileName: string; fileType: string }[],
-    options?: { displayContent?: string },
+    options?: SendMessageOptions,
   ) => {
-    if (!userMessage.trim() && (!uploadedFiles || uploadedFiles.length === 0) && (!snippets || snippets.length === 0)) return
+    const hasContent = userMessage.trim() || uploadedFiles?.length || snippets?.length
+    if (!hasContent && !options?.continuedFrom) return
     if (isLoading) return
     if (isLoadingRef.current) return
     isLoadingRef.current = true
@@ -135,7 +145,9 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     const display = options?.displayContent ?? userMessage
     setMessages((prev) => [
       ...prev,
-      { role: "user", content: display, toolUses: [], snippets: snippets && snippets.length > 0 ? snippets : undefined, attachments: sentAttachments && sentAttachments.length > 0 ? sentAttachments : undefined },
+      ...(!options?.hideUserMessage
+        ? [{ role: "user" as const, content: display, toolUses: [], snippets: snippets && snippets.length > 0 ? snippets : undefined, attachments: sentAttachments && sentAttachments.length > 0 ? sentAttachments : undefined }]
+        : []),
       { role: "assistant", content: "", toolUses: [] },
     ])
     setIsLoading(true)
@@ -150,7 +162,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
 
       await invokeAgentCore(
         userMessage,
-        sessionId,
+        options?.sessionIdOverride ?? sessionId,
         (streamed: string) => {
           lastTextSnapshot = streamed
           setMessages((prev) => {
@@ -270,11 +282,16 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
         controller.signal,
         mode,
         deckId,
+        options?.continuedFrom,
       )
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         // Keep partial response
       } else {
+        if (options?.propagateError) {
+          setMessages([])
+          throw err
+        }
         const errorMessage = err instanceof Error ? err.message : String(err)
         const code = classifyAgentError(errorMessage)
         // Transport-level failures don't carry raw model errors worth showing —

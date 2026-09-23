@@ -240,7 +240,40 @@
   "plusMenu": {
     "attachLabel": "ファイルまたはスニペットを添付",
     "attachFile": "ファイルを添付",
-    "textSnippet": "テキストスニペット"
+    "textSnippet": "テキストスニペット",
+    "continueFromSession": "kiro セッションから続ける",
+    "continueDisabledHint": "新しいチャットで使えます"
+  },
+  "sessionPicker": {
+    "title": "kiro セッションから続ける",
+    "description": "以前の作業セッションを、新しいデッキの文脈として引き継ぎます。",
+    "searchPlaceholder": "セッションを検索…",
+    "showAll": "すべて表示",
+    "empty": "セッションが見つかりません",
+    "emptyHint": "`kiro-cli chat` で会話すると、ここに表示されます。",
+    "messages": "{count, plural, other {# メッセージ}}",
+    "forking": "「{title}」から分岐しています…",
+    "forkFailed": "このセッションから分岐できませんでした。再試行してください。",
+    "loading": "セッションを読み込み中",
+    "error": "セッションを読み込めませんでした。再試行してください。",
+    "keyboardHint": "↑↓ で移動 · Enter で選択 · Esc で閉じる"
+  },
+  "forkProgress": {
+    "sessionMeta": "{project} · {count} メッセージ",
+    "stepsLabel": "分岐の進捗",
+    "copying": "セッションを複製",
+    "starting": "エージェントを起動",
+    "loading": "会話を読み込み中",
+    "loadingWithCount": "会話を読み込み中… {count} 件",
+    "switching": "スライド作成の準備",
+    "slowHint": "長いセッションは読み込みに数十秒かかることがあります",
+    "cancel": "キャンセル"
+  },
+  "continuedFrom": {
+    "chip": "〈{title}〉から分岐",
+    "tooltipCwd": "作業フォルダー: {cwd}",
+    "tooltipUpdated": "元セッションの更新日時: {date}",
+    "tooltipImmutable": "元のセッションは変更されません。"
   },
   "attachments": {
     "removeFile": "{name} を削除",
@@ -345,6 +378,8 @@
     "noModelFound": "モデルが見つかりません"
   },
   "compose": {
+    "recentSessionsHeading": "最近の kiro セッション",
+    "pickOtherSession": "すべて見る",
     "composingAria": "スライドを作成中",
     "preparing": "準備中…",
     "composing": "スライド {slides} 枚を {agents} エージェントで並列作成中",

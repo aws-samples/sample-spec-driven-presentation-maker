@@ -12,13 +12,24 @@ import path from "path"
 import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
 import { getActiveAgent, type AgentConfig } from "./acp-adapter"
 import { syncToAgentsDir } from "./agents-sync"
+import type { ForkSessionPhase, ForkSessionPhaseDetail, SessionOrigin } from "./kiro-sessions.types"
 
 export { DECK_ROOT }
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
 const MAX_PROCESSES = 3
 
 type PendingResolve = (value: unknown) => void
+interface PendingRequest {
+  resolve: PendingResolve
+  reject: (reason?: unknown) => void
+}
 type NotifyListener = (msg: Record<string, unknown>) => void
+
+interface SpawnProcessOptions {
+  setMode?: boolean
+  onPhase?: (phase: ForkSessionPhase, detail?: ForkSessionPhaseDetail) => void
+  signal?: AbortSignal
+}
 
 interface ProcessState {
   child: ChildProcess
@@ -26,7 +37,7 @@ interface ProcessState {
   sessionId: string | null
   agentName: string
   requestId: number
-  pending: Map<number, PendingResolve>
+  pending: Map<number, PendingRequest>
   listeners: Set<NotifyListener>
   lineBuffer: string
   running: boolean
@@ -38,6 +49,7 @@ interface ProcessState {
 
 /** Map keyed by sessionId */
 const processes = new Map<string, ProcessState>()
+export const pendingOrigins = new Map<string, SessionOrigin>()
 
 // Model info (shared, populated from first process)
 export interface AcpModel { modelId: string; name: string; description?: string }
@@ -57,9 +69,17 @@ function handleLine(ps: ProcessState, line: string) {
   // process, dropping the prior turn's context (read_guides, upload result,
   // hearing answers) and making the agent appear to drift back into Phase 1.
   if (msg.id != null && ps.pending.has(msg.id as number)) {
-    const resolve = ps.pending.get(msg.id as number)!
+    const pending = ps.pending.get(msg.id as number)!
     ps.pending.delete(msg.id as number)
-    resolve(msg.result)
+    if (msg.error) {
+      const error = msg.error as { message?: string; data?: unknown }
+      // kiro-cli puts the actual cause in `data` ("Internal error" alone is useless in logs)
+      const detail = error.data === undefined ? "" : `: ${typeof error.data === "string" ? error.data : JSON.stringify(error.data)}`
+      ps.running = false
+      pending.reject(new Error(`${error.message || "ACP request failed"}${detail}`))
+    } else {
+      pending.resolve(msg.result)
+    }
   }
 
   // Auto-approve permission requests
@@ -105,7 +125,7 @@ function rpcRequestTo(ps: ProcessState, method: string, params: Record<string, u
   if (!ps.child) throw new Error("Process not running")
   const id = ++ps.requestId
   ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n")
-  return new Promise((resolve) => { ps.pending.set(id, resolve) })
+  return new Promise((resolve, reject) => { ps.pending.set(id, { resolve, reject }) })
 }
 
 function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}): void {
@@ -114,7 +134,14 @@ function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, un
 }
 
 /** Ensure agents/ has files (first launch before Settings is opened). */
-async function spawnProcess(agentName: string, existingSessionId?: string, adapter?: AgentConfig): Promise<ProcessState> {
+async function spawnProcess(
+  agentName: string,
+  existingSessionId?: string,
+  opts: SpawnProcessOptions = {},
+  adapter?: AgentConfig,
+): Promise<ProcessState> {
+  if (opts.signal?.aborted) throw new DOMException("Fork cancelled", "AbortError")
+  opts.onPhase?.("starting")
   // Re-derive .kiro/agents/ from the acp-agents catalog + user selection on
   // every spawn (idempotent, all-or-nothing) — a `git pull` that updates the
   // catalog takes effect on the next spawn. If the derivation fails, the
@@ -132,6 +159,8 @@ async function spawnProcess(agentName: string, existingSessionId?: string, adapt
     stdio: ["pipe", "pipe", "pipe"],
     env: { ...process.env, ...cfg.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT },
   })
+  const abortSpawn = () => child.kill()
+  opts.signal?.addEventListener("abort", abortSpawn, { once: true })
 
   const ps: ProcessState = {
     child, deckId: "", sessionId: null, agentName,
@@ -153,39 +182,89 @@ async function spawnProcess(agentName: string, existingSessionId?: string, adapt
 
   child.on("close", (code) => {
     console.log("[acp close] sessionId=%s code=%s", ps.sessionId, code)
+    for (const pending of ps.pending.values()) pending.reject(new Error(`ACP process exited with code ${code}`))
+    ps.pending.clear()
     if (ps.sessionId) processes.delete(ps.sessionId)
   })
 
-  // Initialize ACP
-  await rpcRequestTo(ps, "initialize", {
-    protocolVersion: 1,
-    clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
-    clientInfo: { name: "sdpm-local", version: "0.1.0" },
-  })
+  try {
+    // Initialize ACP
+    await rpcRequestTo(ps, "initialize", {
+      protocolVersion: 1,
+      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
+      clientInfo: { name: "sdpm-local", version: "0.1.0" },
+    })
 
-  // Create session
-  const result = await rpcRequestTo(ps, "session/new", { cwd: MCP_LOCAL_DIR, mcpServers: [], agent: agentName }) as Record<string, unknown>
-  ps.sessionId = result.sessionId as string
+    // Create session
+    const result = await rpcRequestTo(ps, "session/new", {
+      cwd: MCP_LOCAL_DIR,
+      mcpServers: [],
+      agent: agentName,
+    }) as Record<string, unknown>
+    ps.sessionId = result.sessionId as string
 
-  // Restore existing session context if provided (Obsidian agent-client pattern)
-  if (existingSessionId) {
-    await rpcRequestTo(ps, "session/load", { sessionId: existingSessionId, cwd: MCP_LOCAL_DIR, mcpServers: [] })
-    // After session/load, prompts must use the old sessionId
-    processes.delete(ps.sessionId!)
-    ps.sessionId = existingSessionId
-  }
+    // Restore existing session context if provided (Obsidian agent-client pattern)
+    if (existingSessionId) {
+      let replayed = 0
+      let lastReported = 0
+      let lastReportAt = Date.now()
+      const replayListener: NotifyListener = (msg) => {
+        if (msg.method !== "session/update" && msg.method !== "_kiro.dev/session/update") return
+        const params = msg.params as Record<string, unknown> | undefined
+        if (params?.sessionId !== existingSessionId) return
+        replayed++
+        const now = Date.now()
+        if (replayed % 20 === 0 || now - lastReportAt >= 250) {
+          lastReported = replayed
+          lastReportAt = now
+          opts.onPhase?.("loading", { replayed })
+        }
+      }
 
-  // Extract model info from first process
-  if (!availableModels.length) {
-    const modelsData = result.models as { currentModelId?: string; availableModels?: AcpModel[] } | undefined
-    if (modelsData) {
-      currentModelId = modelsData.currentModelId || ""
-      availableModels = (modelsData.availableModels || [])
-        .filter(o => !o.description?.startsWith("[Internal]") && !o.description?.startsWith("[Deprecated]"))
+      opts.onPhase?.("loading", { replayed: 0 })
+      ps.listeners.add(replayListener)
+      let loaded: { modes?: { availableModes?: { id: string }[] } }
+      try {
+        loaded = await rpcRequestTo(ps, "session/load", {
+          sessionId: existingSessionId,
+          cwd: MCP_LOCAL_DIR,
+          mcpServers: [],
+        }) as { modes?: { availableModes?: { id: string }[] } }
+      } finally {
+        ps.listeners.delete(replayListener)
+      }
+      if (replayed !== lastReported) opts.onPhase?.("loading", { replayed })
+
+      // After session/load, prompts must use the old sessionId
+      processes.delete(ps.sessionId!)
+      ps.sessionId = existingSessionId
+      if (opts.setMode) {
+        const available = loaded.modes?.availableModes
+        if (!available?.some((mode) => mode.id === agentName)) {
+          throw new Error(`mode ${agentName} unavailable`)
+        }
+        opts.onPhase?.("switching")
+        await rpcRequestTo(ps, "session/set_mode", { sessionId: existingSessionId, modeId: agentName })
+      }
     }
-  }
 
-  return ps
+    // Extract model info from first process
+    if (!availableModels.length) {
+      const modelsData = result.models as { currentModelId?: string; availableModels?: AcpModel[] } | undefined
+      if (modelsData) {
+        currentModelId = modelsData.currentModelId || ""
+        availableModels = (modelsData.availableModels || [])
+          .filter(o => !o.description?.startsWith("[Internal]") && !o.description?.startsWith("[Deprecated]"))
+      }
+    }
+
+    opts.signal?.removeEventListener("abort", abortSpawn)
+    return ps
+  } catch (error) {
+    opts.signal?.removeEventListener("abort", abortSpawn)
+    child.kill()
+    throw error
+  }
 }
 
 async function evictIfNeeded(): Promise<void> {
@@ -209,8 +288,23 @@ export function hasProcess(sessionId: string): boolean {
   return processes.has(sessionId)
 }
 
+/** Kill a process and remove every map key that refers to it. */
+export function terminateProcess(sessionId: string): void {
+  const ps = processes.get(sessionId)
+    ?? Array.from(processes.values()).find((candidate) => candidate.sessionId === sessionId)
+  if (!ps) return
+  for (const [key, candidate] of processes) {
+    if (candidate === ps) processes.delete(key)
+  }
+  ps.child.kill()
+}
+
 /** Get or create a process for a sessionId. Restores context if existingSessionId provided. */
-export async function getOrCreateProcess(sessionId: string, agentName: string = "sdpm-orchestrator"): Promise<ProcessState> {
+export async function getOrCreateProcess(
+  sessionId: string,
+  agentName: string = "sdpm-orchestrator",
+  opts: SpawnProcessOptions = {},
+): Promise<ProcessState> {
   let ps = processes.get(sessionId)
   if (ps) {
     ps.lastActivity = Date.now()
@@ -218,7 +312,7 @@ export async function getOrCreateProcess(sessionId: string, agentName: string = 
   }
   // No live process — spawn new one and restore session context
   await evictIfNeeded()
-  ps = await spawnProcess(agentName, sessionId)
+  ps = await spawnProcess(agentName, sessionId, opts)
   processes.set(sessionId, ps)
   return ps
 }
@@ -253,9 +347,11 @@ export async function sendPrompt(sessionId: string, text: string, agentName?: st
       return () => { ps.listeners.delete(fn) }
     },
     send: () => {
-      rpcRequestTo(ps, "session/prompt", {
+      void rpcRequestTo(ps, "session/prompt", {
         sessionId: ps.sessionId,
         prompt: [{ type: "text", text }],
+      }).catch(() => {
+        // handleLine forwards the same JSON-RPC error to the subscribed SSE bridge.
       })
     },
   }
@@ -339,6 +435,22 @@ export function readSessionFromDeck(deckId: string): string | null {
   try { return fs.readFileSync(path.join(dir, ".session"), "utf-8").trim() } catch { return null }
 }
 
+/** Save a fork's source metadata to the deck. */
+export function saveOriginToDeck(deckId: string, origin: SessionOrigin): void {
+  const fs = require("fs") as typeof import("fs")
+  const dir = resolveDeckDir(deckId)
+  if (!dir || !fs.existsSync(dir)) return
+  fs.writeFileSync(path.join(dir, ".session-origin.json"), JSON.stringify(origin), "utf-8")
+}
+
+/** Read a fork's source metadata from the deck. */
+export function readOriginFromDeck(deckId: string): SessionOrigin | null {
+  const fs = require("fs") as typeof import("fs")
+  const dir = resolveDeckDir(deckId)
+  if (!dir) return null
+  try { return JSON.parse(fs.readFileSync(path.join(dir, ".session-origin.json"), "utf-8")) as SessionOrigin } catch { return null }
+}
+
 /** Save chat messages to deck's .chat.json file. */
 export function saveChatToDeck(deckId: string, messages: unknown[]): void {
   const fs = require("fs") as typeof import("fs")
@@ -360,5 +472,6 @@ for (const sig of ["exit", "SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     for (const ps of processes.values()) ps.child.kill()
     processes.clear()
+    pendingOrigins.clear()
   })
 }

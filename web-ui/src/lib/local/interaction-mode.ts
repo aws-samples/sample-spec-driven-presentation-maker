@@ -9,6 +9,8 @@
  * so here the same token is prepended to the first prompt of a fresh session.
  * The meaning of `dialogue` / `fast` is defined in the orchestrator workflow only.
  */
+import type { SessionOrigin } from "./kiro-sessions.types"
+
 const TOKEN: Record<string, "dialogue" | "fast"> = {
   vibe: "fast",
   spec: "dialogue",
@@ -26,4 +28,18 @@ export function withInteractionMode(query: string, mode: string | undefined, isF
   const token = interactionToken(mode)
   if (!token || !isFirstPrompt) return query
   return `${token}\n\n${query}`
+}
+
+export function continuedFromToken(origin: SessionOrigin): string {
+  return `Continued from: kiro session ${JSON.stringify(origin.title)}`
+}
+
+/** Prepend the continuation fact only to the first prompt after a fork. */
+export function withContinuedFrom(
+  query: string,
+  origin: SessionOrigin | undefined,
+  isFirst: boolean,
+): string {
+  if (!origin || !isFirst) return query
+  return `${continuedFromToken(origin)}\n\n${query}`
 }
