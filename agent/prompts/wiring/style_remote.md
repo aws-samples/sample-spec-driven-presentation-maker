@@ -8,7 +8,7 @@ Workspace layout:
 - `ref/{name}.html` — reference styles (read-only; loaded via the `ref_styles` parameter)
 
 Usage patterns:
-- Read a reference: `run_style_python(code="html = open('ref/corporate-executive.html').read(); print(html[:500])", ref_styles=["corporate-executive"])`
+- Read a reference: `run_style_python(code="html = open('ref/consulting.html').read(); print(html[:500])", ref_styles=["consulting"])`
 - Create/edit the style: `run_style_python(code="open('style.html','w').write(html)", style_name="style-20260506-1430")`
 - Read back for incremental edits: `run_style_python(code="print(open('style.html').read())", style_name="style-20260506-1430")`
 

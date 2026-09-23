@@ -12,6 +12,18 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **Six new bundled styles — `consulting`, `keynote`, `facilitation`,
+  `engineering`, `lecture`, `report`** — replace the previous eight. Each is a
+  rulebook, reference and gallery sample in one file: a design decision with
+  DO / DON'T rules derived from it, a Message & Outline part (deck length,
+  per-slide density, title grammar, chapter shape), palette and type ramp with
+  usage rules, the repeated frame, and 8–12 annotated pattern slides showing how
+  *that* style builds numbers, comparisons, processes, tables, charts and more.
+  All six define `--color-text` (read by `apply_style`) and `--fs-*` sizes (read
+  by the build-time font-size lint — the old styles used `--size-*`, so the lint
+  never ran on them). Lineup and intent: `docs/en/custom-template.md`.
+- **Style contract test** (`tests/test_builtin_styles_contract.py`) and a
+  style-verification sample deck (`tests/fixtures/style-sample-deck/`).
 - **Claude Opus 5.5, GPT-6 Sol and GPT-6 Luna** are selectable models
   (`global.anthropic.claude-opus-5-5`, `global.openai.gpt-6-sol`,
   `global.openai.gpt-6-luna`). Opus 5.5 uses the extended-thinking profile
@@ -57,6 +69,15 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **The `style` workflow now defines what a style is** — the Part 0–7 skeleton,
+  the `:root` token contract, HTML constraints and writing principles (state the
+  design decision, derive the rules; describe by design, not by brand). Demo type
+  is rendered at true slide scale (`calc(var(--fs-*) * 1.5)`: the 1920 px canvas is
+  960 slide-pt, CSS draws 1pt as 1.333 px), so box heights copied from a style no
+  longer overflow when built.
+- **Orchestrator writes the style before the outline** (brief → style → outline):
+  a style's Message & Outline part fixes deck length, density, title grammar and
+  chapter shape, so an outline written first had to be rewritten.
 - **Slide list moves instead of jumping** — slides that appear, disappear or
   move in the Slides tab slide into place (both grid and full view); a
   regenerated preview crossfades over the old image instead of flashing a
@@ -76,6 +97,16 @@ Entries before v0.5.0 were written retroactively as summaries.
   gone. Main-thread work during a compose burst drops by about half and a
   finished deck scrolls at full frame rate. The full view now follows the
   slide being composed until you scroll yourself.
+
+### Removed
+
+- **Bundled styles `border`, `corporate-executive`, `cute-playful`,
+  `elegant-dark`, `elegant-light`, `flat-shadow`, `lumina`, `tech-cyber`.** They
+  were early swatch-and-type-ramp demos with no composition rules and used
+  `--size-*` tokens the lint does not read. No migration path: pick one of the six
+  new styles (or copy an old file from git history into `~/.config/sdpm/styles/`
+  to keep using it). Decks already built keep their `specs/art-direction.html`.
+  Pinned names in `state.json` that no longer exist are ignored; re-pin.
 
 ## [0.9.0] - 2026-09-22
 

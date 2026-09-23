@@ -52,7 +52,7 @@ def test_builder_skips_region_comments_silently(tmp_path, capsys) -> None:
 
     r = tools.init_presentation(str(tmp_path / "deck"))
     deck = Path(r.get("output_dir", str(tmp_path / "deck")))
-    api.apply_style(deck, "elegant-dark", "blank-dark")
+    api.apply_style(deck, "engineering", "blank-dark")
     (deck / "specs" / "outline.md").write_text(
         "# O\n\n## A\n- [one] T\n  - body: b\n  - visual: v\n  - evidence: e\n"
     )

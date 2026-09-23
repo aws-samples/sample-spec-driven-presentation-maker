@@ -206,13 +206,28 @@ In the cloud Web UI, each user can add a private note to builtin and user templa
 
 ## Custom Styles
 
-Styles are HTML files that describe the visual direction (colors, typography,
-components, tone) for a deck. The agent reads `:root` CSS variables and style
-classes to mirror the design in `slides.json`.
+A style is one HTML file that serves as rulebook, reference and gallery sample at once: its
+`:root` tokens (colours, `--fs-*` font sizes, geometry) are machine-read by `apply_style` and
+the build-time lint, and its slides show — and explain in comments — how *this* style builds a
+cover, a title frame, a comparison, a process, a table, a chart. Composers read the whole file
+as `specs/art-direction.html`, and the orchestrator reads its Message & Outline part before
+writing the outline, so a style shapes the deck's structure, not only its look. The skeleton
+and token contract are defined in the `style` workflow (`read_workflows(["style"])`).
+
+### Bundled styles
+
+| Style | Built for | Look |
+|---|---|---|
+| `consulting` | Decision documents read alone by senior readers | White, navy, one electric accent, serif assertion titles, agenda tracker |
+| `keynote` | Large-room talks; one beat per slide | Near-black, huge type, one warm accent, ≥ 28pt |
+| `facilitation` | Workshops and steering meetings; a surface the room works on | Light, calm neutrals, one teal accent, horizontal journey maps, ≥ 10% margins |
+| `engineering` | Design reviews and tech talks; code and diagrams first | Dark slate, monospaced code and metrics, one accent plus ok/warn/fail states |
+| `lecture` | Courses and training revisited alone later | Warm paper, define → example → practise rhythm, lesson and step indicators |
+| `report` | Periodic results and operations reports; numbers first | White, serif findings, one deep-green accent, tables and small multiples, greyscale-safe |
 
 ### User-local styles
 
-Use the `create-style` workflow (agent-driven) to generate a new style HTML.
+Use the `style` workflow (agent-driven) to generate a new style HTML.
 The workflow writes to `<user-config>/styles/{name}.html` — i.e.
 `~/.config/sdpm/styles/` on macOS/Linux or `%APPDATA%/sdpm/styles/` on Windows.
 
@@ -220,7 +235,7 @@ You can also copy an existing style manually:
 
 ```bash
 mkdir -p ~/.config/sdpm/styles
-cp sdpm/references/examples/styles/elegant-dark.html \
+cp sdpm/references/examples/styles/consulting.html \
    ~/.config/sdpm/styles/my-style.html
 ```
 
