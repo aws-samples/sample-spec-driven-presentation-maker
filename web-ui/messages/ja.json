@@ -243,10 +243,7 @@
     "slidePreview": "スライドプレビュー",
     "options": "オプション",
     "fetchWebImages": "Web 画像を取得",
-    "fetchWebImagesDescription": "Web サイトの画像をプレゼンテーションに取り込みます",
-    "parallelAgents": "エージェント並列実行",
-    "experimental": "🧪 実験的機能",
-    "parallelAgentsDescription": "複数のコンポーザーエージェントがスライドを並列生成します"
+    "fetchWebImagesDescription": "Web サイトの画像をプレゼンテーションに取り込みます"
   },
   "snippet": {
     "title": "テキストスニペット",

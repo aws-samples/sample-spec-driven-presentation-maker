@@ -16,7 +16,6 @@ interface Prefs {
   sendWithEnter: boolean
   viewMode: "full" | "grid"
   fetchWebImages: boolean
-  parallelAgents: boolean
   agentMode: "spec" | "vibe"
   textScale: TextScale
   chatModelId?: string
@@ -27,7 +26,6 @@ const DEFAULTS: Prefs = {
   sendWithEnter: false,
   viewMode: "full",
   fetchWebImages: false,
-  parallelAgents: true,
   agentMode: "spec",
   textScale: 100,
 }
@@ -76,8 +74,6 @@ export function usePreferences() {
     setViewMode: useCallback((v: "full" | "grid") => update({ viewMode: v }), [update]),
     fetchWebImages: prefs.fetchWebImages,
     setFetchWebImages: useCallback((v: boolean) => update({ fetchWebImages: v }), [update]),
-    parallelAgents: prefs.parallelAgents,
-    setParallelAgents: useCallback((v: boolean) => update({ parallelAgents: v }), [update]),
     agentMode: prefs.agentMode,
     setAgentMode: useCallback((v: "spec" | "vibe") => update({ agentMode: v }), [update]),
     textScale: prefs.textScale,

@@ -243,10 +243,7 @@
     "slidePreview": "Slide preview",
     "options": "Options",
     "fetchWebImages": "Fetch web images",
-    "fetchWebImagesDescription": "Include images from websites in presentations",
-    "parallelAgents": "Parallel agents",
-    "experimental": "🧪 Experimental",
-    "parallelAgentsDescription": "Multiple composer agents generate slides in parallel"
+    "fetchWebImagesDescription": "Include images from websites in presentations"
   },
   "snippet": {
     "title": "Text Snippet",
