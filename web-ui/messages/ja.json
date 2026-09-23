@@ -374,6 +374,8 @@
   "modelPicker": {
     "selectModel": "モデルを選択",
     "recommended": "おすすめ",
+    "otherModels": "その他のモデル",
+    "default": "デフォルト",
     "searchModels": "モデルを検索…",
     "noModelFound": "モデルが見つかりません"
   },

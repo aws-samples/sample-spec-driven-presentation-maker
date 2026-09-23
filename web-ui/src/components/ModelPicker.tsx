@@ -68,6 +68,49 @@ export function ModelPicker({
 
   const listId = triggerId ? `${triggerId}-list` : undefined
 
+  // Operator-curated grouping. When no model carries `recommended`, the list
+  // stays flat (local-mode agent pickers, or config without recommendedModelIds).
+  const hasGroups = models.some((m) => m.recommended)
+  const recommendedModels = hasGroups ? models.filter((m) => m.recommended) : models
+  const otherModels = hasGroups ? models.filter((m) => !m.recommended) : []
+
+  const renderItem = (m: AllowedModel) => {
+    const isSelected = !isInherit && value === m.modelId
+    const isDefault = m.modelId === defaultId
+    return (
+      <CommandItem
+        key={m.modelId}
+        value={m.modelId}
+        keywords={[m.displayName, m.description ?? ""]}
+        onSelect={(v) => {
+          onChange(v)
+          setOpen(false)
+        }}
+        className="gap-3 py-2"
+      >
+        <Check
+          className={cn(
+            "size-4",
+            isSelected ? "opacity-100 text-brand-teal" : "opacity-0",
+          )}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-foreground">
+              {m.displayName}
+            </span>
+            {isDefault && <DefaultBadge label={t("default")} />}
+          </div>
+          {m.description && (
+            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+              {m.description}
+            </p>
+          )}
+        </div>
+      </CommandItem>
+    )
+  }
+
   return (
     <div>
       {/* Trigger button */}
@@ -97,13 +140,7 @@ export function ModelPicker({
             {displayName}
           </span>
           {selected && selected.modelId === defaultId && (
-            <span
-              aria-label={t("recommended")}
-              className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-brand-teal/15 px-1.5 py-px text-[11px] font-semibold text-brand-teal"
-            >
-              <Sparkles className="h-2.5 w-2.5" />
-              {t("recommended")}
-            </span>
+            <DefaultBadge label={t("default")} />
           )}
         </span>
         <ChevronsUpDown
@@ -124,8 +161,8 @@ export function ModelPicker({
             <CommandInput placeholder={t("searchModels")} />
             <CommandList id={listId} className="max-h-[280px] overflow-y-auto">
               <CommandEmpty>{t("noModelFound")}</CommandEmpty>
-              <CommandGroup>
-                {inheritLabel !== undefined && (
+              {inheritLabel !== undefined && (
+                <CommandGroup>
                   <CommandItem
                     value="__inherit__"
                     keywords={["inherit", "main", "default", "same"]}
@@ -147,56 +184,33 @@ export function ModelPicker({
                       </div>
                     </div>
                   </CommandItem>
-                )}
-                {models.map((m) => {
-                  const isSelected = !isInherit && value === m.modelId
-                  const isDefault = m.modelId === defaultId
-                  return (
-                    <CommandItem
-                      key={m.modelId}
-                      value={m.modelId}
-                      keywords={[m.displayName, m.description ?? ""]}
-                      onSelect={(v) => {
-                        onChange(v)
-                        setOpen(false)
-                      }}
-                      className="gap-3 py-2"
-                    >
-                      <Check
-                        className={cn(
-                          "size-4",
-                          isSelected ? "opacity-100 text-brand-teal" : "opacity-0",
-                        )}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-foreground">
-                            {m.displayName}
-                          </span>
-                          {isDefault && (
-                            <span
-                              aria-label={t("recommended")}
-                              className="inline-flex items-center gap-0.5 rounded-full bg-brand-teal/15 px-1.5 py-px text-[11px] font-semibold text-brand-teal"
-                            >
-                              <Sparkles className="h-2.5 w-2.5" />
-                              {t("recommended")}
-                            </span>
-                          )}
-                        </div>
-                        {m.description && (
-                          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
-                            {m.description}
-                          </p>
-                        )}
-                      </div>
-                    </CommandItem>
-                  )
-                })}
+                </CommandGroup>
+              )}
+              <CommandGroup heading={hasGroups ? t("recommended") : undefined}>
+                {recommendedModels.map(renderItem)}
               </CommandGroup>
+              {otherModels.length > 0 && (
+                <CommandGroup heading={t("otherModels")}>
+                  {otherModels.map(renderItem)}
+                </CommandGroup>
+              )}
             </CommandList>
           </Command>
         </div>
       )}
     </div>
+  )
+}
+
+/** Small pill marking the operator-configured default for this task. */
+function DefaultBadge({ label }: { label: string }) {
+  return (
+    <span
+      aria-label={label}
+      className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-brand-teal/15 px-1.5 py-px text-[11px] font-semibold text-brand-teal"
+    >
+      <Sparkles className="h-2.5 w-2.5" />
+      {label}
+    </span>
   )
 }

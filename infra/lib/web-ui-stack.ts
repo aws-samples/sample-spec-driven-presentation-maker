@@ -59,12 +59,20 @@ interface WebUiStackProps extends cdk.StackProps {
   allowedIpV4AddressRanges?: string[];
   /** Allowed IPv6 CIDR ranges for regional WAF. */
   allowedIpV6AddressRanges?: string[];
-  /** Default model ID for the chat task (for "Recommended" badge in Settings). */
+  /** Default model ID for the chat task (for "Default" badge in Settings). */
   defaultChatModelId: string;
-  /** Default model ID for the create task (for "Recommended" badge in Settings). */
+  /** Default model ID for the create task (for "Default" badge in Settings). */
   defaultCreateModelId: string;
   /** Allowed models with resolved display metadata. */
-  allowedModels: Array<{ modelId: string; displayName: string; description?: string }>;
+  allowedModels: Array<{
+    modelId: string;
+    displayName: string;
+    description?: string;
+    /** Capable enough for slide generation (Create picker). */
+    composable?: boolean;
+    /** Listed under the "Recommended" group in the picker. */
+    recommended?: boolean;
+  }>;
   /** Custom OAuth scope for MCP access (e.g. `sdpm-mcp/invoke`). */
   mcpCustomScope?: string;
 }

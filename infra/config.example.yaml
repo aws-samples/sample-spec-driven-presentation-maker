@@ -36,15 +36,27 @@ model:
   # Each entry must be registered in infra/lib/model-metadata.ts.
   # Both defaults.chat and defaults.create must appear in this list.
   allowedModelIds:
+    - "global.anthropic.claude-opus-5-5"             # latest Opus, agentic coding / long-running tasks
     - "global.anthropic.claude-sonnet-5"             # latest Sonnet (default chat/create)
-    - "global.anthropic.claude-opus-4-8"             # latest Opus, deep reasoning
+    - "global.anthropic.claude-opus-4-8"             # previous Opus, deep reasoning
     - "global.anthropic.claude-sonnet-4-6"           # previous Sonnet
     - "global.anthropic.claude-opus-4-7"
     - "global.anthropic.claude-opus-4-6-v1"
     - "global.anthropic.claude-haiku-4-5-20251001-v1:0"
     - "global.openai.gpt-6-astra"                    # Converse API (global inference profile)
+    - "global.openai.gpt-6-sol"                      # Converse API (global inference profile)
+    - "global.openai.gpt-6-luna"                     # Converse API (global inference profile)
     - "global.openai.gpt-5.6-terra"                  # Converse API (global inference profile)
     - "global.moonshotai.kimi-k3"                    # Converse API (global inference profile)
+  # Optional. Models listed here appear under a "Recommended" heading at the top
+  # of the model picker; every other allowed model goes under "Other models".
+  # Order within each group follows the order above. Both defaults must be in
+  # this list. Remove the key for a flat list.
+  recommendedModelIds:
+    - "global.anthropic.claude-sonnet-4-6"           # defaults.chat / create must be listed
+    - "global.anthropic.claude-sonnet-5"
+    - "global.anthropic.claude-opus-5-5"
+    - "global.openai.gpt-6-sol"
 
 # OAuth settings for external MCP clients (Layer 3).
 # enableDCR: Allow any MCP client to register dynamically via RFC 7591 (default: true).
