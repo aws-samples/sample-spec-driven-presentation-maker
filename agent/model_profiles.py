@@ -140,12 +140,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     # OpenAI GPT (Converse API via global inference profile)
     "global.openai.gpt-6-astra": NO_TEMPERATURE_IMPLICIT_CACHE,
     "global.openai.gpt-6-sol": NO_TEMPERATURE_IMPLICIT_CACHE,
-    # Luna is OpenAI's efficiency tier (summarisation / extraction /
-    # classification / routing) — Haiku-class positioning, so keep it out of
-    # the compose picker like Haiku.
-    "global.openai.gpt-6-luna": NO_TEMPERATURE_IMPLICIT_CACHE.with_overrides(
-        compose_capable=False
-    ),
+    "global.openai.gpt-6-luna": NO_TEMPERATURE_IMPLICIT_CACHE,
     "global.openai.gpt-5.6-terra": NO_TEMPERATURE_IMPLICIT_CACHE,
     # Moonshot AI (Converse API via global inference profile)
     "global.moonshotai.kimi-k3": NO_TEMPERATURE_IMPLICIT_CACHE,

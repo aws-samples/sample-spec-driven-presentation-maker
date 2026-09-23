@@ -59,7 +59,6 @@ export const MODEL_METADATA: Record<string, ModelMetadata> = {
   "global.openai.gpt-6-luna": {
     displayName: "GPT-6 Luna",
     description: "Fast and efficient for summarization, extraction and routing",
-    composable: false,
   },
   "global.openai.gpt-5.6-terra": {
     displayName: "GPT-5.6 Terra",
