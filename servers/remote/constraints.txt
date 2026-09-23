@@ -425,7 +425,7 @@ pydantic==2.13.5
     # via
     #   mcp
     #   pydantic-settings
-pydantic-core==2.46.4
+pydantic-core==2.46.5
     # via pydantic
 pydantic-settings==2.15.0
     # via mcp
@@ -487,6 +487,7 @@ typer==0.27.2
     # via mcp
 typing-extensions==4.16.0
     # via
+    #   anyio
     #   grpcio
     #   mcp
     #   opentelemetry-api
