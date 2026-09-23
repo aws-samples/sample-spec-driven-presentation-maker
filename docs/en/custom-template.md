@@ -224,6 +224,8 @@ and token contract are defined in the `style` workflow (`read_workflows(["style"
 | `engineering` | Design reviews and tech talks; code and diagrams first | Dark slate, monospaced code and metrics, one accent plus ok/warn/fail states |
 | `lecture` | Courses and training revisited alone later | Warm paper, define → example → practise rhythm, lesson and step indicators |
 | `report` | Periodic results and operations reports; numbers first | White, serif findings, one deep-green accent, tables and small multiples, greyscale-safe |
+| `briefing` | Technical briefings spoken to decision makers, re-read afterwards | Dark, one teal accent, noun-phrase titles with a topic sentence, header bands and rules instead of cards |
+| `aws-dark` / `aws-light` | Decks about AWS services, architectures and cost — talks/demos (dark) or documents/print (light) | Squid Ink or white ground, official service-category colours for identification, official icons, one Smile Orange emphasis |
 
 ### User-local styles
 

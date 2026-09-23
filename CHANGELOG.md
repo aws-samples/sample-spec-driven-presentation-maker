@@ -24,6 +24,16 @@ Entries before v0.5.0 were written retroactively as summaries.
   never ran on them). Lineup and intent: `docs/en/custom-template.md`.
 - **Style contract test** (`tests/test_builtin_styles_contract.py`) and a
   style-verification sample deck (`tests/fixtures/style-sample-deck/`).
+- **`briefing`, `aws-dark` and `aws-light` bundled styles.** `briefing` is a
+  dark technical-briefing style for decision makers (noun-phrase titles with a
+  topic sentence, header bands and rules instead of cards, one teal accent).
+  `aws-dark` / `aws-light` are AWS-themed: Squid Ink or white ground, the
+  official service-category colours as `--cat-*` tokens with per-background
+  tints, official icons, one Smile Orange emphasis per slide; the two files
+  differ only in `:root` and the palette specimens.
+- **`"_noEffects": true`** is documented in the slide JSON spec as the way to
+  suppress a template theme shadow on a filled shape (the builder already
+  honoured it; styles that forbid shadows now name it).
 - **Claude Opus 5.5, GPT-6 Sol and GPT-6 Luna** are selectable models
   (`global.anthropic.claude-opus-5-5`, `global.openai.gpt-6-sol`,
   `global.openai.gpt-6-luna`). Opus 5.5 uses the extended-thinking profile
