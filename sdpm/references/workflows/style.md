@@ -97,6 +97,12 @@ The demo slides are read as coordinates, so the format is constrained:
 - **Describe by design, not by brand.** Do not name companies, firms or presenters whose
   decks the style resembles, and do not describe the style as "what AI decks look like" or
   its opposite. Say what the style does and for whom.
+- **State rules, not engine behaviour.** "This style has no shadows" is a rule; "shapes render
+  without a shadow unless `shadow` is set" is how the builder works and does not belong in a
+  style. If a default behaviour of the engine surprises composers, fix the engine rather than
+  warn about it in every style. The only renderer facts worth stating are limits a composer
+  cannot infer (native tables inherit the template font; slide JSON has no letter-spacing,
+  line-height or intermediate font weights).
 - **Comment the patterns.** Each Part 7 slide has an HTML comment: what slide type it is,
   why the elements are arranged this way in this style, what to vary and what not to.
 - Keep text on demo slides as placeholder content ("Claim of this slide stated as a sentence",
