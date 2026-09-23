@@ -235,13 +235,13 @@ to the outline, not the style, so any concept style can carry any kind of deck.
 | Style | Idea | Look |
 |---|---|---|
 | `neo-brutalist` | Blunt hierarchy over polish; "zero apology" | Cream ground, 6px black borders, hard 12px offset shadows, flat primary fills, uppercase labels, square corners |
-| `typographic` | Type is the image; one beat per slide | White, near-black type set huge and tight, one red word at most, no shapes or rules at all |
+| `typographic` | Type is the image; one beat per slide | White, display type at 384px that bleeds off the left edge, focus stacks in black and light grey, one red word or number at most, no shapes or rules at all |
 | `signal` | Warning-sign vocabulary; one thing is highlighted | Near-black, one safety-yellow panel per slide, upright ultra-bold headlines, huge numerals, monospaced metadata, one hazard stripe |
 | `racing` | Momentum; every slide hands off to the next | Near-black, italic condensed headlines, blue-violet-red top stripe, thin white speed lines, one red element |
 | `bento` | One fact per tile; modular product-story rhythm | Soft grey ground, white rounded tiles (20px) on a 24px grid, exactly one dark tile and at most one blue accent tile per slide, faint shadow |
 | `newspaper` | Broadsheet; the deck is meant to be read | Aged paper, near-black serif headlines, 3px masthead rule and 1px hairlines, 2–3 justified columns, drop cap, one red figure or rule |
 | `swiss-poster` | One red geometric shape anchors the page | White, black type at poster sizes that never bleeds, exactly one red circle / bar / band / square (may bleed), 1–2 grid lines, a vertical label |
-| `duotone` | One hard edge, two fields: claim on one, evidence on the other | Near-black and vivid orange only, 50/50 or 33/67 split (vertical or horizontal), white on black, black on orange, no third colour |
+| `duotone` | One hard edge, two fields: claim on one, evidence on the other | Near-black and vivid orange, 50/50 or 33/67 split (vertical or horizontal); near-black type on orange, white and orange type on near-black, grey only for meta; shape bar charts with one white bar |
 | _(more in later phases — see CHANGELOG)_ | | |
 
 ### User-local styles

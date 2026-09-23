@@ -2,497 +2,530 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>duotone — A two-colour presentation look for rooms where one claim has to land from the back row; every slide is cut by a single hard edge into a near-black field and a vivid orange field, the claim standing on one side and its evidence on the other, with no third colour, no cards, no shadows and no rounded corners.</title>
+<title>duotone — A two-field presentation look for a claim that has to land from the back row of a large room or a shared screen; every slide is cut by one hard edge into a near-black field and a vivid orange field, the claim standing on one side and its evidence on the other, and the design decision is that contrast alone carries the hierarchy, so the type is very large and very heavy, orange is the accent voice on the dark field, and there are no cards, no shadows, no rounded corners and no third colour.</title>
 <style>
 :root {
-  --color-text:#FFFFFF;
-  --color-bg:#1D1D1B;
-  --color-surface:#1D1D1B;
-  --color-border:#FFFFFF;
-  --color-muted:#FFFFFF;
-  --accent:#FF4F00;
-  --color-on-accent:#1D1D1B;
-  --font-family:"Helvetica Neue",Arial,"Segoe UI","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
-  --fs-cover-title:84pt;
-  --fs-slide-title:44pt;
-  --fs-heading:26pt;
-  --fs-body:18pt;
-  --fs-caption:14pt;
-  --fs-label:12pt;
-  --fs-metric:140pt;
-  --fs-metric-sm:64pt;
-  --split-50:960px;
-  --split-33:640px;
-  --split-67:1280px;
-  --split-h:540px;
-  --margin-x:96px;
-  --field-pad:96px;
-  --field-pad-y:72px;
-  --field-w-50:768px;
-  --field-w-33:448px;
-  --field-w-67:1088px;
-  --title-zone-h:200px;
-  --content-top:392px;
-  --content-top-bare:144px;
-  --content-bottom:984px;
-  --rule-thin:2px;
-  --border-thin:2px;
-  --frame-strong:6px;
-  --radius:0px;
-  --shadow:none;
+  --color-text: #FFFFFF;
+  --color-bg: #1D1D1B;
+  --color-surface: #1D1D1B;
+  --color-border: #FFFFFF;
+  --color-muted: #AAAAAA;
+  --accent: #FF4F00;
+  --color-on-accent: #1D1D1B;
+  --font-family: "Helvetica Neue", Arial, "Segoe UI", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+  --fs-cover-title: 90pt;
+  --fs-slide-title: 60pt;
+  --fs-metric: 216pt;
+  --fs-metric-sm: 90pt;
+  --fs-heading: 32pt;
+  --fs-body: 24pt;
+  --fs-caption: 18pt;
+  --fs-label: 14pt;
+  --split-50: 960px;
+  --split-33: 640px;
+  --split-67: 1280px;
+  --split-h: 540px;
+  --field-pad: 96px;
+  --field-w-50: 768px;
+  --field-w-33: 448px;
+  --field-w-67: 1088px;
+  --label-top: 88px;
+  --title-top: 144px;
+  --title-zone-h: 240px;
+  --content-top: 440px;
+  --content-bottom: 984px;
+  --lead-w: 200px;
+  --lead-gap: 216px;
+  --rule-thin: 2px;
+  --border-thin: 2px;
+  --radius: 0px;
+  --shadow: none;
 }
-* {box-sizing:border-box}
+* {box-sizing: border-box}
 body {
-  margin:0;
-  padding:30pt;
-  background:#000000;
-  font-family:var(--font-family);
+  margin: 0;
+  padding: 30pt;
+  background: #000000;
+  font-family: var(--font-family);
   zoom: 0.7;
 }
 .slide {
-  position:relative;
-  width:1920px;
-  height:1080px;
-  margin:0 auto 30pt;
-  overflow:hidden;
-  background:var(--color-bg);
-  color:var(--color-text);
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  margin: 0 auto 30pt;
+  overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
-.el {position:absolute}
+.el {position: absolute}
 /* the one orange field — a single rectangle drawn on the deck ground */
-.field {background:var(--accent)}
-/* text colour is set per element: white is the deck default, near-black is explicit */
-.on-accent {color:var(--color-on-accent)}
+.field {background: var(--accent)}
+/* colour roles. near-black is the ONLY text colour on the orange field;
+   orange and grey are only ever used on the dark field. */
+.on-accent {color: var(--color-on-accent)}
+.accent {color: var(--accent)}
+.muted {color: var(--color-muted)}
 .t-cover-title {
-  font-size:calc(var(--fs-cover-title) * 1.5);
-  font-weight:900;
-  line-height:.95;
-  letter-spacing:-2.5pt;
+  font-size: calc(var(--fs-cover-title) * 1.5);
+  font-weight: 900;
+  line-height: .95;
+  letter-spacing: -3pt;
 }
 .t-slide-title {
-  font-size:calc(var(--fs-slide-title) * 1.5);
-  font-weight:900;
-  line-height:.95;
-  letter-spacing:-1.2pt;
+  font-size: calc(var(--fs-slide-title) * 1.5);
+  font-weight: 900;
+  line-height: .95;
+  letter-spacing: -2pt;
 }
 .t-heading {
-  font-size:calc(var(--fs-heading) * 1.5);
-  font-weight:900;
-  line-height:1.1;
+  font-size: calc(var(--fs-heading) * 1.5);
+  font-weight: 900;
+  line-height: 1.15;
 }
 .t-body {
-  font-size:calc(var(--fs-body) * 1.5);
-  font-weight:400;
-  line-height:1.45;
+  font-size: calc(var(--fs-body) * 1.5);
+  font-weight: 400;
+  line-height: 1.45;
+}
+.t-lead {
+  font-size: calc(var(--fs-body) * 1.5);
+  font-weight: 900;
+  line-height: 1.45;
 }
 .t-caption {
-  font-size:calc(var(--fs-caption) * 1.5);
-  font-weight:400;
-  line-height:1.4;
+  font-size: calc(var(--fs-caption) * 1.5);
+  font-weight: 400;
+  line-height: 1.4;
 }
 .t-label {
-  font-size:calc(var(--fs-label) * 1.5);
-  font-weight:700;
-  line-height:1.2;
-  letter-spacing:1.6pt;
-  text-transform:uppercase;
+  font-size: calc(var(--fs-label) * 1.5);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 1.6pt;
+  text-transform: uppercase;
 }
 .t-metric {
-  font-size:calc(var(--fs-metric) * 1.5);
-  font-weight:900;
-  line-height:.82;
-  letter-spacing:-6pt;
+  font-size: calc(var(--fs-metric) * 1.5);
+  font-weight: 900;
+  line-height: .82;
+  letter-spacing: -10pt;
 }
 .t-metric-sm {
-  font-size:calc(var(--fs-metric-sm) * 1.5);
-  font-weight:900;
-  line-height:.9;
-  letter-spacing:-2.5pt;
+  font-size: calc(var(--fs-metric-sm) * 1.5);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -4pt;
 }
-/* 2px hairlines, bars and the 6px image frame take the colour of the field they sit in */
-.rule-w {background:var(--color-text)}
-.rule-k {background:var(--color-on-accent)}
-.frame-img {border:var(--frame-strong) solid currentColor}
-.bar-solid-w {background:var(--color-text)}
-.bar-open-w {border:var(--frame-strong) solid var(--color-text)}
-.bar-solid-k {background:var(--color-on-accent)}
-.bar-open-k {border:var(--frame-strong) solid var(--color-on-accent)}
-.rule-list {margin:0;padding:0;list-style:none}
-.rule-list li {position:relative;padding-left:36px;margin-bottom:9pt}
-.rule-list li:before {content:"";position:absolute;left:0;top:15px;width:16px;height:16px;background:currentColor}
-.rule-list.no li:before {top:22px;height:4px}
-.limit-list {margin:0;padding:0;list-style:none}
-.limit-list li {margin-bottom:9pt}
-.limit-list b {font-weight:900}
-.ramp-name {font-weight:700;letter-spacing:1.4pt;text-transform:uppercase}
-.tbl {width:100%;height:100%;border-collapse:collapse}
-.tbl th,.tbl td {padding:11pt 18pt;text-align:left;border-bottom:var(--rule-thin) solid currentColor;font-size:calc(var(--fs-caption) * 1.5);font-weight:400}
-.tbl th {font-size:calc(var(--fs-label) * 1.5);font-weight:700;letter-spacing:1.4pt;text-transform:uppercase}
-.tbl td.num,.tbl th.num {text-align:right}
-.tbl td strong {font-weight:900}
-.tbl tr:last-child td {border-bottom:0}
-.tbl th:first-child,.tbl td:first-child {width:34%}
-.step b {display:block;font-weight:900}
+/* 2px hairlines and chart bars take a field colour — never a tint */
+.rule-w {background: var(--color-text)}
+.rule-k {background: var(--color-on-accent)}
+.bar-k {background: var(--color-on-accent)}
+.bar-w {background: var(--color-text)}
+.bar-a {background: var(--accent)}
+.rule-list {margin: 0; padding: 0; list-style: none}
+.rule-list li {position: relative; padding-left: 40px; margin-bottom: 6pt}
+.rule-list li:before {content: ""; position: absolute; left: 0; top: 20px; width: 20px; height: 20px; background: currentColor}
+.flat-list {margin: 0; padding: 0; list-style: none}
+.flat-list li {margin-bottom: 6pt}
+.flat-list b {font-weight: 900}
+.split-list {margin: 0; padding: 0; list-style: none}
+.split-list li {margin-bottom: 6pt}
+.split-list b {display: block; font-weight: 900}
+.split-list span {font-size: calc(var(--fs-caption) * 1.5)}
+.ramp-name {font-weight: 700; letter-spacing: 1.4pt; text-transform: uppercase; font-size: calc(var(--fs-label) * 1.5)}
+.tbl {width: 100%; height: 100%; border-collapse: collapse}
+.tbl th, .tbl td {padding: 10pt 18pt; text-align: left; border-bottom: var(--rule-thin) solid var(--color-text); font-size: calc(var(--fs-caption) * 1.5); font-weight: 400}
+.tbl th {font-size: calc(var(--fs-label) * 1.5); font-weight: 700; letter-spacing: 1.4pt; text-transform: uppercase}
+.tbl td.num, .tbl th.num {text-align: right}
+.tbl td.acc {color: var(--accent); font-weight: 900}
+.tbl tr:last-child td {border-bottom: 0}
+.tbl th:first-child, .tbl td:first-child {width: 34%}
 </style>
 </head>
 <body>
-<!-- Part 0: the title and the single token block. Two colours, one white, one geometry family — the whole system lives in :root. -->
-<!-- Part 1: the cover states the split before it states anything else: one hard vertical edge at x=960, the name on the orange field, the framing on the near-black field. -->
-<!-- Type: cover. The deck name sits in the orange field in near-black; what the reader needs in order to place the deck sits in the opposite field in white. Nothing competes with the edge. -->
+<!-- Part 0: the title and the single token block live in <head>. Two field colours, white, one
+     accent voice, one grey for meta — the whole system is in :root. -->
+
+<!-- Part 1: Cover. The cover states the split before it states anything else, and it states the
+     accent rule at full size: the name in near-black on the orange field, the echo of the name in
+     ORANGE on the dark field at the same size. The echo is what tells the reader the two fields
+     are one sentence, not two panels. -->
+<!-- Type: cover. Composition A — echo cover. Split A, orange left. MAY VARY: which half of the
+     title goes on which field, 1 to 3 lines each. MAY NOT VARY: both halves at --fs-cover-title,
+     the dark half in orange, meta in grey at the foot of the dark field, nothing else on the slide. -->
 <div class="slide">
   <div class="el field" style="left:0px;top:0px;width:960px;height:1080px;"></div>
-  <div class="el t-label on-accent" style="left:96px;top:88px;width:768px;height:30px;">BUNDLED STYLE / CONCEPT TIER</div>
-  <div class="el t-cover-title on-accent" style="left:96px;top:300px;width:768px;height:360px;">Duotone</div>
-  <div class="el t-body on-accent" style="left:96px;top:900px;width:768px;height:84px;">Two colours. One edge.</div>
-  <div class="el t-label" style="left:1056px;top:88px;width:768px;height:30px;">PLACEHOLDER SUBTITLE LINE</div>
-  <div class="el t-heading" style="left:1056px;top:392px;width:768px;height:200px;">Claim on one field, evidence on the other</div>
-  <div class="el t-body" style="left:1056px;top:640px;width:768px;height:200px;">Placeholder standfirst of two short sentences. State what the deck argues, not what it contains.</div>
-  <div class="el t-label" style="left:1056px;top:954px;width:768px;height:30px;">PLACEHOLDER DATE / PLACEHOLDER TEAM</div>
+  <div class="el t-label on-accent" style="left:96px;top:96px;width:768px;height:34px;">BUNDLED STYLE / CONCEPT TIER</div>
+  <div class="el t-cover-title on-accent" style="left:96px;top:240px;width:768px;height:540px;">Duotone</div>
+  <div class="el t-cover-title accent" style="left:1056px;top:240px;width:768px;height:540px;">One hard edge</div>
+  <div class="el t-body muted" style="left:1056px;top:840px;width:768px;height:100px;">Placeholder team · 2026-09</div>
 </div>
 
-<!-- Part 2: Rules. The design decision comes first and every limit is derived from it. The DO list stands on the orange field and the DON'T list on the near-black field, so the slide is its own specimen. -->
-<!-- Type: rules. Split A with the orange field on the left. The field with the title starts its content at y=392; the field without it starts at y=144, which is how the opposite list gets room for the decision paragraph above it. -->
+<!-- Part 2: Rules. The design decision comes first and every limit follows from it. The DO list
+     stands on the orange field and the DON'T list on the dark field, so the slide is its own
+     specimen. -->
+<!-- Type: rules. Split A, orange left. The orange field takes the title, so its content starts at
+     y=440; the dark field has no title, so its decision paragraph starts at y=144. -->
 <div class="slide">
   <div class="el field" style="left:0px;top:0px;width:960px;height:1080px;"></div>
-  <div class="el t-label on-accent" style="left:96px;top:88px;width:768px;height:30px;">PART 2 / RULES</div>
-  <div class="el t-slide-title on-accent" style="left:96px;top:144px;width:768px;height:200px;">One edge decides the page</div>
-  <div class="el t-body on-accent" style="left:96px;top:392px;width:768px;height:592px;">
+  <div class="el t-label on-accent" style="left:96px;top:88px;width:768px;height:34px;">PART 2 / RULES</div>
+  <div class="el t-slide-title on-accent" style="left:96px;top:144px;width:768px;height:240px;">One edge decides it</div>
+  <div class="el t-body on-accent" style="left:96px;top:440px;width:768px;height:500px;">
     <ul class="rule-list">
-      <li>Cut each slide with exactly 1 edge.</li>
-      <li>Take that edge from the 4 splits.</li>
-      <li>Claim on one field, proof on the other.</li>
-      <li>1 title per slide, 2 lines at most.</li>
-      <li>2 body blocks per field, no more.</li>
-      <li>White on near-black, near-black on orange.</li>
-      <li>Size makes hierarchy: 1 largest item.</li>
-      <li>Label every value and unit directly.</li>
+      <li>Cut the slide with 1 edge.</li>
+      <li>Use 1 of the 4 splits.</li>
+      <li>Claim here, proof there.</li>
+      <li>1 title, 6 words, 2–3 lines.</li>
+      <li>Orange words, dark field only.</li>
+      <li>Near-black type on orange.</li>
     </ul>
   </div>
-  <div class="el t-label" style="left:1056px;top:88px;width:768px;height:30px;">DO NOT / KEEP THE CUT HARD</div>
-  <div class="el t-body" style="left:1056px;top:144px;width:768px;height:270px;">Read at distance, often on a screen nobody can walk up to: contrast does the work a grid, a card or a shadow would do elsewhere. So the slide is one straight cut across two flat fields, and nothing may soften it.</div>
-  <div class="el t-body" style="left:1056px;top:430px;width:768px;height:554px;">
-    <ul class="rule-list no">
-      <li>0 colours beyond the two fields.</li>
-      <li>0 greys, tints or second accents.</li>
-      <li>0 cards, panels, badges or outlines.</li>
-      <li>0 elements across the edge, 0 second edges.</li>
-      <li>0 gradients, shadows, rotation or radius.</li>
-      <li>0 white text on orange — it reaches 3.3:1.</li>
-      <li>0 emoji; fill icons with one field colour.</li>
-      <li>0 gridlines that carry no information.</li>
+  <div class="el t-label accent" style="left:1056px;top:88px;width:768px;height:34px;">DO NOT / KEEP THE CUT HARD</div>
+  <div class="el t-body" style="left:1056px;top:144px;width:768px;height:290px;">Read from the back of a room: contrast does the work a grid, a card or a shadow would do elsewhere.</div>
+  <div class="el t-body" style="left:1056px;top:520px;width:768px;height:460px;">
+    <ul class="flat-list">
+      <li>0 second edges, 0 crossings.</li>
+      <li>0 cards, panels or badges.</li>
+      <li>0 white type on orange.</li>
+      <li>0 grey on the orange field.</li>
+      <li>0 greys in body copy.</li>
+      <li>0 shadows, radius, rotation.</li>
     </ul>
   </div>
 </div>
 
-<!-- Type: limits. The same rules as countable numbers, so a composer can check a slide against a list instead of a paragraph. Split A with the orange field on the right. -->
+<!-- Type: limits. The same rules as countable numbers, so a composer can check a built slide
+     against a list instead of a paragraph. Split A, orange right. The identity is the single hard
+     edge and two flat fields: the accent is never a stripe, a badge or a rule — only type and
+     chart bars. That is what separates this style from its stripe-and-badge siblings. -->
 <div class="slide">
   <div class="el field" style="left:960px;top:0px;width:960px;height:1080px;"></div>
-  <div class="el t-label" style="left:96px;top:88px;width:768px;height:30px;">PART 2 / LIMITS</div>
-  <div class="el t-slide-title" style="left:96px;top:144px;width:768px;height:200px;">Count before you build</div>
-  <div class="el t-body" style="left:96px;top:392px;width:768px;height:300px;">Every number opposite is a ceiling, not a suggestion. A slide that needs a fifth split, a third colour or a third body block is two slides.</div>
-  <div class="el t-body" style="left:96px;top:740px;width:768px;height:160px;">Contrast is measured, not assumed: white on near-black reaches 16.8:1 and near-black on orange 5.1:1, so both pass at every size used here.</div>
-  <div class="el t-label on-accent" style="left:1056px;top:88px;width:768px;height:30px;">NUMERIC LIMITS</div>
+  <div class="el t-label accent" style="left:96px;top:88px;width:768px;height:34px;">PART 2 / LIMITS</div>
+  <div class="el t-slide-title" style="left:96px;top:144px;width:768px;height:240px;">Count the parts</div>
+  <div class="el t-body" style="left:96px;top:440px;width:768px;height:290px;">Every number opposite is a ceiling, not a target. A slide that needs a fifth split or a third block is two slides.</div>
+  <div class="el t-caption muted" style="left:96px;top:760px;width:768px;height:220px;">Contrast is measured, not assumed: white on near-black 16.8:1, near-black on orange 5.2:1, orange on near-black 5.2:1, grey on near-black 7.4:1.</div>
+  <div class="el t-label on-accent" style="left:1056px;top:88px;width:768px;height:34px;">NUMERIC LIMITS</div>
   <div class="el t-body on-accent" style="left:1056px;top:144px;width:768px;height:840px;">
-    <ul class="limit-list">
-      <li><b>1</b> split per slide, from <b>4</b> allowed</li>
-      <li><b>2</b> colours per slide, <b>0</b> greys</li>
-      <li><b>1</b> title, <b>2</b> lines, <b>6</b> words</li>
-      <li><b>2</b> body blocks per field</li>
+    <ul class="flat-list">
+      <li><b>1</b> split, from <b>4</b> allowed</li>
+      <li><b>2</b> field colours plus white</li>
+      <li>orange type: dark field only</li>
+      <li>grey: dark-field meta, <b>14–24pt</b></li>
+      <li><b>1</b> title, <b>6</b> words, <b>2–3</b> lines</li>
+      <li><b>2</b> body blocks per field + meta</li>
       <li><b>30–70</b> words per content slide</li>
-      <li><b>0</b> boxes, <b>3</b> hairlines of <b>2px</b> per field (relationship connectors are the one exception: up to <b>8</b>, all 2px)</li>
-      <li><b>1</b> image per slide, <b>6px</b> frame</li>
-      <li><b>0°</b> rotation, <b>0</b> shadows, <b>0px</b> radius</li>
-      <li><b>96px</b> across and <b>72px</b> down from every edge</li>
+      <li><b>3–5</b> bars, <b>0</b> gridlines</li>
+      <li><b>96px</b> inset on every field edge</li>
     </ul>
   </div>
 </div>
 
-<!-- Part 3: Message and Outline. Both slides derive their writing rules from the split itself — what a field can hold, how long the deck runs, how often the edge turns. No chapter shape is prescribed, because a split carries no purpose. -->
-<!-- Type: message. Split B with the orange field taking the 67% side. The title always stands on the larger field: at 44pt a 448px column fits about 9 characters per line, which is not a title. -->
+<!-- Part 3: Message and Outline. Both slides derive their writing rules from the split itself:
+     what a field can hold at this type size, how long the deck runs, how often the edge turns. -->
+<!-- Type: message. Split B with the orange field on the 67% side. The title always stands on the
+     wider field — at 60pt a 448px column holds 6 Latin characters, which is not a title. -->
 <div class="slide">
   <div class="el field" style="left:640px;top:0px;width:1280px;height:1080px;"></div>
-  <div class="el t-label" style="left:96px;top:88px;width:448px;height:30px;">PART 3 / MESSAGE</div>
-  <div class="el t-body" style="left:96px;top:144px;width:448px;height:500px;">The edge is the argument: claim here, proof there. Decide which field holds the claim before writing a word, then keep that decision for the whole slide.</div>
-  <div class="el t-label on-accent" style="left:736px;top:88px;width:1088px;height:30px;">TITLE GRAMMAR / ONE CLAIM</div>
-  <div class="el t-slide-title on-accent" style="left:736px;top:144px;width:1088px;height:200px;">Two fields, two jobs</div>
-  <div class="el t-heading on-accent" style="left:736px;top:392px;width:1088px;height:60px;">Six words, one assertion</div>
-  <div class="el t-body on-accent" style="left:736px;top:470px;width:1088px;height:230px;">Write the title as one assertion of 6 words or fewer, in sentence case, 2 lines at most. This is arithmetic, not taste: at 44pt a 768px field holds about 16 characters per line and a 1088px field about 22. Drop the articles before you drop the verb.</div>
-  <div class="el rule-k" style="left:736px;top:740px;width:1088px;height:2px;"></div>
-  <div class="el t-body on-accent" style="left:736px;top:780px;width:1088px;height:204px;">One claim per slide, and the title is that claim. The opposite field answers only that claim: a measure, a set of three, a table, a chart. A second claim needs a second slide, never a second split.</div>
+  <div class="el t-label accent" style="left:96px;top:88px;width:448px;height:34px;">PART 3 / MESSAGE</div>
+  <div class="el t-body" style="left:96px;top:144px;width:448px;height:560px;">The edge is the argument: claim on one field, proof on the other. Decide which field holds the claim before writing a word.</div>
+  <div class="el t-label on-accent" style="left:736px;top:88px;width:1088px;height:34px;">TITLE GRAMMAR / ONE CLAIM</div>
+  <div class="el t-slide-title on-accent" style="left:736px;top:144px;width:1088px;height:240px;">Two fields, two jobs</div>
+  <div class="el t-heading on-accent" style="left:736px;top:440px;width:1088px;height:74px;">Six words, one assertion</div>
+  <div class="el t-body on-accent" style="left:736px;top:520px;width:1088px;height:350px;">Write the title as one assertion of 6 words or fewer, sentence case, 2 lines at most. At 60pt a 1088px field holds about 15 Latin or 9 Japanese characters per line; a 448px field holds 6 and 4, so a title there takes 3 short lines instead.</div>
+  <div class="el rule-k" style="left:736px;top:890px;width:1088px;height:2px;"></div>
+  <div class="el t-body on-accent" style="left:736px;top:910px;width:1088px;height:74px;">A second claim needs a second slide.</div>
 </div>
 
-<!-- Type: outline. Split C with the orange field on the narrow right side. Deck length and density are ranges; the split rhythm is the only sequencing rule this look imposes. -->
+<!-- Type: outline. Split C, orange on the narrow right. Deck length and density are ranges; the
+     split rhythm is the only sequencing rule this look imposes. No chapter shape belongs to a
+     split, so a section change is a title slide, not a divider graphic. -->
 <div class="slide">
   <div class="el field" style="left:1280px;top:0px;width:640px;height:1080px;"></div>
-  <div class="el t-label" style="left:96px;top:88px;width:1088px;height:30px;">PART 3 / OUTLINE</div>
-  <div class="el t-slide-title" style="left:96px;top:144px;width:1088px;height:200px;">Length follows contrast</div>
-  <div class="el t-body" style="left:96px;top:392px;width:520px;height:420px;">
-    <div class="ramp-name">DECK LENGTH</div>
-    <div class="t-metric-sm">12–20</div>
-    <div>Slides. High contrast tires the eye sooner than it tires the mind, so split content across more slides rather than filling a field.</div>
-  </div>
-  <div class="el t-body" style="left:664px;top:392px;width:520px;height:420px;">
-    <div class="ramp-name">WORDS PER SLIDE</div>
-    <div class="t-metric-sm">30–70</div>
-    <div>Words on a content slide, title included. Two fields hold two thoughts; a third thought is the next slide.</div>
-  </div>
-  <div class="el t-label on-accent" style="left:1376px;top:88px;width:448px;height:30px;">SPLIT RHYTHM</div>
-  <div class="el t-body on-accent" style="left:1376px;top:144px;width:448px;height:840px;">No chapter shape belongs to this style. Order the claims by the logic of the argument, then assign splits: long evidence takes the 67% field, a single measure the 50/50, a wide table or a four-part set the horizontal split. Open on the cover split and close on the same one; in between, turn the edge every 3 to 4 slides so the deck keeps a beat without any slide needing two edges. A section change is a title slide, not a divider graphic.</div>
+  <div class="el t-label accent" style="left:96px;top:88px;width:1088px;height:34px;">PART 3 / OUTLINE</div>
+  <div class="el t-slide-title" style="left:96px;top:144px;width:1088px;height:240px;">Length follows contrast</div>
+  <div class="el t-label accent" style="left:96px;top:440px;width:540px;height:34px;">DECK LENGTH</div>
+  <div class="el t-metric-sm" style="left:96px;top:490px;width:540px;height:190px;">12&ndash;20</div>
+  <div class="el t-body" style="left:96px;top:700px;width:540px;height:220px;">Slides. High contrast tires the eye sooner than the mind.</div>
+  <div class="el t-label accent" style="left:644px;top:440px;width:540px;height:34px;">WORDS PER SLIDE</div>
+  <div class="el t-metric-sm" style="left:644px;top:490px;width:540px;height:190px;">30&ndash;70</div>
+  <div class="el t-body" style="left:644px;top:700px;width:540px;height:220px;">Words including the title. Two fields hold two thoughts.</div>
+  <div class="el t-label on-accent" style="left:1376px;top:88px;width:448px;height:34px;">SPLIT RHYTHM</div>
+  <div class="el t-body on-accent" style="left:1376px;top:144px;width:448px;height:800px;">Order the claims by the argument, then assign splits: long evidence takes the 67% field, one measure the 50/50, a wide table the horizontal split. Turn the edge every 3 or 4 slides.</div>
 </div>
 
-<!-- Part 4: Palette. Two colours, one white, nothing else. The slide also fixes the one thing a composer has to do by hand — set near-black text on the orange field, because the deck default text colour is white. -->
-<!-- Type: palette. Split A with the orange field on the right, so both text colours are shown at body size side by side. -->
+<!-- Part 4: Palette. Two field colours, white, one accent voice, one grey. The slide fixes the two
+     things a composer has to do by hand: set near-black type on the orange field, because the deck
+     default text colour is white, and reach for orange type on the dark field instead of a tint. -->
+<!-- Type: palette. Split A, orange right, so both text colours are shown at body size side by side. -->
 <div class="slide">
   <div class="el field" style="left:960px;top:0px;width:960px;height:1080px;"></div>
-  <div class="el t-label" style="left:96px;top:88px;width:768px;height:30px;">PART 4 / PALETTE</div>
-  <div class="el t-slide-title" style="left:96px;top:144px;width:768px;height:200px;">Two colours, no middle</div>
-  <div class="el t-heading" style="left:96px;top:392px;width:768px;height:60px;">Near-black #1D1D1B</div>
-  <div class="el t-body" style="left:96px;top:470px;width:768px;height:250px;">The ground, applied to the whole deck. Text on it is white at 16.8:1. It is also the text colour used on the orange field, so the deck needs no third value anywhere.</div>
-  <div class="el rule-w" style="left:96px;top:742px;width:768px;height:2px;"></div>
-  <div class="el t-body" style="left:96px;top:776px;width:768px;height:208px;">There is no surface or muted colour here: both tokens resolve to the ground and to white on purpose, so nobody can reach for a grey. Go smaller instead.</div>
-  <div class="el t-heading on-accent" style="left:1056px;top:144px;width:768px;height:60px;">Orange #FF4F00</div>
-  <div class="el t-body on-accent" style="left:1056px;top:222px;width:768px;height:250px;">One field per slide — never a highlight, a bullet, a badge or a rule inside the other field. Text on it is always near-black at 5.1:1; white on orange reaches 3.3:1 and is not used at any size.</div>
-  <div class="el rule-k" style="left:1056px;top:510px;width:768px;height:2px;"></div>
-  <div class="el t-body on-accent" style="left:1056px;top:550px;width:768px;height:434px;">Set fontColor to #1D1D1B on every element standing on the orange field: the deck default is white, so an unset element disappears. Photographs keep their own colours — there is no two-tone filter to apply — so place one image inside a single field with a 6px frame in that field's text colour, and never across the edge.</div>
+  <div class="el t-label accent" style="left:96px;top:88px;width:768px;height:34px;">PART 4 / PALETTE</div>
+  <div class="el t-slide-title" style="left:96px;top:144px;width:768px;height:240px;">Two fields, one voice</div>
+  <div class="el t-heading" style="left:96px;top:440px;width:768px;height:74px;">Near-black #1D1D1B</div>
+  <div class="el t-body" style="left:96px;top:530px;width:768px;height:230px;">The ground, applied to the whole deck. White type on it reaches 16.8:1.</div>
+  <div class="el t-heading accent" style="left:96px;top:780px;width:768px;height:74px;">Orange type 5.2:1</div>
+  <div class="el t-caption muted" style="left:96px;top:880px;width:768px;height:100px;">Grey #AAAAAA at 7.4:1 &mdash; meta, captions and axis labels on this field only, 14 to 24pt.</div>
+  <div class="el t-label on-accent" style="left:1056px;top:88px;width:768px;height:34px;">ON THE ORANGE FIELD</div>
+  <div class="el t-heading on-accent" style="left:1056px;top:144px;width:768px;height:74px;">Orange #FF4F00</div>
+  <div class="el t-body on-accent" style="left:1056px;top:240px;width:768px;height:300px;">One field per slide. Type on it is always near-black at 5.2:1; white type reaches only 3.3:1 and is never used.</div>
+  <div class="el rule-k" style="left:1056px;top:570px;width:768px;height:2px;"></div>
+  <div class="el t-body on-accent" style="left:1056px;top:610px;width:768px;height:374px;">A white shape may stand here: the highlighted bar of a chart is white at 3.3:1, which the 3:1 limit for non-text allows. Type never is.</div>
 </div>
 
-<!-- Part 5: Typography. One family, two weights, one ramp. Weight 900 at line-height 0.95 is what makes a headline read as a block of colour rather than as text sitting on a colour. -->
-<!-- Type: typography. Split D, orange on top: display sizes on the orange field, reading sizes on the near-black field, every row labelled with its token. -->
+<!-- Part 5: Typography. One family, two weights, one ramp. Weight 900 at line height 0.95 is what
+     makes a headline read as a block of colour rather than text sitting on a colour — and it is the
+     only display device here, so Japanese headlines carry exactly as well as Latin ones. -->
+<!-- Type: typography. Split D, orange on top: display sizes on the orange field, reading sizes on
+     the dark field, every row labelled with its token. The unit beside the metric is a separate
+     textbox, baseline-matched — slide JSON has no inline size change. -->
 <div class="slide">
   <div class="el field" style="left:0px;top:0px;width:1920px;height:540px;"></div>
-  <div class="el t-label on-accent" style="left:96px;top:72px;width:1728px;height:30px;">PART 5 / TYPOGRAPHY</div>
-  <div class="el t-metric on-accent" style="left:96px;top:150px;width:860px;height:280px;">42%</div>
-  <div class="el t-label on-accent" style="left:1024px;top:200px;width:800px;height:30px;">--FS-METRIC / 140PT / LINE HEIGHT 0.82 / WEIGHT 900</div>
-  <div class="el t-slide-title on-accent" style="left:1024px;top:256px;width:800px;height:110px;">Slide title</div>
-  <div class="el t-label on-accent" style="left:1024px;top:400px;width:800px;height:30px;">--FS-SLIDE-TITLE / 44PT / 0.95 / 2 LINES MAXIMUM</div>
-  <div class="el t-label" style="left:96px;top:612px;width:1728px;height:30px;">READING SIZES / WHITE ON THE NEAR-BLACK FIELD</div>
-  <div class="el t-heading" style="left:96px;top:672px;width:1088px;height:60px;">Heading carries a column</div>
-  <div class="el t-label" style="left:1256px;top:684px;width:568px;height:30px;">--FS-HEADING / 26PT / 1.1 / WEIGHT 900</div>
-  <div class="el rule-w" style="left:96px;top:762px;width:1728px;height:2px;"></div>
-  <div class="el t-body" style="left:96px;top:792px;width:1088px;height:56px;">Body text stays regular weight and sentence case.</div>
-  <div class="el t-label" style="left:1256px;top:800px;width:568px;height:30px;">--FS-BODY / 18PT / 1.45 / WEIGHT 400</div>
-  <div class="el t-caption" style="left:96px;top:866px;width:1088px;height:50px;">Caption qualifies a measure. Never below 14pt, never grey.</div>
-  <div class="el t-label" style="left:1256px;top:872px;width:568px;height:30px;">--FS-CAPTION 14PT / --FS-LABEL 12PT</div>
-  <div class="el t-label" style="left:96px;top:944px;width:1728px;height:40px;">ONE FAMILY / WEIGHTS 900 AND 400 ONLY / 0 ITALICS / TIGHT TRACKING IS DEMO RENDERING ONLY — SLIDE JSON HAS NO LETTER-SPACING</div>
+  <div class="el t-label on-accent" style="left:96px;top:72px;width:1728px;height:34px;">PART 5 / TYPOGRAPHY</div>
+  <div class="el t-metric on-accent" style="left:96px;top:130px;width:540px;height:360px;">42</div>
+  <div class="el t-metric-sm on-accent" style="left:656px;top:293px;width:200px;height:190px;">%</div>
+  <div class="el t-label on-accent" style="left:900px;top:200px;width:924px;height:34px;">--FS-METRIC / 216PT / 0.82 / WEIGHT 900</div>
+  <div class="el t-slide-title on-accent" style="left:900px;top:260px;width:924px;height:120px;">Slide title</div>
+  <div class="el t-label on-accent" style="left:900px;top:400px;width:924px;height:34px;">--FS-SLIDE-TITLE / 60PT / 0.95 / 2 LINES, 3 IF NARROW</div>
+  <div class="el t-label accent" style="left:96px;top:590px;width:1728px;height:34px;">READING SIZES / WHITE ON THE DARK FIELD</div>
+  <div class="el t-heading" style="left:96px;top:640px;width:1000px;height:74px;">Heading carries a column</div>
+  <div class="el t-label muted" style="left:1160px;top:656px;width:664px;height:34px;">--FS-HEADING / 32PT / 1.15 / 900</div>
+  <div class="el rule-w" style="left:96px;top:730px;width:1728px;height:2px;"></div>
+  <div class="el t-body" style="left:96px;top:750px;width:1000px;height:74px;">Body text stays regular weight.</div>
+  <div class="el t-label muted" style="left:1160px;top:762px;width:664px;height:34px;">--FS-BODY / 24PT / 1.45 / 400</div>
+  <div class="el rule-w" style="left:96px;top:840px;width:1728px;height:2px;"></div>
+  <div class="el t-caption muted" style="left:96px;top:858px;width:1000px;height:60px;">Caption or meta. Grey only on this field.</div>
+  <div class="el t-label muted" style="left:1160px;top:862px;width:664px;height:34px;">--FS-CAPTION 18PT / --FS-LABEL 14PT</div>
+  <div class="el t-label accent" style="left:96px;top:936px;width:1728px;height:40px;">WEIGHTS 900 AND 400 / NO ITALICS / 4 JAPANESE CHARACTERS PER COVER LINE / TRACKING IS DEMO ONLY</div>
 </div>
 
-<!-- Part 6: Frame. There is no title band and no footer in this style: the frame is the orange rectangle itself. These two slides give its exact geometry and the grid inside a field, so every slide of a deck lines up. -->
-<!-- Type: frame, geometry. The orange field is ONE rectangle on the deck ground — the engine already fills the slide with --color-bg, so a composer draws that rectangle and nothing else. Split B with the orange field on the narrow left. -->
+<!-- Part 6: Frame. There is no title band and no footer in this style: the frame is the orange
+     rectangle itself. These two slides give its exact geometry, the grid inside a field, and the
+     two constructions a composer cannot guess — the two-textbox lead word and the shape bar chart. -->
+<!-- Type: frame, geometry. The orange field is ONE rectangle on the deck ground: the engine already
+     fills the slide with --color-bg, so a composer draws that rectangle and nothing else. Split B,
+     orange on the narrow left. -->
 <div class="slide">
   <div class="el field" style="left:0px;top:0px;width:640px;height:1080px;"></div>
-  <div class="el t-label on-accent" style="left:96px;top:88px;width:448px;height:30px;">PART 6 / FRAME</div>
-  <div class="el t-heading on-accent" style="left:96px;top:144px;width:448px;height:180px;">One rectangle makes the split</div>
-  <div class="el t-body on-accent" style="left:96px;top:360px;width:448px;height:624px;">The near-black ground arrives with the deck. Draw exactly one orange rectangle on it, full height or full width, with no line, no radius and no shadow. Take its coordinates from the eight rows opposite. A slide that seems to need another edge is a slide carrying two claims.</div>
-  <div class="el t-label" style="left:736px;top:88px;width:1088px;height:30px;">PART 6 / THE FOUR SPLITS</div>
-  <div class="el t-slide-title" style="left:736px;top:144px;width:1088px;height:200px;">Four edges, eight grounds</div>
-  <div class="el t-body" style="left:736px;top:392px;width:1088px;height:480px;">
-    <ul class="limit-list">
-      <li><b>A / vertical 50:50, edge x=960</b><br>orange 0,0,960,1080 or 960,0,960,1080</li>
-      <li><b>B / vertical 33:67, edge x=640</b><br>orange 0,0,640,1080 or 640,0,1280,1080</li>
-      <li><b>C / vertical 67:33, edge x=1280</b><br>orange 1280,0,640,1080 or 0,0,1280,1080</li>
-      <li><b>D / horizontal 50:50, edge y=540</b><br>orange 0,0,1920,540 or 0,540,1920,540</li>
+  <div class="el t-label on-accent" style="left:96px;top:88px;width:448px;height:34px;">PART 6 / FRAME</div>
+  <div class="el t-heading on-accent" style="left:96px;top:144px;width:448px;height:240px;">One rectangle makes the split</div>
+  <div class="el t-body on-accent" style="left:96px;top:420px;width:448px;height:440px;">The dark ground arrives with the deck. Draw one orange rectangle on it &mdash; no line, no radius.</div>
+  <div class="el t-label accent" style="left:736px;top:88px;width:1088px;height:34px;">THE FOUR SPLITS</div>
+  <div class="el t-slide-title" style="left:736px;top:144px;width:1088px;height:240px;">Four edges, eight grounds</div>
+  <div class="el t-body" style="left:736px;top:420px;width:1088px;height:560px;">
+    <ul class="split-list">
+      <li><b>A / vertical 50:50, edge x=960</b><span>orange 0,0,960,1080 or 960,0,960,1080</span></li>
+      <li><b>B / vertical 33:67, edge x=640</b><span>orange 0,0,640,1080 or 640,0,1280,1080</span></li>
+      <li><b>C / vertical 67:33, edge x=1280</b><span>orange 1280,0,640,1080 or 0,0,1280,1080</span></li>
+      <li><b>D / horizontal 50:50, edge y=540</b><span>orange 0,0,1920,540 or 0,540,1920,540</span></li>
     </ul>
   </div>
-  <div class="el t-body" style="left:736px;top:900px;width:1088px;height:84px;">No other edge exists: no 25:75, no 40:60, no diagonal, no second rectangle.</div>
 </div>
 
-<!-- Type: frame, grid. Split D with the orange field at the bottom. Vertical and horizontal splits keep different vertical grids, because a 540px field cannot hold a two-line title and content underneath it. -->
+<!-- Type: frame, grid and the two non-obvious constructions. Split D, orange at the bottom.
+     Vertical and horizontal splits keep different vertical grids, because a 540px field cannot hold
+     a two-line 60pt title and content underneath it. -->
 <div class="slide">
   <div class="el field" style="left:0px;top:540px;width:1920px;height:540px;"></div>
-  <div class="el t-label" style="left:96px;top:72px;width:1728px;height:30px;">PART 6 / GRID</div>
-  <div class="el t-slide-title" style="left:96px;top:120px;width:1400px;height:110px;">Same grid inside every field</div>
-  <div class="el t-body" style="left:96px;top:280px;width:860px;height:180px;">Vertical splits, full-height fields: label at y=88, title at y=144 in a 200px zone, content from y=392, nothing below y=984. Inset 96px from both field edges.</div>
-  <div class="el t-body" style="left:1024px;top:280px;width:800px;height:180px;">Horizontal split, 540px fields: label at y=72 or y=612, a one-line title at y=120 or y=660, content from y=290 or y=660, nothing below y=468 or y=1008.</div>
-  <div class="el t-label on-accent" style="left:96px;top:612px;width:1728px;height:30px;">REPEATED ON EVERY SLIDE</div>
-  <div class="el t-body on-accent" style="left:96px;top:660px;width:860px;height:348px;">One 12pt uppercase label sits at the top of each field. No page number, no running footer, no logo strip — each would have to hug or cross the edge and would blunt it. The 96px inset gives a 448px column in a 640px field, 1088px in a 1280px field.</div>
-  <div class="el t-body on-accent" style="left:1024px;top:660px;width:800px;height:348px;">The title always stands on the larger field; on a 50/50 either may take it. The field without the title starts its content at y=144, or y=120 in a horizontal field. A closing slide is the same construction with one word.</div>
+  <div class="el t-label accent" style="left:96px;top:72px;width:1728px;height:34px;">PART 6 / GRID</div>
+  <div class="el t-slide-title" style="left:96px;top:130px;width:1728px;height:120px;">One grid per field</div>
+  <div class="el t-caption" style="left:96px;top:270px;width:850px;height:170px;">Full-height field: label y=88, title y=144 in a 240px zone, content from y=440, nothing below y=984. Inset 96px from both field edges.</div>
+  <div class="el t-caption" style="left:976px;top:270px;width:848px;height:170px;">Horizontal field, 540px tall: label y=72 or y=590, a one-line title, content 270&ndash;440 or 640&ndash;920. The field without the title starts its content at the title's y.</div>
+  <div class="el t-label on-accent" style="left:96px;top:590px;width:1728px;height:34px;">REPEATED ON EVERY SLIDE</div>
+  <div class="el t-body on-accent" style="left:96px;top:640px;width:850px;height:280px;">One 14pt label tops each field &mdash; orange on the dark field, near-black on the orange one. No page number, no footer, no logo strip.</div>
+  <div class="el t-body on-accent" style="left:976px;top:640px;width:848px;height:280px;">A coloured lead word is two textboxes: the lead in orange at 900, the body beside it at 400. Slide JSON has no inline colour change.</div>
+  <div class="el t-caption on-accent" style="left:96px;top:930px;width:1728px;height:50px;">Bars are rectangle shapes with direct labels &mdash; a native chart colours a whole series, never one bar.</div>
 </div>
 
-<!-- Part 7: Patterns. Every recurring slide type is rebuilt on the split: the claim field carries the title, the opposite field carries the form. The splits alternate through the set the way they should through a deck. -->
-<!-- Pattern: numbers — Split A, orange left. WHY: the measure needs a field to itself, so the claim keeps the orange field and the near-black field holds one numeral at 140pt with two supporting measures below a hairline. MAY VARY: the values, the supporting measures (two, one, or none), which field is orange. MAY NOT VARY: one numeral is the largest thing on the slide, supporting measures stay at --fs-metric-sm, and every unit is named in the label beside its value. -->
-<div class="slide">
-  <div class="el field" style="left:0px;top:0px;width:960px;height:1080px;"></div>
-  <div class="el t-label on-accent" style="left:96px;top:88px;width:768px;height:30px;">PATTERN / NUMBERS / 01</div>
-  <div class="el t-slide-title on-accent" style="left:96px;top:144px;width:768px;height:200px;">One measure carries it</div>
-  <div class="el t-body on-accent" style="left:96px;top:392px;width:768px;height:300px;">Placeholder sentence naming the basis of the measure: the period it covers, the population behind it and what it is compared against.</div>
-  <div class="el t-label" style="left:1056px;top:88px;width:768px;height:30px;">PRIMARY MEASURE / PLACEHOLDER UNIT</div>
-  <div class="el t-metric" style="left:1056px;top:150px;width:768px;height:280px;">42%</div>
-  <div class="el t-body" style="left:1056px;top:450px;width:768px;height:120px;">Placeholder gloss of one line.</div>
-  <div class="el rule-w" style="left:1056px;top:600px;width:768px;height:2px;"></div>
-  <div class="el t-body" style="left:1056px;top:640px;width:360px;height:240px;">
-    <div class="t-metric-sm">18</div>
-    <div class="ramp-name">PLACEHOLDER UNIT</div>
-  </div>
-  <div class="el t-body" style="left:1464px;top:640px;width:360px;height:240px;">
-    <div class="t-metric-sm">3.4x</div>
-    <div class="ramp-name">PLACEHOLDER RATIO</div>
-  </div>
-</div>
-
-<!-- Pattern: comparison — Split A, orange right. WHY: this is the split's natural pattern. Two options, one per field, at identical coordinates, so the only difference the eye can find is the content, and the orange field marks the recommended option without a highlight, a badge or a tick. MAY VARY: the criteria, 2 to 4 criteria rows, which side is recommended. MAY NOT VARY: matched row positions across the edge, the same criteria in the same order, and exactly two options — a third option is a table. -->
+<!-- Part 7: Patterns. Every recurring slide type is rebuilt on the split: the claim field carries
+     the title, the opposite field carries the form, and the dark field always carries at least one
+     orange element — the label, a lead word, a unit or a bar. The splits alternate through the set
+     the way they should through a deck. -->
+<!-- Pattern: numbers — Composition C, metric with proof. Split A, orange right. WHY: the measure
+     needs a field to itself at 216pt, and its proof is a shape bar chart on the orange field so the
+     reader can see the measure and its history in one look. The unit is orange, which is the one
+     orange element on the dark field here. MAY VARY: the values, 3 to 5 bars, which field is orange.
+     MAY NOT VARY: 2 digits plus a 1-glyph unit at 216pt in a 960px field (a 3-digit figure needs the
+     full-width field or --fs-metric-sm), bar bottoms aligned at y=720, heights proportional to the
+     labelled values, one highlighted bar in white, 0 gridlines, 0 legend. -->
 <div class="slide">
   <div class="el field" style="left:960px;top:0px;width:960px;height:1080px;"></div>
-  <div class="el t-label" style="left:96px;top:88px;width:768px;height:30px;">OPTION A / PLACEHOLDER LABEL</div>
-  <div class="el t-slide-title" style="left:96px;top:144px;width:768px;height:200px;">Option B clears the bar</div>
-  <div class="el t-heading" style="left:96px;top:420px;width:768px;height:60px;">Placeholder option name</div>
-  <div class="el t-body" style="left:96px;top:500px;width:768px;height:440px;">Cost — placeholder evidence in one line.<br><br>Effort — placeholder evidence in one line.<br><br>Risk — placeholder evidence in one line.</div>
-  <div class="el t-label on-accent" style="left:1056px;top:88px;width:768px;height:30px;">OPTION B / RECOMMENDED</div>
-  <div class="el t-heading on-accent" style="left:1056px;top:420px;width:768px;height:60px;">Placeholder option name</div>
-  <div class="el t-body on-accent" style="left:1056px;top:500px;width:768px;height:440px;">Cost — placeholder evidence in one line.<br><br>Effort — placeholder evidence in one line.<br><br>Risk — placeholder evidence in one line.</div>
+  <div class="el t-label accent" style="left:96px;top:88px;width:768px;height:34px;">PATTERN / NUMBERS / 01</div>
+  <div class="el t-metric" style="left:96px;top:240px;width:540px;height:360px;">42</div>
+  <div class="el t-metric-sm accent" style="left:656px;top:402px;width:200px;height:190px;">%</div>
+  <div class="el t-body muted" style="left:96px;top:660px;width:768px;height:220px;">Placeholder basis of the measure: the period, the population and the comparison.</div>
+  <div class="el t-label on-accent" style="left:1056px;top:88px;width:768px;height:34px;">PROOF / PLACEHOLDER UNIT</div>
+  <div class="el rule-k" style="left:1160px;top:720px;width:520px;height:2px;"></div>
+  <div class="el t-lead on-accent" style="left:1160px;top:290px;width:136px;height:60px;">100</div>
+  <div class="el bar-k" style="left:1160px;top:360px;width:136px;height:360px;"></div>
+  <div class="el t-label on-accent" style="left:1160px;top:740px;width:136px;height:34px;">P1</div>
+  <div class="el t-lead on-accent" style="left:1352px;top:380px;width:136px;height:60px;">75</div>
+  <div class="el bar-k" style="left:1352px;top:450px;width:136px;height:270px;"></div>
+  <div class="el t-label on-accent" style="left:1352px;top:740px;width:136px;height:34px;">P2</div>
+  <div class="el t-lead on-accent" style="left:1544px;top:452px;width:136px;height:60px;">55</div>
+  <div class="el bar-w" style="left:1544px;top:522px;width:136px;height:198px;"></div>
+  <div class="el t-label on-accent" style="left:1544px;top:740px;width:136px;height:34px;">P3</div>
+  <div class="el t-caption on-accent" style="left:1056px;top:840px;width:768px;height:120px;">The white bar is the period the claim is about. Placeholder source.</div>
 </div>
 
-<!-- Pattern: process — Split D, orange top. WHY: a sequence needs width, so it runs the full 1728px of the lower field while the claim keeps the upper one; the steps are numerals and text joined by 2px hairlines, because this style has no boxes to put them in. MAY VARY: 3 to 5 steps, the step wording, which field is orange. MAY NOT VARY: equal step columns, connectors as 2px hairlines in the field's own text colour, no chevrons, no arrowheads, no rotation. -->
-<div class="slide">
-  <div class="el field" style="left:0px;top:0px;width:1920px;height:540px;"></div>
-  <div class="el t-label on-accent" style="left:96px;top:72px;width:1728px;height:30px;">PATTERN / PROCESS / 03</div>
-  <div class="el t-slide-title on-accent" style="left:96px;top:120px;width:1400px;height:110px;">Four steps reach the change</div>
-  <div class="el t-body on-accent" style="left:96px;top:290px;width:1400px;height:130px;">Placeholder line stating what has to be true before step one can start. Number the steps only when each one depends on the one before it.</div>
-  <div class="el t-label" style="left:96px;top:612px;width:1728px;height:30px;">SEQUENCE / PLACEHOLDER OWNER</div>
-  <div class="el t-body step" style="left:96px;top:672px;width:384px;height:290px;">
-    <div class="t-metric-sm">01</div>
-    <b>Define</b>
-    Placeholder verb phrase.
-  </div>
-  <div class="el rule-w" style="left:480px;top:730px;width:64px;height:2px;"></div>
-  <div class="el t-body step" style="left:544px;top:672px;width:384px;height:290px;">
-    <div class="t-metric-sm">02</div>
-    <b>Build</b>
-    Placeholder verb phrase.
-  </div>
-  <div class="el rule-w" style="left:928px;top:730px;width:64px;height:2px;"></div>
-  <div class="el t-body step" style="left:992px;top:672px;width:384px;height:290px;">
-    <div class="t-metric-sm">03</div>
-    <b>Verify</b>
-    Placeholder verb phrase.
-  </div>
-  <div class="el rule-w" style="left:1376px;top:730px;width:64px;height:2px;"></div>
-  <div class="el t-body step" style="left:1440px;top:672px;width:384px;height:290px;">
-    <div class="t-metric-sm">04</div>
-    <b>Release</b>
-    Placeholder verb phrase.
-  </div>
-</div>
-
-<!-- Pattern: relationship — Split C, orange on the narrow right. WHY: a hub and its satellites cannot be drawn as nodes here, because a node would be a box; the relationship is carried by position, by 2px hairlines and by one size step, with the core as the only item at heading size. It all stays inside one field, since nothing may cross the edge. MAY VARY: 3 to 5 satellites, inputs only or inputs and outputs. MAY NOT VARY: orthogonal hairlines, one core, no outline around any label, no rotated shape. -->
-<div class="slide">
-  <div class="el field" style="left:1280px;top:0px;width:640px;height:1080px;"></div>
-  <div class="el t-label" style="left:96px;top:88px;width:1088px;height:30px;">PATTERN / RELATIONSHIP / 04</div>
-  <div class="el t-slide-title" style="left:96px;top:144px;width:1088px;height:200px;">Two inputs feed one core</div>
-  <div class="el t-body" style="left:96px;top:430px;width:280px;height:50px;">Placeholder input A</div>
-  <div class="el t-body" style="left:96px;top:700px;width:280px;height:50px;">Placeholder input B</div>
-  <div class="el t-heading" style="left:500px;top:560px;width:280px;height:60px;">Core claim</div>
-  <div class="el t-body" style="left:904px;top:430px;width:280px;height:50px;">Placeholder output A</div>
-  <div class="el t-body" style="left:904px;top:700px;width:280px;height:50px;">Placeholder output B</div>
-  <div class="el rule-w" style="left:376px;top:454px;width:44px;height:2px;"></div>
-  <div class="el rule-w" style="left:376px;top:724px;width:44px;height:2px;"></div>
-  <div class="el rule-w" style="left:420px;top:454px;width:2px;height:272px;"></div>
-  <div class="el rule-w" style="left:420px;top:590px;width:80px;height:2px;"></div>
-  <div class="el rule-w" style="left:780px;top:590px;width:50px;height:2px;"></div>
-  <div class="el rule-w" style="left:830px;top:454px;width:2px;height:272px;"></div>
-  <div class="el rule-w" style="left:830px;top:454px;width:74px;height:2px;"></div>
-  <div class="el rule-w" style="left:830px;top:724px;width:74px;height:2px;"></div>
-  <div class="el t-label on-accent" style="left:1376px;top:88px;width:448px;height:30px;">DEPENDENCY</div>
-  <div class="el t-body on-accent" style="left:1376px;top:144px;width:448px;height:700px;">Placeholder paragraph explaining what the core depends on and what it changes in turn. Name the direction in words, since the hairlines carry no arrowheads.</div>
-</div>
-
-<!-- Pattern: two columns — Split A, orange left. WHY: the edge already is the two-column rule, so no gutter, divider or card is needed; the claim field is deliberately the shorter read and the evidence field the longer one, which is what separates this from the comparison pattern above. MAY VARY: which field is orange, the form the evidence takes. MAY NOT VARY: one claim on the claim field, at most two body blocks opposite, no third column. -->
-<div class="slide">
-  <div class="el field" style="left:0px;top:0px;width:960px;height:1080px;"></div>
-  <div class="el t-label on-accent" style="left:96px;top:88px;width:768px;height:30px;">PATTERN / TWO COLUMNS / 05</div>
-  <div class="el t-slide-title on-accent" style="left:96px;top:144px;width:768px;height:200px;">The claim takes one field</div>
-  <div class="el t-body on-accent" style="left:96px;top:392px;width:768px;height:300px;">Placeholder statement of the claim in two short sentences. Say what follows from it, then stop — the opposite field answers it.</div>
-  <div class="el t-label" style="left:1056px;top:88px;width:768px;height:30px;">EVIDENCE / PLACEHOLDER SOURCE</div>
-  <div class="el t-heading" style="left:1056px;top:144px;width:768px;height:60px;">Placeholder heading</div>
-  <div class="el t-body" style="left:1056px;top:222px;width:768px;height:280px;">Placeholder paragraph of four or five lines giving the evidence for the claim opposite, with the scope of that evidence stated plainly.</div>
-  <div class="el rule-w" style="left:1056px;top:540px;width:768px;height:2px;"></div>
-  <div class="el t-body" style="left:1056px;top:580px;width:768px;height:404px;">Placeholder second block naming the condition under which the evidence holds. This is the last block allowed in this field: a third one belongs on the next slide.</div>
-</div>
-
-<!-- Pattern: three columns — Split B, orange on the narrow left. WHY: three peers do not fit a two-field slide, so they share the 67% field as equal 340px columns separated by 2px hairlines while the claim keeps the narrow field; a hairline is the only separator this style allows, because a card would restate the split. MAY VARY: the column headings, the length of the evidence. MAY NOT VARY: equal column widths, exactly two hairlines, all three columns inside one field, no fourth column on a vertical split. -->
+<!-- Pattern: three items — Composition B, narrow claim / wide evidence. Split B, orange on the
+     narrow left. WHY: three peers need width, so they take the 67% field while the claim is
+     compressed into three short lines on the narrow one; each item leads with one orange word, which
+     is what lets the eye find the three items without a bullet, a rule or a box. The eyebrow label
+     is dropped on the dark field here because an orange lead word already opens it. MAY VARY: 3 to 4
+     items, the lead words, 2 or 3 lines of body each. MAY NOT VARY: lead word and body as two
+     separate textboxes sharing a top, the lead word at --fs-body weight 900 in orange within 200px,
+     item tops 120 / 384 / 648. -->
 <div class="slide">
   <div class="el field" style="left:0px;top:0px;width:640px;height:1080px;"></div>
-  <div class="el t-label on-accent" style="left:96px;top:88px;width:448px;height:30px;">PATTERN / 06</div>
-  <div class="el t-body on-accent" style="left:96px;top:144px;width:448px;height:700px;">Placeholder sentence naming the axis the three columns share, so the reader reads them as peers and not as a sequence.</div>
-  <div class="el t-label" style="left:736px;top:88px;width:1088px;height:30px;">THREE DIMENSIONS / PLACEHOLDER AXIS</div>
-  <div class="el t-slide-title" style="left:736px;top:144px;width:1088px;height:200px;">Three peers, one field</div>
-  <div class="el t-body" style="left:736px;top:392px;width:340px;height:560px;">
-    <div class="ramp-name">01</div>
-    <div class="t-heading">Dimension A</div>
-    <div>Placeholder evidence of two or three lines.</div>
-  </div>
-  <div class="el rule-w" style="left:1093px;top:392px;width:2px;height:560px;"></div>
-  <div class="el t-body" style="left:1110px;top:392px;width:340px;height:560px;">
-    <div class="ramp-name">02</div>
-    <div class="t-heading">Dimension B</div>
-    <div>Placeholder evidence of two or three lines.</div>
-  </div>
-  <div class="el rule-w" style="left:1467px;top:392px;width:2px;height:560px;"></div>
-  <div class="el t-body" style="left:1484px;top:392px;width:340px;height:560px;">
-    <div class="ramp-name">03</div>
-    <div class="t-heading">Dimension C</div>
-    <div>Placeholder evidence of two or three lines.</div>
-  </div>
+  <div class="el t-slide-title on-accent" style="left:96px;top:96px;width:448px;height:360px;">Three axes decide</div>
+  <div class="el t-caption on-accent" style="left:96px;top:840px;width:448px;height:140px;">Placeholder note on the axis the three share.</div>
+  <div class="el t-lead accent" style="left:736px;top:120px;width:200px;height:70px;">Cost</div>
+  <div class="el t-body" style="left:952px;top:120px;width:872px;height:220px;">Placeholder evidence of two lines. Name the condition under which it inverts.</div>
+  <div class="el t-lead accent" style="left:736px;top:384px;width:200px;height:70px;">Ops</div>
+  <div class="el t-body" style="left:952px;top:384px;width:872px;height:220px;">Placeholder evidence of two lines. Say what disappears and what is rebuilt.</div>
+  <div class="el t-lead accent" style="left:736px;top:648px;width:200px;height:70px;">Speed</div>
+  <div class="el t-body" style="left:952px;top:648px;width:872px;height:220px;">Placeholder evidence of two lines. Name the precondition, not the benefit.</div>
 </div>
 
-<!-- Pattern: four columns — Split D, orange at the bottom. WHY: four columns need the full slide width, which only the horizontal split gives; the set runs across the orange field in near-black while the claim keeps the field above, which is also the case that proves the orange field can be the large one. MAY VARY: the column labels, 4 columns down to 3 for a smaller set. MAY NOT VARY: equal 396px columns, descriptions of 2 lines, three 2px hairlines, and the one-line title a 540px field forces. -->
+<!-- Pattern: comparison — Split A, orange right. WHY: this is the split's natural pattern. Two
+     options at identical coordinates, one per field, so the only difference the eye can find is the
+     content, and the orange field marks the recommended option without a badge or a tick. MAY VARY:
+     the criteria, 2 to 4 criteria rows, which side is recommended. MAY NOT VARY: matched row
+     positions across the edge, the same criteria in the same order, exactly two options — a third
+     option is a table. -->
 <div class="slide">
-  <div class="el field" style="left:0px;top:540px;width:1920px;height:540px;"></div>
-  <div class="el t-label" style="left:96px;top:72px;width:1728px;height:30px;">PATTERN / FOUR COLUMNS / 07</div>
-  <div class="el t-slide-title" style="left:96px;top:120px;width:1600px;height:110px;">Four parts complete the set</div>
-  <div class="el t-body" style="left:96px;top:290px;width:1600px;height:130px;">Placeholder line stating what makes these four a complete set, and what would be missing if one of them were dropped.</div>
-  <div class="el t-label on-accent" style="left:96px;top:612px;width:1728px;height:30px;">THE SET / PLACEHOLDER SCOPE</div>
-  <div class="el t-body on-accent" style="left:96px;top:660px;width:396px;height:300px;">
-    <div class="t-metric-sm">01</div>
-    <div class="ramp-name">PLACEHOLDER A</div>
-    <div>Placeholder description of two lines.</div>
-  </div>
-  <div class="el rule-k" style="left:516px;top:660px;width:2px;height:300px;"></div>
-  <div class="el t-body on-accent" style="left:540px;top:660px;width:396px;height:300px;">
-    <div class="t-metric-sm">02</div>
-    <div class="ramp-name">PLACEHOLDER B</div>
-    <div>Placeholder description of two lines.</div>
-  </div>
-  <div class="el rule-k" style="left:960px;top:660px;width:2px;height:300px;"></div>
-  <div class="el t-body on-accent" style="left:984px;top:660px;width:396px;height:300px;">
-    <div class="t-metric-sm">03</div>
-    <div class="ramp-name">PLACEHOLDER C</div>
-    <div>Placeholder description of two lines.</div>
-  </div>
-  <div class="el rule-k" style="left:1404px;top:660px;width:2px;height:300px;"></div>
-  <div class="el t-body on-accent" style="left:1428px;top:660px;width:396px;height:300px;">
-    <div class="t-metric-sm">04</div>
-    <div class="ramp-name">PLACEHOLDER D</div>
-    <div>Placeholder description of two lines.</div>
-  </div>
+  <div class="el field" style="left:960px;top:0px;width:960px;height:1080px;"></div>
+  <div class="el t-label accent" style="left:96px;top:88px;width:768px;height:34px;">OPTION A / PLACEHOLDER</div>
+  <div class="el t-slide-title" style="left:96px;top:144px;width:768px;height:240px;">Option B clears it</div>
+  <div class="el t-heading" style="left:96px;top:440px;width:768px;height:74px;">Placeholder option</div>
+  <div class="el t-body" style="left:96px;top:540px;width:768px;height:400px;">Cost &mdash; placeholder line.<br><br>Effort &mdash; placeholder line.<br><br>Risk &mdash; placeholder line.</div>
+  <div class="el t-label on-accent" style="left:1056px;top:88px;width:768px;height:34px;">OPTION B / RECOMMENDED</div>
+  <div class="el t-heading on-accent" style="left:1056px;top:440px;width:768px;height:74px;">Placeholder option</div>
+  <div class="el t-body on-accent" style="left:1056px;top:540px;width:768px;height:400px;">Cost &mdash; placeholder line.<br><br>Effort &mdash; placeholder line.<br><br>Risk &mdash; placeholder line.</div>
 </div>
 
-<!-- Pattern: text-heavy — Split C, orange on the narrow right. WHY: prose is the case where the claim must take the narrow field; two blocks separated by a hairline then fill the 1088px field at full body size, so nothing has to shrink. MAY VARY: the block headings, one block instead of two. MAY NOT VARY: two body blocks maximum, body never below 18pt, and no grey text to create hierarchy — the hierarchy is heading size against body size. -->
-<div class="slide">
-  <div class="el field" style="left:1280px;top:0px;width:640px;height:1080px;"></div>
-  <div class="el t-label" style="left:96px;top:88px;width:1088px;height:30px;">PATTERN / TEXT-HEAVY / 08</div>
-  <div class="el t-slide-title" style="left:96px;top:144px;width:1088px;height:200px;">Prose stays on one field</div>
-  <div class="el t-heading" style="left:96px;top:392px;width:1088px;height:60px;">First placeholder block</div>
-  <div class="el t-body" style="left:96px;top:470px;width:1088px;height:230px;">Placeholder paragraph of four lines. State one supporting fact, the population it covers and the condition that qualifies it. Keep the sentences short enough to be read from the back of the room.</div>
-  <div class="el rule-w" style="left:96px;top:740px;width:1088px;height:2px;"></div>
-  <div class="el t-heading" style="left:96px;top:774px;width:1088px;height:60px;">Second placeholder block</div>
-  <div class="el t-body" style="left:96px;top:852px;width:1088px;height:132px;">Placeholder paragraph of two lines adding a second fact without repeating the title or introducing a second claim.</div>
-  <div class="el t-label on-accent" style="left:1376px;top:88px;width:448px;height:30px;">CONTEXT</div>
-  <div class="el t-body on-accent" style="left:1376px;top:144px;width:448px;height:700px;">Placeholder paragraph of three or four lines. The narrow field states where the reading came from; the wide field carries the reading itself.</div>
-</div>
-
-<!-- Pattern: table — Split D, orange on top. WHY: a table needs the full width and a calm ground, so it takes the near-black field alone; its rules are 2px hairlines in the field's own text colour, and the exception is marked by weight 900, not by a fill or a second colour. MAY VARY: 3 to 5 columns, 4 to 8 rows, which field is orange. MAY NOT VARY: units named in the header, no vertical rules, no zebra fill, no coloured cell — and keep the column count low, since a native table inherits the template font. -->
+<!-- Pattern: process — Split D, orange top. WHY: a sequence needs width, so it runs the full 1728px
+     of the lower field while the claim keeps the upper one; the step numerals are orange at
+     --fs-metric-sm, which is the orange element this dark field carries, and the connectors are 2px
+     hairlines because this style has no boxes to put steps in. MAY VARY: 3 to 5 steps, the wording,
+     which field is orange. MAY NOT VARY: equal step columns, connectors as 2px hairlines, no
+     chevrons, no arrowheads, no rotation. -->
 <div class="slide">
   <div class="el field" style="left:0px;top:0px;width:1920px;height:540px;"></div>
-  <div class="el t-label on-accent" style="left:96px;top:72px;width:1728px;height:30px;">PATTERN / TABLE / 09</div>
-  <div class="el t-slide-title on-accent" style="left:96px;top:120px;width:1600px;height:110px;">One row misses the threshold</div>
-  <div class="el t-body on-accent" style="left:96px;top:290px;width:1600px;height:130px;">Placeholder line naming the threshold, the period and the source of the measures below.</div>
-  <div class="el t-label" style="left:96px;top:612px;width:1728px;height:30px;">PLACEHOLDER PERIOD / PLACEHOLDER UNIT</div>
-  <div class="el" style="left:96px;top:660px;width:1728px;height:340px;">
+  <div class="el t-label on-accent" style="left:96px;top:72px;width:1728px;height:34px;">PATTERN / PROCESS / 03</div>
+  <div class="el t-slide-title on-accent" style="left:96px;top:130px;width:1728px;height:120px;">Four steps reach it</div>
+  <div class="el t-body on-accent" style="left:96px;top:290px;width:1600px;height:150px;">Placeholder line stating what has to be true before step one can start.</div>
+  <div class="el t-label accent" style="left:96px;top:590px;width:1728px;height:34px;">SEQUENCE / PLACEHOLDER OWNER</div>
+  <div class="el t-metric-sm accent" style="left:96px;top:640px;width:384px;height:186px;">01</div>
+  <div class="el t-heading" style="left:96px;top:830px;width:384px;height:74px;">Define</div>
+  <div class="el t-body" style="left:96px;top:904px;width:384px;height:76px;">Verb phrase.</div>
+  <div class="el rule-w" style="left:492px;top:730px;width:40px;height:2px;"></div>
+  <div class="el t-metric-sm accent" style="left:544px;top:640px;width:384px;height:186px;">02</div>
+  <div class="el t-heading" style="left:544px;top:830px;width:384px;height:74px;">Build</div>
+  <div class="el t-body" style="left:544px;top:904px;width:384px;height:76px;">Verb phrase.</div>
+  <div class="el rule-w" style="left:940px;top:730px;width:40px;height:2px;"></div>
+  <div class="el t-metric-sm accent" style="left:992px;top:640px;width:384px;height:186px;">03</div>
+  <div class="el t-heading" style="left:992px;top:830px;width:384px;height:74px;">Verify</div>
+  <div class="el t-body" style="left:992px;top:904px;width:384px;height:76px;">Verb phrase.</div>
+  <div class="el rule-w" style="left:1388px;top:730px;width:40px;height:2px;"></div>
+  <div class="el t-metric-sm accent" style="left:1440px;top:640px;width:384px;height:186px;">04</div>
+  <div class="el t-heading" style="left:1440px;top:830px;width:384px;height:74px;">Release</div>
+  <div class="el t-body" style="left:1440px;top:904px;width:384px;height:76px;">Verb phrase.</div>
+</div>
+
+<!-- Pattern: relationship — Split C, orange on the narrow right. WHY: a hub and its satellites
+     cannot be drawn as nodes here, because a node would be a box; the relationship is carried by
+     position, by 2px hairlines and by one size step, with the core as the only orange item and the
+     only one at heading size. It stays inside one field, since nothing may cross the edge. MAY VARY:
+     3 to 4 satellites, inputs only or inputs and outputs. MAY NOT VARY: orthogonal hairlines, one
+     core, no outline around any label, no rotated shape. -->
+<div class="slide">
+  <div class="el field" style="left:1280px;top:0px;width:640px;height:1080px;"></div>
+  <div class="el t-label accent" style="left:96px;top:88px;width:1088px;height:34px;">PATTERN / RELATIONSHIP / 04</div>
+  <div class="el t-slide-title" style="left:96px;top:144px;width:1088px;height:240px;">Two inputs feed one core</div>
+  <div class="el t-body" style="left:96px;top:480px;width:300px;height:70px;">Input A</div>
+  <div class="el t-body" style="left:96px;top:700px;width:300px;height:70px;">Input B</div>
+  <div class="el t-heading accent" style="left:480px;top:550px;width:320px;height:160px;">Core claim</div>
+  <div class="el t-body" style="left:884px;top:480px;width:300px;height:70px;">Output A</div>
+  <div class="el t-body" style="left:884px;top:700px;width:300px;height:70px;">Output B</div>
+  <div class="el rule-w" style="left:400px;top:514px;width:40px;height:2px;"></div>
+  <div class="el rule-w" style="left:400px;top:734px;width:40px;height:2px;"></div>
+  <div class="el rule-w" style="left:440px;top:514px;width:2px;height:222px;"></div>
+  <div class="el rule-w" style="left:440px;top:624px;width:40px;height:2px;"></div>
+  <div class="el rule-w" style="left:804px;top:624px;width:40px;height:2px;"></div>
+  <div class="el rule-w" style="left:844px;top:514px;width:2px;height:222px;"></div>
+  <div class="el rule-w" style="left:844px;top:514px;width:40px;height:2px;"></div>
+  <div class="el rule-w" style="left:844px;top:734px;width:40px;height:2px;"></div>
+  <div class="el t-label on-accent" style="left:1376px;top:88px;width:448px;height:34px;">DEPENDENCY</div>
+  <div class="el t-body on-accent" style="left:1376px;top:144px;width:448px;height:700px;">Placeholder paragraph naming the direction in words, since the hairlines carry no arrowheads.</div>
+</div>
+
+<!-- Pattern: four columns — Split D, orange at the bottom. WHY: four columns need the full slide
+     width, which only the horizontal split gives; the set runs across the orange field in near-black
+     while the claim keeps the field above, which is also the case that proves the orange field can be
+     the large one. MAY VARY: the labels, 4 columns down to 3 for a smaller set. MAY NOT VARY: equal
+     396px columns, one-line descriptions, three 2px hairlines, the one-line title a 540px field
+     forces. -->
+<div class="slide">
+  <div class="el field" style="left:0px;top:540px;width:1920px;height:540px;"></div>
+  <div class="el t-label accent" style="left:96px;top:72px;width:1728px;height:34px;">PATTERN / FOUR COLUMNS / 05</div>
+  <div class="el t-slide-title" style="left:96px;top:130px;width:1728px;height:120px;">Four parts complete it</div>
+  <div class="el t-body" style="left:96px;top:290px;width:1600px;height:150px;">Placeholder line stating what makes these four a complete set.</div>
+  <div class="el t-label on-accent" style="left:96px;top:590px;width:1728px;height:34px;">THE SET / PLACEHOLDER SCOPE</div>
+  <div class="el t-metric-sm on-accent" style="left:96px;top:640px;width:396px;height:186px;">01</div>
+  <div class="el t-heading on-accent" style="left:96px;top:830px;width:396px;height:74px;">Part A</div>
+  <div class="el t-body on-accent" style="left:96px;top:904px;width:396px;height:76px;">Placeholder.</div>
+  <div class="el rule-k" style="left:516px;top:640px;width:2px;height:340px;"></div>
+  <div class="el t-metric-sm on-accent" style="left:540px;top:640px;width:396px;height:186px;">02</div>
+  <div class="el t-heading on-accent" style="left:540px;top:830px;width:396px;height:74px;">Part B</div>
+  <div class="el t-body on-accent" style="left:540px;top:904px;width:396px;height:76px;">Placeholder.</div>
+  <div class="el rule-k" style="left:960px;top:640px;width:2px;height:340px;"></div>
+  <div class="el t-metric-sm on-accent" style="left:984px;top:640px;width:396px;height:186px;">03</div>
+  <div class="el t-heading on-accent" style="left:984px;top:830px;width:396px;height:74px;">Part C</div>
+  <div class="el t-body on-accent" style="left:984px;top:904px;width:396px;height:76px;">Placeholder.</div>
+  <div class="el rule-k" style="left:1404px;top:640px;width:2px;height:340px;"></div>
+  <div class="el t-metric-sm on-accent" style="left:1428px;top:640px;width:396px;height:186px;">04</div>
+  <div class="el t-heading on-accent" style="left:1428px;top:830px;width:396px;height:74px;">Part D</div>
+  <div class="el t-body on-accent" style="left:1428px;top:904px;width:396px;height:76px;">Placeholder.</div>
+</div>
+
+<!-- Pattern: text-heavy — Split C, orange on the narrow right. WHY: prose is the case where the
+     claim must take the narrow field; two blocks separated by a hairline fill the 1088px field at
+     full body size, so nothing has to shrink. MAY VARY: the block headings, one block instead of
+     two. MAY NOT VARY: two body blocks maximum, body never below --fs-body, and no grey to create
+     hierarchy — the hierarchy is heading size against body size. -->
+<div class="slide">
+  <div class="el field" style="left:1280px;top:0px;width:640px;height:1080px;"></div>
+  <div class="el t-label accent" style="left:96px;top:88px;width:1088px;height:34px;">PATTERN / TEXT-HEAVY / 06</div>
+  <div class="el t-slide-title" style="left:96px;top:144px;width:1088px;height:240px;">Prose stays on one field</div>
+  <div class="el t-heading" style="left:96px;top:440px;width:1088px;height:74px;">First placeholder block</div>
+  <div class="el t-body" style="left:96px;top:520px;width:1088px;height:220px;">Placeholder paragraph of three lines. State one supporting fact, the population it covers and the condition that qualifies it.</div>
+  <div class="el rule-w" style="left:96px;top:760px;width:1088px;height:2px;"></div>
+  <div class="el t-heading" style="left:96px;top:790px;width:1088px;height:74px;">Second placeholder block</div>
+  <div class="el t-body" style="left:96px;top:870px;width:1088px;height:110px;">Placeholder second fact in one line.</div>
+  <div class="el t-label on-accent" style="left:1376px;top:88px;width:448px;height:34px;">CONTEXT</div>
+  <div class="el t-body on-accent" style="left:1376px;top:144px;width:448px;height:700px;">Placeholder paragraph. The narrow field says where the reading came from; the wide field carries the reading.</div>
+</div>
+
+<!-- Pattern: table — Split D, orange on top. WHY: a table needs the full width and a calm ground, so
+     it takes the dark field alone; its rules are 2px white hairlines and the exception row is orange
+     at weight 900, not a fill or a second colour — which is also the orange this dark field carries.
+     MAY VARY: 3 to 5 columns, 4 to 6 rows, which field is orange. MAY NOT VARY: units named in the
+     header, no vertical rules, no zebra fill, no coloured cell fill, and a low column count, since a
+     native table inherits the template font. -->
+<div class="slide">
+  <div class="el field" style="left:0px;top:0px;width:1920px;height:540px;"></div>
+  <div class="el t-label on-accent" style="left:96px;top:72px;width:1728px;height:34px;">PATTERN / TABLE / 07</div>
+  <div class="el t-slide-title on-accent" style="left:96px;top:130px;width:1728px;height:120px;">One row misses it</div>
+  <div class="el t-body on-accent" style="left:96px;top:290px;width:1600px;height:150px;">Placeholder line naming the threshold, the period and the source.</div>
+  <div class="el t-label accent" style="left:96px;top:590px;width:1728px;height:34px;">PLACEHOLDER PERIOD / PLACEHOLDER UNIT</div>
+  <div class="el" style="left:96px;top:640px;width:1728px;height:340px;">
     <table class="tbl">
       <thead><tr><th>Item</th><th class="num">Measure</th><th class="num">Threshold</th><th>State</th></tr></thead>
       <tbody>
         <tr><td>Placeholder A</td><td class="num">42</td><td class="num">50</td><td>Within range</td></tr>
-        <tr><td>Placeholder B</td><td class="num"><strong>68</strong></td><td class="num">50</td><td><strong>Above threshold</strong></td></tr>
+        <tr><td class="acc">Placeholder B</td><td class="num acc">68</td><td class="num acc">50</td><td class="acc">Above threshold</td></tr>
         <tr><td>Placeholder C</td><td class="num">31</td><td class="num">50</td><td>Within range</td></tr>
         <tr><td>Placeholder D</td><td class="num">47</td><td class="num">50</td><td>Within range</td></tr>
       </tbody>
@@ -500,49 +533,62 @@ body {
   </div>
 </div>
 
-<!-- Pattern: chart — Split A, orange left. WHY: colour cannot encode anything here, so every bar takes the field's own text colour and emphasis comes from fill against outline — the bar that matters is solid, the rest are 6px outlines. Values sit above the bars, which removes the axis. MAY VARY: 3 to 6 bars, the values, which field is orange. MAY NOT VARY: a zero baseline as a 2px hairline, direct value labels, exactly one solid bar, 0 gridlines, 0 legends. -->
+<!-- Pattern: chart — Split A, orange left. The mirror of the numbers pattern: the same shape bar
+     chart, built on the dark field instead of the orange one. WHY: the engine's native chart colours
+     a whole series, so a single highlighted bar has to be drawn as rectangle shapes; on the dark
+     field the bars are white and the highlighted one is orange, which is how the accent reaches a
+     chart without becoming a stripe or a badge. MAY VARY: 3 to 5 bars, the values, which field is
+     orange. MAY NOT VARY: a zero baseline as a 2px hairline, heights proportional to the labelled
+     values, direct value labels above each bar, exactly one highlighted bar, 0 gridlines, 0 legend. -->
 <div class="slide">
   <div class="el field" style="left:0px;top:0px;width:960px;height:1080px;"></div>
-  <div class="el t-label on-accent" style="left:96px;top:88px;width:768px;height:30px;">PATTERN / CHART / 10</div>
-  <div class="el t-slide-title on-accent" style="left:96px;top:144px;width:768px;height:200px;">Period four breaks the trend</div>
-  <div class="el t-body on-accent" style="left:96px;top:392px;width:768px;height:300px;">Placeholder sentence stating why the last period matters and what the reader is being asked to do about it.</div>
-  <div class="el t-label" style="left:1056px;top:88px;width:768px;height:30px;">PLACEHOLDER UNIT / FOUR PERIODS</div>
-  <div class="el t-heading" style="left:1076px;top:630px;width:140px;height:60px;">32</div>
-  <div class="el bar-open-w" style="left:1076px;top:700px;width:140px;height:180px;"></div>
-  <div class="el t-label" style="left:1076px;top:900px;width:140px;height:30px;">P1</div>
-  <div class="el t-heading" style="left:1276px;top:560px;width:140px;height:60px;">48</div>
-  <div class="el bar-open-w" style="left:1276px;top:630px;width:140px;height:250px;"></div>
-  <div class="el t-label" style="left:1276px;top:900px;width:140px;height:30px;">P2</div>
-  <div class="el t-heading" style="left:1476px;top:490px;width:140px;height:60px;">61</div>
-  <div class="el bar-open-w" style="left:1476px;top:560px;width:140px;height:320px;"></div>
-  <div class="el t-label" style="left:1476px;top:900px;width:140px;height:30px;">P3</div>
-  <div class="el t-heading" style="left:1676px;top:380px;width:140px;height:60px;">84</div>
-  <div class="el bar-solid-w" style="left:1676px;top:450px;width:140px;height:430px;"></div>
-  <div class="el t-label" style="left:1676px;top:900px;width:140px;height:30px;">P4</div>
+  <div class="el t-label on-accent" style="left:96px;top:88px;width:768px;height:34px;">PATTERN / CHART / 08</div>
+  <div class="el t-slide-title on-accent" style="left:96px;top:144px;width:768px;height:240px;">Period four breaks it</div>
+  <div class="el t-body on-accent" style="left:96px;top:440px;width:768px;height:290px;">Placeholder sentence stating why the last period matters and what the reader is asked to do.</div>
+  <div class="el t-label accent" style="left:1056px;top:88px;width:768px;height:34px;">PLACEHOLDER UNIT / FOUR PERIODS</div>
   <div class="el rule-w" style="left:1056px;top:880px;width:768px;height:2px;"></div>
+  <div class="el t-lead" style="left:1056px;top:646px;width:136px;height:60px;">32</div>
+  <div class="el bar-w" style="left:1056px;top:716px;width:136px;height:164px;"></div>
+  <div class="el t-label muted" style="left:1056px;top:900px;width:136px;height:34px;">P1</div>
+  <div class="el t-lead" style="left:1264px;top:564px;width:136px;height:60px;">48</div>
+  <div class="el bar-w" style="left:1264px;top:634px;width:136px;height:246px;"></div>
+  <div class="el t-label muted" style="left:1264px;top:900px;width:136px;height:34px;">P2</div>
+  <div class="el t-lead" style="left:1472px;top:498px;width:136px;height:60px;">61</div>
+  <div class="el bar-w" style="left:1472px;top:568px;width:136px;height:312px;"></div>
+  <div class="el t-label muted" style="left:1472px;top:900px;width:136px;height:34px;">P3</div>
+  <div class="el t-lead accent" style="left:1680px;top:380px;width:136px;height:60px;">84</div>
+  <div class="el bar-a" style="left:1680px;top:450px;width:136px;height:430px;"></div>
+  <div class="el t-label muted" style="left:1680px;top:900px;width:136px;height:34px;">P4</div>
 </div>
 
-<!-- Pattern: before / after — Split A, orange right. WHY: before and after are the same shape read twice, so both fields carry identical rows and the orange field is always the after state; the change reads as a change of measure at the same position, with no arrow between them. MAY VARY: the measures, 2 to 4 condition lines, the labels. MAY NOT VARY: the after state on the orange field, matched row positions, the same measure and unit on both sides, no arrow across the edge. -->
+<!-- Pattern: before / after — Split A, orange right. WHY: before and after are the same shape read
+     twice, so both fields carry identical rows and the orange field is always the after state; the
+     change reads as a change of measure at the same position, with no arrow between them. The after
+     state gets the title size, the before state only heading size — the asymmetry is the argument.
+     MAY VARY: the measures, 2 to 4 condition lines, the labels. MAY NOT VARY: the after state on the
+     orange field, matched row positions, the same measure and unit on both sides, no arrow across
+     the edge. -->
 <div class="slide">
   <div class="el field" style="left:960px;top:0px;width:960px;height:1080px;"></div>
-  <div class="el t-label" style="left:96px;top:88px;width:768px;height:30px;">BEFORE / PLACEHOLDER DATE</div>
-  <div class="el t-heading" style="left:96px;top:144px;width:768px;height:180px;">Placeholder starting state</div>
-  <div class="el t-metric-sm" style="left:96px;top:360px;width:768px;height:140px;">3.4h</div>
-  <div class="el t-body" style="left:96px;top:530px;width:768px;height:300px;">Placeholder condition one.<br>Placeholder condition two.<br>Placeholder condition three.</div>
-  <div class="el t-label on-accent" style="left:1056px;top:88px;width:768px;height:30px;">AFTER / PLACEHOLDER DATE</div>
-  <div class="el t-slide-title on-accent" style="left:1056px;top:144px;width:768px;height:180px;">Handover drops to minutes</div>
-  <div class="el t-metric-sm on-accent" style="left:1056px;top:360px;width:768px;height:140px;">18m</div>
-  <div class="el t-body on-accent" style="left:1056px;top:530px;width:768px;height:300px;">Placeholder condition one.<br>Placeholder condition two.<br>Placeholder condition three.</div>
+  <div class="el t-label accent" style="left:96px;top:88px;width:768px;height:34px;">BEFORE / PLACEHOLDER DATE</div>
+  <div class="el t-heading" style="left:96px;top:144px;width:768px;height:160px;">Placeholder starting state</div>
+  <div class="el t-metric-sm" style="left:96px;top:420px;width:768px;height:190px;">3.4h</div>
+  <div class="el t-body" style="left:96px;top:640px;width:768px;height:300px;">Placeholder condition one.<br>Placeholder condition two.<br>Placeholder condition three.</div>
+  <div class="el t-label on-accent" style="left:1056px;top:88px;width:768px;height:34px;">AFTER / PLACEHOLDER DATE</div>
+  <div class="el t-slide-title on-accent" style="left:1056px;top:144px;width:768px;height:240px;">Handover drops</div>
+  <div class="el t-metric-sm on-accent" style="left:1056px;top:420px;width:768px;height:190px;">18m</div>
+  <div class="el t-body on-accent" style="left:1056px;top:640px;width:768px;height:300px;">Placeholder condition one.<br>Placeholder condition two.<br>Placeholder condition three.</div>
 </div>
 
-<!-- Frame: closing. The last slide repeats the cover split with one word on the claim field, so the deck ends on the cut it opened with. -->
+<!-- Pattern: closing. The last slide repeats the cover split with one word on the claim field, so the
+     deck ends on the cut it opened with. The ask sits opposite in white, the owner in grey. -->
 <div class="slide">
   <div class="el field" style="left:0px;top:0px;width:960px;height:1080px;"></div>
-  <div class="el t-label on-accent" style="left:96px;top:88px;width:768px;height:30px;">CLOSE</div>
-  <div class="el t-cover-title on-accent" style="left:96px;top:300px;width:768px;height:360px;">Next</div>
-  <div class="el t-label" style="left:1056px;top:88px;width:768px;height:30px;">PLACEHOLDER OWNER / PLACEHOLDER DATE</div>
-  <div class="el t-heading" style="left:1056px;top:392px;width:768px;height:200px;">Placeholder single ask, stated as one sentence</div>
-  <div class="el t-body" style="left:1056px;top:640px;width:768px;height:200px;">Placeholder line naming who decides, by when, and what happens if the decision slips.</div>
+  <div class="el t-label on-accent" style="left:96px;top:96px;width:768px;height:34px;">CLOSE</div>
+  <div class="el t-cover-title on-accent" style="left:96px;top:240px;width:768px;height:540px;">Next</div>
+  <div class="el t-label accent" style="left:1056px;top:96px;width:768px;height:34px;">THE ASK</div>
+  <div class="el t-heading" style="left:1056px;top:240px;width:768px;height:240px;">Placeholder single ask stated as one sentence</div>
+  <div class="el t-body muted" style="left:1056px;top:840px;width:768px;height:100px;">Placeholder owner · 2026-09</div>
 </div>
 </body>
 </html>
