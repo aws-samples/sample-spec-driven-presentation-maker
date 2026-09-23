@@ -82,7 +82,7 @@ async def agent_stream(payload, context):
 
     try:
         os.environ["_CURRENT_SESSION_ID"] = session_id
-        mode = payload.get("mode", "single")
+        mode = payload.get("mode", "spec")
         requested_chat_model_id = payload.get("chatModelId") if isinstance(payload, dict) else None
         requested_create_model_id = payload.get("createModelId") if isinstance(payload, dict) else None
         agent, mcp_status = create_agent(

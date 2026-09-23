@@ -103,7 +103,7 @@ export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessTo
       prompt: query,
       runtimeSessionId: sessionId,
       userId: userId,
-      mode: mode || "separated",
+      mode: mode || "spec",
       ...(selectedChatModelId ? { chatModelId: selectedChatModelId } : {}),
       ...(selectedCreateModelId ? { createModelId: selectedCreateModelId } : {}),
     }
