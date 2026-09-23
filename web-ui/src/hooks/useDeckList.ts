@@ -24,6 +24,9 @@ import {
 import { toast } from "sonner"
 import { notifyError } from "@/lib/errors"
 
+/** Parallel DELETE calls during a bulk delete. */
+const BULK_DELETE_CONCURRENCY = 5
+
 export function useDeckList(
   idToken: string | undefined,
   isAuthenticated: boolean,
@@ -38,6 +41,8 @@ export function useDeckList(
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeckSummary | null>(null)
+  const [bulkDeleteTargets, setBulkDeleteTargets] = useState<DeckSummary[] | null>(null)
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<SlideSearchResult[]>([])
   const [searching, setSearching] = useState(false)
@@ -157,6 +162,41 @@ export function useDeckList(
     }
   }, [deleteTarget, idToken])
 
+  /** Bulk delete: ask for confirmation, then delete in parallel (bounded). */
+  const requestBulkDelete = useCallback((deckIds: string[]) => {
+    const wanted = new Set(deckIds)
+    const targets = decks.filter((d) => wanted.has(d.deckId))
+    if (targets.length) setBulkDeleteTargets(targets)
+  }, [decks])
+
+  const confirmBulkDelete = useCallback(async (): Promise<{ deleted: number; failed: number }> => {
+    if (!bulkDeleteTargets || !idToken) return { deleted: 0, failed: 0 }
+    const targets = bulkDeleteTargets
+    const total = targets.length
+    setBulkProgress({ done: 0, total })
+    let failed = 0
+    let done = 0
+    // Bounded concurrency: keep API Gateway / KB cleanup load predictable.
+    const queue = [...targets]
+    async function worker() {
+      for (let next = queue.shift(); next; next = queue.shift()) {
+        const target = next
+        try {
+          await deleteDeck(target.deckId, idToken!)
+          setDecks((prev) => prev.filter((d) => d.deckId !== target.deckId))
+        } catch {
+          failed += 1
+        }
+        done += 1
+        setBulkProgress({ done, total })
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(BULK_DELETE_CONCURRENCY, total) }, worker))
+    setBulkProgress(null)
+    setBulkDeleteTargets(null)
+    return { deleted: total - failed, failed }
+  }, [bulkDeleteTargets, idToken])
+
   /** Decks for the currently active list tab. */
   const tabDecks = activeListTab === "mine" ? decks
     : activeListTab === "favorites" ? favoriteDecks
@@ -166,6 +206,7 @@ export function useDeckList(
   return {
     decks, tabDecks, favoriteIds, activeListTab, setActiveListTab,
     loading, error, deleteTarget, setDeleteTarget,
+    bulkDeleteTargets, setBulkDeleteTargets, bulkProgress, requestBulkDelete, confirmBulkDelete,
     searchQuery, setSearchQuery, searchResults, searching,
     handleToggleFavorite, handleDelete, handleToggleVisibility, handleDownload, handleOpenFolder, confirmDelete,
     setDecks,

@@ -22,7 +22,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { AppShell } from "@/components/AppShell"
-import { DeckListView } from "@/components/deck/DeckListView"
+import { DeckListView, visibleDecks } from "@/components/deck/DeckListView"
 import { SlideCarousel } from "@/components/deck/SlideCarousel"
 import { DeckActions } from "@/components/deck/DeckActions"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
@@ -32,6 +32,8 @@ import { updateVisibility, shareDeck } from "@/services/deckService"
 import { useIsMobile } from "@/hooks/UseMobile"
 import { useSwipe } from "@/hooks/useSwipe"
 import { useDeckList } from "@/hooks/useDeckList"
+import { useDeckSelection } from "@/hooks/useDeckSelection"
+import { toast } from "sonner"
 import { useWorkspace } from "@/hooks/useWorkspace"
 import { Plus, MessageSquare, Image as ImageIcon, Star } from "lucide-react"
 import { useTranslations } from "next-intl"
@@ -50,6 +52,31 @@ export default function DecksPage() {
 
   /* ── List state (decks, search, favorites, actions) ── */
   const list = useDeckList(idToken, auth.isAuthenticated, ws.activeDeckId)
+
+  /* ── Multi-select (bulk delete) — owner tab only, list view only ── */
+  const selectableIds = useMemo(
+    () => visibleDecks(list.tabDecks, list.searchQuery).map((d) => d.deckId),
+    [list.tabDecks, list.searchQuery],
+  )
+  const selectionEnabled = ws.activeDeckId === null && list.activeListTab === "mine"
+    && (IS_LOCAL || list.searchQuery.length < 2)
+  const selection = useDeckSelection(selectableIds, selectionEnabled)
+  const deckSelection = useMemo(() => ({
+    selectionMode: selection.selectionMode,
+    selectedIds: selection.selectedIds,
+    enter: selection.enter,
+    exit: selection.exit,
+    toggle: selection.toggle,
+    selectAll: selection.selectAll,
+    onDeleteSelected: () => list.requestBulkDelete([...selection.selectedIds]),
+    progress: list.bulkProgress,
+  }), [selection, list.requestBulkDelete, list.bulkProgress])
+  const handleConfirmBulkDelete = useCallback(async () => {
+    selection.enter() // keep the bar (progress) up while selected cards disappear
+    const { failed } = await list.confirmBulkDelete()
+    if (failed > 0) toast.error(t("bulkDeleteFailed", { count: failed }))
+    selection.exit()
+  }, [list.confirmBulkDelete, selection.enter, selection.exit, t])
 
   /* ── Local UI state ── */
   const [mounted, setMounted] = useState(false)
@@ -219,6 +246,7 @@ export default function DecksPage() {
                 onDownload={list.handleDownload}
                 onOpenFolder={list.handleOpenFolder}
                 loading={list.loading}
+                selection={deckSelection}
               />
               {list.error && (
                 <div className="max-w-5xl mx-auto px-5 sm:px-8">
@@ -258,6 +286,16 @@ export default function DecksPage() {
         confirmLabel={t("delete")}
         variant="destructive"
         onConfirm={list.confirmDelete}
+      />
+
+      <ConfirmDialog
+        open={!!list.bulkDeleteTargets}
+        onOpenChange={(open) => { if (!open && !list.bulkProgress) list.setBulkDeleteTargets(null) }}
+        title={t("bulkDeleteTitle", { count: list.bulkDeleteTargets?.length ?? 0 })}
+        description={IS_LOCAL ? t("bulkDeleteDescriptionLocal") : t("bulkDeleteDescription")}
+        confirmLabel={t("delete")}
+        variant="destructive"
+        onConfirm={handleConfirmBulkDelete}
       />
 
       {isMobile && !ws.isWorkspace && (
