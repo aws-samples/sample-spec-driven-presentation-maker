@@ -216,16 +216,25 @@ and token contract are defined in the `style` workflow (`read_workflows(["style"
 
 ### Bundled styles
 
+Bundled styles come in two tiers. The **orthodox** tier is for when you do not want to
+think about looks: any subject, any audience, light or dark. The **concept** tier is
+chosen by look — each style commits to one visual idea and states how far it may be
+pushed. Purpose-specific structure (how a lesson or a workshop deck is organised) belongs
+to the outline, not the style, so any concept style can carry any kind of deck.
+
+**Orthodox — pick one of these when in doubt**
+
 | Style | Built for | Look |
 |---|---|---|
-| `consulting` | Decision documents read alone by senior readers | White, navy, one electric accent, serif assertion titles, agenda tracker |
-| `keynote` | Large-room talks; one beat per slide | Near-black, huge type, one warm accent, ≥ 28pt |
-| `facilitation` | Workshops and steering meetings; a surface the room works on | Light, calm neutrals, one teal accent, horizontal journey maps, ≥ 10% margins |
-| `engineering` | Design reviews and tech talks; code and diagrams first | Dark slate, monospaced code and metrics, one accent plus ok/warn/fail states |
-| `lecture` | Courses and training revisited alone later | Warm paper, define → example → practise rhythm, lesson and step indicators |
-| `report` | Periodic results and operations reports; numbers first | White, serif findings, one deep-green accent, tables and small multiples, greyscale-safe |
-| `briefing` | Technical briefings spoken to decision makers, re-read afterwards | Dark, one teal accent, noun-phrase titles with a topic sentence, header bands and rules instead of cards |
+| `report` | Documents read alone; numbers, tables and findings first | White, serif findings, one deep-green accent, tables and small multiples, greyscale-safe |
+| `briefing` | Decks spoken to a room, re-read afterwards | Dark, one teal accent, noun-phrase titles with a topic sentence, header bands and rules instead of cards |
 | `aws-dark` / `aws-light` | Decks about AWS services, architectures and cost — talks/demos (dark) or documents/print (light) | Squid Ink or white ground, official service-category colours for identification, official icons, one Smile Orange emphasis |
+
+**Concept — choose by look**
+
+| Style | Idea | Look |
+|---|---|---|
+| _(added in phases — see CHANGELOG)_ | | |
 
 ### User-local styles
 
@@ -237,7 +246,7 @@ You can also copy an existing style manually:
 
 ```bash
 mkdir -p ~/.config/sdpm/styles
-cp sdpm/references/examples/styles/consulting.html \
+cp sdpm/references/examples/styles/report.html \
    ~/.config/sdpm/styles/my-style.html
 ```
 

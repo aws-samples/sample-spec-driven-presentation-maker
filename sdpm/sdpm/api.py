@@ -268,7 +268,7 @@ def apply_style(
 
     Args:
         deck_dir: Deck output directory path.
-        style: Style name (e.g. "consulting").
+        style: Style name (e.g. "report").
         template: Optional template name, with or without the .pptx extension.
 
     Returns:

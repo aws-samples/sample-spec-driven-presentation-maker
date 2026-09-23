@@ -12,25 +12,29 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
-- **Six new bundled styles — `consulting`, `keynote`, `facilitation`,
-  `engineering`, `lecture`, `report`** — replace the previous eight. Each is a
+- **Bundled styles re-organised into two tiers** — an *orthodox* tier for when
+  looks do not matter (`report`, `briefing`, `aws-light`, `aws-dark`) and a
+  *concept* tier chosen by look (added in phases, listed below). The previous
+  purpose-based lineup (`consulting`, `keynote`, `facilitation`, `engineering`,
+  `lecture`) is removed: purpose belongs to the outline, not the style, and
+  those five differed from each other only by accent hue. Each style is a
   rulebook, reference and gallery sample in one file: a design decision with
   DO / DON'T rules derived from it, a Message & Outline part (deck length,
   per-slide density, title grammar, chapter shape), palette and type ramp with
   usage rules, the repeated frame, and 8–12 annotated pattern slides showing how
   *that* style builds numbers, comparisons, processes, tables, charts and more.
-  All six define `--color-text` (read by `apply_style`) and `--fs-*` sizes (read
-  by the build-time font-size lint — the old styles used `--size-*`, so the lint
-  never ran on them). Lineup and intent: `docs/en/custom-template.md`.
+  All styles define `--color-text` (read by `apply_style`) and `--fs-*` sizes (read
+  by the build-time font-size lint). Lineup and intent: `docs/en/custom-template.md`.
+  - `report` — white, serif findings, one deep-green accent, tables and small
+    multiples, greyscale-safe.
+  - `briefing` — dark technical-briefing style (noun-phrase titles with a
+    topic sentence, header bands and rules instead of cards, one teal accent).
+  - `aws-dark` / `aws-light` — Squid Ink or white ground, the official
+    service-category colours as `--cat-*` tokens with per-background tints,
+    official icons, one Smile Orange emphasis per slide; the two files differ
+    only in `:root` and the palette specimens.
 - **Style contract test** (`tests/test_builtin_styles_contract.py`) and a
   style-verification sample deck (`tests/fixtures/style-sample-deck/`).
-- **`briefing`, `aws-dark` and `aws-light` bundled styles.** `briefing` is a
-  dark technical-briefing style for decision makers (noun-phrase titles with a
-  topic sentence, header bands and rules instead of cards, one teal accent).
-  `aws-dark` / `aws-light` are AWS-themed: Squid Ink or white ground, the
-  official service-category colours as `--cat-*` tokens with per-background
-  tints, official icons, one Smile Orange emphasis per slide; the two files
-  differ only in `:root` and the palette specimens.
 
 - **Claude Opus 5.5, GPT-6 Sol and GPT-6 Luna** are selectable models
   (`global.anthropic.claude-opus-5-5`, `global.openai.gpt-6-sol`,

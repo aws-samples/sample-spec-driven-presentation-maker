@@ -22,8 +22,8 @@ from sdpm.knowledge.reference import BUNDLED_STYLES_DIR
 
 BUNDLED = sorted(p for p in BUNDLED_STYLES_DIR.glob("*.html"))
 EXPECTED_NAMES = {
-    "consulting", "keynote", "facilitation", "engineering", "lecture", "report",
-    "briefing", "aws-light", "aws-dark",
+    # orthodox tier — pick one of these when in doubt
+    "report", "briefing", "aws-light", "aws-dark",
 }
 
 REQUIRED_TOKENS = ("--color-text", "--color-bg", "--fs-cover-title", "--fs-slide-title", "--fs-body")
@@ -41,7 +41,7 @@ def _root(html: str) -> str:
     return blocks[0]
 
 
-def test_bundled_lineup_is_exactly_the_six_styles() -> None:
+def test_bundled_lineup_is_exactly_the_expected_styles() -> None:
     assert {p.stem for p in BUNDLED} == EXPECTED_NAMES
 
 

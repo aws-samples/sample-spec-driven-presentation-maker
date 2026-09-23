@@ -662,7 +662,7 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
 
     Args:
         deck_id: Deck ID.
-        style: Style name from list_styles (e.g. "consulting").
+        style: Style name from list_styles (e.g. "report").
         template: Optional template name, with or without the .pptx extension.
 
     Returns:
