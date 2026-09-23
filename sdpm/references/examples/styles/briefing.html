@@ -1,819 +1,2355 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
 <meta charset="UTF-8">
-<title>briefing — A dark technical-briefing system for decision makers listening in the room and reviewing later; noun-phrase titles name each issue, a topic sentence states the claim, and sharp header bands, rules, washed panels, direct metrics, and one teal accent structure the spoken argument without cards.</title>
+<title>briefing — A dark presentation style for forward-looking growth briefings delivered to an audience. Teal (#11A497) is the single primary accent; green and coral appear only when they carry success or danger meaning. Build with filled header bands, rule dividers, lightly washed panels, and whitespace rather than cards. Emoji are prohibited, corners stay sharp, and text stays short. Every slide places a stated topic sentence directly below its title, while the closing implication appears as plain text rather than inside a band or box. Titles are formal business noun phrases; never print questions or conversational language. The design assumes a presenter will speak while the room listens. For material intended to be read independently, use fuller topic sentences and supporting detail.</title>
 <style>
 :root {
-  --color-bg: #0D1117;
-  --color-surface: #161B22;
-  --color-wash: #1C222B;
-  --color-border: #30363D;
-  --color-muted: #8B949E;
-  --color-text: #E6EDF3;
-  --accent: #11A497;
-  --color-on-accent: #06110F;
-  --success: #5BC455;
-  --danger: #FF7E5B;
-  --color-gallery-bg: #070A0E;
-  --fs-cover-title: 56pt;
-  --fs-slide-title: 40pt;
-  --fs-heading: 20pt;
-  --fs-body: 20pt;
-  --fs-caption: 17pt;
-  --fs-mid: 14pt;
-  --fs-label: 12pt;
-  --fs-num: 32pt;
-  --fs-metric: 40pt;
-  --fs-metric-lg: 56pt;
-  --font-family: "Segoe UI", "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif;
-  --margin-x: 120px;
-  --content-w: 1680px;
-  --bar-h: 120px;
-  --content-top: 330px;
-  --radius: 2px;
-  --border-thin: 1px;
-  --border-accent: 3px;
-  --shadow: none;
-}
-* { box-sizing: border-box; }
-body { margin: 0; padding: 40px; background: var(--color-gallery-bg); font-family: var(--font-family); zoom: 0.7; }
-.slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; overflow: hidden; background: var(--color-bg); color: var(--color-text); }
-.el { position: absolute; box-sizing: border-box; }
-.frame-accent { background: var(--accent); }
-.section-label { color: var(--accent); font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; font-weight: 700; letter-spacing: 1.2pt; text-transform: uppercase; }
-.cover-title { font-size: calc(var(--fs-cover-title) * 1.5); line-height: 1.05; font-weight: 700; letter-spacing: -0.5pt; }
-.title { font-size: calc(var(--fs-slide-title) * 1.5); line-height: 1.2; font-weight: 700; letter-spacing: -0.3pt; }
-.topic { font-size: calc(var(--fs-body) * 1.5); line-height: 1.35; color: var(--color-text); }
-.heading { font-size: calc(var(--fs-heading) * 1.5); line-height: 1.3; font-weight: 700; }
-.body-text { font-size: calc(var(--fs-body) * 1.5); line-height: 1.42; }
-.caption { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.35; color: var(--color-muted); }
-.mid { font-size: calc(var(--fs-mid) * 1.5); line-height: 1.35; }
-.label { font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; font-weight: 700; letter-spacing: 1pt; text-transform: uppercase; color: var(--color-muted); }
-.num { font-size: calc(var(--fs-num) * 1.5); line-height: 1; font-weight: 700; }
-.metric { font-size: calc(var(--fs-metric) * 1.5); line-height: 1; font-weight: 700; }
-.metric-lg { font-size: calc(var(--fs-metric-lg) * 1.5); line-height: 1; font-weight: 700; }
-.muted { color: var(--color-muted); }
-.accent-text { color: var(--accent); }
-.success-text { color: var(--success); }
-.danger-text { color: var(--danger); }
-.bold { font-weight: 700; }
-.center { text-align: center; }
-.right { text-align: right; }
-.rule { border-top: var(--border-thin) solid var(--color-border); }
-.vrule { border-left: var(--border-thin) solid var(--color-border); }
-.accent-rule { border-top: var(--border-accent) solid var(--accent); }
-.surface { background: var(--color-surface); }
-.wash { background: var(--color-wash); }
-.border { border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); }
-.open-panel { border-top: var(--border-thin) solid var(--color-border); padding-top: 22px; }
-.left-rule { border-left: var(--border-accent) solid var(--accent); padding-left: 26px; }
-.danger-rule { border-left: var(--border-accent) solid var(--danger); padding-left: 26px; }
-.header-band { background: var(--accent); color: var(--color-on-accent); padding: 18px 24px; font-size: calc(var(--fs-heading) * 1.5); line-height: 1.2; font-weight: 700; }
-.quiet-band { background: var(--color-surface); padding: 18px 24px; font-size: calc(var(--fs-heading) * 1.5); line-height: 1.2; font-weight: 700; }
-.wash-panel { background: var(--color-wash); padding: 28px 30px; border-radius: var(--radius); }
-.paragraph-bar { border-left: var(--border-accent) solid var(--color-border); padding-left: 28px; }
-.paragraph-bar.current { border-left-color: var(--accent); }
-.metric-block { border-top: var(--border-thin) solid var(--color-border); padding-top: 24px; }
-.source { font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; color: var(--color-muted); }
-.closing-insight { font-size: calc(var(--fs-heading) * 1.5); line-height: 1.35; font-weight: 700; }
-.rule-list { margin: 0; padding: 0; list-style: none; }
-.rule-list li { margin: 0 0 20px; padding-left: 24px; border-left: var(--border-accent) solid var(--color-border); }
-.rule-list li.good { border-left-color: var(--accent); }
-.rule-list li.risk { border-left-color: var(--danger); }
-.rule-list strong { color: var(--color-text); }
-.inline-note { color: var(--color-muted); }
-.swatch { border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); }
-.fill-bg { background: var(--color-bg); }
-.fill-surface { background: var(--color-surface); }
-.fill-wash { background: var(--color-wash); }
-.fill-border { background: var(--color-border); }
-.fill-muted { background: var(--color-muted); }
-.fill-text { background: var(--color-text); }
-.fill-accent { background: var(--accent); color: var(--color-on-accent); }
-.fill-success { background: var(--success); color: var(--color-bg); }
-.fill-danger { background: var(--danger); color: var(--color-bg); }
-.type-row { border-top: var(--border-thin) solid var(--color-border); display: flex; align-items: center; justify-content: space-between; }
-.type-meta { font-size: calc(var(--fs-mid) * 1.5); line-height: 1.3; color: var(--color-muted); text-align: right; }
-.pair-head { display: flex; align-items: center; padding: 0 26px; font-size: calc(var(--fs-heading) * 1.5); line-height: 1.2; font-weight: 700; }
-.pair-row { border-bottom: var(--border-thin) solid var(--color-border); padding: 17px 0; font-size: calc(var(--fs-mid) * 1.5); line-height: 1.35; }
-.pair-row b { color: var(--accent); }
-.chevrons { display: flex; align-items: stretch; }
-.chevron { flex: 1; margin-right: -18px; padding: 22px 38px 18px 28px; background: var(--color-surface); clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 50%, calc(100% - 28px) 100%, 0 100%, 28px 50%); }
-.chevron:first-child { clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 50%, calc(100% - 28px) 100%, 0 100%); }
-.chevron:last-child { margin-right: 0; background: var(--accent); color: var(--color-on-accent); }
-.chevron b { display: block; font-size: calc(var(--fs-heading) * 1.5); line-height: 1.2; }
-.chevron span { display: block; margin-top: 8px; font-size: calc(var(--fs-mid) * 1.5); line-height: 1.25; color: var(--color-muted); }
-.chevron:last-child span { color: var(--color-on-accent); }
-.effect-band { display: flex; align-items: stretch; border-top: var(--border-thin) solid var(--color-border); border-bottom: var(--border-thin) solid var(--color-border); }
-.effect-cell { flex: 1; padding: 20px 28px; border-right: var(--border-thin) solid var(--color-border); }
-.effect-cell:last-child { border-right: 0; }
-.effect-cell b { display: block; font-size: calc(var(--fs-heading) * 1.5); line-height: 1.2; }
-.effect-cell span { display: block; margin-top: 8px; font-size: calc(var(--fs-mid) * 1.5); line-height: 1.25; color: var(--color-muted); }
-.lane-label { background: var(--color-wash); display: flex; align-items: center; justify-content: center; text-align: center; font-size: calc(var(--fs-mid) * 1.5); line-height: 1.2; font-weight: 700; }
-.lane-bg { background: var(--color-surface); }
-.node { background: var(--color-surface); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; font-size: calc(var(--fs-mid) * 1.5); line-height: 1.2; }
-.node.current { border-color: var(--accent); color: var(--accent); }
-.connector-h { background: var(--color-border); }
-.connector-v { background: var(--color-border); }
-.connector-accent { background: var(--accent); }
-.arrow-right { width: 0; height: 0; border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-left: 12px solid var(--color-border); }
-.arrow-right.accent-arrow { border-left-color: var(--accent); }
-.arrow-down { width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 12px solid var(--color-border); }
-.cycle-ring { border: 3px solid var(--color-border); border-radius: 50%; }
-.cycle-core { background: var(--accent); color: var(--color-on-accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; text-align: center; font-size: calc(var(--fs-heading) * 1.5); line-height: 1.2; font-weight: 700; }
-.stage { border-left: var(--border-accent) solid var(--color-border); padding-left: 24px; }
-.stage.current { border-left-color: var(--accent); }
-.chapter-num { font-size: calc(var(--fs-metric-lg) * 1.5); line-height: 0.9; font-weight: 700; color: var(--accent); }
-.chapter-map { border-bottom: var(--border-thin) solid var(--color-border); padding: 16px 0 16px 22px; font-size: calc(var(--fs-mid) * 1.5); line-height: 1.3; color: var(--color-muted); }
-.chapter-map.current { border-left: var(--border-accent) solid var(--accent); color: var(--color-text); font-weight: 700; }
-.column-a { border-top: var(--border-thin) solid var(--color-border); }
-.column-body { padding: 24px; font-size: calc(var(--fs-mid) * 1.5); line-height: 1.4; }
-.column-foot { border-top: var(--border-thin) solid var(--color-border); padding: 18px 24px; }
-.column-foot b { font-size: calc(var(--fs-heading) * 1.5); line-height: 1.2; color: var(--accent); }
-.column-foot span { display: block; margin-top: 6px; font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; color: var(--color-muted); text-transform: uppercase; }
-.column-band { display: flex; background: var(--color-surface); }
-.column-band-cell { flex: 1; padding: 30px; border-right: var(--border-thin) solid var(--color-border); }
-.column-band-cell:last-child { border-right: 0; }
-.column-band-cell b { display: block; font-size: calc(var(--fs-heading) * 1.5); line-height: 1.2; }
-.column-band-cell span { display: block; margin-top: 18px; font-size: calc(var(--fs-mid) * 1.5); line-height: 1.4; color: var(--color-muted); }
-.data-table { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; font-size: calc(var(--fs-mid) * 1.5); line-height: 1.25; }
-.data-table th { padding: 14px 16px; text-align: left; background: var(--accent); color: var(--color-on-accent); font-weight: 700; }
-.data-table td { padding: 13px 16px; text-align: left; border-bottom: var(--border-thin) solid var(--color-border); }
-.data-table td:not(:first-child), .data-table th:not(:first-child) { text-align: right; }
-.gauge-track { position: relative; width: 260px; height: 260px; border-radius: 50%; background: var(--color-surface); }
-.gauge-segment { position: absolute; inset: 0; border-radius: 50%; border: 24px solid transparent; border-top-color: var(--accent); border-right-color: var(--accent); border-bottom-color: var(--accent); }
-.gauge-hole { position: absolute; inset: 42px; border-radius: 50%; background: var(--color-bg); display: flex; align-items: center; justify-content: center; font-size: calc(var(--fs-metric) * 1.5); line-height: 1; font-weight: 700; }
-.hbar { height: 22px; background: var(--color-surface); }
-.hbar-fill { height: 100%; background: var(--accent); }
-.bar-chart { display: flex; align-items: flex-end; justify-content: space-around; border-bottom: var(--border-thin) solid var(--color-border); }
-.bar-wrap { height: 100%; flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
-.bar-value { margin-bottom: 8px; font-size: calc(var(--fs-mid) * 1.5); line-height: 1.2; font-weight: 700; }
-.bar { width: 90px; background: var(--color-border); }
-.bar.current { background: var(--accent); }
-.bar-label { margin-top: 10px; font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; color: var(--color-muted); }
-.h100 { height: 100px; }
-.h150 { height: 150px; }
-.h210 { height: 210px; }
-.h275 { height: 275px; }
-.h340 { height: 340px; }
+  --accent:#11A497;
+  --color-on-accent:#06110F;
+  --success:#5BC455;
+  --danger:#FF7E5B;
+  --color-bg:#0D1117;
+  --color-surface:#161B22;
+  --color-border:#30363D;
+  --color-muted:#8B949E;
+  --color-text:#E6EDF3;
+  --wash:#161B22;
+  --wash-accent:#1C222B;
+  --font-family:"Segoe UI","Helvetica Neue",Arial,"Hiragino Sans","Yu Gothic",Meiryo,"Noto Sans JP",sans-serif;
+  --fs-cover-title:56pt;
+  --fs-slide-title:40pt;
+  --fs-heading:20pt;
+  --fs-body:20pt;
+  --fs-caption:17pt;
+  --fs-metric:40pt;
+  --fs-metric-lg:56pt;
+  --fs-label:12pt;
+  --fs-num:32pt;
+  --fs-mid:14pt;
+  --radius:2px;
+  --border-thin:1px;
+  --border-accent:3px;
+  --shadow:none;
+  --shadow-sm:none;
+  --margin-x:120px;
+  --content-w:1680px;
+  --content-top:330px;
+  --bar-h:260px}
+* {
+  box-sizing:border-box}
+body {
+  margin:0;
+  padding:40px;
+  background:#070A0E;
+  font-family:var(--font-family);
+  zoom: 0.7}
+.slide {
+  position:relative;
+  width:1920px;
+  height:1080px;
+  margin:0 auto 40px;
+  overflow:hidden}
+.slide-dark {
+  background:var(--color-bg);
+  color:var(--color-text)}
+.el {
+  position:absolute}
+.t-cover-title {
+  font-size:calc(var(--fs-cover-title)*1.5);
+  font-weight:700;
+  line-height:1.15;
+  letter-spacing:-.5pt}
+.t-slide-title {
+  font-size:calc(var(--fs-slide-title)*1.5);
+  font-weight:600;
+  line-height:1.2;
+  letter-spacing:-.3pt}
+.t-heading {
+  font-size:calc(var(--fs-heading)*1.5);
+  font-weight:600;
+  line-height:1.4}
+.t-body {
+  font-size:calc(var(--fs-body)*1.5);
+  line-height:1.55}
+.t-caption {
+  font-size:calc(var(--fs-caption)*1.5);
+  line-height:1.45;
+  color:var(--color-muted)}
+.t-metric {
+  font-size:calc(var(--fs-metric)*1.5);
+  font-weight:700;
+  line-height:1}
+.t-metric-lg {
+  font-size:calc(var(--fs-metric-lg)*1.5);
+  font-weight:700;
+  line-height:1}
+.t-label {
+  font-size:calc(var(--fs-label)*1.5);
+  font-weight:600;
+  line-height:1.3;
+  letter-spacing:1.2pt;
+  text-transform:uppercase}
+.t-num {
+  font-size:calc(var(--fs-num)*1.5);
+  font-weight:700;
+  line-height:1}
+.topbar {
+  display:flex;
+  align-items:center;
+  border-bottom:1px solid var(--color-border);
+  background:transparent}
+.topbar:before {
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:3px;
+  height:100%;
+  background:var(--accent)}
+.topbar .tb-num {
+  color:var(--accent);
+  font-size:calc(var(--fs-num)*1.5);
+  font-weight:700;
+  padding:0 32px 0 var(--margin-x)}
+.topbar .tb-rule {
+  width:1px;
+  height:92px;
+  background:var(--color-border)}
+.topbar .tb-texts {
+  padding-left:32px;
+  width:1450px}
+.topbar .tb-sub {
+  color:var(--color-muted);
+  font-size:calc(var(--fs-label)*1.5);
+  font-weight:600;
+  letter-spacing:1.2pt;
+  margin-bottom:6px}
+.topbar .tb-title {
+  color:var(--color-text);
+  font-size:calc(var(--fs-slide-title)*1.5);
+  font-weight:600;
+  line-height:1.2;
+  max-height:192px}
+.label-head {
+  font-size:calc(var(--fs-label)*1.5);
+  font-weight:600;
+  color:var(--accent);
+  letter-spacing:1.2pt;
+  text-transform:uppercase;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--color-border)}
+.label-head.sub,.label-head.accent {
+  color:var(--accent);
+  border-bottom-color:var(--accent)}
+.row-item {
+  display:flex;
+  gap:24px;
+  align-items:flex-start}
+.row-item .ri-icon {
+  width:48px;
+  height:48px;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  justify-content:center}
+.row-item .ri-title {
+  font-size:calc(var(--fs-body)*1.5);
+  font-weight:600;
+  margin-bottom:6px}
+.row-item .ri-desc {
+  font-size:calc(var(--fs-caption)*1.5);
+  color:var(--color-muted);
+  line-height:1.5}
+.rule-h {
+  height:1px;
+  background:var(--color-border)}
+.wash {
+  background:var(--wash);
+  border-radius:var(--radius)}
+.wash-accent {
+  background:var(--wash-accent);
+  border-radius:var(--radius)}
+.leftbar,.leftbar-sub {
+  border-left:var(--border-accent) solid var(--accent);
+  padding-left:24px}
+.check-item {
+  position:relative;
+  padding-left:28px;
+  margin-bottom:14px}
+.check-item:before {
+  content:"";
+  position:absolute;
+  left:0;
+  top:17px;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--accent)}
+.dont-item {
+  position:relative;
+  padding-left:28px;
+  margin-bottom:14px;
+  color:var(--color-muted)}
+.dont-item:before {
+  content:"×";
+  position:absolute;
+  left:0;
+  color:var(--danger);
+  font-weight:700}
+.icon {
+  width:40px;
+  height:40px;
+  border-radius:var(--radius);
+  background:var(--color-surface);
+  display:flex;
+  align-items:center;
+  justify-content:center}
+.icon:after {
+  content:"";
+  width:18px;
+  height:18px;
+  border-radius:2px;
+  background:var(--accent);
+  opacity:.7}
+.ico {
+  position:relative;
+  width:44px;
+  height:44px;
+  color:var(--color-muted);
+  flex-shrink:0}
+.ico.accent {
+  color:var(--accent)}
+.ico:before,.ico:after {
+  content:"";
+  position:absolute;
+  box-sizing:border-box}
+.ico-folder:before {
+  left:4px;
+  top:15px;
+  width:40px;
+  height:26px;
+  border:3px solid currentColor}
+.ico-folder:after {
+  left:4px;
+  top:8px;
+  width:20px;
+  height:10px;
+  border:3px solid currentColor;
+  border-bottom:0}
+.ico-doc:before {
+  left:8px;
+  top:4px;
+  width:30px;
+  height:38px;
+  border:3px solid currentColor}
+.ico-doc:after {
+  left:15px;
+  top:15px;
+  width:16px;
+  height:3px;
+  background:currentColor;
+  box-shadow:0 8px 0 currentColor,0 16px 0 currentColor}
+.ico-search:before {
+  left:5px;
+  top:5px;
+  width:26px;
+  height:26px;
+  border:3px solid currentColor;
+  border-radius:50%}
+.ico-search:after {
+  left:29px;
+  top:29px;
+  width:12px;
+  height:3px;
+  background:currentColor;
+  transform:rotate(45deg)}
+.ico-chart:before {
+  left:6px;
+  top:27px;
+  width:8px;
+  height:14px;
+  background:currentColor;
+  box-shadow:14px -8px 0 currentColor,28px -16px 0 currentColor}
+.ico-chart:after {
+  left:4px;
+  top:6px;
+  width:3px;
+  height:35px;
+  background:currentColor}
+.ico-check:before {
+  left:6px;
+  top:4px;
+  width:34px;
+  height:38px;
+  border:3px solid currentColor}
+.ico-check:after {
+  left:14px;
+  top:17px;
+  width:11px;
+  height:6px;
+  border-left:3px solid currentColor;
+  border-bottom:3px solid currentColor;
+  transform:rotate(-45deg)}
+.ico-cloud:before {
+  left:5px;
+  top:17px;
+  width:36px;
+  height:20px;
+  border:3px solid currentColor;
+  border-radius:14px}
+.ico-cloud:after {
+  left:15px;
+  top:8px;
+  width:18px;
+  height:18px;
+  border:3px solid currentColor;
+  border-radius:50%;
+  background:var(--color-bg)}
+.effect-band {
+  display:flex;
+  align-items:stretch;
+  border-top:1px solid var(--color-border)}
+.effect-band .eb-label {
+  color:var(--accent);
+  display:flex;
+  align-items:center;
+  padding-right:24px;
+  font-size:calc(var(--fs-label)*1.5);
+  font-weight:600;
+  text-transform:uppercase}
+.effect-band .eb-item {
+  padding:20px 32px}
+.effect-band .eb-sep {
+  width:1px;
+  background:var(--color-border)}
+.chevron {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:86px;
+  padding:0 36px 0 24px;
+  background:var(--color-surface);
+  font-size:calc(var(--fs-mid)*1.5);
+  font-weight:600;
+  clip-path:polygon(0 0,calc(100% - 20px) 0,100% 50%,calc(100% - 20px) 100%,0 100%,20px 50%)}
+.chevron.first {
+  clip-path:polygon(0 0,calc(100% - 20px) 0,100% 50%,calc(100% - 20px) 100%,0 100%)}
+.chevron.is-last {
+  background:var(--accent);
+  color:var(--color-on-accent)}
+.sec-head {
+  padding-left:22px;
+  font-size:calc(var(--fs-heading)*1.5);
+  font-weight:600;
+  line-height:1.3}
+.sec-head:before {
+  content:"";
+  position:absolute;
+  left:0;
+  top:2px;
+  bottom:2px;
+  width:5px;
+  background:var(--accent)}
+.sec-head-fill {
+  display:inline-block;
+  padding:12px 28px;
+  font-size:calc(var(--fs-heading)*1.5);
+  font-weight:600;
+  color:var(--color-on-accent);
+  line-height:1.3;
+  background:var(--accent);
+  border-radius:var(--radius)}
+.para {
+  padding-left:24px;
+  font-size:calc(var(--fs-body)*1.5);
+  line-height:1.55}
+.para:before {
+  content:"";
+  position:absolute;
+  left:0;
+  top:4px;
+  bottom:4px;
+  width:3px;
+  background:var(--color-border)}
+.para.accent:before {
+  background:var(--accent)}
+.weak {
+  color:var(--color-muted)}
+.bullets {
+  list-style:none;
+  margin:0;
+  padding:0}
+.bullets li {
+  position:relative;
+  padding-left:26px;
+  margin-bottom:12px;
+  font-size:calc(var(--fs-body)*1.5);
+  line-height:1.45}
+.bullets li:before {
+  content:"";
+  position:absolute;
+  left:6px;
+  top:16px;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:var(--color-muted)}
+.bullets.dash li:before {
+  left:2px;
+  top:18px;
+  width:12px;
+  height:2px;
+  border-radius:0}
+.sub-line {
+  display:block;
+  margin-top:6px;
+  font-size:calc(var(--fs-caption)*1.5);
+  color:var(--color-muted)}
+.em {
+  font-weight:700}
+.em-accent,.em-sub {
+  font-weight:700;
+  color:var(--accent)}
+.em-success {
+  font-weight:700;
+  color:var(--success)}
+.em-danger {
+  font-weight:700;
+  color:var(--danger)}
+.em-mark {
+  font-weight:700;
+  color:var(--color-on-accent);
+  background:var(--accent);
+  padding:0 6px}
+.summary-bar {
+  background:var(--wash);
+  border-left:5px solid var(--accent);
+  padding:22px 32px;
+  font-size:calc(var(--fs-heading)*1.5);
+  font-weight:600;
+  line-height:1.4}
+.summary-bar .sb-label {
+  display:block;
+  font-size:calc(var(--fs-label)*1.5);
+  color:var(--accent);
+  margin-bottom:8px}
+.lead {
+  font-size:calc(var(--fs-heading)*1.5);
+  line-height:1.45}
+.pill-head {
+  display:inline-block;
+  padding:8px 28px;
+  border-radius:999px;
+  font-size:calc(var(--fs-body)*1.5);
+  font-weight:600;
+  background:var(--color-surface);
+  border:1px solid var(--color-border)}
+.pill-head.accent,.pill-head.sub {
+  background:var(--accent);
+  border-color:var(--accent);
+  color:var(--color-on-accent)}
+.key-band {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:14px;
+  text-align:center;
+  background:var(--wash-accent);
+  border-top:1px solid var(--accent);
+  padding:26px var(--margin-x)}
+.key-band .kb-pill {
+  font-size:calc(var(--fs-label)*1.5);
+  color:var(--accent);
+  font-weight:600;
+  text-transform:uppercase}
+.key-band .kb-msg {
+  font-size:calc(var(--fs-heading)*1.5);
+  font-weight:700;
+  line-height:1.4}
+.divider-label {
+  display:flex;
+  align-items:center;
+  gap:24px}
+.divider-label .dl-text {
+  flex-shrink:0;
+  font-size:calc(var(--fs-label)*1.5);
+  font-weight:600;
+  color:var(--accent);
+  text-transform:uppercase}
+.divider-label .dl-line {
+  flex:1;
+  height:1px;
+  background:var(--color-border)}
+.divider-label.center .dl-text {
+  color:var(--color-text)}
+.col-card {
+  border:1px solid var(--color-border);
+  border-radius:var(--radius);
+  background:var(--color-surface);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden}
+.col-card .cc-head {
+  padding:16px 20px;
+  border-bottom:1px solid var(--color-border);
+  display:flex;
+  gap:12px}
+.cc-num {
+  font-size:calc(var(--fs-caption)*1.5);
+  font-weight:700;
+  color:var(--accent)}
+.cc-title {
+  font-size:calc(var(--fs-body)*1.5);
+  font-weight:600}
+.cc-body {
+  padding:24px 20px;
+  text-align:center;
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  justify-content:center}
+.cc-desc {
+  font-size:calc(var(--fs-caption)*1.5);
+  color:var(--color-muted);
+  line-height:1.45;
+  margin-top:16px}
+.cc-foot {
+  padding:16px 20px;
+  border-top:1px solid var(--color-border);
+  text-align:center}
+.cf-label {
+  font-size:calc(var(--fs-caption)*1.5);
+  color:var(--color-muted)}
+.cf-value {
+  font-size:calc(var(--fs-heading)*1.5);
+  font-weight:700;
+  color:var(--accent)}
+.col-band {
+  background:var(--color-surface);
+  border:1px solid var(--color-border);
+  display:flex}
+.cb-col {
+  flex:1;
+  padding:30px 28px;
+  text-align:center;
+  display:flex;
+  flex-direction:column;
+  justify-content:center}
+.cb-sep {
+  width:1px;
+  background:var(--color-border);
+  margin:28px 0}
+.cb-title {
+  font-size:calc(var(--fs-body)*1.5);
+  font-weight:600;
+  margin:16px 0 10px}
+.cb-desc {
+  font-size:calc(var(--fs-caption)*1.5);
+  color:var(--color-muted);
+  line-height:1.4}
+.ba-head {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:calc(var(--fs-heading)*1.5);
+  font-weight:700}
+.ba-head.before {
+  background:var(--color-surface);
+  color:var(--color-muted);
+  border:1px solid var(--color-border)}
+.ba-head.after {
+  background:var(--accent);
+  color:var(--color-on-accent)}
+.ba-arrow {
+  border-top:26px solid transparent;
+  border-bottom:26px solid transparent;
+  border-left:34px solid var(--accent)}
+.stage-label {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  font-size:calc(var(--fs-mid)*1.5);
+  font-weight:700;
+  background:var(--color-surface)}
+.stage-label.on {
+  background:var(--accent);
+  color:var(--color-on-accent)}
+.stage-track {
+  background:rgba(255,255,255,.02)}
+.stage-track.on {
+  background:var(--wash-accent)}
+.data-node {
+  background:var(--color-surface);
+  border:1px solid var(--color-border);
+  display:flex;
+  align-items:center;
+  justify-content:center}
+.data-node.done {
+  border-color:var(--accent)}
+.merge-band {
+  display:flex;
+  align-items:center;
+  padding:0 8px;
+  background:var(--accent);
+  border-radius:999px}
+.mb-bi {
+  width:76px;
+  height:76px;
+  border-radius:50%;
+  background:var(--color-bg);
+  color:var(--accent);
+  font-weight:800;
+  font-size:calc(var(--fs-heading)*1.5);
+  display:flex;
+  align-items:center;
+  justify-content:center}
+.mb-text {
+  flex:1;
+  text-align:center;
+  color:var(--color-on-accent);
+  font-size:calc(var(--fs-body)*1.5);
+  font-weight:700}
+.cond-bubble {
+  display:inline-block;
+  padding:8px 16px;
+  border:1px solid var(--accent);
+  color:var(--accent);
+  font-size:calc(var(--fs-mid)*1.5);
+  font-weight:700}
+.gauge {
+  border-radius:50%;
+  background:conic-gradient(var(--accent) calc(var(--val)*1%),var(--color-surface) 0)}
+.gauge:after {
+  content:"";
+  position:absolute;
+  inset:16%;
+  border-radius:50%;
+  background:var(--color-bg)}
+.g-label {
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:1}
+.donut {
+  border-radius:50%;
+  background:conic-gradient(var(--accent) 0 41%,#14867d 41% 73%,#22544f 73% 91%,var(--color-surface) 91%)}
+.donut:after {
+  content:"";
+  position:absolute;
+  inset:30%;
+  border-radius:50%;
+  background:var(--color-bg)}
+.d-center {
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:1;
+  text-align:center}
+.legend-item {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  font-size:calc(var(--fs-caption)*1.5)}
+.lg-swatch {
+  width:16px;
+  height:16px;
+  flex-shrink:0}
+.hbar {
+  height:30px;
+  border-radius:999px;
+  background:var(--color-surface);
+  overflow:hidden}
+.hb-fill {
+  height:100%;
+  width:calc(var(--val)*1%);
+  background:var(--accent)}
+.col-chart {
+  display:flex;
+  align-items:flex-end}
+.col-bar {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-end}
+.cb-fill {
+  width:80px;
+  background:#22544f}
+.col-bar.on .cb-fill {
+  background:var(--accent)}
+.cb-val {
+  font-size:calc(var(--fs-body)*1.5);
+  font-weight:700;
+  margin-bottom:8px}
+.col-bar.on .cb-val {
+  color:var(--accent)}
+.cb-x {
+  font-size:calc(var(--fs-caption)*1.5);
+  color:var(--color-muted);
+  margin-top:10px}
+.divider-num {
+  font-size:calc(var(--fs-metric-lg)*1.5);
+  font-weight:700;
+  line-height:.9;
+  color:var(--accent)}
+.agenda-mini .am-item {
+  display:flex;
+  align-items:center;
+  gap:20px;
+  padding:14px 0 14px 20px;
+  font-size:calc(var(--fs-caption)*1.5);
+  color:var(--color-muted);
+  border-bottom:1px solid var(--color-border)}
+.agenda-mini .am-num {
+  width:44px;
+  font-weight:700}
+.agenda-mini .am-check {
+  margin-left:auto}
+.agenda-mini .am-item.now {
+  color:var(--color-text);
+  font-size:calc(var(--fs-body)*1.5);
+  font-weight:600;
+  border-left:4px solid var(--accent)}
+.card {
+  border:1px solid var(--color-border);
+  padding:24px}
+.card-accent {
+  border-left:var(--border-accent) solid var(--accent);
+  padding:24px}
+.badge {
+  display:inline-block;
+  padding:4px 14px;
+  border:1px solid var(--color-border)}
+.pill {
+  display:inline-block;
+  padding:6px 18px;
+  border:1px solid var(--accent);
+  color:var(--accent);
+  font-size:calc(var(--fs-caption)*1.5);
+  font-weight:600}
+.node {
+  background:var(--color-surface);
+  border:1px solid var(--color-border);
+  padding:12px 16px;
+  text-align:center;
+  font-size:calc(var(--fs-mid)*1.5);
+  font-weight:500;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  line-height:1.3}
+.node-strong {
+  background:transparent;
+  border-color:var(--accent);
+  color:var(--accent)}
+.node-sub {
+  border-left:var(--border-accent) solid var(--accent)}
+.diamond {
+  border:1px solid var(--accent);
+  transform:rotate(45deg)}
+.diamond>span {
+  display:block;
+  transform:rotate(-45deg);
+  font-size:calc(var(--fs-mid)*1.5);
+  text-align:center}
+.conn {
+  background:var(--color-border)}
+.conn-accent {
+  background:var(--accent)}
+.arrow-h {
+  border-top:7px solid transparent;
+  border-bottom:7px solid transparent;
+  border-left:10px solid var(--color-border)}
+.arrow-v {
+  border-left:7px solid transparent;
+  border-right:7px solid transparent;
+  border-top:10px solid var(--color-border)}
+.lane-label {
+  background:var(--wash);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:600;
+  font-size:calc(var(--fs-mid)*1.5)}
+.lane-row-bg {
+  background:var(--color-surface)}
+.stage-circle {
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:calc(var(--fs-mid)*1.5)}
+.stage-before {
+  border:1px solid var(--color-border);
+  color:var(--color-muted)}
+.stage-step {
+  border:2px solid var(--accent);
+  color:var(--accent)}
+.varrow {
+  border-left:10px solid transparent;
+  border-right:10px solid transparent;
+  border-top:12px solid var(--accent)}
+.frame-accent {
+  background:var(--accent)}
+.c-muted {
+  color:var(--color-muted)}
+.c-accent {
+  color:var(--accent)}
+.c-danger {
+  color:var(--danger)}
+.c-success {
+  color:var(--success)}
+.bg-accent {
+  background:var(--accent);
+  color:var(--color-on-accent)}
+.bg-surface {
+  background:var(--color-surface)}
+.bd-accent {
+  border:1px solid var(--accent)}
+.bd-danger {
+  border:2px dashed var(--danger)}
+.text-center {
+  text-align:center}
+.flex {
+  display:flex}
+.items-center {
+  align-items:center}
+.justify-center {
+  justify-content:center}
+.space-between {
+  justify-content:space-between}
+.mono {
+  font-family:Menlo,Consolas,monospace}
+.bold {
+  font-weight:700}
+.source-line {
+  font-size:calc(var(--fs-label)*1.5);
+  color:var(--color-muted);
+  line-height:1.2}
+.flex>.chevron {
+  flex:1}
+.palette-rules li {
+  font-size:calc(var(--fs-caption)*1.5);
+  line-height:1.35}
 </style>
 </head>
 <body>
-<!-- Part 0: Document identity and machine-readable design tokens -->
-<!-- Part 1: Cover -->
-<!-- Slide type: cover — the sparse title, fixed left rule, and one direct sentence establish a briefing spoken to decision makers rather than a card-based document. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:1080px;"></div>
-  <div class="el section-label" style="left:120px;top:330px;width:1100px;height:30px;">Bundled style / technical briefing</div>
-  <div class="el cover-title" style="left:120px;top:380px;width:1500px;height:130px;">Briefing</div>
-  <div class="el topic" style="left:120px;top:540px;width:1320px;height:120px;">A short argument for people who decide in the room and verify the reasoning later.</div>
-  <div class="el accent-rule" style="left:120px;top:705px;width:220px;height:3px;"></div>
-  <div class="el caption" style="left:120px;top:930px;width:1220px;height:50px;">Dark ground / one teal accent / noun-phrase title / stated claim / no cards</div>
-</div>
-<!-- Part 2: Rules -->
-<!-- Slide type: design decision and derived rules — paired open columns keep obligations attached to reasons while demonstrating separation without cards. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">01 / Rules / design decision</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Decision-room legibility</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">The speaker explains the evidence; the slide preserves one position for later review.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el heading open-panel" style="left:120px;top:360px;width:790px;height:135px;">DO / because the argument must scan</div>
-  <div class="el body-text" style="left:120px;top:500px;width:790px;height:370px;">
-    <ul class="rule-list">
-      <li class="good"><strong>Keep one claim per slide.</strong> The title-topic pair advances one position rather than listing several topics.</li>
-      <li class="good"><strong>Use at least 5% margins.</strong> Room projection needs a stable reading edge and breathing space.</li>
-    </ul>
+<!-- Part 0: This metadata identifies the briefing style and states the design decisions that govern the entire document. -->
+<!-- Part 1: This section introduces the style with a cover that demonstrates its dark ground, sharp edge, and restrained teal accent. -->
+<!-- Type: cover. The cover uses one vertical accent rule, a short title, and generous open space so structure—not decoration—sets the tone. -->
+<div class="slide slide-dark">
+  <div class="el frame-accent" style="left:0;top:0;width:3px;height:1080px;">
   </div>
-  <div class="el vrule" style="left:960px;top:360px;width:1px;height:500px;"></div>
-  <div class="el heading open-panel danger-text" style="left:1040px;top:360px;width:760px;height:135px;">DO NOT / because decoration changes order</div>
-  <div class="el body-text" style="left:1040px;top:500px;width:760px;height:370px;">
-    <ul class="rule-list">
-      <li class="risk"><strong>No cards.</strong> Repeated boxes fragment a spoken argument into tiles the eye reads out of order.</li>
-      <li class="risk"><strong>No gradients or shadows.</strong> Dark grounds muddy both; set shadows off.</li>
-    </ul>
+  <div class="el t-label c-accent" style="left:120px;top:330px;width:1000px;height:36px;">BUNDLED STYLE
   </div>
-  <div class="el caption" style="left:120px;top:885px;width:1680px;height:90px;">Text contrast is at least 4.5:1, or 3:1 at 18pt and above. Structure comes from filled header bands, rules, washed panels, and whitespace—not enclosure.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: briefing design decision</div>
-</div>
-
-<!-- Slide type: global discipline and derived rules — the second rules page preserves full-size text while pairing universal constraints with briefing-specific colour and icon reasons. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">01 / Rules / discipline</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Evidence-first discipline</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Direct labels and restrained colour keep attention on the evidence.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el heading open-panel" style="left:120px;top:360px;width:790px;height:135px;">DO / because evidence must decode directly</div>
-  <div class="el body-text" style="left:120px;top:495px;width:790px;height:300px;">
-    <ul class="rule-list">
-      <li class="good"><strong>Label values directly.</strong> Remove chart gridlines that carry no information.</li>
-      <li class="good"><strong>Keep colour minimal.</strong> Add only the hue needed to distinguish content.</li>
-    </ul>
+  <div class="el t-cover-title" style="left:120px;top:390px;width:1500px;height:135px;">Briefing
   </div>
-  <div class="el vrule" style="left:960px;top:360px;width:1px;height:470px;"></div>
-  <div class="el heading open-panel danger-text" style="left:1040px;top:360px;width:760px;height:135px;">DO NOT / because unsupported marks distract</div>
-  <div class="el body-text" style="left:1040px;top:495px;width:760px;height:320px;">
-    <ul class="rule-list">
-      <li class="risk"><strong>No emoji.</strong> Use monochrome icons from <span class="accent-text">search_assets</span> in the text colour.</li>
-      <li class="risk"><strong>No decorative state colour.</strong> Success and danger require a stated outcome or risk.</li>
-    </ul>
+  <div class="el t-body c-muted" style="left:120px;top:560px;width:1250px;height:130px;">A dark style that speaks through spacing and rules.<br>Structure the information; do not decorate it.
   </div>
-  <div class="el closing-insight" style="left:120px;top:885px;width:1680px;height:70px;">Neutrals structure the page; one meaningful mark directs attention.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: briefing discipline</div>
-</div>
-
-<!-- Slide type: title and message discipline — good and bad examples make the noun-phrase rule testable, while the unboxed final line demonstrates the spoken closing insight. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">01 / Rules / wording</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Formal title grammar</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">A noun-phrase title names the issue; the topic sentence directly below states the one claim.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el header-band" style="left:120px;top:360px;width:790px;height:72px;">Use / formal noun phrases</div>
-  <div class="el body-text" style="left:120px;top:465px;width:790px;height:250px;">
-    <ul class="rule-list">
-      <li class="good"><strong>Measured reduction in review time</strong></li>
-      <li class="good"><strong>Preferred operating model</strong></li>
-      <li class="good"><strong>Controlled rollout conditions</strong></li>
-    </ul>
+  <div class="el t-caption" style="left:120px;top:920px;width:1200px;height:45px;">Dark ground / one teal accent / direct claims / no shadows
   </div>
-  <div class="el quiet-band danger-text" style="left:1010px;top:360px;width:790px;height:72px;">Avoid / questions and spoken phrasing</div>
-  <div class="el body-text muted" style="left:1010px;top:465px;width:790px;height:250px;">
-    <ul class="rule-list">
-      <li class="risk"><strong>Can we move faster?</strong></li>
-      <li class="risk"><strong>Let's look at the options</strong></li>
-      <li class="risk"><strong>What this means for us</strong></li>
-    </ul>
+</div>
+<!-- Part 2: This section gives the composer the highest-priority rules for preserving the style and explains why each rule matters. -->
+<!-- Type: rules. The two columns separate required practices from prohibited practices, while the plain-text closing states the style philosophy without enclosing it. -->
+<div class="slide slide-dark">
+  <div class="el t-slide-title" style="left:120px;top:55px;width:1680px;height:192px;">Core rules of this style
   </div>
-  <div class="el rule" style="left:120px;top:760px;width:1680px;height:1px;"></div>
-  <div class="el body-text" style="left:120px;top:790px;width:1680px;height:110px;">Questions, invitations, and conversational emphasis belong in speaker notes. Printed language remains direct, formal, and unambiguous after the meeting.</div>
-  <div class="el closing-insight" style="left:120px;top:900px;width:1680px;height:60px;">Closing insight stays plain text: the last line is spoken, not labelled.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: wording discipline</div>
-</div>
-
-<!-- Slide type: renderer facts — three washed regions expose implementation constraints without asking composers to copy unsupported HTML refinements. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">01 / Rules / renderer facts</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Editable-renderer constraints</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Slide JSON preserves the frame when HTML refinements disappear.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el wash-panel" style="left:120px;top:370px;width:500px;height:430px;"></div>
-  <div class="el label accent-text" style="left:150px;top:405px;width:440px;height:32px;">Native tables</div>
-  <div class="el heading" style="left:150px;top:465px;width:440px;height:65px;">Use template type</div>
-  <div class="el mid" style="left:150px;top:555px;width:440px;height:220px;">Native tables inherit the template font. Use them here; preserve hierarchy with a header fill, hairlines, alignment, and size.</div>
-  <div class="el wash-panel" style="left:710px;top:370px;width:500px;height:430px;"></div>
-  <div class="el label accent-text" style="left:740px;top:405px;width:440px;height:32px;">Filled shapes</div>
-  <div class="el heading" style="left:740px;top:465px;width:440px;height:65px;">Leave shadows off</div>
-  <div class="el mid" style="left:740px;top:555px;width:440px;height:220px;">Leave shadows off on every band, panel, chevron, bar, and node.</div>
-  <div class="el wash-panel" style="left:1300px;top:370px;width:500px;height:430px;"></div>
-  <div class="el label accent-text" style="left:1330px;top:405px;width:440px;height:32px;">Type mapping</div>
-  <div class="el heading" style="left:1330px;top:465px;width:440px;height:65px;">Map type simply</div>
-  <div class="el mid" style="left:1330px;top:555px;width:440px;height:220px;">Slide JSON lacks letter-spacing, line-height, and weight 650. Use bold, unchanged token sizes, and explicit box heights.</div>
-  <div class="el closing-insight" style="left:120px;top:880px;width:1680px;height:65px;">Build the supported structure; do not recreate unsupported polish with extra shapes.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: renderer implementation facts</div>
-</div>
-
-<!-- Part 3: Message and Outline -->
-<!-- Slide type: orchestrator outline contract — quantified modes and literal outline mapping prevent the noun-phrase display rule from changing SDPM's one-sentence outline format. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:820px;height:30px;">02 / Message and outline / orchestrator</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">One-sentence outline contract</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Each outline slug stays one claim; the composer splits its display.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el label accent-text" style="left:120px;top:365px;width:780px;height:32px;">Required mapping</div>
-  <div class="el heading" style="left:120px;top:420px;width:780px;height:70px;">Keep - [slug] as one claim</div>
-  <div class="el body-text" style="left:120px;top:510px;width:780px;height:230px;">Keep the sentence claim. The composer displays it as a noun-phrase title and the same claim as the topic sentence; together they form one claim.</div>
-  <div class="el vrule" style="left:960px;top:365px;width:1px;height:420px;"></div>
-  <div class="el label accent-text" style="left:1040px;top:365px;width:760px;height:32px;">Twenty-minute briefing</div>
-  <div class="el metric accent-text" style="left:1040px;top:420px;width:330px;height:90px;">10–14</div>
-  <div class="el caption" style="left:1040px;top:525px;width:330px;height:55px;">slides</div>
-  <div class="el metric" style="left:1430px;top:420px;width:330px;height:90px;">2–4</div>
-  <div class="el caption" style="left:1430px;top:525px;width:330px;height:55px;">chapters</div>
-  <div class="el body-text" style="left:1040px;top:620px;width:760px;height:180px;">Open with context, prove the position, state its implication, and close on a decision, condition, or action.</div>
-  <div class="el rule" style="left:120px;top:830px;width:1680px;height:1px;"></div>
-  <div class="el closing-insight" style="left:120px;top:865px;width:1680px;height:90px;">Read title-topic pairs in sequence; they must form one complete argument.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: orchestrator outline guidance</div>
-</div>
-
-<!-- Slide type: reading modes and chapter shape — two open columns show that spoken and read-alone variants share one frame while only body depth changes. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:820px;height:30px;">02 / Message and outline / density</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Two reading modes</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Choose spoken or read-alone in the brief; keep the frame and patterns.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el header-band" style="left:120px;top:360px;width:790px;height:72px;">Spoken / default</div>
-  <div class="el metric accent-text" style="left:120px;top:470px;width:300px;height:90px;">≤ 40</div>
-  <div class="el caption" style="left:120px;top:570px;width:650px;height:55px;">body words beyond title and topic</div>
-  <div class="el body-text" style="left:120px;top:650px;width:790px;height:175px;">Use short lines and direct labels. Notes carry explanation, qualification, and spoken questions.</div>
-  <div class="el quiet-band" style="left:1010px;top:360px;width:790px;height:72px;">Read-alone / explicit choice</div>
-  <div class="el metric" style="left:1010px;top:470px;width:300px;height:90px;">≤ 90</div>
-  <div class="el caption" style="left:1010px;top:570px;width:650px;height:55px;">body words beyond title and topic</div>
-  <div class="el body-text" style="left:1010px;top:650px;width:790px;height:175px;">Keep the frame. Grow body regions downward and add notes; preserve the pattern instead of shrinking type.</div>
-  <div class="el rule" style="left:120px;top:835px;width:1680px;height:1px;"></div>
-  <div class="el caption" style="left:120px;top:865px;width:1680px;height:90px;">For three or more chapters, use a numbered divider with a mini map. Content slides use only the section label. Close on evidence or an unboxed insight.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: density and chapter-shape guidance</div>
-</div>
-
-<!-- Slide type: title tests and visual selection — compact examples plus a reasoning-task matrix give the orchestrator concrete title and visual choices before composition begins. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:820px;height:30px;">02 / Message and outline / selection</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Outline selection tests</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Formal titles and reasoning-specific visuals keep the deck legible without the speaker.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el label accent-text" style="left:120px;top:355px;width:790px;height:32px;">Good noun-phrase titles</div>
-  <div class="el mid" style="left:120px;top:405px;width:790px;height:125px;">Measured reduction in review time<br>Preferred operating model<br>Controlled rollout conditions</div>
-  <div class="el label danger-text" style="left:1010px;top:355px;width:790px;height:32px;">Bad questions or spoken phrasing</div>
-  <div class="el mid muted" style="left:1010px;top:405px;width:790px;height:125px;">Can we move faster?<br>Let's look at the options<br>What this means for us</div>
-  <div class="el rule" style="left:120px;top:555px;width:1680px;height:1px;"></div>
-  <div class="el label" style="left:120px;top:585px;width:300px;height:30px;">Reasoning task</div>
-  <div class="el label" style="left:500px;top:585px;width:600px;height:30px;">Favour</div>
-  <div class="el label" style="left:1210px;top:585px;width:590px;height:30px;">Avoid</div>
-  <div class="el pair-row" style="left:120px;top:630px;width:1680px;height:62px;"><b>Numbers</b> — problem-to-outcome groups, direct metrics &nbsp;&nbsp; / &nbsp;&nbsp; gauges without a target</div>
-  <div class="el pair-row" style="left:120px;top:692px;width:1680px;height:62px;"><b>Comparison</b> — equal columns, matched rows &nbsp;&nbsp; / &nbsp;&nbsp; unequal boxes or decorative scoring</div>
-  <div class="el pair-row" style="left:120px;top:754px;width:1680px;height:62px;"><b>Process</b> — chevron band, swimlane for ownership &nbsp;&nbsp; / &nbsp;&nbsp; winding paths or unexplained loops</div>
-  <div class="el pair-row" style="left:120px;top:816px;width:1680px;height:62px;"><b>Relationship</b> — cycle or staged progression &nbsp;&nbsp; / &nbsp;&nbsp; unlabeled bubbles and decorative networks</div>
-  <div class="el pair-row" style="left:120px;top:878px;width:1680px;height:62px;"><b>Text</b> — section bullets or paragraph bars &nbsp;&nbsp; / &nbsp;&nbsp; forcing prose into an invented diagram</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: title and visual-form guidance</div>
-</div>
-
-<!-- Part 4: Palette -->
-<!-- Slide type: palette and usage rules — a neutral ladder dominates the page while isolated semantic swatches prove that colour has a role, not a decorative category. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">03 / Palette</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">One-accent hierarchy</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Neutral value steps carry structure; teal marks one current or decision-relevant element.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el swatch fill-bg" style="left:120px;top:365px;width:180px;height:110px;"></div>
-  <div class="el label" style="left:120px;top:490px;width:200px;height:35px;">Background</div>
-  <div class="el caption" style="left:120px;top:525px;width:180px;height:55px;">slide field</div>
-  <div class="el swatch fill-surface" style="left:330px;top:365px;width:180px;height:110px;"></div>
-  <div class="el label" style="left:330px;top:490px;width:180px;height:30px;">Surface</div>
-  <div class="el caption" style="left:330px;top:525px;width:180px;height:55px;">headers</div>
-  <div class="el swatch fill-wash" style="left:540px;top:365px;width:180px;height:110px;"></div>
-  <div class="el label" style="left:540px;top:490px;width:180px;height:30px;">Wash</div>
-  <div class="el caption" style="left:540px;top:525px;width:180px;height:55px;">metrics</div>
-  <div class="el swatch fill-border" style="left:750px;top:365px;width:180px;height:110px;"></div>
-  <div class="el label" style="left:750px;top:490px;width:180px;height:30px;">Border</div>
-  <div class="el caption" style="left:750px;top:525px;width:180px;height:55px;">hairlines</div>
-  <div class="el swatch fill-muted" style="left:960px;top:365px;width:180px;height:110px;"></div>
-  <div class="el label" style="left:960px;top:490px;width:180px;height:30px;">Muted</div>
-  <div class="el caption" style="left:960px;top:525px;width:180px;height:55px;">support</div>
-  <div class="el swatch fill-text" style="left:1170px;top:365px;width:180px;height:110px;"></div>
-  <div class="el label" style="left:1170px;top:490px;width:180px;height:30px;">Text</div>
-  <div class="el caption" style="left:1170px;top:525px;width:180px;height:55px;">copy</div>
-  <div class="el swatch fill-accent" style="left:1380px;top:365px;width:180px;height:110px;"></div>
-  <div class="el label accent-text" style="left:1380px;top:490px;width:180px;height:30px;">Accent</div>
-  <div class="el caption" style="left:1380px;top:525px;width:180px;height:55px;">one focus</div>
-  <div class="el swatch fill-success" style="left:1590px;top:365px;width:90px;height:110px;"></div>
-  <div class="el swatch fill-danger" style="left:1710px;top:365px;width:90px;height:110px;"></div>
-  <div class="el label" style="left:1590px;top:490px;width:210px;height:30px;">States</div>
-  <div class="el caption" style="left:1590px;top:525px;width:210px;height:55px;">states</div>
-  <div class="el rule" style="left:120px;top:610px;width:1680px;height:1px;"></div>
-  <div class="el heading" style="left:120px;top:645px;width:500px;height:60px;">Usage budget</div>
-  <!-- One teal ROLE, not one teal element: in a before / after slide the whole "after" side (its header band and its changed values) is a single role. -->
-  <div class="el body-text" style="left:120px;top:715px;width:780px;height:230px;">Teal takes one role per slide: a section rule, the current item, one number, or one header band. Success marks a positive outcome; danger a stated risk.</div>
-  <div class="el vrule" style="left:960px;top:645px;width:1px;height:275px;"></div>
-  <div class="el heading" style="left:1040px;top:645px;width:760px;height:60px;">Approved pairs</div>
-  <div class="el header-band center" style="left:1040px;top:720px;width:350px;height:85px;">Text on teal</div>
-  <div class="el quiet-band center" style="left:1430px;top:720px;width:370px;height:85px;">Text on surface</div>
-  <div class="el caption" style="left:1040px;top:825px;width:760px;height:155px;">Use light text on background, surface, or wash. Never place muted text on teal. Keep contrast at least 4.5:1, or 3:1 at 18pt and above.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: palette role specification</div>
-</div>
-
-<!-- Part 5: Typography -->
-<!-- Slide type: primary typography ramp — real-scale title and reading roles show the exact hierarchy and box depth required on a 1920×1080 canvas. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">04 / Typography / primary</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Room-scale type hierarchy</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Samples render at slide scale; labels show slide JSON point sizes.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el type-row" style="left:120px;top:350px;width:1680px;height:140px;"><span class="cover-title">Briefing title</span><span class="type-meta">--fs-cover-title / 56pt / 1.05<br>cover or divider, one line preferred</span></div>
-  <div class="el type-row" style="left:120px;top:490px;width:1680px;height:115px;"><span class="title">Formal noun phrase</span><span class="type-meta">--fs-slide-title / 40pt / 1.20<br>two lines maximum / 192 px box</span></div>
-  <div class="el type-row" style="left:120px;top:605px;width:1680px;height:78px;"><span class="heading">Evidence heading</span><span class="type-meta">--fs-heading / 20pt / 1.30<br>column or region heading</span></div>
-  <div class="el type-row" style="left:120px;top:683px;width:1680px;height:78px;"><span class="body-text">Topic sentence and body text</span><span class="type-meta">--fs-body / 20pt / 1.42<br>main reading size</span></div>
-  <div class="el type-row" style="left:120px;top:761px;width:1680px;height:72px;"><span class="caption">Supporting note and evidence qualifier</span><span class="type-meta">--fs-caption / 17pt / 1.35<br>secondary reading text</span></div>
-  <div class="el closing-insight" style="left:120px;top:890px;width:1680px;height:60px;">Never shrink to fit: edit the message, enlarge the region, or split the slide.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: primary typography specification</div>
-</div>
-
-<!-- Slide type: metric and utility typography ramp — aligned numeric roles and small labels demonstrate the remaining token sizes without inventing intermediate values. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">04 / Typography / metrics</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Numeric and utility roles</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Large values lead; units, labels, and annotations step down through a fixed supporting scale.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el type-row" style="left:120px;top:350px;width:1680px;height:130px;"><span class="metric-lg accent-text">1,500</span><span class="type-meta">--fs-metric-lg / 56pt / 1.00<br>single hero number</span></div>
-  <div class="el type-row" style="left:120px;top:480px;width:1680px;height:105px;"><span class="metric">42%</span><span class="type-meta">--fs-metric / 40pt / 1.00<br>primary metric</span></div>
-  <div class="el type-row" style="left:120px;top:585px;width:1680px;height:90px;"><span class="num accent-text">03</span><span class="type-meta">--fs-num / 32pt / 1.00<br>chapter number or sequence anchor</span></div>
-  <div class="el type-row" style="left:120px;top:675px;width:1680px;height:72px;"><span class="mid">Node, table cell, or compact annotation</span><span class="type-meta">--fs-mid / 14pt / 1.35<br>dense component text</span></div>
-  <div class="el type-row" style="left:120px;top:747px;width:1680px;height:70px;"><span class="label">Section label</span><span class="type-meta">--fs-label / 12pt / 1.20<br>absolute floor / metadata only</span></div>
-  <div class="el caption" style="left:120px;top:850px;width:1680px;height:95px;">HTML letter-spacing and line-height are preview refinements. Slide JSON uses bold instead of intermediate weights and explicit box heights instead of line-height controls. The template supplies PPTX fonts.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: metric and utility typography specification</div>
-</div>
-
-<!-- Part 6: Frame -->
-<!-- Slide type: standard content frame — live production coordinates show the fixed two-line title box, topic sentence, content start, source line, and template-reserved page-number area. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">05 / Frame / standard</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Fixed briefing frame</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">The title zone never moves; evidence geometry changes only below the rule.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el border" style="left:120px;top:350px;width:1680px;height:570px;"></div>
-  <div class="el label accent-text" style="left:155px;top:385px;width:900px;height:32px;">Content region / x 120–1800 / y 330–960</div>
-  <div class="el heading" style="left:155px;top:455px;width:700px;height:65px;">Exact production geometry</div>
-  <div class="el mid" style="left:155px;top:545px;width:700px;height:260px;">Section label: x=120, y=28. Accent bar: 3×120 px. Title: x=120, y=58, width=1680, height=192 px for two 40pt lines. Topic sentence: y=258, height=58. Rule: y=322. Content begins at y=330.</div>
-  <div class="el vrule" style="left:960px;top:455px;width:1px;height:350px;"></div>
-  <div class="el heading" style="left:1040px;top:455px;width:700px;height:65px;">Footer and template contract</div>
-  <div class="el mid" style="left:1040px;top:545px;width:700px;height:260px;">One-line titles leave the second line empty; content never moves up. A source line is content and may be drawn at bottom left. The page number is the template's and is never drawn. Leave x=1400–1920, y=985–1080 clear.</div>
-  <div class="el caption" style="left:155px;top:830px;width:1500px;height:110px;">No cards: the outline here marks the available region only. Production slides use bands, rules, washes, or whitespace as their reasoning requires.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: fixed frame geometry</div>
-</div>
-
-<!-- Slide type: chapter divider frame — oversized numbering creates a spoken pause while a compact map orients the room without becoming a persistent agenda tracker. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:1080px;"></div>
-  <div class="el section-label" style="left:120px;top:240px;width:600px;height:30px;">Section 03</div>
-  <div class="el chapter-num" style="left:115px;top:300px;width:700px;height:125px;">03</div>
-  <div class="el cover-title" style="left:120px;top:455px;width:930px;height:250px;">Decision conditions</div>
-  <div class="el topic" style="left:120px;top:725px;width:900px;height:110px;">The next chapter tests the conditions required for a bounded decision.</div>
-  <div class="el vrule" style="left:1120px;top:220px;width:1px;height:640px;"></div>
-  <div class="el label" style="left:1210px;top:235px;width:590px;height:30px;">Briefing map</div>
-  <div class="el chapter-map" style="left:1210px;top:300px;width:590px;height:70px;">01 / Context</div>
-  <div class="el chapter-map" style="left:1210px;top:370px;width:590px;height:70px;">02 / Evidence</div>
-  <div class="el chapter-map current" style="left:1210px;top:440px;width:590px;height:70px;">03 / Decision conditions</div>
-  <div class="el chapter-map" style="left:1210px;top:510px;width:590px;height:70px;">04 / Action</div>
-  <div class="el caption" style="left:1210px;top:630px;width:590px;height:240px;">Use this divider only when the deck has at least three chapters. Change the current row, title, and topic sentence; keep the map order and geometry fixed.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: chapter-divider frame</div>
-</div>
-
-<!-- Slide type: closing frame — a sparse decision line and plain closing insight keep the final statement in the speaker's voice rather than turning it into a labelled box. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:250px;width:900px;height:30px;">Decision required</div>
-  <div class="el cover-title" style="left:120px;top:320px;width:1560px;height:250px;">Bounded approval conditions</div>
-  <div class="el topic" style="left:120px;top:595px;width:1350px;height:120px;">Approve the next phase only when the named measure clears its threshold and an accountable owner accepts the handoff.</div>
-  <div class="el accent-rule" style="left:120px;top:760px;width:220px;height:3px;"></div>
-  <div class="el closing-insight" style="left:120px;top:825px;width:1550px;height:110px;">The last line stays plain text because it is the sentence the speaker leaves in the room.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: closing-frame specification</div>
-</div>
-
-<!-- Part 7: Patterns -->
-<!-- Pattern: numbers — WHY: two unequal metric groups move from problem to outcome in one spoken direction, with the wider outcome side and one teal number carrying priority. MAY vary metric count from two to four per group. MUST NOT turn metrics into cards or colour every value. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / numbers</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Problem-to-outcome measures</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">The proposed change converts a recurring delay into a measurable operating gain.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el label" style="left:120px;top:370px;width:520px;height:30px;">Problem / current state</div>
-  <div class="el metric-block" style="left:120px;top:430px;width:520px;height:175px;"></div>
-  <div class="el metric" style="left:120px;top:465px;width:320px;height:100px;">18 min</div>
-  <div class="el caption" style="left:450px;top:470px;width:190px;height:100px;">cycle delay</div>
-  <div class="el metric-block" style="left:120px;top:635px;width:520px;height:175px;"></div>
-  <div class="el metric" style="left:120px;top:670px;width:230px;height:90px;">34%</div>
-  <div class="el caption" style="left:360px;top:675px;width:280px;height:90px;">work repeated<br>each period</div>
-  <div class="el vrule" style="left:700px;top:370px;width:1px;height:500px;"></div>
-  <div class="el label accent-text" style="left:780px;top:370px;width:1020px;height:30px;">Outcome / target state</div>
-  <div class="el wash-panel" style="left:780px;top:430px;width:1020px;height:260px;"></div>
-  <div class="el metric-lg accent-text" style="left:825px;top:475px;width:420px;height:120px;">42%</div>
-  <div class="el heading" style="left:1270px;top:475px;width:480px;height:65px;">shorter cycle</div>
-  <div class="el body-text" style="left:1270px;top:545px;width:480px;height:150px;">Same scope, unit, and review definition.</div>
-  <div class="el metric-block" style="left:780px;top:730px;width:470px;height:145px;"></div>
-  <div class="el metric" style="left:780px;top:765px;width:470px;height:100px;">1 owner</div>
-  <div class="el metric-block" style="left:1330px;top:730px;width:470px;height:145px;"></div>
-  <div class="el metric" style="left:1330px;top:765px;width:470px;height:100px;">2 gates</div>
-  <div class="el closing-insight" style="left:120px;top:920px;width:1680px;height:60px;">Show the problem first; give the outcome more space because it is the decision.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative measures</div>
-</div>
-
-<!-- Pattern: comparison 2-way — WHY: a single vertical rule and filled sub-headers make matched criteria comparable without enclosing either option. MAY vary labels, row count from three to five, and which header receives teal. MUST NOT use unequal row order or separate cards. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / comparison</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Two-way operating comparison</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">The preferred option trades a small setup cost for clear ownership and lower recurring effort.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el quiet-band" style="left:120px;top:365px;width:790px;height:75px;">Option A / distributed</div>
-  <div class="el header-band" style="left:1010px;top:365px;width:790px;height:75px;">Option B / coordinated</div>
-  <div class="el vrule" style="left:960px;top:365px;width:1px;height:500px;"></div>
-  <div class="el pair-row" style="left:120px;top:480px;width:790px;height:95px;"><b>Ownership</b> — several local owners</div>
-  <div class="el pair-row" style="left:1010px;top:480px;width:790px;height:95px;"><b>Ownership</b> — one accountable owner</div>
-  <div class="el pair-row" style="left:120px;top:575px;width:790px;height:95px;"><b>Handoffs</b> — four transitions</div>
-  <div class="el pair-row" style="left:1010px;top:575px;width:790px;height:95px;"><b>Handoffs</b> — two controlled transitions</div>
-  <div class="el pair-row" style="left:120px;top:670px;width:790px;height:95px;"><b>Cadence</b> — exception driven</div>
-  <div class="el pair-row" style="left:1010px;top:670px;width:790px;height:95px;"><b>Cadence</b> — measured weekly</div>
-  <div class="el pair-row" style="left:120px;top:765px;width:790px;height:95px;"><b>Cost</b> — low setup, repeated effort</div>
-  <div class="el pair-row" style="left:1010px;top:765px;width:790px;height:95px;"><b>Cost</b> — setup once, lower recurrence</div>
-  <div class="el closing-insight" style="left:120px;top:910px;width:1680px;height:65px;">Keep criteria aligned; layout must not imply preference.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative option comparison</div>
-</div>
-
-<!-- Pattern: before / after — WHY: identical baselines and row order isolate the state change, while teal appears only on the after header and changed values. MAY vary dimensions from two to four. MUST NOT enlarge the after side or change units between states. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / before and after</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Control-model transition</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">The target state removes two handoffs and makes the decision path visible.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el quiet-band" style="left:120px;top:365px;width:760px;height:75px;">Before</div>
-  <div class="el header-band" style="left:1040px;top:365px;width:760px;height:75px;">After</div>
-  <div class="el label" style="left:120px;top:485px;width:220px;height:30px;">Ownership</div>
-  <div class="el body-text muted" style="left:360px;top:475px;width:520px;height:70px;">Three roles share ownership</div>
-  <div class="el label accent-text" style="left:1040px;top:485px;width:220px;height:30px;">Ownership</div>
-  <div class="el body-text" style="left:1280px;top:475px;width:520px;height:70px;">One accountable owner</div>
-  <div class="el rule" style="left:120px;top:565px;width:760px;height:1px;"></div>
-  <div class="el rule" style="left:1040px;top:565px;width:760px;height:1px;"></div>
-  <div class="el label" style="left:120px;top:620px;width:220px;height:30px;">Handoffs</div>
-  <div class="el metric muted" style="left:360px;top:595px;width:300px;height:90px;">4</div>
-  <div class="el label accent-text" style="left:1040px;top:620px;width:220px;height:30px;">Handoffs</div>
-  <div class="el metric accent-text" style="left:1280px;top:595px;width:300px;height:90px;">2</div>
-  <div class="el rule" style="left:120px;top:715px;width:760px;height:1px;"></div>
-  <div class="el rule" style="left:1040px;top:715px;width:760px;height:1px;"></div>
-  <div class="el label" style="left:120px;top:770px;width:220px;height:30px;">Review path</div>
-  <div class="el body-text muted" style="left:360px;top:755px;width:520px;height:85px;">Implicit and exception driven</div>
-  <div class="el label accent-text" style="left:1040px;top:770px;width:220px;height:30px;">Review path</div>
-  <div class="el body-text" style="left:1280px;top:755px;width:520px;height:85px;">Visible and threshold based</div>
-  <div class="el closing-insight" style="left:120px;top:900px;width:1680px;height:75px;">Use the same labels, units, order, and widths on both sides so only the state changes.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative state transition</div>
-</div>
-
-<!-- Pattern: process — WHY: a continuous chevron band makes irreversible sequence explicit, and the separate expected-effect band connects each phase to evidence without carding the steps. MAY vary from three to five phases. MUST NOT colour every phase or curve the path. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / process</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Gated delivery sequence</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Each phase produces evidence required to release the next commitment.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el chevrons" style="left:120px;top:390px;width:1680px;height:150px;">
-    <div class="chevron"><b>1 — Define</b><span>scope and baseline</span></div>
-    <div class="chevron"><b>2 — Test</b><span>critical assumption</span></div>
-    <div class="chevron"><b>3 — Decide</b><span>threshold evidence</span></div>
-    <div class="chevron"><b>4 — Release</b><span>bounded commitment</span></div>
+  <div class="el frame-accent" style="left:120px;top:255px;width:120px;height:3px;">
   </div>
-  <div class="el label" style="left:120px;top:600px;width:1680px;height:30px;">Expected effect by phase</div>
-  <div class="el effect-band" style="left:120px;top:650px;width:1680px;height:180px;">
-    <div class="effect-cell"><b>Shared baseline</b><span>Comparable starting evidence</span></div>
-    <div class="effect-cell"><b>Measured result</b><span>Critical uncertainty reduced</span></div>
-    <div class="effect-cell"><b>Recorded choice</b><span>Decision and condition explicit</span></div>
-    <div class="effect-cell"><b>Named owner</b><span>Handoff becomes executable</span></div>
+  <!-- The left column states the practices that make each claim readable at presentation distance. -->
+  <div class="el label-head accent" style="left:120px;top:310px;width:760px;height:55px;">DO — because the room must scan the claim
   </div>
-  <div class="el closing-insight" style="left:120px;top:895px;width:1680px;height:75px;">Begin each phase with a verb and end it with the evidence needed to continue.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative gated process</div>
-</div>
-
-<!-- Pattern: swimlane — WHY: roles form rows, phases form columns, and one orthogonal branch makes ownership and exception routing visible at once. MAY vary from three to five roles and phases. MUST NOT use curved connectors, decorative icons, or more than one branch on a briefing slide. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / swimlane</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Cross-role approval flow</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">One exception returns to assessment; the approved path continues to controlled release.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el quiet-band center" style="left:360px;top:355px;width:430px;height:65px;">Assess</div>
-  <div class="el quiet-band center" style="left:810px;top:355px;width:430px;height:65px;">Decide</div>
-  <div class="el header-band center" style="left:1260px;top:355px;width:540px;height:65px;">Release</div>
-  <div class="el lane-label" style="left:120px;top:440px;width:220px;height:130px;">Sponsor</div>
-  <div class="el lane-label" style="left:120px;top:590px;width:220px;height:130px;">Review team</div>
-  <div class="el lane-label" style="left:120px;top:740px;width:220px;height:130px;">Delivery owner</div>
-  <div class="el lane-bg" style="left:360px;top:590px;width:1440px;height:130px;"></div>
-  <div class="el node" style="left:420px;top:470px;width:300px;height:75px;">Set threshold</div>
-  <div class="el node current" style="left:875px;top:470px;width:300px;height:75px;">Approve condition</div>
-  <div class="el node" style="left:1325px;top:470px;width:360px;height:75px;">Confirm owner</div>
-  <div class="el node" style="left:420px;top:620px;width:300px;height:75px;">Measure evidence</div>
-  <div class="el node" style="left:875px;top:620px;width:300px;height:75px;">Test threshold</div>
-  <div class="el node" style="left:1325px;top:770px;width:360px;height:75px;">Release phase</div>
-  <div class="el connector-h" style="left:720px;top:507px;width:155px;height:2px;"></div>
-  <div class="el arrow-right" style="left:863px;top:500px;width:12px;height:16px;"></div>
-  <div class="el connector-h connector-accent" style="left:1175px;top:507px;width:150px;height:2px;"></div>
-  <div class="el arrow-right accent-arrow" style="left:1313px;top:500px;width:12px;height:16px;"></div>
-  <div class="el connector-v" style="left:570px;top:545px;width:2px;height:75px;"></div>
-  <div class="el connector-h" style="left:720px;top:657px;width:155px;height:2px;"></div>
-  <div class="el arrow-right" style="left:863px;top:650px;width:12px;height:16px;"></div>
-  <div class="el connector-v connector-accent" style="left:1505px;top:545px;width:2px;height:225px;"></div>
-  <div class="el arrow-down" style="left:1498px;top:758px;width:16px;height:12px;"></div>
-  <div class="el connector-v" style="left:1025px;top:695px;width:2px;height:120px;"></div>
-  <div class="el connector-h" style="left:570px;top:813px;width:455px;height:2px;"></div>
-  <div class="el arrow-right" style="left:1013px;top:806px;width:12px;height:16px;"></div>
-  <div class="el label" style="left:780px;top:825px;width:190px;height:30px;">Revise</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative cross-role flow</div>
-</div>
-
-<!-- Pattern: relationship — cycle and staged — WHY: the page is split because recurrence and progression are different logics; a cycle occupies the left, a vertical stage sequence the right. MAY vary labels and step count. MUST NOT render both with the same component or imply an order in the cycle. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / relationship</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Recurring and staged relationships</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Recurring reinforcement belongs in a cycle; maturity belongs in a directional sequence.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el label" style="left:120px;top:365px;width:760px;height:30px;">Cycle / no starting hierarchy</div>
-  <div class="el cycle-ring" style="left:300px;top:460px;width:400px;height:400px;"></div>
-  <div class="el cycle-core" style="left:390px;top:550px;width:220px;height:220px;">Reinforcing<br>loop</div>
-  <div class="el heading center" style="left:365px;top:415px;width:270px;height:55px;">Measure</div>
-  <div class="el heading center" style="left:650px;top:625px;width:220px;height:55px;">Adjust</div>
-  <div class="el heading center" style="left:365px;top:855px;width:270px;height:55px;">Review</div>
-  <div class="el heading center" style="left:120px;top:625px;width:220px;height:55px;">Learn</div>
-  <div class="el vrule" style="left:960px;top:365px;width:1px;height:540px;"></div>
-  <div class="el label accent-text" style="left:1040px;top:365px;width:760px;height:30px;">Stages / explicit direction</div>
-  <div class="el stage" style="left:1040px;top:445px;width:760px;height:110px;"></div>
-  <div class="el num muted" style="left:1080px;top:465px;width:110px;height:70px;">01</div>
-  <div class="el heading" style="left:1220px;top:465px;width:500px;height:60px;">Document the baseline</div>
-  <div class="el stage current" style="left:1040px;top:600px;width:760px;height:110px;"></div>
-  <div class="el num accent-text" style="left:1080px;top:620px;width:110px;height:70px;">02</div>
-  <div class="el heading" style="left:1220px;top:620px;width:500px;height:60px;">Apply the control</div>
-  <div class="el stage" style="left:1040px;top:755px;width:760px;height:110px;"></div>
-  <div class="el num muted" style="left:1080px;top:775px;width:110px;height:70px;">03</div>
-  <div class="el heading" style="left:1220px;top:775px;width:500px;height:60px;">Scale after evidence</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative relationship models</div>
-</div>
-
-<!-- Pattern: section heading + bullets — WHY: read-alone mode uses two filled section headers and complete bullet sentences so the logic survives without narration. MAY vary to two or three sections and up to 90 body words. MUST NOT add a decorative diagram or nest bullets beyond two levels. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / read-alone bullets</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Evidence qualification</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">A bounded start is justified, but expansion remains conditional on measured adoption.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el header-band" style="left:120px;top:365px;width:1680px;height:72px;">What the evidence supports</div>
-  <div class="el body-text" style="left:120px;top:475px;width:1680px;height:180px;">
-    <ul class="rule-list">
-      <li class="good">The operating measure clears the stated threshold across two comparable periods.</li>
-      <li class="good">The accountable owner accepts the bounded scope and review cadence.</li>
-    </ul>
+  <div class="el" style="left:120px;top:385px;width:760px;height:595px;">
+    <div class="check-item t-body">State the claim directly below the title.
+    </div>
+    <div class="check-item t-body">Separate fields with rules, labels, and space.
+    </div>
+    <div class="check-item t-body">Lead with concise icon-and-text rows.
+    </div>
+    <div class="check-item t-body">Set numbers large and units small.
+    </div>
+    <div class="check-item t-body">Use one accent in one or two places.
+    </div>
+    <div class="check-item t-body">Whitespace is structure; remove content to keep 5% margins.
+    </div>
   </div>
-  <div class="el quiet-band" style="left:120px;top:690px;width:1680px;height:72px;">What remains conditional</div>
-  <div class="el body-text" style="left:120px;top:790px;width:1680px;height:155px;">
-    <ul class="rule-list">
-      <li>Expansion depends on the adoption measure clearing its gate.</li>
-      <li>The next review must retain the same scope, unit, and comparison period.</li>
-    </ul>
+  <!-- The vertical rule separates the two lists without enclosing either one in a card. -->
+  <div class="el rule-h" style="left:960px;top:310px;width:1px;height:660px;">
   </div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative decision evidence</div>
-</div>
-
-<!-- Pattern: paragraph slide — WHY: paragraph bars preserve narrative order in read-alone mode without inventing a diagram; one teal bar marks the decisive paragraph. MAY vary from two to four paragraphs and up to 90 body words. MUST NOT box the conclusion or reduce the body size. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / read-alone paragraphs</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Sequence of evidence</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Evidence moves from condition to turning point to bounded implication.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el paragraph-bar body-text" style="left:120px;top:380px;width:1680px;height:130px;"><span class="bold">Observed condition.</span> The current process distributes responsibility across several handoffs, so no single role sees the complete decision path or owns the recurring delay.</div>
-  <div class="el paragraph-bar current body-text" style="left:120px;top:550px;width:1680px;height:180px;"><span class="bold accent-text">Measured turning point.</span> A bounded trial removes two transitions while preserving the same threshold, scope, and review period; the improvement can therefore be attributed to the control change.</div>
-  <div class="el paragraph-bar body-text" style="left:120px;top:740px;width:1680px;height:130px;"><span class="bold">Bounded implication.</span> The evidence supports the next phase, but expansion remains conditional on adoption and an accountable owner.</div>
-  <div class="el closing-insight" style="left:120px;top:915px;width:1680px;height:60px;">Use prose when sequence and qualification matter more than a diagram.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative narrative evidence</div>
-</div>
-
-<!-- Pattern: chapter divider — WHY: an oversized number creates a pause and the mini map shows current position without adding a tracker to every slide. MAY vary chapter count from three to six and current row. MUST NOT pair it with a second divider or add decorative imagery. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:1080px;"></div>
-  <div class="el section-label" style="left:120px;top:235px;width:600px;height:30px;">Section 02</div>
-  <div class="el chapter-num" style="left:115px;top:295px;width:700px;height:125px;">02</div>
-  <div class="el cover-title" style="left:120px;top:450px;width:930px;height:250px;">Measured evidence</div>
-  <div class="el topic" style="left:120px;top:720px;width:900px;height:110px;">This chapter establishes the comparison basis before presenting an outcome.</div>
-  <div class="el vrule" style="left:1120px;top:215px;width:1px;height:650px;"></div>
-  <div class="el label" style="left:1210px;top:235px;width:590px;height:30px;">Briefing map</div>
-  <div class="el chapter-map" style="left:1210px;top:300px;width:590px;height:70px;">01 / Decision context</div>
-  <div class="el chapter-map current" style="left:1210px;top:370px;width:590px;height:70px;">02 / Measured evidence</div>
-  <div class="el chapter-map" style="left:1210px;top:440px;width:590px;height:70px;">03 / Implications</div>
-  <div class="el chapter-map" style="left:1210px;top:510px;width:590px;height:70px;">04 / Action</div>
-  <div class="el caption" style="left:1210px;top:625px;width:590px;height:210px;">Completed rows stay muted rather than receiving success colour. Only the current row receives teal; future rows remain neutral.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative chapter map</div>
-</div>
-
-<!-- Pattern: 4-column A — WHY: separate filled header bands, open bodies, and metric footers let four independent dimensions compare without enclosing them as cards. MAY vary labels and metrics while keeping equal column widths. MUST NOT add side borders, shadows, or four accent colours. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / four columns A</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Four operating dimensions</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Ownership, cadence, evidence, and escalation must change together.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el column-a" style="left:120px;top:365px;width:390px;height:500px;"></div>
-  <div class="el quiet-band" style="left:120px;top:365px;width:390px;height:75px;">01 / Ownership</div>
-  <div class="el mid" style="left:145px;top:485px;width:340px;height:160px;">One accountable role receives the complete outcome and names the handoff.</div>
-  <div class="el column-foot" style="left:120px;top:700px;width:390px;height:145px;"><b>1 owner</b><span>target state</span></div>
-  <div class="el column-a" style="left:550px;top:365px;width:390px;height:500px;"></div>
-  <div class="el quiet-band" style="left:550px;top:365px;width:390px;height:75px;">02 / Cadence</div>
-  <div class="el mid" style="left:575px;top:485px;width:340px;height:130px;">A fixed review interval replaces exception-driven coordination.</div>
-  <div class="el column-foot" style="left:550px;top:700px;width:390px;height:145px;"><b>7 days</b><span>review interval</span></div>
-  <div class="el column-a" style="left:980px;top:365px;width:390px;height:500px;"></div>
-  <div class="el quiet-band" style="left:980px;top:365px;width:390px;height:75px;">03 / Evidence</div>
-  <div class="el mid" style="left:1005px;top:485px;width:340px;height:130px;">Direct measures preserve one scope and comparison basis.</div>
-  <div class="el column-foot" style="left:980px;top:700px;width:390px;height:145px;"><b>3 measures</b><span>decision basis</span></div>
-  <div class="el column-a" style="left:1410px;top:365px;width:390px;height:500px;"></div>
-  <div class="el quiet-band" style="left:1410px;top:365px;width:390px;height:75px;">04 / Escalation</div>
-  <div class="el mid" style="left:1435px;top:485px;width:340px;height:130px;">A named threshold triggers review before exposure expands.</div>
-  <div class="el column-foot" style="left:1410px;top:700px;width:390px;height:145px;"><b class="accent-text">1 gate</b><span>current focus</span></div>
-  <div class="el closing-insight" style="left:120px;top:910px;width:1680px;height:65px;">Use this form when each column is independent and owns a comparable metric.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative operating dimensions</div>
-</div>
-
-<!-- Pattern: 4-column B — WHY: one shared band split by vertical dividers makes four phases feel like a single coordinated system rather than separate cards. MAY vary between ordered steps and equal peer functions. MUST NOT break the band into floating boxes or add gaps between columns. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / four columns B</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Coordinated control chain</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Four controls operate as one chain from framing through release.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el label accent-text" style="left:120px;top:390px;width:1680px;height:30px;">One system / divided internally</div>
-  <div class="el column-band" style="left:120px;top:455px;width:1680px;height:360px;">
-    <div class="column-band-cell"><b>01 / Frame</b><span>Define scope, baseline, and decision owner.</span></div>
-    <div class="column-band-cell"><b>02 / Measure</b><span>Collect directly comparable evidence.</span></div>
-    <div class="column-band-cell"><b>03 / Decide</b><span>Apply the named threshold and condition.</span></div>
-    <div class="column-band-cell"><b>04 / Release</b><span>Transfer the bounded action to one owner.</span></div>
+  <!-- The right column prohibits signals that compete with the title-topic pair or weaken the visual hierarchy. -->
+  <div class="el label-head c-danger" style="left:1040px;top:310px;width:760px;height:55px;">DO NOT — because extra signals dilute order
   </div>
-  <div class="el effect-band" style="left:120px;top:850px;width:1680px;height:100px;">
-    <div class="effect-cell"><b>Scope</b></div><div class="effect-cell"><b>Evidence</b></div><div class="effect-cell"><b>Condition</b></div><div class="effect-cell"><b>Owner</b></div>
+  <div class="el" style="left:1040px;top:385px;width:760px;height:595px;">
+    <div class="dont-item t-body">Never show a label without its claim.
+    </div>
+    <div class="dont-item t-body">Do not rely on cards; use bands, rules, washed panels, and space.
+    </div>
+    <div class="dont-item t-body">Use neither emoji nor shadows.
+    </div>
+    <div class="dont-item t-body">Keep titles short and fields open.
+    </div>
+    <div class="dont-item t-body">Vary each slide’s composition.
+    </div>
+    <div class="dont-item t-body">Use direct terms, not metaphor.
+    </div>
   </div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative control chain</div>
-</div>
-
-<!-- Pattern: table — WHY: one filled header band and horizontal hairlines support exact scanning with no zebra fill or cell cards. Native tables inherit the template font, which this pattern accepts. MAY vary from three to eight rows and four to six columns. MUST NOT centre row labels, use zebra stripes, or add more than one accent column. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / table</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Decision-condition table</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Every condition has a measure, threshold, evidence owner, and current result.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el" style="left:120px;top:375px;width:1680px;height:470px;">
-    <table class="data-table">
-      <thead><tr><th>Condition</th><th>Measure</th><th>Threshold</th><th>Owner</th><th>Result</th></tr></thead>
-      <tbody>
-        <tr><td>Operating stability</td><td>Rate</td><td>≥ 90%</td><td>Role A</td><td>92%</td></tr>
-        <tr><td>Review cycle</td><td>Duration</td><td>≤ 12 days</td><td>Role B</td><td>11 days</td></tr>
-        <tr><td>Adoption gate</td><td>Participation</td><td>≥ 65%</td><td>Role C</td><td class="accent-text">61%</td></tr>
-        <tr><td>Escalation load</td><td>Count</td><td>≤ 4</td><td>Role D</td><td>3</td></tr>
-        <tr><td>Evidence quality</td><td>Coverage</td><td>≥ 95%</td><td>Role E</td><td>96%</td></tr>
-      </tbody>
-    </table>
+  <!-- The closing philosophy remains plain text below a rule because the style does not box its final implication. -->
+  <div class="el rule-h" style="left:120px;top:990px;width:1680px;height:1px;">
   </div>
-  <div class="el body-text" style="left:120px;top:865px;width:1680px;height:125px;">Only the adoption result receives teal because it is the current decision constraint; every other value remains neutral.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative condition register</div>
-</div>
-
-<!-- Pattern: share — WHY: one gauge gives a single headline proportion and horizontal bars expose the composition behind it; direct labels remove the need for a colour legend. MAY vary to one gauge plus three to five bars. MUST NOT use multiple gauges, gradients, or category colours. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / share</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Adoption share and composition</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">Overall adoption is approaching the gate, but one group remains materially behind.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el label accent-text" style="left:120px;top:385px;width:480px;height:30px;">Overall adoption</div>
-  <div class="el" style="left:180px;top:460px;width:260px;height:260px;"><div class="gauge-track"><div class="gauge-segment"></div><div class="gauge-hole">61%</div></div></div>
-  <div class="el caption center" style="left:120px;top:755px;width:380px;height:90px;">Gate: 65%<br>four points remaining</div>
-  <div class="el vrule" style="left:620px;top:385px;width:1px;height:500px;"></div>
-  <div class="el label" style="left:700px;top:385px;width:1100px;height:30px;">Composition by group</div>
-  <div class="el heading" style="left:700px;top:455px;width:300px;height:55px;">Group A</div>
-  <div class="el metric" style="left:1600px;top:445px;width:200px;height:90px;">78%</div>
-  <div class="el hbar" style="left:700px;top:525px;width:1100px;height:22px;"><div class="hbar-fill" style="width:78%;"></div></div>
-  <div class="el heading" style="left:700px;top:600px;width:300px;height:55px;">Group B</div>
-  <div class="el metric" style="left:1600px;top:590px;width:200px;height:90px;">64%</div>
-  <div class="el hbar" style="left:700px;top:670px;width:1100px;height:22px;"><div class="hbar-fill" style="width:64%;"></div></div>
-  <div class="el heading" style="left:700px;top:745px;width:300px;height:55px;">Group C</div>
-  <div class="el metric accent-text" style="left:1600px;top:735px;width:200px;height:90px;">41%</div>
-  <div class="el hbar" style="left:700px;top:815px;width:1100px;height:22px;"><div class="hbar-fill" style="width:41%;"></div></div>
-  <div class="el closing-insight" style="left:700px;top:890px;width:1100px;height:75px;">Group C explains most of the remaining gap.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative adoption data</div>
-</div>
-
-<!-- Pattern: trend — WHY: directly labelled columns establish the time series, while a separate matched before-to-after pair isolates the decision-relevant change. MAY vary periods from four to six and metric units. MUST NOT add non-informative gridlines, legends, or different scales for the pair. -->
-<div class="slide">
-  <div class="el frame-accent" style="left:0;top:0;width:3px;height:120px;"></div>
-  <div class="el section-label" style="left:120px;top:28px;width:760px;height:30px;">Pattern / trend</div>
-  <div class="el title" style="left:120px;top:58px;width:1680px;height:192px;">Trend and endpoint change</div>
-  <div class="el topic" style="left:120px;top:258px;width:1680px;height:58px;">The measure improves across five periods and ends materially above its starting point.</div>
-  <div class="el rule" style="left:120px;top:322px;width:1680px;height:1px;"></div>
-  <div class="el label" style="left:120px;top:370px;width:850px;height:30px;">Five-period trend</div>
-  <div class="el bar-chart" style="left:120px;top:440px;width:850px;height:420px;">
-    <div class="bar-wrap"><span class="bar-value">42</span><div class="bar h100"></div><span class="bar-label">P1</span></div>
-    <div class="bar-wrap"><span class="bar-value">51</span><div class="bar h150"></div><span class="bar-label">P2</span></div>
-    <div class="bar-wrap"><span class="bar-value">63</span><div class="bar h210"></div><span class="bar-label">P3</span></div>
-    <div class="bar-wrap"><span class="bar-value">74</span><div class="bar h275"></div><span class="bar-label">P4</span></div>
-    <div class="bar-wrap"><span class="bar-value accent-text">86</span><div class="bar current h340"></div><span class="bar-label">P5</span></div>
+  <div class="el t-body c-muted" style="left:120px;top:1005px;width:1680px;height:70px;">Do not enclose—<b class="c-accent">separate</b>. Do not pack—<b class="c-accent">open space</b>. Do not decorate—<b class="c-accent">align</b>.
   </div>
-  <div class="el vrule" style="left:1040px;top:370px;width:1px;height:520px;"></div>
-  <div class="el label accent-text" style="left:1120px;top:370px;width:680px;height:30px;">Before to after / same scale</div>
-  <div class="el metric muted" style="left:1120px;top:475px;width:280px;height:90px;">42</div>
-  <div class="el caption" style="left:1120px;top:575px;width:280px;height:55px;">Before / P1</div>
-  <div class="el connector-h connector-accent" style="left:1370px;top:520px;width:170px;height:3px;"></div>
-  <div class="el arrow-right accent-arrow" style="left:1528px;top:513px;width:12px;height:16px;"></div>
-  <div class="el metric accent-text" style="left:1580px;top:475px;width:220px;height:90px;">86</div>
-  <div class="el caption" style="left:1580px;top:575px;width:220px;height:55px;">After / P5</div>
-  <div class="el wash-panel" style="left:1120px;top:680px;width:680px;height:170px;"></div>
-  <div class="el heading" style="left:1160px;top:720px;width:600px;height:60px;">+44 on the same measure</div>
-  <div class="el caption" style="left:1160px;top:790px;width:600px;height:50px;">Direct labels remove the legend.</div>
-  <div class="el closing-insight" style="left:960px;top:900px;width:840px;height:70px;">Pair states end; columns show path.</div>
-  <div class="el source" style="left:120px;top:1000px;width:1200px;height:28px;">Source: illustrative trend data</div>
+  <div class="el source-line" style="left:600px;top:260px;width:1200px;height:32px;">Contrast: 4.5:1 for text; 3:1 at 18pt and above.
+  </div>
 </div>
-
+<!-- Part 3: This section defines message discipline, title grammar, spoken-versus-printed language, and the outline contract used before composition. -->
+<!-- Type: message 1/3. This slide uses three unboxed columns in a fact-to-consequence sequence, then closes with a centred plain-text assertion and one highlight. -->
+<div class="slide slide-dark">
+  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">One-direction message depth
+  </div>
+  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
+  </div>
+  <div class="el lead" style="left:120px;top:265px;width:1680px;height:120px;">Every slide has a title and topic sentence, begins with facts, and ends with an implication.
+  </div>
+  <!-- Three unboxed columns move from the reason for each discipline through a downward arrow to its practical consequence. -->
+  <div class="el rule-h" style="left:670px;top:385px;width:1px;height:555px;">
+  </div>
+  <div class="el rule-h" style="left:1250px;top:385px;width:1px;height:555px;">
+  </div>
+  <!-- The first column explains why a noun label needs a complete topic sentence directly beneath it. -->
+  <div class="el t-label c-accent" style="left:120px;top:385px;width:520px;height:38px;">RULE 1 — STATE THE CLAIM
+  </div>
+  <div class="el t-body" style="left:120px;top:445px;width:520px;height:250px;">A short title label states no claim, so the reader must supply “so what?”
+  </div>
+  <div class="el arrow-v" style="left:360px;top:710px;width:24px;height:14px;">
+  </div>
+  <div class="el t-body" style="left:120px;top:750px;width:520px;height:190px;">Put a subject-and-predicate claim below the title; never make a label-only slide.
+  </div>
+  <div class="el t-label c-accent" style="left:700px;top:385px;width:520px;height:38px;">RULE 2 — ORDER BY DEPTH
+  </div>
+  <div class="el t-body" style="left:700px;top:445px;width:520px;height:250px;">Place facts above and interpretation below, so depth increases down the page.
+  </div>
+  <div class="el arrow-v" style="left:940px;top:710px;width:24px;height:14px;">
+  </div>
+  <div class="el t-body" style="left:700px;top:750px;width:520px;height:190px;">Do not state an implication without visible evidence above to support it.
+  </div>
+  <div class="el t-label c-accent" style="left:1280px;top:385px;width:520px;height:38px;">RULE 3 — COMPRESS
+  </div>
+  <div class="el t-body" style="left:1280px;top:445px;width:520px;height:250px;">Lead with the conclusion, cut dispensable words, and never repeat a point.
+  </div>
+  <div class="el arrow-v" style="left:1520px;top:710px;width:24px;height:14px;">
+  </div>
+  <div class="el t-body" style="left:1280px;top:750px;width:520px;height:190px;">A sentence that wraps because it carries two claims is a signal to split the slide.
+  </div>
+  <!-- The slide closes with a centred plain statement and a single highlight instead of a conclusion band. -->
+  <div class="el rule-h" style="left:520px;top:960px;width:880px;height:1px;">
+  </div>
+  <div class="el t-heading text-center" style="left:120px;top:980px;width:1680px;height:80px;">Read only the topic sentences in order; they must form
+    <span class="em-mark">one continuous argument</span>.
+  </div>
+</div>
+<!-- Type: message 2/3. This slide uses bordered label heads over two aligned panels, then resolves the rule through two dark chips between plain-text statements. -->
+<div class="slide slide-dark">
+  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">Emphasis through colour and voice
+  </div>
+  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
+  </div>
+  <div class="el lead" style="left:120px;top:265px;width:1680px;height:120px;">Write the most important sentence in the most readable colour; keep spoken prompts off the page.
+  </div>
+  <!-- The two aligned panels pair bordered label heads with explanatory text so colour and voice can be compared without cards. -->
+  <div class="el rule-h" style="left:960px;top:385px;width:1px;height:330px;">
+  </div>
+  <div class="el sec-head bd-accent" style="left:120px;top:385px;width:760px;height:70px;">The topic sentence uses
+  </div>
+  <div class="el t-body" style="left:120px;top:485px;width:760px;height:220px;">
+    <span class="em">the full text colour</span>. Use muted text only for a qualifying phrase; muting the whole claim makes it disappear.
+  </div>
+  <div class="el sec-head bd-accent" style="left:1040px;top:385px;width:760px;height:70px;">The printed voice uses
+  </div>
+  <div class="el t-body" style="left:1040px;top:485px;width:760px;height:220px;">formal written language. Questions and invitations belong in notes; the page carries a direct statement.
+  </div>
+  <!-- The closing sequence places two outcomes in restrained dark chips between plain-text setup and qualification. -->
+  <div class="el t-body text-center" style="left:120px;top:755px;width:1680px;height:68px;">This discipline keeps
+  </div>
+  <div class="el bg-surface t-body bold text-center flex items-center justify-center" style="left:160px;top:825px;width:780px;height:80px;">the conclusion visible first
+  </div>
+  <div class="el bg-surface t-body bold text-center flex items-center justify-center" style="left:980px;top:825px;width:780px;height:80px;">the reading path unambiguous
+  </div>
+  <div class="el t-body text-center" style="left:120px;top:935px;width:1680px;height:75px;">Qualify uncertainty directly with “the evidence indicates” rather than vague emphasis.
+  </div>
+</div>
+<!-- Type: message 3/3. A solid panel marks language to use, a dashed panel marks language to reject, and a plain-text close reinforces the unambiguous choice. -->
+<div class="slide slide-dark">
+  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">Direct nouns and unambiguous statements
+  </div>
+  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
+  </div>
+  <div class="el lead" style="left:120px;top:265px;width:1680px;height:85px;">The slide is a document the audience may revisit, not a transcript of the presenter.
+  </div>
+  <!-- The solid upper panel marks direct language that names the subject itself and is approved for the page. -->
+  <div class="el bd-accent" style="left:120px;top:380px;width:1680px;height:240px;">
+  </div>
+  <div class="el t-heading" style="left:180px;top:415px;width:1560px;height:60px;">Write about
+    <span class="em-sub">the subject itself</span>.
+  </div>
+  <div class="el t-body c-accent" style="left:180px;top:495px;width:1560px;height:190px;">• One distribution or coordination decision<br>• Working flow demonstration<br>• Implementation issues and mitigations
+  </div>
+  <!-- The dashed lower panel marks meeting narration and metaphor that must be kept off the printed slide. -->
+  <div class="el bd-danger" style="left:120px;top:655px;width:1680px;height:230px;">
+  </div>
+  <div class="el t-heading" style="left:180px;top:690px;width:1560px;height:60px;">Do
+    <span class="em-danger">not</span> narrate the meeting or use metaphor.
+  </div>
+  <div class="el t-body c-muted" style="left:180px;top:765px;width:760px;height:150px;">• Today is for finding a direction<br>• Experience the demonstration
+  </div>
+  <div class="el t-body c-muted" style="left:1000px;top:765px;width:740px;height:150px;">• Hidden traps or silver bullets<br>• Gravity, foundations, or iron rules
+  </div>
+  <!-- The final plain-text sentence states the selection test and highlights only the required property. -->
+  <div class="el t-heading text-center" style="left:120px;top:925px;width:1680px;height:85px;">Choose direct words that retain
+    <span class="em-mark">one meaning when read later</span>.
+  </div>
+</div>
+<!-- Type: wording 1/2. Three title conditions lead to a dashed avoid panel and a solid use panel, followed by a plain-text conclusion with one highlight. -->
+<div class="slide slide-dark">
+  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">Title grammar standards
+  </div>
+  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
+  </div>
+  <div class="el lead" style="left:120px;top:265px;width:1680px;height:116px;">A display title is a formal noun phrase derived from the outline claim, not a copied question or conversational sentence.
+  </div>
+  <!-- Three unboxed columns define the complete title grammar before the avoid-and-use examples appear. -->
+  <div class="el t-heading" style="left:120px;top:375px;width:500px;height:80px;">
+    <span class="em-accent">1</span> Noun phrase
+  </div>
+  <div class="el t-caption" style="left:120px;top:455px;width:500px;height:100px;">Use a noun phrase so no question or invitation is printed.
+  </div>
+  <div class="el rule-h" style="left:660px;top:375px;width:1px;height:140px;">
+  </div>
+  <div class="el t-heading" style="left:700px;top:375px;width:500px;height:80px;">
+    <span class="em-accent">2</span> Formal vocabulary
+  </div>
+  <div class="el t-caption" style="left:700px;top:455px;width:500px;height:100px;">Use formal terms that name the model, role, or condition.
+  </div>
+  <div class="el rule-h" style="left:1240px;top:375px;width:1px;height:140px;">
+  </div>
+  <div class="el t-heading" style="left:1280px;top:375px;width:520px;height:80px;">
+    <span class="em-accent">3</span> No rhetoric
+  </div>
+  <div class="el t-caption" style="left:1280px;top:455px;width:520px;height:100px;">Remove rhetoric and suspense punctuation from the title.
+  </div>
+  <!-- The dashed left panel shows outline questions and conversational language that must not be copied into display titles. -->
+  <div class="el bd-danger" style="left:120px;top:550px;width:810px;height:300px;">
+  </div>
+  <div class="el t-heading" style="left:170px;top:585px;width:710px;height:60px;">
+    <span class="em-danger">Avoid</span> — copied outline language
+  </div>
+  <div class="el t-body c-muted" style="left:170px;top:670px;width:710px;height:190px;">Can we reduce review time?<br>Let us compare the two options<br>What does this mean for delivery?
+  </div>
+  <!-- The solid right panel translates the same issues into formal noun phrases suitable for display titles. -->
+  <div class="el bd-accent" style="left:990px;top:550px;width:810px;height:300px;">
+  </div>
+  <div class="el t-heading" style="left:1040px;top:585px;width:710px;height:60px;">
+    <span class="em-sub">Use</span> — a formal noun phrase
+  </div>
+  <div class="el t-body c-accent" style="left:1040px;top:670px;width:710px;height:190px;">Measured reduction in review time<br>Comparison of operating options<br>Delivery implications and conditions
+  </div>
+  <div class="el t-heading text-center" style="left:120px;top:910px;width:1680px;height:90px;">The title names the issue; the topic sentence
+    <span class="em-mark">states its claim</span>.
+  </div>
+</div>
+<!-- Type: wording 2/2. The dashed upper panel holds language that must remain spoken, while the solid lower panel pairs printable wording with speaker-note prompts. -->
+<div class="slide slide-dark">
+  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">Separation of printed and spoken language
+  </div>
+  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
+  </div>
+  <div class="el lead" style="left:120px;top:265px;width:1680px;height:120px;">A hypothesis may be asked aloud, but the slide records the precise subject and current position.
+  </div>
+  <!-- The dashed upper panel contains questions and calls to the room that belong in live speech, not on the page. -->
+  <div class="el bd-danger" style="left:120px;top:380px;width:1680px;height:210px;">
+  </div>
+  <div class="el t-heading" style="left:180px;top:415px;width:1560px;height:60px;">Do
+    <span class="em-danger">not print</span> questions or calls to the room.
+  </div>
+  <div class="el t-body c-muted" style="left:180px;top:495px;width:1560px;height:80px;">“Would this handoff work here?” / “How much could this role own?” / “Any reactions?”
+  </div>
+  <!-- The solid lower panel pairs printable noun phrases with conversational prompts that belong in speaker notes. -->
+  <div class="el bd-accent" style="left:120px;top:625px;width:1680px;height:250px;">
+  </div>
+  <div class="el t-heading" style="left:180px;top:660px;width:1560px;height:60px;">Print a
+    <span class="em-sub">noun phrase or short assertion</span>; place the question in speaker notes.
+  </div>
+  <div class="el t-body c-accent" style="left:180px;top:745px;width:760px;height:130px;">Printed: expected operating model<br>Printed: ownership after handoff
+  </div>
+  <div class="el t-body c-muted" style="left:1000px;top:745px;width:740px;height:130px;">Notes: “Would this work here?”<br>Notes: “How much could this role own?”
+  </div>
+  <!-- The closing sentence states that the printed page survives alone while dialogue remains spoken. -->
+  <div class="el t-heading text-center" style="left:120px;top:930px;width:1680px;height:80px;">The printed page works alone;
+    <span class="em-mark">dialogue remains spoken</span>.
+  </div>
+</div>
+<!-- Type: outline. This instruction slide tells the orchestrator how to shape a 20-minute deck and tells the composer how to preserve each claim in the title-topic pair. -->
+<div class="slide slide-dark">
+  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">Outline claims become title-topic pairs
+  </div>
+  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
+  </div>
+  <div class="el lead" style="left:120px;top:265px;width:1680px;height:120px;">The orchestrator keeps each outline entry as one sentence claim; the composer splits its display without changing meaning.
+  </div>
+  <!-- The left column gives the orchestrator a complete chapter shape, slide range, and title-topic transformation contract. -->
+  <div class="el label-head accent" style="left:120px;top:390px;width:790px;height:55px;">STRUCTURE
+  </div>
+  <div class="el t-body" style="left:120px;top:465px;width:790px;height:430px;">A 20-minute talk uses 10–16 slides in two to four chapters.<br>Open with context and close with implication; add a divider and mini map for three chapters.<br>Keep each outline as one claim; display it as a noun title and topic sentence.
+  </div>
+  <div class="el rule-h" style="left:960px;top:390px;width:1px;height:500px;">
+  </div>
+  <!-- The right column distinguishes spoken and read-alone density and maps each reasoning need to a preferred visual form. -->
+  <div class="el label-head accent" style="left:1040px;top:390px;width:760px;height:55px;">DENSITY AND VISUALS
+  </div>
+  <div class="el t-caption" style="left:1040px;top:465px;width:760px;height:430px;">Spoken decks use 25–45 words and notes; read-alone decks use 60–90 words and larger boxes.<br>Use direct metrics for numbers, matched halves for comparisons, chevrons for process, and swimlanes for ownership.<br>Use cycles for recurrence and prose for chronology; avoid decorative networks and empty grids.
+  </div>
+  <!-- The vertical test verifies that the sequence of title-topic pairs forms one argument before composition begins. -->
+  <div class="el effect-band" style="left:120px;top:920px;width:1680px;height:145px;">
+    <div class="eb-label">VERTICAL TEST
+    </div>
+    <div class="eb-item t-body">Read every title-topic pair in order; together they must form one continuous argument.
+    </div>
+  </div>
+</div>
+<!-- Part 4: This section assigns every colour a semantic role and limits accents so the reading order remains deliberate. -->
+<!-- Type: palette. The swatch row defines approved roles, and the three rule columns explain permitted use, prohibited multiplication, and contrast-safe text pairs. -->
+<div class="slide slide-dark">
+  <div class="el t-slide-title" style="left:120px;top:40px;width:1680px;height:192px;">Colour palette
+  </div>
+  <div class="el frame-accent" style="left:120px;top:242px;width:120px;height:3px;">
+  </div>
+  <div class="el lead" style="left:120px;top:265px;width:1680px;height:120px;">Teal is the single main accent. Green and coral appear only when success or danger is part of the meaning.
+  </div>
+  <!-- The swatch band combines one teal accent, two semantic colours, and a neutral scale for text, fields, rules, and ground. -->
+  <div class="el flex" style="left:120px;top:390px;width:1680px;height:190px;">
+    <div class="row-item">
+      <div>
+        <div class="icon bg-accent">
+        </div>
+        <div class="t-label">ACCENT
+        </div>
+        <div class="t-caption mono">#11A497
+        </div>
+      </div>
+      <div>
+        <div class="icon c-success">
+        </div>
+        <div class="t-label">SUCCESS
+        </div>
+        <div class="t-caption mono">#5BC455
+        </div>
+      </div>
+      <div>
+        <div class="icon c-danger">
+        </div>
+        <div class="t-label">DANGER
+        </div>
+        <div class="t-caption mono">#FF7E5B
+        </div>
+      </div>
+      <div>
+        <div class="icon">
+        </div>
+        <div class="t-label">TEXT
+        </div>
+        <div class="t-caption mono">#E6EDF3
+        </div>
+      </div>
+      <div>
+        <div class="icon">
+        </div>
+        <div class="t-label">MUTED
+        </div>
+        <div class="t-caption mono">#8B949E
+        </div>
+      </div>
+      <div>
+        <div class="icon">
+        </div>
+        <div class="t-label">SURFACE
+        </div>
+        <div class="t-caption mono">#161B22
+        </div>
+      </div>
+      <div>
+        <div class="icon">
+        </div>
+        <div class="t-label">WASH
+        </div>
+        <div class="t-caption mono">#1C222B
+        </div>
+      </div>
+      <div>
+        <div class="icon">
+        </div>
+        <div class="t-label">GROUND
+        </div>
+        <div class="t-caption mono">#0D1117
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Three rule columns explain permitted roles, prohibited colour multiplication, and contrast-safe text pairs. -->
+  <div class="el sec-head-fill" style="left:120px;top:585px;width:500px;height:70px;">Use only these roles
+  </div>
+  <ul class="el bullets palette-rules" style="left:145px;top:680px;width:475px;height:250px;">
+    <li>Teal marks one decisive role.
+    </li>
+    <li>Neutrals build fields and text.
+    </li>
+    <li>Accent fill: one header or result.
+    </li>
+  </ul>
+  <div class="el rule-h" style="left:660px;top:585px;width:1px;height:285px;">
+  </div>
+  <div class="el sec-head-fill c-danger" style="left:700px;top:585px;width:500px;height:70px;">Do not multiply colour
+  </div>
+  <ul class="el bullets dash palette-rules" style="left:725px;top:680px;width:475px;height:250px;">
+    <li>Use one accent role.
+    </li>
+    <li>Green means stated success.
+    </li>
+    <li>Coral means risk or rejection.
+    </li>
+  </ul>
+  <div class="el rule-h" style="left:1240px;top:585px;width:1px;height:285px;">
+  </div>
+  <div class="el sec-head-fill" style="left:1280px;top:585px;width:520px;height:70px;">Approved text pairs
+  </div>
+  <div class="el t-body" style="left:1280px;top:680px;width:520px;height:250px;">Teal → dark text<br>Success → dark text<br>Danger → dark text<br>Surface / wash → light text
+  </div>
+  <!-- The final contrast rule applies to every rendered slide, not merely to the palette specimen. -->
+  <div class="el t-caption" style="left:120px;top:955px;width:1680px;height:105px;">Never put muted text on a coloured fill. Beyond ground and text, use only the minimum colour needed to distinguish content.
+  </div>
+</div>
+<!-- Part 5: This section demonstrates the fixed typographic hierarchy at actual size and explains when each role carries the reading load. -->
+<!-- Type: typography. Full-size specimens align with their token names and measurements so the composer can reproduce the hierarchy without inventing intermediate sizes. -->
+<div class="slide slide-dark">
+  <div class="el t-slide-title" style="left:120px;top:35px;width:1680px;height:192px;">Typography
+  </div>
+  <div class="el frame-accent" style="left:120px;top:235px;width:120px;height:3px;">
+  </div>
+  <div class="el lead" style="left:120px;top:255px;width:1680px;height:80px;">The fixed hierarchy is 40 / 20 / 17 / 14 / 12pt, with larger roles only for cover titles and metrics.
+  </div>
+  <!-- Each specimen appears at actual size on the left, while its token and measurement appear in a consistent right column. -->
+  <div class="el t-slide-title" style="left:120px;top:350px;width:1150px;height:105px;">Slide title 40
+  </div>
+  <div class="el t-caption mono" style="left:1300px;top:375px;width:500px;height:55px;">--fs-slide-title / 40pt
+  </div>
+  <div class="el rule-h" style="left:120px;top:455px;width:1680px;height:1px;">
+  </div>
+  <div class="el t-body" style="left:120px;top:475px;width:1150px;height:75px;"><b>Heading 20</b> / Body text 20 carries the reading load.
+  </div>
+  <div class="el t-caption mono" style="left:1300px;top:485px;width:500px;height:55px;">body / heading: 20pt
+  </div>
+  <div class="el rule-h" style="left:120px;top:560px;width:1680px;height:1px;">
+  </div>
+  <div class="el t-caption" style="left:120px;top:580px;width:1150px;height:60px;">Caption 17 qualifies evidence without competing with the claim.
+  </div>
+  <div class="el t-caption mono" style="left:1300px;top:580px;width:500px;height:55px;">--fs-caption / 17pt
+  </div>
+  <div class="el rule-h" style="left:120px;top:650px;width:1680px;height:1px;">
+  </div>
+  <div class="el t-label" style="left:120px;top:675px;width:1150px;height:50px;">UTILITY LABEL 12 / compact node text uses 14
+  </div>
+  <div class="el t-caption mono" style="left:1300px;top:675px;width:500px;height:55px;">label 12pt / mid 14pt
+  </div>
+  <div class="el rule-h" style="left:120px;top:745px;width:1680px;height:1px;">
+  </div>
+  <!-- The metric row demonstrates the only larger type roles permitted beyond the cover and standard hierarchy. -->
+  <div class="el flex items-center" style="left:120px;top:780px;width:1000px;height:130px;">
+    <span class="t-metric-lg c-accent">1,500</span>
+    <span class="t-metric c-accent">42%</span>
+    <span class="t-num c-accent">03</span>
+  </div>
+  <div class="el t-caption mono" style="left:1300px;top:790px;width:500px;height:110px;">metric-lg 56pt<br>metric 40pt / num 32pt
+  </div>
+  <!-- The final rule requires editing, enlarging the box, or splitting the slide instead of shrinking type. -->
+  <div class="el rule-h" style="left:120px;top:915px;width:1680px;height:1px;">
+  </div>
+  <div class="el t-body c-muted" style="left:120px;top:930px;width:1680px;height:125px;">Never shrink to fit: edit, enlarge, or split. Titles use at most two lines in 192px.
+  </div>
+</div>
+<!-- Part 6: This section defines the production frame that every standard content slide must reproduce before selecting a content pattern. -->
+<!-- Type: frame. The fixed two-line title zone, stable content start, and footer contract keep evidence aligned even when a title occupies only one line. -->
+<div class="slide slide-dark">
+  <!-- The topbar reserves the same number, rule, section label, and two-line title zone on every standard content slide. -->
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">06
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">SECTION / FRAME
+      </div>
+      <div class="tb-title">Two-line title zone preserves a fixed<br>content start on every page
+      </div>
+    </div>
+  </div>
+  <!-- The topic sentence begins below the fixed title zone and never rises to consume an unused title line. -->
+  <div class="el lead" style="left:120px;top:290px;width:1680px;height:80px;">A one-line title leaves the second line empty; evidence never moves upward to fill it.
+  </div>
+  <!-- The outlined specimen marks the safe content region and demonstrates the fixed geometry in complete sentences. -->
+  <div class="el bd-accent" style="left:120px;top:400px;width:1680px;height:480px;">
+  </div>
+  <div class="el t-label c-accent" style="left:160px;top:435px;width:900px;height:35px;">CONTENT REGION / X 120–1800 / Y 330–970
+  </div>
+  <div class="el sec-head" style="left:160px;top:515px;width:700px;height:65px;">Fixed production geometry
+  </div>
+  <div class="el t-body" style="left:160px;top:605px;width:700px;height:310px;">Draw a 3px left accent.<br>Reserve 260px for the topbar.<br>Set the 40pt title in a 192px zone.<br>Use at most two title lines.<br>Start content at y=330 or below.
+  </div>
+  <div class="el rule-h" style="left:960px;top:515px;width:1px;height:310px;">
+  </div>
+  <div class="el sec-head sub" style="left:1040px;top:515px;width:700px;height:65px;">Footer contract
+  </div>
+  <div class="el t-body" style="left:1040px;top:605px;width:700px;height:250px;">Place an optional source at lower left. The template supplies page numbers, so never draw them as slide elements.
+  </div>
+  <!-- A source line is optional content at the lower left, while page numbers remain the responsibility of the template. -->
+  <div class="el source-line" style="left:120px;top:1005px;width:1200px;height:28px;">Source: frame geometry specimen
+  </div>
+</div>
+<!-- Part 7: This section provides complete pattern slides that solve recurring communication problems while preserving one recognisable briefing system. -->
+<!-- Pattern: numbers — WHY: The 3:7 split gives outcome measures the dominant field, so the room reads the result before the supporting losses. Vary the values and labels, but keep the unequal fields, direct labels, and oversized-number hierarchy. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">01
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">PATTERN / NUMBERS
+      </div>
+      <div class="tb-title">Problem and outcome measures
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:290px;width:1680px;height:70px;">Set both problem and outcome as oversized values; give the outcome the wider 70% field.
+  </div>
+  <!-- The narrow left field stacks problem measures vertically so they remain supporting evidence. -->
+  <div class="el label-head" style="left:120px;top:395px;width:500px;height:55px;">CURRENT LOSS
+  </div>
+  <div class="el" style="left:120px;top:475px;width:500px;height:300px;">
+    <div class="row-item">
+      <span class="t-metric c-accent">18</span>
+      <span class="t-caption">minutes per search</span>
+    </div>
+    <div class="rule-h">
+    </div>
+    <div class="row-item">
+      <span class="t-metric c-accent">41%</span>
+      <span class="t-caption">cannot identify the current version</span>
+    </div>
+    <div class="rule-h">
+    </div>
+    <div class="row-item">
+      <span class="t-metric c-accent">34%</span>
+      <span class="t-caption">of work is repeated</span>
+    </div>
+  </div>
+  <div class="el leftbar" style="left:120px;top:800px;width:500px;height:150px;">
+    <div class="t-caption">Fragmented information slows retrieval.<br>Prior work is difficult to reuse.
+    </div>
+  </div>
+  <div class="el rule-h" style="left:672px;top:395px;width:1px;height:515px;">
+  </div>
+  <!-- The broad right field gives the outcome one hero measure followed by directly labelled supporting measures. -->
+  <div class="el label-head accent" style="left:744px;top:395px;width:1056px;height:55px;">TARGET OUTCOME
+  </div>
+  <div class="el flex items-center" style="left:744px;top:475px;width:1056px;height:130px;">
+    <span class="t-metric-lg c-accent">1,500</span>
+    <span class="t-slide-title">records available</span>
+  </div>
+  <div class="el t-body c-muted" style="left:744px;top:620px;width:1056px;height:80px;">Comparable items use one operating definition.
+  </div>
+  <div class="el flex" style="left:744px;top:720px;width:1056px;height:175px;">
+    <div class="leftbar">
+      <div class="t-caption">Cycle time
+      </div>
+      <div class="t-metric c-accent">42%
+      </div>
+    </div>
+    <div class="leftbar">
+      <div class="t-caption">Decision rate
+      </div>
+      <div class="t-metric c-accent">32%
+      </div>
+    </div>
+    <div class="leftbar">
+      <div class="t-caption">Quality score
+      </div>
+      <div class="t-metric c-success">85
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Pattern: comparison — WHY: Matched halves align unlike approaches on the same criteria, making differences visible without implying a winner through area. Vary the criteria and evidence, but keep their order, widths, and typographic hierarchy matched. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">02
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">PATTERN / COMPARISON
+      </div>
+      <div class="tb-title">Two operating approaches
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:290px;width:1680px;height:116px;">Align unlike approaches symmetrically so the differences are visible without implying a winner by size.
+  </div>
+  <!-- Both approaches use the same rows, order, widths, and type so only their evidence changes. -->
+  <div class="el text-center" style="left:120px;top:420px;width:792px;height:60px;">
+    <span class="pill sub">DISTRIBUTED</span>
+  </div>
+  <div class="el" style="left:120px;top:510px;width:792px;height:400px;">
+    <div class="t-body text-center c-muted">Local teams collect and interpret evidence independently.
+    </div>
+    <div class="row-item">
+      <div class="t-body c-accent">Strength
+      </div>
+      <div class="t-body">Fast local response
+      </div>
+    </div>
+    <div class="row-item">
+      <div class="t-body c-accent">Method
+      </div>
+      <div class="t-body">Separate records and reviews
+      </div>
+    </div>
+    <div class="row-item">
+      <div class="t-body c-accent">Effect
+      </div>
+      <div class="t-metric">+25%
+      </div>
+    </div>
+  </div>
+  <!-- A central rule and multiplication sign separate the approaches without enclosing either half. -->
+  <div class="el rule-h" style="left:960px;top:420px;width:1px;height:490px;">
+  </div>
+  <div class="el t-metric c-accent text-center" style="left:925px;top:650px;width:70px;height:90px;">×
+  </div>
+  <div class="el text-center" style="left:1032px;top:420px;width:792px;height:60px;">
+    <span class="pill">COORDINATED</span>
+  </div>
+  <div class="el" style="left:1032px;top:510px;width:792px;height:400px;">
+    <div class="t-body text-center c-muted">One model coordinates evidence and ownership.
+    </div>
+    <div class="row-item">
+      <div class="t-body c-accent">Strength
+      </div>
+      <div class="t-body">Comparable decisions
+      </div>
+    </div>
+    <div class="row-item">
+      <div class="t-body c-accent">Method
+      </div>
+      <div class="t-body">Shared definitions and gates
+      </div>
+    </div>
+    <div class="row-item">
+      <div class="t-body c-accent">Effect
+      </div>
+      <div class="t-metric">+40%
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Pattern: process — WHY: A chevron chain makes prerequisite order visible, while the open icon-and-text row explains each stage without turning it into a card. Vary the sequence from three to five stages, but keep one accent hue and the left-to-right order. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">03
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">PATTERN / PROCESS
+      </div>
+      <div class="tb-title">Standard delivery sequence
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:290px;width:1680px;height:70px;">Use chevrons when each stage must finish before the next begins.
+  </div>
+  <!-- The chevron band makes the prerequisite order of three to five stages immediately visible. -->
+  <div class="el flex" style="left:120px;top:410px;width:1680px;height:86px;">
+    <div class="chevron first">01 Define
+    </div>
+    <div class="chevron">02 Structure
+    </div>
+    <div class="chevron">03 Build
+    </div>
+    <div class="chevron">04 Review
+    </div>
+    <div class="chevron is-last">05 Release
+    </div>
+  </div>
+  <!-- An open icon-and-text row explains each stage without creating five independent cards. -->
+  <div class="el flex" style="left:120px;top:535px;width:1680px;height:150px;">
+    <div class="row-item">
+      <div class="ico ico-search accent">
+      </div>
+      <div class="ri-desc">Gather comparable evidence
+      </div>
+    </div>
+    <div class="row-item">
+      <div class="ico ico-doc accent">
+      </div>
+      <div class="ri-desc">Choose the reasoning frame
+      </div>
+    </div>
+    <div class="row-item">
+      <div class="ico ico-check accent">
+      </div>
+      <div class="ri-desc">Build from the standard
+      </div>
+    </div>
+    <div class="row-item">
+      <div class="ico ico-chart accent">
+      </div>
+      <div class="ri-desc">Test against the gate
+      </div>
+    </div>
+    <div class="row-item">
+      <div class="ico ico-cloud accent">
+      </div>
+      <div class="ri-desc">Transfer to one owner
+      </div>
+    </div>
+  </div>
+  <div class="el rule-h" style="left:120px;top:715px;width:1680px;height:1px;">
+  </div>
+  <div class="el label-head accent" style="left:120px;top:755px;width:1680px;height:68px;">EXPECTED EFFECT
+  </div>
+  <div class="el effect-band" style="left:120px;top:835px;width:1680px;height:130px;">
+    <div class="eb-item">
+      <div class="t-caption">Cycle time
+      </div>
+      <div class="t-heading c-accent">42% shorter
+      </div>
+    </div>
+    <div class="eb-sep">
+    </div>
+    <div class="eb-item">
+      <div class="t-caption">Quality score
+      </div>
+      <div class="t-heading c-accent">85 points
+      </div>
+    </div>
+    <div class="eb-sep">
+    </div>
+    <div class="eb-item">
+      <div class="t-caption">Rework rate
+      </div>
+      <div class="t-heading c-accent">8%
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Pattern: swimlane — WHY: Rows identify who acts and columns identify when, while the single return branch exposes the consequential exception. Vary role, phase, and action labels, but preserve aligned lanes and connector paths that state ownership and causality. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">04
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">PATTERN / SWIMLANE
+      </div>
+      <div class="tb-title">Ownership across phases
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Rows show who acts; columns show when; the branch shows the one exception that returns.
+  </div>
+  <!-- Phase chevrons establish columns, while role labels establish rows. -->
+  <div class="el flex" style="left:380px;top:375px;width:1398px;height:86px;">
+    <div class="chevron first">1 Assess
+    </div>
+    <div class="chevron">2 Decide
+    </div>
+    <div class="chevron is-last">3 Release
+    </div>
+  </div>
+  <div class="el lane-label" style="left:120px;top:485px;width:240px;height:80px;">Sponsor
+  </div>
+  <div class="el lane-label" style="left:120px;top:575px;width:240px;height:80px;">Review team
+  </div>
+  <div class="el lane-label" style="left:120px;top:665px;width:240px;height:80px;">Planning
+  </div>
+  <div class="el lane-row-bg" style="left:356px;top:575px;width:1468px;height:80px;">
+  </div>
+  <div class="el lane-label" style="left:120px;top:755px;width:240px;height:80px;">Operations
+  </div>
+  <div class="el lane-row-bg" style="left:356px;top:755px;width:1468px;height:80px;">
+  </div>
+  <!-- Action nodes occupy the responsible role and phase, and the diamond alone represents a decision. -->
+  <div class="el node node-strong" style="left:400px;top:490px;width:280px;height:60px;">Set threshold
+  </div>
+  <div class="el node node-sub" style="left:400px;top:585px;width:280px;height:60px;">Measure evidence
+  </div>
+  <div class="el node" style="left:820px;top:585px;width:260px;height:60px;">Test condition
+  </div>
+  <div class="el node" style="left:400px;top:675px;width:280px;height:60px;">Refine scope
+  </div>
+  <div class="el node" style="left:820px;top:675px;width:260px;height:60px;">Assess risk
+  </div>
+  <div class="el diamond flex items-center justify-center" style="left:865px;top:765px;width:90px;height:90px;">
+    <span>Gate<br>met?</span>
+  </div>
+  <div class="el node" style="left:1320px;top:490px;width:300px;height:60px;">Confirm owner
+  </div>
+  <div class="el node" style="left:1320px;top:585px;width:300px;height:60px;">Release briefing
+  </div>
+  <div class="el node" style="left:1320px;top:765px;width:300px;height:60px;">Record handoff
+  </div>
+  <!-- Connectors state consequence and preserve the one return path when the decision requires revision. -->
+  <div class="el conn" style="left:540px;top:550px;width:2px;height:35px;">
+  </div>
+  <div class="el conn" style="left:680px;top:615px;width:140px;height:2px;">
+  </div>
+  <div class="el arrow-h" style="left:810px;top:608px;width:10px;height:14px;">
+  </div>
+  <div class="el conn" style="left:950px;top:645px;width:2px;height:85px;">
+  </div>
+  <div class="el conn conn-accent" style="left:955px;top:775px;width:365px;height:2px;">
+  </div>
+  <div class="el arrow-h" style="left:1310px;top:768px;width:10px;height:14px;">
+  </div>
+  <div class="el conn" style="left:1470px;top:550px;width:2px;height:35px;">
+  </div>
+  <div class="el t-label c-accent" style="left:1100px;top:740px;width:100px;height:30px;">YES
+  </div>
+  <div class="el t-label c-muted" style="left:700px;top:785px;width:100px;height:30px;">REVISE
+  </div>
+  <div class="el t-caption" style="left:120px;top:900px;width:1680px;height:105px;">Node = action, diamond = decision, arrow = consequence. Use this only when ownership changes across phases.
+  </div>
+</div>
+<!-- Pattern: composition — WHY: The sequence forces the composer to decide the claim before regions and whitespace, preventing components from dictating the argument. Vary region ratios according to information volume, but do not change this reasoning order or fill empty space. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">05
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">GUIDANCE / COMPOSITION
+      </div>
+      <div class="tb-title">How to compose one page
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Do not start with components; decide message, region split, then whitespace.
+  </div>
+  <!-- The chain requires message, then region split, then whitespace; components never come first. -->
+  <div class="el flex" style="left:120px;top:385px;width:1680px;height:90px;">
+    <div class="node">
+      <span><b>1 Message</b> — write one claim</span>
+    </div>
+    <div class="arrow-h">
+    </div>
+    <div class="node">
+      <span><b>2 Regions</b> — split by meaning</span>
+    </div>
+    <div class="arrow-h">
+    </div>
+    <div class="node">
+      <span><b>3 Space</b> — group by proximity</span>
+    </div>
+  </div>
+  <!-- Regions follow meaning and information volume, while retained margins and proximity show relationship. -->
+  <div class="el label-head accent" style="left:120px;top:525px;width:828px;height:55px;">REGION SPLIT — DIVIDE BY MEANING
+  </div>
+  <div class="el" style="left:120px;top:610px;width:828px;height:220px;">
+    <div class="check-item t-body">
+      <span class="em">Use 2–3 regions; split at four.
+    </div>
+    <div class="check-item t-body">Equal ideas get equal fields.
+    </div>
+    <div class="check-item t-body">Set 4:6 / 3:7 / 7:3 by volume.
+    </div>
+  </div>
+  <div class="el label-head accent" style="left:996px;top:525px;width:828px;height:55px;">WHITESPACE — SHOW RELATIONSHIP
+  </div>
+  <div class="el" style="left:996px;top:610px;width:828px;height:220px;">
+    <div class="check-item t-body">
+      <span class="em">Proximity means relationship.
+    </div>
+    <div class="check-item t-body">Keep margins; remove content for space.
+    </div>
+    <div class="check-item t-body">Empty space is structure.
+    </div>
+  </div>
+  <div class="el effect-band" style="left:120px;top:875px;width:1680px;height:90px;">
+    <div class="eb-label">IN SHORT
+    </div>
+    <div class="eb-item t-body">Field = meaning
+    </div>
+    <div class="eb-sep">
+    </div>
+    <div class="eb-item t-body">Size = information
+    </div>
+    <div class="eb-sep">
+    </div>
+    <div class="eb-item t-body">Distance = relationship
+    </div>
+  </div>
+</div>
+<!-- Pattern: relationship — WHY: A cycle and a staged sequence express different logical relationships, so separate fields and different structures prevent a false equivalence. Vary labels and evidence, but keep the cycle unordered and the stages explicitly directional. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">06
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">PATTERN / RELATIONSHIP
+      </div>
+      <div class="tb-title">Recurring and staged relationships
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Split the page by meaning: a cycle has no start; a stage sequence has explicit direction.
+  </div>
+  <!-- The left field uses an open cycle because recurring elements have direction but no privileged start. -->
+  <div class="el label-head" style="left:120px;top:385px;width:760px;height:55px;">A — CYCLE / NO STARTING ORDER
+  </div>
+  <div class="el bg-accent flex items-center justify-center t-body bold text-center" style="left:310px;top:565px;width:260px;height:210px;">Reinforcing<br>cycle
+  </div>
+  <div class="el t-body bold text-center" style="left:360px;top:475px;width:180px;height:70px;">Measure
+  </div>
+  <div class="el t-body bold text-center" style="left:600px;top:635px;width:180px;height:70px;">Learn
+  </div>
+  <div class="el t-body bold text-center" style="left:360px;top:805px;width:180px;height:70px;">Adjust
+  </div>
+  <div class="el t-body bold text-center" style="left:120px;top:635px;width:180px;height:70px;">Review
+  </div>
+  <div class="el t-caption" style="left:120px;top:885px;width:760px;height:105px;">Numbers and small arrows show direction; the open field avoids turning the cycle into four cards.
+  </div>
+  <div class="el rule-h" style="left:960px;top:385px;width:1px;height:570px;">
+  </div>
+  <!-- The right field uses vertical stages and arrows because this relationship has explicit temporal direction. -->
+  <div class="el label-head accent" style="left:1000px;top:385px;width:800px;height:55px;">B — STAGES / EXPLICIT ORDER
+  </div>
+  <div class="el flex items-center" style="left:1000px;top:495px;width:800px;height:110px;">
+    <div class="stage-circle stage-before">Before
+    </div>
+    <div>
+      <div class="t-body bold c-muted">Stage 0 — local
+      </div>
+      <div class="t-caption">Work depends on individual practice.
+      </div>
+    </div>
+  </div>
+  <div class="el varrow" style="left:1040px;top:615px;width:20px;height:12px;">
+  </div>
+  <div class="el flex items-center" style="left:1000px;top:655px;width:800px;height:110px;">
+    <div class="stage-circle stage-step">Step 1
+    </div>
+    <div>
+      <div class="t-body bold c-accent">Stage 1 — shared
+      </div>
+      <div class="t-caption">The team adopts one definition.
+      </div>
+    </div>
+  </div>
+  <div class="el varrow" style="left:1040px;top:775px;width:20px;height:12px;">
+  </div>
+  <div class="el flex items-center" style="left:1000px;top:815px;width:800px;height:110px;">
+    <div class="stage-circle stage-step">Step 2
+    </div>
+    <div>
+      <div class="t-body bold c-accent">Stage 2 — sustained
+      </div>
+      <div class="t-caption">The control becomes routine.
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Pattern: bullets — WHY: Filled section headers and complete sentences organise evidence that needs no diagram, while whitespace carries hierarchy between sections. Vary the section names and claims, but keep bullets to two levels and avoid noun-only fragments. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">07
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">PATTERN / TEXT
+      </div>
+      <div class="tb-title">Sectioned evidence summary
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:270px;width:1680px;height:116px;">Complete sentences under section headers let the audience follow evidence without a diagram.
+  </div>
+  <!-- The first section states context, evidence, and implication as separate complete claims. -->
+  <div class="el sec-head-fill" style="left:120px;top:400px;width:430px;height:70px;">Frame the issue
+  </div>
+  <div class="el t-body" style="left:120px;top:490px;width:1680px;height:130px;">Separate context, evidence, and implication into one sentence each; split a sentence that carries two claims.
+  </div>
+  <!-- The second section limits bullets to complete sentences, one emphasis per line, and two levels. -->
+  <div class="el sec-head-fill" style="left:120px;top:640px;width:430px;height:70px;">Write the evidence
+  </div>
+  <ul class="el bullets" style="left:145px;top:730px;width:1655px;height:200px;">
+    <li>Each bullet states a subject and action rather than a list of nouns.
+    </li>
+    <li>Emphasise one word per line; bolding everything removes hierarchy.
+    </li>
+    <li>Use at most two levels; a third level requires another slide.
+    </li>
+  </ul>
+  <div class="el sec-head-fill" style="left:120px;top:935px;width:430px;height:70px;">Qualify precisely
+  </div>
+  <div class="el t-caption" style="left:590px;top:940px;width:1210px;height:80px;">Place a source, exception, or limitation beside the claim in muted text.
+  </div>
+</div>
+<!-- Pattern: paragraphs — WHY: Left bars let a chronological argument remain prose, and the accent marks only the measured turning point so the reader follows the sequence. Vary the number and length of paragraphs, but keep the reasoning linear and the final implication concise. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">08
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">PATTERN / PARAGRAPHS
+      </div>
+      <div class="tb-title">Narrative evidence sequence
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">When chronology matters, use paragraphs and raise only the turning point.
+  </div>
+  <!-- The opening paragraph aligns the reader on the observed condition without introducing the response too early. -->
+  <div class="el para accent" style="left:120px;top:405px;width:1680px;height:125px;">First state the
+    <span class="em">observed condition</span>: who encountered what constraint, and under which comparable scope.
+  </div>
+  <!-- The accent marks only the measured turning point, which is the central sentence of the chronology. -->
+  <div class="el para" style="left:120px;top:575px;width:1680px;height:150px;">Then state the
+    <span class="em-accent">measured turning point</span>. This is the central sentence; the preceding condition and following implication exist to make its meaning precise.
+  </div>
+  <div class="el para" style="left:120px;top:770px;width:1680px;height:125px;">Finally state the
+    <span class="em">bounded implication</span>: what changes now and which condition still limits expansion.
+  </div>
+  <div class="el summary-bar" style="left:120px;top:915px;width:1680px;height:125px;">
+    <span class="sb-label">MESSAGE</span>A diagram is a means, not a goal; use prose when prose carries the reasoning faster.
+  </div>
+</div>
+<!-- Pattern: pills — WHY: Rounded labels create light section markers for distinct premises, while the full-width lower band reserves maximum emphasis for their resulting action. Vary the premise labels and evidence, but keep the action band singular and last. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">09
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">PATTERN / PILL SECTIONS
+      </div>
+      <div class="tb-title">Premises resolved into one implication
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Rounded labels separate premises; the lower band carries only the resulting action.
+  </div>
+  <!-- The upper pill labels separate two premises lightly while their evidence remains in open fields. -->
+  <div class="el pill-head" style="left:120px;top:400px;width:260px;height:60px;">Context
+  </div>
+  <div class="el t-body" style="left:120px;top:490px;width:800px;height:190px;">Evidence is distributed across several locations, so the current version is difficult to identify when a decision is due.
+  </div>
+  <div class="el pill-head" style="left:1000px;top:400px;width:260px;height:60px;">Constraint
+  </div>
+  <div class="el t-body" style="left:1000px;top:490px;width:800px;height:190px;">Repeated search and reconstruction consume time while ownership remains unclear.
+  </div>
+  <div class="el pill-head accent" style="left:120px;top:690px;width:260px;height:60px;">Therefore
+  </div>
+  <div class="el t-body" style="left:120px;top:775px;width:1680px;height:125px;">One operating definition must connect retrieval, ownership, and review without adding another handoff.
+  </div>
+  <!-- The full-width final band is reserved for the resulting action and must not be repeated. -->
+  <div class="el key-band" style="left:0;top:900px;width:1920px;height:140px;">
+    <span class="kb-pill">ACTION</span>
+    <span class="kb-msg">Standardise the record and assign one accountable owner.</span>
+  </div>
+</div>
+<!-- Pattern: divider — WHY: Replacing the normal topbar with a large chapter number creates a deliberate pause, while the mini map shows current position without a persistent tracker. Vary chapter names and counts, but use this skeleton only for decks with at least three chapters. -->
+<div class="slide slide-dark">
+  <div class="el frame-accent" style="left:0;top:0;width:3px;height:1080px;">
+  </div>
+  <!-- The left field uses an oversized chapter number and title to create a pause unlike the normal topbar. -->
+  <div class="el t-label c-muted" style="left:120px;top:280px;width:500px;height:35px;">SECTION
+  </div>
+  <div class="el divider-num" style="left:115px;top:340px;width:700px;height:120px;">03
+  </div>
+  <div class="el frame-accent" style="left:120px;top:505px;width:120px;height:3px;">
+  </div>
+  <div class="el t-cover-title" style="left:120px;top:535px;width:1000px;height:260px;">Decision conditions
+  </div>
+  <div class="el t-body c-muted" style="left:120px;top:815px;width:900px;height:130px;">The next section tests the conditions for a bounded decision.
+  </div>
+  <div class="el rule-h" style="left:1150px;top:240px;width:1px;height:650px;">
+  </div>
+  <!-- The right field uses a compact map to show completed, current, and remaining chapters. -->
+  <div class="el t-label c-muted" style="left:1230px;top:250px;width:570px;height:35px;">AGENDA
+  </div>
+  <div class="el agenda-mini" style="left:1230px;top:320px;width:570px;height:430px;">
+    <div class="am-item">
+      <span class="am-num">01</span>Context
+      <span class="am-check">done</span>
+    </div>
+    <div class="am-item">
+      <span class="am-num">02</span>Evidence
+      <span class="am-check">done</span>
+    </div>
+    <div class="am-item now">
+      <span class="am-num">03</span>Decision conditions
+    </div>
+    <div class="am-item">
+      <span class="am-num">04</span>Action
+    </div>
+  </div>
+  <div class="el t-caption" style="left:120px;top:955px;width:1680px;height:75px;">Use this only for three or more chapters; the mini map replaces any persistent agenda tracker.
+  </div>
+</div>
+<!-- Pattern: 4-column A — WHY: Equal columns make independent dimensions and their comparable metrics easy to scan without implying sequence. Vary labels, descriptions, and values, but preserve equal widths, one accent hue, and one metric footer per column. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">11
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">PATTERN / FOUR COLUMNS A
+      </div>
+      <div class="tb-title">Four independent operating dimensions
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Use separate columns when each dimension is independent and owns a comparable metric.
+  </div>
+  <!-- The centred label introduces four independent dimensions without implying process order. -->
+  <div class="el divider-label center" style="left:120px;top:375px;width:1680px;height:40px;">
+    <div class="dl-line">
+    </div>
+    <div class="dl-text">DIMENSIONS
+    </div>
+    <div class="dl-line">
+    </div>
+  </div>
+  <!-- Equal columns each carry one icon, one explanation, and one comparable metric footer. -->
+  <div class="el col-card" style="left:120px;top:450px;width:396px;height:520px;">
+    <div class="cc-head">
+      <span class="cc-num">01</span>
+      <span class="cc-title">Ownership</span>
+    </div>
+    <div class="cc-body">
+      <div class="ico ico-folder accent">
+      </div>
+      <div class="cc-desc">One role receives the complete outcome and names the handoff.
+      </div>
+    </div>
+    <div class="cc-foot">
+      <div class="cf-label">TARGET
+      </div>
+      <div class="cf-value">1 owner
+      </div>
+    </div>
+  </div>
+  <div class="el col-card" style="left:548px;top:450px;width:396px;height:520px;">
+    <div class="cc-head">
+      <span class="cc-num">02</span>
+      <span class="cc-title">Cadence</span>
+    </div>
+    <div class="cc-body">
+      <div class="ico ico-doc accent">
+      </div>
+      <div class="cc-desc">A fixed review interval replaces exception-driven work.
+      </div>
+    </div>
+    <div class="cc-foot">
+      <div class="cf-label">INTERVAL
+      </div>
+      <div class="cf-value">7 days
+      </div>
+    </div>
+  </div>
+  <div class="el col-card" style="left:976px;top:450px;width:396px;height:520px;">
+    <div class="cc-head">
+      <span class="cc-num">03</span>
+      <span class="cc-title">Evidence</span>
+    </div>
+    <div class="cc-body">
+      <div class="ico ico-check accent">
+      </div>
+      <div class="cc-desc">Direct measures retain one scope and comparison basis.
+      </div>
+    </div>
+    <div class="cc-foot">
+      <div class="cf-label">BASIS
+      </div>
+      <div class="cf-value">3 measures
+      </div>
+    </div>
+  </div>
+  <div class="el col-card" style="left:1404px;top:450px;width:396px;height:520px;">
+    <div class="cc-head">
+      <span class="cc-num">04</span>
+      <span class="cc-title">Escalation</span>
+    </div>
+    <div class="cc-body">
+      <div class="ico ico-chart accent">
+      </div>
+      <div class="cc-desc">A named threshold triggers review before scope expands.
+      </div>
+    </div>
+    <div class="cc-foot">
+      <div class="cf-label">FOCUS
+      </div>
+      <div class="cf-value">1 gate
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Pattern: 4-column B — WHY: One continuous divided surface shows that peer functions or ordered stages belong to a connected system rather than four isolated cards. Vary stage labels and descriptions, but keep the shared field, divider rhythm, gaps, and fills. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">12
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">PATTERN / FOUR COLUMNS B
+      </div>
+      <div class="tb-title">Four-stage coordinated chain
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Use one divided band when the phases operate as a single connected system.
+  </div>
+  <!-- The left-anchored label introduces a connected process rather than independent dimensions. -->
+  <div class="el divider-label" style="left:120px;top:400px;width:1680px;height:40px;">
+    <div class="dl-text">PROCESS
+    </div>
+    <div class="dl-line">
+    </div>
+  </div>
+  <!-- One field is split by vertical dividers so peer functions or ordered stages remain connected. -->
+  <div class="el col-band" style="left:120px;top:485px;width:1680px;height:380px;">
+    <div class="cb-col">
+      <div class="ico ico-search accent">
+      </div>
+      <div class="cb-title">01 Define
+      </div>
+      <div class="cb-desc">Set scope, baseline, and owner.
+      </div>
+    </div>
+    <div class="cb-sep">
+    </div>
+    <div class="cb-col">
+      <div class="ico ico-doc accent">
+      </div>
+      <div class="cb-title">02 Measure
+      </div>
+      <div class="cb-desc">Collect comparable evidence.
+      </div>
+    </div>
+    <div class="cb-sep">
+    </div>
+    <div class="cb-col">
+      <div class="ico ico-cloud accent">
+      </div>
+      <div class="cb-title">03 Decide
+      </div>
+      <div class="cb-desc">Apply the named threshold.
+      </div>
+    </div>
+    <div class="cb-sep">
+    </div>
+    <div class="cb-col">
+      <div class="ico ico-check accent">
+      </div>
+      <div class="cb-title">04 Release
+      </div>
+      <div class="cb-desc">Transfer the bounded action.
+      </div>
+    </div>
+  </div>
+  <div class="el t-caption" style="left:120px;top:900px;width:1680px;height:105px;">Pattern A isolates dimensions with their metrics; Pattern B keeps peer functions or ordered stages on one continuous field.
+  </div>
+</div>
+<!-- Pattern: before/after — WHY: Identical aligned rows isolate the changed relationship, so geometry—not extra prose—reveals the transition from fragmented to controlled. Vary stage labels and node counts, but keep row order, measurement units, and left-right scale comparable. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">13
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">GUIDANCE / BEFORE AND AFTER
+      </div>
+      <div class="tb-title">How to build a before-and-after page
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Change only the relationship among identical elements; aligned rows reveal the transition.
+  </div>
+  <!-- The before state uses muted fragmentation so the problem is visible in the arrangement itself. -->
+  <div class="el ba-head before" style="left:120px;top:385px;width:820px;height:65px;">BEFORE — MUTED
+  </div>
+  <!-- The after state aligns the same rows and uses teal only on the relationship that changed. -->
+  <div class="el ba-head after" style="left:1040px;top:385px;width:760px;height:65px;">AFTER — TEAL CHANGE
+  </div>
+  <div class="el stage-label" style="left:120px;top:485px;width:150px;height:100px;">Output
+  </div>
+  <div class="el stage-label" style="left:120px;top:600px;width:150px;height:100px;">Process
+  </div>
+  <div class="el stage-label" style="left:120px;top:715px;width:150px;height:100px;">Input
+  </div>
+  <div class="el stage-track" style="left:286px;top:485px;width:654px;height:100px;">
+  </div>
+  <div class="el stage-track" style="left:286px;top:600px;width:654px;height:100px;">
+  </div>
+  <div class="el data-node" style="left:360px;top:725px;width:84px;height:84px;">
+    <div class="ico ico-doc">
+    </div>
+  </div>
+  <div class="el data-node" style="left:570px;top:725px;width:84px;height:84px;">
+    <div class="ico ico-doc">
+    </div>
+  </div>
+  <div class="el data-node" style="left:780px;top:725px;width:84px;height:84px;">
+    <div class="ico ico-doc">
+    </div>
+  </div>
+  <div class="el data-node" style="left:470px;top:610px;width:84px;height:84px;">
+    <div class="ico ico-doc">
+    </div>
+  </div>
+  <div class="el data-node" style="left:680px;top:610px;width:84px;height:84px;">
+    <div class="ico ico-doc">
+    </div>
+  </div>
+  <div class="el data-node" style="left:575px;top:495px;width:84px;height:84px;">
+    <div class="ico ico-doc">
+    </div>
+  </div>
+  <div class="el t-caption c-danger" style="left:120px;top:840px;width:820px;height:105px;">Before: mute the state and show fragmentation in the geometry.
+  </div>
+  <div class="el rule-h" style="left:983px;top:385px;width:1px;height:545px;">
+  </div>
+  <div class="el ba-arrow" style="left:958px;top:650px;width:34px;height:52px;">
+  </div>
+  <div class="el stage-label" style="left:1040px;top:485px;width:150px;height:100px;">Output
+  </div>
+  <div class="el stage-label on" style="left:1040px;top:600px;width:150px;height:100px;">Unified<br>process
+  </div>
+  <div class="el stage-label" style="left:1040px;top:715px;width:150px;height:100px;">Input
+  </div>
+  <div class="el stage-track" style="left:1206px;top:485px;width:594px;height:100px;">
+  </div>
+  <div class="el stage-track on" style="left:1206px;top:600px;width:594px;height:100px;">
+  </div>
+  <div class="el data-node" style="left:1270px;top:725px;width:84px;height:84px;">
+    <div class="ico ico-doc">
+    </div>
+  </div>
+  <div class="el data-node" style="left:1478px;top:725px;width:84px;height:84px;">
+    <div class="ico ico-doc">
+    </div>
+  </div>
+  <div class="el data-node" style="left:1686px;top:725px;width:84px;height:84px;">
+    <div class="ico ico-doc">
+    </div>
+  </div>
+  <div class="el merge-band" style="left:1240px;top:602px;width:400px;height:96px;">
+    <div class="mb-bi">1
+    </div>
+    <div class="mb-text">One controlled process
+    </div>
+  </div>
+  <div class="el cond-bubble" style="left:1660px;top:620px;width:120px;height:55px;">Gate
+  </div>
+  <div class="el data-node done" style="left:1398px;top:495px;width:84px;height:84px;">
+    <div class="ico ico-doc accent">
+    </div>
+  </div>
+  <div class="el t-caption c-accent" style="left:1040px;top:840px;width:760px;height:105px;">After: align the rows and accent only the changed relationship.
+  </div>
+</div>
+<!-- Pattern: proportion — WHY: The gauge, progress bar, and donut each answer a different proportional question, while direct labels and teal shades prevent legend hunting. Vary values and category labels, but do not introduce category hues or non-informative gridlines. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">14
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">PATTERN / PROPORTION
+      </div>
+      <div class="tb-title">Three proportional chart forms
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Use teal shades only; make the primary percentage large and label every value directly.
+  </div>
+  <div class="el divider-label" style="left:120px;top:375px;width:1680px;height:40px;">
+    <div class="dl-text">PROPORTION
+    </div>
+    <div class="dl-line">
+    </div>
+  </div>
+  <!-- The gauge answers one completion or occupancy question by treating the ring as the whole. -->
+  <div class="el t-body bold" style="left:120px;top:445px;width:500px;height:70px;">Gauge — one share
+  </div>
+  <div class="el gauge" style="left:220px;top:520px;width:260px;height:260px;">
+    <div class="g-label">
+      <span class="t-metric">74%</span>
+    </div>
+  </div>
+  <div class="el t-caption" style="left:120px;top:805px;width:500px;height:150px;">Use for one completion or occupancy rate; the ring is the whole.
+  </div>
+  <div class="el t-body bold" style="left:660px;top:445px;width:600px;height:70px;">Horizontal bar — progress
+  </div>
+  <div class="el t-metric-lg c-accent text-center" style="left:660px;top:525px;width:600px;height:130px;">35%
+  </div>
+  <div class="el hbar" style="left:660px;top:675px;width:600px;height:30px;">
+    <div class="hb-fill">
+    </div>
+  </div>
+  <div class="el flex space-between" style="left:660px;top:730px;width:600px;height:50px;">
+    <span class="t-caption">0%</span>
+    <span class="t-caption">50%</span>
+    <span class="t-caption">100%</span>
+  </div>
+  <div class="el t-caption" style="left:660px;top:805px;width:600px;height:120px;">Use for progress to a known end point; keep only informative marks.
+  </div>
+  <!-- The donut answers composition with three to five directly labelled parts in teal shades. -->
+  <div class="el t-body bold" style="left:1300px;top:445px;width:500px;height:70px;">Donut — composition
+  </div>
+  <div class="el donut" style="left:1320px;top:520px;width:250px;height:250px;">
+    <div class="d-center">
+      <span class="t-caption">Total<br>share</span>
+    </div>
+  </div>
+  <div class="el legend-item" style="left:1600px;top:530px;width:200px;height:45px;">
+    <span class="lg-swatch bg-accent"></span>41%
+  </div>
+  <div class="el legend-item" style="left:1600px;top:590px;width:200px;height:45px;">
+    <span class="lg-swatch wash-accent"></span>32%
+  </div>
+  <div class="el legend-item" style="left:1600px;top:650px;width:200px;height:45px;">
+    <span class="lg-swatch bg-surface"></span>18%
+  </div>
+  <div class="el legend-item" style="left:1600px;top:710px;width:200px;height:45px;">
+    <span class="lg-swatch wash"></span>9%
+  </div>
+  <div class="el t-caption" style="left:1300px;top:805px;width:500px;height:120px;">Use three to five parts; order teal from strongest to weakest.
+  </div>
+  <div class="el t-caption" style="left:120px;top:950px;width:1680px;height:55px;">Charts label values directly and remove gridlines that do not carry information.
+  </div>
+</div>
+<!-- Pattern: trend — WHY: Columns reveal the path over time and same-scale endpoints isolate the decision-relevant change, with teal reserved for the final state. Vary periods and values, but retain direct labels and avoid legends or gridlines that carry no information. -->
+<div class="slide slide-dark">
+  <div class="el topbar" style="left:0;top:0;width:1920px;height:260px;">
+    <div class="tb-num">15
+    </div>
+    <div class="tb-rule">
+    </div>
+    <div class="tb-texts">
+      <div class="tb-sub">PATTERN / TREND
+      </div>
+      <div class="tb-title">Time series and endpoint comparison
+      </div>
+    </div>
+  </div>
+  <div class="el lead" style="left:120px;top:285px;width:1680px;height:70px;">Use columns for the path and a matched before-to-after pair for the decision-relevant change.
+  </div>
+  <!-- The left field uses columns to trace one comparable measure and accents only the final state. -->
+  <div class="el divider-label" style="left:120px;top:375px;width:800px;height:40px;">
+    <div class="dl-text">FIVE PERIOD TREND
+    </div>
+    <div class="dl-line">
+    </div>
+  </div>
+  <div class="el col-chart" style="left:230px;top:485px;width:690px;height:360px;">
+    <div class="col-bar">
+      <div class="cb-val">42
+      </div>
+      <div class="cb-fill" style="height:100px;">
+      </div>
+      <div class="cb-x">P1
+      </div>
+    </div>
+    <div class="col-bar">
+      <div class="cb-val">51
+      </div>
+      <div class="cb-fill" style="height:150px;">
+      </div>
+      <div class="cb-x">P2
+      </div>
+    </div>
+    <div class="col-bar">
+      <div class="cb-val">63
+      </div>
+      <div class="cb-fill" style="height:205px;">
+      </div>
+      <div class="cb-x">P3
+      </div>
+    </div>
+    <div class="col-bar">
+      <div class="cb-val">74
+      </div>
+      <div class="cb-fill" style="height:260px;">
+      </div>
+      <div class="cb-x">P4
+      </div>
+    </div>
+    <div class="col-bar on">
+      <div class="cb-val">86
+      </div>
+      <div class="cb-fill" style="height:315px;">
+      </div>
+      <div class="cb-x">P5
+      </div>
+    </div>
+  </div>
+  <div class="el rule-h" style="left:983px;top:375px;width:1px;height:540px;">
+  </div>
+  <!-- The right field compares same-scale endpoints and labels the relevant difference directly. -->
+  <div class="el divider-label" style="left:1040px;top:375px;width:760px;height:40px;">
+    <div class="dl-text">SAME-SCALE ENDPOINTS
+    </div>
+    <div class="dl-line">
+    </div>
+  </div>
+  <div class="el t-metric c-muted" style="left:1120px;top:520px;width:250px;height:95px;">42
+  </div>
+  <div class="el t-caption" style="left:1120px;top:630px;width:250px;height:55px;">Before / P1
+  </div>
+  <div class="el conn conn-accent" style="left:1370px;top:565px;width:170px;height:3px;">
+  </div>
+  <div class="el arrow-h" style="left:1530px;top:558px;width:10px;height:14px;">
+  </div>
+  <div class="el t-metric c-accent" style="left:1580px;top:520px;width:220px;height:95px;">86
+  </div>
+  <div class="el t-caption" style="left:1580px;top:630px;width:220px;height:55px;">After / P5
+  </div>
+  <div class="el wash-accent" style="left:1120px;top:730px;width:680px;height:150px;">
+  </div>
+  <div class="el t-heading" style="left:1160px;top:765px;width:600px;height:60px;">+44 on the same measure
+  </div>
+  <div class="el t-caption" style="left:1160px;top:830px;width:600px;height:45px;">Direct labels remove the legend.
+  </div>
+  <div class="el t-caption" style="left:120px;top:950px;width:1680px;height:55px;">The final bar alone receives teal; all preceding bars remain quieter versions of the same hue.
+  </div>
+</div>
 </body>
 </html>
