@@ -42,7 +42,15 @@ function assertSessionId(sessionId: string): void {
 
 function sessionPath(sessionId: string, extension: ".json" | ".jsonl", dir?: string): string {
   assertSessionId(sessionId)
-  return path.join(sessionsDir(dir), `${sessionId}${extension}`)
+  // Same defence layers as resolveDeckDir(): allow-list above, then a normalized
+  // prefix check on the resolved path so the file can only ever be a direct child
+  // of the sessions directory.
+  const root = path.resolve(sessionsDir(dir))
+  const resolved = path.resolve(root, `${sessionId}${extension}`)
+  if (!resolved.startsWith(root + path.sep) || path.dirname(resolved) !== root) {
+    throw new Error("invalid kiro session ID")
+  }
+  return resolved
 }
 
 function agentName(meta: SessionMeta): string | null {
