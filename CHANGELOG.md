@@ -12,6 +12,14 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **Claude Opus 5.5, GPT-6 Sol and GPT-6 Luna** are selectable models
+  (`global.anthropic.claude-opus-5-5`, `global.openai.gpt-6-sol`,
+  `global.openai.gpt-6-luna`). Opus 5.5 uses the extended-thinking profile
+  (no `temperature`, prompt cache on); Sol and Luna use the same Converse
+  profile as Astra (no `temperature`, no Bedrock `cachePoint` — implicit
+  caching only). Luna is registered as not compose-capable (efficiency tier),
+  so it appears in the chat picker but not the Create picker. Add the IDs to
+  `model.allowedModelIds` in `infra/config.yaml` and redeploy to enable them.
 - **Continue a deck from a kiro-cli session (Web UI Local mode)** — any chat
   you had in `kiro-cli` on the machine can be the starting point of a deck.
   The empty chat offers the last 24 hours of sessions as cards; the **+** menu

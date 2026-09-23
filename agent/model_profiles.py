@@ -75,9 +75,11 @@ CLAUDE_STANDARD = ModelProfile(temperature=0.1, cache_strategy="auto")
 # Claude Haiku — same invocation params as standard, but not capable enough for compose.
 CLAUDE_HAIKU = ModelProfile(temperature=0.1, cache_strategy="auto", compose_capable=False)
 
-# Claude with extended thinking (e.g. Opus 4.7). Bedrock rejects
+# Claude with extended thinking (e.g. Opus 4.7, 4.8, 5.5). Bedrock rejects
 # ``temperature`` because extended thinking forces temperature=1 internally;
 # passing it triggers ``ValidationException: temperature is deprecated``.
+# Opus 5.5 verified in ap-northeast-1 on 2026-09-23: temperature=0.1 rejected
+# with that message, temperature omitted accepted, cachePoint accepted.
 CLAUDE_EXTENDED_THINKING = ModelProfile(temperature=None, cache_strategy="auto")
 
 # Claude with adaptive thinking (e.g. Opus 4.6). Temperature=1 is required
@@ -86,8 +88,8 @@ CLAUDE_ADAPTIVE_THINKING = ModelProfile(temperature=1.0, cache_strategy="auto")
 
 # Third-party models that reject Bedrock's inference knobs on Converse.
 # Named after the constraint rather than a vendor because two unrelated
-# providers share it exactly: OpenAI GPT (gpt-6-astra, gpt-5.6-terra) and
-# Moonshot AI (kimi-k3).
+# providers share it exactly: OpenAI GPT (gpt-6-astra/sol/luna, gpt-5.6-terra)
+# and Moonshot AI (kimi-k3).
 #
 # temperature MUST be None — these models reject `temperature` on
 # Converse/ConverseStream with
@@ -109,7 +111,9 @@ CLAUDE_ADAPTIVE_THINKING = ModelProfile(temperature=1.0, cache_strategy="auto")
 # those tokens count against the output budget: at maxTokens=16 a one-word
 # answer returned 12 reasoning deltas, zero text and stopReason=max_tokens.
 #
-# Verified in ap-northeast-1: GPT 2026-09-10, Kimi K3 2026-09-19.
+# Verified in ap-northeast-1: GPT Astra/Terra 2026-09-10, Kimi K3 2026-09-19,
+# GPT-6 Sol/Luna 2026-09-23 (temperature rejected at any value; cachePoint
+# rejected with AccessDeniedException).
 NO_TEMPERATURE_IMPLICIT_CACHE = ModelProfile(temperature=None, cache_strategy="none")
 
 
@@ -126,6 +130,7 @@ _DEFAULT = CLAUDE_STANDARD
 
 MODEL_PROFILES: dict[str, ModelProfile] = {
     # Anthropic Claude
+    "global.anthropic.claude-opus-5-5": CLAUDE_EXTENDED_THINKING,
     "global.anthropic.claude-sonnet-5": CLAUDE_ADAPTIVE_THINKING,
     "global.anthropic.claude-opus-4-8": CLAUDE_EXTENDED_THINKING,
     "global.anthropic.claude-opus-4-7": CLAUDE_EXTENDED_THINKING,
@@ -134,6 +139,13 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     "global.anthropic.claude-haiku-4-5-20251001-v1:0": CLAUDE_HAIKU,
     # OpenAI GPT (Converse API via global inference profile)
     "global.openai.gpt-6-astra": NO_TEMPERATURE_IMPLICIT_CACHE,
+    "global.openai.gpt-6-sol": NO_TEMPERATURE_IMPLICIT_CACHE,
+    # Luna is OpenAI's efficiency tier (summarisation / extraction /
+    # classification / routing) — Haiku-class positioning, so keep it out of
+    # the compose picker like Haiku.
+    "global.openai.gpt-6-luna": NO_TEMPERATURE_IMPLICIT_CACHE.with_overrides(
+        compose_capable=False
+    ),
     "global.openai.gpt-5.6-terra": NO_TEMPERATURE_IMPLICIT_CACHE,
     # Moonshot AI (Converse API via global inference profile)
     "global.moonshotai.kimi-k3": NO_TEMPERATURE_IMPLICIT_CACHE,
