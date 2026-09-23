@@ -22,11 +22,13 @@ while ((match = re.exec(metadataSource)) !== null) {
 
 const config = yaml.parse(fs.readFileSync(path.join(__dirname, "../config.yaml"), "utf8"));
 const ids = config.model?.allowedModelIds ?? [];
+const recommendedIds = config.model?.recommendedModelIds ?? [];
 const models = ids.map((id) => ({
   modelId: id,
   displayName: metadata[id]?.displayName,
   description: metadata[id]?.description,
   composable: metadata[id]?.composable !== false,
+  recommended: recommendedIds.includes(id),
 }));
 
 console.log(`export NEXT_PUBLIC_ALLOWED_MODELS=${JSON.stringify(JSON.stringify(models))}`);

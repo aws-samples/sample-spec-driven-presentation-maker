@@ -198,6 +198,17 @@ Update these 3 files:
 `compose_capable` / `composable` controls whether the model appears in the Create picker.
 Set to `false` for models below Sonnet-class capability.
 
+Optionally add the ID to `model.recommendedModelIds` to list it under the
+"Recommended" heading in the picker (everything else goes under "Other models",
+order follows `allowedModelIds`). Both `defaults.chat` / `defaults.create` must be
+in that list when it is present; `infra/bin/infra.ts` validates this at synth.
+
+Pick the profile from behaviour, not from the announcement: probe the model with
+`aws bedrock-runtime converse` using `temperature=0.1`, `temperature=1.0`, no
+temperature, and a `cachePoint` system block. "temperature is deprecated" →
+`CLAUDE_EXTENDED_THINKING`; temperature rejected at any value plus cachePoint
+`AccessDeniedException` → `NO_TEMPERATURE_IMPLICIT_CACHE`.
+
 ## Web UI: Typography & Sizing
 
 ### Tailwind class convention

@@ -6,6 +6,8 @@ export interface AllowedModel {
   displayName: string;
   description?: string;
   composable?: boolean;
+  /** Operator-curated: listed under the "Recommended" group in the picker. */
+  recommended?: boolean;
 }
 
 export function getAllowedModels(): AllowedModel[] {

@@ -147,11 +147,43 @@ if (allowedModelIds.length > 0) {
   }
 }
 
+// Optional operator-curated "Recommended" group shown first in the model
+// picker. Everything else in allowedModelIds falls under "Other models".
+// Omit (or leave empty) to keep a flat list.
+const recommendedModelIds: string[] = config.model?.recommendedModelIds ?? [];
+
+if (recommendedModelIds.length > 0) {
+  const seenRecommended = new Set<string>();
+  for (const id of recommendedModelIds) {
+    if (seenRecommended.has(id)) {
+      throw new Error(`Config error: model.recommendedModelIds contains duplicate "${id}".`);
+    }
+    seenRecommended.add(id);
+    if (!allowedModelIds.includes(id)) {
+      throw new Error(
+        `Config error: model.recommendedModelIds entry "${id}" is not in model.allowedModelIds. ` +
+        `Recommended models must also be allowed.`,
+      );
+    }
+  }
+  // The defaults must sit in the Recommended group; otherwise the pre-selected
+  // model would be listed under "Other models", which reads as a contradiction.
+  for (const [key, id] of [["chat", defaultChatModelId], ["create", defaultCreateModelId]] as const) {
+    if (!recommendedModelIds.includes(id)) {
+      throw new Error(
+        `Config error: model.defaults.${key} "${id}" is not in model.recommendedModelIds. ` +
+        `Add it to recommendedModelIds, or remove recommendedModelIds for a flat list.`,
+      );
+    }
+  }
+}
+
 const allowedModels = allowedModelIds.map((id) => ({
   modelId: id,
   displayName: MODEL_METADATA[id].displayName,
   description: MODEL_METADATA[id].description,
   composable: MODEL_METADATA[id].composable !== false,
+  recommended: recommendedModelIds.includes(id),
 }));
 
 // --- WAF IP restriction (optional) ---

@@ -19,6 +19,13 @@ Entries before v0.5.0 were written retroactively as summaries.
   profile as Astra (no `temperature`, no Bedrock `cachePoint` — implicit
   caching only). All three are compose-capable. Add the IDs to
   `model.allowedModelIds` in `infra/config.yaml` and redeploy to enable them.
+- **Recommended / Other models grouping in the model picker** — operators can
+  list a few models under `model.recommendedModelIds` in `infra/config.yaml`;
+  the Settings Chat / Create pickers then show them first under a "Recommended"
+  heading and the remaining allowed models under "Other models" (order within
+  each group follows `allowedModelIds`). Without the key the list stays flat.
+  Both defaults must be in the recommended list — `cdk synth` fails otherwise.
+  The badge on the default model now reads "Default" instead of "Recommended".
 - **Continue a deck from a kiro-cli session (Web UI Local mode)** — any chat
   you had in `kiro-cli` on the machine can be the starting point of a deck.
   The empty chat offers the last 24 hours of sessions as cards; the **+** menu

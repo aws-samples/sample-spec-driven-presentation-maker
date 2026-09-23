@@ -374,6 +374,8 @@
   "modelPicker": {
     "selectModel": "Select model",
     "recommended": "Recommended",
+    "otherModels": "Other models",
+    "default": "Default",
     "searchModels": "Search models...",
     "noModelFound": "No model found."
   },
