@@ -162,9 +162,11 @@ def merge_style_metadata(
 ) -> dict[str, Any]:
     """Merge style and template facts into deck metadata without mutating inputs.
 
-    The style's ``--color-text`` always becomes ``defaultTextColor``; without it,
-    the template theme's text colour fills an empty ``defaultTextColor``. Template
-    analysis fills only empty font and slide-size fields.
+    The style's ``--color-text`` always becomes ``defaultTextColor`` and its
+    ``--color-bg`` becomes ``defaultBackground`` (the ground every slide gets unless
+    it sets its own ``background``); without ``--color-text`` the template theme's
+    text colour fills an empty ``defaultTextColor``. Template analysis fills only
+    empty font and slide-size fields.
     """
     import re
 
@@ -183,6 +185,14 @@ def merge_style_metadata(
         if color_match:
             merged["defaultTextColor"] = color_match.group("value").strip()
             sources["defaultTextColor"] = "style --color-text"
+        bg_match = re.search(
+            r"--color-bg\s*:\s*(?P<value>[^;}]+)",
+            root_match.group("body"),
+            re.IGNORECASE,
+        )
+        if bg_match:
+            merged["defaultBackground"] = bg_match.group("value").strip()
+            sources["defaultBackground"] = "style --color-bg"
 
     if not template_analysis:
         return merged
@@ -252,7 +262,7 @@ def _changed_style_fields(before: dict[str, Any], after: dict[str, Any]) -> dict
     """Return style-managed metadata fields whose values changed."""
     return {
         key: after[key]
-        for key in ("template", "defaultTextColor", "fonts", "slideSize")
+        for key in ("template", "defaultTextColor", "defaultBackground", "fonts", "slideSize")
         if after.get(key) != before.get(key) and key in after
     }
 
@@ -477,6 +487,7 @@ class BuildConfig:
     warnings: list[str] = field(default_factory=list)
     lint_diagnostics: list = field(default_factory=list)
     auto_spacing: bool = True  # deck.json "autoSpacing"; False for imported decks
+    default_background: str | None = None  # deck.json "defaultBackground"; None keeps template ground
 
 
 def _assemble_slides_from_dir(
@@ -719,6 +730,7 @@ def _resolve_config(
         warnings=warnings,
         lint_diagnostics=lint_diagnostics,
         auto_spacing=data.get("autoSpacing", True),
+        default_background=data.get("defaultBackground") or None,
     )
 
 
@@ -733,6 +745,7 @@ def _build(config: BuildConfig, output_path: Path) -> Path:
         base_dir=config.base_dir,
         default_text_color=config.default_text_color,
         auto_spacing=config.auto_spacing,
+        default_background=config.default_background,
     )
     for s in config.slides:
         builder.add_slide(s)

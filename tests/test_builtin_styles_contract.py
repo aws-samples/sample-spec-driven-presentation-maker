@@ -99,6 +99,9 @@ class TestStyleContract:
         deck_json = json.loads((deck / "deck.json").read_text())
         assert result["sources"]["defaultTextColor"] == "style --color-text"
         assert re.fullmatch(r"#[0-9A-Fa-f]{6}", deck_json["defaultTextColor"])
+        # --color-bg is the deck ground: every slide without its own background gets it
+        assert result["sources"]["defaultBackground"] == "style --color-bg"
+        assert re.fullmatch(r"#[0-9A-Fa-f]{6}", deck_json["defaultBackground"])
         assert _FS_TOKEN_RE.findall((deck / "specs" / "art-direction.html").read_text())
 
 

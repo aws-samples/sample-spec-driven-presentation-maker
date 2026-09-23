@@ -44,8 +44,11 @@ The `:root` block is machine-read; the rest is read by agents and people.
 
 - Exactly one `:root { … }` block. `apply_style` parses it with a regular expression.
 - `--color-text` is required: `apply_style` copies it into `deck.json` as `defaultTextColor`.
-  Also define `--color-bg`, `--color-surface`, `--color-border`, `--color-muted`, and the
-  accents (`--accent`, `--accent-2`, …, and `--success` / `--danger` only if the style uses them).
+  `--color-bg` is the ground: `apply_style` copies it as `defaultBackground`, and every slide
+  that does not set its own `background` is filled with it, so a cream or near-black style
+  keeps its ground on any template. Also define `--color-surface`, `--color-border`,
+  `--color-muted`, and the accents (`--accent`, `--accent-2`, …, and `--success` / `--danger`
+  only if the style uses them).
 - Font sizes are `--fs-<role>: NNpt;` — e.g. `--fs-cover-title`, `--fs-slide-title`,
   `--fs-heading`, `--fs-body`, `--fs-caption`, `--fs-label`, `--fs-metric`. The build-time
   font-size lint accepts exactly these values, so every size a composer may use must be a

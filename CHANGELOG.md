@@ -43,6 +43,12 @@ Entries before v0.5.0 were written retroactively as summaries.
     headlines, blue-violet-red stripe, speed lines).
 - **Style contract test** (`tests/test_builtin_styles_contract.py`) and a
   style-verification sample deck (`tests/fixtures/style-sample-deck/`).
+- **Styles now set the deck ground.** `apply_style` copies the style's
+  `--color-bg` into `deck.json` as `defaultBackground`, and the builder fills
+  every slide that has no `background` of its own with it (table auto-colours
+  and the icon theme follow). Until now only `--color-text` was applied, so a
+  cream or near-black style rendered on the template's white or navy unless
+  each slide set `background` by hand.
 
 - **Claude Opus 5.5, GPT-6 Sol and GPT-6 Luna** are selectable models
   (`global.anthropic.claude-opus-5-5`, `global.openai.gpt-6-sol`,

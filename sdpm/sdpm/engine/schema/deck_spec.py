@@ -122,6 +122,12 @@ def validate_specs(
     ):
         errors.append("deck.json defaultTextColor must match #RRGGBB")
 
+    bg = deck_json.get("defaultBackground")
+    if "defaultBackground" in deck_json and bg not in ("", None) and (
+        not isinstance(bg, str) or not _COLOR_RE.fullmatch(bg)
+    ):
+        errors.append("deck.json defaultBackground must match #RRGGBB")
+
     if not _is_non_empty(fonts.get("halfwidth")):
         errors.append("deck.json fonts.halfwidth is empty")
     if not _is_non_empty(fonts.get("fullwidth")):
