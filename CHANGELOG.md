@@ -40,7 +40,12 @@ Entries before v0.5.0 were written retroactively as summaries.
     (white, type set huge and tight, one red word, no shapes at all),
     `signal` (near-black, one safety-yellow panel, upright ultra-bold
     headlines, hazard stripe), `racing` (near-black, italic condensed
-    headlines, blue-violet-red stripe, speed lines).
+    headlines, blue-violet-red stripe, speed lines), `bento` (soft grey, white
+    rounded tiles on a fixed grid, one dark and at most one accent tile),
+    `newspaper` (aged paper, serif headlines, hairlines, 2–3 justified
+    columns, drop cap, one red), `swiss-poster` (white, one red geometric
+    shape that may bleed, grid lines, vertical label), `duotone` (near-black
+    and orange split by one hard edge, no third colour).
 - **Style contract test** (`tests/test_builtin_styles_contract.py`) and a
   style-verification sample deck (`tests/fixtures/style-sample-deck/`).
 - **Styles now set the deck ground.** `apply_style` copies the style's

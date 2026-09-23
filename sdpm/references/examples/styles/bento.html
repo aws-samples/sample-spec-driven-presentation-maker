@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>bento — A calm modular system for broad audiences and any presentation purpose, from product stories and status reviews to teaching material; the design decision gives every fact its own container so a slide can be scanned in any order, and the signature look is a soft grey ground carrying white rounded tiles of varied sizes on a fixed 24px grid, with one dark tile and at most one blue accent tile per slide under a faint shadow.</title>
+<style>
+:root {
+  --color-text: #1D1D1F;
+  --color-bg: #F2F2F5;
+  --color-surface: #FFFFFF;
+  --color-border: #DFDFE4;
+  --color-muted: #66666B;
+  --color-muted-dark: #A1A1A6;
+  --color-dark-tile: #1D1D1F;
+  --color-on-dark: #FFFFFF;
+  --accent: #3B5BFF;
+  --color-on-accent: #FFFFFF;
+  --color-bar: #C9C9D1;
+  --font-family: "Helvetica Neue", "Segoe UI", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+  --fs-cover-title: 44pt;
+  --fs-slide-title: 30pt;
+  --fs-heading: 22pt;
+  --fs-tile-title: 20pt;
+  --fs-body: 16pt;
+  --fs-caption: 12pt;
+  --fs-label: 10pt;
+  --fs-metric: 44pt;
+  --fs-metric-lg: 72pt;
+  --fs-table: 13pt;
+  --margin-x: 120px;
+  --content-w: 1680px;
+  --content-top: 300px;
+  --col: 118px;
+  --row: 220px;
+  --row-lg: 280px; /* second row module: 3 rows of 280 + 2 gaps fill the 888px content height */
+  --gap: 24px;
+  --radius: 20px;
+  --tile-pad: 40px;
+  --border-thin: 1px;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 40px; background: #DDDDE2; font-family: var(--font-family); zoom: 0.7; color: var(--color-text); }
+.slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; overflow: hidden; background: var(--color-bg); color: var(--color-text); }
+.el { position: absolute; }
+.tile { background: var(--color-surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: var(--tile-pad); display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
+.pad-sm { padding: 24px 28px; gap: 10px; }
+.pad-lg { padding: 48px; gap: 22px; }
+.dark { background: var(--color-dark-tile); color: var(--color-on-dark); }
+.acc { background: var(--accent); color: var(--color-on-accent); }
+.mid { justify-content: center; }
+.between { justify-content: space-between; }
+.center { text-align: center; align-items: center; }
+.cover-title { font-size: calc(var(--fs-cover-title) * 1.5); line-height: 1.1; font-weight: 700; letter-spacing: -1.5px; }
+.slide-title { font-size: calc(var(--fs-slide-title) * 1.5); line-height: 1.15; font-weight: 700; letter-spacing: -0.8px; }
+.heading { font-size: calc(var(--fs-heading) * 1.5); line-height: 1.2; font-weight: 700; letter-spacing: -0.4px; }
+.tile-title { font-size: calc(var(--fs-tile-title) * 1.5); line-height: 1.2; font-weight: 700; letter-spacing: -0.3px; }
+.body-text { font-size: calc(var(--fs-body) * 1.5); line-height: 1.45; }
+.caption { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.35; color: var(--color-muted); }
+.label { font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--color-muted); }
+.metric { font-size: calc(var(--fs-metric) * 1.5); line-height: 1; font-weight: 700; letter-spacing: -2px; }
+.metric-lg { font-size: calc(var(--fs-metric-lg) * 1.5); line-height: 1; font-weight: 700; letter-spacing: -3px; }
+.table-text { font-size: calc(var(--fs-table) * 1.5); line-height: 1.3; }
+.accent-text { color: var(--accent); }
+.muted { color: var(--color-muted); }
+.dark .label, .dark .caption, .dark .muted, .dark .reason { color: var(--color-muted-dark); }
+.acc .label, .acc .caption, .acc .muted { color: var(--color-on-accent); }
+.rule-list { margin: 0; padding-left: 26px; }
+.rule-list li { font-size: calc(var(--fs-body) * 1.5); line-height: 1.4; margin: 0 0 16px; }
+.rule-list.compact li { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.32; margin-bottom: 11px; }
+.reason { display: block; color: var(--color-muted); font-size: calc(var(--fs-caption) * 1.5); line-height: 1.3; margin-top: 3px; }
+.type-row { display: flex; align-items: baseline; justify-content: space-between; gap: 32px; border-bottom: var(--border-thin) solid var(--color-border); }
+.type-meta { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.3; color: var(--color-muted); text-align: right; white-space: nowrap; }
+.chip { border-radius: var(--radius); box-shadow: var(--shadow); }
+.chip-ground { background: var(--color-bg); border: var(--border-thin) solid var(--color-border); }
+.chip-surface { background: var(--color-surface); }
+.chip-dark { background: var(--color-dark-tile); }
+.chip-accent { background: var(--accent); }
+.chip-muted { background: var(--color-muted); }
+.swatch-name { font-size: calc(var(--fs-table) * 1.5); line-height: 1.25; font-weight: 700; }
+.swatch-use { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.32; color: var(--color-muted); margin-top: 6px; }
+.data-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.data-table th { text-align: left; font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; letter-spacing: 1px; text-transform: uppercase; color: var(--color-muted); font-weight: 700; padding: 0 16px 14px 0; border-bottom: var(--border-thin) solid var(--color-border); }
+.data-table td { font-size: calc(var(--fs-table) * 1.5); line-height: 1.3; padding: 16px 16px 16px 0; border-bottom: var(--border-thin) solid var(--color-border); }
+.data-table tbody tr:last-child td { border-bottom: 0; }
+.data-table .num { text-align: right; }
+.data-table .pick { color: var(--accent); font-weight: 700; }
+.bar { background: var(--color-bar); }
+.bar-pick { background: var(--accent); }
+.baseline { background: var(--color-border); }
+.bar-value { font-size: calc(var(--fs-table) * 1.5); line-height: 1.2; font-weight: 700; text-align: center; }
+.bar-label { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.2; color: var(--color-muted); text-align: center; }
+.step-index { font-size: calc(var(--fs-metric) * 1.5); line-height: 1; font-weight: 700; letter-spacing: -2px; color: var(--color-bar); }
+.acc .step-index { color: var(--color-on-accent); }
+</style>
+</head>
+<body>
+
+<!-- Part 0: title and machine-readable design tokens live in <head> above. -->
+<!-- Part 1: Cover -->
+<!-- Slide 1: Cover — The dark tile holds the name while three lighter tiles of different sizes state the system in one pass; name and descriptors may vary, but the grey ground, 20px radius, 24px gap, single dark tile and single accent tile may not. -->
+<div class="slide cover">
+  <div class="el tile dark pad-lg between" style="left:120px; top:120px; width:970px; height:584px;">
+    <div class="label">Style / any deck</div>
+    <div class="cover-title">Bento</div>
+    <div class="caption">One fact per tile. Nothing floats between them.</div>
+  </div>
+  <div class="el tile acc between" style="left:1114px; top:120px; width:686px; height:280px;">
+    <div class="label">Grid</div>
+    <div class="metric">12</div>
+    <div class="caption">columns of 118px, gap 24px</div>
+  </div>
+  <div class="el tile between" style="left:1114px; top:424px; width:686px; height:280px;">
+    <div class="label">Deck meta</div>
+    <div class="tile-title">Placeholder team</div>
+    <div class="caption">Placeholder period / 12 slides</div>
+  </div>
+  <div class="el tile between" style="left:120px; top:728px; width:1680px; height:280px;">
+    <div class="heading">Soft grey ground. White tiles. One dark voice, one accent.</div>
+    <div class="caption">Radius 20px, gap 24px, faint shadow. Tile sizes vary; the grid does not.</div>
+  </div>
+</div>
+
+<!-- Part 2: Rules -->
+<!-- Slide 2: Design decision and universal rules — The decision is stated before the numbers so the modular look stays calm instead of becoming a collage; wording may tighten, but the fixed numbers and the universal readability rules may not. -->
+<div class="slide rules">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Rules / read first</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">One container, one fact, one grid</div>
+  <div class="el tile between" style="left:120px; top:300px; width:1680px; height:220px;">
+    <div class="body-text">This deck is scanned before it is read, often on a screen shared with people who joined late. Each fact therefore gets its own rounded container on a quiet grey ground, so any tile can be entered first and still make sense. Order is a reading convenience, never a prerequisite.</div>
+  </div>
+  <div class="el tile dark between" style="left:120px; top:544px; width:828px; height:464px;">
+    <div class="tile-title">Every slide, every style</div>
+    <div class="body-text">
+      <ul class="rule-list compact">
+        <li>State one claim per slide; the title is that claim.</li>
+        <li>Keep every edge margin at 5% of the slide or more.</li>
+        <li>Keep text contrast at 4.5:1 or better; 3:1 only at 18pt and above.</li>
+        <li>Label chart values directly; drop gridlines that carry no information.</li>
+        <li>Use no emoji; use sourced icons only when a word cannot do the work.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="el tile between" style="left:972px; top:544px; width:828px; height:464px;">
+    <div class="tile-title">Fixed numbers</div>
+    <div class="body-text">
+      <ul class="rule-list compact">
+        <li>Tiles per content slide: 3 minimum, 6 maximum.</li>
+        <li>Gap between tiles: 24px, horizontally and vertically, always.</li>
+        <li>Corner radius: 20px on every tile, whatever its size.</li>
+        <li>Dark tiles: exactly 1 per slide. Accent tiles: 0 or 1, never 2.</li>
+        <li>Text in one tile: one fact, 12 words or fewer.</li>
+        <li>Rotation: 0 degrees. Tiles are never tilted or overlapped.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 3: Derived DO and DON'T rules — Each prohibition is tied back to the modular decision so a composer can tell restraint from arbitrary limits; examples may vary, but the 3–6 tile count, 24px gap, 20px radius, one-dark rule, 12-word ceiling and zero rotation may not. -->
+<div class="slide rules">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Rules / derived practice</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Restraint is what keeps it readable</div>
+  <div class="el tile between" style="left:120px; top:300px; width:828px; height:464px;">
+    <div class="tile-title accent-text">Do</div>
+    <div class="body-text">
+      <ul class="rule-list compact">
+        <li>Place 3 to 6 tiles and let their sizes differ.<span class="reason">Size is the hierarchy: the largest tile carries the claim's evidence.</span></li>
+        <li>Snap every tile to the 12-column grid and the 220px row.<span class="reason">Column 118px, gap 24px; a span of n columns is 142n - 24 px.</span></li>
+        <li>Give each tile a label, a value and one qualifying line.<span class="reason">Keep the fact itself to 12 words or fewer.</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="el tile between" style="left:972px; top:300px; width:828px; height:464px;">
+    <div class="tile-title">Don't</div>
+    <div class="body-text">
+      <ul class="rule-list compact">
+        <li>Do not nest a tile inside a tile, or overlap two tiles.<span class="reason">A split fact takes a second tile on the grid, not an inner box.</span></li>
+        <li>Do not vary the gap, the radius or the shadow for emphasis.<span class="reason">Emphasis is size, the dark tile and the accent tile.</span></li>
+        <li>Do not draw arrows or connectors between tiles.<span class="reason">Order is left to right, top to bottom; a numeral carries sequence.</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="el tile dark pad-sm between" style="left:120px; top:788px; width:1680px; height:220px;">
+    <div class="tile-title">Test every tile</div>
+    <div class="body-text">Can this tile be read alone, in one breath, and still say something true? If not, merge it with its neighbour or give it a slide.</div>
+  </div>
+</div>
+
+<!-- Part 3: Message and Outline -->
+<!-- Slide 4: Look-derived message structure — Short titles and bounded density are what a tile grid can physically hold, so the rules follow the look and never prescribe a subject or chapter sequence; ranges may adapt inside the limits, but no purpose-specific outline is implied. -->
+<div class="slide message">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Message and outline</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Short claims, one fact per tile</div>
+  <div class="el tile between" style="left:120px; top:300px; width:544px; height:464px;">
+    <div class="tile-title">Title grammar</div>
+    <div class="body-text">Write the title as an assertion of 8 words or fewer, on 2 lines at most. Compress until it fits without losing the claim.</div>
+    <div class="caption">No topic-label titles.</div>
+  </div>
+  <div class="el tile between" style="left:688px; top:300px; width:544px; height:464px;">
+    <div class="tile-title">Deck length</div>
+    <div class="body-text">Build 8 to 20 slides unless the material demands otherwise. One claim per slide, so the count follows the claims.</div>
+    <div class="caption">Opening and order follow the material.</div>
+  </div>
+  <div class="el tile between" style="left:1256px; top:300px; width:544px; height:464px;">
+    <div class="tile-title">Density</div>
+    <div class="body-text">Use 20 to 60 visible words over 3 to 6 tiles. Each tile holds one fact of 12 words or fewer plus one qualifying line.</div>
+    <div class="caption">Split rather than shrink.</div>
+  </div>
+  <div class="el tile dark pad-sm between" style="left:120px; top:788px; width:1680px; height:220px;">
+    <div class="tile-title">Where the title lives</div>
+    <div class="body-text">In the title band above the grid, or inside the dark tile as the grid's first tile; keep one placement per deck. Favour numbers and parallel categories.</div>
+  </div>
+</div>
+
+<!-- Part 4: Palette -->
+<!-- Slide 5: Palette — Five fixed roles keep the ground quiet and make the two loud tiles meaningful; hex values and roles may not vary, and the swatch strip is a specimen row, so the one-dark and one-accent limits govern content slides rather than this reference page. -->
+<div class="slide palette">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Palette / five roles</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Grey ground, white tiles, two voices</div>
+  <div class="el chip chip-ground" style="left:120px; top:300px; width:260px; height:220px;"></div>
+  <div class="el" style="left:120px; top:544px; width:260px; height:176px;">
+    <div class="swatch-name">Ground / #F2F2F5</div>
+    <div class="swatch-use">The deck ground behind every tile. Never used as a tile fill.</div>
+  </div>
+  <div class="el chip chip-surface" style="left:404px; top:300px; width:260px; height:220px;"></div>
+  <div class="el" style="left:404px; top:544px; width:260px; height:176px;">
+    <div class="swatch-name">Tile / #FFFFFF</div>
+    <div class="swatch-use">The default tile. Text on it is #1D1D1F at 15:1.</div>
+  </div>
+  <div class="el chip chip-dark" style="left:688px; top:300px; width:260px; height:220px;"></div>
+  <div class="el" style="left:688px; top:544px; width:260px; height:176px;">
+    <div class="swatch-name">Dark tile / #1D1D1F</div>
+    <div class="swatch-use">Exactly one per slide. White text; secondary lines #A1A1A6.</div>
+  </div>
+  <div class="el chip chip-accent" style="left:972px; top:300px; width:260px; height:220px;"></div>
+  <div class="el" style="left:972px; top:544px; width:260px; height:176px;">
+    <div class="swatch-name">Accent tile / #3B5BFF</div>
+    <div class="swatch-use">At most one per slide. White text only, no muted grade.</div>
+  </div>
+  <div class="el chip chip-muted" style="left:1256px; top:300px; width:260px; height:220px;"></div>
+  <div class="el" style="left:1256px; top:544px; width:260px; height:176px;">
+    <div class="swatch-name">Muted text / #66666B</div>
+    <div class="swatch-use">Labels, captions and chart bars at #C9C9D1. Text only, never a tile fill.</div>
+  </div>
+  <div class="el tile pad-sm between" style="left:120px; top:788px; width:1680px; height:220px;">
+    <div class="body-text">The dark tile marks the anchor of the slide: the claim, the synopsis or the conclusion. The accent tile marks the one thing that changed, was chosen or must be remembered.</div>
+    <div class="caption">Two accents cancel each other, so the second becomes a white tile. Colour never carries meaning alone; the label in the tile says what it is.</div>
+  </div>
+</div>
+
+<!-- Part 5: Typography -->
+<!-- Slide 6: Typography ramp — One installed family at two weights keeps tiles quiet enough for their size differences to read as hierarchy; sample wording may vary, but the token sizes, the two-line title ceiling and the absence of italics may not. -->
+<div class="slide typography">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Typography / actual-size ramp</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">One family, regular and bold only</div>
+  <div class="el tile pad-lg" style="left:120px; top:300px; width:1254px; height:708px;"></div>
+  <div class="el type-row" style="left:168px; top:352px; width:1158px; height:130px;"><span class="cover-title">Cover title</span><span class="type-meta">--fs-cover-title / 44pt / 1.1 / bold / 3 lines maximum</span></div>
+  <div class="el type-row" style="left:168px; top:482px; width:1158px; height:110px;"><span class="slide-title">Claim in eight words</span><span class="type-meta">--fs-slide-title / 30pt / 1.15 / bold / 2 lines maximum</span></div>
+  <div class="el type-row" style="left:168px; top:592px; width:1158px; height:84px;"><span class="body-text">Supporting fact stated in one short line.</span><span class="type-meta">--fs-body / 16pt / 1.45 / regular</span></div>
+  <div class="el type-row" style="left:168px; top:676px; width:1158px; height:126px;"><span class="metric">42%</span><span class="type-meta">--fs-metric / 44pt / 1.0 / bold / one line</span></div>
+  <div class="el type-row" style="left:168px; top:802px; width:1158px; height:74px;"><span class="caption">Source, unit, period or qualification</span><span class="type-meta">--fs-caption / 12pt / 1.35 / muted</span></div>
+  <div class="el type-row" style="left:168px; top:876px; width:1158px; height:64px;"><span class="label">Tile label</span><span class="type-meta">--fs-label / 10pt / uppercase / 3 words maximum</span></div>
+  <div class="el tile dark between" style="left:1398px; top:300px; width:402px; height:464px;">
+    <div class="tile-title">More tokens</div>
+    <div class="caption">--fs-heading 22pt: one sentence on a wide tile.<br>--fs-tile-title 20pt: a tile's name.<br>--fs-metric-lg 72pt: one hero figure.<br>--fs-table 13pt: native table cells.</div>
+  </div>
+  <div class="el tile pad-sm between" style="left:1398px; top:788px; width:402px; height:220px;">
+    <div class="tile-title">Rules</div>
+    <div class="caption">No italics, no third weight; tracking is a rendering detail here and does not exist in slide JSON.</div>
+  </div>
+</div>
+
+<!-- Part 6: Frame -->
+<!-- Slide 7: Standard frame — A fixed title band and a fixed tile grid mean tiles can change size from slide to slide without the page ever shifting; the page tag and section label may vary, but the band geometry, the grid arithmetic and the shadow values may not. -->
+<div class="slide frame">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Section label</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1254px; height:160px;">Claim stated in eight words</div>
+  <div class="el tile acc pad-sm mid center" style="left:1540px; top:118px; width:260px; height:96px;">
+    <div class="tile-title">03 / 12</div>
+  </div>
+  <div class="el tile pad-sm between" style="left:120px; top:300px; width:1112px; height:220px;">
+    <div class="tile-title">The band above the grid</div>
+    <div class="body-text">Section label at 62px. Title box at 118px, height 160px: two lines at 30pt. A one-line title leaves the second empty and the grid never moves up.</div>
+  </div>
+  <div class="el tile pad-sm between" style="left:120px; top:544px; width:1112px; height:220px;">
+    <div class="tile-title">Margins</div>
+    <div class="body-text">Side margins 120px, top margin 62px, bottom margin 72px: every edge is above 5% of the slide.</div>
+  </div>
+  <div class="el tile pad-sm between" style="left:120px; top:788px; width:1112px; height:220px;">
+    <div class="tile-title">The grid</div>
+    <div class="body-text">12 columns of 118px, 3 rows of 220px, gap 24px. Column n starts at 120 + 142(n - 1); a span of n columns is 142n - 24 px.</div>
+  </div>
+  <div class="el tile dark pad-lg between" style="left:1256px; top:300px; width:544px; height:708px;">
+    <div class="tile-title">Tile construction</div>
+    <div class="body-text">Radius 20px: adjustment = 20 divided by the tile's shorter side.</div>
+    <div class="caption">A 220px-tall tile takes 0.09; a 402 x 464 tile takes 0.05.</div>
+    <div class="caption">Shadow: blur 8, distance 2, direction 90, colour #000000, opacity 0.08.</div>
+    <div class="caption">Padding 40px; 24px at 220px tall, 48px at 464px and above.</div>
+    <div class="caption">Only the label and the title sit on the ground; a source is the last line of its own tile.</div>
+  </div>
+</div>
+
+<!-- Slide 8: Section divider — One dark tile carrying the whole question, plus an index and a single note, gives a pause without introducing a chapter model; the question and the index may vary, but the sparse three-tile composition may not. -->
+<div class="slide divider">
+  <div class="el tile dark pad-lg between" style="left:120px; top:120px; width:1112px; height:888px;">
+    <div class="label">Section 02</div>
+    <div class="cover-title">Section question stated briefly</div>
+    <div class="caption">One question or one transition. No evidence, no agenda, no decoration.</div>
+  </div>
+  <div class="el tile acc mid center" style="left:1256px; top:120px; width:544px; height:432px;">
+    <div class="metric-lg">02</div>
+  </div>
+  <div class="el tile between" style="left:1256px; top:576px; width:544px; height:432px;">
+    <div class="tile-title">Use sparingly</div>
+    <div class="body-text">A divider earns its place only when the material needs a pause. Keep it to 3 tiles and repeat the same geometry for every divider in the deck.</div>
+    <div class="caption">Optional frame.</div>
+  </div>
+</div>
+
+<!-- Slide 9: Closing frame — The final claim gets the dark tile it has been building towards, and the two tiles below split takeaway from next step; wording may vary, but the close may not become a summary grid or a new claim. -->
+<div class="slide closing">
+  <div class="el tile dark pad-lg between" style="left:120px; top:120px; width:1680px; height:584px;">
+    <div class="label">Closing</div>
+    <div class="cover-title">Final claim stated in eight words</div>
+    <div class="caption">Close on the claim and its immediate consequence.</div>
+  </div>
+  <div class="el tile between" style="left:120px; top:728px; width:828px; height:280px;">
+    <div class="label">Takeaway</div>
+    <div class="tile-title">One sentence the audience repeats</div>
+  </div>
+  <div class="el tile acc between" style="left:972px; top:728px; width:828px; height:280px;">
+    <div class="label">Next step</div>
+    <div class="tile-title">One verb phrase with an owner</div>
+  </div>
+</div>
+
+<!-- Part 7: Patterns -->
+<!-- Slide 10: Big number — WHY: the hero figure gets a tile eight columns wide so size alone says which number matters, while three single-row tiles carry the supporting figures without competing. MAY VARY: the metric, its unit, the comparator and which tile is the accent. MAY NOT VARY: one hero figure per slide, the figure's own label and qualifier inside the same tile, 3–6 tiles, one dark tile. -->
+<div class="slide pattern-number">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Numbers</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Claim stated in eight words</div>
+  <div class="el tile pad-lg between" style="left:120px; top:300px; width:1112px; height:708px;">
+    <div class="label">Measure / period</div>
+    <div class="metric-lg accent-text">42%</div>
+    <div class="body-text">One line saying what the figure means.</div>
+    <div class="caption">Source: placeholder source. Baseline and unit stated here, not below the tile.</div>
+  </div>
+  <div class="el tile acc pad-sm between" style="left:1256px; top:300px; width:544px; height:220px;">
+    <div class="label">Change</div>
+    <div class="metric">12 pts</div>
+  </div>
+  <div class="el tile pad-sm between" style="left:1256px; top:544px; width:544px; height:220px;">
+    <div class="label">Second measure</div>
+    <div class="metric">3.4x</div>
+  </div>
+  <div class="el tile dark pad-sm between" style="left:1256px; top:788px; width:544px; height:220px;">
+    <div class="label">Context</div>
+    <div class="tile-title">Placeholder qualifier in a short phrase</div>
+  </div>
+</div>
+
+<!-- Slide 11: Three-option comparison — WHY: three tiles of identical size force the same measure and depth on every option, and the accent tile is the only signal of which one is recommended. MAY VARY: option names, the evidence line, which option is the accent. MAY NOT VARY: equal tile geometry, the same measure in every tile, one accent tile, the dark tile holding the criterion. -->
+<div class="slide pattern-comparison">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Comparison</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Claim stated in eight words</div>
+  <div class="el tile between" style="left:120px; top:300px; width:544px; height:464px;">
+    <div class="label">Option A</div>
+    <div class="tile-title">Placeholder option name</div>
+    <div class="metric">18</div>
+    <div class="body-text">Evidence on the shared measure.</div>
+  </div>
+  <div class="el tile acc between" style="left:688px; top:300px; width:544px; height:464px;">
+    <div class="label">Option B / recommended</div>
+    <div class="tile-title">Placeholder option name</div>
+    <div class="metric">42</div>
+    <div class="body-text">Evidence on the shared measure.</div>
+  </div>
+  <div class="el tile between" style="left:1256px; top:300px; width:544px; height:464px;">
+    <div class="label">Option C</div>
+    <div class="tile-title">Placeholder option name</div>
+    <div class="metric">27</div>
+    <div class="body-text">Evidence on the shared measure.</div>
+  </div>
+  <div class="el tile dark pad-sm between" style="left:120px; top:788px; width:1680px; height:220px;">
+    <div class="tile-title">Criterion</div>
+    <div class="body-text">Name the measure that decides between the three and use it in all three tiles: same scope, same period, same unit.</div>
+  </div>
+</div>
+
+<!-- Slide 12: Process — WHY: four equal tiles in reading order carry the sequence, and a numeral in each tile makes the order explicit so no arrow is needed between tiles. MAY VARY: 3 to 5 steps, the step wording, which step is the accent. MAY NOT VARY: left-to-right order, the step numeral, "Step N - verb phrase" grammar, the absence of connectors, zero rotation. -->
+<div class="slide pattern-process">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Process</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Claim stated in eight words</div>
+  <div class="el tile between" style="left:120px; top:300px; width:402px; height:464px;">
+    <div class="step-index">01</div>
+    <div class="tile-title">Step 1 - verb phrase</div>
+    <div class="body-text">What happens here, in one line.</div>
+  </div>
+  <div class="el tile between" style="left:546px; top:300px; width:402px; height:464px;">
+    <div class="step-index">02</div>
+    <div class="tile-title">Step 2 - verb phrase</div>
+    <div class="body-text">What happens here, in one line.</div>
+  </div>
+  <div class="el tile acc between" style="left:972px; top:300px; width:402px; height:464px;">
+    <div class="step-index">03</div>
+    <div class="tile-title">Step 3 - verb phrase</div>
+    <div class="body-text">The step that carries the claim.</div>
+  </div>
+  <div class="el tile between" style="left:1398px; top:300px; width:402px; height:464px;">
+    <div class="step-index">04</div>
+    <div class="tile-title">Step 4 - verb phrase</div>
+    <div class="body-text">What happens here, in one line.</div>
+  </div>
+  <div class="el tile dark pad-sm between" style="left:120px; top:788px; width:1680px; height:220px;">
+    <div class="tile-title">Precondition</div>
+    <div class="body-text">One line stating what must be true before step 1. If a step needs a paragraph, give it its own slide.</div>
+  </div>
+</div>
+
+<!-- Slide 13: Relationship — WHY: with no connectors allowed, the hub is expressed by a tall centre tile and each satellite names its own relation in its first words, so the structure survives being read in any order. MAY VARY: 2 to 4 satellites, the relation verbs, which satellite is the accent. MAY NOT VARY: the relation named in words, the centre tile as the single hub, no arrows, no nesting, no overlap. -->
+<div class="slide pattern-relationship">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Relationship</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Claim stated in eight words</div>
+  <div class="el tile between" style="left:120px; top:300px; width:402px; height:464px;">
+    <div class="label">Feeds the centre</div>
+    <div class="tile-title">Placeholder part A</div>
+    <div class="body-text">What it sends, in one line.</div>
+  </div>
+  <div class="el tile pad-sm between" style="left:120px; top:788px; width:402px; height:220px;">
+    <div class="label">Constrains the centre</div>
+    <div class="tile-title">Placeholder part B</div>
+  </div>
+  <div class="el tile dark pad-lg between" style="left:688px; top:300px; width:544px; height:708px;">
+    <div class="label">Centre</div>
+    <div class="tile-title">Placeholder central idea</div>
+    <div class="body-text">Name the relationship here in words: what the parts around this tile do to it, and what it returns.</div>
+    <div class="caption">Geometry is not evidence; the sentence is.</div>
+  </div>
+  <div class="el tile acc between" style="left:1256px; top:300px; width:544px; height:464px;">
+    <div class="label">Depends on the centre</div>
+    <div class="tile-title">Placeholder part C</div>
+    <div class="body-text">What it receives, in one line.</div>
+  </div>
+  <div class="el tile pad-sm between" style="left:1256px; top:788px; width:544px; height:220px;">
+    <div class="label">Measures the centre</div>
+    <div class="tile-title">Placeholder part D</div>
+  </div>
+</div>
+
+<!-- Slide 14: Two columns with the title inside the dark tile — WHY: a full-width dark tile makes the claim the first tile of the grid, which frees the whole band above and lets two tall tiles take equal weight below. MAY VARY: the two column subjects, the copy length inside the density limit, and marking one column as the accent when it is the recommendation. MAY NOT VARY: equal width and aligned tops for the two columns, one claim, one dark tile, the 24px gap. -->
+<div class="slide pattern-two-column">
+  <div class="el tile dark between" style="left:120px; top:120px; width:1680px; height:280px;">
+    <div class="label">Section label</div>
+    <div class="slide-title">Claim stated in eight words</div>
+  </div>
+  <div class="el tile pad-lg between" style="left:120px; top:424px; width:828px; height:584px;">
+    <div class="label">Point A</div>
+    <div class="tile-title">Placeholder heading for the first side</div>
+    <div class="body-text">Supporting evidence in one short sentence. Keep the two sides at the same depth: if one needs more, the claim is really two claims.</div>
+    <div class="caption">Source: placeholder source.</div>
+  </div>
+  <div class="el tile pad-lg between" style="left:972px; top:424px; width:828px; height:584px;">
+    <div class="label">Point B</div>
+    <div class="tile-title">Placeholder heading for the second side</div>
+    <div class="body-text">Supporting evidence in one short sentence. Use the same measure and the same scope as the tile on the left.</div>
+    <div class="caption">Source: placeholder source.</div>
+  </div>
+</div>
+
+<!-- Slide 15: Three columns — WHY: three full-height tiles present parallel categories at equal weight, and the dark one is last because it carries the consequence of the two before it. MAY VARY: category names, the figure in each tile, which tile is dark when the consequence sits elsewhere. MAY NOT VARY: equal widths, one fact per tile, exactly one dark tile, no fourth column squeezed in. -->
+<div class="slide pattern-three-column">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Three columns</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Claim stated in eight words</div>
+  <div class="el tile pad-lg between" style="left:120px; top:300px; width:544px; height:708px;">
+    <div class="label">Category one</div>
+    <div class="metric">18</div>
+    <div class="tile-title">Placeholder category name</div>
+    <div class="body-text">One fact about this category, 12 words or fewer.</div>
+    <div class="caption">Unit and period.</div>
+  </div>
+  <div class="el tile pad-lg between" style="left:688px; top:300px; width:544px; height:708px;">
+    <div class="label">Category two</div>
+    <div class="metric">27</div>
+    <div class="tile-title">Placeholder category name</div>
+    <div class="body-text">One fact about this category, 12 words or fewer.</div>
+    <div class="caption">Unit and period.</div>
+  </div>
+  <div class="el tile dark pad-lg between" style="left:1256px; top:300px; width:544px; height:708px;">
+    <div class="label">Consequence</div>
+    <div class="metric">42</div>
+    <div class="tile-title">What the two columns add up to</div>
+    <div class="body-text">One line stating the consequence, not a third category.</div>
+    <div class="caption">Same unit as the tiles at left.</div>
+  </div>
+</div>
+
+<!-- Slide 16: Four columns with a wide accent tile — WHY: four single-column tiles show parallel items at the smallest useful size, and the wide accent tile beneath them states the one thing the four have in common. MAY VARY: 3 or 4 items, their labels, which item is dark. MAY NOT VARY: equal item widths, terse copy of 12 words or fewer, the 6-tile ceiling, one dark and one accent tile. -->
+<div class="slide pattern-four-column">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Four columns</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Claim stated in eight words</div>
+  <div class="el tile between" style="left:120px; top:300px; width:402px; height:464px;">
+    <div class="label">Item A</div>
+    <div class="metric">18</div>
+    <div class="body-text">One short evidence phrase.</div>
+  </div>
+  <div class="el tile dark between" style="left:546px; top:300px; width:402px; height:464px;">
+    <div class="label">Item B</div>
+    <div class="metric">42</div>
+    <div class="body-text">The item the claim rests on.</div>
+  </div>
+  <div class="el tile between" style="left:972px; top:300px; width:402px; height:464px;">
+    <div class="label">Item C</div>
+    <div class="metric">27</div>
+    <div class="body-text">One short evidence phrase.</div>
+  </div>
+  <div class="el tile between" style="left:1398px; top:300px; width:402px; height:464px;">
+    <div class="label">Item D</div>
+    <div class="metric">31</div>
+    <div class="body-text">One short evidence phrase.</div>
+  </div>
+  <div class="el tile acc pad-sm between" style="left:120px; top:788px; width:1680px; height:220px;">
+    <div class="label">What the four share</div>
+    <div class="tile-title">One sentence that holds for every item above</div>
+  </div>
+</div>
+
+<!-- Slide 17: Text-heavy slide — WHY: prose becomes one dark synopsis tile plus one tile per point, so a paragraph-shaped argument still reads as separable facts instead of a bullet list. MAY VARY: 2 to 4 points, the synopsis wording, the height split between points. MAY NOT VARY: one claim, the 60-word typical ceiling, one fact per tile, no bullet list spanning tiles. -->
+<div class="slide pattern-text">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Text heavy</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Claim stated in eight words</div>
+  <div class="el tile dark pad-lg between" style="left:120px; top:300px; width:686px; height:708px;">
+    <div class="label">Synopsis</div>
+    <div class="tile-title">The argument in one sentence</div>
+    <div class="body-text">Write the synopsis first. If it cannot be written, the slide has more than one claim and needs to be split.</div>
+    <div class="caption">Qualifications belong in the notes, not in this tile.</div>
+  </div>
+  <div class="el tile pad-sm between" style="left:830px; top:300px; width:970px; height:220px;">
+    <div class="label">Point 01</div>
+    <div class="tile-title">Supporting point in one short line</div>
+  </div>
+  <div class="el tile pad-sm between" style="left:830px; top:544px; width:970px; height:220px;">
+    <div class="label">Point 02</div>
+    <div class="tile-title">Supporting point in one short line</div>
+  </div>
+  <div class="el tile pad-sm between" style="left:830px; top:788px; width:970px; height:220px;">
+    <div class="label">Point 03</div>
+    <div class="tile-title">Supporting point in one short line</div>
+  </div>
+</div>
+
+<!-- Slide 18: Table — WHY: the table is one tile, so it reads as a single object on the grid, and the reading of it goes in a dark tile beneath rather than in a caption floating on the ground. MAY VARY: 3 to 6 rows, 3 to 5 columns, the highlighted column, the figure lifted into the accent tile. MAY NOT VARY: hairline rules only, no zebra fills, aligned numerals, one dark tile stating what the table shows. -->
+<div class="slide pattern-table">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Table</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Claim stated in eight words</div>
+  <div class="el tile pad-lg table-text" style="left:120px; top:300px; width:1680px; height:464px;">
+    <table class="data-table">
+      <thead><tr><th>Category</th><th class="num">Measure A / unit</th><th class="num">Measure B / unit</th><th>Direct result</th></tr></thead>
+      <tbody>
+        <tr><td>Item A</td><td class="num">18</td><td class="num">4.2</td><td>Result phrase</td></tr>
+        <tr><td>Item B</td><td class="num">27</td><td class="num">3.1</td><td>Result phrase</td></tr>
+        <tr><td>Item C</td><td class="num pick">42</td><td class="num">2.4</td><td class="pick">Result phrase</td></tr>
+        <tr><td>Item D</td><td class="num">31</td><td class="num">3.8</td><td>Result phrase</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="el tile dark pad-sm between" style="left:120px; top:788px; width:1112px; height:220px;">
+    <div class="tile-title">What the table shows</div>
+    <div class="body-text">One sentence naming the row that matters and why.</div>
+    <div class="caption">Source: placeholder source. Native tables inherit the presentation template font.</div>
+  </div>
+  <div class="el tile acc pad-sm between" style="left:1256px; top:788px; width:544px; height:220px;">
+    <div class="label">Item C</div>
+    <div class="metric">42</div>
+  </div>
+</div>
+
+<!-- Slide 19: Bar chart — WHY: the plot lives inside one tile so the chart is a tile like any other fact, and every value is labelled on the bar, which removes the legend entirely. MAY VARY: 3 to 6 bars, the values, which bar is the accent. MAY NOT VARY: direct value labels, a common zero baseline, grey bars with one accent bar, square bars, no gridlines. -->
+<div class="slide pattern-chart">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Chart</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Claim stated in eight words</div>
+  <div class="el tile pad-lg between" style="left:120px; top:300px; width:1112px; height:708px;">
+    <div class="label">Measure / unit / period</div>
+    <div class="caption">Source: placeholder source. Values labelled on the bars; no legend, no gridlines.</div>
+  </div>
+  <div class="el baseline" style="left:168px; top:880px; width:1016px; height:2px;"></div>
+  <div class="el bar" style="left:220px; top:660px; width:160px; height:220px;"></div>
+  <div class="el bar-value" style="left:220px; top:614px; width:160px; height:40px;">18</div>
+  <div class="el bar-label" style="left:220px; top:894px; width:160px; height:40px;">Period A</div>
+  <div class="el bar" style="left:460px; top:590px; width:160px; height:290px;"></div>
+  <div class="el bar-value" style="left:460px; top:544px; width:160px; height:40px;">27</div>
+  <div class="el bar-label" style="left:460px; top:894px; width:160px; height:40px;">Period B</div>
+  <div class="el bar" style="left:700px; top:515px; width:160px; height:365px;"></div>
+  <div class="el bar-value" style="left:700px; top:469px; width:160px; height:40px;">31</div>
+  <div class="el bar-label" style="left:700px; top:894px; width:160px; height:40px;">Period C</div>
+  <div class="el bar bar-pick" style="left:940px; top:440px; width:160px; height:440px;"></div>
+  <div class="el bar-value" style="left:940px; top:394px; width:160px; height:40px;">42</div>
+  <div class="el bar-label" style="left:940px; top:894px; width:160px; height:40px;">Period D</div>
+  <div class="el tile dark pad-lg between" style="left:1256px; top:300px; width:544px; height:464px;">
+    <div class="tile-title">What the chart shows</div>
+    <div class="body-text">One sentence reading the trend, with the scope and the unit named.</div>
+    <div class="caption">Do not restate every value.</div>
+  </div>
+  <div class="el tile acc pad-sm between" style="left:1256px; top:788px; width:544px; height:220px;">
+    <div class="label">Latest period</div>
+    <div class="metric">42</div>
+  </div>
+</div>
+
+<!-- Slide 20: Before and after — WHY: two tall tiles of identical size make the two states comparable, and the narrow accent tile between them turns the delta into its own fact rather than a caption. MAY VARY: the state labels, the metric, the unit, which side is dark. MAY NOT VARY: identical geometry for both states, the same measure and scope in both, the delta stated as a number and a word, no arrow between the tiles. -->
+<div class="slide pattern-before-after">
+  <div class="el label" style="left:120px; top:62px; width:700px; height:34px;">Before / after</div>
+  <div class="el slide-title" style="left:120px; top:118px; width:1680px; height:160px;">Claim stated in eight words</div>
+  <div class="el tile pad-lg between" style="left:120px; top:300px; width:686px; height:708px;">
+    <div class="label">Before / placeholder period</div>
+    <div class="metric-lg">64</div>
+    <div class="tile-title">State before the change</div>
+    <div class="body-text">Same measure, same scope, same unit as the tile on the right.</div>
+    <div class="caption">Source: placeholder source.</div>
+  </div>
+  <div class="el tile acc pad-sm mid center" style="left:830px; top:300px; width:260px; height:708px;">
+    <div class="metric">-22</div>
+    <div class="tile-title">points</div>
+  </div>
+  <div class="el tile dark pad-lg between" style="left:1114px; top:300px; width:686px; height:708px;">
+    <div class="label">After / placeholder period</div>
+    <div class="metric-lg">42</div>
+    <div class="tile-title">State after the change</div>
+    <div class="body-text">State the arithmetic in words; colour alone does not say which direction is good.</div>
+    <div class="caption">Source: placeholder source.</div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -26,6 +26,7 @@ EXPECTED_NAMES = {
     "report", "briefing", "aws-light", "aws-dark",
     # concept tier — chosen by look
     "neo-brutalist", "typographic", "signal", "racing",
+    "bento", "newspaper", "swiss-poster", "duotone",
 }
 
 REQUIRED_TOKENS = ("--color-text", "--color-bg", "--fs-cover-title", "--fs-slide-title", "--fs-body")
