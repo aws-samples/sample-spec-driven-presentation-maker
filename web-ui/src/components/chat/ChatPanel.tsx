@@ -40,7 +40,6 @@ interface ChatPanelProps {
   deckId: string
   chatSessionId?: string
   sessionOrigin?: SessionOrigin
-  slideSlugs?: string[]
   onDeckCreated?: (deckId: string) => void
   onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
@@ -64,7 +63,7 @@ function formatRelativeTime(value: string, locale: string): string {
   return formatter.format(Math.round(hours / 24), "day")
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, slideSlugs, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange }, ref) {
   const t = useTranslations("chat")
   const tCompose = useTranslations("compose")
   const tSessionPicker = useTranslations("sessionPicker")
@@ -662,7 +661,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   isStreaming={stream.isLoading && i === stream.messages.length - 1}
                   idToken={auth.user?.id_token}
                   accessToken={auth.user?.access_token}
-                  deckSlugs={slideSlugs}
                   sessionId={sessionId}
                   onSend={(text: string) => handleSend(text, [], [], [])}
                   hearingDisabled={i < lastUserIdx}

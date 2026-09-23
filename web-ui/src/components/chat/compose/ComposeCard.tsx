@@ -3,9 +3,12 @@
 /**
  * Compose production board.
  *
- * Progress measures observable slide creation only; tool completion remains the
- * source of truth for overall completion. Lanes keep stable order, expose the
- * latest tool action while collapsed, and allow one manually selected history.
+ * Progress is driven by composer-agent completion (per-group `status: "done"`
+ * stream events), not by slide file existence — after a layout pass every
+ * slides/<slug>.json already exists, so file presence says nothing about the
+ * current pass. Tool completion remains the source of truth for overall
+ * completion. Lanes keep stable order, expose the latest tool action while
+ * collapsed, and allow one manually selected history.
  */
 
 "use client"
@@ -25,7 +28,6 @@ interface ComposeCardProps {
   result?: Record<string, unknown> | string
   isActive: boolean
   streamMessages?: Record<string, unknown>[]
-  deckSlugs?: string[]
   toolUseId?: string
   sessionId?: string
   accessToken?: string
@@ -37,7 +39,6 @@ export function ComposeCard({
   result,
   isActive,
   streamMessages = [],
-  deckSlugs = [],
   toolUseId,
   sessionId,
   accessToken,
@@ -70,8 +71,10 @@ export function ComposeCard({
   const isDone = !isActive && !isStopped && !hasError && (status === "success" || state.phase === "done")
   const rushedCount = state.agents.filter((agent) => agent.budgetReached).length
 
+  // A slug counts as created once the composer agent owning it has finished
+  // (or the whole tool has completed successfully).
   const expectedSlugs = [...new Set(state.agents.flatMap((agent) => agent.slugs))]
-  const createdSlugs = new Set(deckSlugs)
+  const createdSlugs = new Set<string>()
   for (const agent of state.agents) {
     if (agent.status === "done" || isDone) agent.slugs.forEach((slug) => createdSlugs.add(slug))
   }

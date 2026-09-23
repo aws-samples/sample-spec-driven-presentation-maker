@@ -38,13 +38,12 @@ describe("ComposeCard production board", () => {
     expect(container.textContent).toContain("Preparing")
   })
 
-  it("measures slide creation independently from tool completion", () => {
+  it("measures slide creation by composer completion, not tool completion", () => {
     renderWithIntl(
       <ComposeCard
         input={twoGroups}
         isActive
-        deckSlugs={["intro"]}
-        streamMessages={twoStarted}
+        streamMessages={[...twoStarted, { group: 1, status: "done", slugs: "intro" }]}
       />
     )
     const progress = screen.getByRole("progressbar", { name: "Slide creation" })
@@ -53,11 +52,26 @@ describe("ComposeCard production board", () => {
     expect(screen.getByText("1 / 2 created")).toBeTruthy()
   })
 
-  it("shows finishing status when all artifacts exist but the tool is active", () => {
+  it("shows finishing status when all composers are done but the tool is active", () => {
     renderWithIntl(
-      <ComposeCard input={twoGroups} isActive deckSlugs={["intro", "body"]} streamMessages={twoStarted} />
+      <ComposeCard
+        input={twoGroups}
+        isActive
+        streamMessages={[
+          ...twoStarted,
+          { group: 1, status: "done", slugs: "intro" },
+          { group: 2, status: "done", slugs: "body" },
+        ]}
+      />
     )
     expect(screen.getByText("Finishing presentation…")).toBeTruthy()
+  })
+
+  it("ignores pre-existing slide files: nothing is created until a composer finishes", () => {
+    renderWithIntl(<ComposeCard input={twoGroups} isActive streamMessages={twoStarted} />)
+    const progress = screen.getByRole("progressbar", { name: "Slide creation" })
+    expect(progress.getAttribute("aria-valuenow")).toBe("0")
+    expect(screen.queryAllByLabelText("Slide created")).toHaveLength(0)
   })
 
   it("renders cancel only when all credentials are present", () => {
@@ -131,9 +145,13 @@ describe("ComposeCard production board", () => {
     expect(expand[1].getAttribute("aria-expanded")).toBe("true")
   })
 
-  it("marks each existing slug with a neutral created check", () => {
+  it("marks each slug of a finished composer with a neutral created check", () => {
     const { container } = renderWithIntl(
-      <ComposeCard input={twoGroups} isActive deckSlugs={["intro"]} streamMessages={twoStarted} />
+      <ComposeCard
+        input={twoGroups}
+        isActive
+        streamMessages={[...twoStarted, { group: 1, status: "done", slugs: "intro" }]}
+      />
     )
     expect(container.querySelectorAll("[aria-label='Slide created']")).toHaveLength(1)
     expect(screen.getByText("intro").className).toContain("font-semibold")
@@ -179,7 +197,11 @@ describe("ComposeCard production board", () => {
 
   it("announces created slide progress", () => {
     const { container } = renderWithIntl(
-      <ComposeCard input={twoGroups} isActive deckSlugs={["intro"]} streamMessages={twoStarted} />
+      <ComposeCard
+        input={twoGroups}
+        isActive
+        streamMessages={[...twoStarted, { group: 1, status: "done", slugs: "intro" }]}
+      />
     )
     const live = container.querySelector(".sr-only[aria-live='polite']") as HTMLElement
     expect(live.textContent).toContain("1 of 2 slides created")

@@ -171,8 +171,6 @@ interface ToolCardProps {
   isActive?: boolean
   /** Streaming progress events from tool execution. */
   streamMessages?: Record<string, unknown>[]
-  /** Current deck slide IDs — used by ComposeCard for slug existence rendering. */
-  deckSlugs?: string[]
   /** tool use id — forwarded to ComposeCard for soft-stop. */
   toolUseId?: string
   /** Session ID — forwarded to ComposeCard for soft-stop. */
@@ -187,7 +185,7 @@ export function stripPrefix(n: string): string {
   return n.replace(/^spec_driven_presentation_maker_/, "")
 }
 
-export function ToolCard({ name, input, status, result, isActive = false, streamMessages, deckSlugs, toolUseId, sessionId, idToken, accessToken }: ToolCardProps) {
+export function ToolCard({ name, input, status, result, isActive = false, streamMessages, toolUseId, sessionId, idToken, accessToken }: ToolCardProps) {
   const t = useTranslations("tools")
   // Dispatch: compose_slides has a dedicated rich card.
   if (name === "compose_slides" || name.endsWith("_compose_slides")) {
@@ -198,7 +196,6 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
         result={result}
         isActive={isActive}
         streamMessages={streamMessages}
-        deckSlugs={deckSlugs}
         toolUseId={toolUseId}
         sessionId={sessionId}
         accessToken={accessToken}
