@@ -112,4 +112,31 @@ describe("SlashPickerPopup", () => {
 
     expect(screen.queryByRole("listbox")).toBeNull()
   })
+
+  describe("preview placement", () => {
+    function anchorAt(left: number, width: number) {
+      const anchor = document.createElement("form")
+      anchor.getBoundingClientRect = () =>
+        ({ left, right: left + width, width, top: 600, bottom: 660, height: 60, x: left, y: 600, toJSON: () => ({}) }) as DOMRect
+      return { current: anchor }
+    }
+
+    it("shows the preview at the default panel width by growing leftwards over the main pane", () => {
+      // 1280px window, 440px chat panel at the right edge: input frame starts around x=852.
+      renderPopup({ anchorRef: anchorAt(852, 416), activeIndex: 0 })
+
+      expect(screen.getByText("Arial / Noto Sans JP")).toBeTruthy()
+      const popup = screen.getByRole("listbox").parentElement as HTMLElement
+      expect(popup.style.right).toBe(`${window.innerWidth - (852 + 416)}px`)
+      expect(popup.style.width).toBe(`${416 + 240 + 8}px`)
+    })
+
+    it("drops the preview only when the window has no room to its left", () => {
+      renderPopup({ anchorRef: anchorAt(100, 416), activeIndex: 0 })
+
+      expect(screen.queryByText("Arial / Noto Sans JP")).toBeNull()
+      const popup = screen.getByRole("listbox").parentElement as HTMLElement
+      expect(popup.style.width).toBe("416px")
+    })
+  })
 })

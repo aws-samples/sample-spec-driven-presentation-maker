@@ -37,8 +37,8 @@ export interface SlashPickerPopupProps {
   listboxId: string
 }
 
-/** Below this anchor width the preview panel is dropped so the list keeps a readable width. */
-const PREVIEW_MIN_ANCHOR_WIDTH = 520
+/** Gap between the preview panel and the list (Tailwind `gap-2`). */
+const PREVIEW_GAP = 8
 
 const SLIDE_WIDTH = 1920
 const SLIDE_HEIGHT = 1080
@@ -274,16 +274,18 @@ export function SlashPickerPopup({
 
   if (!open || typeof document === "undefined") return null
 
-  // Anchor to the input frame: the chat panel sits at the screen edge, so a
-  // textarea-left anchor with a fixed-width popup would run off-screen.
+  // The list sits exactly over the input frame (where the caret is); the
+  // preview hangs off its left edge, over the main pane. The chat panel lives
+  // at the right screen edge, so growing leftwards always stays on-screen —
+  // unless the window itself is too narrow for the preview, then drop it.
   const anchorRect = (anchorRef?.current ?? textareaRef.current)?.getBoundingClientRect()
-  const showPreview = !isMobile && (anchorRect?.width ?? 0) >= PREVIEW_MIN_ANCHOR_WIDTH
+  const showPreview = !isMobile && (anchorRect?.left ?? 0) >= PREVIEW_WIDTH + PREVIEW_GAP
   const popupStyle = anchorRect
     ? {
         position: "fixed" as const,
         bottom: window.innerHeight - anchorRect.top + 8,
-        left: anchorRect.left,
-        width: anchorRect.width,
+        right: window.innerWidth - anchorRect.right,
+        width: anchorRect.width + (showPreview ? PREVIEW_WIDTH + PREVIEW_GAP : 0),
       }
     : { position: "fixed" as const, bottom: 16, left: 16 }
   const templateItems = filtered.filter((item) => item.kind === "template")
