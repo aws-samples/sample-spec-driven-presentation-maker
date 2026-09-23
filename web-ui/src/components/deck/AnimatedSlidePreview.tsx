@@ -221,6 +221,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   const skipRef = useRef(skipAnimation)
   const knownUrlRef = useRef(knownUrl?.split("?")[0] || null)
   const defsMountedRef = useRef(defsMounted)
+  const propsTriggeredRef = useRef(false)
   composeUrlRef.current = composeUrl
   defsUrlRef.current = defsUrl
   skipRef.current = skipAnimation
@@ -643,6 +644,10 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     return () => {
       cancelled = true
       lifecycleController.abort()
+      // In-flight work for the current URL is discarded with the abort, so a
+      // remount (React Strict Mode in dev, or a key change) must fetch again.
+      lastComposeUrlRef.current = ""
+      propsTriggeredRef.current = false
       visibilityWaitersRef.current.forEach((resolve) => resolve("hidden"))
       visibilityWaitersRef.current.clear()
       sceneRef.current = null
@@ -654,7 +659,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
   const previousComposePropRef = useRef(composeUrl)
   const previousDefsUrlPropRef = useRef(defsUrl)
   const previousDefsMountedPropRef = useRef(defsMounted)
-  const propsTriggeredRef = useRef(false)
   // React to a new payload or lost/changed defs. Loading → ready needs no rebuild:
   // the in-flight slide already fetched its own fallback defs.
   useEffect(() => {
