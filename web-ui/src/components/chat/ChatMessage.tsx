@@ -157,8 +157,6 @@ interface ChatMessageProps {
   isStreaming?: boolean
   /** Cognito ID token for fetching slide previews. */
   idToken?: string
-  /** Current deck slide IDs — forwarded to ToolCard/ComposeCard for slug existence. */
-  deckSlugs?: string[]
   /** Session ID — forwarded to ComposeCard for soft-stop calls. */
   sessionId?: string
   /** Cognito Access Token — forwarded to ComposeCard for soft-stop (client_id claim lives on the access token). */
@@ -169,7 +167,7 @@ interface ChatMessageProps {
   hearingDisabled?: boolean
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, deckSlugs, sessionId, accessToken, onSend, hearingDisabled = false }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, sessionId, accessToken, onSend, hearingDisabled = false }: ChatMessageProps) {
   const t = useTranslations("chat")
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
@@ -309,7 +307,6 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                   result={block.tool.result}
                   isActive={isStreaming && !block.tool.status && (i === blocks.length - 1 || (block.tool.streamMessages?.length ?? 0) > 0)}
                   streamMessages={block.tool.streamMessages}
-                  deckSlugs={deckSlugs}
                   sessionId={sessionId}
                   idToken={idToken}
                   accessToken={accessToken}
@@ -362,7 +359,6 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                     result={latestTool.result}
                     isActive={isStreaming && !latestTool.status}
                     streamMessages={latestTool.streamMessages}
-                    deckSlugs={deckSlugs}
                     sessionId={sessionId}
                     idToken={idToken}
                     accessToken={accessToken}
