@@ -122,17 +122,17 @@ describe("TemplatePickerSection", () => {
     expect(screen.getByText("In use: my-brand")).toBeTruthy()
   })
 
-  it("calls onTemplateSelect with isChange=false when unconfirmed", async () => {
+  it("calls onTemplateSelect with the template name when unconfirmed", async () => {
     const onSelect = vi.fn()
     renderWithIntl(
       <TemplatePickerSection idToken="tok" currentTemplate={null} onTemplateSelect={onSelect} />
     )
     await screen.findByText("my-brand")
     fireEvent.click(screen.getByRole("button", { name: "Use the my-brand template" }))
-    expect(onSelect).toHaveBeenCalledWith("my-brand", false)
+    expect(onSelect).toHaveBeenCalledWith("my-brand")
   })
 
-  it("calls onTemplateSelect with isChange=true when a template is confirmed", async () => {
+  it("calls onTemplateSelect with the template name when a template is confirmed", async () => {
     const onSelect = vi.fn()
     renderWithIntl(
       <TemplatePickerSection idToken="tok" currentTemplate="corporate.pptx" onTemplateSelect={onSelect} />
@@ -140,7 +140,7 @@ describe("TemplatePickerSection", () => {
     await screen.findByText("my-brand")
     // The current card is NOT disabled — re-asserting the same template is allowed
     fireEvent.click(screen.getByRole("button", { name: "Use the corporate template" }))
-    expect(onSelect).toHaveBeenCalledWith("corporate", true)
+    expect(onSelect).toHaveBeenCalledWith("corporate")
   })
 
   it("shows the custom badge only for user templates", async () => {

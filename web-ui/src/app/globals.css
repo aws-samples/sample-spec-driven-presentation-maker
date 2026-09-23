@@ -980,8 +980,22 @@ body {
   animation: none;
 }
 
+/* ── Slash picker entrance and token insertion feedback ── */
+@keyframes slash-pop-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes slash-landed {
+  0% { box-shadow: 0 0 0 1px var(--brand), 0 0 24px color-mix(in oklch, var(--brand) 18%, transparent); }
+  100% { box-shadow: 0 0 0 1px var(--border-hover), 0 0 24px color-mix(in oklch, var(--foreground) 4%, transparent); }
+}
+.search-glow[data-landed] {
+  animation: slash-landed 400ms ease-out;
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
+  .search-glow[data-landed] { animation: none; }
   .team-action-btn::before { animation: none; }
   .animate-card-in,
   .content-enter,

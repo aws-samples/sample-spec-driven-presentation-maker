@@ -63,7 +63,7 @@ const specComponents = {
   },
 }
 
-export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outlineExists, deckId }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; onTemplateSelect?: (name: string, isChange: boolean) => void; currentTemplate?: string | null; idToken?: string; outlineExists?: boolean; deckId?: string }) {
+export function SpecMarkdownPreview({ content, specName, specKey, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outlineExists, deckId }: { content: string | null; specName: string; specKey?: string; onStyleSelect?: (name: string) => void; onTemplateSelect?: (name: string) => void; currentTemplate?: string | null; idToken?: string; outlineExists?: boolean; deckId?: string }) {
   const t = useTranslations("stylePicker")
   // Hooks must be called unconditionally — before any early returns.
 

@@ -27,6 +27,7 @@ import { ToolCard, ToolCardCompact } from "./ToolCard"
 import { HearingCard } from "./HearingCard"
 import { SnippetBlock } from "./SnippetBlock"
 import { batchGetSlidePreviewUrls } from "@/services/deckService"
+import { SLASH_TOKEN_SOURCE } from "@/lib/slashToken"
 import { useTranslations } from "next-intl"
 
 type HearingQuestion = { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }
@@ -38,7 +39,7 @@ function extractQuestions(input: Record<string, unknown>): HearingQuestion[] {
     .filter(Boolean) as HearingQuestion[]
 }
 
-const MENTION_RE = /(@Page\s\d+|@\[[^\]]+\])/g
+const MENTION_RE = new RegExp(`(@Page\\s\\d+|@\\[[^\\]]+\\]|${SLASH_TOKEN_SOURCE})`)
 const SLIDE_PREVIEW_RE = /\[slide-preview:([a-f0-9]+):([a-z0-9][a-z0-9_-]*)\]/g
 const COLOR_CODE_RE = /(#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3}))\b/g
 
@@ -67,8 +68,8 @@ function renderInlinePreviews(text: string, urls: Record<string, string>): strin
  * @returns Array of string and JSX elements with mentions/colors highlighted
  */
 function highlightMentions(text: string): (string | React.JSX.Element)[] {
-  // Combined regex: mentions OR hex color codes
-  const COMBINED_RE = /(@Page\s\d+|@\[[^\]]+\]|#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b)/g
+  // Combined regex: mentions OR slash-picker tokens OR hex color codes
+  const COMBINED_RE = new RegExp(`(@Page\\s\\d+|@\\[[^\\]]+\\]|${SLASH_TOKEN_SOURCE}|#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\\b)`, "g")
   const parts = text.split(COMBINED_RE)
   return parts.map((part, i) => {
     if (MENTION_RE.test(part)) {

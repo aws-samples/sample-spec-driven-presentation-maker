@@ -71,8 +71,8 @@ interface SlideCarouselProps {
   workflowPhase?: string | null
   /** Callback when user selects a style inline. */
   onStyleSelect?: (name: string) => void
-  /** Callback when user selects a template inline (isChange = template already confirmed). */
-  onTemplateSelect?: (name: string, isChange: boolean) => void
+  /** Callback when user selects a template inline. */
+  onTemplateSelect?: (name: string) => void
   /** Confirmed template from deck.json (raw value, e.g. "corporate.pptx"). */
   currentTemplate?: string | null
   /** Cognito ID token for style API calls. */

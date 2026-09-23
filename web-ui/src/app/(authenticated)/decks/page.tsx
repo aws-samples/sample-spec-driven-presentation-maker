@@ -36,6 +36,7 @@ import { useWorkspace } from "@/hooks/useWorkspace"
 import { Plus, MessageSquare, Image as ImageIcon, Star } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { IS_LOCAL } from "@/lib/mode"
+import { buildToken } from "@/lib/slashToken"
 import { OutlineChatContext } from "@/components/deck/OutlineChatContext"
 
 export default function DecksPage() {
@@ -68,22 +69,14 @@ export default function DecksPage() {
     () => setActiveTab("chat"),
   )
 
-  /** Handle inline style selection — insert message into chat input. */
+  /** Handle inline style selection — insert a `@style:<name>` token into chat input. */
   const handleStyleSelect = useCallback((name: string) => {
-    const hasArtDirection = ws.deck?.specs?.artDirection != null
-    const msg = hasArtDirection
-      ? `I want to change the style to "${name}". `
-      : `I'll use the "${name}" style. `
-    chatRef.current?.insertAtCursor(msg)
-  }, [ws.deck?.specs?.artDirection])
+    chatRef.current?.insertAtCursor(buildToken({ kind: "style", name }))
+  }, [])
 
-  /** Handle inline template selection — insert message into chat input.
-   *  isChange is true when deck.json already has a confirmed template. */
-  const handleTemplateSelect = useCallback((name: string, isChange: boolean) => {
-    const msg = isChange
-      ? `I want to change the template to "${name}". `
-      : `I'll use the "${name}" template. `
-    chatRef.current?.insertAtCursor(msg)
+  /** Handle inline template selection — insert a `@template:<name>` token into chat input. */
+  const handleTemplateSelect = useCallback((name: string) => {
+    chatRef.current?.insertAtCursor(buildToken({ kind: "template", name }))
   }, [])
 
   /* ── Render ── */
