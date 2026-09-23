@@ -45,8 +45,8 @@ function sessionPath(sessionId: string, extension: ".json" | ".jsonl", dir?: str
   // Same defence layers as resolveDeckDir(): allow-list above, then a normalized
   // prefix check on the resolved path so the file can only ever be a direct child
   // of the sessions directory.
-  const root = path.resolve(sessionsDir(dir))
-  const resolved = path.resolve(root, `${sessionId}${extension}`)
+  const root = path.resolve(sessionsDir(dir)) // nosemgrep: path-join-resolve-traversal — trusted config, not user input
+  const resolved = path.resolve(root, `${sessionId}${extension}`) // nosemgrep: path-join-resolve-traversal — UUID allow-list above, containment check below
   if (!resolved.startsWith(root + path.sep) || path.dirname(resolved) !== root) {
     throw new Error("invalid kiro session ID")
   }
@@ -148,6 +148,7 @@ export async function listSessions(opts: { includeAll: boolean; dir?: string }):
     .map(async (name) => {
       const sessionId = name.slice(0, -5)
       try {
+        // nosemgrep: path-join-resolve-traversal — `name` comes from readdir and passed the UUID filter above
         const meta = JSON.parse(await fsp.readFile(path.join(dir, name), "utf-8")) as SessionMeta
         return { meta, summary: await summarize(sessionId, meta, dir), candidate: isCandidate(meta) }
       } catch {

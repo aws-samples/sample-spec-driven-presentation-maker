@@ -21,8 +21,8 @@ function prompt(text: string): string {
 }
 
 function writeSession(id: string, meta: SessionMeta, lines: string[] = []): void {
-  fs.writeFileSync(path.join(tmp, `${id}.json`), JSON.stringify({ session_id: id, ...meta }, null, 2))
-  fs.writeFileSync(path.join(tmp, `${id}.jsonl`), lines.join("\n") + (lines.length ? "\n" : ""))
+  fs.writeFileSync(path.join(tmp, `${id}.json`), JSON.stringify({ session_id: id, ...meta }, null, 2)) // nosemgrep: path-join-resolve-traversal — test fixture in tmpdir
+  fs.writeFileSync(path.join(tmp, `${id}.jsonl`), lines.join("\n") + (lines.length ? "\n" : "")) // nosemgrep: path-join-resolve-traversal — test fixture in tmpdir
 }
 
 beforeEach(() => {
