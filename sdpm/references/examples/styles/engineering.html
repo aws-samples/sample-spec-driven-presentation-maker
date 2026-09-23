@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>engineering — A dark-slate system for engineers presenting design reviews and technical talks, where code and structure diagrams carry the argument and prose annotates it; precise rectangular geometry, monospaced identifiers, one cyan accent, and restrained semantic states keep dense technical evidence readable under projection.</title>
+<style>
+  :root {
+    --color-text: #E7EDF3;
+    --color-bg: #111820;
+    --color-surface: #18222D;
+    --color-surface-2: #202C38;
+    --color-border: #506070;
+    --color-muted: #A8B4C0;
+    --accent: #59B6D9;
+    --accent-2: #A7C7D8;
+    --success: #76B78A;
+    --warning: #D3A765;
+    --danger: #C97979;
+    --on-accent: #0D1820;
+    --color-gallery-bg: #080C10;
+    --color-code-bg: #0C1218;
+    --color-code-highlight: #18313D;
+    --color-syntax-key: #86B8D0;
+    --color-syntax-type: #C6B47A;
+    --color-syntax-string: #87B58D;
+    --color-syntax-comment: #82909D;
+    --color-syntax-function: #D7A1A1;
+
+    --fs-cover-title: 48pt;
+    --fs-slide-title: 30pt;
+    --fs-heading: 21pt;
+    --fs-body: 17pt;
+    --fs-caption: 13pt;
+    --fs-label: 11pt;
+    --fs-metric: 42pt;
+    --fs-code: 17pt;
+    --fs-code-small: 16pt;
+    --fs-node: 14pt;
+    --fs-table: 13pt;
+
+    --font-family: "Segoe UI", "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif;
+    --font-mono: Consolas, Menlo, "Hiragino Sans", "Yu Gothic", Meiryo, "Noto Sans JP", monospace;
+
+    --margin-x: 120px;
+    --content-w: 1680px;
+    --content-top: 280px;
+    --bar-h: 132px;
+    --radius: 2px;
+    --border-thin: 1px;
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 40px; background: var(--color-gallery-bg); font-family: var(--font-family); zoom: 0.7; }
+  .slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; overflow: hidden; background: var(--color-bg); color: var(--color-text); }
+  .el { position: absolute; box-sizing: border-box; }
+
+  .section-label { font-family: var(--font-mono); font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent); }
+  .cover-title { font-family: var(--font-family); font-size: calc(var(--fs-cover-title) * 1.5); font-weight: 650; line-height: 1.08; letter-spacing: -1.2px; }
+  .slide-title { font-family: var(--font-family); font-size: calc(var(--fs-slide-title) * 1.5); font-weight: 650; line-height: 1.18; letter-spacing: -0.45px; }
+  .heading { font-size: calc(var(--fs-heading) * 1.5); font-weight: 650; line-height: 1.28; }
+  .body { font-size: calc(var(--fs-body) * 1.5); line-height: 1.48; }
+  .caption { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.4; color: var(--color-muted); }
+  .label { font-family: var(--font-mono); font-size: calc(var(--fs-label) * 1.5); line-height: 1.25; letter-spacing: 1px; text-transform: uppercase; color: var(--color-muted); }
+  .mono { font-family: var(--font-mono); }
+  .muted { color: var(--color-muted); }
+  .accent-text { color: var(--accent); }
+  .success-text { color: var(--success); }
+  .warning-text { color: var(--warning); }
+  .danger-text { color: var(--danger); }
+  .bold { font-weight: 700; }
+  .right { text-align: right; }
+  .center { text-align: center; }
+
+  .hairline { background: var(--color-border); }
+  .accent-line { background: var(--accent); }
+  .surface { background: var(--color-surface); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); }
+  .surface-quiet { background: var(--color-surface); }
+  .outline { border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); }
+  .outline-accent { border: var(--border-thin) solid var(--accent); border-radius: var(--radius); }
+  .outline-dashed { border: var(--border-thin) dashed var(--color-muted); border-radius: var(--radius); }
+  .rule-panel { border-top: var(--border-thin) solid var(--color-border); padding: 28px 0 0 0; }
+  .rule-do { border-left: 4px solid var(--accent); padding: 2px 0 2px 24px; }
+  .rule-dont { border-left: 4px solid var(--danger); padding: 2px 0 2px 24px; }
+  .callout { border-left: 4px solid var(--accent); background: var(--color-surface); padding: 22px 28px; }
+  .token-chip { border: var(--border-thin) solid var(--color-border); background: var(--color-surface); padding: 14px 18px; font-family: var(--font-mono); font-size: calc(var(--fs-caption) * 1.5); }
+
+  .swatch { border: var(--border-thin) solid var(--color-border); }
+  .fill-accent.heading, .fill-success.heading, .fill-warning.heading, .fill-danger.heading { padding: 18px 22px; }
+  .outline.heading, .outline-accent.heading, .outline-dashed.heading { padding: 18px 22px; }
+  .outline.body, .outline-dashed.body { padding: 18px 22px; }
+  .code-sample { font-family: var(--font-mono); font-size: calc(var(--fs-code) * 1.5); line-height: 1.42; }
+  .code-small-sample { font-family: var(--font-mono); font-size: calc(var(--fs-code-small) * 1.5); line-height: 1.42; color: var(--color-muted); }
+  .node-sample { font-family: var(--font-mono); font-size: calc(var(--fs-node) * 1.5); line-height: 1.25; }
+  .table-sample { font-family: var(--font-mono); font-size: calc(var(--fs-table) * 1.5); line-height: 1.25; }
+  .fill-bg { background: var(--color-bg); }
+  .fill-surface { background: var(--color-surface); }
+  .fill-surface-2 { background: var(--color-surface-2); }
+  .fill-border { background: var(--color-border); }
+  .fill-muted { background: var(--color-muted); }
+  .fill-text { background: var(--color-text); }
+  .fill-accent { background: var(--accent); color: var(--on-accent); }
+  .fill-success { background: var(--success); color: var(--color-bg); }
+  .fill-warning { background: var(--warning); color: var(--color-bg); }
+  .fill-danger { background: var(--danger); color: var(--color-bg); }
+
+  .node { background: var(--color-surface); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; padding: 12px 16px; text-align: center; font-family: var(--font-mono); font-size: calc(var(--fs-node) * 1.5); line-height: 1.25; }
+  .node-accent { border-color: var(--accent); }
+  .connector-h { height: 1px; background: var(--color-border); }
+  .connector-v { width: 1px; background: var(--color-border); }
+  .connector-accent-h { height: 1px; background: var(--accent); }
+  .connector-accent-v { width: 1px; background: var(--accent); }
+  .arrow-right { width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-left: 9px solid var(--color-border); }
+  .arrow-right-accent { width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-left: 9px solid var(--accent); }
+  .arrow-down { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 9px solid var(--color-border); }
+  .edge-label { background: var(--color-bg); padding: 2px 8px; font-family: var(--font-mono); font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; color: var(--color-muted); text-align: center; }
+  .step-number { border: var(--border-thin) solid var(--accent); color: var(--accent); background: var(--color-bg); font-family: var(--font-mono); font-size: calc(var(--fs-caption) * 1.5); font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+  .code-block { background: var(--color-code-bg); border: var(--border-thin) solid var(--color-border); padding: 28px 32px; font-family: var(--font-mono); font-size: calc(var(--fs-code) * 1.5); line-height: 1.42; white-space: pre; overflow: hidden; }
+  .code-label { font-family: var(--font-mono); font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; letter-spacing: 1px; color: var(--color-muted); text-transform: uppercase; }
+  .code-line { display: block; padding: 0 12px; }
+  .code-highlight { display: block; margin: 0 -12px; padding: 0 24px; background: var(--color-code-highlight); border-left: 3px solid var(--accent); }
+  .syn-key { color: var(--color-syntax-key); }
+  .syn-type { color: var(--color-syntax-type); }
+  .syn-string { color: var(--color-syntax-string); }
+  .syn-comment { color: var(--color-syntax-comment); }
+  .syn-fn { color: var(--color-syntax-function); }
+
+  .metric { font-family: var(--font-mono); font-size: calc(var(--fs-metric) * 1.5); font-weight: 700; line-height: 1; letter-spacing: -1px; }
+  .metric-unit { font-family: var(--font-mono); font-size: calc(var(--fs-body) * 1.5); color: var(--color-muted); }
+  .metric-cell { border-top: var(--border-thin) solid var(--color-border); padding-top: 22px; }
+  .state-ok { color: var(--success); }
+  .state-warn { color: var(--warning); }
+  .state-fail { color: var(--danger); }
+
+  .compare-before { border: var(--border-thin) solid var(--color-border); background: var(--color-surface); }
+  .compare-after { border: var(--border-thin) solid var(--accent); background: var(--color-surface); }
+  .latency-bar-before { background: var(--color-border); }
+  .latency-bar-after { background: var(--accent); }
+
+  .stack-layer { border: var(--border-thin) solid var(--color-border); background: var(--color-surface); display: flex; align-items: center; padding: 0 28px; font-family: var(--font-mono); font-size: calc(var(--fs-node) * 1.5); }
+  .stack-layer-accent { border-color: var(--accent); }
+
+  .dense-table { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; font-size: calc(var(--fs-table) * 1.5); line-height: 1.25; color: var(--color-text); }
+  .dense-table th { padding: 12px 14px; text-align: left; color: var(--accent); font-weight: 700; border-top: var(--border-thin) solid var(--color-border); border-bottom: var(--border-thin) solid var(--color-border); background: var(--color-surface); }
+  .dense-table td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: var(--border-thin) solid var(--color-border); }
+  .dense-table .cell-muted { color: var(--color-muted); }
+
+  .timeline-line { height: 1px; background: var(--color-border); }
+  .milestone { border: var(--border-thin) solid var(--accent); background: var(--color-bg); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: calc(var(--fs-caption) * 1.5); font-weight: 700; color: var(--accent); }
+  .milestone-open { border: var(--border-thin) dashed var(--color-muted); color: var(--color-muted); }
+
+  .decision-mark { border-left: 4px solid var(--success); padding-left: 22px; }
+  .question-mark { border-left: 4px solid var(--warning); padding-left: 22px; }
+  .footer-note { font-family: var(--font-mono); font-size: calc(var(--fs-label) * 1.5); color: var(--color-muted); border-top: var(--border-thin) solid var(--color-border); padding-top: 12px; }
+</style>
+</head>
+<body>
+
+<!-- Part 0: Document identity and machine-readable design tokens -->
+
+<!-- Part 1: Cover -->
+<!-- Slide type: cover — sparse coordinates and a code-like identifier establish precision before any content appears. -->
+<div class="slide">
+  <div class="el accent-line" style="left:0; top:0; width:6px; height:1080px;"></div>
+  <div class="el section-label" style="left:120px; top:300px; width:900px; height:32px;">Bundled style / design review</div>
+  <div class="el cover-title" style="left:120px; top:350px; width:1380px; height:130px;">Engineering</div>
+  <div class="el body muted" style="left:124px; top:500px; width:1120px; height:120px;">Code and structure carry the argument.<br>Prose annotates what the system proves.</div>
+  <div class="el token-chip" style="left:120px; top:720px; width:760px; height:58px;">mode = precision_over_polish</div>
+  <div class="el caption mono" style="left:120px; top:930px; width:1100px; height:40px;">Dark slate / one accent / explicit states / no decorative effects</div>
+</div>
+
+<!-- Part 2: Rules -->
+<!-- Slide type: design decision and derived rules — matched columns make obligations and prohibitions scan like a technical review checklist. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">01 / Rules</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1560px; height:144px;">Technical evidence must remain legible under review</div>
+  <div class="el rule-panel" style="left:120px; top:290px; width:790px; height:60px;"><span class="label accent-text">DO / because structure is the evidence</span></div>
+  <div class="el rule-do body" style="left:120px; top:380px; width:790px; height:105px;"><span class="bold">Use one assertion title.</span> Reviewers see the conclusion before parsing evidence.</div>
+  <div class="el rule-do body" style="left:120px; top:510px; width:790px; height:105px;"><span class="bold">Make code or the diagram largest.</span> Prose only annotates the primary technical artifact.</div>
+  <div class="el rule-do body" style="left:120px; top:640px; width:790px; height:105px;"><span class="bold">Use mono for identifiers and metrics.</span> Stable widths make syntax and values comparable.</div>
+  <div class="el rule-do body" style="left:120px; top:770px; width:790px; height:105px;"><span class="bold">Reserve semantic hues for named states.</span> Colour then retains operational meaning.</div>
+  <div class="el rule-panel" style="left:1010px; top:290px; width:790px; height:60px;"><span class="label danger-text">DON'T / because effects obscure meaning</span></div>
+  <div class="el rule-dont body" style="left:1010px; top:380px; width:790px; height:105px;"><span class="bold">No glow, gradient, or cyber effects.</span> Value contrast keeps syntax and lines calm.</div>
+  <div class="el rule-dont body" style="left:1010px; top:510px; width:790px; height:105px;"><span class="bold">No decorative icons or colourful cards.</span> Extra symbols invent false categories.</div>
+  <div class="el rule-dont body" style="left:1010px; top:640px; width:790px; height:105px;"><span class="bold">Use mono for code.</span> Proportional type breaks character-level comparison.</div>
+  <div class="el rule-dont body" style="left:1010px; top:770px; width:790px; height:105px;"><span class="bold">Never centre or pair code blocks.</span> Code needs one stable edge and one reading path.</div>
+  <div class="el footer-note" style="left:120px; top:930px; width:1680px; height:80px;">Audience: engineers in live or shared review. One claim; margins ≥ 5%; text contrast ≥ 4.5:1 (3:1 at ≥ 18pt); direct chart labels; no emoji; neutrals + cyan + at most one named state hue.</div>
+</div>
+
+<!-- Slide type: renderer facts — explicit JSON approximations prevent composers from copying unsupported HTML refinements. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:900px; height:32px;">01 / Rules / renderer facts</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1560px; height:144px;">Build technical structure with properties the slide renderer supports</div>
+  <div class="el outline" style="left:120px; top:280px; width:520px; height:610px;"></div>
+  <div class="el label accent-text" style="left:155px; top:320px; width:440px; height:32px;">Tables</div>
+  <div class="el heading" style="left:155px; top:380px; width:440px; height:110px;">Choose precision or capacity</div>
+  <div class="el body" style="left:155px; top:520px; width:440px; height:310px;">Native tables inherit the template font and have no per-table family. Use aligned mono text rows for 3–6 rows; for 7–10, use a native table and accept its font.</div>
+  <div class="el outline" style="left:700px; top:280px; width:520px; height:610px;"></div>
+  <div class="el label accent-text" style="left:735px; top:320px; width:440px; height:32px;">Shapes</div>
+  <div class="el heading" style="left:735px; top:380px; width:440px; height:110px;">Keep the geometry flat</div>
+  <div class="el body" style="left:735px; top:520px; width:440px; height:310px;">Filled shapes may inherit a template shadow. Set every shape's shadow off explicitly; use rectangular fills, hairline borders, and straight connectors.</div>
+  <div class="el outline" style="left:1280px; top:280px; width:520px; height:610px;"></div>
+  <div class="el label accent-text" style="left:1315px; top:320px; width:440px; height:32px;">Type mapping</div>
+  <div class="el heading" style="left:1315px; top:380px; width:440px; height:110px;">Approximate HTML refinements</div>
+  <div class="el body" style="left:1315px; top:520px; width:440px; height:310px;">Slide JSON has no letter-spacing, line-height, or weight 650. Use bold for 650 and explicit box heights for rhythm; the template supplies PPTX fonts.</div>
+  <div class="el footer-note" style="left:120px; top:940px; width:1680px; height:70px;">HTML refines the gallery preview; slide JSON carries the supported structural approximation.</div>
+</div>
+
+<!-- Part 3: Message and outline -->
+<!-- Slide type: outline specification — quantified limits and three chapter moves give the orchestrator an engineering review path. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:800px; height:32px;">02 / Message and outline</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1560px; height:144px;">A 20-minute review resolves one decision in 12–16 slides</div>
+  <div class="el metric accent-text" style="left:120px; top:285px; width:320px; height:96px;">12–16</div>
+  <div class="el body muted" style="left:120px; top:400px; width:380px; height:100px;">slides / 20 minutes</div>
+  <div class="el metric" style="left:560px; top:285px; width:320px; height:96px;">12–35</div>
+  <div class="el body muted" style="left:560px; top:400px; width:380px; height:100px;">visible words / normal slide</div>
+  <div class="el metric" style="left:1000px; top:285px; width:320px; height:96px;">≤14</div>
+  <div class="el body muted" style="left:1000px; top:400px; width:380px; height:100px;">code lines / code slide</div>
+  <div class="el metric" style="left:1440px; top:285px; width:320px; height:96px;">1</div>
+  <div class="el body muted" style="left:1440px; top:400px; width:360px; height:100px;">decision / closing</div>
+  <div class="el hairline" style="left:120px; top:525px; width:1680px; height:1px;"></div>
+  <div class="el heading" style="left:120px; top:570px; width:500px; height:110px;">Open with a system assertion</div>
+  <div class="el body muted" style="left:120px; top:700px; width:500px; height:205px;">Use sentence case: system + verb + consequence. Dividers state what the chapter establishes.</div>
+  <div class="el heading" style="left:710px; top:570px; width:500px; height:110px;">Move from boundary to evidence</div>
+  <div class="el body muted" style="left:710px; top:700px; width:500px; height:155px;">Order context, architecture or code, measured behavior, then trade-offs.</div>
+  <div class="el heading" style="left:1300px; top:570px; width:500px; height:110px;">Close with a decision</div>
+  <div class="el body muted" style="left:1300px; top:700px; width:500px; height:155px;">Record the selected option, owner, operating limit, and unresolved verification path.</div>
+  <div class="el footer-note" style="left:120px; top:930px; width:1680px; height:80px;">No persistent agenda tracker: use the section label. Add dividers only for three or more chapters; end on evidence or an explicit choice, never a generic summary.</div>
+</div>
+
+<!-- Part 4: Palette -->
+<!-- Slide type: core palette — neutral surfaces and one accent show that hierarchy comes from value contrast. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">03 / Palette / core</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">One cyan accent is enough to direct technical attention</div>
+  <div class="el body muted" style="left:120px; top:280px; width:1600px; height:100px;">Use neutral value steps for layers and boundaries. Cyan marks only the active path, selected option, highlighted code range, or current milestone.</div>
+  <div class="el swatch fill-bg" style="left:120px; top:410px; width:240px; height:120px;"></div>
+  <div class="el heading mono" style="left:120px; top:550px; width:240px; height:60px;">BG</div>
+  <div class="el caption mono" style="left:120px; top:620px; width:240px; height:80px;">#111820<br>slide field</div>
+  <div class="el swatch fill-surface" style="left:400px; top:410px; width:240px; height:120px;"></div>
+  <div class="el heading mono" style="left:400px; top:550px; width:240px; height:60px;">SURFACE</div>
+  <div class="el caption mono" style="left:400px; top:620px; width:240px; height:110px;">#18222D<br>node / code shell</div>
+  <div class="el swatch fill-surface-2" style="left:680px; top:410px; width:240px; height:120px;"></div>
+  <div class="el heading mono" style="left:680px; top:550px; width:240px; height:60px;">SURFACE 2</div>
+  <div class="el caption mono" style="left:680px; top:620px; width:240px; height:80px;">#202C38<br>selected layer</div>
+  <div class="el swatch fill-border" style="left:960px; top:410px; width:240px; height:120px;"></div>
+  <div class="el heading mono" style="left:960px; top:550px; width:240px; height:60px;">BORDER</div>
+  <div class="el caption mono" style="left:960px; top:620px; width:240px; height:80px;">#506070<br>1px hairlines</div>
+  <div class="el swatch fill-muted" style="left:1240px; top:410px; width:240px; height:120px;"></div>
+  <div class="el heading mono" style="left:1240px; top:550px; width:240px; height:60px;">MUTED</div>
+  <div class="el caption mono" style="left:1240px; top:620px; width:240px; height:110px;">#A8B4C0<br>annotation / unit</div>
+  <div class="el swatch fill-text" style="left:1520px; top:410px; width:240px; height:120px;"></div>
+  <div class="el heading mono" style="left:1520px; top:550px; width:240px; height:60px;">TEXT</div>
+  <div class="el caption mono" style="left:1520px; top:620px; width:240px; height:80px;">#E7EDF3<br>primary text</div>
+  <div class="el fill-accent heading mono" style="left:120px; top:760px; width:520px; height:100px;">ACCENT #59B6D9</div>
+  <div class="el body" style="left:690px; top:750px; width:1110px; height:150px;">On cyan use <span class="mono bold">#0D1820</span>. On dark slate, cyan labels the selected path but never colours paragraphs.</div>
+  <div class="el footer-note" style="left:120px; top:940px; width:1680px; height:70px;">Default budget: neutrals + cyan. Add one semantic hue only when a state is explicitly named.</div>
+</div>
+
+<!-- Slide type: semantic states — three matched columns preserve exact state meaning without a decorative rainbow. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">03 / Palette / states</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">State colours report outcomes; they never decorate categories</div>
+  <div class="el fill-success heading mono" style="left:120px; top:300px; width:500px; height:100px;">OK / #76B78A</div>
+  <div class="el body" style="left:120px; top:440px; width:500px; height:205px;">Passed check, healthy state, or accepted criterion. Pair the hue with the literal label <span class="mono state-ok">OK</span>.</div>
+  <div class="el outline body" style="left:120px; top:690px; width:500px; height:150px;"><span class="mono state-ok bold">OK  replica caught up</span></div>
+  <div class="el fill-warning heading mono" style="left:710px; top:300px; width:500px; height:100px;">WARN / #D3A765</div>
+  <div class="el body" style="left:710px; top:440px; width:500px; height:205px;">Threshold near breach, accepted risk, or pending verification. Pair it with <span class="mono state-warn">WARN</span>.</div>
+  <div class="el outline body" style="left:710px; top:690px; width:500px; height:150px;"><span class="mono state-warn bold">WARN  p95 near budget</span></div>
+  <div class="el fill-danger heading mono" style="left:1300px; top:300px; width:500px; height:100px;">FAIL / #C97979</div>
+  <div class="el body" style="left:1300px; top:440px; width:500px; height:205px;">Failed check, breached limit, or confirmed outage. Pair it with <span class="mono state-fail">FAIL</span> and the condition.</div>
+  <div class="el outline body" style="left:1300px; top:690px; width:500px; height:150px;"><span class="mono state-fail bold">FAIL  retry budget exhausted</span></div>
+  <div class="el footer-note" style="left:120px; top:930px; width:1680px; height:80px;">Use cyan plus one state hue. If multiple states must appear, drop cyan. Set every filled shape's shadow off explicitly.</div>
+</div>
+
+<!-- Part 5: Typography -->
+<!-- Slide type: narrative type ramp — samples are drawn at slide scale and labels retain token pt values. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">04 / Typography / narrative</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">Four narrative sizes separate assertion from annotation</div>
+  <div class="el cover-title" style="left:120px; top:280px; width:1150px; height:115px;">System boundary</div>
+  <div class="el caption mono right" style="left:1320px; top:290px; width:480px; height:80px;">--fs-cover-title / 48pt / 1.08<br>cover only, one line preferred</div>
+  <div class="el hairline" style="left:120px; top:415px; width:1680px; height:1px;"></div>
+  <div class="el slide-title" style="left:120px; top:445px; width:1150px; height:80px;">The queue isolates burst load</div>
+  <div class="el caption mono right" style="left:1320px; top:450px; width:480px; height:80px;">--fs-slide-title / 30pt / 1.18<br>assertion, maximum two lines</div>
+  <div class="el hairline" style="left:120px; top:550px; width:1680px; height:1px;"></div>
+  <div class="el heading" style="left:120px; top:585px; width:1150px; height:65px;">The consumer controls concurrency</div>
+  <div class="el caption mono right" style="left:1320px; top:580px; width:480px; height:80px;">--fs-heading / 21pt / 1.28<br>subsection or column claim</div>
+  <div class="el hairline" style="left:120px; top:680px; width:1680px; height:1px;"></div>
+  <div class="el body" style="left:120px; top:720px; width:1150px; height:155px;">Body annotation explains why the artifact proves the title. Keep it short enough that the reviewer returns to the evidence.</div>
+  <div class="el caption mono right" style="left:1320px; top:720px; width:480px; height:80px;">--fs-body / 17pt / 1.48<br>two to four short lines</div>
+  <div class="el footer-note" style="left:120px; top:930px; width:1680px; height:80px;">Use bold to approximate HTML weight 650. JSON has no letter-spacing or line-height; preserve rhythm with explicit box heights.</div>
+</div>
+
+<!-- Slide type: technical type ramp — monospaced samples align every technical token at slide scale while labels retain token pt values. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">04 / Typography / technical</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">Monospaced roles make technical comparison stable</div>
+  <div class="el metric mono accent-text" style="left:120px; top:275px; width:500px; height:96px;">42<span class="metric-unit"> ms</span></div>
+  <div class="el caption mono" style="left:700px; top:285px; width:1100px; height:75px;">--fs-metric / 42pt / 1.0 — primary value; unit uses body size</div>
+  <div class="el hairline" style="left:120px; top:390px; width:1680px; height:1px;"></div>
+  <div class="el code-sample" style="left:120px; top:420px; width:820px; height:55px;">const batch = await queue.read(limit);</div>
+  <div class="el caption mono" style="left:1030px; top:420px; width:770px; height:75px;">--fs-code / 17pt / 1.42 — primary code</div>
+  <div class="el code-small-sample" style="left:120px; top:515px; width:820px; height:55px;">retry_budget = min(attempts, 3)</div>
+  <div class="el caption mono" style="left:1030px; top:515px; width:770px; height:75px;">--fs-code-small / 16pt / 1.42 — dense code floor</div>
+  <div class="el node-sample" style="left:120px; top:610px; width:820px; height:45px;">scoring_worker</div>
+  <div class="el caption mono" style="left:1030px; top:600px; width:770px; height:75px;">--fs-node / 14pt / 1.25 — nodes and connectors</div>
+  <div class="el caption" style="left:120px; top:695px; width:820px; height:75px;">Annotation names the condition, source, or exception.</div>
+  <div class="el caption mono" style="left:1030px; top:695px; width:770px; height:75px;">--fs-caption / 13pt / 1.4 — supporting prose</div>
+  <div class="el table-sample" style="left:120px; top:790px; width:820px; height:45px;">max_in_flight   integer   128</div>
+  <div class="el caption mono" style="left:1030px; top:780px; width:770px; height:75px;">--fs-table / 13pt / 1.25 — aligned rows or table cells</div>
+  <div class="el label" style="left:120px; top:875px; width:820px; height:32px;">runtime / selected path</div>
+  <div class="el caption mono" style="left:1030px; top:865px; width:770px; height:75px;">--fs-label / 11pt / 1.25 — metadata floor</div>
+  <div class="el footer-note" style="left:120px; top:965px; width:1680px; height:45px;">Identifiers use mono; metrics mute the unit so magnitude leads.</div>
+</div>
+
+<!-- Part 6: Frame -->
+<!-- Slide type: standard content frame — title, section label, evidence boundary, source line, and reserved template band use production coordinates. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">05 / Frame / content</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">A two-line title zone protects the technical evidence below</div>
+  <div class="el accent-line" style="left:120px; top:260px; width:92px; height:3px;"></div>
+  <div class="el outline" style="left:120px; top:280px; width:1680px; height:640px;"></div>
+  <div class="el label accent-text" style="left:150px; top:310px; width:900px; height:32px;">Content boundary / x 120–1800 / y 280–920</div>
+  <div class="el node node-accent" style="left:270px; top:430px; width:360px; height:120px;">primary_artifact</div>
+  <div class="el connector-h" style="left:630px; top:490px; width:250px; height:1px;"></div>
+  <div class="el arrow-right" style="left:875px; top:484px; width:9px; height:12px;"></div>
+  <div class="el node" style="left:880px; top:430px; width:360px; height:120px;">dependent_system</div>
+  <div class="el body muted" style="left:1320px; top:420px; width:360px; height:205px;">Short annotation aligns to the artifact; it does not form a competing third panel.</div>
+  <div class="el caption" style="left:150px; top:835px; width:1500px; height:45px;">Evidence note or source stays inside the content boundary.</div>
+  <div class="el footer-note" style="left:120px; top:940px; width:1680px; height:70px;">Title box: 144 px (two lines). One-line titles leave the second line empty; content never moves up. Source line is content (draw it); page number is the template's (do not draw it). Leave y=1010–1080 clear.</div>
+</div>
+
+<!-- Slide type: section divider frame — a large assertion and one boundary line create a pause without changing the visual language. -->
+<div class="slide">
+  <div class="el accent-line" style="left:0; top:0; width:6px; height:1080px;"></div>
+  <div class="el section-label" style="left:120px; top:250px; width:600px; height:32px;">Section 02 / Runtime behavior</div>
+  <div class="el cover-title" style="left:120px; top:315px; width:1420px; height:220px;">The runtime contains failure<br>at the queue boundary</div>
+  <div class="el hairline" style="left:120px; top:605px; width:1680px; height:1px;"></div>
+  <div class="el body muted" style="left:120px; top:660px; width:1050px; height:105px;">The next chapter moves from topology to measured behavior and trade-offs.</div>
+  <div class="el mono caption right" style="left:1370px; top:660px; width:430px; height:110px;">boundary = queue<br>evidence = latency + retries</div>
+</div>
+
+<!-- Slide type: closing frame — aligned registers separate what is settled from what still needs investigation. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">05 / Frame / close</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">The review ends when decisions and unknowns are explicit</div>
+  <div class="el label success-text" style="left:120px; top:280px; width:760px; height:32px;">Decisions recorded</div>
+  <div class="el decision-mark heading" style="left:120px; top:340px; width:760px; height:65px;">Chosen boundary and owner</div>
+  <div class="el decision-mark body muted" style="left:120px; top:430px; width:760px; height:105px;">State the selected path, constraint, and next owner.</div>
+  <div class="el decision-mark heading" style="left:120px; top:600px; width:760px; height:65px;">Accepted operating limit</div>
+  <div class="el decision-mark body muted" style="left:120px; top:690px; width:760px; height:105px;">Record the measured threshold or explicit trade-off.</div>
+  <div class="el label warning-text" style="left:1040px; top:280px; width:760px; height:32px;">Open questions</div>
+  <div class="el question-mark heading" style="left:1040px; top:340px; width:760px; height:65px;">Unknown with a verification path</div>
+  <div class="el question-mark body muted" style="left:1040px; top:430px; width:760px; height:105px;">Name the experiment, owner, and decision date.</div>
+  <div class="el question-mark heading" style="left:1040px; top:600px; width:760px; height:65px;">Deferred choice and trigger</div>
+  <div class="el question-mark body muted" style="left:1040px; top:690px; width:760px; height:105px;">Name the event that deliberately reopens the choice.</div>
+  <div class="el footer-note" style="left:120px; top:940px; width:1680px; height:55px;">Never close with “thank you”: the final frame remains a decision record.</div>
+</div>
+
+
+<!-- Part 7: Patterns -->
+<!-- Pattern slide: code with highlighted lines — WHY: code is the evidence, so one 17pt block occupies most of the canvas and one contiguous range carries the accent. MAY vary language, line count up to 14, and highlighted range. MUST NOT add a second block, centre code, or shrink below 16pt. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">Pattern / code evidence</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">The retry budget stops duplicate work at the boundary</div>
+  <div class="el code-label right" style="left:1450px; top:280px; width:350px; height:32px;">typescript / 11 lines</div>
+  <div class="el code-block" style="left:120px; top:320px; width:1260px; height:590px;"><span class="code-line"><span class="syn-key">async function</span> <span class="syn-fn">process</span>(job: <span class="syn-type">Job</span>) {</span><span class="code-line">  <span class="syn-key">const</span> key = job.idempotencyKey;</span><span class="code-line">  <span class="syn-key">const</span> prior = <span class="syn-key">await</span> store.read(key);</span><span class="code-line">  <span class="syn-key">if</span> (prior?.complete) <span class="syn-key">return</span> prior.result;</span><span class="code-line"> </span><span class="code-highlight">  <span class="syn-key">for</span> (<span class="syn-key">let</span> attempt = 0; attempt &lt; 3; attempt++) {</span><span class="code-highlight">    <span class="syn-key">const</span> result = <span class="syn-key">await</span> worker.run(job);</span><span class="code-highlight">    <span class="syn-key">if</span> (result.ok) <span class="syn-key">return</span> store.commit(key, result);</span><span class="code-line">  }</span><span class="code-line">  <span class="syn-key">throw new</span> <span class="syn-type">RetryBudgetExceeded</span>(key);</span><span class="code-line">}</span></div>
+  <div class="el heading mono accent-text" style="left:1450px; top:350px; width:350px; height:62px;">lines 6–8</div>
+  <div class="el body" style="left:1450px; top:430px; width:350px; height:360px;">The highlighted range is the mechanism that proves the title. Annotation names its consequence instead of paraphrasing each line.</div>
+  <div class="el caption" style="left:1450px; top:800px; width:350px; height:110px;">Syntax stays muted; cyan marks the reviewed range, not every keyword.</div>
+  <div class="el footer-note" style="left:120px; top:955px; width:1680px; height:45px;">Code limit: 14 lines / 16–18pt mono / one highlighted range / one block</div>
+</div>
+
+<!-- Pattern slide: architecture diagram — WHY: six rectangular nodes and orthogonal hairlines expose system boundaries without pictorial metaphor. MAY vary node count from 5–7, labels, and routing. MUST NOT use decorative icons, curves, thick pipes, or unlabeled cross-boundary connectors. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">Pattern / architecture</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">The queue decouples ingestion from scoring</div>
+  <div class="el label muted" style="left:120px; top:280px; width:500px; height:32px;">Request boundary</div>
+  <div class="el label muted" style="left:710px; top:280px; width:500px; height:32px;">Durability boundary</div>
+  <div class="el label muted" style="left:1300px; top:280px; width:500px; height:32px;">Compute boundary</div>
+  <div class="el connector-h" style="left:440px; top:390px; width:270px; height:1px;"></div>
+  <div class="el arrow-right" style="left:701px; top:384px; width:9px; height:12px;"></div>
+  <div class="el edge-label" style="left:500px; top:365px; width:150px; height:32px;">enqueue</div>
+  <div class="el connector-h" style="left:1030px; top:390px; width:270px; height:1px;"></div>
+  <div class="el arrow-right-accent" style="left:1291px; top:384px; width:9px; height:12px;"></div>
+  <div class="el edge-label" style="left:1090px; top:365px; width:150px; height:32px;">consume</div>
+  <div class="el connector-v" style="left:270px; top:500px; width:1px; height:180px;"></div>
+  <div class="el arrow-down" style="left:264px; top:671px; width:12px; height:9px;"></div>
+  <div class="el edge-label" style="left:285px; top:570px; width:150px; height:32px;">authorize</div>
+  <div class="el connector-v" style="left:860px; top:500px; width:1px; height:180px;"></div>
+  <div class="el arrow-down" style="left:854px; top:671px; width:12px; height:9px;"></div>
+  <div class="el edge-label" style="left:875px; top:570px; width:150px; height:32px;">persist</div>
+  <div class="el connector-v" style="left:1450px; top:500px; width:1px; height:180px;"></div>
+  <div class="el arrow-down" style="left:1444px; top:671px; width:12px; height:9px;"></div>
+  <div class="el edge-label" style="left:1465px; top:570px; width:150px; height:32px;">emit</div>
+  <div class="el node" style="left:120px; top:330px; width:320px; height:170px;">ingress<br><span class="muted">validate request</span></div>
+  <div class="el node node-accent" style="left:710px; top:330px; width:320px; height:170px;">durable_queue<br><span class="muted">absorb burst</span></div>
+  <div class="el node" style="left:1300px; top:330px; width:320px; height:170px;">scoring_worker<br><span class="muted">bounded concurrency</span></div>
+  <div class="el node" style="left:120px; top:680px; width:320px; height:150px;">policy_store<br><span class="muted">request rules</span></div>
+  <div class="el node" style="left:710px; top:680px; width:320px; height:150px;">result_store<br><span class="muted">idempotent commit</span></div>
+  <div class="el node" style="left:1300px; top:680px; width:320px; height:150px;">event_sink<br><span class="muted">completion record</span></div>
+  <div class="el callout body" style="left:120px; top:895px; width:1680px; height:72px;">The active queue boundary is the only accent; connector labels state the contract crossing each boundary.</div>
+</div>
+
+<!-- Pattern slide: numbered sequence flow — WHY: numbered arrows make event order inspectable while straight connectors preserve cause and timing. MAY vary from 3–6 steps and route vertically when needed. MUST NOT use chevrons, curved arrows, or multiple competing paths. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">Pattern / sequence</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">Acknowledgement follows the durable write, not the request</div>
+  <div class="el node" style="left:120px; top:355px; width:280px; height:150px;">caller</div>
+  <div class="el connector-accent-h" style="left:400px; top:430px; width:180px; height:1px;"></div>
+  <div class="el arrow-right-accent" style="left:571px; top:424px; width:9px; height:12px;"></div>
+  <div class="el step-number" style="left:465px; top:395px; width:44px; height:44px;">1</div>
+  <div class="el edge-label" style="left:425px; top:455px; width:130px; height:32px;">submit</div>
+  <div class="el node node-accent" style="left:580px; top:355px; width:280px; height:150px;">ingress</div>
+  <div class="el connector-h" style="left:860px; top:430px; width:180px; height:1px;"></div>
+  <div class="el arrow-right" style="left:1031px; top:424px; width:9px; height:12px;"></div>
+  <div class="el step-number" style="left:925px; top:395px; width:44px; height:44px;">2</div>
+  <div class="el edge-label" style="left:885px; top:455px; width:130px; height:32px;">append</div>
+  <div class="el node" style="left:1040px; top:355px; width:280px; height:150px;">queue</div>
+  <div class="el connector-h" style="left:1320px; top:430px; width:180px; height:1px;"></div>
+  <div class="el arrow-right" style="left:1491px; top:424px; width:9px; height:12px;"></div>
+  <div class="el step-number" style="left:1385px; top:395px; width:44px; height:44px;">3</div>
+  <div class="el edge-label" style="left:1345px; top:455px; width:130px; height:32px;">dispatch</div>
+  <div class="el node" style="left:1500px; top:355px; width:280px; height:150px;">worker</div>
+  <div class="el connector-v" style="left:1640px; top:505px; width:1px; height:185px;"></div>
+  <div class="el arrow-down" style="left:1634px; top:681px; width:12px; height:9px;"></div>
+  <div class="el step-number" style="left:1618px; top:565px; width:44px; height:44px;">4</div>
+  <div class="el edge-label" style="left:1660px; top:625px; width:120px; height:32px;">commit</div>
+  <div class="el node" style="left:1500px; top:690px; width:280px; height:150px;">result_store</div>
+  <div class="el connector-h" style="left:860px; top:765px; width:640px; height:1px;"></div>
+  <div class="el arrow-right" style="left:1491px; top:759px; width:9px; height:12px;"></div>
+  <div class="el step-number" style="left:1140px; top:743px; width:44px; height:44px;">5</div>
+  <div class="el edge-label" style="left:1205px; top:740px; width:160px; height:32px;">completion</div>
+  <div class="el body muted" style="left:120px; top:600px; width:1000px; height:105px;">Separate the response boundary from asynchronous completion. Attach numbers to arrows because order belongs to interactions.</div>
+  <div class="el footer-note" style="left:120px; top:950px; width:1680px; height:45px;">Number the arrows, label the messages, and use orthogonal routing when a return path crosses rows.</div>
+</div>
+
+<!-- Pattern slide: chosen versus rejected trade-off — WHY: matched columns make criteria comparable, while a solid accent border records the choice and a dashed neutral border marks rejection without implying failure. MAY vary criteria and column ratio. MUST NOT colour the rejected option red or use unequal structures. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">Pattern / trade-off</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">The durable queue is chosen because burst isolation outweighs immediacy</div>
+  <div class="el outline-accent" style="left:120px; top:280px; width:800px; height:620px;"></div>
+  <div class="el label accent-text" style="left:165px; top:320px; width:710px; height:32px;">Chosen / durable queue</div>
+  <div class="el heading" style="left:165px; top:370px; width:710px; height:65px;">Capacity is independently bounded</div>
+  <div class="el body" style="left:165px; top:455px; width:710px; height:105px;"><span class="mono accent-text">isolation</span> — ingress accepts bursts without matching worker concurrency.</div>
+  <div class="el hairline" style="left:165px; top:575px; width:710px; height:1px;"></div>
+  <div class="el body" style="left:165px; top:600px; width:710px; height:105px;"><span class="mono accent-text">recovery</span> — retries resume from a durable position.</div>
+  <div class="el hairline" style="left:165px; top:720px; width:710px; height:1px;"></div>
+  <div class="el body" style="left:165px; top:745px; width:710px; height:105px;"><span class="mono accent-text">cost</span> — completion becomes eventually visible.</div>
+  <div class="el caption" style="left:165px; top:855px; width:710px; height:40px;">Accepted: one component; asynchronous status.</div>
+  <div class="el outline-dashed" style="left:1000px; top:280px; width:800px; height:620px;"></div>
+  <div class="el label muted" style="left:1045px; top:320px; width:710px; height:32px;">Rejected / synchronous call</div>
+  <div class="el heading muted" style="left:1045px; top:370px; width:710px; height:65px;">The request waits for compute</div>
+  <div class="el body muted" style="left:1045px; top:455px; width:710px; height:105px;"><span class="mono">isolation</span> — request capacity and worker capacity remain coupled.</div>
+  <div class="el hairline" style="left:1045px; top:575px; width:710px; height:1px;"></div>
+  <div class="el body muted" style="left:1045px; top:600px; width:710px; height:105px;"><span class="mono">recovery</span> — caller retries can duplicate work.</div>
+  <div class="el hairline" style="left:1045px; top:720px; width:710px; height:1px;"></div>
+  <div class="el body muted" style="left:1045px; top:745px; width:710px; height:105px;"><span class="mono">benefit</span> — completion is immediate on success.</div>
+  <div class="el caption" style="left:1045px; top:855px; width:710px; height:40px;">Rejected: simplicity does not satisfy the burst boundary.</div>
+  <div class="el callout body" style="left:120px; top:910px; width:1680px; height:72px;">Decision rule: choose against the named constraint, then record the cost accepted by the chosen path.</div>
+</div>
+
+<!-- Pattern slide: metrics dashboard row — WHY: one aligned monospaced row supports rapid magnitude comparison, with muted units and only one state hue. MAY vary from 3–5 metrics, thresholds, and one explicit state. MUST NOT use gauges, decorative charts, or unrelated colours. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">Pattern / metrics</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">Throughput holds while tail latency approaches its budget</div>
+  <div class="el metric-cell" style="left:120px; top:300px; width:360px; height:250px;"></div>
+  <div class="el label" style="left:120px; top:330px; width:360px; height:32px;">throughput</div>
+  <div class="el metric mono" style="left:120px; top:390px; width:360px; height:96px;">2.4<span class="metric-unit">k/s</span></div>
+  <div class="el caption mono" style="left:120px; top:485px; width:360px; height:40px;">target ≥ 2.0k/s</div>
+  <div class="el metric-cell" style="left:560px; top:300px; width:360px; height:250px;"></div>
+  <div class="el label" style="left:560px; top:330px; width:360px; height:32px;">p50 latency</div>
+  <div class="el metric mono" style="left:560px; top:390px; width:360px; height:96px;">42<span class="metric-unit"> ms</span></div>
+  <div class="el caption mono" style="left:560px; top:485px; width:360px; height:40px;">budget ≤ 80ms</div>
+  <div class="el metric-cell" style="left:1000px; top:300px; width:360px; height:250px;"></div>
+  <div class="el label warning-text" style="left:1000px; top:330px; width:360px; height:32px;">p95 latency / warn</div>
+  <div class="el metric mono warning-text" style="left:1000px; top:390px; width:360px; height:96px;">184<span class="metric-unit"> ms</span></div>
+  <div class="el caption mono" style="left:1000px; top:485px; width:360px; height:40px;">budget ≤ 200ms</div>
+  <div class="el metric-cell" style="left:1440px; top:300px; width:360px; height:250px;"></div>
+  <div class="el label" style="left:1440px; top:330px; width:360px; height:32px;">error rate</div>
+  <div class="el metric mono" style="left:1440px; top:390px; width:360px; height:96px;">0.3<span class="metric-unit">%</span></div>
+  <div class="el caption mono" style="left:1440px; top:485px; width:360px; height:40px;">budget ≤ 1.0%</div>
+  <div class="el outline" style="left:120px; top:640px; width:1680px; height:210px;"></div>
+  <div class="el heading mono warning-text" style="left:165px; top:685px; width:520px; height:60px;">WARN  p95 near budget</div>
+  <div class="el body" style="left:720px; top:680px; width:1010px; height:155px;">The state callout names the only metric that needs discussion. All other values remain neutral so the threshold breach cannot be mistaken for decoration.</div>
+  <div class="el footer-note" style="left:120px; top:940px; width:1680px; height:45px;">Value first / muted unit / threshold below / explicit state only when action changes</div>
+</div>
+
+<!-- Pattern: before / after — latency comparison — WHY: matched baselines and directly labelled bar lengths make the latency reduction visible without a legend or grid. MAY vary metric, scale, and annotation. MUST NOT change the axis between sides or use colour as the only evidence. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">Pattern / before and after</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">Batching cuts write latency from 184 ms to 72 ms</div>
+  <div class="el label" style="left:120px; top:280px; width:720px; height:32px;">Before / one write per item</div>
+  <div class="el compare-before" style="left:120px; top:330px; width:760px; height:430px;"></div>
+  <div class="el metric mono muted" style="left:170px; top:380px; width:420px; height:96px;">184<span class="metric-unit"> ms p95</span></div>
+  <div class="el latency-bar-before" style="left:170px; top:530px; width:600px; height:42px;"></div>
+  <div class="el caption mono" style="left:170px; top:595px; width:600px; height:40px;">0 ms                                    200 ms</div>
+  <div class="el body muted" style="left:170px; top:665px; width:620px; height:105px;">Connection setup repeats for every item.</div>
+  <div class="el label accent-text" style="left:1040px; top:280px; width:760px; height:32px;">After / bounded batch</div>
+  <div class="el compare-after" style="left:1040px; top:330px; width:760px; height:430px;"></div>
+  <div class="el metric mono accent-text" style="left:1090px; top:380px; width:420px; height:96px;">72<span class="metric-unit"> ms p95</span></div>
+  <div class="el latency-bar-after" style="left:1090px; top:500px; width:235px; height:42px;"></div>
+  <div class="el caption mono" style="left:1090px; top:595px; width:600px; height:40px;">0 ms                                    200 ms</div>
+  <div class="el body" style="left:1090px; top:665px; width:620px; height:105px;">One connection amortizes 32 item writes.</div>
+  <div class="el callout body" style="left:120px; top:805px; width:1680px; height:125px;">The bars share a 0–200 ms scale. Direct values carry the exact comparison; length lets the reviewer verify the direction immediately.</div>
+  <div class="el footer-note" style="left:120px; top:955px; width:1680px; height:45px;">Keep baselines, scale, units, and statistic identical across before and after.</div>
+</div>
+
+<!-- Pattern slide: layered stack diagram — WHY: aligned rectangular layers reveal dependency direction and ownership without icons or isometric effects. MAY vary from 4–7 layers and split one layer into peers. MUST NOT add perspective, depth effects, or unlabelled overlaps. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">Pattern / layered stack</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">The domain layer remains independent of transport and storage</div>
+  <div class="el label" style="left:120px; top:280px; width:280px; height:60px;">Dependency direction</div>
+  <div class="el connector-v" style="left:255px; top:340px; width:1px; height:470px;"></div>
+  <div class="el arrow-down" style="left:249px; top:801px; width:12px; height:9px;"></div>
+  <div class="el caption mono center" style="left:150px; top:830px; width:210px; height:80px;">depends<br>inward</div>
+  <div class="el stack-layer" style="left:500px; top:300px; width:1200px; height:100px;">interfaces / review entry points<span class="muted">　outermost</span></div>
+  <div class="el stack-layer" style="left:560px; top:420px; width:1080px; height:100px;">transport adapters<span class="muted">　request mapping and authentication</span></div>
+  <div class="el stack-layer" style="left:620px; top:540px; width:960px; height:100px;">application services<span class="muted">　orchestration and policy</span></div>
+  <div class="el stack-layer stack-layer-accent" style="left:680px; top:660px; width:840px; height:100px;">domain model<span class="muted">　rules and invariants</span></div>
+  <div class="el stack-layer" style="left:740px; top:780px; width:720px; height:100px;">pure data types<span class="muted">　innermost</span></div>
+  <div class="el callout body" style="left:500px; top:900px; width:1200px; height:100px;">Cyan marks the boundary; narrowing shows dependency.</div>
+</div>
+
+<!-- Pattern: table — WHY: aligned columns and hairlines support exact scanning better than cards. Use aligned monospaced text rows for 3–6 rows; above 6 rows use a native table with the template font. MAY vary to an API, schema, or configuration matrix with 3–10 rows; the shape does not change with row count. MUST NOT centre values, use zebra colours, or exceed one accent column. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">Pattern / dense table</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">Bounded defaults make overload behavior explicit</div>
+  <div class="el body muted" style="left:120px; top:280px; width:1500px; height:105px;">Configuration values are implementation contracts. Use aligned mono text rows for 3–6 rows; for 7–10 rows, use a native table with the template font.</div>
+  <div class="el" style="left:120px; top:400px; width:1680px; height:500px;">
+    <table class="dense-table">
+      <thead><tr><th>key</th><th>type</th><th>default</th><th>constraint</th><th>effect</th></tr></thead>
+      <tbody>
+        <tr><td class="accent-text">queue.capacity</td><td>integer</td><td>4096</td><td class="cell-muted">256–16384</td><td>caps accepted burst</td></tr>
+        <tr><td class="accent-text">worker.max_in_flight</td><td>integer</td><td>128</td><td class="cell-muted">1–512</td><td>bounds concurrent work</td></tr>
+        <tr><td class="accent-text">batch.max_items</td><td>integer</td><td>32</td><td class="cell-muted">1–128</td><td>amortizes writes</td></tr>
+        <tr><td class="accent-text">batch.max_wait_ms</td><td>duration</td><td>20</td><td class="cell-muted">0–100</td><td>limits batching delay</td></tr>
+        <tr><td class="accent-text">retry.max_attempts</td><td>integer</td><td>3</td><td class="cell-muted">0–5</td><td>caps duplicate risk</td></tr>
+        <tr><td class="accent-text">retry.backoff_ms</td><td>duration</td><td>100</td><td class="cell-muted">10–1000</td><td>spaces transient retries</td></tr>
+        <tr><td class="accent-text">result.ttl_hours</td><td>integer</td><td>24</td><td class="cell-muted">1–168</td><td>bounds retained state</td></tr>
+        <tr><td class="accent-text">drain.timeout_s</td><td>duration</td><td>30</td><td class="cell-muted">5–120</td><td>limits shutdown wait</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="el callout body" style="left:120px; top:930px; width:1680px; height:80px;">Eight rows use a native table and its template font; the shape does not change with row count.</div>
+</div>
+
+<!-- Pattern slide: milestone roadmap — WHY: one straight baseline and compact dated milestones show delivery order without turning work into decorative cards. MAY vary from 4–6 milestones, dates, and one current marker. MUST NOT use a gradient, winding path, or semantic state colours for ordinary time. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">Pattern / roadmap</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">The rollout validates safety before increasing traffic</div>
+  <div class="el timeline-line" style="left:180px; top:520px; width:1560px; height:1px;"></div>
+  <div class="el milestone" style="left:190px; top:485px; width:72px; height:72px;">M1</div>
+  <div class="el label accent-text" style="left:150px; top:330px; width:260px; height:32px;">Week 1</div>
+  <div class="el heading" style="left:150px; top:375px; width:280px; height:60px;">Instrument</div>
+  <div class="el caption" style="left:150px; top:580px; width:280px; height:80px;">Baseline latency and failure modes.</div>
+  <div class="el milestone" style="left:550px; top:485px; width:72px; height:72px;">M2</div>
+  <div class="el label accent-text" style="left:510px; top:330px; width:260px; height:32px;">Week 2</div>
+  <div class="el heading" style="left:510px; top:375px; width:280px; height:60px;">Shadow</div>
+  <div class="el caption" style="left:510px; top:580px; width:280px; height:80px;">Compare outputs without serving.</div>
+  <div class="el milestone" style="left:910px; top:485px; width:72px; height:72px;">M3</div>
+  <div class="el label accent-text" style="left:870px; top:330px; width:260px; height:32px;">Week 3</div>
+  <div class="el heading" style="left:870px; top:375px; width:280px; height:60px;">Constrain</div>
+  <div class="el caption" style="left:870px; top:580px; width:280px; height:80px;">Serve a bounded traffic slice.</div>
+  <div class="el milestone milestone-open" style="left:1270px; top:485px; width:72px; height:72px;">M4</div>
+  <div class="el label muted" style="left:1230px; top:330px; width:260px; height:32px;">Week 4</div>
+  <div class="el heading muted" style="left:1230px; top:375px; width:280px; height:60px;">Expand</div>
+  <div class="el caption" style="left:1230px; top:580px; width:280px; height:80px;">Increase after budget holds.</div>
+  <div class="el milestone milestone-open" style="left:1630px; top:485px; width:72px; height:72px;">M5</div>
+  <div class="el label muted" style="left:1590px; top:330px; width:210px; height:32px;">Week 5</div>
+  <div class="el heading muted" style="left:1590px; top:375px; width:210px; height:60px;">Review</div>
+  <div class="el caption" style="left:1590px; top:580px; width:210px; height:80px;">Record the operating limit.</div>
+  <div class="el outline body" style="left:120px; top:760px; width:1680px; height:125px;">Current milestone: <span class="mono accent-text bold">M3 / Constrain</span><br><span class="muted">Exit criterion: latency, errors, and rollback remain within the named budget.</span></div>
+  <div class="el footer-note" style="left:120px; top:950px; width:1680px; height:45px;">Solid accent marker = current or complete / dashed neutral marker = planned</div>
+</div>
+
+<!-- Pattern slide: closing decisions and open questions — WHY: two aligned registers preserve the deck as a decision record after the talk. MAY vary item count from 2–4 per column and include owners or dates. MUST NOT add a generic thank-you message, hide questions in notes, or colour unresolved items as failures. -->
+<div class="slide">
+  <div class="el section-label" style="left:120px; top:60px; width:700px; height:32px;">Pattern / closing record</div>
+  <div class="el slide-title" style="left:120px; top:100px; width:1500px; height:144px;">Decisions and open questions define the next change</div>
+  <div class="el label success-text" style="left:120px; top:280px; width:780px; height:32px;">Decisions</div>
+  <div class="el decision-mark heading" style="left:120px; top:340px; width:780px; height:110px;">Use the queue as the burst boundary</div>
+  <div class="el decision-mark caption mono" style="left:120px; top:465px; width:780px; height:75px;">owner: platform / next: implementation plan</div>
+  <div class="el decision-mark heading" style="left:120px; top:610px; width:780px; height:110px;">Cap concurrency at the measured limit</div>
+  <div class="el decision-mark caption mono" style="left:120px; top:735px; width:780px; height:75px;">owner: runtime / limit: placeholder value</div>
+  <div class="el label warning-text" style="left:1040px; top:280px; width:760px; height:32px;">Open questions</div>
+  <div class="el question-mark heading" style="left:1040px; top:340px; width:760px; height:110px;">What batch limit holds under peak load?</div>
+  <div class="el question-mark caption mono" style="left:1040px; top:465px; width:760px; height:75px;">test: peak replay / owner: performance / due: milestone 2</div>
+  <div class="el question-mark heading" style="left:1040px; top:610px; width:760px; height:110px;">When should a failed job leave the queue?</div>
+  <div class="el question-mark caption mono" style="left:1040px; top:735px; width:760px; height:75px;">test: fault matrix / owner: reliability / due: milestone 3</div>
+  <div class="el callout body" style="left:120px; top:900px; width:1680px; height:80px;">A question is complete only with a verification path, owner, and decision point.</div>
+</div>
+
+</body>
+</html>

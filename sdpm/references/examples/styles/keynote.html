@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!-- Part 0: Title and design tokens -->
+<title>keynote — A large-room speaking style for audiences who must understand each beat in two seconds: near-black space, enormous direct language, one warm accent, and no visual competition with the speaker.</title>
+<style>
+  :root {
+    --color-text: #F4F7FA;
+    --color-bg: #090B0E;
+    --color-canvas: #252A30;
+    --color-surface: #151A20;
+    --color-border: #3B4652;
+    --color-muted: #AAB4BF;
+    --accent: #FFB347;
+    --color-on-accent: #090B0E;
+
+    --font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+
+    --fs-cover-title: 104pt;
+    --fs-slide-title: 72pt;
+    --fs-heading: 48pt;
+    --fs-body: 32pt;
+    --fs-caption: 28pt;
+    --fs-label: 28pt;
+    --fs-metric: 196pt;
+    --fs-metric-compact: 140pt;
+    --fs-quote: 68pt;
+
+    --margin-x: 120px;
+    --content-w: 1680px;
+    --title-top: 90px;
+    --title-h: 350px;
+    --content-top: 650px;
+    --footer-top: 1000px;
+    --bar-h: 0px;
+    --radius: 0px;
+    --border-thin: 2px;
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 40px;
+    background: var(--color-canvas);
+    font-family: var(--font-family);
+    zoom: 0.7;
+  }
+  .slide {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    margin: 0 auto 40px;
+    overflow: hidden;
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+  .el { position: absolute; }
+
+  .cover-title { font-size: calc(var(--fs-cover-title) * 1.5); font-weight: 700; line-height: 0.95; letter-spacing: -4pt; }
+  .cover-subtitle { font-size: calc(var(--fs-body) * 1.5); font-weight: 400; line-height: 1.25; color: var(--color-muted); }
+  .guide-title { font-size: calc(var(--fs-heading) * 1.5); font-weight: 700; line-height: 1.05; letter-spacing: -1pt; }
+  .guide-kicker { font-size: calc(var(--fs-label) * 1.5); font-weight: 700; line-height: 1; letter-spacing: 2pt; text-transform: uppercase; color: var(--accent); }
+  .guide-copy { font-size: calc(var(--fs-body) * 1.5); font-weight: 500; line-height: 1.2; }
+  .guide-small { font-size: calc(var(--fs-caption) * 1.5); font-weight: 400; line-height: 1.2; color: var(--color-muted); }
+  .claim { font-size: calc(var(--fs-slide-title) * 1.5); font-weight: 700; line-height: 1.04; letter-spacing: -2pt; }
+  .claim-center { font-size: calc(var(--fs-slide-title) * 1.5); font-weight: 700; line-height: 1.04; letter-spacing: -2pt; text-align: center; }
+  .subtitle { font-size: calc(var(--fs-body) * 1.5); font-weight: 400; line-height: 1.2; color: var(--color-muted); }
+  .section-word { font-size: calc(var(--fs-cover-title) * 1.5); font-weight: 700; line-height: 1; letter-spacing: -3pt; text-align: center; }
+  .metric { font-size: calc(var(--fs-metric) * 1.5); font-weight: 800; line-height: 0.85; letter-spacing: -10pt; text-align: center; }
+  .metric-compact { font-size: calc(var(--fs-metric-compact) * 1.5); font-weight: 800; line-height: 0.9; letter-spacing: -6pt; text-align: center; }
+  .quote { font-size: calc(var(--fs-quote) * 1.5); font-weight: 700; line-height: 1.08; letter-spacing: -2pt; }
+  .attribution { font-size: calc(var(--fs-caption) * 1.5); font-weight: 600; line-height: 1.1; color: var(--color-muted); }
+  .triad, .process-line { font-size: calc(var(--fs-heading) * 1.5); font-weight: 700; line-height: 1; letter-spacing: 1pt; text-align: center; }
+  .image-label { font-size: calc(var(--fs-label) * 1.5); font-weight: 700; line-height: 1; letter-spacing: 2pt; color: var(--color-muted); text-transform: uppercase; }
+  .image-overlay { font-size: calc(var(--fs-slide-title) * 1.5); font-weight: 700; line-height: 1.02; letter-spacing: -2pt; }
+  .bar-label { font-size: calc(var(--fs-body) * 1.5); font-weight: 700; line-height: 1; color: var(--color-text); }
+  .bar-value { font-size: calc(var(--fs-heading) * 1.5); font-weight: 800; line-height: 1; color: var(--color-text); }
+  .table-text { font-size: calc(var(--fs-body) * 1.5); font-weight: 400; line-height: 1; }
+  .table-key { font-size: calc(var(--fs-body) * 1.5); font-weight: 700; line-height: 1; color: var(--accent); }
+
+  .accent { color: var(--accent); }
+  .muted { color: var(--color-muted); }
+  .center { text-align: center; }
+  .right { text-align: right; }
+  .rule-line { background: var(--color-border); }
+  .accent-line { background: var(--accent); }
+  .surface, .image-placeholder { background: var(--color-surface); }
+  .swatch-bg { background: var(--color-bg); border: var(--border-thin) solid var(--color-border); }
+  .swatch-text { background: var(--color-text); }
+  .swatch-muted { background: var(--color-muted); }
+  .swatch-surface { background: var(--color-surface); border: var(--border-thin) solid var(--color-border); }
+  .swatch-border { background: var(--color-border); }
+  .swatch-accent { background: var(--accent); }
+  .on-accent { color: var(--color-on-accent); background: var(--accent); }
+  .on-surface { color: var(--color-text); background: var(--color-surface); }
+  .bar-accent { background: var(--accent); }
+  .bar-muted { background: var(--color-border); }
+</style>
+</head>
+<body>
+
+<!-- Part 1: Cover -->
+<!-- Slide type: style cover — the empty field and oversized name demonstrate back-row scale and speaker-first restraint. -->
+<div class="slide">
+  <div class="el guide-kicker" style="left:120px; top:210px; width:1680px; height:60px;">Large-room speaking system</div>
+  <div class="el cover-title" style="left:120px; top:330px; width:1680px; height:220px;">keynote</div>
+  <div class="el cover-subtitle" style="left:120px; top:650px; width:1500px; height:170px;">One beat. Two seconds. Readable from the back row.</div>
+</div>
+
+<!-- Part 2: Rules -->
+<!-- Slide type: design decision — agents read the audience, room, and time constraint before any visual rule. -->
+<div class="slide">
+  <div class="el guide-kicker" style="left:120px; top:55px; width:1680px; height:60px;">Design decision</div>
+  <div class="el guide-title" style="left:120px; top:140px; width:1680px; height:210px;">The speaker is the medium; each slide is one beat of support.</div>
+  <div class="el guide-copy accent" style="left:120px; top:390px; width:500px; height:90px;">One short claim</div>
+  <div class="el guide-small" style="left:680px; top:390px; width:1120px; height:135px;">Use 12 words or fewer. Meaning lands before attention returns to the speaker.</div>
+  <div class="el rule-line" style="left:120px; top:535px; width:1680px; height:2px;"></div>
+  <div class="el guide-copy accent" style="left:120px; top:570px; width:500px; height:90px;">Text is the slide</div>
+  <div class="el guide-small" style="left:680px; top:570px; width:1120px; height:135px;">The title is the claim. Add only one subtitle when spoken context is insufficient.</div>
+  <div class="el rule-line" style="left:120px; top:715px; width:1680px; height:2px;"></div>
+  <div class="el guide-copy accent" style="left:120px; top:750px; width:500px; height:90px;">28pt is the floor</div>
+  <div class="el guide-small" style="left:680px; top:750px; width:1120px; height:135px;">If a label needs smaller type, remove detail or split the content across slides.</div>
+  <div class="el guide-small" style="left:120px; top:940px; width:1680px; height:140px;">One claim; minimal color; ≥ 5% margins; direct chart labels; no decorative gridlines; no emoji.</div>
+</div>
+
+<!-- Slide type: renderer facts — transport limitations are explicit so the composer does not guess at unsupported typography or inherited effects. -->
+<div class="slide">
+  <div class="el guide-kicker" style="left:120px; top:55px; width:1680px; height:60px;">Renderer facts</div>
+  <div class="el guide-title" style="left:120px; top:140px; width:1680px; height:210px;">Preserve the restraint when HTML refinements disappear.</div>
+  <div class="el guide-copy accent" style="left:120px; top:390px; width:420px; height:90px;">Native tables</div>
+  <div class="el guide-small" style="left:600px; top:390px; width:1200px; height:205px;">Tables inherit the template font. Do not set per-table font-family; use aligned rows only when needed.</div>
+  <div class="el rule-line" style="left:120px; top:615px; width:1680px; height:2px;"></div>
+  <div class="el guide-copy accent" style="left:120px; top:650px; width:420px; height:90px;">Filled shapes</div>
+  <div class="el guide-small" style="left:600px; top:650px; width:1200px; height:135px;">Template shadows may carry through. Set every filled shape shadow off explicitly.</div>
+  <div class="el rule-line" style="left:120px; top:805px; width:1680px; height:2px;"></div>
+  <div class="el guide-copy accent" style="left:120px; top:840px; width:420px; height:90px;">Type mapping</div>
+  <div class="el guide-small" style="left:600px; top:840px; width:1200px; height:145px;">Slide JSON omits tracking and line height. Use bold for 650; set box heights explicitly.</div>
+  <div class="el guide-small" style="left:120px; top:1000px; width:1680px; height:70px;">Text contrast ≥ 4.5:1, or ≥ 3:1 at 18pt and above.</div>
+</div>
+
+<!-- Part 3: Message and outline -->
+<!-- Slide type: message grammar — accepted claims and rejected topic labels teach the orchestrator how to phrase every beat. -->
+<div class="slide">
+  <div class="el guide-kicker" style="left:120px; top:55px; width:1680px; height:60px;">Message grammar</div>
+  <div class="el guide-title" style="left:120px; top:140px; width:1680px; height:120px;">Write the conclusion, not the topic.</div>
+  <div class="el guide-copy accent" style="left:120px; top:325px; width:760px; height:90px;">Good</div>
+  <div class="el guide-small" style="left:120px; top:435px; width:760px; height:205px;">“One choice changes the outcome.”<br>Declarative; one spoken beat.</div>
+  <div class="el guide-small" style="left:120px; top:675px; width:760px; height:205px;">“Momentum”<br>One-word section change only.</div>
+  <div class="el guide-copy muted" style="left:1040px; top:325px; width:760px; height:90px;">Avoid</div>
+  <div class="el guide-small" style="left:1040px; top:435px; width:760px; height:205px;">“Market overview”<br>A topic without a claim.</div>
+  <div class="el guide-small" style="left:1040px; top:675px; width:760px; height:205px;">“Three things to consider”<br>A list instead of a conclusion.</div>
+  <div class="el guide-copy" style="left:120px; top:930px; width:1680px; height:90px;">One sentence. Active voice. Twelve words maximum.</div>
+</div>
+
+<!-- Slide type: outline contract — the orchestrator splits density before composition because this style is chosen before the outline. -->
+<div class="slide">
+  <div class="el guide-kicker" style="left:120px; top:55px; width:1680px; height:60px;">Outline contract · 1/2</div>
+  <div class="el guide-title" style="left:120px; top:140px; width:1680px; height:210px;">Plan a sequence of beats, not dense summary slides.</div>
+  <div class="el guide-copy accent" style="left:120px; top:390px; width:470px; height:90px;">20–40 slides</div>
+  <div class="el guide-small" style="left:650px; top:390px; width:1150px; height:205px;">Open with the strongest claim; use one-word section pauses; close by returning to the opening phrase.</div>
+  <div class="el rule-line" style="left:120px; top:620px; width:1680px; height:2px;"></div>
+  <div class="el guide-copy accent" style="left:120px; top:655px; width:470px; height:90px;">Split metrics</div>
+  <div class="el guide-small" style="left:650px; top:655px; width:1150px; height:205px;">Orchestrator: split multi-metric content across slides. Reveal one measure per progressive-build beat.</div>
+</div>
+
+<!-- Slide type: outline contract — the second beat keeps evidence exceptions readable at the promised type scale. -->
+<div class="slide">
+  <div class="el guide-kicker" style="left:120px; top:55px; width:1680px; height:60px;">Outline contract · 2/2</div>
+  <div class="el guide-title" style="left:120px; top:140px; width:1680px; height:210px;">Remove density before composition.</div>
+  <div class="el guide-copy accent" style="left:120px; top:390px; width:470px; height:90px;">Avoid tables</div>
+  <div class="el guide-small" style="left:650px; top:390px; width:1150px; height:205px;">Rewrite a table as sequential claims. If evidence requires a table, cap it at four rows and follow the Part 7 exception.</div>
+  <div class="el rule-line" style="left:120px; top:620px; width:1680px; height:2px;"></div>
+  <div class="el guide-small" style="left:120px; top:700px; width:1680px; height:140px;">No agenda grid, bullets, paragraphs, cards, scorecards, multi-node diagrams, or repeating logos.</div>
+</div>
+
+<!-- Part 4: Palette -->
+<!-- Slide type: palette and usage — neutral roles dominate while one warm accent marks the item the audience should retain. -->
+<div class="slide">
+  <div class="el guide-kicker" style="left:120px; top:55px; width:1680px; height:60px;">Palette</div>
+  <div class="el guide-title" style="left:120px; top:140px; width:1680px; height:210px;">One accent means one decision about attention.</div>
+  <div class="el swatch-bg" style="left:120px; top:390px; width:240px; height:125px;"></div>
+  <div class="el swatch-text" style="left:408px; top:390px; width:240px; height:125px;"></div>
+  <div class="el swatch-muted" style="left:696px; top:390px; width:240px; height:125px;"></div>
+  <div class="el swatch-surface" style="left:984px; top:390px; width:240px; height:125px;"></div>
+  <div class="el swatch-border" style="left:1272px; top:390px; width:240px; height:125px;"></div>
+  <div class="el swatch-accent" style="left:1560px; top:390px; width:240px; height:125px;"></div>
+  <div class="el guide-small center" style="left:100px; top:540px; width:320px; height:145px;">Background<br>#090B0E</div>
+  <div class="el guide-small center" style="left:440px; top:540px; width:240px; height:145px;">Text<br>#F4F7FA</div>
+  <div class="el guide-small center" style="left:696px; top:540px; width:240px; height:145px;">Muted<br>#AAB4BF</div>
+  <div class="el guide-small center" style="left:984px; top:540px; width:240px; height:145px;">Surface<br>#151A20</div>
+  <div class="el guide-small center" style="left:1272px; top:540px; width:240px; height:145px;">Border<br>#3B4652</div>
+  <div class="el guide-small center" style="left:1560px; top:540px; width:240px; height:145px;">Accent<br>#FFB347</div>
+  <div class="el on-accent guide-copy center" style="left:120px; top:720px; width:520px; height:160px;">Accent → dark text</div>
+  <div class="el on-surface guide-copy center" style="left:700px; top:720px; width:520px; height:160px;">Surface → light text</div>
+  <div class="el guide-copy center" style="left:1280px; top:720px; width:520px; height:160px;">Background → light text</div>
+  <div class="el guide-small" style="left:120px; top:920px; width:1680px; height:140px;">Accent one word, one number, or one bar—not all three. Use surface only for imagery or required structure.</div>
+</div>
+
+<!-- Part 5: Typography -->
+<!-- Slide type: primary type ramp — every row is rendered with the token and labelled with token name, pt value, line height, and weight. -->
+<div class="slide">
+  <div class="el guide-kicker" style="left:120px; top:45px; width:1680px; height:60px;">Typography 1 of 3</div>
+  <div class="el cover-title" style="left:120px; top:130px; width:1120px; height:220px;">Cover 104</div>
+  <div class="el guide-small right" style="left:1260px; top:160px; width:540px; height:205px;">--fs-cover-title / 104pt<br>0.95 / bold</div>
+  <div class="el rule-line" style="left:120px; top:380px; width:1680px; height:2px;"></div>
+  <div class="el claim" style="left:120px; top:420px; width:900px; height:175px;">Claim 72</div>
+  <div class="el guide-small right" style="left:1060px; top:440px; width:740px; height:145px;">--fs-slide-title / 72pt<br>1.04 / bold</div>
+  <div class="el rule-line" style="left:120px; top:625px; width:1680px; height:2px;"></div>
+  <div class="el guide-title" style="left:120px; top:670px; width:900px; height:120px;">Heading 48</div>
+  <div class="el guide-small right" style="left:1060px; top:665px; width:740px; height:145px;">--fs-heading / 48pt<br>1.05 / bold</div>
+  <div class="el guide-small" style="left:120px; top:885px; width:1680px; height:135px;">Claims prefer one line and allow two. The title box always reserves both lines.</div>
+</div>
+
+<!-- Slide type: supporting type ramp — the readable floor and limited uses prevent body-copy density. -->
+<div class="slide">
+  <div class="el guide-kicker" style="left:120px; top:45px; width:1680px; height:60px;">Typography 2 of 3</div>
+  <div class="el guide-copy" style="left:120px; top:150px; width:1120px; height:100px;">Body 32 — one subtitle</div>
+  <div class="el guide-small right" style="left:1260px; top:135px; width:540px; height:135px;">--fs-body / 32pt<br>1.20 / regular</div>
+  <div class="el rule-line" style="left:120px; top:285px; width:1680px; height:2px;"></div>
+  <div class="el guide-small" style="left:120px; top:335px; width:1120px; height:100px;">Caption 28 — attribution or source</div>
+  <div class="el guide-small right" style="left:1260px; top:320px; width:540px; height:135px;">--fs-caption / 28pt<br>1.20 / regular</div>
+  <div class="el rule-line" style="left:120px; top:470px; width:1680px; height:2px;"></div>
+  <div class="el guide-kicker" style="left:120px; top:520px; width:1120px; height:70px;">Label 28 — navigation</div>
+  <div class="el guide-small right" style="left:1260px; top:505px; width:540px; height:135px;">--fs-label / 28pt<br>1.00 / bold</div>
+  <div class="el quote" style="left:120px; top:690px; width:1120px; height:165px;">“Quote 68”</div>
+  <div class="el guide-small right" style="left:1260px; top:700px; width:540px; height:135px;">--fs-quote / 68pt<br>1.08 / bold</div>
+  <div class="el guide-small" style="left:120px; top:930px; width:1680px; height:70px;">28pt is the absolute floor. Shorten or split instead of shrinking.</div>
+</div>
+
+<!-- Slide type: display type ramp — the two metric scales show the single-value and paired-value limits at their real rendered size. -->
+<div class="slide">
+  <div class="el guide-kicker" style="left:120px; top:45px; width:1680px; height:60px;">Typography 3 of 3</div>
+  <div class="el metric accent" style="left:120px; top:130px; width:930px; height:410px;">42%</div>
+  <div class="el guide-small" style="left:1120px; top:220px; width:680px; height:200px;">--fs-metric / 196pt<br>0.85 / bold<br>One value only.</div>
+  <div class="el metric-compact" style="left:120px; top:560px; width:760px; height:300px;">3.2×</div>
+  <div class="el guide-small" style="left:980px; top:580px; width:820px; height:200px;">--fs-metric-compact / 140pt<br>0.90 / bold<br>Two values maximum.</div>
+  <div class="el guide-small" style="left:120px; top:920px; width:1680px; height:140px;">Never place a metric row beneath another metric row; split measures into progressive-build slides.</div>
+</div>
+
+<!-- Part 6: Frame -->
+<!-- Slide type: frame specification — prose, tokens, and live examples use the same title and content coordinates. -->
+<div class="slide">
+  <div class="el guide-kicker" style="left:120px; top:55px; width:1680px; height:60px;">Frame geometry · 1/2</div>
+  <div class="el guide-title" style="left:120px; top:140px; width:1680px; height:210px;">Reserve space; never chase a short title upward.</div>
+  <div class="el guide-copy accent" style="left:120px; top:390px; width:470px; height:90px;">Title</div>
+  <div class="el guide-small" style="left:650px; top:390px; width:1150px; height:205px;">Top 90px; height 350px (two lines). One-line titles leave the second line empty; content never moves up.</div>
+  <div class="el rule-line" style="left:120px; top:620px; width:1680px; height:2px;"></div>
+  <div class="el guide-copy accent" style="left:120px; top:655px; width:470px; height:90px;">Content</div>
+  <div class="el guide-small" style="left:650px; top:655px; width:1150px; height:205px;">Optional subtitle sits after the title. Visual content begins at y=650px and stays centered in the remaining field.</div>
+</div>
+
+<!-- Slide type: frame specification — the second beat reserves source and template-footer space without compressing the rules. -->
+<div class="slide">
+  <div class="el guide-kicker" style="left:120px; top:55px; width:1680px; height:60px;">Frame geometry · 2/2</div>
+  <div class="el guide-title" style="left:120px; top:140px; width:1680px; height:210px;">Keep sources clear of template furniture.</div>
+  <div class="el guide-copy accent" style="left:120px; top:390px; width:470px; height:90px;">Source + footer</div>
+  <div class="el guide-small" style="left:650px; top:390px; width:1150px; height:270px;">Source line is content (draw it at y=930–990 when required); page number and footer are the template's (do not draw them). Leave y=1000–1080 empty.</div>
+  <div class="el rule-line" style="left:120px; top:690px; width:1680px; height:2px;"></div>
+  <div class="el guide-small" style="left:120px; top:750px; width:1680px; height:140px;">Frame: x=120px, width=1680px. No title band, agenda tracker, repeating logo, or authored page number.</div>
+</div>
+
+<!-- Slide type: standard content frame — the optional subtitle follows the two-line title zone and the visual is vertically centered in the lower field. -->
+<div class="slide">
+  <div class="el claim" style="left:120px; top:90px; width:1680px; height:350px;">The claim begins at the same horizon.</div>
+  <div class="el subtitle" style="left:120px; top:485px; width:1500px; height:100px;">One subtitle may clarify the spoken beat.</div>
+  <div class="el image-placeholder" style="left:120px; top:650px; width:1680px; height:280px;"></div>
+  <div class="el image-label center" style="left:120px; top:755px; width:1680px; height:60px;">One image or figure</div>
+</div>
+
+<!-- Slide type: section-divider frame — one centered word and no furniture make the empty lower third an intentional breath. -->
+<div class="slide">
+  <div class="el section-word" style="left:120px; top:420px; width:1680px; height:235px;">Momentum</div>
+</div>
+
+<!-- Slide type: closing frame — the callback occupies the same 350px claim box and the optional action remains below it. -->
+<div class="slide">
+  <div class="el claim-center" style="left:210px; top:260px; width:1500px; height:350px;">Return to the opening phrase.</div>
+  <div class="el subtitle center" style="left:360px; top:680px; width:1200px; height:100px;">Leave one thought in the room.</div>
+</div>
+
+<!-- Part 7: Patterns -->
+<!-- Pattern: single statement — WHY: one centered sentence is a complete spoken beat. Keep the 350px two-line box even for one line; do not add a subtitle or second claim. -->
+<div class="slide">
+  <div class="el claim-center" style="left:210px; top:365px; width:1500px; height:350px;">Claim stated as one sentence.</div>
+</div>
+
+<!-- Pattern: big number — WHY: the unexplained value creates a two-second moment before interpretation. Use a second progressive-build slide for context; do not add labels here. -->
+<div class="slide">
+  <div class="el metric accent" style="left:240px; top:335px; width:1440px; height:410px;">42%</div>
+</div>
+
+<!-- Pattern: before / after — WHY: two huge values and one shared label row expose a state change without a scorecard. If more measures exist, show one per slide via progressive build. -->
+<div class="slide">
+  <div class="el claim" style="left:120px; top:90px; width:1680px; height:350px;">One change moves the outcome.</div>
+  <div class="el guide-kicker center muted" style="left:120px; top:650px; width:760px; height:60px;">Before</div>
+  <div class="el guide-kicker center accent" style="left:1040px; top:650px; width:760px; height:60px;">After</div>
+  <div class="el metric-compact" style="left:120px; top:720px; width:760px; height:300px;">18%</div>
+  <div class="el metric-compact accent" style="left:1040px; top:720px; width:760px; height:300px;">42%</div>
+</div>
+
+<!-- Pattern: table — when a table is unavoidable — WHY: four aligned rows preserve evidence without becoming a dense reading task. Use no fills, hairlines only, 32pt minimum, and accent only the one value that matters. -->
+<div class="slide">
+  <div class="el claim" style="left:120px; top:90px; width:1680px; height:350px;">Only one row changes the decision.</div>
+  <div class="el table-text" style="left:120px; top:650px; width:700px; height:70px;">Measure</div>
+  <div class="el table-text right" style="left:1180px; top:650px; width:620px; height:70px;">Value</div>
+  <div class="el rule-line" style="left:120px; top:730px; width:1680px; height:2px;"></div>
+  <div class="el table-text" style="left:120px; top:755px; width:700px; height:70px;">First evidence row</div>
+  <div class="el table-text right" style="left:1180px; top:755px; width:620px; height:70px;">24</div>
+  <div class="el rule-line" style="left:120px; top:835px; width:1680px; height:2px;"></div>
+  <div class="el table-key" style="left:120px; top:860px; width:700px; height:70px;">Decisive row</div>
+  <div class="el table-key right" style="left:1180px; top:860px; width:620px; height:70px;">42</div>
+  <div class="el rule-line" style="left:120px; top:940px; width:1680px; height:2px;"></div>
+</div>
+
+<!-- Pattern: three-word triad — WHY: three isolated words create rhythm without list hierarchy. Accent one word at most; do not add descriptions or enclosing shapes. -->
+<div class="slide">
+  <div class="el guide-title center" style="left:120px; top:470px; width:500px; height:120px;">Notice</div>
+  <div class="el guide-title center accent" style="left:710px; top:470px; width:500px; height:120px;">Decide</div>
+  <div class="el guide-title center" style="left:1300px; top:470px; width:500px; height:120px;">Act</div>
+</div>
+
+<!-- Pattern: quote with attribution — WHY: a single large quotation lets another voice occupy one beat. Limit the quote to two lines and keep attribution outside the quote box. -->
+<div class="slide">
+  <div class="el quote" style="left:210px; top:260px; width:1500px; height:330px;">“Clarity leaves room for the speaker.”</div>
+  <div class="el attribution" style="left:210px; top:660px; width:1200px; height:70px;">— Source name</div>
+</div>
+
+<!-- Pattern: full-bleed image — WHY: one image supplies atmosphere while one short overlay anchors the point. Set the image shape shadow off explicitly. -->
+<div class="slide">
+  <div class="el image-placeholder" style="left:0px; top:0px; width:1920px; height:1080px;"></div>
+  <div class="el image-label" style="left:120px; top:100px; width:1200px; height:60px;">Full-bleed image placeholder</div>
+  <div class="el image-overlay" style="left:120px; top:620px; width:1680px; height:350px;">The moment changes here.</div>
+</div>
+
+<!-- Pattern: simple process — WHY: three verbs on one line let spoken pacing provide sequence without diagram furniture. Use three or four phrases; no arrows, cards, or branches. -->
+<div class="slide">
+  <div class="el process-line" style="left:120px; top:465px; width:1680px; height:120px;">NOTICE&nbsp;&nbsp;&nbsp;&nbsp;DECIDE&nbsp;&nbsp;&nbsp;&nbsp;ACT</div>
+</div>
+
+<!-- Pattern: minimal chart — WHY: three bars and direct labels make relative scale readable without axes or gridlines. Keep the claim in the 350px title box and start chart content at y=650. -->
+<div class="slide">
+  <div class="el claim" style="left:120px; top:90px; width:1680px; height:350px;">Three bars are enough.</div>
+  <div class="el bar-value center" style="left:250px; top:650px; width:320px; height:110px;">24</div>
+  <div class="el bar-muted" style="left:250px; top:780px; width:320px; height:150px;"></div>
+  <div class="el bar-label center" style="left:250px; top:950px; width:320px; height:75px;">First</div>
+  <div class="el bar-value center" style="left:800px; top:590px; width:320px; height:110px;">36</div>
+  <div class="el bar-muted" style="left:800px; top:720px; width:320px; height:210px;"></div>
+  <div class="el bar-label center" style="left:800px; top:950px; width:320px; height:75px;">Second</div>
+  <div class="el bar-value center accent" style="left:1350px; top:530px; width:320px; height:110px;">48</div>
+  <div class="el bar-accent" style="left:1350px; top:660px; width:320px; height:270px;"></div>
+  <div class="el bar-label center" style="left:1350px; top:950px; width:320px; height:75px;">Third</div>
+</div>
+
+<!-- Pattern: closing slide — WHY: one callback sentence and one optional action line create a final beat rather than a recap. Keep the callback in the reserved 350px box. -->
+<div class="slide">
+  <div class="el claim-center" style="left:210px; top:260px; width:1500px; height:350px;">The room remembers one thing.</div>
+  <div class="el subtitle center accent" style="left:360px; top:680px; width:1200px; height:100px;">Make it the right thing.</div>
+</div>
+
+</body>
+</html>
