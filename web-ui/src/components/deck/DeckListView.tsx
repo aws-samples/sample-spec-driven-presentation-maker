@@ -28,7 +28,8 @@ import { DeckSummary, SlideSearchResult } from "@/services/deckService"
 import { DeckCard } from "@/components/deck/DeckCard"
 import { EmptyState } from "@/components/deck/EmptyState"
 import { SearchResultsGrid } from "@/components/deck/SearchResultsGrid"
-import { Search, X, Plus, Lock, Star, Users, Building2, Sparkles } from "lucide-react"
+import { SelectionBar } from "@/components/deck/SelectionBar"
+import { Search, X, Plus, Lock, Star, Users, Building2, Sparkles, CheckSquare } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { IS_LOCAL } from "@/lib/mode"
 import { useTranslations } from "next-intl"
@@ -66,22 +67,43 @@ interface DeckListViewProps {
   onDownload?: (deckId: string) => void
   onOpenFolder?: (deckId: string) => void
   loading: boolean
+  /** Multi-select (bulk delete). Provided only when the active tab allows it. */
+  selection?: {
+    selectionMode: boolean
+    selectedIds: Set<string>
+    enter: () => void
+    exit: () => void
+    toggle: (deckId: string, shiftKey: boolean) => void
+    selectAll: () => void
+    onDeleteSelected: () => void
+    progress: { done: number; total: number } | null
+  }
+}
+
+/**
+ * Decks actually rendered as cards. Local mode has no server-side slide search,
+ * so the query filters deck names client-side instead.
+ */
+export function visibleDecks(decks: DeckSummary[], searchQuery: string): DeckSummary[] {
+  if (!IS_LOCAL || !searchQuery) return decks
+  const q = searchQuery.toLowerCase()
+  return decks.filter(d => (d.name || "").toLowerCase().includes(q))
 }
 
 export function DeckListView({
   decks, activeTab, onTabChange, searchQuery, onSearchChange,
   searchResults, searching, onDeckOpen, onNewDeck, favoriteIds,
   onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, onOpenFolder, loading,
+  selection,
 }: DeckListViewProps) {
   const t = useTranslations("deckList")
-  // Tauri: no server-side slide search; filter decks by name client-side instead.
   const showSearch = !IS_LOCAL && searchQuery.length >= 2
-  const filteredDecks = (IS_LOCAL && searchQuery)
-    ? decks.filter(d => (d.name || "").toLowerCase().includes(searchQuery.toLowerCase()))
-    : decks
+  const filteredDecks = visibleDecks(decks, searchQuery)
+  const canSelect = !!selection && activeTab === "mine" && !showSearch && filteredDecks.length > 0
+  const selecting = canSelect && selection.selectionMode
 
   return (
-    <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
+    <div className={`max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12 ${selecting ? "pb-28" : ""}`}>
       {/* Title + actions */}
       <div className="animate-card-in flex items-end justify-between mb-10">
         <div>
@@ -93,6 +115,17 @@ export function DeckListView({
           </p>
         </div>
         <div className="hidden sm:flex items-center gap-2">
+          {canSelect && (
+            <button
+              type="button"
+              onClick={() => (selecting ? selection.exit() : selection.enter())}
+              aria-pressed={selecting}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg border border-border text-foreground-secondary hover:text-foreground hover:bg-background-hover transition-colors"
+            >
+              <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
+              {selecting ? t("cancelSelection") : t("select")}
+            </button>
+          )}
           <button
             onClick={onNewDeck}
             className="team-action-btn team-entry-btn inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg transition-all"
@@ -195,11 +228,26 @@ export function DeckListView({
                   onShare={onShare}
                   onDownload={onDownload}
                   onOpenFolder={onOpenFolder}
+                  selectable={canSelect}
+                  selectionMode={selecting}
+                  selected={canSelect && selection.selectedIds.has(deck.deckId)}
+                  onSelectToggle={canSelect ? selection.toggle : undefined}
                 />
               ))}
             </div>
           )}
         </>
+      )}
+
+      {selecting && (
+        <SelectionBar
+          count={selection.selectedIds.size}
+          total={filteredDecks.length}
+          progress={selection.progress}
+          onSelectAll={selection.selectAll}
+          onDelete={selection.onDeleteSelected}
+          onCancel={selection.exit}
+        />
       )}
     </div>
   )

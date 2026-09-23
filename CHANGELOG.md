@@ -12,6 +12,14 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **Bulk delete in the deck list** — hover a card in My Decks and tick its
+  checkbox (or press "Select" in the header) to enter selection mode; click
+  toggles, shift-click selects a range, ⌘/Ctrl+A selects everything shown,
+  Escape leaves. A floating bar shows the count with Select all / Delete /
+  Cancel; one confirmation deletes the whole selection (five requests in
+  flight at a time, progress in the bar, failures reported and left in the
+  list). Owner tab only; the local build shows the checkbox permanently on
+  touch-sized screens.
 - **Claude Opus 5.5, GPT-6 Sol and GPT-6 Luna** are selectable models
   (`global.anthropic.claude-opus-5-5`, `global.openai.gpt-6-sol`,
   `global.openai.gpt-6-luna`). Opus 5.5 uses the extended-thinking profile

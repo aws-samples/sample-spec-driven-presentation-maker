@@ -24,7 +24,7 @@ import { DeckSummary } from "@/services/deckService"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Layers, Star, MoreHorizontal, Trash2, Building2, Lock, Share2, Download, Users, Link, FolderOpen } from "lucide-react"
+import { Layers, Star, MoreHorizontal, Trash2, Building2, Lock, Share2, Download, Users, Link, FolderOpen, Check } from "lucide-react"
 import { CloudOnly, IS_LOCAL } from "@/lib/mode"
 import { formatDate, meshGradient } from "@/lib/utils"
 import { useTranslations } from "next-intl"
@@ -43,22 +43,75 @@ interface DeckCardProps {
   onShare?: (deckId: string) => void
   onDownload?: (deckId: string) => void
   onOpenFolder?: (deckId: string) => void
+  /** Show the hover checkbox and allow this card to join a selection. */
+  selectable?: boolean
+  /** The list is in selection mode: clicking the card toggles instead of opening. */
+  selectionMode?: boolean
+  selected?: boolean
+  onSelectToggle?: (deckId: string, shiftKey: boolean) => void
 }
 
-export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOpen, onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, onOpenFolder }: DeckCardProps) {
+export function DeckCard({
+  deck, index, isFavorite = false, isOwner = true, onOpen, onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, onOpenFolder,
+  selectable = false, selectionMode = false, selected = false, onSelectToggle,
+}: DeckCardProps) {
   const t = useTranslations("deckCard")
   const { locale } = useLocale()
+  const canSelect = selectable && !!onSelectToggle
+  const toggle = (shiftKey: boolean) => onSelectToggle?.(deck.deckId, shiftKey)
+
+  function handleCardClick(e: React.MouseEvent) {
+    if (canSelect && selectionMode) { toggle(e.shiftKey); return }
+    onOpen(deck.deckId)
+  }
+  function handleCardKeyDown(e: React.KeyboardEvent) {
+    if (canSelect && selectionMode && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault()
+      toggle(e.shiftKey)
+      return
+    }
+    if (e.key === "Enter") onOpen(deck.deckId)
+  }
+
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onOpen(deck.deckId)}
-      onKeyDown={(e) => { if (e.key === "Enter") onOpen(deck.deckId) }}
-      className="animate-card-in group relative rounded-xl overflow-hidden bg-card border border-border hover:border-border-hover hover:-translate-y-[3px] transition-all duration-350 cursor-pointer hover:shadow-[var(--shadow-lift)] motion-reduce:hover:translate-y-0 motion-reduce:transition-none"
+      aria-pressed={canSelect && selectionMode ? selected : undefined}
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
+      // Shift-click range selection must not start a text selection.
+      onMouseDown={(e) => { if (canSelect && e.shiftKey) e.preventDefault() }}
+      className={`animate-card-in group relative rounded-xl overflow-hidden bg-card border transition-all duration-350 cursor-pointer motion-reduce:hover:translate-y-0 motion-reduce:transition-none ${
+        selected
+          ? "border-brand-teal ring-2 ring-brand-teal/60 shadow-[var(--shadow-lift)]"
+          : "border-border hover:border-border-hover hover:-translate-y-[3px] hover:shadow-[var(--shadow-lift)]"
+      }`}
       style={{ "--delay": `${index * 60}ms` } as React.CSSProperties}
     >
 
-      {/* Action buttons */}
+      {/* Selection checkbox */}
+      {canSelect && (
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selected}
+          aria-label={t("selectDeck", { name: deck.name })}
+          tabIndex={-1}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(e.shiftKey) }}
+          onMouseDown={(e) => { if (e.shiftKey) e.preventDefault() }}
+          className={`absolute top-2.5 left-2.5 z-10 flex h-6 w-6 items-center justify-center rounded-md border backdrop-blur-md transition-all ${
+            selected
+              ? "border-brand-teal bg-brand-teal text-background opacity-100"
+              : `border-white/60 bg-black/40 text-transparent hover:border-white ${selectionMode ? "opacity-100" : "sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"}`
+          }`}
+        >
+          <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
+        </button>
+      )}
+
+      {/* Action buttons (hidden while selecting — the card itself is the control) */}
+      {!(canSelect && selectionMode) && (
       <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-0.5">
         {!IS_LOCAL && (
         <button
@@ -147,9 +200,10 @@ export function DeckCard({ deck, index, isFavorite = false, isOwner = true, onOp
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      )}
 
       {/* Thumbnail */}
-      <div className="aspect-[16/9.5] relative overflow-hidden">
+      <div className={`aspect-[16/9.5] relative overflow-hidden transition-transform duration-300 ${selected ? "scale-[0.97] rounded-lg" : ""}`}>
         {deck.thumbnailUrl ? (
           <img
             src={deck.thumbnailUrl}

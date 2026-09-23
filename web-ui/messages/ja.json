@@ -39,7 +39,14 @@
     "emptyMineDescription": "AI の支援で最初のプレゼンテーションを作りましょう。",
     "emptyMineAction": "最初のデッキを作成",
     "emptyOtherTitle": "{tab}はまだありません",
-    "emptyOtherDescription": "デッキが追加されるとこのタブに表示されます。"
+    "emptyOtherDescription": "デッキが追加されるとこのタブに表示されます。",
+    "select": "選択",
+    "cancelSelection": "選択を解除",
+    "selectedCount": "{count, plural, other {# 件選択中}}",
+    "selectAll": "すべて選択 ({total})",
+    "deleteSelected": "削除",
+    "deletingProgress": "{done} / {total} 件削除中…",
+    "selectionToolbar": "選択中のデッキ"
   },
   "settings": {
     "title": "設定",
@@ -69,7 +76,8 @@
     "delete": "削除",
     "previewAlt": "{name} のプレビュー",
     "internal": "社内公開",
-    "private": "非公開"
+    "private": "非公開",
+    "selectDeck": "{name} を選択"
   },
   "workspace": {
     "slideCount": "{count, plural, other {# 枚のスライド}}",
@@ -377,7 +385,11 @@
     "newDeck": "新規デッキ",
     "createNewDeck": "新しいデッキを作成",
     "chat": "チャット",
-    "preview": "プレビュー"
+    "preview": "プレビュー",
+    "bulkDeleteTitle": "{count, plural, other {# 件のデッキを削除しますか?}}",
+    "bulkDeleteDescription": "選択したデッキは 30 日後に完全に削除されます。この操作は元に戻せません。",
+    "bulkDeleteFailed": "{count, plural, other {# 件のデッキを削除できませんでした。}}",
+    "bulkDeleteDescriptionLocal": "選択したデッキのフォルダを即時に削除します。この操作は元に戻せません。"
   },
   "mcp": {
     "connected": "接続済み: {names}",
