@@ -77,6 +77,17 @@ Entries before v0.5.0 were written retroactively as summaries.
   finished deck scrolls at full frame rate. The full view now follows the
   slide being composed until you scroll yourself.
 
+### Removed
+
+- **"Parallel agents" toggle in the chat Options** — it did not do what it
+  said. On the cloud stack it switched to a `single` agent mode that dropped
+  `compose_slides` entirely (the orchestrator wrote every slide itself, slowly
+  and without the compose board); in local mode it reached nothing at all. It
+  also hid the Spec / Vibe selector when off. Composers always run now. The
+  `single` and `separated` wire values are gone — the agent accepts `spec`,
+  `vibe`, `composer`, `style_creator`; a payload without `mode` defaults to
+  `spec` (was `single`).
+
 ## [0.9.0] - 2026-09-22
 
 ### Added

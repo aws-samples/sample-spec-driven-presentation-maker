@@ -25,8 +25,6 @@ _WORKFLOW_BY_MODE = {
     "orchestrator": "orchestrator",
     "vibe": "orchestrator",
     "spec": "orchestrator",
-    "separated": "orchestrator",
-    "single": "orchestrator",
     "composer": "composer",
     "style_creator": "style",
 }
@@ -62,8 +60,6 @@ def _file_parts(mode):
 @pytest.mark.parametrize("mode,token", [
     ("vibe", "wiring/interaction_fast"),
     ("spec", "wiring/interaction_dialogue"),
-    ("separated", "wiring/interaction_dialogue"),
-    ("single", "wiring/interaction_dialogue"),
 ])
 def test_ui_modes_pass_interaction_token_only(mode, token):
     """Spec/Vibe differ from the plain orchestrator by exactly one token part."""
@@ -82,13 +78,13 @@ def test_interaction_tokens_are_bare_lines_defined_by_the_workflow():
     assert "`Interaction mode: fast`" in workflow
 
 
-def test_single_mode_composes_without_composer_agents():
-    single = MODES["single"]
-    assert single.use_composer is False
-    assert single.agent_model == "create"
-    assert "wiring/no_composers" in _file_parts("single")
-    assert "wiring/compose_report" not in _file_parts("single")
-    assert MODES["separated"].use_composer is True
+def test_ui_modes_always_have_composers():
+    """No mode drops compose_slides: the former "single" (no-composer) mode is gone."""
+    for name in ("spec", "vibe", "orchestrator"):
+        assert MODES[name].use_composer is True
+    assert "single" not in MODES
+    assert "separated" not in MODES
+    assert not (_PROMPTS_DIR / "wiring" / "no_composers.md").exists()
 
 
 def test_no_mode_uses_local_role_files():

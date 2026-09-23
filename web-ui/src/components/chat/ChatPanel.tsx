@@ -102,7 +102,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   // --- Options ---
   const [optionsOpen, setOptionsOpen] = useState(false)
-  const { fetchWebImages, setFetchWebImages, parallelAgents, setParallelAgents, agentMode, setAgentMode } = usePreferences()
+  const { fetchWebImages, setFetchWebImages, agentMode, setAgentMode } = usePreferences()
 
   // --- Local kiro session continuation ---
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false)
@@ -204,7 +204,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [sessionId, auth.user?.id_token, onDeckCreated, onPreviewInvalidated, onWorkflowPhase])
 
   // --- useChatStream ---
-  const mode = agentMode === "vibe" ? "vibe" : (parallelAgents ? "separated" : "single")
+  const mode = agentMode === "vibe" ? "vibe" : "spec"
   const stream = useChatStream({
     sessionId,
     mode,
@@ -638,7 +638,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 ))}
               </div>
             )}
-            {parallelAgents && <ModeSelector value={agentMode} onChange={setAgentMode} />}
+            <ModeSelector value={agentMode} onChange={setAgentMode} />
           </div>
         ) : (
           <div className="space-y-4">
@@ -692,7 +692,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           onSlashOpen={slashPickerItems.ensure}
           onTextareaFocus={slashPickerItems.ensure}
         >
-          {/* Options expander */}
+          {/* Options expander — the only option (web images) is cloud-only */}
+          {!IS_LOCAL && (
           <div className="px-2">
             <button
               type="button"
@@ -704,7 +705,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             </button>
             {optionsOpen && (
               <div className="flex flex-col gap-2 pb-2 pl-1">
-                {!IS_LOCAL && (
                 <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
                   bg-foreground/[0.02] hover:bg-foreground/[0.05] transition-colors">
                   <div className="flex flex-col gap-0.5 min-w-0">
@@ -725,37 +725,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     }`} />
                   </button>
                 </label>
-                )}
-
-                <label className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 cursor-pointer
-                  bg-foreground/[0.02] hover:bg-foreground/[0.05] transition-colors">
-                  <div className="flex flex-col gap-0.5 min-w-0">
-                    <span className="text-xs text-foreground-secondary font-medium select-none flex items-center gap-2">
-                      {t("parallelAgents")}
-                      <span className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-semibold tracking-wide
-                        bg-brand-amber-soft text-brand-amber border border-brand-amber/25">
-                        {t("experimental")}
-                      </span>
-                    </span>
-                    <span className="text-xs text-foreground-muted select-none leading-snug">{t("parallelAgentsDescription")}</span>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={parallelAgents}
-                    onClick={() => setParallelAgents(!parallelAgents)}
-                    className={`relative flex-none w-9 h-5 rounded-full transition-colors duration-200 ${
-                      parallelAgents ? "bg-brand-teal" : "bg-foreground/[0.1]"
-                    }`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                      parallelAgents ? "translate-x-4" : ""
-                    }`} />
-                  </button>
-                </label>
               </div>
             )}
           </div>
+          )}
         </ChatInput>
       </FileDropZone>
       {IS_LOCAL && (

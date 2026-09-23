@@ -59,7 +59,6 @@ _STYLE_TOOLS = [
 
 _INTERACTION_DIALOGUE = Part(Source.file("wiring/interaction_dialogue"), target="system")
 _INTERACTION_FAST = Part(Source.file("wiring/interaction_fast"), target="system")
-_NO_COMPOSERS = Part(Source.file("wiring/no_composers"), target="system")
 
 
 def _orchestrator(*wiring: Part, use_composer: bool = True, **overrides) -> ModeConfig:
@@ -84,10 +83,6 @@ _ORCHESTRATOR = _orchestrator()
 # environment fact the workflow cannot know, so it is passed as a one-line token.
 _ORCHESTRATOR_DIALOGUE = _orchestrator(_INTERACTION_DIALOGUE)
 _ORCHESTRATOR_FAST = _orchestrator(_INTERACTION_FAST)
-# Web UI "Parallel agents" off: no compose_slides tool; the agent composes itself.
-_SINGLE = _orchestrator(
-    _INTERACTION_DIALOGUE, _NO_COMPOSERS, use_composer=False, agent_model="create",
-)
 
 _COMPOSER = ModeConfig(
     parts=[_workflow("composer")],
@@ -107,14 +102,12 @@ _STYLE_CREATOR = ModeConfig(
     allowed_tools=_STYLE_TOOLS,
 )
 
-# Wire values from API/Web UI. "spec"/"separated" and "vibe" share the orchestrator
-# workflow and differ only in the interaction-mode token; "single" also drops composers.
+# Wire values from API/Web UI. "spec" and "vibe" share the orchestrator workflow
+# and differ only in the interaction-mode token.
 MODES: dict[str, ModeConfig] = {
     "orchestrator": _ORCHESTRATOR,
     "vibe": _ORCHESTRATOR_FAST,
     "spec": _ORCHESTRATOR_DIALOGUE,
-    "separated": _ORCHESTRATOR_DIALOGUE,
-    "single": _SINGLE,
     "composer": _COMPOSER,
     "style_creator": _STYLE_CREATOR,
 }
