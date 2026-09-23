@@ -31,9 +31,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   official service-category colours as `--cat-*` tokens with per-background
   tints, official icons, one Smile Orange emphasis per slide; the two files
   differ only in `:root` and the palette specimens.
-- **`"_noEffects": true`** is documented in the slide JSON spec as the way to
-  suppress a template theme shadow on a filled shape (the builder already
-  honoured it; styles that forbid shadows now name it).
+
 - **Claude Opus 5.5, GPT-6 Sol and GPT-6 Luna** are selectable models
   (`global.anthropic.claude-opus-5-5`, `global.openai.gpt-6-sol`,
   `global.openai.gpt-6-luna`). Opus 5.5 uses the extended-thinking profile
@@ -73,6 +71,16 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **Shapes and connectors no longer inherit the template theme's shadow.**
+  python-pptx gives every autoshape a default `<p:style effectRef>` that
+  resolves to the theme's effect style — an outer shadow in the Office default
+  theme and in the bundled blank templates — so any filled shape or line built
+  from JSON without a `shadow` key grew a shadow nobody asked for. The builder
+  now always writes an explicit effect list (empty when no effect is requested),
+  and `"shadow": "none"` (also glow / softEdge / reflection / bevel) is an
+  explicit off instead of falling back to the `md` preset. Decks that relied on
+  the accidental theme shadow will render flat; set `"shadow": "sm"` where a
+  shadow is wanted.
 - **Local ACP prompt errors no longer hang the stream** — an RPC error from
   `session/prompt` now surfaces on the SSE stream as an error event instead of
   an unhandled rejection with the chat stuck in "thinking".

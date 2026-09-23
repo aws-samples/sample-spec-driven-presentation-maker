@@ -138,17 +138,16 @@ class LineMixin:
             x2_emu, y2_emu
         )
 
-        # Source had no effects: drop python-pptx's default <p:style>
-        # (effectRef idx=1 = theme shadow painted under plain lines) and
-        # write an empty effectLst.
+        # Effects are explicit: apply_effects pins an empty effectLst when the
+        # JSON asks for none, so the theme shadow behind python-pptx's default
+        # <p:style effectRef> never paints under a plain line. Imported lines
+        # (_noEffects) additionally drop the <p:style> itself.
         if elem.get("_noEffects"):
-            from lxml import etree as _et_ne
             from pptx.oxml.ns import qn as _qn_ne
             for style in connector._element.findall(_qn_ne('p:style')):
                 connector._element.remove(style)
-            sp_pr_ne = connector._element.spPr
-            if sp_pr_ne.find(_qn_ne('a:effectLst')) is None:
-                _et_ne.SubElement(sp_pr_ne, _qn_ne('a:effectLst'))
+        from sdpm.utils.effects import apply_effects as _apply_effects
+        _apply_effects(connector._element, elem, self.EMU_PER_PX)
 
         # V-H-V elbow: rotate connector so it starts vertically
         elbow_start = elem.get("elbowStart", "horizontal")

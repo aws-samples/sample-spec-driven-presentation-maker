@@ -499,9 +499,9 @@ Effects applicable to shape, textbox, and image.
 - Presets: `"sm"` / `"md"` / `"lg"` (outer shadow, varying size)
 - Custom: `type` (outer/inner), `blur` (blur radius px), `distance` (px), `direction` (angle deg), `color`, `opacity`
 - For card floating effect, text readability, layer expression
-- **Turning inherited effects off**: a filled shape with no `shadow` key can still pick up the
-  template theme's shadow. `"_noEffects": true` on the element writes an empty effect list so no
-  theme shadow applies — use it when the style says shapes carry no shadow.
+- Effects are explicit: an element with no effect keys renders with none. The template
+  theme's own shadow (Office default themes carry one) never applies to elements built from
+  JSON. `"shadow": "none"` is an explicit off (same for `glow`, `softEdge`, `reflection`, `bevel`).
 
 ### glow
 ```json

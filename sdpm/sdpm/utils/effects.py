@@ -56,17 +56,30 @@ def _insert_ordered(parent, child):
     parent.append(child)
 
 
-def apply_effects(element, elem_def, emu_per_px=6350):
-    """Apply visual effects (shadow, glow, softEdge, reflection, bevel, 3D rotation)."""
-    shadow = elem_def.get("shadow")
-    glow = elem_def.get("glow")
-    soft_edge = elem_def.get("softEdge")
-    reflection = elem_def.get("reflection")
-    bevel = elem_def.get("bevel")
-    rotation3d = elem_def.get("rotation3d")
+def _off(value):
+    """Normalise the 'no effect' spellings: missing, null, false, "none", ""."""
+    if value is None or value is False or value == "" or value == "none":
+        return None
+    return value
 
-    if not any([shadow, glow, soft_edge, reflection, bevel, rotation3d]):
-        return
+
+def apply_effects(element, elem_def, emu_per_px=6350):
+    """Apply visual effects (shadow, glow, softEdge, reflection, bevel, 3D rotation).
+
+    What the JSON says is what renders: an element with no effect keys gets an
+    explicit empty ``<a:effectLst/>``. Without it, python-pptx's default
+    ``<p:style><a:effectRef idx="…">`` resolves to the template theme's effect
+    style, which in the Office default theme (and the bundled blank templates)
+    is an outer shadow — so shapes would grow a shadow nobody asked for.
+    ``"shadow": "none"`` (likewise glow/softEdge/reflection/bevel) is an
+    explicit off, not an unknown preset.
+    """
+    shadow = _off(elem_def.get("shadow"))
+    glow = _off(elem_def.get("glow"))
+    soft_edge = _off(elem_def.get("softEdge"))
+    reflection = _off(elem_def.get("reflection"))
+    bevel = _off(elem_def.get("bevel"))
+    rotation3d = _off(elem_def.get("rotation3d"))
 
     sp_pr = element.spPr if hasattr(element, 'spPr') else element.find(qn('p:spPr'))
     if sp_pr is None:
@@ -74,12 +87,21 @@ def apply_effects(element, elem_def, emu_per_px=6350):
     if sp_pr is None:
         return
 
+    if not any([shadow, glow, soft_edge, reflection, bevel, rotation3d]):
+        if sp_pr.find(qn('a:effectLst')) is None:
+            _insert_ordered(sp_pr, etree.Element(qn('a:effectLst')))
+        return
+
     if any([shadow, glow, soft_edge, reflection]):
         for existing in sp_pr.findall(qn('a:effectLst')):
             sp_pr.remove(existing)
         effect_lst = etree.Element(qn('a:effectLst'))
         _insert_ordered(sp_pr, effect_lst)
+    elif sp_pr.find(qn('a:effectLst')) is None:
+        # bevel / 3D only: still pin the effect list so no theme shadow joins in
+        _insert_ordered(sp_pr, etree.Element(qn('a:effectLst')))
 
+    if any([shadow, glow, soft_edge, reflection]):
         if shadow:
             if isinstance(shadow, str):
                 shadow = SHADOW_PRESETS.get(shadow, SHADOW_PRESETS["md"])
