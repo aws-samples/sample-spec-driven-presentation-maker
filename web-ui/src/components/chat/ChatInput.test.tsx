@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: MIT-0
 
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { createRef } from "react"
+import { act, cleanup, fireEvent, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import type { PickerItem } from "@/lib/slashToken"
-import { ChatInput, type ChatInputProps } from "./ChatInput"
+import { ChatInput, type ChatInputHandle, type ChatInputProps } from "./ChatInput"
 
 vi.mock("@/hooks/UseMobile", () => ({ useIsMobile: () => false }))
 vi.mock("@/services/deckService", () => ({
@@ -32,8 +33,10 @@ const slashItems: PickerItem[] = [
 
 function renderInput(overrides: Partial<ChatInputProps> = {}) {
   const onSend = vi.fn()
+  const handle = createRef<ChatInputHandle>()
   renderWithIntl(
     <ChatInput
+      ref={handle}
       onSend={onSend}
       isLoading={false}
       onStop={vi.fn()}
@@ -43,6 +46,7 @@ function renderInput(overrides: Partial<ChatInputProps> = {}) {
   )
   return {
     onSend,
+    handle,
     textarea: screen.getByRole("textbox", { name: "Chat message input" }) as HTMLTextAreaElement,
   }
 }
@@ -112,5 +116,16 @@ describe("ChatInput slash picker", () => {
     fireEvent.keyDown(textarea, { key: "Enter" })
     expect(onSend).toHaveBeenCalledTimes(1)
     expect(onSend.mock.calls[0][0]).toBe("/")
+  })
+
+  it("opens when a slash is inserted programmatically (empty-state hint)", () => {
+    const { handle, textarea } = renderInput()
+    textarea.focus()
+    textarea.setSelectionRange(0, 0)
+
+    act(() => { handle.current?.insertAtCursor("/") })
+
+    expect(screen.getByRole("listbox")).toBeTruthy()
+    expect(textarea.getAttribute("aria-expanded")).toBe("true")
   })
 })

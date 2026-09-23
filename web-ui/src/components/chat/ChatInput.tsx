@@ -132,10 +132,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       const end = ta.selectionEnd
       const before = input.slice(0, start)
       const after = input.slice(end)
-      setInput(before + text + after)
+      const next = before + text + after
+      const pos = start + text.length
+      setInput(next)
+      // Programmatic inserts bypass onChange, so feed the slash picker here too
+      // (e.g. the empty-state hint inserts "/" to open it).
+      if (slashEnabled) picker.onInputChange(next, pos)
       requestAnimationFrame(() => {
         ta.focus()
-        const pos = start + text.length
         ta.setSelectionRange(pos, pos)
       })
     },
@@ -147,7 +151,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       handleFilesRef.current(fakeList)
     },
     textareaRef,
-  }), [input])
+  }), [input, picker, slashEnabled])
 
   const handleFiles = useCallback((files: FileList) => {
     const currentCount = attachments.length

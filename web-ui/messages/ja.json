@@ -228,7 +228,7 @@
     "example3": "これから説明するテーマで 5 分の技術トークを作って",
     "chatMessages": "チャットメッセージ",
     "placeholderMobile": "なんでも聞いてください…",
-    "placeholderDesktop": "なんでも聞いてください…  ⌘↵ で送信",
+    "placeholderDesktop": "なんでも聞いてください…  / でテンプレート・スタイル  ⌘↵ で送信",
     "forceStop": "強制停止 — 進行中のレポートが失われる可能性があります",
     "mentionSuggestions": "メンション候補",
     "errorSwitchModel": "モデルを切り替えられませんでした",

@@ -228,7 +228,7 @@
     "example3": "Make a 5-minute tech talk about a topic I'll describe",
     "chatMessages": "Chat messages",
     "placeholderMobile": "Ask anything…",
-    "placeholderDesktop": "Ask anything…  ⌘↵ send",
+    "placeholderDesktop": "Ask anything…  / template · style  ⌘↵ send",
     "forceStop": "Force stop — partial report may be lost",
     "mentionSuggestions": "Mention suggestions",
     "errorSwitchModel": "Failed to switch model",
