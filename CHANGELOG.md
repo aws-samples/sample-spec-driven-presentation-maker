@@ -33,6 +33,14 @@ Entries before v0.5.0 were written retroactively as summaries.
     service-category colours as `--cat-*` tokens with per-background tints,
     official icons, one Smile Orange emphasis per slide; the two files differ
     only in `:root` and the palette specimens.
+  - Concept tier, chosen by look. Each states numeric limits for how far the
+    look may be pushed (border and shadow sizes, colours per slide, words per
+    title, rotation) so composers cannot drift: `neo-brutalist` (cream, 6px
+    black borders, hard 12px shadows, flat primary fills), `typographic`
+    (white, type set huge and tight, one red word, no shapes at all),
+    `signal` (near-black, one safety-yellow panel, upright ultra-bold
+    headlines, hazard stripe), `racing` (near-black, italic condensed
+    headlines, blue-violet-red stripe, speed lines).
 - **Style contract test** (`tests/test_builtin_styles_contract.py`) and a
   style-verification sample deck (`tests/fixtures/style-sample-deck/`).
 

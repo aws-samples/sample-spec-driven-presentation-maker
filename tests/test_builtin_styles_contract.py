@@ -24,6 +24,8 @@ BUNDLED = sorted(p for p in BUNDLED_STYLES_DIR.glob("*.html"))
 EXPECTED_NAMES = {
     # orthodox tier — pick one of these when in doubt
     "report", "briefing", "aws-light", "aws-dark",
+    # concept tier — chosen by look
+    "neo-brutalist", "typographic", "signal", "racing",
 }
 
 REQUIRED_TOKENS = ("--color-text", "--color-bg", "--fs-cover-title", "--fs-slide-title", "--fs-body")

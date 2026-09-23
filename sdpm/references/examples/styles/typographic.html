@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>typographic — For presenters and readers who need an idea to register instantly, this style turns each slide into one visual beat; the design decision removes every graphic device so scale, weight, line breaks, and a single red word make type itself the signature image.</title>
+<style>
+:root {
+  --color-text: #111111;
+  --color-bg: #FFFFFF;
+  --color-surface: #FFFFFF;
+  --color-border: #111111;
+  --color-muted: #666666;
+  --accent: #E63312;
+  --color-on-accent: #FFFFFF;
+  --font-family: "Helvetica Neue", Arial, "Segoe UI", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+  --fs-cover-title: 118pt;
+  --fs-slide-title: 84pt;
+  --fs-display: 150pt;
+  --fs-metric: 170pt;
+  --fs-heading: 42pt;
+  --fs-body: 16pt;
+  --fs-caption: 12pt;
+  --fs-label: 10pt;
+  --fs-meta: 9pt;
+  --margin-x: 96px;
+  --content-w: 1728px;
+  --content-top: 320px;
+  --body-w: 360pt;
+  --body-bottom: 54pt;
+  --bar-h: 0px;
+  --radius: 0px;
+  --border-thin: 0px;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(--font-family); zoom: 0.7; color: var(--color-text); }
+.slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; overflow: hidden; background: var(--color-bg); color: var(--color-text); }
+.el { position: absolute; }
+.cover-title { font-size: calc(var(--fs-cover-title) * 1.5); line-height: .9; font-weight: 900; letter-spacing: -5pt; white-space: nowrap; }
+.slide-title { font-size: calc(var(--fs-slide-title) * 1.5); line-height: .9; font-weight: 900; letter-spacing: -4pt; white-space: nowrap; }
+.display { font-size: calc(var(--fs-display) * 1.5); line-height: .88; font-weight: 900; letter-spacing: -7pt; white-space: nowrap; }
+.metric { font-size: calc(var(--fs-metric) * 1.5); line-height: .84; font-weight: 900; letter-spacing: -9pt; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.heading { font-size: calc(var(--fs-heading) * 1.5); line-height: .92; font-weight: 800; letter-spacing: -1.5pt; }
+.body-text { font-size: calc(var(--fs-body) * 1.5); line-height: 1.25; font-weight: 400; }
+.caption { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.3; }
+.label { font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; font-weight: 800; letter-spacing: .8pt; text-transform: uppercase; }
+.meta { font-size: calc(var(--fs-meta) * 1.5); line-height: 1.25; font-weight: 500; }
+.muted { color: var(--color-muted); }
+.accent { color: var(--accent); }
+.black { color: var(--color-text); }
+.heavy { font-weight: 900; }
+.regular { font-weight: 400; }
+.right { text-align: right; }
+.center { text-align: center; }
+.tabular { font-variant-numeric: tabular-nums; }
+.nowrap { white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<!-- Part 0: Title and machine-readable design tokens -->
+<!-- Part 1: Cover -->
+<!-- Slide 1: Cover — Two words fill the field so type becomes the image; wording may vary within the three-word limit, but the white ground, edge-reaching scale, and maximum of one red word may not. -->
+<div class="slide cover">
+  <div class="el display" style="left:96px; top:64px; width:1933px; height:200px;">TYPE</div>
+  <div class="el display accent" style="left:96px; top:264px; width:1933px; height:200px;">SPEAKS</div>
+  <div class="el body-text" style="left:1240px; top:907px; width:480px; height:96px;">Placeholder subtitle for the deck.<br>Context and date occupy one compact block.</div>
+</div>
+
+<!-- Part 2: Rules -->
+<!-- Slide 2: Design decision and numeric limits — The constraints are stated in one compact block because any additional visual device would contradict the style; values may not be relaxed. -->
+<div class="slide">
+  <div class="el slide-title" style="left:96px; top:88px; width:1933px; height:139px;">TYPE DECIDES</div>
+  <div class="el body-text" style="left:96px; top:667px; width:1653px; height:160px;">Design decision: immediate recognition comes from typography alone; every non-type mark competes with the message.<br>Limits: cover ≤ 3 words; title = 1 line; at most 1 red word; body = 1 block of ≤ 3 lines; a display word never shrinks to fit — a word wider than the content width (about 8 characters at --fs-display) is broken into two lines or bleeds past the right edge on purpose.<br>Use 0 shapes, 0 rules, 0 boxes, 0 images except charts, 0 emoji, and 0° rotation; muted grey is the only second colour.</div>
+</div>
+
+<!-- Slide 3: Derived DO and DON'T rules — Universal composition and accessibility rules become operational without adding decoration; wording may tighten, but the numeric thresholds and bleed exception may not. -->
+<div class="slide">
+  <div class="el slide-title" style="left:96px; top:88px; width:2000px; height:139px;">KEEP IT TIGHT</div>
+  <div class="el body-text" style="left:96px; top:667px; width:1653px; height:160px;">DO: make one claim per slide, make the title that claim, keep margins ≥ 5%, keep contrast ≥ 4.5:1 (≥ 3:1 for 18pt+), and label chart values directly.<br>DON'T: add decoration, extra colours, emoji, body fragments, or empty gridlines; only the headline may bleed past the right edge as a deliberate exception.<br>Renderer fact: slide JSON has no letter-spacing; create tightness with size and line breaks, using only 800 or 900 weight for display type.</div>
+</div>
+
+<!-- Part 3: Message and Outline -->
+<!-- Slide 4: Title grammar — Short claim grammar protects the oversized composition; words may change, but one beat and the three-word ceiling may not. -->
+<div class="slide">
+  <div class="el display" style="left:96px; top:72px; width:1933px; height:197px;">ONE BEAT</div>
+  <div class="el body-text" style="left:1240px; top:880px; width:480px; height:120px;">The title is a single word or a phrase of ≤ 3 words.<br>It carries one claim, not a topic label.<br>Supporting copy remains one block of ≤ 3 lines.</div>
+</div>
+
+<!-- Slide 5: Outline rhythm — Deck guidance follows visual pacing rather than a use case; length may vary inside the range, but no purpose-specific chapter sequence may be imposed. -->
+<div class="slide">
+  <div class="el slide-title" style="left:96px; top:83px; width:1933px; height:139px;">8–18 SLIDES</div>
+  <div class="el body-text" style="left:96px; top:667px; width:1653px; height:160px;">Sequence one visual beat per slide; alternate very large statements with quieter evidence while retaining the same frame.<br>Break a word across lines only when the whole word cannot stay legible at display size or when the break reveals a meaningful spoken beat.<br>Use no fixed chapter shape: pacing comes from scale, white space, and deliberate repetition rather than a purpose-specific outline.</div>
+</div>
+
+<!-- Part 4: Palette -->
+<!-- Slide 6: Palette — Colour is described with words rather than swatch shapes to preserve the type-only system; token values and roles may not vary. -->
+<div class="slide">
+  <div class="el display" style="left:96px; top:56px; width:1933px; height:200px;">BLACK</div>
+  <div class="el heading accent" style="left:96px; top:363px; width:560px; height:75px;">RED</div>
+  <div class="el heading muted" style="left:96px; top:475px; width:827px; height:75px;">MUTED GREY</div>
+  <div class="el body-text" style="left:1240px; top:853px; width:480px; height:144px;">#111111 carries every claim on white.<br>#E63312 marks at most one word per slide.<br>#666666 is the only auxiliary colour; surfaces stay white.</div>
+</div>
+
+<!-- Part 5: Typography -->
+<!-- Slide 7: Actual-size type ramp — The ramp demonstrates hierarchy as content rather than as a boxed specimen; sample words may vary, but token sizes, weights, and line heights may not. -->
+<div class="slide">
+  <div class="el label muted" style="left:96px; top:56px; width:667px; height:27px;">Typography / actual-size ramp</div>
+  <div class="el display" style="left:96px; top:96px; width:1933px; height:200px;">DISPLAY</div>
+  <div class="el slide-title" style="left:96px; top:331px; width:1933px; height:139px;">SLIDE TITLE</div>
+  <div class="el heading" style="left:96px; top:515px; width:1067px; height:77px;">Heading at 42pt / 800</div>
+  <div class="el body-text" style="left:96px; top:635px; width:1013px; height:64px;">Body at 16pt / regular / line-height 1.25</div>
+  <div class="el caption muted" style="left:96px; top:725px; width:1013px; height:53px;">Caption at 12pt / supporting information</div>
+  <div class="el meta muted" style="left:96px; top:803px; width:1200px; height:48px;">--fs-cover-title 118pt · --fs-display 150pt · --fs-metric 170pt</div>
+  <div class="el body-text" style="left:1240px; top:880px; width:480px; height:120px;">Display uses weight 900; headings use 800.<br>Titles stay on one line and may crop at right.<br>Body copy remains regular and compact.</div>
+</div>
+
+<!-- Part 6: Frame -->
+<!-- Slide 8: Standard frame — A top-left oversized claim and one bottom-right copy block create the repeatable frame; title and copy may vary, but their positions may not. -->
+<div class="slide">
+  <div class="el slide-title" style="left:96px; top:77px; width:1933px; height:139px;">CLAIM FIRST</div>
+  <div class="el body-text" style="left:1240px; top:880px; width:480px; height:120px;">Every slide sets its background to --color-bg (#FFFFFF).<br>Standard content starts at 72pt from the left.<br>The claim owns the upper field.<br>One supporting block closes the lower-right corner.</div>
+</div>
+
+<!-- Slide 9: Section divider — A single word creates a pause without a graphic divider; the word may vary, but no subtitle, rule, or shape may enter this frame. -->
+<div class="slide">
+  <div class="el display accent" style="left:96px; top:347px; width:1933px; height:213px;">SHIFT</div>
+  <div class="el meta muted" style="left:96px; top:867px; width:693px; height:37px;">SECTION WORD / PLACEHOLDER</div>
+</div>
+
+<!-- Slide 10: Closing frame — The final verbal beat fills the slide and ends without a decorative flourish; the phrase may vary to three words, but the body remains one compact block. -->
+<div class="slide">
+  <div class="el display" style="left:96px; top:69px; width:1933px; height:200px;">NEXT</div>
+  <div class="el display accent" style="left:96px; top:272px; width:1933px; height:200px;">MOVE</div>
+  <div class="el body-text" style="left:1240px; top:893px; width:480px; height:96px;">Placeholder closing implication.<br>Owner, timing, or invitation in one block.</div>
+</div>
+
+<!-- Part 7: Patterns -->
+<!-- Slide 11: Numbers — WHY: one enormous metric acts as both claim and image. The value and one-line explanation may vary; the edge-reaching scale, direct unit, one red text item, and absence of shapes may not. -->
+<div class="slide">
+  <div class="el metric accent" style="left:75px; top:93px; width:2000px; height:280px;">−42%</div>
+  <div class="el body-text" style="left:1240px; top:899px; width:480px; height:96px;">Placeholder metric and comparator.<br>Scope and period stated directly.</div>
+</div>
+
+<!-- Slide 12: Comparison — WHY: scale, weight, grey versus black, and vertical position establish priority without boxes or dividers. Labels and order may vary; one dominant black choice and muted alternatives may not. -->
+<div class="slide">
+  <div class="el slide-title" style="left:96px; top:72px; width:1933px; height:139px;">PRIMARY</div>
+  <div class="el slide-title muted" style="left:96px; top:235px; width:1933px; height:139px;">SECONDARY</div>
+  <div class="el slide-title muted" style="left:96px; top:397px; width:1933px; height:139px;">TERTIARY</div>
+  <div class="el body-text" style="left:1240px; top:867px; width:480px; height:120px;">Placeholder comparison conclusion.<br>Black carries the selected option.<br>Muted grey keeps alternatives visible but subordinate.</div>
+</div>
+
+<!-- Slide 13: Process — WHY: reading order comes from left-to-right word placement, while weight and colour mark the active beat without arrows. Stage words may vary; three stages, one red word maximum, and no connectors may not. -->
+<div class="slide">
+  <div class="el heading muted" style="left:96px; top:347px; width:480px; height:93px;">BEGIN</div>
+  <div class="el slide-title accent" style="left:581px; top:317px; width:693px; height:139px;">CHANGE</div>
+  <div class="el heading" style="left:1333px; top:347px; width:480px; height:93px;">RESULT</div>
+  <div class="el body-text" style="left:1240px; top:867px; width:480px; height:120px;">Placeholder three-stage process.<br>Position supplies sequence; weight supplies emphasis.<br>Use verbs, not numbered boxes or arrows.</div>
+</div>
+
+<!-- Slide 14: Relationship — WHY: typographic scale and vertical placement express hierarchy without lines, nodes, or containers. Terms may vary; one parent, two subordinate labels, and the size relationship may not. -->
+<div class="slide">
+  <div class="el slide-title" style="left:560px; top:147px; width:1093px; height:139px;">OUTCOME</div>
+  <div class="el heading muted" style="left:200px; top:493px; width:667px; height:93px;">DRIVER</div>
+  <div class="el heading accent" style="left:1133px; top:493px; width:667px; height:93px;">SIGNAL</div>
+  <div class="el body-text" style="left:1240px; top:867px; width:480px; height:120px;">Placeholder relationship statement.<br>Larger, higher type is the parent.<br>Smaller, lower type is subordinate.</div>
+</div>
+
+<!-- Slide 15: Two columns as stacked words — WHY: opposing stacks create two columns using only alignment and white space. Words may vary and stacks may hold two or three items; equal column widths and zero boxes or rules may not. -->
+<div class="slide">
+  <div class="el slide-title" style="left:96px; top:77px; width:1933px; height:139px;">TWO VIEWS</div>
+  <div class="el heading" style="left:96px; top:328px; width:693px; height:80px;">FIRST</div>
+  <div class="el heading muted" style="left:96px; top:435px; width:693px; height:80px;">ATTRIBUTE</div>
+  <div class="el heading muted" style="left:96px; top:541px; width:693px; height:80px;">EVIDENCE</div>
+  <div class="el heading accent" style="left:960px; top:328px; width:693px; height:80px;">SECOND</div>
+  <div class="el heading muted" style="left:960px; top:435px; width:693px; height:80px;">ATTRIBUTE</div>
+  <div class="el heading muted" style="left:960px; top:541px; width:693px; height:80px;">EVIDENCE</div>
+  <div class="el body-text" style="left:1240px; top:867px; width:480px; height:96px;">Placeholder two-part synthesis.<br>Alignment replaces column containers.</div>
+</div>
+
+<!-- Slide 16: Three columns as stacked words — WHY: repeated word stacks and equal visual intervals make three parts comparable without cards. Labels may vary and each stack may hold two or three words; three equal starts and one red word maximum may not. -->
+<div class="slide">
+  <div class="el slide-title" style="left:96px; top:77px; width:1933px; height:139px;">THREE PARTS</div>
+  <div class="el heading" style="left:96px; top:347px; width:480px; height:80px;">ONE</div>
+  <div class="el caption muted" style="left:96px; top:451px; width:400px; height:48px;">PLACEHOLDER LABEL</div>
+  <div class="el heading accent" style="left:672px; top:347px; width:480px; height:80px;">TWO</div>
+  <div class="el caption muted" style="left:672px; top:451px; width:400px; height:48px;">PLACEHOLDER LABEL</div>
+  <div class="el heading" style="left:1248px; top:347px; width:480px; height:80px;">THREE</div>
+  <div class="el caption muted" style="left:1248px; top:451px; width:400px; height:48px;">PLACEHOLDER LABEL</div>
+  <div class="el body-text" style="left:1240px; top:867px; width:480px; height:96px;">Placeholder three-part synthesis.<br>Repeated starts replace cards and separators.</div>
+</div>
+
+<!-- Slide 17: Text-heavy — WHY: an oversized short claim gives one compact paragraph enough context without shrinking the title. Claim and copy may vary; copy remains one block of no more than three lines and no bullets may be added. -->
+<div class="slide">
+  <div class="el slide-title" style="left:96px; top:77px; width:1933px; height:139px;">READ THIS</div>
+  <div class="el body-text" style="left:920px; top:560px; width:800px; height:160px;">Placeholder paragraph states the supporting reasoning in complete, concise sentences.<br>A second line adds evidence or qualification without starting another visual fragment.<br>The third and final line states the implication, threshold, or next question.</div>
+</div>
+
+<!-- Slide 18: Table as aligned text columns — WHY: tabular alignment and weight preserve exact comparison without a native table, fills, or row rules. Rows and values may vary from three to five; fixed column starts, direct headers, and bold selected values may not. -->
+<div class="slide">
+  <div class="el slide-title" style="left:96px; top:69px; width:1933px; height:139px;">ALIGNED FACTS</div>
+  <div class="el label muted" style="left:96px; top:307px; width:480px; height:32px;">ITEM</div>
+  <div class="el label muted right" style="left:720px; top:307px; width:293px; height:32px;">PRIOR</div>
+  <div class="el label muted right" style="left:1107px; top:307px; width:293px; height:32px;">CURRENT</div>
+  <div class="el label muted right" style="left:1493px; top:307px; width:293px; height:32px;">CHANGE</div>
+  <div class="el body-text" style="left:96px; top:381px; width:480px; height:48px;">Placeholder item A</div>
+  <div class="el body-text tabular right" style="left:720px; top:381px; width:293px; height:48px;">100</div>
+  <div class="el body-text tabular heavy right" style="left:1107px; top:381px; width:293px; height:48px;">124</div>
+  <div class="el body-text tabular right" style="left:1493px; top:381px; width:293px; height:48px;">+24</div>
+  <div class="el body-text" style="left:96px; top:472px; width:480px; height:48px;">Placeholder item B</div>
+  <div class="el body-text tabular right" style="left:720px; top:472px; width:293px; height:48px;">80</div>
+  <div class="el body-text tabular heavy right" style="left:1107px; top:472px; width:293px; height:48px;">91</div>
+  <div class="el body-text tabular right" style="left:1493px; top:472px; width:293px; height:48px;">+11</div>
+  <div class="el body-text" style="left:96px; top:563px; width:480px; height:48px;">Placeholder item C</div>
+  <div class="el body-text tabular right" style="left:720px; top:563px; width:293px; height:48px;">60</div>
+  <div class="el body-text tabular heavy accent right" style="left:1107px; top:563px; width:293px; height:48px;">72</div>
+  <div class="el body-text tabular right" style="left:1493px; top:563px; width:293px; height:48px;">+12</div>
+  <div class="el body-text" style="left:1240px; top:867px; width:480px; height:96px;">Placeholder table conclusion.<br>Alignment replaces cells, fills, and rules.</div>
+</div>
+
+<!-- Slide 19: Chart with direct labels — WHY: numeric labels occupy their own data positions so the chart remains type-only and needs neither bars nor axes. Periods and values may vary; direct values, shared positional scale, and one highlighted endpoint may not. -->
+<div class="slide">
+  <div class="el slide-title" style="left:96px; top:69px; width:1933px; height:139px;">TREND RISES</div>
+  <div class="el heading muted tabular" style="left:160px; top:627px; width:240px; height:80px;">24</div>
+  <div class="el meta muted" style="left:160px; top:720px; width:240px; height:37px;">PERIOD 1</div>
+  <div class="el heading muted tabular" style="left:547px; top:520px; width:240px; height:80px;">31</div>
+  <div class="el meta muted" style="left:547px; top:613px; width:240px; height:37px;">PERIOD 2</div>
+  <div class="el heading muted tabular" style="left:933px; top:413px; width:240px; height:80px;">37</div>
+  <div class="el meta muted" style="left:933px; top:507px; width:240px; height:37px;">PERIOD 3</div>
+  <div class="el heading accent tabular" style="left:1320px; top:280px; width:240px; height:80px;">48</div>
+  <div class="el meta muted" style="left:1320px; top:373px; width:240px; height:37px;">CURRENT</div>
+  <div class="el body-text" style="left:1240px; top:867px; width:480px; height:120px;">Placeholder trend conclusion.<br>Values label themselves directly.<br>Vertical position carries magnitude without gridlines.</div>
+</div>
+
+<!-- Slide 20: Before and after — WHY: two large state words, grey versus red, and opposing positions make change visible without a split line or containers. State labels may vary; before stays muted, after is the sole red word, and both retain equal scale. -->
+<div class="slide">
+  <div class="el slide-title muted" style="left:96px; top:227px; width:827px; height:139px;">BEFORE</div>
+  <div class="el slide-title accent" style="left:987px; top:480px; width:933px; height:139px;">AFTER</div>
+  <div class="el body-text" style="left:1240px; top:867px; width:480px; height:120px;">Placeholder state-change conclusion.<br>Position supplies movement; colour supplies focus.<br>Use identical scope and comparator for both states.</div>
+</div>
+
+</body>
+</html>

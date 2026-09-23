@@ -234,7 +234,11 @@ to the outline, not the style, so any concept style can carry any kind of deck.
 
 | Style | Idea | Look |
 |---|---|---|
-| _(added in phases — see CHANGELOG)_ | | |
+| `neo-brutalist` | Blunt hierarchy over polish; "zero apology" | Cream ground, 6px black borders, hard 12px offset shadows, flat primary fills, uppercase labels, square corners |
+| `typographic` | Type is the image; one beat per slide | White, near-black type set huge and tight, one red word at most, no shapes or rules at all |
+| `signal` | Warning-sign vocabulary; one thing is highlighted | Near-black, one safety-yellow panel per slide, upright ultra-bold headlines, huge numerals, monospaced metadata, one hazard stripe |
+| `racing` | Momentum; every slide hands off to the next | Near-black, italic condensed headlines, blue-violet-red top stripe, thin white speed lines, one red element |
+| _(more in later phases — see CHANGELOG)_ | | |
 
 ### User-local styles
 
