@@ -97,3 +97,17 @@ class TestRemoteListStyles:
         assert len(user) == 1
         assert user[0]["name"] == "my-style"
         assert user[0]["description"] == "My Style"
+
+    def test_pinned_filter_reports_hidden_builtin_names(self):
+        storage = MagicMock()
+        storage.pptx_bucket = "bucket"
+        storage.list_files.return_value = []
+        all_builtin = remote_list_styles(storage=storage, user_id="", include_all=True)["styles"]
+        assert len(all_builtin) >= 2
+        pinned, *others = [s["name"] for s in all_builtin]
+        storage.get_style_pins.return_value = [pinned]
+
+        result = remote_list_styles(storage=storage, user_id="u1", include_all=False)
+        assert [s["name"] for s in result["styles"]] == [pinned]
+        assert result["other_styles"] == others
+        assert "hint" in result

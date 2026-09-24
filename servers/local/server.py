@@ -81,7 +81,9 @@ def list_styles(include_all: bool = False) -> dict:
     Opens a visual gallery in the browser for selection.
 
     Returns:
-        Dict with styles list (name, description, pinned, source).
+        Dict with styles list (name, description, pinned, source). When the pin
+        filter hid some styles, also other_styles (their names — they still exist
+        and can be passed to apply_style) and a hint.
     """
     from sdpm.api import get_styles_dirs
     from sdpm.knowledge.reference import open_styles_gallery
