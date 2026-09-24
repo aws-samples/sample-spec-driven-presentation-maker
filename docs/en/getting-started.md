@@ -161,7 +161,7 @@ Ask your agent to "create a presentation." The following workflow runs automatic
 
 1. Reads workflow files via MCP Server Instructions
 2. Interviews you about topic, audience, and purpose
-3. Designs briefing → outline → art direction, persisted to `specs/`
+3. Designs briefing → art direction → outline, persisted to `specs/` (the style is chosen before the outline because its Message & Outline part fixes deck length, density and title grammar)
 4. Builds slides one by one
 5. Generates PPTX and shows a preview
 

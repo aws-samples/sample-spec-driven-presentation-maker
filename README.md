@@ -38,7 +38,7 @@ automatically — just describe what you want:
 
 | Ask | What happens |
 |---|---|
-| "Make slides about …" | New presentation (brief → outline → art direction → parallel slide composition → review) |
+| "Make slides about …" | New presentation (brief → art direction → outline → parallel slide composition → review) |
 | "Edit this PPTX" | Imports an existing PPTX into an editable deck |
 | "I hand-edited the PPTX, continue from it" | Syncs your PowerPoint edits back into the deck |
 | "Create a style like …" | Builds a reusable style guide (colors, typography, decoration) |
