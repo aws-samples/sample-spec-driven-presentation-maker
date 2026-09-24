@@ -217,5 +217,18 @@ export class AuthStack extends cdk.Stack {
       exportName: `${this.stackName}:ExportsOutputRefUserPoolWebClient4C9370B02E2C9FF9`, // pragma: allowlist secret
     });
     webClientIdExport.overrideLogicalId("ExportsOutputRefUserPoolWebClient4C9370B02E2C9FF9"); // pragma: allowlist secret
+
+    // McpClient is conditional (only created when mcpCallbackUrls is
+    // configured), so its legacy export must be conditional too — emitting
+    // a CfnOutput that references a construct that doesn't exist would fail
+    // synth. Environments that never configured mcpCallbackUrls never had
+    // this export in the first place, so skipping it is safe for them.
+    if (mcpClient) {
+      const mcpClientIdExport = new cdk.CfnOutput(this, "LegacyMcpClientIdExport", {
+        value: mcpClient.userPoolClientId,
+        exportName: `${this.stackName}:ExportsOutputRefUserPoolMcpClient2D19DB876064FDF5`, // pragma: allowlist secret
+      });
+      mcpClientIdExport.overrideLogicalId("ExportsOutputRefUserPoolMcpClient2D19DB876064FDF5"); // pragma: allowlist secret
+    }
   }
 }

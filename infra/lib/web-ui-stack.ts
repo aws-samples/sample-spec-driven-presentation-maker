@@ -439,8 +439,9 @@ function handler(event) {
       ApiBaseUrl: `${httpApi.apiEndpoint}/`,
       // AuthStack always publishes mcpCustomScope (non-empty), so this is
       // always appended — unlike the pre-SSM version this replaces, there is
-      // no "unset" case to guard with a conditional.
-      McpScope: cdk.Fn.join("", [" ", mcpCustomScope]),
+      // no "unset" case to guard with a conditional. The template string
+      // above already has the separating space before ${McpScope}.
+      McpScope: mcpCustomScope,
     });
 
     const awsExports = new cr.AwsCustomResource(this, "WriteAwsExports", {
