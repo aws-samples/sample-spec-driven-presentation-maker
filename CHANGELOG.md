@@ -135,6 +135,15 @@ Entries before v0.5.0 were written retroactively as summaries.
 - **Local ACP prompt errors no longer hang the stream** — an RPC error from
   `session/prompt` now surfaces on the SSE stream as an error event instead of
   an unhandled rejection with the chat stuck in "thinking".
+- **Local MCP server starts on native Windows** (#385). The attachment stage
+  cache imported the POSIX-only `fcntl` module at load time and fsynced
+  directories by opening them, both of which fail on Windows. The cache and the
+  import bundle committer now share one lock-free `publish_directory`
+  primitive (`sdpm.tools.attachment.atomic`): stage in a writer-unique
+  directory, fsync, then a single rename; if another writer lands first, verify
+  and reuse its result. This also drops a lock file whose unlink-on-release
+  could let two writers hold the lock at once, and aligns the cache's fsync
+  coverage with the bundle committer's. Directory fsync is skipped on Windows.
 
 ### Changed
 
