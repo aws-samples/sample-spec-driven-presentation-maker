@@ -122,6 +122,15 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **`list_styles` no longer makes hidden styles look non-existent.** With pins
+  set, the default listing drops every style that is neither pinned nor
+  user-created, and the orchestrator is told not to substitute a style it cannot
+  find — so asking for an unpinned bundled style was answered with "that style
+  does not exist". The payload now carries `other_styles` (the hidden names) and
+  a `hint` whenever the pin filter dropped something, so the agent can use the
+  name directly with `apply_style` (which never depended on pins) or fetch
+  descriptions with `include_all=True`. Both keys are absent when nothing was
+  hidden. Local and remote servers share the new `build_styles_listing()`.
 - **Shapes and connectors no longer inherit the template theme's shadow.**
   python-pptx gives every autoshape a default `<p:style effectRef>` that
   resolves to the theme's effect style — an outer shadow in the Office default

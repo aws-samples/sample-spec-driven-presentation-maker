@@ -27,11 +27,12 @@ def list_styles(storage: Storage, user_id: str = "", include_all: bool = False) 
                      (falls back to all if no pins exist).
 
     Returns:
-        Dict with styles list (name, description, pinned, source).
+        Dict with styles list (name, description, pinned, source). When the pin
+        filter hid some styles, also other_styles (names) and a hint.
     """
     from sdpm.knowledge.reference import (
         BUNDLED_STYLES_DIR,
-        filter_styles,
+        build_styles_listing,
         list_styles as _list_bundled_styles,
     )
 
@@ -64,7 +65,6 @@ def list_styles(storage: Storage, user_id: str = "", include_all: bool = False) 
     if user_id:
         pinned_names = storage.get_style_pins(user_id)
 
-    # 4. Filter via Engine
+    # 4. Build payload via Engine (filter + hidden-style names/hint)
     all_styles = user_styles + builtin_styles
-    filtered = filter_styles(all_styles, pinned_names, include_all)
-    return {"styles": filtered}
+    return build_styles_listing(all_styles, pinned_names, include_all)
