@@ -57,6 +57,16 @@ Entries before v0.5.0 were written retroactively as summaries.
     radial ramps or gradient panels. Note: LibreOffice previews render
     `textGradient` / `lineGradient` as the first stop colour (solid violet);
     PowerPoint and Keynote render the gradient. Shape fills preview correctly.
+  - `aws-console` — the deck looks like the AWS Management Console. Two dark
+    header bands (wordmark, a search box that shows the section name and slide
+    index, a notification badge counting open actions, date and presenter in the
+    region / account positions, a favourites row of the deck's services) over a
+    white toolbar; a page title with an Info link and an outline + orange button
+    pair; white 2px-bordered containers with drag handle, Info link, kebab and
+    resize handle; blue links and blue metrics; three fixed status colours;
+    dense 56px rows instead of prose. Orange appears only as the one action
+    button. Final concept-tier lineup is eleven styles (the planned `memphis`,
+    `chalkboard`, `art-deco` and `zine` were dropped).
 - **Style contract test** (`tests/test_builtin_styles_contract.py`) and a
   style-verification sample deck (`tests/fixtures/style-sample-deck/`).
 - **Styles now set the deck ground.** `apply_style` copies the style's

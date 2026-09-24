@@ -244,7 +244,7 @@ to the outline, not the style, so any concept style can carry any kind of deck.
 | `duotone` | One hard edge, two fields: claim on one, evidence on the other | Near-black and vivid orange, 50/50 or 33/67 split (vertical or horizontal); near-black type on orange, white and orange type on near-black, grey only for meta; shape bar charts with one white bar |
 | `prism-dark` | The gradient is a pointer: it marks the one thing the title is talking about, everything else is flat | Near-black ground, one violet-to-pink gradient used as gradient text on the key figure, a 4px outline + one filled pill on the chosen card, or one gradient bar; a 40px gradient bar down the left edge is the only constant. No gradient panels, no blur or glow |
 | `prism-light` | Same rule set as `prism-dark` for lit rooms and print | White ground, near-black type, flat white cards with 1px borders, the same violet-to-pink gradient in the same pointer roles |
-| _(more in later phases — see CHANGELOG)_ | | |
+| `aws-console` | The deck is an AWS Management Console screen; every piece of chrome carries deck information | Two dark header bands (aws wordmark, search box showing the section and slide index, notification badge = open actions, date and presenter where region and account sit; a favourites row of the deck's services) over a white toolbar; page title with an Info link and an outline + orange button pair; white 2px-bordered containers with drag handle, Info, kebab and resize handle; blue links and blue metrics; three fixed status colours; dense 56px rows, no prose |
 
 ### User-local styles
 

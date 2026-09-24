@@ -29,6 +29,8 @@ EXPECTED_NAMES = {
     "bento", "newspaper", "swiss-poster", "duotone",
     # gradient tier — the gradient is a pointer, everything else is flat
     "prism-dark", "prism-light",
+    # product-UI tier — the deck looks like the AWS Management Console
+    "aws-console",
 }
 
 REQUIRED_TOKENS = ("--color-text", "--color-bg", "--fs-cover-title", "--fs-slide-title", "--fs-body")
