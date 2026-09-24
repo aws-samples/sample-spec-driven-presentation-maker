@@ -44,6 +44,7 @@ from sdpm.engine.builder.elements.line import LineMixin
 from sdpm.engine.builder.elements.chart import ChartMixin
 from sdpm.engine.builder.elements.table import TableMixin
 from sdpm.engine.builder.elements.group import GroupMixin
+from sdpm.engine.schema.regions import is_comment_element
 
 # Re-export effect presets for backward compatibility
 from sdpm.utils.effects import (  # noqa: E402, F401
@@ -276,8 +277,8 @@ class PPTXBuilder(
                 break
 
         for elem in expanded:
-            if "_comment" in elem:
-                continue  # comments (incl. layout regions) are not elements
+            if is_comment_element(elem):
+                continue  # comment-only entries (section markers, layout regions) are not elements
             n_before = len(sp_tree)
             elem_type = elem.get("type")
             if elem_type == "group":

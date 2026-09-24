@@ -122,6 +122,14 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **A typed element carrying `_comment` is built, not dropped.** The builder,
+  diff and lint treated *any* element with a `_comment` key as a comment-only
+  entry and skipped it, although `slide-json-spec` says the key may be used
+  inside elements as an ignored annotation. A layout pass that annotated its
+  frame elements (`{"type": "textbox", "_comment": "frame: slide title", …}`)
+  therefore shipped a deck with no titles, edge bars or rules — and nothing
+  warned. Only entries without a `type` (section markers, `region:` layout
+  regions) are comment-only now (`sdpm.engine.schema.is_comment_element`).
 - **`list_styles` no longer makes hidden styles look non-existent.** With pins
   set, the default listing drops every style that is neither pinned nor
   user-created, and the orchestrator is told not to substitute a style it cannot
