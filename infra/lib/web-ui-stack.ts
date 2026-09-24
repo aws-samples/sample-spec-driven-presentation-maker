@@ -19,7 +19,6 @@ import * as apigatewayv2_authorizers from "aws-cdk-lib/aws-apigatewayv2-authoriz
 import * as apigatewayv2_integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
-import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as cr from "aws-cdk-lib/custom-resources";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
@@ -27,10 +26,12 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import { CfnWebACLAssociation } from "aws-cdk-lib/aws-wafv2";
 import { Construct } from "constructs";
 import * as path from "path";
 import { CommonWebAcl } from "./construct/common-web-acl";
+import { AUTH_SSM_PARAMS } from "./auth-stack";
 
 interface WebUiStackProps extends cdk.StackProps {
   /** Amazon DynamoDB table from DataStack. */
@@ -41,10 +42,6 @@ interface WebUiStackProps extends cdk.StackProps {
   resourceBucket: s3.Bucket;
   /** Agent Runtime ARN. */
   agentRuntimeArn: string;
-  /** Amazon Cognito User Pool from AuthStack. */
-  userPool: cognito.UserPool;
-  /** Amazon Cognito User Pool Client from AuthStack. */
-  userPoolClient: cognito.UserPoolClient;
   /** Amazon Bedrock AgentCore Memory ID for chat history retrieval. */
   memoryId?: string;
   /** Amazon Bedrock KB ID (empty if KB not enabled). */
@@ -73,8 +70,6 @@ interface WebUiStackProps extends cdk.StackProps {
     /** Listed under the "Recommended" group in the picker. */
     recommended?: boolean;
   }>;
-  /** Custom OAuth scope for MCP access (e.g. `sdpm-mcp/invoke`). */
-  mcpCustomScope?: string;
 }
 
 export class WebUiStack extends cdk.Stack {
@@ -83,6 +78,22 @@ export class WebUiStack extends cdk.Stack {
 
   constructor(scope: Construct, id: string, props: WebUiStackProps) {
     super(scope, id, props);
+
+    // --- Read shared Auth values from SSM Parameter Store ---
+    // Decouples this stack from AuthStack: no cross-stack CloudFormation
+    // Export/Import. See docs/internal/ssm-cross-stack-refs.md.
+    const userPoolId = ssm.StringParameter.valueForStringParameter(
+      this, AUTH_SSM_PARAMS.userPoolId,
+    );
+    const userPoolArn = ssm.StringParameter.valueForStringParameter(
+      this, AUTH_SSM_PARAMS.userPoolArn,
+    );
+    const webClientId = ssm.StringParameter.valueForStringParameter(
+      this, AUTH_SSM_PARAMS.webClientId,
+    );
+    const mcpCustomScope = ssm.StringParameter.valueForStringParameter(
+      this, AUTH_SSM_PARAMS.mcpCustomScope,
+    );
 
     // --- S3 bucket for static site ---
     const siteBucket = new s3.Bucket(this, "SiteBucket", {
@@ -333,9 +344,9 @@ function handler(event) {
       },
     });
 
-    const issuerUrl = `https://cognito-idp.${this.region}.amazonaws.com/${props.userPool.userPoolId}`;
+    const issuerUrl = `https://cognito-idp.${this.region}.amazonaws.com/${userPoolId}`;
     const jwtAuthorizer = new apigatewayv2_authorizers.HttpJwtAuthorizer("CognitoJwt", issuerUrl, {
-      jwtAudience: [props.userPoolClient.userPoolClientId],
+      jwtAudience: [webClientId],
     });
 
     const lambdaIntegration = new apigatewayv2_integrations.HttpLambdaIntegration("ApiIntegration", apiLambda);
@@ -415,18 +426,22 @@ function handler(event) {
       redirect_uri: "${SiteUrl}",
       post_logout_redirect_uri: "${SiteUrl}",
       response_type: "code",
-      scope: "openid profile email${McpScope}",
+      scope: "openid profile email ${McpScope}",
       automaticSilentRenew: true,
       agentRuntimeArn: "${AgentRuntimeArn}",
       apiBaseUrl: "${ApiBaseUrl}",
       awsRegion: "${AWS::Region}",
     }), {
-      UserPoolId: props.userPool.userPoolId,
-      ClientId: props.userPoolClient.userPoolClientId,
+      UserPoolId: userPoolId,
+      ClientId: webClientId,
       SiteUrl: this.siteUrl,
       AgentRuntimeArn: props.agentRuntimeArn,
       ApiBaseUrl: `${httpApi.apiEndpoint}/`,
-      McpScope: props.mcpCustomScope ? ` ${props.mcpCustomScope}` : "",
+      // AuthStack always publishes mcpCustomScope (non-empty), so this is
+      // always appended — unlike the pre-SSM version this replaces, there is
+      // no "unset" case to guard with a conditional. The template string
+      // above already has the separating space before ${McpScope}.
+      McpScope: mcpCustomScope,
     });
 
     const awsExports = new cr.AwsCustomResource(this, "WriteAwsExports", {
@@ -459,14 +474,18 @@ function handler(event) {
     awsExports.node.addDependency(deployment);
 
     // --- Add Amazon CloudFront URL to Amazon Cognito callback/logout URLs ---
-    const oauthScopes = ["openid", "profile", "email", ...(props.mcpCustomScope ? [props.mcpCustomScope] : [])];
+    // AllowedOAuthScopes always includes the MCP custom scope — AuthStack
+    // always publishes it. The SSM value is a CDK token so we construct
+    // the list inline here (Fn::Sub not needed because the SDK call accepts
+    // tokens directly).
+    const oauthScopes = ["openid", "profile", "email", mcpCustomScope];
     new cr.AwsCustomResource(this, "UpdateCognitoCallbackUrls", {
       onCreate: {
         service: "CognitoIdentityServiceProvider",
         action: "updateUserPoolClient",
         parameters: {
-          UserPoolId: props.userPool.userPoolId,
-          ClientId: props.userPoolClient.userPoolClientId,
+          UserPoolId: userPoolId,
+          ClientId: webClientId,
           SupportedIdentityProviders: ["COGNITO"],
           AllowedOAuthFlows: ["code"],
           AllowedOAuthScopes: oauthScopes,
@@ -485,8 +504,8 @@ function handler(event) {
         service: "CognitoIdentityServiceProvider",
         action: "updateUserPoolClient",
         parameters: {
-          UserPoolId: props.userPool.userPoolId,
-          ClientId: props.userPoolClient.userPoolClientId,
+          UserPoolId: userPoolId,
+          ClientId: webClientId,
           SupportedIdentityProviders: ["COGNITO"],
           AllowedOAuthFlows: ["code"],
           AllowedOAuthScopes: oauthScopes,
@@ -504,7 +523,7 @@ function handler(event) {
       policy: cr.AwsCustomResourcePolicy.fromStatements([
         new iam.PolicyStatement({
           actions: ["cognito-idp:UpdateUserPoolClient"],
-          resources: [props.userPool.userPoolArn],
+          resources: [userPoolArn],
         }),
       ]),
     });
