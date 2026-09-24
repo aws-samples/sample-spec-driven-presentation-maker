@@ -171,7 +171,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
 
   /**
    * Auto-focus: when a spec file transitions from null to non-null,
-   * switch to that tab. Priority: brief → outline → artDirection.
+   * switch to that tab. Priority: brief → artDirection → outline (workflow order).
    * When slides appear (0 → 1+), switch to slides tab.
    */
   useEffect(() => {
@@ -179,7 +179,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     prevSpecsRef.current = specs
     if (!prev || !specs) return
 
-    const order: (keyof SpecFiles)[] = ["brief", "outline", "artDirection"]
+    const order: (keyof SpecFiles)[] = ["brief", "artDirection", "outline"]
     for (const key of order) {
       if (prev[key] == null && specs[key] != null) {
         setSpecTab(key)

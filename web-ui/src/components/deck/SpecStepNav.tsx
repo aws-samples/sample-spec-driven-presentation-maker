@@ -35,9 +35,12 @@ interface StepDef {
 
 // label is the en fallback; display text resolves via specNav.<key>
 const STEPS: StepDef[] = [
+  // Order follows the orchestrator workflow: the style (art direction) is chosen
+  // before the outline because its Message & Outline part fixes deck length,
+  // density, title grammar and chapter shape.
   { key: "brief", label: "Brief", step: 1 },
-  { key: "outline", label: "Outline", step: 2 },
-  { key: "artDirection", label: "Art Direction", step: 3 },
+  { key: "artDirection", label: "Art Direction", step: 2 },
+  { key: "outline", label: "Outline", step: 3 },
   { key: "slides", label: "Slides" },
 ]
 
