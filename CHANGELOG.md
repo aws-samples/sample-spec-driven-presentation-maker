@@ -48,6 +48,15 @@ Entries before v0.5.0 were written retroactively as summaries.
     shape that may bleed, grid lines, vertical label), `duotone` (near-black
     and orange split by one hard edge, orange type as the accent on the dark
     field, shape bar charts with one white bar).
+  - `prism-dark` / `prism-light` — the first bundled styles whose identity is a
+    gradient. The rule is a role, not a quota: one violet-to-pink gradient is a
+    *pointer* that marks the thing the slide title is talking about (gradient
+    text on the key figure, a 4px outline plus one filled pill on the chosen
+    card, or one gradient bar); everything else is flat, and a 40px gradient bar
+    down the left edge is the only constant. Crisp edges only — no blur, glow,
+    radial ramps or gradient panels. Note: LibreOffice previews render
+    `textGradient` / `lineGradient` as the first stop colour (solid violet);
+    PowerPoint and Keynote render the gradient. Shape fills preview correctly.
 - **Style contract test** (`tests/test_builtin_styles_contract.py`) and a
   style-verification sample deck (`tests/fixtures/style-sample-deck/`).
 - **Styles now set the deck ground.** `apply_style` copies the style's

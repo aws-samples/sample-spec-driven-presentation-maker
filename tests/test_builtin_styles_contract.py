@@ -27,6 +27,8 @@ EXPECTED_NAMES = {
     # concept tier — chosen by look
     "neo-brutalist", "typographic", "signal", "racing",
     "bento", "newspaper", "swiss-poster", "duotone",
+    # gradient tier — the gradient is a pointer, everything else is flat
+    "prism-dark", "prism-light",
 }
 
 REQUIRED_TOKENS = ("--color-text", "--color-bg", "--fs-cover-title", "--fs-slide-title", "--fs-body")
