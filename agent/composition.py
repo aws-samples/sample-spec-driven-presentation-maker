@@ -120,12 +120,14 @@ def _resolve_source(source: Source, mcp_client, context: dict, memo: dict | None
     if source.type == "file":
         return _read_file(source.value)
     if source.type == "mcp":
+        # Only picking sources share one call: they exist to slice a single
+        # response. Plain Source.mcp keeps its one-call-per-part semantics.
         key = (source.value, json.dumps(source.args, sort_keys=True))
-        if memo is not None and key in memo:
+        if source.pick and memo is not None and key in memo:
             text = memo[key]
         else:
             text = _call_mcp(mcp_client, source.value, source.args)
-            if memo is not None:
+            if source.pick and memo is not None:
                 memo[key] = text
         return pick_from_text(text, source.pick) if text else text
     if source.type == "callable":

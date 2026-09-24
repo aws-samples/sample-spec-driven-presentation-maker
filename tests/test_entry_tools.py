@@ -161,3 +161,26 @@ def test_instructions_can_be_disabled(monkeypatch):
     assert mod.instructions() and "start_presentation" in mod.instructions()
     monkeypatch.setenv("SDPM_DISABLE_INSTRUCTIONS", "1")
     assert mod.instructions() is None
+
+
+class TestOverrideGroups:
+    def test_numeric_order_not_lexicographic(self, deck: Path):
+        slides = deck / "slides"
+        for slug in ("demo-10", "demo-3"):
+            (slides / f"{slug}.json").write_text(json.dumps({"id": slug, "elements": []}), encoding="utf-8")
+        # outline must list them for check_specs; append rows
+        outline = deck / "specs" / "outline.md"
+        outline.write_text(outline.read_text() + "".join(
+            f"- [{s}] X\n  - body: b\n  - visual: v\n  - evidence: e\n" for s in ("demo-3", "demo-10")
+        ), encoding="utf-8")
+        existing = tools.start_composing(str(deck), ["demo-10"])["deck"]["existing_slides"]
+        assert set(existing) == {"demo-1", "demo-10"}  # head is demo-1, not demo-10
+        assert existing["demo-1"]["readonly"] is True
+
+    def test_unsuffixed_slug_is_not_a_group_head(self, deck: Path):
+        slides = deck / "slides"
+        (slides / "demo.json").write_text(json.dumps({"id": "demo", "elements": []}), encoding="utf-8")
+        outline = deck / "specs" / "outline.md"
+        outline.write_text(outline.read_text() + "- [demo] X\n  - body: b\n  - visual: v\n  - evidence: e\n", encoding="utf-8")
+        existing = tools.start_composing(str(deck), ["demo-2"])["deck"]["existing_slides"]
+        assert set(existing) == {"demo-1", "demo-2"}

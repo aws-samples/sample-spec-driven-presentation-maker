@@ -54,6 +54,6 @@
       "timeout": 120000
     }
   },
-  "prompt": "file://../../../../sdpm/references/workflows/translate.md",
+  "prompt": "file://../acp-agents/prompts/translate.md",
   "resources": []
 }

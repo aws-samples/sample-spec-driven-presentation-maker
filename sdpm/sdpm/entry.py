@@ -30,8 +30,8 @@ _GUIDES_DIR = REFERENCES_DIR / "guides"
 _DEFAULT_BASE_STYLE = "typographic"  # smallest bundled style that follows the full skeleton
 
 # ``demo-1`` / ``demo-2`` / … form one override group; later slides inherit from
-# the first. The group key is the slug without its trailing ``-<n>``.
-_GROUP_SUFFIX = re.compile(r"-\d+$")
+# the first (lowest number). Slugs without a ``-<n>`` suffix belong to no group.
+_GROUP_MEMBER = re.compile(r"^(.+)-(\d+)$")
 
 
 def _read_reference(directory: Path, name: str) -> str:
@@ -104,21 +104,24 @@ def start_presentation(
 # ---------------------------------------------------------------------------
 
 
-def _group_key(slug: str) -> str:
-    return _GROUP_SUFFIX.sub("", slug)
+def _group_of(slug: str) -> tuple[str, int] | None:
+    m = _GROUP_MEMBER.match(slug)
+    return (m.group(1), int(m.group(2))) if m else None
 
 
 def _group_heads(present: list[str], assigned: set[str]) -> set[str]:
     """Group heads that an assigned slide inherits from but that are not assigned."""
-    heads: set[str] = set()
-    by_group: dict[str, list[str]] = {}
+    by_group: dict[str, list[tuple[int, str]]] = {}
     for slug in present:
-        by_group.setdefault(_group_key(slug), []).append(slug)
+        g = _group_of(slug)
+        if g:
+            by_group.setdefault(g[0], []).append((g[1], slug))
+    heads: set[str] = set()
     for slug in assigned:
-        members = by_group.get(_group_key(slug), [])
-        if len(members) < 2:
+        g = _group_of(slug)
+        if not g or len(by_group.get(g[0], [])) < 2:
             continue
-        head = members[0]  # ``present`` is sorted, so ``-1`` sorts before ``-2``
+        head = min(by_group[g[0]])[1]
         if head != slug and head not in assigned:
             heads.add(head)
     return heads

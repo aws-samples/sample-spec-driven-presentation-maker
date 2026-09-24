@@ -56,6 +56,6 @@
       "timeout": 120000
     }
   },
-  "prompt": "file://../../../../sdpm/references/workflows/composer.md",
+  "prompt": "file://../acp-agents/prompts/composer.md",
   "resources": []
 }

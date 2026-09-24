@@ -103,10 +103,20 @@ def test_name_and_workflow_match_file(path: Path):
     assert data["name"] == path.stem
     prompt = data["prompt"]
     assert prompt.startswith("file://")
-    target = (_ACP_AGENTS_DIR / prompt.removeprefix("file://")).resolve()
-    assert target.is_file()
-    assert target.parent.name == "workflows"
-    assert target.stem == path.stem.removeprefix("sdpm-")
+    # Resolved from .kiro/acp-agents/ and from the derived .kiro/agents/ alike.
+    for base in (_ACP_AGENTS_DIR, _ACP_AGENTS_DIR.parent / "agents"):
+        target = (base / prompt.removeprefix("file://")).resolve()
+        assert target.is_file(), target
+    assert target.parent == _ACP_AGENTS_DIR / "prompts"
+    role = path.stem.removeprefix("sdpm-")
+    assert target.stem == role
+    # Thin dispatch to the role's entry tool — no workflow prose here.
+    text = target.read_text(encoding="utf-8")
+    entry = {"orchestrator": "start_presentation", "composer": "start_composing",
+             "style": "start_style", "translate": "start_translation"}[role]
+    assert f"`{entry}(" in text
+    assert len(text.splitlines()) <= 4
+    assert f"@sdpm/{entry}" in data["tools"]
     assert data.get("resources") == []
 
 

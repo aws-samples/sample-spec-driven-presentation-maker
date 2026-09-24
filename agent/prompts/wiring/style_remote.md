@@ -1,3 +1,9 @@
+## Inputs (this environment)
+
+`start_style` was not called here — its `styles` and `base` are not in your context.
+Use `list_styles()` for the catalogue and read a bundled style's HTML through
+`run_style_python` with `ref_styles` (below) to get the skeleton to imitate.
+
 ## run_style_python — sandbox I/O (this environment)
 
 In this environment, `run_style_python` does NOT inject `read_style` /

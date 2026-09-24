@@ -320,16 +320,24 @@ def _check_deck_access(deck_id: str, action: str = "read") -> None:
 # checkout and has no cloud path (same reasoning as diff_pptx).
 
 
+_MATERIALIZE_FILES = {"deck.json", "specs/brief.md", "specs/outline.md", "specs/art-direction.html"}
+_MATERIALIZE_SLIDE = re.compile(r"^slides/[A-Za-z0-9_-]+\.json$")
+
+
 def _materialize_deck(deck_id: str, target: Path) -> None:
-    """Download deck.json, specs/ and slides/*.json into ``target`` (attachments excluded)."""
+    """Download deck.json, the three spec files and slides/*.json into ``target``.
+
+    Strict allowlist on the relative key (no attachments, no path segments other
+    than the ones named here), so a malformed key can never escape ``target``.
+    """
     prefix = f"decks/{deck_id}/"
-    keys = _storage.list_files(prefix=prefix, bucket=_storage.pptx_bucket)
-    for key in keys:
+    for key in _storage.list_files(prefix=prefix, bucket=_storage.pptx_bucket):
         rel = key.removeprefix(prefix)
-        if rel == "deck.json" or rel.startswith("specs/") or (rel.startswith("slides/") and rel.endswith(".json")):
-            dest = target / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(_storage.download_file_from_pptx_bucket(key=key))
+        if rel not in _MATERIALIZE_FILES and not _MATERIALIZE_SLIDE.match(rel):
+            continue
+        dest = target / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(_storage.download_file_from_pptx_bucket(key=key))
 
 
 @offloaded_tool
