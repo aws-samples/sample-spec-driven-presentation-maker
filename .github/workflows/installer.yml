@@ -1,0 +1,81 @@
+name: Installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/install/**"
+      - ".gitignore"
+      - ".github/workflows/installer.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/install/**"
+      - ".gitignore"
+      - ".github/workflows/installer.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  generated-installers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check generated installer drift
+        run: bash scripts/install/build.sh --check
+
+  unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install shellcheck
+        shell: bash
+        run: |
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            if [[ "${RUNNER_OS}" == "macOS" ]]; then
+              brew install shellcheck
+            else
+              sudo apt-get update
+              sudo apt-get install -y shellcheck
+            fi
+          fi
+      - name: Shellcheck
+        shell: bash
+        run: shellcheck scripts/install/*.sh scripts/install/lib/*.sh scripts/install/dist/install.sh
+      - name: Dependency-only smoke
+        shell: bash
+        run: |
+          export HOME="$(mktemp -d)"
+          export PATH="$HOME/.local/bin:$PATH"
+          bash scripts/install/dist/install.sh --deps-only --non-interactive --skip-libreoffice
+          uv --version
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+      - name: Analyze PowerShell sources
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem scripts/install -Recurse -Filter *.ps1
+          $findings = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName -Severity Error }
+          if ($findings) {
+            $findings | Format-Table -AutoSize
+            exit 1
+          }
+      - name: Dependency-only smoke
+        shell: pwsh
+        run: |
+          & ./scripts/install/dist/install.ps1 -DepsOnly -NonInteractive -SkipLibreOffice
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          uv --version

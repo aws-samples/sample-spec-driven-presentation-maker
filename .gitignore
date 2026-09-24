@@ -9,6 +9,11 @@ venv/
 
 # Distribution
 dist/
+# Public single-file installers are generated and committed for raw URL delivery.
+!scripts/install/dist/
+scripts/install/dist/*
+!scripts/install/dist/install.sh
+!scripts/install/dist/install.ps1
 build/
 *.egg-info/
 
@@ -58,6 +63,7 @@ web-ui/playwright-report/
 !.kiro/steering/steering-policy.md
 !.kiro/steering/i18n.md
 
+sdpm/sdpm/_data/
 # Config (contains secrets)
 infra/config.yaml
 
