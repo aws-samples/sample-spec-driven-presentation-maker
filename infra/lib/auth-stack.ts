@@ -196,22 +196,26 @@ export class AuthStack extends cdk.Stack {
     // are certain every deployed environment has re-synthesized without the
     // old imports, which is not guaranteed given the independent deployment
     // model of this sample.
+    // The long hex hashes in the export names below (e.g. 6BA7E5F2Arn686ACC00)
+    // are CDK-generated stable resource hashes, not secrets — they encode the
+    // construct path. Marked with `pragma: allowlist secret` so detect-secrets
+    // does not flag them as Base64 high-entropy strings.
     const userPoolArnExport = new cdk.CfnOutput(this, "LegacyUserPoolArnExport", {
       value: this.userPool.userPoolArn,
-      exportName: `${this.stackName}:ExportsOutputFnGetAttUserPool6BA7E5F2Arn686ACC00`,
+      exportName: `${this.stackName}:ExportsOutputFnGetAttUserPool6BA7E5F2Arn686ACC00`, // pragma: allowlist secret
     });
-    userPoolArnExport.overrideLogicalId("ExportsOutputFnGetAttUserPool6BA7E5F2Arn686ACC00");
+    userPoolArnExport.overrideLogicalId("ExportsOutputFnGetAttUserPool6BA7E5F2Arn686ACC00"); // pragma: allowlist secret
 
     const userPoolIdExport = new cdk.CfnOutput(this, "LegacyUserPoolIdExport", {
       value: this.userPool.userPoolId,
-      exportName: `${this.stackName}:ExportsOutputRefUserPool6BA7E5F296FD7236`,
+      exportName: `${this.stackName}:ExportsOutputRefUserPool6BA7E5F296FD7236`, // pragma: allowlist secret
     });
-    userPoolIdExport.overrideLogicalId("ExportsOutputRefUserPool6BA7E5F296FD7236");
+    userPoolIdExport.overrideLogicalId("ExportsOutputRefUserPool6BA7E5F296FD7236"); // pragma: allowlist secret
 
     const webClientIdExport = new cdk.CfnOutput(this, "LegacyWebClientIdExport", {
       value: this.userPoolClient.userPoolClientId,
-      exportName: `${this.stackName}:ExportsOutputRefUserPoolWebClient4C9370B02E2C9FF9`,
+      exportName: `${this.stackName}:ExportsOutputRefUserPoolWebClient4C9370B02E2C9FF9`, // pragma: allowlist secret
     });
-    webClientIdExport.overrideLogicalId("ExportsOutputRefUserPoolWebClient4C9370B02E2C9FF9");
+    webClientIdExport.overrideLogicalId("ExportsOutputRefUserPoolWebClient4C9370B02E2C9FF9"); // pragma: allowlist secret
   }
 }
