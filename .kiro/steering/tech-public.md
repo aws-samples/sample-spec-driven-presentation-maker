@@ -5,6 +5,17 @@
 ## Deployment
 - WebUI: `AWS_DEFAULT_REGION=<region> bash scripts/deploy_webui.sh`
 - CDK stacks: SdpmWebUi, SdpmAgent, SdpmRuntime, SdpmData, SdpmAuth
+- Which stack to redeploy for a change:
+  - `sdpm/references/**` (bundled styles, workflows, guides, templates) → **SdpmData**
+    (BucketDeployment uploads `references/` to the resource bucket; the API Lambda serves
+    the Web UI style gallery from there and caches it per cold start) **and SdpmRuntime**
+    (the MCP image bundles `sdpm/references/` for `list_styles` / `apply_style`).
+    Deploying only SdpmRuntime leaves the Web UI gallery on the old style set.
+  - `sdpm/sdpm/**`, `servers/remote/**` → SdpmRuntime
+  - `agent/**` → SdpmAgent
+  - `web-ui/**` → `scripts/deploy_webui.sh` (no CDK)
+  - `api/**`, `infra/**` → SdpmWebUi (or the stack that owns the resource)
+  - Single stack: `deploy.sh --stack "<Stack> --exclusively"`
 
 ## npm Dependency Management (web-ui / infra)
 
