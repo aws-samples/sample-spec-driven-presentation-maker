@@ -48,21 +48,50 @@ automatically — just describe what you want:
 
 ## Quick Start
 
-One MCP server is the single integration surface. Connect your agent to it and ask for
-slides — the first tool the agent reaches for, `start_presentation`, returns the role
-document that drives the work together with the styles and templates on offer. The repository is also a portable
-[Agent Plugins](https://agent-plugins.org) package, so clients that support that format
-load the MCP server and the skill entry points together.
+How do you want to use SDPM?
 
-| Environment | Setup |
+### Use it in your browser (full experience)
+
+Install the local Web UI on macOS or Linux with one command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
+```
+
+The installer adds the required tools, builds the Web UI, and creates the `sdpm`
+launcher and a desktop shortcut. Run `sdpm` at any time to open
+[http://localhost:3000](http://localhost:3000).
+
+On Windows (verified in CI only; no manual Windows QA yet), run:
+
+```powershell
+irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
+```
+
+### Use it from the AI agent you already have
+
+Choose your client and complete the action shown. The `uvx` options do not require a
+repository checkout. Expect the first launch to take tens of seconds while the package is built.
+
+| Client | One-action setup |
 |---|---|
+| Claude Desktop | [Download `sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb), then double-click it |
+| Cursor | [![Add to Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=sdpm&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJnaXQraHR0cHM6Ly9naXRodWIuY29tL2F3cy1zYW1wbGVzL3NhbXBsZS1zcGVjLWRyaXZlbi1wcmVzZW50YXRpb24tbWFrZXIjc3ViZGlyZWN0b3J5PXNlcnZlcnMvbG9jYWwiLCJzZHBtLW1jcCJdfQ==) |
+| Visual Studio Code | `code --add-mcp '{"name":"sdpm","command":"uvx","args":["--from","git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local","sdpm-mcp"]}'` |
+| Kiro CLI | `kiro-cli mcp add --name sdpm --command uvx --args '["--from","git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local","sdpm-mcp"]' --scope global` |
 | Claude Code | `/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker` then `/plugin install sdpm@sdpm` |
-| Kiro CLI | `git clone` this repo, then `make install-kiro` |
-| Kiro IDE (Powers) | Install this checkout as a Power — it is an Agent Plugins package |
-| Codex | `codex plugin marketplace add ./` in the checkout, then install from the ChatGPT desktop app |
-| Claude Desktop / any MCP client | Register `servers/local` as a stdio MCP server — see [Getting Started](docs/en/getting-started.md) |
-| No MCP at all | Point your agent at [`sdpm/SKILL.md`](sdpm/SKILL.md) — it drives the CLI directly |
-| Team / remote MCP / Web UI (AWS) | [Deploy Guide](docs/en/deploy-cloudshell.md) |
+| Codex | Run `codex plugin marketplace add ./` in the checkout, then install from the ChatGPT desktop app |
+
+For the `uvx` options, install **uv**, **LibreOffice**, and **poppler** in one step
+(LibreOffice and poppler provide PNG previews):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --deps-only
+```
+
+Then ask your agent: **“Make slides about …”** It will choose the right workflow. See
+[Getting Started](docs/en/getting-started.md) for asset installation, updates, Kiro's full
+composer setup, Kiro IDE Power, manual MCP configuration, and AWS deployment.
 
 **Picking a mode.** Just asking for slides is enough — the agent calls `start_presentation`
 and follows it. To choose explicitly, use the server's prompts where your client shows them:
@@ -71,13 +100,6 @@ first), `sdpm-style` (a reusable style guide), `sdpm-translate` (a language vari
 Desktop's "+" menu, Claude Code `/mcp__sdpm__sdpm-vibe`, VS Code `/mcp.sdpm.sdpm-vibe`, Kiro CLI
 `/sdpm-vibe`. Each prompt only names the role's entry tool; the behavior itself still lives in
 `sdpm/references/workflows/`, in one place.
-
-**Prerequisites for local use:** [`uv`](https://docs.astral.sh/uv/) on your `PATH`, plus
-**LibreOffice** and **poppler** for slide previews (PNG rendering).
-
-**Keep the checkout in place** for Claude Code / Kiro / local MCP: the server runs from it
-(`uv run --directory <checkout>/servers/local`). Updating is `git pull` — workflow and
-knowledge files are read live from the checkout.
 
 > **Upgrading from an older release?** Directory layout, tool names and skills changed —
 > see the [v0.5](docs/en/migration-v0.5.md) and [role workflows](docs/en/migration-role-workflows.md)
@@ -114,7 +136,8 @@ sdpm/        Engine (json <-> pptx) + Knowledge (references, assets, templates)
 skills/      Mode entry points — one-line dispatchers that call the start_* entry tools
 plugin.json  Agent Plugins manifest (+ mcp.json) — makes the root a portable plugin
 servers/     local (stdio, no AWS) / remote (HTTP, S3 + DynamoDB) — thin binds of one tool contract
-clients/     Per-client wiring (Claude Code / Codex manifests, Kiro installer)
+clients/     Client manifests, clone-free uvx config, generated install snippets
+scripts/install/   macOS / Linux / Windows installer sources and distributable scripts
 agent/ api/ infra/ web-ui/   Optional AWS cloud stack (Strands Agent, REST API, CDK, React UI)
 ```
 
@@ -140,7 +163,7 @@ See [Architecture](docs/en/architecture.md) for the full picture.
 | [Cost Estimates](docs/en/cost.md) | Monthly cost breakdown and optimisation tips |
 | [Measuring Usage](docs/en/usage-measurement.md) | Per-user token & slide-count measurement for PoC operators |
 | [Uninstall](docs/en/uninstall.md) | Clean up deployed AWS resources |
-| [Web UI (Local Mode — experimental)](web-ui/README.md#local-mode) | Run the Web UI locally against a Kiro CLI ACP backend (no AWS) |
+| [Web UI (Local Mode)](web-ui/README.md#local-mode) | Run the Web UI locally against a Kiro CLI ACP backend (no AWS) |
 
 ---
 

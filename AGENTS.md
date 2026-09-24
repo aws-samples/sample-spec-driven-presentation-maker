@@ -5,8 +5,9 @@ served through MCP servers (`servers/`), with optional AWS cloud stack.
 
 ## First: Are you developing this repo, or using it?
 
-**Using it to generate slides with an AI agent:**
-→ Connect your agent to the local MCP server — see [Getting Started](docs/en/getting-started.md).
+**Using it to generate slides:**
+→ Choose one of the two first-class entry points in the [README Quick Start](README.md#quick-start):
+use the full experience in your browser, or connect SDPM to the AI agent you already have.
 Do NOT work inside this repo for everyday slide generation.
 
 **Developing / modifying this repo:**
@@ -29,7 +30,12 @@ plugin.json  Agent Plugins 1.0.0 manifest; mcp.json declares the bundled MCP ser
 servers/
 ├─ local/    stdio MCP + ACP server (no AWS)
 └─ remote/   streamable-HTTP MCP server (AWS: S3 + DynamoDB)
-clients/     Per-client wiring only (claude-code plugin agents, kiro installer, ACP configs live in servers/local/.kiro)
+clients/     Per-client wiring only
+├─ uvx-config.json       Canonical clone-free MCP command
+├─ snippets.md           Generated client installation commands (do not hand-edit)
+├─ claude-desktop/       MCPB manifest and packaging rules
+└─ kiro/                 Checkout-based full Kiro installer
+scripts/install/  Web UI installers, launcher sources, and generated dist/install.*
 agent/       L4 Strands Agent (cloud)
 api/         L4 REST API Lambda
 infra/       CDK stacks
@@ -65,6 +71,8 @@ See [Architecture](docs/en/architecture.md).
   `.codex-plugin/plugin.json` + `.mcp.json` (Codex), `.claude-plugin/plugin.json`
   (Claude Code). All must keep pointing at the same `servers/local` definition —
   `tests/test_codex_adapter.py` fails on drift
+- `clients/snippets.md` is generated from `clients/uvx-config.json`; regenerate it with
+  `uv run python scripts/gen_client_snippets.py` and never edit it by hand
 - Slide spec: JSON — schema and examples in `sdpm/references/`
 - Python: always `uv run`, never bare `python`
 - Verify changes: `make lint` (ruff) and `make test` (pytest) before committing
@@ -81,7 +89,7 @@ See [Architecture](docs/en/architecture.md).
 
 ## Further Documentation
 
-- [Getting Started](docs/en/getting-started.md) — setup for every layer (L1–L4)
+- [Getting Started](docs/en/getting-started.md) — browser, local agent, manual, and AWS setup
 - [Architecture](docs/en/architecture.md) — data flow, auth model, MCP tool reference
 - [Custom Templates & Assets](docs/en/custom-template.md)
 - [Connecting Agents](docs/en/add-to-gateway.md)

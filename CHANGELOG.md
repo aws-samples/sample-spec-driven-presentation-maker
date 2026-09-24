@@ -45,6 +45,15 @@ Entries before v0.5.0 were written retroactively as summaries.
 - `SDPM_DISABLE_INSTRUCTIONS=1` serves no MCP server instructions — nothing
   depends on them any more; the entry tools' own descriptions carry the routing.
 
+- **Clone-free local MCP startup and one-action client setup** — the local server now
+  runs from GitHub with `uvx` and exposes `sdpm-mcp` and `sdpm-install-assets` console
+  scripts. Generated, drift-tested snippets cover Cursor, Visual Studio Code, Kiro CLI,
+  Claude Code, and generic MCP configuration; Claude Desktop releases include a
+  double-click `.mcpb` bundle.
+- **Local Web UI installers for macOS, Linux, and Windows** — `install.sh` /
+  `install.ps1` install dependencies, build the Web UI, and add an `sdpm` launcher and
+  desktop shortcut. Dependency-only and non-interactive modes support agent setup and CI;
+  Windows is verified in CI only.
 - **Bundled styles re-organised into two tiers** — an *orthodox* tier for when
   looks do not matter (`report`, `briefing`, `aws-light`, `aws-dark`) and a
   *concept* tier chosen by look (added in phases, listed below). The previous
@@ -246,6 +255,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 - **Orchestrator writes the style before the outline** (brief → style → outline):
   a style's Message & Outline part fixes deck length, density, title grammar and
   chapter shape, so an outline written first had to be rewritten.
+- **Onboarding now starts with two equal entry points** — the README and Getting Started
+  ask whether to use the full browser experience or the AI agent already installed, then
+  provide a one-action path. Layer terminology moved out of setup instructions and remains
+  in the architecture reference. The Web UI Local mode is no longer labeled experimental.
+- **`sdpm-skill` now builds with hatchling** — source distributions and wheels include the
+  runtime knowledge, templates, and shared support code required by checkout-free `uvx`
+  execution.
 - **Off-screen slides are always drawn in their final state** — the
   agent-cursor animation now plays only for a live update on the slide you are
   looking at. A change that lands on a slide out of view is drawn immediately

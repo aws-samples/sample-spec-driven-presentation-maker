@@ -85,3 +85,23 @@ def test_mcpb_manifest_uses_uv_runtime() -> None:
     assert "LibreOffice" in manifest["long_description"]
     assert "poppler" in manifest["long_description"]
     assert "PPTX generation still works" in manifest["long_description"]
+
+
+def test_readmes_use_generated_client_snippets() -> None:
+    generator = _load_generator()
+    rendered = generator.render_snippets(generator.load_config())
+
+    def section_lines(heading: str) -> list[str]:
+        section = rendered.split(f"## {heading}\n\n", maxsplit=1)[1]
+        section = section.split("\n## ", maxsplit=1)[0]
+        return [line for line in section.splitlines() if line]
+
+    expected = (
+        section_lines("Cursor")[0],
+        section_lines("Visual Studio Code")[1],
+        section_lines("Kiro CLI")[1],
+    )
+    for relative_path in ("README.md", "README_ja.md"):
+        readme = (ROOT / relative_path).read_text(encoding="utf-8")
+        for snippet in expected:
+            assert snippet in readme, f"{relative_path} drifted from generated snippet: {snippet}"

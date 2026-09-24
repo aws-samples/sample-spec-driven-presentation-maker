@@ -51,37 +51,50 @@
 
 ## クイックスタート
 
-統合面は MCP サーバー 1 つだけです。エージェントを接続してスライド作成を頼むだけ —
-エージェントが最初に呼ぶ `start_presentation` ツールが、作業を導く役割文書と
-使えるスタイル・テンプレートをまとめて返します。
-リポジトリ自体が [Agent Plugins](https://agent-plugins.org) 準拠のポータブルパッケージ
-なので、この形式に対応したクライアントは MCP サーバーと skill 入口をまとめて読み込めます。
+SDPM をどこから使いますか?
 
-| 環境 | セットアップ |
+### ブラウザで使う（フル機能）
+
+macOS / Linux では、次の 1 行でローカル Web UI を導入できます。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
+```
+
+必要なツールの導入、Web UI のビルド、`sdpm` ランチャーとデスクトップショートカットの
+作成まで自動で行います。導入後は `sdpm` を実行すると
+[http://localhost:3000](http://localhost:3000) が開きます。
+
+Windows では次を実行します（CI でのみ検証済み。Windows 実機での手動 QA は未実施です）。
+
+```powershell
+irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
+```
+
+### いつもの AI エージェントから使う
+
+クライアントを選び、表の操作を行ってください。`uvx` を使う経路はリポジトリの clone が不要です。
+初回起動時はパッケージをビルドするため、数十秒かかることがあります。
+
+| クライアント | 1 アクションで導入 |
 |---|---|
+| Claude Desktop | [`sdpm.mcpb` をダウンロード](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb)してダブルクリック |
+| Cursor | [![Add to Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=sdpm&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJnaXQraHR0cHM6Ly9naXRodWIuY29tL2F3cy1zYW1wbGVzL3NhbXBsZS1zcGVjLWRyaXZlbi1wcmVzZW50YXRpb24tbWFrZXIjc3ViZGlyZWN0b3J5PXNlcnZlcnMvbG9jYWwiLCJzZHBtLW1jcCJdfQ==) |
+| Visual Studio Code | `code --add-mcp '{"name":"sdpm","command":"uvx","args":["--from","git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local","sdpm-mcp"]}'` |
+| Kiro CLI | `kiro-cli mcp add --name sdpm --command uvx --args '["--from","git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local","sdpm-mcp"]' --scope global` |
 | Claude Code | `/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker` → `/plugin install sdpm@sdpm` |
-| Kiro CLI | このリポジトリを `git clone` して `make install-kiro` |
-| Kiro IDE（Powers） | このチェックアウトを Power として導入 — Agent Plugins パッケージです |
-| Codex | チェックアウトで `codex plugin marketplace add ./` → ChatGPT デスクトップアプリから導入 |
-| Claude Desktop / 任意の MCP クライアント | `servers/local` を stdio MCP サーバーとして登録 — [はじめに](docs/ja/getting-started.md) 参照 |
-| MCP なし | エージェントに [`sdpm/SKILL.md`](sdpm/SKILL.md) を読ませる — CLI を直接駆動します |
-| チーム利用 / リモート MCP / Web UI（AWS） | [デプロイ手順](docs/en/deploy-cloudshell.md) |
+| Codex | チェックアウトで `codex plugin marketplace add ./` を実行し、ChatGPT デスクトップアプリから導入 |
 
-**モードの選び方.** 「スライドにして」と頼むだけで十分です（エージェントが
-`start_presentation` を呼んでそれに従います）。明示的に選ぶなら入口を使ってください:
-`sdpm-create`（プレゼンを作成 — 対話の深さは頼み方次第）、
-`sdpm-style`（再利用できるスタイルガイド作成）、`sdpm-translate`（既存デッキの他言語翻訳）。
-skill をスラッシュコマンドにする
-クライアントでは `/sdpm-create` `/sdpm-style` `/sdpm-translate` として使えます。入口は
-役割文書の名前をサーバーに伝えるだけで、振る舞いの実体は
-`sdpm/references/workflows/` の 1 箇所のままです。
+`uvx` を使う場合は、**uv**、**LibreOffice**、**poppler** を次の 1 行で導入できます
+（LibreOffice と poppler は PNG プレビューに使用します）。
 
-**ローカル利用の前提:** [`uv`](https://docs.astral.sh/uv/) が `PATH` にあること。
-スライドプレビュー（PNG 描画）には **LibreOffice** と **poppler** も必要です。
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --deps-only
+```
 
-**チェックアウトはそのまま置いてください:** Claude Code / Kiro / ローカル MCP は
-チェックアウトからサーバーを起動します（`uv run --directory <checkout>/servers/local`）。
-更新は `git pull` だけ — ワークフローやナレッジはチェックアウトから直接読まれます。
+導入後はエージェントに **「〜のスライドを作って」** と頼むだけです。アセットの導入、更新、
+Kiro の composer を含むフル構成、Kiro IDE Power、MCP の手動設定、AWS デプロイについては
+[はじめに](docs/ja/getting-started.md)を参照してください。
 
 > **旧バージョンからのアップグレード:** ディレクトリ構成・ツール名・skill が変わりました —
 > [v0.5 移行ガイド](docs/en/migration-v0.5.md) と
@@ -118,7 +131,8 @@ sdpm/        エンジン（json <-> pptx）+ ナレッジ（references, assets,
 skills/      モードの入口 — start_* 入口ツールを 1 行で呼ぶディスパッチャ
 plugin.json  Agent Plugins マニフェスト（+ mcp.json）— ルートをポータブルプラグインにする
 servers/     local（stdio, AWS 不要）/ remote（HTTP, S3 + DynamoDB）— 単一ツールコントラクトの薄い bind
-clients/     クライアント別の配線（Claude Code / Codex マニフェスト、Kiro インストーラ）
+clients/     クライアントマニフェスト、clone 不要の uvx 設定、生成済み導入スニペット
+scripts/install/   macOS / Linux / Windows インストーラーのソースと配布スクリプト
 agent/ api/ infra/ web-ui/   オプションの AWS クラウドスタック（Strands Agent, REST API, CDK, React UI）
 ```
 
@@ -147,7 +161,7 @@ MCP サーバーが配信します。クライアント側のファイルは最�
 | [Cost Estimates](docs/en/cost.md) | 月額コストの内訳と最適化 |
 | [使用量の計測](docs/ja/usage-measurement.md) | PoC 運営者向けのユーザー別トークン・スライド数計測 |
 | [Uninstall](docs/en/uninstall.md) | デプロイ済み AWS リソースの削除 |
-| [Web UI（ローカルモード — 実験的機能）](web-ui/README_ja.md#local-mode) | Kiro CLI ACP をバックエンドにローカル環境で Web UI を動作させる（AWS 不要） |
+| [Web UI（ローカルモード）](web-ui/README_ja.md#local-mode) | Kiro CLI ACP をバックエンドにローカル環境で Web UI を動作させる（AWS 不要） |
 
 ---
 
