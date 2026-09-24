@@ -24,21 +24,17 @@ import { useSlideVisibility } from "./useSlideVisibility"
 // --- Constants ---
 const COMPOSE_VERSION = 1
 /**
- * Share of a slide that must be in view before an unseen update replays.
+ * Share of a slide that must be in view for a live update to animate.
  * Full-view slides are ~90% of the viewport tall, so 0.5 meant "half the
  * screen" before anything moved; 0.35 starts as the slide arrives.
+ *
+ * Updates that land on a slide below this ratio are drawn in their final
+ * state immediately — no deferral and no replay when the slide comes into
+ * view. The agent-drawing animation is for watching work happen live; a
+ * reviewer scrolling through a finished deck should never wait for it.
  */
-const REPLAY_VISIBLE_RATIO = 0.35
+const ANIMATE_VISIBLE_RATIO = 0.35
 const STAGGER_MS = 260
-/**
- * Catch-up replay: when a slide changed while off-screen and the user reaches
- * it within CATCHUP_MAX_AGE_MS, the agent-drawing animation replays for the
- * accumulated changes with a tighter stagger. The wireframe lead stays: without
- * it the frame, the element and the landing flash appear in the same frame and
- * the landing reads as a sudden flash. Older changes are simply shown.
- */
-const CATCHUP_STAGGER_MS = 150
-const CATCHUP_MAX_AGE_MS = 60_000
 interface ComposeData {
   version: number
   viewBox: string
@@ -146,28 +142,13 @@ function fillsRegion(
 export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation, knownUrl, onAnimate, onComplete, onAspectRatio, fallback, defsMounted }: AnimatedSlidePreviewProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  /** Changed component keys that arrived while off-screen → arrival time (ms). */
-  const pendingKeysRef = useRef(new Map<string, number>())
-  /** Draws pending (arrived-while-away) changes on the built scene when the slide comes into view. */
-  const replayPendingRef = useRef<() => void>(() => {})
   const sceneRef = useRef<{ url: string; scene: Scene } | null>(null)
-  const pendingRef = useRef<{ url: string; apply: (animateNow: boolean) => void } | null>(null)
-  const applyPendingRef = useRef<(animateNow: boolean) => void>(() => {})
   const visibilityWaitersRef = useRef(new Set<(visibility: "visible" | "hidden") => void>())
   const checkRef = useRef<() => void>(() => {})
-  const visibleRef = useSlideVisibility(wrapperRef, REPLAY_VISIBLE_RATIO, (visibility) => {
+  const visibleRef = useSlideVisibility(wrapperRef, ANIMATE_VISIBLE_RATIO, (visibility) => {
     visibilityWaitersRef.current.forEach((resolve) => resolve(visibility))
     visibilityWaitersRef.current.clear()
-    if (visibility === "visible") {
-      if (pendingRef.current) applyPendingRef.current(true)
-      else if (pendingKeysRef.current.size > 0) replayPendingRef.current()
-    }
   })
-  const nearRef = useSlideVisibility(wrapperRef, 0, (visibility) => {
-    if (visibility === "visible" && pendingRef.current) {
-      applyPendingRef.current(visibleRef.current === "visible")
-    }
-  }, "100% 0px")
   const animationSessionRef = useRef<AgentAnimationSession | null>(null)
   const releaseRef = useRef<(() => void) | null>(null)
   const lastComposeUrlRef = useRef("")
@@ -190,30 +171,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     parent?.querySelectorAll(".asp-overlay, .asp-region-overlay").forEach(el => el.remove())
   }, [])
 
-  applyPendingRef.current = (animateNow) => {
-    const pending = pendingRef.current
-    if (!pending) return
-    pendingRef.current = null
-    if (pending.url !== composeUrlRef.current) {
-      checkRef.current()
-      return
-    }
-    pending.apply(animateNow)
-  }
-
-  useEffect(() => () => {
-    pendingRef.current = null
-    cleanup()
-  }, [cleanup])
-
-  const addPendingKeys = (keys: Iterable<string>) => {
-    const now = performance.now()
-    for (const key of keys) if (!pendingKeysRef.current.has(key)) pendingKeysRef.current.set(key, now)
-  }
-  const mergeSupersededHiddenChanges = (data: ComposeData) => {
-    if (nearRef.current === "visible" || reducedMotion.current) return
-    addPendingKeys(data.components.filter((c) => c.changed).map(composeComponentKey))
-  }
+  useEffect(() => () => cleanup(), [cleanup])
 
   // Track latest props in refs so check() always reads current values
   const composeUrlRef = useRef(composeUrl)
@@ -260,18 +218,16 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     }
 
     /**
-     * Run the agent-drawing animation on an already-built scene. Used by live
-     * updates right after the build and by catch-up replays when a slide that
-     * changed while away comes into view (no rebuild — the SVG is already there).
+     * Run the agent-drawing animation on an already-built scene, right after a
+     * live update lands on a visible slide.
      */
     const animateScene = (
       scene: Scene,
       componentTargets: Set<string>,
       regionTargets: Set<number>,
-      stagger: number,
     ) => {
       let session: AgentAnimationSession | null = null
-      session = startAgentAnimation(scene, componentTargets, regionTargets, stagger, () => {
+      session = startAgentAnimation(scene, componentTargets, regionTargets, STAGGER_MS, () => {
         if (animationSessionRef.current !== session) return
         animationSessionRef.current = null
         animatingRef.current = false
@@ -282,46 +238,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
       })
       animationSessionRef.current = session
     }
-
-    /** Catch-up: the slide changed while away and is now in view — draw the pending changes on the existing scene. */
-    const replayPending = async () => {
-      const current = sceneRef.current
-      if (!current || cancelled) return
-      if (current.url !== composeUrlRef.current) { check(); return }
-      if (animatingRef.current) return
-      const { scene } = current
-      const now = performance.now()
-      const targets = new Set<string>()
-      const showNow = (key: string) => {
-        const g = scene.svgEl.querySelector(`g[data-component-key="${key}"]`) as SVGGElement | null
-        if (g) { g.style.opacity = "1"; delete g.dataset.pending }
-        const entry = scene.componentEntries.find((e) => e.key === key)
-        if (entry) scene.markFilledRegions(entry.component)
-      }
-      for (const [key, arrivedAt] of pendingKeysRef.current) {
-        if (now - arrivedAt > CATCHUP_MAX_AGE_MS || reducedMotion.current) showNow(key)
-        else targets.add(key)
-      }
-      pendingKeysRef.current.clear()
-      if (targets.size === 0) return
-      animatingRef.current = true
-      const release = await acquire(lifecycleController.signal)
-      if (!release || cancelled) { release?.(); animatingRef.current = false; return }
-      if (current !== sceneRef.current || current.url !== composeUrlRef.current) {
-        release(); animatingRef.current = false; addPendingKeys(targets); check(); return
-      }
-      if (visibleRef.current !== "visible") {
-        release(); animatingRef.current = false; addPendingKeys(targets); return
-      }
-      targets.forEach((key) => {
-        const g = scene.svgEl.querySelector(`g[data-component-key="${key}"]`) as SVGGElement | null
-        if (g) delete g.dataset.pending
-      })
-      releaseRef.current = release
-      onAnimate?.()
-      animateScene(scene, targets, new Set(), CATCHUP_STAGGER_MS)
-    }
-    replayPendingRef.current = () => { void replayPending() }
 
     function check() {
       const requestedUrl = composeUrlRef.current
@@ -362,12 +278,9 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             return
           }
           if (cancelled) return
-          if (superseded || requestedUrl !== composeUrlRef.current) {
-            if (isComposeData(parsedData) && parsedData.version === COMPOSE_VERSION) {
-              mergeSupersededHiddenChanges(parsedData)
-            }
-            return
-          }
+          // Superseded by a newer composeUrl: the newer request renders its own
+          // final state, so this response contributes nothing.
+          if (superseded || requestedUrl !== composeUrlRef.current) return
           if (defsResp && !defsResp.ok) {
             markRetryableError(requestedUrl, false)
             return
@@ -404,18 +317,16 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           const visibleAtArrival = await waitForFirstVisibility()
           if (cancelled || requestedUrl !== composeUrlRef.current) return
 
-          const applyPayload = async (animateNow = visibleAtArrival === "visible") => {
-            const container = containerRef.current
-            if (!container || cancelled) {
-              // Container not mounted — reset so a later prop change can retry
-              lastComposeUrlRef.current = ""
-              return
-            }
-            pendingRef.current = null
+          const container = containerRef.current
+          if (!container || cancelled) {
+            // Container not mounted — reset so a later prop change can retry
+            lastComposeUrlRef.current = ""
+            return
+          }
 
-            cleanup()
-            retryFailureRef.current = null
-            setErrorKind(null)
+          cleanup()
+          retryFailureRef.current = null
+          setErrorKind(null)
           setShowError(false)
           // Immediately hide fallback (React re-render is async)
           const fb = container.parentElement?.querySelector("[data-fallback]") as HTMLElement | null
@@ -426,33 +337,17 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             index,
             key: composeComponentKey(component),
           }))
-          const currentKeys = new Set(componentEntries.map((entry) => entry.key))
-          const now = performance.now()
-          for (const [key, arrivedAt] of pendingKeysRef.current) {
-            // Gone from the payload, or too old to be worth replaying → just show it.
-            if (!currentKeys.has(key) || now - arrivedAt > CATCHUP_MAX_AGE_MS) pendingKeysRef.current.delete(key)
-          }
-          const changedTargets = new Set<string>()
-          if (!suppressThisUpdate) {
+          // Only a live update on a slide the user is looking at animates. An
+          // update that lands off-screen is drawn in its final state right away,
+          // so the slide is already settled when the user scrolls to it.
+          const animateNow = visibleAtArrival === "visible"
+          const skipAgentAnimation = suppressThisUpdate || !animateNow || reducedMotion.current
+          const animTargets = new Set<string>()
+          if (!skipAgentAnimation) {
             componentEntries.forEach(({ component, key }) => {
-              if (component.changed) changedTargets.add(key)
+              if (component.changed) animTargets.add(key)
             })
           }
-          if (reducedMotion.current) pendingKeysRef.current.clear()
-          // Live update on a visible slide: animate this payload's changes plus any
-          // changes that piled up while the slide was away. Arrival on a slide that
-          // changed while away: replay those changes in catch-up form.
-          const catchUp = animateNow && visibleAtArrival !== "visible"
-          const animTargets = new Set<string>()
-          if (animateNow && !reducedMotion.current) {
-            if (visibleAtArrival === "visible") changedTargets.forEach((key) => animTargets.add(key))
-            pendingKeysRef.current.forEach((_, key) => animTargets.add(key))
-            pendingKeysRef.current.clear()
-          } else if (!reducedMotion.current) {
-            addPendingKeys(changedTargets)
-          }
-          const skipAgentAnimation = suppressThisUpdate || !animateNow
-          const stagger = catchUp ? CATCHUP_STAGGER_MS : STAGGER_MS
 
           const regions = data.regions ?? []
           const previousRegionKeys = new Set(previousRegionsRef.current.map(regionKey))
@@ -465,7 +360,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           previousRegionsRef.current = regions.map(region => ({ ...region }))
 
           let hasAnimationTargets = animTargets.size > 0 || regionAnimTargets.size > 0
-          if (hasAnimationTargets && !reducedMotion.current) {
+          if (hasAnimationTargets) {
             animatingRef.current = true
             const release = await acquire(lifecycleController.signal)
             if (!release || cancelled) {
@@ -479,12 +374,11 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
               check()
               return
             }
-            // A queued slide may have become hidden while waiting for its slot.
+            // A queued slide may have become hidden while waiting for its slot:
+            // drop the animation and draw the final state instead.
             if (visibleRef.current !== "visible") {
               release()
               animatingRef.current = false
-              // Defer what would have been drawn; it replays when the slide comes back.
-              if (visibleRef.current === "hidden") addPendingKeys(animTargets)
               animTargets.clear()
               regionAnimTargets.clear()
               hasAnimationTargets = false
@@ -536,9 +430,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             g.innerHTML = component.svg
             g.dataset.index = String(index)
             g.dataset.componentKey = key
-            const hidden = !reducedMotion.current && (animTargets.has(key) || pendingKeysRef.current.has(key))
-            g.style.opacity = hidden ? "0" : "1"
-            if (pendingKeysRef.current.has(key)) g.dataset.pending = "1"
+            g.style.opacity = animTargets.has(key) ? "0" : "1"
             svgEl.appendChild(g)
           })
 
@@ -573,7 +465,7 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
             if (region.w < 120 || region.h < 40) label.classList.add("asp-region-label-hidden")
             regionOverlay.appendChild(label)
 
-            if (!regionAnimTargets.has(i) || reducedMotion.current) {
+            if (!regionAnimTargets.has(i)) {
               g.classList.add("asp-region-on", "asp-region-drawn")
               label.classList.add("asp-region-on")
             }
@@ -602,35 +494,14 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
           const scene: Scene = { container, svgEl, vb, regionScale, componentEntries, regionEntries, markFilledRegions, markFilledByAll }
           sceneRef.current = { url: requestedUrl, scene }
 
-          if (reducedMotion.current || !hasAnimationTargets) {
+          if (!hasAnimationTargets) {
             markFilledByAll()
             animatingRef.current = false
             onComplete?.()
             return
           }
 
-          animateScene(scene, animTargets, regionAnimTargets, stagger)
-          }
-
-          const hasRenderedSvg = Boolean(containerRef.current?.querySelector("svg"))
-          if (visibleAtArrival !== "visible" && nearRef.current !== "visible" && hasRenderedSvg && !reducedMotion.current) {
-            mergeSupersededHiddenChanges(data)
-            pendingRef.current = {
-              url: requestedUrl,
-              apply: (animateNow) => {
-                void applyPayload(animateNow).catch(() => {
-                  animatingRef.current = false
-                  releaseRef.current?.()
-                  releaseRef.current = null
-                  markRetryableError(requestedUrl, false)
-                })
-              },
-            }
-            onComplete?.()
-            return
-          }
-
-          await applyPayload()
+          animateScene(scene, animTargets, regionAnimTargets)
         } catch {
           animatingRef.current = false
           releaseRef.current?.()
@@ -672,7 +543,6 @@ export function AnimatedSlidePreview({ defsUrl, composeUrl, slug, skipAnimation,
     previousDefsMountedPropRef.current = defsMounted
     if (!firstTrigger && !composeChanged && !defsUrlChanged && !lostDeckDefs) return
     if (composeChanged) {
-      pendingRef.current = null
       retryFailureRef.current = null
       setErrorKind(null)
       setShowError(false)

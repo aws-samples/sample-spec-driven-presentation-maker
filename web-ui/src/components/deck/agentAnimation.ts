@@ -178,7 +178,6 @@ export function startAgentAnimation(
           const group = svgEl.querySelector(`g[data-index="${index}"]`) as SVGGElement | null
           if (group) {
             group.style.opacity = "1"
-            delete group.dataset.pending
             // Landing: the component lights up, then returns to normal brightness.
             // One component at a time on a visible slide keeps SVG filter cost bounded.
             group.style.filter = "brightness(2) saturate(0.5)"
