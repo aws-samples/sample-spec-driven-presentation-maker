@@ -210,6 +210,9 @@ describe("AnimatedSlidePreview performance gating", () => {
     await waitFor(() => expect(container.querySelector('g[data-index="0"]')).toBeTruthy())
     expect(container.querySelector(".asp-overlay")).toBeNull()
     expect(container.textContent).not.toContain("Visual")
+    // Drawn in its final state: nothing is held back for a later replay.
+    expect((container.querySelector('g[data-index="0"]') as SVGGElement).style.opacity).toBe("1")
+    expect(container.querySelector("[data-pending]")).toBeNull()
   })
 
   it("does not install a setInterval poll on mount", async () => {
@@ -284,7 +287,7 @@ describe("AnimatedSlidePreview performance gating", () => {
     expect(requestSignal?.aborted).toBe(true)
   })
 
-  it("defers DOM work for subsequent off-screen updates", async () => {
+  it("applies subsequent off-screen updates immediately in their final state", async () => {
     class OffscreenObserver implements IntersectionObserver {
       readonly root = null
       readonly rootMargin = "0px"
@@ -303,8 +306,8 @@ describe("AnimatedSlidePreview performance gating", () => {
       takeRecords(): IntersectionObserverEntry[] { return [] }
     }
     vi.stubGlobal("IntersectionObserver", OffscreenObserver)
-    const first = { ...component, changed: true }
-    const second = { ...component, bbox: { x: 600, y: 200, w: 300, h: 300 }, changed: false }
+    const first = { ...component, svg: '<rect id="first" x="200" y="200" width="300" height="300" />', changed: true }
+    const second = { ...component, bbox: { x: 600, y: 200, w: 300, h: 300 }, svg: '<rect id="second" x="600" y="200" width="300" height="300" />', changed: false }
     vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
       const url = String(input)
       const data = url.includes("defs") ? defs : {
@@ -322,17 +325,20 @@ describe("AnimatedSlidePreview performance gating", () => {
     const rendered = render(
       <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-1.json" />
     )
-    await waitFor(() => expect(rendered.container.querySelector('g[data-index="0"]')?.getAttribute("data-pending")).toBe("1"))
+    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:first"]')).toBeTruthy())
+    expect((rendered.container.querySelector('g[data-component-key="id:first"]') as SVGGElement).style.opacity).toBe("1")
 
     rendered.rerender(
       <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" />
     )
     await waitFor(() => expect(wasFetched("/compose-2.json")).toBe(true))
-    await act(() => Promise.resolve())
 
-    // The first payload remains untouched until the slide approaches the viewport.
-    expect(rendered.container.querySelector('g[data-index="0"]')?.getAttribute("data-pending")).toBe("1")
-    expect(rendered.container.querySelector('g[data-index="1"]')?.getAttribute("data-pending")).toBeNull()
+    // The new payload lands right away — the slide is settled before the user scrolls to it.
+    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:second"]')?.getAttribute("data-index")).toBe("0"))
+    rendered.container.querySelectorAll("g[data-component-key]").forEach((g) => {
+      expect((g as SVGGElement).style.opacity).toBe("1")
+    })
+    expect(rendered.container.querySelector("[data-pending]")).toBeNull()
     expect(rendered.container.querySelector(".asp-overlay")).toBeNull()
   })
 })
@@ -371,12 +377,6 @@ class ControlledObserver implements IntersectionObserver {
     const observers = ControlledObserver.instances.filter((candidate) => candidate.targets.has(target))
     if (observers.length === 0) throw new Error("No observer owns target")
     observers.forEach((observer) => observer.emit(target, visible))
-  }
-
-  static emitZone(target: Element, rootMargin: string, visible: boolean) {
-    const observer = ControlledObserver.instances.find((candidate) => candidate.targets.has(target) && candidate.rootMargin === rootMargin)
-    if (!observer) throw new Error(`No ${rootMargin} observer owns target`)
-    observer.emit(target, visible)
   }
 }
 
@@ -418,7 +418,7 @@ describe("AnimatedSlidePreview visibility and error races", () => {
     expect(rendered.container.querySelector('g[data-index="0"]')?.hasAttribute("data-pending")).toBe(false)
   })
 
-  it("builds a pending hidden payload when near, then replays the agent animation when visible", async () => {
+  it("draws an update that lands on a hidden slide immediately, and does not replay it when the slide comes into view", async () => {
     const oldComponent = { ...component, changed: false, svg: '<rect id="old" x="200" y="200" width="300" height="300" />' }
     const newComponent = { ...component, svg: '<rect id="new" x="600" y="200" width="300" height="300" />' }
     vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
@@ -428,125 +428,35 @@ describe("AnimatedSlidePreview visibility and error races", () => {
         : { version: 1, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components: [oldComponent] }
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) })
     }))
+    const onAnimate = vi.fn()
 
     const rendered = render(
-      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-1.json" slug="lazy" defsMounted />
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-1.json" slug="lazy" defsMounted onAnimate={onAnimate} />
     )
     const wrapper = rendered.container.querySelector('[data-slide-id="lazy"]')!
     act(() => ControlledObserver.emit(wrapper, false))
     await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:old"]')).toBeTruthy())
 
     rendered.rerender(
-      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" slug="lazy" defsMounted />
+      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" slug="lazy" defsMounted onAnimate={onAnimate} />
     )
-    await waitFor(() => expect(wasFetched("/compose-2.json")).toBe(true))
-    await act(() => Promise.resolve())
-    expect(rendered.container.querySelector('g[data-component-key="id:old"]')).toBeTruthy()
-    expect(rendered.container.querySelector('g[data-component-key="id:new"]')).toBeNull()
-
-    act(() => ControlledObserver.emitZone(wrapper, "100% 0px", true))
-    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new"]')?.getAttribute("data-pending")).toBe("1"))
-
-    act(() => ControlledObserver.emitZone(wrapper, "0px", true))
-    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new"]')?.getAttribute("data-pending")).toBeNull())
-  })
-
-  it("replays for a slide that was only just below the fold (never a full viewport away)", async () => {
-    const oldComponent = { ...component, changed: false, svg: '<rect id="old-fold" x="200" y="200" width="300" height="300" />' }
-    const newComponent = { ...component, svg: '<rect id="new-fold" x="600" y="200" width="300" height="300" />' }
-    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
-      const data = String(input).includes("compose-2")
-        ? { version: 1, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components: [newComponent] }
-        : { version: 1, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components: [oldComponent] }
-      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) })
-    }))
-
-    const rendered = render(
-      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-1.json" slug="fold" defsMounted />
-    )
-    const wrapper = rendered.container.querySelector('[data-slide-id="fold"]')!
-    // Within one viewport (near) but below the replay threshold — the common case right after Follow scrolls.
-    act(() => ControlledObserver.emitZone(wrapper, "100% 0px", true))
-    act(() => ControlledObserver.emitZone(wrapper, "0px", false))
-    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:old-fold"]')).toBeTruthy())
-
-    rendered.rerender(
-      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" slug="fold" defsMounted />
-    )
-    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new-fold"]')?.getAttribute("data-pending")).toBe("1"))
-
-    const builtSvg = rendered.container.querySelector("svg")
-    act(() => ControlledObserver.emitZone(wrapper, "0px", true))
-    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new-fold"]')?.getAttribute("data-pending")).toBeNull())
-    // The arrival replays the agent-drawing animation for the accumulated change on the existing scene (no rebuild).
-    await waitFor(() => expect(rendered.container.querySelector(".asp-overlay")).toBeTruthy())
-    expect(rendered.container.querySelector("svg")).toBe(builtSvg)
-    expect(rendered.container.querySelector('g[data-component-key="id:new-fold"]')?.getAttribute("style")).toContain("opacity: 0")
-  })
-
-  it("shows changes older than 60 s instantly instead of replaying them", async () => {
-    const oldComponent = { ...component, changed: false, svg: '<rect id="old-stale" x="200" y="200" width="300" height="300" />' }
-    const newComponent = { ...component, svg: '<rect id="new-stale" x="600" y="200" width="300" height="300" />' }
-    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
-      const data = String(input).includes("compose-2")
-        ? { version: 1, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components: [newComponent] }
-        : { version: 1, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components: [oldComponent] }
-      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) })
-    }))
-    let now = 1000
-    const nowSpy = vi.spyOn(performance, "now").mockImplementation(() => now)
-
-    const rendered = render(
-      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-1.json" slug="stale" defsMounted />
-    )
-    const wrapper = rendered.container.querySelector('[data-slide-id="stale"]')!
-    act(() => ControlledObserver.emitZone(wrapper, "100% 0px", true))
-    act(() => ControlledObserver.emitZone(wrapper, "0px", false))
-    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:old-stale"]')).toBeTruthy())
-
-    rendered.rerender(
-      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" slug="stale" defsMounted />
-    )
-    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new-stale"]')?.getAttribute("data-pending")).toBe("1"))
-
-    now += 61_000
-    act(() => ControlledObserver.emitZone(wrapper, "0px", true))
-    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new-stale"]')?.getAttribute("data-pending")).toBeNull())
+    // Settled while still hidden: final state, no cursors, nothing held back.
+    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new"]')).toBeTruthy())
+    expect(rendered.container.querySelector('g[data-component-key="id:old"]')).toBeNull()
+    expect((rendered.container.querySelector('g[data-component-key="id:new"]') as SVGGElement).style.opacity).toBe("1")
+    expect(rendered.container.querySelector("[data-pending]")).toBeNull()
     expect(rendered.container.querySelector(".asp-overlay")).toBeNull()
-    expect(rendered.container.querySelector('g[data-component-key="id:new-stale"]')?.getAttribute("style")).toContain("opacity: 1")
-    nowSpy.mockRestore()
-  })
 
-  it("builds and replays immediately when a hidden slide jumps straight to visible", async () => {
-    const oldComponent = { ...component, changed: false, svg: '<rect id="old-fast" x="200" y="200" width="300" height="300" />' }
-    const newComponent = { ...component, svg: '<rect id="new-fast" x="600" y="200" width="300" height="300" />' }
-    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
-      const data = String(input).includes("compose-2")
-        ? { version: 1, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components: [newComponent] }
-        : { version: 1, viewBox: "0 0 1920 1080", bgFill: "#000", bgSvg: null, components: [oldComponent] }
-      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) })
-    }))
-
-    const rendered = render(
-      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-1.json" slug="fast" defsMounted />
-    )
-    const wrapper = rendered.container.querySelector('[data-slide-id="fast"]')!
-    act(() => ControlledObserver.emit(wrapper, false))
-    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:old-fast"]')).toBeTruthy())
-
-    rendered.rerender(
-      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-2.json" slug="fast" defsMounted />
-    )
-    await waitFor(() => expect(wasFetched("/compose-2.json")).toBe(true))
+    // Scrolling to it later changes nothing — the reviewer never waits for a replay.
+    const builtSvg = rendered.container.querySelector("svg")
+    act(() => ControlledObserver.emit(wrapper, true))
     await act(() => Promise.resolve())
-    expect(rendered.container.querySelector('g[data-component-key="id:new-fast"]')).toBeNull()
-
-    act(() => ControlledObserver.emitZone(wrapper, "0px", true))
-    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:new-fast"]')).toBeTruthy())
-    expect(rendered.container.querySelector('g[data-component-key="id:new-fast"]')?.getAttribute("data-pending")).toBeNull()
+    expect(rendered.container.querySelector("svg")).toBe(builtSvg)
+    expect(rendered.container.querySelector(".asp-overlay")).toBeNull()
+    expect(onAnimate).not.toHaveBeenCalled()
   })
 
-  it("drops a queued animation when the slide becomes hidden and keeps the change pending", async () => {
+  it("drops a queued animation when the slide becomes hidden and shows the change instead", async () => {
     mockFetch({
       version: 1,
       viewBox: "0 0 1920 1080",
@@ -574,12 +484,12 @@ describe("AnimatedSlidePreview visibility and error races", () => {
     const landed = third.container.querySelector('g[data-index="0"]') as SVGGElement
     expect(callbacks[2]).not.toHaveBeenCalled()
     expect(third.container.querySelector(".asp-overlay")).toBeNull()
-    // Stays undrawn (like a live target before its cursor lands) until the slide comes back and replays.
-    expect(landed.style.opacity).toBe("0")
-    expect(landed.dataset.pending).toBe("1")
+    // Drawn in its final state — nothing waits for the slide to come back.
+    expect(landed.style.opacity).toBe("1")
+    expect(landed.dataset.pending).toBeUndefined()
   })
 
-  it("merges changed keys from a superseded hidden response into the current pending set", async () => {
+  it("ignores a superseded hidden response without touching the current SVG", async () => {
     const first = { ...component, svg: '<rect id="first" x="200" y="200" width="300" height="300" />' }
     const second = { ...component, bbox: { x: 600, y: 200, w: 300, h: 300 }, svg: '<rect id="second" x="600" y="200" width="300" height="300" />' }
     const pending = new Map<string, (response: { ok: boolean; status: number; json: () => Promise<unknown> }) => void>()
@@ -606,23 +516,16 @@ describe("AnimatedSlidePreview visibility and error races", () => {
     )
     await waitFor(() => expect(pending.has("/compose-2.json")).toBe(true))
     act(() => respond("/compose-2.json", [{ ...first, changed: false }, { ...second, changed: true }]))
-    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:second"]')?.getAttribute("data-pending")).toBe("1"))
+    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:second"]')).toBeTruthy())
+    const builtSvg = rendered.container.querySelector("svg")
 
     act(() => respond("/compose-1.json", [{ ...first, changed: true }, { ...second, changed: false }]))
     await act(() => Promise.resolve())
-    // The stale response contributes identity only; it must not touch the current SVG.
-    expect(rendered.container.querySelector('g[data-component-key="id:first"]')?.getAttribute("data-pending")).toBeNull()
-
-    rendered.rerender(
-      <AnimatedSlidePreview defsUrl="/defs.json" composeUrl="/compose-3.json" slug="rapid" defsMounted />
-    )
-    await waitFor(() => expect(pending.has("/compose-3.json")).toBe(true))
-    act(() => respond("/compose-3.json", [{ ...first, changed: false }, { ...second, changed: false }]))
-    await act(() => Promise.resolve())
-    act(() => ControlledObserver.emitZone(wrapper, "100% 0px", true))
-
-    await waitFor(() => expect(rendered.container.querySelector('g[data-component-key="id:first"]')?.getAttribute("data-pending")).toBe("1"))
-    expect(rendered.container.querySelector('g[data-component-key="id:second"]')?.getAttribute("data-pending")).toBe("1")
+    expect(rendered.container.querySelector("svg")).toBe(builtSvg)
+    rendered.container.querySelectorAll("g[data-component-key]").forEach((g) => {
+      expect((g as SVGGElement).style.opacity).toBe("1")
+    })
+    expect(rendered.container.querySelector("[data-pending]")).toBeNull()
   })
 
   it("never renders a stale payload superseded while waiting for the scheduler", async () => {

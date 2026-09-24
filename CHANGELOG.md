@@ -65,6 +65,16 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **Off-screen slides are always drawn in their final state** — the
+  agent-cursor animation now plays only for a live update on the slide you are
+  looking at. A change that lands on a slide out of view is drawn immediately
+  and completely, with nothing held back and no replay when you scroll to it.
+  This walks back the "kept undrawn and replayed within 60 s" behaviour
+  introduced with the large-deck animation work below: on review it meant
+  waiting through a re-enactment on every slide, two at a time, and whether a
+  slide replayed or simply appeared depended on how fast you scrolled. The
+  load-reducing parts (two concurrent animations, one typewriter frame loop,
+  hoisted defs, `content-visibility: auto`, follow-scroll) are unchanged.
 - **Slide list moves instead of jumping** — slides that appear, disappear or
   move in the Slides tab slide into place (both grid and full view); a
   regenerated preview crossfades over the old image instead of flashing a
