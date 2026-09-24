@@ -38,9 +38,15 @@ CF_DIST=$(aws cloudformation list-stack-resources \
 echo "Bucket: $SITE_BUCKET"
 echo "Distribution: $CF_DIST"
 
+# A running `next dev --turbopack` writes its own output to build/dev/ (distDir
+# is "build"), and can re-create it between the rm -rf above and this sync.
+# Nothing under CloudFront references it — keep it out of the bucket.
+rm -rf "$BUILD_DIR/dev"
+
 aws s3 sync "$BUILD_DIR" "s3://$SITE_BUCKET/" \
   --delete \
   --exclude "aws-exports.json" \
+  --exclude "dev/*" \
   --region "$REGION"
 
 aws cloudfront create-invalidation \
