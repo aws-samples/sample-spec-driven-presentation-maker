@@ -51,10 +51,10 @@ uv run python3 scripts/download_aws_icons.py
 uv run python3 scripts/download_material_icons.py
 
 # 動作確認
-uv run python3 scripts/pptx_builder.py read_examples
+uv run python3 scripts/pptx_builder.py list_templates
 ```
 
-エンジン、リファレンス（デザインパターン・ワークフロー・ガイド）、サンプルテンプレート（dark/light）、SKILL.md がすべて含まれています。
+エンジン、リファレンス（ワークフロー・ガイド・同梱スタイル）、サンプルテンプレート（dark/light）、SKILL.md がすべて含まれています。
 
 ---
 

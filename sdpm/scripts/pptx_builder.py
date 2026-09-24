@@ -256,7 +256,7 @@ def cmd_list_templates(args):
 
 
 def cmd_examples(args):
-    """List or show design examples (components/styles)."""
+    """List or show design examples (styles)."""
     from sdpm.knowledge.reference import open_styles_gallery, read_docs
 
     examples_dir = Path(__file__).parent.parent / "references" / "examples"
@@ -637,7 +637,7 @@ def main():
     subparsers.add_parser("list-asset-sources", help="List available asset sources")
     subparsers.add_parser("list_templates", help="List available PPTX templates")
 
-    p_ex = subparsers.add_parser("read_examples", help="List or show design pattern/component examples")
+    p_ex = subparsers.add_parser("read_examples", help="List or show bundled style examples")
     p_ex.add_argument("names", nargs="*", help="Example names to show (multiple allowed)")
     p_ex.add_argument("--no-browse", action="store_true", help="Don't open browser for styles")
 

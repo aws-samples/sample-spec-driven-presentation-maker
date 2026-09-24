@@ -30,7 +30,7 @@ The core presentation engine. No network, no AWS, no MCP — just Python.
 - **sdpm/sdpm/knowledge/** — knowledge retrieval: references (guides/workflows/examples) and asset search
 - **sdpm/sdpm/tools/** — the MCP tool contract: every tool's name, schema, docstring, and logic defined once; both servers register these functions directly
 - **sdpm/references/** — workflows (role documents: orchestrator/composer/style/translate),
-  spec (slide JSON schema), guides (design rules), examples (components/styles)
+  spec (slide JSON schema), guides (design rules), examples (bundled styles)
 - **sdpm/templates/** — Sample .pptx templates (dark/light)
 - **sdpm/scripts/** — CLI entry point (`pptx_builder.py`), asset download scripts
 

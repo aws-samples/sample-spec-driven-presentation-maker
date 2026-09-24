@@ -261,6 +261,7 @@ Expands an external JSON file's elements array. Draw order is controlled by posi
 - `height`: **Required**. Text that overflows the box is detected and warned — adjust layout or content to fit
   - Height guide: 1 line = `fontSize × 3.5`, multiple lines = `lines × fontSize × 2.7` (varies with afterSpace etc.)
 - `fontFamily`: font name (omit to use theme default)
+- `marginTop`: textboxes keep PowerPoint's default top inset (7), so the visual top of the text sits below `y`. Set `marginTop: 0` when the text's top edge must align exactly with `y` (or with a neighbouring shape)
 
 **Code blocks (syntax highlighting)**:
 
@@ -440,7 +441,7 @@ Height includes the language label (22px). Code body height is `height - 22`.
 - `patternFill`: pattern fill `{"pattern": "dkDnDiag|ltHorz|ltVert|dkHorz|dkVert|smGrid|lgGrid|dnDiag|upDiag|...", "fgColor": "#...", "bgColor": "#..."}`
 - `adjustments`: adjustment handle values (corner radius for rounded_rectangle, etc.)
 - `verticalAlign`: `top`, `middle`, `bottom` (default: middle for shape)
-- `rotation`: rotation angle (degrees, clockwise)
+- `rotation`: rotation angle (degrees, clockwise). Base orientation at 0° differs per shape: `arrow_right` points right, `triangle` points up — a right-pointing triangle is `"shape": "triangle", "rotation": 90`
 - `gradient.angle`: gradient angle, clockwise from right. 0°=left→right, 90°=top→bottom, 180°=right→left, 270°=bottom→top. Same convention as block_arc/pie shapes
 - `sendToBack`: render this element BEHIND template placeholders (title/subtitle). Elements normally stack in array order, all in front of placeholders — use this on full-bleed decorative shapes/images that must not cover the title. Works on any element type
 - `circle`: alias for oval. Squared using min(width, height)
@@ -590,6 +591,7 @@ Effects applicable to shape, textbox, and image.
 ```
 
 - `x1`/`y1`: start point, `x2`/`y2`: end point. Direction is implicit — (x1,y1) to (x2,y2)
+- Lines carry no text: `text` on a line is ignored. Label a line with a separate `textbox` placed beside or over it
 - `elbowStart`: first segment direction for elbow connectors. `"horizontal"` (default, H-V-H) or `"vertical"` (V-H-V)
 
 ### freeform

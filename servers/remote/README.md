@@ -33,7 +33,7 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 ### References
 | Tool | Description |
 |------|-------------|
-| `list_examples` / `read_examples` | Design pattern and component examples |
+| `read_examples` | Bundled style examples (`styles/<name>`) |
 | `list_workflows` / `read_workflows` | Role workflows and slide JSON specification |
 | `list_guides` / `read_guides` | Design rules and review checklists |
 

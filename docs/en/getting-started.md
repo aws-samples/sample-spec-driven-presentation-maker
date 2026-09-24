@@ -51,10 +51,10 @@ uv run python3 scripts/download_aws_icons.py
 uv run python3 scripts/download_material_icons.py
 
 # Verify
-uv run python3 scripts/pptx_builder.py read_examples components/all
+uv run python3 scripts/pptx_builder.py list_templates
 ```
 
-The engine, references (design patterns, workflows, guides), sample templates (dark/light), and SKILL.md are all included.
+The engine, references (workflows, guides, bundled styles), sample templates (dark/light), and SKILL.md are all included.
 
 ---
 
