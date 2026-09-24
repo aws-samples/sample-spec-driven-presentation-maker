@@ -211,9 +211,9 @@ def list_templates() -> dict[str, Any]:
 
 
 def read_examples(names: list[str]) -> dict[str, Any]:
-    """Read design examples (components and styles).
+    """Read design examples (styles).
 
-    Names: "components/all" (the component vocabulary) or "styles/<style-name>".
+    Names: "styles/<style-name>".
 
     Args:
         names: List of example names to read.
