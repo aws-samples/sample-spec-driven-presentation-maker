@@ -158,14 +158,16 @@ def list_styles(include_all: bool = False) -> dict[str, Any]:
     Default returns pinned + user styles only. Pass include_all=True for all.
 
     Returns:
-        Dict with styles list (name, description, pinned, source).
+        Dict with styles list (name, description, pinned, source). When the pin
+        filter hid some styles, also other_styles (their names — they still exist
+        and can be passed to apply_style) and a hint.
     """
-    from sdpm.api import get_styles_dirs, list_styles_filtered
+    from sdpm.api import get_styles_dirs, list_styles_listing
     from sdpm.config import get_state
 
     styles_dirs = get_styles_dirs()
     pinned = get_state().get("pinned_styles", [])
-    return {"styles": list_styles_filtered(styles_dirs, pinned, include_all)}
+    return list_styles_listing(styles_dirs, pinned, include_all)
 
 
 def apply_style(

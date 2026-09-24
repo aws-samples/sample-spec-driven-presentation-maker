@@ -644,7 +644,9 @@ def list_styles(include_all: bool = False) -> str:
     Default returns pinned + user styles only. Pass include_all=True for all.
 
     Returns:
-        JSON with list of styles (name, description, pinned, source).
+        JSON with list of styles (name, description, pinned, source). When the pin
+        filter hid some styles, also other_styles (their names — they still exist
+        and can be passed to apply_style) and a hint.
     """
     user_id = _get_user_id()
     return json.dumps(

@@ -7,6 +7,7 @@ See docs/internal/DATASET_COMPLIANCE.md for dataset provenance.
 
 Reference: unified access to design patterns, components, schemas, rules, and reviews."""
 from pathlib import Path
+from typing import Any
 
 from sdpm.config import REFERENCES_DIR
 from sdpm.knowledge.reference.providers import FileProvider, ReferenceProvider  # noqa: F401
@@ -374,3 +375,37 @@ def filter_styles(
         return result
 
     return [s for s in result if s["pinned"] or s["source"] == "user"]
+
+
+HIDDEN_STYLES_HINT = (
+    "Styles listed in other_styles exist too but were left out because they are "
+    "neither pinned nor user-created. When the user names one of them, use it "
+    "directly (apply_style accepts any name here) — do not report it as missing. "
+    "Call list_styles(include_all=True) to see their descriptions."
+)
+
+
+def build_styles_listing(
+    styles: list[dict],
+    pinned_names: list[str],
+    include_all: bool = False,
+) -> dict[str, Any]:
+    """Build the ``list_styles`` tool payload.
+
+    Pure function shared by MCP Local and MCP Remote. Wraps
+    :func:`filter_styles` and, whenever the pin filter actually dropped
+    something, also returns the dropped names plus a hint so the agent
+    never mistakes a hidden style for a non-existent one.
+
+    Returns:
+        ``{"styles": [...]}``; when styles were hidden, additionally
+        ``"other_styles": [names]`` and ``"hint": str``.
+    """
+    shown = filter_styles(styles, pinned_names, include_all)
+    shown_names = {s["name"] for s in shown}
+    hidden = [s["name"] for s in styles if s["name"] not in shown_names]
+    payload: dict[str, Any] = {"styles": shown}
+    if hidden:
+        payload["other_styles"] = hidden
+        payload["hint"] = HIDDEN_STYLES_HINT
+    return payload

@@ -43,6 +43,18 @@ def get_styles_dirs() -> list[Path]:
     return _get_resource_dirs("SDPM_STYLES_DIR", "styles", BUNDLED_STYLES_DIR)
 
 
+def _list_styles_tagged(styles_dirs: list[Path]) -> list[dict]:
+    """Merge styles across dirs and tag each with source ("user" | "builtin")."""
+    from sdpm.config import get_user_config_dir
+    from sdpm.knowledge.reference import list_styles_merged
+
+    user_dir = get_user_config_dir() / "styles"
+    raw = list_styles_merged(styles_dirs)
+    for s in raw:
+        s["source"] = "user" if (user_dir / f"{s['name']}.html").exists() else "builtin"
+    return raw
+
+
 def list_styles_filtered(
     styles_dirs: list[Path],
     pinned_names: list[str],
@@ -62,20 +74,25 @@ def list_styles_filtered(
     Returns:
         Filtered list with pinned/source metadata.
     """
-    from sdpm.config import get_user_config_dir
-    from sdpm.knowledge.reference import filter_styles, list_styles_merged
+    from sdpm.knowledge.reference import filter_styles
 
-    user_dir = get_user_config_dir() / "styles"
-    raw = list_styles_merged(styles_dirs)
+    return filter_styles(_list_styles_tagged(styles_dirs), pinned_names, include_all)
 
-    # Tag source based on whether the style file exists in user dir
-    for s in raw:
-        if (user_dir / f"{s['name']}.html").exists():
-            s["source"] = "user"
-        else:
-            s["source"] = "builtin"
 
-    return filter_styles(raw, pinned_names, include_all)
+def list_styles_listing(
+    styles_dirs: list[Path],
+    pinned_names: list[str],
+    include_all: bool = False,
+) -> dict:
+    """Build the ``list_styles`` tool payload from the filesystem.
+
+    Same as :func:`list_styles_filtered` but returns the full tool payload
+    (see :func:`sdpm.knowledge.reference.build_styles_listing`), including the
+    names of styles hidden by the pin filter.
+    """
+    from sdpm.knowledge.reference import build_styles_listing
+
+    return build_styles_listing(_list_styles_tagged(styles_dirs), pinned_names, include_all)
 
 
 def list_templates_with_metadata(

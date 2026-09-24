@@ -206,6 +206,36 @@ def test_filter_styles_with_pins_filters_to_pinned_and_user() -> None:
 
 
 # ---------------------------------------------------------------------------
+# build_styles_listing
+# ---------------------------------------------------------------------------
+
+
+from sdpm.knowledge.reference import HIDDEN_STYLES_HINT, build_styles_listing
+
+
+_THREE_STYLES = [
+    {"name": "a", "description": "", "source": "builtin"},
+    {"name": "b", "description": "", "source": "user"},
+    {"name": "c", "description": "", "source": "builtin"},
+]
+
+
+def test_build_styles_listing_reports_hidden_names_and_hint() -> None:
+    payload = build_styles_listing(_THREE_STYLES, pinned_names=["a"], include_all=False)
+    assert [s["name"] for s in payload["styles"]] == ["a", "b"]
+    assert payload["other_styles"] == ["c"]
+    assert payload["hint"] == HIDDEN_STYLES_HINT
+
+
+def test_build_styles_listing_no_extras_when_nothing_hidden() -> None:
+    for pins, include_all in ([], False), (["a"], True):
+        payload = build_styles_listing(_THREE_STYLES, pinned_names=pins, include_all=include_all)
+        assert len(payload["styles"]) == 3
+        assert "other_styles" not in payload
+        assert "hint" not in payload
+
+
+# ---------------------------------------------------------------------------
 # list_styles_filtered (filesystem integration)
 # ---------------------------------------------------------------------------
 
