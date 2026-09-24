@@ -228,7 +228,7 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview |
 | Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
 | References | `list_styles` | Bundled and user styles |
-| References | `list_guides`, `read_guides` | Design rules, guides, and the slide JSON spec (`slide-json-spec`) |
+| References | `read_guides` | Design rules, guides, and the slide JSON spec (`slide-json-spec`) |
 | Layout | `grid` | CSS Grid coordinate calculation |
 | Utility | `code_to_slide` | Code highlighting |
 

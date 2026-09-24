@@ -44,7 +44,6 @@ export function activityCategory(tool: string): ActivityCategory {
     case "start_style":
     case "start_translation":
     case "list_styles":
-    case "list_guides":
     case "list_templates":
     case "analyze_template":
       return "explore"
@@ -97,7 +96,6 @@ export function activityLabel(tool: string, input?: Record<string, unknown>, t?:
     case "import_attachment": return tr("importingFile", "Importing file")
     case "analyze_template": return tr("analyzingTemplate", "Analyzing template")
     case "list_styles": return tr("browsingStyles", "Browsing styles")
-    case "list_guides": return tr("listingGuides", "Listing guides")
     case "list_templates": return tr("listingTemplates", "Listing templates")
     case "init_deck_workspace": return tr("initializingDeck", "Initializing deck")
     default: return tr("thinking", "Thinking")

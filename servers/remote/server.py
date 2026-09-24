@@ -21,11 +21,13 @@ import sys
 import time
 from contextvars import ContextVar
 from pathlib import Path
+from typing import Annotated
 
 # Add sdpm/ (skill root) to sys.path so the engine is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "sdpm"))
 
 import boto3  # noqa: E402
+from pydantic import Field  # noqa: E402
 from boto_config import LONG_CALL, SHORT_API  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
@@ -342,14 +344,11 @@ def _materialize_deck(deck_id: str, target: Path) -> None:
 
 @offloaded_tool
 def start_presentation() -> str:
-    """Start here for anything about slides: a new deck, editing or importing a PPTX,
-    restyling. Call it first, before any other sdpm tool.
+    """Start here for anything about slides — a new deck, editing or importing a PPTX,
+    restyling a deck. Call it before any other sdpm tool.
 
-    Returns the orchestrator role document (how to run the work end to end) together
-    with the environment it always needs first: available styles and PPTX templates.
-
-    Returns:
-        JSON with static.workflow (the role document), styles, templates.
+    Returns the orchestrator role document (how to run the work end to end) plus what
+    it needs first: available styles and PPTX templates.
     """
     from sdpm.entry import start_presentation as _start
 
@@ -360,23 +359,21 @@ def start_presentation() -> str:
 
 
 @offloaded_tool
-def start_composing(deck_id: str = "", assigned_slugs: list[str] | None = None) -> str:
-    """Composer entry — call first when you were asked to write slides for a deck.
+def start_composing(
+    deck_id: Annotated[str, Field(description="Deck ID, as given in your instruction.")] = "",
+    assigned_slugs: Annotated[
+        list[str] | None,
+        Field(description="The slugs you own. Other slides belong to other composers running in parallel."),
+    ] = None,
+) -> str:
+    """Composer entry. You are a composer when your instruction gives you a deck_id and
+    assigned_slugs — call this first with those values.
 
-    Returns the composer role document and the slide JSON spec, plus everything the
-    deck gives you: deck.json, specs (brief, outline, art direction), template
-    analysis, which slides already exist, and the JSON of your assigned slides
-    (with any override-group head they inherit from, marked read-only).
-    Specs are validated first; specs_ok=false with errors means stop and report.
-
-    Without deck_id, returns only the static part (role document + slide spec).
-
-    Args:
-        deck_id: Deck ID.
-        assigned_slugs: Slugs you own. Other slides belong to other composers.
-
-    Returns:
-        JSON with static.{workflow, slide_spec} and deck.{...}; or specs_ok=false + errors.
+    Validates the specs, then returns the composer role document, the slide JSON spec,
+    and everything the deck gives you: deck.json, brief, outline, art direction, template
+    analysis, which slides exist, and the JSON of your assigned slides (plus any
+    override-group head they inherit from, marked read-only). specs_ok=false with
+    errors means stop and report.
     """
     import tempfile
 
@@ -403,17 +400,13 @@ def start_composing(deck_id: str = "", assigned_slugs: list[str] | None = None) 
 
 
 @offloaded_tool
-def start_style(base: str = "") -> str:
-    """Style entry — call first when asked to create or edit a reusable style guide.
+def start_style(
+    base: Annotated[str, Field(description="Existing style to use as the skeleton; a bundled default when omitted.")] = "",
+) -> str:
+    """Call first when asked to create or edit a reusable style guide. (To restyle one
+    deck, that is apply_style inside the start_presentation workflow.)
 
-    Returns the style role document, the style catalogue, and the HTML of one
-    style to imitate (``base``; a bundled default when omitted).
-
-    Args:
-        base: Name of an existing style to use as the skeleton.
-
-    Returns:
-        JSON with static.workflow, styles, base.{name, html}.
+    Returns the style role document, the style catalogue, and one style's HTML to imitate.
     """
     from sdpm.entry import start_style as _start
 
@@ -434,17 +427,12 @@ def start_style(base: str = "") -> str:
 
 
 @offloaded_tool
-def init_deck_workspace(name: str) -> str:
-    """Create an empty deck workspace in S3: deck.json and specs/.
-
-    Plumbing step of the orchestrator workflow (start_presentation), called once the
-    brief is agreed and before apply_style. Not an entry point.
-
-    Args:
-        name: Presentation name (e.g. "lambda-overview").
-
-    Returns:
-        JSON with deckId and workspace file list.
+def init_deck_workspace(
+    name: Annotated[str, Field(description='Presentation name, e.g. "lambda-overview".')],
+) -> str:
+    """Create an empty deck workspace (deck.json, specs/). A step inside the orchestrator
+    workflow — after the brief is agreed, before apply_style — not where a request
+    starts; start_presentation is. Returns the deckId and the workspace file list.
     """
     return json.dumps(
         init_mod.init_deck_workspace(
@@ -862,7 +850,6 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
 
 # --- Reference tools (bound from the shared contract; bundled data baked into the image) ---
 
-offloaded_tool(contract.list_guides)
 offloaded_tool(contract.read_guides)
 
 

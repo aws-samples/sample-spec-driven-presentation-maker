@@ -18,12 +18,11 @@ class TestContractReference:
         assert not hasattr(contract, "read_workflows")
         assert not hasattr(contract, "list_workflows")
 
-    def test_list_guides(self):
-        result = contract.list_guides()
-        names = [item["name"] for item in result["items"]]
-        assert "design-rules" in names
-        assert "hand-edit-sync" in names
-        assert "slide-json-spec" in names
+    def test_guide_catalogue_rides_in_read_guides_description(self):
+        assert not hasattr(contract, "list_guides")
+        doc = contract.read_guides.__doc__
+        for name in ("design-rules", "hand-edit-sync", "slide-json-spec", "grid", "attachments"):
+            assert name in doc
 
     def test_read_slide_spec_as_guide(self):
         result = contract.read_guides(["slide-json-spec"])

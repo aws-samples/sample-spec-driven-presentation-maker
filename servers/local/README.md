@@ -42,7 +42,6 @@ uv run python server.py
 | `search_assets` | Search icons by keyword (empty query = discovery mode) |
 | `list_templates` | List available templates |
 | `list_styles` | List design styles |
-| `list_guides` | List guide documents |
 | `read_guides` | Read guide documents (incl. `slide-json-spec`) |
 | `code_to_slide` | Generate code block elements JSON |
 | `grid` | CSS Grid coordinate calculation |

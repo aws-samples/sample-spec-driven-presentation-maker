@@ -17,6 +17,9 @@ Usage:
 
 import sys
 from pathlib import Path
+from typing import Annotated
+
+from pydantic import Field
 
 # Add sdpm/ (skill root) to sys.path so sdpm package is importable
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -53,7 +56,6 @@ mcp.tool()(tools.generate_pptx)
 mcp.tool()(tools.search_assets)
 mcp.tool()(tools.list_templates)
 mcp.tool()(tools.apply_style)
-mcp.tool()(tools.list_guides)
 mcp.tool()(tools.read_guides)
 mcp.tool()(tools.code_to_slide)
 mcp.tool()(tools.grid)
@@ -75,16 +77,13 @@ mcp.tool()(sandbox_tools.run_style_python)
 
 
 @mcp.tool()
-def list_styles(include_all: bool = False) -> dict:
-    """List available design styles for presentations.
-
-    Default returns pinned + user styles only. Pass include_all=True for all.
-    Opens a visual gallery in the browser for selection.
-
-    Returns:
-        Dict with styles list (name, description, pinned, source). When the pin
-        filter hid some styles, also other_styles (their names — they still exist
-        and can be passed to apply_style) and a hint.
+@mcp.tool()
+def list_styles(
+    include_all: Annotated[bool, Field(description='Include styles hidden by the pin filter.')] = False,
+) -> dict:
+    """List design styles — pinned and user styles by default, everything with
+    include_all — and open the visual gallery in the browser. Names go to apply_style.
+    start_presentation and start_style already return this list.
     """
     from sdpm.api import get_styles_dirs
     from sdpm.knowledge.reference import open_styles_gallery

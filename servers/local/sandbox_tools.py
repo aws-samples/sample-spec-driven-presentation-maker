@@ -12,7 +12,9 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import Field
 
 
 def _rejection_message(violations: list[str]) -> str:
@@ -49,32 +51,18 @@ def _build_snapshot(deck_dir: Path) -> dict[str, tuple[int, int]]:
     return snap
 
 
-def run_python(purpose: str, code: str, deck_id: str,
-               measure_slides: list[str] | None = None) -> str:
-    """Execute Python code in a restricted sandbox whose working directory is the deck.
-
-    `import` and `open()` are not available; standard builtins (print, len, range,
-    sorted, min/max, zip, …) are. Helpers, with paths relative to the deck directory
-    (access outside it is denied):
-        read_json(path), write_json(path, data), read_text(path), write_text(path, text),
-        list_files(subdir=".")
-
-    Writes persist immediately. output.pptx rebuilds automatically when deck.json,
-    slides/, includes/ or specs/outline.md changed. measure_slides runs the verification
-    pass (render, text overflow measurement, preview PNGs) for those slugs only — pass
-    the slugs you edited.
-
-    Example: run_python(purpose="Fix the title", code=..., deck_id="/path/to/deck",
-    measure_slides=["title"])
-
-    Args:
-        purpose: Brief user-facing description of what this code does. Shown in UI.
-        code: Python code to execute (no import statements).
-        deck_id: Deck output_dir path (from init_deck_workspace).
-        measure_slides: Slide slugs to measure after execution (e.g. ["title", "feature-a"]).
-
-    Returns:
-        JSON: {"output", "measure"?, "pptx"?, "preview"?, "compose"?}
+def run_python(
+    purpose: Annotated[str, Field(description='One line on what this code does (shown in the UI).')],
+    code: Annotated[str, Field(description='Python code; no import statements.')],
+    deck_id: Annotated[str, Field(description='Deck directory path.')],
+    measure_slides: Annotated[list[str] | None, Field(description='Slugs to render, measure and preview after the code ran — the ones you edited.')] = None,
+) -> str:
+    """Run Python inside the deck directory — the way to read and write deck files
+    (deck.json, specs/, slides/, includes/). No import or open(); helpers:
+    read_json(path), write_json(path, data), read_text(path), write_text(path, text),
+    list_files(subdir="."). Writes persist; output.pptx rebuilds when deck.json, slides/,
+    includes/ or specs/outline.md changed. measure_slides renders, measures text overflow
+    and previews those slugs.
     """
     result: dict[str, Any] = {}
     if not deck_id or not Path(deck_id).is_dir():
@@ -417,43 +405,13 @@ def run_python(purpose: str, code: str, deck_id: str,
     return json.dumps(result, ensure_ascii=False)
 
 
-def run_style_python(purpose: str, code: str) -> str:
-    """Execute Python code in a sandboxed environment for style creation.
-
-    ## Sandbox functions
-
-        read_style(name)         → str   Read an existing style HTML (builtin or user)
-        write_style(name, html)  → None  Save HTML to user styles directory
-
-    ## Rules
-
-    - `name` is the file stem without .html (e.g. "report", "style-20260505-1430")
-    - No import statements or direct file access allowed
-    - Use print() for computation output
-
-    ## Examples
-
-        # Read an existing style for reference
-        html = read_style("report")
-        print(html[:200])
-
-        # Create a new style
-        html = '''<!DOCTYPE html>
-        <html><head><title>My Custom Style</title></head>
-        <body>...</body></html>'''
-        write_style("style-20260505-1430", html)
-
-        # Edit an existing user style
-        html = read_style("style-20260505-1430")
-        html = html.replace("old color", "new color")
-        write_style("style-20260505-1430", html)
-
-    Args:
-        purpose: Brief user-facing description of what this code does. Shown in UI.
-        code: Python code to execute (no import statements allowed).
-
-    Returns:
-        JSON: {"output", "saved"?}
+def run_style_python(
+    purpose: Annotated[str, Field(description='One line on what this code does (shown in the UI).')],
+    code: Annotated[str, Field(description='Python code; no import statements.')],
+) -> str:
+    """Run Python for style authoring. Helpers: read_style(name) returns an existing style's
+    HTML (bundled or user); write_style(name, html) saves to the user style store
+    (name = file stem, no .html). No import or file access; print() for output.
     """
     from sandbox import check_code, make_style_runner
 

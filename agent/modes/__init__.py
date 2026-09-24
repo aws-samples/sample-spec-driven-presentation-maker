@@ -65,7 +65,7 @@ _ORCHESTRATOR_ENVIRONMENT = [
 _DECK_TOOLS = [
     "init_deck_workspace", "analyze_template", "read_attachment",
     "list_styles", "apply_style",
-    "list_guides", "read_guides", "search_assets",
+    "read_guides", "search_assets",
     "list_templates", "check_specs",
     "run_python", "generate_pptx", "get_preview", "code_to_slide",
     "grid", "arch_diagram", "import_attachment",
