@@ -14,6 +14,9 @@ Usage:
 
 import sys
 from pathlib import Path
+from typing import Annotated
+
+from pydantic import Field
 
 # Add sdpm/ (skill root) to sys.path so sdpm package is importable
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -38,8 +41,15 @@ _DECK_ROOT = Path(os.environ.get("SDPM_DECK_ROOT", Path.home() / "Documents" / "
 _RAW_ATTACHMENT_ROOT = _DECK_ROOT / ".attachments"
 
 
-def read_attachment(source: str, offset: int = 0, limit: int = 10240) -> dict:
-    """Read an ACP attachment; local paths must come from the raw attachment home."""
+def read_attachment(
+    source: Annotated[str, Field(description="Absolute path under the attachment home, or https:// URL.")],
+    offset: Annotated[int, Field(description="UTF-8 byte offset into the text to start from.")] = 0,
+    limit: Annotated[int, Field(description="Max bytes returned, 512–10240.")] = 10240,
+) -> dict:
+    """Read a user-supplied file or URL as paged, line-numbered text — PDF, DOCX, XLSX, PPTX,
+    text, CSV, HTML, JSON — or image metadata. Pure read, nothing is stored.
+    Formats and paging: read_guides(["attachments"]).
+    """
     if classify_source(source) == "local_path":
         try:
             validate_local_source(source, allow_any_path=False, root=_RAW_ATTACHMENT_ROOT)
@@ -48,8 +58,16 @@ def read_attachment(source: str, offset: int = 0, limit: int = 10240) -> dict:
     return _read_attachment(source=source, offset=offset, limit=limit)
 
 
-def import_attachment(source: str, deck_id: str, filename: str = "") -> dict:
-    """Import into an ACP deck while keeping raw sources and decks under DECK_ROOT."""
+def import_attachment(
+    source: Annotated[str, Field(description="Absolute path under the attachment home, or https:// URL.")],
+    deck_id: Annotated[str, Field(description="Deck directory path.")],
+    filename: Annotated[str, Field(description="Filename override; defaults to the source's name.")] = "",
+) -> dict:
+    """Import a file or URL into the deck's attachments/ so slides can use it: images
+    (converted to PNG), PDF/DOCX/XLSX (text + images), PPTX (full deck structure), URLs.
+    Idempotent per source. On IMPORT_INCOMPLETE call again with the same arguments.
+    Bundle layout: read_guides(["attachments"]).
+    """
     try:
         deck_path = Path(deck_id).resolve(strict=True)
         deck_path.relative_to(_DECK_ROOT)
@@ -100,35 +118,25 @@ mcp.tool()(sandbox_tools.run_style_python)
 # ---------------------------------------------------------------------------
 
 
+_Q_DESC = (
+    'Question object: {"type": "single_select" | "multi_select" | "free_text", "text": str, '
+    '"options": [str] (select types), "recommended": str | [str] (optional), '
+    '"placeholder": str (free_text, optional)}.'
+)
+_Q = Annotated[dict | None, Field(description="Next question; same shape as q0.")]
+
+
 @mcp.tool()
 def hearing(
-    inference: str,
-    q0: dict,
-    q1: dict | None = None,
-    q2: dict | None = None,
-    q3: dict | None = None,
-    q4: dict | None = None,
+    inference: Annotated[str, Field(description="Your reasoning or hypothesis, shown above the questions.")],
+    q0: Annotated[dict, Field(description=_Q_DESC)],
+    q1: _Q = None,
+    q2: _Q = None,
+    q3: _Q = None,
+    q4: _Q = None,
 ) -> str:
-    """Show the user a card of up to five structured questions and collect the answers.
-
-    The card shows `inference` above the questions; the answers arrive in the user's
-    next message. For more than five questions, call again after the reply.
-
-    Args:
-        inference: Your reasoning or hypothesis, shown above the questions.
-        q0: Question object with keys:
-            - type (str): "single_select", "multi_select", or "free_text"
-            - text (str): The question text
-            - options (list[str], optional): Choices for select types
-            - recommended (str or list[str], optional): Suggested choice(s)
-            - placeholder (str, optional): Hint text for free_text type
-        q1: Second question (optional, same schema as q0).
-        q2: Third question (optional, same schema as q0).
-        q3: Fourth question (optional, same schema as q0).
-        q4: Fifth question (optional, same schema as q0).
-
-    Returns:
-        Confirmation that the questions were displayed.
+    """Show the user a card of up to five structured questions; the answers arrive in the
+    user's next message. For more than five, call again after the reply.
     """
     return "Questions displayed to user. Wait for their response."
 
