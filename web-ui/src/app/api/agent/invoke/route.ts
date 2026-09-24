@@ -19,8 +19,6 @@ import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
 const MODE_TO_AGENT: Record<string, string> = {
   vibe: "sdpm-orchestrator",
   spec: "sdpm-orchestrator",
-  separated: "sdpm-orchestrator",
-  single: "sdpm-orchestrator",
   style_creator: "sdpm-style",
   translate: "sdpm-translate",
 }

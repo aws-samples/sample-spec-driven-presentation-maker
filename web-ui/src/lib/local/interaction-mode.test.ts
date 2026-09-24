@@ -19,8 +19,6 @@ describe("interaction-mode", () => {
   it("maps the Web UI mode to the workflow's token", () => {
     expect(interactionToken("vibe")).toBe("Interaction mode: fast")
     expect(interactionToken("spec")).toBe("Interaction mode: dialogue")
-    expect(interactionToken("separated")).toBe("Interaction mode: dialogue")
-    expect(interactionToken("single")).toBe("Interaction mode: dialogue")
   })
 
   it("has no token for roles that are not the orchestrator", () => {

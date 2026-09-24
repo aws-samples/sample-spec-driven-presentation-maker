@@ -39,7 +39,14 @@
     "emptyMineDescription": "Create your first presentation with AI assistance.",
     "emptyMineAction": "Create your first deck",
     "emptyOtherTitle": "No {tab} yet",
-    "emptyOtherDescription": "When decks appear here, you'll see them in this tab."
+    "emptyOtherDescription": "When decks appear here, you'll see them in this tab.",
+    "select": "Select",
+    "cancelSelection": "Cancel selection",
+    "selectedCount": "{count, plural, one {# selected} other {# selected}}",
+    "selectAll": "Select all ({total})",
+    "deleteSelected": "Delete",
+    "deletingProgress": "Deleting {done} / {total}…",
+    "selectionToolbar": "Selected decks"
   },
   "settings": {
     "title": "Settings",
@@ -69,7 +76,8 @@
     "delete": "Delete",
     "previewAlt": "Preview of {name}",
     "internal": "Internal",
-    "private": "Private"
+    "private": "Private",
+    "selectDeck": "Select {name}"
   },
   "workspace": {
     "slideCount": "{count, plural, one {# slide} other {# slides}}",
@@ -235,10 +243,7 @@
     "slidePreview": "Slide preview",
     "options": "Options",
     "fetchWebImages": "Fetch web images",
-    "fetchWebImagesDescription": "Include images from websites in presentations",
-    "parallelAgents": "Parallel agents",
-    "experimental": "🧪 Experimental",
-    "parallelAgentsDescription": "Multiple composer agents generate slides in parallel"
+    "fetchWebImagesDescription": "Include images from websites in presentations"
   },
   "snippet": {
     "title": "Text Snippet",
@@ -377,7 +382,11 @@
     "newDeck": "New Deck",
     "createNewDeck": "Create new deck",
     "chat": "Chat",
-    "preview": "Preview"
+    "preview": "Preview",
+    "bulkDeleteTitle": "Delete {count, plural, one {# deck} other {# decks}}?",
+    "bulkDeleteDescription": "The selected decks will be permanently deleted after 30 days. This action cannot be undone.",
+    "bulkDeleteFailed": "{count, plural, one {# deck} other {# decks}} could not be deleted.",
+    "bulkDeleteDescriptionLocal": "The selected deck folders will be deleted immediately. This action cannot be undone."
   },
   "mcp": {
     "connected": "Connected: {names}",

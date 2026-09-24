@@ -14,8 +14,6 @@ import type { SessionOrigin } from "./kiro-sessions.types"
 const TOKEN: Record<string, "dialogue" | "fast"> = {
   vibe: "fast",
   spec: "dialogue",
-  separated: "dialogue",
-  single: "dialogue",
 }
 
 export function interactionToken(mode: string | undefined): string | null {

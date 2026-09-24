@@ -65,7 +65,14 @@ Entries before v0.5.0 were written retroactively as summaries.
   and the icon theme follow). Until now only `--color-text` was applied, so a
   cream or near-black style rendered on the template's white or navy unless
   each slide set `background` by hand.
-
+- **Bulk delete in the deck list** — hover a card in My Decks and tick its
+  checkbox (or press "Select" in the header) to enter selection mode; click
+  toggles, shift-click selects a range, ⌘/Ctrl+A selects everything shown,
+  Escape leaves. A floating bar shows the count with Select all / Delete /
+  Cancel; one confirmation deletes the whole selection (five requests in
+  flight at a time, progress in the bar, failures reported and left in the
+  list). Owner tab only; the local build shows the checkbox permanently on
+  touch-sized screens.
 - **Claude Opus 5.5, GPT-6 Sol and GPT-6 Luna** are selectable models
   (`global.anthropic.claude-opus-5-5`, `global.openai.gpt-6-sol`,
   `global.openai.gpt-6-luna`). Opus 5.5 uses the extended-thinking profile
@@ -159,6 +166,14 @@ Entries before v0.5.0 were written retroactively as summaries.
   new styles (or copy an old file from git history into `~/.config/sdpm/styles/`
   to keep using it). Decks already built keep their `specs/art-direction.html`.
   Pinned names in `state.json` that no longer exist are ignored; re-pin.
+- **"Parallel agents" toggle in the chat Options** — it did not do what it
+  said. On the cloud stack it switched to a `single` agent mode that dropped
+  `compose_slides` entirely (the orchestrator wrote every slide itself, slowly
+  and without the compose board); in local mode it reached nothing at all. It
+  also hid the Spec / Vibe selector when off. Composers always run now. The
+  `single` and `separated` wire values are gone — the agent accepts `spec`,
+  `vibe`, `composer`, `style_creator`; a payload without `mode` defaults to
+  `spec` (was `single`).
 
 ## [0.9.0] - 2026-09-22
 

@@ -81,7 +81,6 @@ instructions; role documents now ship inside `sdpm/references/workflows/`.
 
 ## Web UI behaviour
 
-Nothing to migrate: the Spec / Vibe selector and the "Parallel agents" setting keep
-their behaviour. They now reach the orchestrator as a one-line `Interaction mode:
-dialogue|fast` token (defined in `workflows/orchestrator.md`) instead of selecting a
-persona file.
+Nothing to migrate: the Spec / Vibe selector keeps its behaviour. It now reaches the
+orchestrator as a one-line `Interaction mode: dialogue|fast` token (defined in
+`workflows/orchestrator.md`) instead of selecting a persona file.
