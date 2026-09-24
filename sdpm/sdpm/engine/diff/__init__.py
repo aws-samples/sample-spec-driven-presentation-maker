@@ -9,6 +9,8 @@ roundtrips) is facade orchestration and lives in :func:`sdpm.api.diff_report`.
 import json
 import re
 
+from sdpm.engine.schema.regions import is_comment_element
+
 
 def _elem_x(elem):
     return elem.get("x1", elem.get("x", 0)) if elem.get("type") == "line" else elem.get("x", 0)
@@ -83,8 +85,8 @@ def match_elements(base_elems, edit_elems):
 
 def slide_similarity(s1, s2):
     """Compute similarity score (0-1) between two slides."""
-    e1 = [e for e in s1.get("elements", []) if "_comment" not in e]
-    e2 = [e for e in s2.get("elements", []) if "_comment" not in e]
+    e1 = [e for e in s1.get("elements", []) if not is_comment_element(e)]
+    e2 = [e for e in s2.get("elements", []) if not is_comment_element(e)]
     layout_match = s1.get("layout") == s2.get("layout")
     if not e1 and not e2:
         return 0.8 if layout_match else 0.0
@@ -196,8 +198,8 @@ def diff_slides(base: dict, edit: dict) -> dict:
                                                json.dumps(bv, ensure_ascii=False)[:60],
                                                json.dumps(ev, ensure_ascii=False)[:60]))
 
-        b_elems = [e for e in bs.get("elements", []) if "_comment" not in e]
-        e_elems = [e for e in es.get("elements", []) if "_comment" not in e]
+        b_elems = [e for e in bs.get("elements", []) if not is_comment_element(e)]
+        e_elems = [e for e in es.get("elements", []) if not is_comment_element(e)]
 
         pairs, added = match_elements(b_elems, e_elems)
         elem_diffs = []

@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import re
 
+from sdpm.engine.schema.regions import is_comment_element
+
 _COLOR_RE = re.compile(r'^#[0-9A-Fa-f]{6}$')
 _ALIGN_VALUES = {"left", "center", "right"}
 _VALIGN_VALUES = {"top", "middle", "bottom"}
@@ -64,7 +66,7 @@ def _diag(slide: int, element: int, rule: str, message: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def _lint_element(si: int, ei: int, elem: dict) -> list[dict]:
-    if "_comment" in elem:
+    if is_comment_element(elem):
         comment = elem.get("_comment")
         if isinstance(comment, str) and comment.strip().lower().startswith("region"):
             from sdpm.engine.schema.regions import extract_regions
@@ -74,6 +76,7 @@ def _lint_element(si: int, ei: int, elem: dict) -> list[dict]:
                               f"region comment {comment!r} has no x/y/w/h — the layout pass "
                               "wrote coordinates; keep them (the Web UI draws them)")]
         return []
+    # A typed element may carry ``_comment`` as an annotation; lint it as usual.
     etype = elem.get("type")
     if etype is None:
         return [_diag(si, ei, "missing-type", "element has no 'type' field")]

@@ -27,6 +27,19 @@ def _is_number(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
+def is_comment_element(element: object) -> bool:
+    """True for a comment-only entry in ``elements`` — ``_comment`` and no ``type``.
+
+    Section markers (``{"_comment": "--- Problem ---"}``) and layout regions
+    (``{"_comment": "region: body", "x": .., "y": .., "w": .., "h": ..}``) are
+    comment-only and produce no shape. An element that *has* a ``type`` is a
+    real element even when it also carries ``_comment`` (the spec allows the
+    key inside elements as an annotation); it must be built, diffed and linted
+    like any other element.
+    """
+    return isinstance(element, dict) and "_comment" in element and "type" not in element
+
+
 def extract_regions(slide: dict) -> list[dict]:
     """Extract valid 1920-based layout regions from a slide definition.
 

@@ -71,7 +71,10 @@ Pass the deck **directory** path to `generate_pptx`. Slides are assembled in out
 
 ## Comments
 
-JSON has no comment syntax, so use the `_comment` key. Can be used inside elements too (ignored).
+JSON has no comment syntax, so use the `_comment` key. An entry with `_comment` and no
+`type` is comment-only and produces nothing (section markers, layout `region:` entries).
+On an element that has a `type`, `_comment` is an ignored annotation — the element is
+built as usual.
 
 ```json
 {"_comment": "--- Section: Problem ---"}
