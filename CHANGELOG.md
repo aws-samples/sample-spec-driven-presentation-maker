@@ -58,9 +58,9 @@ Entries before v0.5.0 were written retroactively as summaries.
     `textGradient` / `lineGradient` as the first stop colour (solid violet);
     PowerPoint and Keynote render the gradient. Shape fills preview correctly.
   - `aws-console` — the deck looks like the AWS Management Console. Two dark
-    header bands (wordmark, a search box that shows the section name and slide
+    header bands (wordmark, a search box that shows the deck title and slide
     index, a notification badge counting open actions, date and presenter in the
-    region / account positions, a favourites row of the deck's services) over a
+    region / account positions, a favourites row of numbered section chips, the current one lit) over a
     white toolbar; a page title with an Info link and an outline + orange button
     pair; white 2px-bordered containers with drag handle, Info link, kebab and
     resize handle; blue links and blue metrics; three fixed status colours;
