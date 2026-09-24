@@ -3,7 +3,6 @@
 """Tests for the shared tool contract (sdpm.tools) reference access
 and the remote-specific style listing (tools.reference)."""
 
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
 

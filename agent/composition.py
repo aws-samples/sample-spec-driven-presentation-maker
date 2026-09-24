@@ -13,6 +13,7 @@ Otherwise it is returned as a plain string.
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -31,6 +32,7 @@ class Source:
     type: SourceType
     value: Union[str, Callable[[dict], str]]
     args: dict = field(default_factory=dict)
+    pick: str = ""
 
     @classmethod
     def file(cls, name: str) -> "Source":
@@ -38,9 +40,16 @@ class Source:
         return cls(type="file", value=name)
 
     @classmethod
-    def mcp(cls, tool_name: str, args: dict) -> "Source":
-        """Call MCP tool and use returned text as content."""
-        return cls(type="mcp", value=tool_name, args=args)
+    def mcp(cls, tool_name: str, args: dict, pick: str = "") -> "Source":
+        """Call MCP tool and use returned text as content.
+
+        ``pick`` selects part of a JSON result: a dotted path (``static.workflow``)
+        yields that value (strings verbatim, anything else re-serialised as JSON);
+        a comma-separated list of paths (``styles,templates``) yields a JSON object
+        keyed by the last path segment. Identical (tool, args) calls are made once
+        per resolve_parts run, so several parts may pick from one response.
+        """
+        return cls(type="mcp", value=tool_name, args=args, pick=pick)
 
     @classmethod
     def call(cls, fn: Callable[[dict], str]) -> "Source":
@@ -85,17 +94,48 @@ def _call_mcp(mcp_client, tool_name: str, args: dict) -> str:
     return text
 
 
-def _resolve_source(source: Source, mcp_client, context: dict) -> str:
+def _walk(payload: Any, path: str) -> Any:
+    node = payload
+    for key in path.split("."):
+        if not isinstance(node, dict) or key not in node:
+            raise KeyError(f"'{path}' not in tool result")
+        node = node[key]
+    return node
+
+
+def pick_from_text(text: str, pick: str) -> str:
+    """Apply a Source.mcp ``pick`` expression to a JSON tool result."""
+    if not pick:
+        return text
+    payload = json.loads(text)
+    paths = [p.strip() for p in pick.split(",") if p.strip()]
+    if len(paths) == 1:
+        value = _walk(payload, paths[0])
+        return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    picked = {path.rsplit(".", 1)[-1]: _walk(payload, path) for path in paths}
+    return json.dumps(picked, ensure_ascii=False)
+
+
+def _resolve_source(source: Source, mcp_client, context: dict, memo: dict | None = None) -> str:
     if source.type == "file":
         return _read_file(source.value)
     if source.type == "mcp":
-        return _call_mcp(mcp_client, source.value, source.args)
+        key = (source.value, json.dumps(source.args, sort_keys=True))
+        if memo is not None and key in memo:
+            text = memo[key]
+        else:
+            text = _call_mcp(mcp_client, source.value, source.args)
+            if memo is not None:
+                memo[key] = text
+        return pick_from_text(text, source.pick) if text else text
     if source.type == "callable":
         return source.value(context)
     raise ValueError(f"Unknown source type: {source.type}")
 
 
-def _tool_result_pair(label: str, content: str, prefill_text: str = "") -> list[dict]:
+def _tool_result_pair(
+    label: str, content: str, prefill_text: str = "", tool_input: dict | None = None,
+) -> list[dict]:
     """Build assistant toolUse + user toolResult pair for prefill."""
     tool_use_id = f"prefill-{uuid.uuid4().hex[:8]}"
     text = prefill_text or f"I'll read {label}."
@@ -104,7 +144,7 @@ def _tool_result_pair(label: str, content: str, prefill_text: str = "") -> list[
             "role": "assistant",
             "content": [
                 {"text": text},
-                {"toolUse": {"toolUseId": tool_use_id, "name": label, "input": {}}},
+                {"toolUse": {"toolUseId": tool_use_id, "name": label, "input": tool_input or {}}},
             ],
         },
         {
@@ -152,16 +192,18 @@ def resolve_parts(
     # Collect system chunks as (text, cache_point_after) pairs
     system_chunks: list[tuple[str, bool]] = []
     messages: list[dict] = []
+    memo: dict = {}
 
     for part in parts:
-        content = _resolve_source(part.source, mcp_client, context)
+        content = _resolve_source(part.source, mcp_client, context, memo)
         if not content:
             continue
         if part.target == "system":
             system_chunks.append((content, part.cache_point))
         elif part.target == "history:tool_result":
+            tool_input = part.source.args if part.source.type == "mcp" else None
             messages.extend(_tool_result_pair(
-                part.label or "prefill", content, part.prefill_text))
+                part.label or "prefill", content, part.prefill_text, tool_input))
         elif part.target == "history:user":
             messages.append({"role": "user", "content": [{"text": content}]})
         elif part.target == "history:assistant":
