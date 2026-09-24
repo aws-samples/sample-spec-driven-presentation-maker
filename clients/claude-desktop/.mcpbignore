@@ -1,0 +1,11 @@
+.venv/
+**/.venv/
+.kiro/
+**/.kiro/
+__pycache__/
+**/__pycache__/
+tests/
+**/tests/
+.DS_Store
+**/.DS_Store
+*.pyc
