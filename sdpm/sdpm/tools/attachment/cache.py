@@ -19,18 +19,19 @@ Stage order (fixed): materialize, extract_text, extract_images, convert_deck, va
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import logging
 import os
 import shutil
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import sdpm
 from sdpm.tools.attachment import ATTACHMENT_PIPELINE_REVISION
+from sdpm.tools.attachment.atomic import publish_directory
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ class StageRecord:
 
 @dataclass
 class LocalStageCache:
-    """Local XDG-based stage cache with flock + atomic directory rename."""
+    """Local XDG-based stage cache with atomic directory rename (first-writer-wins)."""
 
     base_dir: Path | None = None
 
@@ -192,7 +193,7 @@ class LocalStageCache:
         record: StageRecord,
         outputs_dir: Path,
     ) -> Path:
-        """Atomically publish a stage result using flock + rename.
+        """Atomically publish a stage result via staging + rename.
 
         Args:
             source_identity_hash: Source identity hash.
@@ -206,81 +207,34 @@ class LocalStageCache:
             Final stage directory path.
         """
         target = self.stage_dir(source_identity_hash, pipeline_key, stage, stage_key)
-        lock_dir = target.parent
-        lock_dir.mkdir(parents=True, exist_ok=True)
-        lock_path = lock_dir / f".{stage_key}.lock"
+        target.parent.mkdir(parents=True, exist_ok=True)
 
-        # Prepare staging directory as sibling of target
-        import uuid
+        # Staging directory: sibling of target (same filesystem), unique per writer
         staging = target.parent / f".staging-{stage_key}-{os.getpid()}-{uuid.uuid4().hex}"
         if staging.exists():
             shutil.rmtree(staging)
-
         staging.mkdir(parents=True)
-        staging_outputs = staging / "outputs"
 
         # Copy outputs to staging
+        staging_outputs = staging / "outputs"
         if outputs_dir.exists():
             shutil.copytree(outputs_dir, staging_outputs)
         else:
             staging_outputs.mkdir()
 
-        # Write completion record
-        complete_path = staging / "complete.json"
-        complete_path.write_text(
+        # Write completion record last
+        (staging / "complete.json").write_text(
             json.dumps(record.to_dict(), ensure_ascii=False, indent=None),
             encoding="utf-8",
         )
 
-        # Fsync the staging directory
-        _fsync_dir(staging)
-
-        # Atomic publish under flock
-        try:
-            with open(lock_path, "w") as lf:
-                fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
-                try:
-                    if target.exists():
-                        # Winner already exists — verify and reuse
-                        existing = self.get_stage(source_identity_hash, pipeline_key, stage, stage_key)
-                        if existing is not None:
-                            shutil.rmtree(staging)
-                            return target
-                        # Corrupt existing — remove and replace
-                        shutil.rmtree(target)
-                    os.rename(str(staging), str(target))
-                finally:
-                    fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
-        except OSError:
-            # Clean up staging on failure
-            if staging.exists():
-                shutil.rmtree(staging)
-            raise
-        finally:
-            # Clean up lock file
-            try:
-                lock_path.unlink(missing_ok=True)
-            except OSError:
-                pass
-
-        return target
-
-
-def _fsync_dir(path: Path) -> None:
-    """Fsync a directory and its contents."""
-    for child in path.rglob("*"):
-        if child.is_file():
-            fd = os.open(str(child), os.O_RDONLY)
-            try:
-                os.fsync(fd)
-            finally:
-                os.close(fd)
-    # Fsync the directory itself
-    fd = os.open(str(path), os.O_RDONLY)
-    try:
-        os.fsync(fd)
-    finally:
-        os.close(fd)
+        return publish_directory(
+            staging,
+            target,
+            reuse_existing=lambda: self.get_stage(
+                source_identity_hash, pipeline_key, stage, stage_key,
+            ) is not None,
+        )
 
 
 def get_completed_stages(

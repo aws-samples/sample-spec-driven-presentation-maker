@@ -21,13 +21,13 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import shutil
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from sdpm.tools.attachment.atomic import publish_directory
 from sdpm.tools.attachment.errors import ImportConflict
 
 logger = logging.getLogger(__name__)
@@ -146,10 +146,9 @@ class LocalBundleCommitter:
         """Atomically commit the staging bundle.
 
         Steps:
-        1. Write manifest.json to staging
-        2. Fsync staging directory
-        3. Check target doesn't exist (or matches)
-        4. Rename staging → target
+        1. Write manifest.json to staging (last file to appear)
+        2. Publish via :func:`publish_directory` — fsync, then a single rename;
+           if another writer already committed the same importKey, reuse it
 
         Returns:
             Path to committed bundle.
@@ -177,42 +176,18 @@ class LocalBundleCommitter:
             encoding="utf-8",
         )
 
-        # Fsync all files in staging
-        _fsync_recursive(staging)
-
-        # Ensure parent exists
-        self.imports_dir.mkdir(parents=True, exist_ok=True)
-
-        # Check target
-        if target.exists():
+        def _reuse_existing() -> bool:
             existing = self.get_committed(manifest.import_key)
             if existing is not None:
-                # Same importKey already committed — verify it matches
                 if existing.source_hash == manifest.source_hash:
-                    # Reuse existing (no-op)
-                    shutil.rmtree(staging)
-                    return target
-                else:
-                    raise ImportConflict(manifest.import_key)
-            else:
-                if (target / "manifest.json").exists():
-                    raise ImportConflict(manifest.import_key)
-                shutil.rmtree(target)
+                    return True  # Same importKey already committed — reuse
+                raise ImportConflict(manifest.import_key)
+            if (target / "manifest.json").exists():
+                # Manifest present but unreadable/mismatched — do not overwrite
+                raise ImportConflict(manifest.import_key)
+            return False  # No manifest: partial/corrupt target, replace it
 
-        # Atomic rename
-        try:
-            os.rename(str(staging), str(target))
-            _fsync_directory(self.imports_dir)
-        except OSError:
-            # Rename failed — check if someone else won
-            if target.exists():
-                existing = self.get_committed(manifest.import_key)
-                if existing and existing.source_hash == manifest.source_hash:
-                    shutil.rmtree(staging, ignore_errors=True)
-                    return target
-            raise
-
-        return target
+        return publish_directory(staging, target, reuse_existing=_reuse_existing)
 
     def cleanup_staging(self, request_id: str) -> None:
         """Clean up a staging directory on failure."""
@@ -268,26 +243,3 @@ def _guess_content_type(path: Path) -> str:
         ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     }
     return mapping.get(ext, "application/octet-stream")
-
-
-def _fsync_recursive(path: Path) -> None:
-    """Fsync all files and directories under a tree."""
-    for child in path.rglob("*"):
-        if child.is_file():
-            fd = os.open(str(child), os.O_RDONLY)
-            try:
-                os.fsync(fd)
-            finally:
-                os.close(fd)
-    directories = [child for child in path.rglob("*") if child.is_dir()]
-    for directory in sorted(directories, key=lambda item: len(item.parts), reverse=True):
-        _fsync_directory(directory)
-    _fsync_directory(path)
-
-
-def _fsync_directory(path: Path) -> None:
-    fd = os.open(str(path), os.O_RDONLY)
-    try:
-        os.fsync(fd)
-    finally:
-        os.close(fd)
