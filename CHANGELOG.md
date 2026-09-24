@@ -208,7 +208,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   (`marginTop: 0` for exact alignment, base orientation of `triangle` /
   `arrow_right` under `rotation`, lines carry no `text`). `read_examples`
   now serves `styles/<name>` only. Same reasoning as the `patterns.pptx`
-  removal below.
+  removal in 0.9.0.
 - **Bundled styles `border`, `corporate-executive`, `cute-playful`,
   `elegant-dark`, `elegant-light`, `flat-shadow`, `lumina`, `tech-cyber`.** They
   were early swatch-and-type-ramp demos with no composition rules and used
