@@ -12,6 +12,25 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **Role entry tools — `start_presentation`, `start_composing`, `start_style`,
+  `start_translation`.** Each returns the role document *and* what that role
+  always reads first, in one call: the orchestrator gets the style and template
+  catalogues and the output directory; a composer gets the slide JSON spec, the
+  deck's `brief` / `outline` / `art_direction`, `deck.json`, the template's
+  layout analysis, which slides exist, and the JSON of its assigned slides (plus
+  any override-group head they inherit from, marked read-only) — after the specs
+  have been validated, so a composer never starts from broken specs; the style
+  role gets the catalogue and one bundled style's HTML to imitate; translate gets
+  the source deck's shape and the sibling path. The payload is split into a
+  deck-independent `static` part (cacheable) and a per-call part. Register the
+  MCP server and ask for slides: with no skills, no agent definition and server
+  instructions disabled, the first tool the model calls is `start_presentation`
+  in 9/9 trials on Kiro CLI and 9/9 on Claude Code (previously 7/9
+  `read_workflows`, 1/9 straight to `init_presentation`, 1/9 no tool at all).
+  The CLI has a matching `start <role>` subcommand.
+- `SDPM_DISABLE_INSTRUCTIONS=1` serves no MCP server instructions — nothing
+  depends on them any more; the entry tools' own descriptions carry the routing.
+
 - **Bundled styles re-organised into two tiers** — an *orthodox* tier for when
   looks do not matter (`report`, `briefing`, `aws-light`, `aws-dark`) and a
   *concept* tier chosen by look (added in phases, listed below). The previous
@@ -164,6 +183,25 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **`init_presentation` → `init_deck_workspace`.** The old name read like the
+  place to start and competed with the entry tool; the tool only creates
+  `deck.json`, `slides/` and `specs/`. Same signature and result.
+- **`slide-json-spec` is a guide** (`read_guides(["slide-json-spec"])`) — it
+  arrives with `start_composing` / `start_translation`, so re-reading it is the
+  only remaining direct use.
+- **Role documents no longer ask for what the entry tool already returned**
+  (no `list_styles()` / `list_templates()` step; the composer reads its inputs
+  from the `start_composing` payload rather than from files). The orchestrator's
+  composer spawn prompt is `start_composing(deck_id, assigned_slugs)` and works
+  with any sub-agent that has the sdpm tools — a dedicated composer agent or a
+  skill is no longer required, and the `sdpm-*` skills are now one-line calls to
+  the entry tools.
+- **Cloud agent (L4)** loads roles through the same entry tools: the role
+  document goes to the system prompt (`Source.mcp(..., pick="static.workflow")`),
+  the composer's slide spec joins the cached system prefix, and each composer
+  opens with a replayed `start_composing` call instead of the agent hand-rolling
+  a `run_python` prefetch of the specs. `compose_slides` lost its
+  `_prefetch_deck_specs` and template pre-analysis.
 - **The `style` workflow now defines what a style is** — the Part 0–7 skeleton,
   the `:root` token contract, HTML constraints and writing principles (state the
   design decision, derive the rules; describe by design, not by brand). Demo type
@@ -205,6 +243,10 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Removed
 
+- **`read_workflows` / `list_workflows`.** Role documents are delivered by the
+  `start_*` entry tools (and the CLI `start` subcommand); the spec is a guide.
+  A client that still calls `read_workflows(["orchestrator"])` should call
+  `start_presentation()` instead.
 - **`sdpm/references/examples/components.pptx` — the "component vocabulary"
   (`read_examples(["components/all"])`, ~40 KB of text read by every
   composer).** An A/B run on the same material with two bundled styles

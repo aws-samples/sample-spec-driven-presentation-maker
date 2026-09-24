@@ -49,8 +49,8 @@ automatically — just describe what you want:
 ## Quick Start
 
 One MCP server is the single integration surface. Connect your agent to it and ask for
-slides — the server delivers the role documents that drive the work via the
-`read_workflows` tool. The repository is also a portable
+slides — the first tool the agent reaches for, `start_presentation`, returns the role
+document that drives the work together with the styles and templates on offer. The repository is also a portable
 [Agent Plugins](https://agent-plugins.org) package, so clients that support that format
 load the MCP server and the skill entry points together.
 
@@ -64,8 +64,8 @@ load the MCP server and the skill entry points together.
 | No MCP at all | Point your agent at [`sdpm/SKILL.md`](sdpm/SKILL.md) — it drives the CLI directly |
 | Team / remote MCP / Web UI (AWS) | [Deploy Guide](docs/en/deploy-cloudshell.md) |
 
-**Picking a mode.** Just asking for slides is enough — the agent calls `read_workflows`
-and picks. To choose explicitly, use the entry points: `sdpm-create` (build a
+**Picking a mode.** Just asking for slides is enough — the agent calls `start_presentation`
+and follows it. To choose explicitly, use the entry points: `sdpm-create` (build a
 presentation; how much dialogue happens is up to how you phrase the request), `sdpm-style`
 (build a reusable style guide), `sdpm-translate` (translate an existing deck into another
 language). In clients that turn skills into slash commands, those are `/sdpm-create`,
@@ -110,8 +110,8 @@ A hands-on workshop is available with sample data for various real-world scenari
 ```
 sdpm/        Engine (json <-> pptx) + Knowledge (references, assets, templates)
              references/workflows/ — role documents (orchestrator, composer, style,
-             translate), served to any MCP client via read_workflows
-skills/      Mode entry points — thin dispatchers that call read_workflows
+             translate), delivered to any MCP client by the start_* entry tools
+skills/      Mode entry points — one-line dispatchers that call the start_* entry tools
 plugin.json  Agent Plugins manifest (+ mcp.json) — makes the root a portable plugin
 servers/     local (stdio, no AWS) / remote (HTTP, S3 + DynamoDB) — thin binds of one tool contract
 clients/     Per-client wiring (Claude Code / Codex manifests, Kiro installer)

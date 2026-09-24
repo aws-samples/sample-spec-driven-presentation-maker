@@ -121,7 +121,7 @@ Place your .pptx file anywhere accessible and specify the path when initializing
 
 ```json
 {
-  "tool": "init_presentation",
+  "tool": "init_deck_workspace",
   "arguments": {
     "name": "My Deck"
   }
@@ -212,7 +212,7 @@ the build-time lint, and its slides show — and explain in comments — how *th
 cover, a title frame, a comparison, a process, a table, a chart. Composers read the whole file
 as `specs/art-direction.html`, and the orchestrator reads its Message & Outline part before
 writing the outline, so a style shapes the deck's structure, not only its look. The skeleton
-and token contract are defined in the `style` workflow (`read_workflows(["style"])`).
+and token contract are defined in the `style` workflow (returned by `start_style()`).
 
 ### Bundled styles
 

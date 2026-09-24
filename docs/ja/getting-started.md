@@ -79,8 +79,9 @@ skill の入口を `<KIRO_HOME>/skills/` に symlink します。これにより
 `/sdpm-style` `/sdpm-translate` で役割を明示的に選べます。加えて composer エージェントを
 `<KIRO_HOME>/agents/sdpm-composer.json` に生成します — compose ワーカーに sdpm サーバー
 だけを持たせる薄いポインタで、ワーカーごとにプロファイル内の全 MCP サーバーを
-コールドスタートするのを防ぎます。振る舞いの実体は MCP サーバーが
-`read_workflows([...])` で配信し、入口も composer エージェントも役割文書の名前を指すだけです。
+コールドスタートするのを防ぎます。振る舞いの実体は MCP サーバーが配信します。どの役割も入口ツール
+（`start_presentation`、`start_composing` …）から始まり、それが役割文書と最初に要る入力を返します。
+入口も composer エージェントもその呼び出しを指すだけです。
 前提: [`uv`](https://docs.astral.sh/uv/) が `PATH` にあること、プレビュー用に
 **LibreOffice** と **poppler**。
 

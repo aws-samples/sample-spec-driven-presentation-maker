@@ -48,7 +48,7 @@ Key capabilities:
 A thin bind of the `sdpm.tools` contract. Runs as a stdio server (plus an ACP variant for the local Web UI).
 
 - Registers the contract tools via FastMCP — no tool logic of its own
-- **Role documents via `read_workflows(names)`** — any MCP client (including ones with no skill/sub-agent mechanism, e.g. Claude Desktop) receives the orchestrator/composer/style/translate role document as a tool response. Clients that read MCP Server Instructions also get the workflow menu automatically.
+- **Role entry tools `start_presentation` / `start_composing` / `start_style` / `start_translation`** — any MCP client (including ones with no skill/sub-agent mechanism, e.g. Claude Desktop) gets the role document as a tool response, together with what that role reads first (style/template catalogues; the deck's specs and assigned slides; a base style). The entry is carried by the tool surface itself, so nothing depends on skills, agent definitions or MCP Server Instructions (`SDPM_DISABLE_INSTRUCTIONS=1` turns the latter off).
 - No AWS required — all files stored locally
 
 ---
@@ -165,7 +165,7 @@ The agent's system prompt is minimal — workflow knowledge is dynamically retri
 ### Slide Generation Steps
 
 1. User describes the presentation content via chat
-2. Agent calls MCP Server tools to create a deck (`init_presentation`)
+2. Agent calls MCP Server tools to create a deck (`init_deck_workspace`)
 3. Analyzes the template and retrieves available layouts (`analyze_template`)
 4. Following workflow files, designs briefing → art direction → outline (persisted to `specs/`)
 5. Builds slides (`run_python` to edit files in the workspace)
@@ -223,12 +223,12 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 
 | Category | Tool | Description |
 |----------|------|-------------|
-| Workflow | `init_presentation`, `analyze_template` | Initialize deck, analyze template |
+| Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate) |
+| Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template` | Create deck workspace, validate specs, apply style, analyze template |
 | Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview |
 | Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
 | References | `list_styles` | Bundled and user styles |
-| References | `list_workflows`, `read_workflows` | Role documents (orchestrator, composer, style, translate) |
-| References | `list_guides`, `read_guides` | Design rules and guides |
+| References | `list_guides`, `read_guides` | Design rules, guides, and the slide JSON spec (`slide-json-spec`) |
 | Layout | `grid` | CSS Grid coordinate calculation |
 | Utility | `code_to_slide` | Code highlighting |
 

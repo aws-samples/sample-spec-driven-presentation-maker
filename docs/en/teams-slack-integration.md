@@ -62,7 +62,7 @@ An SSE (Server-Sent Events) stream. Text chunks, tool execution status, and fina
 
 ```
 data: {"event":{"contentBlockDelta":{"delta":{"text":"Creating slides"}}}}
-data: {"toolStart":{"name":"init_presentation","toolUseId":"abc123"}}
+data: {"toolStart":{"name":"init_deck_workspace","toolUseId":"abc123"}}
 data: {"toolResult":{"toolUseId":"abc123","status":"success","content":"{\"deckId\":\"a1b2c3d4\"}"}}
 data: {"keepalive":true}
 ```
