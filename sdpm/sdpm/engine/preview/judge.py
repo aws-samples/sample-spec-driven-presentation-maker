@@ -10,9 +10,8 @@ this module checks rendering results):
 - J2 overflow:  text extends beyond its host shape's fill
 - J3 contrast:  text is unreadable against its resolved background
 
-All thresholds are calibrated against the official reference decks
-(components.pptx) rendered with LibreOffice — zero
-false positives there is a hard requirement. When uncertain
+All thresholds are calibrated against reference decks rendered with
+LibreOffice — zero false positives there is a hard requirement. When uncertain
 (gradients, images), judgments are skipped rather than guessed.
 """
 

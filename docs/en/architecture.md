@@ -30,7 +30,7 @@ The core presentation engine. No network, no AWS, no MCP — just Python.
 - **sdpm/sdpm/knowledge/** — knowledge retrieval: references (guides/workflows/examples) and asset search
 - **sdpm/sdpm/tools/** — the MCP tool contract: every tool's name, schema, docstring, and logic defined once; both servers register these functions directly
 - **sdpm/references/** — workflows (role documents: orchestrator/composer/style/translate),
-  spec (slide JSON schema), guides (design rules), examples (components/styles)
+  spec (slide JSON schema), guides (design rules), examples (bundled styles)
 - **sdpm/templates/** — Sample .pptx templates (dark/light)
 - **sdpm/scripts/** — CLI entry point (`pptx_builder.py`), asset download scripts
 
@@ -226,7 +226,7 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Workflow | `init_presentation`, `analyze_template` | Initialize deck, analyze template |
 | Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview |
 | Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
-| References | `list_styles`, `read_examples` | Slide style examples |
+| References | `list_styles` | Bundled and user styles |
 | References | `list_workflows`, `read_workflows` | Role documents (orchestrator, composer, style, translate) |
 | References | `list_guides`, `read_guides` | Design rules and guides |
 | Layout | `grid` | CSS Grid coordinate calculation |

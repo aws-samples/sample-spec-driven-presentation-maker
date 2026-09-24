@@ -21,7 +21,7 @@ working** locally and on the cloud stack.
 | Old | New |
 |---|---|
 | `generate` | `generate_pptx` |
-| `examples` | `read_examples` |
+| `examples` | *(removed — `list_styles` for styles)* |
 | `workflows` | `read_workflows` |
 | `guides` | `read_guides` |
 | `analyze-template` | `analyze_template` |

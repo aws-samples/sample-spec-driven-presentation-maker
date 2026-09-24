@@ -38,7 +38,6 @@ uv run python server.py
 | `search_assets` | Search icons by keyword (empty query = discovery mode) |
 | `list_templates` | List available templates |
 | `list_styles` | List design styles |
-| `read_examples` | Read design pattern and component examples |
 | `list_workflows` | List workflow documents |
 | `read_workflows` | Read workflow instructions |
 | `list_guides` | List guide documents |

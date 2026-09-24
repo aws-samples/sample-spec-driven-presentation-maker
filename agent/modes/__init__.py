@@ -45,7 +45,7 @@ def _workflow(name: str) -> Part:
 # the cloud path growing an implementation.
 _DECK_TOOLS = [
     "init_presentation", "analyze_template", "read_attachment",
-    "list_styles", "apply_style", "read_examples", "list_workflows",
+    "list_styles", "apply_style", "list_workflows",
     "read_workflows", "list_guides", "read_guides", "search_assets",
     "list_templates", "check_specs",
     "run_python", "generate_pptx", "get_preview", "code_to_slide",

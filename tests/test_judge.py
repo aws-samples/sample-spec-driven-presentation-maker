@@ -170,7 +170,7 @@ class TestContrast:
 
     def test_translucent_fill_composited(self, tmp_path):
         # white fill at 0.078 opacity over dark bg renders dark — white text
-        # on it is readable, must NOT flag (components.pptx card pattern)
+        # on it is readable, must NOT flag (translucent card pattern)
         body = _shape_with_text(
             "Card title", "rgb(255,255,255)",
             fx=2000, fy=2000, fw=15000, fh=6000,

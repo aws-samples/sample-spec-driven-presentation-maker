@@ -38,7 +38,6 @@ export function activityCategory(tool: string): ActivityCategory {
     case "web_search":
     case "web_fetch":
     case "search_assets":
-    case "read_examples":
     case "read_guides":
     case "read_workflows":
     case "list_styles":
@@ -83,7 +82,6 @@ export function activityLabel(tool: string, input?: Record<string, unknown>, t?:
         : tr("searchingIcons", "Searching icons")
     }
     case "read_reference": return tr("readingReference", "Reading reference")
-    case "read_examples": return tr("reviewingExamples", "Reviewing examples")
     case "read_guides": return tr("consultingGuide", "Consulting guide")
     case "read_workflows": return tr("consultingWorkflow", "Consulting workflow")
     case "apply_style": return tr("applyingStyle", "Applying style")

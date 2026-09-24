@@ -255,60 +255,27 @@ def cmd_list_templates(args):
         print(f"  {t['name']:<24} [{t['source']}]  {paths[t['name']]}{desc}")
 
 
-def cmd_examples(args):
-    """List or show design examples (components/styles)."""
-    from sdpm.knowledge.reference import open_styles_gallery, read_docs
+def cmd_list_styles(args):
+    """List design styles (user-local + bundled) with their HTML paths.
 
-    examples_dir = Path(__file__).parent.parent / "references" / "examples"
-    if not examples_dir.exists():
-        print("Directory not found: references/examples", file=sys.stderr)
-        return
+    Mirrors the ``list_styles`` tool: pinned + user styles by default,
+    ``--all`` for every bundled style. Opens the browser gallery unless
+    ``--no-browse``. Apply a style by copying its HTML to ``specs/art-direction.html``.
+    """
+    from sdpm.api import _find_style_in_dirs, get_styles_dirs
+    from sdpm.knowledge.reference import open_styles_gallery
+    from sdpm import tools
 
-    names = args.names
-    if not names:
-        print("Usage: read_examples <category> or <category/name>", file=sys.stderr)
-        return
-
-    for name in names:
-        parts = name.split("/", 1)
-        base = parts[0]
-        sub = parts[1] if len(parts) > 1 else None
-
-        # styles/ directory — searches user-local + bundled
-        if base == "styles":
-            from sdpm.api import get_styles_dirs
-            from sdpm.knowledge.reference import list_styles_merged
-            styles_dirs = get_styles_dirs()
-            if sub is None:
-                for s in list_styles_merged(styles_dirs):
-                    print(f"  styles/{s['name']}  {s['description']}")
-                if not args.no_browse:
-                    open_styles_gallery(styles_dirs)
-            else:
-                from sdpm.api import _find_style_in_dirs
-                src = _find_style_in_dirs(sub, styles_dirs)
-                if src is None:
-                    print(f"# Style not found: {sub}", file=sys.stderr)
-                else:
-                    print(f"# cp {src} specs/art-direction.html")
-            continue
-
-        # PPTX component examples
-        query = f"{base}/{sub}" if sub else base
-        try:
-            docs = read_docs(examples_dir, [query])
-            for doc in docs:
-                print(doc["content"])
-                print()
-        except FileNotFoundError:
-            print(f"# Not found: {base}", file=sys.stderr)
-            cats = []
-            for f in sorted(examples_dir.iterdir()):
-                if f.suffix == ".pptx":
-                    cats.append(f.stem)
-                elif f.is_dir() and not f.name.startswith('.'):
-                    cats.append(f"{f.name}/")
-            print(f"# Available: {', '.join(cats)}", file=sys.stderr)
+    styles_dirs = get_styles_dirs()
+    result = tools.list_styles(include_all=args.all)
+    for st in result["styles"]:
+        path = _find_style_in_dirs(st["name"], styles_dirs)
+        pin = " *" if st.get("pinned") else ""
+        print(f"  {st['name']:<24} [{st['source']}]{pin}  {path}  — {st['description']}")
+    if result.get("other_styles"):
+        print(f"# Hidden by pins (pass --all): {', '.join(result['other_styles'])}", file=sys.stderr)
+    if not args.no_browse:
+        open_styles_gallery(styles_dirs)
 
 
 def cmd_workflows(args):
@@ -637,9 +604,9 @@ def main():
     subparsers.add_parser("list-asset-sources", help="List available asset sources")
     subparsers.add_parser("list_templates", help="List available PPTX templates")
 
-    p_ex = subparsers.add_parser("read_examples", help="List or show design pattern/component examples")
-    p_ex.add_argument("names", nargs="*", help="Example names to show (multiple allowed)")
-    p_ex.add_argument("--no-browse", action="store_true", help="Don't open browser for styles")
+    p_ls = subparsers.add_parser("list_styles", help="List design styles (user-local + bundled)")
+    p_ls.add_argument("--all", action="store_true", help="Include styles hidden by pins")
+    p_ls.add_argument("--no-browse", action="store_true", help="Don't open the browser gallery")
 
     p_wf = subparsers.add_parser("read_workflows", help="List or show workflow documents")
     p_wf.add_argument("names", nargs="*", help="Workflow names to show (multiple allowed)")
@@ -705,8 +672,8 @@ def main():
         cmd_list_asset_sources(args)
     elif args.command == "list_templates":
         cmd_list_templates(args)
-    elif args.command == "read_examples":
-        cmd_examples(args)
+    elif args.command == "list_styles":
+        cmd_list_styles(args)
     elif args.command == "read_workflows":
         cmd_workflows(args)
     elif args.command == "read_guides":
