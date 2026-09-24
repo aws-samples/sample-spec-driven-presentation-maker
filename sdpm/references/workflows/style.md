@@ -16,8 +16,9 @@ style — what makes decks look consistent and deliberate is the part that says 
 builds a slide*: how titles are phrased, how much goes on one slide, how a comparison or a
 process or a table is laid out here rather than anywhere else.
 
-Read a bundled style first — `list_styles()` for names, `run_style_python` with
-`read_style(name)` for the HTML. Every bundled style follows the skeleton below; keep it.
+`start_style(base)` — the call that gave you this document — also returned the style
+catalogue (`styles`) and one bundled style's HTML (`base`) to imitate; `run_style_python` with
+`read_style(name)` reads any other. Every bundled style follows the skeleton below; keep it.
 
 ## Skeleton
 

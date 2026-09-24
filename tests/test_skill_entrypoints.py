@@ -10,13 +10,13 @@ import pytest
 _REPO = Path(__file__).resolve().parent.parent
 _SKILLS_DIR = _REPO / "skills"
 _EXPECTED = {
-    "sdpm-create": "orchestrator",
-    "sdpm-composer": "composer",
-    "sdpm-style": "style",
-    "sdpm-translate": "translate",
+    "sdpm-create": "start_presentation",
+    "sdpm-composer": "start_composing",
+    "sdpm-style": "start_style",
+    "sdpm-translate": "start_translation",
 }
 _SKILL_FILES = sorted(_SKILLS_DIR.glob("*/SKILL.md"))
-_DISPATCH = re.compile(r'read_workflows\(\["([a-z-]+)"\]\)')
+_DISPATCH = re.compile(r"`(start_[a-z]+)\(")
 _WORKFLOW_PROSE = (
     "# Role",
     "## Workflow",
@@ -64,7 +64,7 @@ def test_claude_composer_agent_is_a_thin_matching_dispatch():
     frontmatter, body = _parts(path)
     assert frontmatter["name"] == "sdpm-composer"
     assert frontmatter["tools"]
-    assert _DISPATCH.findall(body) == ["composer"]
+    assert _DISPATCH.findall(body) == ["start_composing"]
     assert len(body.splitlines()) <= 6
     assert not [phrase for phrase in _WORKFLOW_PROSE if phrase in body]
     assert "deck_id" in body and "assigned_slugs" in body and "task_instruction" in body

@@ -50,7 +50,7 @@ def test_builder_skips_region_comments_silently(tmp_path, capsys) -> None:
 
     from pathlib import Path
 
-    r = tools.init_presentation(str(tmp_path / "deck"))
+    r = tools.init_deck_workspace(str(tmp_path / "deck"))
     deck = Path(r.get("output_dir", str(tmp_path / "deck")))
     api.apply_style(deck, "briefing", "blank-dark")
     (deck / "specs" / "outline.md").write_text(

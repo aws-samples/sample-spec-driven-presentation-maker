@@ -14,25 +14,22 @@ from tools.reference import list_styles as remote_list_styles
 class TestContractReference:
     """Contract reference tools read bundled data from the local filesystem."""
 
-    def test_list_workflows_includes_roles_and_spec(self):
-        result = contract.list_workflows()
-        names = {item["name"] for item in result["items"]}
-        assert {"orchestrator", "composer", "style", "translate"} <= names
-        assert "slide-json-spec" in names
-
-    @pytest.mark.parametrize("name", [
-        "orchestrator", "composer", "style", "translate", "slide-json-spec",
-    ])
-    def test_read_workflows_resolves_roles_and_spec(self, name):
-        result = contract.read_workflows([name])
-        assert len(result["documents"]) == 1
-        assert result["documents"][0]["content"]
+    def test_workflow_readers_are_gone(self):
+        # Role documents arrive through the start_* entry tools; the spec is a guide.
+        assert not hasattr(contract, "read_workflows")
+        assert not hasattr(contract, "list_workflows")
 
     def test_list_guides(self):
         result = contract.list_guides()
         names = [item["name"] for item in result["items"]]
         assert "design-rules" in names
         assert "hand-edit-sync" in names
+        assert "slide-json-spec" in names
+
+    def test_read_slide_spec_as_guide(self):
+        result = contract.read_guides(["slide-json-spec"])
+        assert len(result["documents"]) == 1
+        assert "deck.json" in result["documents"][0]["content"]
 
     def test_read_guides(self):
         result = contract.read_guides(["hand-edit-sync"])
@@ -48,12 +45,12 @@ class TestContractReference:
 def test_reference_vocabulary_is_environment_neutral():
     """Role/fact docs use contract vocabulary, apart from documented CLI setup."""
     references = Path(__file__).parents[1] / "sdpm" / "references"
-    roots = [references / name for name in ("workflows", "guides", "spec")]
+    roots = [references / name for name in ("workflows", "guides")]
     allowed_cli = {
         references / "guides" / "setup.md",
         references / "guides" / "arch-layout-engine.md",
     }
-    banned = ("pptx_builder.py", "uv run", "start_presentation")
+    banned = ("pptx_builder.py", "uv run", "read_workflows", "init_presentation")
 
     offenders = []
     for base in roots:

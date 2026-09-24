@@ -7,8 +7,10 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 ### Workflow
 | Tool | Description |
 |------|-------------|
-| `read_workflows` | Load role instructions (`orchestrator`, `composer`, `style`, or `translate`) |
-| `init_presentation` | Create deck + associate template |
+| `start_presentation` | Entry point — orchestrator role document + styles and templates |
+| `start_composing` | Composer entry — role document, slide spec, and the deck's specs and assigned slides |
+| `start_style` | Style entry — role document, style catalogue, a base style's HTML |
+| `init_deck_workspace` | Create an empty deck workspace |
 | `analyze_template` | Get pre-analyzed template info (layouts, colors, fonts) |
 
 ### Deck CRUD
@@ -33,7 +35,6 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 ### References
 | Tool | Description |
 |------|-------------|
-| `list_workflows` / `read_workflows` | Role workflows and slide JSON specification |
 | `list_guides` / `read_guides` | Design rules and review checklists |
 
 ### Utility

@@ -4,6 +4,6 @@ description: Composes assigned slides from approved specs. No user interaction. 
 tools: mcp__plugin_sdpm_sdpm__*, mcp__sdpm__*, Read, Glob, Grep
 ---
 
-Follow the `sdpm-composer` skill: call `read_workflows(["composer"])` first and follow it.
+Call `start_composing(deck_id, assigned_slugs)` first and follow the role document it returns.
 Your task prompt carries `deck_id`, `assigned_slugs`, and `task_instruction`.
 If the sdpm tools are missing, report that and stop.

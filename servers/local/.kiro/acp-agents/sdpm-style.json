@@ -25,7 +25,8 @@
     "glob",
     "grep",
     "web_fetch",
-    "web_search"
+    "web_search",
+    "@sdpm/start_style"
   ],
   "allowedTools": [
     "@sdpm/run_style_python",
@@ -39,7 +40,8 @@
     "glob",
     "grep",
     "web_fetch",
-    "web_search"
+    "web_search",
+    "@sdpm/start_style"
   ],
   "resources": [],
   "welcomeMessage": "What style would you like to create?"

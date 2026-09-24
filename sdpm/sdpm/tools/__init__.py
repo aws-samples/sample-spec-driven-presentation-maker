@@ -20,11 +20,86 @@ from typing import Any
 from sdpm.config import REFERENCES_DIR as _REFERENCES_DIR
 
 
-def init_presentation(name: str) -> dict[str, Any]:
-    """Initialize a presentation workspace. Creates deck.json, slides/, and specs/.
+def start_presentation() -> dict[str, Any]:
+    """Start here for anything about slides: a new deck, editing or importing a PPTX,
+    restyling, translating. Call it first, before any other sdpm tool.
 
-    Call after briefing is complete, before applying a template and style with
-    apply_style and building slides.
+    Returns the orchestrator role document (how to run the work end to end) together
+    with the environment it always needs first: available styles, available PPTX
+    templates, and the directory decks are written to.
+
+    Returns:
+        Dict with static.workflow (the role document), styles, templates, output_dir.
+    """
+    from sdpm.entry import start_presentation as _start
+
+    return _start()
+
+
+def start_composing(deck_id: str = "", assigned_slugs: list[str] | None = None) -> dict[str, Any]:
+    """Composer entry — call first when you were asked to write slides for a deck.
+
+    Returns the composer role document and the slide JSON spec, plus everything the
+    deck gives you: deck.json, specs (brief, outline, art direction), template
+    analysis, which slides already exist, and the JSON of your assigned slides
+    (with any override-group head they inherit from, marked read-only).
+    Specs are validated first; specs_ok=false with errors means stop and report.
+
+    Without deck_id, returns only the static part (role document + slide spec).
+
+    Args:
+        deck_id: Deck directory path.
+        assigned_slugs: Slugs you own. Other slides belong to other composers.
+
+    Returns:
+        Dict with static.{workflow, slide_spec} and deck.{...}; or specs_ok=false + errors.
+    """
+    from sdpm.entry import start_composing as _start
+
+    return _start(deck_dir=deck_id or None, assigned_slugs=assigned_slugs)
+
+
+def start_style(base: str = "") -> dict[str, Any]:
+    """Style entry — call first when asked to create or edit a reusable style guide.
+
+    Returns the style role document, the style catalogue, and the HTML of one
+    bundled style to imitate (``base``; a sensible default when omitted).
+
+    Args:
+        base: Name of an existing style to use as the skeleton.
+
+    Returns:
+        Dict with static.workflow, styles, base.{name, html}.
+    """
+    from sdpm.entry import start_style as _start
+
+    return _start(base=base)
+
+
+def start_translation(deck_id: str, language: str) -> dict[str, Any]:
+    """Translate entry — call first when asked to translate an existing deck.
+
+    Returns the translate role document, the slide JSON spec, and the source deck's
+    shape (deck.json, existing slides, the sibling deck path the variant will use).
+
+    Args:
+        deck_id: Source deck directory path.
+        language: Target language code or name (becomes the ``-<lang>`` suffix).
+
+    Returns:
+        Dict with static.{workflow, slide_spec} and deck.{...}.
+    """
+    from sdpm.entry import start_translation as _start
+
+    return _start(deck_dir=deck_id, language=language)
+
+
+def init_deck_workspace(name: str) -> dict[str, Any]:
+    """Create an empty deck workspace: deck.json, slides/, and specs/.
+
+    Plumbing step of the orchestrator workflow (start_presentation), called once the
+    brief is agreed and before apply_style. Not an entry point — if you have not
+    called start_presentation yet, do that first.
 
     Args:
         name: Presentation name (e.g. "lambda-overview").
@@ -44,6 +119,8 @@ def check_specs(
     """Validate deck.json and specs/outline.md before composing; ok=false means composers must not be dispatched.
 
     Checks required deck metadata, outline format and fields, TBD markers, and assigned slugs.
+    Composers get the same check from start_composing; this is the orchestrator's
+    pre-dispatch gate.
     """
     from sdpm.api import check_specs as _check_specs
 
@@ -210,55 +287,8 @@ def list_templates() -> dict[str, Any]:
     return {"templates": list_templates_with_metadata(templates_dirs, metadata)}
 
 
-def list_workflows() -> dict[str, Any]:
-    """List all role workflow and presentation specification documents.
-
-    Returns:
-        Dict with items list (name, description).
-    """
-    from sdpm.knowledge.reference import list_category
-
-    items = list_category(_REFERENCES_DIR / "workflows")
-    seen = {item["name"] for item in items}
-    items.extend(item for item in list_category(_REFERENCES_DIR / "spec") if item["name"] not in seen)
-    return {"items": items}
-
-
-def read_workflows(names: list[str]) -> dict[str, Any]:
-    """Read role workflows and presentation specifications.
-
-    To create slides, read orchestrator first.
-
-    - orchestrator: build a deck from material or dialogue.
-    - composer: write assigned slides from approved specs.
-    - style: create a reusable style guide.
-    - translate: derive a translated deck.
-
-    Args:
-        names: List of workflow or specification names to read.
-
-    Returns:
-        Dict with documents list.
-    """
-    from sdpm.knowledge.reference import read_docs
-
-    documents = []
-    directories = (_REFERENCES_DIR / "workflows", _REFERENCES_DIR / "spec")
-    for name in names:
-        errors = []
-        for directory in directories:
-            try:
-                documents.extend(read_docs(directory, [name]))
-                break
-            except FileNotFoundError as error:
-                errors.append(error)
-        else:
-            raise errors[0]
-    return {"documents": documents}
-
-
 def list_guides() -> dict[str, Any]:
-    """List all guide documents.
+    """List all guide documents (including slide-json-spec, the slide JSON format).
 
     Returns:
         Dict with items list (name, description).

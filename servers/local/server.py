@@ -8,7 +8,7 @@ data classification, and IAM policies. See SECURITY.md for details.
 stdio transport for local MCP clients (Claude Desktop, VS Code, Goose, etc.).
 Thin bind of the shared tool contract (:mod:`sdpm.tools`) — all file I/O is
 local filesystem. Workflow discovery is exposed through MCP Server Instructions;
-role workflows are read through the shared ``read_workflows`` contract.
+role documents are delivered by the shared ``start_*`` entry tools.
 
 Usage:
     python server.py
@@ -31,26 +31,28 @@ from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from sdpm import tools  # noqa: E402
 from sdpm.tools.attachment.contracts import read_attachment, import_attachment  # noqa: E402
-from sdpm.tools.instructions import INSTRUCTIONS  # noqa: E402
+from sdpm.tools.instructions import instructions  # noqa: E402
 
 mcp = FastMCP(
     "spec-driven-presentation-maker",
-    instructions=INSTRUCTIONS,
+    instructions=instructions(),
 )
 
 # ---------------------------------------------------------------------------
 # Contract tools (1-line registration from sdpm.tools)
 # ---------------------------------------------------------------------------
 
-mcp.tool()(tools.init_presentation)
+mcp.tool()(tools.start_presentation)
+mcp.tool()(tools.start_composing)
+mcp.tool()(tools.start_style)
+mcp.tool()(tools.start_translation)
+mcp.tool()(tools.init_deck_workspace)
 mcp.tool()(tools.check_specs)
 mcp.tool()(tools.analyze_template)
 mcp.tool()(tools.generate_pptx)
 mcp.tool()(tools.search_assets)
 mcp.tool()(tools.list_templates)
 mcp.tool()(tools.apply_style)
-mcp.tool()(tools.list_workflows)
-mcp.tool()(tools.read_workflows)
 mcp.tool()(tools.list_guides)
 mcp.tool()(tools.read_guides)
 mcp.tool()(tools.code_to_slide)

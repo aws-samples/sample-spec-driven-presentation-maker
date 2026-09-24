@@ -278,21 +278,30 @@ def cmd_list_styles(args):
         open_styles_gallery(styles_dirs)
 
 
-def cmd_workflows(args):
-    """List or show workflow and specification documents."""
+def cmd_start(args):
+    """Print a role's entry payload (start_presentation / start_composing / start_style / start_translation)."""
+    import json
+
     from sdpm import tools
 
-    if not args.names:
-        print("# Workflows")
-        for item in tools.list_workflows()["items"]:
-            print(f"  {item['name']:<36} {item['description']}")
+    role = args.role
+    if role == "presentation":
+        payload = tools.start_presentation()
+    elif role == "composing":
+        payload = tools.start_composing(args.deck or "", args.slugs or None)
+    elif role == "style":
+        payload = tools.start_style(args.base or "")
+    elif role == "translation":
+        if not args.deck or not args.language:
+            print("# start translation needs --deck and --language", file=sys.stderr)
+            return
+        payload = tools.start_translation(args.deck, args.language)
+    else:  # pragma: no cover - argparse restricts choices
+        raise SystemExit(f"unknown role: {role}")
+    if args.workflow_only:
+        print(payload.get("static", {}).get("workflow", ""))
     else:
-        try:
-            for doc in tools.read_workflows(args.names)["documents"]:
-                print(doc["content"])
-                print()
-        except FileNotFoundError as e:
-            print(f"# {e}", file=sys.stderr)
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
 def cmd_guides(args):
@@ -608,13 +617,18 @@ def main():
     p_ls.add_argument("--all", action="store_true", help="Include styles hidden by pins")
     p_ls.add_argument("--no-browse", action="store_true", help="Don't open the browser gallery")
 
-    p_wf = subparsers.add_parser("read_workflows", help="List or show workflow documents")
-    p_wf.add_argument("names", nargs="*", help="Workflow names to show (multiple allowed)")
+    p_start = subparsers.add_parser("start", help="Role entry payload: role document + what the role reads first")
+    p_start.add_argument("role", choices=["presentation", "composing", "style", "translation"])
+    p_start.add_argument("--deck", help="Deck directory (composing / translation)")
+    p_start.add_argument("--slugs", nargs="*", help="Assigned slugs (composing)")
+    p_start.add_argument("--base", help="Base style name (style)")
+    p_start.add_argument("--language", help="Target language (translation)")
+    p_start.add_argument("--workflow-only", action="store_true", help="Print only the role document")
 
     p_gd = subparsers.add_parser("read_guides", help="List or show guide documents")
     p_gd.add_argument("names", nargs="*", help="Guide names to show (multiple allowed)")
 
-    p_init = subparsers.add_parser("init_presentation", help="Initialize output directory with empty presentation JSON")
+    p_init = subparsers.add_parser("init_deck_workspace", help="Create an empty deck workspace (deck.json, slides/, specs/)")
     p_init.add_argument("name", nargs="?", help="Presentation name (e.g. 'my-proposal')")
     p_init.add_argument("-o", "--output", help="Output directory (overrides default)")
 
@@ -674,11 +688,11 @@ def main():
         cmd_list_templates(args)
     elif args.command == "list_styles":
         cmd_list_styles(args)
-    elif args.command == "read_workflows":
-        cmd_workflows(args)
+    elif args.command == "start":
+        cmd_start(args)
     elif args.command == "read_guides":
         cmd_guides(args)
-    elif args.command == "init_presentation":
+    elif args.command == "init_deck_workspace":
         cmd_init(args)
     elif args.command == "arch_diagram":
         cmd_layout(args)

@@ -50,7 +50,8 @@ _INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generat
 
 The agent edits deck files through `run_python`; MCP tools handle workflows,
 initialization, generation, previews, and references.
-To create or edit slides, read `read_workflows(["orchestrator"])` first.
+To create or edit slides, call `start_presentation()` first; a composer calls
+`start_composing(deck_id, assigned_slugs)` first.
 """
 
 mcp = FastMCP(
@@ -310,13 +311,126 @@ def _check_deck_access(deck_id: str, action: str = "read") -> None:
         raise ValueError(f"Access denied: {decision.reason}")
 
 
+# --- Role entry tools ---
+#
+# The payloads come from sdpm.entry (same code as the local server). What differs
+# here is where things live: styles/templates are per user on S3, and a deck has
+# to be materialised into a temporary directory before the core can read it.
+# start_translation is not bound — the translate workflow runs scripts from a
+# checkout and has no cloud path (same reasoning as diff_pptx).
+
+
+def _materialize_deck(deck_id: str, target: Path) -> None:
+    """Download deck.json, specs/ and slides/*.json into ``target`` (attachments excluded)."""
+    prefix = f"decks/{deck_id}/"
+    keys = _storage.list_files(prefix=prefix, bucket=_storage.pptx_bucket)
+    for key in keys:
+        rel = key.removeprefix(prefix)
+        if rel == "deck.json" or rel.startswith("specs/") or (rel.startswith("slides/") and rel.endswith(".json")):
+            dest = target / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(_storage.download_file_from_pptx_bucket(key=key))
+
+
+@offloaded_tool
+def start_presentation() -> str:
+    """Start here for anything about slides: a new deck, editing or importing a PPTX,
+    restyling. Call it first, before any other sdpm tool.
+
+    Returns the orchestrator role document (how to run the work end to end) together
+    with the environment it always needs first: available styles and PPTX templates.
+
+    Returns:
+        JSON with static.workflow (the role document), styles, templates.
+    """
+    from sdpm.entry import start_presentation as _start
+
+    user_id = _get_user_id()
+    styles = reference.list_styles(storage=_storage, user_id=user_id).get("styles", [])
+    templates = template_mod.list_templates(storage=_storage, user_id=user_id).get("templates", [])
+    return json.dumps(_start(styles=styles, templates=templates, output_dir=""), ensure_ascii=False)
+
+
+@offloaded_tool
+def start_composing(deck_id: str = "", assigned_slugs: list[str] | None = None) -> str:
+    """Composer entry — call first when you were asked to write slides for a deck.
+
+    Returns the composer role document and the slide JSON spec, plus everything the
+    deck gives you: deck.json, specs (brief, outline, art direction), template
+    analysis, which slides already exist, and the JSON of your assigned slides
+    (with any override-group head they inherit from, marked read-only).
+    Specs are validated first; specs_ok=false with errors means stop and report.
+
+    Without deck_id, returns only the static part (role document + slide spec).
+
+    Args:
+        deck_id: Deck ID.
+        assigned_slugs: Slugs you own. Other slides belong to other composers.
+
+    Returns:
+        JSON with static.{workflow, slide_spec} and deck.{...}; or specs_ok=false + errors.
+    """
+    import tempfile
+
+    from sdpm.entry import start_composing as _start
+
+    if not deck_id or not deck_id.strip():
+        return json.dumps(_start(), ensure_ascii=False)
+    _check_deck_access(deck_id, action="generate_pptx")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        _materialize_deck(deck_id, root)
+        analysis: dict | None = None
+        try:
+            template = json.loads((root / "deck.json").read_text(encoding="utf-8")).get("template") or ""
+            if template:
+                analysis = template_mod.analyze_template(
+                    template_name=template, storage=_storage, user_id=_get_user_id()
+                )
+        except Exception:  # analysis is an aid, never a blocker
+            analysis = None
+        payload = _start(root, assigned_slugs, deck_id=deck_id, template_analysis=analysis or {})
+    return json.dumps(payload, ensure_ascii=False)
+
+
+@offloaded_tool
+def start_style(base: str = "") -> str:
+    """Style entry — call first when asked to create or edit a reusable style guide.
+
+    Returns the style role document, the style catalogue, and the HTML of one
+    style to imitate (``base``; a bundled default when omitted).
+
+    Args:
+        base: Name of an existing style to use as the skeleton.
+
+    Returns:
+        JSON with static.workflow, styles, base.{name, html}.
+    """
+    from sdpm.entry import start_style as _start
+
+    user_id = _get_user_id()
+    styles = reference.list_styles(storage=_storage, user_id=user_id, include_all=True).get("styles", [])
+    base_html: str | None = None
+    if base:
+        if not re.fullmatch(r"[a-zA-Z0-9_-]+", base):
+            raise ValueError("Invalid style name")
+        try:
+            base_html = _storage.download_file_from_pptx_bucket(key=f"user-styles/{user_id}/{base}.html").decode("utf-8")
+        except Exception:
+            base_html = None  # fall through to the bundled lookup inside sdpm.entry
+    return json.dumps(_start(base, styles=styles, base_html=base_html), ensure_ascii=False)
+
+
 # --- Workflow Tools ---
 
 
 @offloaded_tool
-def init_presentation(name: str) -> str:
-    """Initialize a presentation. Creates a deck and empty workspace in S3.
-    Call after the brief is written, before apply_style and slide composition.
+def init_deck_workspace(name: str) -> str:
+    """Create an empty deck workspace in S3: deck.json and specs/.
+
+    Plumbing step of the orchestrator workflow (start_presentation), called once the
+    brief is agreed and before apply_style. Not an entry point.
 
     Args:
         name: Presentation name (e.g. "lambda-overview").
@@ -325,7 +439,7 @@ def init_presentation(name: str) -> str:
         JSON with deckId and workspace file list.
     """
     return json.dumps(
-        init_mod.init_presentation(
+        init_mod.init_deck_workspace(
             name=name.strip(),
             user_id=_get_user_id(),
             storage=_storage,
@@ -458,7 +572,7 @@ def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
 
     Args:
         source: S3 key from [Attached:...] message, or an HTTP(S) URL.
-        deck_id: The deck ID (must be initialized via init_presentation).
+        deck_id: The deck ID (from init_deck_workspace).
         filename: Optional output filename. If omitted, derived from source.
 
     Returns:
@@ -740,8 +854,6 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
 
 # --- Reference tools (bound from the shared contract; bundled data baked into the image) ---
 
-offloaded_tool(contract.list_workflows)
-offloaded_tool(contract.read_workflows)
 offloaded_tool(contract.list_guides)
 offloaded_tool(contract.read_guides)
 
@@ -868,7 +980,7 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
 
     Args:
         code: Python code to execute.
-        deck_id: Deck ID (from init_presentation).
+        deck_id: Deck ID (from init_deck_workspace).
         measure_slides: Slugs to measure after execution.
         purpose: Brief user-facing description of what this code does,
             written in the user's language. Shown in the UI.
@@ -879,7 +991,7 @@ def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] 
     if not deck_id:
         return json.dumps({
             "error": "deck_id is required: run_python runs inside a deck workspace "
-                     "(create one with init_presentation first)."
+                     "(create one with init_deck_workspace first)."
         })
 
     result: dict = {}

@@ -29,28 +29,30 @@ _FULL_ORCHESTRATOR = {
     "@sdpm/grid",
     "@sdpm/hearing",
     "@sdpm/import_attachment",
-    "@sdpm/init_presentation",
+    "@sdpm/init_deck_workspace",
     "@sdpm/list_guides",
     "@sdpm/list_styles",
     "@sdpm/list_templates",
-    "@sdpm/list_workflows",
     "@sdpm/read_attachment",
     "@sdpm/read_guides",
-    "@sdpm/read_workflows",
+    "@sdpm/start_presentation",
+    "@sdpm/start_translation",
     "@sdpm/run_python",
     "@sdpm/search_assets",
 }
-_COMPOSER = _FULL_ORCHESTRATOR - {
+_COMPOSER = (_FULL_ORCHESTRATOR - {
     "use_subagent",
     "web_fetch",
     "web_search",
     "@sdpm/hearing",
     "@sdpm/diff_pptx",
-}
+    "@sdpm/start_presentation",
+    "@sdpm/start_translation",
+}) | {"@sdpm/start_composing"}
 _EXPECTED_TOOLS = {
     "sdpm-orchestrator": _FULL_ORCHESTRATOR,
     "sdpm-composer": _COMPOSER,
-    "sdpm-translate": _COMPOSER - {"@sdpm/check_specs"},
+    "sdpm-translate": (_COMPOSER - {"@sdpm/check_specs", "@sdpm/start_composing"}) | {"@sdpm/start_translation"},
     "sdpm-style": {
         "read",
         "glob",
@@ -64,6 +66,7 @@ _EXPECTED_TOOLS = {
         "@sdpm/list_styles",
         "@sdpm/read_guides",
         "@sdpm/run_style_python",
+        "@sdpm/start_style",
     },
 }
 

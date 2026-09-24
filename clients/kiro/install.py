@@ -26,7 +26,7 @@ from colliding, because Powers are global-scope only.
 
 The repository stays the single source of truth: role behavior lives in
 ``sdpm/references/workflows/*.md`` and skills dispatch to it through
-``read_workflows(...)``. The generated composer agent carries no behavior — its
+``start_*`` entry tools. The generated composer agent carries no behavior — its
 prompt is a ``file://`` pointer to ``skills/sdpm-composer/SKILL.md``. ``git pull``
 updates take effect without re-running this script. Re-run only if you move the
 checkout.

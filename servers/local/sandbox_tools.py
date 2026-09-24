@@ -70,7 +70,7 @@ def run_python(purpose: str, code: str, deck_id: str,
     Args:
         purpose: Brief user-facing description of what this code does. Shown in UI.
         code: Python code to execute (no import statements).
-        deck_id: Deck output_dir path (from init_presentation).
+        deck_id: Deck output_dir path (from init_deck_workspace).
         measure_slides: Slide slugs to measure after execution (e.g. ["title", "feature-a"]).
 
     Returns:
@@ -80,7 +80,7 @@ def run_python(purpose: str, code: str, deck_id: str,
     if not deck_id or not Path(deck_id).is_dir():
         result["error"] = (
             f"deck directory not found: {deck_id!r}. run_python runs inside a deck "
-            "workspace — pass the output_dir returned by init_presentation."
+            "workspace — pass the output_dir returned by init_deck_workspace."
         )
         return json.dumps(result, ensure_ascii=False)
     cwd = deck_id
