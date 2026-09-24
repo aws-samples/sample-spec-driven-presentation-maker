@@ -39,13 +39,10 @@ class TestContractReference:
         assert len(result["documents"]) == 1
         assert result["documents"][0]["content"]
 
-    def test_read_examples_rejects_missing(self):
-        with pytest.raises(FileNotFoundError, match="not found"):
-            contract.read_examples(["nonexistent-doc-xyz"])
-
-    def test_patterns_are_not_available(self):
-        with pytest.raises(FileNotFoundError, match="patterns.*not found"):
-            contract.read_examples(["patterns"])
+    def test_read_examples_is_gone(self):
+        # components/all and patterns were retired; styles are reached via
+        # list_styles / apply_style, not a generic example reader.
+        assert not hasattr(contract, "read_examples")
 
 
 def test_reference_vocabulary_is_environment_neutral():

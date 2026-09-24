@@ -19,7 +19,7 @@ uv run python3 scripts/pptx_builder.py {contract_name} [args]
 ```
 
 Subcommand names match the MCP tool names (`generate_pptx`, `read_workflows`,
-`read_guides`, `read_examples`, `init_presentation`, `analyze_template`, `search_assets`,
+`read_guides`, `list_styles`, `init_presentation`, `analyze_template`, `search_assets`,
 `list_templates`, `code_to_slide`, `diff_pptx`, `arch_diagram`, `grid`), so workflow text
 that calls a tool applies verbatim here. `--help` on any subcommand shows its arguments.
 

@@ -210,22 +210,6 @@ def list_templates() -> dict[str, Any]:
     return {"templates": list_templates_with_metadata(templates_dirs, metadata)}
 
 
-def read_examples(names: list[str]) -> dict[str, Any]:
-    """Read design examples (styles).
-
-    Names: "styles/<style-name>".
-
-    Args:
-        names: List of example names to read.
-
-    Returns:
-        Dict with documents list.
-    """
-    from sdpm.knowledge.reference import read_docs
-
-    return {"documents": read_docs(_REFERENCES_DIR / "examples", names)}
-
-
 def list_workflows() -> dict[str, Any]:
     """List all role workflow and presentation specification documents.
 

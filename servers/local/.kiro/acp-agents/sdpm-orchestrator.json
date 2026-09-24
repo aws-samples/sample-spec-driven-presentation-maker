@@ -14,8 +14,7 @@
     "@sdpm/code_to_slide", "@sdpm/diff_pptx", "@sdpm/generate_pptx",
     "@sdpm/grid", "@sdpm/hearing", "@sdpm/import_attachment",
     "@sdpm/init_presentation", "@sdpm/list_guides", "@sdpm/list_styles",
-    "@sdpm/list_templates", "@sdpm/list_workflows", "@sdpm/read_attachment",
-    "@sdpm/read_examples", "@sdpm/read_guides", "@sdpm/read_workflows",
+    "@sdpm/list_templates", "@sdpm/list_workflows", "@sdpm/read_attachment", "@sdpm/read_guides", "@sdpm/read_workflows",
     "@sdpm/run_python", "@sdpm/search_assets", "use_subagent", "read", "glob",
     "grep", "web_search", "web_fetch"
   ],
@@ -24,8 +23,7 @@
     "@sdpm/code_to_slide", "@sdpm/diff_pptx", "@sdpm/generate_pptx",
     "@sdpm/grid", "@sdpm/hearing", "@sdpm/import_attachment",
     "@sdpm/init_presentation", "@sdpm/list_guides", "@sdpm/list_styles",
-    "@sdpm/list_templates", "@sdpm/list_workflows", "@sdpm/read_attachment",
-    "@sdpm/read_examples", "@sdpm/read_guides", "@sdpm/read_workflows",
+    "@sdpm/list_templates", "@sdpm/list_workflows", "@sdpm/read_attachment", "@sdpm/read_guides", "@sdpm/read_workflows",
     "@sdpm/run_python", "@sdpm/search_assets", "use_subagent", "read", "glob",
     "grep", "web_search", "web_fetch"
   ],

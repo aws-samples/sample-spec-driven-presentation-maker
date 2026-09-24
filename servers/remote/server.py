@@ -740,7 +740,6 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
 
 # --- Reference tools (bound from the shared contract; bundled data baked into the image) ---
 
-offloaded_tool(contract.read_examples)
 offloaded_tool(contract.list_workflows)
 offloaded_tool(contract.read_workflows)
 offloaded_tool(contract.list_guides)
