@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>typographic — For a speaker whose point must land in one second from the back of a room: every slide is one enormous word, number, or two-line claim set at edge-to-edge scale on white, where position and a light grey replace bullets and numbering, one red word or number carries the point, and no shape, rule, box, or image is ever drawn.</title>
+<style>
+/* Part 0 — tokens.
+   Unit note, because every coordinate in this file depends on it: the demo canvas is
+   1920x1080 px and a 16:9 slide is 960pt wide, so 1pt = 2px. A token of NNpt therefore
+   occupies NN*2 px of em height here. CSS draws 1pt as 1.333px, so every text class
+   multiplies its token by 1.5 to reach NN*2 px on screen. Read a size as "token pt"
+   and a box as "px"; never mix them. */
+:root {
+  --color-text: #111111;
+  --color-bg: #FFFFFF;
+  --color-surface: #FFFFFF;
+  --color-border: #111111;
+  --color-muted: #BBBBBB;
+  --color-dim: #666666;
+  --accent: #E63312;
+  --color-on-accent: #FFFFFF;
+  --font-family: "Helvetica Neue", Arial, "Segoe UI", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+  --fs-cover-title: 192pt;
+  --fs-display: 192pt;
+  --fs-stack: 120pt;
+  --fs-slide-title: 100pt;
+  --fs-heading: 56pt;
+  --fs-metric: 380pt;
+  --fs-unit: 80pt;
+  --fs-table: 24pt;
+  --fs-body: 18pt;
+  --fs-caption: 14pt;
+  --fs-label: 11pt;
+  --margin-x: 80px;
+  --bleed-x: -24px;
+  --content-w: 1760px;
+  --support-x: 1040px;
+  --support-w: 800px;
+  --caption-y: 920px;
+  --bar-h: 0px;
+  --radius: 0px;
+  --border-thin: 0px;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(--font-family); zoom: 0.7; color: var(--color-text); }
+.slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; overflow: hidden; background: var(--color-bg); color: var(--color-text); }
+.el { position: absolute; }
+/* Display classes are nowrap: a line longer than its box bleeds off the edge on purpose. */
+.cover-title { font-size: calc(var(--fs-cover-title) * 1.5); line-height: .9; font-weight: 900; letter-spacing: -11pt; white-space: nowrap; }
+.display { font-size: calc(var(--fs-display) * 1.5); line-height: .9; font-weight: 900; letter-spacing: -11pt; white-space: nowrap; }
+.stack { font-size: calc(var(--fs-stack) * 1.5); line-height: .9; font-weight: 900; letter-spacing: -7pt; white-space: nowrap; }
+.slide-title { font-size: calc(var(--fs-slide-title) * 1.5); line-height: .9; font-weight: 900; letter-spacing: -6pt; white-space: nowrap; }
+.metric { font-size: calc(var(--fs-metric) * 1.5); line-height: .84; font-weight: 900; letter-spacing: -20pt; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.unit { font-size: calc(var(--fs-unit) * 1.5); line-height: .9; font-weight: 900; letter-spacing: -4pt; }
+.heading { font-size: calc(var(--fs-heading) * 1.5); line-height: .95; font-weight: 800; letter-spacing: -3pt; white-space: nowrap; }
+.body-text { font-size: calc(var(--fs-body) * 1.5); line-height: 1.6; font-weight: 400; }
+.meta { font-size: calc(var(--fs-body) * 1.5); line-height: 1.3; font-weight: 600; }
+.table-text { font-size: calc(var(--fs-table) * 1.5); line-height: 1.2; font-weight: 400; font-variant-numeric: tabular-nums; }
+.caption { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.4; font-weight: 400; }
+.label { font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; font-weight: 800; letter-spacing: 1.2pt; text-transform: uppercase; }
+.muted { color: var(--color-muted); }
+.dim { color: var(--color-dim); }
+.accent { color: var(--accent); }
+.black { color: var(--color-text); }
+.heavy { font-weight: 900; }
+.right { text-align: right; }
+.tabular { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<!-- Part 1 — Cover.
+     Composition A of three (bleed cover): two display lines at --fs-cover-title, left -24px so
+     the first stem is cut by the slide edge, line pitch 352px, exactly one word red, one meta
+     line at the bottom left. The cut left edge and the 384px em are the identity of this style;
+     a cover that sits politely inside a margin is not this style. Wording may change within the
+     character budget in Part 2; the -24px left and the 384px em may not. -->
+<div class="slide cover">
+  <div class="el cover-title" style="left:-24px; top:64px; width:1944px; height:352px;">SCALE</div>
+  <div class="el cover-title accent" style="left:-24px; top:416px; width:1944px; height:352px;">DECIDES</div>
+  <div class="el meta" style="left:96px; top:888px; width:1400px; height:48px;">Three decisions — placeholder audience, placeholder date</div>
+</div>
+
+<!-- Part 2 — Rules: the design decision.
+     This slide and the next two are reference slides — the only ones allowed more than three
+     lines of body copy (12 lines, two columns of 860 and 840px). -->
+<div class="slide">
+  <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">TYPE ONLY</div>
+  <div class="el label dim" style="left:80px; top:300px; width:860px; height:28px;">Who this is for</div>
+  <div class="el body-text" style="left:80px; top:344px; width:860px; height:620px;">A slide here is read in one second, from the back of a room, by someone who gets no handout. One beat lands per slide, so the beat is the whole slide: a word, a number, or a two-line claim.<br><br>Every graphic device is gone. At this scale a shape, a rule, or a box competes with the only thing carrying the message, so position replaces the box, grey replaces the bullet, and reading order replaces the arrow.</div>
+  <div class="el label dim" style="left:1000px; top:300px; width:840px; height:28px;">What that rules out</div>
+  <div class="el body-text" style="left:1000px; top:344px; width:840px; height:620px;">Red is only ever a word or a number — never a fill, a bar, an underline, or a rule. This style owns no shape and no line at all.<br><br>A poster look that needs a red block or a grid of rules is a different style; do not grow one into the other. What this one has instead is scale: 384px of black on white, and one word that is not black.</div>
+</div>
+
+<!-- Part 2 (continued) — the numeric limits. Every demo slide in this file is checked against
+     these numbers; if a demo and a number disagree, the number wins and the demo is wrong. -->
+<div class="slide">
+  <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">THE LIMITS</div>
+  <div class="el label dim" style="left:80px; top:288px; width:860px; height:28px;">Character budget per line, weight 900</div>
+  <div class="el body-text" style="left:80px; top:332px; width:860px; height:700px;">--fs-cover-title / --fs-display 192pt, 384px em: 7 capitals, or 5 Japanese characters.<br>--fs-stack 120pt, 240px em: 10 capitals / 7 Japanese.<br>--fs-slide-title 100pt, 200px em: 12 capitals / 9 Japanese.<br>--fs-heading 56pt, 112px em: 22 capitals / 16 Japanese.<br><br>Over budget, a line does not shrink: it breaks into two lines, or it bleeds off the right edge on purpose.</div>
+  <div class="el label dim" style="left:1000px; top:288px; width:840px; height:28px;">Counts per slide and per deck</div>
+  <div class="el body-text" style="left:1000px; top:332px; width:840px; height:700px;">Deck: 8–18 slides. Stacks: 3 words, or 3–5 agenda items.<br>Red: 1 item per slide — a word or a number, never both.<br>Support copy: 3 lines per block; 1 block per slide, or 1 per column plus the synthesis at D.<br>Support widths: 800px at anchors A and C, 1760px at D, 1500px at B.<br>More than 3 lines only on the reference slides of Parts 2–6, at 12, and the text-heavy pattern, at 6.<br>Shapes 0, rules 0, boxes 0, images 0, rotation 0.</div>
+</div>
+
+<!-- Part 2 (continued) — DO and DON'T, each one derived from the decision two slides back rather
+     than from taste. The grey exception is spelled out with its contrast ratio because #BBBBBB
+     cannot legally carry information on its own. -->
+<div class="slide">
+  <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">DO / DON'T</div>
+  <div class="el label dim" style="left:80px; top:280px; width:860px; height:28px;">Do</div>
+  <div class="el body-text" style="left:80px; top:324px; width:860px; height:690px;">Make one claim per slide and make the largest type that claim.<br>Let display type cross the left edge; -24px is the standard bleed.<br>Rank with position, size, and grey — first, largest, and black is the point.<br>Move the support block between the four anchors so no two consecutive slides look alike.<br>Keep body copy at #111111 and 18pt or larger.<br>Keep the left margin at 80px and the caption line at 920px.</div>
+  <div class="el label dim" style="left:1000px; top:280px; width:840px; height:28px;">Don't</div>
+  <div class="el body-text" style="left:1000px; top:324px; width:840px; height:690px;">No shape, rule, divider, box, panel, or icon — not even a hairline.<br>No red fill, bar, or underline; red is a word or a number.<br>No second accent, gradient, shadow, rotation, bullet character, or step number.<br>Never use #BBBBBB below 100pt or for body copy: at 1.9:1 on white it may only carry display words restated in black nearby. Where every word must stay legible, use #666666 at 5.7:1 instead.<br>Never shrink display type to fit a sentence; cut the sentence.</div>
+</div>
+
+<!-- Part 3 — Message and outline: title grammar. The character budget, not taste, decides the
+     grammar — a full assertion cannot be set at 384px, so the claim is split in two. -->
+<div class="slide">
+  <div class="el stack" style="left:80px; top:88px; width:1200px; height:280px;">ONE BEAT</div>
+  <div class="el label dim" style="left:80px; top:400px; width:860px; height:28px;">Title grammar</div>
+  <div class="el body-text" style="left:80px; top:444px; width:860px; height:580px;">A title here is a noun or a two-word verb phrase, never a sentence: 12 capitals is the ceiling at --fs-slide-title, 7 at --fs-cover-title.<br><br>So the claim lives in two parts. The display line names the beat; the support block states the assertion in sentences. The display line alone is only a label, so the support block is optional only on a cover or a divider.</div>
+  <div class="el label dim" style="left:1000px; top:400px; width:840px; height:28px;">Density</div>
+  <div class="el body-text" style="left:1000px; top:444px; width:840px; height:580px;">One claim, one display beat, one support block, one red item. Nothing else is on the slide.<br><br>A slide that needs two claims is two slides. A slide that needs six lines of reasoning is the text-heavy pattern, which drops its display line to --fs-slide-title to earn the room.<br><br>Numbers get their own pattern: the metric is the beat and the caption is one line.</div>
+</div>
+
+<!-- Part 3 (continued) — outline shape. Pacing is the chapter structure here, because there is no
+     header, footer, page number, or section band to carry one. -->
+<div class="slide">
+  <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">8–18 SLIDES</div>
+  <div class="el label dim" style="left:80px; top:300px; width:860px; height:28px;">Sequence</div>
+  <div class="el body-text" style="left:80px; top:344px; width:860px; height:650px;">Open with the bleed cover and close with the same composition and different words, so the deck is bracketed by its two loudest slides.<br><br>Between them, alternate: a 384px beat, then quieter evidence at --fs-stack or --fs-slide-title. Two 384px slides in a row read as shouting.<br><br>A divider is one red word alone on white; the agenda slide, repeated with the black item moved down, is the only tracker.</div>
+  <div class="el label dim" style="left:1000px; top:300px; width:840px; height:28px;">Favoured forms</div>
+  <div class="el body-text" style="left:1000px; top:344px; width:840px; height:650px;">Strongest here: a single metric, a three-word focus stack, a before / after pair, a one-word divider. Workable: columns as word stacks, a trend as numbers placed by magnitude, a table as aligned tabular text.<br><br>Avoid anything whose meaning is in a drawn form — a cycle, a tree, a swimlane, a dashboard. Faking one with type reads as a missing diagram, so use another style for those decks.</div>
+</div>
+
+<!-- Part 4 — Palette. The swatch is the word set in the colour, because a swatch square would be
+     the only shape in the style. Three values, and the grey is size-restricted. -->
+<div class="slide">
+  <div class="el display" style="left:-24px; top:64px; width:1944px; height:352px;">BLACK</div>
+  <div class="el stack accent" style="left:80px; top:440px; width:900px; height:280px;">RED</div>
+  <div class="el stack muted" style="left:80px; top:720px; width:900px; height:280px;">GREY</div>
+  <div class="el body-text" style="left:1040px; top:440px; width:800px; height:480px;">#111111 on #FFFFFF, 18.9:1 — every claim, title, and body line.<br>#E63312 — one word or number per slide at 100pt or more; the beat that decides, never a fill.<br>#BBBBBB — display words deliberately not the point: options you are not choosing, steps already done. 100pt minimum.</div>
+  <div class="el caption dim" style="left:1040px; top:940px; width:800px; height:100px;">#666666 at 5.7:1 is the only other value: small meta and labels, and the substitute for #BBBBBB whenever every word must stay legible.</div>
+</div>
+
+<!-- Part 5 — Typography, display ramp at actual size. Three sizes do nearly all the work; the
+     label beside each row gives the token, the px em, and the line pitch to leave below it. -->
+<div class="slide">
+  <div class="el label dim" style="left:80px; top:48px; width:900px; height:28px;">Display ramp / actual size</div>
+  <div class="el cover-title" style="left:80px; top:96px; width:1400px; height:352px;">COVER</div>
+  <div class="el caption dim right" style="left:1440px; top:250px; width:400px; height:60px;">--fs-cover-title 192pt<br>384px em / 352px pitch</div>
+  <div class="el stack" style="left:80px; top:472px; width:900px; height:280px;">STACK</div>
+  <div class="el caption dim right" style="left:1440px; top:570px; width:400px; height:60px;">--fs-stack 120pt<br>240px em / 280px pitch</div>
+  <div class="el slide-title" style="left:80px; top:780px; width:760px; height:200px;">TITLE</div>
+  <div class="el caption dim right" style="left:1440px; top:850px; width:400px; height:60px;">--fs-slide-title 100pt<br>200px em / 240px pitch</div>
+  <div class="el caption dim" style="left:900px; top:850px; width:500px; height:120px;">--fs-metric 380pt and --fs-unit 80pt appear on the metric pattern; --fs-display 192pt equals the cover size and carries one-word statements.</div>
+</div>
+
+<!-- Part 5 (continued) — text ramp, and the three renderer facts a composer cannot infer from
+     looking at this file. The tracking and line heights here are demo-only. -->
+<div class="slide">
+  <div class="el label dim" style="left:80px; top:48px; width:900px; height:28px;">Text ramp / actual size</div>
+  <div class="el heading" style="left:80px; top:96px; width:1500px; height:140px;">Heading, 56pt, weight 800</div>
+  <div class="el body-text" style="left:80px; top:264px; width:1200px; height:200px;">Body, 18pt, weight 400, line height 1.6. Three lines is the limit beside display type.<br>A block is 800px wide, so a line holds about 44 characters.<br>Body copy never goes grey and never goes below 18pt.</div>
+  <div class="el table-text" style="left:80px; top:488px; width:1200px; height:80px;">Table text, 24pt, tabular figures: 1,240 · 87.4 · −42</div>
+  <div class="el caption dim" style="left:80px; top:588px; width:1200px; height:60px;">Caption, 14pt — one line under a number, or a source note.</div>
+  <div class="el label dim" style="left:80px; top:660px; width:1200px; height:40px;">Label, 11pt, weight 800, uppercase</div>
+  <div class="el label dim" style="left:80px; top:712px; width:1760px; height:28px;">What the renderer cannot do</div>
+  <div class="el body-text" style="left:80px; top:752px; width:1760px; height:290px;">Slide JSON has no letter-spacing and no line-height: the tracking and the 0.9 line height here are demo-only. In a built deck, budget one line as em x 1.2 and expect display lines to sit further apart.<br>Only weights 400, 600, 800, and 900 exist; there is no intermediate weight to soften a display line with.<br>A native table inherits the template font, so the aligned-text table in Part 7 keeps this style and a native table does not.</div>
+</div>
+
+<!-- Part 5 (continued) — Japanese at display size, checked because Japanese is the common case.
+     A Japanese glyph advances a full em, so the budget is about 0.7x the Latin one: 5 characters
+     is 1920px at --fs-cover-title and exactly fills the canvas. CJK needs no negative tracking —
+     the density is in the glyphs — which matters because the built deck has none to give. The red
+     word is its own element rather than a run inside the line, so its colour survives conversion
+     and the composer can measure where it starts. -->
+<div class="slide">
+  <div class="el cover-title" style="left:-24px; top:64px; width:1600px; height:352px;">サーバー</div>
+  <div class="el cover-title" style="left:-24px; top:416px; width:800px; height:352px;">レス</div>
+  <div class="el cover-title accent" style="left:744px; top:416px; width:1000px; height:352px;">移行</div>
+  <div class="el meta" style="left:96px; top:888px; width:1500px; height:48px;">4 characters per line at 192pt — the cover composition, measured</div>
+</div>
+
+<!-- Part 6 — Frame. There is no title band, no page number, no running header: the frame is four
+     numbers (left margin 80px, bleed -24px, caption line 920px, support column 1040px) and the
+     rule that the support block moves. Anchor A is demonstrated here; the list names all four. -->
+<div class="slide">
+  <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">CLAIM FIRST</div>
+  <div class="el body-text" style="left:1040px; top:344px; width:800px; height:200px;">Anchor A, beside the display type: left 1040px, top 160–344px, width 800px. The default for a stack or a title.</div>
+  <div class="el label dim" style="left:80px; top:344px; width:940px; height:28px;">The four support anchors</div>
+  <div class="el body-text" style="left:80px; top:388px; width:940px; height:540px;">A — left 1040, top 160, width 800: beside the type.<br>B — left 96, top 920, width 1500: one caption line.<br>C — left 1040, top 800, width 800: lower right.<br>D — left 80, top 800, width 1760: full width.<br><br>No two consecutive slides use the same anchor. A display line and a block at A or C never share a row: the line stays left of x = 960, or the block sits below it.</div>
+  <div class="el caption dim" style="left:80px; top:948px; width:940px; height:60px;">A one-word divider and the closing slide carry no support block at all.</div>
+</div>
+
+<!-- Part 6 (continued) — section divider: one red word, alone, at 384px. No subtitle, no number,
+     no rule. The empty field is the pause; filling it defeats the slide. -->
+<div class="slide">
+  <div class="el display accent" style="left:-24px; top:348px; width:1944px; height:352px;">SHIFT</div>
+  <div class="el label dim" style="left:96px; top:888px; width:1200px; height:28px;">Section word / placeholder chapter</div>
+</div>
+
+<!-- Part 6 (continued) — closing: the cover composition with the last two words, so the deck ends
+     where it began. The red word stays on the second line. -->
+<div class="slide">
+  <div class="el cover-title" style="left:-24px; top:64px; width:1944px; height:352px;">NEXT</div>
+  <div class="el cover-title accent" style="left:-24px; top:416px; width:1944px; height:352px;">MOVE</div>
+  <div class="el meta" style="left:96px; top:888px; width:1500px; height:48px;">Placeholder owner, placeholder date, one sentence of ask</div>
+</div>
+
+<!-- Part 7 — Patterns.
+     1 / Numbers. Composition C of three (giant metric): the number at --fs-metric, left -32px so
+     it bleeds off the left edge, red; the unit at --fs-unit in black at the top right; one caption
+     line at 920px (anchor B). The number is the claim, so nothing else is on the slide. The number
+     may bleed; the unit and the caption never do. Vary the value and the caption — do not add a
+     comparator, a second number, or a bar behind it. -->
+<div class="slide">
+  <div class="el metric accent" style="left:-32px; top:80px; width:1500px; height:700px;">−42</div>
+  <div class="el unit right" style="left:1584px; top:144px; width:240px; height:200px;">%</div>
+  <div class="el meta" style="left:96px; top:920px; width:1500px; height:48px;">Placeholder measure — placeholder scope, placeholder period</div>
+</div>
+
+<!-- 2 / One of three. Composition B of three (focus stack): three words at --fs-stack, left 80px,
+     pitch 280px, the chosen one black and the other two #BBBBBB, with the reasoning at anchor A.
+     This is how a list, a comparison, and a "one of three" all read in this style — position and
+     grey instead of bullets, numbers, or a box around the winner. Words stay at 4 capitals or
+     fewer because the support block owns everything right of x = 960px. -->
+<div class="slide">
+  <div class="el stack" style="left:80px; top:88px; width:900px; height:280px;">COST</div>
+  <div class="el stack muted" style="left:80px; top:368px; width:900px; height:280px;">TIME</div>
+  <div class="el stack muted" style="left:80px; top:648px; width:900px; height:280px;">RISK</div>
+  <div class="el body-text" style="left:1040px; top:160px; width:800px; height:200px;">Placeholder reasoning for the chosen dimension, in one sentence.<br>A second sentence gives the evidence or the threshold.<br>A third states what it costs to be wrong.</div>
+</div>
+
+<!-- 3 / Agenda. The focus stack again at --fs-slide-title, where four items fit; the current item
+     is black and the rest grey. Repeat this slide before each turn with the black item moved down —
+     that repetition is the whole navigation system, and it is why no tracker band is needed. The
+     one pattern with no support block, because the items are the content. -->
+<div class="slide">
+  <div class="el label dim" style="left:80px; top:64px; width:600px; height:28px;">Agenda / 3–5 items</div>
+  <div class="el slide-title" style="left:80px; top:120px; width:1760px; height:200px;">FIRST CLAIM</div>
+  <div class="el slide-title muted" style="left:80px; top:360px; width:1760px; height:200px;">SECOND CLAIM</div>
+  <div class="el slide-title muted" style="left:80px; top:600px; width:1760px; height:200px;">THIRD CLAIM</div>
+  <div class="el slide-title muted" style="left:80px; top:840px; width:1760px; height:200px;">IMPLICATION</div>
+</div>
+
+<!-- 4 / Process. Three stages stacked, reading downward, the active one black at the top of the
+     eye's path and the rest grey. No arrows, no numbers, no connectors — stack order is the
+     sequence. The dim label above the black word is the only marker allowed. Support at anchor A,
+     so stage words stay at 5 capitals. -->
+<div class="slide">
+  <div class="el label dim" style="left:80px; top:48px; width:600px; height:28px;">Now</div>
+  <div class="el stack" style="left:80px; top:88px; width:900px; height:280px;">START</div>
+  <div class="el stack muted" style="left:80px; top:368px; width:900px; height:280px;">SHIFT</div>
+  <div class="el stack muted" style="left:80px; top:648px; width:900px; height:280px;">SCALE</div>
+  <div class="el body-text" style="left:1040px; top:160px; width:800px; height:200px;">Placeholder verb phrase for the active stage.<br>What has to be true before the next stage starts.<br>Who owns it and by when.</div>
+</div>
+
+<!-- 5 / Before and after. Two words at --fs-stack: the before grey and high left, the after red
+     and low right, so the diagonal is the change. No arrow between them, no split rule, no equals
+     sign — the offset carries the movement. Caption at anchor B keeps the field empty. -->
+<div class="slide">
+  <div class="el stack muted" style="left:80px; top:200px; width:1000px; height:280px;">BEFORE</div>
+  <div class="el stack accent" style="left:860px; top:560px; width:1000px; height:280px;">AFTER</div>
+  <div class="el meta" style="left:96px; top:920px; width:1500px; height:48px;">Placeholder state change — identical scope and comparator on both sides</div>
+</div>
+
+<!-- 6 / Two views. Columns without columns: two --fs-heading words at the same top, each with its
+     own three lines, the second red because it is the recommendation. Equal starts and equal
+     widths do what a pair of boxes would do. The synthesis takes anchor D, full width, so it reads
+     as the conclusion of both columns rather than a note on one. -->
+<div class="slide">
+  <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">TWO VIEWS</div>
+  <div class="el heading" style="left:80px; top:360px; width:860px; height:140px;">FIRST VIEW</div>
+  <div class="el body-text" style="left:80px; top:520px; width:800px; height:200px;">Placeholder position stated in one sentence.<br>The evidence that supports it.<br>What it cannot account for.</div>
+  <div class="el heading accent" style="left:1000px; top:360px; width:860px; height:140px;">SECOND VIEW</div>
+  <div class="el body-text" style="left:1000px; top:520px; width:800px; height:200px;">Placeholder counter-position in one sentence.<br>The evidence that supports it.<br>Why it wins on the criterion above.</div>
+  <div class="el body-text" style="left:80px; top:800px; width:1760px; height:120px;">Placeholder synthesis: name the criterion that decides between the two views, then state the choice in the same sentence.</div>
+</div>
+
+<!-- 7 / Text-heavy. The single exception to the three-line limit, and it pays for the extra lines
+     by dropping the display line to --fs-slide-title. Six lines maximum, one paragraph, no
+     bullets — a bulleted list at this scale is a focus stack instead (pattern 2). The dim block on
+     the right holds the source, never a second idea. -->
+<div class="slide">
+  <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">READ THIS</div>
+  <div class="el body-text" style="left:80px; top:344px; width:1100px; height:420px;">Placeholder paragraph opens with the claim restated as a full sentence, because the display line above it is a label and cannot carry an assertion on its own.<br>The second sentence gives the mechanism — what causes the effect the claim names.<br>The third gives the evidence and its scope.<br>The fourth gives the counter-case and why it does not change the conclusion.<br>The fifth states the implication.<br>The sixth, if it exists, states the decision being asked for.</div>
+  <div class="el caption dim" style="left:1280px; top:344px; width:560px; height:200px;">Placeholder source note.<br>Placeholder method or sample.<br>Placeholder period.</div>
+</div>
+
+<!-- 8 / Table as aligned text. Column starts and right-aligned tabular figures replace a native
+     table, which would import the template font and break the style; no row rules, no header
+     fill, no zebra. Weight marks the column that matters and red marks the one value the slide is
+     about. Three to five rows — more than that is a chart or a different slide. -->
+<div class="slide">
+  <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">THE NUMBERS</div>
+  <div class="el label dim" style="left:80px; top:320px; width:600px; height:28px;">Item</div>
+  <div class="el label dim right" style="left:760px; top:320px; width:320px; height:28px;">Prior</div>
+  <div class="el label dim right" style="left:1160px; top:320px; width:320px; height:28px;">Current</div>
+  <div class="el label dim right" style="left:1520px; top:320px; width:320px; height:28px;">Change</div>
+  <div class="el table-text" style="left:80px; top:380px; width:600px; height:70px;">Placeholder item A</div>
+  <div class="el table-text right" style="left:760px; top:380px; width:320px; height:70px;">100</div>
+  <div class="el table-text heavy right" style="left:1160px; top:380px; width:320px; height:70px;">124</div>
+  <div class="el table-text right" style="left:1520px; top:380px; width:320px; height:70px;">+24</div>
+  <div class="el table-text" style="left:80px; top:480px; width:600px; height:70px;">Placeholder item B</div>
+  <div class="el table-text right" style="left:760px; top:480px; width:320px; height:70px;">80</div>
+  <div class="el table-text heavy right" style="left:1160px; top:480px; width:320px; height:70px;">91</div>
+  <div class="el table-text right" style="left:1520px; top:480px; width:320px; height:70px;">+11</div>
+  <div class="el table-text" style="left:80px; top:580px; width:600px; height:70px;">Placeholder item C</div>
+  <div class="el table-text right" style="left:760px; top:580px; width:320px; height:70px;">60</div>
+  <div class="el table-text heavy accent right" style="left:1160px; top:580px; width:320px; height:70px;">72</div>
+  <div class="el table-text right" style="left:1520px; top:580px; width:320px; height:70px;">+12</div>
+  <div class="el body-text" style="left:80px; top:800px; width:1760px; height:120px;">Placeholder conclusion names the red value and says what it decides; the table is evidence for that sentence, not a data dump.</div>
+</div>
+
+<!-- 9 / Trend. The values are the chart: each number sits at the height its magnitude earns, so
+     position is the axis and no gridline, baseline, or bar is drawn. The current value steps up
+     from --fs-stack to --fs-display and goes red, which is the only emphasis available without a
+     marker. Four to six points; beyond that use a real chart and accept that it will not look
+     like this style. -->
+<div class="slide">
+  <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">TREND RISES</div>
+  <div class="el stack muted tabular" style="left:120px; top:600px; width:400px; height:280px;">24</div>
+  <div class="el label dim" style="left:120px; top:880px; width:300px; height:28px;">Period 1</div>
+  <div class="el stack muted tabular" style="left:560px; top:500px; width:400px; height:280px;">31</div>
+  <div class="el label dim" style="left:560px; top:780px; width:300px; height:28px;">Period 2</div>
+  <div class="el stack muted tabular" style="left:1000px; top:400px; width:400px; height:280px;">37</div>
+  <div class="el label dim" style="left:1000px; top:680px; width:300px; height:28px;">Period 3</div>
+  <div class="el display accent tabular" style="left:1400px; top:220px; width:500px; height:352px;">48</div>
+  <div class="el label dim" style="left:1400px; top:580px; width:300px; height:28px;">Current</div>
+  <div class="el meta" style="left:96px; top:960px; width:1500px; height:48px;">Placeholder trend statement — values label themselves, position carries magnitude</div>
+</div>
+
+<!-- 10 / Relationship. Hierarchy by scale alone: the outcome at 384px bleeding left is the parent,
+     and the two 240px words below it are what produce it — one grey because it is a given, one red
+     because it is the lever. No tree, no connector, no containing box; size and vertical order say
+     which is which. One parent and two children, never more. -->
+<div class="slide">
+  <div class="el display" style="left:-24px; top:96px; width:1944px; height:352px;">OUTCOME</div>
+  <div class="el stack muted" style="left:80px; top:520px; width:860px; height:280px;">DRIVER</div>
+  <div class="el stack accent" style="left:1000px; top:520px; width:860px; height:280px;">LEVER</div>
+  <div class="el body-text" style="left:80px; top:860px; width:1760px; height:120px;">Placeholder relationship statement: the red word is the one you can change, the grey word is the one you cannot, and the outcome above is what they produce together.</div>
+</div>
+
+</body>
+</html>

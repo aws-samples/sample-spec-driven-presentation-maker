@@ -72,7 +72,8 @@ class PPTXBuilder(
 
     def __init__(self, template_path: Path, custom_template: bool = False,
                  fonts: dict = None, base_dir: Path = None, keep_empty_placeholders: bool = False,
-                 default_text_color: str = None, auto_spacing: bool = True):
+                 default_text_color: str = None, auto_spacing: bool = True,
+                 default_background: str = None):
         """Initialize PPTXBuilder.
 
         Args:
@@ -83,6 +84,9 @@ class PPTXBuilder(
             base_dir: Base directory for resolving relative paths in slide JSON.
             default_text_color: Default color for text and icons (e.g. "#FFFFFF").
                    Required. Set via presentation.json "defaultTextColor" field.
+            default_background: Solid background applied to every slide that does
+                   not set its own "background" (deck.json "defaultBackground").
+                   None keeps the template background.
 
         Raises:
             ValueError: If fonts or default_text_color is not provided.
@@ -102,6 +106,12 @@ class PPTXBuilder(
         self.prs = Presentation(str(template_path))
         self.theme_colors, self.is_dark = self._extract_theme_colors(template_path)
         self.theme_colors["text"] = default_text_color
+        self.default_background = default_background
+        if default_background:
+            # The deck ground replaces the template's: auto-colours (tables,
+            # icon theme) must judge dark/light against it, not the template.
+            self.theme_colors["background"] = default_background
+            self.is_dark = self._is_dark_hex(default_background)
         self.master_idx = 0
         from sdpm.engine import emu_per_px as _emu_per_px
         self.EMU_PER_PX = _emu_per_px(int(self.prs.slide_width))
@@ -114,6 +124,12 @@ class PPTXBuilder(
         self._base_dir = base_dir if base_dir is not None else Path(".")
         self._list_styles = self._load_list_styles()
         self._clear_slides()
+
+    @staticmethod
+    def _is_dark_hex(color: str) -> bool:
+        h = color.lstrip('#')
+        r, g, b = int(h[:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        return (0.299 * r + 0.587 * g + 0.114 * b) < 128
 
     @staticmethod
     def _extract_theme_colors(template_path):
@@ -215,7 +231,7 @@ class PPTXBuilder(
         saved_bg = self.theme_colors["background"]
         saved_is_dark = self.is_dark
 
-        bg_color = slide_def.get("background")
+        bg_color = slide_def.get("background") or self.default_background
         if bg_color:
             from pptx.dml.color import RGBColor
             bg = slide.background
@@ -223,8 +239,7 @@ class PPTXBuilder(
             fill.solid()
             fill.fore_color.rgb = RGBColor.from_string(bg_color.lstrip('#'))
             self.theme_colors["background"] = bg_color
-            r, g, b = int(bg_color.lstrip('#')[:2], 16), int(bg_color.lstrip('#')[2:4], 16), int(bg_color.lstrip('#')[4:6], 16)
-            self.is_dark = (0.299 * r + 0.587 * g + 0.114 * b) < 128
+            self.is_dark = self._is_dark_hex(bg_color)
 
         slide_text_color = slide_def.get("defaultTextColor")
         if slide_text_color:

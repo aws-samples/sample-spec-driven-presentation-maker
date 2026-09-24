@@ -167,7 +167,7 @@ The agent's system prompt is minimal — workflow knowledge is dynamically retri
 1. User describes the presentation content via chat
 2. Agent calls MCP Server tools to create a deck (`init_presentation`)
 3. Analyzes the template and retrieves available layouts (`analyze_template`)
-4. Following workflow files, designs briefing → outline → art direction (persisted to `specs/`)
+4. Following workflow files, designs briefing → art direction → outline (persisted to `specs/`)
 5. Builds slides (`run_python` to edit files in the workspace)
 6. Generates PPTX (`generate_pptx`) → saved to S3, previews generated synchronously
 7. Retrieves preview images for review (`get_preview`)

@@ -30,6 +30,7 @@ Design guide for AWS architecture diagrams and AWS service introduction slides.
 ## AWS service category colors
 
 Official colors for representing services by category. Used for group borders, card borders, section color-coding, etc.
+The bundled `aws-light` / `aws-dark` styles carry the same values as `--cat-<category>` tokens (plus a per-background `--cat-<category>-tint` for filled areas) — when one of them is the deck's style, use the tokens rather than this table.
 
 | Color | Code | Category |
 |-------|------|----------|

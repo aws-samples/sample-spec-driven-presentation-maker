@@ -427,14 +427,14 @@ def run_style_python(purpose: str, code: str) -> str:
 
     ## Rules
 
-    - `name` is the file stem without .html (e.g. "corporate-executive", "style-20260505-1430")
+    - `name` is the file stem without .html (e.g. "report", "style-20260505-1430")
     - No import statements or direct file access allowed
     - Use print() for computation output
 
     ## Examples
 
         # Read an existing style for reference
-        html = read_style("corporate-executive")
+        html = read_style("report")
         print(html[:200])
 
         # Create a new style

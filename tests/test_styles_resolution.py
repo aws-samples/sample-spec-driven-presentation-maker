@@ -274,6 +274,47 @@ def test_merge_style_metadata_extracts_root_text_color_without_mutation() -> Non
     assert original["defaultTextColor"] == "#111111"
 
 
+def test_merge_style_metadata_extracts_root_background_as_default_background() -> None:
+    from sdpm.api import merge_style_metadata, style_field_sources
+
+    html = ":root { --color-text: #111111; --color-bg: #FFF6E5; --color-surface: #FFFFFF; }"
+    result = merge_style_metadata(html, None, {"template": ""})
+
+    assert result["defaultBackground"] == "#FFF6E5"
+    assert style_field_sources(result)["defaultBackground"] == "style --color-bg"
+
+
+def test_merge_style_metadata_without_color_bg_leaves_background_unset() -> None:
+    from sdpm.api import merge_style_metadata
+
+    result = merge_style_metadata(":root { --color-text: #111111; }", None, {"template": ""})
+
+    assert "defaultBackground" not in result
+
+
+def test_builder_applies_default_background_to_slides_without_their_own(tmp_path: Path) -> None:
+    from pptx import Presentation
+
+    from sdpm.config import TEMPLATES_DIR
+    from sdpm.engine.builder import PPTXBuilder
+
+    builder = PPTXBuilder(
+        TEMPLATES_DIR / "blank-light.pptx",
+        fonts={"fullwidth": "Arial", "halfwidth": "Arial"},
+        default_text_color="#111111",
+        default_background="#FFF6E5",
+    )
+    assert builder.is_dark is False
+    builder.add_slide({"layout": "Blank", "elements": []})
+    builder.add_slide({"layout": "Blank", "background": "#0A0A0A", "elements": []})
+    out = tmp_path / "out.pptx"
+    builder.save(out)
+
+    slides = Presentation(str(out)).slides
+    assert str(slides[0].background.fill.fore_color.rgb) == "FFF6E5"
+    assert str(slides[1].background.fill.fore_color.rgb) == "0A0A0A"
+
+
 def test_merge_style_metadata_fills_only_empty_template_fields() -> None:
     from sdpm.api import merge_style_metadata
 

@@ -38,6 +38,7 @@ Metadata only. Do NOT put slides here.
   - `"halfwidth"`: Font for halfwidth characters (e.g. English, numbers)
   - Call `analyze_template(template)` to detect fonts from your template.
 - `"defaultTextColor"`: **Required**. Default color for text and icons (e.g. `"#FFFFFF"` for dark backgrounds, `"#000000"` for light). Overridden per element by `fontColor` / `iconColor`.
+- `"defaultBackground"`: Optional. Solid ground for every slide that does not set its own `background` (e.g. `"#FFF6E5"`). `apply_style` fills it from the style's `--color-bg`; omit to keep the template background. Table auto-colors and icon theme (dark/light) follow it.
 - Line color, table color, and chart color are auto-resolved from the template's theme colors.
 
 ### slides/{slug}.json
@@ -87,7 +88,7 @@ JSON has no comment syntax, so use the `_comment` key. Can be used inside elemen
 }
 ```
 
-- `"background"`: Solid fill color for the slide background. Overrides the template's default background for this slide only.
+- `"background"`: Solid fill color for the slide background. Overrides the deck's `defaultBackground` (or the template background) for this slide only.
 - `"defaultTextColor"`: Override the deck.json `defaultTextColor` for this slide. Affects text, icons, lines, and table auto-colors.
 - Omit either to use the deck.json / template default.
 - When `background` is set, table auto-colors and icon theme (dark/light) also adapt automatically.
@@ -499,6 +500,9 @@ Effects applicable to shape, textbox, and image.
 - Presets: `"sm"` / `"md"` / `"lg"` (outer shadow, varying size)
 - Custom: `type` (outer/inner), `blur` (blur radius px), `distance` (px), `direction` (angle deg), `color`, `opacity`
 - For card floating effect, text readability, layer expression
+- Effects are explicit: an element with no effect keys renders with none. The template
+  theme's own shadow (Office default themes carry one) never applies to elements built from
+  JSON. `"shadow": "none"` is an explicit off (same for `glow`, `softEdge`, `reflection`, `bevel`).
 
 ### glow
 ```json

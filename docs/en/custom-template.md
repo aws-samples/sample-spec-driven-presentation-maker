@@ -206,13 +206,49 @@ In the cloud Web UI, each user can add a private note to builtin and user templa
 
 ## Custom Styles
 
-Styles are HTML files that describe the visual direction (colors, typography,
-components, tone) for a deck. The agent reads `:root` CSS variables and style
-classes to mirror the design in `slides.json`.
+A style is one HTML file that serves as rulebook, reference and gallery sample at once: its
+`:root` tokens (colours, `--fs-*` font sizes, geometry) are machine-read by `apply_style` and
+the build-time lint, and its slides show — and explain in comments — how *this* style builds a
+cover, a title frame, a comparison, a process, a table, a chart. Composers read the whole file
+as `specs/art-direction.html`, and the orchestrator reads its Message & Outline part before
+writing the outline, so a style shapes the deck's structure, not only its look. The skeleton
+and token contract are defined in the `style` workflow (`read_workflows(["style"])`).
+
+### Bundled styles
+
+Bundled styles come in two tiers. The **orthodox** tier is for when you do not want to
+think about looks: any subject, any audience, light or dark. The **concept** tier is
+chosen by look — each style commits to one visual idea and states how far it may be
+pushed. Purpose-specific structure (how a lesson or a workshop deck is organised) belongs
+to the outline, not the style, so any concept style can carry any kind of deck.
+
+**Orthodox — pick one of these when in doubt**
+
+| Style | Built for | Look |
+|---|---|---|
+| `report` | Documents read alone; numbers, tables and findings first | White, serif findings, one deep-green accent, tables and small multiples, greyscale-safe |
+| `briefing` | Decks spoken to a room, re-read afterwards | Dark, one teal accent, noun-phrase titles with a topic sentence, header bands and rules instead of cards |
+| `aws-dark` / `aws-light` | Decks about AWS services, architectures and cost — talks/demos (dark) or documents/print (light) | Squid Ink or white ground, official service-category colours for identification, official icons, one Smile Orange emphasis |
+
+**Concept — choose by look**
+
+| Style | Idea | Look |
+|---|---|---|
+| `neo-brutalist` | Blunt hierarchy over polish; "zero apology" | Cream ground, 6px black borders, hard 12px offset shadows, flat primary fills, uppercase labels, square corners |
+| `typographic` | Type is the image; one beat per slide | White, display type at 384px that bleeds off the left edge, focus stacks in black and light grey, one red word or number at most, no shapes or rules at all |
+| `signal` | Warning-sign vocabulary; one thing is highlighted | Near-black, one safety-yellow panel per slide, upright ultra-bold headlines, huge numerals, monospaced metadata, one hazard stripe |
+| `racing` | Momentum; every slide hands off to the next | Near-black, italic condensed headlines, blue-violet-red top stripe, thin white speed lines, one red element |
+| `bento` | One fact per tile; modular product-story rhythm | Soft grey ground, white rounded tiles (20px) on a 24px grid, exactly one dark tile and at most one blue accent tile per slide, faint shadow |
+| `newspaper` | Broadsheet; the deck is meant to be read | Aged paper, near-black serif headlines, 3px masthead rule and 1px hairlines, 2–3 justified columns, drop cap, one red figure or rule |
+| `swiss-poster` | One red geometric shape anchors the page | White, black type at poster sizes that never bleeds, exactly one red circle / bar / band / square (may bleed), 1–2 grid lines, a vertical label |
+| `duotone` | One hard edge, two fields: claim on one, evidence on the other | Near-black and vivid orange, 50/50 or 33/67 split (vertical or horizontal); near-black type on orange, white and orange type on near-black, grey only for meta; shape bar charts with one white bar |
+| `prism-dark` | The gradient is a pointer: it marks the one thing the title is talking about, everything else is flat | Near-black ground, one violet-to-pink gradient used as gradient text on the key figure, a 4px outline + one filled pill on the chosen card, or one gradient bar; a 40px gradient bar down the left edge is the only constant. No gradient panels, no blur or glow |
+| `prism-light` | Same rule set as `prism-dark` for lit rooms and print | White ground, near-black type, flat white cards with 1px borders, the same violet-to-pink gradient in the same pointer roles |
+| `aws-console` | The deck is an AWS Management Console screen; every piece of chrome carries deck information | Two dark header bands (aws wordmark, search box showing the deck title and slide index, notification badge = open actions, date and presenter where region and account sit; a favourites row of numbered section chips with the current section lit) over a white toolbar; page title with an Info link and an outline + orange button pair; white 2px-bordered containers with drag handle, Info, kebab and resize handle; blue links and blue metrics; three fixed status colours; dense 56px rows, no prose |
 
 ### User-local styles
 
-Use the `create-style` workflow (agent-driven) to generate a new style HTML.
+Use the `style` workflow (agent-driven) to generate a new style HTML.
 The workflow writes to `<user-config>/styles/{name}.html` — i.e.
 `~/.config/sdpm/styles/` on macOS/Linux or `%APPDATA%/sdpm/styles/` on Windows.
 
@@ -220,7 +256,7 @@ You can also copy an existing style manually:
 
 ```bash
 mkdir -p ~/.config/sdpm/styles
-cp sdpm/references/examples/styles/elegant-dark.html \
+cp sdpm/references/examples/styles/report.html \
    ~/.config/sdpm/styles/my-style.html
 ```
 

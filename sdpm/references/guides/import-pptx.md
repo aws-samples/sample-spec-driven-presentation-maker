@@ -205,7 +205,7 @@ The output follows the same conventions as every other sdpm style:
   explaining the reasoning. This is **NOT** a re-render of the
   source deck's content slides.
 - 1920×1080 absolute positioning, pt units, `.t-*` text classes,
-  `.el` for absolute elements. (See `create-style` workflow for the
+  `.el` for absolute elements. (See the `style` workflow for the
   full rule list.)
 
 The composer reads this file when the user later asks to **edit**
@@ -221,7 +221,7 @@ slides — it consumes the tokens, not the demonstration markup.
 
 ### 5-1. Load the style-authoring workflow + scaffold
 
-`create-style.md` is the canonical workflow for authoring sdpm
+`style.md` is the canonical workflow for authoring sdpm
 styles. **Read it first** so you understand what tokens to define,
 the demonstration slide pattern, and the critical CSS rules. The
 authoring conventions there apply unchanged to art-direction.html;
@@ -229,7 +229,7 @@ this guide only adds the import-pptx-specific signal extraction in
 Step 5-2.
 
 ```
-read_workflows(["create-style"])
+read_workflows(["style"])
 ```
 
 Key conventions you must follow (full list in the workflow):
@@ -307,7 +307,7 @@ While inspecting each preview, write down:
   title vs body, weights, italics, font pair contrast.
 
 These are the qualitative tokens (`--decoration-*`, `--shadow-*`,
-`--radius-*`, `--size-*`) that Lens B and C cannot give you.
+`--radius-*`, `--fs-*`) that Lens B and C cannot give you.
 
 **Lens B — Theme XML / layouts via `analyze_template`:**
 
@@ -336,7 +336,7 @@ Capture from the result:
   through verbatim. Don't substitute with system fonts unless the
   source explicitly uses one.
 - `layouts[]` — placeholder positions per layout. Use these to size
-  cover title, slide title, content area in `--size-*` and the
+  cover title, slide title, content area in `--fs-*` and the
   body x/y/width/height in your demonstration slides.
 
 **Lens C — Pixel-frequency sampling via PIL on `previews/`:**
@@ -380,14 +380,14 @@ your visual notes (Lens A):
   slide), still encode it — Lens A gives the meaning, Lens C only
   the prevalence.
 
-### 5-3. Author art-direction.html following the create-style workflow
+### 5-3. Author art-direction.html following the style workflow
 
-You are now writing a style — follow the **`create-style` workflow**
+You are now writing a style — follow the **`style` workflow**
 you loaded in 5-1. The HTML skeleton, `:root` token conventions,
-text-class naming (`.t-cover-title` / `.t-body` / ...), demonstration
-slide pattern (cover + palette + type ramp + component variants,
-total 5-6 slides), absolute-positioning rules, font-size unit, and
-violation examples are all defined there. Do not re-invent any of
+text-class naming (`.t-cover-title` / `.t-body` / ...), the Part 0–7
+skeleton (cover, rules, message & outline, palette, typography, frame,
+patterns), absolute-positioning rules, the 1.5× type scale, font-size
+unit, and violation examples are all defined there. Do not re-invent any of
 those conventions in this guide.
 
 This Step contributes only the **import-pptx-specific token
@@ -397,18 +397,18 @@ to the lens that produced it in 5-2:
 | Token kind                                 | Source                               |
 |--------------------------------------------|--------------------------------------|
 | `--color-bg`                               | Lens B `theme_colors.lt1` (light deck) or `dk1` (dark deck), confirmed by Lens C frequency. **Do not** use a guessed neutral or the scaffold's bg. |
-| `--color-fg` / text                        | Lens B `theme_colors.dk1` (light deck) or `lt1` (dark deck) |
-| `--color-accent-N` (1 per accent in use)   | Lens B `theme_colors.accent1..6`. Hero is the most-used accent per Lens C, not necessarily accent1. |
+| `--color-text` (required by `apply_style`)  | Lens B `theme_colors.dk1` (light deck) or `lt1` (dark deck) |
+| `--accent`, `--accent-2` (1 per accent in use) | Lens B `theme_colors.accent1..6`. Hero is the most-used accent per Lens C, not necessarily accent1. |
 | Brand color outside the theme              | Lens C outliers (high frequency, not in theme_colors). Encode as `--color-brand-<name>`. Lens A confirms semantic role. |
-| `--font-heading` / `--font-body`           | Lens B `fonts.latin / eastAsian / complex`, verbatim. No system-font substitution. |
-| `--size-cover-title` / `--size-slide-title` / `--size-body` | Lens B `layouts[]` text-frame heights → derive pt sizes; cross-check with Lens A visual hierarchy. |
+| `--font-family` (HTML rendering only; the PPTX font comes from the template) | Lens B `fonts.latin / eastAsian / complex`, verbatim. No system-font substitution. |
+| `--fs-cover-title` / `--fs-slide-title` / `--fs-body` (`NNpt`) | Lens B `layouts[]` text-frame heights → derive pt sizes; cross-check with Lens A visual hierarchy. |
 | `--radius-*` / `--shadow-*` / `--border-*` / decoration motifs | Lens A only. If Lens A did not see it, do not declare it. |
 | Margin / grid (where title sits, body x/y) | Lens B `layouts[]` placeholder x/y/width/height. |
 
 After populating tokens, write the demonstration slides. **The
 demonstration slides are NOT a re-render of the source deck.** Read
-the create-style workflow's "Plan slide composition" section: each
-slide demonstrates one design rule with placeholder content like
+the style workflow's skeleton: each Part 7 slide demonstrates how this
+style builds one slide type with placeholder content like
 "Cover Title" / "Section header" / "Body sample paragraph" /
 "Component swatches". Do not paste source-deck headlines, bullet
 lists, charts, or specific data into the demonstration slides — that
@@ -417,7 +417,7 @@ specification.
 
 Write incrementally via `run_python` — one call for the
 skeleton + `:root` + first slide, then one or two more for the
-remaining slides (per the create-style workflow's incremental writing
+remaining slides (per the style workflow's incremental writing
 guidance):
 
 ```python
@@ -450,7 +450,7 @@ write_text("specs/art-direction.html", header + cover_slide)
 ```
 
 Subsequent calls append palette swatches, type ramp, and
-component-only demonstration slides — see the create-style workflow
+component-only demonstration slides — see the style workflow
 for the standard demonstration-slide set.
 
 Quality bar before considering this Step done:

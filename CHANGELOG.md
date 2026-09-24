@@ -12,6 +12,69 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **Bundled styles re-organised into two tiers** — an *orthodox* tier for when
+  looks do not matter (`report`, `briefing`, `aws-light`, `aws-dark`) and a
+  *concept* tier chosen by look (added in phases, listed below). The previous
+  purpose-based lineup (`consulting`, `keynote`, `facilitation`, `engineering`,
+  `lecture`) is removed: purpose belongs to the outline, not the style, and
+  those five differed from each other only by accent hue. Each style is a
+  rulebook, reference and gallery sample in one file: a design decision with
+  DO / DON'T rules derived from it, a Message & Outline part (deck length,
+  per-slide density, title grammar, chapter shape), palette and type ramp with
+  usage rules, the repeated frame, and 8–12 annotated pattern slides showing how
+  *that* style builds numbers, comparisons, processes, tables, charts and more.
+  All styles define `--color-text` (read by `apply_style`) and `--fs-*` sizes (read
+  by the build-time font-size lint). Lineup and intent: `docs/en/custom-template.md`.
+  - `report` — white, serif findings, one deep-green accent, tables and small
+    multiples, greyscale-safe.
+  - `briefing` — dark technical-briefing style (noun-phrase titles with a
+    topic sentence, header bands and rules instead of cards, one teal accent).
+  - `aws-dark` / `aws-light` — Squid Ink or white ground, the official
+    service-category colours as `--cat-*` tokens with per-background tints,
+    official icons, one Smile Orange emphasis per slide; the two files differ
+    only in `:root` and the palette specimens.
+  - Concept tier, chosen by look. Each states numeric limits for how far the
+    look may be pushed (border and shadow sizes, colours per slide, words per
+    title, rotation) so composers cannot drift: `neo-brutalist` (cream, 6px
+    black borders, hard 12px shadows, flat primary fills), `typographic`
+    (white, 384px display type bleeding off the left edge, black-and-grey
+    focus stacks, one red word, no shapes at all),
+    `signal` (near-black, one safety-yellow panel, upright ultra-bold
+    headlines, hazard stripe), `racing` (near-black, italic condensed
+    headlines, blue-violet-red stripe, speed lines), `bento` (soft grey, white
+    rounded tiles on a fixed grid, one dark and at most one accent tile),
+    `newspaper` (aged paper, serif headlines, hairlines, 2–3 justified
+    columns, drop cap, one red), `swiss-poster` (white, one red geometric
+    shape that may bleed, grid lines, vertical label), `duotone` (near-black
+    and orange split by one hard edge, orange type as the accent on the dark
+    field, shape bar charts with one white bar).
+  - `prism-dark` / `prism-light` — the first bundled styles whose identity is a
+    gradient. The rule is a role, not a quota: one violet-to-pink gradient is a
+    *pointer* that marks the thing the slide title is talking about (gradient
+    text on the key figure, a 4px outline plus one filled pill on the chosen
+    card, or one gradient bar); everything else is flat, and a 40px gradient bar
+    down the left edge is the only constant. Crisp edges only — no blur, glow,
+    radial ramps or gradient panels. Note: LibreOffice previews render
+    `textGradient` / `lineGradient` as the first stop colour (solid violet);
+    PowerPoint and Keynote render the gradient. Shape fills preview correctly.
+  - `aws-console` — the deck looks like the AWS Management Console. Two dark
+    header bands (wordmark, a search box that shows the deck title and slide
+    index, a notification badge counting open actions, date and presenter in the
+    region / account positions, a favourites row of numbered section chips, the current one lit) over a
+    white toolbar; a page title with an Info link and an outline + orange button
+    pair; white 2px-bordered containers with drag handle, Info link, kebab and
+    resize handle; blue links and blue metrics; three fixed status colours;
+    dense 56px rows instead of prose. Orange appears only as the one action
+    button. Final concept-tier lineup is eleven styles (the planned `memphis`,
+    `chalkboard`, `art-deco` and `zine` were dropped).
+- **Style contract test** (`tests/test_builtin_styles_contract.py`) and a
+  style-verification sample deck (`tests/fixtures/style-sample-deck/`).
+- **Styles now set the deck ground.** `apply_style` copies the style's
+  `--color-bg` into `deck.json` as `defaultBackground`, and the builder fills
+  every slide that has no `background` of its own with it (table auto-colours
+  and the icon theme follow). Until now only `--color-text` was applied, so a
+  cream or near-black style rendered on the template's white or navy unless
+  each slide set `background` by hand.
 - **Bulk delete in the deck list** — hover a card in My Decks and tick its
   checkbox (or press "Select" in the header) to enter selection mode; click
   toggles, shift-click selects a range, ⌘/Ctrl+A selects everything shown,
@@ -59,12 +122,31 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **Shapes and connectors no longer inherit the template theme's shadow.**
+  python-pptx gives every autoshape a default `<p:style effectRef>` that
+  resolves to the theme's effect style — an outer shadow in the Office default
+  theme and in the bundled blank templates — so any filled shape or line built
+  from JSON without a `shadow` key grew a shadow nobody asked for. The builder
+  now always writes an explicit effect list (empty when no effect is requested),
+  and `"shadow": "none"` (also glow / softEdge / reflection / bevel) is an
+  explicit off instead of falling back to the `md` preset. Decks that relied on
+  the accidental theme shadow will render flat; set `"shadow": "sm"` where a
+  shadow is wanted.
 - **Local ACP prompt errors no longer hang the stream** — an RPC error from
   `session/prompt` now surfaces on the SSE stream as an error event instead of
   an unhandled rejection with the chat stuck in "thinking".
 
 ### Changed
 
+- **The `style` workflow now defines what a style is** — the Part 0–7 skeleton,
+  the `:root` token contract, HTML constraints and writing principles (state the
+  design decision, derive the rules; describe by design, not by brand). Demo type
+  is rendered at true slide scale (`calc(var(--fs-*) * 1.5)`: the 1920 px canvas is
+  960 slide-pt, CSS draws 1pt as 1.333 px), so box heights copied from a style no
+  longer overflow when built.
+- **Orchestrator writes the style before the outline** (brief → style → outline):
+  a style's Message & Outline part fixes deck length, density, title grammar and
+  chapter shape, so an outline written first had to be rewritten.
 - **Off-screen slides are always drawn in their final state** — the
   agent-cursor animation now plays only for a live update on the slide you are
   looking at. A change that lands on a slide out of view is drawn immediately
@@ -97,6 +179,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Removed
 
+- **Bundled styles `border`, `corporate-executive`, `cute-playful`,
+  `elegant-dark`, `elegant-light`, `flat-shadow`, `lumina`, `tech-cyber`.** They
+  were early swatch-and-type-ramp demos with no composition rules and used
+  `--size-*` tokens the lint does not read. No migration path: pick one of the six
+  new styles (or copy an old file from git history into `~/.config/sdpm/styles/`
+  to keep using it). Decks already built keep their `specs/art-direction.html`.
+  Pinned names in `state.json` that no longer exist are ignored; re-pin.
 - **"Parallel agents" toggle in the chat Options** — it did not do what it
   said. On the cloud stack it switched to a `single` agent mode that dropped
   `compose_slides` entirely (the orchestrator wrote every slide itself, slowly

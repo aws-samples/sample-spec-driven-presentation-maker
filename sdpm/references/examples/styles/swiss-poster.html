@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>swiss-poster — For talks and reviews shown on a large screen where each slide must read as a single image from the back of the room; the design decision gives every slide one oversized red geometric shape on a white ground, leaves the asymmetric twelve-column grid visible as black hairlines, and turns the right margin into a vertical rotated label, so composition rather than type size carries the slide.</title>
+<style>
+:root {
+  --color-text: #111111;
+  --color-bg: #FFFFFF;
+  --color-surface: #FFFFFF;
+  --color-border: #111111;
+  --color-muted: #6B6B6B;
+  --accent: #E30613;
+  --color-on-accent: #FFFFFF;
+  --font-family: "Helvetica Neue", Helvetica, Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+  --fs-cover-title: 68pt;
+  --fs-slide-title: 40pt;
+  --fs-metric: 64pt;
+  --grid-w: 1704px; /* 12 x 120 + 11 x 24; the last 24px is slack inside the right margin */
+  --fs-number: 48pt;
+  --fs-heading: 24pt;
+  --fs-body: 16pt;
+  --fs-table: 13pt;
+  --fs-caption: 12pt;
+  --fs-vertical: 11pt;
+  --fs-label: 10pt;
+  --margin-x: 96px;
+  --content-w: 1728px;
+  --content-top: 376px;
+  --title-top: 120px;
+  --title-h: 192px;
+  --line-body: 45px;
+  --line-heading: 58px;
+  --grid-col: 120px;
+  --grid-gutter: 24px;
+  --grid-pitch: 144px;
+  --bar-w: 8px;
+  --bar-h: 240px;
+  --rule-w: 1px;
+  --shape-min: 280px;
+  --shape-max: 720px;
+  --band-h: 160px;
+  --band-angle: -18deg;
+  --radius: 0px;
+  --border-thin: 1px;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(--font-family); zoom: 0.7; color: var(--color-text); }
+.slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; overflow: hidden; background: var(--color-bg); color: var(--color-text); }
+.el { position: absolute; }
+.cover-title { font-size: calc(var(--fs-cover-title) * 1.5); line-height: 1; font-weight: 800; letter-spacing: -2pt; }
+.slide-title { font-size: calc(var(--fs-slide-title) * 1.5); line-height: 1.2; font-weight: 800; letter-spacing: -1pt; }
+.metric { font-size: calc(var(--fs-metric) * 1.5); line-height: 1; font-weight: 800; letter-spacing: -3pt; font-variant-numeric: tabular-nums; }
+.number { font-size: calc(var(--fs-number) * 1.5); line-height: 1; font-weight: 800; letter-spacing: -2pt; font-variant-numeric: tabular-nums; }
+.heading { font-size: calc(var(--fs-heading) * 1.5); line-height: 1.2; font-weight: 700; }
+.body-text { font-size: calc(var(--fs-body) * 1.5); line-height: 1.4; font-weight: 400; }
+.table-text { font-size: calc(var(--fs-table) * 1.5); line-height: 1.35; font-weight: 400; font-variant-numeric: tabular-nums; }
+.caption { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.35; font-weight: 400; }
+.label { font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; font-weight: 700; letter-spacing: 1.2pt; text-transform: uppercase; }
+.vert { font-size: calc(var(--fs-vertical) * 1.5); line-height: 1.2; font-weight: 700; letter-spacing: 2pt; text-transform: uppercase; writing-mode: vertical-rl; transform: rotate(180deg); }
+.muted { color: var(--color-muted); }
+.on-accent { color: var(--color-on-accent); }
+.heavy { font-weight: 800; }
+.right { text-align: right; }
+.center { text-align: center; }
+.shape { background: var(--accent); }
+.circle { background: var(--accent); border-radius: 50%; }
+.band { background: var(--accent); transform: rotate(var(--band-angle)); }
+.band-alt { background: var(--accent); transform: rotate(18deg); }
+.rule { background: var(--color-border); }
+.grid-bar { background: var(--color-border); }
+.bar-black { background: var(--color-text); }
+.bar-red { background: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- Part 0: the <title> description and the machine-read :root tokens are above. -->
+<!-- Box heights below are derived, not guessed: one body line is 45px (16pt x 2 x 1.4), -->
+<!-- one heading line 58px, one caption line 33px, one title line 96px. Copy them as they are. -->
+
+<!-- Part 1: Cover -->
+<!-- Slide 1: Cover — WHY: the red circle crossing the top edge, not the wording, is what the room remembers, so the title is set at cover size inside seven columns and stops well short of the right margin. MAY VARY: the title wording within three lines, the circle diameter inside 280-720px, and which single edge the circle crosses. MAY NOT VARY: one red shape, the white ground, the visible hairline, and the deck numbering in the bottom-left module. -->
+<div class="slide cover">
+  <div class="el circle" style="left:1264px; top:-180px; width:560px; height:560px;"></div>
+  <div class="el rule" style="left:1104px; top:0px; width:1px; height:1080px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Deck label placeholder</div>
+  <div class="el cover-title" style="left:96px; top:200px; width:1008px; height:272px;">COVER TITLE<br>TWO LINES</div>
+  <div class="el body-text" style="left:96px; top:700px; width:696px; height:90px;">Placeholder subtitle for the deck.<br>Occasion, owner and date in one block.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">01 / 22</div>
+  <div class="el vert label muted" style="left:1784px; top:600px; width:40px; height:400px;">Context placeholder</div>
+</div>
+
+<!-- Part 2: Rules -->
+<!-- Slide 2: The design decision and the shape catalogue — WHY: a composer has to know which four shapes exist before anything else, because every other rule on this style hangs off the one shape a slide is allowed. MAY VARY: nothing but the wording. MAY NOT VARY: the four shapes and their size ranges. -->
+<div class="slide">
+  <div class="el shape" style="left:960px; top:120px; width:1100px; height:240px;"></div>
+  <div class="el grid-bar" style="left:0px; top:0px; width:8px; height:1080px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Rules / read first</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:816px; height:192px;">ONE SHAPE<br>PER SLIDE</div>
+  <div class="el body-text" style="left:96px; top:376px; width:1728px; height:180px;">Design decision: this deck is projected large and read from the back of a room, so every slide is built as a poster. One oversized red shape anchors the composition and the grid is left visible instead of hidden. Scale alone does not carry a slide here: remove the shape and the hairlines and nothing is left to look at, which is why titles stay at 36-44pt and never run off an edge to become the image.</div>
+  <div class="el body-text" style="left:96px; top:596px; width:1728px; height:135px;">Per slide, exactly 1 red shape, from 4: circle 280-720px across; bar 96-240px thick; diagonal band 96-200px thick and 1200-1400px long, fixed at -18deg or +18deg; square 280-560px per side.<br>Vary the shape from slide to slide so two consecutive slides never repeat one silhouette.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">02 / 22</div>
+</div>
+
+<!-- Slide 3: The remaining counts and the bleed rule — WHY: the bleed rule is the one a composer gets wrong in both directions, so it is stated as a pair: the shape is the only element allowed past an edge, and the band's rotation sweeps a corridor that type has to stay out of. MAY VARY: wording. MAY NOT VARY: any count, and the rule that type never bleeds. -->
+<div class="slide">
+  <div class="el shape" style="left:1600px; top:320px; width:440px; height:440px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1440px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Rules / counts</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">COUNT IT BEFORE<br>YOU BUILD IT</div>
+  <div class="el body-text" style="left:96px; top:376px; width:1440px; height:225px;">Per slide, 1-2 black grid lines: a 1px hairline (--rule-w) running the full width or height, or the 8px left bar (--bar-w). Never three.<br>Per slide, at most 1 vertical label at 11pt and at most 2 body blocks of 5 lines at 16pt.<br>Slide title 1-2 lines at 36-44pt; cover title up to 3 lines at 68pt.</div>
+  <div class="el body-text" style="left:96px; top:641px; width:1440px; height:180px;">The red shape may cross 1 or 2 slide edges and is the only element allowed to. Type crosses none and keeps 96px, 5% of the edge, clear.<br>The diagonal band always runs from the top edge to the bottom edge, and its rotation sweeps a corridor 300-600px wide that no type enters.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">03 / 22</div>
+</div>
+
+<!-- Slide 4: DO and DON'T — WHY: the universal composition and accessibility rules are repeated here so the style is self-contained, and the colour and rotation bans are what stop the poster look drifting into decoration. MAY VARY: wording. MAY NOT VARY: the three-colour palette, the zero counts, and the two rotation exceptions. -->
+<div class="slide">
+  <div class="el shape" style="left:1500px; top:-60px; width:200px; height:1200px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1272px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Rules / do and don't</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">WHAT TO DO,<br>WHAT NEVER TO DO</div>
+  <div class="el body-text" style="left:96px; top:376px; width:1272px; height:225px;">DO: make one claim per slide and make the title that claim. Derive coordinates from the grid: column n starts at 96 + 144(n-1)px and a span of n modules is 144n - 24px wide. Keep margins at 96px or more. Keep text contrast at 4.5:1, or 3:1 at 18pt and above. Label chart values on the bars and draw no gridline but the baseline.</div>
+  <div class="el body-text" style="left:96px; top:641px; width:1272px; height:225px;">DON'T: add a fourth colour, a tint or a second accent. The palette is #FFFFFF ground, #111111 type, #E30613 shape, and #6B6B6B for secondary labels. Never set red as type: the one place red carries words is white text on a red bar or square. 0 gradients, 0 shadows, 0 rounded corners, 0 emoji, and rotation only on the vertical label and the band.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">04 / 22</div>
+</div>
+
+<!-- Part 3: Message and Outline -->
+<!-- Slide 5: Title grammar — WHY: a short noun phrase leaves the shape room to be the loudest thing on the slide, which a full-sentence title at this size would not. MAY VARY: whether a slide uses a plain noun phrase or a numbered title. MAY NOT VARY: two lines maximum, one claim, and no title wrapping to a third line. -->
+<div class="slide">
+  <div class="el circle" style="left:1448px; top:380px; width:520px; height:520px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1272px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Message / title grammar</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">TITLES ARE<br>SHORT NOUN PHRASES</div>
+  <div class="el body-text" style="left:96px; top:376px; width:1272px; height:180px;">Write the title as a short noun phrase of 2-6 words, or as a numbered title where the number joins the composition.<br>One claim per slide, and the title is that claim.<br>Supporting copy sits in one or two blocks and never restates the title.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">05 / 22</div>
+</div>
+
+<!-- Slide 6: Outline rhythm and density — WHY: the deck length and the density ceiling come from the look rather than from a use case, because a slide holding more than one shape's worth of content stops reading as a poster. MAY VARY: the deck length inside the range. MAY NOT VARY: one claim per slide, the six-item ceiling, and continuous numbering. -->
+<div class="slide">
+  <div class="el shape" style="left:1416px; top:-80px; width:200px; height:1240px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1272px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Message / outline</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">10 TO 20 SLIDES,<br>ONE POSTER EACH</div>
+  <div class="el body-text" style="left:96px; top:376px; width:1272px; height:180px;">Plan 10-20 slides: below ten the repeated shape has no rhythm to build, above twenty the four shapes read as wallpaper.<br>Density per slide: 1 title, at most 2 body blocks of 5 lines, and at most 6 discrete items. A seventh item means the slide splits.</div>
+  <div class="el body-text" style="left:96px; top:596px; width:1272px; height:270px;">Numbering is a design element, not a footnote: every slide carries NN / NN in the bottom-left module at 10pt, and a section divider sets its number at cover size.<br>The sequence never restarts inside a deck.<br>Favour forms the shape can anchor: one large figure, a two- or three-part comparison, a short numbered process, a single chart.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">06 / 22</div>
+</div>
+
+<!-- Part 4: Palette -->
+<!-- Slide 7: Palette — WHY: the red square is both the swatch and this slide's one shape, which demonstrates the palette rule instead of describing it; black and grey appear as type because type is the only form they take. MAY VARY: the square's position. MAY NOT VARY: the four token values, and the rule that red is never type. -->
+<div class="slide">
+  <div class="el shape" style="left:1560px; top:376px; width:440px; height:440px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1416px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Palette</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">THREE COLOURS AND<br>ONE GREY, ONE JOB EACH</div>
+  <div class="el heading" style="left:96px; top:376px; width:1416px; height:58px;">#FFFFFF — ground, every slide</div>
+  <div class="el heading" style="left:96px; top:448px; width:1416px; height:58px;">#111111 — all type, hairlines and chart bars</div>
+  <div class="el heading" style="left:96px; top:520px; width:1416px; height:58px;">#E30613 — the one shape per slide</div>
+  <div class="el heading muted" style="left:96px; top:592px; width:1416px; height:58px;">#6B6B6B — secondary labels only</div>
+  <div class="el body-text" style="left:96px; top:688px; width:1416px; height:225px;">--color-bg is the ground and needs no fill on the slide. --color-text carries every word except those sitting on red, where --color-on-accent takes over. --accent appears once per slide and only as a filled shape. --color-muted is limited to labels, captions and the subordinate side of a before-and-after slide; it never sets a title.</div>
+  <div class="el label on-accent" style="left:1584px; top:752px; width:240px; height:32px;">--accent #E30613</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">07 / 22</div>
+</div>
+
+<!-- Part 5: Typography -->
+<!-- Slide 8: Type ramp at real size — WHY: the ramp is shown beside a bleeding bar so a composer can see that even the largest title stays smaller and quieter than the shape. MAY VARY: the sample words. MAY NOT VARY: the token sizes, the weights, and the two-line ceiling on titles. -->
+<div class="slide">
+  <div class="el shape" style="left:1664px; top:-60px; width:240px; height:1200px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1440px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Typography / actual size</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">SLIDE TITLE<br>AT FORTY POINT</div>
+  <div class="el metric" style="left:96px; top:348px; width:552px; height:192px;">128</div>
+  <div class="el caption muted" style="left:1008px; top:420px; width:528px; height:66px;">--fs-metric 64pt / weight 800 / line height 1.0</div>
+  <div class="el number" style="left:96px; top:556px; width:264px; height:96px;">01</div>
+  <div class="el caption muted" style="left:1008px; top:570px; width:528px; height:66px;">--fs-number 48pt / weight 800 / step numerals</div>
+  <div class="el heading" style="left:96px; top:668px; width:840px; height:58px;">Heading at 24pt, weight 700</div>
+  <div class="el caption muted" style="left:1008px; top:672px; width:528px; height:33px;">--fs-heading 24pt / 58px per line</div>
+  <div class="el body-text" style="left:96px; top:742px; width:840px; height:45px;">Body copy at 16pt, weight 400</div>
+  <div class="el caption muted" style="left:1008px; top:744px; width:528px; height:33px;">--fs-body 16pt / 45px per line</div>
+  <div class="el caption muted" style="left:96px; top:812px; width:1440px; height:33px;">Caption 12pt, table text 13pt, corner label 10pt, vertical label 11pt, uppercase for labels</div>
+  <div class="el body-text" style="left:96px; top:868px; width:1440px; height:90px;">Slide JSON carries no letter-spacing and no intermediate weights, so tightness comes from size and line breaks, and emphasis from weight 700 or 800 only.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">08 / 22</div>
+</div>
+
+<!-- Part 6: Frame -->
+<!-- Slide 9: Standard frame — WHY: every content slide repeats these five positions so the shape is the only thing that changes and the deck reads as one poster series. MAY VARY: the shape, which edge it crosses, and the vertical label wording. MAY NOT VARY: the label at 56px, the title at 120px, content starting at 376px, and the numbering in the bottom-left module. -->
+<div class="slide">
+  <div class="el circle" style="left:1448px; top:520px; width:560px; height:560px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1272px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Section label placeholder</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">STANDARD FRAME<br>FOR CONTENT SLIDES</div>
+  <div class="el body-text" style="left:96px; top:376px; width:1272px; height:225px;">The section label sits in the top-left module at 10pt. The title takes two lines below it and never moves down to centre itself.<br>Content begins at --content-top, 376px, whether the title used one line or two.<br>The numbering closes the bottom-left module.</div>
+  <div class="el body-text" style="left:96px; top:641px; width:1272px; height:135px;">The vertical label runs up the right margin at x 1784px. Composers build it as a textbox with textDirection "vert270", which sets the text bottom-to-top; the box is 40px wide, 320-480px tall, and carries 2-5 uppercase words.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">09 / 22</div>
+  <div class="el vert label muted" style="left:1784px; top:120px; width:40px; height:400px;">Vertical label placeholder</div>
+</div>
+
+<!-- Slide 10: Section divider — WHY: the divider is the one slide where the shape crosses the left edge and the section number is set at cover size, so the pause is visible before a word is read. MAY VARY: the section number and title. MAY NOT VARY: no body copy, no vertical label, one shape, one hairline. -->
+<div class="slide">
+  <div class="el shape" style="left:-160px; top:300px; width:560px; height:560px;"></div>
+  <div class="el rule" style="left:96px; top:880px; width:1728px; height:1px;"></div>
+  <div class="el cover-title" style="left:528px; top:300px; width:1296px; height:272px;">02<br>SECTION TITLE</div>
+  <div class="el label muted" style="left:528px; top:612px; width:840px; height:32px;">Section divider placeholder</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">10 / 22</div>
+</div>
+
+<!-- Slide 11: Closing frame — WHY: the circle crossing the bottom edge mirrors the cover, so the deck closes on the silhouette it opened with. MAY VARY: the closing phrase and the single body block. MAY NOT VARY: the mirrored circle, one hairline, and no second shape. -->
+<div class="slide">
+  <div class="el circle" style="left:1264px; top:700px; width:560px; height:560px;"></div>
+  <div class="el rule" style="left:1104px; top:0px; width:1px; height:1080px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Closing</div>
+  <div class="el cover-title" style="left:96px; top:240px; width:984px; height:272px;">CLOSING<br>PHRASE</div>
+  <div class="el body-text" style="left:96px; top:600px; width:984px; height:180px;">Placeholder closing implication in one block.<br>Owner, date or invitation stated directly.<br>No second shape and no additional colour enters the final slide.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">11 / 22</div>
+</div>
+
+<!-- Part 7: Patterns -->
+<!-- Slide 12: Numbers — WHY: the bar crossing the left edge is the anchor and the figure is set in white on top of it, the only place red carries words; the hairline under the title keeps the figure inside the grid. MAY VARY: the figure, the bar length, and the comparator block. MAY NOT VARY: one bar 96-240px thick, white type on red, and the figure at --fs-metric. -->
+<div class="slide">
+  <div class="el shape" style="left:-96px; top:400px; width:1224px; height:240px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1728px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Numbers</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">ONE FIGURE<br>CARRIES THE CLAIM</div>
+  <div class="el metric on-accent" style="left:96px; top:424px; width:984px; height:192px;">-42%</div>
+  <div class="el body-text" style="left:96px; top:688px; width:840px; height:180px;">Placeholder figure and comparator in one line.<br>Scope and period stated directly beneath it.<br>The bar is this slide's shape, so nothing else is filled.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">12 / 22</div>
+  <div class="el vert label muted" style="left:1784px; top:600px; width:40px; height:400px;">Result placeholder</div>
+</div>
+
+<!-- Slide 13: Comparison of two options — WHY: the circle crossing the top-right sits over the recommended column, so position marks the choice and neither column needs a fill or a colour of its own; the short hairline between them replaces a box. MAY VARY: the labels, the attribute lines, and which column the circle sits over. MAY NOT VARY: two columns of equal width, black type in both, and no box around either. -->
+<div class="slide">
+  <div class="el circle" style="left:1360px; top:-140px; width:480px; height:480px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1728px; height:1px;"></div>
+  <div class="el rule" style="left:948px; top:376px; width:1px; height:480px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Comparison</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">TWO OPTIONS,<br>ONE RECOMMENDATION</div>
+  <div class="el heading" style="left:96px; top:376px; width:816px; height:58px;">Option A placeholder</div>
+  <div class="el body-text" style="left:96px; top:450px; width:816px; height:135px;">Placeholder attribute in one line.<br>Placeholder attribute in one line.<br>Placeholder consequence in one line.</div>
+  <div class="el heading" style="left:1008px; top:376px; width:816px; height:58px;">Option B placeholder</div>
+  <div class="el body-text" style="left:1008px; top:450px; width:816px; height:135px;">Placeholder attribute in one line.<br>Placeholder attribute in one line.<br>Placeholder consequence in one line.</div>
+  <div class="el body-text heavy" style="left:96px; top:700px; width:1728px; height:90px;">Placeholder conclusion naming the option the deck recommends and the reason, in one sentence.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">13 / 22</div>
+</div>
+
+<!-- Slide 14: Process — WHY: a thin red bar runs under the whole sequence and off both side edges, so the bar reads as the track and the numerals as stations; arrows are unnecessary because the bar already states direction. MAY VARY: three to five steps, and the bar thickness inside 96-240px. MAY NOT VARY: one bar, black numerals at --fs-number, equal step pitch, and no arrows or connectors. -->
+<div class="slide">
+  <div class="el shape" style="left:-80px; top:520px; width:2080px; height:96px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1728px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Process</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">FOUR STEPS<br>ON ONE TRACK</div>
+  <div class="el number" style="left:96px; top:376px; width:264px; height:96px;">01</div>
+  <div class="el heading" style="left:96px; top:648px; width:408px; height:58px;">Verb phrase</div>
+  <div class="el body-text" style="left:96px; top:716px; width:408px; height:90px;">Placeholder step note in one or two lines.</div>
+  <div class="el number" style="left:528px; top:376px; width:264px; height:96px;">02</div>
+  <div class="el heading" style="left:528px; top:648px; width:408px; height:58px;">Verb phrase</div>
+  <div class="el body-text" style="left:528px; top:716px; width:408px; height:90px;">Placeholder step note in one or two lines.</div>
+  <div class="el number" style="left:960px; top:376px; width:264px; height:96px;">03</div>
+  <div class="el heading" style="left:960px; top:648px; width:408px; height:58px;">Verb phrase</div>
+  <div class="el body-text" style="left:960px; top:716px; width:408px; height:90px;">Placeholder step note in one or two lines.</div>
+  <div class="el number" style="left:1392px; top:376px; width:264px; height:96px;">04</div>
+  <div class="el heading" style="left:1392px; top:648px; width:408px; height:58px;">Verb phrase</div>
+  <div class="el body-text" style="left:1392px; top:716px; width:408px; height:90px;">Placeholder step note in one or two lines.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">14 / 22</div>
+</div>
+
+<!-- Slide 15: Relationship — WHY: this is the one pattern where the circle stays wholly inside the slide, because it has to act as the centre the surrounding labels point at; the labels sit on the circle's own centre lines, so no connector is drawn. MAY VARY: three or four satellite labels, and the circle diameter. MAY NOT VARY: the circle fully inside the slide, white type only where it sits on red, and no arrows, rings or nodes. -->
+<div class="slide">
+  <div class="el circle" style="left:720px; top:392px; width:480px; height:480px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1728px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Relationship</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">ONE CENTRE,<br>FOUR DEPENDENCIES</div>
+  <div class="el heading on-accent center" style="left:760px; top:574px; width:400px; height:116px;">Centre<br>placeholder</div>
+  <div class="el heading right" style="left:96px; top:420px; width:552px; height:58px;">Dependency one</div>
+  <div class="el caption muted right" style="left:96px; top:486px; width:552px; height:33px;">Placeholder note in one line</div>
+  <div class="el heading" style="left:1272px; top:420px; width:552px; height:58px;">Dependency two</div>
+  <div class="el caption muted" style="left:1272px; top:486px; width:552px; height:33px;">Placeholder note in one line</div>
+  <div class="el heading right" style="left:96px; top:760px; width:552px; height:58px;">Dependency three</div>
+  <div class="el caption muted right" style="left:96px; top:826px; width:552px; height:33px;">Placeholder note in one line</div>
+  <div class="el heading" style="left:1272px; top:760px; width:552px; height:58px;">Dependency four</div>
+  <div class="el caption muted" style="left:1272px; top:826px; width:552px; height:33px;">Placeholder note in one line</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">15 / 22</div>
+</div>
+
+<!-- Slide 16: Two columns — WHY: the diagonal band crosses the top and bottom edges rather than the sides, so it reads as a slash over the page; the two columns are pulled left of its corridor, which is what makes the page asymmetric without a divider between them. MAY VARY: the band angle between the two fixed values, its thickness inside 96-200px, and the column headings. MAY NOT VARY: no type inside the band corridor, the equal column widths, and no divider between the columns. -->
+<div class="slide">
+  <div class="el band" style="left:1500px; top:-160px; width:160px; height:1400px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1128px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Two columns</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">TWO VIEWS<br>OF THE SAME CASE</div>
+  <div class="el heading" style="left:96px; top:376px; width:552px; height:58px;">First view</div>
+  <div class="el body-text" style="left:96px; top:450px; width:552px; height:90px;">Placeholder supporting line.<br>A second line adds evidence.</div>
+  <div class="el heading" style="left:672px; top:376px; width:552px; height:58px;">Second view</div>
+  <div class="el body-text" style="left:672px; top:450px; width:552px; height:90px;">Placeholder supporting line.<br>A second line adds evidence.</div>
+  <div class="el body-text heavy" style="left:96px; top:640px; width:1128px; height:90px;">Placeholder synthesis stating what the two views together imply.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">16 / 22</div>
+</div>
+
+<!-- Slide 17: Three columns — WHY: the square anchored past the top-right corner lets three four-module columns start at the same height without a card or a fill behind any of them, and the hairline under the title is the only rule the columns need. MAY VARY: the column headings, and the square's size inside 280-560px. MAY NOT VARY: three equal columns, one square, and no fills or borders around the columns. -->
+<div class="slide">
+  <div class="el shape" style="left:1560px; top:-80px; width:440px; height:440px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1272px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Three columns</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">THREE PARTS,<br>ONE ARGUMENT</div>
+  <div class="el number" style="left:96px; top:376px; width:264px; height:96px;">01</div>
+  <div class="el heading" style="left:96px; top:508px; width:552px; height:58px;">Part heading</div>
+  <div class="el body-text" style="left:96px; top:582px; width:552px; height:135px;">Placeholder description.<br>A second line adds detail.<br>A third states the result.</div>
+  <div class="el number" style="left:672px; top:376px; width:264px; height:96px;">02</div>
+  <div class="el heading" style="left:672px; top:508px; width:552px; height:58px;">Part heading</div>
+  <div class="el body-text" style="left:672px; top:582px; width:552px; height:135px;">Placeholder description.<br>A second line adds detail.<br>A third states the result.</div>
+  <div class="el number" style="left:1248px; top:376px; width:264px; height:96px;">03</div>
+  <div class="el heading" style="left:1248px; top:508px; width:552px; height:58px;">Part heading</div>
+  <div class="el body-text" style="left:1248px; top:582px; width:552px; height:135px;">Placeholder description.<br>A second line adds detail.<br>A third states the result.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">17 / 22</div>
+</div>
+
+<!-- Slide 18: Four columns — WHY: four three-module columns are the densest layout this style allows, so the shape moves to a bar along the bottom that crosses the right edge and reads as a base line instead of competing with the columns. MAY VARY: the bar thickness inside 96-240px, and the four headings. MAY NOT VARY: four columns maximum, two lines of copy each, and one shape. -->
+<div class="slide">
+  <div class="el shape" style="left:400px; top:848px; width:1620px; height:120px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1728px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Four columns</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1272px; height:192px;">FOUR ITEMS,<br>EQUAL WEIGHT</div>
+  <div class="el heading" style="left:96px; top:376px; width:408px; height:58px;">Item one</div>
+  <div class="el body-text" style="left:96px; top:450px; width:408px; height:90px;">Placeholder line for the first item.</div>
+  <div class="el heading" style="left:528px; top:376px; width:408px; height:58px;">Item two</div>
+  <div class="el body-text" style="left:528px; top:450px; width:408px; height:90px;">Placeholder line for the second item.</div>
+  <div class="el heading" style="left:960px; top:376px; width:408px; height:58px;">Item three</div>
+  <div class="el body-text" style="left:960px; top:450px; width:408px; height:90px;">Placeholder line for the third item.</div>
+  <div class="el heading" style="left:1392px; top:376px; width:408px; height:58px;">Item four</div>
+  <div class="el body-text" style="left:1392px; top:450px; width:408px; height:90px;">Placeholder line for the fourth item.</div>
+  <div class="el body-text" style="left:96px; top:640px; width:1272px; height:45px;">Placeholder line stating what the four items have in common.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">18 / 22</div>
+</div>
+
+<!-- Slide 19: Text-heavy — WHY: a paragraph slide has nothing to look at, so the band at the opposite angle slashes the right corridor top to bottom and becomes the image while the prose stays plain; the measure is one eight-module column, which stops clear of the corridor. MAY VARY: the paragraph length up to two blocks of five lines, and the band angle. MAY NOT VARY: the single measure, no bullets, and no type inside the band corridor. -->
+<div class="slide">
+  <div class="el band-alt" style="left:1480px; top:-160px; width:120px; height:1400px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1128px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Text-heavy</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">ONE PARAGRAPH,<br>ONE MEASURE</div>
+  <div class="el body-text" style="left:96px; top:376px; width:1128px; height:225px;">Placeholder paragraph sets out the reasoning in complete sentences within a single measure of eight modules.<br>A second sentence adds the evidence the claim depends on.<br>A third states the implication, the threshold, or the open question.</div>
+  <div class="el body-text" style="left:96px; top:641px; width:840px; height:180px;">A second block may hold a short aside of no more than five lines, set below the measure rather than beside it. Beyond that the slide splits rather than growing a bulleted list.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">19 / 22</div>
+</div>
+
+<!-- Slide 20: Table — WHY: the table is built from aligned text on the grid between two hairlines rather than from a filled header, because a fill would read as a second shape; the square crossing the right edge supplies the anchor the plain rows lack. MAY VARY: three to six rows, and four or five columns. MAY NOT VARY: two hairlines, no row fills or vertical rules, right-aligned figures, and one square. -->
+<div class="slide">
+  <div class="el shape" style="left:1680px; top:560px; width:400px; height:400px;"></div>
+  <div class="el rule" style="left:96px; top:376px; width:1440px; height:1px;"></div>
+  <div class="el rule" style="left:96px; top:760px; width:1440px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Table</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">FOUR ROWS,<br>COMPARED DIRECTLY</div>
+  <div class="el label muted" style="left:96px; top:332px; width:552px; height:32px;">Item</div>
+  <div class="el label muted right" style="left:816px; top:332px; width:264px; height:32px;">Prior</div>
+  <div class="el label muted right" style="left:1104px; top:332px; width:264px; height:32px;">Current</div>
+  <div class="el label muted right" style="left:1392px; top:332px; width:144px; height:32px;">Change</div>
+  <div class="el table-text" style="left:96px; top:412px; width:552px; height:36px;">Placeholder item A</div>
+  <div class="el table-text right" style="left:816px; top:412px; width:264px; height:36px;">100</div>
+  <div class="el table-text heavy right" style="left:1104px; top:412px; width:264px; height:36px;">124</div>
+  <div class="el table-text right" style="left:1392px; top:412px; width:144px; height:36px;">+24</div>
+  <div class="el table-text" style="left:96px; top:496px; width:552px; height:36px;">Placeholder item B</div>
+  <div class="el table-text right" style="left:816px; top:496px; width:264px; height:36px;">80</div>
+  <div class="el table-text heavy right" style="left:1104px; top:496px; width:264px; height:36px;">91</div>
+  <div class="el table-text right" style="left:1392px; top:496px; width:144px; height:36px;">+11</div>
+  <div class="el table-text" style="left:96px; top:580px; width:552px; height:36px;">Placeholder item C</div>
+  <div class="el table-text right" style="left:816px; top:580px; width:264px; height:36px;">60</div>
+  <div class="el table-text heavy right" style="left:1104px; top:580px; width:264px; height:36px;">72</div>
+  <div class="el table-text right" style="left:1392px; top:580px; width:144px; height:36px;">+12</div>
+  <div class="el table-text" style="left:96px; top:664px; width:552px; height:36px;">Placeholder item D</div>
+  <div class="el table-text right" style="left:816px; top:664px; width:264px; height:36px;">45</div>
+  <div class="el table-text heavy right" style="left:1104px; top:664px; width:264px; height:36px;">44</div>
+  <div class="el table-text right" style="left:1392px; top:664px; width:144px; height:36px;">-1</div>
+  <div class="el body-text" style="left:96px; top:800px; width:1440px; height:90px;">Placeholder reading of the table in one sentence. A native table inherits the template font, so build the rows as textboxes on the grid to keep this style's type.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">20 / 22</div>
+</div>
+
+<!-- Slide 21: Chart — WHY: the bars are black and the single highlighted bar is this slide's red shape, which is why a chart slide needs no other shape; the baseline is one of the two grid lines, so no other gridline is drawn. MAY VARY: three to six bars, and which bar is red. MAY NOT VARY: exactly one red bar, values labelled on the bars, one baseline, and no axis or gridlines. -->
+<div class="slide">
+  <div class="el grid-bar" style="left:0px; top:0px; width:8px; height:1080px;"></div>
+  <div class="el rule" style="left:96px; top:800px; width:1440px; height:1px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Chart</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">FOUR PERIODS,<br>ONE HIGHLIGHTED</div>
+  <div class="el caption muted center" style="left:384px; top:550px; width:96px; height:33px;">24</div>
+  <div class="el bar-black" style="left:384px; top:590px; width:96px; height:210px;"></div>
+  <div class="el caption muted center" style="left:384px; top:816px; width:96px; height:33px;">P1</div>
+  <div class="el caption muted center" style="left:528px; top:489px; width:96px; height:33px;">31</div>
+  <div class="el bar-black" style="left:528px; top:529px; width:96px; height:271px;"></div>
+  <div class="el caption muted center" style="left:528px; top:816px; width:96px; height:33px;">P2</div>
+  <div class="el caption muted center" style="left:672px; top:436px; width:96px; height:33px;">37</div>
+  <div class="el bar-black" style="left:672px; top:476px; width:96px; height:324px;"></div>
+  <div class="el caption muted center" style="left:672px; top:816px; width:96px; height:33px;">P3</div>
+  <div class="el caption heavy center" style="left:816px; top:340px; width:96px; height:33px;">48</div>
+  <div class="el bar-red" style="left:816px; top:380px; width:96px; height:420px;"></div>
+  <div class="el caption heavy center" style="left:816px; top:816px; width:96px; height:33px;">P4</div>
+  <div class="el body-text" style="left:1056px; top:460px; width:696px; height:135px;">Placeholder reading of the trend.<br>Values are labelled on the bars.<br>The red bar is this slide's shape.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">21 / 22</div>
+</div>
+
+<!-- Slide 22: Before and after — WHY: the square crossing the right edge sits on the after state, so the change reads as a movement to the right before either label is read; the before state is set in muted grey to make the direction unambiguous without a second colour. MAY VARY: the state labels and the figures. MAY NOT VARY: before in muted grey, after in black, one square on the after side, and no arrow between the states. -->
+<div class="slide">
+  <div class="el shape" style="left:1560px; top:376px; width:480px; height:480px;"></div>
+  <div class="el rule" style="left:96px; top:312px; width:1416px; height:1px;"></div>
+  <div class="el rule" style="left:816px; top:376px; width:1px; height:384px;"></div>
+  <div class="el label muted" style="left:96px; top:56px; width:552px; height:32px;">Before and after</div>
+  <div class="el slide-title" style="left:96px; top:120px; width:1128px; height:192px;">BEFORE AND AFTER,<br>SAME MEASURE</div>
+  <div class="el label muted" style="left:96px; top:376px; width:552px; height:32px;">Before</div>
+  <div class="el metric muted" style="left:96px; top:428px; width:552px; height:192px;">100</div>
+  <div class="el body-text muted" style="left:96px; top:648px; width:552px; height:90px;">Placeholder description of the prior state.</div>
+  <div class="el label" style="left:960px; top:376px; width:552px; height:32px;">After</div>
+  <div class="el metric" style="left:960px; top:428px; width:552px; height:192px;">58</div>
+  <div class="el body-text" style="left:960px; top:648px; width:552px; height:90px;">Placeholder description of the current state.</div>
+  <div class="el body-text heavy" style="left:96px; top:800px; width:1416px; height:90px;">Placeholder statement of what changed and over what period, using one comparator for both states.</div>
+  <div class="el label" style="left:96px; top:984px; width:264px; height:32px;">22 / 22</div>
+</div>
+
+</body>
+</html>
