@@ -196,6 +196,15 @@ Entries before v0.5.0 were written retroactively as summaries.
   with any sub-agent that has the sdpm tools — a dedicated composer agent or a
   skill is no longer required, and the `sdpm-*` skills are now one-line calls to
   the entry tools.
+- **Tool descriptions say when to call a tool; what each argument means is on the
+  argument (schema property description); formats, examples and internal structures
+  live in guides.** `grid`, `arch_diagram` and `diff_pptx` point at their guides
+  instead of inlining the spec; a new `attachments` guide takes what
+  `read_attachment` / `import_attachment` carried. The local server's tool
+  surface (description + schema, sent to the model on every turn) shrinks from
+  18.4K to 13.6K characters. With the rewritten descriptions the first tool the
+  model calls, MCP only, was the matching entry tool in 30/30 trials on each of
+  Kiro CLI and Claude Code (create / edit / outline / translate / style prompts).
 - **Cloud agent (L4)** loads roles through the same entry tools: the role
   document goes to the system prompt (`Source.mcp(..., pick="static.workflow")`),
   the composer's slide spec joins the cached system prefix, and each composer
@@ -243,6 +252,7 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Removed
 
+- **`list_guides`.** `read_guides`' description lists the guide catalogue.
 - **`read_workflows` / `list_workflows`.** Role documents are delivered by the
   `start_*` entry tools (and the CLI `start` subcommand); the spec is a guide.
   A client that still calls `read_workflows(["orchestrator"])` should call
