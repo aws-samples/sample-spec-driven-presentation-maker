@@ -26,7 +26,7 @@ export function activityCategory(tool: string): ActivityCategory {
     case "clone_deck":
     case "clone_slide":
     case "apply_style":
-    case "init_presentation":
+    case "init_deck_workspace":
     case "import_attachment":
     case "run_style_python":
       return "build"
@@ -39,10 +39,12 @@ export function activityCategory(tool: string): ActivityCategory {
     case "web_fetch":
     case "search_assets":
     case "read_guides":
-    case "read_workflows":
+    case "start_presentation":
+    case "start_composing":
+    case "start_style":
+    case "start_translation":
     case "list_styles":
     case "list_guides":
-    case "list_workflows":
     case "list_templates":
     case "analyze_template":
       return "explore"
@@ -83,7 +85,10 @@ export function activityLabel(tool: string, input?: Record<string, unknown>, t?:
     }
     case "read_reference": return tr("readingReference", "Reading reference")
     case "read_guides": return tr("consultingGuide", "Consulting guide")
-    case "read_workflows": return tr("consultingWorkflow", "Consulting workflow")
+    case "start_presentation":
+    case "start_composing":
+    case "start_style":
+    case "start_translation": return tr("startingRole", "Loading role")
     case "apply_style": return tr("applyingStyle", "Applying style")
     case "get_preview":
     case "generate_preview": return tr("previewingSlides", "Previewing slides")
@@ -93,9 +98,8 @@ export function activityLabel(tool: string, input?: Record<string, unknown>, t?:
     case "analyze_template": return tr("analyzingTemplate", "Analyzing template")
     case "list_styles": return tr("browsingStyles", "Browsing styles")
     case "list_guides": return tr("listingGuides", "Listing guides")
-    case "list_workflows": return tr("listingWorkflows", "Listing workflows")
     case "list_templates": return tr("listingTemplates", "Listing templates")
-    case "init_presentation": return tr("initializingDeck", "Initializing deck")
+    case "init_deck_workspace": return tr("initializingDeck", "Initializing deck")
     default: return tr("thinking", "Thinking")
   }
 }

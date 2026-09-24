@@ -77,7 +77,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const sessionIdRef = useRef(sessionId)
   sessionIdRef.current = sessionId
   // Mid-stream guard: when a deck is created while the agent is still
-  // streaming (init_presentation in the import-pptx guide), the parent
+  // streaming (init_deck_workspace in the import-pptx guide), the parent
   // re-renders with a fresh chatSessionId. Swapping sessionId here would
   // re-trigger history loading and clobber the in-flight messages
   // (toolUses disappear from the UI). Defer the swap until streaming
@@ -173,15 +173,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       onPreviewInvalidated()
     }
 
-    // Workflow phase detection
-    if (onWorkflowPhase && (toolName === "read_workflows" || toolName.endsWith("_read_workflows"))) {
-      const names = (toolUseData?.input?.names || []) as string[]
-      const first = names[0] || ""
-      if (first.includes("briefing")) onWorkflowPhase("brief")
-      else if (first.includes("outline")) onWorkflowPhase("outline")
-      else if (first.includes("art-direction")) onWorkflowPhase("artDirection")
-      else if (first.includes("compose")) onWorkflowPhase("slides")
-    }
     if (onWorkflowPhase && (toolName === "compose_slides" || toolName.endsWith("_compose_slides"))) {
       onWorkflowPhase("slides")
       saveLocalChat()
@@ -331,7 +322,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (!IS_LOCAL || !deckId || deckId === "new") return
     // Skip reconnect when this ChatPanel is already streaming via
     // /api/agent/invoke. Without this guard, the deckId prop swap from
-    // "new" → real deckId after init_presentation triggers a second SSE
+    // "new" → real deckId after init_deck_workspace triggers a second SSE
     // consumer (EventSource), which reads the same stream alongside the
     // in-flight fetch — every chunk lands in setMessages twice and the
     // tool cards / text either get clobbered or duplicated mid-stream.
