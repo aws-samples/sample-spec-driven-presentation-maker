@@ -1172,6 +1172,8 @@ def load_slides_json_or_pptx(path) -> dict:
             )
             # New deck-structure output: deck.json + slides/slide-NN.json
             return _load_deck_as_roundtrip(Path(tmpdir))
+    from sdpm.engine.schema import is_comment_element
+
     with open(path) as f:
         data = json.load(f)
     # Check if this is a source JSON (not already a roundtrip JSON) by looking
@@ -1180,7 +1182,7 @@ def load_slides_json_or_pptx(path) -> dict:
         any(k in el for k in ("text", "src", "chartData", "include"))
         for s in data.get("slides", [])
         for el in s.get("elements", [])
-        if not isinstance(el, str) and "_comment" not in el
+        if not is_comment_element(el) and not isinstance(el, str)
     )
     # Also treat as source if slides have layout/title but no elements (title, agenda, section, etc.)
     if not is_source:
