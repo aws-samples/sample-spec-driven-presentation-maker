@@ -315,22 +315,6 @@ def arch_diagram(
     )
 
 
-def diff_pptx(
-    baseline: Annotated[str, Field(description='The deck directory (or its slides JSON / generated PPTX).')],
-    edited: Annotated[str, Field(description='The PPTX the user edited.')],
-) -> dict[str, Any]:
-    """Compare a deck with a PPTX the user hand-edited in PowerPoint and report the changes
-    per slide. Apply them to the slide JSON before regenerating or they are lost.
-    Procedure: read_guides(["hand-edit-sync"]).
-    """
-    from sdpm.api import diff_report
-
-    for p in (baseline, edited):
-        if not Path(p).exists():
-            raise FileNotFoundError(f"Not found: {p}")
-    return diff_report(baseline, edited)
-
-
 def _guide_names() -> list[str]:
     from sdpm.knowledge.reference import list_category
 

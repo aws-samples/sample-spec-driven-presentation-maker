@@ -54,11 +54,8 @@ _ORCHESTRATOR_ENVIRONMENT = [
 # Tool allowlists — explicit control over which MCP tools each mode can use.
 # run_style_python is only available to style_creator.
 #
-# diff_pptx is deliberately absent: the hand-edit sync workflow is a local/CLI
-# capability, and servers/remote does not bind the tool. Listing it here only
-# produced a "not found on MCP server" warning on every request. The tool is
-# slated for removal, so the workflow document carries the same note rather than
-# the cloud path growing an implementation.
+# Hand-edit sync (diff) is a CLI capability, not an MCP tool; the hand-edit-sync
+# guide says how to run it from a checkout.
 # start_* are deliberately absent: the role document is already in the system
 # prompt (and start_presentation's environment in the history), so exposing them
 # would only invite a redundant call.

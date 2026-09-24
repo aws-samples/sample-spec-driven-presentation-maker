@@ -141,6 +141,9 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- `grid` accepts `rows` / `columns` given as an int (`"rows": 1`) or a token list;
+  the int form crashed the tool in a real composer run.
+
 - **A typed element carrying `_comment` is built, not dropped.** The builder,
   diff and lint treated *any* element with a `_comment` key as a comment-only
   entry and skipped it, although `slide-json-spec` says the key may be used
@@ -253,6 +256,9 @@ Entries before v0.5.0 were written retroactively as summaries.
 ### Removed
 
 - **`list_guides`.** `read_guides`' description lists the guide catalogue.
+- **`diff_pptx` as an MCP tool.** Hand-edit sync stays a CLI operation
+  (`pptx_builder.py diff_pptx`), as the `hand-edit-sync` guide now says; it was
+  never bound on the remote server and was marked for removal.
 - **`read_workflows` / `list_workflows`.** Role documents are delivered by the
   `start_*` entry tools (and the CLI `start` subcommand); the spec is a guide.
   A client that still calls `read_workflows(["orchestrator"])` should call

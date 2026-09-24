@@ -60,7 +60,6 @@ mcp.tool()(tools.read_guides)
 mcp.tool()(tools.code_to_slide)
 mcp.tool()(tools.grid)
 mcp.tool()(tools.arch_diagram)
-mcp.tool()(tools.diff_pptx)
 
 # Attachment tools (stateless pipeline)
 mcp.tool()(read_attachment)

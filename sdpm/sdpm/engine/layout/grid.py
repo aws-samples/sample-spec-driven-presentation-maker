@@ -85,14 +85,17 @@ def _expand_repeat(track_str: str) -> str:
     return re.sub(r"repeat\(\s*(\d+)\s*,\s*([^)]+)\)", _replace, track_str)
 
 
-def _resolve_tracks(track_str: str, available: int, gap: int) -> list[int]:
+def _resolve_tracks(track_str: str | int | list, available: int, gap: int) -> list[int]:
     """Parse track-list and resolve to pixel sizes.
 
     Supported syntax: fr (e.g. "1fr", "2fr"), px (e.g. "280px"),
     % (e.g. "50%" — percentage of available space before gap subtraction),
-    repeat(n, X) (e.g. "repeat(3, 1fr)"), or a bare integer (equal split).
+    repeat(n, X) (e.g. "repeat(3, 1fr)"), or a bare integer (equal split) — given
+    as a string or as an int (``"rows": 1``), or as a list of tokens.
     """
-    track_str = track_str.strip()
+    if isinstance(track_str, (list, tuple)):
+        track_str = " ".join(str(t) for t in track_str)
+    track_str = str(track_str).strip()
 
     # Expand repeat() before tokenizing
     track_str = _expand_repeat(track_str)

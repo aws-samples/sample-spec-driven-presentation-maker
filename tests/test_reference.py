@@ -47,6 +47,7 @@ def test_reference_vocabulary_is_environment_neutral():
     allowed_cli = {
         references / "guides" / "setup.md",
         references / "guides" / "arch-layout-engine.md",
+        references / "guides" / "hand-edit-sync.md",  # diff runs from the checkout (CLI-only)
     }
     banned = ("pptx_builder.py", "uv run", "read_workflows", "init_presentation")
 

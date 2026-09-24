@@ -319,7 +319,7 @@ def _check_deck_access(deck_id: str, action: str = "read") -> None:
 # here is where things live: styles/templates are per user on S3, and a deck has
 # to be materialised into a temporary directory before the core can read it.
 # start_translation is not bound — the translate workflow runs scripts from a
-# checkout and has no cloud path (same reasoning as diff_pptx).
+# checkout and has no cloud path (hand-edit sync is CLI-only for the same reason).
 
 
 _MATERIALIZE_FILES = {"deck.json", "specs/brief.md", "specs/outline.md", "specs/art-direction.html"}

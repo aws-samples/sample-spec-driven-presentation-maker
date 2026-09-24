@@ -184,3 +184,13 @@ class TestOverrideGroups:
         outline.write_text(outline.read_text() + "- [demo] X\n  - body: b\n  - visual: v\n  - evidence: e\n", encoding="utf-8")
         existing = tools.start_composing(str(deck), ["demo-2"])["deck"]["existing_slides"]
         assert set(existing) == {"demo-1", "demo-2"}
+
+
+def test_grid_accepts_int_and_list_tracks():
+    """A composer passed rows=1 (int) and the tool crashed; ints and token lists must work."""
+    import json
+
+    a = tools.grid("t", json.dumps({"area": {"x": 120, "y": 372, "w": 1680, "h": 185}, "columns": "90px 1fr 330px", "rows": 1, "gap": 30}))
+    b = tools.grid("t", json.dumps({"area": {"x": 120, "y": 372, "w": 1680, "h": 185}, "columns": ["90px", "1fr", "330px"], "rows": "1", "gap": "30"}))
+    assert "error" not in a and a == b
+    assert a["r0c1"]["x"] == 240 and a["r0c1"]["w"] == 1200 and a["r0c2"]["x"] == 1470

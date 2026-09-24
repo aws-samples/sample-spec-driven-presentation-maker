@@ -24,7 +24,6 @@ _FULL_ORCHESTRATOR = {
     "@sdpm/arch_diagram",
     "@sdpm/check_specs",
     "@sdpm/code_to_slide",
-    "@sdpm/diff_pptx",
     "@sdpm/generate_pptx",
     "@sdpm/grid",
     "@sdpm/hearing",
@@ -44,7 +43,6 @@ _COMPOSER = (_FULL_ORCHESTRATOR - {
     "web_fetch",
     "web_search",
     "@sdpm/hearing",
-    "@sdpm/diff_pptx",
     "@sdpm/start_presentation",
     "@sdpm/start_translation",
 }) | {"@sdpm/start_composing"}
