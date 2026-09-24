@@ -14,8 +14,10 @@ that local-facing regressions slip through the mocked unit suite).
 Run: uv run python scripts/smoke_local.py  (or: make smoke)
 """
 
+import argparse
 import asyncio
 import json
+import shlex
 import sys
 from pathlib import Path
 
@@ -29,11 +31,16 @@ def _text(result) -> str:
     return "".join(c.text for c in result.content if getattr(c, "text", None))
 
 
-async def main() -> None:
-    params = StdioServerParameters(
-        command="uv",
-        args=["run", "--directory", str(ROOT / "servers" / "local"), "python", "server.py"],
-    )
+async def main(command: str | None = None) -> None:
+    if command:
+        command_parts = shlex.split(command)
+        if not command_parts:
+            raise ValueError("--command must not be empty")
+    else:
+        command_parts = [
+            "uv", "run", "--directory", str(ROOT / "servers" / "local"), "python", "server.py",
+        ]
+    params = StdioServerParameters(command=command_parts[0], args=command_parts[1:])
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
@@ -65,8 +72,14 @@ _TIMEOUT_SECONDS = 120
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--command",
+        help="server command to execute (default: checkout-based uv run)",
+    )
+    args = parser.parse_args()
     try:
-        asyncio.run(asyncio.wait_for(main(), timeout=_TIMEOUT_SECONDS))
+        asyncio.run(asyncio.wait_for(main(args.command), timeout=_TIMEOUT_SECONDS))
     except AssertionError as e:
         print(f"SMOKE FAILED: {e}", file=sys.stderr)
         sys.exit(1)

@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "sdpm-skill"
 dynamic = ["version"]
@@ -12,11 +16,20 @@ dependencies = [
     "defusedxml",
 ]
 
-[tool.setuptools.packages.find]
-include = ["sdpm*"]
+[tool.hatch.version]
+path = "sdpm/__init__.py"
 
-[tool.setuptools.dynamic]
-version = {attr = "sdpm.__version__"}
+[tool.hatch.build]
+exclude = [
+    "**/.DS_Store",
+    "assets/config.example.json",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["sdpm"]
+
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
 
 [dependency-groups]
 dev = [

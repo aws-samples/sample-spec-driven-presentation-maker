@@ -21,13 +21,14 @@ from typing import Annotated
 
 from pydantic import Field
 
-# Add sdpm/ (skill root) to sys.path so sdpm package is importable
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+# Prefer checkout sources only when this file is running from the repository.
+# Installed wheels resolve sdpm and shared from their normal site-packages paths.
+_HERE = Path(__file__).resolve().parent
+_REPO_ROOT = _HERE.parents[1]
 _SKILL_DIR = _REPO_ROOT / "sdpm"
-sys.path.insert(0, str(_SKILL_DIR))
-
-# Add project root to sys.path so shared/ package is importable
-sys.path.insert(0, str(_REPO_ROOT))
+if (_SKILL_DIR / "sdpm" / "config.py").is_file():
+    sys.path.insert(0, str(_SKILL_DIR))
+    sys.path.insert(0, str(_REPO_ROOT))
 
 import sandbox_tools  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
@@ -95,5 +96,10 @@ def list_styles(
     return tools.list_styles(include_all=include_all)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Run the local MCP server over stdio."""
     mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()

@@ -73,8 +73,13 @@ Rules that follow from this:
    `sdpm/sdpm/engine/`; a new client touches only `clients/`; a new tool
    touches only `sdpm/sdpm/tools/`.
 
-Known debt against this philosophy (tracked for v0.5.x):
-`api/index.py` has no test coverage.
+Known debt against this philosophy:
+- `api/index.py` has no test coverage (tracked for v0.5.x).
+- `sdpm.tools.attachment.pipeline` imports the repository-level `shared` package,
+  so the core currently depends outward on shared application code. The sdpm wheel
+  bundles `shared` to preserve that existing dependency; a future package-boundary
+  cleanup should move the required attachment logic inward before PyPI publication.
+
 (v0.5.2 resolved: `converter/elements.py` monolith → `converter/elements/`
 package with an enforced dependency DAG; scale state → ContextVar scope.)
 

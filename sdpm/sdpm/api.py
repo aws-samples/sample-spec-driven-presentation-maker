@@ -1209,6 +1209,13 @@ def load_slides_json_or_pptx(path) -> dict:
 
     from sdpm.config import SCRIPTS_DIR
 
+    converter_script = SCRIPTS_DIR / "pptx_to_json.py"
+    converter_command = (
+        [sys.executable, str(converter_script)]
+        if converter_script.is_file()
+        else [sys.executable, "-m", "sdpm.engine.converter"]
+    )
+
     path_obj = Path(path)
     if path_obj.is_dir():
         # Deck-structure directory (deck.json + slides/*.json + specs/outline.md):
@@ -1220,7 +1227,7 @@ def load_slides_json_or_pptx(path) -> dict:
             generate(path_obj, output_path=tmp_pptx)
             rt_dir = Path(tmpdir) / "rt"
             subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                [sys.executable, str(SCRIPTS_DIR / "pptx_to_json.py"), str(tmp_pptx), "-o", str(rt_dir)],
+                [*converter_command, str(tmp_pptx), "-o", str(rt_dir)],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -1229,7 +1236,7 @@ def load_slides_json_or_pptx(path) -> dict:
     if str(path).endswith(".pptx"):
         with tempfile.TemporaryDirectory() as tmpdir:
             subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                [sys.executable, str(SCRIPTS_DIR / "pptx_to_json.py"), path, "-o", tmpdir],
+                [*converter_command, path, "-o", tmpdir],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -1282,7 +1289,7 @@ def load_slides_json_or_pptx(path) -> dict:
                 builder.add_slide(resolve_override(slide_def, id_map))
             builder.save(tmp_pptx)
             subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                [sys.executable, str(SCRIPTS_DIR / "pptx_to_json.py"), str(tmp_pptx), "-o", tmpdir],
+                [*converter_command, str(tmp_pptx), "-o", tmpdir],
                 capture_output=True,
                 text=True,
                 check=True,

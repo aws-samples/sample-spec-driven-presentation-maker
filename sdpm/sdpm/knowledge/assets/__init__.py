@@ -15,8 +15,9 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from sdpm.config import ASSETS_DIR, get_extra_sources, get_user_config_dir
+from sdpm.config import ASSETS_DIR, assets_install_dir, get_extra_sources, get_user_config_dir
 from sdpm.utils.svg import _recolor_svg  # noqa: F401 - re-exported for builder
+from .download import install_assets  # noqa: F401 - public asset installation API
 _KNOWN_EXTS = (".svg", ".png", ".gif", ".jpg", ".jpeg")
 
 
@@ -144,17 +145,20 @@ def _load_manifests() -> list[dict]:
 
 
 def _assets_not_installed_error() -> None:
-    """Print asset installation instructions and exit."""
+    """Print mode-appropriate asset installation instructions and exit."""
     print("=" * 60, file=sys.stderr)
     print("CRITICAL: Assets not installed. Cannot continue.", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
     print("", file=sys.stderr)
     print("Assets are required for slide generation.", file=sys.stderr)
     print("", file=sys.stderr)
-    print("  Run: uv run python3 scripts/download_aws_icons.py", file=sys.stderr)
-    print("  Run: uv run python3 scripts/download_material_icons.py", file=sys.stderr)
+    if assets_install_dir() != ASSETS_DIR:
+        print("  Run: sdpm-install-assets", file=sys.stderr)
+    else:
+        print("  Run: uv run python3 scripts/download_aws_icons.py", file=sys.stderr)
+        print("  Run: uv run python3 scripts/download_material_icons.py", file=sys.stderr)
     print("", file=sys.stderr)
-    print("Stop current work and ask the user which option to use.", file=sys.stderr)
+    print("Stop current work and install the required assets.", file=sys.stderr)
     sys.exit(1)
 
 
