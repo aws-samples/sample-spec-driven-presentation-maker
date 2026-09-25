@@ -16,7 +16,7 @@ _WORKFLOW_PROSE = ("# Role", "Layout pass.", "specs/brief.md", "## Skeleton")
 
 @pytest.mark.parametrize("fn", prompts.PROMPTS, ids=lambda f: f.__name__)
 def test_prompt_names_an_entry_tool_and_nothing_more(fn):
-    kwargs = {"deck_id": "/tmp/deck", "language": "ja"} if fn is prompts.translate else {}
+    kwargs = {"deck_id": "decks/example", "language": "ja"} if fn is prompts.translate else {}
     text = fn(**kwargs)
     assert re.search(r"`start_(presentation|style|translation)\(", text)
     assert "follow the role document it returns" in text
