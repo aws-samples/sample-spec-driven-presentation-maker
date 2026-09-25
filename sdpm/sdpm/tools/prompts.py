@@ -58,7 +58,14 @@ def translate(
 PROMPTS = (vibe, spec, style, translate)
 
 
+# Registered with an ``sdpm-`` prefix: some clients (Kiro CLI's slash menu) list
+# prompts by bare name across all servers, where ``spec`` or ``style`` alone would
+# be ambiguous. Clients that namespace by server show ``/mcp__sdpm__sdpm-vibe``;
+# the redundancy there is the cheaper of the two problems.
+PREFIX = "sdpm-"
+
+
 def register(mcp) -> None:
     """Bind every prompt on a FastMCP/MCPServer instance."""
     for fn in PROMPTS:
-        mcp.prompt(name=fn.__name__, description=fn.__doc__)(fn)
+        mcp.prompt(name=PREFIX + fn.__name__, description=fn.__doc__)(fn)

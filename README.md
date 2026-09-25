@@ -66,10 +66,10 @@ load the MCP server and the skill entry points together.
 
 **Picking a mode.** Just asking for slides is enough — the agent calls `start_presentation`
 and follows it. To choose explicitly, use the server's prompts where your client shows them:
-`vibe` (build from material, no questions), `spec` (shape the deck in dialogue first),
-`style` (a reusable style guide), `translate` (a language variant of a deck) — Claude
-Desktop's "+" menu, Claude Code `/mcp__sdpm__vibe`, VS Code `/mcp.sdpm.vibe`, Kiro CLI
-`@sdpm/vibe`. Each prompt only names the role's entry tool; the behavior itself still lives in
+`sdpm-vibe` (build from material, no questions), `sdpm-spec` (shape the deck in dialogue
+first), `sdpm-style` (a reusable style guide), `sdpm-translate` (a language variant of a deck) — Claude
+Desktop's "+" menu, Claude Code `/mcp__sdpm__sdpm-vibe`, VS Code `/mcp.sdpm.sdpm-vibe`, Kiro CLI
+`/sdpm-vibe`. Each prompt only names the role's entry tool; the behavior itself still lives in
 `sdpm/references/workflows/`, in one place.
 
 **Prerequisites for local use:** [`uv`](https://docs.astral.sh/uv/) on your `PATH`, plus

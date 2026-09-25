@@ -48,4 +48,4 @@ def test_prompts_are_registered_on_the_local_server():
     finally:
         for p in (str(local), str(_ROOT / "sdpm")):
             sys.path.remove(p)
-    assert names == {"vibe", "spec", "style", "translate"}
+    assert names == {"sdpm-vibe", "sdpm-spec", "sdpm-style", "sdpm-translate"}
