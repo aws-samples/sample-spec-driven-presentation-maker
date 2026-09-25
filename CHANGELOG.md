@@ -28,6 +28,11 @@ Entries before v0.5.0 were written retroactively as summaries.
   in 9/9 trials on Kiro CLI and 9/9 on Claude Code (previously 7/9
   `read_workflows`, 1/9 straight to `init_presentation`, 1/9 no tool at all).
   The CLI has a matching `start <role>` subcommand.
+- **`apply_style` returns `style_toc`** — a line-numbered map of the style file
+  (one entry per `<style>` block and per `.slide`: line, classes, preceding
+  comments, first visible text) so the orchestrator reads the rules and outline
+  guidance it needs with one `run_python` `read_text` + line slice. Structural
+  only: no dependence on the Part convention a user-authored style may skip.
 - `SDPM_DISABLE_INSTRUCTIONS=1` serves no MCP server instructions — nothing
   depends on them any more; the entry tools' own descriptions carry the routing.
 
@@ -38,8 +43,8 @@ Entries before v0.5.0 were written retroactively as summaries.
   `lecture`) is removed: purpose belongs to the outline, not the style, and
   those five differed from each other only by accent hue. Each style is a
   rulebook, reference and gallery sample in one file: a design decision with
-  DO / DON'T rules derived from it, a Message & Outline part (deck length,
-  per-slide density, title grammar, chapter shape), palette and type ramp with
+  DO / DON'T rules derived from it, a Message & Outline part (per-slide
+  density, title grammar, chapter shape), palette and type ramp with
   usage rules, the repeated frame, and 8–12 annotated pattern slides showing how
   *that* style builds numbers, comparisons, processes, tables, charts and more.
   All styles define `--color-text` (read by `apply_style`) and `--fs-*` sizes (read
@@ -186,6 +191,15 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **`start_presentation` / `start_style` return every style, `pinned` flagged.**
+  The pin filter is a gallery concern; the role picking a style sees the whole
+  catalogue with the user's favourites marked. `list_styles` keeps its
+  pinned-by-default behaviour.
+- **Bundled styles no longer prescribe a slide count.** 13 of 15 stated a range
+  (often with a "20-minute talk" assumption). Length follows the brief and the
+  material; a style states per-slide density and chapter shape. The ranges are
+  rephrased as density statements in each style's voice; the style workflow's
+  Part 3 contract and the orchestrator say the same.
 - **`init_presentation` → `init_deck_workspace`.** The old name read like the
   place to start and competed with the entry tool; the tool only creates
   `deck.json`, `slides/` and `specs/`. Same signature and result.
