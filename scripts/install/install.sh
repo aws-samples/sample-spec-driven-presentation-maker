@@ -7,12 +7,14 @@
 set -uo pipefail
 
 INSTALLER_VERSION="0.1.0"
-REPO_URL="https://github.com/aws-samples/sample-spec-driven-presentation-maker.git"
+REPO_URL="${SDPM_REPO_URL:-https://github.com/aws-samples/sample-spec-driven-presentation-maker.git}"
 REPO_HELP="https://github.com/aws-samples/sample-spec-driven-presentation-maker"
 SDPM_HOME="${SDPM_HOME:-$HOME/.sdpm}"
 CHECKOUT="$SDPM_HOME/checkout"
 LAUNCHER_DIR="${SDPM_LAUNCHER_DIR:-$HOME/.local/bin}"
 DEPS_ONLY=0
+PROFILE="${SDPM_PROFILE:-}"          # full | mcp ; asked interactively when empty
+REGISTER="${SDPM_REGISTER:-ask}"     # ask | yes | no
 NON_INTERACTIVE="${SDPM_NON_INTERACTIVE:-0}"
 SKIP_LIBREOFFICE="${SDPM_SKIP_LIBREOFFICE:-0}"
 SKIP_SHORTCUT="${SDPM_SKIP_SHORTCUT:-0}"
@@ -23,8 +25,12 @@ usage() {
 Usage: install.sh [OPTIONS]
 
 Options:
+  --full               Install the MCP server and the browser Web UI (needs Node.js)
+  --mcp-only           Install the MCP server only (no Node.js, no Web UI)
+  --register           Register the MCP server with every detected client without asking
+  --no-register        Skip client registration (print the configuration instead)
   --deps-only          Install git, uv, LibreOffice, and poppler only
-  --non-interactive    Accept dependency installation prompts
+  --non-interactive    Accept dependency installation prompts; default profile: full
   --skip-libreoffice   Do not check or install LibreOffice
   --skip-shortcut      Do not create a desktop shortcut
   -h, --help           Show this help
@@ -32,6 +38,9 @@ Options:
 Environment:
   SDPM_HOME                 Installation root (default: ~/.sdpm)
   SDPM_LAUNCHER_DIR         Launcher directory (default: ~/.local/bin)
+  SDPM_PROFILE=full|mcp     Same as --full / --mcp-only
+  SDPM_REPO_URL             Clone source (default: the GitHub repository; CI/testing)
+  SDPM_REGISTER=yes|no      Same as --register / --no-register
   SDPM_NON_INTERACTIVE=1    Same as --non-interactive
   SDPM_SKIP_LIBREOFFICE=1   Same as --skip-libreoffice
   SDPM_SKIP_SHORTCUT=1      Same as --skip-shortcut
@@ -40,6 +49,10 @@ HELP
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --full) PROFILE=full ;;
+    --mcp-only) PROFILE=mcp ;;
+    --register) REGISTER=yes ;;
+    --no-register) REGISTER=no ;;
     --deps-only) DEPS_ONLY=1 ;;
     --non-interactive) NON_INTERACTIVE=1 ;;
     --skip-libreoffice) SKIP_LIBREOFFICE=1 ;;
@@ -115,7 +128,7 @@ scan_dependencies() {
   fi
   if has_command pdftoppm; then add_dep "poppler" "$(pdftoppm -v 2>&1 | head -1)" 1 "PDF previews" "https://poppler.freedesktop.org/"
   else add_dep "poppler" "" 0 "PDF previews" "https://poppler.freedesktop.org/"; fi
-  if [[ "$DEPS_ONLY" != "1" ]]; then
+  if [[ "$DEPS_ONLY" != "1" && "$PROFILE" == "full" ]]; then
     if has_command node; then
       local node_version node_major
       node_version="$(node --version)"; node_major="${node_version#v}"; node_major="${node_major%%.*}"
@@ -230,9 +243,13 @@ setup_checkout() {
 }
 
 setup_packages() {
-  start_step "Syncing local MCP dependencies" "servers/local"
-  if run_with_spinner "uv sync --directory '$CHECKOUT/servers/local'"; then complete_step "MCP dependencies synced ($LAST_ELAPSED)"
+  start_step "Syncing the MCP server environment" "servers/local"
+  if run_with_spinner "uv sync --directory '$CHECKOUT/servers/local'"; then complete_step "MCP server ready ($LAST_ELAPSED)"
   else fail_step "uv sync failed" "$LAST_LOG" "$REPO_HELP/blob/main/docs/en/getting-started.md"; exit 1; fi
+  echo "$PROFILE" > "$SDPM_HOME/.profile"
+  local uv_path; uv_path="$(command -v uv)"   # absolute; symlinks kept (brew's bin/uv is the stable path)
+  echo "$uv_path" > "$SDPM_HOME/.uv-path"
+  [[ "$PROFILE" == "full" ]] || return 0
 
   start_step "Installing Web UI dependencies" "npm ci"
   if run_with_spinner "npm ci" "$CHECKOUT/web-ui"; then complete_step "Web UI dependencies installed ($LAST_ELAPSED)"
@@ -269,7 +286,7 @@ setup_shortcut() {
   if [[ "$OS_TYPE" == "macos" ]]; then
     local desktop="$HOME/Desktop"
     if [[ ! -d "$desktop" ]]; then complete_step "Desktop folder not found; shortcut skipped"; return; fi
-    printf '#!/bin/bash\nexec "%s/sdpm" launch\n' "$LAUNCHER_DIR" > "$desktop/SDPM.command"
+    printf '#!/bin/bash\nexec "%s/sdpm" webui\n' "$LAUNCHER_DIR" > "$desktop/SDPM.command"
     chmod +x "$desktop/SDPM.command"
   else
     local apps="$HOME/.local/share/applications"
@@ -279,7 +296,7 @@ setup_shortcut() {
 Type=Application
 Name=SDPM
 Comment=Spec-Driven Presentation Maker
-Exec=$LAUNCHER_DIR/sdpm launch
+Exec=$LAUNCHER_DIR/sdpm webui
 Terminal=true
 Categories=Office;Presentation;
 EOF
@@ -288,11 +305,40 @@ EOF
   complete_step "Desktop shortcut created"
 }
 
+choose_profile() {
+  [[ -n "$PROFILE" ]] && return 0
+  if [[ "$NON_INTERACTIVE" == "1" ]]; then PROFILE=full; return 0; fi
+  echo ""
+  echo "  SDPM has two surfaces on one installation:"
+  echo "    - your own AI agent (Kiro CLI, Claude Code, Cursor, ...) through the MCP server"
+  echo "    - a browser Web UI (needs Node.js 20+; adds a few minutes of build time)"
+  if show_confirm "Also install the browser Web UI? [Y/n]"; then PROFILE=full; else PROFILE=mcp; fi
+}
+
+register_clients() {
+  [[ "$REGISTER" == "no" ]] && { "$LAUNCHER_DIR/sdpm" mcp-config || true; return 0; }
+  echo ""
+  if [[ "$REGISTER" == "yes" || "$NON_INTERACTIVE" == "1" ]]; then
+    if [[ "$REGISTER" == "yes" ]]; then "$LAUNCHER_DIR/sdpm" register --yes || true
+    else "$LAUNCHER_DIR/sdpm" mcp-config || true; fi
+    return 0
+  fi
+  echo "  Connect your MCP clients now? Each one is asked separately; nothing is written"
+  echo "  without your yes, and 'sdpm register' does the same later."
+  "$LAUNCHER_DIR/sdpm" register || true
+}
+
 show_completion() {
-  echo ""; printf "  ${C_GREEN}SDPM setup is complete.${C_RESET}\n\n"
-  echo "    1. Authenticate once: kiro-cli login"
-  echo "    2. Launch the Web UI: $LAUNCHER_DIR/sdpm launch"
-  echo "    3. Open http://localhost:3000 (the launcher opens it automatically)"
+  echo ""; printf "  ${C_GREEN}SDPM is installed.${C_RESET}\n\n"
+  echo "    Your agent:   ask it \"Make slides about ...\" — it finds SDPM through MCP."
+  if [[ "$PROFILE" == "full" ]]; then
+    echo "    Browser:      sdpm webui"
+    kiro-cli whoami >/dev/null 2>&1 || echo "                  (the Web UI uses Kiro CLI: run 'kiro-cli login' once first)"
+  else
+    echo "    Browser:      not installed — add it any time with 'sdpm update --with-webui'"
+  fi
+  echo "    Later:        sdpm            status      sdpm register   connect more clients"
+  echo "                  sdpm update     upgrade     sdpm uninstall  remove"
   echo ""; echo "    Checkout: $CHECKOUT"
   if [[ ":$PATH:" != *":$LAUNCHER_DIR:"* ]]; then
     printf "    ${C_YELLOW}Add %s to PATH to run 'sdpm' directly.${C_RESET}\n" "$LAUNCHER_DIR"
@@ -301,9 +347,13 @@ show_completion() {
 
 main() {
   show_header "SDPM Setup" "$INSTALLER_VERSION"
+  [[ "$DEPS_ONLY" == "1" ]] || choose_profile
   scan_dependencies
   TOTAL_STEPS=0
-  [[ "$DEPS_ONLY" == "1" ]] || TOTAL_STEPS=$((7 + (SKIP_SHORTCUT == 1 ? 0 : 1)))
+  if [[ "$DEPS_ONLY" != "1" ]]; then
+    TOTAL_STEPS=5
+    [[ "$PROFILE" == "full" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 2 + (SKIP_SHORTCUT == 1 ? 0 : 1)))
+  fi
   install_missing_dependencies
   if [[ "$DEPS_ONLY" == "1" ]]; then
     echo ""; printf "  ${C_GREEN}Dependency setup complete.${C_RESET}\n"; uv --version; return
@@ -313,12 +363,8 @@ main() {
   setup_icon_set "AWS Architecture" "$CHECKOUT/sdpm/assets/aws/manifest.json" "$CHECKOUT/sdpm/scripts/download_aws_icons.py"
   setup_icon_set "Material Symbols" "$CHECKOUT/sdpm/assets/material/manifest.json" "$CHECKOUT/sdpm/scripts/download_material_icons.py"
   setup_launcher
-  setup_shortcut
-  if kiro-cli whoami >/dev/null 2>&1; then
-    printf "    ${C_GREEN}✓${C_RESET} Kiro CLI is authenticated.\n"
-  else
-    printf "    ${C_YELLOW}! Run 'kiro-cli login' before the first launch.${C_RESET}\n"
-  fi
+  [[ "$PROFILE" == "full" ]] && setup_shortcut
+  register_clients
   show_completion
 }
 

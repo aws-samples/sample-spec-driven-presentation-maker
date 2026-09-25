@@ -83,7 +83,6 @@ mcp.tool()(sandbox_tools.run_style_python)
 
 
 @mcp.tool()
-@mcp.tool()
 def list_styles(
     include_all: Annotated[bool, Field(description='Include styles hidden by the pin filter.')] = False,
 ) -> dict:

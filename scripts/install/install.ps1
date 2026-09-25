@@ -4,6 +4,10 @@
 # irm | iex entry point.
 [CmdletBinding()]
 param(
+    [switch]$Full,
+    [switch]$McpOnly,
+    [switch]$Register,
+    [switch]$NoRegister,
     [switch]$DepsOnly,
     [switch]$NonInteractive,
     [switch]$SkipLibreOffice,
@@ -16,8 +20,12 @@ $ErrorActionPreference = "Stop"
 $script:NonInteractive = $NonInteractive -or $env:SDPM_NON_INTERACTIVE -eq "1"
 if ($env:SDPM_SKIP_LIBREOFFICE -eq "1") { $SkipLibreOffice = $true }
 if ($env:SDPM_SKIP_SHORTCUT -eq "1") { $SkipShortcut = $true }
+# Profile: full | mcp. Asked interactively when neither switch nor SDPM_PROFILE is given.
+$script:Profile = if ($Full) { "full" } elseif ($McpOnly) { "mcp" } elseif ($env:SDPM_PROFILE) { $env:SDPM_PROFILE } else { "" }
+# Registration: ask | yes | no
+$script:RegisterMode = if ($Register) { "yes" } elseif ($NoRegister) { "no" } elseif ($env:SDPM_REGISTER) { $env:SDPM_REGISTER } else { "ask" }
 $InstallerVersion = "0.1.0"
-$RepoUrl = "https://github.com/aws-samples/sample-spec-driven-presentation-maker.git"
+$RepoUrl = if ($env:SDPM_REPO_URL) { $env:SDPM_REPO_URL } else { "https://github.com/aws-samples/sample-spec-driven-presentation-maker.git" }
 $RepoHelp = "https://github.com/aws-samples/sample-spec-driven-presentation-maker"
 $SdpmHome = if ($env:SDPM_HOME) { $env:SDPM_HOME } else { Join-Path $env:USERPROFILE ".sdpm" }
 $Checkout = Join-Path $SdpmHome "checkout"
@@ -40,7 +48,7 @@ function Get-Dependencies {
         $items += @{ Name="LibreOffice"; Found=(Test-Path $soffice); Version=$(if (Test-Path $soffice) { "installed" } else { "" }); Reason="slide previews"; Id="TheDocumentFoundation.LibreOffice"; Url="https://www.libreoffice.org/download/" }
     }
     $items += @{ Name="poppler"; Found=(Has-Command "pdftoppm"); Version=$(if (Has-Command "pdftoppm") { "installed" } else { "" }); Reason="PDF previews"; Id="oschwartz10612.Poppler"; Url="https://github.com/oschwartz10612/poppler-windows/releases" }
-    if (-not $DepsOnly) {
+    if (-not $DepsOnly -and $script:Profile -eq "full") {
         $hasNode = Has-Command "node"
         $nodeVersion = if ($hasNode) { (& node --version).TrimStart('v') } else { "" }
         $nodeSupported = $hasNode -and ([int]($nodeVersion -split '\.')[0] -ge 20)
@@ -144,10 +152,13 @@ function Setup-Checkout {
 }
 
 function Setup-Packages {
-    Start-Step "Syncing local MCP dependencies" "servers/local"
+    Start-Step "Syncing the MCP server environment" "servers/local"
     $result = Run-WithSpinner -Exe "uv" -Arguments @("sync", "--directory", (Join-Path $Checkout "servers\local"))
     if (-not $result.Success) { Fail-Step "uv sync failed" $result.Output "$RepoHelp/blob/main/docs/en/getting-started.md"; exit 1 }
-    Complete-Step "MCP dependencies synced ($($result.Elapsed))"
+    Complete-Step "MCP server ready ($($result.Elapsed))"
+    $script:Profile | Set-Content -Path (Join-Path $SdpmHome ".profile") -Encoding ASCII
+    (Get-Command uv).Source | Set-Content -Path (Join-Path $SdpmHome ".uv-path") -Encoding ASCII
+    if ($script:Profile -ne "full") { return }
 
     Start-Step "Installing Web UI dependencies" "npm ci"
     $result = Run-WithSpinner -Exe "npm" -Arguments @("ci") -WorkDir (Join-Path $Checkout "web-ui")
@@ -194,25 +205,59 @@ function Setup-Shortcut {
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut((Join-Path $desktop "SDPM.lnk"))
     $shortcut.TargetPath = Join-Path $LauncherDir "sdpm.cmd"
-    $shortcut.Arguments = "launch"
+    $shortcut.Arguments = "webui"
     $shortcut.WorkingDirectory = $LauncherDir
     $shortcut.Description = "Spec-Driven Presentation Maker"
     $shortcut.Save()
     Complete-Step "Desktop shortcut created"
 }
 
+function Choose-Profile {
+    if ($script:Profile) { return }
+    if ($script:NonInteractive) { $script:Profile = "full"; return }
+    Write-Host ""
+    Write-Host "  SDPM has two surfaces on one installation:"
+    Write-Host "    - your own AI agent (Kiro CLI, Claude Code, Cursor, ...) through the MCP server"
+    Write-Host "    - a browser Web UI (needs Node.js 20+; adds a few minutes of build time)"
+    $script:Profile = if (Show-Confirm "Also install the browser Web UI?") { "full" } else { "mcp" }
+}
+
+function Invoke-Launcher {
+    param([string[]]$LauncherArgs)
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $LauncherDir "sdpm.ps1") @LauncherArgs
+}
+
+function Register-Clients {
+    Write-Host ""
+    if ($script:RegisterMode -eq "no") { try { Invoke-Launcher @("mcp-config") } catch { }; return }
+    if ($script:RegisterMode -eq "yes") { try { Invoke-Launcher @("register", "--yes") } catch { }; return }
+    if ($script:NonInteractive) { try { Invoke-Launcher @("mcp-config") } catch { }; return }
+    Write-Host "  Connect your MCP clients now? Each one is asked separately; nothing is written"
+    Write-Host "  without your yes, and 'sdpm register' does the same later."
+    try { Invoke-Launcher @("register") } catch { }
+}
+
 function Show-Completion {
-    Write-Host "`n  SDPM setup is complete.`n" -ForegroundColor Green
-    Write-Host "    1. Authenticate once: kiro-cli login"
-    Write-Host "    2. Launch the Web UI: sdpm launch"
-    Write-Host "    3. Open http://localhost:3000 (the launcher opens it automatically)"
+    Write-Host "`n  SDPM is installed.`n" -ForegroundColor Green
+    Write-Host "    Your agent:   ask it `"Make slides about ...`" - it finds SDPM through MCP."
+    if ($script:Profile -eq "full") {
+        Write-Host "    Browser:      sdpm webui"
+        & kiro-cli whoami *> $null
+        if ($LASTEXITCODE -ne 0) { Write-Host "                  (the Web UI uses Kiro CLI: run 'kiro-cli login' once first)" }
+    } else {
+        Write-Host "    Browser:      not installed - add it any time with 'sdpm update --with-webui'"
+    }
+    Write-Host "    Later:        sdpm            status      sdpm register   connect more clients"
+    Write-Host "                  sdpm update     upgrade     sdpm uninstall  remove"
     Write-Host "`n    Checkout: $Checkout"
+    Write-Host "    Open a new terminal so 'sdpm' is on PATH."
 }
 
 Show-Header -Title "SDPM Setup" -Version $InstallerVersion
 Refresh-Path
+if (-not $DepsOnly) { Choose-Profile }
 $dependencies = @(Get-Dependencies)
-$script:TotalSteps = if ($DepsOnly) { 0 } else { 7 + $(if ($SkipShortcut) { 0 } else { 1 }) }
+$script:TotalSteps = if ($DepsOnly) { 0 } elseif ($script:Profile -eq "full") { 7 + $(if ($SkipShortcut) { 0 } else { 1 }) } else { 5 }
 Install-MissingDependencies -Dependencies $dependencies
 if ($DepsOnly) { Write-Host "`n  Dependency setup complete." -ForegroundColor Green; & uv --version; return }
 Setup-Checkout
@@ -220,8 +265,6 @@ Setup-Packages
 Setup-IconSet -Name "AWS Architecture" -Manifest (Join-Path $Checkout "sdpm\assets\aws\manifest.json") -Script (Join-Path $Checkout "sdpm\scripts\download_aws_icons.py")
 Setup-IconSet -Name "Material Symbols" -Manifest (Join-Path $Checkout "sdpm\assets\material\manifest.json") -Script (Join-Path $Checkout "sdpm\scripts\download_material_icons.py")
 Setup-Launcher
-Setup-Shortcut
-& kiro-cli whoami *> $null
-if ($LASTEXITCODE -eq 0) { Write-Host "    [OK] Kiro CLI is authenticated." -ForegroundColor Green }
-else { Write-Host "    [!] Run 'kiro-cli login' before the first launch." -ForegroundColor Yellow }
+if ($script:Profile -eq "full") { Setup-Shortcut }
+Register-Clients
 Show-Completion

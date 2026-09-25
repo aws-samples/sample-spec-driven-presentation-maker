@@ -93,11 +93,8 @@ class LibreOfficeBackend:
 
 
 def detect_backend() -> LibreOfficeBackend | None:
-    """Return LibreOffice backend if available."""
-    if shutil.which("soffice") is not None:
-        return LibreOfficeBackend()
-    # Windows: LibreOffice is typically not on PATH
-    win_lo = Path(r"C:\Program Files\LibreOffice\program\soffice.exe")
-    if win_lo.exists():
-        return LibreOfficeBackend(soffice_path=str(win_lo))
-    return None
+    """Return LibreOffice backend if available (PATH, then the usual app locations)."""
+    from .environment import soffice_path
+
+    found = soffice_path()
+    return LibreOfficeBackend(soffice_path=found) if found else None

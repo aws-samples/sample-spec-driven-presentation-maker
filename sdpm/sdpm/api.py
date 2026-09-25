@@ -1008,7 +1008,11 @@ def preview(
     # PDF + pdftoppm pipeline
     pdf = out_dir / "slides.pdf"
     if not export_pdf(out, pdf, work_dir=work_dir):
-        raise RuntimeError("PDF export failed. Is LibreOffice (soffice) installed?")
+        from sdpm.engine.preview.environment import preview_environment
+
+        env = preview_environment()
+        hint = f" Install: {env['install']}" if env["missing"] else ""
+        raise RuntimeError(f"PDF export failed. Is LibreOffice (soffice) installed?{hint}")
 
     cmd = ["pdftoppm", "-png", "-scale-to", "1280", str(pdf), str(out_dir / "page")]
     result = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit

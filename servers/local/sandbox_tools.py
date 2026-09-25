@@ -190,16 +190,8 @@ def run_python(
 
                 # Export SVG from iso.pptx
                 svg_path: Path | None = None
-                lo = shutil.which("soffice")
-                if not lo:
-                    _lo_candidates = [
-                        Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"),
-                        Path(r"C:\Program Files\LibreOffice\program\soffice.exe"),
-                    ]
-                    for _c in _lo_candidates:
-                        if _c.exists():
-                            lo = str(_c)
-                            break
+                from sdpm.engine.preview.environment import soffice_path
+                lo = soffice_path()
 
                 if lo:
                     env = dict(os.environ)
@@ -334,7 +326,11 @@ def run_python(
                         result["measure"] = f"Measure error: {e}"
 
                 # --- Preview: PDF → PNG (slug-named) ---
-                if iso_pptx.exists():
+                from sdpm.engine.preview.environment import preview_unavailable
+                _no_preview = preview_unavailable()
+                if _no_preview is not None:
+                    result["preview"] = _no_preview
+                elif iso_pptx.exists():
                     try:
                         from sdpm.engine.preview import export_pdf
                         preview_dir = deck_dir / "preview"
