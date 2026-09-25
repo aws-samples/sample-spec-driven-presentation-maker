@@ -204,3 +204,18 @@ def test_start_presentation_returns_every_style_with_pin_flag(monkeypatch):
     names = {s["name"] for s in styles}
     assert {"report", "typographic", "briefing"} <= names  # unpinned ones are listed too
     assert {s["name"] for s in styles if s.get("pinned")} == {"report"}
+
+
+def test_apply_style_hands_over_rules_and_outline_guidance(tmp_path: Path):
+    """The orchestrator reads the style's Parts 2–3 right after apply_style; they come with it."""
+    from sdpm.api import style_guidance
+
+    deck_dir = tools.init_deck_workspace(str(tmp_path / "deck"))["output_dir"]
+    r = tools.apply_style(deck_dir, style="newspaper", template="blank-light")
+    g = r["style_guidance"]
+    assert g.startswith("## Part 2:") and "## Part 3:" in g
+    assert "<" not in g.split("## Part 3:")[0][:400]  # tags stripped
+    # every bundled style yields both parts, including comment styles with "(continued)" markers
+    styles_dir = Path(__file__).resolve().parents[1] / "sdpm" / "references" / "examples" / "styles"
+    for path in styles_dir.glob("*.html"):
+        assert style_guidance(path.read_text(encoding="utf-8")).count("## Part") == 2, path.name
