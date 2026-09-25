@@ -47,7 +47,9 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 - **Clone-free local MCP startup and one-action client setup** — the local server now
   runs from GitHub with `uvx` and exposes `sdpm-mcp` and `sdpm-install-assets` console
-  scripts. Generated, drift-tested snippets cover Cursor, Visual Studio Code, Kiro CLI,
+  scripts. On first start the server fetches the icon catalogs in the background
+  (`SDPM_AUTO_INSTALL_ASSETS=0` opts out), and `search_assets` reports a missing or
+  in-progress catalog instead of exiting the process. Generated, drift-tested snippets cover Cursor, Visual Studio Code, Kiro CLI,
   Claude Code, and generic MCP configuration; Claude Desktop releases include a
   double-click `.mcpb` bundle.
 - **Local Web UI installers for macOS, Linux, and Windows** — `install.sh` /

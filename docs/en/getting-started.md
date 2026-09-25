@@ -77,7 +77,9 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
 LibreOffice and poppler render PNG previews. PPTX generation works without them. Claude
 Desktop manages its own Python runtime, and its `.mcpb` includes the official icon catalogs.
 
-Install the AWS and Material icon catalogs for a clone-free `uvx` setup:
+The AWS and Material icon catalogs are downloaded in the background the first time the
+server starts (about 40 MB; `search_assets` reports the progress to the agent until they
+are in). To fetch them ahead of time, or on a host without network access at run time:
 
 ```bash
 uvx --from "git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local" sdpm-install-assets

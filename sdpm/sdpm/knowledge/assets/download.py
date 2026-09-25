@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import zipfile
 from pathlib import Path
 from urllib.request import urlopen
@@ -169,6 +170,13 @@ def _generate_material_tags(name: str, category: str) -> list[str]:
     return tags
 
 
+def _write_atomic(path: Path, text: str) -> None:
+    """Write the manifest last and atomically — readers see either no catalog or a complete one."""
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+
+
 def _install_aws(destination: Path) -> dict:
     print("Downloading AWS Architecture Icons...", file=sys.stderr)
     print(f"  URL: {ASSET_PACKAGE_URL}", file=sys.stderr)
@@ -206,7 +214,7 @@ def _install_aws(destination: Path) -> dict:
         "icons": icons,
     }
     manifest_path = destination / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    _write_atomic(manifest_path, json.dumps(manifest, indent=2, ensure_ascii=False))
 
     print(f"  Extracted: {len(icons)} SVG icons", file=sys.stderr)
     print(f"  Manifest: {manifest_path} ({len(icons)} entries)", file=sys.stderr)
@@ -259,7 +267,7 @@ def _install_material(destination: Path) -> dict:
         "icons": icons,
     }
     manifest_path = destination / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    _write_atomic(manifest_path, json.dumps(manifest, indent=2, ensure_ascii=False))
 
     print(f"  Extracted: {len(icons)} SVG icons", file=sys.stderr)
     print(f"  Manifest: {manifest_path} ({len(icons)} entries)", file=sys.stderr)
@@ -287,6 +295,47 @@ def install_assets(sources: list[str], dest: Path | None = None) -> dict:
     installers = {"aws": _install_aws, "material": _install_material}
     results = [installers[source](base / source) for source in normalized]
     return {"destination": str(base), "sources": results}
+
+
+_background: dict = {"state": "idle", "error": None, "thread": None}
+_background_lock = threading.Lock()
+
+
+def install_status() -> dict:
+    """State of the background installation: idle | running | done | failed."""
+    return {"state": _background["state"], "error": _background["error"]}
+
+
+def ensure_assets_installed_async() -> bool:
+    """Install the official catalogs in a background thread if none is present.
+
+    Called by long-lived hosts at startup so that a clone-free setup needs no
+    separate install step. Returns True when an installation was started. Never
+    raises — a failure is recorded in :func:`install_status` and the host keeps
+    serving; ``search_assets`` reports the state to the agent.
+    """
+    from sdpm.knowledge.assets import assets_installed, invalidate_manifest_cache
+
+    with _background_lock:
+        if _background["state"] == "running" or assets_installed():
+            return False
+        _background["state"] = "running"
+        _background["error"] = None
+
+    def _run() -> None:
+        try:
+            install_assets(list(SUPPORTED_SOURCES))
+            invalidate_manifest_cache()
+            _background["state"] = "done"
+        except Exception as error:  # noqa: BLE001 - reported through install_status
+            _background["error"] = str(error)
+            _background["state"] = "failed"
+            print(f"Asset installation failed: {error}", file=sys.stderr)
+
+    thread = threading.Thread(target=_run, name="sdpm-install-assets", daemon=True)
+    _background["thread"] = thread
+    thread.start()
+    return True
 
 
 def _parse_sources(value: str) -> list[str]:

@@ -64,10 +64,11 @@ import contextlib
 import io
 import json
 import shutil
+import sys
 
 import sdpm.config as config
 import shared
-from sdpm.knowledge.assets import invalidate_manifest_cache, resolve_asset_path, search_assets
+from sdpm.knowledge.assets import AssetsNotInstalledError, invalidate_manifest_cache, resolve_asset_path, search_assets
 
 install_dir = config.assets_install_dir()
 source_dir = install_dir / "test"
@@ -95,8 +96,9 @@ stderr = io.StringIO()
 with contextlib.redirect_stderr(stderr):
     try:
         search_assets("aws")
-    except SystemExit as error:
-        missing_exit = error.code
+    except AssetsNotInstalledError as error:
+        missing_exit = 1
+        print(str(error), file=sys.stderr)
     else:
         missing_exit = None
 

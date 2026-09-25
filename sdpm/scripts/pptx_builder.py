@@ -24,6 +24,7 @@ from sdpm.knowledge.assets import (  # noqa: F401
     check_icon_exists,
     print_search_results,
     resolve_asset_path,
+    AssetsNotInstalledError,
     resolve_icon_path,
     search_assets,
 )
@@ -708,4 +709,12 @@ def main():
         cmd_grid(args)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except AssetsNotInstalledError as error:
+        print("=" * 60, file=sys.stderr)
+        print("CRITICAL: Assets not installed. Cannot continue.", file=sys.stderr)
+        print("=" * 60, file=sys.stderr)
+        print(f"  Run: {error.install_command}", file=sys.stderr)
+        print("Stop current work and install the required assets.", file=sys.stderr)
+        sys.exit(1)

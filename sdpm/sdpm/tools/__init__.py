@@ -161,23 +161,46 @@ def search_assets(
     """Search icons and images by keyword. With an empty query, lists the available sources
     (icon packs, image libraries) with counts, types and themes.
     """
-    from sdpm.knowledge.assets import invalidate_manifest_cache, search_assets as _search, list_sources
+    from sdpm.knowledge.assets import (
+        AssetsNotInstalledError,
+        invalidate_manifest_cache,
+        list_sources,
+        search_assets as _search,
+    )
+    from sdpm.knowledge.assets.download import install_status
 
     invalidate_manifest_cache()
 
-    if not query.strip():
-        return {"query": "", "sources": list_sources()}
-
-    return {
-        "query": query,
-        "results": _search(
-            query,
-            limit=limit,
-            source_filter=source_filter or None,
-            type_filter=type_filter or None,
-            theme_filter=theme_filter or None,
-        ),
-    }
+    try:
+        if not query.strip():
+            sources = list_sources()
+            if not sources:
+                raise AssetsNotInstalledError()
+            return {"query": "", "sources": sources}
+        return {
+            "query": query,
+            "results": _search(
+                query,
+                limit=limit,
+                source_filter=source_filter or None,
+                type_filter=type_filter or None,
+                theme_filter=theme_filter or None,
+            ),
+        }
+    except AssetsNotInstalledError as error:
+        status = install_status()
+        if status["state"] == "running":
+            hint = "Icon catalogs are being installed in the background; retry in a moment."
+        else:
+            hint = f"Icon catalogs are not installed. Run: {error.install_command}"
+        return {
+            "query": query,
+            "results": [],
+            "sources": [],
+            "assets_installed": False,
+            "install_status": status,
+            "error": hint,
+        }
 
 
 def list_styles(

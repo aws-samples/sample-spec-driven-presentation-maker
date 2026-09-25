@@ -144,22 +144,35 @@ def _load_manifests() -> list[dict]:
     return all_assets
 
 
-def _assets_not_installed_error() -> None:
-    """Print mode-appropriate asset installation instructions and exit."""
-    print("=" * 60, file=sys.stderr)
-    print("CRITICAL: Assets not installed. Cannot continue.", file=sys.stderr)
-    print("=" * 60, file=sys.stderr)
-    print("", file=sys.stderr)
-    print("Assets are required for slide generation.", file=sys.stderr)
-    print("", file=sys.stderr)
+class AssetsNotInstalledError(RuntimeError):
+    """No asset catalog (icon pack) is installed.
+
+    Raised instead of exiting so that long-lived hosts (the MCP server) survive
+    a missing catalog and can report it; the CLI converts it to exit status 1.
+    """
+
+    def __init__(self) -> None:
+        self.install_command = assets_install_command()
+        super().__init__(
+            "Assets not installed. Icon catalogs are required for slide generation. "
+            f"Run: {self.install_command}"
+        )
+
+
+def assets_install_command() -> str:
+    """The command that installs the official icon catalogs in the current setup."""
     if assets_install_dir() != ASSETS_DIR:
-        print("  Run: sdpm-install-assets", file=sys.stderr)
-    else:
-        print("  Run: uv run python3 scripts/download_aws_icons.py", file=sys.stderr)
-        print("  Run: uv run python3 scripts/download_material_icons.py", file=sys.stderr)
-    print("", file=sys.stderr)
-    print("Stop current work and install the required assets.", file=sys.stderr)
-    sys.exit(1)
+        return "sdpm-install-assets"
+    return "uv run python3 scripts/download_aws_icons.py && uv run python3 scripts/download_material_icons.py"
+
+
+def assets_installed() -> bool:
+    """True when at least one asset catalog is discoverable."""
+    return bool(_load_manifests())
+
+
+def _assets_not_installed_error() -> None:
+    raise AssetsNotInstalledError()
 
 
 def _find_by_manifest(source: str, name: str) -> Optional[Path]:

@@ -77,7 +77,9 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
 LibreOffice と poppler は PNG プレビューの描画に使用します。未導入でも PPTX は生成できます。
 Claude Desktop は Python ランタイムを管理し、`.mcpb` には公式アイコンカタログが同梱されます。
 
-clone 不要の `uvx` 構成に AWS / Material アイコンを導入するには、次を実行します。
+AWS / Material のアイコンカタログは、サーバー初回起動時にバックグラウンドで取得されます（約 40 MB。
+完了までは `search_assets` が進行状況をエージェントに返します）。事前に取得したい場合や、実行時に
+ネットワークが使えないホストでは次を実行します。
 
 ```bash
 uvx --from "git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local" sdpm-install-assets
