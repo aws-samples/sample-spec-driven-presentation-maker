@@ -353,7 +353,7 @@ def start_presentation() -> str:
     from sdpm.entry import start_presentation as _start
 
     user_id = _get_user_id()
-    styles = reference.list_styles(storage=_storage, user_id=user_id).get("styles", [])
+    styles = reference.list_styles(storage=_storage, user_id=user_id, include_all=True).get("styles", [])
     templates = template_mod.list_templates(storage=_storage, user_id=user_id).get("templates", [])
     return json.dumps(_start(styles=styles, templates=templates, output_dir=""), ensure_ascii=False)
 

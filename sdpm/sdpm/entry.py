@@ -62,7 +62,9 @@ def _styles_and_templates() -> tuple[list[dict], list[dict]]:
     from sdpm.config import get_state
 
     state = get_state()
-    styles = list_styles_filtered(get_styles_dirs(), state.get("pinned_styles", []))
+    # Every style, with its pin flag: the pin filter is a gallery concern, the
+    # orchestrator should know the whole catalogue when it picks.
+    styles = list_styles_filtered(get_styles_dirs(), state.get("pinned_styles", []), include_all=True)
     templates = list_templates_with_metadata(get_templates_dirs(), state.get("template_metadata", {}))
     return styles, templates
 

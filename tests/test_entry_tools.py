@@ -194,3 +194,13 @@ def test_grid_accepts_int_and_list_tracks():
     b = tools.grid("t", json.dumps({"area": {"x": 120, "y": 372, "w": 1680, "h": 185}, "columns": ["90px", "1fr", "330px"], "rows": "1", "gap": "30"}))
     assert "error" not in a and a == b
     assert a["r0c1"]["x"] == 240 and a["r0c1"]["w"] == 1200 and a["r0c2"]["x"] == 1470
+
+
+def test_start_presentation_returns_every_style_with_pin_flag(monkeypatch):
+    from sdpm import config
+
+    monkeypatch.setattr(config, "get_state", lambda: {"pinned_styles": ["report"], "template_metadata": {}})
+    styles = tools.start_presentation()["styles"]
+    names = {s["name"] for s in styles}
+    assert {"report", "typographic", "briefing"} <= names  # unpinned ones are listed too
+    assert {s["name"] for s in styles if s.get("pinned")} == {"report"}
