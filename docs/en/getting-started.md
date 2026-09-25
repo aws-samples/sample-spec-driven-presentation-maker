@@ -94,7 +94,10 @@ After setup, ask your agent to “make slides about …”. The agent's first ca
 `start_presentation`, returns the orchestrator role document plus the styles and templates
 on offer; a deck-writing sub-agent starts with `start_composing`, a style request with
 `start_style`, a translation with `start_translation`. The MCP server alone is the complete
-setup — skills and agent definitions are optional extras.
+setup — skills and agent definitions are optional extras. To pick a mode explicitly, use
+the server's prompts where your client shows them: `sdpm-vibe` (build from material, no
+questions), `sdpm-spec` (shape the deck in dialogue first), `sdpm-style`, `sdpm-translate`
+(Claude Code `/mcp__sdpm__sdpm-vibe`, VS Code `/mcp.sdpm.sdpm-vibe`, Kiro CLI `/sdpm-vibe`).
 
 ## AWS deployment
 

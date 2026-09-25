@@ -94,7 +94,9 @@ uvx --refresh --from "git+https://github.com/aws-samples/sample-spec-driven-pres
 `start_presentation` が、オーケストレーターの役割文書と使えるスタイル・テンプレートを返します。
 スライドを書くサブエージェントは `start_composing`、スタイル作成は `start_style`、翻訳は
 `start_translation` から始まります。MCP サーバーだけで完全な構成です — skill やエージェント定義は
-任意の追加要素です。
+任意の追加要素です。モードを明示するにはサーバーの prompt を使います: `sdpm-vibe`（素材から質問なし）、
+`sdpm-spec`（対話で構成を固める）、`sdpm-style`、`sdpm-translate`（Claude Code `/mcp__sdpm__sdpm-vibe`、
+VS Code `/mcp.sdpm.sdpm-vibe`、Kiro CLI `/sdpm-vibe`）。
 
 ## AWS にデプロイする
 

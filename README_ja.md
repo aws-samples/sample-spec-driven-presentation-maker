@@ -98,6 +98,13 @@ MCP サーバーだけで完全な構成で、skill やエージェント定義�
 Kiro IDE Power、MCP の手動設定、AWS デプロイについては[はじめに](docs/ja/getting-started.md)を
 参照してください。
 
+**モードを選ぶ。** 頼むだけで十分ですが、明示したいときはサーバーの prompt を使います:
+`sdpm-vibe`（素材から質問なしで作る）、`sdpm-spec`（対話で構成を固めてから作る）、
+`sdpm-style`（再利用できるスタイルガイド）、`sdpm-translate`（デッキの言語版）— Claude Desktop の
+「+」メニュー、Claude Code `/mcp__sdpm__sdpm-vibe`、VS Code `/mcp.sdpm.sdpm-vibe`、Kiro CLI
+`/sdpm-vibe`。各 prompt は役割の入口ツールを指すだけで、振る舞いは `sdpm/references/workflows/`
+の 1 か所にあります。
+
 > **旧バージョンからのアップグレード:** ディレクトリ構成・ツール名・skill が変わりました —
 > [v0.5 移行ガイド](docs/en/migration-v0.5.md) と
 > [role workflows 移行ガイド](docs/en/migration-role-workflows.md) を参照してください。
