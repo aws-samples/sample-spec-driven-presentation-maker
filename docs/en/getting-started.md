@@ -90,9 +90,11 @@ packages, run:
 uvx --refresh --from "git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local" sdpm-install-assets --help
 ```
 
-After setup, ask your agent to “make slides about …”. To select a workflow explicitly in
-clients that expose skills as commands, use `/sdpm-create`, `/sdpm-style`, or
-`/sdpm-translate`.
+After setup, ask your agent to “make slides about …”. The agent's first call,
+`start_presentation`, returns the orchestrator role document plus the styles and templates
+on offer; a deck-writing sub-agent starts with `start_composing`, a style request with
+`start_style`, a translation with `start_translation`. The MCP server alone is the complete
+setup — skills and agent definitions are optional extras.
 
 ## AWS deployment
 
@@ -112,9 +114,6 @@ Use the engine directly from a SKILL.md-compatible agent by copying or symlinkin
 into the agent's skills directory. The agent calls `scripts/pptx_builder.py`; no MCP server
 or AWS account is involved.
 
-> **Kiro CLI users:** use the [full Kiro CLI setup](#kiro-cli-full-setup) below when you
-> want the dedicated composer agent and skill links.
-
 ```bash
 cd sdpm
 uv sync
@@ -133,10 +132,13 @@ The engine, references (workflows, guides, bundled styles), sample templates (da
 
 Connect SDPM to an MCP-compatible client without AWS.
 
-#### Kiro CLI full setup
+#### Kiro CLI from a checkout
 
-`make install-kiro` installs the checkout-based full configuration: the local MCP server,
-skill symlinks, and a dedicated `sdpm-composer` agent for parallel slide generation.
+The `kiro-cli mcp add … uvx …` one-liner in the quick start is the complete setup: the
+orchestrator spawns composers as ordinary sub-agents, which start with `start_composing`.
+`make install-kiro` is the checkout-based alternative; it additionally links the `sdpm-*`
+skills (slash-command entry points) and generates a `sdpm-composer` agent whose only MCP
+server is SDPM — an optimisation for profiles with many MCP servers, not a requirement.
 
 ```bash
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git

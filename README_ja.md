@@ -92,9 +92,11 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --deps-only
 ```
 
-導入後はエージェントに **「〜のスライドを作って」** と頼むだけです。アセットの導入、更新、
-Kiro の composer を含むフル構成、Kiro IDE Power、MCP の手動設定、AWS デプロイについては
-[はじめに](docs/ja/getting-started.md)を参照してください。
+導入後はエージェントに **「〜のスライドを作って」** と頼むだけです。エージェントが最初に呼ぶ
+`start_presentation` が、作業を導く役割文書と使えるスタイル・テンプレートをまとめて返します —
+MCP サーバーだけで完全な構成で、skill やエージェント定義は不要です。アセットの導入、更新、
+Kiro IDE Power、MCP の手動設定、AWS デプロイについては[はじめに](docs/ja/getting-started.md)を
+参照してください。
 
 > **旧バージョンからのアップグレード:** ディレクトリ構成・ツール名・skill が変わりました —
 > [v0.5 移行ガイド](docs/en/migration-v0.5.md) と

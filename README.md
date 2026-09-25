@@ -89,9 +89,11 @@ For the `uvx` options, install **uv**, **LibreOffice**, and **poppler** in one s
 curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --deps-only
 ```
 
-Then ask your agent: **“Make slides about …”** It will choose the right workflow. See
-[Getting Started](docs/en/getting-started.md) for asset installation, updates, Kiro's full
-composer setup, Kiro IDE Power, manual MCP configuration, and AWS deployment.
+Then ask your agent: **“Make slides about …”** The first tool it reaches for,
+`start_presentation`, returns the role document that drives the work together with the
+styles and templates on offer — the MCP server alone is the complete setup; no skills or
+agent definitions are required. See [Getting Started](docs/en/getting-started.md) for asset
+installation, updates, Kiro IDE Power, manual MCP configuration, and AWS deployment.
 
 **Picking a mode.** Just asking for slides is enough — the agent calls `start_presentation`
 and follows it. To choose explicitly, use the server's prompts where your client shows them:

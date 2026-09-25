@@ -90,8 +90,11 @@ uvx --from "git+https://github.com/aws-samples/sample-spec-driven-presentation-m
 uvx --refresh --from "git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local" sdpm-install-assets --help
 ```
 
-導入後はエージェントに「〜のスライドを作って」と頼んでください。skill をコマンドとして公開する
-クライアントでは、`/sdpm-create`、`/sdpm-style`、`/sdpm-translate` でワークフローを明示できます。
+導入後はエージェントに「〜のスライドを作って」と頼んでください。エージェントが最初に呼ぶ
+`start_presentation` が、オーケストレーターの役割文書と使えるスタイル・テンプレートを返します。
+スライドを書くサブエージェントは `start_composing`、スタイル作成は `start_style`、翻訳は
+`start_translation` から始まります。MCP サーバーだけで完全な構成です — skill やエージェント定義は
+任意の追加要素です。
 
 ## AWS にデプロイする
 
@@ -111,9 +114,6 @@ uvx --refresh --from "git+https://github.com/aws-samples/sample-spec-driven-pres
 エンジンを直接利用できます。エージェントは `scripts/pptx_builder.py` を呼び出すため、MCP サーバーも
 AWS アカウントも不要です。
 
-> **Kiro CLI ユーザー:** 専用 composer エージェントと skill link が必要な場合は、以下の
-> [Kiro CLI フル構成](#kiro-cli-フル構成)を使用してください。
-
 ```bash
 cd sdpm
 uv sync
@@ -132,10 +132,13 @@ uv run python3 scripts/pptx_builder.py list_templates
 
 AWS を使わず、SDPM を MCP 対応クライアントへ接続します。
 
-#### Kiro CLI フル構成
+#### checkout からの Kiro CLI 導入
 
-`make install-kiro` は checkout ベースのフル構成を導入します。ローカル MCP サーバー、skill の
-symlink、並列スライド生成用の専用 `sdpm-composer` エージェントが対象です。
+クイックスタートの `kiro-cli mcp add … uvx …` 1 行で構成は完全です。オーケストレーターは通常の
+サブエージェントとして composer を spawn し、composer は `start_composing` から始めます。
+`make install-kiro` は checkout ベースの代替手段で、加えて `sdpm-*` skill（スラッシュコマンドの
+入口）を link し、SDPM だけを MCP サーバーに持つ `sdpm-composer` エージェントを生成します —
+MCP サーバーが多いプロファイル向けの最適化であり、必須ではありません。
 
 ```bash
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
