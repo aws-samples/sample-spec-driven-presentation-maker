@@ -52,20 +52,22 @@ Run the full Web UI on your machine with **[Kiro](https://kiro.dev/) CLI** over
 
 ### Install and start
 
-The recommended installer adds Kiro CLI and the other dependencies, builds the Web UI,
-and creates the `sdpm` launcher and a desktop shortcut:
+The installer adds Kiro CLI and the other dependencies, builds the Web UI (answer yes to
+"Also install the browser Web UI?"), and creates the `sdpm` launcher and a desktop shortcut:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
-sdpm
+sdpm webui
 ```
 
 Windows support is verified in CI only:
 
 ```powershell
 irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
-sdpm
+sdpm webui
 ```
+
+An MCP-only installation adds the Web UI later with `sdpm update --with-webui`.
 
 ### Manual start for development
 

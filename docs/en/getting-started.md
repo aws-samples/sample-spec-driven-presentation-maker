@@ -6,235 +6,156 @@ Use SDPM in a browser or connect it to the AI agent you already use. Both paths 
 locally without an AWS account. For the internal four-layer design, see
 [Architecture](architecture.md#4-layer-architecture).
 
-## Choose how you want to use SDPM
+## Install
 
-### Use it in your browser (full experience)
-
-The local Web UI provides chat, deck management, editable previews, and PowerPoint export.
-Install it on macOS or Linux with one command:
+One command installs SDPM into `~/.sdpm`: a git checkout, the MCP server environment, the
+icon catalogs, and the `sdpm` launcher. The same checkout serves every surface — your AI
+agent through MCP and, optionally, a browser Web UI — so there is one thing to update and
+one thing to remove.
 
 ```bash
+# macOS / Linux
 curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
 ```
 
-The installer installs git, uv, LibreOffice, poppler, Node.js, and Kiro CLI; clones SDPM to
-`${SDPM_HOME:-~/.sdpm}/checkout`; builds the local Web UI; and creates an `sdpm` launcher
-and desktop shortcut. Run `sdpm` or `sdpm launch` to open
-[http://localhost:3000](http://localhost:3000).
-
-On Windows:
-
 ```powershell
+# Windows (PowerShell 5.1 or 7; verified in CI only)
 irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
 ```
 
-Windows support is verified in CI only and has not received manual Windows QA.
+What happens:
 
-#### Launcher commands
+1. Dependencies are checked and offered for installation: `git`, `uv`, and — for slide
+   previews — LibreOffice and poppler. Previews are optional; a deck builds without them.
+2. **"Also install the browser Web UI?"** — yes installs Node.js 20+ and Kiro CLI (the Web
+   UI's agent backend) and builds the UI; no gives you an MCP-only install with no Node.js.
+3. The checkout is cloned to `~/.sdpm/checkout`, the server environment is synced, and the
+   AWS / Material icon catalogs are downloaded.
+4. **"Register SDPM with <client>?"** — asked once per MCP client found on the machine.
+   Nothing is written without your yes. The final screen tells you what to do next.
 
-| Command | Action |
+Re-running the installer repairs an existing installation; it never creates a second one.
+
+### Installer options
+
+| Option | Effect |
 |---|---|
-| `sdpm` / `sdpm launch` | Start the local Web UI and open it in your browser |
-| `sdpm update` | Pull `main`, update dependencies, and rebuild the Web UI |
-| `sdpm check-update` | Check whether a newer revision is available |
-| `sdpm doctor` | Run the repository environment checks |
-| `sdpm version` | Show the installed revision |
-| `sdpm path` | Print the checkout path |
-| `sdpm help` | Show command help |
+| `--full` / `--mcp-only` | Skip the profile question |
+| `--register` / `--no-register` | Register with every detected client / only print the configuration |
+| `--non-interactive` | Accept all prompts (profile defaults to full) |
+| `--skip-libreoffice`, `--skip-shortcut` | Leave those out |
+| `--deps-only` | Install `git`, `uv`, LibreOffice and poppler only (for a developer checkout) |
 
-#### Installer options
+Environment equivalents: `SDPM_PROFILE=full|mcp`, `SDPM_REGISTER=yes|no`,
+`SDPM_NON_INTERACTIVE=1`, `SDPM_HOME` (install root, default `~/.sdpm`),
+`SDPM_LAUNCHER_DIR` (default `~/.local/bin`; `%USERPROFILE%\bin` on Windows).
+`bash -s -- --mcp-only` passes options through `curl … | bash`.
 
-| macOS / Linux | Windows | Effect |
-|---|---|---|
-| `--deps-only` | `-DepsOnly` | Install only git, uv, LibreOffice, and poppler |
-| `--non-interactive` | `-NonInteractive` | Accept dependency installation prompts |
-| `--skip-libreoffice` | `-SkipLibreOffice` | Skip LibreOffice checks and installation |
-| `--skip-shortcut` | `-SkipShortcut` | Do not create a desktop shortcut |
+## The `sdpm` launcher
 
-Set `SDPM_HOME` to change the install root. The default is `~/.sdpm` on Unix and
-`%USERPROFILE%\.sdpm` on Windows.
+```
+sdpm                    status: version, profile, surfaces, which clients are connected
+sdpm webui              start the browser Web UI and open it
+sdpm mcp                run the MCP server on stdio (to check it from a terminal)
+sdpm register [CLIENT]  connect MCP clients (asks per client; --yes, --dry-run)
+sdpm unregister         disconnect them again
+sdpm mcp-config [CLIENT]  print the client configuration with this machine's paths (--json, --all)
+sdpm update [--with-webui]  pull main, sync, rebuild what is installed (or add the Web UI)
+sdpm doctor             environment checks
+sdpm uninstall          remove ~/.sdpm, the launcher, shortcuts; offers to unregister
+```
 
-### Use it from the AI agent you already have
+The launcher is the same on every OS. `sdpm mcp` exists for humans; the configuration the
+clients receive points at `uv` and the checkout directly (next section).
 
-Choose your client and complete the action shown. The `uvx` options do not require a
-checkout. Expect the first launch to take tens of seconds while uv builds and caches the package.
+## Your AI agent (MCP)
 
-| Client | Setup |
+`sdpm register` connects the server through each client's own CLI, so no configuration file
+is edited by hand:
+
+| Client | What `sdpm register` does |
 |---|---|
-| Claude Desktop | [Download `sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb), then double-click it |
-| Cursor | [![Add to Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=sdpm&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJnaXQraHR0cHM6Ly9naXRodWIuY29tL2F3cy1zYW1wbGVzL3NhbXBsZS1zcGVjLWRyaXZlbi1wcmVzZW50YXRpb24tbWFrZXIjc3ViZGlyZWN0b3J5PXNlcnZlcnMvbG9jYWwiLCJzZHBtLW1jcCJdfQ==) |
-| Visual Studio Code | `code --add-mcp '{"name":"sdpm","command":"uvx","args":["--from","git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local","sdpm-mcp"]}'` |
-| Kiro CLI | `kiro-cli mcp add --name sdpm --command uvx --args '["--from","git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local","sdpm-mcp"]' --scope global` |
-| Claude Code | `/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker` then `/plugin install sdpm@sdpm` |
-| Codex | Run `codex plugin marketplace add ./` in the checkout, then install from the ChatGPT desktop app |
+| Kiro CLI (and Kiro IDE — shared `~/.kiro/settings/mcp.json`) | `kiro-cli mcp add --scope global …` |
+| Claude Code | `claude mcp add --scope user sdpm -- …` |
+| Visual Studio Code | `code --add-mcp …` |
+| Codex (CLI, IDE extension, ChatGPT desktop app) | `codex mcp add sdpm -- …` |
+| Cursor | opens the `cursor://…/mcp/install` deep link built with your real paths — one click |
+| Kiro IDE without Kiro CLI, other clients | prints the JSON and the file it belongs in |
+| Claude Desktop | use the [`sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) release instead (double-click) |
 
-For `uvx` clients, install the system dependencies with:
+Every configuration is the same one line, with absolute paths:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --deps-only
+```json
+{
+  "mcpServers": {
+    "sdpm": {
+      "command": "/Users/you/.local/bin/uv",
+      "args": ["run", "--directory", "/Users/you/.sdpm/checkout/servers/local", "python", "server.py"]
+    }
+  }
+}
 ```
 
-LibreOffice and poppler render PNG previews. PPTX generation works without them. Claude
-Desktop manages its own Python runtime, and its `.mcpb` includes the official icon catalogs.
+Absolute paths matter: GUI clients started from the Dock or Start Menu do not inherit your
+shell `PATH`. `sdpm mcp-config` prints this block with your paths filled in for any client,
+so a client that is not listed above takes it verbatim.
 
-The AWS and Material icon catalogs are downloaded in the background the first time the
-server starts (about 40 MB; `search_assets` reports the progress to the agent until they
-are in). To fetch them ahead of time, or on a host without network access at run time:
+Then ask your agent for slides. The first tool it reaches for, `start_presentation`, returns
+the role document that drives the work plus the styles and templates on offer — the MCP
+server alone is the complete setup. To pick a mode explicitly, use the server's prompts
+where your client shows them: `sdpm-vibe` (build from material, no questions), `sdpm-spec`
+(shape the deck in dialogue first), `sdpm-style`, `sdpm-translate` (Claude Code
+`/mcp__sdpm__sdpm-vibe`, VS Code `/mcp.sdpm.sdpm-vibe`, Kiro CLI `/sdpm-vibe`).
 
-```bash
-uvx --from "git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local" sdpm-install-assets
-```
+Slide previews need LibreOffice and poppler. Without them the deck still builds; the build
+result carries `preview: {"status": "unavailable", "install": "…"}` with the one command
+for your OS, and the agent relays it. Icon catalogs missing for any reason are fetched in
+the background on the server's first start.
 
-The default `uvx` command follows `main`. To force uv to refresh its cached checkout and
-packages, run:
+## Your browser (Web UI)
 
-```bash
-uvx --refresh --from "git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local" sdpm-install-assets --help
-```
-
-After setup, ask your agent to “make slides about …”. The agent's first call,
-`start_presentation`, returns the orchestrator role document plus the styles and templates
-on offer; a deck-writing sub-agent starts with `start_composing`, a style request with
-`start_style`, a translation with `start_translation`. The MCP server alone is the complete
-setup — skills and agent definitions are optional extras. To pick a mode explicitly, use
-the server's prompts where your client shows them: `sdpm-vibe` (build from material, no
-questions), `sdpm-spec` (shape the deck in dialogue first), `sdpm-style`, `sdpm-translate`
-(Claude Code `/mcp__sdpm__sdpm-vibe`, VS Code `/mcp.sdpm.sdpm-vibe`, Kiro CLI `/sdpm-vibe`).
+`sdpm webui` starts the Web UI in Local mode — Next.js on `http://localhost:3000` talking to
+Kiro CLI over ACP — and opens it. Run `kiro-cli login` once before the first use. The
+installer also creates a desktop shortcut. An MCP-only install adds the Web UI later with
+`sdpm update --with-webui`. Details: [Web UI Local mode](../../web-ui/README.md#local-mode).
 
 ## AWS deployment
 
 For a shared remote MCP server or hosted Web UI, use the
 [One-Click Deploy](deploy-cloudshell.md#one-click-deploy-recommended). The recommended path
 runs from AWS CloudShell and does not require local CDK or Docker. Direct CDK instructions
-for development and debugging are under [Manual setup](#manual-setup).
+for development and debugging are under [Developer setup](#developer-setup).
 
-## Manual setup
+## Developer setup
 
-These paths are for contributors, advanced client configuration, or direct AWS development.
-They expose implementation details that the two quick-start paths do not require.
+For contributors working from their own clone (not `~/.sdpm/checkout`).
+
+### Local MCP server from a checkout
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --deps-only
+git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
+cd sample-spec-driven-presentation-maker
+uv sync
+(cd servers/local && uv sync)
+uv run python3 sdpm/scripts/download_aws_icons.py
+uv run python3 sdpm/scripts/download_material_icons.py
+make smoke        # tools/list + start_presentation against the local server
+```
+
+Point a client at the clone with the same one-line configuration, using the clone's
+`servers/local` path — or let the checkout do it:
+
+```bash
+uv run --directory servers/local python client_config.py --checkout "$PWD" print --all
+```
 
 ### Agent skill without MCP
 
-Use the engine directly from a SKILL.md-compatible agent by copying or symlinking `sdpm/`
-into the agent's skills directory. The agent calls `scripts/pptx_builder.py`; no MCP server
-or AWS account is involved.
-
-```bash
-cd sdpm
-uv sync
-
-# Download icons (optional, recommended)
-uv run python3 scripts/download_aws_icons.py
-uv run python3 scripts/download_material_icons.py
-
-# Verify
-uv run python3 scripts/pptx_builder.py list_templates
-```
-
-The engine, references (workflows, guides, bundled styles), sample templates (dark/light), and SKILL.md are all included.
-
-### Local MCP server
-
-Connect SDPM to an MCP-compatible client without AWS.
-
-#### Kiro CLI from a checkout
-
-The `kiro-cli mcp add … uvx …` one-liner in the quick start is the complete setup: the
-orchestrator spawns composers as ordinary sub-agents, which start with `start_composing`.
-`make install-kiro` is the checkout-based alternative; it additionally links the `sdpm-*`
-skills (slash-command entry points) and generates a `sdpm-composer` agent whose only MCP
-server is SDPM — an optimisation for profiles with many MCP servers, not a requirement.
-
-```bash
-git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
-cd sample-spec-driven-presentation-maker
-make install-kiro
-kiro-cli chat   # then ask: "make slides about ..."
-```
-
-This registers `sdpm` in `<KIRO_HOME>/settings/mcp.json` (default `~/.kiro`), links the
-entry points into `<KIRO_HOME>/skills/`, and generates
-`<KIRO_HOME>/agents/sdpm-composer.json`. The composer profile starts only the SDPM MCP
-server instead of every server in your profile. Keep the checkout in place. Update it with
-`git pull`; rerun `make install-kiro` only after moving the checkout.
-
-Useful options:
-
-```bash
-uv run python3 clients/kiro/install.py --agent NAME       # one agent config
-uv run python3 clients/kiro/install.py --mode legacy      # skip Power detection
-KIRO_HOME=~/.kiro-sdpm-dev make install-kiro              # separate profile
-```
-
-The installer stops rather than overwrite wiring owned by another checkout. Use a separate
-`KIRO_HOME`, remove the other wiring yourself, or pass `--replace-existing` deliberately.
-
-#### Kiro IDE Power
-
-The repository root is an [Agent Plugins](https://agent-plugins.org) package
-(`plugin.json`, `mcp.json`, and `skills/`). Install the checkout as a Power from Kiro IDE.
-Kiro manages the bundled MCP server at global scope. The GitHub import URL still requires
-separate device verification, so this guide does not claim a one-click URL yet.
-
-Do not activate the Power and checkout-based Kiro CLI wiring in the same profile. Use a
-separate `KIRO_HOME`; `make install-kiro` removes its own legacy wiring when it detects the
-Power in that profile.
-
-#### Codex plugin from a checkout
-
-```bash
-codex plugin marketplace add ./
-```
-
-Run the command inside the checkout, install `spec-driven-presentation-maker` from that
-marketplace in the ChatGPT desktop app, and start a new conversation. Codex copies the
-plugin into `~/.codex/plugins/cache/…` and creates its Python environment in writable plugin
-data.
-
-#### Manual MCP configuration
-
-For a clone-free client configuration, add the canonical stdio server definition:
-
-```json
-{
-  "mcpServers": {
-    "sdpm": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local",
-        "sdpm-mcp"
-      ]
-    }
-  }
-}
-```
-
-To run from a source checkout instead, prepare and test the server:
-
-```bash
-cd servers/local
-uv sync
-uv run python server.py
-```
-
-Then point your client's MCP configuration at the absolute checkout path:
-
-```json
-{
-  "mcpServers": {
-    "spec-driven-presentation-maker": {
-      "command": "uv",
-      "args": ["run", "--directory", "/absolute/path/to/servers/local", "python", "server.py"]
-    }
-  }
-}
-```
-
-Ask the connected agent to create a presentation. It reads the workflow, gathers the topic,
-audience, and purpose, writes the brief, art direction, and outline, builds the slides, then
-generates the PPTX and previews. See the
-[Architecture MCP tool reference](architecture.md#mcp-tool-reference) for the tool list.
+`sdpm/SKILL.md` drives the CLI (`sdpm/scripts/pptx_builder.py`) directly for agents that
+have no MCP support. Copy or symlink `sdpm/` into the agent's skills directory; the engine,
+references and templates are all inside it. This is an architecture artefact, not a
+recommended path.
 
 ### Remote MCP server (AWS)
 

@@ -50,20 +50,22 @@ AWS へのデプロイは不要です。
 
 ### 導入と起動
 
-推奨インストーラーは Kiro CLI などの依存関係を導入し、Web UI をビルドして、`sdpm`
-ランチャーとデスクトップショートカットを作成します。
+インストーラーは Kiro CLI などの依存関係を導入し、Web UI をビルドして（「ブラウザ用の Web UI も
+入れますか？」に yes）、`sdpm` ランチャーとデスクトップショートカットを作成します。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
-sdpm
+sdpm webui
 ```
 
 Windows 対応は CI でのみ検証済みです。
 
 ```powershell
 irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
-sdpm
+sdpm webui
 ```
+
+MCP のみで入れた場合は `sdpm update --with-webui` で後から Web UI を追加できます。
 
 ### 開発者向けの手動起動
 

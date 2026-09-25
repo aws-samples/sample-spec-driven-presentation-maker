@@ -48,52 +48,34 @@ automatically — just describe what you want:
 
 ## Quick Start
 
-How do you want to use SDPM?
-
-### Use it in your browser (full experience)
-
-Install the local Web UI on macOS or Linux with one command:
+One command installs everything into `~/.sdpm` — the MCP server your AI agent talks to
+and, if you want it, a browser Web UI. Both run from the same checkout and update together.
 
 ```bash
+# macOS / Linux
 curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
 ```
 
-The installer adds the required tools, builds the Web UI, and creates the `sdpm`
-launcher and a desktop shortcut. Run `sdpm` at any time to open
-[http://localhost:3000](http://localhost:3000).
-
-On Windows (verified in CI only; no manual Windows QA yet), run:
-
 ```powershell
+# Windows (PowerShell; verified in CI only)
 irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
 ```
 
-### Use it from the AI agent you already have
+The installer asks two things — whether to add the browser Web UI (needs Node.js) and
+which of your MCP clients to connect — and ends with what to do next. Then:
 
-Choose your client and complete the action shown. The `uvx` options do not require a
-repository checkout. Expect the first launch to take tens of seconds while the package is built.
-
-| Client | One-action setup |
+| You want to | Do this |
 |---|---|
-| Claude Desktop | [Download `sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb), then double-click it |
-| Cursor | [![Add to Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=sdpm&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJnaXQraHR0cHM6Ly9naXRodWIuY29tL2F3cy1zYW1wbGVzL3NhbXBsZS1zcGVjLWRyaXZlbi1wcmVzZW50YXRpb24tbWFrZXIjc3ViZGlyZWN0b3J5PXNlcnZlcnMvbG9jYWwiLCJzZHBtLW1jcCJdfQ==) |
-| Visual Studio Code | `code --add-mcp '{"name":"sdpm","command":"uvx","args":["--from","git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local","sdpm-mcp"]}'` |
-| Kiro CLI | `kiro-cli mcp add --name sdpm --command uvx --args '["--from","git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local","sdpm-mcp"]' --scope global` |
-| Claude Code | `/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker` then `/plugin install sdpm@sdpm` |
-| Codex | Run `codex plugin marketplace add ./` in the checkout, then install from the ChatGPT desktop app |
+| Use your own AI agent (Kiro CLI, Claude Code, Cursor, VS Code, Codex, Kiro IDE) | Ask it **“Make slides about …”** — the installer registered SDPM for you. Later: `sdpm register` |
+| Use a browser | `sdpm webui` |
+| Use Claude Desktop | [Download `sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) and double-click it (no installer needed) |
+| Give a team a shared server or Web UI | [Deploy on AWS](docs/en/deploy-cloudshell.md) |
 
-For the `uvx` options, install **uv**, **LibreOffice**, and **poppler** in one step
-(LibreOffice and poppler provide PNG previews):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --deps-only
-```
-
-Then ask your agent: **“Make slides about …”** The first tool it reaches for,
-`start_presentation`, returns the role document that drives the work together with the
-styles and templates on offer — the MCP server alone is the complete setup; no skills or
-agent definitions are required. See [Getting Started](docs/en/getting-started.md) for asset
-installation, updates, Kiro IDE Power, manual MCP configuration, and AWS deployment.
+`sdpm` alone shows what is installed and connected; `sdpm update` upgrades both surfaces;
+`sdpm uninstall` removes everything. Slide previews (PNG) need LibreOffice and poppler — the
+installer offers them, and a build without them still produces the PPTX and tells the agent
+what is missing. See [Getting Started](docs/en/getting-started.md) for options, manual
+client configuration, and the developer setup.
 
 **Picking a mode.** Just asking for slides is enough — the agent calls `start_presentation`
 and follows it. To choose explicitly, use the server's prompts where your client shows them:
@@ -103,9 +85,9 @@ Desktop's "+" menu, Claude Code `/mcp__sdpm__sdpm-vibe`, VS Code `/mcp.sdpm.sdpm
 `/sdpm-vibe`. Each prompt only names the role's entry tool; the behavior itself still lives in
 `sdpm/references/workflows/`, in one place.
 
-> **Upgrading from an older release?** Directory layout, tool names and skills changed —
-> see the [v0.5](docs/en/migration-v0.5.md) and [role workflows](docs/en/migration-role-workflows.md)
-> migration notes.
+> **Upgrading from an older release?** Plugins, skills, `make install-kiro` and the `uvx`
+> setup are gone — run the installer once and see [Migration: onboarding](docs/en/migration-onboarding.md).
+> Older changes: [v0.5](docs/en/migration-v0.5.md), [role workflows](docs/en/migration-role-workflows.md).
 
 ---
 
@@ -135,17 +117,15 @@ A hands-on workshop is available with sample data for various real-world scenari
 sdpm/        Engine (json <-> pptx) + Knowledge (references, assets, templates)
              references/workflows/ — role documents (orchestrator, composer, style,
              translate), delivered to any MCP client by the start_* entry tools
-skills/      Mode entry points — one-line dispatchers that call the start_* entry tools
-plugin.json  Agent Plugins manifest (+ mcp.json) — makes the root a portable plugin
 servers/     local (stdio, no AWS) / remote (HTTP, S3 + DynamoDB) — thin binds of one tool contract
-clients/     Client manifests, clone-free uvx config, generated install snippets
-scripts/install/   macOS / Linux / Windows installer sources and distributable scripts
+             local/client_config.py wires the server into MCP clients (sdpm register)
+scripts/install/   installer + `sdpm` launcher for macOS / Linux / Windows; scripts/mcpb/ the Claude Desktop bundle
 agent/ api/ infra/ web-ui/   Optional AWS cloud stack (Strands Agent, REST API, CDK, React UI)
 ```
 
 Everything an agent needs — tools, workflows, guides, and role behavior — is served by
-the MCP server. Client-side files are minimal wiring: per-client manifests and entry
-points that name a role document without restating what it does.
+the MCP server. Nothing lives on the client side: a client only holds the one line that
+starts the server, and `sdpm register` writes that line for you.
 See [Architecture](docs/en/architecture.md) for the full picture.
 
 ---
@@ -158,6 +138,7 @@ See [Architecture](docs/en/architecture.md) for the full picture.
 | [Architecture](docs/en/architecture.md) | Layer design, data flow, auth model, MCP tool reference |
 | [Migration to v0.5](docs/en/migration-v0.5.md) | Upgrading from v0.4 (paths, skills removal) |
 | [Migration: role workflows](docs/en/migration-role-workflows.md) | Upgrading from v0.5 (workflow consolidation and renamed tools/skills) |
+| [Migration: onboarding](docs/en/migration-onboarding.md) | Upgrading from plugins / skills / `make install-kiro` / `uvx` to the installer |
 | [Recommended Deploy](docs/en/deploy-cloudshell.md) | AWS deployment via CloudShell (no CDK/Docker required) |
 | [Connecting Agents](docs/en/add-to-gateway.md) | MCP client connection guide |
 | [Teams & Slack Integration](docs/en/teams-slack-integration.md) | Chat platform integration |

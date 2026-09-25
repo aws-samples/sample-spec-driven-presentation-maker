@@ -6,232 +6,150 @@ SDPM はブラウザで使うことも、普段の AI エージェントに接�
 AWS アカウントなしでローカル利用できます。内部の 4 層構成については
 [アーキテクチャ](../en/architecture.md#4-layer-architecture)を参照してください。
 
-## 使い方を選ぶ
+## インストール
 
-### ブラウザで使う（フル機能）
-
-ローカル Web UI では、チャット、デッキ管理、編集可能なプレビュー、PowerPoint 出力を利用できます。
-macOS / Linux では次の 1 行で導入します。
+1 コマンドで SDPM が `~/.sdpm` に入ります: git checkout、MCP サーバーの環境、アイコンカタログ、
+`sdpm` ランチャー。同じ checkout がすべての面に使われます — MCP 経由の AI エージェントと、
+必要ならブラウザ用 Web UI。更新するものも削除するものも 1 つです。
 
 ```bash
+# macOS / Linux
 curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
 ```
 
-git、uv、LibreOffice、poppler、Node.js、Kiro CLI の導入、
-`${SDPM_HOME:-~/.sdpm}/checkout` への clone、Web UI のビルド、`sdpm` ランチャーと
-デスクトップショートカットの作成まで自動で行います。`sdpm` または `sdpm launch` を実行すると
-[http://localhost:3000](http://localhost:3000) が開きます。
-
-Windows では次を実行します。
-
 ```powershell
+# Windows（PowerShell 5.1 / 7。CI での検証のみ）
 irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
 ```
 
-Windows 対応は CI でのみ検証済みで、Windows 実機での手動 QA は未実施です。
+流れ:
 
-#### ランチャーコマンド
+1. 依存を確認し、無ければ導入を提案します: `git`、`uv`、そしてスライドプレビュー用の
+   LibreOffice と poppler。プレビューは任意で、無くてもデッキは生成されます。
+2. **「ブラウザ用の Web UI も入れますか？」** — yes なら Node.js 20+ と Kiro CLI（Web UI の
+   エージェント基盤）を入れて UI をビルド、no なら Node.js 不要の MCP のみ構成。
+3. `~/.sdpm/checkout` に clone し、サーバー環境を同期し、AWS / Material のアイコンカタログを取得。
+4. **「<client> に SDPM を登録しますか？」** — マシン上で見つかった MCP クライアントごとに 1 回
+   聞きます。yes と言わない限り何も書きません。最後に次にやることを表示します。
 
-| コマンド | 動作 |
+再実行しても既存のインストールを修復するだけで、2 つ目は作りません。
+
+### インストーラーのオプション
+
+| オプション | 効果 |
 |---|---|
-| `sdpm` / `sdpm launch` | ローカル Web UI を起動してブラウザで開く |
-| `sdpm update` | `main` を取得し、依存関係を更新して Web UI を再ビルド |
-| `sdpm check-update` | 新しいリビジョンがあるか確認 |
-| `sdpm doctor` | リポジトリの環境チェックを実行 |
-| `sdpm version` | 導入済みリビジョンを表示 |
-| `sdpm path` | checkout のパスを表示 |
-| `sdpm help` | コマンドヘルプを表示 |
+| `--full` / `--mcp-only` | プロファイルの質問を省く |
+| `--register` / `--no-register` | 検出した全クライアントに登録 / 設定を表示するだけ |
+| `--non-interactive` | すべて yes（プロファイルは full） |
+| `--skip-libreoffice`, `--skip-shortcut` | それらを省く |
+| `--deps-only` | `git`・`uv`・LibreOffice・poppler だけ入れる（開発者の checkout 向け） |
 
-#### インストーラーオプション
+環境変数版: `SDPM_PROFILE=full|mcp`、`SDPM_REGISTER=yes|no`、`SDPM_NON_INTERACTIVE=1`、
+`SDPM_HOME`（既定 `~/.sdpm`）、`SDPM_LAUNCHER_DIR`（既定 `~/.local/bin`、Windows は
+`%USERPROFILE%\bin`）。`curl … | bash -s -- --mcp-only` のようにオプションを渡せます。
 
-| macOS / Linux | Windows | 動作 |
-|---|---|---|
-| `--deps-only` | `-DepsOnly` | git、uv、LibreOffice、poppler だけを導入 |
-| `--non-interactive` | `-NonInteractive` | 依存関係の導入確認を自動承認 |
-| `--skip-libreoffice` | `-SkipLibreOffice` | LibreOffice の確認と導入を省略 |
-| `--skip-shortcut` | `-SkipShortcut` | デスクトップショートカットを作成しない |
+## `sdpm` ランチャー
 
-導入先を変更する場合は `SDPM_HOME` を設定します。既定値は Unix で `~/.sdpm`、
-Windows で `%USERPROFILE%\.sdpm` です。
+```
+sdpm                    状態: 版、プロファイル、入っている面、接続済みクライアント
+sdpm webui              ブラウザ用 Web UI を起動して開く
+sdpm mcp                MCP サーバーを stdio で起動（ターミナルでの動作確認用）
+sdpm register [CLIENT]  MCP クライアントに接続（クライアントごとに確認。--yes, --dry-run）
+sdpm unregister         接続を解除
+sdpm mcp-config [CLIENT]  このマシンのパス入りでクライアント設定を表示（--json, --all）
+sdpm update [--with-webui]  main を取得して同期し、入っているものを再ビルド（Web UI の追加も）
+sdpm doctor             環境チェック
+sdpm uninstall          ~/.sdpm・ランチャー・ショートカットを削除。登録解除も提案
+```
 
-### いつもの AI エージェントから使う
+ランチャーは全 OS で同じです。`sdpm mcp` は人間用で、クライアントに渡す設定は `uv` と
+checkout を直接指します（次節）。
 
-クライアントを選び、表の操作を行ってください。`uvx` を使う経路は checkout が不要です。
-初回は uv がパッケージをビルドしてキャッシュするため、数十秒かかることがあります。
+## AI エージェントから使う（MCP）
 
-| クライアント | 導入方法 |
+`sdpm register` は各クライアント自身の CLI で接続するので、設定ファイルを手で編集しません:
+
+| クライアント | `sdpm register` がすること |
 |---|---|
-| Claude Desktop | [`sdpm.mcpb` をダウンロード](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb)してダブルクリック |
-| Cursor | [![Add to Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=sdpm&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJnaXQraHR0cHM6Ly9naXRodWIuY29tL2F3cy1zYW1wbGVzL3NhbXBsZS1zcGVjLWRyaXZlbi1wcmVzZW50YXRpb24tbWFrZXIjc3ViZGlyZWN0b3J5PXNlcnZlcnMvbG9jYWwiLCJzZHBtLW1jcCJdfQ==) |
-| Visual Studio Code | `code --add-mcp '{"name":"sdpm","command":"uvx","args":["--from","git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local","sdpm-mcp"]}'` |
-| Kiro CLI | `kiro-cli mcp add --name sdpm --command uvx --args '["--from","git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local","sdpm-mcp"]' --scope global` |
-| Claude Code | `/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker` → `/plugin install sdpm@sdpm` |
-| Codex | チェックアウトで `codex plugin marketplace add ./` を実行し、ChatGPT デスクトップアプリから導入 |
+| Kiro CLI（Kiro IDE も — `~/.kiro/settings/mcp.json` を共有） | `kiro-cli mcp add --scope global …` |
+| Claude Code | `claude mcp add --scope user sdpm -- …` |
+| Visual Studio Code | `code --add-mcp …` |
+| Codex（CLI / IDE 拡張 / ChatGPT デスクトップアプリ） | `codex mcp add sdpm -- …` |
+| Cursor | 実パスで組み立てた `cursor://…/mcp/install` deep link を開く — 1 クリック |
+| Kiro CLI 無しの Kiro IDE、その他 | JSON と書き込み先ファイルを表示 |
+| Claude Desktop | 代わりに [`sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) をダブルクリック |
 
-`uvx` を使うクライアントでは、OS 依存を次の 1 行で導入できます。
+どの設定も同じ 1 行で、絶対パスです:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --deps-only
+```json
+{
+  "mcpServers": {
+    "sdpm": {
+      "command": "/Users/you/.local/bin/uv",
+      "args": ["run", "--directory", "/Users/you/.sdpm/checkout/servers/local", "python", "server.py"]
+    }
+  }
+}
 ```
 
-LibreOffice と poppler は PNG プレビューの描画に使用します。未導入でも PPTX は生成できます。
-Claude Desktop は Python ランタイムを管理し、`.mcpb` には公式アイコンカタログが同梱されます。
+絶対パスが重要です: Dock やスタートメニューから起動した GUI クライアントはシェルの `PATH` を
+引き継ぎません。`sdpm mcp-config` があなたのパスを埋めたこのブロックを表示するので、上の表に
+無いクライアントにはそのまま貼ります。
 
-AWS / Material のアイコンカタログは、サーバー初回起動時にバックグラウンドで取得されます（約 40 MB。
-完了までは `search_assets` が進行状況をエージェントに返します）。事前に取得したい場合や、実行時に
-ネットワークが使えないホストでは次を実行します。
+あとはエージェントにスライドを頼むだけです。最初に呼ばれる `start_presentation` が、作業を導く
+役割文書と使えるスタイル・テンプレートを返します — MCP サーバーだけで完全な構成です。モードを
+明示するにはサーバーの prompt を使います: `sdpm-vibe`（素材から質問なし）、`sdpm-spec`（対話で
+構成を固める）、`sdpm-style`、`sdpm-translate`（Claude Code `/mcp__sdpm__sdpm-vibe`、VS Code
+`/mcp.sdpm.sdpm-vibe`、Kiro CLI `/sdpm-vibe`）。
 
-```bash
-uvx --from "git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local" sdpm-install-assets
-```
+スライドプレビューには LibreOffice と poppler が必要です。無くてもデッキは生成され、ビルド結果に
+`preview: {"status": "unavailable", "install": "…"}` として OS 別の導入コマンドが載り、
+エージェントがそれを伝えます。アイコンカタログが何らかの理由で無い場合は、サーバー初回起動時に
+バックグラウンドで取得されます。
 
-既定の `uvx` コマンドは `main` を追従します。キャッシュ済みの checkout とパッケージを強制更新するには
-次を実行します。
+## ブラウザから使う（Web UI）
 
-```bash
-uvx --refresh --from "git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local" sdpm-install-assets --help
-```
-
-導入後はエージェントに「〜のスライドを作って」と頼んでください。エージェントが最初に呼ぶ
-`start_presentation` が、オーケストレーターの役割文書と使えるスタイル・テンプレートを返します。
-スライドを書くサブエージェントは `start_composing`、スタイル作成は `start_style`、翻訳は
-`start_translation` から始まります。MCP サーバーだけで完全な構成です — skill やエージェント定義は
-任意の追加要素です。モードを明示するにはサーバーの prompt を使います: `sdpm-vibe`（素材から質問なし）、
-`sdpm-spec`（対話で構成を固める）、`sdpm-style`、`sdpm-translate`（Claude Code `/mcp__sdpm__sdpm-vibe`、
-VS Code `/mcp.sdpm.sdpm-vibe`、Kiro CLI `/sdpm-vibe`）。
+`sdpm webui` は Web UI をローカルモードで起動して開きます — `http://localhost:3000` の Next.js が
+Kiro CLI と ACP で話します。初回の前に `kiro-cli login` を 1 度実行してください。インストーラーは
+デスクトップショートカットも作ります。MCP のみ構成に Web UI を後から足すには
+`sdpm update --with-webui`。詳細: [Web UI ローカルモード](../../web-ui/README_ja.md#local-mode)。
 
 ## AWS にデプロイする
 
 チーム向けのリモート MCP サーバーまたはホスト型 Web UI には
 [ワンクリックデプロイ](../en/deploy-cloudshell.md#one-click-deploy-recommended)を使用してください。
 推奨経路は AWS CloudShell から実行でき、ローカルの CDK / Docker は不要です。開発・デバッグ用の
-直接 CDK 手順は[手動セットアップ](#手動セットアップ)にあります。
+直接 CDK 手順は[開発者向けセットアップ](#開発者向けセットアップ)にあります。
 
-## 手動セットアップ
+## 開発者向けセットアップ
 
-以下はコントリビューター、クライアントの高度な設定、AWS の直接開発向けです。2 つの
-クイックスタートでは不要な実装詳細を含みます。
+`~/.sdpm/checkout` ではなく自分の clone で作業するコントリビューター向け。
+
+### checkout からローカル MCP サーバー
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --deps-only
+git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
+cd sample-spec-driven-presentation-maker
+uv sync
+(cd servers/local && uv sync)
+uv run python3 sdpm/scripts/download_aws_icons.py
+uv run python3 sdpm/scripts/download_material_icons.py
+make smoke        # ローカルサーバーに tools/list + start_presentation
+```
+
+クライアントは同じ 1 行設定で clone の `servers/local` を指します — checkout に書かせるなら:
+
+```bash
+uv run --directory servers/local python client_config.py --checkout "$PWD" print --all
+```
 
 ### MCP を使わないエージェントスキル
 
-`sdpm/` を SKILL.md 対応エージェントの skills ディレクトリへコピーまたは symlink すると、
-エンジンを直接利用できます。エージェントは `scripts/pptx_builder.py` を呼び出すため、MCP サーバーも
-AWS アカウントも不要です。
-
-```bash
-cd sdpm
-uv sync
-
-# アイコンのダウンロード（任意、推奨）
-uv run python3 scripts/download_aws_icons.py
-uv run python3 scripts/download_material_icons.py
-
-# 動作確認
-uv run python3 scripts/pptx_builder.py list_templates
-```
-
-エンジン、リファレンス（ワークフロー・ガイド・同梱スタイル）、サンプルテンプレート（dark/light）、SKILL.md がすべて含まれています。
-
-### ローカル MCP サーバー
-
-AWS を使わず、SDPM を MCP 対応クライアントへ接続します。
-
-#### checkout からの Kiro CLI 導入
-
-クイックスタートの `kiro-cli mcp add … uvx …` 1 行で構成は完全です。オーケストレーターは通常の
-サブエージェントとして composer を spawn し、composer は `start_composing` から始めます。
-`make install-kiro` は checkout ベースの代替手段で、加えて `sdpm-*` skill（スラッシュコマンドの
-入口）を link し、SDPM だけを MCP サーバーに持つ `sdpm-composer` エージェントを生成します —
-MCP サーバーが多いプロファイル向けの最適化であり、必須ではありません。
-
-```bash
-git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
-cd sample-spec-driven-presentation-maker
-make install-kiro
-kiro-cli chat   # あとは「〜のスライドを作って」と頼むだけ
-```
-
-`sdpm` を `<KIRO_HOME>/settings/mcp.json`（既定は `~/.kiro`）へ登録し、入口を
-`<KIRO_HOME>/skills/` へ link し、`<KIRO_HOME>/agents/sdpm-composer.json` を生成します。
-composer profile はプロファイル内の全サーバーではなく、SDPM MCP サーバーだけを起動します。
-checkout は移動せずに保持してください。更新は `git pull` で行い、移動した場合だけ
-`make install-kiro` を再実行します。
-
-```bash
-uv run python3 clients/kiro/install.py --agent NAME       # 特定のエージェント設定に登録
-uv run python3 clients/kiro/install.py --mode legacy      # Power 自動判定を使わない
-KIRO_HOME=~/.kiro-sdpm-dev make install-kiro              # 別プロファイルに導入
-```
-
-別の checkout が配線を所有している場合、インストーラーは上書きせず停止します。別の
-`KIRO_HOME` を使う、他方の配線を削除する、または意図的に切り替える場合だけ
-`--replace-existing` を指定してください。
-
-#### Kiro IDE Power
-
-リポジトリルートは [Agent Plugins](https://agent-plugins.org) パッケージ
-（`plugin.json`、`mcp.json`、`skills/`）です。Kiro IDE から checkout を Power として導入します。
-同梱 MCP サーバーは Kiro がグローバルスコープで管理します。GitHub import URL は実機での検証が
-別途必要なため、このガイドでは未検証のワンクリック URL を案内しません。
-
-同じプロファイルで Power と checkout ベースの Kiro CLI 配線を同時に有効にしないでください。
-別の `KIRO_HOME` を使います。Power があるプロファイルで `make install-kiro` を実行すると、
-インストーラーは自身が作った旧配線を削除します。
-
-#### checkout から Codex プラグインを導入
-
-```bash
-codex plugin marketplace add ./
-```
-
-checkout 内で実行し、ChatGPT デスクトップアプリから `spec-driven-presentation-maker` を導入して
-新しい会話を開始します。Codex はプラグインを `~/.codex/plugins/cache/…` へコピーし、書き込み可能な
-plugin data に Python 環境を作成します。
-
-#### MCP の手動設定
-
-clone 不要の構成では、次の stdio サーバー定義をクライアントへ追加します。
-
-```json
-{
-  "mcpServers": {
-    "sdpm": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/aws-samples/sample-spec-driven-presentation-maker#subdirectory=servers/local",
-        "sdpm-mcp"
-      ]
-    }
-  }
-}
-```
-
-ソース checkout から起動する場合は、サーバーを準備して動作確認します。
-
-```bash
-cd servers/local
-uv sync
-uv run python server.py
-```
-
-クライアントの MCP 設定では、checkout の絶対パスを指定します。
-
-```json
-{
-  "mcpServers": {
-    "spec-driven-presentation-maker": {
-      "command": "uv",
-      "args": ["run", "--directory", "/absolute/path/to/servers/local", "python", "server.py"]
-    }
-  }
-}
-```
-
-接続後に「プレゼンテーションを作って」と依頼してください。エージェントがワークフローを読み、
-トピック・対象者・目的を確認し、ブリーフ、アートディレクション、アウトライン、スライドを作成して、
-PPTX とプレビューを生成します。ツール一覧は
-[アーキテクチャの MCP ツール一覧](../en/architecture.md#mcp-tool-reference)を参照してください。
+`sdpm/SKILL.md` は MCP 非対応のエージェント向けに CLI（`sdpm/scripts/pptx_builder.py`）を直接
+操作します。`sdpm/` をエージェントの skills ディレクトリにコピーまたはシンボリックリンクすれば、
+エンジン・参照資料・テンプレートがすべて含まれています。アーキテクチャ上の成果物であり、
+推奨経路ではありません。
 
 ### リモート MCP サーバー（AWS）
 

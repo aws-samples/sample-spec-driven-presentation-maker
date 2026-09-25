@@ -45,17 +45,27 @@ Entries before v0.5.0 were written retroactively as summaries.
 - `SDPM_DISABLE_INSTRUCTIONS=1` serves no MCP server instructions — nothing
   depends on them any more; the entry tools' own descriptions carry the routing.
 
-- **Clone-free local MCP startup and one-action client setup** — the local server now
-  runs from GitHub with `uvx` and exposes `sdpm-mcp` and `sdpm-install-assets` console
-  scripts. On first start the server fetches the icon catalogs in the background
-  (`SDPM_AUTO_INSTALL_ASSETS=0` opts out), and `search_assets` reports a missing or
-  in-progress catalog instead of exiting the process. Generated, drift-tested snippets cover Cursor, Visual Studio Code, Kiro CLI,
-  Claude Code, and generic MCP configuration; Claude Desktop releases include a
-  double-click `.mcpb` bundle.
-- **Local Web UI installers for macOS, Linux, and Windows** — `install.sh` /
-  `install.ps1` install dependencies, build the Web UI, and add an `sdpm` launcher and
-  desktop shortcut. Dependency-only and non-interactive modes support agent setup and CI;
-  Windows is verified in CI only.
+- **One installer, one launcher.** `install.sh` / `install.ps1` install SDPM into
+  `~/.sdpm` once — dependencies, checkout, MCP server environment, icon catalogs — and
+  create the `sdpm` launcher. The installer asks two questions: whether to add the browser
+  Web UI (`--full` / `--mcp-only`; MCP-only needs no Node.js) and which detected MCP
+  clients to connect (`--register` / `--no-register`). `sdpm webui` starts the Web UI,
+  `sdpm mcp` runs the server on stdio, `sdpm register` / `unregister` / `mcp-config`
+  connect clients through their own CLIs — Kiro CLI (covers Kiro IDE), Claude Code,
+  VS Code, Codex — or open Cursor's deep link built with the real paths; other clients
+  get the JSON and the file it belongs in. `sdpm` alone shows status; `sdpm update
+  [--with-webui]` upgrades both surfaces; `sdpm uninstall` removes everything. Client
+  detection, configuration and registration live once in
+  `servers/local/client_config.py`; both launchers delegate to it. Every client
+  configuration points at the absolute `uv` and checkout paths (GUI apps do not inherit
+  `PATH`). Same command set on macOS, Linux and Windows (Windows verified in CI only).
+- **Previews report what is missing, once, where it matters.** When LibreOffice or
+  poppler is absent, the build result carries `preview: {"status": "unavailable",
+  "missing": [...], "install": "<one command for this OS>"}` and the deck still builds;
+  nothing else nags. Icon catalogs missing for any reason are fetched in the background on
+  the server's first start (`SDPM_AUTO_INSTALL_ASSETS=0` opts out), and `search_assets`
+  reports a missing or in-progress catalog instead of exiting the process.
+
 - **Bundled styles re-organised into two tiers** — an *orthodox* tier for when
   looks do not matter (`report`, `briefing`, `aws-light`, `aws-dark`) and a
   *concept* tier chosen by look (added in phases, listed below). The previous
@@ -163,6 +173,20 @@ Entries before v0.5.0 were written retroactively as summaries.
   about plus one question (audience and talk length). A chip above the chat
   shows the source session. The orchestrator workflow gained a `Continued
   from:` paragraph defining that first reply.
+
+### Removed
+
+- **The plugin layer, skills and the Kiro installer.** `plugin.json` + `mcp.json` (Agent
+  Plugins / Kiro Power), `.claude-plugin/`, `.codex-plugin/` + `.mcp.json`, `skills/`, the
+  `sdpm-composer` Claude Code agent, `clients/kiro/install.py` and `make install-kiro`.
+  Since the `start_*` entry tools (#394) and the `sdpm-*` prompts (#395) nothing has to be
+  placed on the agent side; these only wrapped one MCP server line in vendor manifests
+  and carried three extra copies of the version. The `uvx --from git+https://…` path and
+  its generated snippets are removed with them: PyPI is unavailable to this repository,
+  the git URL followed `main` yet was frozen by uv's cache, and it gave a user who also
+  installed the Web UI a second copy of the server. Migration: run the installer once and
+  see `docs/en/migration-onboarding.md`. The Claude Desktop `.mcpb` bundle stays
+  (now built from `scripts/mcpb/`).
 
 ### Fixed
 

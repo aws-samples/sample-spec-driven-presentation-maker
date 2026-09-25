@@ -57,12 +57,13 @@ Rules that follow from this:
 4. **Role documents are content, not client config** ("server-driven behavior").
    Each role (orchestrator, composer, style, translate) has exactly one document,
    `sdpm/references/workflows/<role>.md`, served through the port via
-   the role's `start_*` entry tool. Entry points (skills, agent definitions, `SKILL.md`,
-   server instructions) only ever name a role document — they never restate or
-   duplicate its content.
+   the role's `start_*` entry tool. Entry points (the `sdpm-*` prompts, ACP agent
+   definitions, `SKILL.md`, server instructions) only ever name a role document — they
+   never restate or duplicate its content. Nothing else lives on the client side: a client
+   holds the one line that starts the server, written by `sdpm register`.
 
    Role assignment is a dispatch-time decision, not a discovery-time one: a
-   spawner (the orchestrator delegating to a composer, a skill dispatching a
+   spawner (the orchestrator delegating to a composer, a prompt dispatching a
    role, a client picking a mode) tells the spawned agent which role to load in
    its first instruction. The agent then calls `start_<role>(...)`
    itself. There is no docstring heuristic to infer role from arguments, and no
@@ -70,15 +71,15 @@ Rules that follow from this:
    — every consumer, including the L4 agent, fetches live.
 5. **Change-locality goal** — the structure is optimised so that:
    prompt changes touch only `sdpm/references/workflows/`; engine changes touch only
-   `sdpm/sdpm/engine/`; a new client touches only `clients/`; a new tool
-   touches only `sdpm/sdpm/tools/`.
+   `sdpm/sdpm/engine/`; a new MCP client touches only the client table in
+   `servers/local/client_config.py`; a new tool touches only `sdpm/sdpm/tools/`.
 
 Known debt against this philosophy:
 - `api/index.py` has no test coverage (tracked for v0.5.x).
 - `sdpm.tools.attachment.pipeline` imports the repository-level `shared` package,
-  so the core currently depends outward on shared application code. The sdpm wheel
-  bundles `shared` to preserve that existing dependency; a future package-boundary
-  cleanup should move the required attachment logic inward before PyPI publication.
+  so the core currently depends outward on shared application code. Harmless while the
+  server always runs from a checkout; move the required attachment logic inward before
+  the core is ever packaged on its own.
 
 (v0.5.2 resolved: `converter/elements.py` monolith → `converter/elements/`
 package with an enforced dependency DAG; scale state → ContextVar scope.)
