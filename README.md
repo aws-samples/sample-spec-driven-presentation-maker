@@ -69,7 +69,7 @@ and follows it. To choose explicitly, use the server's prompts where your client
 `vibe` (build from material, no questions), `spec` (shape the deck in dialogue first),
 `style` (a reusable style guide), `translate` (a language variant of a deck) — Claude
 Desktop's "+" menu, Claude Code `/mcp__sdpm__vibe`, VS Code `/mcp.sdpm.vibe`, Kiro CLI
-`@vibe`. Each prompt only names the role's entry tool; the behavior itself still lives in
+`@sdpm/vibe`. Each prompt only names the role's entry tool; the behavior itself still lives in
 `sdpm/references/workflows/`, in one place.
 
 **Prerequisites for local use:** [`uv`](https://docs.astral.sh/uv/) on your `PATH`, plus

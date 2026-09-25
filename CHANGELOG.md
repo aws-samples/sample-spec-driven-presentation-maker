@@ -14,7 +14,7 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 - **MCP prompts `vibe`, `spec`, `style`, `translate`** — user-invoked entry
   points every MCP client can surface (Claude Desktop's "+" menu, Claude Code
-  `/mcp__sdpm__vibe`, VS Code `/mcp.sdpm.vibe`, Kiro CLI `@vibe`). `vibe` and
+  `/mcp__sdpm__vibe`, VS Code `/mcp.sdpm.vibe`, Kiro CLI `@sdpm/vibe`). `vibe` and
   `spec` carry the `Interaction mode: fast` / `dialogue` token the orchestrator
   already understands, so the Web UI's Spec / Vibe choice is available from any
   client; each prompt is one line naming the role's entry tool — the role text
