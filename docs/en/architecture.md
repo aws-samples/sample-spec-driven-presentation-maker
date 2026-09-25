@@ -223,6 +223,7 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 
 | Category | Tool | Description |
 |----------|------|-------------|
+| Prompts | `sdpm-vibe`, `sdpm-spec`, `sdpm-style`, `sdpm-translate` | User-invoked (slash-command) entry points; `vibe` / `spec` set the interaction mode |
 | Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate) |
 | Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template` | Create deck workspace, validate specs, apply style, analyze template |
 | Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview |

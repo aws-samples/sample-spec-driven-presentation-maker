@@ -807,6 +807,11 @@ def apply_style(
 
 offloaded_tool(contract.read_guides)
 
+# User-invoked entry points (slash commands / prompt menu): vibe, spec, style, translate
+from sdpm.tools import prompts as _prompts  # noqa: E402
+
+_prompts.register(mcp)
+
 
 # --- Utility Tools ---
 

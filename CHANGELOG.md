@@ -12,6 +12,15 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **MCP prompts `sdpm-vibe`, `sdpm-spec`, `sdpm-style`, `sdpm-translate`** — user-invoked entry
+  points every MCP client can surface (Claude Desktop's "+" menu, Claude Code
+  `/mcp__sdpm__sdpm-vibe`, VS Code `/mcp.sdpm.sdpm-vibe`, Kiro CLI `/sdpm-vibe`). `sdpm-vibe` and
+  `sdpm-spec` carry the `Interaction mode: fast` / `dialogue` token the orchestrator
+  already understands, so the Web UI's Spec / Vibe choice is available from any
+  client; each prompt is one line naming the role's entry tool — the role text
+  itself is still fetched, never copied. Defined once in `sdpm.tools.prompts`,
+  bound by the local, ACP and remote servers.
+
 - **Role entry tools — `start_presentation`, `start_composing`, `start_style`,
   `start_translation`.** Each returns the role document *and* what that role
   always reads first, in one call: the orchestrator gets the style and template
