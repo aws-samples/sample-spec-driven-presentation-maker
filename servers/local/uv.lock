@@ -1415,7 +1415,7 @@ wheels = [
 [[package]]
 name = "sdpm-mcp-local"
 version = "1.0.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "mcp", extra = ["cli"] },
     { name = "openpyxl" },

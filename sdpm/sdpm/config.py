@@ -9,34 +9,20 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-# Path anchors for the skill distribution (package dir = sdpm/, source root =
-# its parent). Wheels copy the sibling references/templates/assets directories
-# into sdpm/_data without changing their checkout locations.
-# SDPM_SKILL_ROOT remains the highest-priority override for containers and
-# custom installs where package code and bundled data are separated.
+# Path anchors for the skill distribution (package dir = sdpm/, root = its parent).
+# All bundled-data lookups must go through these so that moving modules inside
+# the package never silently changes what they point at.
+# SDPM_SKILL_ROOT overrides the root for installs where the package is
+# separated from its bundled data (e.g. pip-installed engine in a container
+# with references/ and templates/ copied elsewhere).
 PACKAGE_DIR = Path(__file__).resolve().parent
-_BUNDLED_DATA_DIR = PACKAGE_DIR / "_data"
 _skill_root_env = os.environ.get("SDPM_SKILL_ROOT")
-if _skill_root_env:
-    SKILL_ROOT = Path(_skill_root_env).expanduser()
-elif _BUNDLED_DATA_DIR.is_dir():
-    SKILL_ROOT = _BUNDLED_DATA_DIR
-else:
-    SKILL_ROOT = PACKAGE_DIR.parent
-
+SKILL_ROOT = Path(_skill_root_env).expanduser() if _skill_root_env else PACKAGE_DIR.parent
 ASSETS_DIR = SKILL_ROOT / "assets"
 REFERENCES_DIR = SKILL_ROOT / "references"
 TEMPLATES_DIR = SKILL_ROOT / "templates"
 SCRIPTS_DIR = SKILL_ROOT / "scripts"
-
-if _skill_root_env or SKILL_ROOT != _BUNDLED_DATA_DIR:
-    CACHE_DIR = SKILL_ROOT / ".cache"
-elif sys.platform == "win32":
-    _cache_base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-    CACHE_DIR = _cache_base / "sdpm" / "cache"
-else:
-    _cache_base = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
-    CACHE_DIR = _cache_base / "sdpm"
+CACHE_DIR = SKILL_ROOT / ".cache"
 
 _DEFAULTS = {
     "output_dir": "~/Documents/SDPM-Presentations",
@@ -63,15 +49,7 @@ def get_user_config_dir() -> Path:
 
 
 def assets_install_dir() -> Path:
-    """Return the writable base directory for downloaded asset catalogs.
-
-    Source checkouts and explicit ``SDPM_SKILL_ROOT`` overrides keep the
-    historical ``ASSETS_DIR`` destination. Installed wheels write to the
-    user-local assets directory, which asset discovery already searches before
-    bundled data.
-    """
-    if not _skill_root_env and SKILL_ROOT == _BUNDLED_DATA_DIR:
-        return get_user_config_dir() / "assets"
+    """Writable base directory for downloaded asset catalogs (the checkout's assets/)."""
     return ASSETS_DIR
 
 

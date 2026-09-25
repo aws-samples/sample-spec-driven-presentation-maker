@@ -45,8 +45,8 @@ tar -C "$ROOT" \
   --exclude='*/.DS_Store' \
   --exclude='*.pyc' \
   -cf - servers/local sdpm shared | tar -C "$STAGE" -xf -
-cp "$ROOT/clients/claude-desktop/manifest.json" "$STAGE/manifest.json"
-cp "$ROOT/clients/claude-desktop/.mcpbignore" "$STAGE/.mcpbignore"
+cp "$ROOT/scripts/mcpb/manifest.json" "$STAGE/manifest.json"
+cp "$ROOT/scripts/mcpb/.mcpbignore" "$STAGE/.mcpbignore"
 
 # The UV MCPB runtime requires a pyproject.toml at bundle root. Reuse the local
 # server's dependency declaration, point its sdpm-skill source into the bundle,

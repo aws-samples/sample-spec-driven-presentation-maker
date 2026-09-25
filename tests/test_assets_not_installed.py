@@ -23,8 +23,8 @@ def no_assets(tmp_path, monkeypatch):
     monkeypatch.setattr(assets, "ASSETS_DIR", tmp_path / "bundled")
     monkeypatch.setattr(assets, "get_user_config_dir", lambda: tmp_path / "user")
     monkeypatch.setattr(assets, "get_extra_sources", lambda: [])
-    monkeypatch.setattr(assets, "assets_install_dir", lambda: tmp_path / "user" / "assets")
     monkeypatch.setattr(config, "ASSETS_DIR", tmp_path / "bundled")
+    monkeypatch.setattr(download, "assets_install_dir", lambda: tmp_path / "user" / "assets")
     assets.invalidate_manifest_cache()
     yield tmp_path
     assets.invalidate_manifest_cache()
@@ -33,7 +33,7 @@ def no_assets(tmp_path, monkeypatch):
 def test_core_raises_instead_of_exiting(no_assets):
     with pytest.raises(assets.AssetsNotInstalledError) as excinfo:
         assets.search_assets("cloud")
-    assert "sdpm-install-assets" in excinfo.value.install_command
+    assert "download_aws_icons.py" in excinfo.value.install_command
     with pytest.raises(assets.AssetsNotInstalledError):
         assets.resolve_asset_path("icons:cloud")
     assert assets.assets_installed() is False
@@ -44,7 +44,7 @@ def test_tool_reports_missing_catalog(no_assets, monkeypatch):
     result = tools.search_assets("cloud")
     assert result["results"] == []
     assert result["assets_installed"] is False
-    assert "sdpm-install-assets" in result["error"]
+    assert "download_aws_icons.py" in result["error"]
     # Empty query (list sources) takes the same path.
     assert tools.search_assets("")["assets_installed"] is False
 

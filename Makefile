@@ -1,4 +1,4 @@
-.PHONY: all lint test format check smoke doctor install-kiro lock
+.PHONY: all lint test format check smoke doctor lock
 
 all: lint test
 
@@ -21,9 +21,6 @@ smoke:
 # Diagnose local setup (uv / LibreOffice / poppler / checkout paths)
 doctor:
 	uv run python scripts/doctor.py
-
-install-kiro:
-	uv run python3 clients/kiro/install.py
 
 # Regenerate container dependency locks (agent + servers/remote).
 # Both images build for linux/arm64 + Python 3.13 (AgentCore Runtime).

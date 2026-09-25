@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from sdpm.config import ASSETS_DIR, assets_install_dir, get_extra_sources, get_user_config_dir
+from sdpm.config import ASSETS_DIR, get_extra_sources, get_user_config_dir
 from sdpm.utils.svg import _recolor_svg  # noqa: F401 - re-exported for builder
 from .download import install_assets  # noqa: F401 - public asset installation API
 _KNOWN_EXTS = (".svg", ".png", ".gif", ".jpg", ".jpeg")
@@ -160,9 +160,7 @@ class AssetsNotInstalledError(RuntimeError):
 
 
 def assets_install_command() -> str:
-    """The command that installs the official icon catalogs in the current setup."""
-    if assets_install_dir() != ASSETS_DIR:
-        return "sdpm-install-assets"
+    """The command that installs the official icon catalogs into this checkout."""
     return "uv run python3 scripts/download_aws_icons.py && uv run python3 scripts/download_material_icons.py"
 
 
