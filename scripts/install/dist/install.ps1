@@ -19,7 +19,9 @@ $script:CurrentStep = 0
 
 function Show-Header {
     param([string]$Title = "SDPM Setup", [string]$Version = "")
-    if ($Host.Name -ne "ServerRemoteHost") { Clear-Host }
+    if ($Host.Name -ne "ServerRemoteHost" -and -not [Console]::IsOutputRedirected) {
+        try { Clear-Host } catch { }
+    }
     Write-Host ""
     Write-Host "  ===========================================" -ForegroundColor Cyan
     Write-Host "  $Title  v$Version" -ForegroundColor Cyan

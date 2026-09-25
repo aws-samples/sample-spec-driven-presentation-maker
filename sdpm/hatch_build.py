@@ -10,6 +10,11 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 _IGNORED_NAMES = {".DS_Store", "__MACOSX", "__pycache__", "config.example.json", "config.json"}
 
+# Downloaded asset catalogs (gitignored, ~36 MB) live under assets/<source>/ in a
+# developer checkout. They are installed at runtime by sdpm-install-assets and
+# must never ride in the wheel, whatever the builder's checkout contains.
+_EXCLUDED_SUBTREES = {("assets", "aws"), ("assets", "material")}
+
 
 def _add_tree(build_data: dict, source: Path, destination: str) -> None:
     """Add filtered files below *source* to Hatch's force-include map."""
@@ -20,6 +25,8 @@ def _add_tree(build_data: dict, source: Path, destination: str) -> None:
     for path in source.rglob("*"):
         relative = path.relative_to(source)
         if not path.is_file() or any(part in _IGNORED_NAMES for part in relative.parts):
+            continue
+        if (source.name, *relative.parts[:1]) in _EXCLUDED_SUBTREES:
             continue
         if path.suffix == ".pyc" or path.name.startswith("._"):
             continue

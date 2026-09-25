@@ -155,19 +155,23 @@ export class DataStack extends cdk.Stack {
       destinationKeyPrefix: "templates/",
     });
 
-    // Deploy asset icons — auto-download if not present
-    const assetsDir = path.join(__dirname, "../../sdpm/assets");
-    const scriptsDir = path.join(__dirname, "../../sdpm/scripts");
+    // Deploy asset icons — auto-download if not present.
+    // The asset root is sdpm/ (not sdpm/scripts): the download scripts import the
+    // sdpm package, so the Docker fallback needs it inside the container too.
+    const skillDir = path.join(__dirname, "../../sdpm");
+    const assetsDir = path.join(skillDir, "assets");
+    const scriptsDir = path.join(skillDir, "scripts");
     new s3deploy.BucketDeployment(this, "DeployIcons", {
       sources: [
-        s3deploy.Source.asset(scriptsDir, {
+        s3deploy.Source.asset(skillDir, {
+          exclude: ["assets/aws", "assets/material", "**/__pycache__", "**/.venv", "build", "dist"],
           bundling: {
             image: cdk.DockerImage.fromRegistry("python:3.13-slim"),
             command: [
               "bash", "-c",
-              "python3 /asset-input/download_aws_icons.py && " +
-              "python3 /asset-input/download_material_icons.py && " +
-              "cp -r /asset-input/../assets/* /asset-output/",
+              "python3 /asset-input/scripts/download_aws_icons.py && " +
+              "python3 /asset-input/scripts/download_material_icons.py && " +
+              "cp -r /asset-input/assets/* /asset-output/",
             ],
             local: {
               tryBundle(outputDir: string): boolean {

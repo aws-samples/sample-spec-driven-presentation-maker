@@ -18,7 +18,7 @@ LAST_ELAPSED=${LAST_ELAPSED:-}
 
 show_header() {
   local title="$1" version="${2:-}"
-  [[ -t 1 ]] && clear 2>/dev/null || true
+  if [[ -t 1 ]]; then clear 2>/dev/null || true; fi
   echo ""
   printf "  ${C_CYAN}╭───────────────────────────────────────────╮${C_RESET}\n"
   printf "  ${C_CYAN}│  %-28s v%-8s │${C_RESET}\n" "$title" "$version"
