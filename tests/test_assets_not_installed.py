@@ -9,8 +9,6 @@ so a clone-free setup needs no separate step.
 from __future__ import annotations
 
 import json
-from pathlib import Path
-
 import pytest
 
 import sdpm.config as config
@@ -97,11 +95,17 @@ def test_ensure_assets_installed_async_failure_is_reported_not_raised(no_assets,
     assert result["install_status"]["state"] == "failed"
 
 
-def test_ensure_assets_installed_async_skips_when_present(tmp_path, monkeypatch):
+def test_ensure_assets_installed_async_skips_when_present(no_assets, monkeypatch):
     monkeypatch.setattr(download, "_background", {"state": "idle", "error": None, "thread": None})
+    catalog = no_assets / "user" / "assets" / "aws"
+    catalog.mkdir(parents=True)
+    (catalog / "manifest.json").write_text(json.dumps({
+        "source": "aws",
+        "icons": [{"name": "cloud", "file": "cloud.svg", "tags": [], "category": "c", "type": "service"}],
+    }))
+    assets.invalidate_manifest_cache()
     called = []
     monkeypatch.setattr(download, "install_assets", lambda *a, **k: called.append(1))
-    assert Path(config.ASSETS_DIR, "aws", "manifest.json").exists(), "dev checkout has catalogs"
     assert download.ensure_assets_installed_async() is False
     assert called == []
 
