@@ -729,7 +729,8 @@ def apply_style(
     """Apply a style (and optionally a template) to a deck: writes specs/art-direction.html
     and completes deck.json (template, defaultTextColor, fonts, slideSize). Returns what
     was written, which fields changed and where each value came from — fix anything
-    wrong in deck.json with run_python.
+    wrong in deck.json with run_python — and style_toc, a line-numbered map of the
+    style file for reading the parts you need with run_python read_text.
     """
     _check_deck_access(deck_id, action="edit_slide")
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", style):
@@ -754,7 +755,13 @@ def apply_style(
             raise FileNotFoundError(f"Style not found: {style}")
         html_bytes = builtin_path.read_bytes()
 
-    from sdpm.api import _changed_style_fields, merge_style_metadata, missing_deck_fields, style_field_sources
+    from sdpm.api import (
+        _changed_style_fields,
+        merge_style_metadata,
+        missing_deck_fields,
+        style_field_sources,
+        style_toc,
+    )
 
     deck_data = _storage.get_deck_json(deck_id)
     completed = dict(deck_data)
@@ -791,6 +798,7 @@ def apply_style(
             "updated": updated,
             "sources": sources,
             "missing": missing_deck_fields(merged),
+            "style_toc": style_toc(html_bytes.decode("utf-8")),
         }
     )
 

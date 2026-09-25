@@ -204,3 +204,26 @@ def test_start_presentation_returns_every_style_with_pin_flag(monkeypatch):
     names = {s["name"] for s in styles}
     assert {"report", "typographic", "briefing"} <= names  # unpinned ones are listed too
     assert {s["name"] for s in styles if s.get("pinned")} == {"report"}
+
+
+def test_apply_style_returns_a_line_numbered_toc(tmp_path: Path):
+    """The orchestrator reads the style right after apply_style; the TOC lets one run_python
+    slice the lines it needs. Structural only: .slide blocks, not the Part convention."""
+    from sdpm.api import style_toc
+
+    deck_dir = tools.init_deck_workspace(str(tmp_path / "deck"))["output_dir"]
+    toc = tools.apply_style(deck_dir, style="newspaper", template="blank-light")["style_toc"]
+    slides = [e for e in toc if e["kind"] == "slide"]
+    assert toc[0]["kind"] == "style" and len(slides) >= 8
+    assert all(e["line"] > 0 and "slide" in e["classes"].split() for e in slides)
+    assert any("Rules" in (e["comment"] or "") or "Rules" in e["text"] for e in slides)
+    # line numbers point at the slide openings
+    lines = (Path(deck_dir) / "specs" / "art-direction.html").read_text(encoding="utf-8").splitlines()
+    assert all("slide" in lines[e["line"] - 1] for e in slides)
+    # a nested element whose class merely contains "slide-" is not a slide
+    assert not any("slide-title" in e["classes"] for e in slides)
+    # every bundled style maps; a file without .slide blocks maps to nothing
+    styles_dir = Path(__file__).resolve().parents[1] / "sdpm" / "references" / "examples" / "styles"
+    for path in styles_dir.glob("*.html"):
+        assert len([e for e in style_toc(path.read_text(encoding="utf-8")) if e["kind"] == "slide"]) >= 8, path.name
+    assert style_toc("<html><body><p>plain</p></body></html>") == []

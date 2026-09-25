@@ -203,7 +203,8 @@ def apply_style(
     """Apply a style (and optionally a template) to a deck: writes specs/art-direction.html
     and completes deck.json (template, defaultTextColor, fonts, slideSize). Returns what
     was written, which fields changed and where each value came from — fix anything
-    wrong in deck.json with run_python.
+    wrong in deck.json with run_python — and style_toc, a line-numbered map of the
+    style file for reading the parts you need with run_python read_text.
     """
     from sdpm.api import apply_style as _apply_style
 
