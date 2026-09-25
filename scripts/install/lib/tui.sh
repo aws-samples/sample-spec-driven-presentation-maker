@@ -73,8 +73,15 @@ fail_step() {
 show_confirm() {
   local prompt="$1" reply
   if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then return 0; fi
+  # Under `curl … | bash` stdin is the script itself; prompts must come from the terminal.
+  if [[ ! -r /dev/tty ]]; then
+    echo "" >&2
+    echo "No terminal available for prompts. Re-run with --non-interactive (add --mcp-only/--full" >&2
+    echo "and --register/--no-register to choose instead of accepting the defaults)." >&2
+    exit 2
+  fi
   printf "\n  %s " "$prompt"
-  read -r reply
+  read -r reply </dev/tty
   case "${reply:-y}" in [Yy]*|"") return 0 ;; *) return 1 ;; esac
 }
 

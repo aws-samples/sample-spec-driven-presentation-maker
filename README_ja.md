@@ -53,6 +53,7 @@
 
 1 コマンドで `~/.sdpm` にすべてが入ります — AI エージェントが話す MCP サーバーと、
 必要ならブラウザ用の Web UI。どちらも同じ checkout から動き、一緒に更新されます。
+（唯一の例外は Claude Desktop で、こちらはダウンロードするバンドルを使います。下記参照。）
 
 ```bash
 # macOS / Linux
@@ -69,7 +70,7 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 
 | やりたいこと | 手順 |
 |---|---|
-| いつもの AI エージェントで使う（Kiro CLI / Claude Code / Cursor / VS Code / Codex / Kiro IDE） | **「〜のスライドを作って」**と頼むだけ — インストーラーが SDPM を登録済みです。あとから: `sdpm register` |
+| いつもの AI エージェントで使う（Kiro CLI / Claude Code / Cursor / VS Code / Codex / Kiro IDE） | インストーラーの登録提案に yes と答えていれば、エージェントに**「〜のスライドを作って」**と頼むだけ。それ以外、または別のクライアントを後から: `sdpm register` |
 | ブラウザで使う | `sdpm webui` |
 | Claude Desktop で使う | [`sdpm.mcpb` をダウンロード](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb)してダブルクリック（インストーラー不要） |
 | チームで共有サーバー / Web UI を使う | [AWS にデプロイ](docs/en/deploy-cloudshell.md) |

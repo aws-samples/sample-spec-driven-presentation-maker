@@ -74,8 +74,15 @@ fail_step() {
 show_confirm() {
   local prompt="$1" reply
   if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then return 0; fi
+  # Under `curl … | bash` stdin is the script itself; prompts must come from the terminal.
+  if [[ ! -r /dev/tty ]]; then
+    echo "" >&2
+    echo "No terminal available for prompts. Re-run with --non-interactive (add --mcp-only/--full" >&2
+    echo "and --register/--no-register to choose instead of accepting the defaults)." >&2
+    exit 2
+  fi
   printf "\n  %s " "$prompt"
-  read -r reply
+  read -r reply </dev/tty
   case "${reply:-y}" in [Yy]*|"") return 0 ;; *) return 1 ;; esac
 }
 
@@ -660,14 +667,16 @@ choose_profile() {
   if show_confirm "Also install the browser Web UI? [Y/n]"; then PROFILE=full; else PROFILE=mcp; fi
 }
 
+REGISTER_FAILED=0
+
 register_clients() {
   [[ "$REGISTER" == "no" ]] && { "$LAUNCHER_DIR/sdpm" mcp-config || true; return 0; }
   echo ""
-  if [[ "$REGISTER" == "yes" || "$NON_INTERACTIVE" == "1" ]]; then
-    if [[ "$REGISTER" == "yes" ]]; then "$LAUNCHER_DIR/sdpm" register --yes || true
-    else "$LAUNCHER_DIR/sdpm" mcp-config || true; fi
+  if [[ "$REGISTER" == "yes" ]]; then
+    "$LAUNCHER_DIR/sdpm" register --yes || REGISTER_FAILED=1
     return 0
   fi
+  if [[ "$NON_INTERACTIVE" == "1" ]]; then "$LAUNCHER_DIR/sdpm" mcp-config || true; return 0; fi
   echo "  Connect your MCP clients now? Each one is asked separately; nothing is written"
   echo "  without your yes, and 'sdpm register' does the same later."
   "$LAUNCHER_DIR/sdpm" register || true
@@ -687,6 +696,10 @@ show_completion() {
   echo ""; echo "    Checkout: $CHECKOUT"
   if [[ ":$PATH:" != *":$LAUNCHER_DIR:"* ]]; then
     printf "    ${C_YELLOW}Add %s to PATH to run 'sdpm' directly.${C_RESET}\n" "$LAUNCHER_DIR"
+  fi
+  if [[ "$REGISTER_FAILED" == "1" ]]; then
+    printf "    ${C_YELLOW}Some client registrations failed (see above). Fix them with 'sdpm register <client>'.${C_RESET}\n"
+    exit 1
   fi
 }
 

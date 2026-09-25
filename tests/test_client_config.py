@@ -144,3 +144,14 @@ def test_cli_without_uv_fails_clearly(monkeypatch, tmp_path):
     with pytest.raises(SystemExit) as e:
         cc.main(["--checkout", str(tmp_path), "print", "--all"])
     assert "uv not found" in str(e.value)
+
+
+def test_missing_client_executable_is_a_failure_not_a_traceback(monkeypatch, capsys):
+    def raise_missing(*_a, **_k):
+        raise FileNotFoundError(2, "No such file or directory", "codex")
+
+    monkeypatch.setattr(cc.subprocess, "run", raise_missing)
+    failures = cc.register([cc.by_id("codex")], POSIX, assume_yes=True)  # default runner
+    assert failures == 1
+    err = capsys.readouterr().err
+    assert "codex" in err and "manually" in err

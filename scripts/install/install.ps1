@@ -227,10 +227,16 @@ function Invoke-Launcher {
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $LauncherDir "sdpm.ps1") @LauncherArgs
 }
 
+$script:RegisterFailed = $false
+
 function Register-Clients {
     Write-Host ""
     if ($script:RegisterMode -eq "no") { try { Invoke-Launcher @("mcp-config") } catch { }; return }
-    if ($script:RegisterMode -eq "yes") { try { Invoke-Launcher @("register", "--yes") } catch { }; return }
+    if ($script:RegisterMode -eq "yes") {
+        try { Invoke-Launcher @("register", "--yes"); if ($LASTEXITCODE -ne 0) { $script:RegisterFailed = $true } }
+        catch { $script:RegisterFailed = $true }
+        return
+    }
     if ($script:NonInteractive) { try { Invoke-Launcher @("mcp-config") } catch { }; return }
     Write-Host "  Connect your MCP clients now? Each one is asked separately; nothing is written"
     Write-Host "  without your yes, and 'sdpm register' does the same later."
@@ -251,6 +257,10 @@ function Show-Completion {
     Write-Host "                  sdpm update     upgrade     sdpm uninstall  remove"
     Write-Host "`n    Checkout: $Checkout"
     Write-Host "    Open a new terminal so 'sdpm' is on PATH."
+    if ($script:RegisterFailed) {
+        Write-Host "    Some client registrations failed (see above). Fix them with 'sdpm register <client>'." -ForegroundColor Yellow
+        exit 1
+    }
 }
 
 Show-Header -Title "SDPM Setup" -Version $InstallerVersion

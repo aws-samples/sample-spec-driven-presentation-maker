@@ -50,6 +50,7 @@ automatically — just describe what you want:
 
 One command installs everything into `~/.sdpm` — the MCP server your AI agent talks to
 and, if you want it, a browser Web UI. Both run from the same checkout and update together.
+(Claude Desktop is the one exception: it takes a downloadable bundle instead, see below.)
 
 ```bash
 # macOS / Linux
@@ -66,7 +67,7 @@ which of your MCP clients to connect — and ends with what to do next. Then:
 
 | You want to | Do this |
 |---|---|
-| Use your own AI agent (Kiro CLI, Claude Code, Cursor, VS Code, Codex, Kiro IDE) | Ask it **“Make slides about …”** — the installer registered SDPM for you. Later: `sdpm register` |
+| Use your own AI agent (Kiro CLI, Claude Code, Cursor, VS Code, Codex, Kiro IDE) | Said yes when the installer offered to register it? Ask the agent **“Make slides about …”**. Otherwise, or for another client later: `sdpm register` |
 | Use a browser | `sdpm webui` |
 | Use Claude Desktop | [Download `sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) and double-click it (no installer needed) |
 | Give a team a shared server or Web UI | [Deploy on AWS](docs/en/deploy-cloudshell.md) |

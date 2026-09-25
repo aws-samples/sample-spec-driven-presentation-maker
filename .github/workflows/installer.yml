@@ -59,7 +59,8 @@ jobs:
           MIRROR="$(mktemp -d)/mirror.git"
           git clone -q --bare . "$MIRROR"
           git -C "$MIRROR" branch -f main HEAD
-          export SDPM_HOME="$(mktemp -d)/.sdpm" SDPM_LAUNCHER_DIR="$(mktemp -d)/bin"
+          # A path with a space: the failure mode that quoting bugs hide behind.
+          export SDPM_HOME="$(mktemp -d)/sdpm home/.sdpm" SDPM_LAUNCHER_DIR="$(mktemp -d)/bin"
           export SDPM_REPO_URL="$MIRROR"
           echo "SDPM_HOME=$SDPM_HOME" >> "$GITHUB_ENV"; echo "SDPM_LAUNCHER_DIR=$SDPM_LAUNCHER_DIR" >> "$GITHUB_ENV"
           export PATH="$HOME/.local/bin:$PATH"
@@ -150,7 +151,8 @@ jobs:
           $mirror = Join-Path ([IO.Path]::GetTempPath()) ("mirror-" + [guid]::NewGuid() + ".git")
           git clone -q --bare . $mirror
           git -C $mirror branch -f main HEAD
-          $env:SDPM_HOME = Join-Path ([IO.Path]::GetTempPath()) ("sdpm-" + [guid]::NewGuid())
+          # A path with a space: the failure mode that quoting bugs hide behind.
+          $env:SDPM_HOME = Join-Path ([IO.Path]::GetTempPath()) ("sdpm home " + [guid]::NewGuid())
           $env:SDPM_LAUNCHER_DIR = Join-Path ([IO.Path]::GetTempPath()) ("bin-" + [guid]::NewGuid())
           $env:SDPM_REPO_URL = $mirror
           "SDPM_HOME=$env:SDPM_HOME" >> $env:GITHUB_ENV

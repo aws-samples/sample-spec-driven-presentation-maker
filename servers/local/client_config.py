@@ -271,10 +271,26 @@ def config_document(clients: list[Client], target: Target) -> dict:
 
 
 def _confirm(question: str) -> bool:
+    """Ask on the terminal. Under `curl … | bash` stdin is the script, so prefer /dev/tty."""
+    prompt = f"{question} [y/N] "
     try:
-        return input(f"{question} [y/N] ").strip().lower() in {"y", "yes"}
-    except EOFError:
+        if sys.platform != "win32" and os.path.exists("/dev/tty"):
+            with open("/dev/tty", "r+", encoding="utf-8", errors="replace") as tty:
+                tty.write(prompt)
+                tty.flush()
+                return tty.readline().strip().lower() in {"y", "yes"}
+        return input(prompt).strip().lower() in {"y", "yes"}
+    except (EOFError, OSError):
         return False
+
+
+def _run(argv: list[str]) -> int:
+    """Run a client CLI; a missing executable is a failure, not a traceback."""
+    try:
+        return subprocess.run(argv, check=False).returncode
+    except OSError as error:
+        print(f"  {argv[0]}: {error.strerror or error}", file=sys.stderr)
+        return 127
 
 
 def register(
@@ -283,7 +299,7 @@ def register(
     *,
     dry_run: bool = False,
     assume_yes: bool = False,
-    run: Callable[[list[str]], int] = lambda argv: subprocess.run(argv, check=False).returncode,
+    run: Callable[[list[str]], int] = _run,
     open_url: Callable[[str], bool] = webbrowser.open,
 ) -> int:
     """Register with each client; returns the number of failures."""
@@ -309,8 +325,7 @@ def register(
     return failures
 
 
-def unregister(clients: list[Client], *, dry_run: bool = False,
-               run: Callable[[list[str]], int] = lambda argv: subprocess.run(argv, check=False).returncode) -> int:
+def unregister(clients: list[Client], *, dry_run: bool = False, run: Callable[[list[str]], int] = _run) -> int:
     failures = 0
     for client in clients:
         if client.unregister is None:

@@ -107,7 +107,10 @@ function Invoke-Mcp {
     # Foreground stdio server. The child inherits this process's stdin/stdout handles
     # directly (no PowerShell pipeline in the byte path), so JSON-RPC framing survives.
     $uv = Resolve-Uv
-    $proc = Start-Process -FilePath $uv -ArgumentList @("run", "--directory", $ServerDir, "python", "server.py") -NoNewWindow -Wait -PassThru
+    # -ArgumentList joins with spaces and drops PowerShell's quotes; quote each argument ourselves
+    # so a checkout under a path with spaces survives.
+    $quoted = @("run", "--directory", $ServerDir, "python", "server.py") | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }
+    $proc = Start-Process -FilePath $uv -ArgumentList ($quoted -join " ") -NoNewWindow -Wait -PassThru
     exit $proc.ExitCode
 }
 
