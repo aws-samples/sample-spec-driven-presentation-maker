@@ -104,6 +104,11 @@ mcp.tool()(tools.code_to_slide)
 mcp.tool()(tools.grid)
 mcp.tool()(tools.arch_diagram)
 
+# User-invoked entry points (slash commands / prompt menu): vibe, spec, style, translate
+from sdpm.tools import prompts as _prompts  # noqa: E402
+
+_prompts.register(mcp)
+
 # Attachment tools (stateless pipeline)
 mcp.tool()(read_attachment)
 mcp.tool()(import_attachment)

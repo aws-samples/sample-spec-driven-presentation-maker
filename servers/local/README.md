@@ -30,6 +30,7 @@ uv run python server.py
 
 | Tool | Description |
 |------|-------------|
+| prompts `vibe` `spec` `style` `translate` | Slash-command entry points (fast / dialogue mode, style, translation) |
 | `start_presentation` | Entry point — orchestrator role document + styles, templates, output dir |
 | `start_composing` | Composer entry — role document, slide spec, and the deck's specs and assigned slides |
 | `start_style` | Style entry — role document, style catalogue, a base style's HTML |
