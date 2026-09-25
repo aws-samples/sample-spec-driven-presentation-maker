@@ -356,53 +356,7 @@ def apply_style(
         "updated": updated,
         "sources": sources,
         "missing": missing_deck_fields(merged),
-        # What the orchestrator reads next, every time: the style's rules and its
-        # message / outline guidance. Handed over here so no client file tool is needed.
-        "style_guidance": style_guidance(src.read_text(encoding="utf-8")),
     }
-
-
-_PART_MARKER = None  # compiled lazily below
-
-
-def style_guidance(html: str, parts: tuple[int, ...] = (2, 3)) -> str:
-    """Plain text of the given style parts (default: 2 Rules, 3 Message & Outline).
-
-    Styles carry ``<!-- Part N: title -->`` markers; each part runs to the next
-    marker. Tags are dropped and whitespace collapsed, so the result reads like
-    the slides' text, one line per element.
-    """
-    import html as _html
-    import re
-
-    global _PART_MARKER
-    if _PART_MARKER is None:
-        # "<!-- Part 2: Rules -->", "<!-- Part 2 — Rules: … -->", "<!-- Part 2 (continued) — … -->"
-        _PART_MARKER = re.compile(
-            r"<!--\s*Part\s+(\d+)\s*(\(continued\))?\s*[:—–-]\s*(.*?)\s*-->", re.I | re.S
-        )
-    markers = list(_PART_MARKER.finditer(html))
-    chunks: list[str] = []
-    seen: set[int] = set()
-    for i, m in enumerate(markers):
-        number = int(m.group(1))
-        if number not in parts:
-            continue
-        end = markers[i + 1].start() if i + 1 < len(markers) else len(html)
-        body = html[m.end():end]
-        body = re.sub(r"<(script|style)\b.*?</\1>", " ", body, flags=re.S | re.I)
-        body = re.sub(r"<br\s*/?>|</(div|p|li|h\d|tr|section)>", "\n", body, flags=re.I)
-        body = re.sub(r"<[^>]+>", " ", body)
-        body = _html.unescape(body)
-        lines = [re.sub(r"[ \t]+", " ", ln).strip() for ln in body.splitlines()]
-        text = "\n".join(ln for ln in lines if ln)
-        if number in seen:  # a "(continued)" comment — same part, more text
-            chunks[-1] += "\n" + text
-            continue
-        seen.add(number)
-        title = m.group(3).splitlines()[0].strip().rstrip(".:")
-        chunks.append(f"## Part {number}: {title}\n{text}")
-    return "\n\n".join(chunks)
 
 
 def _find_style_in_dirs(name: str, styles_dirs: list[Path]) -> Path | None:
