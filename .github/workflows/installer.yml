@@ -5,12 +5,16 @@ on:
     branches: [main]
     paths:
       - "scripts/install/**"
+      - "servers/local/client_config.py"
+      - "servers/local/pyproject.toml"
       - ".gitignore"
       - ".github/workflows/installer.yml"
   pull_request:
     branches: [main]
     paths:
       - "scripts/install/**"
+      - "servers/local/client_config.py"
+      - "servers/local/pyproject.toml"
       - ".gitignore"
       - ".github/workflows/installer.yml"
 
@@ -25,42 +29,112 @@ jobs:
       - name: Check generated installer drift
         run: bash scripts/install/build.sh --check
 
+  # The real thing on every OS: install the MCP-only profile from this checkout into an
+  # isolated home, then prove the launcher path with an MCP handshake over `sdpm mcp`.
   unix:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - name: Install shellcheck
         shell: bash
         run: |
           if ! command -v shellcheck >/dev/null 2>&1; then
-            if [[ "${RUNNER_OS}" == "macOS" ]]; then
-              brew install shellcheck
-            else
-              sudo apt-get update
-              sudo apt-get install -y shellcheck
-            fi
+            if [[ "${RUNNER_OS}" == "macOS" ]]; then brew install shellcheck
+            else sudo apt-get update && sudo apt-get install -y shellcheck; fi
           fi
       - name: Shellcheck
         shell: bash
         run: shellcheck scripts/install/*.sh scripts/install/lib/*.sh scripts/install/dist/install.sh
-      - name: Dependency-only smoke
+      - name: Install (mcp-only) into an isolated home
         shell: bash
         run: |
-          export HOME="$(mktemp -d)"
+          # The installer clones "main"; serve this PR's tree under that name from a local mirror.
+          MIRROR="$(mktemp -d)/mirror.git"
+          git clone -q --bare . "$MIRROR"
+          git -C "$MIRROR" branch -f main HEAD
+          export SDPM_HOME="$(mktemp -d)/.sdpm" SDPM_LAUNCHER_DIR="$(mktemp -d)/bin"
+          export SDPM_REPO_URL="$MIRROR"
+          echo "SDPM_HOME=$SDPM_HOME" >> "$GITHUB_ENV"; echo "SDPM_LAUNCHER_DIR=$SDPM_LAUNCHER_DIR" >> "$GITHUB_ENV"
           export PATH="$HOME/.local/bin:$PATH"
-          bash scripts/install/dist/install.sh --deps-only --non-interactive --skip-libreoffice
-          uv --version
+          bash scripts/install/dist/install.sh --mcp-only --non-interactive --skip-libreoffice --no-register
+      - name: Launcher — status, config, dry-run registration
+        shell: bash
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          "$SDPM_LAUNCHER_DIR/sdpm"
+          "$SDPM_LAUNCHER_DIR/sdpm" mcp-config --all --json > config.json
+          python3 -c '
+          import json; d = json.load(open("config.json")); s = d["server"]["sdpm"]
+          assert s["command"].startswith("/"), s
+          assert s["args"][2].endswith("/servers/local"), s
+          assert not any("uvx" in a or "sdpm" == a for a in s["args"]), s
+          print("config OK:", s["command"])'
+          "$SDPM_LAUNCHER_DIR/sdpm" register --dry-run | tee register.log
+          ! grep -q "^kiro-cli\|^claude\|^code\|^codex" register.log   # dry-run never executes
+      - name: MCP handshake over `sdpm mcp`
+        shell: bash
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          python3 scripts/install/mcp_smoke.py "$SDPM_LAUNCHER_DIR/sdpm" mcp
+      - name: MCP handshake over the client command
+        shell: bash
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          python3 - <<'EOF'
+          import json, subprocess, sys
+          s = json.load(open("config.json"))["server"]["sdpm"]
+          sys.exit(subprocess.call([sys.executable, "scripts/install/mcp_smoke.py", s["command"], *s["args"]]))
+          EOF
+      - name: Idempotent re-run
+        shell: bash
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          MIRROR="$(mktemp -d)/mirror.git"; git clone -q --bare . "$MIRROR"; git -C "$MIRROR" branch -f main HEAD
+          SDPM_REPO_URL="$MIRROR" bash scripts/install/dist/install.sh --mcp-only --non-interactive --skip-libreoffice --no-register
+          "$SDPM_LAUNCHER_DIR/sdpm" version
+
+  full-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+      - name: Install (full) into an isolated home
+        shell: bash
+        run: |
+          MIRROR="$(mktemp -d)/mirror.git"; git clone -q --bare . "$MIRROR"; git -C "$MIRROR" branch -f main HEAD
+          export SDPM_HOME="$(mktemp -d)/.sdpm" SDPM_LAUNCHER_DIR="$(mktemp -d)/bin" SDPM_REPO_URL="$MIRROR"
+          echo "SDPM_HOME=$SDPM_HOME" >> "$GITHUB_ENV"; echo "SDPM_LAUNCHER_DIR=$SDPM_LAUNCHER_DIR" >> "$GITHUB_ENV"
+          export PATH="$HOME/.local/bin:$PATH"
+          # kiro-cli is a Web UI runtime dependency; the installer offers it but CI has no login, so skip its install.
+          SDPM_SKIP_KIRO_CLI=1 bash scripts/install/dist/install.sh --full --non-interactive --skip-libreoffice --skip-shortcut --no-register
+      - name: Web UI build present, launcher knows it
+        shell: bash
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          test -d "$SDPM_HOME/checkout/web-ui/build"
+          test "$(cat "$SDPM_HOME/.profile")" = full
+          "$SDPM_LAUNCHER_DIR/sdpm" | tee status.log
+          grep -q "webui      installed" status.log
 
   windows:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - name: Install PSScriptAnalyzer
         shell: pwsh
         run: Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
@@ -69,13 +143,36 @@ jobs:
         run: |
           $files = Get-ChildItem scripts/install -Recurse -Filter *.ps1
           $findings = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName -Severity Error }
-          if ($findings) {
-            $findings | Format-Table -AutoSize
-            exit 1
-          }
-      - name: Dependency-only smoke
+          if ($findings) { $findings | Format-Table -AutoSize; exit 1 }
+      - name: Install (mcp-only) into an isolated home
         shell: pwsh
         run: |
-          & ./scripts/install/dist/install.ps1 -DepsOnly -NonInteractive -SkipLibreOffice
+          $mirror = Join-Path ([IO.Path]::GetTempPath()) ("mirror-" + [guid]::NewGuid() + ".git")
+          git clone -q --bare . $mirror
+          git -C $mirror branch -f main HEAD
+          $env:SDPM_HOME = Join-Path ([IO.Path]::GetTempPath()) ("sdpm-" + [guid]::NewGuid())
+          $env:SDPM_LAUNCHER_DIR = Join-Path ([IO.Path]::GetTempPath()) ("bin-" + [guid]::NewGuid())
+          $env:SDPM_REPO_URL = $mirror
+          "SDPM_HOME=$env:SDPM_HOME" >> $env:GITHUB_ENV
+          "SDPM_LAUNCHER_DIR=$env:SDPM_LAUNCHER_DIR" >> $env:GITHUB_ENV
+          & ./scripts/install/dist/install.ps1 -McpOnly -NonInteractive -SkipLibreOffice -NoRegister
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          uv --version
+      - name: Launcher — status, config, dry-run registration
+        shell: pwsh
+        run: |
+          $sdpm = Join-Path $env:SDPM_LAUNCHER_DIR "sdpm.cmd"
+          & $sdpm
+          & $sdpm mcp-config --all --json | Out-File -Encoding utf8 config.json
+          $s = (Get-Content config.json -Raw | ConvertFrom-Json).server.sdpm
+          if (-not [IO.Path]::IsPathRooted($s.command)) { throw "uv path not absolute: $($s.command)" }
+          if (-not $s.args[2].EndsWith("servers\local")) { throw "checkout path wrong: $($s.args[2])" }
+          & $sdpm register --dry-run
+      - name: MCP handshake over `sdpm mcp` and over the client command
+        shell: pwsh
+        run: |
+          $sdpm = Join-Path $env:SDPM_LAUNCHER_DIR "sdpm.cmd"
+          python scripts/install/mcp_smoke.py $sdpm mcp
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $s = (Get-Content config.json -Raw | ConvertFrom-Json).server.sdpm
+          python scripts/install/mcp_smoke.py $s.command @($s.args)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -478,8 +478,10 @@ scan_dependencies() {
       if [[ "$node_major" =~ ^[0-9]+$ ]] && [[ "$node_major" -ge 20 ]]; then add_dep "Node.js" "$node_version" 1 "Web UI" "https://nodejs.org/"
       else add_dep "Node.js" "$node_version (20+ required)" 0 "Web UI" "https://nodejs.org/"; fi
     else add_dep "Node.js" "" 0 "Web UI" "https://nodejs.org/"; fi
-    if has_command kiro-cli; then add_dep "kiro-cli" "installed" 1 "Local ACP agent" "https://kiro.dev/docs/cli/setup/"
-    else add_dep "kiro-cli" "" 0 "Local ACP agent" "https://kiro.dev/docs/cli/setup/"; fi
+    if [[ "${SDPM_SKIP_KIRO_CLI:-0}" != "1" ]]; then
+      if has_command kiro-cli; then add_dep "kiro-cli" "installed" 1 "Web UI agent backend" "https://kiro.dev/docs/cli/setup/"
+      else add_dep "kiro-cli" "" 0 "Web UI agent backend" "https://kiro.dev/docs/cli/setup/"; fi
+    fi
   fi
 }
 

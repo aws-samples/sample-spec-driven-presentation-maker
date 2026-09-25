@@ -53,7 +53,7 @@ function Get-Dependencies {
         $nodeVersion = if ($hasNode) { (& node --version).TrimStart('v') } else { "" }
         $nodeSupported = $hasNode -and ([int]($nodeVersion -split '\.')[0] -ge 20)
         $items += @{ Name="Node.js"; Found=$nodeSupported; Version=$(if ($nodeSupported) { "v$nodeVersion" } elseif ($hasNode) { "v$nodeVersion (20+ required)" } else { "" }); Reason="Web UI"; Id="OpenJS.NodeJS.LTS"; Url="https://nodejs.org/" }
-        $items += @{ Name="kiro-cli"; Found=(Has-Command "kiro-cli"); Version=$(if (Has-Command "kiro-cli") { "installed" } else { "" }); Reason="Local ACP agent"; Id=""; Url="https://kiro.dev/docs/cli/setup/" }
+        if ($env:SDPM_SKIP_KIRO_CLI -ne "1") { $items += @{ Name="kiro-cli"; Found=(Has-Command "kiro-cli"); Version=$(if (Has-Command "kiro-cli") { "installed" } else { "" }); Reason="Local ACP agent"; Id=""; Url="https://kiro.dev/docs/cli/setup/" } }
     }
     return $items
 }
