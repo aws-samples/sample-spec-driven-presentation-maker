@@ -46,8 +46,10 @@ are peers. `sdpm.tools` defines every MCP tool once — names, schemas,
 docstrings, logic — and both servers register those functions directly. Role and
 procedure text is content, not client config: `sdpm/references/workflows/<role>.md`
 (orchestrator, composer, style, translate) is the single definition for each role,
-served to any MCP client via `read_workflows`, so the files under `skills/` are entry
-points only — they name a workflow and never restate what it does.
+delivered to any MCP client by the `start_*` entry tools (`start_presentation`,
+`start_composing`, `start_style`, `start_translation`), each of which also returns what
+that role reads first. The files under `skills/` are entry points only — they call the
+entry tool and never restate what the role does.
 See [Architecture](docs/en/architecture.md).
 
 ## Conventions
@@ -56,7 +58,7 @@ See [Architecture](docs/en/architecture.md).
 - Role + procedure text lives only in `sdpm/references/workflows/<role>.md`; skills,
   client agent definitions, `SKILL.md` and server instructions are dispatch/environment
   only (guarded by `tests/test_skill_entrypoints.py`)
-- `skills/*/SKILL.md` may only dispatch to `read_workflows([...])`; copying workflow
+- `skills/*/SKILL.md` may only call a `start_*` entry tool; copying workflow
   prose into a skill is what forced the v0.5.0 skill removal and is now guarded by
   `tests/test_skill_entrypoints.py`
 - Client manifests: `plugin.json` + `mcp.json` (portable, Agent Plugins 1.0.0),

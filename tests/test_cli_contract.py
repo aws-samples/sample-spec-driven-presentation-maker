@@ -22,16 +22,17 @@ def test_cli_subcommands_match_contract_vocabulary() -> None:
     choices = set(choices_match.group(1).split(","))
 
     contract_commands = {
-        "generate_pptx", "list_styles", "read_workflows", "read_guides",
+        "generate_pptx", "list_styles", "start", "read_guides",
         "analyze_template", "search_assets", "list_templates",
-        "init_presentation", "code_to_slide", "grid", "diff_pptx",
+        "init_deck_workspace", "code_to_slide", "grid", "diff_pptx",
         "arch_diagram",
     }
     unchanged_cli_only = {"preview", "measure", "image-size", "list-asset-sources"}
     old_commands = {
         "generate", "examples", "workflows", "guides", "analyze-template",
         "search-assets", "list-templates", "init", "code-block", "diff",
-        "layout", "search-patterns", "read_examples",
+        "layout", "search-patterns", "read_examples", "read_workflows",
+        "list_workflows", "init_presentation",
     }
     assert contract_commands | unchanged_cli_only <= choices
     assert choices.isdisjoint(old_commands)

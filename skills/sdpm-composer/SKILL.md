@@ -7,7 +7,7 @@ description: >-
 
 # sdpm-composer
 
-Call `read_workflows(["composer"])` on the **sdpm** MCP server before any other tool,
+Call `start_composing(deck_id, assigned_slugs)` on the **sdpm** MCP server before any other tool,
 then follow it. Your task prompt carries `deck_id`, `assigned_slugs`, and `task_instruction`.
 
 If the sdpm MCP server is unavailable, stop and report that it is unavailable.

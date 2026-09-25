@@ -36,7 +36,7 @@ uv run python3 scripts/pptx_builder.py list_templates
 uv run python3 scripts/pptx_builder.py search_assets "lambda"
 
 # Check init works
-uv run python3 scripts/pptx_builder.py init_presentation -o /tmp/test-pptx && rm -rf /tmp/test-pptx
+uv run python3 scripts/pptx_builder.py init_deck_workspace -o /tmp/test-pptx && rm -rf /tmp/test-pptx
 ```
 
 ## Troubleshooting

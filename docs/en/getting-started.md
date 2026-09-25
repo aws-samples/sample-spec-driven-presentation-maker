@@ -80,8 +80,9 @@ run `/sdpm-create`, `/sdpm-style` or `/sdpm-translate` to pick a role explicitly
 generates
 a composer agent at `<KIRO_HOME>/agents/sdpm-composer.json` — a thin pointer that gives
 compose workers the sdpm server only, instead of cold-starting every MCP server in your
-profile per worker. The behavior itself is still served by the MCP server via
-`read_workflows([...])`; the entry points and the composer agent only name the role.
+profile per worker. The behavior itself is still served by the MCP server: every role begins with its
+entry tool (`start_presentation`, `start_composing`, …), which returns the role document
+and its inputs; the entry points and the composer agent only name that call.
 Prerequisites: [`uv`](https://docs.astral.sh/uv/) on your
 `PATH`, plus **LibreOffice** and **poppler** for slide previews.
 

@@ -98,7 +98,7 @@ class TestStyleContract:
         assert not re.search(r"\bAI\b", html.split("<body", 1)[-1]), f"{path.stem}: defines itself against 'AI'"
 
     def test_apply_style_reads_the_style(self, path: Path, tmp_path: Path) -> None:
-        r = tools.init_presentation(str(tmp_path / "deck"))
+        r = tools.init_deck_workspace(str(tmp_path / "deck"))
         deck = Path(r.get("output_dir", str(tmp_path / "deck")))
         result = api.apply_style(deck, path.stem, "blank-light")
         deck_json = json.loads((deck / "deck.json").read_text())
@@ -113,7 +113,7 @@ class TestStyleContract:
 def test_sample_deck_outline_parses_with_every_style(tmp_path: Path) -> None:
     fixture = Path(__file__).parent / "fixtures" / "style-sample-deck"
     for path in BUNDLED:
-        r = tools.init_presentation(str(tmp_path / path.stem))
+        r = tools.init_deck_workspace(str(tmp_path / path.stem))
         deck = Path(r.get("output_dir", str(tmp_path / path.stem)))
         (deck / "specs" / "outline.md").write_text((fixture / "outline.md").read_text())
         api.apply_style(deck, path.stem, "blank-light")

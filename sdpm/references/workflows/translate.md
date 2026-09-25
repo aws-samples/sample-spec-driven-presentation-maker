@@ -9,7 +9,9 @@ shell access to it (CLI, or an agent whose tools include a shell).
 ## What SDPM needs you to know
 
 - The source must be an sdpm deck (`deck.json` + `slides/*.json`); if the user only has a PPTX,
-  import it first (`read_guides(["import-pptx"])`).
+  import it first (`read_guides(["import-pptx"])`). `start_translation(deck_id, language)`
+  returned the source's `deck`, `slides_present` and the `sibling` path the variant will use
+  (and whether it already exists).
 - The variant lives next to the source as `<deck>-<lang>` and reuses the source template.
 - Extraction and application are scripts in the sdpm checkout:
   `scripts/translate_extract.py <deck> --target-lang <lang>` creates the sibling and writes
@@ -27,5 +29,6 @@ shell access to it (CLI, or an agent whose tools include a shell).
 - Apply syncs text gradients only when one gradient run covered the whole paragraph; partial
   gradients need a manual fix in the slide JSON.
 - After applying, build with `generate_pptx(...)`, measure and preview; fix overflow in the
-  sibling's slide JSON (`read_workflows(["slide-json-spec"])`). Measurement does not catch
+  sibling's slide JSON (`slide_spec` came with this document; `read_guides(["slide-json-spec"])`
+  brings it back). Measurement does not catch
   unnatural line breaks in the target language — check the previews for those.

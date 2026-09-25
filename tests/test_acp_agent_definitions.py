@@ -24,33 +24,32 @@ _FULL_ORCHESTRATOR = {
     "@sdpm/arch_diagram",
     "@sdpm/check_specs",
     "@sdpm/code_to_slide",
-    "@sdpm/diff_pptx",
     "@sdpm/generate_pptx",
     "@sdpm/grid",
     "@sdpm/hearing",
     "@sdpm/import_attachment",
-    "@sdpm/init_presentation",
-    "@sdpm/list_guides",
+    "@sdpm/init_deck_workspace",
     "@sdpm/list_styles",
     "@sdpm/list_templates",
-    "@sdpm/list_workflows",
     "@sdpm/read_attachment",
     "@sdpm/read_guides",
-    "@sdpm/read_workflows",
+    "@sdpm/start_presentation",
+    "@sdpm/start_translation",
     "@sdpm/run_python",
     "@sdpm/search_assets",
 }
-_COMPOSER = _FULL_ORCHESTRATOR - {
+_COMPOSER = (_FULL_ORCHESTRATOR - {
     "use_subagent",
     "web_fetch",
     "web_search",
     "@sdpm/hearing",
-    "@sdpm/diff_pptx",
-}
+    "@sdpm/start_presentation",
+    "@sdpm/start_translation",
+}) | {"@sdpm/start_composing"}
 _EXPECTED_TOOLS = {
     "sdpm-orchestrator": _FULL_ORCHESTRATOR,
     "sdpm-composer": _COMPOSER,
-    "sdpm-translate": _COMPOSER - {"@sdpm/check_specs"},
+    "sdpm-translate": (_COMPOSER - {"@sdpm/check_specs", "@sdpm/start_composing"}) | {"@sdpm/start_translation"},
     "sdpm-style": {
         "read",
         "glob",
@@ -64,6 +63,7 @@ _EXPECTED_TOOLS = {
         "@sdpm/list_styles",
         "@sdpm/read_guides",
         "@sdpm/run_style_python",
+        "@sdpm/start_style",
     },
 }
 
@@ -100,10 +100,20 @@ def test_name_and_workflow_match_file(path: Path):
     assert data["name"] == path.stem
     prompt = data["prompt"]
     assert prompt.startswith("file://")
-    target = (_ACP_AGENTS_DIR / prompt.removeprefix("file://")).resolve()
-    assert target.is_file()
-    assert target.parent.name == "workflows"
-    assert target.stem == path.stem.removeprefix("sdpm-")
+    # Resolved from .kiro/acp-agents/ and from the derived .kiro/agents/ alike.
+    for base in (_ACP_AGENTS_DIR, _ACP_AGENTS_DIR.parent / "agents"):
+        target = (base / prompt.removeprefix("file://")).resolve()
+        assert target.is_file(), target
+    assert target.parent == _ACP_AGENTS_DIR / "prompts"
+    role = path.stem.removeprefix("sdpm-")
+    assert target.stem == role
+    # Thin dispatch to the role's entry tool — no workflow prose here.
+    text = target.read_text(encoding="utf-8")
+    entry = {"orchestrator": "start_presentation", "composer": "start_composing",
+             "style": "start_style", "translate": "start_translation"}[role]
+    assert f"`{entry}(" in text
+    assert len(text.splitlines()) <= 4
+    assert f"@sdpm/{entry}" in data["tools"]
     assert data.get("resources") == []
 
 

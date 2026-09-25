@@ -8,7 +8,7 @@ description: >-
 
 # sdpm-create
 
-Call `read_workflows(["orchestrator"])` on the **sdpm** MCP server before any other tool,
-then follow it.
+Call `start_presentation()` on the **sdpm** MCP server before any other tool, then follow
+the role document it returns.
 
 If the sdpm MCP server is unavailable, stop and tell the user that it is unavailable.

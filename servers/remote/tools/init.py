@@ -14,7 +14,7 @@ from tools.deck import create_deck
 _SPEC_FILES_ALWAYS = ("specs/brief.md", "specs/outline.md")
 
 
-def init_presentation(
+def init_deck_workspace(
     name: str,
     user_id: str,
     storage: Storage,

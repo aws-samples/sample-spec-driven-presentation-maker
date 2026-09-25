@@ -16,7 +16,9 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import Field
 
 from sdpm.tools.attachment.cache import LocalStageCache
 from sdpm.tools.attachment.limits import PAGING_DEFAULT_LIMIT, PAGING_MAX_LIMIT, PAGING_MIN_LIMIT
@@ -24,26 +26,14 @@ from sdpm.tools.attachment.pipeline import import_attachment_core, read_attachme
 from sdpm.tools.attachment.source import classify_source, materialize_local_source, source_identity_local
 
 
-def read_attachment(source: str, offset: int = 0, limit: int = PAGING_DEFAULT_LIMIT) -> dict[str, Any]:
-    """Read an attachment: convert + text projection + guidance.
-
-    Pure read — creates no state. Returns paged text with line numbers,
-    or image metadata (adapter fills in Image content or path+colorAnalysis).
-
-    Supported formats:
-    - text/md/csv/html/json: UTF-8 paged text with line numbers
-    - pdf/docx/xlsx: Markdown conversion → paged text
-    - pptx: deck_text_summary + slideCount/themeHints + import guidance
-    - image: metadata (adapter-specific: Cloud=Image content, Local=path+colorAnalysis)
-
-    Args:
-        source: Source identifier — absolute path (Local), S3 key (Cloud), or https:// URL.
-        offset: 0-based UTF-8 byte offset into the text projection. Default 0.
-        limit: Maximum UTF-8 bytes for the response (header + body). Default/max 10240, min 512.
-
-    Returns:
-        Dict with header (JSON metadata) and body (line-numbered text),
-        or image metadata dict.
+def read_attachment(
+    source: Annotated[str, Field(description='Absolute path, S3 key (cloud), or https:// URL.')],
+    offset: Annotated[int, Field(description='UTF-8 byte offset into the text to start from.')] = 0,
+    limit: Annotated[int, Field(description='Max bytes returned, 512–10240.')] = PAGING_DEFAULT_LIMIT,
+) -> dict[str, Any]:
+    """Read a user-supplied file or URL as paged, line-numbered text — PDF, DOCX, XLSX, PPTX,
+    text, CSV, HTML, JSON — or image metadata. Pure read, nothing is stored.
+    Formats and paging: read_guides(["attachments"]).
     """
     # Parameter validation
     if offset < 0:
@@ -110,30 +100,15 @@ def read_attachment(source: str, offset: int = 0, limit: int = PAGING_DEFAULT_LI
         return {"error": {"code": "ADAPTER_REQUIRED", "message": "S3 source requires Remote adapter"}}
 
 
-def import_attachment(source: str, deck_id: str, filename: str = "") -> dict[str, Any]:
-    """Import an attachment into a deck — convert + commit to immutable bundle.
-
-    Converts the source and commits the result atomically to:
-      {deck_id}/attachments/imports/{importKey}/
-
-    Same source + options = same importKey → no-op/reuse.
-    The bundle is immutable after commit. Agent selects from it.
-
-    Supported imports:
-    - image: images/{hash}_{name} (webp→PNG) + image_mapping
-    - pdf/docx/xlsx: extracted text + images
-    - pptx: full deck structure (deck.json + slides/ + template.pptx)
-    - URL: downloaded → processed as above
-
-    Args:
-        source: Source identifier — absolute path (Local), S3 key (Cloud), or https:// URL.
-        deck_id: Deck directory path to import into.
-        filename: Optional filename override (default: source filename).
-
-    Returns:
-        Dict with importKey, sourceHash, files list, imageMapping, etc.
-        On timeout: {code: "IMPORT_INCOMPLETE", retryable: true, completedStages: [...],
-                    nextAction: "Call import_attachment again with exactly the same source, deck_id, and filename."}
+def import_attachment(
+    source: Annotated[str, Field(description='Absolute path, S3 key (cloud), or https:// URL.')],
+    deck_id: Annotated[str, Field(description='Deck directory path.')],
+    filename: Annotated[str, Field(description="Filename override; defaults to the source's name.")] = "",
+) -> dict[str, Any]:
+    """Import a file or URL into the deck's attachments/ so slides can use it: images
+    (converted to PNG), PDF/DOCX/XLSX (text + images), PPTX (full deck structure), URLs.
+    Idempotent per source. On IMPORT_INCOMPLETE call again with the same arguments.
+    Bundle layout: read_guides(["attachments"]).
     """
     deck_dir = Path(deck_id)
     if not deck_dir.is_dir():

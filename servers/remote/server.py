@@ -21,11 +21,13 @@ import sys
 import time
 from contextvars import ContextVar
 from pathlib import Path
+from typing import Annotated
 
 # Add sdpm/ (skill root) to sys.path so the engine is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "sdpm"))
 
 import boto3  # noqa: E402
+from pydantic import Field  # noqa: E402
 from boto_config import LONG_CALL, SHORT_API  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
@@ -50,7 +52,8 @@ _INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generat
 
 The agent edits deck files through `run_python`; MCP tools handle workflows,
 initialization, generation, previews, and references.
-To create or edit slides, read `read_workflows(["orchestrator"])` first.
+To create or edit slides, call `start_presentation()` first; a composer calls
+`start_composing(deck_id, assigned_slugs)` first.
 """
 
 mcp = FastMCP(
@@ -310,22 +313,129 @@ def _check_deck_access(deck_id: str, action: str = "read") -> None:
         raise ValueError(f"Access denied: {decision.reason}")
 
 
+# --- Role entry tools ---
+#
+# The payloads come from sdpm.entry (same code as the local server). What differs
+# here is where things live: styles/templates are per user on S3, and a deck has
+# to be materialised into a temporary directory before the core can read it.
+# start_translation is not bound — the translate workflow runs scripts from a
+# checkout and has no cloud path (hand-edit sync is CLI-only for the same reason).
+
+
+_MATERIALIZE_FILES = {"deck.json", "specs/brief.md", "specs/outline.md", "specs/art-direction.html"}
+_MATERIALIZE_SLIDE = re.compile(r"^slides/[A-Za-z0-9_-]+\.json$")
+
+
+def _materialize_deck(deck_id: str, target: Path) -> None:
+    """Download deck.json, the three spec files and slides/*.json into ``target``.
+
+    Strict allowlist on the relative key (no attachments, no path segments other
+    than the ones named here), so a malformed key can never escape ``target``.
+    """
+    prefix = f"decks/{deck_id}/"
+    for key in _storage.list_files(prefix=prefix, bucket=_storage.pptx_bucket):
+        rel = key.removeprefix(prefix)
+        if rel not in _MATERIALIZE_FILES and not _MATERIALIZE_SLIDE.match(rel):
+            continue
+        dest = target / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(_storage.download_file_from_pptx_bucket(key=key))
+
+
+@offloaded_tool
+def start_presentation() -> str:
+    """Start here for anything about slides — a new deck, editing or importing a PPTX,
+    restyling a deck. Call it before any other sdpm tool.
+
+    Returns the orchestrator role document (how to run the work end to end) plus what
+    it needs first: available styles and PPTX templates.
+    """
+    from sdpm.entry import start_presentation as _start
+
+    user_id = _get_user_id()
+    styles = reference.list_styles(storage=_storage, user_id=user_id, include_all=True).get("styles", [])
+    templates = template_mod.list_templates(storage=_storage, user_id=user_id).get("templates", [])
+    return json.dumps(_start(styles=styles, templates=templates, output_dir=""), ensure_ascii=False)
+
+
+@offloaded_tool
+def start_composing(
+    deck_id: Annotated[str, Field(description="Deck ID, as given in your instruction.")] = "",
+    assigned_slugs: Annotated[
+        list[str] | None,
+        Field(description="The slugs you own. Other slides belong to other composers running in parallel."),
+    ] = None,
+) -> str:
+    """Composer entry. You are a composer when your instruction gives you a deck_id and
+    assigned_slugs — call this first with those values.
+
+    Validates the specs, then returns the composer role document, the slide JSON spec,
+    and everything the deck gives you: deck.json, brief, outline, art direction, template
+    analysis, which slides exist, and the JSON of your assigned slides (plus any
+    override-group head they inherit from, marked read-only). specs_ok=false with
+    errors means stop and report.
+    """
+    import tempfile
+
+    from sdpm.entry import start_composing as _start
+
+    if not deck_id or not deck_id.strip():
+        return json.dumps(_start(), ensure_ascii=False)
+    _check_deck_access(deck_id, action="generate_pptx")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        _materialize_deck(deck_id, root)
+        analysis: dict | None = None
+        try:
+            template = json.loads((root / "deck.json").read_text(encoding="utf-8")).get("template") or ""
+            if template:
+                analysis = template_mod.analyze_template(
+                    template_name=template, storage=_storage, user_id=_get_user_id()
+                )
+        except Exception:  # analysis is an aid, never a blocker
+            analysis = None
+        payload = _start(root, assigned_slugs, deck_id=deck_id, template_analysis=analysis or {})
+    return json.dumps(payload, ensure_ascii=False)
+
+
+@offloaded_tool
+def start_style(
+    base: Annotated[str, Field(description="Existing style to use as the skeleton; a bundled default when omitted.")] = "",
+) -> str:
+    """Call first when asked to create or edit a reusable style guide. (To restyle one
+    deck, that is apply_style inside the start_presentation workflow.)
+
+    Returns the style role document, the style catalogue, and one style's HTML to imitate.
+    """
+    from sdpm.entry import start_style as _start
+
+    user_id = _get_user_id()
+    styles = reference.list_styles(storage=_storage, user_id=user_id, include_all=True).get("styles", [])
+    base_html: str | None = None
+    if base:
+        if not re.fullmatch(r"[a-zA-Z0-9_-]+", base):
+            raise ValueError("Invalid style name")
+        try:
+            base_html = _storage.download_file_from_pptx_bucket(key=f"user-styles/{user_id}/{base}.html").decode("utf-8")
+        except Exception:
+            base_html = None  # fall through to the bundled lookup inside sdpm.entry
+    return json.dumps(_start(base, styles=styles, base_html=base_html), ensure_ascii=False)
+
+
 # --- Workflow Tools ---
 
 
 @offloaded_tool
-def init_presentation(name: str) -> str:
-    """Initialize a presentation. Creates a deck and empty workspace in S3.
-    Call after the brief is written, before apply_style and slide composition.
-
-    Args:
-        name: Presentation name (e.g. "lambda-overview").
-
-    Returns:
-        JSON with deckId and workspace file list.
+def init_deck_workspace(
+    name: Annotated[str, Field(description='Presentation name, e.g. "lambda-overview".')],
+) -> str:
+    """Create an empty deck workspace (deck.json, specs/). A step inside the orchestrator
+    workflow — after the brief is agreed, before apply_style — not where a request
+    starts; start_presentation is. Returns the deckId and the workspace file list.
     """
     return json.dumps(
-        init_mod.init_presentation(
+        init_mod.init_deck_workspace(
             name=name.strip(),
             user_id=_get_user_id(),
             storage=_storage,
@@ -336,10 +446,13 @@ def init_presentation(name: str) -> str:
 
 @offloaded_tool
 def check_specs(
-    deck_id: str,
-    assigned_slugs: list[str] | None = None,
+    deck_id: Annotated[str, Field(description='Deck ID.')],
+    assigned_slugs: Annotated[list[str] | None, Field(description='Slugs about to be dispatched; each must exist in the outline.')] = None,
 ) -> str:
-    """Validate deck.json and specs/outline.md before composing."""
+    """Validate deck.json and specs/outline.md before dispatching composers; ok=false means
+    do not dispatch. Checks deck metadata, outline format and fields, TBD markers and the
+    assigned slugs. Composers run the same check inside start_composing.
+    """
     _check_deck_access(deck_id, action="generate_pptx")
 
     errors: list[str] = []
@@ -368,17 +481,12 @@ def check_specs(
 
 
 @offloaded_tool
-def analyze_template(template: str, deck_id: str = "") -> str:
-    """Get pre-analyzed template information — layouts, theme colors, fonts.
-    Call this to understand what layouts are available before building slides.
-
-    Args:
-        template: Template name from list_templates, a legacy "template.pptx",
-            or `attachments/imports/{importKey}/deck/template.pptx` from import_attachment.
-        deck_id: Required for either deck-owned template form.
-
-    Returns:
-        JSON with layouts, theme colors, and font information.
+def analyze_template(
+    template: Annotated[str, Field(description='Template name, or a deck-owned template: attachments/imports/{importKey}/deck/template.pptx from import_attachment (needs deck_id).')],
+    deck_id: Annotated[str, Field(description='Deck ID; required for a deck-owned template.')] = "",
+) -> str:
+    """Layouts, theme colors, fonts and slide size of a PPTX template. slide_size.ptPerPx
+    belongs in deck.json slideSize (arch_diagram reads it).
     """
     if not template or not template.strip():
         return json.dumps({"error": "template is required"})
@@ -420,22 +528,14 @@ def analyze_template(template: str, deck_id: str = "") -> str:
 
 
 @offloaded_tool
-def read_attachment(source: str, offset: int = 0, limit: int = 10240) -> dict:
-    """Read the content of an attached file (text projection with paging).
-
-    Stateless: no conversion state is stored. The file is converted on each call
-    (with transparent caching for performance). Works before deck creation —
-    no deck_id required.
-
-    Args:
-        source: S3 key (`uploads/{userId}/{uuid}/{name}`) from the
-            [Attached:...] marker, or an HTTPS URL.
-        offset: Starting byte offset in the canonical text projection (0-based).
-        limit: Maximum bytes to return (default/max 10240, min 512).
-
-    Returns:
-        Text content with line numbers and structured JSON header containing
-        source, fileName, mediaType, page metadata, and optional guide hints.
+def read_attachment(
+    source: Annotated[str, Field(description='S3 key from the [Attached:...] marker (uploads/{userId}/{uuid}/{name}), or an https:// URL.')],
+    offset: Annotated[int, Field(description='UTF-8 byte offset into the text to start from.')] = 0,
+    limit: Annotated[int, Field(description='Max bytes returned, 512–10240.')] = 10240,
+) -> str:
+    """Read a user-supplied file or URL as paged, line-numbered text — PDF, DOCX, XLSX, PPTX,
+    text, CSV, HTML, JSON — or the image itself. Pure read, nothing is stored; works before
+    a deck exists. Formats and paging: read_guides(["attachments"]).
     """
     from tools.attachment import read_attachment as _read
 
@@ -449,20 +549,15 @@ def read_attachment(source: str, offset: int = 0, limit: int = 10240) -> dict:
 
 
 @offloaded_tool
-def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
-    """Import a file into the deck workspace for use in slides.
-
-    source is an S3 key (`uploads/{userId}/{uuid}/{name}`) from the
-    [Attached:...] marker, or an HTTPS URL. Converts and commits an
-    immutable bundle into the deck's attachments directory.
-
-    Args:
-        source: S3 key from [Attached:...] message, or an HTTP(S) URL.
-        deck_id: The deck ID (must be initialized via init_presentation).
-        filename: Optional output filename. If omitted, derived from source.
-
-    Returns:
-        JSON with saved file paths and image_mapping for use in slide JSON.
+def import_attachment(
+    source: Annotated[str, Field(description='S3 key from the [Attached:...] marker (uploads/{userId}/{uuid}/{name}), or an https:// URL.')],
+    deck_id: Annotated[str, Field(description='Deck ID.')],
+    filename: Annotated[str, Field(description="Filename override; defaults to the source's name.")] = "",
+) -> str:
+    """Import a file or URL into the deck's attachments/ so slides can use it: images
+    (converted to PNG), PDF/DOCX/XLSX (text + images), PPTX (full deck structure), URLs.
+    Idempotent per source. On IMPORT_INCOMPLETE call again with the same arguments.
+    Bundle layout: read_guides(["attachments"]).
     """
     from tools.attachment import import_attachment as _import
 
@@ -480,19 +575,10 @@ def import_attachment(source: str, deck_id: str, filename: str = "") -> str:
 
 
 @offloaded_tool
-def generate_pptx(deck_id: str) -> str:
-    """Generate final PPTX — the explicit finalize/handoff step.
-
-    The PPTX artifact already refreshes automatically when the deck changes
-    (run_python post-processing); this tool additionally produces the WebP
-    preview set, syncs the knowledge base, and returns a full-deck warnings
-    report. Resolves include references automatically.
-
-    Args:
-        deck_id: The deck ID to generate PPTX from.
-
-    Returns:
-        JSON with status, slideCount, slides summary, and optional warnings.
+def generate_pptx(deck_id: Annotated[str, Field(description='Deck ID.')]) -> str:
+    """Finalize the deck: full PPTX build, the WebP preview set, knowledge-base sync, and a
+    whole-deck warnings report. run_python already rebuilds the PPTX after edits; this is
+    the explicit hand-off step.
     """
     _check_deck_access(deck_id, action="generate_pptx")
     import traceback
@@ -510,22 +596,13 @@ def generate_pptx(deck_id: str) -> str:
 
 
 @offloaded_tool
-def get_preview(deck_id: str, slugs: list[str], quality: str = "high") -> list:
-    """Get PNG preview images for visual review by the agent.
-
-    Returns actual slide images that the model can see and analyze.
-    Available after generate_pptx completes.
-
-    - quality="low" (800px): Review all slides at once — check flow, structure, design consistency.
-    - quality="high" (1280px): Precise review of specific slides — check text, layout details.
-
-    Args:
-        deck_id: The deck ID.
-        slugs: List of slide slugs to preview (required, at least one). Example: ["intro", "pricing"].
-        quality: "low" (800px, ~480 tokens/slide) or "high" (1280px, ~1229 tokens/slide).
-
-    Returns:
-        List of text labels and slide images for visual inspection.
+def get_preview(
+    deck_id: Annotated[str, Field(description='Deck ID.')],
+    slugs: Annotated[list[str], Field(description='Slides to preview; at least one.')],
+    quality: Annotated[str, Field(description='low (800px, ~480 tokens/slide) to review many slides; high (1280px, ~1229 tokens/slide) for detail.')] = "high",
+) -> list:
+    """Look at slides: returns PNG images of the given slugs for visual review. Available
+    once the deck has been built (run_python with measure_slides, or generate_pptx).
     """
     _check_deck_access(deck_id, action="preview")
     if not slugs:
@@ -604,23 +681,14 @@ def _run_measure(
 
 @offloaded_tool
 def search_assets(
-    query: str = "", source_filter: str = "", limit: int = 20, type_filter: str = "", theme_filter: str = ""
+    query: Annotated[str, Field(description='Keywords, space-separated. Empty string lists the available sources instead.')] = "",
+    source_filter: Annotated[str, Field(description='Only this source, e.g. aws or material.')] = "",
+    limit: Annotated[int, Field(description='Max results per keyword.')] = 20,
+    type_filter: Annotated[str, Field(description='Only this asset type, e.g. Architecture-Service.')] = "",
+    theme_filter: Annotated[str, Field(description='dark or light.')] = "",
 ) -> str:
-    """Search icons and assets by keyword, or discover available sources.
-
-    Discovery mode: call with query="" (empty string) to get a listing of all
-    available asset sources with their item counts.
-    Multiple keywords can be space-separated (e.g. "lambda s3 dynamodb").
-
-    Args:
-        query: Search keywords, space-separated. Empty string triggers discovery mode.
-        source_filter: Filter by source name (e.g. "aws", "material").
-        limit: Maximum results per keyword.
-        type_filter: Filter by type (e.g. "Architecture-Service").
-        theme_filter: Filter by theme ("dark" or "light").
-
-    Returns:
-        JSON with matching assets, or sources list in discovery mode.
+    """Search icons and images by keyword. With an empty query, lists the available sources
+    (icon packs, image libraries) with counts, types and themes.
     """
     return json.dumps(
         assets.search_assets(
@@ -638,15 +706,12 @@ def search_assets(
 
 
 @offloaded_tool
-def list_styles(include_all: bool = False) -> str:
-    """List available design styles for presentations.
-
-    Default returns pinned + user styles only. Pass include_all=True for all.
-
-    Returns:
-        JSON with list of styles (name, description, pinned, source). When the pin
-        filter hid some styles, also other_styles (their names — they still exist
-        and can be passed to apply_style) and a hint.
+def list_styles(
+    include_all: Annotated[bool, Field(description='Include styles hidden by the pin filter.')] = False,
+) -> str:
+    """List design styles — pinned and user styles by default, everything with
+    include_all. Names go to apply_style. start_presentation and start_style already
+    return this list.
     """
     user_id = _get_user_id()
     return json.dumps(
@@ -656,23 +721,16 @@ def list_styles(include_all: bool = False) -> str:
 
 
 @offloaded_tool
-def apply_style(deck_id: str, style: str, template: str = "") -> str:
-    """Apply a named style and optional template to a deck.
-
-    Writes specs/art-direction.html and completes deck.json (template, defaultTextColor, fonts, slideSize).
-    Searches user resources first, then builtin resources.
-
-    Args:
-        deck_id: Deck ID.
-        style: Style name from list_styles (e.g. "report").
-        template: Optional template name, with or without the .pptx extension.
-
-    Returns:
-        JSON with files written (specs/art-direction.html; deck.json with its content),
-        updated (changed deck.json fields), sources (where each filled field came from)
-        and missing (fields neither the style nor the template could fill). Review
-        deck.json and edit it with run_python if the derived values are not what the
-        deck needs.
+def apply_style(
+    deck_id: Annotated[str, Field(description='Deck ID.')],
+    style: Annotated[str, Field(description='Style name, e.g. "report".')],
+    template: Annotated[str, Field(description='Template name, with or without .pptx.')] = "",
+) -> str:
+    """Apply a style (and optionally a template) to a deck: writes specs/art-direction.html
+    and completes deck.json (template, defaultTextColor, fonts, slideSize). Returns what
+    was written, which fields changed and where each value came from — fix anything
+    wrong in deck.json with run_python — and style_toc, a line-numbered map of the
+    style file for reading the parts you need with run_python read_text.
     """
     _check_deck_access(deck_id, action="edit_slide")
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", style):
@@ -697,7 +755,13 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
             raise FileNotFoundError(f"Style not found: {style}")
         html_bytes = builtin_path.read_bytes()
 
-    from sdpm.api import _changed_style_fields, merge_style_metadata, missing_deck_fields, style_field_sources
+    from sdpm.api import (
+        _changed_style_fields,
+        merge_style_metadata,
+        missing_deck_fields,
+        style_field_sources,
+        style_toc,
+    )
 
     deck_data = _storage.get_deck_json(deck_id)
     completed = dict(deck_data)
@@ -734,15 +798,13 @@ def apply_style(deck_id: str, style: str, template: str = "") -> str:
             "updated": updated,
             "sources": sources,
             "missing": missing_deck_fields(merged),
+            "style_toc": style_toc(html_bytes.decode("utf-8")),
         }
     )
 
 
 # --- Reference tools (bound from the shared contract; bundled data baked into the image) ---
 
-offloaded_tool(contract.list_workflows)
-offloaded_tool(contract.read_workflows)
-offloaded_tool(contract.list_guides)
 offloaded_tool(contract.read_guides)
 
 
@@ -751,10 +813,8 @@ offloaded_tool(contract.read_guides)
 
 @offloaded_tool
 def list_templates() -> str:
-    """List all available templates with name, source, and description.
-
-    Returns:
-        JSON with list of templates.
+    """List available PPTX templates (name, source, description).
+    start_presentation already returns this list.
     """
     return json.dumps(
         template_mod.list_templates(storage=_storage, user_id=_get_user_id()),
@@ -763,33 +823,18 @@ def list_templates() -> str:
 
 @offloaded_tool
 def code_to_slide(
-    deck_id: str,
-    code: str,
-    name: str,
-    language: str = "python",
-    theme: str = "dark",
-    x: int = 0,
-    y: int = 0,
-    width: int = 800,
-    height: int = 300,
+    deck_id: Annotated[str, Field(description='Deck ID.')],
+    code: Annotated[str, Field(description='Source code text.')],
+    name: Annotated[str, Field(description='Basename of the includes file, without .json.')],
+    language: Annotated[str, Field(description='Language for syntax highlighting.')] = "python",
+    theme: Annotated[str, Field(description='dark or light.')] = "dark",
+    x: Annotated[int, Field(description='Left edge in px.')] = 0,
+    y: Annotated[int, Field(description='Top edge in px.')] = 0,
+    width: Annotated[int, Field(description='Width in px.')] = 800,
+    height: Annotated[int, Field(description='Height in px.')] = 300,
 ) -> str:
-    """Generate syntax-highlighted code block and save as include file in S3.
-    Returns the include path to use in presentation.json:
-    {"type": "include", "src": "<returned include_path>"}
-
-    Args:
-        deck_id: The deck ID (for S3 path).
-        code: Source code text.
-        name: Include file name (without extension, e.g. "code-1").
-        language: Programming language for syntax highlighting.
-        theme: Color theme ("dark" or "light").
-        x: X position in pixels.
-        y: Y position in pixels.
-        width: Width in pixels.
-        height: Height in pixels.
-
-    Returns:
-        JSON with include_path for use in presentation.json.
+    """Render source code as a syntax-highlighted block saved to includes/<name>.json in the
+    deck. Reference it from a slide as {"type": "include", "src": "<returned include_path>"}.
     """
     _check_deck_access(deck_id, action="edit_slide")
     return json.dumps(
@@ -840,46 +885,23 @@ def _post_processing_plan(deck_changed: bool, measure_slides: list[str] | None) 
 
 
 @offloaded_tool
-def run_python(purpose: str, code: str, deck_id: str, measure_slides: list[str] | None = None) -> str:
-    """Execute Python code in a sandbox whose working directory is the deck workspace.
-
-    Workspace:
-        deck.json                 — template, fonts, defaultTextColor, slideSize
-        slides/{slug}.json        — one file per slide
-        specs/brief.md            — brief
-        specs/outline.md          — outline (chapters; one line per slide with body / visual / evidence)
-        specs/art-direction.html  — art direction
-        includes/                 — element JSON referenced by slides (code_to_slide writes here)
-        attachments/              — files imported with import_attachment
-
-    Helpers are injected (no import needed), paths relative to the deck root:
-        read_json(path), write_json(path, data), read_text(path), write_text(path, text),
-        list_files(subdir=".")
-    Plain `open()` also works here; the helpers are what runs unchanged on the local server.
-
-    Writes persist after every execution (read-only decks: writes are discarded and the
-    result says so). The PPTX rebuilds automatically when deck.json, slides/, includes/ or
-    specs/outline.md changed. measure_slides runs the verification pass (render, text
-    overflow measurement, lint, layout bias, live preview) for those slugs only — pass the
-    slugs you edited.
-
-    Example: run_python(purpose="Fix the title", code=..., deck_id="abc12345",
-    measure_slides=["title"])
-
-    Args:
-        code: Python code to execute.
-        deck_id: Deck ID (from init_presentation).
-        measure_slides: Slugs to measure after execution.
-        purpose: Brief user-facing description of what this code does,
-            written in the user's language. Shown in the UI.
-
-    Returns:
-        JSON string: {"output", "measure"?, "errors"?, "warnings"?}
+def run_python(
+    purpose: Annotated[str, Field(description="One line on what this code does, in the user's language (shown in the UI).")],
+    code: Annotated[str, Field(description='Python code.')],
+    deck_id: Annotated[str, Field(description='Deck ID.')],
+    measure_slides: Annotated[list[str] | None, Field(description='Slugs to render, measure, lint and preview after the code ran — the ones you edited.')] = None,
+) -> str:
+    """Run Python inside the deck workspace — the way to read and write deck files
+    (deck.json, specs/, slides/, includes/, attachments/). Helpers: read_json(path),
+    write_json(path, data), read_text(path), write_text(path, text), list_files(subdir=".");
+    plain open() also works. Writes persist (read-only decks: discarded, and the result
+    says so); output.pptx rebuilds when deck.json, slides/, includes/ or specs/outline.md
+    changed. measure_slides renders, measures text overflow, lints and previews those slugs.
     """
     if not deck_id:
         return json.dumps({
             "error": "deck_id is required: run_python runs inside a deck workspace "
-                     "(create one with init_presentation first)."
+                     "(create one with init_deck_workspace first)."
         })
 
     result: dict = {}
@@ -1279,27 +1301,13 @@ offloaded_tool(contract.arch_diagram)
 
 @offloaded_tool
 def run_style_python(
-    purpose: str, code: str, style_name: str | None = None, ref_styles: list[str] | None = None
+    purpose: Annotated[str, Field(description="One line on what this code does, in the user's language (shown in the UI).")],
+    code: Annotated[str, Field(description='Python code; imports allowed (PIL, colorsys, numpy installed).')],
+    style_name: Annotated[str | None, Field(description='Style to load as style.html (read/write).')] = None,
+    ref_styles: Annotated[list[str] | None, Field(description='Styles to load read-only as ref/{name}.html.')] = None,
 ) -> str:
-    """Execute Python code in a sandbox whose working directory is a style workspace.
-
-    Workspace:
-        style.html          — the style named by style_name (read/write with normal file I/O)
-        ref/{name}.html     — the styles named in ref_styles (read-only)
-
-    Writes to style.html persist to the user's style storage after every execution;
-    there is no unsaved state. Imports are allowed (PIL, colorsys, numpy are installed).
-    Style names come from list_styles.
-
-    Args:
-        purpose: Brief user-facing description of what this code does,
-            written in the user's language. Shown in the UI.
-        code: Python code to execute.
-        style_name: Style to load as style.html. Optional.
-        ref_styles: Styles to load as ref/{name}.html. Optional.
-
-    Returns:
-        JSON string: {"output", "saved"?}
+    """Run Python in a style workspace: style.html is the style named by style_name, ref/ holds
+    the ref_styles. Writes to style.html persist to the user's style store on every run.
     """
     user_id = _get_user_id()
 
@@ -1487,23 +1495,14 @@ if _kb_configured:
 
     @offloaded_tool
     def search_slides(
-        query: str,
-        scope: str = "mine",
-        deck_name: str = "",
-        layout: str = "",
-        days: int = 0,
+        query: Annotated[str, Field(description="Natural-language query.")],
+        scope: Annotated[str, Field(description="mine (your decks), public, or all.")] = "mine",
+        deck_name: Annotated[str, Field(description="Partial match on deck name.")] = "",
+        layout: Annotated[str, Field(description="Exact match on layout type.")] = "",
+        days: Annotated[int, Field(description="Only slides from the last N days; 0 = all time.")] = 0,
     ) -> str:
-        """Search existing slides by semantic similarity.
-
-        Args:
-            query: Natural language search query.
-            scope: "mine" for own slides, "public" for public, "all" for both.
-            deck_name: Partial match filter on deck name.
-            layout: Exact match filter on layout type.
-            days: Date range (0=all time, 30=last 30 days).
-
-        Returns:
-            JSON with matching slides.
+        """Find existing slides by meaning across your (or public) decks — to reuse or
+        reference earlier work.
         """
         kb = _get_kb_sync()
         if kb is None:

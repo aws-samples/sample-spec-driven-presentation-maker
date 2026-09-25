@@ -8,7 +8,7 @@ description: >-
 
 # sdpm-style
 
-Call `read_workflows(["style"])` on the **sdpm** MCP server before any other tool,
+Call `start_style()` on the **sdpm** MCP server before any other tool,
 then follow it.
 
 If the sdpm MCP server is unavailable, stop and tell the user that it is unavailable.

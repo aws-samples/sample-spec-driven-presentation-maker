@@ -52,7 +52,7 @@ function handlePrompt(msg) {
   update({
     sessionUpdate: "tool_call",
     toolCallId: "stub-tool-1",
-    title: "init_presentation",
+    title: "init_deck_workspace",
     rawInput: { template: "e2e" },
   })
   update({

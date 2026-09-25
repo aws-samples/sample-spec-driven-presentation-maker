@@ -52,7 +52,8 @@
 ## クイックスタート
 
 統合面は MCP サーバー 1 つだけです。エージェントを接続してスライド作成を頼むだけ —
-作業を導く役割文書は `read_workflows` ツールでサーバーから配信されます。
+エージェントが最初に呼ぶ `start_presentation` ツールが、作業を導く役割文書と
+使えるスタイル・テンプレートをまとめて返します。
 リポジトリ自体が [Agent Plugins](https://agent-plugins.org) 準拠のポータブルパッケージ
 なので、この形式に対応したクライアントは MCP サーバーと skill 入口をまとめて読み込めます。
 
@@ -67,7 +68,7 @@
 | チーム利用 / リモート MCP / Web UI（AWS） | [デプロイ手順](docs/en/deploy-cloudshell.md) |
 
 **モードの選び方.** 「スライドにして」と頼むだけで十分です（エージェントが
-`read_workflows` を呼んで選びます）。明示的に選ぶなら入口を使ってください:
+`start_presentation` を呼んでそれに従います）。明示的に選ぶなら入口を使ってください:
 `sdpm-create`（プレゼンを作成 — 対話の深さは頼み方次第）、
 `sdpm-style`（再利用できるスタイルガイド作成）、`sdpm-translate`（既存デッキの他言語翻訳）。
 skill をスラッシュコマンドにする
@@ -113,8 +114,8 @@ skill をスラッシュコマンドにする
 ```
 sdpm/        エンジン（json <-> pptx）+ ナレッジ（references, assets, templates）
              references/workflows/ — 役割文書（orchestrator, composer, style,
-             translate）。read_workflows で全 MCP クライアントに配信
-skills/      モードの入口 — read_workflows を呼ぶだけの薄いディスパッチャ
+             translate）。start_* 入口ツールで全 MCP クライアントに配信
+skills/      モードの入口 — start_* 入口ツールを 1 行で呼ぶディスパッチャ
 plugin.json  Agent Plugins マニフェスト（+ mcp.json）— ルートをポータブルプラグインにする
 servers/     local（stdio, AWS 不要）/ remote（HTTP, S3 + DynamoDB）— 単一ツールコントラクトの薄い bind
 clients/     クライアント別の配線（Claude Code / Codex マニフェスト、Kiro インストーラ）

@@ -22,15 +22,19 @@ Call `list_guides()` and use `read_guides([...])` for guides relevant to the upc
 
 ### 1. Run diff
 
-Call `diff_pptx(baseline={deck_dir}, edited={edited_pptx})`. The baseline
-may be a deck directory, slides JSON, or PPTX; the operation builds or converts
-to round-trip JSON internally.
+Run the diff from the sdpm checkout (it is a CLI operation, not an MCP tool — it
+needs an environment with shell access, like the translate workflow):
 
-> **Local / CLI only.** `servers/remote` does not bind `diff_pptx`, so this step
-> is unavailable on the cloud stack (Web UI + L4 agent) and the tool is not in the
-> agent's allowlist. It is also slated for removal. On the cloud path, treat an
-> edited PPTX as an import instead: `import_attachment` commits it and you work
-> from the resulting deck rather than diffing against the old one.
+```
+uv run python3 scripts/pptx_builder.py diff_pptx {deck_dir} {edited_pptx}
+```
+
+The baseline may be a deck directory, slides JSON, or PPTX; the operation builds or
+converts to round-trip JSON internally.
+
+> Without shell access (Claude Desktop, the cloud Web UI), treat the edited PPTX as
+> an import instead: `import_attachment` commits it and you work from the resulting
+> deck rather than diffing against the old one.
 
 ---
 

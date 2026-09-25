@@ -356,7 +356,71 @@ def apply_style(
         "updated": updated,
         "sources": sources,
         "missing": missing_deck_fields(merged),
+        # A map of the style file, so the orchestrator can read the parts it needs
+        # (rules, message & outline) with one run_python read_text + line slice.
+        "style_toc": style_toc(src.read_text(encoding="utf-8")),
     }
+
+
+def style_toc(html: str, snippet: int = 40) -> list[dict[str, Any]]:
+    """Table of contents of a style HTML: one entry per ``<style>`` block and per
+    ``.slide`` element, with its 1-based line, class list, the HTML comments that
+    precede it (first line of each), and the first visible text inside it.
+
+    Structural only — no assumption about how the style is organised beyond
+    ``.slide`` blocks (which the gallery already relies on). A style without them
+    yields an empty list, meaning: read the whole file.
+    """
+    import html as _html
+    import re
+
+    lines = html.splitlines()
+    entries: list[dict[str, Any]] = []
+    pending_comments: list[str] = []
+    in_comment = False
+    open_re = re.compile(r'<(?:div|section|article)\b[^>]*\bclass="([^"]*)"', re.I)
+    tag_re = re.compile(r"<[^>]+>")
+
+    def slide_open(text: str):
+        m = open_re.search(text)
+        return m if m and "slide" in m.group(1).split() else None
+
+    def first_text(start: int) -> str:
+        for j in range(start, min(start + 80, len(lines))):
+            if j > start and slide_open(lines[j]):
+                break
+            text = _html.unescape(tag_re.sub(" ", lines[j])).strip()
+            text = re.sub(r"\s+", " ", text)
+            if text and not text.startswith("<!--"):
+                return text[:snippet]
+        return ""
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if in_comment:
+            if "-->" in stripped:
+                in_comment = False
+            continue
+        if stripped.startswith("<!--"):
+            head = stripped[4:].split("-->")[0].strip()
+            pending_comments.append(head[:60])
+            in_comment = "-->" not in stripped
+            continue
+        if stripped.startswith("<style"):
+            entries.append({"line": i + 1, "kind": "style", "text": ":root tokens + CSS"})
+            pending_comments = []
+            continue
+        m = slide_open(line)
+        if m:
+            entries.append({
+                "line": i + 1,
+                "kind": "slide",
+                "classes": m.group(1).strip(),
+                "comment": " | ".join(pending_comments) or None,
+                "text": first_text(i + 1),
+            })
+            pending_comments = []
+    return entries if any(e["kind"] == "slide" for e in entries) else []
 
 
 def _find_style_in_dirs(name: str, styles_dirs: list[Path]) -> Path | None:

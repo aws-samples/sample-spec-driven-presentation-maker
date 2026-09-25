@@ -21,10 +21,12 @@ The SPEC agent handles user dialogue (Phase 1). Composer agents handle slide gen
 (Phase 2+3) via the `compose_slides` tool (Agents as Tools pattern).
 
 Role and procedure text lives in `sdpm/references/workflows/<role>.md` (orchestrator,
-composer, style, translate) and is served to MCP clients via `read_workflows`.
+composer, style, translate) and reaches MCP clients through the role's entry tool
+(`start_presentation` / `start_composing` / `start_style` / `start_translation`), which also
+returns what that role reads first (`sdpm.entry`).
 Client-side files are thin wiring (composer sub-agent registration) that name a role
 document without restating it. The L4 agent fetches role documents through the same
-port (`Source.mcp("read_workflows", ...)` in `agent/modes/`); only transport-specific
+port (`Source.mcp("start_*", pick="static.workflow")` in `agent/modes/`); only transport-specific
 wiring (attachment wire format, compose_slides report format) lives in `agent/prompts/`.
 
 ## Design Philosophy — Ports and Adapters
@@ -55,14 +57,14 @@ Rules that follow from this:
 4. **Role documents are content, not client config** ("server-driven behavior").
    Each role (orchestrator, composer, style, translate) has exactly one document,
    `sdpm/references/workflows/<role>.md`, served through the port via
-   `read_workflows([...])`. Entry points (skills, agent definitions, `SKILL.md`,
+   the role's `start_*` entry tool. Entry points (skills, agent definitions, `SKILL.md`,
    server instructions) only ever name a role document — they never restate or
    duplicate its content.
 
    Role assignment is a dispatch-time decision, not a discovery-time one: a
    spawner (the orchestrator delegating to a composer, a skill dispatching a
    role, a client picking a mode) tells the spawned agent which role to load in
-   its first instruction. The agent then calls `read_workflows(["<role>"])`
+   its first instruction. The agent then calls `start_<role>(...)`
    itself. There is no docstring heuristic to infer role from arguments, and no
    case where a role's text is embedded into a system prompt instead of fetched
    — every consumer, including the L4 agent, fetches live.
@@ -100,8 +102,9 @@ Every MCP tool is defined once here: name, signature, docstring, and logic
 functions directly (`mcp.tool()(tools.xxx)`) — never redefine a tool body
 in a server.
 
-`read_workflows(names)` is part of the contract and serves
-`sdpm/references/workflows/<role>.md` documents to any MCP client.
+The `start_*` entry tools are part of the contract: each serves
+`sdpm/references/workflows/<role>.md` plus that role's first inputs (`sdpm.entry`,
+Path-based; the remote server materialises the deck from S3 and calls the same code).
 
 ## Local server (`servers/local/`) — Layer 2
 

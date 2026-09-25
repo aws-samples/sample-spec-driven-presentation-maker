@@ -30,7 +30,11 @@ uv run python server.py
 
 | Tool | Description |
 |------|-------------|
-| `init_presentation` | Initialize a new deck workspace |
+| `start_presentation` | Entry point — orchestrator role document + styles, templates, output dir |
+| `start_composing` | Composer entry — role document, slide spec, and the deck's specs and assigned slides |
+| `start_style` | Style entry — role document, style catalogue, a base style's HTML |
+| `start_translation` | Translate entry — role document, slide spec, source deck shape |
+| `init_deck_workspace` | Create an empty deck workspace |
 | `analyze_template` | Analyze a PPTX template (layouts, colors, fonts) |
 | `generate_pptx` | Generate PPTX from JSON |
 | `read_attachment` | Read content from an attached file with byte-offset paging |
@@ -38,10 +42,7 @@ uv run python server.py
 | `search_assets` | Search icons by keyword (empty query = discovery mode) |
 | `list_templates` | List available templates |
 | `list_styles` | List design styles |
-| `list_workflows` | List workflow documents |
-| `read_workflows` | Read workflow instructions |
-| `list_guides` | List guide documents |
-| `read_guides` | Read guide documents |
+| `read_guides` | Read guide documents (incl. `slide-json-spec`) |
 | `code_to_slide` | Generate code block elements JSON |
 | `grid` | CSS Grid coordinate calculation |
 

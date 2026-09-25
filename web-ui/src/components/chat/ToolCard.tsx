@@ -81,14 +81,15 @@ export const TOOL_META: Record<string, ToolMeta> = {
   generate_pptx:      { Icon: Download,        label: "Generating PPTX",        category: "produce" },
   generate_preview:   { Icon: Image,           label: "Generating preview",     category: "produce" },
   // MCP Server tools
-  init_presentation:  { Icon: FolderPlus,      label: "Initializing deck",      category: "build" },
+  start_presentation: { Icon: BookOpen,        label: "Loading role",           category: "explore" },
+  start_composing:    { Icon: BookOpen,        label: "Loading role",           category: "explore" },
+  start_style:        { Icon: BookOpen,        label: "Loading role",           category: "explore" },
+  start_translation:  { Icon: BookOpen,        label: "Loading role",           category: "explore" },
+  init_deck_workspace: { Icon: FolderPlus,     label: "Initializing deck",      category: "build" },
   analyze_template:   { Icon: LayoutTemplate,  label: "Analyzing template",     category: "explore" },
   list_templates:     { Icon: LayoutTemplate,  label: "Listing templates",      category: "explore" },
   list_styles:        { Icon: List,            label: "Listing styles",         category: "explore" },
   apply_style:        { Icon: Palette,         label: "Applying style",         category: "build" },
-  list_workflows:     { Icon: List,            label: "Listing workflows",      category: "explore" },
-  read_workflows:     { Icon: BookOpen,        label: "Reading workflow",        category: "explore" },
-  list_guides:        { Icon: List,            label: "Listing guides",         category: "explore" },
   read_guides:        { Icon: BookOpen,        label: "Reading guide",          category: "explore" },
   search_assets:      { Icon: Search,          label: "Searching assets",       category: "explore" },
   get_preview:        { Icon: Image,           label: "Getting preview",        category: "produce" },
@@ -98,14 +99,14 @@ export const TOOL_META: Record<string, ToolMeta> = {
   code_to_slide:      { Icon: Code,            label: "Code to slide",          category: "build" },
   // MCP prefixed tools (Strands adds prefix from MCPClient)
   hearing:            { Icon: BookOpen,        label: "Asking questions",       category: "hearing" },
-  spec_driven_presentation_maker_init_presentation:  { Icon: FolderPlus,     label: "Initializing deck",     category: "build" },
+  spec_driven_presentation_maker_start_presentation: { Icon: BookOpen,       label: "Loading role",          category: "explore" },
+  spec_driven_presentation_maker_start_composing:    { Icon: BookOpen,       label: "Loading role",          category: "explore" },
+  spec_driven_presentation_maker_start_style:        { Icon: BookOpen,       label: "Loading role",          category: "explore" },
+  spec_driven_presentation_maker_init_deck_workspace: { Icon: FolderPlus,    label: "Initializing deck",     category: "build" },
   spec_driven_presentation_maker_analyze_template:   { Icon: LayoutTemplate, label: "Analyzing template",    category: "explore" },
   spec_driven_presentation_maker_list_templates:     { Icon: LayoutTemplate, label: "Listing templates",     category: "explore" },
   spec_driven_presentation_maker_list_styles:      { Icon: List,           label: "Listing styles",        category: "explore" },
   spec_driven_presentation_maker_apply_style:      { Icon: Palette,        label: "Applying style",        category: "build" },
-  spec_driven_presentation_maker_list_workflows:     { Icon: List,           label: "Listing workflows",     category: "explore" },
-  spec_driven_presentation_maker_read_workflows:     { Icon: BookOpen,       label: "Reading workflow",       category: "explore" },
-  spec_driven_presentation_maker_list_guides:        { Icon: List,           label: "Listing guides",        category: "explore" },
   spec_driven_presentation_maker_read_guides:        { Icon: BookOpen,       label: "Reading guide",         category: "explore" },
   spec_driven_presentation_maker_search_assets:      { Icon: Search,         label: "Searching assets",      category: "explore" },
   spec_driven_presentation_maker_get_preview:        { Icon: Image,          label: "Getting preview",       category: "produce" },
@@ -128,7 +129,7 @@ export const TOOL_META: Record<string, ToolMeta> = {
 function getDetail(name: string, input?: Record<string, unknown>): string {
   if (!input || Object.keys(input).length === 0) return ""
   if ((name === "write_slide" || name.endsWith("_write_slide")) && input.slide_id) return String(input.slide_id)
-  if ((name === "create_deck" || name.endsWith("_init_presentation")) && input.name) return String(input.name)
+  if ((name === "create_deck" || name.endsWith("_init_deck_workspace")) && input.name) return String(input.name)
   if (input.purpose) { const p = String(input.purpose); return p.length > 40 ? p.slice(0, 40) + "…" : p }
   if (input.path) { const p = String(input.path); return basename(p) }
   if (input.template) return String(input.template)

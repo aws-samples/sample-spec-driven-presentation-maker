@@ -8,6 +8,8 @@ import asyncio
 import importlib.util
 import json
 import sys
+
+import pytest
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock
@@ -115,3 +117,60 @@ def test_compose_slides_rejects_invalid_specs_before_dispatch(monkeypatch) -> No
         "deck_id": "deck-1",
         "assigned_slugs": ["intro", "detail"],
     }
+
+
+class _ContractClient:
+    """Dispatches call_tool_sync to the real sdpm.tools contract."""
+
+    def call_tool_sync(self, tool_use_id: str, name: str, arguments: dict):
+        del tool_use_id
+        from sdpm import tools as contract
+
+        result = getattr(contract, name)(**arguments)
+        return {"status": "success", "content": [{"text": json.dumps(result, ensure_ascii=False)}]}
+
+
+def _deck_with_specs(tmp_path: Path) -> str:
+    from sdpm import tools as contract
+
+    deck_dir = contract.init_deck_workspace(str(tmp_path / "deck"))["output_dir"]
+    contract.apply_style(deck_dir, style="typographic", template="blank-dark")
+    (Path(deck_dir) / "specs" / "brief.md").write_text("# Brief\n", encoding="utf-8")
+    (Path(deck_dir) / "specs" / "outline.md").write_text(
+        "# D\n\n## S\n- [a] A\n  - body: b\n  - visual: v\n  - evidence: e\n", encoding="utf-8",
+    )
+    return deck_dir
+
+
+def test_composer_opening_replays_start_composing(monkeypatch, tmp_path: Path) -> None:
+    """compose_slides seeds each composer's history with its own start_composing call."""
+    composer = _load_composer(monkeypatch)
+    deck_dir = _deck_with_specs(tmp_path)
+
+    deck = composer._start_composing(_ContractClient(), deck_dir, ["a"])
+    assert deck["specs_ok"] is True and deck["assigned_slugs"] == ["a"]
+
+    replay = composer._replay_start_composing(deck_dir, ["a"], deck)
+    assert [m["role"] for m in replay] == ["assistant", "user"]
+    tool_use = replay[0]["content"][1]["toolUse"]
+    assert tool_use["name"] == "start_composing"
+    assert tool_use["input"] == {"deck_id": deck_dir, "assigned_slugs": ["a"]}
+    result = replay[1]["content"][0]["toolResult"]
+    assert result["toolUseId"] == tool_use["toolUseId"]
+    assert json.loads(result["content"][0]["text"])["deck"]["outline"].startswith("# D")
+
+
+def test_composer_start_rejects_broken_specs(monkeypatch, tmp_path: Path) -> None:
+    composer = _load_composer(monkeypatch)
+    from sdpm import tools as contract
+
+    deck_dir = contract.init_deck_workspace(str(tmp_path / "deck"))["output_dir"]
+    with pytest.raises(RuntimeError, match="specs rejected"):
+        composer._start_composing(_ContractClient(), deck_dir, ["a"])
+
+
+def test_composer_no_longer_prefetches_by_hand() -> None:
+    src = (Path(__file__).resolve().parents[1] / "agent" / "modes" / "composer.py").read_text(encoding="utf-8")
+    assert "_prefetch_deck_specs" not in src
+    assert "read_workflows" not in src
+    assert "analyze_template" not in src  # comes back inside start_composing's payload

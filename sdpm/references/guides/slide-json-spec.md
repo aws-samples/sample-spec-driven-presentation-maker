@@ -1,3 +1,9 @@
+---
+name: slide-json-spec
+description: "Slide JSON format — deck.json, slides/*.json, every element type and its fields"
+category: guide
+---
+
 # JSON Schema Reference
 
 ## Deck Structure

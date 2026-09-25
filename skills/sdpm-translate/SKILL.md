@@ -10,7 +10,7 @@ description: >-
 
 # sdpm-translate
 
-Call `read_workflows(["translate"])` on the **sdpm** MCP server before any other tool,
+Call `start_translation(deck_id, language)` on the **sdpm** MCP server before any other tool,
 then follow it.
 
 If the sdpm MCP server is unavailable, stop and tell the user that it is unavailable.

@@ -16,8 +16,9 @@ style — what makes decks look consistent and deliberate is the part that says 
 builds a slide*: how titles are phrased, how much goes on one slide, how a comparison or a
 process or a table is laid out here rather than anywhere else.
 
-Read a bundled style first — `list_styles()` for names, `run_style_python` with
-`read_style(name)` for the HTML. Every bundled style follows the skeleton below; keep it.
+`start_style(base)` — the call that gave you this document — also returned the style
+catalogue (`styles`) and one bundled style's HTML (`base`) to imitate; `run_style_python` with
+`read_style(name)` reads any other. Every bundled style follows the skeleton below; keep it.
 
 ## Skeleton
 
@@ -29,7 +30,7 @@ Every style has the same parts in the same order, so a composer knows where to l
 | 0 `<title>` + `:root` | `<title>` is `name — one paragraph`: audience, purpose, the design decision, the signature look. It becomes the description in `list_styles()`. `:root` holds the design tokens (contract below). |
 | 1 Cover | The style's own cover slide. **Always the first `.slide`** — the gallery shows it as the thumbnail. |
 | 2 Rules | Read first by agents. The design decision (who reads this, in what setting, under what constraint) and DO / DON'T lists that **follow from it**. |
-| 3 Message & Outline | What the orchestrator reads before writing the outline: title grammar (assertion sentence, noun phrase, single word…), one claim per slide, lead-in and closing conventions, deck length range, density per slide, chapter shape (agenda tracker, section dividers, summary first…), which visual forms this style favours. |
+| 3 Message & Outline | What the orchestrator reads before writing the outline: title grammar (assertion sentence, noun phrase, single word…), one claim per slide, lead-in and closing conventions, density per slide, chapter shape (agenda tracker, section dividers, summary first…), which visual forms this style favours. The style states per-slide density and chapter shape, but **deck length is not the style's decision**: it follows the brief and material (audience, time, takeaway). |
 | 4 Palette | Swatches with usage rules: which colour means what, how many accents on one slide, text colour on each fill. |
 | 5 Typography | The size ramp at real size, each row labelled with token name / pt / line height, plus rules (max lines per title, when to use each size). |
 | 6 Frame | The elements repeated on every slide — title band, section label, section divider, agenda tracker, closing slide — built exactly as composers should build them. |

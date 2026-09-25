@@ -50,7 +50,7 @@ The `read_attachment` response header and the attachment marker
 `[Attached:{"v":1,"name":"...","source":"..."}]` provide:
 
 - `source` — Step 2 (`import_attachment(source=<source>, ...)`)
-- `fileName` — Step 1 (`init_presentation(name=<derived from fileName>)`)
+- `fileName` — Step 1 (`init_deck_workspace(name=<derived from fileName>)`)
 - `slideCount`, `themeHints` — Step 4 validation and style selection
 
 These values stay in your conversation context. If you cannot locate
@@ -61,10 +61,10 @@ user to re-upload.
 
 ## Step 1 — Initialize the deck
 
-Call `init_presentation(name=<suggestedName>)` — **do NOT pass a template
+Call `init_deck_workspace(name=<suggestedName>)` — **do NOT pass a template
 argument**.
 
-- Neither Cloud nor Local `init_presentation` accepts a template parameter.
+- Neither Cloud nor Local `init_deck_workspace` accepts a template parameter.
   The bundle template path, fonts, and `defaultTextColor` are assigned to
   `deck.json` in Step 4; the immutable bundle itself is not modified.
 - Returns the new `deck_id` (directory path in Local, deckId in Cloud).
@@ -229,7 +229,7 @@ this guide only adds the import-pptx-specific signal extraction in
 Step 5-2.
 
 ```
-read_workflows(["style"])
+start_style()
 ```
 
 Key conventions you must follow (full list in the workflow):
