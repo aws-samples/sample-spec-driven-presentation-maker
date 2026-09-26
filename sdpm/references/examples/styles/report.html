@@ -2,560 +2,252 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>report — A print-resilient system for periodic results, all-hands reviews, and operating reports where leaders compare figures across pages and periods; a white field, near-black serif findings, sans-serif figures, one accent for the current period, and disciplined grey data ink make tables and charts comparable before they are decorative.</title>
+<title>report — A print-resilient system for periodic results, operating reviews, and leadership readouts where figures must compare across pages and periods; stable white geometry, near-black serif findings, tabular sans-serif figures, disciplined grey data ink, and one current-period accent make evidence auditable before it is decorative.</title>
 <style>
 :root {
-  --color-text: #1C1C1A;
-  --color-bg: #FFFFFF;
-  --color-surface: #F3F3F0;
-  --color-border: #C8C8C3;
-  --color-muted: #666662;
-  --color-canvas: #DDDDDA;
-  --color-bar: #969691;
-  --color-bar-soft: #A8A8A3;
-  --accent: #1F6B4E;
-  --font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif;
-  --font-heading: Georgia, "Yu Mincho", "Hiragino Mincho ProN", serif;
-  --fs-cover-title: 50pt;
-  --fs-slide-title: 30pt;
-  --fs-heading: 21pt;
-  --fs-body: 18pt;
-  --fs-caption: 14pt;
-  --fs-label: 10pt;
-  --fs-metric: 31pt;
-  --fs-metric-lg: 43pt;
-  --fs-table: 13pt;
-  --fs-small: 9pt;
-  --margin-x: 120px;
-  --content-w: 1680px;
-  --content-top: 310px;
-  --bar-h: 220px;
-  --radius: 0px;
-  --border-thin: 1px;
-  --shadow: none;
+  --color-text: #1C1C1A; /* claims, totals, and primary rules */
+  --color-bg: #FFFFFF; /* printable ground on every slide */
+  --color-surface: #F3F3F0; /* zebra rows and reference bands */
+  --color-border: #C8C8C3; /* baselines, rows, and separators */
+  --color-muted: #666662; /* units, periods, definitions, sources */
+  --color-canvas: #DDDDDA; /* gallery surround outside slides */
+  --color-bar: #969691; /* historical chart series */
+  --color-bar-soft: #A8A8A3; /* secondary historical series */
+  --accent: #1F6B4E; /* current period or selected series only */
+  --font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif; /* figures, labels, and body */
+  --font-heading: Georgia, "Yu Mincho", "Hiragino Mincho ProN", serif; /* cover and finding titles */
+  --fs-cover-title: 50pt; /* cover and divider question, two lines */
+  --fs-slide-title: 30pt; /* assertion title, two lines maximum */
+  --fs-heading: 21pt; /* section or finding within a page */
+  --fs-body: 18pt; /* short explanatory sentences */
+  --fs-caption: 14pt; /* comparators, units, and definitions */
+  --fs-label: 10pt; /* uppercase section and status labels */
+  --fs-metric: 31pt; /* standard headline figure */
+  --fs-metric-lg: 43pt; /* single comparison figure */
+  --fs-table: 13pt; /* exact values in native tables */
+  --fs-small: 9pt; /* footer or dense table note only */
+  --margin-x: 120px; /* safe edge beyond five percent */
+  --content-w: 1680px; /* common evidence width */
+  --content-top: 310px; /* evidence begins below title reserve */
+  --bar-h: 220px; /* fixed two-line title band */
+  --radius: 0px; /* square report geometry */
+  --border-thin: 1px; /* quiet rules for repeated scanning */
+  --shadow: none; /* flat print-resilient surfaces */
 }
 * { box-sizing: border-box; }
-body { margin: 0; padding: 40px; background: var(--color-canvas); font-family: var(--font-family); zoom: 0.7; color: var(--color-text); }
-.slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; overflow: hidden; background: var(--color-bg); color: var(--color-text); }
+body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--color-text); font-family: var(--font-family); zoom: 0.7; }
+.slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; overflow: hidden; background: var(--color-bg); }
 .el { position: absolute; }
-.heading { font-family: var(--font-heading); }
-.cover-title { font-family: var(--font-heading); font-size: calc(var(--fs-cover-title) * 1.5); line-height: 1.08; font-weight: 400; letter-spacing: -1px; }
-.slide-title { font-family: var(--font-heading); font-size: calc(var(--fs-slide-title) * 1.5); line-height: 1.15; font-weight: 400; letter-spacing: -0.3px; }
-.section-title { font-family: var(--font-heading); font-size: calc(var(--fs-heading) * 1.5); line-height: 1.2; font-weight: 400; }
-.body-text { font-size: calc(var(--fs-body) * 1.5); line-height: 1.45; }
+.cover-title, .slide-title, .section-title, .claim, .finding-copy, .section-number { font-family: var(--font-heading); font-weight: 400; }
+.cover-title { font-size: calc(var(--fs-cover-title) * 1.5); line-height: 1.08; }
+.slide-title, .claim { font-size: calc(var(--fs-slide-title) * 1.5); line-height: 1.15; }
+.section-title, .finding-copy { font-size: calc(var(--fs-heading) * 1.5); line-height: 1.22; }
+.body-text { font-size: calc(var(--fs-body) * 1.5); line-height: 1.4; }
 .caption { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.35; color: var(--color-muted); }
-.label { font-size: calc(var(--fs-label) * 1.5); line-height: 1.25; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; color: var(--color-muted); }
-.metric { font-size: calc(var(--fs-metric) * 1.5); line-height: 1; font-weight: 700; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
-.metric-lg { font-size: calc(var(--fs-metric-lg) * 1.5); line-height: 1; font-weight: 700; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
-.muted { color: var(--color-muted); }
+.label { font-size: calc(var(--fs-label) * 1.5); line-height: 1.25; font-weight: 700; text-transform: uppercase; color: var(--color-muted); }
+.tag { font-size: calc(var(--fs-label) * 1.5); line-height: 1.25; font-weight: 700; text-transform: uppercase; color: var(--color-muted); }
+.table-text { font-size: calc(var(--fs-table) * 1.5); line-height: 1.3; }
+.small { font-size: calc(var(--fs-small) * 1.5); line-height: 1.25; color: var(--color-muted); }
 .accent { color: var(--accent); }
 .bold { font-weight: 700; }
 .rule { background: var(--color-border); }
 .rule-dark { background: var(--color-text); }
 .rule-accent { background: var(--accent); }
-.surface { background: var(--color-surface); }
-.accent-fill { background: var(--accent); color: var(--color-bg); }
 .frame-head { border-bottom: var(--border-thin) solid var(--color-border); }
-.frame-foot { border-top: var(--border-thin) solid var(--color-border); }
-.title-meta { display: flex; height: 144px; align-items: flex-start; justify-content: space-between; gap: 32px; }
-.title-meta .claim { font-family: var(--font-heading); font-size: calc(var(--fs-slide-title) * 1.5); line-height: 1.15; max-width: 1320px; }
-.title-meta .period { font-size: calc(var(--fs-caption) * 1.5); color: var(--color-muted); text-align: right; white-space: nowrap; }
-.chart-subtitle { font-size: calc(var(--fs-caption) * 1.5); color: var(--color-muted); line-height: 1.3; }
-.footer-row { display: flex; justify-content: space-between; align-items: center; font-size: calc(var(--fs-small) * 1.5); color: var(--color-muted); }
-.rule-list { margin: 0; padding: 0; list-style: none; }
-.rule-list li { font-size: calc(var(--fs-body) * 1.5); line-height: 1.4; margin: 0 0 20px; padding-left: 24px; position: relative; }
-.compact-list li { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.25; margin-bottom: 12px; }
-.compact-list .reason { line-height: 1.25; }
-.rule-list li::before { content: ""; position: absolute; left: 0; top: 12px; width: 8px; height: 2px; background: var(--accent); }
-.reason { display: block; color: var(--color-muted); font-size: calc(var(--fs-caption) * 1.5); margin-top: 4px; line-height: 1.35; }
-.two-col { display: flex; gap: 80px; }
-.two-col > div { flex: 1; }
-.note-box { border-top: 3px solid var(--accent); background: var(--color-surface); padding: 22px 26px; }
-.goodbad { display: flex; gap: 40px; }
-.goodbad > div { flex: 1; border-top: 2px solid var(--color-text); padding-top: 18px; }
-.goodbad .bad { border-top-color: var(--color-border); color: var(--color-muted); }
-.goodbad .section-title { margin-top: 42px; }
-.swatches { display: flex; gap: 18px; }
-.swatch { flex: 1; }
-.swatch-chip { height: 100px; border: 1px solid var(--color-border); }
-.swatch-name { font-size: calc(var(--fs-table) * 1.5); font-weight: 700; margin-top: 12px; }
-.swatch-use { font-size: calc(var(--fs-caption) * 1.5); color: var(--color-muted); margin-top: 4px; line-height: 1.3; }
-.token-code { font-family: Menlo, Consolas, monospace; font-size: calc(var(--fs-small) * 1.5); color: var(--color-muted); margin-top: 5px; }
-.type-row { border-bottom: 1px solid var(--color-border); display: flex; align-items: baseline; justify-content: space-between; }
-.type-meta { font-family: Menlo, Consolas, monospace; font-size: calc(var(--fs-small) * 1.5); color: var(--color-muted); }
-.section-number { font-family: var(--font-heading); font-size: calc(var(--fs-metric-lg) * 1.5); color: var(--accent); }
-.kpi-row { display: flex; border-top: 1px solid var(--color-text); border-bottom: 1px solid var(--color-border); }
-.kpi { flex: 1; padding: 22px 24px 18px 0; border-right: 1px solid var(--color-border); }
-.kpi + .kpi { padding-left: 24px; }
-.kpi:last-child { border-right: 0; }
-.kpi-label { font-size: calc(var(--fs-label) * 1.5); color: var(--color-muted); font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; }
-.kpi-value { font-size: calc(var(--fs-metric) * 1.5); font-weight: 700; line-height: 1.05; margin-top: 10px; font-variant-numeric: tabular-nums; }
-.kpi-delta { font-size: calc(var(--fs-caption) * 1.5); color: var(--color-muted); margin-top: 8px; }
-.spark { height: 34px; margin-top: 12px; position: relative; border-bottom: 1px solid var(--color-border); }
-.spark::after { content: ""; position: absolute; left: 0; right: 0; top: 17px; height: 2px; background: var(--color-muted); clip-path: polygon(0 70%,18% 45%,36% 62%,55% 20%,75% 38%,100% 0,100% 100%,0 100%); opacity: .65; }
-.chart-area { border-bottom: 1px solid var(--color-border); }
-.bar-cluster { display: flex; align-items: flex-end; justify-content: space-around; }
-.bar-item { width: 150px; height: 100%; display: flex; align-items: flex-end; justify-content: center; position: relative; }
-.bar { width: 72px; background: var(--color-bar); }
-.bar.current { background: var(--accent); }
-.bar-value { position: absolute; left: 0; right: 0; text-align: center; font-size: calc(var(--fs-caption) * 1.5); font-weight: 700; }
-.bar-label { position: absolute; left: 0; right: 0; bottom: -34px; text-align: center; font-size: calc(var(--fs-caption) * 1.5); color: var(--color-muted); }
-.legend-inline { display: flex; gap: 30px; font-size: calc(var(--fs-caption) * 1.5); color: var(--color-muted); }
-.legend-key { display: inline-block; width: 22px; height: 8px; margin-right: 8px; background: var(--color-bar); }
-.legend-key.current { background: var(--accent); }
-.line-chart { position: relative; border-bottom: 1px solid var(--color-border); }
-.reference-line { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--color-muted); }
-.segment { position: absolute; height: 3px; transform-origin: left center; background: var(--color-muted); }
-.segment.current { background: var(--accent); }
-.point { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--color-bg); border: 3px solid var(--color-muted); }
-.point.current { border-color: var(--accent); }
-.point-label { position: absolute; font-size: calc(var(--fs-caption) * 1.5); font-weight: 700; }
-.axis-label { position: absolute; font-size: calc(var(--fs-caption) * 1.5); color: var(--color-muted); }
-.multiples { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 34px 38px; }
-.mini { border-top: 1px solid var(--color-text); position: relative; padding-top: 12px; }
-.mini-title { font-size: calc(var(--fs-table) * 1.5); font-weight: 700; }
-.mini-scale { position: absolute; left: 0; bottom: 22px; right: 0; height: 120px; border-bottom: 1px solid var(--color-border); }
-.mini-bar { position: absolute; bottom: 0; width: 42px; background: var(--color-bar-soft); }
-.mini-bar.current { background: var(--accent); }
-.mini-value { position: absolute; font-size: calc(var(--fs-small) * 1.5); font-weight: 700; transform: translateX(-50%); }
+.frame-head .claim { width: 1280px; margin-top: 14px; }
+.frame-head .period { position: absolute; right: 0; top: 36px; width: 330px; text-align: right; font-size: calc(var(--fs-caption) * 1.5); line-height: 1.35; color: var(--color-muted); }
+.frame-foot { border-top: var(--border-thin) solid var(--color-border); padding-top: 10px; font-size: calc(var(--fs-small) * 1.5); color: var(--color-muted); }
+.container { border-top: 2px solid var(--color-text); padding: 24px 28px 0 0; }
+.container.selected { border-top: 4px solid var(--accent); background: var(--color-surface); padding: 22px 28px 0 28px; }
+.takeaway { border-top: 3px solid var(--accent); background: var(--color-surface); padding: 22px 26px; font-size: calc(var(--fs-body) * 1.5); line-height: 1.35; }
+.tag { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); }
+.columns { display: flex; gap: 70px; }
+.columns > div { flex: 1; border-top: 2px solid var(--color-text); padding-top: 22px; }
+.columns p { margin: 14px 0 0; }
+.step { border-top: 3px solid var(--color-text); padding: 20px 18px 0 0; }
+.step.current { border-top-color: var(--accent); }
+.connector { background: var(--color-border); }
+.metric-strip { display: flex; border-block: 1px solid var(--color-border); border-top-color: var(--color-text); }
+.metric-cell { flex: 1; padding: 24px 22px 18px 0; border-right: 1px solid var(--color-border); }
+.metric-cell + .metric-cell { padding-left: 22px; }
+.metric-cell:last-child { border-right: 0; }
+.metric-value { margin-top: 10px; font-size: calc(var(--fs-metric) * 1.5); line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.metric-delta { margin-top: 9px; font-size: calc(var(--fs-caption) * 1.5); color: var(--color-muted); }
 .data-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: calc(var(--fs-table) * 1.5); font-variant-numeric: tabular-nums; }
-.data-table th { text-align: right; font-size: calc(var(--fs-label) * 1.5); color: var(--color-muted); text-transform: uppercase; letter-spacing: .6px; padding: 14px 16px; border-top: 1px solid var(--color-text); border-bottom: 1px solid var(--color-border); }
-.data-table th:first-child, .data-table td:first-child { text-align: left; padding-left: 0; }
-.data-table td { text-align: right; padding: 15px 16px; border-bottom: 1px solid var(--color-border); }
+.data-table th, .data-table td { padding: 15px 16px; border-bottom: 1px solid var(--color-border); text-align: right; }
+.data-table th { border-top: 1px solid var(--color-text); font-size: calc(var(--fs-label) * 1.5); color: var(--color-muted); text-transform: uppercase; }
+.data-table th:first-child, .data-table td:first-child { padding-left: 0; text-align: left; }
 .data-table tbody tr:nth-child(even) { background: var(--color-surface); }
-.data-table .total td { font-weight: 700; border-top: 2px solid var(--color-text); background: var(--color-bg); }
+.data-table .total td { border-top: 2px solid var(--color-text); background: var(--color-bg); font-weight: 700; }
 .data-table .current-col { color: var(--accent); font-weight: 700; }
-.bridge { display: flex; align-items: flex-end; position: relative; border-bottom: 1px solid var(--color-border); }
-.bridge-col { flex: 1; height: 100%; position: relative; }
-.bridge-block { position: absolute; left: 20%; width: 60%; background: var(--color-bar-soft); }
-.bridge-block.current { background: var(--accent); }
-.bridge-connector { position: absolute; right: -50%; width: 100%; border-top: 1px dashed var(--color-muted); }
-.bridge-label { position: absolute; left: 0; right: 0; bottom: -46px; text-align: center; font-size: calc(var(--fs-caption) * 1.5); color: var(--color-muted); }
-.bridge-value { position: absolute; left: 0; right: 0; text-align: center; font-size: calc(var(--fs-caption) * 1.5); font-weight: 700; }
-.rank-list { border-top: 1px solid var(--color-text); }
-.rank-row { display: flex; align-items: center; height: 82px; border-bottom: 1px solid var(--color-border); }
-.rank-name { width: 290px; font-size: calc(var(--fs-table) * 1.5); font-weight: 700; }
-.rank-track { flex: 1; height: 20px; position: relative; background: var(--color-surface); }
-.rank-fill { height: 20px; background: var(--color-bar); }
-.rank-fill.current { background: var(--accent); }
-.rank-value { width: 120px; text-align: right; font-size: calc(var(--fs-table) * 1.5); font-weight: 700; font-variant-numeric: tabular-nums; }
-.findings { counter-reset: finding; }
-.finding { display: grid; grid-template-columns: 90px 1fr 330px; gap: 30px; align-items: start; padding: 26px 0; border-top: 1px solid var(--color-border); }
-.finding:last-child { border-bottom: 1px solid var(--color-border); }
+.chart { border-bottom: 1px solid var(--color-border); }
+.chart text { font-family: var(--font-family); }
+.chart .svg-label { font-size: calc(var(--fs-caption) * 1.5); fill: var(--color-muted); }
+.chart .svg-value { font-size: calc(var(--fs-caption) * 1.5); font-weight: 700; fill: var(--color-text); }
+.chart .svg-current { fill: var(--accent); }
+.chart .svg-history { fill: var(--color-bar); }
+.before-after { display: flex; gap: 110px; }
+.before-after > div { flex: 1; border-top: 2px solid var(--color-text); padding-top: 22px; }
+.before-after .after { border-top: 4px solid var(--accent); }
+.metric-lg { margin-top: 22px; font-size: calc(var(--fs-metric-lg) * 1.5); line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.findings { border-bottom: 1px solid var(--color-border); }
+.finding { display: grid; grid-template-columns: 90px 1fr 330px; gap: 30px; padding: 26px 0; border-top: 1px solid var(--color-border); }
 .finding-num { font-family: var(--font-heading); font-size: calc(var(--fs-metric) * 1.5); color: var(--accent); }
-.finding-text { font-family: var(--font-heading); font-size: calc(var(--fs-heading) * 1.5); line-height: 1.25; }
-.finding-proof { font-size: calc(var(--fs-caption) * 1.5); color: var(--color-muted); line-height: 1.4; }
-.definition-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 70px; }
-.definition { border-top: 1px solid var(--color-border); padding: 20px 0; }
-.definition-term { font-size: calc(var(--fs-table) * 1.5); font-weight: 700; }
-.definition-copy { font-size: calc(var(--fs-caption) * 1.5); color: var(--color-muted); line-height: 1.4; margin-top: 7px; }
-.el.line-chart, .el.mini { position: absolute; }
-.muted-fill { background: var(--color-muted); }
-.seg-a { transform: rotate(-13deg); }
-.seg-b { transform: rotate(7deg); }
-.seg-c { transform: rotate(-26deg); }
-.seg-d { transform: rotate(-6deg); }
-.mini-bars { position: absolute; left: 0; right: 0; bottom: 22px; height: 120px; border-bottom: 1px solid var(--color-border); }
-.mini-bar { position: absolute; bottom: 0; width: 42px; background: var(--color-bar-soft); }
-.mini-bar::after { content: attr(data-v); position: absolute; left: 50%; top: -18px; transform: translateX(-50%); font-size: calc(var(--fs-small) * 1.5); font-weight: 700; color: var(--color-text); }
-.mini-bar.current { background: var(--accent); }
-.mx1 { left: 36px; } .mx2 { left: 156px; } .mx3 { left: 276px; } .mx4 { left: 396px; }
-.mh1 { height: 36px; } .mh2 { height: 52px; } .mh3 { height: 68px; } .mh4 { height: 84px; } .mh5 { height: 100px; } .mh6 { height: 116px; }
-.before-metric { margin-top: 24px; }
-.before-rule { height: 1px; margin: 34px 0; }
-.after-rule { height: 3px; margin: 32px 0; }
-.mini-periods { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; font-size: calc(var(--fs-small) * 1.5); color: var(--color-muted); }
+.finding-proof { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.35; color: var(--color-muted); }
+.section-number { font-size: calc(var(--fs-metric-lg) * 1.5); color: var(--accent); }
 </style>
 </head>
 <body>
 
-<!-- Part 0: Title and machine-readable design tokens -->
-<!-- Part 1: Cover -->
-<!-- Slide 1: Cover — The restrained report cover declares period and scope without decoration; only the current-period accent may vary. -->
+<!-- Part: Cover -->
 <div class="slide">
-  <div class="el rule-accent" style="left:120px; top:180px; width:180px; height:6px;"></div>
-  <div class="el label" style="left:120px; top:230px; width:900px; height:42px;">Periodic performance report</div>
-  <div class="el cover-title" style="left:120px; top:300px; width:1320px; height:225px;">Results read clearly,<br>period after period</div>
-  <div class="el body-text muted" style="left:120px; top:540px; width:940px; height:165px;">A data-first system for quarterly results, operating reviews, and all-hands updates. Figures align, comparisons repeat, and the argument survives greyscale printing.</div>
-  <div class="el rule-dark" style="left:120px; top:780px; width:1680px; height:1px;"></div>
-  <div class="el label accent" style="left:120px; top:820px; width:520px; height:26px;">Reporting period</div>
-  <div class="el section-title" style="left:120px; top:860px; width:620px; height:55px;">Current period / fiscal year</div>
-  <div class="el caption" style="left:1280px; top:830px; width:520px; height:80px;">Prepared for recurring review<br>Illustrative style guide</div>
+<div class="el rule-accent" style="left:120px; top:180px; width:180px; height:6px;"></div>
+<div class="el label" style="left:120px; top:230px; width:900px; height:42px;">Periodic performance report</div>
+<div class="el cover-title" style="left:120px; top:300px; width:1320px; height:225px;">Results read clearly,<br>period after period</div>
+<div class="el body-text caption" style="left:120px; top:555px; width:950px; height:150px;">Stable comparisons turn recurring figures into decisions, on screen or paper.</div>
+<div class="el rule-dark" style="left:120px; top:780px; width:1680px; height:1px;"></div>
+<div class="el label accent" style="left:120px; top:820px; width:520px; height:36px;">Reporting period</div>
+<div class="el section-title" style="left:120px; top:860px; width:700px; height:60px;">Current period / fiscal year</div>
 </div>
 
-<!-- Part 2: Rules -->
-<!-- Slide 2: Design decision and universal rules — This slide states the operating constraint first so every visual choice has a reason; wording may tighten, but the constraints may not. -->
+<!-- Part: Rules -->
+<!-- Stable coordinates let readers compare pages without relearning the frame. The source line is content when supplied; template pagination owns the clear right footer band. -->
+<!-- Frame: content — fixed 120px margins, a 220px two-line assertion band, evidence below 310px, and a quiet source footer; section, claim, period, and source may vary, geometry may not. -->
 <div class="slide">
-  <div class="el label accent" style="left:120px; top:70px; width:460px; height:24px;">Rules / read first</div>
-  <div class="el slide-title" style="left:120px; top:112px; width:1500px; height:144px;">Comparability is the design decision, not decoration</div>
-  <div class="el body-text muted" style="left:120px; top:280px; width:1550px; height:108px;">Leaders read this report on screen and on paper, return to it each period, and compare pages faster than they read prose. Stable geometry and restrained ink therefore outrank novelty.</div>
-  <div class="el two-col" style="left:120px; top:390px; width:1680px; height:515px;">
-    <div>
-      <div class="label accent">Always</div>
-      <ul class="rule-list compact-list">
-        <li>Write one claim as the slide title.<span class="reason">Reason: readers get the result before the exhibit.</span></li>
-        <li>Keep every edge margin at least 5%.<span class="reason">Reason: print and annotations need clear space.</span></li>
-        <li>Use colour only to distinguish data.<span class="reason">Reason: meaning must survive greyscale.</span></li>
-        <li>Keep contrast ≥ 4.5:1; ≥ 3:1 at 18pt+.<span class="reason">Reason: review material must remain readable.</span></li>
-      </ul>
-    </div>
-    <div>
-      <div class="label accent">Across every exhibit</div>
-      <ul class="rule-list compact-list">
-        <li>Label values directly; remove empty gridlines.<span class="reason">Reason: eyes compare marks, not legends.</span></li>
-        <li>Use one baseline; add target or zero only if needed.<span class="reason">Reason: axes orient; they do not decorate.</span></li>
-        <li>Accent current period or selected series.<span class="reason">Outline emphasis selects the series; history stays grey.</span></li>
-        <li>Use no emoji; keep sourced icons outside tables.<span class="reason">Reason: glyphs fail and icons disrupt numeric scanning.</span></li>
-      </ul>
-    </div>
-  </div>
-  <div class="el note-box caption" style="left:120px; top:915px; width:1680px; height:125px;"><span class="bold">Renderer facts:</span> native tables inherit the template font and accept no per-table family. JSON has no letter-spacing, line-height, or 650 weight: approximate with bold and explicit box heights.</div>
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Rules / design decision</div><div class="claim">Comparability outranks decoration in a recurring report</div><div class="period">Recurring review</div></div>
+<div class="el body-text" style="left:120px; top:330px; width:1460px; height:120px;">Recurring readers compare figures before prose; stable geometry must expose differences.</div>
+<!-- Component: container (.container) — group related evidence with whitespace and a square top rule; may vary: width and contents; may not: round corners, add shadows, or become decorative cards. -->
+<div class="el container" style="left:120px; top:500px; width:760px; height:260px;"><div class="label accent">Do</div><div class="section-title">Lead with one finding</div><div class="caption">Use direct values, one baseline, and explicit comparators.</div></div>
+<div class="el container" style="left:1040px; top:500px; width:760px; height:260px;"><div class="label">Do not</div><div class="section-title">Spend ink on novelty</div><div class="caption">No rounded cards, shadows, 3D, decorative colour, or emoji.</div></div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Margins ≥ five percent</div>
 </div>
 
-<!-- Slide 3: Derived DO and DON'T rules — Paired rules expose the reason behind every prohibition; examples may change, but no prohibition may lose its rationale. -->
+<!-- Core evidence keeps contrast at least 4.5:1, or 3:1 for text at least 18pt. Use one accent for current period, selected series, or final total; signs and words carry direction. Use solid fills only, and keep sourced icons outside tables. -->
 <div class="slide">
-  <div class="el label accent" style="left:120px; top:70px; width:460px; height:24px;">Rules / derived practice</div>
-  <div class="el slide-title" style="left:120px; top:112px; width:1500px; height:144px;">Data ink earns space only when it improves comparison</div>
-  <div class="el two-col" style="left:120px; top:285px; width:1680px; height:620px;">
-    <div>
-      <div class="label accent">Do</div>
-      <ul class="rule-list compact-list">
-        <li>Repeat the finding, metric/unit, and period header.<span class="reason">Reason: readers compare exhibits without relearning frames.</span></li>
-        <li>Make tables primary: align figures, rule rows, bold totals, and sign changes.<span class="reason">Native tables use the template font; alignment carries the style.</span></li>
-        <li>Open with 4–6 contextualised KPIs.<span class="reason">With no history, omit delta/sparkline and state “first period”.</span></li>
-      </ul>
-    </div>
-    <div>
-      <div class="label muted">Do not</div>
-      <ul class="rule-list compact-list">
-        <li>Use 3D, decorative charts, rounded cards, or shadows.<span class="reason">Leave shadows off.</span></li>
-        <li>Use decorative colour or a second accent.<span class="reason">Accent means current period or selected series.</span></li>
-        <li>Place a large number alone.<span class="reason">Always pair it with prior, plan, benchmark, or trend.</span></li>
-      </ul>
-    </div>
-  </div>
-  <div class="el note-box body-text" style="left:120px; top:900px; width:1680px; height:100px;"><span class="bold">Title test:</span> use a quantified finding, not a topic label.</div>
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Rules / evidence discipline</div><div class="claim">Every mark must improve comparison or audit</div><div class="period">Screen and print</div></div>
+<div class="el columns" style="left:120px; top:340px; width:1680px; height:430px;"><div><div class="label accent">Always</div><p class="section-title">Label direct values</p><p class="caption">Keep one useful baseline.</p><p class="section-title">Contextualise figures</p><p class="caption">Pair with prior, plan, benchmark, or trend.</p></div><div><div class="label">Never</div><p class="section-title">Judge with colour</p><p class="caption">Accent identifies current or selected evidence.</p></div></div>
+<!-- Component: takeaway (.takeaway) — state one decision implication the exhibit cannot carry; may vary: one sentence; may not: repeat the title or introduce a second claim. -->
+<div class="el takeaway" style="left:120px; top:820px; width:1680px; height:110px;">Alignment carries the style when template fonts vary.</div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Use regular or bold weight</div>
 </div>
 
-<!-- Part 3: Message and outline -->
-<!-- Slide 4: Message grammar — Good and bad titles make assertion syntax operational; examples may change with content, but titles remain findings rather than topics. -->
+<!-- Part: Message & Outline -->
+<!-- Density: 55 -->
+<!-- Typical analytical body copy is 25–55 words excluding labels and table cells. A title is subject plus directional verb plus quantified or bounded implication, usually 8–14 words. One-line titles retain the second reserved line; two independent clauses require two slides. -->
 <div class="slide">
-  <div class="el label accent" style="left:120px; top:70px; width:500px; height:24px;">Message and outline / title grammar</div>
-  <div class="el slide-title" style="left:120px; top:112px; width:1540px; height:144px;">A finding title makes the page useful before the chart is read</div>
-  <div class="el body-text muted" style="left:120px; top:280px; width:1540px; height:104px;">Use a declarative sentence: subject + directional verb + quantified or bounded implication. Keep it to two lines and 8–14 words where possible.</div>
-  <div class="el goodbad" style="left:120px; top:400px; width:1680px; height:380px;">
-    <div>
-      <div class="label accent">Good: states the finding</div>
-      <div class="section-title">Revenue grew 12% on a flat cost base</div>
-      <div class="section-title">Three regions closed half of the plan gap</div>
-      <div class="section-title">Cycle time improved, but the target remains unmet</div>
-    </div>
-    <div class="bad">
-      <div class="label">Bad: names the exhibit</div>
-      <div class="section-title">Revenue overview</div>
-      <div class="section-title">Regional performance</div>
-      <div class="section-title">Cycle time chart</div>
-    </div>
-  </div>
-  <div class="el note-box body-text" style="left:120px; top:800px; width:1680px; height:185px;"><span class="bold">One claim per slide.</span> Put 25–55 visible words on a typical analytical page, excluding labels and tables. If two independent “and” clauses survive, split the page. Numbers substantiate the title; they do not replace it.</div>
-  <div class="el caption" style="left:120px; top:990px; width:1680px; height:42px;">Grammar remains plain, specific, and comparable across reporting periods.</div>
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Message / title grammar</div><div class="claim">A finding title makes the page useful before its exhibit</div><div class="period">One claim<br>Two lines</div></div>
+<!-- Component: selected (.selected) — emphasise the one member named by the claim with the accent top rule; may vary: content and side; may not: imply favourable or compete with another selection. -->
+<div class="el container selected" style="left:120px; top:370px; width:760px; height:300px;"><div class="label accent">Finding</div><div class="section-title">Measure improved 12% while cost held flat</div><div class="caption">Specific, directional, and bounded.</div></div>
+<div class="el container" style="left:1040px; top:370px; width:760px; height:300px;"><div class="label">Topic label to avoid</div><div class="section-title">Measure overview</div><div class="caption">It asks the reader to discover the claim.</div></div>
+<div class="el takeaway" style="left:120px; top:760px; width:1680px; height:130px;">Numbers substantiate the title; they never replace it.</div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Plain language across periods</div>
 </div>
 
-<!-- Slide 5: Outline architecture — The sequence mirrors how recurring reviews are consumed; section names may vary, but the summary-first and evidence-to-action arc may not. -->
+<!-- The core flow is cover, three to five findings, four to six contextualised KPIs, two or three evidence chapters, owned actions, then an alphabetical appendix with governed definitions and supplied source/scope notes. Relationships use sparse lines or a matrix only for explicit causality; avoid dense networks and unauditable diagrams. -->
 <div class="slide">
-  <div class="el label accent" style="left:120px; top:70px; width:800px; height:30px;">Message and outline / deck architecture</div>
-  <div class="el slide-title" style="left:120px; top:112px; width:1540px; height:144px;">A summary-first report moves from result to cause to action</div>
-  <div class="el body-text muted" style="left:120px; top:280px; width:1540px; height:165px;">Use this shape: cover, executive findings, KPI scorecard, 2–3 evidence chapters, actions, and appendix. Let the brief and material set the length; keep backup detail outside the core flow.</div>
-  <div class="el" style="left:120px; top:455px; width:1680px; height:240px;">
-    <div class="kpi-row">
-      <div class="kpi"><div class="kpi-label">01 / Lead-in</div><div class="section-title">Executive findings</div><div class="caption">Answer first; 3–5 numbered findings.</div></div>
-      <div class="kpi"><div class="kpi-label">02 / Score</div><div class="section-title">KPI header</div><div class="caption">Current, delta, comparator, trend.</div></div>
-      <div class="kpi"><div class="kpi-label">03 / Explain</div><div class="section-title">Evidence chapters</div><div class="caption">One cause or segment per chapter.</div></div>
-      <div class="kpi"><div class="kpi-label">04 / Close</div><div class="section-title">Actions and outlook</div><div class="caption">Owner, timing, expected movement.</div></div>
-    </div>
-  </div>
-  <div class="el two-col" style="left:120px; top:710px; width:1680px; height:365px;">
-    <div>
-      <div class="label accent">Chapter rhythm</div>
-      <div class="caption"><span class="bold">Open</span> with a divider stating the chapter question and period.<br><span class="bold">Build</span> from shared KPIs to drivers to segment evidence.<br><span class="bold">Close</span> with one takeaway or action, not a recap of every exhibit.</div>
-      <div class="caption">Use the standard header section label for location; reserve dividers for major chapter changes.</div>
-    </div>
-    <div>
-      <div class="label accent">Visual choice</div>
-      <div class="caption"><span class="bold">Numbers:</span> KPI row, table, waterfall, direct-labelled bars.<br><span class="bold">Comparison:</span> small multiples, variance table, ranking.<br><span class="bold">Process:</span> simple left-to-right stages only when sequence explains a metric.<br><span class="bold">Relationship:</span> sparse lines or matrix only when causality is explicit.<br><span class="bold">Text:</span> numbered findings or short evidence paragraphs.</div>
-      <div class="caption">Avoid decorative timelines, dense networks, and unauditable diagrams.</div>
-    </div>
-  </div>
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Outline / summary first</div><div class="claim">Move from result to cause to action</div><div class="period">Brief sets length</div></div>
+<div class="el columns" style="left:120px; top:350px; width:1680px; height:440px;"><div><div class="label accent">Lead</div><div class="section-title">Answer before explaining</div><p class="caption">Start with findings and shared-period metrics.</p></div><div><div class="label accent">Build</div><div class="section-title">Question, evidence, implication</div><p class="caption">Reserve dividers for major chapters.</p></div><div><div class="label accent">Close</div><div class="section-title">Assign measurable work</div><p class="caption">Name owner, timing, expected movement.</p></div></div>
+<div class="el takeaway" style="left:120px; top:830px; width:1680px; height:105px;">Prefer metrics, tables, charts, comparisons, and findings.</div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Keep backup outside the argument</div>
 </div>
 
-<!-- Part 4: Palette -->
-<!-- Slide 6: Palette — Neutral roles dominate and one accent has a single semantic job; hex values may not drift between slides. -->
+<!-- Part: Patterns -->
+<!-- Frame: divider — pause at a major chapter with one analytical question and period; number and wording may vary, evidence and charts may not enter this frame. -->
 <div class="slide">
-  <div class="el label accent" style="left:120px; top:70px; width:500px; height:24px;">Palette / one semantic accent</div>
-  <div class="el slide-title" style="left:120px; top:112px; width:1540px; height:144px;">Colour means current period; grey carries everything else</div>
-  <div class="el body-text muted" style="left:120px; top:280px; width:1540px; height:104px;">Accent identifies the current period, selected series, or final total. An outline-emphasised figure takes precedence as the selected series; neutral structure stays distinct in greyscale.</div>
-  <div class="el swatches" style="left:120px; top:390px; width:1680px; height:250px;">
-    <div class="swatch"><div class="swatch-chip accent-fill"></div><div class="swatch-name">Current / accent</div><div class="swatch-use">Current, selected series, or final total.</div><div class="token-code">--accent #1F6B4E</div></div>
-    <div class="swatch"><div class="swatch-chip rule-dark"></div><div class="swatch-name">Ink</div><div class="swatch-use">Claims, body, totals, primary rules.</div><div class="token-code">--color-text #1C1C1A</div></div>
-    <div class="swatch"><div class="swatch-chip muted-fill"></div><div class="swatch-name">Muted text</div><div class="swatch-use">Sources, units, prior-period explanation.</div><div class="token-code">--color-muted #666662</div></div>
-    <div class="swatch"><div class="swatch-chip rule"></div><div class="swatch-name">Rule</div><div class="swatch-use">Baselines, table rows, separators.</div><div class="token-code">--color-border #C8C8C3</div></div>
-    <div class="swatch"><div class="swatch-chip surface"></div><div class="swatch-name">Surface</div><div class="swatch-use">Optional zebra row or reference band.</div><div class="token-code">--color-surface #F3F3F0</div></div>
-  </div>
-  <div class="el two-col" style="left:120px; top:660px; width:1680px; height:345px;">
-    <div>
-      <div class="label accent">Text-on-fill pairs</div>
-      <div class="caption"><span class="accent-fill bold"> White on #1F6B4E: 6.42:1. </span><br><br><span class="surface bold"> Near-black on #F3F3F0: 15.35:1. </span><br><br>Near-black on white is 17.07:1; muted text on white is 5.77:1 and remains supporting copy.</div>
-    </div>
-    <div>
-      <div class="label accent">Usage limits</div>
-      <ul class="rule-list compact-list">
-        <li>One accent on one slide, never a decorative second colour.<span class="reason">A fixed meaning preserves cross-page comparison.</span></li>
-        <li>Do not encode positive and negative by red and green.<span class="reason">Use explicit +/− signs and words so print and accessibility do not erase meaning.</span></li>
-        <li>Use solid fills only.<span class="reason">Flat greys and rules reproduce consistently in the renderer and on paper.</span></li>
-      </ul>
-    </div>
-  </div>
+<div class="el rule-accent" style="left:120px; top:170px; width:160px; height:5px;"></div>
+<div class="el label accent" style="left:120px; top:220px; width:420px; height:36px;">Patterns / recurring evidence</div>
+<div class="el section-number" style="left:120px; top:320px; width:260px; height:100px;">01</div>
+<div class="el cover-title" style="left:420px; top:300px; width:1260px; height:230px;">How does this style<br>build an argument?</div>
+<div class="el body-text caption" style="left:420px; top:590px; width:980px; height:140px;">Each following slide demonstrates the pattern it explains.</div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Use a common metric, scale, and reporting window across a chapter</div>
 </div>
 
-<!-- Part 5: Typography -->
-<!-- Slide 7: Typography ramp — Sizes are shown at actual scale and separated by role; copy may vary, but role, weight, and line-height remain fixed. -->
+<!-- Pattern: comparison — for: two options or states on identical criteria; regions: left, right, takeaway; components: container ×2 + selected + takeaway; may vary: labels and evidence; may not: compare unlike scopes or add a third state. -->
 <div class="slide">
-  <div class="el label accent" style="left:120px; top:70px; width:500px; height:24px;">Typography / actual-size ramp</div>
-  <div class="el slide-title" style="left:120px; top:112px; width:1540px; height:144px;">Serif findings lead; sans-serif figures support audit</div>
-  <div class="el body-text muted" style="left:120px; top:280px; width:1540px; height:104px;">Use Georgia for findings and the sans stack for body, labels, and figures. Native slide tables inherit the template font; accept it and rely on alignment and tabular figures.</div>
-  <div class="el type-row" style="left:120px; top:400px; width:1680px; height:110px;"><span class="cover-title">Cover title</span><span class="type-meta">--fs-cover-title / 50pt / 1.08 / regular serif</span></div>
-  <div class="el type-row" style="left:120px; top:512px; width:1680px; height:80px;"><span class="slide-title">Finding stated as a sentence</span><span class="type-meta">--fs-slide-title / 30pt / 1.15 / regular serif</span></div>
-  <div class="el type-row" style="left:120px; top:594px; width:1680px; height:65px;"><span class="section-title">Section or finding within a page</span><span class="type-meta">--fs-heading / 21pt / 1.20 / regular serif</span></div>
-  <div class="el type-row" style="left:120px; top:661px; width:1680px; height:60px;"><span class="body-text">Body copy explains the evidence in complete, short sentences.</span><span class="type-meta">--fs-body / 18pt / 1.45 / regular sans</span></div>
-  <div class="el type-row" style="left:120px; top:723px; width:1680px; height:70px;"><span class="metric">42%</span><span class="type-meta">--fs-metric / 31pt / 1.00 / bold sans / tabular</span></div>
-  <div class="el type-row" style="left:120px; top:795px; width:1680px; height:55px;"><span class="caption">Metric, unit, period range, source, and definition</span><span class="type-meta">--fs-caption / 14pt / 1.35 / regular sans</span></div>
-  <div class="el type-row" style="left:120px; top:852px; width:1680px; height:42px;"><span class="label">Section label</span><span class="type-meta">--fs-label / 10pt / 1.25 / bold sans / tracked uppercase</span></div>
-  <div class="el caption" style="left:120px; top:905px; width:1680px; height:84px;">Titles: maximum two lines. Body: usually 25–55 words. Captions and source lines use 14pt; 9pt is reserved for dense table notes and footers, never core evidence.</div>
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / comparison</div><div class="claim">Equal geometry makes one meaningful difference visible</div><div class="period">Shared criteria<br>One selected state</div></div>
+<div class="el container" style="left:120px; top:350px; width:760px; height:330px;"><div class="label">Left / baseline</div><div class="metric-lg">24 days</div><div class="caption">State scope, period, and comparator.</div></div>
+<div class="el container selected" style="left:1040px; top:350px; width:760px; height:330px;"><div class="label accent">Right / selected</div><div class="metric-lg accent">18 days</div><div class="caption">Keep the same scope and baseline.</div></div>
+<div class="el takeaway" style="left:120px; top:760px; width:1680px; height:130px;">Show direction with an explicit −6 days, not colour judgement.</div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Split competing measures across slides</div>
 </div>
 
-<!-- Part 6: Frame -->
-<!-- Slide 8: Standard analytical frame — The recurring header reserves two title lines; one-line titles leave the second line empty so evidence never moves between pages. -->
+<!-- Pattern: columns — for: parallel explanations with equal weight; regions: col-1, col-2, col-3; components: container ×3; may vary: two or three columns; may not: mix unrelated questions or unequal reading order. -->
 <div class="slide">
-  <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;">
-    <div class="label accent">Section label / 02 performance</div>
-    <div class="title-meta"><div class="claim">Claim stated as one sentence; the reserved second line stays empty</div><div class="period">Metric (unit)<br>Prior period–current period</div></div>
-  </div>
-  <div class="el label" style="left:120px; top:310px; width:700px; height:42px;">Content begins at --content-top / 310 px</div>
-  <div class="el rule" style="left:120px; top:355px; width:1680px; height:1px;"></div>
-  <div class="el section-title" style="left:120px; top:400px; width:1500px; height:105px;">Title box: 144 px (two lines). One-line titles leave the second line empty; content never moves up.</div>
-  <div class="el body-text muted" style="left:120px; top:530px; width:1500px; height:125px;">Header top: 58 px; header height: 220 px; side margins: 120 px; content top: 310 px. Align every exhibit to the same left edge and use the white field instead of a card.</div>
-  <div class="el note-box body-text" style="left:120px; top:690px; width:1680px; height:160px;"><span class="bold">Footer contract:</span> Source line is content (draw it); page number is the template's (do not draw it). Leave the right footer band from x = 1680–1800 px empty for template pagination.</div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: source label. Definition: scope and exclusions.</span></div>
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / columns</div><div class="claim">Parallel columns separate causes without fragmenting the claim</div><div class="period">Three equal causes</div></div>
+<div class="el columns" style="left:120px; top:370px; width:1680px; height:450px;"><div><div class="label accent">01 / Frame</div><div class="section-title">Name one shared question</div><p class="caption">Parallel headings.</p></div><div><div class="label accent">02 / Evidence</div><div class="section-title">Give each cause one proof</div><p class="caption">Same unit and window.</p></div><div><div class="label accent">03 / Read</div><div class="section-title">Order by contribution</div><p class="caption">Descending contribution.</p></div></div>
+<div class="el takeaway" style="left:120px; top:850px; width:1680px; height:95px;">Split any column needing another claim.</div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Whitespace and rules group the evidence</div>
 </div>
 
-<!-- Slide 9: Section divider — The divider creates a deliberate pause and states the analytical question; chapter number and wording may vary, but no chart enters this frame. -->
+<!-- Pattern: process — for: sequence that explains a metric; regions: tag, step-1, step-2, step-3; components: tag + step ×3 + connector ×2; may vary: three to five stages; may not: use sequence when order carries no analytical meaning. -->
 <div class="slide">
-  <div class="el rule-accent" style="left:120px; top:170px; width:160px; height:5px;"></div>
-  <div class="el label accent" style="left:120px; top:220px; width:420px; height:26px;">Section 03 / drivers</div>
-  <div class="el section-number" style="left:120px; top:320px; width:300px; height:100px;">03</div>
-  <div class="el cover-title" style="left:420px; top:300px; width:1260px; height:230px;">Which drivers explain<br>the period change?</div>
-  <div class="el body-text muted" style="left:420px; top:560px; width:950px; height:165px;">Section dividers introduce one question, not a summary. The next pages answer it with a common metric, shared scale, and direct labels.</div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Reporting period: prior period–current period</span></div>
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / process</div><div class="claim">Sequence earns space only when it explains movement</div><div class="period">Three stages</div></div>
+<!-- Component: tag (.tag) — identify category or status in compact uppercase text; may vary: wording; may not: replace a finding title or rely on colour alone. -->
+<div class="el tag" style="left:120px; top:330px; width:210px; height:42px;">Build sequence</div>
+<!-- Component: step (.step) — hold one verb-led stage and its measurable output; may vary: count and copy; may not: become a paragraph or decorative milestone. -->
+<div class="el step current" style="left:120px; top:430px; width:430px; height:280px;"><div class="label accent">01 / Define</div><div class="section-title">Fix metric and scope</div><div class="caption">Name the stage output.</div></div>
+<!-- Component: connector (.connector) — show one directional handoff between adjacent stages; may vary: length; may not: branch, loop, or imply unsupported causality. -->
+<div class="el connector" style="left:570px; top:500px; width:140px; height:2px;"></div>
+<div class="el step" style="left:730px; top:430px; width:430px; height:280px;"><div class="label">02 / Measure</div><div class="section-title">Label each transition</div><div class="caption">Use one reporting window.</div></div>
+<div class="el connector" style="left:1180px; top:500px; width:140px; height:2px;"></div>
+<div class="el step" style="left:1340px; top:430px; width:460px; height:280px;"><div class="label">03 / Decide</div><div class="section-title">End on owned action</div><div class="caption">Tie it to expected movement.</div></div>
+<div class="el takeaway" style="left:120px; top:800px; width:1680px; height:105px;">Use a native bridge for signed drivers.</div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Avoid decorative timelines</div>
 </div>
 
-<!-- Slide 10: Closing frame — The close converts evidence into owned action rather than ending on a slogan; action wording may vary, but owner, timing, and measure may not be omitted. -->
+<!-- Pattern: metric — for: overall performance at a glance; regions: kpi-1, kpi-2, kpi-3, kpi-4, takeaway; components: metric ×4 + selected + takeaway; may vary: four to six measures and units; may not: omit comparators, mix windows, or use cards. -->
 <div class="slide">
-  <div class="el label accent" style="left:120px; top:110px; width:500px; height:26px;">Close / action and outlook</div>
-  <div class="el cover-title" style="left:120px; top:190px; width:1500px; height:230px;">The next period tests<br>three owned actions</div>
-  <div class="el" style="left:120px; top:500px; width:1680px; height:330px;">
-    <table class="data-table">
-      <thead><tr><th>Action</th><th>Owner</th><th>Due</th><th>Expected measure</th></tr></thead>
-      <tbody>
-        <tr><td>Action 1 — verb phrase</td><td>Role</td><td>Period date</td><td class="current-col">Metric +4 pts</td></tr>
-        <tr><td>Action 2 — verb phrase</td><td>Role</td><td>Period date</td><td class="current-col">Metric −2 days</td></tr>
-        <tr><td>Action 3 — verb phrase</td><td>Role</td><td>Period date</td><td class="current-col">Metric +6%</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: action register. Definition: expected movement is directional, not a forecast.</span></div>
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / metric</div><div class="claim">Aligned figures make the current period scannable</div><div class="period">One window<br>Mixed units</div></div>
+<!-- Component: metric (.metric-strip) — pair every headline figure with unit, comparator, and optional trend; may vary: four to six cells; may not: float a number without context or mix periods. -->
+<div class="el metric-strip" style="left:120px; top:370px; width:1680px; height:280px;"><div class="metric-cell"><div class="label">Measure 1</div><div class="metric-value accent">124</div><div class="metric-delta">+12% vs prior</div></div><div class="metric-cell"><div class="label">Measure 2</div><div class="metric-value accent">42%</div><div class="metric-delta">+1.8 pts vs prior</div></div><div class="metric-cell"><div class="label">Measure 3</div><div class="metric-value accent">68</div><div class="metric-delta">−1% vs prior</div></div><div class="metric-cell"><div class="label">Measure 4</div><div class="metric-value accent">18d</div><div class="metric-delta">+2 days vs target</div></div></div>
+<div class="el takeaway" style="left:120px; top:740px; width:1680px; height:135px;">Accent marks current, not favourable. With no history, state “first period.”</div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Keep explicit comparators</div>
 </div>
 
-<!-- Part 7: Patterns -->
-<!-- Slide 11: KPI header row — WHY: five aligned metrics make current, delta, comparator, and trend scannable without cards. Values and metric count may vary from 4–6; the shared baseline and comparator may not; when no history exists, omit delta/sparkline and state “first period”. -->
+<!-- Pattern: table — for: exact period, plan, or variance values; regions: table, takeaway; components: table + selected + takeaway; may vary: rows and comparator columns; may not: left-align figures, hide signs, split one table into cards, or style every row. -->
 <div class="slide">
-  <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Executive scorecard</div><div class="title-meta"><div class="claim">Four of five headline measures improved this period</div><div class="period">Headline metrics (mixed units)<br>Prior period–current period</div></div></div>
-  <div class="el chart-subtitle" style="left:120px; top:310px; width:1200px; height:42px;">Current value, change versus prior period, and four-period direction</div>
-  <div class="el kpi-row" style="left:120px; top:370px; width:1680px; height:310px;">
-    <div class="kpi"><div class="kpi-label">Revenue</div><div class="kpi-value accent">124</div><div class="kpi-delta">+12% vs prior period</div><div class="spark"></div></div>
-    <div class="kpi"><div class="kpi-label">Gross margin</div><div class="kpi-value accent">42%</div><div class="kpi-delta">+1.8 pts vs prior period</div><div class="spark"></div></div>
-    <div class="kpi"><div class="kpi-label">Operating cost</div><div class="kpi-value accent">68</div><div class="kpi-delta">−1% vs prior period</div><div class="spark"></div></div>
-    <div class="kpi"><div class="kpi-label">Retention</div><div class="kpi-value accent">91%</div><div class="kpi-delta">+2 pts vs prior period</div><div class="spark"></div></div>
-    <div class="kpi"><div class="kpi-label">Cycle time</div><div class="kpi-value accent">18d</div><div class="kpi-delta">+2 days vs target</div><div class="spark"></div></div>
-  </div>
-  <div class="el note-box body-text" style="left:120px; top:720px; width:1680px; height:180px;"><span class="bold">Reading:</span> the accent marks current values, not favourable outcomes. Explicit +/− signs and comparator labels carry the direction; trend placeholders use the same four-period window. Without history, omit delta and sparkline, retain the comparator, or label “first period”.</div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: reporting dataset. Definitions: values are illustrative; d = days.</span></div>
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / table</div><div class="claim">Aligned columns preserve exact comparison</div><div class="period">Amount, millions<br>Prior–current</div></div>
+<!-- Component: table (.data-table) — use for auditable exact values with right-aligned figures, thin row rules, and bold totals; may vary: rows and columns; may not: remove signs or depend on fill alone. -->
+<div class="el" style="left:120px; top:355px; width:1680px; height:390px;"><table class="data-table"><thead><tr><th>Line item</th><th>Prior</th><th class="current-col">Current</th><th>Change</th></tr></thead><tbody><tr><td>Primary measure</td><td>72.0</td><td class="current-col">81.4</td><td>+9.4</td></tr><tr><td>Secondary measure</td><td>28.0</td><td class="current-col">30.6</td><td>+2.6</td></tr><tr class="total"><td>Total</td><td>100.0</td><td class="current-col">112.0</td><td>+12.0</td></tr></tbody></table></div>
+<div class="el takeaway" style="left:120px; top:800px; width:1680px; height:120px;">Use interpretation text when arithmetic direction and favourable direction differ.</div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Native tables inherit the template font</div>
 </div>
 
-<!-- Slide 12: Bar chart with conventions — WHY: direct labels and one baseline maximize period comparison with minimum ink. Period labels and values may vary; zero baseline, grey history, and accent current period may not. -->
+<!-- Pattern: chart — for: trend, ranking, or bridge evidence; regions: legend, chart, takeaway; components: chart + takeaway; may vary: native chart type and one labelled target; may not: use decorative grids, legends instead of direct labels, unequal scales, or accent history. Bridges retain start/end totals and connector logic; rankings descend on a zero baseline and highlight only the title focus. -->
 <div class="slide">
-  <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Performance / volume</div><div class="title-meta"><div class="claim">Volume increased in every period and ended 24% higher</div><div class="period">Completed units (thousands)<br>Period 1–current period</div></div></div>
-  <div class="el chart-subtitle" style="left:120px; top:310px; width:1200px; height:42px;">Completed units, thousands; values labelled directly</div>
-  <div class="el rule" style="left:210px; top:820px; width:1470px; height:1px;"></div>
-  <div class="el bar" style="left:310px; top:570px; width:120px; height:250px;"></div><div class="el caption bold" style="left:300px; top:530px; width:140px; height:42px;">80</div><div class="el caption" style="left:300px; top:845px; width:140px; height:42px;">Period 1</div>
-  <div class="el bar" style="left:600px; top:530px; width:120px; height:290px;"></div><div class="el caption bold" style="left:590px; top:490px; width:140px; height:42px;">86</div><div class="el caption" style="left:590px; top:845px; width:140px; height:42px;">Period 2</div>
-  <div class="el bar" style="left:890px; top:490px; width:120px; height:330px;"></div><div class="el caption bold" style="left:880px; top:450px; width:140px; height:42px;">91</div><div class="el caption" style="left:880px; top:845px; width:140px; height:42px;">Period 3</div>
-  <div class="el bar" style="left:1180px; top:455px; width:120px; height:365px;"></div><div class="el caption bold" style="left:1170px; top:415px; width:140px; height:42px;">95</div><div class="el caption" style="left:1170px; top:845px; width:140px; height:42px;">Period 4</div>
-  <div class="el bar current" style="left:1470px; top:420px; width:120px; height:400px;"></div><div class="el caption bold accent" style="left:1460px; top:380px; width:140px; height:42px;">99</div><div class="el caption accent bold" style="left:1460px; top:845px; width:160px; height:42px;">Current</div>
-  <div class="el caption" style="left:120px; top:915px; width:1680px; height:44px;">Axis treatment: light zero baseline only; no gridlines; current period is the sole accent.</div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: reporting dataset. Definition: completed units within period; illustrative values.</span></div>
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / chart</div><div class="claim">Direct labels make the trend readable with less ink</div><div class="period">Completed units<br>Four periods</div></div>
+<div class="el caption" style="left:120px; top:310px; width:1100px; height:42px;">Native chart in the deck; HTML values are illustrative</div>
+<!-- Component: chart (.chart) — build as a native chart with grey history, accent current focus, direct values, common zero baseline, and at most one labelled reference; may vary: bar, line, ranking, bridge, or four/six small multiples; may not: draw production charts with shapes. -->
+<div class="el chart" style="left:120px; top:380px; width:1180px; height:470px;"><svg viewBox="0 0 1180 470" width="1180" height="470" aria-label="Illustrative four-period bar chart"><rect class="svg-history" x="100" y="220" width="130" height="250"></rect><rect class="svg-history" x="360" y="170" width="130" height="300"></rect><rect class="svg-history" x="620" y="120" width="130" height="350"></rect><rect class="svg-current" x="880" y="60" width="130" height="410"></rect><text class="svg-value" x="140" y="195">80</text><text class="svg-value" x="400" y="145">86</text><text class="svg-value" x="660" y="95">91</text><text class="svg-value svg-current" x="920" y="35">99</text><text class="svg-label" x="100" y="455">Period 1</text><text class="svg-label" x="360" y="455">Period 2</text><text class="svg-label" x="620" y="455">Period 3</text><text class="svg-label svg-current" x="880" y="455">Current</text></svg></div>
+<div class="el takeaway" style="left:1400px; top:470px; width:400px; height:250px;">Keep one useful baseline. Label values directly; remove empty gridlines.</div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Small multiples share scale and geometry</div>
 </div>
 
-<!-- Slide 13: Line chart with reference line — WHY: a single analytical target line explains whether the trend is sufficient. Values and target may vary; direct labels, one baseline, and only one labelled reference line may not. -->
+<!-- Pattern: before-after — for: one state transition on identical scope; regions: left, right, takeaway; components: before-after + selected + takeaway; may vary: measure and comparator wording; may not: compare unlike definitions or add competing measures. -->
 <div class="slide">
-  <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Operations / quality</div><div class="title-meta"><div class="claim">Quality improved, but the current result remains below target</div><div class="period">Quality score (points)<br>Period 1–current period</div></div></div>
-  <div class="el chart-subtitle" style="left:120px; top:310px; width:1200px; height:42px;">Quality score, points; target shown as the only reference line</div>
-  <div class="el line-chart" style="left:240px; top:370px; width:1360px; height:560px;">
-    <div class="el reference-line" style="left:0; top:40px; width:1240px; height:1px;"></div>
-    <div class="el caption" style="left:1170px; top:24px; width:180px; height:45px;">Target 90</div>
-    <div class="el segment seg-a" style="left:6px; top:336px; width:318px; height:3px;"></div>
-    <div class="el segment seg-b" style="left:316px; top:266px; width:313px; height:3px;"></div>
-    <div class="el segment seg-c" style="left:626px; top:306px; width:344px; height:3px;"></div>
-    <div class="el segment current seg-d" style="left:936px; top:156px; width:316px; height:3px;"></div>
-    <div class="el point" style="left:0; top:330px; width:12px; height:12px;"></div><div class="el point-label" style="left:-10px; top:292px; width:60px; height:42px;">72</div><div class="el axis-label" style="left:-30px; top:490px; width:150px; height:42px;">Period 1</div>
-    <div class="el point" style="left:310px; top:260px; width:12px; height:12px;"></div><div class="el point-label" style="left:300px; top:222px; width:60px; height:42px;">78</div><div class="el axis-label" style="left:260px; top:490px; width:150px; height:42px;">Period 2</div>
-    <div class="el point" style="left:620px; top:300px; width:12px; height:12px;"></div><div class="el point-label" style="left:610px; top:262px; width:60px; height:42px;">76</div><div class="el axis-label" style="left:570px; top:490px; width:150px; height:42px;">Period 3</div>
-    <div class="el point" style="left:930px; top:150px; width:12px; height:12px;"></div><div class="el point-label" style="left:920px; top:112px; width:60px; height:42px;">86</div><div class="el axis-label" style="left:880px; top:490px; width:150px; height:42px;">Period 4</div>
-    <div class="el point current" style="left:1240px; top:120px; width:12px; height:12px;"></div><div class="el point-label accent" style="left:1220px; top:82px; width:70px; height:42px;">88</div><div class="el axis-label accent bold" style="left:1190px; top:490px; width:150px; height:42px;">Current</div>
-    <div class="el rule" style="left:0; top:470px; width:1250px; height:1px;"></div>
-  </div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: reporting dataset. Definition: composite quality score; illustrative values.</span></div>
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / before and after</div><div class="claim">The changed process cut cycle time by six days</div><div class="period">Cycle time, days<br>Before–after</div></div>
+<!-- Component: before-after (.before-after) — compare one measure across two identically scoped states; may vary: labels and values; may not: change baseline, scope, or unit between sides. -->
+<div class="el before-after" style="left:120px; top:380px; width:1680px; height:340px;"><div><div class="label">Before / prior process</div><div class="metric-lg">24 days</div><div class="caption">Agreed baseline and scope</div></div><div class="after"><div class="label accent">After / current process</div><div class="metric-lg accent">18 days</div><div class="caption">−6 days / −25% · same scope</div></div></div>
+<div class="el takeaway" style="left:120px; top:790px; width:1680px; height:125px;">Use explicit signs for direction; accent only identifies the selected state.</div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">One transition and one implication per slide</div>
 </div>
 
-<!-- Slide 14: Small multiples grid — WHY: six segments share one scale so shape and magnitude can be compared without six colours. Segment count may vary to 4 or 6; shared scale, identical geometry, and accent current period may not. -->
+<!-- Pattern: text — for: three to five executive findings with compact proof; regions: finding-1, finding-2, finding-3; components: numbered ×3; may vary: count and evidence reference; may not: use topic labels or turn proof into a second narrative. -->
 <div class="slide">
-  <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Segments / comparison</div><div class="title-meta"><div class="claim">Growth was broad-based, with two segments accelerating fastest</div><div class="period">Output index (base = 100)<br>Four periods ending current</div></div></div>
-  <div class="el chart-subtitle" style="left:120px; top:310px; width:1200px; height:42px;">Output index on a shared 0–140 scale; each mini chart uses the same four periods</div>
-  <div class="el mini" style="left:120px; top:370px; width:500px; height:260px;"><div class="mini-title">Segment A</div><div class="mini-bars"><div class="mini-bar mx1 mh2" data-v="84"></div><div class="mini-bar mx2 mh3" data-v="96"></div><div class="mini-bar mx3 mh4" data-v="108"></div><div class="mini-bar current mx4 mh5" data-v="121"></div></div><div class="mini-periods"><span>Prior periods</span><span>Current</span></div></div>
-  <div class="el mini" style="left:710px; top:370px; width:500px; height:260px;"><div class="mini-title">Segment B</div><div class="mini-bars"><div class="mini-bar mx1 mh1" data-v="78"></div><div class="mini-bar mx2 mh3" data-v="94"></div><div class="mini-bar mx3 mh5" data-v="118"></div><div class="mini-bar current mx4 mh6" data-v="134"></div></div><div class="mini-periods"><span>Prior periods</span><span>Current</span></div></div>
-  <div class="el mini" style="left:1300px; top:370px; width:500px; height:260px;"><div class="mini-title">Segment C</div><div class="mini-bars"><div class="mini-bar mx1 mh3" data-v="96"></div><div class="mini-bar mx2 mh3" data-v="98"></div><div class="mini-bar mx3 mh4" data-v="104"></div><div class="mini-bar current mx4 mh4" data-v="110"></div></div><div class="mini-periods"><span>Prior periods</span><span>Current</span></div></div>
-  <div class="el mini" style="left:120px; top:650px; width:500px; height:260px;"><div class="mini-title">Segment D</div><div class="mini-bars"><div class="mini-bar mx1 mh2" data-v="88"></div><div class="mini-bar mx2 mh2" data-v="90"></div><div class="mini-bar mx3 mh3" data-v="97"></div><div class="mini-bar current mx4 mh4" data-v="106"></div></div><div class="mini-periods"><span>Prior periods</span><span>Current</span></div></div>
-  <div class="el mini" style="left:710px; top:650px; width:500px; height:260px;"><div class="mini-title">Segment E</div><div class="mini-bars"><div class="mini-bar mx1 mh2" data-v="86"></div><div class="mini-bar mx2 mh4" data-v="104"></div><div class="mini-bar mx3 mh5" data-v="119"></div><div class="mini-bar current mx4 mh6" data-v="132"></div></div><div class="mini-periods"><span>Prior periods</span><span>Current</span></div></div>
-  <div class="el mini" style="left:1300px; top:650px; width:500px; height:260px;"><div class="mini-title">Segment F</div><div class="mini-bars"><div class="mini-bar mx1 mh4" data-v="105"></div><div class="mini-bar mx2 mh4" data-v="107"></div><div class="mini-bar mx3 mh5" data-v="116"></div><div class="mini-bar current mx4 mh5" data-v="124"></div></div><div class="mini-periods"><span>Prior periods</span><span>Current</span></div></div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: reporting dataset. Definition: index rebased to common starting point; illustrative values.</span></div>
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / numbered findings</div><div class="claim">Three findings expose the argument before the detail</div><div class="period">Executive summary</div></div>
+<!-- Component: numbered (.findings) — pair each sentence claim with compact evidence and implication; may vary: three to five findings; may not: use topic labels, unsupported implications, or paragraph proof. -->
+<div class="el findings" style="left:120px; top:350px; width:1680px; height:500px;"><div class="finding"><div class="finding-num">01</div><div class="finding-copy">State the headline result</div><div class="finding-proof">Metric + comparator<br>Decision</div></div><div class="finding"><div class="finding-num">02</div><div class="finding-copy">Name the primary driver</div><div class="finding-proof">Driver + scale<br>Owner</div></div><div class="finding"><div class="finding-num">03</div><div class="finding-copy">Bound the remaining risk</div><div class="finding-proof">Target gap + trend<br>Threshold</div></div></div>
+<div class="el takeaway" style="left:120px; top:880px; width:1680px; height:80px;">Proof points to evidence.</div>
+<div class="el frame-foot" style="left:120px; top:990px; width:1560px; height:35px;">Use sentence claims, not exhibit names</div>
 </div>
 
-<!-- Pattern: table — native table uses the template font. Slide 15: Financial table with totals — WHY: aligned columns preserve exact values and period comparability better than a decorative chart. Rows may vary; right alignment, thin rules, explicit change, and bold total may not. -->
+<!-- Part: Closing -->
+<!-- Frame: closing — convert evidence into owned next-period work; action count and wording may vary, owner, timing, and expected measure may not be omitted. -->
 <div class="slide">
-  <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Financial performance</div><div class="title-meta"><div class="claim">Revenue growth outpaced operating cost growth</div><div class="period">Amount (currency millions)<br>Prior period–current period</div></div></div>
-  <div class="el chart-subtitle" style="left:120px; top:310px; width:1200px; height:42px;">Current and prior period; change shown with explicit sign</div>
-  <div class="el" style="left:120px; top:370px; width:1680px; height:520px;">
-    <table class="data-table">
-      <thead><tr><th>Line item</th><th>Prior period</th><th class="current-col">Current period</th><th>Change</th><th>Change %</th></tr></thead>
-      <tbody>
-        <tr><td>Product revenue</td><td>72.0</td><td class="current-col">81.4</td><td>+9.4</td><td>+13.1%</td></tr>
-        <tr><td>Service revenue</td><td>28.0</td><td class="current-col">30.6</td><td>+2.6</td><td>+9.3%</td></tr>
-        <tr class="total"><td>Total revenue</td><td>100.0</td><td class="current-col">112.0</td><td>+12.0</td><td>+12.0%</td></tr>
-        <tr><td>Cost of revenue</td><td>58.0</td><td class="current-col">62.0</td><td>+4.0</td><td>+6.9%</td></tr>
-        <tr><td>Operating expense</td><td>31.0</td><td class="current-col">31.5</td><td>+0.5</td><td>+1.6%</td></tr>
-        <tr class="total"><td>Operating result</td><td>11.0</td><td class="current-col">18.5</td><td>+7.5</td><td>+68.2%</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="el caption" style="left:120px; top:905px; width:1680px; height:45px;">Optional zebra is subtle and neutral. Totals use weight and a stronger rule, never a rounded container.</div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: reporting dataset. Definition: amounts and line items are illustrative; rounding may affect totals.</span></div>
-</div>
-
-<!-- Slide 16: Variance table — WHY: plan, actual, and delta sit in one scan path so misses cannot hide behind colour. Measures may vary; actual remains accent and delta retains explicit +/− with stated favourable logic. -->
-<div class="slide">
-  <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Plan versus actual</div><div class="title-meta"><div class="claim">Actual results exceeded plan on three of five measures</div><div class="period">Mixed operating measures<br>Current period</div></div></div>
-  <div class="el chart-subtitle" style="left:120px; top:310px; width:1200px; height:42px;">Variance = actual minus plan; favourable direction is stated per row</div>
-  <div class="el" style="left:120px; top:370px; width:1680px; height:440px;">
-    <table class="data-table">
-      <thead><tr><th>Measure</th><th>Unit</th><th>Plan</th><th class="current-col">Actual</th><th>Delta</th><th>Interpretation</th></tr></thead>
-      <tbody>
-        <tr><td>Revenue</td><td>millions</td><td>108.0</td><td class="current-col">112.0</td><td>+4.0</td><td>Above plan</td></tr>
-        <tr><td>Gross margin</td><td>percent</td><td>41.0%</td><td class="current-col">42.0%</td><td>+1.0 pt</td><td>Above plan</td></tr>
-        <tr><td>Operating cost</td><td>millions</td><td>66.0</td><td class="current-col">68.0</td><td>+2.0</td><td>Above plan; unfavourable</td></tr>
-        <tr><td>Retention</td><td>percent</td><td>90.0%</td><td class="current-col">91.0%</td><td>+1.0 pt</td><td>Above plan</td></tr>
-        <tr><td>Cycle time</td><td>days</td><td>16</td><td class="current-col">18</td><td>+2</td><td>Above plan; unfavourable</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="el note-box body-text" style="left:120px; top:825px; width:1680px; height:135px;">Do not rely on red or green. The sign reports arithmetic; the interpretation column reports whether that direction is favourable.</div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: plan and reporting datasets. Definition: illustrative values; pt = percentage point.</span></div>
-</div>
-
-<!-- Slide 17: Waterfall or bridge — WHY: floating bars reconcile the start value to the current total while direct labels expose each driver. Drivers may vary; start/end totals, connector logic, and accent final total may not. -->
-<div class="slide">
-  <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Bridge / period movement</div><div class="title-meta"><div class="claim">Volume and mix more than offset the cost headwind</div><div class="period">Operating result (currency millions)<br>Prior period–current period</div></div></div>
-  <div class="el chart-subtitle" style="left:120px; top:310px; width:1200px; height:42px;">Bridge from prior result to current result; each contribution labelled directly</div>
-  <div class="el rule" style="left:180px; top:820px; width:1560px; height:1px;"></div>
-  <div class="el bar" style="left:220px; top:590px; width:150px; height:230px;"></div><div class="el caption bold" style="left:220px; top:550px; width:150px; height:42px;">11.0</div><div class="el caption" style="left:205px; top:850px; width:180px; height:52px;">Prior result</div>
-  <div class="el reference-line" style="left:370px; top:590px; width:170px; height:1px;"></div>
-  <div class="el bar" style="left:540px; top:480px; width:150px; height:110px;"></div><div class="el caption bold" style="left:540px; top:440px; width:150px; height:42px;">+5.2</div><div class="el caption" style="left:540px; top:850px; width:150px; height:52px;">Volume</div>
-  <div class="el reference-line" style="left:690px; top:480px; width:170px; height:1px;"></div>
-  <div class="el bar" style="left:860px; top:415px; width:150px; height:65px;"></div><div class="el caption bold" style="left:860px; top:375px; width:150px; height:42px;">+3.1</div><div class="el caption" style="left:860px; top:850px; width:150px; height:52px;">Mix</div>
-  <div class="el reference-line" style="left:1010px; top:415px; width:170px; height:1px;"></div>
-  <div class="el bar" style="left:1180px; top:415px; width:150px; height:82px;"></div><div class="el caption bold" style="left:1180px; top:505px; width:150px; height:42px;">−3.8</div><div class="el caption" style="left:1180px; top:850px; width:150px; height:52px;">Cost</div>
-  <div class="el reference-line" style="left:1330px; top:497px; width:170px; height:1px;"></div>
-  <div class="el bar current" style="left:1500px; top:495px; width:150px; height:325px;"></div><div class="el caption bold accent" style="left:1500px; top:455px; width:150px; height:42px;">15.5</div><div class="el caption accent bold" style="left:1480px; top:850px; width:190px; height:52px;">Current result</div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: reporting dataset. Definition: residual effects included in illustrative bridge rounding.</span></div>
-</div>
-
-<!-- Slide 18: Ranking with ordered horizontal bars — WHY: descending position and bar length reveal both rank and magnitude without category colours. Items may vary; descending order, direct values, and one highlighted current-period focus may not. -->
-<div class="slide">
-  <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Segments / ranking</div><div class="title-meta"><div class="claim">The leading segment contributed nearly twice the median</div><div class="period">Contribution (index points)<br>Current period</div></div></div>
-  <div class="el chart-subtitle" style="left:120px; top:310px; width:1200px; height:42px;">Ordered contribution, index points; current focus highlighted</div>
-  <div class="el rank-list" style="left:120px; top:370px; width:1680px; height:492px;">
-    <div class="rank-row"><div class="rank-name">1&nbsp;&nbsp; Segment A</div><div class="rank-track"><div class="rank-fill current" style="width:100%;"></div></div><div class="rank-value accent">42</div></div>
-    <div class="rank-row"><div class="rank-name">2&nbsp;&nbsp; Segment B</div><div class="rank-track"><div class="rank-fill" style="width:81%;"></div></div><div class="rank-value">34</div></div>
-    <div class="rank-row"><div class="rank-name">3&nbsp;&nbsp; Segment C</div><div class="rank-track"><div class="rank-fill" style="width:64%;"></div></div><div class="rank-value">27</div></div>
-    <div class="rank-row"><div class="rank-name">4&nbsp;&nbsp; Segment D</div><div class="rank-track"><div class="rank-fill" style="width:52%;"></div></div><div class="rank-value">22</div></div>
-    <div class="rank-row"><div class="rank-name">5&nbsp;&nbsp; Segment E</div><div class="rank-track"><div class="rank-fill" style="width:38%;"></div></div><div class="rank-value">16</div></div>
-    <div class="rank-row"><div class="rank-name">6&nbsp;&nbsp; Segment F</div><div class="rank-track"><div class="rank-fill" style="width:29%;"></div></div><div class="rank-value">12</div></div>
-  </div>
-  <div class="el caption" style="left:120px; top:875px; width:1680px; height:42px;">Use a common zero baseline. Highlight only the item discussed in the title; category identity comes from labels, not colour.</div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: reporting dataset. Definition: contribution is illustrative and additive.</span></div>
-</div>
-
-<!-- Slide 19: Text summary with numbered findings — WHY: numbered findings let leaders scan the argument while the proof column keeps each claim auditable. Finding count may vary from 3–5; sentence titles and evidence references may not. -->
-<div class="slide">
-  <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Executive summary</div><div class="title-meta"><div class="claim">Three findings explain the current period result</div><div class="period">Summary of reported measures<br>Current period</div></div></div>
-  <div class="el chart-subtitle" style="left:120px; top:310px; width:1200px; height:42px;">Each finding states the claim, then points to the evidence and implication</div>
-  <div class="el findings" style="left:120px; top:370px; width:1680px; height:595px;">
-    <div class="finding"><div class="finding-num">01</div><div class="finding-text">Claim stated as one sentence about the headline result</div><div class="finding-proof">Evidence: metric + comparator + page.<br>Implication: decision or watch item.</div></div>
-    <div class="finding"><div class="finding-num">02</div><div class="finding-text">Claim stated as one sentence about the primary driver</div><div class="finding-proof">Evidence: driver + page.<br>Implication: action and owner.</div></div>
-    <div class="finding"><div class="finding-num">03</div><div class="finding-text">Claim stated as one sentence about the remaining risk</div><div class="finding-proof">Evidence: target gap + trend.<br>Implication: next-period threshold.</div></div>
-  </div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: exhibits in this report. Definition: page references point to underlying evidence.</span></div>
-</div>
-
-<!-- Slide 20: Appendix and definitions — WHY: a two-column glossary keeps the core story concise while preserving auditability. Terms may vary; alphabetical grouping, plain definitions, source, and scope notes may not. -->
-<div class="slide">
-  <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Appendix / definitions</div><div class="title-meta"><div class="claim">Definitions keep period comparisons consistent</div><div class="period">Metric glossary and scope<br>Reporting period</div></div></div>
-  <div class="el chart-subtitle" style="left:120px; top:310px; width:1200px; height:42px;">Use exact formulas, inclusions, exclusions, and reporting cut-off</div>
-  <div class="el definition-grid" style="left:120px; top:370px; width:1680px; height:520px;">
-    <div>
-      <div class="definition"><div class="definition-term">Current period</div><div class="definition-copy">The reporting window ending on the stated cut-off date; accent colour always maps to this period.</div></div>
-      <div class="definition"><div class="definition-term">Completed units</div><div class="definition-copy">Count of units meeting the completion rule within the period; excludes cancelled and duplicate records.</div></div>
-      <div class="definition"><div class="definition-term">Gross margin</div><div class="definition-copy">Revenue less direct cost, divided by revenue. State whether values are reported or adjusted.</div></div>
-    </div>
-    <div>
-      <div class="definition"><div class="definition-term">Prior period</div><div class="definition-copy">The immediately preceding comparable window using the same cut-off and scope rules.</div></div>
-      <div class="definition"><div class="definition-term">Quality score</div><div class="definition-copy">Composite measure using the documented weighting; include formula and target owner in the source notes.</div></div>
-      <div class="definition"><div class="definition-term">Retention</div><div class="definition-copy">Eligible entities remaining at period end divided by eligible entities at period start.</div></div>
-    </div>
-  </div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: metric dictionary. Definition: illustrative wording; replace with governed definitions.</span></div>
-</div>
-
-<!-- Pattern: before / after — WHY: two states of one measure share a baseline and comparator row, so direction is visible without decorative cards. Keep the two-state geometry; if multiple measures compete, split them across slides. -->
-<div class="slide">
-  <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Operations / before and after</div><div class="title-meta"><div class="claim">The changed process cut cycle time by six days</div><div class="period">Cycle time (days)<br>Before–after</div></div></div>
-  <div class="el chart-subtitle" style="left:120px; top:310px; width:1200px; height:42px;">Same measure, scope, and baseline in both states</div>
-  <div class="el" style="left:120px; top:390px; width:760px; height:390px;">
-    <div class="label">Before / prior process</div><div class="metric-lg muted before-metric">24 days</div><div class="rule before-rule"></div><div class="body-text muted">Comparator: agreed baseline period<br>Scope: identical completed work</div>
-  </div>
-  <div class="el" style="left:1040px; top:390px; width:760px; height:390px;">
-    <div class="label accent">After / current process</div><div class="metric-lg accent before-metric">18 days</div><div class="rule-accent after-rule"></div><div class="body-text"><span class="bold">−6 days / −25%</span><br>Comparator: same baseline and scope</div>
-  </div>
-  <div class="el note-box body-text" style="left:120px; top:820px; width:1680px; height:135px;"><span class="bold">Use for one state transition.</span> Accent marks the outline-emphasised after figure as the selected series; explicit signs carry direction.</div>
-  <div class="el frame-foot footer-row" style="left:120px; top:970px; width:1560px; height:46px;"><span>Source: process dataset. Definition: identical scope before and after.</span></div>
+<div class="el label accent" style="left:120px; top:110px; width:600px; height:36px;">Close / action and outlook</div>
+<div class="el cover-title" style="left:120px; top:190px; width:1550px; height:220px;">The next period tests<br>three owned actions</div>
+<div class="el" style="left:120px; top:500px; width:1680px; height:340px;"><table class="data-table"><thead><tr><th>Action</th><th>Owner</th><th>Due</th><th>Expected measure</th></tr></thead><tbody><tr><td>Resolve primary gap</td><td>Role</td><td>Period date</td><td class="current-col">Metric +4 pts</td></tr><tr><td>Remove delay</td><td>Role</td><td>Period date</td><td class="current-col">Metric −2 days</td></tr><tr><td>Extend leading practice</td><td>Role</td><td>Period date</td><td class="current-col">Metric +6%</td></tr></tbody></table></div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Expected movement is directional, not a forecast</div>
 </div>
 
 </body>

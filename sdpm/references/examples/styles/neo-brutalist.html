@@ -5,373 +5,269 @@
 <title>neo-brutalist — A confrontational visual system for broad audiences and any presentation purpose where the message must land immediately; the design decision favors blunt hierarchy over polish, using a cream ground, six-pixel black borders, hard twelve-pixel shadows, flat primary fills, uppercase labels, and square corners.</title>
 <style>
 :root {
-  --color-text: #111111;
-  --color-bg: #FFF6E5;
-  --color-surface: #FFFFFF;
-  --color-border: #111111;
-  --color-muted: #5A5046;
-  --accent: #FF5E5B;
-  --accent-2: #FFD166;
-  --accent-3: #06D6A0;
-  --accent-4: #118AB2;
-  --color-on-accent: #111111;
-  --font-family: "Arial Black", Impact, "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
-  --fs-cover-title: 54pt;
-  --fs-slide-title: 34pt;
-  --fs-heading: 24pt;
-  --fs-body: 18pt;
-  --fs-caption: 13pt;
-  --fs-label: 11pt;
-  --fs-metric: 64pt;
-  --fs-metric-xl: 88pt;
-  --fs-table: 14pt;
-  --margin-x: 120px;
-  --content-w: 1680px;
-  --content-top: 300px;
-  --bar-h: 220px;
-  --radius: 0px;
-  --border-thin: 6px;
-  --shadow: 12px 12px 0 #111111;
+  --color-text: #111111; /* claims, structure, and text */
+  --color-bg: #FFF6E5; /* cream ground on every slide */
+  --color-surface: #FFFFFF; /* quiet evidence block */
+  --color-border: #111111; /* every border and connector */
+  --color-muted: #5A5046; /* sources, units, and qualifiers */
+  --accent: #FF5E5B; /* primary claim or selected block */
+  --accent-2: #FFD166; /* note, comparison, or sequence */
+  --accent-3: #06D6A0; /* alternative, step, or result */
+  --accent-4: #118AB2; /* evidence or section focus */
+  --color-on-accent: #111111; /* text on every primary fill */
+  --font-family: "Arial Black", Impact, "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; /* heavy display stack; sans fallback */
+  --fs-cover-title: 54pt; /* uppercase cover; three lines maximum */
+  --fs-slide-title: 34pt; /* uppercase claim; six words and two lines maximum */
+  --fs-heading: 24pt; /* uppercase block heading */
+  --fs-body: 18pt; /* bold supporting sentence */
+  --fs-caption: 13pt; /* source, unit, comparator, or qualifier */
+  --fs-label: 11pt; /* uppercase label; three words maximum */
+  --fs-metric: 64pt; /* standard headline figure */
+  --fs-metric-xl: 88pt; /* one dominant figure */
+  --fs-table: 14pt; /* compact native table values */
+  --margin-x: 120px; /* side inset beyond five percent */
+  --content-w: 1680px; /* usable width inside margins */
+  --content-top: 300px; /* content below two-line title reserve */
+  --bar-h: 220px; /* fixed label and claim band */
+  --radius: 0px; /* square corners without exception */
+  --border-thin: 6px; /* black structural rule */
+  --shadow: 12px 12px 0 #111111; /* hard native shadow direction */
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 40px; background: #D8CDBA; font-family: var(--font-family); zoom: 0.7; color: var(--color-text); }
 .slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; overflow: hidden; background: var(--color-bg); color: var(--color-text); }
 .el { position: absolute; }
-.cover-title { font-size: calc(var(--fs-cover-title) * 1.5); line-height: 0.96; font-weight: 900; letter-spacing: -2px; text-transform: uppercase; }
-.slide-title { font-size: calc(var(--fs-slide-title) * 1.5); line-height: 1.02; font-weight: 900; letter-spacing: -1px; text-transform: uppercase; }
-.heading { font-size: calc(var(--fs-heading) * 1.5); line-height: 1.08; font-weight: 900; text-transform: uppercase; }
-.body-text { font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; font-size: calc(var(--fs-body) * 1.5); line-height: 1.32; font-weight: 700; }
-.caption { font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; font-size: calc(var(--fs-caption) * 1.5); line-height: 1.28; font-weight: 700; color: var(--color-muted); }
-.label { font-size: calc(var(--fs-label) * 1.5); line-height: 1.1; font-weight: 900; letter-spacing: 1.5px; text-transform: uppercase; }
-.metric { font-size: calc(var(--fs-metric) * 1.5); line-height: 0.9; font-weight: 900; letter-spacing: -3px; }
-.metric-xl { font-size: calc(var(--fs-metric-xl) * 1.5); line-height: 0.86; font-weight: 900; letter-spacing: -5px; }
-.table-text { font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; font-size: calc(var(--fs-table) * 1.5); line-height: 1.18; font-weight: 700; }
+.ct { font-size: calc(var(--fs-cover-title) * 1.5); line-height: .96; font-weight: 900; letter-spacing: -2px; text-transform: uppercase; }
+.st { font-size: calc(var(--fs-slide-title) * 1.5); line-height: 1.02; font-weight: 900; letter-spacing: -1px; text-transform: uppercase; }
+.hd { font-size: calc(var(--fs-heading) * 1.5); line-height: 1.08; font-weight: 900; text-transform: uppercase; }
+.bt { font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; font-size: calc(var(--fs-body) * 1.5); line-height: 1.32; font-weight: 700; }
+.cp { font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; font-size: calc(var(--fs-caption) * 1.5); line-height: 1.28; font-weight: 700; color: var(--color-muted); }
+.lb { font-size: calc(var(--fs-label) * 1.5); line-height: 1.1; font-weight: 900; letter-spacing: 1.5px; text-transform: uppercase; }
+.mt { font-size: calc(var(--fs-metric) * 1.5); line-height: .9; font-weight: 900; letter-spacing: -3px; }
+.mx { font-size: calc(var(--fs-metric-xl) * 1.5); line-height: .86; font-weight: 900; letter-spacing: -5px; }
+.tt { font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; font-size: calc(var(--fs-table) * 1.5); line-height: 1.18; font-weight: 700; }
 .box { border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px; }
-.box-tight { padding: 18px; }
-.box-center { display: flex; align-items: center; justify-content: center; text-align: center; }
+.center { display: flex; align-items: center; justify-content: center; text-align: center; }
 .red { background: var(--accent); color: var(--color-on-accent); }
 .yellow { background: var(--accent-2); color: var(--color-on-accent); }
 .green { background: var(--accent-3); color: var(--color-on-accent); }
 .blue { background: var(--accent-4); color: var(--color-on-accent); }
 .surface { background: var(--color-surface); color: var(--color-text); }
-.cream { background: var(--color-bg); color: var(--color-text); }
+.muted { color: var(--color-muted); }
 .text-red { color: var(--accent); }
 .text-blue { color: var(--accent-4); }
-.muted { color: var(--color-muted); }
 .frame-title { border-bottom: var(--border-thin) solid var(--color-border); }
-.frame-foot { border-top: var(--border-thin) solid var(--color-border); }
-.line-h { border-top: var(--border-thin) solid var(--color-border); }
-.line-v { border-left: var(--border-thin) solid var(--color-border); }
-.rule-list { margin: 0; padding-left: 28px; }
-.rule-list li { margin: 0 0 16px; }
-.compact li { margin-bottom: 10px; }
-.reason { display: block; font-size: calc(var(--fs-caption) * 1.5); line-height: 1.22; color: var(--color-muted); margin-top: 3px; }
-.type-row { border-bottom: var(--border-thin) solid var(--color-border); display: flex; align-items: center; justify-content: space-between; }
-.type-meta { font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; font-size: calc(var(--fs-caption) * 1.5); line-height: 1.2; font-weight: 700; color: var(--color-muted); text-align: right; }
-.swatch-name { font-size: calc(var(--fs-label) * 1.5); line-height: 1.1; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+.frame-foot { border-top: var(--border-thin) solid var(--color-border); padding-top: 12px; }
+.selected { background: var(--accent); color: var(--color-on-accent); }
+.takeaway { border: var(--border-thin) solid var(--color-border); box-shadow: var(--shadow); padding: 24px 28px; background: var(--accent-2); }
+.marker { display: flex; align-items: center; justify-content: center; border: var(--border-thin) solid var(--color-border); box-shadow: var(--shadow); background: var(--accent); }
+.tag { display: flex; align-items: center; justify-content: center; border: var(--border-thin) solid var(--color-border); box-shadow: var(--shadow); background: var(--accent-2); }
+.step { border: var(--border-thin) solid var(--color-border); box-shadow: var(--shadow); padding: 28px; }
+.connector { background: var(--color-border); }
+.metric-block { border: var(--border-thin) solid var(--color-border); box-shadow: var(--shadow); padding: 34px; background: var(--color-surface); }
+.state { border: var(--border-thin) solid var(--color-border); box-shadow: var(--shadow); padding: 28px; }
 .data-table { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; }
 .data-table th, .data-table td { border-right: var(--border-thin) solid var(--color-border); border-bottom: var(--border-thin) solid var(--color-border); padding: 12px 16px; text-align: left; vertical-align: middle; }
 .data-table th:last-child, .data-table td:last-child { border-right: 0; }
 .data-table tr:last-child td { border-bottom: 0; }
 .data-table th { font-size: calc(var(--fs-label) * 1.5); line-height: 1.05; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
 .data-table td { font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; font-size: calc(var(--fs-table) * 1.5); line-height: 1.15; font-weight: 700; }
-.bar { padding: 0; }
-.chart-label { font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; font-size: calc(var(--fs-caption) * 1.5); line-height: 1.15; font-weight: 900; text-align: center; }
-.connector { border-top: var(--border-thin) solid var(--color-border); }
-.arrow-tip { width: 0; height: 0; border-top: 18px solid transparent; border-bottom: 18px solid transparent; border-left: 28px solid var(--color-border); }
-.big-index { font-size: calc(var(--fs-metric) * 1.5); line-height: 0.9; font-weight: 900; color: var(--accent); }
+.chart { border-left: var(--border-thin) solid var(--color-border); border-bottom: var(--border-thin) solid var(--color-border); }
+.chart text { font-family: "Helvetica Neue", Arial, sans-serif; font-size: calc(var(--fs-caption) * 1.5); font-weight: 900; fill: var(--color-text); }
+.prose { border-left: var(--border-thin) solid var(--color-border); padding-left: 36px; }
 </style>
 </head>
 <body>
 
-<!-- Part 0: Title and machine-readable design tokens -->
-<!-- Part 1: Cover -->
-<!-- Slide 1: Cover — The oversized red title block and offset green counter-block declare the square, confrontational system immediately; the style name and short descriptor may vary, but the cream ground, 6px borders, 12px hard shadows, and zero-radius geometry may not. -->
-<div class="slide cover">
-  <div class="el box red cover-title" style="left:120px; top:150px; width:1190px; height:470px;">Neo-<br>brutalist</div>
-  <div class="el box green box-center metric" style="left:1390px; top:235px; width:290px; height:290px;">01</div>
-  <div class="el box yellow label box-center" style="left:120px; top:730px; width:430px; height:92px;">Zero apology</div>
-  <div class="el body-text" style="left:120px; top:865px; width:1180px; height:100px;">Cream ground. Black structure. Flat primary impact.</div>
-  <div class="el label" style="left:1390px; top:895px; width:410px; height:42px;">Style / any deck</div>
+<!-- Part: Cover -->
+<!-- The cover spends three primary fills on the style declaration; no other decoration, rotation, overlap, or gradient is permitted. -->
+<div class="slide">
+<div class="el box red ct" style="left:120px;top:150px;width:1190px;height:470px">Neo-<br>brutalist</div>
+<div class="el box green center mt" style="left:1390px;top:235px;width:290px;height:290px">01</div>
+<div class="el box yellow lb center" style="left:120px;top:730px;width:430px;height:92px">Zero apology</div>
+<div class="el bt" style="left:120px;top:865px;width:1180px;height:100px">Cream ground. Black structure. Flat primary impact.</div>
+<div class="el lb" style="left:1390px;top:895px;width:410px;height:42px">Style / any deck</div>
 </div>
 
-<!-- Part 2: Rules -->
-<!-- Slide 2: Design decision and universal rules — The decision is stated before its consequences so the visual aggression remains disciplined; wording may tighten, but the numeric limits and universal readability rules may not. -->
-<div class="slide rules">
-  <div class="el label" style="left:120px; top:70px; width:500px; height:32px;">Rules / read first</div>
-  <div class="el slide-title frame-title" style="left:120px; top:115px; width:1680px; height:145px;">Blunt hierarchy is the decision</div>
-  <div class="el body-text" style="left:120px; top:285px; width:1600px; height:105px;">The audience must grasp the claim at a glance in any setting. Heavy structure, hard contrast, and a few flat fills make hierarchy undeniable; restraint keeps force from becoming noise.</div>
-  <div class="el box red label" style="left:120px; top:420px; width:250px; height:75px;">Always</div>
-  <div class="el body-text" style="left:120px; top:525px; width:760px; height:410px;">
-    <ul class="rule-list compact">
-      <li>One claim per slide; the title is the claim.</li>
-      <li>Keep every edge margin at least 5%.</li>
-      <li>Keep text contrast at least 4.5:1; 3:1 only for 18pt or larger.</li>
-      <li>Label chart values directly; remove non-informative gridlines.</li>
-      <li>Use no emoji; use sourced icons only when essential.</li>
-    </ul>
-  </div>
-  <div class="el box yellow label" style="left:1010px; top:420px; width:350px; height:75px;">Fixed geometry</div>
-  <div class="el body-text" style="left:1010px; top:525px; width:790px; height:430px;">
-    <ul class="rule-list compact">
-      <li>Border: 6px black, fixed.</li>
-      <li>Shadow: 12px hard offset, fixed; blur 0.</li>
-      <li>Corner radius: 0px, always.</li>
-      <li>Rotation: 0 degrees; no rotated elements.</li>
-      <li>Primary fills: maximum 3 colors per slide.</li>
-      <li>Labels: uppercase, maximum 3 words.</li>
-    </ul>
-  </div>
+<!-- Part: Rules -->
+<!-- Frame: content — fixed 120px margins, label at y 65, a 160px two-line title reserve at y 112, content after y 300, and an optional source above the clear template footer; a filled page tag appears only when sequence helps, stays uppercase, and adds at most three words beyond its index; wording may vary, geometry may not. -->
+<!-- Broad audiences must grasp the claim at a glance in any setting. Heavy structure, hard contrast, and few flat fills make hierarchy undeniable; restraint keeps force from becoming noise. Contrast stays at least 4.5:1, or 3:1 for text at least 18pt. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Rules / decision</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">Blunt hierarchy beats polish</div>
+<!-- Component: container (.box) — group one content block with a six-pixel black border, square corners, and one hard shadow; may vary: size and one of three slide fills; may not: rotate, overlap, soften, or gain a gradient. -->
+<div class="el box surface" style="left:120px;top:350px;width:760px;height:430px"><div class="lb">Do</div><div class="hd" style="margin-top:34px">Make structure unavoidable</div><div class="bt" style="margin-top:36px">One claim. Direct values. At most three primary fills.</div></div>
+<!-- Component: selected (.selected) — mark the one active or recommended peer with a flat fill while preserving matched geometry; may vary: selected member and fill role; may not: highlight every peer or rely on colour alone. -->
+<div class="el box selected" style="left:1040px;top:350px;width:760px;height:430px"><div class="lb">Do not</div><div class="hd" style="margin-top:34px">Turn force into noise</div><div class="bt" style="margin-top:36px">No gradients, opacity, skew, rotation, overlap, or emoji.</div></div>
+<!-- Component: takeaway (.takeaway) — state one immediate implication in a single hard block; may vary: sentence and one fill; may not: repeat the title or introduce another claim. -->
+<div class="el takeaway bt" style="left:120px;top:850px;width:1680px;height:110px">Colour reinforces hierarchy; black structure must work first.</div>
 </div>
 
-<!-- Slide 3: Derived DO and DON'T rules — Paired instructions connect each prohibition to the blunt-hierarchy decision; examples may vary, but 6px borders, 12px shadows, zero radius, zero rotation, and the three-fill ceiling may not. -->
-<div class="slide rules">
-  <div class="el label" style="left:120px; top:70px; width:500px; height:32px;">Rules / derived practice</div>
-  <div class="el slide-title frame-title" style="left:120px; top:115px; width:1680px; height:145px;">Force comes from consistency</div>
-  <div class="el box green heading" style="left:120px; top:330px; width:720px; height:100px;">Do</div>
-  <div class="el body-text" style="left:120px; top:470px; width:720px; height:390px;">
-    <ul class="rule-list">
-      <li>Build every filled box with a 6px black border.<span class="reason">The border makes each block legible before color does.</span></li>
-      <li>Apply one native hard shadow to every filled box.<span class="reason">Use {type: outer, blur: 0, distance: 12, direction: 45, color: #111111, opacity: 1}.</span></li>
-      <li>Choose up to 3 primary fills for the slide.<span class="reason">Repeat colors by role; do not spend all four at once.</span></li>
-    </ul>
-  </div>
-  <div class="el box red heading" style="left:960px; top:330px; width:720px; height:100px;">Don't</div>
-  <div class="el body-text" style="left:960px; top:470px; width:720px; height:390px;">
-    <ul class="rule-list">
-      <li>Do not soften corners, borders, or shadows.<span class="reason">Radius stays 0px; border stays 6px; shadow stays 12px.</span></li>
-      <li>Do not rotate, skew, overlap, or add gradients.<span class="reason">The permitted rotation is exactly 0 degrees.</span></li>
-      <li>Do not write long labels or decorative tags.<span class="reason">Labels stay uppercase and no longer than 3 words.</span></li>
-    </ul>
-  </div>
-  <div class="el box yellow body-text" style="left:120px; top:900px; width:1560px; height:105px;">Test every choice: does it sharpen the claim, or merely make the slide louder?</div>
+<!-- Every filled box uses one native outer shadow with blur 0, distance 12, direction 45, colour #111111, and opacity 1. Every filled box keeps a 6px black border and radius 0. Rotation is exactly 0 degrees. Repeat colours only by role. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Rules / geometry</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">Consistency creates the force</div>
+<!-- Component: numbered (.marker) — order three to five short rules or findings; may vary: index and sentence; may not: become a decorative tag or carry paragraphs. -->
+<div class="el marker lb" style="left:120px;top:350px;width:90px;height:70px">01</div>
+<div class="el hd" style="left:260px;top:350px;width:560px;height:100px">Six-pixel borders</div>
+<div class="el marker lb" style="left:120px;top:520px;width:90px;height:70px">02</div>
+<div class="el hd" style="left:260px;top:520px;width:560px;height:100px">Twelve-pixel shadows</div>
+<div class="el marker lb" style="left:980px;top:350px;width:90px;height:70px">03</div>
+<div class="el hd" style="left:1120px;top:350px;width:560px;height:100px">Square corners</div>
+<div class="el marker lb" style="left:980px;top:520px;width:90px;height:70px">04</div>
+<div class="el hd" style="left:1120px;top:520px;width:560px;height:100px">Zero rotation</div>
+<div class="el takeaway bt" style="left:120px;top:760px;width:1680px;height:140px">Labels stay uppercase and three words maximum. Icons are sourced, monochrome, and essential.</div>
+<div class="el frame-foot cp" style="left:120px;top:970px;width:1680px;height:50px">Margins exceed five percent</div>
 </div>
 
-<!-- Part 3: Message and Outline -->
-<!-- Slide 4: Look-derived message structure — Short claims and bounded density protect the forceful visual hierarchy without prescribing any subject or chapter sequence; ranges may adapt within the limits, but no purpose-specific outline is implied. -->
-<div class="slide message">
-  <div class="el label" style="left:120px; top:70px; width:700px; height:32px;">Message and outline</div>
-  <div class="el slide-title frame-title" style="left:120px; top:115px; width:1680px; height:145px;">Short claims hit harder</div>
-  <div class="el box red heading" style="left:120px; top:340px; width:500px; height:120px;">Title grammar</div>
-  <div class="el body-text" style="left:120px; top:500px; width:500px; height:360px;">Use a punchy assertion of 6 words or fewer. Keep it to 2 lines maximum. Draft “Claim of this slide stated as a sentence,” then compress without losing the claim.</div>
-  <div class="el box yellow heading" style="left:710px; top:340px; width:500px; height:120px;">Deck shape</div>
-  <div class="el body-text" style="left:710px; top:500px; width:500px; height:360px;">Let the brief and content set the length. Use one claim per slide. Opening, sequence, and closing follow the material; this look imposes no chapter template.</div>
-  <div class="el box green heading" style="left:1300px; top:340px; width:500px; height:120px;">Density limit</div>
-  <div class="el body-text" style="left:1300px; top:500px; width:500px; height:360px;">Use 15–45 visible words on a typical slide, excluding labels and tables. Show 1–4 content blocks. Split the slide when a second independent claim appears.</div>
-  <div class="el box surface body-text" style="left:120px; top:900px; width:1680px; height:105px;">Favor large numbers, direct comparisons, short processes, explicit relationships, and compact tables. The subject may vary; the visual grammar does not.</div>
+<!-- Part: Message & Outline -->
+<!-- Density: 45 -->
+<!-- The 45-word ceiling includes labels and tables in this style document. A typical content slide uses 15–45 words in one to four blocks. Add slides before adding a second independent claim. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:620px;height:32px">Message / grammar</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1320px;height:160px">Short claims hit harder</div>
+<!-- Component: tag (.tag) — carry a short index, period, unit, or status; may vary: concise metadata; may not: exceed three words, decorate, or replace the claim. -->
+<div class="el tag lb" style="left:1480px;top:65px;width:300px;height:70px">Two lines max</div>
+<!-- Component: metric (.metric-block) — lead with one figure plus unit, period, and direct comparator; may vary: value and one flat focus colour; may not: float without context or encode direction through colour alone. -->
+<div class="el metric-block" style="left:120px;top:350px;width:600px;height:390px"><div class="mx text-red">45</div><div class="hd" style="margin-top:36px">Words maximum</div></div>
+<div class="el bt" style="left:850px;top:370px;width:820px;height:190px">Write a punchy assertion of six words or fewer. Keep two lines reserved, even when one is empty.</div>
+<div class="el takeaway bt" style="left:850px;top:650px;width:820px;height:140px">Draft the full claim, then compress without losing meaning.</div>
 </div>
 
-<!-- Part 4: Palette -->
-<!-- Slide 5: Palette — Five fixed roles make color loud but predictable; names and hex values may not vary, while a slide may select any one to three primary fills according to hierarchy. -->
-<div class="slide palette">
-  <div class="el label" style="left:120px; top:70px; width:500px; height:32px;">Palette / flat only</div>
-  <div class="el slide-title frame-title" style="left:120px; top:115px; width:1680px; height:145px;">Color blocks, never decorates</div>
-  <div class="el box red" style="left:120px; top:340px; width:280px; height:220px;"></div>
-  <div class="el swatch-name" style="left:120px; top:600px; width:280px; height:75px;">Red / #FF5E5B<br>Primary claim</div>
-  <div class="el box yellow" style="left:470px; top:340px; width:280px; height:220px;"></div>
-  <div class="el swatch-name" style="left:470px; top:600px; width:280px; height:75px;">Yellow / #FFD166<br>Sequence or note</div>
-  <div class="el box green" style="left:820px; top:340px; width:280px; height:220px;"></div>
-  <div class="el swatch-name" style="left:820px; top:600px; width:280px; height:75px;">Green / #06D6A0<br>Alternative or step</div>
-  <div class="el box blue" style="left:1170px; top:340px; width:280px; height:220px;"></div>
-  <div class="el swatch-name" style="left:1170px; top:600px; width:280px; height:75px;">Blue / #118AB2<br>Evidence or focus</div>
-  <div class="el box surface" style="left:1520px; top:340px; width:280px; height:220px;"></div>
-  <div class="el swatch-name" style="left:1520px; top:600px; width:280px; height:75px;">White / #FFFFFF<br>Quiet surface</div>
-  <div class="el body-text" style="left:120px; top:745px; width:1680px; height:180px;">Ground: cream #FFF6E5. Structure and text: black #111111. Use black text on every primary fill; each pair meets 4.5:1. Use at most 3 primary fill colors on one slide. Repeat a color only when its role repeats. Never use gradients, opacity, or color as the only signal.</div>
-  <div class="el caption" style="left:120px; top:970px; width:1680px; height:35px;">Filled boxes always carry 6px black borders and 12px hard shadows.</div>
+<!-- Deck length follows the brief and source material. Opening, sequence, chapters, and closing follow the argument; this style imposes no chapter template. Use a divider only when navigation needs a pause. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:620px;height:32px">Outline / flow</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">The argument sets the sequence</div>
+<div class="el box red hd" style="left:120px;top:350px;width:460px;height:310px">Open<br><span class="bt">Strongest claim</span></div>
+<div class="el box yellow hd" style="left:730px;top:350px;width:460px;height:310px">Build<br><span class="bt">Evidence order</span></div>
+<div class="el box green hd" style="left:1340px;top:350px;width:460px;height:310px">Close<br><span class="bt">Immediate implication</span></div>
+<div class="el takeaway bt" style="left:120px;top:770px;width:1680px;height:145px">Favor large numbers, direct comparisons, short processes, explicit relationships, compact tables, and native charts.</div>
 </div>
 
-<!-- Part 5: Typography -->
-<!-- Slide 6: Typography ramp — One installed heavy stack keeps every level blunt and available across ordinary machines; sample wording may vary, but token sizes, uppercase display roles, and line limits may not. -->
-<div class="slide typography">
-  <div class="el label" style="left:120px; top:60px; width:600px; height:32px;">Typography / actual-size ramp</div>
-  <div class="el slide-title frame-title" style="left:120px; top:105px; width:1680px; height:125px;">Weight replaces ornament</div>
-  <div class="el type-row" style="left:120px; top:270px; width:1680px; height:150px;"><span class="cover-title">Cover title</span><span class="type-meta">--fs-cover-title / 54pt / 0.96 / uppercase / 3 lines maximum</span></div>
-  <div class="el type-row" style="left:120px; top:420px; width:1680px; height:115px;"><span class="slide-title">Claim in six words</span><span class="type-meta">--fs-slide-title / 34pt / 1.02 / uppercase / 2 lines maximum</span></div>
-  <div class="el type-row" style="left:120px; top:535px; width:1680px; height:95px;"><span class="heading">Section heading</span><span class="type-meta">--fs-heading / 24pt / 1.08 / uppercase</span></div>
-  <div class="el type-row" style="left:120px; top:630px; width:1680px; height:90px;"><span class="body-text">Supporting evidence in one short sentence.</span><span class="type-meta">--fs-body / 18pt / 1.32 / bold sans</span></div>
-  <div class="el type-row" style="left:120px; top:720px; width:1680px; height:130px;"><span class="metric">42%</span><span class="type-meta">--fs-metric / 64pt / 0.90 / heavy</span></div>
-  <div class="el type-row" style="left:120px; top:850px; width:1680px; height:70px;"><span class="caption">Source, unit, comparator, or qualification</span><span class="type-meta">--fs-caption / 13pt / 1.28 / supporting only</span></div>
-  <div class="el type-row" style="left:120px; top:920px; width:1680px; height:55px;"><span class="label">Short label</span><span class="type-meta">--fs-label / 11pt / 1.10 / uppercase / 3 words maximum</span></div>
-  <div class="el caption" style="left:120px; top:995px; width:1680px; height:38px;">Use the installed stack exactly as tokenized. Native tables inherit the presentation template font; preserve the heavy hierarchy through size, weight, borders, and alignment.</div>
+<!-- Part: Patterns -->
+<!-- Frame: divider — use one short section question, one flat section block, and one offset number; number, question, and one fill may vary, while evidence, agenda items, extra decoration, and dense copy may not enter. -->
+<div class="slide">
+<div class="el box blue lb center" style="left:120px;top:120px;width:330px;height:90px">Patterns</div>
+<div class="el ct" style="left:120px;top:310px;width:1410px;height:300px">How does force<br>stay useful?</div>
+<div class="el box red mt center" style="left:1480px;top:660px;width:300px;height:250px">02</div>
+<div class="el bt" style="left:120px;top:725px;width:1120px;height:150px">Each layout makes one claim unavoidable.</div>
 </div>
 
-<!-- Part 6: Frame -->
-<!-- Slide 7: Standard frame — A fixed two-line title zone and thick baseline keep content aligned across forceful compositions; section wording may vary, but 5% margins, title reserve, and content top may not. -->
-<div class="slide frame">
-  <div class="el label" style="left:120px; top:65px; width:620px; height:32px;">Section label</div>
-  <div class="el slide-title frame-title" style="left:120px; top:112px; width:1680px; height:160px;">Claim stated in six words</div>
-  <div class="el box yellow label box-center" style="left:1480px; top:55px; width:300px; height:70px;">01 / 12</div>
-  <div class="el caption" style="left:120px; top:315px; width:900px; height:35px;">Content begins at --content-top / 300px.</div>
-  <div class="el line-h" style="left:120px; top:370px; width:1680px; height:6px;"></div>
-  <div class="el heading" style="left:120px; top:425px; width:1500px; height:90px;">Reserved title space stays fixed</div>
-  <div class="el body-text" style="left:120px; top:540px; width:1350px; height:160px;">Side margins are 120px and exceed 5% of the slide width. The title box reserves two lines. A one-line title leaves the second line empty; content does not move upward.</div>
-  <div class="el box green body-text" style="left:120px; top:755px; width:1300px; height:145px;">Use the page tag only when sequence helps orientation. It remains uppercase, at most 3 words beyond the numeric index, and uses one of the slide's selected fills.</div>
-  <div class="el frame-foot caption" style="left:120px; top:975px; width:1680px; height:48px;">Source: placeholder source. Leave template-owned pagination clear.</div>
+<!-- Pattern: comparison — for: two matched options or states; regions: left, right, takeaway; components: container ×2 + selected + takeaway; may vary: selected side and concise evidence; may not: change geometry, measure, scope, or evidence order. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Pattern / comparison</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">Matched blocks make choice credible</div>
+<div class="el box surface" style="left:120px;top:350px;width:760px;height:430px"><div class="lb">Baseline</div><div class="mt" style="margin-top:60px">64</div><div class="bt" style="margin-top:40px">Same measure and scope.</div></div>
+<div class="el box selected" style="left:1040px;top:350px;width:760px;height:430px"><div class="lb">Selected</div><div class="mt" style="margin-top:60px">42</div><div class="bt" style="margin-top:40px">Same measure and scope.</div></div>
+<div class="el takeaway bt" style="left:120px;top:850px;width:1680px;height:110px">State the −22 delta directly; colour does not carry direction.</div>
 </div>
 
-<!-- Slide 8: Section divider — One monumental question and one offset block create a pause without introducing a purpose-specific chapter model; question and section number may vary, but the sparse composition may not. -->
-<div class="slide divider">
-  <div class="el box blue label box-center" style="left:120px; top:120px; width:330px; height:90px;">Section 02</div>
-  <div class="el cover-title" style="left:120px; top:310px; width:1410px; height:300px;">Section question<br>stated briefly</div>
-  <div class="el box red metric box-center" style="left:1480px; top:660px; width:300px; height:250px;">02</div>
-  <div class="el body-text" style="left:120px; top:725px; width:1120px; height:150px;">One question or transition only. Do not add evidence, agenda items, or decorative marks to this frame.</div>
-  <div class="el frame-foot caption" style="left:120px; top:975px; width:1680px; height:48px;">Optional section divider / use only when the material needs a pause.</div>
+<!-- Pattern: columns — for: three or four parallel categories, including a three-way comparison; regions: col-1, col-2, col-3, col-4; components: container ×4; may vary: three or four columns and reuse of three fills; may not: vary widths, evidence depth, shared baseline, evidence order, or exceed four blocks. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Pattern / columns</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">Equal columns hold parallel logic</div>
+<div class="el box red hd" style="left:120px;top:370px;width:360px;height:400px">Frame<br><span class="bt">Name the claim.</span></div>
+<div class="el box yellow hd" style="left:560px;top:370px;width:360px;height:400px">Measure<br><span class="bt">Use one scale.</span></div>
+<div class="el box green hd" style="left:1000px;top:370px;width:360px;height:400px">Compare<br><span class="bt">Match depth.</span></div>
+<div class="el box red hd" style="left:1440px;top:370px;width:360px;height:400px">Decide<br><span class="bt">End directly.</span></div>
+<div class="el takeaway bt" style="left:120px;top:850px;width:1680px;height:110px">Repeat colour only when its role repeats.</div>
 </div>
 
-<!-- Slide 9: Closing frame — The final claim receives the same blunt hierarchy as the opening and ends with one compact takeaway box; wording may vary, but the close may not become a collage or agenda. -->
-<div class="slide closing">
-  <div class="el label" style="left:120px; top:110px; width:500px; height:32px;">Closing claim</div>
-  <div class="el cover-title" style="left:120px; top:200px; width:1520px; height:310px;">Final claim stated<br>in six words</div>
-  <div class="el box yellow heading" style="left:120px; top:610px; width:1100px; height:190px;">One takeaway phrase</div>
-  <div class="el box green label box-center" style="left:1370px; top:610px; width:310px; height:190px;">End</div>
-  <div class="el body-text" style="left:120px; top:870px; width:1300px; height:100px;">Close on the claim and its immediate implication. Do not introduce a new claim.</div>
+<!-- Pattern: process — for: three to five ordered stages; regions: step-1, step-2, step-3, takeaway; components: step ×3 + connector ×2 + takeaway; may vary: stage count and repeated fills; may not: rotate, curve, detach connectors, add paragraphs, or use sequence without meaningful order. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Pattern / process</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">Three checks prevent rework</div>
+<!-- Component: step (.step) — hold one “Step N — verb phrase” stage in matched geometry; may vary: three to five stages and repeated fills; may not: rotate, change sibling size, or carry a paragraph. -->
+<div class="el step red hd" style="left:120px;top:390px;width:400px;height:280px">Step 1<br>Frame claim</div>
+<!-- Component: connector (.connector) — make one straight left-to-right handoff between adjacent steps; may vary: length with spacing; may not: curve, rotate, detach, or become decorative. -->
+<div class="el connector" style="left:540px;top:525px;width:120px;height:6px"></div>
+<div class="el step yellow hd" style="left:680px;top:390px;width:400px;height:280px">Step 2<br>Test evidence</div>
+<div class="el connector" style="left:1100px;top:525px;width:120px;height:6px"></div>
+<div class="el step green hd" style="left:1240px;top:390px;width:400px;height:280px">Step 3<br>Name owner</div>
+<div class="el takeaway bt" style="left:120px;top:790px;width:1520px;height:130px">Move left to right. Split stages that need paragraphs.</div>
 </div>
 
-<!-- Part 7: Patterns -->
-<!-- Slide 10: Big number — WHY: one white shadowed stage lets the red metric dominate without floating decoration. MAY VARY: metric, unit, comparator, and one secondary fill. MAY NOT VARY: direct context, 6px border, 12px hard shadow, zero radius, or one-claim hierarchy. -->
-<div class="slide pattern-number">
-  <div class="el label" style="left:120px; top:65px; width:500px; height:32px;">Numbers</div>
-  <div class="el slide-title frame-title" style="left:120px; top:112px; width:1680px; height:160px;">Claim stated in six words</div>
-  <div class="el box surface" style="left:120px; top:350px; width:1120px; height:500px;"></div>
-  <div class="el metric-xl text-red" style="left:180px; top:430px; width:940px; height:180px;">42%</div>
-  <div class="el heading" style="left:180px; top:650px; width:900px; height:75px;">Metric label</div>
-  <div class="el body-text" style="left:180px; top:750px; width:900px; height:65px;">Comparator stated directly.</div>
-  <div class="el box green box-center heading" style="left:1390px; top:430px; width:330px; height:300px;">+12<br>points</div>
-  <div class="el caption" style="left:120px; top:930px; width:1680px; height:45px;">Source: placeholder source. Unit and period stated explicitly.</div>
+<!-- Pattern: metric — for: one dominant result and direct comparator; regions: body, takeaway; components: metric + selected + takeaway; may vary: figure, unit, comparator, and one secondary fill; may not: float the figure, omit context, or create a dashboard. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Pattern / metric</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">One number owns the slide</div>
+<div class="el metric-block" style="left:120px;top:350px;width:1120px;height:500px"><div class="mx text-red">78%</div><div class="hd" style="margin-top:50px">Current completion</div><div class="bt" style="margin-top:32px">+12 points versus prior period.</div></div>
+<div class="el box green center hd" style="left:1390px;top:430px;width:330px;height:300px">+12<br>points</div>
+<div class="el frame-foot cp" style="left:120px;top:950px;width:1680px;height:55px">State unit, period, scope, and comparator</div>
 </div>
 
-<!-- Slide 11: Three-column comparison — WHY: equal shadowed columns turn comparison into three undeniable blocks and reproduce the mock's signature scan. MAY VARY: column labels, evidence, and assignment of up to three fills. MAY NOT VARY: equal geometry, shared baseline, direct labels, or the three-primary-fill maximum. -->
-<div class="slide pattern-comparison">
-  <div class="el label" style="left:120px; top:65px; width:500px; height:32px;">Comparison</div>
-  <div class="el slide-title frame-title" style="left:120px; top:112px; width:1680px; height:160px;">Claim stated in six words</div>
-  <div class="el box yellow heading" style="left:120px; top:350px; width:500px; height:500px;">Option A</div>
-  <div class="el body-text" style="left:160px; top:520px; width:410px; height:240px;">Supporting evidence in one short sentence.<br><br>Direct comparator label.</div>
-  <div class="el box green heading" style="left:710px; top:350px; width:500px; height:500px;">Option B</div>
-  <div class="el body-text" style="left:750px; top:520px; width:410px; height:240px;">Supporting evidence in one short sentence.<br><br>Direct comparator label.</div>
-  <div class="el box blue heading" style="left:1300px; top:350px; width:500px; height:500px;">Option C</div>
-  <div class="el body-text" style="left:1340px; top:520px; width:410px; height:240px;">Supporting evidence in one short sentence.<br><br>Direct comparator label.</div>
-  <div class="el caption" style="left:120px; top:930px; width:1680px; height:45px;">Use the same measure, scope, and evidence depth in every column.</div>
+<!-- Pattern: table — for: exact categorical evidence; regions: table, takeaway; components: table + takeaway; may vary: three to six rows, two to five columns, labels, and one highlighted cell; may not: lose direct headers, aligned measures, six-pixel rules, or add decorative fills. -->
+<!-- Native tables inherit the presentation template font; preserve hierarchy through size, weight, borders, and alignment. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Pattern / table</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">Exact values stay visibly exact</div>
+<!-- Component: table (.data-table) — place auditable values in one native table with direct headers and six-pixel rules; may vary: permitted rows, columns, labels, and one focus cell; may not: split into cards or misalign measures. -->
+<div class="el box surface tt" style="left:120px;top:340px;width:1180px;height:500px"><table class="data-table"><thead><tr><th>Stage</th><th>Prior</th><th>Current</th></tr></thead><tbody><tr><td>Frame</td><td>42</td><td>58</td></tr><tr><td>Build</td><td>58</td><td>73</td></tr><tr><td>Review</td><td>73</td><td>81</td></tr></tbody></table></div>
+<div class="el takeaway hd" style="left:1410px;top:430px;width:390px;height:300px">Align measures.<br>Label units.</div>
+<div class="el frame-foot cp" style="left:120px;top:950px;width:1680px;height:55px">Use exact values for lookup</div>
 </div>
 
-<!-- Slide 12: Process — WHY: alternating hard blocks and black connectors make sequence explicit without arrows becoming decoration. MAY VARY: 3–5 steps, labels, and up to three repeated fills. MAY NOT VARY: left-to-right order, “Step N — verb phrase” grammar, direct connectors, or zero rotation. -->
-<div class="slide pattern-process">
-  <div class="el label" style="left:120px; top:65px; width:500px; height:32px;">Process</div>
-  <div class="el slide-title frame-title" style="left:120px; top:112px; width:1680px; height:160px;">Claim stated in six words</div>
-  <div class="el box red heading" style="left:120px; top:410px; width:360px; height:270px;">Step 1<br>Verb phrase</div>
-  <div class="el connector" style="left:500px; top:540px; width:120px; height:6px;"></div>
-  <div class="el arrow-tip" style="left:615px; top:525px; width:28px; height:36px;"></div>
-  <div class="el box yellow heading" style="left:660px; top:410px; width:360px; height:270px;">Step 2<br>Verb phrase</div>
-  <div class="el connector" style="left:1040px; top:540px; width:120px; height:6px;"></div>
-  <div class="el arrow-tip" style="left:1155px; top:525px; width:28px; height:36px;"></div>
-  <div class="el box green heading" style="left:1200px; top:410px; width:360px; height:270px;">Step 3<br>Verb phrase</div>
-  <div class="el body-text" style="left:120px; top:770px; width:1440px; height:100px;">One short sentence states the transition or constraint across all steps.</div>
-  <div class="el caption" style="left:120px; top:930px; width:1680px; height:45px;">Sequence is logical, not decorative. Split the slide if steps require paragraphs.</div>
+<!-- Pattern: chart — for: trend, ranking, or proportion; regions: chart, takeaway; components: chart + takeaway; may vary: three to six native marks, chart type, values, and repeated fills; may not: lose direct labels, common zero baseline, black outlines, hard shadows, or add needless grids and legends. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Pattern / chart</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">Direct labels beat a legend</div>
+<!-- Component: chart (.chart) — build production evidence as a native chart with three to six directly labelled marks, common zero baseline, black outlines, and repeated role fills; the HTML SVG is plainly illustrative; may not: use shape-built production bars or empty gridlines. -->
+<div class="el chart" style="left:160px;top:350px;width:1120px;height:500px"><svg viewBox="0 0 1120 500" width="1120" height="500" aria-label="Illustrative four-bar chart"><rect x="120" y="230" width="170" height="264" fill="#FF5E5B" stroke="#111111" stroke-width="6"></rect><rect x="380" y="170" width="170" height="324" fill="#FFD166" stroke="#111111" stroke-width="6"></rect><rect x="640" y="100" width="170" height="394" fill="#06D6A0" stroke="#111111" stroke-width="6"></rect><rect x="900" y="190" width="170" height="304" fill="#FF5E5B" stroke="#111111" stroke-width="6"></rect><text x="175" y="205">42</text><text x="435" y="145">58</text><text x="695" y="75">73</text><text x="955" y="165">50</text></svg></div>
+<div class="el takeaway hd" style="left:1400px;top:430px;width:400px;height:300px">One baseline.<br>No empty grids.</div>
+<div class="el frame-foot cp" style="left:120px;top:950px;width:1680px;height:55px">Repeat colours by role</div>
 </div>
 
-<!-- Slide 13: Relationship — WHY: a large central claim block and three evenly spaced satellites expose one-to-many structure without a dense network. MAY VARY: 2–4 satellites, labels, and selected fills. MAY NOT VARY: explicit relationship wording, straight connectors, direct labels, or the absence of rotation and overlap. -->
-<div class="slide pattern-relationship">
-  <div class="el label" style="left:120px; top:65px; width:500px; height:32px;">Relationship</div>
-  <div class="el slide-title frame-title" style="left:120px; top:112px; width:1680px; height:160px;">Claim stated in six words</div>
-  <div class="el box surface box-center heading" style="left:710px; top:375px; width:500px; height:220px;">Central idea</div>
-  <div class="el line-v" style="left:960px; top:595px; width:6px; height:95px;"></div>
-  <div class="el line-h" style="left:320px; top:685px; width:1280px; height:6px;"></div>
-  <div class="el line-v" style="left:320px; top:685px; width:6px; height:70px;"></div>
-  <div class="el line-v" style="left:960px; top:685px; width:6px; height:70px;"></div>
-  <div class="el line-v" style="left:1600px; top:685px; width:6px; height:70px;"></div>
-  <div class="el box yellow box-center heading" style="left:120px; top:755px; width:400px; height:150px;">Relation A</div>
-  <div class="el box green box-center heading" style="left:760px; top:755px; width:400px; height:150px;">Relation B</div>
-  <div class="el box blue box-center heading" style="left:1400px; top:755px; width:400px; height:150px;">Relation C</div>
-  <div class="el caption" style="left:120px; top:970px; width:1680px; height:40px;">Name the relationship in the title or supporting sentence; geometry alone is not evidence.</div>
+<!-- Pattern: before-after — for: one state change on identical scope; regions: left, right, takeaway; components: before-after ×2 + selected + takeaway; may vary: metric, comparator, and after fill; may not: mismatch geometry, scope, baseline, period, or omit arithmetic. -->
+<!-- Component: before-after (.state) — compare two matched states with identical geometry, measure, scope, and row order; may vary: values and after fill; may not: let colour replace a direct delta. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Pattern / before after</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">Matched states expose the change</div>
+<div class="el state surface" style="left:120px;top:370px;width:600px;height:420px"><div class="lb">Before</div><div class="mt" style="margin-top:80px">64</div><div class="bt" style="margin-top:54px">Same scope</div></div>
+<div class="el box red center hd" style="left:805px;top:505px;width:310px;height:180px">−22<br>points</div>
+<div class="el state green" style="left:1200px;top:370px;width:600px;height:420px"><div class="lb">After</div><div class="mt" style="margin-top:80px">42</div><div class="bt" style="margin-top:54px">Same scope</div></div>
+<div class="el frame-foot cp" style="left:120px;top:930px;width:1680px;height:65px">State baseline, period, scope, and arithmetic</div>
 </div>
 
-<!-- Slide 14: Two-column layout — WHY: one colored claim-side block and one white evidence-side block create a decisive split while preserving room for explanation. MAY VARY: left/right assignment, one or two fills, and copy length within the density limit. MAY NOT VARY: equal visual weight, aligned tops, 6px borders, 12px shadows, or one claim. -->
-<div class="slide pattern-two-column">
-  <div class="el label" style="left:120px; top:65px; width:500px; height:32px;">Two columns</div>
-  <div class="el slide-title frame-title" style="left:120px; top:112px; width:1680px; height:160px;">Claim stated in six words</div>
-  <div class="el box red heading" style="left:120px; top:355px; width:760px; height:500px;">Point A</div>
-  <div class="el metric" style="left:170px; top:545px; width:640px; height:130px;">01</div>
-  <div class="el body-text" style="left:170px; top:710px; width:640px; height:100px;">Supporting evidence in one short sentence.</div>
-  <div class="el box surface heading" style="left:1040px; top:355px; width:760px; height:500px;">Point B</div>
-  <div class="el metric text-blue" style="left:1090px; top:545px; width:640px; height:130px;">02</div>
-  <div class="el body-text" style="left:1090px; top:710px; width:640px; height:100px;">Supporting evidence in one short sentence.</div>
-  <div class="el caption" style="left:120px; top:930px; width:1680px; height:45px;">Use matched evidence depth. If one side needs more detail, split the claims.</div>
+<!-- Pattern: relationship — for: one hub and two to four satellites; regions: hub, col-1, col-2, col-3; components: hub + container ×3 + connector; may vary: labels, satellites, and three fills; may not: overlap, curve, rotate, or leave relationship wording implicit. -->
+<!-- Component: hub (.box) — make one central idea visibly relate to two to four evenly spaced satellites; may vary: labels and fills; may not: overlap, rotate, or ask geometry alone to explain the relationship. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Pattern / relationship</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">One rule governs three outcomes</div>
+<div class="el box surface center hd" style="left:710px;top:340px;width:500px;height:190px">Black structure</div>
+<div class="el connector" style="left:957px;top:530px;width:6px;height:100px"></div>
+<div class="el connector" style="left:320px;top:624px;width:1280px;height:6px"></div>
+<div class="el connector" style="left:320px;top:624px;width:6px;height:70px"></div>
+<div class="el connector" style="left:957px;top:624px;width:6px;height:70px"></div>
+<div class="el connector" style="left:1594px;top:624px;width:6px;height:70px"></div>
+<div class="el box yellow center hd" style="left:120px;top:694px;width:400px;height:170px">Hierarchy</div>
+<div class="el box green center hd" style="left:760px;top:694px;width:400px;height:170px">Sequence</div>
+<div class="el box blue center hd" style="left:1400px;top:694px;width:400px;height:170px">Evidence</div>
+<div class="el frame-foot cp" style="left:120px;top:950px;width:1680px;height:55px">Name the relationship in the claim</div>
 </div>
 
-<!-- Slide 15: Four-column layout — WHY: four compact equal blocks show parallel categories while the shared title carries the only claim. MAY VARY: category count from 3–4 and reuse of up to three fills. MAY NOT VARY: equal widths, terse copy, aligned baselines, or the maximum of four content blocks. -->
-<div class="slide pattern-four-column">
-  <div class="el label" style="left:120px; top:65px; width:500px; height:32px;">Four columns</div>
-  <div class="el slide-title frame-title" style="left:120px; top:112px; width:1680px; height:160px;">Claim stated in six words</div>
-  <div class="el box red heading" style="left:120px; top:380px; width:360px; height:420px;">Item A</div>
-  <div class="el body-text" style="left:155px; top:565px; width:290px; height:160px;">One short evidence phrase.</div>
-  <div class="el box yellow heading" style="left:560px; top:380px; width:360px; height:420px;">Item B</div>
-  <div class="el body-text" style="left:595px; top:565px; width:290px; height:160px;">One short evidence phrase.</div>
-  <div class="el box green heading" style="left:1000px; top:380px; width:360px; height:420px;">Item C</div>
-  <div class="el body-text" style="left:1035px; top:565px; width:290px; height:160px;">One short evidence phrase.</div>
-  <div class="el box red heading" style="left:1440px; top:380px; width:360px; height:420px;">Item D</div>
-  <div class="el body-text" style="left:1475px; top:565px; width:290px; height:160px;">One short evidence phrase.</div>
-  <div class="el caption" style="left:120px; top:900px; width:1680px; height:55px;">Repeated red is one fill role; this slide uses three primary fill colors total.</div>
+<!-- Pattern: text — for: a bounded prose-led argument; regions: left, finding-1, finding-2, finding-3; components: lead + numbered ×3; may vary: synopsis and three to five points; may not: exceed density, scatter cards, use an unnumbered scan path, or move qualification onto the slide. -->
+<!-- Component: lead (.prose) — hold one unboxed synopsis beside numbered support; may vary: one sentence; may not: become a paragraph, card stack, or second claim. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Pattern / text</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">Numbered proof controls dense prose</div>
+<div class="el prose hd" style="left:120px;top:360px;width:560px;height:420px">One synopsis frames the evidence.</div>
+<div class="el marker lb" style="left:800px;top:360px;width:90px;height:70px">01</div>
+<div class="el bt" style="left:940px;top:365px;width:700px;height:80px">State the result.</div>
+<div class="el marker lb" style="left:800px;top:520px;width:90px;height:70px">02</div>
+<div class="el bt" style="left:940px;top:525px;width:700px;height:80px">Name the evidence.</div>
+<div class="el marker lb" style="left:800px;top:680px;width:90px;height:70px">03</div>
+<div class="el bt" style="left:940px;top:685px;width:700px;height:80px">Bound the implication.</div>
+<div class="el frame-foot cp" style="left:120px;top:930px;width:1680px;height:65px">Move qualification to notes or another slide</div>
 </div>
 
-<!-- Slide 16: Text-heavy slide — WHY: one yellow synopsis block and a strict numbered list keep a prose-led slide within the style instead of scattering many cards. MAY VARY: 3–5 points and synopsis wording. MAY NOT VARY: one claim, 45-word typical density ceiling, numbered scan path, or a single supporting fill. -->
-<div class="slide pattern-text">
-  <div class="el label" style="left:120px; top:65px; width:500px; height:32px;">Text heavy</div>
-  <div class="el slide-title frame-title" style="left:120px; top:112px; width:1680px; height:160px;">Claim stated in six words</div>
-  <div class="el box yellow heading" style="left:120px; top:350px; width:600px; height:470px;">One-sentence synopsis stays here.</div>
-  <div class="el big-index" style="left:850px; top:350px; width:100px; height:90px;">01</div>
-  <div class="el body-text" style="left:980px; top:360px; width:760px; height:100px;">Supporting point stated in one short sentence.</div>
-  <div class="el big-index" style="left:850px; top:500px; width:100px; height:90px;">02</div>
-  <div class="el body-text" style="left:980px; top:510px; width:760px; height:100px;">Supporting point stated in one short sentence.</div>
-  <div class="el big-index" style="left:850px; top:650px; width:100px; height:90px;">03</div>
-  <div class="el body-text" style="left:980px; top:660px; width:760px; height:100px;">Supporting point stated in one short sentence.</div>
-  <div class="el caption" style="left:120px; top:910px; width:1680px; height:60px;">Use 15–45 visible words on a typical prose slide. Move qualification to notes or another slide.</div>
-</div>
-
-<!-- Slide 17: Table — WHY: one white shadowed frame makes the table a single brutalist object while 6px internal rules keep rows and columns explicit. MAY VARY: 3–6 rows, 2–5 columns, labels, and one highlighted cell. MAY NOT VARY: direct headers, aligned measures, exact values, 6px rules, or the absence of decorative fills. -->
-<div class="slide pattern-table">
-  <div class="el label" style="left:120px; top:65px; width:500px; height:32px;">Table</div>
-  <div class="el slide-title frame-title" style="left:120px; top:112px; width:1680px; height:160px;">Claim stated in six words</div>
-  <div class="el box surface box-tight table-text" style="left:120px; top:350px; width:1680px; height:520px;">
-    <table class="data-table">
-      <thead><tr><th>Category</th><th>Measure A</th><th>Measure B</th><th>Direct result</th></tr></thead>
-      <tbody>
-        <tr><td>Item A</td><td>Value</td><td>Value</td><td>Result phrase</td></tr>
-        <tr><td>Item B</td><td>Value</td><td>Value</td><td>Result phrase</td></tr>
-        <tr><td>Item C</td><td>Value</td><td>Value</td><td>Result phrase</td></tr>
-        <tr><td>Item D</td><td>Value</td><td>Value</td><td>Result phrase</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="el caption" style="left:120px; top:930px; width:1680px; height:45px;">Source: placeholder source. State units in headers and align comparable values.</div>
-</div>
-
-<!-- Slide 18: Bar chart — WHY: three shadowed primary bars turn values into unmistakable objects while direct labels eliminate a legend. MAY VARY: 3–6 bars, values, labels, and up to three repeated fills. MAY NOT VARY: direct value labels, common zero baseline, 6px outlines, 12px shadows, or removal of unnecessary gridlines. -->
-<div class="slide pattern-chart">
-  <div class="el label" style="left:120px; top:65px; width:500px; height:32px;">Chart</div>
-  <div class="el slide-title frame-title" style="left:120px; top:112px; width:1680px; height:160px;">Claim stated in six words</div>
-  <div class="el line-h" style="left:220px; top:830px; width:1480px; height:6px;"></div>
-  <div class="el box bar red" style="left:300px; top:560px; width:210px; height:270px;"></div>
-  <div class="el chart-label" style="left:300px; top:500px; width:210px; height:45px;">42 / A</div>
-  <div class="el box bar yellow" style="left:660px; top:460px; width:210px; height:370px;"></div>
-  <div class="el chart-label" style="left:660px; top:400px; width:210px; height:45px;">58 / B</div>
-  <div class="el box bar green" style="left:1020px; top:365px; width:210px; height:465px;"></div>
-  <div class="el chart-label" style="left:1020px; top:305px; width:210px; height:45px;">73 / C</div>
-  <div class="el box bar red" style="left:1380px; top:510px; width:210px; height:320px;"></div>
-  <div class="el chart-label" style="left:1380px; top:450px; width:210px; height:45px;">50 / D</div>
-  <div class="el caption" style="left:120px; top:920px; width:1680px; height:55px;">Values and categories are labelled directly. Use a common zero baseline and no legend.</div>
-</div>
-
-<!-- Slide 19: Before and after — WHY: matched white and green blocks make the state change explicit, while the central delta states the comparison in words and numbers. MAY VARY: state labels, metric, comparator, and which primary fill marks after. MAY NOT VARY: matched geometry, identical scope, direct delta, 6px borders, 12px shadows, or one claim. -->
-<div class="slide pattern-before-after">
-  <div class="el label" style="left:120px; top:65px; width:500px; height:32px;">Before / after</div>
-  <div class="el slide-title frame-title" style="left:120px; top:112px; width:1680px; height:160px;">Claim stated in six words</div>
-  <div class="el box surface heading" style="left:120px; top:380px; width:600px; height:420px;">Before</div>
-  <div class="el metric" style="left:170px; top:560px; width:500px; height:120px;">64</div>
-  <div class="el body-text" style="left:170px; top:705px; width:500px; height:70px;">Same measure and scope.</div>
-  <div class="el box red box-center heading" style="left:805px; top:505px; width:310px; height:180px;">−22<br>points</div>
-  <div class="el box green heading" style="left:1200px; top:380px; width:600px; height:420px;">After</div>
-  <div class="el metric" style="left:1250px; top:560px; width:500px; height:120px;">42</div>
-  <div class="el body-text" style="left:1250px; top:705px; width:500px; height:70px;">Same measure and scope.</div>
-  <div class="el caption" style="left:120px; top:915px; width:1680px; height:60px;">State the baseline, period, scope, and arithmetic directly. Color does not carry direction alone.</div>
+<!-- Part: Closing -->
+<!-- Frame: closing — finish with one six-word claim, one immediate implication, and one terminal tag; wording and two fills may vary, while a collage, agenda, evidence exhibit, or new claim may not appear. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:110px;width:500px;height:32px">Closing claim</div>
+<div class="el ct" style="left:120px;top:200px;width:1520px;height:310px">Make the claim<br>impossible to miss</div>
+<div class="el takeaway hd" style="left:120px;top:610px;width:1100px;height:190px">Black structure first.<br>Flat colour second.</div>
+<div class="el box green lb center" style="left:1370px;top:610px;width:310px;height:190px">End</div>
+<div class="el bt" style="left:120px;top:870px;width:1300px;height:100px">Force stays useful when every block has a job.</div>
 </div>
 
 </body>

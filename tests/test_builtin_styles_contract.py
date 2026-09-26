@@ -5,11 +5,13 @@ A style is a rulebook + reference + gallery sample in one HTML file
 document other code depends on — ``apply_style`` reads ``--color-text``, the
 build-time font-size lint reads ``--fs-*``, the Web UI splits on
 ``<div class="slide`` and shows the first slide as the thumbnail — plus the
-skeleton and writing principles the style workflow promises to every reader.
+skeleton (cover, rules, message & outline, patterns, closing), the component and pattern
+vocabulary, the style's own density on every slide, a size budget and writing principles the style workflow promises to every reader.
 """
 
 from __future__ import annotations
 
+import html as _html
 import json
 import re
 from pathlib import Path
@@ -34,7 +36,22 @@ EXPECTED_NAMES = {
 }
 
 REQUIRED_TOKENS = ("--color-text", "--color-bg", "--fs-cover-title", "--fs-slide-title", "--fs-body")
-PART_MARKERS = tuple(f"Part {n}" for n in range(1, 8))
+PARTS = ("Cover", "Rules", "Message & Outline", "Patterns", "Closing")
+REQUIRED_FRAMES = ("content", "divider", "closing")
+REQUIRED_PATTERNS = ("comparison", "columns", "process", "metric", "table", "chart")
+# Every composer receives the whole file; the skeleton fits well under this.
+MAX_STYLE_CHARS = 40_000
+# Component vocabulary (workflows/style.md): roles every style must state, and all roles
+REQUIRED_ROLES = ("container", "selected", "takeaway", "numbered", "metric", "step", "connector", "tag", "table", "chart")
+ALL_ROLES = REQUIRED_ROLES + (
+    "list", "lead", "quote", "delta", "before-after", "progress", "phase", "milestone",
+    "hub", "hierarchy", "axis", "brace", "marker", "legend", "media", "code", "icon",
+)
+COMPONENT_RE = re.compile(r"<!--\s*Component:\s*([a-z-]+)")
+PATTERN_RE = re.compile(r"<!--\s*Pattern:\s*([a-z-]+)(.*?)-->", re.DOTALL)
+FRAME_RE = re.compile(r"<!--\s*Frame:\s*([a-z-]+)")
+DENSITY_RE = re.compile(r"<!--\s*Density:\s*(\d+)\s*-->")
+COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 BRAND_WORDS = ("McKinsey", "BCG", "Bain", "Accenture", "Deloitte", "Apple", "TED", "Amazon", "AWS", "Google")
 EMOJI_RE = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F2FF]")
 ROOT_RE = re.compile(r":root\s*\{(.*?)\}", re.DOTALL | re.IGNORECASE)
@@ -70,12 +87,52 @@ class TestStyleContract:
 
     def test_skeleton(self, path: Path) -> None:
         html = path.read_text(encoding="utf-8")
-        assert len(SLIDE_RE.findall(html)) >= 14, f"{path.stem}: skeleton with 8+ patterns needs >= 14 slides"
-        for marker in PART_MARKERS:
-            assert marker in html, f"{path.stem}: no '{marker}' marker"
+        positions = [html.find(f"<!-- Part: {name} -->") for name in PARTS]
+        assert all(pos >= 0 for pos in positions), f"{path.stem}: missing part markers {PARTS}"
+        assert positions == sorted(positions), f"{path.stem}: parts out of order"
         # first slide is the cover — the gallery shows it as the thumbnail
         first = SLIDE_RE.search(html)
-        assert first and "Part 1" in html[: first.start()]
+        assert first and positions[0] < first.start() < positions[1]
+
+    def test_style_toc_sees_every_slide(self, path: Path) -> None:
+        # apply_style returns style_toc and agents read the file by line range, so every
+        # slide must open on its own line (a minified file collapses the TOC).
+        html = path.read_text(encoding="utf-8")
+        toc = [e for e in api.style_toc(html) if e["kind"] == "slide"]
+        assert len(toc) == len(SLIDE_RE.findall(html)), f"{path.stem}: slides share a line"
+
+    def test_frames_patterns_components(self, path: Path) -> None:
+        html = path.read_text(encoding="utf-8")
+        frames = set(FRAME_RE.findall(html))
+        assert set(REQUIRED_FRAMES) <= frames, f"{path.stem}: frames missing {set(REQUIRED_FRAMES) - frames}"
+        patterns = {name: body for name, body in PATTERN_RE.findall(html)}
+        missing = [p for p in REQUIRED_PATTERNS if p not in patterns]
+        assert not missing, f"{path.stem}: required patterns missing {missing}"
+        for name, body in patterns.items():
+            assert "regions:" in body and "components:" in body, f"{path.stem}: pattern {name} lacks regions/components"
+        roles = COMPONENT_RE.findall(html)
+        unknown = sorted(set(roles) - set(ALL_ROLES))
+        assert not unknown, f"{path.stem}: component roles not in the vocabulary: {unknown}"
+        missing_roles = [r for r in REQUIRED_ROLES if r not in roles]
+        assert not missing_roles, f"{path.stem}: required roles without a Component line: {missing_roles}"
+
+    def test_slides_obey_the_style_density(self, path: Path) -> None:
+        # the file is the gallery sample and the composer's model: no slide may be denser
+        # than the style allows its decks to be
+        html = path.read_text(encoding="utf-8")
+        m = DENSITY_RE.search(html)
+        assert m, f"{path.stem}: no <!-- Density: N --> marker"
+        limit = int(m.group(1))
+        body = COMMENT_RE.sub("", html.split("<body", 1)[-1])
+        slides = re.split(r'<div class="slide[\s"]', body)[1:]
+        for i, slide in enumerate(slides, 1):
+            text = _html.unescape(re.sub(r"<[^>]+>", " ", slide))
+            words = len(re.findall(r"[\w%$€£¥+−-]+", text))
+            assert words <= limit, f"{path.stem}: slide {i} shows {words} words > density {limit}"
+
+    def test_size_budget(self, path: Path) -> None:
+        size = len(path.read_text(encoding="utf-8"))
+        assert size <= MAX_STYLE_CHARS, f"{path.stem}: {size} chars > {MAX_STYLE_CHARS}; cut duplication, not rules"
 
     def test_html_mechanics(self, path: Path) -> None:
         html = path.read_text(encoding="utf-8")

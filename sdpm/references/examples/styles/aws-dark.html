@@ -5,44 +5,44 @@
 <title>aws-dark — For customers, partners, and internal teams explaining AWS services, architectures, and cost decisions in talks and demos; a dark technical ground, official service-category identification, strict grid alignment, and one Smile Orange emphasis make complex systems readable without decorative noise.</title>
 <style>
 :root {
-  --color-bg: #161D26;
-  --color-surface: #1D2733;
-  --color-border: #324256;
-  --color-text: #FFFFFF;
-  --color-muted: #8FADD0;
-  --accent: #FF9900;
-  --color-on-accent: #16191F;
-  --cat-analytics: #8C4FFF;
-  --cat-integration: #E7157B;
-  --cat-storage: #7AA116;
-  --cat-ai: #01A88D;
-  --cat-compute: #ED7100;
-  --cat-security: #DD344C;
-  --cat-database: #C925D1;
-  --cat-analytics-tint: #2B264D;
-  --cat-integration-tint: #3C1C35;
-  --cat-storage-tint: #283523;
-  --cat-ai-tint: #123639;
-  --cat-compute-tint: #3D2C1F;
-  --cat-security-tint: #3A212D;
-  --cat-database-tint: #361E45;
-  --font-family: Arial, "Helvetica Neue", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
-  --fs-cover-title: 52pt;
-  --fs-slide-title: 36pt;
-  --fs-heading: 22pt;
-  --fs-body: 20pt;
-  --fs-caption: 14pt;
-  --fs-label: 12pt;
-  --fs-metric: 44pt;
-  --radius: 4px;
-  --border-thin: 1px;
-  --border-group: 2px;
-  --shadow: none;
-  --margin-x: 112px;
-  --content-w: 1696px;
-  --content-top: 300px;
-  --bar-h: 4px;
-  --gallery-bg: #16191F;
+  --color-bg: #161D26; /* dark technical ground on every slide */
+  --color-surface: #1D2733; /* quiet grouping behind related evidence */
+  --color-border: #324256; /* hairlines and neutral boundaries */
+  --color-text: #FFFFFF; /* claims and primary labels */
+  --color-muted: #8FADD0; /* notes, comparators, and connectors */
+  --accent: #FF9900; /* exactly one emphasis per slide */
+  --color-on-accent: #16191F; /* readable copy on orange fills */
+  --cat-analytics: #8C4FFF; /* analytics identity line or small label */
+  --cat-integration: #E7157B; /* integration identity line or small label */
+  --cat-storage: #7AA116; /* storage identity line or small label */
+  --cat-ai: #01A88D; /* intelligence identity line or small label */
+  --cat-compute: #ED7100; /* compute identity line or small label */
+  --cat-security: #DD344C; /* security identity line or small label */
+  --cat-database: #C925D1; /* database identity line or small label */
+  --cat-analytics-tint: #2B264D; /* analytics group fill */
+  --cat-integration-tint: #3C1C35; /* integration group fill */
+  --cat-storage-tint: #283523; /* storage group fill */
+  --cat-ai-tint: #123639; /* intelligence group fill */
+  --cat-compute-tint: #3D2C1F; /* compute group fill */
+  --cat-security-tint: #3A212D; /* security group fill */
+  --cat-database-tint: #361E45; /* database group fill */
+  --font-family: Arial, "Helvetica Neue", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; /* one sans family, regular or bold */
+  --fs-cover-title: 52pt; /* cover and divider title, two lines maximum */
+  --fs-slide-title: 36pt; /* sentence claim, two lines maximum */
+  --fs-heading: 22pt; /* short content heading */
+  --fs-body: 20pt; /* primary proof text */
+  --fs-caption: 14pt; /* supporting evidence or source */
+  --fs-label: 12pt; /* section, category, and route labels */
+  --fs-metric: 44pt; /* one emphasized figure */
+  --radius: 4px; /* restrained grouping corners */
+  --border-thin: 1px; /* ordinary separators */
+  --border-group: 2px; /* category or selected boundary */
+  --shadow: none; /* flat technical surfaces */
+  --margin-x: 112px; /* safe inset beyond five percent */
+  --content-w: 1696px; /* shared content width */
+  --content-top: 300px; /* content below reserved title zone */
+  --bar-h: 4px; /* title emphasis rule */
+  --gallery-bg: #16191F; /* surround outside the slide */
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 40px; background: var(--gallery-bg); font-family: var(--font-family); zoom: 0.7; }
@@ -51,515 +51,273 @@ body { margin: 0; padding: 40px; background: var(--gallery-bg); font-family: var
 .t-cover { font-size: calc(var(--fs-cover-title) * 1.5); font-weight: 700; line-height: 1.05; }
 .t-title { font-size: calc(var(--fs-slide-title) * 1.5); font-weight: 700; line-height: 1.2; }
 .t-heading { font-size: calc(var(--fs-heading) * 1.5); font-weight: 700; line-height: 1.25; }
-.t-body { font-size: calc(var(--fs-body) * 1.5); font-weight: 400; line-height: 1.35; }
-.t-caption { font-size: calc(var(--fs-caption) * 1.5); font-weight: 400; line-height: 1.35; }
+.t-body { font-size: calc(var(--fs-body) * 1.5); line-height: 1.35; }
+.t-caption { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.35; }
 .t-label { font-size: calc(var(--fs-label) * 1.5); font-weight: 700; line-height: 1.2; text-transform: uppercase; }
 .t-metric { font-size: calc(var(--fs-metric) * 1.5); font-weight: 700; line-height: 1; }
 .muted { color: var(--color-muted); }
 .center { text-align: center; }
 .right { text-align: right; }
-.section-label { color: var(--color-muted); }
 .accent-bar { background: var(--accent); }
-.rule { background: var(--color-border); }
-.surface { background: var(--color-surface); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); box-shadow: var(--shadow); }
-.surface-text { padding: 28px 32px; background: var(--color-surface); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); box-shadow: var(--shadow); }
-.compact-surface { padding: 16px 20px; }
 .title-rule { background: var(--color-border); }
-.text-box { padding: 24px 28px; border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); }
-.flex-center { display: flex; align-items: center; justify-content: center; text-align: center; }
-.flex-left { display: flex; align-items: center; justify-content: flex-start; }
-.line-item { padding: 18px 0; border-bottom: var(--border-thin) solid var(--color-border); }
-.accent-fill { background: var(--accent); color: var(--color-on-accent); }
+.rule { background: var(--color-border); }
+.surface-text { padding: 28px 32px; background: var(--color-surface); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); }
+.takeaway { padding-top: 24px; border-top: var(--border-thin) solid var(--color-border); }
+.marker { display: flex; align-items: center; justify-content: center; border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); color: var(--color-muted); }
+.accent-fill { display: flex; align-items: center; justify-content: center; background: var(--accent); color: var(--color-on-accent); }
 .accent-outline { border: var(--border-group) solid var(--accent); border-radius: var(--radius); }
-.dot { border-radius: 50%; background: var(--color-muted); }
-.connector-h { background: transparent; }
-.connector-h::before { content: ""; position: absolute; left: 0; right: 0; top: 8px; height: 2px; background: var(--color-muted); }
-.connector-v { width: 2px; background: var(--color-muted); }
-.arrow-right::after { content: ""; position: absolute; right: 0; top: 0; border-top: 9px solid transparent; border-bottom: 9px solid transparent; border-left: 14px solid var(--color-muted); }
-.icon-placeholder { display: flex; align-items: center; justify-content: center; text-align: center; background: var(--color-bg); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); color: var(--color-text); padding: 12px; }
-.category-analytics { background: var(--cat-analytics-tint); border: var(--border-group) solid var(--cat-analytics); }
-.category-integration { background: var(--cat-integration-tint); border: var(--border-group) solid var(--cat-integration); }
-.category-storage { background: var(--cat-storage-tint); border: var(--border-group) solid var(--cat-storage); }
-.category-ai { background: var(--cat-ai-tint); border: var(--border-group) solid var(--cat-ai); }
-.category-compute { background: var(--cat-compute-tint); border: var(--border-group) solid var(--cat-compute); }
-.category-security { background: var(--cat-security-tint); border: var(--border-group) solid var(--cat-security); }
-.category-database { background: var(--cat-database-tint); border: var(--border-group) solid var(--cat-database); }
-.cat-text-analytics { color: var(--cat-analytics); }
-.cat-text-integration { color: var(--cat-integration); }
-.cat-text-storage { color: var(--cat-storage); }
-.cat-text-ai { color: var(--cat-ai); }
-.cat-text-compute { color: var(--cat-compute); }
-.cat-text-security { color: var(--cat-security); }
-.cat-text-database { color: var(--cat-database); }
-.swatch-analytics { background: var(--cat-analytics); }
-.swatch-integration { background: var(--cat-integration); }
-.swatch-storage { background: var(--cat-storage); }
-.swatch-ai { background: var(--cat-ai); }
-.swatch-compute { background: var(--cat-compute); }
-.swatch-security { background: var(--cat-security); }
-.swatch-database { background: var(--cat-database); }
-.swatch-bg { background: var(--color-bg); border: var(--border-thin) solid var(--color-border); }
-.swatch-surface { background: var(--color-surface); border: var(--border-thin) solid var(--color-border); }
-.swatch-text { background: var(--color-text); }
-.swatch-muted { background: var(--color-muted); }
-.swatch-accent { background: var(--accent); }
-.tint-analytics { background: var(--cat-analytics-tint); border: var(--border-thin) solid var(--cat-analytics); }
-.tint-integration { background: var(--cat-integration-tint); border: var(--border-thin) solid var(--cat-integration); }
-.tint-storage { background: var(--cat-storage-tint); border: var(--border-thin) solid var(--cat-storage); }
-.tint-ai { background: var(--cat-ai-tint); border: var(--border-thin) solid var(--cat-ai); }
-.tint-compute { background: var(--cat-compute-tint); border: var(--border-thin) solid var(--cat-compute); }
-.tint-security { background: var(--cat-security-tint); border: var(--border-thin) solid var(--cat-security); }
-.tint-database { background: var(--cat-database-tint); border: var(--border-thin) solid var(--cat-database); }
-.table-head { background: var(--color-surface); border-top: var(--border-thin) solid var(--color-border); border-bottom: var(--border-group) solid var(--color-border); padding: 16px 20px; }
-.table-cell { border-bottom: var(--border-thin) solid var(--color-border); padding: 14px 20px; }
-.cat-band-analytics { background: var(--cat-analytics); color: var(--color-text); }
-.cat-band-storage { background: var(--cat-storage); color: var(--color-text); }
-.cat-band-compute { background: var(--cat-compute); color: var(--color-on-accent); }
-.cat-band-database { background: var(--cat-database); color: var(--color-text); }
+.columns { display: flex; gap: 48px; }
+.column { flex: 1; padding: 28px 30px; background: var(--color-surface); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); }
+.step { display: flex; align-items: center; justify-content: center; text-align: center; background: var(--color-surface); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); }
+.step.accent-fill { background: var(--accent); color: var(--color-on-accent); border-color: var(--accent); }
+.connector { background: var(--color-muted); }
+.group { border: var(--border-group) solid; border-radius: var(--radius); }
+.cat-integration { background: var(--cat-integration-tint); border-color: var(--cat-integration); }
+.cat-storage { background: var(--cat-storage-tint); border-color: var(--cat-storage); }
+.cat-compute { background: var(--cat-compute-tint); border-color: var(--cat-compute); }
+.cat-security { background: var(--cat-security-tint); border-color: var(--cat-security); }
+.c-analytics { color: var(--cat-analytics); }
+.c-integration { color: var(--cat-integration); }
+.c-storage { color: var(--cat-storage); }
+.c-compute { color: var(--cat-compute); }
+.c-security { color: var(--cat-security); }
+.icon { display: flex; align-items: center; justify-content: center; text-align: center; background: var(--color-bg); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); padding: 10px; }
+.metric-row { display: flex; border-block: var(--border-thin) solid var(--color-border); }
+.metric-cell { flex: 1; padding: 28px 20px; text-align: center; border-right: var(--border-thin) solid var(--color-border); }
+.metric-cell:last-child { border-right: 0; }
+.metric-value { margin: 22px 0 16px; font-size: calc(var(--fs-metric) * 1.5); font-weight: 700; line-height: 1; }
+.data-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: calc(var(--fs-caption) * 1.5); }
+.data-table th, .data-table td { padding: 17px 20px; border-bottom: var(--border-thin) solid var(--color-border); text-align: left; }
+.data-table th { background: var(--color-surface); border-bottom: var(--border-group) solid var(--color-border); font-size: calc(var(--fs-label) * 1.5); text-transform: uppercase; }
+.data-table .num { text-align: right; }
+.data-table .total { font-weight: 700; border-top: var(--border-group) solid var(--color-border); }
+.chart-specimen { border-left: var(--border-group) solid var(--color-border); border-bottom: var(--border-group) solid var(--color-border); }
+.state { border-top: var(--border-thin) solid var(--color-border); }
+.hierarchy-row { display: flex; align-items: center; justify-content: center; text-align: center; background: var(--color-surface); border-bottom: var(--border-thin) solid var(--color-border); }
 </style>
 </head>
 <body>
 
-<!-- Part 1: Cover -->
-<!-- Slide type: cover — the dark ground and one orange vertical mark establish the system before any detail appears. -->
+<!-- Part: Cover -->
 <div class="slide">
-  <div class="el accent-bar" style="left:0px; top:0px; width:8px; height:1080px;"></div>
-  <div class="el t-label muted" style="left:112px; top:300px; width:900px; height:34px;">Bundled presentation style</div>
-  <div class="el t-cover" style="left:112px; top:360px; width:1500px; height:240px;">AWS architecture,<br>made legible</div>
-  <div class="el t-body muted" style="left:112px; top:650px; width:1320px; height:120px;">A dark-ground system for explaining which services are used,<br>how they connect, and what the design costs.</div>
-  <div class="el t-caption muted" style="left:112px; top:930px; width:1000px; height:44px;">Category color identifies. Smile Orange emphasizes once.</div>
+<div class="el accent-bar" style="left:0px;top:0px;width:8px;height:1080px"></div>
+<!-- Component: tag (.t-label) — section, service category, or connector metadata; may vary: short wording and service-category colour; may not: encode status with category colour or become decoration. -->
+<div class="el t-label muted" style="left:112px;top:300px;width:900px;height:34px">Bundled presentation style</div>
+<div class="el t-cover" style="left:112px;top:360px;width:1500px;height:240px">AWS architecture,<br>made legible</div>
+<div class="el t-body muted" style="left:112px;top:650px;width:1320px;height:120px">A dark-ground system for services, connections, decisions, and cost.</div>
+<div class="el t-caption muted" style="left:112px;top:930px;width:1100px;height:44px">Category colour identifies. Orange emphasizes once.</div>
 </div>
 
-<!-- Part 2: Rules -->
-<!-- Slide type: design rules 1 of 2 — paired rule and reason blocks make every constraint defensible rather than ornamental. -->
+<!-- Part: Rules -->
+<!-- Frame: content — reserve x 112–1808, title y 64–237, content from y 300, primary content above y 930, and optional supplied source at y 970; title and section may vary, geometry and clear template-footer band may not. An orange title rule is used only when content has no orange mark. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:600px; height:30px;">Part 2 · Rules · 1/2</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">Category color identifies services; it never decorates the page</div>
-  <div class="el accent-bar" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el t-heading cat-text-analytics" style="left:112px; top:320px; width:760px; height:60px;">Use full category color for identity</div>
-  <div class="el t-body" style="left:112px; top:395px; width:760px; height:220px;">Place it on a group border, header band, legend swatch, or small category label. The reader learns the mapping once and scans every architecture faster.</div>
-  <div class="el t-heading" style="left:1048px; top:320px; width:760px; height:60px;">Do not decorate with category color</div>
-  <div class="el t-body muted" style="left:1048px; top:395px; width:760px; height:220px;">A decorative purple rule or pink headline falsely signals a service category, so it makes diagrams slower to decode.</div>
-  <div class="el t-heading" style="left:112px; top:640px; width:760px; height:60px;">Use tint for group fills</div>
-  <div class="el t-body" style="left:112px; top:715px; width:760px; height:220px;">Use the matching <b>--cat-*-tint</b> behind services. Put normal <b>--color-text</b> on every tint; reserve the full color for the border and small header.</div>
-  <div class="el t-heading" style="left:1048px; top:640px; width:760px; height:60px;">Keep other colors to the minimum</div>
-  <div class="el t-body muted" style="left:1048px; top:715px; width:760px; height:165px;">Beyond ground and text, add only colors that distinguish content. More color invents categories the message does not contain.</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:700px;height:30px">Rules / identity</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Category colour identifies services; it never decorates</div>
+<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
+<!-- Component: container (.surface-text) — group one compact proof when whitespace alone is insufficient; may vary: width and content; may not: become repeated card chrome, hold an official service icon, or gain shadow. -->
+<div class="el surface-text" style="left:112px;top:340px;width:760px;height:250px"><div class="t-heading c-analytics">Use full colour for identity</div><div class="t-caption">Border, header, legend, or category label.</div></div>
+<div class="el surface-text" style="left:1048px;top:340px;width:760px;height:250px"><div class="t-heading">Use tint for groups</div><div class="t-caption muted">Pair normal text and tint with its category border.</div></div>
+<div class="el t-heading" style="left:112px;top:690px;width:760px;height:90px">Never decorate with category colour</div>
+<div class="el t-body muted" style="left:112px;top:810px;width:1480px;height:100px">Extra colour invents categories.</div>
 </div>
 
-<!-- Slide type: design rules 2 of 2 — operational rules connect icon, emphasis, contrast, and renderer behavior to concrete production choices. -->
+<!-- Category mappings never encode status or ownership. Tints are fixed tokens; full colour is limited to 1–2px boundaries, small headers, labels, and swatches. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:600px; height:30px;">Part 2 · Rules · 2/2</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">One claim, one orange emphasis, and one readable route through the slide</div>
-  <div class="el accent-bar" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el t-heading" style="left:112px; top:315px; width:520px; height:60px;">Message</div>
-  <div class="el t-body" style="left:112px; top:390px; width:520px; height:300px;">Use a full-sentence finding, sentence case, at most two lines. Keep one claim: a claimless architecture is a map without a legend.</div>
-  <div class="el t-heading" style="left:700px; top:315px; width:520px; height:60px;">Emphasis</div>
-  <!-- The frame counts toward "once": when the content carries the orange mark, the title rule stays neutral (as every Part 7 pattern shows); the orange title rule is only for slides with no other orange. -->
-  <div class="el t-body" style="left:700px; top:390px; width:520px; height:300px;">Use Smile Orange once: one number, node, or current step. Because orange can signal warning, two spots read as two alerts.</div>
-  <div class="el t-heading" style="left:1288px; top:315px; width:520px; height:60px;">Icons</div>
-  <div class="el t-caption" style="left:1288px; top:390px; width:520px; height:300px;">Services use official icons from <b>search_assets</b>, source <b>aws</b>. Generic concepts use general icons. Align each icon and short label on a grid; use ground or tint, never a card.</div>
-  <div class="el t-heading" style="left:112px; top:705px; width:520px; height:60px;">Readability</div>
-  <div class="el t-caption" style="left:112px; top:775px; width:520px; height:180px;">Text contrast is at least 4.5:1, or 3:1 at 18pt and above. Keep margins at least 5% of the slide edge. Never use emoji.</div>
-  <div class="el t-heading" style="left:700px; top:705px; width:520px; height:60px;">Charts</div>
-  <div class="el t-caption" style="left:700px; top:775px; width:520px; height:180px;">Label values directly. Remove gridlines that carry no information. Use a table when exact lookup matters and a chart when shape or change matters.</div>
-  <div class="el t-heading" style="left:1288px; top:705px; width:520px; height:60px;">Renderer facts</div>
-  <div class="el t-caption" style="left:1288px; top:775px; width:520px; height:230px;">Native tables inherit the template font. Slide JSON has no letter-spacing, line-height, or weight 650; use bold and explicit box heights.</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:700px;height:30px">Rules / composition</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One claim and one orange mark create the route</div>
+<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
+<div class="el t-heading" style="left:112px;top:340px;width:480px;height:60px">Message</div>
+<div class="el t-body" style="left:112px;top:420px;width:480px;height:190px">Use one finding, at most two lines.</div>
+<div class="el t-heading" style="left:720px;top:340px;width:480px;height:60px">Emphasis</div>
+<div class="el t-body" style="left:720px;top:420px;width:480px;height:190px">Mark one number, node, current step, or title rule.</div>
+<div class="el t-heading" style="left:1328px;top:340px;width:480px;height:60px">Restraint</div>
+<div class="el t-body" style="left:1328px;top:420px;width:480px;height:190px">No gradients, shadows, glow, 3D, or decorative circles.</div>
+<!-- Component: takeaway (.takeaway) — one consequence the visual cannot carry; may vary: one sentence; may not: repeat the title, introduce another claim, or exceed two lines. -->
+<div class="el takeaway t-heading" style="left:112px;top:770px;width:1696px;height:120px">Two orange spots read as two alerts.</div>
 </div>
 
-<!-- Part 3: Message & Outline -->
-<!-- Slide type: message and outline 1 of 2 — per-slide density and chapter rhythm let the orchestrator shape content before composition. -->
+<!-- Icons use official assets from search_assets with source aws; generic concepts use general assets. Align each icon and short label on a grid, on ground or category tint, never a card. Orthogonal connectors avoid nodes and carry short route labels. Contrast is at least 4.5:1, or 3:1 for large text. Margins stay at least 5%. Native tables inherit the template font. Slide JSON has no letter-spacing, line-height, or intermediate weight; use regular or bold with explicit box heights. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:700px; height:30px;">Part 3 · Message & Outline · 1/2</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">A focused story moves from decision to evidence to architecture to action</div>
-  <div class="el accent-bar" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el surface-text t-heading" style="left:112px; top:320px; width:500px; height:150px;">One claim per slide<br><span class="t-caption muted">length follows the material</span></div>
-  <div class="el surface-text t-heading" style="left:710px; top:320px; width:500px; height:150px;">25–45 words<br><span class="t-caption muted">visible per content slide</span></div>
-  <div class="el surface-text t-heading" style="left:1308px; top:320px; width:500px; height:150px;">One claim<br><span class="t-caption muted">proved by one visual form</span></div>
-  <div class="el t-heading" style="left:112px; top:550px; width:500px; height:60px;">Open each chapter</div>
-  <div class="el t-body" style="left:112px; top:625px; width:500px; height:250px;">Use a divider only when the subject changes. State the decision question and intended conclusion.</div>
-  <div class="el t-heading" style="left:710px; top:550px; width:500px; height:60px;">Develop the argument</div>
-  <div class="el t-body" style="left:710px; top:625px; width:500px; height:270px;">Sequence constraint, design, cost, and operations. Omit the agenda tracker; it competes with diagrams.</div>
-  <div class="el t-heading" style="left:1308px; top:550px; width:500px; height:60px;">Close each chapter</div>
-  <div class="el t-body" style="left:1308px; top:625px; width:500px; height:250px;">Resolve the opening question in one sentence. Carry only an unresolved decision forward.</div>
-  <div class="el t-caption muted" style="left:112px; top:950px; width:1696px; height:44px;">The outline chooses the claim before the composer chooses components.</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:700px;height:30px">Rules / production</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Technical evidence stays literal, aligned, and direct</div>
+<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
+<!-- Component: numbered (.marker) — ordered rule or finding; may vary: index and short statement; may not: replace a process stage or become an orange badge set. -->
+<div class="el marker t-label" style="left:112px;top:350px;width:70px;height:52px">01</div>
+<div class="el t-body" style="left:220px;top:342px;width:640px;height:80px">Use official service icons.</div>
+<div class="el marker t-label" style="left:112px;top:500px;width:70px;height:52px">02</div>
+<div class="el t-body" style="left:220px;top:492px;width:640px;height:80px">Label orthogonal routes.</div>
+<div class="el marker t-label" style="left:1010px;top:350px;width:70px;height:52px">03</div>
+<div class="el t-body" style="left:1118px;top:342px;width:640px;height:80px">Label chart values directly.</div>
+<div class="el marker t-label" style="left:1010px;top:500px;width:70px;height:52px">04</div>
+<div class="el t-body" style="left:1118px;top:492px;width:640px;height:80px">Use tables for exact lookup.</div>
+<div class="el rule" style="left:112px;top:680px;width:1696px;height:1px"></div>
+<div class="el t-heading" style="left:112px;top:742px;width:1500px;height:100px">Remove empty grids, diagonal routes, cards around icons, and emoji.</div>
 </div>
 
-<!-- Slide type: message and outline 2 of 2 — good and bad title grammar plus a visual-form matrix prevents topic labels and mismatched diagrams. -->
+<!-- Part: Message & Outline -->
+<!-- Density: 45 -->
+<!-- Typical content uses 25–45 visible words and one claim proved by one visual form. Deck length follows the brief and source. A one-line title retains the full reserve. Supplied sources are content; invented citations are forbidden. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:700px; height:30px;">Part 3 · Message & Outline · 2/2</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">Finding-led titles and literal visual forms keep technical choices unambiguous</div>
-  <div class="el accent-bar" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el t-heading" style="left:112px; top:315px; width:760px; height:60px;">Good: complete findings</div>
-  <div class="el t-caption" style="left:112px; top:390px; width:760px; height:190px;">1. Managed services remove operating steps<br>2. Access tiers make storage cost follow demand<br>3. One event path decouples every consumer</div>
-  <div class="el t-heading muted" style="left:1048px; top:315px; width:760px; height:60px;">Bad: labels without claims</div>
-  <div class="el t-caption muted" style="left:1048px; top:390px; width:760px; height:190px;">1. Target architecture<br>2. Cost overview<br>3. Service comparison</div>
-  <div class="el t-heading" style="left:112px; top:675px; width:330px; height:60px;">Favor</div>
-  <div class="el t-caption" style="left:112px; top:745px; width:650px; height:210px;">Numbers: one metric or a directly labeled KPI row<br>Comparison: aligned rows or a hairline table<br>Process: numbered phases with named services<br>Relationship: grouped architecture with orthogonal connectors</div>
-  <div class="el t-heading" style="left:850px; top:675px; width:330px; height:60px;">Use for text</div>
-  <div class="el t-caption" style="left:850px; top:745px; width:430px; height:210px;">A short claim plus three proof points. Use prose only for a necessary qualification or source note.</div>
-  <div class="el t-heading" style="left:1368px; top:675px; width:330px; height:60px;">Avoid</div>
-  <div class="el t-caption" style="left:1368px; top:745px; width:440px; height:210px;">Decorative circles, gradients, shadows, glow, 3D, diagonal connectors, unlabeled charts, and cards around service icons.</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:800px;height:30px">Message / title grammar</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Finding-led titles make technical choices unambiguous</div>
+<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
+<!-- Component: metric (.t-metric) — one labelled figure with period and comparator; may vary: unit and value; may not: float without context, mix periods, or share orange emphasis. -->
+<div class="el t-metric accent-fill" style="left:112px;top:350px;width:360px;height:150px">45</div>
+<div class="el t-heading" style="left:112px;top:550px;width:520px;height:80px">visible words maximum</div>
+<div class="el t-body" style="left:760px;top:350px;width:900px;height:170px">Write a concrete subject, directional verb, and bounded implication.</div>
+<div class="el t-body muted" style="left:760px;top:600px;width:900px;height:170px">Avoid topic labels. Add slides before adding words.</div>
+<div class="el takeaway t-heading" style="left:760px;top:840px;width:1048px;height:110px">Choose the claim before the components.</div>
 </div>
 
-<!-- Part 4: Palette -->
-<!-- Slide type: palette neutrals and emphasis — role labels show that the palette is a hierarchy, not a set of interchangeable decoration colors. -->
+<!-- Open on the strongest decision unless navigation is necessary. Dividers only mark subject changes and state the decision question and intended conclusion. Develop constraint, design, cost, and operations; resolve each chapter before carrying one unresolved decision forward. No agenda tracker competes with diagrams. Favour figures, comparisons, numbered processes, grouped architecture, direct-labelled charts, spare tables, and short proof points; prose is only for a necessary qualification or source. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:600px; height:30px;">Part 4 · Palette · 1/2</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">Neutral surfaces carry the story; orange marks the one thing to remember</div>
-  <div class="el title-rule" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el swatch-bg" style="left:112px; top:330px; width:300px; height:160px;"></div>
-  <div class="el t-heading" style="left:112px; top:515px; width:300px; height:60px;">Background</div>
-  <div class="el t-caption muted" style="left:112px; top:580px; width:300px; height:90px;">#161D26<br>Primary dark ground</div>
-  <div class="el swatch-surface" style="left:460px; top:330px; width:300px; height:160px;"></div>
-  <div class="el t-heading" style="left:460px; top:515px; width:300px; height:60px;">Surface</div>
-  <div class="el t-caption muted" style="left:460px; top:580px; width:300px; height:90px;">#1D2733<br>Quiet grouping only</div>
-  <div class="el swatch-text" style="left:808px; top:330px; width:300px; height:160px;"></div>
-  <div class="el t-heading" style="left:808px; top:515px; width:300px; height:60px;">Text</div>
-  <div class="el t-caption muted" style="left:808px; top:580px; width:300px; height:90px;">#FFFFFF<br>Claims and labels</div>
-  <div class="el swatch-muted" style="left:1156px; top:330px; width:300px; height:160px;"></div>
-  <div class="el t-heading" style="left:1156px; top:515px; width:300px; height:60px;">Muted</div>
-  <div class="el t-caption muted" style="left:1156px; top:580px; width:300px; height:90px;">#8FADD0<br>Connectors and notes</div>
-  <div class="el swatch-accent" style="left:1504px; top:330px; width:304px; height:160px;"></div>
-  <div class="el t-heading" style="left:1504px; top:515px; width:304px; height:60px;">Smile Orange</div>
-  <div class="el t-caption muted" style="left:1504px; top:580px; width:304px; height:90px;">#FF9900<br>Exactly one emphasis</div>
-  <div class="el t-body" style="left:112px; top:745px; width:1696px; height:165px;">Text on the accent fill is <b>--color-on-accent</b>. When the active ground is light, orange is a fill or mark with dark text, never body text. Borders use <b>--color-border</b>; they do not create a second hierarchy.</div>
-  <div class="el t-caption muted" style="left:112px; top:955px; width:1696px; height:44px;">Do not introduce gradients, shadows, glow, or 3D effects.</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:800px;height:30px">Outline / argument rhythm</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Move from decision to evidence to architecture to action</div>
+<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
+<div class="el surface-text" style="left:112px;top:350px;width:480px;height:290px"><div class="t-label muted">01 / Decide</div><div class="t-heading">Lead with the strongest claim</div></div>
+<div class="el surface-text" style="left:720px;top:350px;width:480px;height:290px"><div class="t-label muted">02 / Prove</div><div class="t-heading">Sequence constraint, design, and cost</div></div>
+<div class="el surface-text accent-outline" style="left:1328px;top:350px;width:480px;height:290px"><div class="t-label muted">03 / Act</div><div class="t-heading">Close on one owned decision</div></div>
+<div class="el takeaway t-heading" style="left:112px;top:800px;width:1696px;height:120px">Use chapters only when they improve navigation.</div>
 </div>
 
-<!-- Slide type: service-category palette — paired full colors and tints teach identification and readable text-on-fill behavior together. -->
+<!-- Part: Patterns -->
+<!-- Frame: divider — use the full-height 8px orange edge, section label near y 300, two-line chapter title, one decision question, and optional one-line preview; may vary: label and wording; may not: add evidence, tracker, or page number. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:600px; height:30px;">Part 4 · Palette · 2/2</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">Every service category has a line color and a quieter group tint</div>
-  <div class="el accent-bar" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el tint-analytics" style="left:112px; top:320px; width:780px; height:120px;"></div>
-  <div class="el t-heading cat-text-analytics" style="left:145px; top:342px; width:300px; height:58px;">Analytics</div>
-  <div class="el t-caption" style="left:470px; top:342px; width:390px; height:70px;">Full #8C4FFF · tint #363561</div>
-  <div class="el tint-integration" style="left:1028px; top:320px; width:780px; height:120px;"></div>
-  <div class="el t-heading cat-text-integration" style="left:1061px; top:342px; width:330px; height:58px;">Integration</div>
-  <div class="el t-caption" style="left:1395px; top:342px; width:380px; height:70px;">Full #E7157B · tint #462A49</div>
-  <div class="el tint-storage" style="left:112px; top:466px; width:780px; height:120px;"></div>
-  <div class="el t-heading cat-text-storage" style="left:145px; top:488px; width:300px; height:58px;">Storage</div>
-  <div class="el t-caption" style="left:470px; top:488px; width:390px; height:70px;">Full #7AA116 · tint #334437</div>
-  <div class="el tint-ai" style="left:1028px; top:466px; width:780px; height:120px;"></div>
-  <div class="el t-heading cat-text-ai" style="left:1061px; top:488px; width:410px; height:110px;">Artificial intelligence</div>
-  <div class="el t-caption" style="left:1490px; top:488px; width:285px; height:70px;">#01A88D · #1D454C</div>
-  <div class="el tint-compute" style="left:112px; top:612px; width:780px; height:120px;"></div>
-  <div class="el t-heading cat-text-compute" style="left:145px; top:634px; width:300px; height:58px;">Compute</div>
-  <div class="el t-caption" style="left:470px; top:634px; width:390px; height:70px;">Full #ED7100 · tint #473B33</div>
-  <div class="el tint-security" style="left:1028px; top:612px; width:780px; height:120px;"></div>
-  <div class="el t-heading cat-text-security" style="left:1061px; top:634px; width:300px; height:58px;">Security</div>
-  <div class="el t-caption" style="left:1395px; top:634px; width:380px; height:70px;">Full #DD344C · tint #443041</div>
-  <div class="el tint-database" style="left:112px; top:758px; width:1696px; height:120px;"></div>
-  <div class="el t-heading cat-text-database" style="left:145px; top:780px; width:300px; height:58px;">Database</div>
-  <div class="el t-caption" style="left:470px; top:780px; width:600px; height:70px;">Full #C925D1 · tint #412D58</div>
-  <div class="el t-caption muted" style="left:112px; top:930px; width:1696px; height:80px;">Tint formula: 18% category color over the dark ground. Use normal text on every tint; use full color only for a 1–2px border, header, or swatch.</div>
+<div class="el accent-bar" style="left:0px;top:0px;width:8px;height:1080px"></div>
+<div class="el t-label muted" style="left:112px;top:300px;width:700px;height:34px">Patterns / technical evidence</div>
+<div class="el t-cover" style="left:112px;top:370px;width:1500px;height:220px">How does the claim<br>choose the layout?</div>
+<div class="el t-body muted" style="left:112px;top:680px;width:1380px;height:120px">Every following slide demonstrates the pattern it explains.</div>
 </div>
 
-<!-- Part 5: Typography -->
-<!-- Slide type: typography ramp — each token is shown at true slide scale with its exact line-height intent and usage boundary. -->
+<!-- Pattern: comparison — for: matched options or states; regions: left, right, takeaway; components: before-after ×2 + selected + takeaway; may vary: 3–5 aligned criteria and chosen side; may not: change widths, row order, scope, measure, or unit, or add arrows. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:600px; height:30px;">Part 5 · Typography</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">A seven-role type ramp separates claims, evidence, labels, and numbers</div>
-  <div class="el title-rule" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el t-cover" style="left:112px; top:300px; width:1000px; height:112px;">Cover title</div>
-  <div class="el t-caption muted" style="left:1260px; top:335px; width:548px; height:42px;">--fs-cover-title · 52pt · 1.05 · up to 2 lines</div>
-  <div class="el rule" style="left:112px; top:420px; width:1696px; height:1px;"></div>
-  <div class="el t-title" style="left:112px; top:440px; width:1000px; height:90px;">Slide finding</div>
-  <div class="el t-caption muted" style="left:1260px; top:462px; width:548px; height:42px;">--fs-slide-title · 36pt · 1.2 · up to 2 lines</div>
-  <div class="el rule" style="left:112px; top:540px; width:1696px; height:1px;"></div>
-  <div class="el t-heading" style="left:112px; top:560px; width:1000px; height:60px;">Content heading</div>
-  <div class="el t-caption muted" style="left:1260px; top:570px; width:548px; height:42px;">--fs-heading · 22pt · 1.25 · short phrase</div>
-  <div class="el rule" style="left:112px; top:630px; width:1696px; height:1px;"></div>
-  <div class="el t-body" style="left:112px; top:650px; width:1000px; height:58px;">Body text explains one proof point clearly.</div>
-  <div class="el t-caption muted" style="left:1260px; top:658px; width:548px; height:42px;">--fs-body · 20pt · 1.35 · main reading text</div>
-  <div class="el rule" style="left:112px; top:720px; width:1696px; height:1px;"></div>
-  <div class="el t-caption" style="left:112px; top:740px; width:1000px; height:42px;">Caption supports a visual or states a source.</div>
-  <div class="el t-caption muted" style="left:1260px; top:740px; width:548px; height:42px;">--fs-caption · 14pt · 1.35 · secondary only</div>
-  <div class="el rule" style="left:112px; top:792px; width:1696px; height:1px;"></div>
-  <div class="el t-label" style="left:112px; top:812px; width:1000px; height:34px;">Category or connector label</div>
-  <div class="el t-caption muted" style="left:1260px; top:808px; width:548px; height:42px;">--fs-label · 12pt · 1.2 · labels only</div>
-  <div class="el rule" style="left:112px; top:860px; width:1696px; height:1px;"></div>
-  <div class="el accent-fill flex-center t-metric" style="left:112px; top:880px; width:500px; height:95px;">42%</div>
-  <div class="el t-caption muted" style="left:1260px; top:905px; width:548px; height:42px;">--fs-metric · 44pt · 1.0 · one takeaway</div>
-  <div class="el t-caption muted" style="left:650px; top:900px; width:510px; height:120px;">Use regular or bold in slide JSON. HTML line-height is represented by explicit textbox height.</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / comparison</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Matched states expose the operating change</div>
+<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
+<!-- Component: before-after (.state) — one matched state with aligned criteria; may vary: values and 3–5 rows; may not: change geometry, units, or row order between states. -->
+<div class="el state" style="left:112px;top:350px;width:760px;height:430px"></div>
+<div class="el t-label muted" style="left:112px;top:390px;width:600px;height:32px">Before</div>
+<div class="el t-heading" style="left:112px;top:470px;width:680px;height:70px">Operate hosts</div>
+<div class="el t-body muted" style="left:112px;top:590px;width:680px;height:120px">Plan capacity<br>Maintain backup tooling</div>
+<!-- Component: selected (.accent-outline) — one option, node, or state named by the claim; may vary: target; may not: coexist with another orange content mark or change peer geometry. -->
+<div class="el state accent-outline" style="left:1048px;top:350px;width:760px;height:430px"></div>
+<div class="el t-label muted" style="left:1080px;top:390px;width:600px;height:32px">After / selected</div>
+<div class="el t-heading" style="left:1080px;top:470px;width:680px;height:70px">Use managed compute</div>
+<div class="el t-body muted" style="left:1080px;top:590px;width:680px;height:120px">Scale with demand<br>Set managed retention</div>
+<div class="el takeaway t-heading" style="left:112px;top:870px;width:1696px;height:100px">Show changed responsibility, not unrelated features.</div>
 </div>
 
-<!-- Part 6: Frame -->
-<!-- Slide type: standard content frame — live geometry shows the fixed title zone, content start, source line, and reserved template-footer band. -->
+<!-- Pattern: columns — for: a service catalogue or parallel evidence; regions: col-1, col-2, col-3; components: container ×3 + icon grid; may vary: 2–4 equal categories and item count; may not: vary widths, card each icon, or use category colours outside their regions. Catalogue headers establish identity once; official icon-name items then use a uniform grid. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:600px; height:30px;">Part 6 · Frame · content</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">The title zone always reserves two lines, even when this finding uses one</div>
-  <div class="el accent-bar" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el surface" style="left:112px; top:300px; width:1696px; height:610px;"></div>
-  <div class="el t-heading" style="left:160px; top:350px; width:1100px; height:60px;">Content begins at y = 300px</div>
-  <div class="el t-body muted" style="left:160px; top:430px; width:1450px; height:180px;">Title box: 173px high at y = 64px, enough for two lines of 36pt type. One-line titles leave the second line empty; content never moves up. Horizontal margins are 112px and content width is 1696px.</div>
-  <div class="el t-heading" style="left:160px; top:690px; width:1100px; height:60px;">Bottom rhythm</div>
-  <div class="el t-body muted" style="left:160px; top:770px; width:1450px; height:110px;">End primary content by y = 930px. A source line is content and may be drawn at y = 970px. Keep the remaining footer band clear for the template.</div>
-  <div class="el t-caption muted" style="left:112px; top:970px; width:1300px; height:42px;">Source: content reference goes here</div>
-  <div class="el t-caption muted right" style="left:1420px; top:970px; width:388px; height:42px;">Page number: template only</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / columns</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Equal columns make a service catalogue scannable</div>
+<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
+<div class="el columns" style="left:112px;top:350px;width:1696px;height:490px"><div class="column"><div class="t-label c-compute">Compute</div><div class="t-heading">Runtime choices</div><div class="t-caption muted">Service A<br>Service B</div></div><div class="column"><div class="t-label c-analytics">Analytics</div><div class="t-heading">Evidence services</div><div class="t-caption muted">Service C<br>Service D</div></div><div class="column"><div class="t-label" style="color:var(--cat-database)">Database</div><div class="t-heading">State services</div><div class="t-caption muted">Service E<br>Service F</div></div></div>
+<div class="el takeaway t-heading" style="left:112px;top:890px;width:1696px;height:90px">Category headers establish identity once.</div>
 </div>
 
-<!-- Slide type: section divider frame — a full-height pause replaces the content frame so chapter changes are unmistakable. -->
+<!-- Pattern: process — for: a governed event flow or migration roadmap; regions: step-1, step-2, step-3, step-4, takeaway; components: step ×4 + connector ×3 + selected + tag; may vary: 3–6 verb-led steps and category-tinted service rows; may not: colour connectors, use category as status, or highlight more than the current step. -->
 <div class="slide">
-  <div class="el accent-bar" style="left:0px; top:0px; width:8px; height:1080px;"></div>
-  <div class="el t-label muted" style="left:112px; top:300px; width:500px; height:34px;">Section 03</div>
-  <div class="el t-cover" style="left:112px; top:370px; width:1450px; height:220px;">Architecture<br>and operations</div>
-  <div class="el t-body muted" style="left:112px; top:650px; width:1300px; height:120px;">Open with the decision question this chapter resolves.<br>Do not add an agenda tracker or page number element.</div>
-  <div class="el t-caption muted" style="left:112px; top:950px; width:1300px; height:44px;">Use only at a real chapter boundary.</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / process</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One orange step locates the current handoff</div>
+<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
+<!-- Component: step (.step) — equal verb-led stage with its service label below; may vary: 3–6 stages; may not: vary peer size or use category colour for sequence status. -->
+<div class="el step t-heading" style="left:112px;top:400px;width:360px;height:170px">1 · Receive</div>
+<!-- Component: connector (.connector) — neutral orthogonal handoff between adjacent nodes; may vary: route and short label; may not: use category colour, run diagonally, cross a node, or imply unsupported causality. -->
+<div class="el connector" style="left:472px;top:484px;width:64px;height:2px"></div>
+<div class="el step t-heading" style="left:536px;top:400px;width:360px;height:170px">2 · Validate</div>
+<div class="el connector" style="left:896px;top:484px;width:64px;height:2px"></div>
+<div class="el step accent-fill t-heading" style="left:960px;top:400px;width:360px;height:170px">3 · Route</div>
+<div class="el connector" style="left:1320px;top:484px;width:64px;height:2px"></div>
+<div class="el step t-heading" style="left:1384px;top:400px;width:424px;height:170px">4 · Observe</div>
+<div class="el t-label c-integration center" style="left:112px;top:630px;width:360px;height:34px">Integration service</div>
+<div class="el t-label c-security center" style="left:536px;top:630px;width:360px;height:34px">Security service</div>
+<div class="el t-label c-integration center" style="left:960px;top:630px;width:360px;height:34px">Routing service</div>
+<div class="el t-label c-analytics center" style="left:1384px;top:630px;width:424px;height:34px">Analytics service</div>
+<div class="el takeaway t-heading" style="left:112px;top:830px;width:1696px;height:110px">Write stages as verbs and outcomes as evidence.</div>
 </div>
 
-<!-- Slide type: closing frame — the decision and immediate action replace a recap list, leaving the audience with one executable next step. -->
+<!-- Pattern: metric — for: 3–5 measures in one reporting window; regions: kpi-1, kpi-2, kpi-3, kpi-4, takeaway; components: metric ×4 + selected + takeaway; may vary: count, values, units, and comparators; may not: mix periods, omit comparators, repeat cards, or colour more than one figure. -->
 <div class="slide">
-  <div class="el t-label muted" style="left:112px; top:250px; width:600px; height:34px;">Decision</div>
-  <div class="el t-cover" style="left:112px; top:315px; width:1500px; height:230px;">State the chosen path<br>in one sentence</div>
-  <div class="el accent-fill flex-left t-heading" style="left:112px; top:610px; width:1696px; height:120px;">&nbsp;&nbsp;Next action — owner, verb, and date</div>
-  <div class="el t-body muted" style="left:112px; top:790px; width:1400px; height:120px;">Close on what happens next, not a miniature replay of the deck. The orange action bar is the only emphasis.</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / metric</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Aligned metrics compare without repeated cards</div>
+<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
+<div class="el metric-row" style="left:112px;top:360px;width:1696px;height:300px"><div class="metric-cell"><div class="t-label muted">Availability</div><div class="metric-value accent-fill">99.9%</div><div class="t-caption muted">+0.2 points vs prior</div></div><div class="metric-cell"><div class="t-label muted">Monthly cost</div><div class="metric-value">−32%</div><div class="t-caption muted">same workload</div></div><div class="metric-cell"><div class="t-label muted">Deploy time</div><div class="metric-value">18 min</div><div class="t-caption muted">median / 30 days</div></div><div class="metric-cell"><div class="t-label muted">Operator hours</div><div class="metric-value">−24%</div><div class="t-caption muted">same team</div></div></div>
+<div class="el takeaway t-heading" style="left:112px;top:800px;width:1696px;height:120px">State period and comparator beneath every figure.</div>
 </div>
 
-<!-- Part 7: Patterns -->
-<!-- Pattern: architecture — WHY: three category groups make service identity readable before connection detail. Vary group widths, icon count, and routes; do not vary category mapping, grid alignment, orthogonal connectors, or the single orange highlight. -->
+<!-- Pattern: table — for: exact lookup, service shortlist, or cost drivers; regions: table, takeaway; components: table + selected + takeaway; may vary: 3–7 rows and 3–6 columns; may not: add zebra fill, recolour body text, omit units, use extra orange cells, or assume a custom table font. Service tables retain category swatches; cost tables align drivers and may highlight one total, without chart decoration or empty grids. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:700px; height:30px;">Part 7 · Pattern · Architecture</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">Three service groups separate ingestion, compute, and durable storage</div>
-  <div class="el title-rule" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el category-integration" style="left:112px; top:330px; width:500px; height:560px;"></div>
-  <div class="el t-label cat-text-integration" style="left:140px; top:352px; width:430px; height:32px;">Application integration</div>
-  <div class="el icon-placeholder t-caption" style="left:165px; top:440px; width:170px; height:125px;">Official icon<br>Service A</div>
-  <div class="el icon-placeholder t-caption" style="left:390px; top:440px; width:170px; height:125px;">Official icon<br>Service B</div>
-  <div class="el icon-placeholder t-caption" style="left:278px; top:660px; width:170px; height:125px;">Official icon<br>Service C</div>
-  <div class="el category-compute" style="left:710px; top:330px; width:500px; height:560px;"></div>
-  <div class="el t-label cat-text-compute" style="left:738px; top:352px; width:430px; height:32px;">Compute</div>
-  <div class="el icon-placeholder t-caption" style="left:763px; top:440px; width:170px; height:125px;">Official icon<br>Service D</div>
-  <div class="el icon-placeholder accent-outline t-caption" style="left:988px; top:440px; width:170px; height:125px;">Highlighted<br>Service E</div>
-  <div class="el icon-placeholder t-caption" style="left:875px; top:660px; width:170px; height:125px;">Official icon<br>Service F</div>
-  <div class="el category-storage" style="left:1308px; top:330px; width:500px; height:560px;"></div>
-  <div class="el t-label cat-text-storage" style="left:1336px; top:352px; width:430px; height:32px;">Storage</div>
-  <div class="el icon-placeholder t-caption" style="left:1361px; top:440px; width:170px; height:125px;">Official icon<br>Service G</div>
-  <div class="el icon-placeholder t-caption" style="left:1586px; top:440px; width:170px; height:125px;">Official icon<br>Service H</div>
-  <div class="el connector-h arrow-right" style="left:612px; top:500px; width:98px; height:18px;"></div>
-  <div class="el connector-h arrow-right" style="left:1210px; top:500px; width:98px; height:18px;"></div>
-  <div class="el t-label muted center" style="left:612px; top:530px; width:98px; height:32px;">Events</div>
-  <div class="el t-label muted center" style="left:1210px; top:530px; width:98px; height:32px;">Writes</div>
-  <div class="el t-caption muted" style="left:112px; top:930px; width:1696px; height:80px;">arch_diagram produces positioned nodes, rectangular groups, and routed connections. The composer adds official icons, short labels, exact category border/tint pairs, and connector labels at --fs-label.</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / table</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">A shortlist is defensible on shared criteria</div>
+<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
+<!-- Component: table (.data-table) — native exact comparison with hairlines and aligned figures; may vary: row and column count within limits; may not: lose units, right alignment, or template font inheritance. -->
+<div class="el" style="left:112px;top:340px;width:1696px;height:430px"><table class="data-table"><thead><tr><th>Service</th><th>Best fit</th><th>Operating model</th><th class="num">Cost unit</th></tr></thead><tbody><tr><td>Compute service</td><td>Steady workload</td><td>Managed host</td><td class="num">Time</td></tr><tr><td>Integration service</td><td>Event routing</td><td>Serverless</td><td class="num">Requests</td></tr><tr><td>Storage service</td><td>Durable objects</td><td>Fully managed</td><td class="num">Capacity</td></tr></tbody></table></div>
+<div class="el takeaway t-heading" style="left:112px;top:840px;width:1696px;height:110px">Use charts for shape; use tables for lookup.</div>
 </div>
 
-<!-- Pattern: service catalogue — WHY: category header bands establish identity once, then a uniform icon-name grid supports rapid scanning. Vary categories and item count; do not put icons in cards or use category colors outside their own bands and regions. -->
+<!-- Pattern: chart — for: trend, ranking, or change; regions: chart, takeaway; components: chart + takeaway; may vary: native chart type, 3–8 marks, one reference, and service-category series; may not: use shape-built production charts, empty grids, indirect legends, multiple baselines, or a second orange mark. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:700px; height:30px;">Part 7 · Pattern · Service catalogue</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">The catalogue groups services by category before describing individual roles</div>
-  <div class="el accent-bar" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el category-compute" style="left:112px; top:330px; width:520px; height:580px;"></div>
-  <div class="el cat-band-compute flex-center t-heading" style="left:112px; top:330px; width:520px; height:80px;">Compute</div>
-  <div class="el icon-placeholder t-caption" style="left:155px; top:465px; width:180px; height:150px;">Official icon<br>Service A</div>
-  <div class="el icon-placeholder t-caption" style="left:410px; top:465px; width:180px; height:150px;">Official icon<br>Service B</div>
-  <div class="el icon-placeholder t-caption" style="left:155px; top:675px; width:180px; height:150px;">Official icon<br>Service C</div>
-  <div class="el icon-placeholder t-caption" style="left:410px; top:675px; width:180px; height:150px;">Official icon<br>Service D</div>
-  <div class="el category-analytics" style="left:700px; top:330px; width:520px; height:580px;"></div>
-  <div class="el cat-band-analytics flex-center t-heading" style="left:700px; top:330px; width:520px; height:80px;">Analytics</div>
-  <div class="el icon-placeholder t-caption" style="left:743px; top:465px; width:180px; height:150px;">Official icon<br>Service E</div>
-  <div class="el icon-placeholder t-caption" style="left:998px; top:465px; width:180px; height:150px;">Official icon<br>Service F</div>
-  <div class="el icon-placeholder t-caption" style="left:743px; top:675px; width:180px; height:150px;">Official icon<br>Service G</div>
-  <div class="el icon-placeholder t-caption" style="left:998px; top:675px; width:180px; height:150px;">Official icon<br>Service H</div>
-  <div class="el category-database" style="left:1288px; top:330px; width:520px; height:580px;"></div>
-  <div class="el cat-band-database flex-center t-heading" style="left:1288px; top:330px; width:520px; height:80px;">Database</div>
-  <div class="el icon-placeholder t-caption" style="left:1331px; top:465px; width:180px; height:150px;">Official icon<br>Service I</div>
-  <div class="el icon-placeholder t-caption" style="left:1586px; top:465px; width:180px; height:150px;">Official icon<br>Service J</div>
-  <div class="el icon-placeholder t-caption" style="left:1331px; top:675px; width:180px; height:150px;">Official icon<br>Service K</div>
-  <div class="el icon-placeholder t-caption" style="left:1586px; top:675px; width:180px; height:150px;">Official icon<br>Service L</div>
-  <div class="el t-caption muted" style="left:112px; top:950px; width:1696px; height:44px;">Search with the aws asset source; labels use each service’s short official name.</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / chart</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One highlighted value carries the trend claim</div>
+<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
+<!-- Component: chart (.chart-specimen) — use a native chart in decks with direct values, one scale, a common baseline, neutral context, and one orange claimed value; service-category colour identifies a series only when services differ; HTML values are illustrative. -->
+<div class="el chart-specimen" style="left:180px;top:350px;width:1120px;height:500px"><svg viewBox="0 0 1120 500" width="1120" height="500" aria-label="Illustrative four-period bar chart"><rect x="100" y="260" width="140" height="238" fill="#8FADD0"/><rect x="360" y="210" width="140" height="288" fill="#8FADD0"/><rect x="620" y="150" width="140" height="348" fill="#8FADD0"/><rect x="880" y="70" width="140" height="428" fill="#FF9900"/><g fill="#FFFFFF" font-family="Arial" font-size="28"><text x="145" y="240">62</text><text x="405" y="190">78</text><text x="665" y="130">91</text><text x="925" y="50">112</text></g></svg></div>
+<div class="el takeaway t-heading" style="left:1400px;top:470px;width:408px;height:230px">Label values directly. Remove empty gridlines.</div>
 </div>
 
-<!-- Pattern: before / after — WHY: identical rows on both sides isolate what changes when an on-premises workload moves to AWS. Vary row labels and evidence; do not change row order, widths, or use more than one orange transition mark. -->
+<!-- Pattern: architecture — for: service relationships across category boundaries; regions: group-1, group-2, group-3, takeaway; components: container ×3 + icon ×5 + selected + connector; may vary: group widths, icon count, and orthogonal routes; may not: change category mapping, misalign nodes, route diagonally, cross nodes, or use more than one orange highlight. -->
+<!-- arch_diagram may position rectangular groups and routed connections; the composer adds official icons, short labels, exact category border/tint pairs, and route labels. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:700px; height:30px;">Part 7 · Pattern · Before / after</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">Moving the same workload to AWS removes undifferentiated operating work</div>
-  <div class="el title-rule" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el surface-text t-heading center" style="left:112px; top:330px; width:700px; height:100px;">Before · On-premises</div>
-  <div class="el surface-text t-heading center" style="left:1108px; top:330px; width:700px; height:100px;">After · AWS</div>
-  <div class="el t-label muted" style="left:112px; top:480px; width:180px; height:32px;">Workload</div>
-  <div class="el t-body line-item" style="left:300px; top:455px; width:512px; height:90px;">Provision and patch hosts</div>
-  <div class="el t-body line-item" style="left:1108px; top:455px; width:700px; height:90px;">Run on managed compute</div>
-  <div class="el t-label muted" style="left:112px; top:610px; width:180px; height:32px;">Data</div>
-  <div class="el t-body line-item" style="left:300px; top:585px; width:512px; height:90px;">Plan capacity in advance</div>
-  <div class="el t-body line-item" style="left:1108px; top:585px; width:700px; height:90px;">Scale storage with demand</div>
-  <div class="el t-label muted" style="left:112px; top:740px; width:180px; height:32px;">Operations</div>
-  <div class="el t-body line-item" style="left:300px; top:715px; width:512px; height:90px;">Maintain backup tooling</div>
-  <div class="el t-body line-item" style="left:1108px; top:715px; width:700px; height:90px;">Set managed retention policy</div>
-  <div class="el accent-fill flex-center t-heading" style="left:886px; top:540px; width:148px; height:148px;">Move</div>
-  <div class="el t-caption muted" style="left:112px; top:890px; width:1696px; height:90px;">Keep the same row labels on both sides. Show changed responsibility, not a different list of features.</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / architecture</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Category boundaries make one event route legible</div>
+<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
+<div class="el group cat-integration" style="left:112px;top:330px;width:500px;height:510px"></div>
+<div class="el t-label c-integration" style="left:145px;top:360px;width:430px;height:32px">Integration</div>
+<!-- Component: icon (.icon) — official AWS service asset with short name; may vary: asset and label; may not: use generic art for a service, use emoji, or add an individual card. -->
+<div class="el icon t-caption" style="left:180px;top:480px;width:170px;height:125px">Official icon<br>Service A</div>
+<div class="el icon t-caption" style="left:400px;top:480px;width:170px;height:125px">Official icon<br>Service B</div>
+<div class="el connector" style="left:612px;top:542px;width:98px;height:2px"></div>
+<div class="el t-label muted center" style="left:612px;top:575px;width:98px;height:32px">Events</div>
+<div class="el group cat-compute" style="left:710px;top:330px;width:500px;height:510px"></div>
+<div class="el t-label c-compute" style="left:743px;top:360px;width:430px;height:32px">Compute</div>
+<div class="el icon accent-outline t-caption" style="left:875px;top:480px;width:170px;height:125px">Selected<br>Service C</div>
+<div class="el connector" style="left:1210px;top:542px;width:98px;height:2px"></div>
+<div class="el t-label muted center" style="left:1210px;top:575px;width:98px;height:32px">Writes</div>
+<div class="el group cat-storage" style="left:1308px;top:330px;width:500px;height:510px"></div>
+<div class="el t-label c-storage" style="left:1341px;top:360px;width:430px;height:32px">Storage</div>
+<div class="el icon t-caption" style="left:1380px;top:480px;width:170px;height:125px">Official icon<br>Service D</div>
+<div class="el icon t-caption" style="left:1595px;top:480px;width:170px;height:125px">Official icon<br>Service E</div>
+<div class="el takeaway t-heading" style="left:112px;top:900px;width:1696px;height:80px">Route labels explain each relationship.</div>
 </div>
 
-<!-- Pattern: migration roadmap — WHY: equal phase columns show sequence while category-tinted service rows identify what enters at each stage. Vary phase count from three to five; do not turn category color into phase status or move the current-step orange mark. -->
+<!-- Pattern: hierarchy — for: shared responsibility or layered ownership; regions: labels, left, right, takeaway; components: hierarchy rows + takeaway; may vary: layers, boundary, and 2–4 owner actions; may not: encode ownership with category colour, add depth, alter row order, or leave a layer unowned. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:700px; height:30px;">Part 7 · Pattern · Migration roadmap</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">Each migration phase introduces only the services needed for its next outcome</div>
-  <div class="el title-rule" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el surface-text t-heading" style="left:112px; top:330px; width:388px; height:110px;">1 · Assess</div>
-  <div class="el surface-text t-heading" style="left:548px; top:330px; width:388px; height:110px;">2 · Prepare</div>
-  <div class="el accent-fill flex-left t-heading" style="left:984px; top:330px; width:388px; height:110px;">&nbsp;3 · Migrate</div>
-  <div class="el surface-text t-heading" style="left:1420px; top:330px; width:388px; height:110px;">4 · Optimize</div>
-  <div class="el t-body" style="left:112px; top:485px; width:388px; height:130px;">Inventory<br>Dependency map</div>
-  <div class="el tint-security t-body" style="left:548px; top:485px; width:388px; height:130px;">Identity service<br>Security service</div>
-  <div class="el tint-compute t-body" style="left:984px; top:485px; width:388px; height:130px;">Compute service<br>Container service</div>
-  <div class="el tint-storage t-body" style="left:1420px; top:485px; width:388px; height:130px;">Storage tier<br>Cost controls</div>
-  <div class="el connector-h arrow-right" style="left:500px; top:385px; width:48px; height:18px;"></div>
-  <div class="el connector-h arrow-right" style="left:936px; top:385px; width:48px; height:18px;"></div>
-  <div class="el connector-h arrow-right" style="left:1372px; top:385px; width:48px; height:18px;"></div>
-  <div class="el t-heading" style="left:112px; top:700px; width:388px; height:60px;">Outcome</div>
-  <div class="el t-caption muted" style="left:112px; top:770px; width:388px; height:120px;">Prioritized waves and a measurable baseline</div>
-  <div class="el t-heading" style="left:548px; top:700px; width:388px; height:60px;">Outcome</div>
-  <div class="el t-caption muted" style="left:548px; top:770px; width:388px; height:120px;">Landing controls ready for workload teams</div>
-  <div class="el t-heading" style="left:984px; top:700px; width:388px; height:60px;">Outcome</div>
-  <div class="el t-caption muted" style="left:984px; top:770px; width:388px; height:120px;">Production workload crosses the boundary</div>
-  <div class="el t-heading" style="left:1420px; top:700px; width:388px; height:60px;">Outcome</div>
-  <div class="el t-caption muted" style="left:1420px; top:770px; width:388px; height:120px;">Cost and reliability improve from evidence</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / shared responsibility</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Every technical layer needs one accountable side</div>
+<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
+<!-- Component: hierarchy (.hierarchy-row) — aligned layer and ownership rows; may vary: layer count and split; may not: encode ownership with service-category colour or decorative depth. -->
+<div class="el t-heading center" style="left:430px;top:320px;width:520px;height:60px">Customer</div>
+<div class="el t-heading center" style="left:1050px;top:320px;width:520px;height:60px">AWS</div>
+<div class="el t-label muted right" style="left:112px;top:440px;width:250px;height:34px">Application</div>
+<div class="el hierarchy-row t-caption" style="left:430px;top:410px;width:520px;height:95px">Own code and data policy</div>
+<div class="el hierarchy-row t-caption" style="left:1050px;top:410px;width:520px;height:95px">Managed runtime service</div>
+<div class="el t-label muted right" style="left:112px;top:580px;width:250px;height:34px">Platform</div>
+<div class="el hierarchy-row t-caption" style="left:430px;top:550px;width:520px;height:95px">Configure workload</div>
+<div class="el hierarchy-row t-caption" style="left:1050px;top:550px;width:520px;height:95px">Operate managed platform</div>
+<div class="el t-label muted right" style="left:112px;top:720px;width:250px;height:34px">Infrastructure</div>
+<div class="el hierarchy-row t-caption" style="left:430px;top:690px;width:520px;height:95px">Review evidence</div>
+<div class="el hierarchy-row t-caption" style="left:1050px;top:690px;width:520px;height:95px">Secure hardware</div>
+<div class="el takeaway t-heading" style="left:112px;top:860px;width:1696px;height:100px">Shared controls need proof.</div>
 </div>
 
-<!-- Pattern: layered / shared-responsibility diagram — WHY: horizontal layers preserve technical stack order while the vertical split assigns responsibility. Vary the layer names and split position; do not encode responsibility with service-category colors or add decorative depth. -->
+<!-- Part: Closing -->
+<!-- Frame: closing — state one chosen path, then one orange owner–verb–date action; may vary: decision, criteria, and 2–4 actions; may not: recap the deck, show multiple recommendations, add a second orange mark, or place appendix material after it. Name an owner and date for every real action. -->
 <div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:800px; height:30px;">Part 7 · Pattern · Layered / shared responsibility</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">The operating model is clear when every layer has one accountable side</div>
-  <div class="el title-rule" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el t-heading center" style="left:490px; top:310px; width:500px; height:60px;">Customer</div>
-  <div class="el t-heading center" style="left:990px; top:310px; width:500px; height:60px;">AWS</div>
-  <div class="el t-label muted right" style="left:112px; top:420px; width:300px; height:34px;">Application</div>
-  <div class="el surface-text compact-surface t-caption center" style="left:460px; top:390px; width:500px; height:95px;">Own code and data policy</div>
-  <div class="el surface-text compact-surface t-caption center" style="left:960px; top:390px; width:500px; height:95px;">Managed runtime service</div>
-  <div class="el t-label muted right" style="left:112px; top:540px; width:300px; height:34px;">Identity</div>
-  <div class="el surface-text compact-surface t-caption center" style="left:460px; top:510px; width:500px; height:95px;">Define access intent</div>
-  <div class="el surface-text compact-surface t-caption center" style="left:960px; top:510px; width:500px; height:95px;">Enforce service controls</div>
-  <div class="el t-label muted right" style="left:112px; top:660px; width:300px; height:34px;">Platform</div>
-  <div class="el surface-text compact-surface t-caption center" style="left:460px; top:630px; width:500px; height:95px;">Configure workload</div>
-  <div class="el surface-text compact-surface t-caption center" style="left:960px; top:630px; width:500px; height:95px;">Operate managed platform</div>
-  <div class="el t-label muted right" style="left:112px; top:780px; width:300px; height:34px;">Infrastructure</div>
-  <div class="el text-box t-body center muted" style="left:460px; top:750px; width:500px; height:95px;">Review evidence</div>
-  <div class="el surface-text compact-surface t-caption center" style="left:960px; top:750px; width:500px; height:95px;">Secure hardware</div>
-  <div class="el accent-fill flex-center t-heading" style="left:1510px; top:510px; width:298px; height:215px;">Shared controls<br>require evidence</div>
-  <div class="el t-caption muted" style="left:112px; top:920px; width:1696px; height:80px;">Use a vertical divider at the responsibility boundary. Category colors are absent because the encoding is ownership, not service identity.</div>
-</div>
-
-<!-- Pattern: cost comparison table — WHY: aligned cost drivers support exact comparison while a single highlighted total carries the decision. Vary drivers and periods; do not add chart decoration, extra orange cells, or non-informative gridlines. -->
-<div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:800px; height:30px;">Part 7 · Pattern · Cost comparison table</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">The target model lowers total cost by changing three underlying drivers</div>
-  <div class="el title-rule" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el table-head t-label" style="left:112px; top:330px; width:650px; height:70px;">Monthly driver</div>
-  <div class="el table-head t-label right" style="left:762px; top:330px; width:400px; height:70px;">Current</div>
-  <div class="el table-head t-label right" style="left:1162px; top:330px; width:400px; height:70px;">Target</div>
-  <div class="el table-head t-label right" style="left:1562px; top:330px; width:246px; height:70px;">Change</div>
-  <div class="el table-cell t-body" style="left:112px; top:420px; width:650px; height:86px;">Capacity</div>
-  <div class="el table-cell t-body right" style="left:762px; top:420px; width:400px; height:86px;">$00,000</div>
-  <div class="el table-cell t-body right" style="left:1162px; top:420px; width:400px; height:86px;">$00,000</div>
-  <div class="el table-cell t-body right" style="left:1562px; top:420px; width:246px; height:86px;">-00%</div>
-  <div class="el table-cell t-body" style="left:112px; top:506px; width:650px; height:86px;">Operations</div>
-  <div class="el table-cell t-body right" style="left:762px; top:506px; width:400px; height:86px;">$00,000</div>
-  <div class="el table-cell t-body right" style="left:1162px; top:506px; width:400px; height:86px;">$00,000</div>
-  <div class="el table-cell t-body right" style="left:1562px; top:506px; width:246px; height:86px;">-00%</div>
-  <div class="el table-cell t-body" style="left:112px; top:592px; width:650px; height:86px;">Data transfer</div>
-  <div class="el table-cell t-body right" style="left:762px; top:592px; width:400px; height:86px;">$00,000</div>
-  <div class="el table-cell t-body right" style="left:1162px; top:592px; width:400px; height:86px;">$00,000</div>
-  <div class="el table-cell t-body right" style="left:1562px; top:592px; width:246px; height:86px;">+00%</div>
-  <div class="el table-cell t-heading" style="left:112px; top:700px; width:650px; height:110px;">Total</div>
-  <div class="el table-cell t-heading right" style="left:762px; top:700px; width:400px; height:110px;">$000,000</div>
-  <div class="el accent-fill flex-center t-heading right" style="left:1162px; top:700px; width:400px; height:110px;">$000,000&nbsp;</div>
-  <div class="el table-cell t-heading right" style="left:1562px; top:700px; width:246px; height:110px;">-00%</div>
-  <div class="el t-caption muted" style="left:112px; top:870px; width:1696px; height:100px;">Use exact values and consistent units. If trend matters more than lookup, replace this table with directly labeled bars and remove non-informative gridlines.</div>
-</div>
-
-<!-- Pattern: KPI row — WHY: whitespace and vertical separators let four metrics compare without card repetition, while one orange figure states the takeaway. Vary the metric count from three to five; do not color more than one figure or omit comparator labels. -->
-<div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:700px; height:30px;">Part 7 · Pattern · KPI row</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">Reliability improves while cost and operating effort both fall</div>
-  <div class="el title-rule" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el t-label muted center" style="left:112px; top:380px; width:388px; height:34px;">Availability</div>
-  <div class="el accent-fill flex-center t-metric center" style="left:112px; top:455px; width:388px; height:100px;">99.9%</div>
-  <div class="el t-caption muted center" style="left:112px; top:590px; width:388px; height:84px;">Target period<br>+0.0 points</div>
-  <div class="el rule" style="left:524px; top:350px; width:1px; height:400px;"></div>
-  <div class="el t-label muted center" style="left:548px; top:380px; width:388px; height:34px;">Monthly cost</div>
-  <div class="el t-metric center" style="left:548px; top:455px; width:388px; height:100px;">-00%</div>
-  <div class="el t-caption muted center" style="left:548px; top:590px; width:388px; height:84px;">Versus baseline<br>same workload</div>
-  <div class="el rule" style="left:960px; top:350px; width:1px; height:400px;"></div>
-  <div class="el t-label muted center" style="left:984px; top:380px; width:388px; height:34px;">Deploy time</div>
-  <div class="el t-metric center" style="left:984px; top:455px; width:388px; height:100px;">00 min</div>
-  <div class="el t-caption muted center" style="left:984px; top:590px; width:388px; height:84px;">Median<br>last 30 days</div>
-  <div class="el rule" style="left:1396px; top:350px; width:1px; height:400px;"></div>
-  <div class="el t-label muted center" style="left:1420px; top:380px; width:388px; height:34px;">Operator hours</div>
-  <div class="el t-metric center" style="left:1420px; top:455px; width:388px; height:100px;">-00%</div>
-  <div class="el t-caption muted center" style="left:1420px; top:590px; width:388px; height:84px;">Per month<br>same team</div>
-  <div class="el t-body center" style="left:280px; top:820px; width:1360px; height:110px;">State the period and comparator beneath every figure so the row remains evidence, not decoration.</div>
-</div>
-
-<!-- Pattern: process — WHY: numbered steps and service labels bind the business sequence to its implementation without a separate legend. Vary from three to six steps; do not use category color for numbering or highlight more than the current step in orange. -->
-<div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:700px; height:30px;">Part 7 · Pattern · Process</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">Five explicit steps turn an event into a governed business response</div>
-  <div class="el title-rule" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el surface-text t-heading center" style="left:112px; top:390px; width:280px; height:145px;">1<br><span class="t-caption">Receive</span></div>
-  <div class="el surface-text t-heading center" style="left:466px; top:390px; width:280px; height:145px;">2<br><span class="t-caption">Validate</span></div>
-  <div class="el accent-fill flex-center t-heading" style="left:820px; top:390px; width:280px; height:145px;">3 · Route</div>
-  <div class="el surface-text t-heading center" style="left:1174px; top:390px; width:280px; height:145px;">4<br><span class="t-caption">Process</span></div>
-  <div class="el surface-text t-heading center" style="left:1528px; top:390px; width:280px; height:145px;">5<br><span class="t-caption">Observe</span></div>
-  <div class="el connector-h arrow-right" style="left:392px; top:460px; width:74px; height:18px;"></div>
-  <div class="el connector-h arrow-right" style="left:746px; top:460px; width:74px; height:18px;"></div>
-  <div class="el connector-h arrow-right" style="left:1100px; top:460px; width:74px; height:18px;"></div>
-  <div class="el connector-h arrow-right" style="left:1454px; top:460px; width:74px; height:18px;"></div>
-  <div class="el t-label cat-text-integration center" style="left:112px; top:600px; width:280px; height:34px;">Integration service</div>
-  <div class="el t-label cat-text-security center" style="left:466px; top:600px; width:280px; height:34px;">Security service</div>
-  <div class="el t-label cat-text-integration center" style="left:820px; top:600px; width:280px; height:34px;">Routing service</div>
-  <div class="el t-label cat-text-compute center" style="left:1174px; top:600px; width:280px; height:34px;">Compute service</div>
-  <div class="el t-label cat-text-analytics center" style="left:1528px; top:600px; width:280px; height:34px;">Analytics service</div>
-  <div class="el t-body center" style="left:240px; top:760px; width:1440px; height:120px;">Write each step as a verb phrase. Put the service used directly beneath it, using the service category color only on that label.</div>
-</div>
-
-<!-- Pattern: table — WHY: hairlines, generous row height, and a category swatch column make exact service attributes scannable without dense card chrome. Vary columns and use three to seven rows; do not shade alternating rows, recolor body text, or assume a custom table font. -->
-<div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:700px; height:30px;">Part 7 · Pattern · Table</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">The shortlist is defensible when each service is compared on the same criteria</div>
-  <div class="el accent-bar" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el table-head t-label" style="left:112px; top:320px; width:120px; height:70px;">Cat.</div>
-  <div class="el table-head t-label" style="left:232px; top:320px; width:430px; height:70px;">Service</div>
-  <div class="el table-head t-label" style="left:662px; top:320px; width:430px; height:70px;">Best fit</div>
-  <div class="el table-head t-label" style="left:1092px; top:320px; width:390px; height:70px;">Operating model</div>
-  <div class="el table-head t-label" style="left:1482px; top:320px; width:326px; height:70px;">Cost unit</div>
-  <div class="el swatch-compute" style="left:145px; top:425px; width:42px; height:42px;"></div>
-  <div class="el table-cell t-body" style="left:232px; top:400px; width:430px; height:92px;">Compute service</div>
-  <div class="el table-cell t-body" style="left:662px; top:400px; width:430px; height:92px;">Steady workload</div>
-  <div class="el table-cell t-body" style="left:1092px; top:400px; width:390px; height:92px;">Managed host</div>
-  <div class="el table-cell t-body" style="left:1482px; top:400px; width:326px; height:92px;">Time</div>
-  <div class="el swatch-integration" style="left:145px; top:517px; width:42px; height:42px;"></div>
-  <div class="el table-cell t-body" style="left:232px; top:492px; width:430px; height:92px;">Integration service</div>
-  <div class="el table-cell t-body" style="left:662px; top:492px; width:430px; height:92px;">Event routing</div>
-  <div class="el table-cell t-body" style="left:1092px; top:492px; width:390px; height:92px;">Serverless</div>
-  <div class="el table-cell t-body" style="left:1482px; top:492px; width:326px; height:92px;">Requests</div>
-  <div class="el swatch-storage" style="left:145px; top:609px; width:42px; height:42px;"></div>
-  <div class="el table-cell t-body" style="left:232px; top:584px; width:430px; height:92px;">Storage service</div>
-  <div class="el table-cell t-body" style="left:662px; top:584px; width:430px; height:92px;">Durable objects</div>
-  <div class="el table-cell t-body" style="left:1092px; top:584px; width:390px; height:92px;">Fully managed</div>
-  <div class="el table-cell t-body" style="left:1482px; top:584px; width:326px; height:92px;">Capacity</div>
-  <div class="el swatch-database" style="left:145px; top:701px; width:42px; height:42px;"></div>
-  <div class="el table-cell t-body" style="left:232px; top:676px; width:430px; height:92px;">Database service</div>
-  <div class="el table-cell t-body" style="left:662px; top:676px; width:430px; height:92px;">Transactional state</div>
-  <div class="el table-cell t-body" style="left:1092px; top:676px; width:390px; height:92px;">Managed engine</div>
-  <div class="el table-cell t-body" style="left:1482px; top:676px; width:326px; height:92px;">Usage</div>
-  <div class="el t-caption muted" style="left:112px; top:835px; width:1696px; height:130px;">Native tables inherit the template font; accept it. Build aligned text rows only when a specific typeface is essential. Category swatches identify each service; the orange title rule remains the only emphasis.</div>
-</div>
-
-<!-- Pattern: decision / next steps closing — WHY: the selected decision and a short owner-action sequence turn technical evidence into execution. Vary decision criteria and owners; do not add a recap grid, multiple recommendations, or more than one orange recommendation band. -->
-<div class="slide">
-  <div class="el t-label section-label" style="left:112px; top:24px; width:800px; height:30px;">Part 7 · Pattern · Decision / next steps</div>
-  <div class="el t-title" style="left:112px; top:64px; width:1696px; height:173px;">Choose the managed path and begin with one production-shaped workload</div>
-  <div class="el title-rule" style="left:112px; top:260px; width:140px; height:4px;"></div>
-  <div class="el t-heading" style="left:112px; top:335px; width:760px; height:60px;">Decision criteria</div>
-  <div class="el t-body line-item" style="left:112px; top:420px; width:760px; height:90px;">Meets the reliability objective</div>
-  <div class="el t-body line-item" style="left:112px; top:510px; width:760px; height:90px;">Reduces ongoing operating work</div>
-  <div class="el t-body line-item" style="left:112px; top:600px; width:760px; height:90px;">Keeps cost proportional to demand</div>
-  <div class="el accent-fill flex-left t-heading" style="left:112px; top:740px; width:760px; height:130px;">&nbsp;Decision · Managed path</div>
-  <div class="el rule" style="left:960px; top:330px; width:1px; height:560px;"></div>
-  <div class="el t-heading" style="left:1048px; top:335px; width:760px; height:60px;">Next steps</div>
-  <div class="el surface-text t-heading" style="left:1048px; top:420px; width:760px; height:145px;">1 · Owner defines success measures</div>
-  <div class="el surface-text t-heading" style="left:1048px; top:570px; width:760px; height:145px;">2 · Team builds the thin production path</div>
-  <div class="el surface-text t-heading" style="left:1048px; top:720px; width:760px; height:145px;">3 · Sponsor reviews evidence and scale gate</div>
-  <div class="el t-caption muted" style="left:1048px; top:890px; width:760px; height:80px;">Name one owner and date for each action in the real deck.</div>
+<div class="el t-label muted" style="left:112px;top:250px;width:600px;height:34px">Decision</div>
+<div class="el t-cover" style="left:112px;top:315px;width:1500px;height:230px">Make the architecture<br>easy to decide</div>
+<div class="el accent-fill t-heading" style="left:112px;top:610px;width:1696px;height:120px">Next action — owner, verb, and date</div>
+<div class="el t-body muted" style="left:112px;top:810px;width:1400px;height:120px">Category identity, strict alignment, and one emphasis keep the path clear.</div>
 </div>
 
 </body>
