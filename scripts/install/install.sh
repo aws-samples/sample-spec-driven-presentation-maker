@@ -316,10 +316,8 @@ choose_profile() {
   [[ -n "$PROFILE" ]] && return 0
   if [[ "$NON_INTERACTIVE" == "1" ]]; then PROFILE=full; return 0; fi
   echo ""
-  echo "  SDPM has two surfaces on one installation:"
-  echo "    - your own AI agent (Kiro CLI, Claude Code, Cursor, …) through the MCP server — always installed"
-  echo "    - a browser Web UI — needs Node.js 20+ and adds a few minutes of build time"
-  if show_confirm "Also install the browser Web UI? [Y/n]"; then PROFILE=full; else PROFILE=mcp; fi
+  show_surface_picker
+  if [[ "$SURFACE_WEBUI" == "1" ]]; then PROFILE=full; else PROFILE=mcp; fi
 }
 
 REGISTER_FAILED=0

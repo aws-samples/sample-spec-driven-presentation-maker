@@ -27,8 +27,9 @@ What happens:
 
 1. Dependencies are checked and offered for installation: `git`, `uv`, and — for slide
    previews — LibreOffice and poppler. Previews are optional; a deck builds without them.
-2. **"Also install the browser Web UI?"** — yes installs Node.js 20+ and Kiro CLI (the Web
-   UI's agent backend) and builds the UI; no gives you an MCP-only install with no Node.js.
+2. **What to install** — a two-row checklist: the MCP server (always on) and the browser Web
+   UI (ticked by default; space unticks). With the Web UI, Node.js 20+ and Kiro CLI (its
+   agent backend) are installed and the UI is built; without it nothing needs Node.js.
 3. The checkout is cloned to `~/.sdpm/checkout`, the server environment is synced, and the
    AWS / Material icon catalogs are downloaded.
 4. **Connect SDPM to your MCP clients** — a checklist of the clients found on the machine,

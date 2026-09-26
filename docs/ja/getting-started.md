@@ -26,8 +26,9 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 
 1. 依存を確認し、無ければ導入を提案します: `git`、`uv`、そしてスライドプレビュー用の
    LibreOffice と poppler。プレビューは任意で、無くてもデッキは生成されます。
-2. **「ブラウザ用の Web UI も入れますか？」** — yes なら Node.js 20+ と Kiro CLI（Web UI の
-   エージェント基盤）を入れて UI をビルド、no なら Node.js 不要の MCP のみ構成。
+2. **What to install** — 2 行のチェックリスト: MCP サーバー（常に on）とブラウザ用 Web UI（既定 on、
+   space で外す）。Web UI を含めると Node.js 20+ と Kiro CLI（そのエージェント基盤）を入れて UI を
+   ビルド、外せば Node.js は不要。
 3. `~/.sdpm/checkout` に clone し、サーバー環境を同期し、AWS / Material のアイコンカタログを取得。
 4. **Connect SDPM to your MCP clients** — マシン上で見つかったクライアントのチェックリスト（全部 on）。
    不要なものを space で外し、enter で確定。結果が表で出ます: ✓ registered / – skipped（後でやる
