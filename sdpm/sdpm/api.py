@@ -1141,7 +1141,8 @@ def code_block(
                 "align": "left",
                 "fill": inverse_bg,
                 "text": f"{{{{#{label_fg}:{label_text}}}}}",
-                "marginLeft": 50000,
+                # Margins are px (the builder converts px -> EMU), not EMU.
+                "marginLeft": 8,
                 "marginTop": 0,
                 "marginRight": 0,
                 "marginBottom": 0,
@@ -1163,9 +1164,14 @@ def code_block(
             "width": width,
             "height": code_height,
             "fontSize": font_size,
+            "fontFamily": "Courier New",
             "align": "left",
             "fill": bg,
             "text": spans,
+            "marginLeft": 8,
+            "marginTop": 5,
+            "marginRight": 8,
+            "marginBottom": 5,
         }
     )
 
