@@ -62,8 +62,9 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
 irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
 ```
 
-The installer asks two things — whether to add the browser Web UI (needs Node.js) and
-which of your MCP clients to connect — and ends with what to do next. Then:
+The installer asks two things — whether to add the browser Web UI (needs Node.js) and, as a
+checklist of the MCP clients it finds, which to connect — and ends with a table of what it
+registered. Then:
 
 | You want to | Do this |
 |---|---|

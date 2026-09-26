@@ -317,39 +317,41 @@ choose_profile() {
   if [[ "$NON_INTERACTIVE" == "1" ]]; then PROFILE=full; return 0; fi
   echo ""
   echo "  SDPM has two surfaces on one installation:"
-  echo "    - your own AI agent (Kiro CLI, Claude Code, Cursor, ...) through the MCP server"
-  echo "    - a browser Web UI (needs Node.js 20+; adds a few minutes of build time)"
+  echo "    - your own AI agent (Kiro CLI, Claude Code, Cursor, …) through the MCP server — always installed"
+  echo "    - a browser Web UI — needs Node.js 20+ and adds a few minutes of build time"
   if show_confirm "Also install the browser Web UI? [Y/n]"; then PROFILE=full; else PROFILE=mcp; fi
 }
 
 REGISTER_FAILED=0
 
+# The register step prints its own result table (✓ registered / – skipped / ✗ failed),
+# which is the part of the completion screen that matters; nothing else repeats it.
 register_clients() {
-  [[ "$REGISTER" == "no" ]] && { "$LAUNCHER_DIR/sdpm" mcp-config || true; return 0; }
   echo ""
+  if [[ "$REGISTER" == "no" ]]; then
+    echo "  Skipping client registration (--no-register). Later: sdpm register"; return 0
+  fi
   if [[ "$REGISTER" == "yes" ]]; then
     "$LAUNCHER_DIR/sdpm" register --yes || REGISTER_FAILED=1
     return 0
   fi
-  if [[ "$NON_INTERACTIVE" == "1" ]]; then "$LAUNCHER_DIR/sdpm" mcp-config || true; return 0; fi
-  echo "  Connect your MCP clients now? Each one is asked separately; nothing is written"
-  echo "  without your yes, and 'sdpm register' does the same later."
-  "$LAUNCHER_DIR/sdpm" register || true
+  if [[ "$NON_INTERACTIVE" == "1" ]]; then
+    echo "  Non-interactive: clients were not registered. Later: sdpm register   (or re-run with --register)"
+    return 0
+  fi
+  "$LAUNCHER_DIR/sdpm" register || REGISTER_FAILED=1
 }
 
 show_completion() {
-  echo ""; printf "  ${C_GREEN}SDPM is installed.${C_RESET}\n\n"
-  echo "    Your agent:   ask it \"Make slides about ...\" — it finds SDPM through MCP."
-  echo "                  Kiro CLI: kiro-cli chat --agent $SDPM_AGENT_NAME"
+  printf "  ${C_GREEN}SDPM is installed${C_RESET} in $CHECKOUT\n\n"
   if [[ "$PROFILE" == "full" ]]; then
-    echo "    Browser:      sdpm webui"
-    kiro-cli whoami >/dev/null 2>&1 || echo "                  (the Web UI uses Kiro CLI: run 'kiro-cli login' once first)"
+    echo "    Browser:   sdpm webui"
+    kiro-cli whoami >/dev/null 2>&1 || echo "               (the Web UI uses Kiro CLI — run 'kiro-cli login' once first)"
   else
-    echo "    Browser:      not installed — add it any time with 'sdpm update --with-webui'"
+    echo "    Browser:   not installed — sdpm update --with-webui"
   fi
-  echo "    Later:        sdpm            status      sdpm register   connect more clients"
-  echo "                  sdpm update     upgrade     sdpm uninstall  remove"
-  echo ""; echo "    Checkout: $CHECKOUT"
+  echo "    Agents:    ask for slides in a registered client (table above)"
+  echo "    Later:     sdpm  ·  sdpm register  ·  sdpm update  ·  sdpm uninstall"
   if [[ ":$PATH:" != *":$LAUNCHER_DIR:"* ]]; then
     printf "    ${C_YELLOW}Add %s to PATH to run 'sdpm' directly.${C_RESET}\n" "$LAUNCHER_DIR"
   fi
