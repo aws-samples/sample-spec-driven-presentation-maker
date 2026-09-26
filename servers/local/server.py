@@ -15,19 +15,21 @@ Usage:
     # or via MCP client config: {"command": "python", "args": ["servers/local/server.py"]}
 """
 
+import os
 import sys
 from pathlib import Path
 from typing import Annotated
 
 from pydantic import Field
 
-# Add sdpm/ (skill root) to sys.path so sdpm package is importable
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+# Prefer checkout sources only when this file is running from the repository.
+# Installed wheels resolve sdpm and shared from their normal site-packages paths.
+_HERE = Path(__file__).resolve().parent
+_REPO_ROOT = _HERE.parents[1]
 _SKILL_DIR = _REPO_ROOT / "sdpm"
-sys.path.insert(0, str(_SKILL_DIR))
-
-# Add project root to sys.path so shared/ package is importable
-sys.path.insert(0, str(_REPO_ROOT))
+if (_SKILL_DIR / "sdpm" / "config.py").is_file():
+    sys.path.insert(0, str(_SKILL_DIR))
+    sys.path.insert(0, str(_REPO_ROOT))
 
 import sandbox_tools  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
@@ -81,7 +83,6 @@ mcp.tool()(sandbox_tools.run_style_python)
 
 
 @mcp.tool()
-@mcp.tool()
 def list_styles(
     include_all: Annotated[bool, Field(description='Include styles hidden by the pin filter.')] = False,
 ) -> dict:
@@ -95,5 +96,16 @@ def list_styles(
     return tools.list_styles(include_all=include_all)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Run the local MCP server over stdio."""
+    # A clone-free (uvx) setup has no icon catalogs on first start; fetch them in the
+    # background so registering the server is the whole setup. SDPM_AUTO_INSTALL_ASSETS=0
+    # opts out (offline hosts, tests).
+    if os.environ.get("SDPM_AUTO_INSTALL_ASSETS", "1") != "0":
+        from sdpm.knowledge.assets.download import ensure_assets_installed_async
+        ensure_assets_installed_async()
     mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()

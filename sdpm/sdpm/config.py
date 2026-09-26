@@ -48,6 +48,11 @@ def get_user_config_dir() -> Path:
     return base / "sdpm"
 
 
+def assets_install_dir() -> Path:
+    """Writable base directory for downloaded asset catalogs (the checkout's assets/)."""
+    return ASSETS_DIR
+
+
 def _get_resource_dirs(env_var: Optional[str], subdir: str, bundled: Path) -> list[Path]:
     """Return ordered list of directories for a resource type.
 

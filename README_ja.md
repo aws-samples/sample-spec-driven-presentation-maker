@@ -51,41 +51,68 @@
 
 ## クイックスタート
 
-統合面は MCP サーバー 1 つだけです。エージェントを接続してスライド作成を頼むだけ —
-エージェントが最初に呼ぶ `start_presentation` ツールが、作業を導く役割文書と
-使えるスタイル・テンプレートをまとめて返します。
-リポジトリ自体が [Agent Plugins](https://agent-plugins.org) 準拠のポータブルパッケージ
-なので、この形式に対応したクライアントは MCP サーバーと skill 入口をまとめて読み込めます。
+1 コマンドで `~/.sdpm` にすべてが入ります — AI エージェントが話す MCP サーバーと、
+必要ならブラウザ用の Web UI。どちらも同じ checkout から動き、一緒に更新されます。
+（唯一の例外は Claude Desktop で、こちらはダウンロードするバンドルを使います。下記参照。）
 
-| 環境 | セットアップ |
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
+```
+
+```powershell
+# Windows（PowerShell。CI での検証のみ）
+irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
+```
+
+インストーラーが聞くのは 2 つだけ — ブラウザ用 Web UI も入れるか（Node.js が必要）と、
+どの MCP クライアントに接続するか。最後に次にやることを表示します。その後は:
+
+| やりたいこと | 手順 |
 |---|---|
-| Claude Code | `/plugin marketplace add aws-samples/sample-spec-driven-presentation-maker` → `/plugin install sdpm@sdpm` |
-| Kiro CLI | このリポジトリを `git clone` して `make install-kiro` |
-| Kiro IDE（Powers） | このチェックアウトを Power として導入 — Agent Plugins パッケージです |
-| Codex | チェックアウトで `codex plugin marketplace add ./` → ChatGPT デスクトップアプリから導入 |
-| Claude Desktop / 任意の MCP クライアント | `servers/local` を stdio MCP サーバーとして登録 — [はじめに](docs/ja/getting-started.md) 参照 |
-| MCP なし | エージェントに [`sdpm/SKILL.md`](sdpm/SKILL.md) を読ませる — CLI を直接駆動します |
-| チーム利用 / リモート MCP / Web UI（AWS） | [デプロイ手順](docs/en/deploy-cloudshell.md) |
+| いつもの AI エージェントで使う（Claude Code / Cursor / VS Code / Codex） | インストーラーの登録提案に yes と答えていれば、エージェントに**「〜のスライドを作って」**と頼むだけ。それ以外、または別のクライアントを後から: `sdpm register` |
+| Kiro CLI で使う | インストーラーが専用の `sdpm` エージェントを作ります（ツールと信頼設定はそのエージェントに閉じ、他のセッションには何も足しません）: `kiro-cli chat --agent sdpm` |
+| ブラウザで使う | `sdpm webui` |
+| Claude Desktop で使う | [`sdpm.mcpb` をダウンロード](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb)してダブルクリック（インストーラー不要） |
+| チームで共有サーバー / Web UI を使う | [AWS にデプロイ](docs/en/deploy-cloudshell.md) |
 
-**モードの選び方.** 「スライドにして」と頼むだけで十分です（エージェントが
-`start_presentation` を呼んでそれに従います）。明示的に選ぶなら入口を使ってください:
-`sdpm-create`（プレゼンを作成 — 対話の深さは頼み方次第）、
-`sdpm-style`（再利用できるスタイルガイド作成）、`sdpm-translate`（既存デッキの他言語翻訳）。
-skill をスラッシュコマンドにする
-クライアントでは `/sdpm-create` `/sdpm-style` `/sdpm-translate` として使えます。入口は
-役割文書の名前をサーバーに伝えるだけで、振る舞いの実体は
-`sdpm/references/workflows/` の 1 箇所のままです。
+`sdpm` だけで、何が入っていて何に接続済みかを表示します。`sdpm update` で両方の面を更新、
+`sdpm uninstall` で全部削除。スライドのプレビュー（PNG）には LibreOffice と poppler が必要です —
+インストーラーが導入を提案し、無くても PPTX は生成され、足りないものをエージェントに伝えます。
+オプション、クライアントの手動設定、開発者向けセットアップは[はじめに](docs/ja/getting-started.md)へ。
 
-**ローカル利用の前提:** [`uv`](https://docs.astral.sh/uv/) が `PATH` にあること。
-スライドプレビュー（PNG 描画）には **LibreOffice** と **poppler** も必要です。
+### AI エージェントにインストールさせる
 
-**チェックアウトはそのまま置いてください:** Claude Code / Kiro / ローカル MCP は
-チェックアウトからサーバーを起動します（`uv run --directory <checkout>/servers/local`）。
-更新は `git pull` だけ — ワークフローやナレッジはチェックアウトから直接読まれます。
+このリポジトリの URL をコーディングエージェントに渡して「入れて」と頼む人も多いはずです。
+その場合（あなたでもエージェントでも）、非対話の形はこれです:
 
-> **旧バージョンからのアップグレード:** ディレクトリ構成・ツール名・skill が変わりました —
-> [v0.5 移行ガイド](docs/en/migration-v0.5.md) と
-> [role workflows 移行ガイド](docs/en/migration-role-workflows.md) を参照してください。
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --mcp-only --non-interactive --register
+```
+
+`--mcp-only` はブラウザ用 Web UI を省きます（含めるなら外すか `--full`。Node.js 20+ が必要）。
+`--register` は見つかった全 MCP クライアントに確認なしで接続します（`--no-register` なら設定を
+表示するだけ）。確認は `sdpm`（状態）と
+`python3 ~/.sdpm/checkout/scripts/install/mcp_smoke.py ~/.local/bin/sdpm mcp`。全オプション:
+[はじめに](docs/ja/getting-started.md#インストーラーのオプション)。
+
+> **旧環境を移行するエージェントへの破壊的変更の注記:** インストーラー以前の導入手段 —
+> Claude Code / Codex の plugin、Kiro Power、`make install-kiro`、`skills/` ディレクトリ、
+> `uvx … sdpm-mcp` のクライアント設定 — はすべて廃止されました。
+> [移行: 導入方法](docs/en/migration-onboarding.md)の表に従って削除してください。特に残りがちな
+> `~/.kiro/agents/sdpm-composer.json` とグローバル `~/.kiro/settings/mcp.json` の項目は
+> `sdpm register kiro-cli` が検出して削除を提案します。ツール名・prompt・デッキのファイルは変わりません。
+
+**モードを選ぶ。** 頼むだけで十分ですが、明示したいときはサーバーの prompt を使います:
+`sdpm-vibe`（素材から質問なしで作る）、`sdpm-spec`（対話で構成を固めてから作る）、
+`sdpm-style`（再利用できるスタイルガイド）、`sdpm-translate`（デッキの言語版）— Claude Desktop の
+「+」メニュー、Claude Code `/mcp__sdpm__sdpm-vibe`、VS Code `/mcp.sdpm.sdpm-vibe`、Kiro CLI
+`/sdpm-vibe`。各 prompt は役割の入口ツールを指すだけで、振る舞いは `sdpm/references/workflows/`
+の 1 か所にあります。
+
+> **旧バージョンからのアップグレード:** 上の破壊的変更の注記と
+> [移行: 導入方法](docs/en/migration-onboarding.md)を参照してください。それ以前の変更:
+> [v0.5](docs/en/migration-v0.5.md)、[role workflows](docs/en/migration-role-workflows.md)。
 
 ---
 
@@ -115,16 +142,15 @@ skill をスラッシュコマンドにする
 sdpm/        エンジン（json <-> pptx）+ ナレッジ（references, assets, templates）
              references/workflows/ — 役割文書（orchestrator, composer, style,
              translate）。start_* 入口ツールで全 MCP クライアントに配信
-skills/      モードの入口 — start_* 入口ツールを 1 行で呼ぶディスパッチャ
-plugin.json  Agent Plugins マニフェスト（+ mcp.json）— ルートをポータブルプラグインにする
 servers/     local（stdio, AWS 不要）/ remote（HTTP, S3 + DynamoDB）— 単一ツールコントラクトの薄い bind
-clients/     クライアント別の配線（Claude Code / Codex マニフェスト、Kiro インストーラ）
+             local/client_config.py が MCP クライアントへの配線を担う（sdpm register）
+scripts/install/   macOS / Linux / Windows のインストーラーと `sdpm` ランチャー。scripts/mcpb/ は Claude Desktop 用バンドル
 agent/ api/ infra/ web-ui/   オプションの AWS クラウドスタック（Strands Agent, REST API, CDK, React UI）
 ```
 
 エージェントに必要なもの — ツール・ワークフロー・ガイド・役割の振る舞い — はすべて
-MCP サーバーが配信します。クライアント側のファイルは最小限の配線（クライアント別マニフェストと、
-何をするかは書かず役割文書の名前だけを指す入口）だけです。
+MCP サーバーが配信します。クライアント側には何も置きません。クライアントが持つのは
+サーバーを起動する 1 行だけで、それは `sdpm register` が書き込みます。
 全体像は [Architecture](docs/en/architecture.md) を参照してください。
 
 ---
@@ -140,6 +166,7 @@ MCP サーバーが配信します。クライアント側のファイルは最�
 | [Architecture](docs/en/architecture.md) | レイヤー設計、データフロー、認証モデル、MCP ツール一覧 |
 | [Migration to v0.5](docs/en/migration-v0.5.md) | v0.4 からの移行（パス変更、skills 廃止） |
 | [Migration: role workflows](docs/en/migration-role-workflows.md) | v0.5 からの移行（ワークフロー統合、ツール/skill 名変更） |
+| [Migration: onboarding](docs/en/migration-onboarding.md) | plugin / skill / `make install-kiro` / `uvx` からインストーラーへの移行 |
 | [Recommended Deploy](docs/en/deploy-cloudshell.md) | CloudShell からの AWS デプロイ（CDK/Docker 不要） |
 | [Connecting Agents](docs/en/add-to-gateway.md) | MCP クライアントの接続方法 |
 | [Teams & Slack Integration](docs/en/teams-slack-integration.md) | チャットプラットフォーム連携 |
@@ -147,7 +174,7 @@ MCP サーバーが配信します。クライアント側のファイルは最�
 | [Cost Estimates](docs/en/cost.md) | 月額コストの内訳と最適化 |
 | [使用量の計測](docs/ja/usage-measurement.md) | PoC 運営者向けのユーザー別トークン・スライド数計測 |
 | [Uninstall](docs/en/uninstall.md) | デプロイ済み AWS リソースの削除 |
-| [Web UI（ローカルモード — 実験的機能）](web-ui/README_ja.md#local-mode) | Kiro CLI ACP をバックエンドにローカル環境で Web UI を動作させる（AWS 不要） |
+| [Web UI（ローカルモード）](web-ui/README_ja.md#local-mode) | `sdpm webui` が Kiro CLI ACP をバックエンドにローカルで Web UI を動かす仕組み（AWS 不要） |
 
 ---
 

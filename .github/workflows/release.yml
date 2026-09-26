@@ -13,6 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - name: Build Claude Desktop MCPB
+        run: bash scripts/build_mcpb.sh
       - name: Extract changelog section
         id: changelog
         run: |
@@ -35,3 +38,7 @@ jobs:
             --title "$GITHUB_REF_NAME" \
             --notes-file release_notes.md \
             --verify-tag
+      - name: Upload Claude Desktop MCPB
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/sdpm.mcpb --clobber

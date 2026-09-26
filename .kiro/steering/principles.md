@@ -57,12 +57,13 @@ Rules that follow from this:
 4. **Role documents are content, not client config** ("server-driven behavior").
    Each role (orchestrator, composer, style, translate) has exactly one document,
    `sdpm/references/workflows/<role>.md`, served through the port via
-   the role's `start_*` entry tool. Entry points (skills, agent definitions, `SKILL.md`,
-   server instructions) only ever name a role document — they never restate or
-   duplicate its content.
+   the role's `start_*` entry tool. Entry points (the `sdpm-*` prompts, ACP agent
+   definitions, `SKILL.md`, server instructions) only ever name a role document — they
+   never restate or duplicate its content. Nothing else lives on the client side: a client
+   holds the one line that starts the server, written by `sdpm register`.
 
    Role assignment is a dispatch-time decision, not a discovery-time one: a
-   spawner (the orchestrator delegating to a composer, a skill dispatching a
+   spawner (the orchestrator delegating to a composer, a prompt dispatching a
    role, a client picking a mode) tells the spawned agent which role to load in
    its first instruction. The agent then calls `start_<role>(...)`
    itself. There is no docstring heuristic to infer role from arguments, and no
@@ -70,11 +71,16 @@ Rules that follow from this:
    — every consumer, including the L4 agent, fetches live.
 5. **Change-locality goal** — the structure is optimised so that:
    prompt changes touch only `sdpm/references/workflows/`; engine changes touch only
-   `sdpm/sdpm/engine/`; a new client touches only `clients/`; a new tool
-   touches only `sdpm/sdpm/tools/`.
+   `sdpm/sdpm/engine/`; a new MCP client touches only the client table in
+   `servers/local/client_config.py`; a new tool touches only `sdpm/sdpm/tools/`.
 
-Known debt against this philosophy (tracked for v0.5.x):
-`api/index.py` has no test coverage.
+Known debt against this philosophy:
+- `api/index.py` has no test coverage (tracked for v0.5.x).
+- `sdpm.tools.attachment.pipeline` imports the repository-level `shared` package,
+  so the core currently depends outward on shared application code. Harmless while the
+  server always runs from a checkout; move the required attachment logic inward before
+  the core is ever packaged on its own.
+
 (v0.5.2 resolved: `converter/elements.py` monolith → `converter/elements/`
 package with an enforced dependency DAG; scale state → ContextVar scope.)
 
@@ -111,6 +117,37 @@ Path-based; the remote server materialises the deck from S3 and calls the same c
 stdio MCP + ACP server for local environments. Must be a **thin bind** of
 `sdpm.tools`. Local-transport specifics (session-scoped upload staging,
 browser style gallery, ACP hearing UI) are the only allowed additions.
+
+`servers/local/client_config.py` is the one place that knows about MCP clients: one
+server template (absolute `uv` + absolute checkout, never a launcher or `PATH`), per-client
+registration through the client's own CLI, a dedicated agent for Kiro CLI, detection of the
+old installer's leftovers. The `sdpm` launcher (`scripts/install/launcher.{sh,ps1}`) only
+delegates to it — never reimplement client logic in shell.
+
+## Onboarding — one install, one launcher
+
+Users install once (`scripts/install/dist/install.{sh,ps1}` → `~/.sdpm/checkout`) and get
+every surface from that checkout: `sdpm webui`, `sdpm register` (MCP clients), `sdpm update`.
+Nothing behavioural lives on the client side — a client holds the one line that starts the
+server; Kiro CLI holds it inside a generated `sdpm` agent (wiring only: no prompt, no
+`file://`, sub-agents restricted to itself). Rules that follow:
+
+- Never write another application's config file; use the client's CLI (`kiro-cli mcp`,
+  `claude mcp`, `code --add-mcp`, `codex mcp`) or print the JSON. Files we create must carry
+  our marker and be removed by `unregister` / `uninstall`; a user's own file of the same
+  name is left alone.
+- Environment gaps are reported at the point of need, once (`preview` →
+  `{"status": "unavailable", "install": …}`; `search_assets` → catalog missing / installing).
+  `start_presentation` carries no environment or update nags.
+- Developers run their clone *next to* the installed release: `make register-dev`
+  (agent `sdpm-dev`), `cd web-ui && npm run dev:local`. Never re-point the installed `sdpm`
+  agent at a working tree.
+- Change anything under `scripts/install/` → `bash scripts/install/build.sh` (CI rejects
+  drift) and read `scripts/install/README.md` for the isolated-home smoke test.
+
+Read before touching onboarding: `docs/en/getting-started.md` (user contract),
+`docs/en/migration-onboarding.md` (what was removed and why), `scripts/install/README.md`
+(build + smoke), `tests/test_client_config.py` (the guarded invariants).
 
 ## Remote server (`servers/remote/`) — Layer 3
 

@@ -1,4 +1,4 @@
-.PHONY: all lint test format check smoke doctor install-kiro lock
+.PHONY: all lint test format check smoke doctor lock register-dev mcp-config-dev
 
 all: lint test
 
@@ -22,8 +22,15 @@ smoke:
 doctor:
 	uv run python scripts/doctor.py
 
-install-kiro:
-	uv run python3 clients/kiro/install.py
+# Point your MCP clients at THIS checkout, next to (not instead of) an installed ~/.sdpm.
+# Kiro CLI gets its own agent so `kiro-cli chat --agent sdpm-dev` runs your working tree
+# while `--agent sdpm` keeps running the installed release. AGENT=sdpm-feature-x for worktrees.
+AGENT ?= sdpm-dev
+register-dev:
+	uv run --directory servers/local python client_config.py --checkout "$(CURDIR)" --agent-name $(AGENT) register $(CLIENTS)
+
+mcp-config-dev:
+	uv run --directory servers/local python client_config.py --checkout "$(CURDIR)" --agent-name $(AGENT) print --all
 
 # Regenerate container dependency locks (agent + servers/remote).
 # Both images build for linux/arm64 + Python 3.13 (AgentCore Runtime).

@@ -352,7 +352,7 @@ wheels = [
 
 [[package]]
 name = "sdpm-skill"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "defusedxml" },
     { name = "lxml" },

@@ -3,15 +3,36 @@
 AI-powered presentation generation toolkit. Engine + knowledge in `sdpm/`,
 served through MCP servers (`servers/`), with optional AWS cloud stack.
 
-## First: Are you developing this repo, or using it?
+## First: installing it, using it, or developing it?
 
-**Using it to generate slides with an AI agent:**
-→ Connect your agent to the local MCP server — see [Getting Started](docs/en/getting-started.md).
-Do NOT work inside this repo for everyday slide generation.
+**Installing it for a user (you were handed this repository's URL and asked to set it up):**
+→ Do not clone or run anything from a checkout by hand. Run the installer non-interactively:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --mcp-only --non-interactive --register
+```
+
+(Windows PowerShell: `irm …/scripts/install/dist/install.ps1 | iex` with `-McpOnly -NonInteractive -Register`.)
+`--mcp-only` skips the browser Web UI (needs Node.js 20+; use `--full` to include it);
+`--register` connects every MCP client found on the machine and cleans up leftovers of older
+setups without asking; `--agent-name NAME` renames the Kiro CLI agent (default `sdpm`).
+Then verify: `~/.local/bin/sdpm` prints status; `python3 ~/.sdpm/checkout/scripts/install/mcp_smoke.py ~/.local/bin/sdpm mcp`
+must print `OK: … 20 tools`. Tell the user how to start: Kiro CLI `kiro-cli chat --agent sdpm`;
+other clients just ask for slides; browser `sdpm webui`.
+**Migrating an older setup** (Claude Code / Codex plugin, Kiro Power, `make install-kiro`,
+`skills/`, `uvx … sdpm-mcp` entries): all of these are gone — follow
+[Migration: onboarding](docs/en/migration-onboarding.md); `sdpm register` detects and offers
+to remove the Kiro and Claude Code leftovers itself.
+
+**Using it to generate slides:**
+→ [README Quick Start](README.md#quick-start). Do NOT work inside this repo for everyday
+slide generation.
 
 **Developing / modifying this repo:**
 → Work in place. Use `make test` / `make lint` to verify changes. Read the
-[Conventions](#conventions) and [Boundaries](#boundaries) sections first.
+[Conventions](#conventions) and [Boundaries](#boundaries) sections first. To use your
+working tree as the server next to an installed release: `make register-dev`
+(Kiro agent `sdpm-dev`) and `cd web-ui && npm run dev:local`.
 
 ## Project Structure
 
@@ -23,13 +44,11 @@ sdpm/        Engine + knowledge (single source of business logic)
 ├─ references/       workflows (role documents), guides, spec, examples (data)
 ├─ templates/        bundled .pptx templates (data)
 └─ SKILL.md          L1 entry (agents without MCP drive the CLI directly)
-skills/      Mode entry points (sdpm-create / sdpm-composer / sdpm-style / sdpm-translate)
-             — thin dispatchers, no behavior text
-plugin.json  Agent Plugins 1.0.0 manifest; mcp.json declares the bundled MCP server
 servers/
-├─ local/    stdio MCP + ACP server (no AWS)
+├─ local/    stdio MCP + ACP server (no AWS); client_config.py wires it into MCP clients
 └─ remote/   streamable-HTTP MCP server (AWS: S3 + DynamoDB)
-clients/     Per-client wiring only (claude-code plugin agents, kiro installer, ACP configs live in servers/local/.kiro)
+scripts/install/  installer (install.sh / install.ps1), `sdpm` launcher, generated dist/
+scripts/mcpb/     Claude Desktop .mcpb manifest (the one client-side artefact)
 agent/       L4 Strands Agent (cloud)
 api/         L4 REST API Lambda
 infra/       CDK stacks
@@ -48,23 +67,24 @@ procedure text is content, not client config: `sdpm/references/workflows/<role>.
 (orchestrator, composer, style, translate) is the single definition for each role,
 delivered to any MCP client by the `start_*` entry tools (`start_presentation`,
 `start_composing`, `start_style`, `start_translation`), each of which also returns what
-that role reads first. The files under `skills/` are entry points only — they call the
-entry tool and never restate what the role does.
+that role reads first. Nothing lives on the client side: `sdpm register`
+(`servers/local/client_config.py`) writes the one line that starts the server into each
+client, and the `sdpm-*` MCP prompts carry the mode choice.
 See [Architecture](docs/en/architecture.md).
 
 ## Conventions
 
 - Engine source of truth: `sdpm/sdpm/` — servers must stay thin binds of `sdpm.tools`
-- Role + procedure text lives only in `sdpm/references/workflows/<role>.md`; skills,
-  client agent definitions, `SKILL.md` and server instructions are dispatch/environment
-  only (guarded by `tests/test_skill_entrypoints.py`)
-- `skills/*/SKILL.md` may only call a `start_*` entry tool; copying workflow
-  prose into a skill is what forced the v0.5.0 skill removal and is now guarded by
-  `tests/test_skill_entrypoints.py`
-- Client manifests: `plugin.json` + `mcp.json` (portable, Agent Plugins 1.0.0),
-  `.codex-plugin/plugin.json` + `.mcp.json` (Codex), `.claude-plugin/plugin.json`
-  (Claude Code). All must keep pointing at the same `servers/local` definition —
-  `tests/test_codex_adapter.py` fails on drift
+- Role + procedure text lives only in `sdpm/references/workflows/<role>.md`; `SKILL.md`,
+  the ACP agent definitions and server instructions are dispatch/environment only
+- Client configuration is generated, never hand-written: one template in
+  `servers/local/client_config.py` (absolute `uv` + absolute checkout, no launcher, no
+  `PATH`), rendered per client; `tests/test_client_config.py` guards it. Both launchers
+  (`launcher.sh` / `launcher.ps1`) delegate to that module rather than reimplementing it
+- `scripts/install/dist/` is generated by `scripts/install/build.sh`; CI fails on drift
+- Developing next to an installed `~/.sdpm`: `make register-dev` points clients at this
+  checkout under a separate Kiro agent name (`sdpm-dev`, `AGENT=` to change); never
+  re-point the installed `sdpm` agent at a working tree
 - Slide spec: JSON — schema and examples in `sdpm/references/`
 - Python: always `uv run`, never bare `python`
 - Verify changes: `make lint` (ruff) and `make test` (pytest) before committing
@@ -79,9 +99,17 @@ See [Architecture](docs/en/architecture.md).
   (infrastructure-only code — S3, DynamoDB, auth — is the exception, and lives in `servers/remote`)
 - Review `infra/config.yaml` before changing deployment settings
 
+## Onboarding code — read before touching
+
+- `docs/en/getting-started.md` — the user contract (installer options, launcher, per-client registration)
+- `docs/en/migration-onboarding.md` — what was removed and why
+- `scripts/install/README.md` — build (`build.sh`, CI rejects drift) and the isolated-home smoke test
+- `servers/local/client_config.py` + `tests/test_client_config.py` — the one implementation of client wiring and its guarded invariants (absolute paths, no launcher/PATH, CLI-based registration, marker-owned files)
+- `.github/workflows/installer.yml` — real install + MCP handshake on ubuntu / macos / windows
+
 ## Further Documentation
 
-- [Getting Started](docs/en/getting-started.md) — setup for every layer (L1–L4)
+- [Getting Started](docs/en/getting-started.md) — browser, local agent, manual, and AWS setup
 - [Architecture](docs/en/architecture.md) — data flow, auth model, MCP tool reference
 - [Custom Templates & Assets](docs/en/custom-template.md)
 - [Connecting Agents](docs/en/add-to-gateway.md)

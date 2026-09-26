@@ -45,17 +45,34 @@ Open [http://localhost:3000](http://localhost:3000).
 
 <a id="local-mode"></a>
 
-## Experimental: Local Mode (Kiro ACP backend)
+## Local Mode (Kiro ACP backend)
 
-> ⚠️ **Experimental.** APIs, flags, and behavior may change or break without notice.
+Run the full Web UI on your machine with **[Kiro](https://kiro.dev/) CLI** over
+[ACP](https://agentclientprotocol.com/) (Agent Client Protocol). No AWS deployment is needed.
 
-Run the Web UI entirely on your machine, backed by **[Kiro](https://kiro.dev/) CLI** via [ACP](https://agentclientprotocol.com/) (Agent Client Protocol) instead of the cloud-deployed Agent and Runtime. No AWS deployment needed. Useful for trying the UI without setting up Layer 3/4.
+### Install and start
 
-### Prerequisites
+The installer adds Kiro CLI and the other dependencies, builds the Web UI (answer yes to
+"Also install the browser Web UI?"), and creates the `sdpm` launcher and a desktop shortcut:
 
-- `kiro-cli` installed and on `PATH` — see [Kiro CLI install guide](https://kiro.dev/docs/cli/install/)
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
+sdpm webui
+```
 
-### Start
+Windows support is verified in CI only:
+
+```powershell
+irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
+sdpm webui
+```
+
+An MCP-only installation adds the Web UI later with `sdpm update --with-webui`.
+
+### Manual start for development
+
+Install `kiro-cli` on `PATH` using the
+[Kiro CLI install guide](https://kiro.dev/docs/cli/install/), then run:
 
 ```bash
 cd web-ui

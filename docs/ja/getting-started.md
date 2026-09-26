@@ -2,182 +2,183 @@
 
 # はじめに
 
-spec-driven-presentation-maker をローカル利用から AWS デプロイまで、段階的にセットアップする手順を説明します。
+SDPM はブラウザで使うことも、普段の AI エージェントに接続することもできます。どちらも
+AWS アカウントなしでローカル利用できます。内部の 4 層構成については
+[アーキテクチャ](../en/architecture.md#4-layer-architecture)を参照してください。
 
-> **🤖 手動で読み進める必要はありません。** このリポジトリには [`AGENTS.md`](../../AGENTS.md) を同梱しています。お使いのコーディングエージェント（Claude Code, Codex CLI, Cursor, Kiro, VS Code の GitHub Copilot 等）に、例えば「このリポジトリをセットアップして」「AWS にデプロイして」「Layer 2 として Claude Desktop から使えるようにして」と話しかけてください。エージェントが AGENTS.md を読み取り、適切なレイヤーとコマンドを自動で選んで進めます。
+## インストール
 
-> **🚀 AWS へのデプロイだけを行いたい場合:** [ワンクリックデプロイ](../en/deploy-cloudshell.md#one-click-deploy-recommended) が最も簡単です。AWS コンソールにログインし、Launch Stack ボタンを押してパラメータを入力するだけで完了します。外部 IdP 連携や WAF 設定など高度なカスタマイズが必要な場合は [CloudShell を使ったデプロイ](../en/deploy-cloudshell.md#deploy-using-cloudshell) を参照してください。本ページは、Layer 1〜2 のローカル利用や、ローカル CDK を使った開発・デバッグ向けの手順を含みます。
-
-## どのレイヤーを使うべきか
-
-- **Layer 1** — SKILL.md 対応のコーディングエージェント（Claude Code, Codex CLI, Cursor, Kiro, VS Code の GitHub Copilot 等）から使う。Python のみ、MCP や AWS は不要。
-- **Layer 2** — ローカル MCP クライアント（Claude Desktop, Claude Cowork 等）から使う。ローカル stdio MCP 接続、AWS は不要。
-- **Layer 3** — リモート MCP のみ対応のクライアント（Claude.ai Web 版など、ローカルプロセスを起動できないクライアント）から使う。AWS デプロイが必要。
-- **Layer 4** — 同梱のブラウザ Web UI を使う。AWS フルスタックデプロイ。
-
-## 前提条件
-
-すべてのレイヤーで共通:
-
-- Python 3.10 以上
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) パッケージマネージャー
-
-Layer 3〜4 を **ローカル CDK で直接デプロイする場合** は追加で以下が必要です（CloudShell デプロイを使う場合は不要）:
-
-- AWS アカウント（[CDK ブートストラップ](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping.html)済み: `cdk bootstrap aws://ACCOUNT_ID/REGION`）
-- Node.js 18 以上
-- Docker または [Finch](https://github.com/runfinch/finch)（コンテナビルド用）
-- AWS CLI（適切な認証情報を設定済み）
-
----
-
-## Layer 1: エージェントスキル（MCP なし）
-
-最もシンプルな使い方です。`sdpm/` ディレクトリをエージェントのスキルディレクトリにコピーまたは
-symlink します。エージェントは `scripts/pptx_builder.py` 経由でエンジンを呼び出すため、MCP
-サーバーは不要です。
-
-> **Kiro CLI ユーザーの方:** [Layer 2](#layer-2-ローカル-mcp-サーバー) をご覧ください —
-> `make install-kiro` でローカル MCP サーバー（役割文書込み）と、
-> 並列スライド生成用の専用 composer エージェントが設定されます。
+1 コマンドで SDPM が `~/.sdpm` に入ります: git checkout、MCP サーバーの環境、アイコンカタログ、
+`sdpm` ランチャー。同じ checkout がすべての面に使われます — MCP 経由の AI エージェントと、
+必要ならブラウザ用 Web UI。更新するものも削除するものも 1 つです。
 
 ```bash
-# 依存関係のインストール
-cd sdpm
-uv sync
-
-# アイコンのダウンロード（任意、推奨）
-uv run python3 scripts/download_aws_icons.py
-uv run python3 scripts/download_material_icons.py
-
-# 動作確認
-uv run python3 scripts/pptx_builder.py list_templates
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
 ```
 
-エンジン、リファレンス（ワークフロー・ガイド・同梱スタイル）、サンプルテンプレート（dark/light）、SKILL.md がすべて含まれています。
-
----
-
-## Layer 2: ローカル MCP サーバー
-
-spec-driven-presentation-maker を MCP 対応の任意のクライアントに接続します。AWS アカウントは不要です。
-
-### Kiro CLI — make ターゲット 1 つ（推奨）
-
-Kiro CLI では make ターゲット 1 つで完了します — 役割文書は MCP サーバーが配信し、
-並列スライド生成は専用の `sdpm-composer` エージェントが担当します。
-
-```bash
-git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
-cd sample-spec-driven-presentation-maker
-make install-kiro
-kiro-cli chat   # あとは「〜のスライドを作って」と頼むだけ
+```powershell
+# Windows（PowerShell 5.1 / 7。CI での検証のみ）
+irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
 ```
 
-`sdpm` ローカル MCP サーバーを `<KIRO_HOME>/settings/mcp.json`（既定は `~/.kiro`）に登録し、
-skill の入口を `<KIRO_HOME>/skills/` に symlink します。これにより `/sdpm-create`
-`/sdpm-style` `/sdpm-translate` で役割を明示的に選べます。加えて composer エージェントを
-`<KIRO_HOME>/agents/sdpm-composer.json` に生成します — compose ワーカーに sdpm サーバー
-だけを持たせる薄いポインタで、ワーカーごとにプロファイル内の全 MCP サーバーを
-コールドスタートするのを防ぎます。振る舞いの実体は MCP サーバーが配信します。どの役割も入口ツール
-（`start_presentation`、`start_composing` …）から始まり、それが役割文書と最初に要る入力を返します。
-入口も composer エージェントもその呼び出しを指すだけです。
-前提: [`uv`](https://docs.astral.sh/uv/) が `PATH` にあること、プレビュー用に
-**LibreOffice** と **poppler**。
+流れ:
 
-MCP サーバーはこの clone 先から起動するため、**ディレクトリはそのまま置いておいてください**。
-更新は `git pull` だけで十分です。
-別パスへ移動した場合のみ `make install-kiro` を再実行してください。
+1. 依存を確認し、無ければ導入を提案します: `git`、`uv`、そしてスライドプレビュー用の
+   LibreOffice と poppler。プレビューは任意で、無くてもデッキは生成されます。
+2. **「ブラウザ用の Web UI も入れますか？」** — yes なら Node.js 20+ と Kiro CLI（Web UI の
+   エージェント基盤）を入れて UI をビルド、no なら Node.js 不要の MCP のみ構成。
+3. `~/.sdpm/checkout` に clone し、サーバー環境を同期し、AWS / Material のアイコンカタログを取得。
+4. **「<client> に SDPM を登録しますか？」** — マシン上で見つかった MCP クライアントごとに 1 回
+   聞きます。yes と言わない限り何も書きません。最後に次にやることを表示します。
 
-`make` は引数を渡さないので、オプションを使うときはスクリプトを直接呼びます:
+再実行しても既存のインストールを修復するだけで、2 つ目は作りません。
 
-```bash
-uv run python3 clients/kiro/install.py --agent NAME       # 特定のエージェント設定に登録
-uv run python3 clients/kiro/install.py --mode legacy      # Power 自動判定を使わない
-KIRO_HOME=~/.kiro-sdpm-dev make install-kiro              # 別プロファイルに導入
+### インストーラーのオプション
+
+| オプション | 効果 |
+|---|---|
+| `--full` / `--mcp-only` | プロファイルの質問を省く |
+| `--register` / `--no-register` | 検出した全クライアントに登録 / 設定を表示するだけ |
+| `--agent-name NAME` | Kiro CLI エージェントの名前（既定 `sdpm`。`sdpm register` / 状態表示でも使われる） |
+| `--non-interactive` | すべて yes（プロファイルは full） |
+| `--skip-libreoffice`, `--skip-shortcut` | それらを省く |
+| `--deps-only` | `git`・`uv`・LibreOffice・poppler だけ入れる（開発者の checkout 向け） |
+
+環境変数版: `SDPM_PROFILE=full|mcp`、`SDPM_REGISTER=yes|no`、`SDPM_NON_INTERACTIVE=1`、
+`SDPM_HOME`（既定 `~/.sdpm`）、`SDPM_LAUNCHER_DIR`（既定 `~/.local/bin`、Windows は
+`%USERPROFILE%\bin`）。`curl … | bash -s -- --mcp-only` のようにオプションを渡せます。
+
+## `sdpm` ランチャー
+
+```
+sdpm                    状態: 版、プロファイル、入っている面、接続済みクライアント
+sdpm webui              ブラウザ用 Web UI を起動して開く
+sdpm mcp                MCP サーバーを stdio で起動（ターミナルでの動作確認用）
+sdpm register [CLIENT]  MCP クライアントに接続（クライアントごとに確認。--yes, --dry-run）
+sdpm unregister         接続を解除
+sdpm mcp-config [CLIENT]  このマシンのパス入りでクライアント設定を表示（--json, --all）
+sdpm update [--with-webui]  main を取得して同期し、入っているものを再ビルド（Web UI の追加も）
+sdpm doctor             環境チェック
+sdpm uninstall          ~/.sdpm・ランチャー・ショートカットを削除。登録解除も提案
 ```
 
-`sdpm` の MCP 登録や skill symlink を**別のチェックアウトが所有している**場合、
-インストーラーは動いている設定を書き換えず、検出内容を一覧表示して停止します。
-別の `KIRO_HOME` に入れる、他方の配線を自分で削除する、あるいは意図的に奪うなら
-`--replace-existing` を指定してください。
+ランチャーは全 OS で同じです。`sdpm mcp` は人間用で、クライアントに渡す設定は `uv` と
+checkout を直接指します（次節）。
 
-### Kiro IDE — Power として導入
+## AI エージェントから使う（MCP）
 
-リポジトリのルートは [Agent Plugins](https://agent-plugins.org) パッケージ
-（`plugin.json` + `mcp.json` + `skills/`）で、これは Kiro Powers が使う形式そのものです。
-Kiro IDE からこのチェックアウトを Power として導入してください。Powers はグローバル
-スコープで、同梱 MCP サーバーは Kiro が内部管理するため `~/.kiro/settings/mcp.json` への
-書き込みは不要です。
+`sdpm register` は各クライアント自身の CLI で（Kiro CLI は SDPM が所有するエージェントファイルを
+作って）接続するので、既存の設定ファイルを手で編集しません:
 
-Power と上記の Kiro CLI 配線は同じパッケージへの 2 経路で、同時に有効にすべきではありません。
-Powers にはプロジェクトスコープが無いため、分離はプロファイルで行います — CLI インストーラーは
-Power を入れた `KIRO_HOME` とは別のプロファイルで実行してください。Power が既に在る
-プロファイルで `make install-kiro` を実行すると、インストーラーは追加ではなく
-自分が作った旧配線の削除を行います。
+| クライアント | `sdpm register` がすること |
+|---|---|
+| Kiro CLI | 専用エージェント `~/.kiro/agents/sdpm.json` を書く（MCP サーバー、ツール、並列 composer のための `@sdpm` と `use_subagent` の信頼設定。prompt テキストは無し）— `kiro-cli chat --agent sdpm` か `/agent sdpm` で開始。他のセッションには何も足さない。`--agent-name` で別名、自作のエージェントファイルには触れない |
+| Claude Code | `claude mcp add --scope user sdpm -- …`。composer は Claude Code のサブエージェントとして動き、サーバーを継承します。sdpm ツールの承認は 1 回（「今後確認しない」）か、`claude --allowedTools "mcp__sdpm__*"` で起動。インストーラー以前の plugin `sdpm@sdpm` が残っていれば `sdpm register` が `claude plugin uninstall` を提案します — 残すと全ツールが二重に見えます |
+| Visual Studio Code | `code --add-mcp …` |
+| Codex（CLI / IDE 拡張 / ChatGPT デスクトップアプリ） | `codex mcp add sdpm -- …` |
+| Cursor | 実パスで組み立てた `cursor://…/mcp/install` deep link を開く — 1 クリック。サブエージェント機構の無いクライアントでは 1 エージェントがグループごとに順に composer 役をこなします（役割文書に明記） |
+| Kiro IDE、その他 | JSON と書き込み先ファイルを表示（Kiro IDE は `~/.kiro/settings/mcp.json`） |
+| Claude Desktop | 代わりに [`sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) をダブルクリック |
 
-### Codex — プラグインとして導入
-
-チェックアウトには Codex 用マニフェスト（`.codex-plugin/plugin.json`）、同梱 MCP サーバー
-定義（`.mcp.json`）、リポジトリ marketplace（`.agents/plugins/marketplace.json`）が含まれる
-ため、`config.toml` を手で編集せずに導入できます:
-
-```bash
-codex plugin marketplace add ./     # チェックアウト内で実行
-```
-
-そのあと ChatGPT デスクトップアプリでこの marketplace から
-`spec-driven-presentation-maker` を導入し、新しい会話を開始してください。Codex は
-プラグインを `~/.codex/plugins/cache/…` にコピーするため、MCP サーバーの Python 環境は
-チェックアウト内ではなくプラグインの書き込み可能データディレクトリに作られます。
-
-### その他の MCP クライアント — 手動セットアップ
-
-#### サーバーの起動
-
-```bash
-cd servers/local
-uv sync
-uv run python server.py
-```
-
-#### MCP クライアントの設定
-
-クライアントの MCP 設定ファイル（`claude_desktop_config.json`、`.vscode/mcp.json` 等）に以下を追加します。
+どの設定も同じ 1 行で、絶対パスです:
 
 ```json
 {
   "mcpServers": {
-    "spec-driven-presentation-maker": {
-      "command": "uv",
-      "args": ["run", "--directory", "/absolute/path/to/servers/local", "python", "server.py"]
+    "sdpm": {
+      "command": "/Users/you/.local/bin/uv",
+      "args": ["run", "--directory", "/Users/you/.sdpm/checkout/servers/local", "python", "server.py"]
     }
   }
 }
 ```
 
-#### 動作確認
+絶対パスが重要です: Dock やスタートメニューから起動した GUI クライアントはシェルの `PATH` を
+引き継ぎません。Kiro CLI では同じブロックがエージェントファイルの中にあります。旧構成でグローバル
+`~/.kiro/settings/mcp.json` に SDPM が入っている場合、`sdpm register kiro-cli` がその項目（全セッションに
+ツールが載る）と、旧インストーラーが生成した `sdpm-composer` エージェントの削除を提案します。`sdpm mcp-config` があなたのパスを埋めたこのブロックを表示するので、上の表に
+無いクライアントにはそのまま貼ります。
 
-エージェントに「プレゼンテーションを作って」と依頼してください。以下のワークフローが自動的に実行されます。
+あとはエージェントにスライドを頼むだけです。最初に呼ばれる `start_presentation` が、作業を導く
+役割文書と使えるスタイル・テンプレートを返します — MCP サーバーだけで完全な構成です。モードを
+明示するにはサーバーの prompt を使います: `sdpm-vibe`（素材から質問なし）、`sdpm-spec`（対話で
+構成を固める）、`sdpm-style`、`sdpm-translate`（Claude Code `/mcp__sdpm__sdpm-vibe`、VS Code
+`/mcp.sdpm.sdpm-vibe`、Kiro CLI `/sdpm-vibe`）。
 
-1. MCP Server Instructions からワークフローファイルを読み取り
-2. トピック・対象者・目的についてヒアリング
-3. ブリーフィング → アートディレクション → アウトラインを設計し、`specs/` に永続化（スタイルの Message & Outline がデッキ長・密度・タイトル文法を決めるため、アウトラインより先にスタイルを選ぶ）
-4. スライドを 1 枚ずつ構築
-5. PPTX を生成し、プレビューを表示
+スライドプレビューには LibreOffice と poppler が必要です。無くてもデッキは生成され、ビルド結果に
+`preview: {"status": "unavailable", "install": "…"}` として OS 別の導入コマンドが載り、
+エージェントがそれを伝えます。アイコンカタログが何らかの理由で無い場合は、サーバー初回起動時に
+バックグラウンドで取得されます。
 
-利用可能なツールの一覧は[アーキテクチャ — MCP ツール一覧](../en/architecture.md#mcp-tool-reference)を参照してください。
+## ブラウザから使う（Web UI）
 
----
+`sdpm webui` は Web UI をローカルモードで起動して開きます — `http://localhost:3000` の Next.js が
+Kiro CLI と ACP で話します。初回の前に `kiro-cli login` を 1 度実行してください。インストーラーは
+デスクトップショートカットも作ります。MCP のみ構成に Web UI を後から足すには
+`sdpm update --with-webui`。詳細: [Web UI ローカルモード](../../web-ui/README_ja.md#local-mode)。
 
-## Layer 3: リモート MCP サーバー（AWS）
+## AWS にデプロイする
+
+チーム向けのリモート MCP サーバーまたはホスト型 Web UI には
+[ワンクリックデプロイ](../en/deploy-cloudshell.md#one-click-deploy-recommended)を使用してください。
+推奨経路は AWS CloudShell から実行でき、ローカルの CDK / Docker は不要です。開発・デバッグ用の
+直接 CDK 手順は[開発者向けセットアップ](#開発者向けセットアップ)にあります。
+
+## 開発者向けセットアップ
+
+`~/.sdpm/checkout` ではなく自分の clone で作業するコントリビューター向け。
+
+### checkout からローカル MCP サーバー
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --deps-only
+git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
+cd sample-spec-driven-presentation-maker
+uv sync
+(cd servers/local && uv sync)
+uv run python3 sdpm/scripts/download_aws_icons.py
+uv run python3 sdpm/scripts/download_material_icons.py
+make smoke        # ローカルサーバーに tools/list + start_presentation
+```
+
+インストール版と自分の clone は**両方持って**構いません。`~/.sdpm` はユーザーが動かすもの、clone は
+あなたが変更するもの。クライアントには clone を**インストール版の隣に**登録します:
+
+```bash
+make register-dev              # Kiro CLI: エージェント `sdpm-dev` → この checkout。他はクライアントごとに確認
+make register-dev AGENT=sdpm-x CLIENTS=kiro-cli   # worktree ごとに 1 エージェント、1 クライアントだけ
+make mcp-config-dev            # この checkout 用の設定を表示するだけ
+```
+
+`kiro-cli chat --agent sdpm-dev` で作業ツリー、`--agent sdpm` でインストール版が動きます。Web UI は登録不要です:
+`servers/local` を自分の `web-ui/` からの相対で解決するので、`cd web-ui && npm run dev:local` で clone の
+サーバーと ACP エージェントがホットリロード付きで動きます（`sdpm webui` が 3000 を使っていれば `PORT=3001`。
+逆にインストール版を動かすなら `SDPM_WEBUI_PORT`）。
+
+| | インストール版（ユーザーが使うもの） | 自分の clone |
+|---|---|---|
+| MCP（Kiro CLI） | `kiro-cli chat --agent sdpm` | `make register-dev` → `--agent sdpm-dev` |
+| Web UI | `sdpm webui` | `cd web-ui && npm run dev:local` |
+| 更新 | `sdpm update` | `git pull` — 編集は次のセッションから反映 |Claude Code の
+`--scope user` はスコープ内でサーバー名が 1 つなので、clone はプロジェクトスコープの登録か
+`claude --mcp-config …` のアドホック設定にし、user スコープの `sdpm` は置き換えないでください。
+
+### MCP を使わないエージェントスキル
+
+`sdpm/SKILL.md` は MCP 非対応のエージェント向けに CLI（`sdpm/scripts/pptx_builder.py`）を直接
+操作します。`sdpm/` をエージェントの skills ディレクトリにコピーまたはシンボリックリンクすれば、
+エンジン・参照資料・テンプレートがすべて含まれています。アーキテクチャ上の成果物であり、
+推奨経路ではありません。
+
+### リモート MCP サーバー（AWS）
 
 spec-driven-presentation-maker を Amazon Bedrock AgentCore Runtime 上のリモート MCP サーバーとしてデプロイします。
 
 > **💡 AWS へのデプロイは [推奨デプロイ手順](../en/deploy-cloudshell.md) を推奨します。**
 > `scripts/deploy.sh` は CloudShell と任意のローカル Linux/macOS から実行でき、CodeBuild 経由でデプロイされるため CDK/Docker のローカルインストールが不要です。本ページ以降の手順はローカル CDK を直接使う開発・デバッグ向けフローです。
 
-### 設定
+#### 設定
 
 ```bash
 cd infra
@@ -187,7 +188,7 @@ cp config.example.yaml config.yaml
 
 `config.yaml` を編集して、デプロイするスタックを選択します。
 
-#### Layer 3 — MCP Server のみ（最小構成）
+##### MCP Server のみ（最小構成）
 
 ```yaml
 stacks:
@@ -200,7 +201,7 @@ features:
   enableInvocationLogging: false  # Bedrock Model Invocation Logging（任意）
 ```
 
-### デプロイ
+#### デプロイ
 
 ```bash
 # Docker Desktop 使用時
@@ -215,7 +216,7 @@ CDK_DOCKER=finch npx cdk deploy --all --require-approval never
 
 デプロイには 15〜30 分程度かかります。
 
-#### モデル ID の変更
+##### モデル ID の変更
 
 デフォルトでは `global.anthropic.claude-sonnet-4-6` が使用されます。別のモデルを使う場合は `infra/config.yaml` を編集:
 
@@ -230,21 +231,21 @@ model:
 npx cdk deploy --all --context modelId=global.anthropic.claude-opus-4-6-v1
 ```
 
-### デプロイされるスタック（Layer 3）
+#### デプロイされるスタック
 
 | スタック | リソース |
 |---------|---------|
 | SdpmData | Amazon DynamoDB テーブル、S3 バケット（pptx + リソース）、リファレンスファイルを S3 にデプロイ |
 | SdpmRuntime | Amazon Bedrock AgentCore Runtime エンドポイント、ECR リポジトリ + Docker イメージ、Amazon Cognito M2M 認証 |
 
-### テンプレートの登録
+#### テンプレートの登録
 
 CDK はテンプレートファイルを S3 にデプロイしますが、`list_templates` で表示するには Amazon DynamoDB への登録が必要です。
-詳細は[カスタムテンプレート — テンプレートの登録（Layer 3）](../en/custom-template.md#layer-3-remote-mcp)を参照してください。
+詳細は[カスタムテンプレート — テンプレートの登録](../en/custom-template.md#layer-3-remote-mcp)を参照してください。
 
-### デプロイの確認
+#### デプロイの確認
 
-#### OAuth トークンの取得
+##### OAuth トークンの取得
 
 ```bash
 TOKEN=$(curl -s -X POST \
@@ -257,7 +258,7 @@ TOKEN=$(curl -s -X POST \
 
 `CognitoDomain`、`M2MClientId`、`M2MClientSecret` は CDK 出力から取得してください。
 
-#### tools/list の呼び出し
+##### tools/list の呼び出し
 
 ```bash
 ENCODED_ARN=$(python3 -c "import urllib.parse; print(urllib.parse.quote('<RuntimeArn>', safe=''))")
@@ -274,9 +275,9 @@ curl -X POST \
 
 ---
 
-## Layer 4: フルスタック（AWS）
+### フルスタック（AWS）
 
-> **💡 推奨:** Layer 4 のデプロイは [推奨デプロイ手順](../en/deploy-cloudshell.md) を利用してください（CloudShell と任意のローカル Linux/macOS で動作）。`./scripts/deploy.sh --region us-east-1` を実行するだけで、CDK/Docker のローカルインストールは不要です。
+> **💡 推奨:** フルスタックのデプロイは [推奨デプロイ手順](../en/deploy-cloudshell.md) を利用してください（CloudShell と任意のローカル Linux/macOS で動作）。`./scripts/deploy.sh --region us-east-1` を実行するだけで、CDK/Docker のローカルインストールは不要です。
 
 `config.yaml` で `agent` と `webUi` を有効にしてデプロイすると、以下が追加されます。
 
@@ -284,7 +285,7 @@ curl -X POST \
 - React Web UI（チャットインターフェース + デッキプレビュー）
 - JWT Bearer 認証（デフォルト Amazon Cognito、任意の OIDC IdP に対応）
 
-### 設定
+#### 設定
 
 ```yaml
 stacks:
@@ -301,7 +302,7 @@ features:
 npx cdk deploy --all
 ```
 
-### デプロイされるスタック（Layer 4 追加分）
+#### フルスタックで追加されるリソース
 
 | スタック | リソース |
 |---------|---------|
@@ -309,15 +310,15 @@ npx cdk deploy --all
 | SdpmAgent | Strands Agent（Amazon Bedrock AgentCore Runtime 上）、ECR イメージ |
 | SdpmWebUi | S3 バケット、Amazon CloudFront ディストリビューション、Amazon API Gateway、Lambda |
 
-### 認証オプション
+#### 認証オプション
 
-#### デフォルト: Amazon Cognito User Pool
+##### デフォルト: Amazon Cognito User Pool
 
 `agent` または `webUi` を有効にすると、CDK が Amazon Cognito User Pool（ホスト UI 付き）を自動作成します。ユーザーは Web UI からサインインし、JWT がスタック全体に伝播されます。
 
 認証・認可モデルの設計詳細は[アーキテクチャ — 認証・認可モデル](../en/architecture.md#authentication-and-authorization-model)を参照してください。
 
-#### 外部 OIDC IdP
+##### 外部 OIDC IdP
 
 自社の IdP（Entra ID、Auth0、Okta 等）を使う場合:
 
@@ -325,7 +326,7 @@ npx cdk deploy --all
 2. `config.yaml` に `oidcDiscoveryUrl` と `allowedClients` を設定
 3. Runtime の `customJwtAuthorizer` が OIDC 準拠の任意の発行者からの JWT を検証
 
-### デプロイ後のエンドポイント確認
+#### デプロイ後のエンドポイント確認
 
 デプロイスクリプトのログ監視が途中で中断した場合や、後からエンドポイントを確認したい場合は以下を実行してください。
 
@@ -335,7 +336,7 @@ bash scripts/show_endpoints.sh
 
 デプロイ済みの CloudFormation スタックから CloudFront URL と Cognito サインアップ URL を表示します。
 
-### Web UI の更新
+#### Web UI の更新
 
 Web UI のコードを変更した場合、フル CDK デプロイなしで更新できます。
 
@@ -348,6 +349,7 @@ bash scripts/deploy_webui.sh
 スタック構成を変更した場合は `npx cdk deploy SdpmWebUi` を実行してください。
 
 ---
+
 
 ## オプション機能
 

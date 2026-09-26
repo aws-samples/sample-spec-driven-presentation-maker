@@ -45,6 +45,32 @@ Entries before v0.5.0 were written retroactively as summaries.
 - `SDPM_DISABLE_INSTRUCTIONS=1` serves no MCP server instructions — nothing
   depends on them any more; the entry tools' own descriptions carry the routing.
 
+- **One installer, one launcher.** `install.sh` / `install.ps1` install SDPM into
+  `~/.sdpm` once — dependencies, checkout, MCP server environment, icon catalogs — and
+  create the `sdpm` launcher. The installer asks two questions: whether to add the browser
+  Web UI (`--full` / `--mcp-only`; MCP-only needs no Node.js) and which detected MCP
+  clients to connect (`--register` / `--no-register`). `sdpm webui` starts the Web UI,
+  `sdpm mcp` runs the server on stdio, `sdpm register` / `unregister` / `mcp-config`
+  connect clients through their own CLIs — Claude Code, VS Code, Codex — or open Cursor's
+  deep link built with the real paths; other clients get the JSON and the file it belongs
+  in. Kiro CLI gets a dedicated `sdpm` agent (`~/.kiro/agents/sdpm.json`: the MCP server,
+  trusted `@sdpm` / `use_subagent`, sub-agents restricted to itself, no prompt text) instead
+  of an entry in the global `mcp.json` — nothing is added to other sessions, and composers
+  need no approval per `run_python`. `sdpm register kiro-cli` also detects the old
+  installer's `sdpm-composer` agent, skill links and global `mcp.json` entry and offers to
+  remove them; a user-authored agent of the same name is left alone. `sdpm` alone shows status; `sdpm update
+  [--with-webui]` upgrades both surfaces; `sdpm uninstall` removes everything. Client
+  detection, configuration and registration live once in
+  `servers/local/client_config.py`; both launchers delegate to it. Every client
+  configuration points at the absolute `uv` and checkout paths (GUI apps do not inherit
+  `PATH`). Same command set on macOS, Linux and Windows (Windows verified in CI only).
+- **Previews report what is missing, once, where it matters.** When LibreOffice or
+  poppler is absent, the build result carries `preview: {"status": "unavailable",
+  "missing": [...], "install": "<one command for this OS>"}` and the deck still builds;
+  nothing else nags. Icon catalogs missing for any reason are fetched in the background on
+  the server's first start (`SDPM_AUTO_INSTALL_ASSETS=0` opts out), and `search_assets`
+  reports a missing or in-progress catalog instead of exiting the process.
+
 - **Bundled styles re-organised into two tiers** — an *orthodox* tier for when
   looks do not matter (`report`, `briefing`, `aws-light`, `aws-dark`) and a
   *concept* tier chosen by look (added in phases, listed below). The previous
@@ -153,6 +179,20 @@ Entries before v0.5.0 were written retroactively as summaries.
   shows the source session. The orchestrator workflow gained a `Continued
   from:` paragraph defining that first reply.
 
+### Removed
+
+- **The plugin layer, skills and the Kiro installer.** `plugin.json` + `mcp.json` (Agent
+  Plugins / Kiro Power), `.claude-plugin/`, `.codex-plugin/` + `.mcp.json`, `skills/`, the
+  `sdpm-composer` Claude Code agent, `clients/kiro/install.py` and `make install-kiro`.
+  Since the `start_*` entry tools (#394) and the `sdpm-*` prompts (#395) nothing has to be
+  placed on the agent side; these only wrapped one MCP server line in vendor manifests
+  and carried three extra copies of the version. The `uvx --from git+https://…` path and
+  its generated snippets are removed with them: PyPI is unavailable to this repository,
+  the git URL followed `main` yet was frozen by uv's cache, and it gave a user who also
+  installed the Web UI a second copy of the server. Migration: run the installer once and
+  see `docs/en/migration-onboarding.md`. The Claude Desktop `.mcpb` bundle stays
+  (now built from `scripts/mcpb/`).
+
 ### Fixed
 
 - `grid` accepts `rows` / `columns` given as an int (`"rows": 1`) or a token list;
@@ -246,6 +286,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 - **Orchestrator writes the style before the outline** (brief → style → outline):
   a style's Message & Outline part fixes deck length, density, title grammar and
   chapter shape, so an outline written first had to be rewritten.
+- **Onboarding now starts with two equal entry points** — the README and Getting Started
+  ask whether to use the full browser experience or the AI agent already installed, then
+  provide a one-action path. Layer terminology moved out of setup instructions and remains
+  in the architecture reference. The Web UI Local mode is no longer labeled experimental.
+- **`sdpm-skill` now builds with hatchling** — source distributions and wheels include the
+  runtime knowledge, templates, and shared support code required by checkout-free `uvx`
+  execution.
 - **Off-screen slides are always drawn in their final state** — the
   agent-cursor animation now plays only for a live update on the slide you are
   looking at. A change that lands on a slide out of view is drawn immediately
