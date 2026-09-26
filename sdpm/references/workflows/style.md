@@ -31,13 +31,21 @@ Every style has the same parts in the same order, so a composer knows where to l
 | 1 Cover | The style's own cover slide. **Always the first `.slide`** — the gallery shows it as the thumbnail. |
 | 2 Rules | Read first by agents. The design decision (who reads this, in what setting, under what constraint) and DO / DON'T lists that **follow from it**. |
 | 3 Message & Outline | What the orchestrator reads before writing the outline: title grammar (assertion sentence, noun phrase, single word…), one claim per slide, lead-in and closing conventions, density per slide, chapter shape (agenda tracker, section dividers, summary first…), which visual forms this style favours. The style states per-slide density and chapter shape, but **deck length is not the style's decision**: it follows the brief and material (audience, time, takeaway). |
-| 4 Palette | Swatches with usage rules: which colour means what, how many accents on one slide, text colour on each fill. |
-| 5 Typography | The size ramp at real size, each row labelled with token name / pt / line height, plus rules (max lines per title, when to use each size). |
-| 6 Frame | The elements repeated on every slide — title band, section label, section divider, agenda tracker, closing slide — built exactly as composers should build them. |
-| 7 Patterns | 8–12 finished slides showing how *this* style builds the recurring slide types: numbers, comparison, process / flow, relationship (cycle, hierarchy), 2 / 3 / 4 columns, text-heavy (bullets, paragraph), table, chart conventions, before / after, and whatever the style is specifically for (swimlane, journey map, code, dashboard). Each pattern slide carries an HTML comment saying **why** it is built this way. |
+| 4 Palette & Type | One or two slides. Each colour as a small chip with its token name and its job (which colour means what, how many accents on one slide, text colour on each fill); the size ramp at real size, one row per `--fs-*` token with pt / line height and when to use it (max lines per title). Values live in `:root` — do not restate them in prose. |
+| 5 Frame | The elements repeated on every slide — title band, section label, section divider, agenda tracker, closing slide — built exactly as composers should build them. **Shown here once**; later parts do not repeat it. |
+| 6 Components | The parts *this* style builds slides from, each shown alone at real size on a few sheet slides: its card or panel (or what replaces cards when the style has none), callout / takeaway line, step and connector, metric block, label / tag, table treatment, chart conventions (series colours, highlight, direct labels, baseline), icon treatment — whatever the style uses, and only that. Each component is preceded by an HTML comment: its class name, when to use it, what may vary and what may not. |
+| 7 Layouts | 5–8 wireframes of how this style divides a slide: one `.el frame-ghost` box marking the area Part 5's frame occupies, then named `.el region` boxes — the same short names the layout pass writes (`body`, `left` / `right`, `step-1`…, `media`, `takeaway`) — each labelled with the components that fill it (`step ×4 + connector`). Cover the recurring slide types (single body, comparison, 3 / 4 columns, process, media beside text, table or chart with takeaway) and what the style is for (swimlane, dashboard, code). Each layout's comment says which kind of claim it serves and what may vary. |
+| 8 Showcase | 2–3 finished slides combining components in layouts, frame included — the style's most characteristic slides. They are what a person sees in the gallery. |
 
-Fill every part. A style with a good palette and no Part 7 gives the composer nothing to
-follow, and the deck ends up in the composer's default look.
+Fill every part. Components and Layouts are what keep a deck in this style's look instead of
+the composer's default; the palette alone does not.
+
+**One fact in one place.** Token values live in `:root`, the frame in Part 5, each component in
+Part 6, region sets in Part 7. A later part refers to an earlier one by class name instead of
+rebuilding it. Everything in the file is either read as an instruction or copied as
+geometry, so leave out what is neither: invented body text and sources, captions that repeat
+the comment, div-drawn charts (charts are native — state their conventions in Part 6), notes
+explaining the demo.
 
 ## Token contract
 
@@ -107,8 +115,8 @@ The demo slides are read as coordinates, so the format is constrained:
   warn about it in every style. The only renderer facts worth stating are limits a composer
   cannot infer (native tables inherit the template font; slide JSON has no letter-spacing,
   line-height or intermediate font weights).
-- **Comment the patterns.** Each Part 7 slide has an HTML comment: what slide type it is,
-  why the elements are arranged this way in this style, what to vary and what not to.
+- **Comment components and layouts.** Each Part 6 component and Part 7 layout has an HTML
+  comment: what it is for, why it is built this way in this style, what to vary and what not to.
 - Keep text on demo slides as placeholder content ("Claim of this slide stated as a sentence",
   "Step 1 — verb phrase"), not real content from any deck.
 
