@@ -11,6 +11,18 @@ global_settings:
       reason: "Local agent specs/steering — not shipped code, gitignored"
 
   suppressions:
+    # --- Bundled styles: inline SVG icon symbols ---
+    # The aws-* styles embed official AWS architecture icons as inline <symbol>s (the
+    # gallery renders each style standalone, so assets cannot be linked). Their long
+    # path data trips the base64 entropy detector; it is vector geometry, not a secret.
+
+    - rule_id: "SECRET-BASE64-HIGH-ENTROPY-STRING"
+      path: "sdpm/references/examples/styles/aws-*.html"
+      reason: >
+        Inline SVG path data of official AWS architecture icons copied from the asset
+        catalog (search_assets names). Vector geometry, not credentials.
+      expiration: "2027-09-27"
+
     # --- CFn Custom Resource: urlopen to pre-signed ResponseURL ---
     # Standard pattern for CloudFormation custom resources.
     # The URL is the CFn-provided ResponseURL, not user-controlled.
