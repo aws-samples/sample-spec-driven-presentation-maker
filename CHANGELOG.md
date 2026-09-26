@@ -240,22 +240,21 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
-- **Bundled styles teach components and layouts, at 60% of their former size.** The style
-  skeleton is now Parts 0–8: Palette and Typography merge into one part, the frame is built
-  once in Part 5, and the old Part 7 of finished pattern slides becomes Part 6 **Components**
-  (this style's own parts, each commented: when to use, what may vary), Part 7 **Layouts**
-  (wireframes of named regions, the same names the layout pass writes) and Part 8
-  **Showcase** (two or three finished slides for the gallery). Invented sources, captions
-  that repeated the comments, div-drawn charts and per-slide frame copies are gone. The 15
-  files total 499k characters instead of 829k — every composer receives the whole file, so
-  this is paid once per composer. Tokens and `<title>` descriptions are unchanged, so decks
-  already built and user styles in the old skeleton keep working. The layout pass now takes
-  its regions from the style's Layouts. Components are named by **role** from one vocabulary
-  in the style workflow (`container`, `selected`, `takeaway`, `numbered`, `metric`, `step` +
-  `connector`, `tag`, `table`, `chart` required; `phase`, `hub`, `axis`, `brace`, … optional),
-  so every style answers "how does this style do a comparison part" in the same place; a style
-  that does without a role says what it uses instead. Non-rectangular parts use
-  `.shape-<json shape name>` classes drawn with `clip-path`.
+- **A style is now a short deck about itself, built in itself.** The bundled styles drop their
+  specimen parts — palette and type-ramp sheets, the finished-pattern Part 7, per-slide frame
+  copies — and become Cover → Rules → Message & Outline → Patterns → Closing, every slide a real
+  slide of the style at the style's **own density** (a `<!-- Density: N -->` marker the
+  contract test enforces on every slide). What the gallery shows is what a deck in that style
+  looks like, and composers no longer copy cramped reference slides. Palette and size usage
+  live in comments beside the `:root` tokens; frames, components and patterns are commented
+  where they first appear. Components are named by **role** from one vocabulary in the style
+  workflow (`container`, `selected`, `takeaway`, `numbered`, `metric`, `step`, `connector`,
+  `tag`, `table`, `chart` required; `phase`, `hub`, `axis`, … optional); each pattern slide
+  (`comparison`, `columns`, `process`, `metric`, `table`, `chart` required) is built as the
+  pattern it explains and names its regions for the layout pass. Non-rectangular parts use
+  `.shape-<json shape name>` classes drawn with `clip-path`. The 15 files total 496k characters
+  instead of 829k. Tokens and `<title>` descriptions are unchanged, so decks already built and
+  user styles in the old skeleton keep working.
 
 - **`start_presentation` / `start_style` return every style, `pinned` flagged.**
   The pin filter is a gallery concern; the role picking a style sees the whole
