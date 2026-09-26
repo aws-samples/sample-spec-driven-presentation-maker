@@ -19,7 +19,7 @@ one local installation serves every client and the browser Web UI.
    | Claude Code plugin `sdpm@sdpm` | `/plugin uninstall sdpm@sdpm` |
    | Claude Code `claude mcp add … uvx …` | `claude mcp remove sdpm` (then `sdpm register claude-code`) |
    | Codex plugin | remove it in the ChatGPT desktop app; `codex mcp remove sdpm` if you added the uvx entry |
-   | Kiro CLI `make install-kiro` (agent `sdpm-composer`, `mcp.json` entry pointing at a checkout) | `kiro-cli mcp remove --scope global --name sdpm`; delete `~/.kiro/agents/sdpm-composer.json`; then `sdpm register kiro-cli` |
+   | Kiro CLI `make install-kiro` (agent `sdpm-composer`, `skills/sdpm-*` links, `mcp.json` entry pointing at a checkout) | `sdpm register kiro-cli` — it overwrites the `sdpm` entry and offers to delete the leftover agent and skill links. **Do this**: a stale `sdpm-composer` agent makes the orchestrator dispatch to a sub-agent that can no longer start. `sdpm` (status) warns while they exist |
    | Kiro IDE Power | uninstall the Power in Kiro IDE; `sdpm register kiro-cli` covers Kiro IDE too |
    | Cursor / VS Code `uvx` entry | delete the `sdpm` entry from `~/.cursor/mcp.json` / the VS Code MCP user configuration, then `sdpm register` |
    | A `skills/sdpm-*` directory copied into an agent | delete it — the `sdpm-*` prompts replaced the skills |

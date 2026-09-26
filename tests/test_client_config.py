@@ -155,3 +155,50 @@ def test_missing_client_executable_is_a_failure_not_a_traceback(monkeypatch, cap
     assert failures == 1
     err = capsys.readouterr().err
     assert "codex" in err and "manually" in err
+
+
+def test_kiro_leftovers_detects_only_our_files(tmp_path):
+    (tmp_path / "agents").mkdir()
+    (tmp_path / "skills").mkdir()
+    (tmp_path / "agents" / "sdpm-composer.json").write_text('{"name": "sdpm-composer", "mcpServers": {"sdpm": {}}}')
+    (tmp_path / "agents" / "other.json").write_text('{"name": "other"}')
+    (tmp_path / "skills" / "sdpm-composer").symlink_to(tmp_path / "nowhere")
+    (tmp_path / "skills" / "sdpm-style").mkdir()
+    (tmp_path / "skills" / "sdpm-style" / "SKILL.md").write_text("x")
+    (tmp_path / "skills" / "unrelated").mkdir()
+    found = {p.name for p in cc.kiro_leftovers(tmp_path)}
+    assert found == {"sdpm-composer.json", "sdpm-composer", "sdpm-style"}
+
+
+def test_kiro_leftovers_ignores_foreign_agent_of_same_name(tmp_path):
+    (tmp_path / "agents").mkdir()
+    (tmp_path / "agents" / "sdpm-composer.json").write_text('{"name": "something-else"}')
+    assert cc.kiro_leftovers(tmp_path) == []
+
+
+def test_register_kiro_offers_and_removes_leftovers(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    (tmp_path / "agents").mkdir()
+    agent = tmp_path / "agents" / "sdpm-composer.json"
+    agent.write_text('{"name": "sdpm-composer"}')
+    cc.register([cc.by_id("kiro-cli")], POSIX, assume_yes=True, run=lambda _a: 0)
+    assert not agent.exists()
+    assert "previous Kiro installer" in capsys.readouterr().out
+
+
+def test_register_kiro_dry_run_keeps_leftovers(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    (tmp_path / "agents").mkdir()
+    agent = tmp_path / "agents" / "sdpm-composer.json"
+    agent.write_text('{"name": "sdpm-composer"}')
+    cc.register([cc.by_id("kiro-cli")], POSIX, dry_run=True, run=lambda _a: 0)
+    assert agent.exists()
+    assert "[dry-run] remove" in capsys.readouterr().out
+
+
+def test_unregister_kiro_removes_leftovers(tmp_path, monkeypatch):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    (tmp_path / "skills").mkdir()
+    (tmp_path / "skills" / "sdpm-create").symlink_to(tmp_path / "gone")
+    cc.unregister([cc.by_id("kiro-cli")], run=lambda _a: 0)
+    assert not (tmp_path / "skills" / "sdpm-create").is_symlink()

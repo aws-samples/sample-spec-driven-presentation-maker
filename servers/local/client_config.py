@@ -215,6 +215,62 @@ def detect(candidates: Optional[list[str]] = None) -> list[Client]:
 
 
 # ---------------------------------------------------------------------------
+# Leftovers of the previous Kiro installer (make install-kiro, removed in v0.10)
+# ---------------------------------------------------------------------------
+
+_LEGACY_SKILLS = ("sdpm-create", "sdpm-composer", "sdpm-style", "sdpm-translate")
+
+
+def kiro_home() -> Path:
+    env = os.environ.get("KIRO_HOME")
+    return Path(env).expanduser() if env else _home() / ".kiro"
+
+
+def kiro_leftovers(root: Optional[Path] = None) -> list[Path]:
+    """Files the old installer wrote that now break sub-agent dispatch.
+
+    ``agents/sdpm-composer.json`` points its prompt at ``skills/sdpm-composer/SKILL.md``,
+    which no longer exists, and its MCP entry at a checkout that may be gone — yet its name
+    makes an orchestrator pick it over a working general-purpose sub-agent. Only entries
+    that are recognisably ours are reported.
+    """
+    root = root or kiro_home()
+    found: list[Path] = []
+    agent = root / "agents" / "sdpm-composer.json"
+    if agent.is_file():
+        try:
+            text = agent.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            text = ""
+        if "sdpm" in text:
+            found.append(agent)
+    for name in _LEGACY_SKILLS:
+        entry = root / "skills" / name
+        if entry.is_symlink() or (entry.is_dir() and (entry / "SKILL.md").exists()):
+            found.append(entry)
+    return found
+
+
+def remove_leftovers(paths: list[Path], *, dry_run: bool = False) -> None:
+    for path in paths:
+        print(("[dry-run] remove " if dry_run else "removed ") + str(path))
+        if dry_run:
+            continue
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+        else:
+            shutil.rmtree(path, ignore_errors=True)
+
+
+def leftover_notice(paths: list[Path]) -> str:
+    lines = ["Found files from the previous Kiro installer (make install-kiro):"]
+    lines += [f"  {p}" for p in paths]
+    lines.append("They point at files that no longer exist and make an orchestrator pick a broken")
+    lines.append("sub-agent named sdpm-composer. Nothing in SDPM needs them any more.")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Rendering
 # ---------------------------------------------------------------------------
 
@@ -317,6 +373,8 @@ def register(
             if not dry_run and run(argv) != 0:
                 failures += 1
                 print(f"  failed — you can add it manually:\n{render_client(client, target)}", file=sys.stderr)
+            if client.id == "kiro-cli":
+                _offer_leftover_cleanup(dry_run=dry_run, assume_yes=assume_yes)
         elif client.deeplink is not None:
             url = client.deeplink(target)
             print(("[dry-run] open " if dry_run else "Opening ") + url)
@@ -325,9 +383,30 @@ def register(
     return failures
 
 
+def _print_leftover_warning() -> None:
+    leftovers = kiro_leftovers()
+    if leftovers:
+        print()
+        print("  ! " + leftover_notice(leftovers).replace("\n", "\n    "))
+        print("    Remove with: sdpm register kiro-cli   (or sdpm unregister kiro-cli)")
+
+
+def _offer_leftover_cleanup(*, dry_run: bool, assume_yes: bool) -> None:
+    leftovers = kiro_leftovers()
+    if not leftovers:
+        return
+    print(leftover_notice(leftovers))
+    if dry_run or assume_yes or _confirm("Remove them?"):
+        remove_leftovers(leftovers, dry_run=dry_run)
+
+
 def unregister(clients: list[Client], *, dry_run: bool = False, run: Callable[[list[str]], int] = _run) -> int:
     failures = 0
     for client in clients:
+        if client.id == "kiro-cli":
+            leftovers = kiro_leftovers()
+            if leftovers:
+                remove_leftovers(leftovers, dry_run=dry_run)
         if client.unregister is None:
             print(f"{client.label}: remove '{SERVER_NAME}' from {client.manual_target}")
             continue
@@ -426,6 +505,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             print(json.dumps({"checkout": target.checkout, "uv": target.uv, "clients": rows}, indent=2))
         elif not rows:
             print("  No MCP client detected on this machine.")
+            _print_leftover_warning()
         else:
             print("  MCP clients:")
             for row in rows:
@@ -436,6 +516,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 }[row["registered"]]
                 label = row["label"].split(" (")[0]
                 print(f"    {label:<22} {mark}")
+            _print_leftover_warning()
         return 0
     return 2
 
