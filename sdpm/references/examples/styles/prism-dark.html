@@ -2,347 +2,320 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>prism-dark — A near-black style for a small room that has to agree on one thing per slide, and for the reader who opens the same deck alone afterwards; the design decision is that a violet-to-pink gradient is a pointer rather than a decoration, so it marks only the element the title is talking about and everything else stays flat, and the signature look is a 40px gradient bar on the left edge of every slide, a hero figure set in gradient text, a single recommended card carried by a 4px gradient outline with one filled gradient pill, and one gradient bar in an otherwise grey chart.</title>
+<title>prism-dark — A near-black decision style for a small room reaching agreement and for readers revisiting the deck alone; its violet-to-pink gradient acts only as a semantic pointer to the element named by an assertion title, while a fixed edge bar, flat dark surfaces, restrained grey structure, large figures, and one outlined choice create a calm signature look.</title>
 <style>
 :root {
---g1: #8B7CFF;
---g2: #6D28D9;
---g3: #EC4899;
---color-text: #F5F3FF;
---color-bg: #050507;
---color-surface: #121118;
---color-border: #262233;
---color-muted: #A79FC4;
---color-on-accent: #0B0912;
---accent: #8B7CFF;
---accent-2: #EC4899;
---color-flat-bar: #605978;
---font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif;
---font-mono: Menlo, Consolas, monospace;
---fs-cover-title: 52pt;
---fs-slide-title: 32pt;
---fs-heading: 22pt;
---fs-body: 18pt;
---fs-caption: 15pt;
---fs-table: 15pt;
---fs-label: 11pt;
---fs-metric: 124pt;
---fs-metric-sm: 60pt;
---edge-w: 40px;
---bar-w: 128px;
---margin-x: 144px;
---content-w: 1680px;
---title-top: 72px;
---content-top: 336px;
---radius: 24px;
---border-thin: 1px;
---border-point: 4px;
---pill-h: 48px;
---shadow: none;
+--g1: #8B7CFF; /* pointer start for two-stop text, fills, and three-stop outlines */
+--g2: #6D28D9; /* dark middle used only in the edge and outlined targets */
+--g3: #EC4899; /* pointer end; never reverse the stop order */
+--color-text: #F5F3FF; /* primary copy on the near-black ground */
+--color-bg: #050507; /* slide ground on every frame */
+--color-surface: #121118; /* flat cards and neutral nodes */
+--color-border: #262233; /* hairlines, baselines, and connectors */
+--color-muted: #A79FC4; /* qualifiers, inactive labels, and supporting values */
+--color-on-accent: #0B0912; /* readable type on filled gradient pills */
+--accent: #8B7CFF; /* solid fallback for the semantic pointer */
+--accent-2: #EC4899; /* second solid accent only when a gradient cannot render */
+--color-flat-bar: #605978; /* every unselected chart mark */
+--font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif; /* one sans family at regular and bold weights */
+--font-mono: Menlo, Consolas, monospace; /* code and literal tokens only */
+--fs-cover-title: 52pt; /* cover and divider name, at most two lines */
+--fs-slide-title: 32pt; /* assertion title, at most two lines */
+--fs-heading: 22pt; /* lead-ins, card headings, and conclusions */
+--fs-body: 18pt; /* readable body copy with short measures */
+--fs-caption: 15pt; /* qualifiers and supporting detail */
+--fs-table: 15pt; /* native table body and headers */
+--fs-label: 11pt; /* uppercase metadata, never body copy */
+--fs-metric: 124pt; /* one hero figure with sign and unit in one box */
+--fs-metric-sm: 60pt; /* supporting figure or paired state */
+--edge-w: 40px; /* full-height signature edge */
+--bar-w: 128px; /* standard vertical chart mark */
+--margin-x: 144px; /* minimum horizontal inset */
+--content-w: 1680px; /* usable width between margins */
+--title-top: 72px; /* top of the reserved title band */
+--content-top: 336px; /* content starts after two title lines and lead-in */
+--radius: 24px; /* cards and nodes */
+--border-thin: 1px; /* neutral rules and card outlines */
+--border-point: 4px; /* gradient outline needs enough mass for its middle stop */
+--pill-h: 48px; /* metadata and selected-state labels */
+--shadow: none; /* all surfaces stay flat and crisp */
 }
-*{box-sizing:border-box} body{margin:0;padding:40px;background:#000;font-family:var(--font-family);zoom: 0.7}
-.slide{position:relative;width:1920px;height:1080px;margin:0 auto 40px;overflow:hidden;background:var(--color-bg);color:var(--color-text)}
-.el{position:absolute}.t-cover-title{font-size:calc(var(--fs-cover-title)*1.5);font-weight:700;line-height:1.1;letter-spacing:-1pt}
-.t-slide-title{font-size:calc(var(--fs-slide-title)*1.5);font-weight:700;line-height:1.2;letter-spacing:-.4pt}
-.t-heading{font-size:calc(var(--fs-heading)*1.5);font-weight:700;line-height:1.35}.t-body{font-size:calc(var(--fs-body)*1.5);line-height:1.5}
-.t-caption{font-size:calc(var(--fs-caption)*1.5);line-height:1.45}.t-table{font-size:calc(var(--fs-table)*1.5);line-height:1.4}
-.t-label{font-size:calc(var(--fs-label)*1.5);font-weight:700;line-height:1.3;letter-spacing:1.6pt;text-transform:uppercase}
-.t-metric{font-size:calc(var(--fs-metric)*1.5);font-weight:800;line-height:1;letter-spacing:-4pt}.t-metric-sm{font-size:calc(var(--fs-metric-sm)*1.5);font-weight:800;line-height:1;letter-spacing:-2pt}
-.c-muted{color:var(--color-muted)}.bold{font-weight:700}.mono{font-family:var(--font-mono)}
-.edge{background:linear-gradient(180deg,var(--g1),var(--g2) 55%,var(--g3))}.gtext{background:linear-gradient(90deg,var(--g1),var(--g3));-webkit-background-clip:text;background-clip:text;color:transparent}
-.card{border-radius:var(--radius);background:var(--color-surface);border:var(--border-thin) solid var(--color-border)}
-.card-g,.node-g{border-radius:var(--radius);border:var(--border-point) solid transparent;background:linear-gradient(var(--color-bg),var(--color-bg)) padding-box,linear-gradient(135deg,var(--g1),var(--g2),var(--g3)) border-box}
-.pill,.pill-g,.pill-o{display:flex;align-items:center;justify-content:center;border-radius:999px;font-size:calc(var(--fs-label)*1.5);font-weight:700;letter-spacing:1.6pt;text-transform:uppercase}
-.pill{border:var(--border-thin) solid var(--color-border);color:var(--color-muted)}.pill-g{background:linear-gradient(90deg,var(--g1),var(--g3));color:var(--color-on-accent)}
-.pill-o{border:2px solid transparent;background:linear-gradient(var(--color-bg),var(--color-bg)) padding-box,linear-gradient(90deg,var(--g1),var(--g3)) border-box}
-.node,.node-g{display:flex;align-items:center;justify-content:center;text-align:center;font-size:calc(var(--fs-body)*1.5);line-height:1.35}.node{border-radius:var(--radius);background:var(--color-surface);border:var(--border-thin) solid var(--color-border)}
-.rule{background:var(--color-border)}.connector{background:var(--color-border)}.swatch{border-radius:8px;border:var(--border-thin) solid var(--color-border)}.sw-g1{background:var(--g1)}.sw-g2{background:var(--g2)}.sw-g3{background:var(--g3)}.sw-bg{background:var(--color-bg)}.sw-surface{background:var(--color-surface)}.sw-text{background:var(--color-text)}
-.bullets{list-style:none;margin:0;padding:0}.bullets li{position:relative;padding-left:40px;margin-bottom:20px;font-size:calc(var(--fs-body)*1.5);line-height:1.45}.bullets li:before{content:"";position:absolute;left:0;top:20px;width:20px;height:2px;background:var(--color-muted)}
-.sheet-label{color:var(--color-muted);font-size:calc(var(--fs-label)*1.5);font-weight:700;letter-spacing:1.2pt;text-transform:uppercase}.table-row{display:flex;align-items:center;border-bottom:var(--border-thin) solid var(--color-border)}
-.frame-ghost{border:2px dashed var(--color-border);padding:18px}.region{border:2px dashed var(--accent);padding:18px}.region-name{font:700 calc(var(--fs-label)*1.5) var(--font-family);letter-spacing:1.2pt;text-transform:uppercase}.region-fill{font:calc(var(--fs-label)*1.5) var(--font-family);color:var(--color-muted);margin-left:12px}
-.chart-specimen{border-left:2px solid var(--color-border);border-bottom:2px solid var(--color-border)}
+* { box-sizing: border-box; }
+body { margin:0; padding:40px; background:#000; font-family:var(--font-family); zoom:0.7; }
+.slide { position:relative; width:1920px; height:1080px; margin:0 auto 40px; overflow:hidden; background:var(--color-bg); color:var(--color-text); }
+.el { position:absolute; }
+.t-cover-title { font-size:calc(var(--fs-cover-title) * 1.5); font-weight:700; line-height:1.1; letter-spacing:-1pt; }
+.t-slide-title { font-size:calc(var(--fs-slide-title) * 1.5); font-weight:700; line-height:1.2; letter-spacing:-.4pt; }
+.t-heading { font-size:calc(var(--fs-heading) * 1.5); font-weight:700; line-height:1.35; }
+.t-body { font-size:calc(var(--fs-body) * 1.5); line-height:1.5; }
+.t-caption { font-size:calc(var(--fs-caption) * 1.5); line-height:1.45; }
+.t-table { font-size:calc(var(--fs-table) * 1.5); line-height:1.4; }
+.t-label { font-size:calc(var(--fs-label) * 1.5); font-weight:700; line-height:1.3; letter-spacing:1.6pt; text-transform:uppercase; }
+.t-metric { font-size:calc(var(--fs-metric) * 1.5); font-weight:800; line-height:1; letter-spacing:-4pt; }
+.t-metric-sm { font-size:calc(var(--fs-metric-sm) * 1.5); font-weight:800; line-height:1; letter-spacing:-2pt; }
+.c-muted { color:var(--color-muted); }
+.bold { font-weight:700; }
+.edge { background:linear-gradient(180deg,var(--g1),var(--g2) 55%,var(--g3)); }
+.gtext { background:linear-gradient(90deg,var(--g1),var(--g3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.rule { background:var(--color-border); }
+.card { border-radius:var(--radius); background:var(--color-surface); border:var(--border-thin) solid var(--color-border); }
+.card-g,.node-g { border-radius:var(--radius); border:var(--border-point) solid transparent; background:linear-gradient(var(--color-bg),var(--color-bg)) padding-box,linear-gradient(135deg,var(--g1),var(--g2),var(--g3)) border-box; }
+.pill,.pill-g,.pill-o { display:flex; align-items:center; justify-content:center; border-radius:999px; font-size:calc(var(--fs-label) * 1.5); font-weight:700; letter-spacing:1.6pt; text-transform:uppercase; }
+.pill { border:var(--border-thin) solid var(--color-border); color:var(--color-muted); }
+.pill-g { background:linear-gradient(90deg,var(--g1),var(--g3)); color:var(--color-on-accent); }
+.pill-o { border:2px solid transparent; background:linear-gradient(var(--color-bg),var(--color-bg)) padding-box,linear-gradient(90deg,var(--g1),var(--g3)) border-box; }
+.marker { display:flex; align-items:center; justify-content:center; border-radius:999px; border:var(--border-thin) solid var(--color-border); color:var(--color-muted); font-size:calc(var(--fs-label) * 1.5); font-weight:700; letter-spacing:1pt; }
+.takeaway { border-top:var(--border-thin) solid var(--color-border); padding-top:24px; }
+.node,.node-g { display:flex; align-items:center; justify-content:center; text-align:center; font-size:calc(var(--fs-body) * 1.5); line-height:1.35; }
+.node { border-radius:var(--radius); background:var(--color-surface); border:var(--border-thin) solid var(--color-border); }
+.connector { background:var(--color-border); }
+.table-row { display:flex; align-items:center; border-bottom:var(--border-thin) solid var(--color-border); }
+.table-row > span:last-child { text-align:right; }
+.chart-specimen { border-left:2px solid var(--color-border); border-bottom:2px solid var(--color-border); }
+.state { border-top:var(--border-thin) solid var(--color-border); }
+.prose { border-left:2px solid var(--color-border); padding-left:46px; }
 </style>
 </head>
 <body>
 
-<!-- Part 1: Cover -->
+<!-- Part: Cover -->
+<!-- The cover has no claim, so the edge is its only gradient; metadata remains flat and no panel, pill, or rule competes with the name. -->
 <div class="slide">
 <div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
 <div class="el t-label c-muted" style="left:144px;top:300px;width:800px;height:32px">Bundled style</div>
 <div class="el t-cover-title" style="left:144px;top:372px;width:1400px;height:180px">Prism</div>
-<div class="el t-heading c-muted" style="left:144px;top:620px;width:1400px;height:120px">The gradient is a pointer, not a surface. It marks the one thing the title is talking about.</div>
-<div class="el t-caption c-muted" style="left:144px;top:944px;width:1500px;height:48px">Near-black ground · violet to pink pointer · flat supporting forms</div>
+<div class="el t-heading c-muted" style="left:144px;top:620px;width:1400px;height:120px">The gradient is a pointer, not a surface. It marks the one thing the title names.</div>
+<div class="el t-caption c-muted" style="left:144px;top:944px;width:1500px;height:48px">Near-black ground · one semantic pointer · flat supporting forms</div>
 </div>
 
-<!-- Part 2: Rules -->
-<div class="slide">
-<div class="el t-slide-title" style="left:144px;top:72px;width:1540px;height:160px">The gradient points at one thing</div>
-<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Find the element the title names; mark only that.</div>
-<div class="el t-label c-muted" style="left:144px;top:350px;width:780px;height:32px">Design decision</div>
-<div class="el t-body" style="left:144px;top:404px;width:780px;height:200px">A room reaching agreement must see which element the decision is about in one glance. Spend the gradient on that target; flat supporting content makes the pointer legible.</div>
-<div class="el t-label c-muted" style="left:144px;top:640px;width:780px;height:32px">Do</div>
-<div class="el bullets" style="left:144px;top:692px;width:780px;height:300px"><ul class="bullets"><li>Name the target in an assertion title.</li><li>Keep siblings flat and equal.</li><li>Keep text and pills horizontal, bars vertical, and every edge crisp: no glow, blur or fade.</li><li>Keep text contrast at 4.5:1; 3:1 at 18pt or larger.</li></ul></div>
-<div class="el rule" style="left:984px;top:350px;width:1px;height:648px"></div>
-<div class="el t-label c-muted" style="left:1020px;top:350px;width:804px;height:32px">Do not</div>
-<div class="el bullets" style="left:1020px;top:404px;width:804px;height:450px"><ul class="bullets"><li>No gradient panels or full-bleed fields: they point everywhere.</li><li>No gradient behind body text: contrast suffers.</li><li>No second colour family, repeated gradient tags, or gradient quota to spend.</li><li>No emoji; use one meaningful asset.</li><li>No second claim; split the slide.</li></ul></div>
-<div class="el t-caption c-muted" style="left:1020px;top:920px;width:804px;height:72px">One subject may be marked twice only when figure and chart mark express the same fact. Preview may flatten gradient text and outlines to violet; do not compensate.</div>
-</div>
-
-<!-- Part 3: Message & Outline -->
-<div class="slide">
-<div class="el t-slide-title" style="left:144px;top:72px;width:1540px;height:160px">The title names what the pointer marks</div>
-<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Write the claim first; choose the visual form from its target.</div>
-<div class="el t-metric-sm" style="left:144px;top:350px;width:480px;height:120px">1 claim</div>
-<div class="el t-caption c-muted" style="left:144px;top:490px;width:480px;height:92px">per slide; deck length follows the brief and material</div>
-<div class="el t-metric-sm" style="left:720px;top:350px;width:480px;height:120px">≤ 45</div>
-<div class="el t-caption c-muted" style="left:720px;top:490px;width:480px;height:92px">words normally; up to 90 when read alone</div>
-<div class="el t-metric-sm" style="left:1296px;top:350px;width:480px;height:120px">2 lines</div>
-<div class="el t-caption c-muted" style="left:1296px;top:490px;width:480px;height:92px">maximum title; leave the reserved line empty</div>
-<div class="el rule" style="left:144px;top:630px;width:1680px;height:1px"></div>
-<div class="el t-body" style="left:144px;top:674px;width:804px;height:270px"><span class="bold">Title grammar.</span> Use a sentence with a concrete object: “Run cost falls by 42%” names a metric; “Shared ownership is the recommended model” names a choice. Never use a topic label such as “Costs.”</div>
-<div class="el t-body" style="left:1020px;top:674px;width:804px;height:270px"><span class="bold">Chapter shape.</span> Open on the strongest claim. A long-review agenda uses a noun-phrase title, hairline rows and a flat current pill—no pointer or highlighted entry. Use flat dividers and one closing ask. Prefer key figures, equal comparisons, processes, native charts and spare tables.</div>
-</div>
-
-<!-- Part 4: Palette & Type -->
-<div class="slide">
-<div class="el t-slide-title" style="left:144px;top:72px;width:1540px;height:160px">One gradient, one ground, two greys</div>
-<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Use two stops for text and fills; three for the edge and outlined targets.</div>
-<div class="el swatch sw-g1" style="left:144px;top:350px;width:240px;height:112px"></div>
-<div class="el t-caption" style="left:144px;top:478px;width:240px;height:100px"><span class="mono">--g1</span><br>pointer start</div>
-<div class="el swatch sw-g2" style="left:432px;top:350px;width:240px;height:112px"></div>
-<div class="el t-caption" style="left:432px;top:478px;width:240px;height:100px"><span class="mono">--g2</span><br>outline middle</div>
-<div class="el swatch sw-g3" style="left:720px;top:350px;width:240px;height:112px"></div>
-<div class="el t-caption" style="left:720px;top:478px;width:240px;height:100px"><span class="mono">--g3</span><br>pointer end</div>
-<div class="el swatch sw-bg" style="left:1008px;top:350px;width:240px;height:112px"></div>
-<div class="el t-caption" style="left:1008px;top:478px;width:240px;height:100px"><span class="mono">--color-bg</span><br>slide ground</div>
-<div class="el swatch sw-surface" style="left:1296px;top:350px;width:240px;height:112px"></div>
-<div class="el t-caption" style="left:1296px;top:478px;width:240px;height:100px"><span class="mono">--color-surface</span><br>flat card</div>
-<div class="el swatch sw-text" style="left:1584px;top:350px;width:240px;height:112px"></div>
-<div class="el t-caption" style="left:1584px;top:478px;width:240px;height:100px"><span class="mono">--color-text</span><br>primary type</div>
-<div class="el rule" style="left:144px;top:630px;width:1680px;height:1px"></div>
-<div class="el t-caption c-muted" style="left:144px;top:674px;width:520px;height:100px"><span class="mono">--color-muted</span><br>supporting labels and inactive values</div>
-<div class="el t-caption c-muted" style="left:720px;top:674px;width:520px;height:100px"><span class="mono">--color-border</span><br>hairlines and neutral connectors</div>
-<div class="el t-caption c-muted" style="left:1296px;top:674px;width:528px;height:100px"><span class="mono">--color-flat-bar</span><br>unselected native chart series</div>
-<div class="el t-body" style="left:144px;top:840px;width:1680px;height:100px">Use dark <span class="mono">--color-on-accent</span> type on filled pills. Keep all body text on the ground or surface.</div>
-</div>
-
-<div class="slide">
-<div class="el t-slide-title" style="left:144px;top:72px;width:1540px;height:160px">The type ramp reserves space before content</div>
-<div class="el t-cover-title" style="left:144px;top:280px;width:900px;height:120px">Cover title</div>
-<div class="el t-caption c-muted mono" style="left:1200px;top:320px;width:624px;height:48px">--fs-cover-title · 52pt / 1.1</div>
-<div class="el t-slide-title" style="left:144px;top:420px;width:900px;height:96px">Assertion title</div>
-<div class="el t-caption c-muted mono" style="left:1200px;top:446px;width:624px;height:48px">--fs-slide-title · 32pt / 1.2 · max 2 lines</div>
-<div class="el t-heading" style="left:144px;top:536px;width:900px;height:64px">Heading or topic sentence</div>
-<div class="el t-caption c-muted mono" style="left:1200px;top:548px;width:624px;height:48px">--fs-heading · 22pt / 1.35</div>
-<div class="el t-body" style="left:144px;top:620px;width:900px;height:56px">Body copy carries one short idea.</div>
-<div class="el t-caption c-muted mono" style="left:1200px;top:626px;width:624px;height:48px">--fs-body · 18pt / 1.5</div>
-<div class="el t-caption c-muted" style="left:144px;top:700px;width:900px;height:48px">Caption, qualifier or supporting detail</div>
-<div class="el t-caption c-muted mono" style="left:1200px;top:700px;width:624px;height:48px">--fs-caption / --fs-table · 15pt</div>
-<div class="el t-label c-muted" style="left:144px;top:752px;width:900px;height:32px">Label, uppercase and tracked</div>
-<div class="el t-caption c-muted mono" style="left:1200px;top:740px;width:624px;height:48px">--fs-label · 11pt / 1.3</div>
-<div class="el t-metric-sm gtext" style="left:144px;top:844px;width:520px;height:120px">2.1 days</div>
-<div class="el t-caption c-muted mono" style="left:720px;top:876px;width:400px;height:48px">--fs-metric-sm · 60pt</div>
-<div class="el t-caption c-muted mono" style="left:1200px;top:792px;width:624px;height:48px">--fs-metric · 124pt / 1</div>
-<div class="el t-metric gtext" style="left:1200px;top:800px;width:624px;height:250px">−42%</div>
-</div>
-
-<!-- Part 5: Frame -->
+<!-- Part: Rules -->
+<!-- Frame: content — use the 40px edge on every slide; reserve x 144–1824, title y 72–232, lead-in y 248, content y 336–940, optional takeaway after y 964; two columns are 804px with a 72px gap, three are 528px with 48px gaps, four are 384px with 48px gaps. -->
+<!-- The decision precedes the forms: a room reaching agreement must identify the target at a glance. A figure takes two horizontal stops; a choice or sequence gate takes one diagonal three-stop outline and one filled pill; a chart takes one vertical two-stop mark; a prose conclusion takes one horizontal two-stop line. A cover, agenda, or divider takes only the edge. One fact may be marked as both figure and chart mark. Preview flattening to violet is expected and never earns compensation. -->
 <div class="slide">
 <div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
-<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Claim of this slide stated as a sentence</div>
-<div class="el t-heading" style="left:144px;top:248px;width:1260px;height:60px">Lead-in gives the one reason the claim is true.</div>
-<div class="el pill-o" style="left:1484px;top:252px;width:340px;height:48px">Section · 03</div>
-<div class="el card" style="left:144px;top:336px;width:1680px;height:604px"></div>
-<div class="el t-label c-muted" style="left:192px;top:384px;width:1500px;height:32px">Content begins at y 336 · two title lines always reserved</div>
-<div class="el t-caption" style="left:192px;top:448px;width:760px;height:300px">Signature edge: 40 × 1080<br>Margins: 144; content width: 1680<br>Two columns: 804 with 72 gap<br>Three columns: 528 with 48 gaps<br>Four columns: 384 with 48 gaps</div>
-<div class="el t-caption" style="left:1020px;top:448px;width:756px;height:300px">Content: y 336–940 with footer<br>Footer rule: y 964<br>Footer line: y 980, 56 high<br>Cards: 24 radius, 1 border<br>Pointer outline: 4; pills: 48 high</div>
-<div class="el pill" style="left:192px;top:824px;width:230px;height:48px">01 Context</div>
-<div class="el pill" style="left:446px;top:824px;width:230px;height:48px">02 Evidence</div>
-<div class="el pill-g" style="left:700px;top:824px;width:230px;height:48px">03 Decision</div>
-<div class="el pill" style="left:954px;top:824px;width:230px;height:48px">04 Ask</div>
-<div class="el rule" style="left:144px;top:964px;width:1680px;height:1px"></div>
-<div class="el t-body" style="left:144px;top:980px;width:1680px;height:56px">One-sentence takeaway or action; omit the footer when it adds no new consequence.</div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">The gradient points at one thing</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Find the element the assertion names; mark only that.</div>
+<div class="el t-label c-muted" style="left:144px;top:356px;width:700px;height:32px">Design decision</div>
+<div class="el t-body" style="left:144px;top:416px;width:760px;height:300px">Agreement needs an unmistakable target. Spend the gradient there; flat support makes it legible.</div>
+<div class="el rule" style="left:984px;top:356px;width:1px;height:520px"></div>
+<div class="el t-label c-muted" style="left:1040px;top:356px;width:700px;height:32px">Legal targets</div>
+<div class="el t-heading" style="left:1040px;top:416px;width:700px;height:280px">Figure<br>Chosen item<br>Chart mark<br>Prose conclusion</div>
+<div class="el t-caption c-muted" style="left:1040px;top:736px;width:700px;height:96px">Everything else stays flat.</div>
 </div>
 
+<!-- These rules derive from pointer semantics rather than decoration preference. Keep contrast at least 4.5:1, or 3:1 for large type; use one meaningful monochrome asset when an icon is necessary; never use a gradient panel, full-bleed field, body-text background, repeated gradient tag, second colour family, glow, blur, fade, or ornamental gradient. -->
 <div class="slide">
 <div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
-<div class="el t-metric-sm c-muted" style="left:144px;top:336px;width:600px;height:120px">03 / 05</div>
-<div class="el t-cover-title" style="left:144px;top:500px;width:1400px;height:180px">Section name</div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Four rules keep the pointer meaningful</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">A second claim or colour weakens the decision.</div>
+<!-- Component: numbered (.marker) — ordered rule or finding; may vary: index and short statement; may not: become a gradient badge or exceed one line. -->
+<div class="el marker" style="left:144px;top:372px;width:72px;height:48px">01</div>
+<div class="el t-body" style="left:248px;top:364px;width:620px;height:70px">Name one assertion.</div>
+<div class="el marker" style="left:144px;top:500px;width:72px;height:48px">02</div>
+<div class="el t-body" style="left:248px;top:492px;width:620px;height:70px">Mark its named element.</div>
+<div class="el marker" style="left:1020px;top:372px;width:72px;height:48px">03</div>
+<div class="el t-body" style="left:1124px;top:364px;width:620px;height:70px">Keep siblings flat and equal.</div>
+<div class="el marker" style="left:1020px;top:500px;width:72px;height:48px">04</div>
+<div class="el t-body" style="left:1124px;top:492px;width:620px;height:70px">Split a second claim.</div>
+<div class="el rule" style="left:144px;top:676px;width:1680px;height:1px"></div>
+<div class="el t-heading gtext" style="left:144px;top:732px;width:1200px;height:100px">One gradient means “look here.”</div>
+<div class="el t-caption c-muted" style="left:144px;top:864px;width:1500px;height:72px">No emoji or decorative effects.</div>
+</div>
+
+<!-- Part: Message & Outline -->
+<!-- Density: 45 -->
+<!-- Standalone reading gets additional slides, not a higher word ceiling. Title rows reserve both lines even when one is empty. Slide count follows the brief and source material. -->
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Claims decide the form and the pointer</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1200px;height:60px">Write the assertion before choosing a layout.</div>
+<!-- Component: tag (.pill-o) — supporting index, unit, or period; may vary: concise metadata; may not: become decoration or a claim pointer. -->
+<div class="el pill-o" style="left:1484px;top:252px;width:340px;height:48px">Outline contract</div>
+<!-- Component: metric (.t-metric-sm) — one key figure with sign and unit in one box; may vary: value and hero size; may not: be boxed, split, or share emphasis with an unrelated figure. -->
+<div class="el t-metric-sm gtext" style="left:144px;top:368px;width:520px;height:144px">45</div>
+<div class="el t-heading" style="left:144px;top:616px;width:520px;height:70px">visible words maximum</div>
+<div class="el t-body" style="left:760px;top:380px;width:880px;height:220px"><span class="bold">Title grammar.</span> Use a sentence with a concrete object. Topic labels point at nothing.</div>
+<!-- Component: takeaway (.takeaway) — one consequence or next action; may vary: one sentence; may not: restate the title, exceed two lines, or sit in a card. -->
+<div class="el takeaway t-heading" style="left:760px;top:704px;width:1064px;height:130px">One claim per slide. Add slides before adding words.</div>
+</div>
+
+<!-- A long review may use an agenda with noun-phrase title, hairline rows, and a flat current-state pill; it carries no pointer beyond the edge. Open on the strongest claim unless navigation is necessary. Section dividers preview the claims in their chapter. -->
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">The deck moves from claim to decision</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Use chapters only when they help the reader navigate.</div>
+<div class="el marker" style="left:144px;top:372px;width:72px;height:48px">01</div>
+<div class="el t-heading" style="left:248px;top:360px;width:520px;height:72px">Strongest claim</div>
+<div class="el rule" style="left:248px;top:456px;width:1200px;height:1px"></div>
+<div class="el marker" style="left:144px;top:516px;width:72px;height:48px">02</div>
+<div class="el t-heading" style="left:248px;top:504px;width:520px;height:72px">Evidence sequence</div>
+<div class="el rule" style="left:248px;top:600px;width:1200px;height:1px"></div>
+<div class="el marker" style="left:144px;top:660px;width:72px;height:48px">03</div>
+<div class="el t-heading" style="left:248px;top:648px;width:520px;height:72px">One recommendation</div>
+<div class="el rule" style="left:248px;top:744px;width:1200px;height:1px"></div>
+<div class="el marker" style="left:144px;top:804px;width:72px;height:48px">04</div>
+<div class="el t-heading" style="left:248px;top:792px;width:520px;height:72px">Closing ask</div>
+<div class="el t-caption c-muted" style="left:1020px;top:792px;width:700px;height:100px">Prefer figures, equal comparisons, processes, native charts, spare tables, and unboxed prose.</div>
+</div>
+
+<!-- Part: Patterns -->
+<!-- Frame: divider — the edge is the only gradient; place a flat chapter index at y 336, the section name at y 500, a short rule at y 744, and a one-line preview below it; no card, pill, or footer. -->
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-metric-sm c-muted" style="left:144px;top:336px;width:600px;height:144px">04 / 05</div>
+<div class="el t-cover-title" style="left:144px;top:500px;width:1400px;height:180px">Patterns</div>
 <div class="el rule" style="left:144px;top:744px;width:804px;height:1px"></div>
-<div class="el t-heading c-muted" style="left:144px;top:788px;width:1400px;height:120px">One-line preview of the claims in this section.</div>
+<div class="el t-heading c-muted" style="left:144px;top:788px;width:1400px;height:120px">Each layout spends the pointer on the element its title names.</div>
 </div>
 
+<!-- Pattern: metric — for: one decisive figure and its qualification; regions: body, chart, takeaway; components: metric + chart + takeaway; may vary: 3–6 bars and the figure; may not: box the figure, split its unit, or mark an unrelated bar. -->
+<!-- The figure and its own chart mark may both carry the pointer because they express one fact; other marks use --color-flat-bar, direct labels, a common baseline, and no empty gridlines. -->
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">A key figure owns the pointer</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Keep its qualifier separate and flat.</div>
+<div class="el t-metric gtext" style="left:144px;top:356px;width:760px;height:300px">−42%</div>
+<div class="el t-caption c-muted" style="left:144px;top:672px;width:760px;height:96px">One measure, one baseline, one period.</div>
+<div class="el chart-specimen" style="left:1060px;top:380px;width:620px;height:360px"><svg viewBox="0 0 620 360" width="620" height="360"><defs><linearGradient id="metricBar" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#8B7CFF"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs><rect x="78" y="92" width="96" height="266" fill="#605978"/><rect x="262" y="150" width="96" height="208" fill="#605978"/><rect x="446" y="204" width="96" height="154" fill="url(#metricBar)"/><g fill="#A79FC4" font-family="Arial" font-size="22"><text x="104" y="80">100</text><text x="292" y="138">78</text><text x="476" y="192" fill="#F5F3FF">58</text></g></svg></div>
+<div class="el takeaway t-heading" style="left:144px;top:836px;width:1680px;height:120px">Mark the fact twice only when both marks mean the same thing.</div>
+</div>
+
+<!-- Pattern: comparison — for: choosing between two matched options; regions: left, right, takeaway; components: container ×2 + selected + takeaway; may vary: winner and concise evidence; may not: change geometry, row order, measure, or unit, or add an arrow. -->
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Equal geometry makes one verdict credible</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Compare the same measures in the same order.</div>
+<!-- Component: container (.card) — equal supporting option; may vary: label, heading, and brief evidence; may not: change sibling geometry or receive gradient decoration. -->
+<div class="el card" style="left:144px;top:356px;width:804px;height:500px"></div>
+<div class="el t-label c-muted" style="left:192px;top:404px;width:700px;height:32px">Alternative</div>
+<div class="el t-heading" style="left:192px;top:476px;width:700px;height:72px">Flat option</div>
+<div class="el t-body c-muted" style="left:192px;top:584px;width:660px;height:150px">Same width, depth, measures, and reading order.</div>
+<!-- Component: selected (.card-g) — the one recommended option; may vary: selected member and copy; may not: lose its 4px outline, one filled pill, or equal geometry. -->
+<div class="el card-g" style="left:1020px;top:356px;width:804px;height:500px"></div>
+<div class="el pill-g" style="left:1068px;top:404px;width:240px;height:48px">Recommended</div>
+<div class="el t-heading" style="left:1068px;top:476px;width:700px;height:72px">Chosen option</div>
+<div class="el t-body" style="left:1068px;top:584px;width:660px;height:150px">One outline and one pill carry the decision.</div>
+</div>
+
+<!-- Pattern: columns — for: three parallel evidence groups or options; regions: col-1, col-2, col-3, takeaway; components: container ×3 + selected + takeaway; may vary: two to four columns and selected column; may not: vary widths, internal rhythm, or measures. -->
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Parallel evidence belongs in equal columns</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Keep one rhythm across the row.</div>
+<div class="el card" style="left:144px;top:356px;width:528px;height:448px"></div>
+<div class="el t-label c-muted" style="left:192px;top:404px;width:432px;height:32px">Context</div>
+<div class="el t-heading" style="left:192px;top:468px;width:432px;height:72px">What changed</div>
+<div class="el t-caption c-muted" style="left:192px;top:580px;width:400px;height:120px">One fact set, aligned to peers.</div>
+<div class="el card-g" style="left:720px;top:356px;width:528px;height:448px"></div>
+<div class="el pill-g" style="left:768px;top:404px;width:210px;height:48px">Target</div>
+<div class="el t-heading" style="left:768px;top:468px;width:432px;height:72px">What matters</div>
+<div class="el t-caption" style="left:768px;top:580px;width:400px;height:120px">Only this column is outlined.</div>
+<div class="el card" style="left:1296px;top:356px;width:528px;height:448px"></div>
+<div class="el t-label c-muted" style="left:1344px;top:404px;width:432px;height:32px">Consequence</div>
+<div class="el t-heading" style="left:1344px;top:468px;width:432px;height:72px">What follows</div>
+<div class="el t-caption c-muted" style="left:1344px;top:580px;width:400px;height:120px">Matched depth keeps comparison honest.</div>
+<div class="el takeaway t-heading" style="left:144px;top:864px;width:1680px;height:100px">Use columns for parallel logic, never decorative splitting.</div>
+</div>
+
+<!-- Pattern: process — for: a left-to-right sequence with one gate; regions: step-1, step-2, step-3, step-4, takeaway; components: step ×4 + connector ×3 + selected + milestone; may vary: 3–5 steps and gate position; may not: vary node size, colour connectors, or release work past the gate. -->
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">One gate controls the process</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Equal steps show sequence; the outlined step shows risk.</div>
+<!-- Component: step (.node) — equal sequence stage; may vary: short verb phrase; may not: vary size within a set or carry decorative colour. -->
+<div class="el node" style="left:144px;top:432px;width:384px;height:220px">Frame</div>
+<!-- Component: connector (.connector) — neutral link between steps or nodes; may vary: length and orientation; may not: use gradient or imply meaning absent from the title. -->
+<div class="el connector" style="left:528px;top:541px;width:48px;height:2px"></div>
+<div class="el node" style="left:576px;top:432px;width:384px;height:220px">Build</div>
+<div class="el connector" style="left:960px;top:541px;width:48px;height:2px"></div>
+<div class="el node-g" style="left:1008px;top:432px;width:384px;height:220px">Measure</div>
+<!-- Component: milestone (.pill-g) — sequence gate label; may vary: stage and status; may not: appear on a cycle or without an outlined step. -->
+<div class="el pill-g" style="left:1056px;top:384px;width:240px;height:48px">Step 3 · gate</div>
+<div class="el connector" style="left:1392px;top:541px;width:48px;height:2px"></div>
+<div class="el node" style="left:1440px;top:432px;width:384px;height:220px">Release</div>
+<div class="el takeaway t-heading" style="left:144px;top:816px;width:1680px;height:120px">Neutral connectors preserve order without stealing the pointer.</div>
+</div>
+
+<!-- Pattern: table — for: exact values and categorical comparison; regions: body, table, takeaway; components: metric + table + takeaway; may vary: 3–6 rows, 3–5 columns, and lifted figure; may not: use zebra fill, vertical rules, gradient cells, or leave the claimed figure inside the grid. -->
+<!-- Native tables inherit the presentation template font; right-align figures and use hairlines only. -->
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Lift the claimed figure out of the table</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">The grid stays exact, quiet, and flat.</div>
+<div class="el t-metric-sm gtext" style="left:144px;top:340px;width:520px;height:144px">180k</div>
+<div class="el t-caption c-muted" style="left:700px;top:372px;width:500px;height:80px">total across three rows</div>
+<!-- Component: table (.table-row) — exact values in a native table; may vary: row and column count within the pattern limit; may not: lose right-aligned figures and horizontal hairlines. -->
+<div class="el table-row t-label c-muted" style="left:144px;top:520px;width:1680px;height:56px"><span style="width:55%">Item</span><span style="width:25%">Type</span><span style="width:20%">Value</span></div>
+<div class="el table-row t-table" style="left:144px;top:576px;width:1680px;height:76px"><span style="width:55%">Recurring</span><span class="c-muted" style="width:25%">Annual</span><span style="width:20%">96k</span></div>
+<div class="el table-row t-table" style="left:144px;top:652px;width:1680px;height:76px"><span style="width:55%">Migration</span><span class="c-muted" style="width:25%">Once</span><span style="width:20%">54k</span></div>
+<div class="el table-row t-table" style="left:144px;top:728px;width:1680px;height:76px"><span style="width:55%">Training</span><span class="c-muted" style="width:25%">Once</span><span style="width:20%">30k</span></div>
+<div class="el takeaway t-heading" style="left:144px;top:872px;width:1680px;height:96px">Use the table for lookup; use the figure for the claim.</div>
+</div>
+
+<!-- Pattern: chart — for: trend, ranking, or proportion; regions: chart, takeaway; components: chart + tag + takeaway; may vary: 3–8 native marks, chart type, and optional reference; may not: lose one scale, direct labels, grey context, or add avoidable legends, donuts, rings, and empty grids. -->
+<!-- Component: chart (.chart-specimen) — native chart in the deck, with one vertical g1-to-g3 highlighted mark, direct labels, and a common baseline; the HTML SVG uses plainly illustrative values only. -->
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">One chart mark carries the claim</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1200px;height:60px">Direct labels remove the need for a legend.</div>
+<div class="el pill-o" style="left:1484px;top:252px;width:340px;height:48px">Index · base 100</div>
+<div class="el chart-specimen" style="left:240px;top:368px;width:1440px;height:464px"><svg viewBox="0 0 1440 464" width="1440" height="464"><defs><linearGradient id="chartBar" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#8B7CFF"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs><rect x="120" y="270" width="128" height="192" fill="#605978"/><rect x="470" y="210" width="128" height="252" fill="#605978"/><rect x="820" y="150" width="128" height="312" fill="#605978"/><rect x="1170" y="62" width="128" height="400" fill="url(#chartBar)"/><g fill="#A79FC4" font-family="Arial" font-size="24"><text x="160" y="254">62</text><text x="510" y="194">88</text><text x="854" y="134">112</text><text x="1204" y="46" fill="#F5F3FF">148</text></g></svg></div>
+<div class="el takeaway t-heading" style="left:144px;top:888px;width:1680px;height:84px">Highlight the named period; keep every sibling grey.</div>
+</div>
+
+<!-- Pattern: before-after — for: matched state change; regions: left, right, takeaway; components: before-after ×2 + metric + takeaway; may vary: 3–5 matched measures; may not: change row order or units, mark the before state, or place an arrow between halves. -->
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Matched states expose the change</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Hold geometry, order, measure, and unit constant.</div>
+<!-- Component: before-after (.state) — one of two matched states; may vary: values and 3–5 rows; may not: change geometry, units, or row order between states. -->
+<div class="el state" style="left:144px;top:372px;width:804px;height:420px"></div>
+<div class="el t-label c-muted" style="left:144px;top:404px;width:700px;height:32px">Before</div>
+<div class="el t-metric-sm c-muted" style="left:144px;top:472px;width:700px;height:144px">6.2 days</div>
+<div class="el t-body c-muted" style="left:144px;top:656px;width:700px;height:80px">31% over ten days</div>
+<div class="el state" style="left:1020px;top:372px;width:804px;height:420px"></div>
+<div class="el t-label c-muted" style="left:1020px;top:404px;width:700px;height:32px">After</div>
+<div class="el t-metric-sm gtext" style="left:1020px;top:472px;width:700px;height:144px">2.1 days</div>
+<div class="el t-body" style="left:1020px;top:656px;width:700px;height:80px">4% over ten days</div>
+<div class="el takeaway t-heading" style="left:144px;top:856px;width:1680px;height:112px">The after figure gets the pointer; comparison does the rest.</div>
+</div>
+
+<!-- Pattern: text — for: a bounded argument that needs prose; regions: body, takeaway; components: lead ×2 + takeaway; may vary: two or three paragraphs; may not: exceed the density ceiling, box the conclusion, or apply gradient to a phrase inside a paragraph. -->
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Prose stays flat until the conclusion</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Neutral rules organize the argument without becoming pointers.</div>
+<!-- Component: lead (.prose) — short unboxed explanatory paragraph; may vary: two or three blocks; may not: use a gradient rule, card, or inline gradient phrase. -->
+<div class="el prose t-body" style="left:144px;top:376px;width:1680px;height:150px">Use short paragraphs with distinct jobs and room to breathe.</div>
+<div class="el prose t-body" style="left:144px;top:584px;width:1680px;height:150px">Put the consequence in its own box so the gradient marks a complete thought.</div>
+<div class="el takeaway t-heading gtext" style="left:144px;top:840px;width:1680px;height:120px">End prose with one bounded action.</div>
+</div>
+
+<!-- Pattern: relationship — for: a cycle or hub without a first step; regions: hub, col-1, col-2, col-3, takeaway; components: hub + step ×3 + connector + takeaway; may vary: 3–5 equal nodes and marked pivot; may not: add arrowheads, a milestone pill, unequal nodes, or a gradient connector. -->
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">A relationship has a pivot, not a start</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Equal nodes and neutral links keep direction open.</div>
+<!-- Component: hub (.node-g) — named pivot among equal relationship nodes; may vary: target and 3–5 satellites; may not: carry a pill, imply sequence, or change node geometry. -->
+<div class="el node-g" style="left:772px;top:372px;width:376px;height:150px">Review</div>
+<div class="el connector" style="left:959px;top:522px;width:2px;height:90px"></div>
+<div class="el node" style="left:144px;top:664px;width:376px;height:150px">Observe</div>
+<div class="el connector" style="left:520px;top:738px;width:252px;height:2px"></div>
+<div class="el node" style="left:772px;top:664px;width:376px;height:150px">Decide</div>
+<div class="el connector" style="left:1148px;top:738px;width:252px;height:2px"></div>
+<div class="el node" style="left:1400px;top:664px;width:376px;height:150px">Adjust</div>
+<div class="el takeaway t-heading" style="left:144px;top:880px;width:1680px;height:88px">Outline the named pivot without adding a sequence pill.</div>
+</div>
+
+<!-- Part: Closing -->
+<!-- Frame: closing — keep the edge; place one gradient ask at y 404, a neutral rule below it, and at most two flat conditions; nothing follows the closing slide, and appendix material belongs in a separate deck. -->
 <div class="slide">
 <div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
 <div class="el t-label c-muted" style="left:144px;top:336px;width:800px;height:32px">The ask</div>
-<div class="el t-cover-title gtext" style="left:144px;top:404px;width:1560px;height:200px">Approve the next step</div>
+<div class="el t-cover-title gtext" style="left:144px;top:404px;width:1560px;height:180px">Point once. Decide clearly.</div>
 <div class="el rule" style="left:144px;top:676px;width:1680px;height:1px"></div>
-<div class="el t-body" style="left:144px;top:724px;width:804px;height:180px"><span class="bold">Condition one.</span> State the owner or boundary that makes the decision safe.</div>
-<div class="el t-body" style="left:1020px;top:724px;width:804px;height:180px"><span class="bold">Condition two.</span> State the measure and review point that release the next stage.</div>
-</div>
-
-<!-- Part 6: Components -->
-<div class="slide">
-<div class="el sheet-label" style="left:144px;top:72px;width:600px;height:32px">Pointer components</div>
-<!-- Component: metric (.t-metric.gtext) — key figure; may vary: figure and unit; may not: split its gradient or box it. -->
-<div class="el t-metric gtext" style="left:144px;top:160px;width:760px;height:230px">−42%</div>
-<!-- Component: lead (.t-caption.c-muted) — flat metric context; may vary: one or two lines; may not: repeat the figure. -->
-<div class="el t-caption c-muted" style="left:144px;top:414px;width:760px;height:96px">metric-pointer + metric-qualifier</div>
-<!-- Component: container (.card) — equal supporting option; may vary: label, heading and short copy; may not: change sibling geometry. -->
-<div class="el card" style="left:1008px;top:160px;width:384px;height:350px"></div>
-<div class="el t-label c-muted" style="left:1048px;top:202px;width:304px;height:32px">card</div>
-<div class="el t-heading" style="left:1048px;top:260px;width:304px;height:64px">Alternative</div>
-<div class="el t-caption c-muted" style="left:1048px;top:344px;width:304px;height:100px">Flat surface and one neutral hairline.</div>
-<!-- Component: selected (.card-g) — one selected option among 2–4 equal cards; may vary: winner and copy; may not: lose its one 4px outline and pill, equal geometry and measure, or muted flat siblings. -->
-<div class="el card-g" style="left:1440px;top:160px;width:384px;height:350px"></div>
-<div class="el pill-g" style="left:1480px;top:202px;width:210px;height:48px">Recommended</div>
-<div class="el t-heading" style="left:1480px;top:276px;width:304px;height:64px">Selected</div>
-<div class="el t-caption c-muted" style="left:1480px;top:360px;width:304px;height:100px">card-g + pill-g</div>
-<!-- Component: tag (.pill-o) — title metadata; may vary: index, period and unit; may not: be used decoratively. -->
-<div class="el pill-o" style="left:144px;top:650px;width:340px;height:48px">Index · base 100</div>
-<!-- Component: tag (.pill) — inactive agenda state; may vary: label; may not: be used as the claim pointer. -->
-<div class="el pill" style="left:532px;top:650px;width:280px;height:48px">02 Evidence</div>
-<div class="el t-body" style="left:144px;top:760px;width:1680px;height:120px">The four legal pointer roles are metric text, one selected card or step, one native chart mark, and the edge bar when no claim is made.</div>
-</div>
-
-<div class="slide">
-<div class="el sheet-label" style="left:144px;top:72px;width:600px;height:32px">Sequence and prose components</div>
-<!-- Component: step (.node) — equal sequence step; may vary: short verb phrase; may not: vary size within a set. -->
-<!-- Component: numbered — none; use equal step nodes with short verb phrases instead -->
-<div class="el node" style="left:144px;top:180px;width:384px;height:220px">Configure</div>
-<!-- Component: connector (.connector) — neutral node link; may vary: length and orientation; may not: add gradient. -->
-<div class="el connector" style="left:528px;top:289px;width:48px;height:2px"></div>
-<!-- Component: selected (.node-g) — named gate among 3–5 equal nodes; may vary: target; may not: lose neutral connectors, muted siblings and one outline. -->
-<!-- Component: hub (.node-g) — named pivot among equal relationship nodes; may vary: target; may not: imply a start with arrows or carry a pill. -->
-<!-- Component: milestone (.pill-g) — left-to-right sequence gate; may vary: gate label; may not: appear on a cycle. -->
-<div class="el node-g" style="left:576px;top:180px;width:384px;height:220px">Measure</div>
-<div class="el pill-g" style="left:624px;top:148px;width:240px;height:48px">Step 2 · gate</div>
-<!-- Component: lead (.connector) — organise unboxed prose beside a neutral rule; may vary: rule height; may not: add gradient. -->
-<div class="el connector" style="left:1056px;top:180px;width:2px;height:220px"></div>
-<div class="el t-body" style="left:1104px;top:180px;width:720px;height:220px">A short paragraph sits beside a neutral rule. Its conclusion belongs in a separate takeaway box rather than receiving an inline gradient.</div>
-<!-- Component: takeaway (.t-heading.gtext) — consequence or action; may vary: one sentence; may not: restate the title or exceed two lines. -->
-<div class="el rule" style="left:144px;top:560px;width:1680px;height:1px"></div>
-<div class="el t-heading gtext" style="left:144px;top:608px;width:1680px;height:110px">Takeaway line names what the room should do next.</div>
-<!-- Component: icon (.card) — one meaningful line asset on a flat surface; may vary: asset; may not: use emoji or decoration. -->
-<div class="el card" style="left:144px;top:820px;width:96px;height:96px"></div>
-<div class="el t-caption c-muted" style="left:272px;top:830px;width:760px;height:80px">icon-slot · one monochrome asset on a flat surface</div>
-</div>
-
-<div class="slide">
-<div class="el sheet-label" style="left:144px;top:72px;width:600px;height:32px">Table and native chart components</div>
-<!-- Component: table (.table-row) — exact values; may vary: 3–6 rows and 3–5 columns; may not: lose right-aligned figures and hairlines, add zebra or vertical rules or a gradient cell, or retain the claimed figure instead of lifting it into metric. -->
-<div class="el table-row t-label c-muted" style="left:144px;top:160px;width:804px;height:56px"><span style="width:45%">Item</span><span style="width:30%">Type</span><span style="width:25%">Value</span></div>
-<div class="el table-row t-table" style="left:144px;top:216px;width:804px;height:76px"><span style="width:45%">Primary row</span><span class="c-muted" style="width:30%">recurring</span><span style="width:25%">96k</span></div>
-<div class="el table-row t-table" style="left:144px;top:292px;width:804px;height:76px"><span style="width:45%">Secondary row</span><span class="c-muted" style="width:30%">one-off</span><span style="width:25%">54k</span></div>
-<div class="el table-row t-table bold" style="left:144px;top:368px;width:804px;height:76px"><span style="width:75%">Total</span><span style="width:25%">150k</span></div>
-<!-- Component: chart (.chart-specimen) — trend, ranking or proportion; may vary: 3–8 native marks, type and optional reference; may not: lose one common baseline and scale, direct labels, one gradient mark, grey siblings and one series, or add empty grids, avoidable legends, donuts, rings or div bars. -->
-<div class="el chart-specimen" style="left:1080px;top:160px;width:744px;height:360px">
-  <svg viewBox="0 0 744 360" width="744" height="360">
-    <defs><linearGradient id="prismBar" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#8B7CFF"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs>
-    <rect x="80" y="210" width="100" height="148" fill="#605978"/><rect x="310" y="150" width="100" height="208" fill="#605978"/><rect x="540" y="70" width="100" height="288" fill="url(#prismBar)"/>
-    <g fill="#A79FC4" font-family="Helvetica Neue,Arial" font-size="22"><text x="108" y="200">62</text><text x="338" y="140">88</text><text x="562" y="60" fill="#F5F3FF">148</text><text x="112" y="340">Q1</text><text x="342" y="340">Q2</text><text x="572" y="340" fill="#F5F3FF">Q3</text></g>
-  </svg>
-</div>
-<div class="el t-caption c-muted" style="left:1080px;top:548px;width:744px;height:80px">native-chart · direct labels · one baseline · one gradient mark</div>
-<div class="el rule" style="left:144px;top:700px;width:1680px;height:1px"></div>
-<div class="el t-body" style="left:144px;top:752px;width:1680px;height:150px">Tables inherit the template font. Charts use native objects, direct labels and the fewest colours that distinguish the claimed mark from its context.</div>
-</div>
-
-<!-- Part 7: Layouts -->
-<!-- Layout: single-body — one explanatory claim or figure; vary body form, never split it decoratively. -->
-<div class="slide">
-<div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:310px;width:1680px;height:570px"><span class="region-name">body</span><span class="region-fill">metric or lead</span></div>
-<div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
-</div>
-
-<!-- Layout: comparison — selection or before/after; vary content/marked side; keep equal geometry and matched row order, measure and unit, with no arrow. -->
-<div class="slide">
-<div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:310px;width:804px;height:570px"><span class="region-name">left</span><span class="region-fill">container or metric</span></div>
-<div class="el region" style="left:996px;top:310px;width:804px;height:570px"><span class="region-name">right</span><span class="region-fill">selected or metric</span></div>
-<div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
-</div>
-
-<!-- Layout: three-columns — compare three options; vary the card-g target, not geometry or measures. -->
-<div class="slide">
-<div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:310px;width:528px;height:570px"><span class="region-name">col-1</span><span class="region-fill">container</span></div>
-<div class="el region" style="left:696px;top:310px;width:528px;height:570px"><span class="region-name">col-2</span><span class="region-fill">selected</span></div>
-<div class="el region" style="left:1272px;top:310px;width:528px;height:570px"><span class="region-name">col-3</span><span class="region-fill">container</span></div>
-<div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
-</div>
-
-<!-- Layout: process-four — sequence or gate; vary 3–5 equal steps, never colour connectors. -->
-<div class="slide">
-<div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:350px;width:384px;height:420px"><span class="region-name">step-1</span><span class="region-fill">step</span></div>
-<div class="el region" style="left:552px;top:350px;width:384px;height:420px"><span class="region-name">step-2</span><span class="region-fill">step</span></div>
-<div class="el region" style="left:984px;top:350px;width:384px;height:420px"><span class="region-name">step-3</span><span class="region-fill">step + selected + milestone</span></div>
-<div class="el region" style="left:1416px;top:350px;width:384px;height:420px"><span class="region-name">step-4</span><span class="region-fill">step</span></div>
-<div class="el region" style="left:120px;top:820px;width:1680px;height:190px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
-</div>
-
-<!-- Layout: chart-takeaway — quantitative pattern; vary native chart and marks, prefer direct labels. -->
-<div class="slide">
-<div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:310px;width:1680px;height:570px"><span class="region-name">chart</span><span class="region-fill">chart + optional metric</span></div>
-<div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
-</div>
-
-<!-- Layout: relationship — hub or cycle; vary 3–5 nodes and target, keep equal nodes, neutral connectors, one outlined node without pill, and no start-implying arrows. -->
-<div class="slide">
-<div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:696px;top:310px;width:528px;height:250px"><span class="region-name">hub</span><span class="region-fill">hub + connector</span></div>
-<div class="el region" style="left:120px;top:650px;width:528px;height:250px"><span class="region-name">col-1</span><span class="region-fill">step</span></div>
-<div class="el region" style="left:696px;top:650px;width:528px;height:250px"><span class="region-name">col-2</span><span class="region-fill">step</span></div>
-<div class="el region" style="left:1272px;top:650px;width:528px;height:250px"><span class="region-name">col-3</span><span class="region-fill">step</span></div>
-</div>
-
-<!-- Layout: table-or-chart — exact values or proportional evidence; vary exhibit and lifted figure, keep direct labels, common scale and no emphasis inside a table. -->
-<div class="slide">
-<div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:310px;width:1160px;height:570px"><span class="region-name">exhibit</span><span class="region-fill">table or chart</span></div>
-<div class="el region" style="left:1328px;top:310px;width:472px;height:570px"><span class="region-name">body</span><span class="region-fill">metric + lead</span></div>
-<div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
-</div>
-
-<!-- Part 8: Showcase -->
-<div class="slide">
-<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
-<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Monthly run cost falls by 42%</div>
-<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Idle capacity outside the peak window is the whole saving.</div>
-<div class="el t-metric gtext" style="left:144px;top:336px;width:804px;height:248px">−42%</div>
-<div class="el t-caption c-muted" style="left:144px;top:608px;width:804px;height:96px">Same request volume and baseline across three periods.</div>
-<div class="el chart-specimen" style="left:1020px;top:336px;width:804px;height:520px">
-  <svg viewBox="0 0 804 520" width="804" height="520">
-    <defs><linearGradient id="showBar" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#8B7CFF"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs>
-    <rect x="90" y="120" width="128" height="398" fill="#605978"/><rect x="338" y="208" width="128" height="310" fill="#605978"/><rect x="586" y="286" width="128" height="232" fill="url(#showBar)"/>
-    <g fill="#A79FC4" font-family="Helvetica Neue,Arial" font-size="24"><text x="128" y="104">100</text><text x="378" y="192">78</text><text x="624" y="270" fill="#F5F3FF">58</text><text x="136" y="500">Q1</text><text x="384" y="500">Q2</text><text x="632" y="500" fill="#F5F3FF">Q3</text></g>
-  </svg>
-</div>
-<div class="el rule" style="left:144px;top:964px;width:1680px;height:1px"></div>
-<div class="el t-body" style="left:144px;top:980px;width:1680px;height:56px">Keep the peak window bounded before committing the saving.</div>
-</div>
-
-<div class="slide">
-<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
-<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Shared ownership is the recommended model</div>
-<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">It removes hand-offs without concentrating every decision.</div>
-<div class="el card" style="left:144px;top:336px;width:528px;height:584px"></div>
-<div class="el t-label c-muted" style="left:192px;top:384px;width:432px;height:32px">Central</div>
-<div class="el t-heading" style="left:192px;top:452px;width:432px;height:64px">One owner</div>
-<div class="el t-body c-muted" style="left:192px;top:540px;width:432px;height:220px">Simple accountability, but the queue becomes a bottleneck at peak load.</div>
-<div class="el card-g" style="left:720px;top:336px;width:528px;height:584px"></div>
-<div class="el pill-g" style="left:768px;top:384px;width:240px;height:48px">Recommended</div>
-<div class="el t-heading" style="left:768px;top:452px;width:432px;height:64px">Shared ownership</div>
-<div class="el t-body" style="left:768px;top:540px;width:432px;height:220px">One intake rule with local decisions keeps work moving and boundaries visible.</div>
-<div class="el card" style="left:1296px;top:336px;width:528px;height:584px"></div>
-<div class="el t-label c-muted" style="left:1344px;top:384px;width:432px;height:32px">Distributed</div>
-<div class="el t-heading" style="left:1344px;top:452px;width:432px;height:64px">Local owners</div>
-<div class="el t-body c-muted" style="left:1344px;top:540px;width:432px;height:220px">Fast within each group, but cross-group work still loses a clear route.</div>
-<div class="el rule" style="left:144px;top:964px;width:1680px;height:1px"></div>
-<div class="el t-body" style="left:144px;top:980px;width:1680px;height:56px">Name the shared intake owner and review the boundary after the first phase.</div>
+<div class="el t-body" style="left:144px;top:724px;width:804px;height:160px"><span class="bold">One claim.</span> Let the title name it.</div>
+<div class="el t-body" style="left:1020px;top:724px;width:804px;height:160px"><span class="bold">One pointer.</span> Let the gradient mark it.</div>
 </div>
 
 </body>

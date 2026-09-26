@@ -22,36 +22,59 @@ catalogue (`styles`) and one bundled style's HTML (`base`) to imitate; `run_styl
 
 ## Skeleton
 
-Every style has the same parts in the same order, so a composer knows where to look for
-"how does this style do a comparison" and a style author has a template to fill.
+A style is **the first deck built in that style, about that style**. Every slide is a real
+slide of the style — its frame, its components, its density — and says something the composer
+needs: the rules, the message grammar, how a comparison or a table is built here. Nothing is a
+specimen sheet: the palette is seen on the slides and explained in `:root`, the type ramp is
+the slides' own titles and body, components are defined where a slide first uses them.
+
+This is also what makes the gallery honest: a person choosing a style sees slides that look
+exactly like the deck they will get. A style whose own slides are denser, more decorated or
+more varied than its rules allow is a false sample — and composers copy what they see.
+
+Parts, in this order, each opened by a marker comment (`<!-- Part: Rules -->`):
 
 | Part | Content |
 |---|---|
-| 0 `<title>` + `:root` | `<title>` is `name — one paragraph`: audience, purpose, the design decision, the signature look. It becomes the description in `list_styles()`. `:root` holds the design tokens (contract below). |
-| 1 Cover | The style's own cover slide. **Always the first `.slide`** — the gallery shows it as the thumbnail. |
-| 2 Rules | Read first by agents. The design decision (who reads this, in what setting, under what constraint) and DO / DON'T lists that **follow from it**. |
-| 3 Message & Outline | What the orchestrator reads before writing the outline: title grammar (assertion sentence, noun phrase, single word…), one claim per slide, lead-in and closing conventions, density per slide, chapter shape (agenda tracker, section dividers, summary first…), which visual forms this style favours. The style states per-slide density and chapter shape, but **deck length is not the style's decision**: it follows the brief and material (audience, time, takeaway). |
-| 4 Palette & Type | One or two slides. Each colour as a small chip with its token name and its job (which colour means what, how many accents on one slide, text colour on each fill); the size ramp at real size, one row per `--fs-*` token with pt / line height and when to use it (max lines per title). Values live in `:root` — do not restate them in prose. |
-| 5 Frame | The elements repeated on every slide — title band, section label, section divider, agenda tracker, closing slide — built exactly as composers should build them. **Shown here once**; later parts do not repeat it. |
-| 6 Components | The parts *this* style builds slides from, each shown alone at real size on a few sheet slides, named by **role** from the vocabulary below. Each component is preceded by `<!-- Component: <role> (.<class>) — when; may vary: …; may not: … -->`. A required role the style does without still gets its line — `<!-- Component: container — none; group by whitespace and rules -->` — so a composer never guesses. |
-| 7 Layouts | 5–8 wireframes of how this style divides a slide: one `.el frame-ghost` box marking the area Part 5's frame occupies, then named `.el region` boxes — the same short names the layout pass writes (`body`, `left` / `right`, `step-1`…, `media`, `takeaway`) — each labelled with the component roles that fill it (`step ×4 + connector`). Cover the recurring slide types (single body, comparison, 3 / 4 columns, process, media beside text, table or chart with takeaway) and what the style is for (swimlane, dashboard, code). Each layout's comment says which kind of claim it serves and what may vary. |
-| 8 Showcase | 2–3 finished slides combining components in layouts, frame included — the style's most characteristic slides. They are what a person sees in the gallery. |
+| `<head>` | `<title>` is `name — one paragraph`: audience, purpose, the design decision, the signature look; it becomes the description in `list_styles()`. `:root` holds the tokens (contract below), each with a short comment saying its job (which colour means what, when a size is used, max lines). CSS follows. |
+| Cover | The style's cover. **Always the first `.slide`** — the gallery thumbnail. |
+| Rules | The design decision (who reads this, in what setting, under what constraint) and the DO / DON'T that **follow from it**. As many slides as the rules need at the style's own density. |
+| Message & Outline | What the orchestrator reads before writing the outline: title grammar, one claim per slide, per-slide density, lead-in and closing conventions, chapter shape (agenda tracker, section dividers, summary first…), favoured visual forms. **Deck length is not the style's decision**: it follows the brief and material. |
+| Patterns | One slide per recurring slide type, each built as that pattern and explaining it: the comparison slide compares, the process slide is a process of how to build one. Required: `comparison`, `columns`, `process`, `metric`, `table`, `chart`; add what the style is for (`relationship`, `before-after`, `text`, `media`, `timeline`, `matrix`, `dashboard`, `swimlane`, `code`, `architecture`). Open with a section divider. |
+| Closing | The closing frame, ending on what makes the style this style. |
 
-Fill every part. Components and Layouts are what keep a deck in this style's look instead of
-the composer's default; the palette alone does not.
+**Frames** are the elements repeated on every slide — title band, section label, agenda
+tracker — plus the section divider and the closing slide. They appear on every slide of the
+file; comment them once, at first use: `<!-- Frame: content — … -->`, `<!-- Frame: divider — … -->`,
+`<!-- Frame: closing — … -->`.
 
-**One fact in one place.** Token values live in `:root`, the frame in Part 5, each component in
-Part 6, region sets in Part 7. A later part refers to an earlier one by class name instead of
-rebuilding it. Everything in the file is either read as an instruction or copied as
-geometry, so leave out what is neither: invented body text and sources, captions that repeat
-the comment, div-drawn charts (charts are native — state their conventions in Part 6), notes
-explaining the demo.
+**Patterns** carry one comment each, which is what the layout pass reads:
+`<!-- Pattern: comparison — for: …; regions: left, right, takeaway; components: container ×2 + selected + takeaway; may vary: …; may not: … -->`.
+Region names are the ones the layout pass writes (`body`, `left` / `right`, `col-1`…,
+`step-1`…, `media`, `chart`, `table`, `takeaway`, `kpi-1`…).
+
+**Density.** Every visible slide obeys the style's own density rule, which the Message & Outline
+part states in words and once as a marker the contract test reads: `<!-- Density: 45 -->`
+(maximum visible words on any slide of the file, labels included). When the rules or the grammar need more words than one slide allows, use more
+slides — never smaller type or tighter boxes. Detail a person does not need in order to judge
+the style — the reason behind each rule, exact coordinates, edge cases — goes in the HTML
+comment next to the slide. Say each thing once: the comment adds to the visible text, it does
+not repeat it.
+
+**One fact in one place.** Token values live in `:root`, a frame is commented where it first
+appears, a component where it is first used, a pattern on its own slide. Leave out what is
+neither an instruction nor a sample: invented sources, captions that repeat the comment,
+notes explaining the demo.
 
 ## Component vocabulary
 
 Roles are shared by every style; how a role looks is each style's decision. Naming components
-by role lets a composer find "this style's comparison part" in any style, and lets Part 7 and
-the layout pass label regions the same way everywhere.
+by role lets a composer find "this style's selected card" in any style, and lets patterns and
+the layout pass name what fills a region the same way everywhere. Define each component with a
+comment directly before the slide element that first uses it:
+`<!-- Component: <role> (.<class>) — when; may vary: …; may not: … -->`. A required role the
+style does without still gets its line — `<!-- Component: container — none; group by
+whitespace and rules -->` — so a composer never guesses.
 
 | Group | Roles | Required |
 |---|---|---|
@@ -159,10 +182,10 @@ The demo slides are read as coordinates, so the format is constrained:
   warn about it in every style. The only renderer facts worth stating are limits a composer
   cannot infer (native tables inherit the template font; slide JSON has no letter-spacing,
   line-height or intermediate font weights).
-- **Comment components and layouts.** Each Part 6 component and Part 7 layout has an HTML
-  comment: what it is for, why it is built this way in this style, what to vary and what not to.
-- Keep text on demo slides as placeholder content ("Claim of this slide stated as a sentence",
-  "Step 1 — verb phrase"), not real content from any deck.
+- **Comment frames, components and patterns** where they first appear: what it is for, why it is
+  built this way in this style, what to vary and what not to.
+- **The slides talk about the style**, never about a real deck's subject. A chart or table
+  pattern needs numbers: use a few plainly illustrative values.
 
 ## Working procedure
 
@@ -170,7 +193,7 @@ The demo slides are read as coordinates, so the format is constrained:
   derive a short kebab-case name.
 - Save with `write_style(name, html)` in `run_style_python`; it stores the file in the user's
   style store (locally `~/.config/sdpm/styles/`), where `list_styles()` and the gallery pick it
-  up. Each write is immediately visible, so write incrementally — skeleton and `:root` first,
+  up. Each write is immediately visible, so write incrementally — `:root` and the cover first,
   then parts in order — and refine.
 - `analyze_template(...)` reads a reference PPTX's theme; `read_guides(["import-pptx"])` when
   the reference deck should be inspected slide by slide.
