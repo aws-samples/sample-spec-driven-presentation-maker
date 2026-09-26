@@ -196,6 +196,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- `code_block` rendered code one character per line: the element margins were written
+  as EMU (`50000` / `30000`) but the builder reads them as px, so the text area collapsed.
+  Margins are now px (8 / 5), the code body uses a monospace font on every surface, and
+  the remote server's `code_block` shares `sdpm.api.code_block` instead of a second
+  element builder. (Reported in
+  [a fork-update writeup](https://qiita.com/yama3133/items/1b1dc9c26f47ab726ec5).)
+
 - `grid` accepts `rows` / `columns` given as an int (`"rows": 1`) or a token list;
   the int form crashed the tool in a real composer run.
 

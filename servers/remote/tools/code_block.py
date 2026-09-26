@@ -1,9 +1,12 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Code block generation — saves syntax-highlighted code as include file in S3."""
+"""Code block generation — saves syntax-highlighted code as include file in S3.
+
+Element construction lives in ``sdpm.api.code_block`` (shared with the local server and
+the CLI); this module only adds the S3 persistence.
+"""
 
 import json
-from typing import Any
 
 from storage import Storage
 
@@ -37,41 +40,11 @@ def code_block_to_include(
     Returns:
         Dict with include_path for use in presentation.json.
     """
-    from sdpm.utils.text import highlight_code
-    from sdpm.engine.builder.constants import CODE_COLORS
+    from sdpm.api import code_block
 
-    colors = CODE_COLORS.get(theme, CODE_COLORS["dark"])
-    bg = colors["background"]
-    inverse_theme = "light" if theme == "dark" else "dark"
-    inverse_bg = CODE_COLORS[inverse_theme]["background"]
-    label_fg = "000000" if theme == "dark" else "FFFFFF"
-    label_height = 22
-
-    label_map = {"typescript": "TypeScript", "javascript": "JavaScript", "csharp": "C#", "cpp": "C++"}
-    label_text = label_map.get(language, language.capitalize())
-
-    elements: list[dict[str, Any]] = [
-        {
-            "type": "textbox",
-            "x": x, "y": y, "width": width, "height": label_height,
-            "fontSize": 8, "align": "left",
-            "fill": inverse_bg,
-            "text": f"{{{{#{label_fg}:{label_text}}}}}",
-            "marginLeft": 50000, "marginTop": 0, "marginRight": 0, "marginBottom": 0,
-            "autoWidth": True,
-        },
-    ]
-
-    spans = highlight_code(code, language, theme)
-    elements.append({
-        "type": "textbox",
-        "x": x, "y": y + label_height,
-        "width": width, "height": height - label_height,
-        "fill": bg,
-        "text": spans,
-        "fontSize": 11, "fontFamily": "Courier New",
-        "marginLeft": 50000, "marginTop": 30000, "marginRight": 50000, "marginBottom": 30000,
-    })
+    elements = code_block(
+        code=code, language=language, theme=theme, x=x, y=y, width=width, height=height,
+    )
 
     # Save to S3 includes/
     include_path = f"includes/{name}.json"
