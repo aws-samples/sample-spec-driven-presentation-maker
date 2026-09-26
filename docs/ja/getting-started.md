@@ -29,8 +29,9 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 2. **「ブラウザ用の Web UI も入れますか？」** — yes なら Node.js 20+ と Kiro CLI（Web UI の
    エージェント基盤）を入れて UI をビルド、no なら Node.js 不要の MCP のみ構成。
 3. `~/.sdpm/checkout` に clone し、サーバー環境を同期し、AWS / Material のアイコンカタログを取得。
-4. **「<client> に SDPM を登録しますか？」** — マシン上で見つかった MCP クライアントごとに 1 回
-   聞きます。yes と言わない限り何も書きません。最後に次にやることを表示します。
+4. **Connect SDPM to your MCP clients** — マシン上で見つかったクライアントのチェックリスト（全部 on）。
+   不要なものを space で外し、enter で確定。結果が表で出ます: ✓ registered / – skipped（後でやる
+   `sdpm register <client>` 付き）/ ✗ failed。外したクライアントには何も書きません。
 
 再実行しても既存のインストールを修復するだけで、2 つ目は作りません。
 
@@ -55,7 +56,7 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 sdpm                    状態: 版、プロファイル、入っている面、接続済みクライアント
 sdpm webui              ブラウザ用 Web UI を起動して開く
 sdpm mcp                MCP サーバーを stdio で起動（ターミナルでの動作確認用）
-sdpm register [CLIENT]  MCP クライアントに接続（クライアントごとに確認。--yes, --dry-run）
+sdpm register [CLIENT]  MCP クライアントに接続（検出クライアントのチェックリスト。--yes, --dry-run）
 sdpm unregister         接続を解除
 sdpm mcp-config [CLIENT]  このマシンのパス入りでクライアント設定を表示（--json, --all）
 sdpm update [--with-webui]  main を取得して同期し、入っているものを再ビルド（Web UI の追加も）

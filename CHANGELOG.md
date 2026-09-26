@@ -49,7 +49,8 @@ Entries before v0.5.0 were written retroactively as summaries.
   `~/.sdpm` once — dependencies, checkout, MCP server environment, icon catalogs — and
   create the `sdpm` launcher. The installer asks two questions: whether to add the browser
   Web UI (`--full` / `--mcp-only`; MCP-only needs no Node.js) and which detected MCP
-  clients to connect (`--register` / `--no-register`). `sdpm webui` starts the Web UI,
+  clients to connect — a checklist of the detected clients, ending in a ✓ / – / ✗ result table
+  (`--register` / `--no-register`). `sdpm webui` starts the Web UI,
   `sdpm mcp` runs the server on stdio, `sdpm register` / `unregister` / `mcp-config`
   connect clients through their own CLIs — Claude Code, VS Code, Codex — or open Cursor's
   deep link built with the real paths; other clients get the JSON and the file it belongs

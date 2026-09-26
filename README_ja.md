@@ -65,8 +65,8 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
 irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
 ```
 
-インストーラーが聞くのは 2 つだけ — ブラウザ用 Web UI も入れるか（Node.js が必要）と、
-どの MCP クライアントに接続するか。最後に次にやることを表示します。その後は:
+インストーラーが聞くのは 2 つだけ — ブラウザ用 Web UI も入れるか（Node.js が必要）と、見つかった
+MCP クライアントのチェックリストからどれに接続するか。最後に何を登録したかを表で示します。その後は:
 
 | やりたいこと | 手順 |
 |---|---|

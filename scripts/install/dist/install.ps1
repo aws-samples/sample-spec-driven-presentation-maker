@@ -588,32 +588,27 @@ $script:RegisterFailed = $false
 
 function Register-Clients {
     Write-Host ""
-    if ($script:RegisterMode -eq "no") { try { Invoke-Launcher @("mcp-config") } catch { }; return }
+    if ($script:RegisterMode -eq "no") { Write-Host "  Skipping client registration (-NoRegister). Later: sdpm register"; return }
     if ($script:RegisterMode -eq "yes") {
         try { Invoke-Launcher @("register", "--yes"); if ($LASTEXITCODE -ne 0) { $script:RegisterFailed = $true } }
         catch { $script:RegisterFailed = $true }
         return
     }
-    if ($script:NonInteractive) { try { Invoke-Launcher @("mcp-config") } catch { }; return }
-    Write-Host "  Connect your MCP clients now? Each one is asked separately; nothing is written"
-    Write-Host "  without your yes, and 'sdpm register' does the same later."
-    try { Invoke-Launcher @("register") } catch { }
+    if ($script:NonInteractive) { Write-Host "  Non-interactive: clients were not registered. Later: sdpm register   (or re-run with -Register)"; return }
+    try { Invoke-Launcher @("register"); if ($LASTEXITCODE -ne 0) { $script:RegisterFailed = $true } } catch { $script:RegisterFailed = $true }
 }
 
 function Show-Completion {
-    Write-Host "`n  SDPM is installed.`n" -ForegroundColor Green
-    Write-Host "    Your agent:   ask it `"Make slides about ...`" - it finds SDPM through MCP."
-    Write-Host "                  Kiro CLI: kiro-cli chat --agent $env:SDPM_AGENT_NAME"
+    Write-Host "  SDPM is installed" -ForegroundColor Green -NoNewline; Write-Host " in $Checkout`n"
     if ($script:Profile -eq "full") {
-        Write-Host "    Browser:      sdpm webui"
+        Write-Host "    Browser:   sdpm webui"
         & kiro-cli whoami *> $null
-        if ($LASTEXITCODE -ne 0) { Write-Host "                  (the Web UI uses Kiro CLI: run 'kiro-cli login' once first)" }
+        if ($LASTEXITCODE -ne 0) { Write-Host "               (the Web UI uses Kiro CLI - run 'kiro-cli login' once first)" }
     } else {
-        Write-Host "    Browser:      not installed - add it any time with 'sdpm update --with-webui'"
+        Write-Host "    Browser:   not installed - sdpm update --with-webui"
     }
-    Write-Host "    Later:        sdpm            status      sdpm register   connect more clients"
-    Write-Host "                  sdpm update     upgrade     sdpm uninstall  remove"
-    Write-Host "`n    Checkout: $Checkout"
+    Write-Host "    Agents:    ask for slides in a registered client (table above)"
+    Write-Host "    Later:     sdpm  |  sdpm register  |  sdpm update  |  sdpm uninstall"
     Write-Host "    Open a new terminal so 'sdpm' is on PATH."
     if ($script:RegisterFailed) {
         Write-Host "    Some client registrations failed (see above). Fix them with 'sdpm register <client>'." -ForegroundColor Yellow

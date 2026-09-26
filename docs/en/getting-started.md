@@ -31,8 +31,10 @@ What happens:
    UI's agent backend) and builds the UI; no gives you an MCP-only install with no Node.js.
 3. The checkout is cloned to `~/.sdpm/checkout`, the server environment is synced, and the
    AWS / Material icon catalogs are downloaded.
-4. **"Register SDPM with <client>?"** — asked once per MCP client found on the machine.
-   Nothing is written without your yes. The final screen tells you what to do next.
+4. **Connect SDPM to your MCP clients** — a checklist of the clients found on the machine,
+   all ticked; untick what you do not want (space), confirm (enter). A result table follows:
+   ✓ registered / – skipped (with the `sdpm register <client>` to do it later) / ✗ failed.
+   Nothing is written for an unticked client.
 
 Re-running the installer repairs an existing installation; it never creates a second one.
 
@@ -58,7 +60,7 @@ Environment equivalents: `SDPM_PROFILE=full|mcp`, `SDPM_REGISTER=yes|no`,
 sdpm                    status: version, profile, surfaces, which clients are connected
 sdpm webui              start the browser Web UI and open it
 sdpm mcp                run the MCP server on stdio (to check it from a terminal)
-sdpm register [CLIENT]  connect MCP clients (asks per client; --yes, --dry-run)
+sdpm register [CLIENT]  connect MCP clients (checklist of detected clients; --yes, --dry-run)
 sdpm unregister         disconnect them again
 sdpm mcp-config [CLIENT]  print the client configuration with this machine's paths (--json, --all)
 sdpm update [--with-webui]  pull main, sync, rebuild what is installed (or add the Web UI)
