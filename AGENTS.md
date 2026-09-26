@@ -3,16 +3,36 @@
 AI-powered presentation generation toolkit. Engine + knowledge in `sdpm/`,
 served through MCP servers (`servers/`), with optional AWS cloud stack.
 
-## First: Are you developing this repo, or using it?
+## First: installing it, using it, or developing it?
+
+**Installing it for a user (you were handed this repository's URL and asked to set it up):**
+→ Do not clone or run anything from a checkout by hand. Run the installer non-interactively:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --mcp-only --non-interactive --register
+```
+
+(Windows PowerShell: `irm …/scripts/install/dist/install.ps1 | iex` with `-McpOnly -NonInteractive -Register`.)
+`--mcp-only` skips the browser Web UI (needs Node.js 20+; use `--full` to include it);
+`--register` connects every MCP client found on the machine and cleans up leftovers of older
+setups without asking; `--agent-name NAME` renames the Kiro CLI agent (default `sdpm`).
+Then verify: `~/.local/bin/sdpm` prints status; `python3 ~/.sdpm/checkout/scripts/install/mcp_smoke.py ~/.local/bin/sdpm mcp`
+must print `OK: … 20 tools`. Tell the user how to start: Kiro CLI `kiro-cli chat --agent sdpm`;
+other clients just ask for slides; browser `sdpm webui`.
+**Migrating an older setup** (Claude Code / Codex plugin, Kiro Power, `make install-kiro`,
+`skills/`, `uvx … sdpm-mcp` entries): all of these are gone — follow
+[Migration: onboarding](docs/en/migration-onboarding.md); `sdpm register` detects and offers
+to remove the Kiro and Claude Code leftovers itself.
 
 **Using it to generate slides:**
-→ Choose one of the two first-class entry points in the [README Quick Start](README.md#quick-start):
-use the full experience in your browser, or connect SDPM to the AI agent you already have.
-Do NOT work inside this repo for everyday slide generation.
+→ [README Quick Start](README.md#quick-start). Do NOT work inside this repo for everyday
+slide generation.
 
 **Developing / modifying this repo:**
 → Work in place. Use `make test` / `make lint` to verify changes. Read the
-[Conventions](#conventions) and [Boundaries](#boundaries) sections first.
+[Conventions](#conventions) and [Boundaries](#boundaries) sections first. To use your
+working tree as the server next to an installed release: `make register-dev`
+(Kiro agent `sdpm-dev`) and `cd web-ui && npm run dev:local`.
 
 ## Project Structure
 
@@ -78,6 +98,14 @@ See [Architecture](docs/en/architecture.md).
 - Do not add logic to `servers/*` that belongs in `sdpm.tools` / `sdpm.engine` / `sdpm.knowledge`
   (infrastructure-only code — S3, DynamoDB, auth — is the exception, and lives in `servers/remote`)
 - Review `infra/config.yaml` before changing deployment settings
+
+## Onboarding code — read before touching
+
+- `docs/en/getting-started.md` — the user contract (installer options, launcher, per-client registration)
+- `docs/en/migration-onboarding.md` — what was removed and why
+- `scripts/install/README.md` — build (`build.sh`, CI rejects drift) and the isolated-home smoke test
+- `servers/local/client_config.py` + `tests/test_client_config.py` — the one implementation of client wiring and its guarded invariants (absolute paths, no launcher/PATH, CLI-based registration, marker-owned files)
+- `.github/workflows/installer.yml` — real install + MCP handshake on ubuntu / macos / windows
 
 ## Further Documentation
 
