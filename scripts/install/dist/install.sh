@@ -86,6 +86,45 @@ show_confirm() {
   case "${reply:-y}" in [Yy]*|"") return 0 ;; *) return 1 ;; esac
 }
 
+# Two-row checklist matching the client picker in servers/local/client_config.py: the MCP
+# server row is always on; the Web UI row toggles. Sets SURFACE_WEBUI=1|0. Falls back to
+# show_confirm without a terminal.
+show_surface_picker() {
+  SURFACE_WEBUI=1
+  if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then return 0; fi
+  if [[ ! -r /dev/tty || ! -t 1 ]]; then
+    if show_confirm "Also install the browser Web UI? [Y/n]"; then SURFACE_WEBUI=1; else SURFACE_WEBUI=0; fi
+    return 0
+  fi
+  _render_surfaces() {
+    printf "  What to install   ${C_DIM}space toggle · enter confirm${C_RESET}\n\n"
+    printf "        ${C_DIM}[x] MCP server        for your AI agent — always installed${C_RESET}\n"
+    if [[ "$SURFACE_WEBUI" == "1" ]]; then
+      printf "  ${C_CYAN}❯${C_RESET} ${C_GREEN}[x]${C_RESET} Browser Web UI    ${C_DIM}needs Node.js 20+; a few minutes of build${C_RESET}\n"
+    else
+      printf "  ${C_CYAN}❯${C_RESET} [ ] Browser Web UI    ${C_DIM}needs Node.js 20+; a few minutes of build${C_RESET}\n"
+    fi
+  }
+  local key
+  printf '\033[?25l'
+  _render_surfaces
+  while :; do
+    IFS= read -rsn1 key </dev/tty || break
+    case "$key" in
+      " ") SURFACE_WEBUI=$((1 - SURFACE_WEBUI)) ;;
+      "") break ;;
+      $'\033') IFS= read -rsn2 -t 1 key </dev/tty || true ;;   # arrows: nothing to move to
+      q) SURFACE_WEBUI=1; break ;;
+    esac
+    printf '\033[4A\033[J'
+    _render_surfaces
+  done
+  printf '\033[4A\033[J\033[?25h'
+  if [[ "$SURFACE_WEBUI" == "1" ]]; then echo "  What to install: MCP server, Browser Web UI"
+  else echo "  What to install: MCP server"; fi
+  echo ""
+}
+
 has_command() { command -v "$1" >/dev/null 2>&1; }
 
 run_with_spinner() {
@@ -671,10 +710,8 @@ choose_profile() {
   [[ -n "$PROFILE" ]] && return 0
   if [[ "$NON_INTERACTIVE" == "1" ]]; then PROFILE=full; return 0; fi
   echo ""
-  echo "  SDPM has two surfaces on one installation:"
-  echo "    - your own AI agent (Kiro CLI, Claude Code, Cursor, …) through the MCP server — always installed"
-  echo "    - a browser Web UI — needs Node.js 20+ and adds a few minutes of build time"
-  if show_confirm "Also install the browser Web UI? [Y/n]"; then PROFILE=full; else PROFILE=mcp; fi
+  show_surface_picker
+  if [[ "$SURFACE_WEBUI" == "1" ]]; then PROFILE=full; else PROFILE=mcp; fi
 }
 
 REGISTER_FAILED=0
