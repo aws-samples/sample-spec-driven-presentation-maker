@@ -44,6 +44,24 @@ the lock back to npm-11 format (this exact mistake shipped once in #254).
 - Known-blocked majors are pinned in `.github/dependabot.yml` `ignore:` with
   re-evaluation triggers in the comment
 
+## Onboarding surfaces — where things live
+
+| Concern | File |
+|---|---|
+| Installer (source → generated `dist/`) | `scripts/install/install.{sh,ps1}`, `lib/tui.*`, `build.sh` |
+| `sdpm` launcher | `scripts/install/launcher.{sh,ps1}` |
+| Client detection / config / registration | `servers/local/client_config.py` (+ `tests/test_client_config.py`) |
+| MCP handshake smoke used by CI | `scripts/install/mcp_smoke.py` |
+| Installer CI (3 OS, real install, handshake) | `.github/workflows/installer.yml` |
+| Claude Desktop bundle | `scripts/mcpb/`, `scripts/build_mcpb.sh`, `release.yml` |
+| Preview dependency reporting | `sdpm/sdpm/engine/preview/environment.py` |
+| Icon catalog auto-install | `sdpm/sdpm/knowledge/assets/download.py` (`ensure_assets_installed_async`) |
+| User-facing contract | `docs/en/getting-started.md`, `docs/en/migration-onboarding.md` |
+
+State the installer leaves in `~/.sdpm`: `checkout/`, `.profile` (full \| mcp), `.uv-path`,
+`.agent-name`. Local smoke: see `scripts/install/README.md` (isolated `SDPM_HOME`, local
+git mirror as `SDPM_REPO_URL`).
+
 ## Security Scanning
 - ASH (Automated Security Helper) v3
 - Local: `ash scan --mode local --fail-on-findings`
