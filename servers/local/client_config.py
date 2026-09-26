@@ -220,6 +220,8 @@ CLIENTS: tuple[Client, ...] = (
         unregister=lambda: ["claude", "mcp", "remove", "--scope", "user", SERVER_NAME],
         list_cmd=["claude", "mcp", "list"],
         manual_target="~/.claude.json",
+        note="Composers run as Claude Code sub-agents (Task), which inherit the server. Approve the sdpm "
+             "tools once, or launch with `claude --allowedTools \"mcp__sdpm__*\"`.",
     ),
     Client(
         id="vscode",
@@ -464,6 +466,8 @@ def register(
                 print(f"  failed — you can add it manually:\n{render_client(client, target)}", file=sys.stderr)
             else:
                 done.append(client)
+            if client.id == "claude-code":
+                _offer_claude_plugin_cleanup(dry_run=dry_run, assume_yes=assume_yes, run=run)
         elif client.deeplink is not None:
             url = client.deeplink(target)
             print(("[dry-run] open " if dry_run else "Opening ") + url)
@@ -484,6 +488,9 @@ def next_step(client: Client, agent_name: str = DEFAULT_KIRO_AGENT) -> str:
         return f"kiro-cli chat --agent {agent_name}   then ask: make slides about …"
     if client.id == "cursor":
         return "confirm the Install dialog Cursor just opened, then ask: make slides about …"
+    if client.id == "claude-code":
+        return ("ask: make slides about …  (approve the sdpm tools once, or start with "
+                "`claude --allowedTools \"mcp__sdpm__*\"` to skip the prompts)")
     return "restart it if it is running, then ask: make slides about …"
 
 
@@ -493,6 +500,30 @@ def _print_leftover_warning() -> None:
         print()
         print("  ! " + leftover_notice(leftovers).replace("\n", "\n    "))
         print("    Remove with: sdpm register kiro-cli   (or sdpm unregister kiro-cli)")
+
+
+CLAUDE_PLUGIN = "sdpm@sdpm"
+
+
+def claude_plugin_installed() -> bool:
+    """The pre-installer Claude Code plugin — its bundled server and skills duplicate ours."""
+    try:
+        out = subprocess.run(["claude", "plugin", "list"], capture_output=True, text=True, timeout=30, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return CLAUDE_PLUGIN in out.stdout
+
+
+def _offer_claude_plugin_cleanup(*, dry_run: bool, assume_yes: bool, run: Callable[[list[str]], int] = _run) -> None:
+    if not claude_plugin_installed():
+        return
+    print(f"The Claude Code plugin {CLAUDE_PLUGIN} (pre-installer) is still installed. It bundles its own")
+    print("copy of the server and skills, so every sdpm tool would appear twice.")
+    argv = ["claude", "plugin", "uninstall", CLAUDE_PLUGIN]
+    if dry_run:
+        print("[dry-run] " + _shell_join(argv))
+    elif assume_yes or _confirm("Uninstall it?"):
+        run(argv)
 
 
 def _offer_leftover_cleanup(*, dry_run: bool, assume_yes: bool, run: Callable[[list[str]], int] = _run) -> None:

@@ -16,7 +16,7 @@ one local installation serves every client and the browser Web UI.
 
    | You had | Remove with |
    |---|---|
-   | Claude Code plugin `sdpm@sdpm` | `/plugin uninstall sdpm@sdpm` |
+   | Claude Code plugin `sdpm@sdpm` | `sdpm register claude-code` detects it and offers `claude plugin uninstall sdpm@sdpm` (or run that yourself) |
    | Claude Code `claude mcp add … uvx …` | `claude mcp remove sdpm` (then `sdpm register claude-code`) |
    | Codex plugin | remove it in the ChatGPT desktop app; `codex mcp remove sdpm` if you added the uvx entry |
    | Kiro CLI `make install-kiro` (agent `sdpm-composer`, `skills/sdpm-*` links, global `mcp.json` entry) | `sdpm register kiro-cli` — it creates the new `sdpm` agent and offers to delete the generated `sdpm-composer` agent, the skill links and the global `mcp.json` entry (only the installer's own files; an agent you wrote yourself is left alone). **Do this**: the generated `sdpm-composer` agent can no longer start, and the global entry loads the tools into every session. `sdpm` (status) warns while they exist |

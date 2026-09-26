@@ -76,10 +76,10 @@ creating an agent file that SDPM owns), so no existing configuration file is edi
 | Client | What `sdpm register` does |
 |---|---|
 | Kiro CLI | writes a dedicated agent `~/.kiro/agents/sdpm.json` (MCP server, tools, trusted `@sdpm` and `use_subagent` for parallel composers, no prompt text) — start it with `kiro-cli chat --agent sdpm` or `/agent sdpm`. Nothing is added to other sessions. `--agent-name` picks another name; an agent file you wrote yourself is never touched |
-| Claude Code | `claude mcp add --scope user sdpm -- …` |
+| Claude Code | `claude mcp add --scope user sdpm -- …`. Composers run as Claude Code sub-agents, which inherit the server. Approve the sdpm tools once ("don't ask again"), or launch with `claude --allowedTools "mcp__sdpm__*"`. If the pre-installer plugin `sdpm@sdpm` is still installed, `sdpm register` offers `claude plugin uninstall` — otherwise every tool appears twice |
 | Visual Studio Code | `code --add-mcp …` |
 | Codex (CLI, IDE extension, ChatGPT desktop app) | `codex mcp add sdpm -- …` |
-| Cursor | opens the `cursor://…/mcp/install` deep link built with your real paths — one click |
+| Cursor | opens the `cursor://…/mcp/install` deep link built with your real paths — one click. Clients without a sub-agent mechanism compose the slides in one agent, one group at a time (the role document says so) |
 | Kiro IDE, other clients | prints the JSON and the file it belongs in (`~/.kiro/settings/mcp.json` for Kiro IDE) |
 | Claude Desktop | use the [`sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) release instead (double-click) |
 

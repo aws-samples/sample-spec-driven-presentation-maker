@@ -251,3 +251,21 @@ def test_register_kiro_offers_to_remove_global_entry(tmp_path, monkeypatch, caps
     cc.register([cc.by_id("kiro-cli")], POSIX, assume_yes=True, run=lambda a: (ran.append(a), 0)[1])
     assert ran == [["kiro-cli", "mcp", "remove", "--scope", "global", "--name", "sdpm"]]
     assert "redundant" in capsys.readouterr().out
+
+
+def test_register_claude_code_offers_plugin_uninstall(monkeypatch, capsys):
+    monkeypatch.setattr(cc, "claude_plugin_installed", lambda: True)
+    ran = []
+    cc.register([cc.by_id("claude-code")], POSIX, assume_yes=True, run=lambda a: (ran.append(a), 0)[1])
+    assert ran == [
+        ["claude", "mcp", "add", "--scope", "user", "sdpm", "--", *cc.server_argv(POSIX)],
+        ["claude", "plugin", "uninstall", "sdpm@sdpm"],
+    ]
+    assert "appear twice" in capsys.readouterr().out
+
+
+def test_register_claude_code_without_plugin_runs_only_add(monkeypatch):
+    monkeypatch.setattr(cc, "claude_plugin_installed", lambda: False)
+    ran = []
+    cc.register([cc.by_id("claude-code")], POSIX, assume_yes=True, run=lambda a: (ran.append(a), 0)[1])
+    assert len(ran) == 1

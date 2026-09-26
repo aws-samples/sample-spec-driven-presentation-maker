@@ -73,10 +73,10 @@ checkout を直接指します（次節）。
 | クライアント | `sdpm register` がすること |
 |---|---|
 | Kiro CLI | 専用エージェント `~/.kiro/agents/sdpm.json` を書く（MCP サーバー、ツール、並列 composer のための `@sdpm` と `use_subagent` の信頼設定。prompt テキストは無し）— `kiro-cli chat --agent sdpm` か `/agent sdpm` で開始。他のセッションには何も足さない。`--agent-name` で別名、自作のエージェントファイルには触れない |
-| Claude Code | `claude mcp add --scope user sdpm -- …` |
+| Claude Code | `claude mcp add --scope user sdpm -- …`。composer は Claude Code のサブエージェントとして動き、サーバーを継承します。sdpm ツールの承認は 1 回（「今後確認しない」）か、`claude --allowedTools "mcp__sdpm__*"` で起動。インストーラー以前の plugin `sdpm@sdpm` が残っていれば `sdpm register` が `claude plugin uninstall` を提案します — 残すと全ツールが二重に見えます |
 | Visual Studio Code | `code --add-mcp …` |
 | Codex（CLI / IDE 拡張 / ChatGPT デスクトップアプリ） | `codex mcp add sdpm -- …` |
-| Cursor | 実パスで組み立てた `cursor://…/mcp/install` deep link を開く — 1 クリック |
+| Cursor | 実パスで組み立てた `cursor://…/mcp/install` deep link を開く — 1 クリック。サブエージェント機構の無いクライアントでは 1 エージェントがグループごとに順に composer 役をこなします（役割文書に明記） |
 | Kiro IDE、その他 | JSON と書き込み先ファイルを表示（Kiro IDE は `~/.kiro/settings/mcp.json`） |
 | Claude Desktop | 代わりに [`sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) をダブルクリック |
 

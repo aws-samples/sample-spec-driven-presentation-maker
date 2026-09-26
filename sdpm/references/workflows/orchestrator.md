@@ -45,7 +45,10 @@ the project's shared vocabulary for structure and look.
 
 Spawn composers with your environment's sub-agent mechanism, one per dispatch. Any
 sub-agent that has the sdpm tools will do — a general-purpose one, or yourself if the
-mechanism spawns a copy of you. Always use this prompt (replace only the placeholders):
+mechanism spawns a copy of you. If your environment has no sub-agent mechanism at all,
+take the composer role yourself: for each dispatch below, call `start_composing` with the
+same values and follow the document it returns, then come back here. Always use this
+prompt (replace only the placeholders):
 
 ```
 You are an sdpm composer. First call start_composing(deck_id, assigned_slugs) with the
