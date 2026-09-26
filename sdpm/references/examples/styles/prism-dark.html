@@ -89,7 +89,7 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 </div>
 
 <!-- Part: Rules -->
-<!-- Frame: content — use the 40px edge on every slide; reserve x 144–1824, title y 72–232, lead-in y 248, content y 336–940, optional takeaway after y 964; two columns are 804px with a 72px gap, three are 528px with 48px gaps, four are 384px with 48px gaps. -->
+<!-- Frame: content — use the 40px edge on every slide; reserve x 144–1824, title y 72–232, lead-in y 248, content y 336–940, optional takeaway after y 964; two columns are 804px with a 72px gap, three are 528px with 48px gaps, four are 384px with 48px gaps; never use the selected outline below 376px wide. -->
 <!-- The decision precedes the forms: a room reaching agreement must identify the target at a glance. A figure takes two horizontal stops; a choice or sequence gate takes one diagonal three-stop outline and one filled pill; a chart takes one vertical two-stop mark; a prose conclusion takes one horizontal two-stop line. A cover, agenda, or divider takes only the edge. One fact may be marked as both figure and chart mark. Preview flattening to violet is expected and never earns compensation. -->
 <div class="slide">
 <div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
@@ -103,7 +103,7 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 <div class="el t-caption c-muted" style="left:1040px;top:736px;width:700px;height:96px">Everything else stays flat.</div>
 </div>
 
-<!-- These rules derive from pointer semantics rather than decoration preference. Keep contrast at least 4.5:1, or 3:1 for large type; use one meaningful monochrome asset when an icon is necessary; never use a gradient panel, full-bleed field, body-text background, repeated gradient tag, second colour family, glow, blur, fade, or ornamental gradient. -->
+<!-- These rules derive from pointer semantics rather than decoration preference. Keep contrast at least 4.5:1, or 3:1 for large type; use one sans family at regular and bold weights without italics, and one meaningful monochrome asset only when necessary. In a built deck the ground and edge arrive with the style: do not redraw either or set a competing slide background. Never use a gradient panel, full-bleed field, body-text background, repeated gradient tag, second colour family, glow, blur, fade, or ornamental gradient. -->
 <div class="slide">
 <div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
 <div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Four rules keep the pointer meaningful</div>
@@ -124,7 +124,7 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 
 <!-- Part: Message & Outline -->
 <!-- Density: 45 -->
-<!-- Standalone reading gets additional slides, not a higher word ceiling. Title rows reserve both lines even when one is empty. Slide count follows the brief and source material. -->
+<!-- The default and this gallery stay at 45 visible words; a production slide meant to be read alone may carry up to 90. Title rows reserve both lines even when one is empty. Slide count follows the brief and source material. -->
 <div class="slide">
 <div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
 <div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Claims decide the form and the pointer</div>
@@ -139,7 +139,7 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 <div class="el takeaway t-heading" style="left:760px;top:704px;width:1064px;height:130px">One claim per slide. Add slides before adding words.</div>
 </div>
 
-<!-- A long review may use an agenda with noun-phrase title, hairline rows, and a flat current-state pill; it carries no pointer beyond the edge. Open on the strongest claim unless navigation is necessary. Section dividers preview the claims in their chapter. -->
+<!-- A long review may use an agenda with four to six items, a noun-phrase title, hairline rows, and a flat current-state pill; it carries no pointer beyond the edge. Open on the strongest claim unless navigation is necessary. Section dividers preview the claims in their chapter. -->
 <div class="slide">
 <div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
 <div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">The deck moves from claim to decision</div>
@@ -180,7 +180,7 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 <div class="el takeaway t-heading" style="left:144px;top:836px;width:1680px;height:120px">Mark the fact twice only when both marks mean the same thing.</div>
 </div>
 
-<!-- Pattern: comparison — for: choosing between two matched options; regions: left, right, takeaway; components: container ×2 + selected + takeaway; may vary: winner and concise evidence; may not: change geometry, row order, measure, or unit, or add an arrow. -->
+<!-- Pattern: comparison — for: choosing among matched options; regions: option-1, option-2, takeaway; components: container ×2–4 + selected + takeaway; may vary: two to four options, winner, and concise evidence; may not: change geometry, row order, measure, or unit, or add an arrow. -->
 <div class="slide">
 <div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
 <div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Equal geometry makes one verdict credible</div>
@@ -252,7 +252,7 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 <div class="el takeaway t-heading" style="left:144px;top:872px;width:1680px;height:96px">Use the table for lookup; use the figure for the claim.</div>
 </div>
 
-<!-- Pattern: chart — for: trend, ranking, or proportion; regions: chart, takeaway; components: chart + tag + takeaway; may vary: 3–8 native marks, chart type, and optional reference; may not: lose one scale, direct labels, grey context, or add avoidable legends, donuts, rings, and empty grids. -->
+<!-- Pattern: chart — for: trend, ranking, or proportion; regions: chart, takeaway; components: chart + tag + takeaway; may vary: trend or ranking with 4–8 marks, proportion with 3–6 shares, chart type, and one useful reference; may not: add a second series, lose one scale, direct labels, or grey context, or add avoidable legends, donuts, rings, and empty grids. -->
 <!-- Component: chart (.chart-specimen) — native chart in the deck, with one vertical g1-to-g3 highlighted mark, direct labels, and a common baseline; the HTML SVG uses plainly illustrative values only. -->
 <div class="slide">
 <div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>

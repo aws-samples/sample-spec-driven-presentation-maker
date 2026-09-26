@@ -1,184 +1,300 @@
-<!DOCTYPE html><html lang="en"><head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
 <meta charset="UTF-8">
 <title>typographic — For a speaker whose point must land in one second from the back of a room: every slide is one enormous word, number, or two-line claim set at edge-to-edge scale on white, where position and a light grey replace bullets and numbering, one red word or number carries the point, and no shape, rule, box, or image is ever drawn.</title>
 <style>
 :root {
---color-text:#111111;--color-bg:#FFFFFF;--color-surface:#FFFFFF;--color-border:#111111;--color-muted:#BBBBBB;--color-dim:#666666;--accent:#E63312;--color-on-accent:#FFFFFF;
---font-family: "Helvetica Neue", Arial, "Segoe UI", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
---fs-cover-title:192pt;--fs-display:192pt;--fs-stack:120pt;--fs-slide-title:100pt;--fs-heading:56pt;--fs-metric:380pt;--fs-unit:80pt;--fs-table:24pt;--fs-body:18pt;--fs-caption:14pt;--fs-label:11pt;
---margin-x:80px;--bleed-x:-24px;--content-w:1760px;--support-x:1040px;--support-w:800px;--caption-y:920px;--bar-h:0px;--radius:0px;--border-thin:0px;--shadow:none;
+  --color-text: #111111; /* claims, titles, and body */
+  --color-bg: #FFFFFF; /* uninterrupted slide ground */
+  --color-surface: #FFFFFF; /* same ground; never a panel */
+  --color-border: #111111; /* contract token; draws nothing */
+  --color-muted: #BBBBBB; /* receding display words at large size */
+  --color-dim: #666666; /* legible labels, meta, and sources */
+  --accent: #E63312; /* one decisive word or number */
+  --color-on-accent: #FFFFFF; /* contract token; no accent surface */
+  --font-family: "Helvetica Neue", Arial, "Segoe UI", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; /* one installed sans family */
+  --fs-cover-title: 192pt; /* bleed cover line, seven capitals maximum */
+  --fs-display: 192pt; /* one-word statement, seven capitals maximum */
+  --fs-stack: 120pt; /* focus stack, ten capitals maximum */
+  --fs-slide-title: 100pt; /* quiet beat, twelve capitals maximum */
+  --fs-heading: 56pt; /* paired view, twenty-two capitals maximum */
+  --fs-metric: 380pt; /* one giant value */
+  --fs-unit: 80pt; /* compact unit beside a metric */
+  --fs-table: 24pt; /* aligned exact values */
+  --fs-body: 18pt; /* black support, three lines normally */
+  --fs-caption: 14pt; /* one-line scope or supplied source */
+  --fs-label: 11pt; /* uppercase meta in dim grey */
+  --margin-x: 80px; /* support begins beyond five percent */
+  --bleed-x: -24px; /* display stem crosses the left edge */
+  --content-w: 1760px; /* full support width */
+  --support-x: 1040px; /* right support anchor */
+  --support-w: 800px; /* about forty-four body characters */
+  --caption-y: 920px; /* fixed one-line caption anchor */
+  --bar-h: 0px; /* no title band */
+  --radius: 0px; /* no rounded geometry */
+  --border-thin: 0px; /* no visible rule */
+  --shadow: none; /* scale stays flat */
 }
-*{box-sizing:border-box}
-body{margin:0;padding:40px;background:var(--color-bg);font-family:var(--font-family);zoom:0.7;color:var(--color-text)}
-.slide{position:relative;width:1920px;height:1080px;margin:0 auto 40px;overflow:hidden;background:var(--color-bg);color:var(--color-text)}
-.el{position:absolute}
-.cover-title,.display,.stack,.slide-title,.metric,.heading{font-weight:900;white-space:nowrap}
-.cover-title,.display{font-size:calc(var(--fs-cover-title)*1.5);line-height:.9;letter-spacing:-11pt}
-.stack{font-size:calc(var(--fs-stack)*1.5);line-height:.9;letter-spacing:-7pt}
-.slide-title{font-size:calc(var(--fs-slide-title)*1.5);line-height:.9;letter-spacing:-6pt}
-.metric{font-size:calc(var(--fs-metric)*1.5);line-height:.84;letter-spacing:-20pt;font-variant-numeric:tabular-nums}
-.unit{font-size:calc(var(--fs-unit)*1.5);line-height:.9;font-weight:900;letter-spacing:-4pt}
-.heading{font-size:calc(var(--fs-heading)*1.5);line-height:.95;letter-spacing:-3pt}
-.body-text{font-size:calc(var(--fs-body)*1.5);line-height:1.6}
-.meta{font-size:calc(var(--fs-body)*1.5);line-height:1.3;font-weight:600}
-.table-text{font-size:calc(var(--fs-table)*1.5);line-height:1.2;font-variant-numeric:tabular-nums}
-.caption{font-size:calc(var(--fs-caption)*1.5);line-height:1.4}
-.label{font-size:calc(var(--fs-label)*1.5);line-height:1.2;font-weight:800;letter-spacing:1.2pt;text-transform:uppercase}
-.muted{color:var(--color-muted)}
-.dim{color:var(--color-dim)}
-.accent{color:var(--accent)}
-.heavy{font-weight:900}
-.right{text-align:right}
-.tabular{font-variant-numeric:tabular-nums}
-.frame-ghost,.region{padding:14px;border:2px dashed var(--color-border)}
-.region{border-color:var(--accent)}
-.region-name,.region-fill{display:block;font:calc(var(--fs-label)*1.5) var(--font-family)}
-.region-name{font-weight:800;text-transform:uppercase;color:var(--accent)}
-.region-fill{margin-top:8px;line-height:1.3;color:var(--color-dim)}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(--font-family); zoom: 0.7; color: var(--color-text); }
+.slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; overflow: hidden; background: var(--color-bg); color: var(--color-text); }
+.el { position: absolute; }
+.cover-title, .display, .stack, .slide-title, .metric, .heading { font-weight: 900; white-space: nowrap; }
+.cover-title, .display { font-size: calc(var(--fs-cover-title) * 1.5); line-height: .9; letter-spacing: -11pt; }
+.stack { font-size: calc(var(--fs-stack) * 1.5); line-height: .9; letter-spacing: -7pt; }
+.slide-title { font-size: calc(var(--fs-slide-title) * 1.5); line-height: .9; letter-spacing: -6pt; }
+.metric { font-size: calc(var(--fs-metric) * 1.5); line-height: .84; letter-spacing: -20pt; font-variant-numeric: tabular-nums; }
+.unit { font-size: calc(var(--fs-unit) * 1.5); line-height: .9; font-weight: 900; letter-spacing: -4pt; }
+.heading { font-size: calc(var(--fs-heading) * 1.5); line-height: .95; letter-spacing: -3pt; }
+.body-text { font-size: calc(var(--fs-body) * 1.5); line-height: 1.6; }
+.meta { font-size: calc(var(--fs-body) * 1.5); line-height: 1.3; font-weight: 600; }
+.table-text { font-size: calc(var(--fs-table) * 1.5); line-height: 1.2; font-variant-numeric: tabular-nums; }
+.caption { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.4; }
+.label { font-size: calc(var(--fs-label) * 1.5); line-height: 1.2; font-weight: 800; letter-spacing: 1.2pt; text-transform: uppercase; }
+.muted { color: var(--color-muted); }
+.dim { color: var(--color-dim); }
+.accent { color: var(--accent); }
+.heavy { font-weight: 900; }
+.right { text-align: right; }
+.tabular { font-variant-numeric: tabular-nums; }
 </style>
-</head><body>
-<!-- Part 1: Cover -->
+</head>
+<body>
+
+<!-- Part: Cover -->
+<!-- The cut left edge and two 384px-em lines define the cover. Keep left at −24px, pitch 352px, exactly one red word, and one black meta line; wording may vary within the display budget. -->
 <div class="slide">
-  <div class="el cover-title" style="left:-24px;top:64px;width:1944px;height:352px">SCALE</div>
-  <div class="el cover-title accent" style="left:-24px;top:416px;width:1944px;height:352px">DECIDES</div>
-  <div class="el meta" style="left:96px;top:888px;width:1400px;height:48px">Placeholder audience · date</div></div>
-<!-- Part 2: Rules -->
+<div class="el cover-title" style="left:-24px; top:64px; width:1944px; height:352px;">SCALE</div>
+<!-- Component: selected (.accent) — the one word or number carrying focus; may vary: chosen item; may not: select twice, become a fill, or appear below 100pt. -->
+<div class="el cover-title accent" style="left:-24px; top:416px; width:1944px; height:352px;">DECIDES</div>
+<!-- Component: tag (.meta) — one-line audience, scope, period, or supplied source at anchor B; may vary: wording; may not: carry another claim. -->
+<div class="el meta" style="left:96px; top:888px; width:1400px; height:48px;">Back row · spoken delivery</div>
+</div>
+
+<!-- Part: Rules -->
+<!-- Frame: content — no visible furniture; display starts at x 80 or bleeds from −24, support uses A at 1040/160/800, B at 96/920/1500, C at 1040/800/800, or D at 80/800/1760; move the support anchor between consecutive slides and never add a header, footer, page number, band, or drawn frame. -->
+<!-- The design decision is distance and speed: a listener without a handout must grasp one beat in one second from the back of a room. -->
 <div class="slide">
-  <div class="el slide-title" style="left:80px;top:72px;width:1760px;height:200px">TYPE ONLY</div>
-  <div class="el label dim" style="left:80px;top:292px;width:820px;height:28px">Design decision</div>
-  <div class="el body-text" style="left:80px;top:336px;width:820px;height:700px">A point must land in one second at the back of a room, without a handout. One beat therefore fills each slide: a word, number, or two-line claim.<br><br>Scale carries the message. Position replaces boxes, grey replaces bullets, and reading order replaces arrows. Red is only a word or number—never a fill, bar, underline, or rule.<br><br>Every graphic device would compete with the beat. A poster needing blocks or ruled grids is another style.</div>
-  <div class="el label dim" style="left:1000px;top:292px;width:840px;height:28px">Hard limits</div>
-  <div class="el body-text" style="left:1000px;top:336px;width:840px;height:650px">Display budget: 7 capitals / 5 Japanese characters at 192pt; 10 / 7 at 120pt; 12 / 9 at 100pt; 22 / 16 at 56pt. Over budget, break the line or bleed right—never shrink.<br><br>Per slide: one claim, one red item, one support block; stacks hold 3 words or 3–5 agenda items. Support is ≤3 lines per block, except 6 on text-heavy slides and 12 on Parts 2–6 reference slides.<br><br>Shapes 0, rules 0, boxes 0, images 0, rotation 0.</div></div>
+<div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">TYPE ONLY</div>
+<!-- Component: lead (.body-text) — black support that turns the display label into an assertion; may vary: anchor and up to three lines; may not: go grey, drop below 18pt, or add another claim. -->
+<div class="el body-text" style="left:1040px; top:344px; width:800px; height:190px;">One enormous beat lands in one second, without a handout.</div>
+</div>
+
+<!-- At this scale every graphic device competes with the message. Position therefore replaces boxes, grey replaces bullets, and reading order replaces arrows. -->
 <div class="slide">
-  <div class="el slide-title" style="left:80px;top:72px;width:1760px;height:200px">DO / DON'T</div>
-  <div class="el label dim" style="left:80px;top:288px;width:820px;height:28px">Do</div>
-  <div class="el body-text" style="left:80px;top:332px;width:820px;height:680px">Make one claim; make its beat the largest type.<br>Bleed display from −24px; keep support 5% inside.<br>Rank with position, size, and grey; black is the point.<br>Rotate anchors A–D between consecutive slides.<br>Keep body #111111 at 18pt+ and ≥4.5:1 contrast.<br>Align display at 80px; captions at 920px.<br>If charts are unavoidable, use native objects and direct labels.</div>
-  <div class="el label dim" style="left:1000px;top:288px;width:840px;height:28px">Don't</div>
-  <div class="el body-text" style="left:1000px;top:332px;width:840px;height:680px">No shapes, rules, dividers, boxes, panels, icons, or emoji.<br>No fills, bars, underlines, second accent, gradients, shadows, rotation, bullets, or step numbers.<br>Never use #BBBBBB below 100pt or for body. Use #666666 when every word must remain legible.<br>Never shrink display type to fit; cut the sentence.<br>Never add a second claim, comparator, or decorative chart; split the slide.</div></div>
-<!-- Part 3: Message & Outline -->
+<div class="el display" style="left:-24px; top:64px; width:1944px; height:352px;">SPACE</div>
+<!-- Component: takeaway (.body-text.heavy) — one synthesis or consequence at anchor D; may vary: one sentence; may not: recap, introduce a second claim, or become a box. -->
+<div class="el body-text heavy" style="left:80px; top:800px; width:1760px; height:120px;">Position groups. Grey ranks. Reading order connects.</div>
+</div>
+
+<!-- Component: container — none; group by open space and shared alignment, never by cards, panels, fills, or enclosing shapes. -->
+<!-- Component: numbered — none; rank by position, size, and tone, never bullets, step numbers, or numbered badges. -->
+<!-- Component: connector — none; sequence and relationships use whitespace, order, scale, and vertical position, never arrows or lines. -->
+<!-- Shapes 0, rules 0, boxes 0, images 0, icons 0, rotation 0. This also forbids dividers, panels, fills, bars, underlines, gradients, shadows, a second accent, and emoji. A poster needing blocks or ruled grids is another style. -->
 <div class="slide">
-  <div class="el stack" style="left:80px;top:72px;width:1200px;height:280px">ONE BEAT</div>
-  <div class="el label dim" style="left:80px;top:384px;width:820px;height:28px">Message grammar and density</div>
-  <div class="el body-text" style="left:80px;top:428px;width:820px;height:650px">The display title is a noun or two-word verb phrase, never a sentence. It names the beat; a support block states the assertion. Support is optional only on covers and dividers.<br><br>Use one display beat, one support block, one red word or number, and one claim. A second claim becomes a second slide. Six lines require one paragraph at --fs-slide-title, no bullets; a dim right block may hold only a supplied source. Metric: one beat, one caption line.</div>
-  <div class="el label dim" style="left:1000px;top:384px;width:840px;height:28px">Chapter shape and favoured forms</div>
-  <div class="el body-text" style="left:1000px;top:428px;width:840px;height:650px">Open and close with the two-line bleed. Alternate a 384px beat with quieter 120pt or 100pt evidence; consecutive 384px slides shout.<br><br>Use one red word for dividers. In long reviews, repeat the agenda with its black item moved. Audience and material set deck length.<br><br>Prefer one metric, focus stack, before/after pair, divider, word columns, magnitude-positioned values, or aligned text. Avoid drawn forms.</div></div>
-<!-- Part 4: Palette & Type -->
+<div class="el display" style="left:-24px; top:348px; width:1944px; height:352px;">NOTHING</div>
+<div class="el meta" style="left:96px; top:920px; width:1500px; height:48px;">No drawn form competes with the beat.</div>
+</div>
+
+<!-- Red identifies exactly one word or number at 100pt or larger. It is never a surface, chart bar, underline, rule, label, or decorative echo. -->
 <div class="slide">
-  <div class="el display" style="left:-24px;top:48px;width:1944px;height:352px">BLACK</div>
-  <div class="el stack accent" style="left:80px;top:410px;width:900px;height:280px">RED</div>
-  <div class="el stack muted" style="left:80px;top:690px;width:900px;height:280px">GREY</div>
-  <div class="el body-text" style="left:1040px;top:410px;width:800px;height:580px">--color-text on --color-bg: claims, titles, and body.<br><br>--accent: one word or number at 100pt+, never a fill; --color-on-accent has no surface here.<br><br>--color-muted: unchosen/completed display words at 100pt+. --color-dim: small meta/labels. --color-surface is the ground; --color-border draws nothing.</div></div>
+<div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">ONE RED ITEM</div>
+<div class="el stack accent" style="left:80px; top:368px; width:900px; height:280px;">FOCUS</div>
+<div class="el body-text" style="left:1040px; top:800px; width:800px; height:120px;">A word or number. Never both.</div>
+</div>
+
+<!-- Display budgets at weight 900: cover/display allow 7 Latin capitals or 5 Japanese characters; stack allows 10 or 7; slide-title allows 12 or 9; heading allows 22 or 16. Japanese glyphs advance one em and need no negative tracking. -->
 <div class="slide">
-  <div class="el label dim" style="left:80px;top:48px;width:900px;height:28px">Support type / actual size</div>
-  <div class="el heading" style="left:80px;top:104px;width:1500px;height:140px">Heading, 56pt, weight 800</div>
-  <div class="el body-text" style="left:80px;top:272px;width:1200px;height:180px">Body, 18pt, weight 400, line height 1.6. Three lines beside display type.<br>Support width is 800px, about 44 characters per line.<br>Body never goes grey or below 18pt.</div>
-  <div class="el table-text" style="left:80px;top:474px;width:1200px;height:70px">Table, 24pt, tabular: 1,240 · 87.4 · −42</div>
-  <div class="el caption dim" style="left:80px;top:576px;width:1200px;height:48px">Caption, 14pt — one line under a metric or supplied source.</div>
-  <div class="el label dim" style="left:80px;top:650px;width:1200px;height:28px">Label, 11pt, weight 800, uppercase</div>
-  <div class="el body-text" style="left:80px;top:724px;width:1760px;height:280px">Renderer limits: no letter-spacing or line-height; budget a built line as em × 1.2. Weights are 400/600/800/900. Native tables inherit template type; aligned text retains this face. Japanese advances one em: use its shorter budgets and no negative tracking.</div></div>
-<!-- Part 5: Frame -->
-<!-- Frame: content slide — no visible frame; use one display beat plus support at A, B, C, or D. Vary: anchor and beat size; may not: repeat anchors consecutively or add running furniture. -->
+<div class="el display" style="left:-24px; top:64px; width:1944px; height:352px;">CUT</div>
+<div class="el slide-title" style="left:80px; top:520px; width:1760px; height:200px;">DON'T SHRINK</div>
+<div class="el body-text" style="left:1040px; top:800px; width:800px; height:120px;">Break the line, shorten it, or bleed right.</div>
+</div>
+
+<!-- Black on white is 18.9:1. Body stays #111111 at 18pt or larger and at least 4.5:1; #666666 is 5.7:1 for labels and necessary small text. #BBBBBB is 1.9:1 and may only carry display words at 100pt or larger that nearby black text restates. Large text still needs 3:1 when it carries unique information. -->
 <div class="slide">
-  <div class="el slide-title" style="left:80px;top:72px;width:1760px;height:200px">CLAIM FIRST</div>
-  <div class="el label dim" style="left:80px;top:330px;width:860px;height:28px">Invisible frame / fixed coordinates</div>
-  <div class="el body-text" style="left:80px;top:374px;width:860px;height:530px">Display: x=80; bleed: −24.<br>A — 1040,160,800: beside type.<br>B — 96,920,1500: caption.<br>C — 1040,800,800: lower right.<br>D — 80,800,1760: synthesis.<br><br>Display and A/C never share a row: type ends by x=960 or support sits below. No header, footer, page number, band, or drawn frame.</div>
-  <div class="el body-text" style="left:1040px;top:330px;width:800px;height:190px">Anchor A shown. Move support next slide; pacing is navigation.</div>
-  <div class="el caption dim" style="left:96px;top:920px;width:1500px;height:52px">Anchor B: one caption, comparator, or supplied source.</div></div>
-<!-- Frame: section divider — one red word is the pause. Vary: chapter word; may not: add subtitle, number, evidence, or tracker. -->
+<div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">BLACK READS</div>
+<div class="el stack muted" style="left:80px; top:368px; width:900px; height:280px;">GREY</div>
+<div class="el body-text" style="left:80px; top:800px; width:1760px; height:120px;">Grey recedes only when black keeps the meaning legible.</div>
+</div>
+
+<!-- Normal support is one block of at most three lines. Comparison may use one block per column plus synthesis at D. Only the text pattern reaches six lines. The former 12-line reference exception is intentionally expressed in comments here so the sample never teaches dense slides. -->
 <div class="slide">
-  <div class="el display accent" style="left:-24px;top:348px;width:1944px;height:352px">SHIFT</div></div>
-<!-- Frame: closing slide — brackets the deck with the cover composition. Vary: two words and one ask line; may not: change bleed, accent line, or add furniture. -->
+<div class="el display" style="left:-24px; top:64px; width:1944px; height:352px;">BREATHE</div>
+<div class="el body-text" style="left:96px; top:920px; width:1500px; height:80px;">One support block. Three lines. More reasoning becomes more slides.</div>
+</div>
+
+<!-- The HTML multiplies font tokens by 1.5 so the 1920px canvas models a 960pt slide. Slide JSON cannot reproduce letter-spacing or line-height; budget built lines at em × 1.2. Available weights are 400, 600, 800, and 900. -->
 <div class="slide">
-  <div class="el cover-title" style="left:-24px;top:64px;width:1944px;height:352px">NEXT</div>
-  <div class="el cover-title accent" style="left:-24px;top:416px;width:1944px;height:352px">MOVE</div>
-  <div class="el meta" style="left:96px;top:888px;width:1500px;height:48px">Placeholder owner, date, and one-sentence ask</div></div>
-<!-- Part 6: Components -->
+<div class="el stack" style="left:80px; top:88px; width:900px; height:280px;">MOVE</div>
+<div class="el stack muted" style="left:80px; top:368px; width:900px; height:280px;">THE</div>
+<div class="el stack muted" style="left:80px; top:648px; width:900px; height:280px;">SUPPORT</div>
+<div class="el body-text" style="left:1040px; top:160px; width:800px; height:190px;">Rotate anchors A–D. Never repeat an anchor consecutively.</div>
+</div>
+
+<!-- Part: Message & Outline -->
+<!-- Density: 20 -->
+<!-- The character budget determines title grammar: the display is a noun or two-word verb phrase, never a sentence. It names the beat; black support states the assertion. Support is optional only on covers, agenda trackers, and dividers. -->
 <div class="slide">
-  <div class="el label dim" style="left:80px;top:48px;width:900px;height:28px">Component sheet / scale and focus</div>
-<!-- Component: container — none; group by open space and shared alignment -->
-<!-- Component: metric (.metric) — one-value claim; may vary: value, unit, and caption; may not: add a second number, comparator, or shape. -->
-  <div class="el metric accent" style="left:-32px;top:80px;width:1300px;height:700px">−42</div>
-  <div class="el unit right" style="left:1584px;top:144px;width:240px;height:200px">%</div>
-<!-- Component: tag (.meta) — scope at B; may vary: wording; may not: carry another claim. -->
-  <div class="el meta" style="left:96px;top:920px;width:1500px;height:48px">metric + unit + one-line scope</div>
-<!-- Component: list (.stack) — compare by order and grey; may vary: chosen word and 3–5 items; may not: add bullets, numbers, or boxes. -->
-<!-- Component: selected (.stack.accent) — the one chosen word; may vary: which item is red; may not: select more than one item. -->
-<!-- Component: numbered — none; use order, grey, and position instead -->
-<!-- Component: step (.stack) — ordered text sequence; may vary: active step and 3–5 items; may not: add numbers, connectors, or boxes. -->
-<!-- Component: connector — none; use whitespace and reading order between steps -->
-  <div class="el stack" style="left:1300px;top:380px;width:800px;height:200px">COST</div>
-  <div class="el stack muted" style="left:1300px;top:580px;width:800px;height:200px">TIME</div>
-  <div class="el stack muted" style="left:1300px;top:780px;width:800px;height:140px">RISK</div></div>
+<div class="el stack" style="left:80px; top:88px; width:1200px; height:280px;">ONE BEAT</div>
+<div class="el body-text" style="left:1040px; top:800px; width:800px; height:120px;">Name it in display type. State it in support.</div>
+</div>
+
+<!-- Per slide: one claim, one display beat, one support block, and at most one red item. A second claim or comparator becomes a second slide; deck length follows the brief and material, never the style. -->
 <div class="slide">
-  <div class="el label dim" style="left:80px;top:48px;width:900px;height:28px">Component sheet / prose and comparison</div>
-<!-- Component: lead (.body-text) — support block that completes the beat; may vary: anchor and up to three lines; may not: use grey or add a claim. -->
-  <div class="el body-text" style="left:80px;top:120px;width:800px;height:190px">State the claim.<br>Give evidence.<br>Name the consequence.</div>
-<!-- Component: before-after (.heading) — two equal text views; may vary: headings and evidence; may not: change widths or add a divider; red selects one heading. -->
-  <div class="el heading" style="left:80px;top:390px;width:860px;height:130px">FIRST VIEW</div>
-  <div class="el body-text" style="left:80px;top:540px;width:800px;height:190px">State position.<br>Give evidence.<br>Name its limit.</div>
-  <div class="el heading accent" style="left:1000px;top:390px;width:860px;height:130px">SECOND VIEW</div>
-  <div class="el body-text" style="left:1000px;top:540px;width:800px;height:190px">State counterpoint.<br>Give evidence.<br>Say why it wins.</div>
-<!-- Component: takeaway (.body-text.heavy) — synthesis at D; may vary: one sentence; may not: recap both columns. -->
-  <div class="el body-text heavy" style="left:80px;top:820px;width:1760px;height:120px">Synthesis names the criterion and states the choice.</div></div>
+<div class="el display accent" style="left:-24px; top:64px; width:1944px; height:352px;">ONE</div>
+<div class="el slide-title" style="left:80px; top:520px; width:1760px; height:200px;">CLAIM EACH</div>
+<div class="el body-text" style="left:1040px; top:800px; width:800px; height:120px;">Add slides before adding words.</div>
+</div>
+
+<!-- Bracket the deck with the two-line bleed composition. The cover opens with the premise; the closing changes the words and ends on one ask. -->
 <div class="slide">
-  <div class="el label dim" style="left:80px;top:48px;width:900px;height:28px">Component sheet / exact values and trend</div>
-<!-- Component: table (.table-text) — aligned exact text; may vary: values and 3–5 rows or columns; may not: add native styling, rules, fills, zebra, or a second red value. -->
-  <div class="el label dim" style="left:80px;top:128px;width:560px;height:28px">Item</div>
-  <div class="el label dim right" style="left:720px;top:128px;width:260px;height:28px">Prior</div>
-  <div class="el label dim right" style="left:1060px;top:128px;width:300px;height:28px">Current</div>
-  <div class="el table-text" style="left:80px;top:190px;width:560px;height:65px">Item A</div>
-  <div class="el table-text right" style="left:720px;top:190px;width:260px;height:65px">100</div>
-  <div class="el table-text heavy right" style="left:1060px;top:190px;width:300px;height:65px">124</div>
-  <div class="el table-text" style="left:80px;top:282px;width:560px;height:65px">Item B</div>
-  <div class="el table-text right" style="left:720px;top:282px;width:260px;height:65px">80</div>
-  <div class="el table-text heavy accent right" style="left:1060px;top:282px;width:300px;height:65px">91</div>
-<!-- Component: chart (.stack.tabular) — positional trend with 4–6 direct values; may vary: value and height on one scale; may not: draw axes, bars, or grids. -->
-  <div class="el stack muted tabular" style="left:80px;top:650px;width:360px;height:250px">24</div>
-  <div class="el stack muted tabular" style="left:500px;top:570px;width:360px;height:250px">31</div>
-  <div class="el stack muted tabular" style="left:920px;top:490px;width:360px;height:250px">37</div>
-  <div class="el stack accent tabular" style="left:1340px;top:380px;width:480px;height:280px">48</div></div>
-<!-- Part 7: Layouts -->
-<!-- Layout: single-body — one claim; vary beat/anchor, never split decoratively. -->
+<div class="el cover-title" style="left:-24px; top:64px; width:1944px; height:352px;">OPEN</div>
+<div class="el cover-title accent" style="left:-24px; top:416px; width:1944px; height:352px;">CLOSE</div>
+<div class="el meta" style="left:96px; top:920px; width:1500px; height:48px;">Two loud brackets hold the argument.</div>
+</div>
+
+<!-- Alternate a 384px beat with quieter evidence at 120pt or 100pt. Consecutive 384px slides shout. Pacing carries chapter structure because there is no running furniture. -->
 <div class="slide">
-  <div class="el frame-ghost" style="left:80px;top:48px;width:1760px;height:240px"><span class="region-name">frame (Part 5)</span><span class="region-fill">lead + tag</span></div>
-  <div class="el region" style="left:80px;top:330px;width:1760px;height:470px"><span class="region-name">body</span><span class="region-fill">lead</span></div>
-  <div class="el region" style="left:96px;top:850px;width:1500px;height:120px"><span class="region-name">takeaway</span><span class="region-fill">tag · B</span></div></div>
-<!-- Layout: comparison — two positions; keep equal columns and synthesis at D. -->
+<div class="el display" style="left:-24px; top:64px; width:1944px; height:352px;">LOUD</div>
+<div class="el stack muted" style="left:80px; top:520px; width:900px; height:280px;">QUIET</div>
+<div class="el body-text" style="left:1040px; top:800px; width:800px; height:120px;">Alternate emphasis with evidence.</div>
+</div>
+
+<!-- Long reviews may repeat this agenda before each turn with the black item moved downward. Use noun phrases, three to five items, no support block, and no pointer beyond the current black item. Open on the strongest claim when navigation is unnecessary. -->
 <div class="slide">
-  <div class="el frame-ghost" style="left:80px;top:48px;width:1760px;height:240px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:80px;top:330px;width:800px;height:420px"><span class="region-name">left</span><span class="region-fill">before-after + lead</span></div>
-  <div class="el region" style="left:1000px;top:330px;width:800px;height:420px"><span class="region-name">right</span><span class="region-fill">selected before-after + lead</span></div>
-  <div class="el region" style="left:80px;top:800px;width:1760px;height:150px"><span class="region-name">takeaway</span><span class="region-fill">takeaway · D</span></div></div>
-<!-- Layout: process-three — vertical sequence; vary active step, never add numbers/connectors. -->
+<div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">FIRST CLAIM</div>
+<div class="el slide-title muted" style="left:80px; top:312px; width:1760px; height:200px;">EVIDENCE</div>
+<div class="el slide-title muted" style="left:80px; top:552px; width:1760px; height:200px;">DECISION</div>
+<div class="el slide-title muted" style="left:80px; top:792px; width:1760px; height:200px;">ASK</div>
+</div>
+
+<!-- Favoured forms are a single metric, focus stack, before/after pair, one-word divider, equal word columns, magnitude-positioned values, and aligned text. Avoid cycles, trees, swimlanes, dashboards, and any layout whose meaning depends on drawn form. -->
 <div class="slide">
-  <div class="el frame-ghost" style="left:80px;top:48px;width:1760px;height:180px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:80px;top:270px;width:800px;height:190px"><span class="region-name">step-1</span><span class="region-fill">step + selected</span></div>
-  <div class="el region" style="left:80px;top:490px;width:800px;height:190px"><span class="region-name">step-2</span><span class="region-fill">step</span></div>
-  <div class="el region" style="left:80px;top:710px;width:800px;height:190px"><span class="region-name">step-3</span><span class="region-fill">step</span></div>
-  <div class="el region" style="left:1040px;top:270px;width:800px;height:280px"><span class="region-name">body</span><span class="region-fill">lead · A</span></div></div>
-<!-- Layout: before-after — one change; vary words, keep diagonal and scope. -->
+<div class="el stack" style="left:80px; top:88px; width:900px; height:280px;">METRIC</div>
+<div class="el stack muted" style="left:80px; top:368px; width:900px; height:280px;">STACK</div>
+<div class="el stack muted" style="left:80px; top:648px; width:900px; height:280px;">PAIR</div>
+<div class="el body-text" style="left:1040px; top:160px; width:800px; height:190px;">Prefer type-led forms. Change styles when a diagram carries the meaning.</div>
+</div>
+
+<!-- Part: Patterns -->
+<!-- Frame: divider — one red word alone at 384px is the pause; the chapter word may vary, but no subtitle, number, evidence, tracker, support, or decorative rule may enter the empty field. -->
 <div class="slide">
-  <div class="el frame-ghost" style="left:80px;top:48px;width:1760px;height:180px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:80px;top:260px;width:900px;height:280px"><span class="region-name">left</span><span class="region-fill">before-after</span></div>
-  <div class="el region" style="left:860px;top:570px;width:960px;height:280px"><span class="region-name">right</span><span class="region-fill">selected before-after</span></div>
-  <div class="el region" style="left:96px;top:900px;width:1500px;height:90px"><span class="region-name">takeaway</span><span class="region-fill">tag · B</span></div></div>
-<!-- Layout: table-takeaway — exact values; vary 3–5 rows/columns, never add rules. -->
+<div class="el display accent" style="left:-24px; top:348px; width:1944px; height:352px;">PATTERNS</div>
+</div>
+
+<!-- Pattern: comparison — for: choosing between two matched positions; regions: left, right, takeaway; components: lead ×2 + selected + takeaway; may vary: headings and evidence; may not: change widths, starts, criteria, or add boxes and dividers. -->
 <div class="slide">
-  <div class="el frame-ghost" style="left:80px;top:48px;width:1760px;height:240px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:80px;top:330px;width:1760px;height:430px"><span class="region-name">table</span><span class="region-fill">table</span></div>
-  <div class="el region" style="left:80px;top:800px;width:1760px;height:150px"><span class="region-name">takeaway</span><span class="region-fill">takeaway · D</span></div></div>
-<!-- Part 8: Showcase -->
-<!-- Showcase: metric — giant value, unit, and one-line scope; the number is the claim. -->
+<div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">TWO VIEWS</div>
+<div class="el slide-title" style="left:80px; top:320px; width:860px; height:240px;">FIRST</div>
+<div class="el body-text" style="left:80px; top:580px; width:800px; height:150px;">Equal scope.<br>Same criterion.</div>
+<div class="el slide-title accent" style="left:1000px; top:320px; width:860px; height:240px;">SECOND</div>
+<div class="el body-text" style="left:1000px; top:580px; width:800px; height:150px;">Equal scope.<br>Same criterion.</div>
+<div class="el body-text heavy" style="left:80px; top:800px; width:1760px; height:120px;">Red selects; synthesis explains why.</div>
+</div>
+
+<!-- Pattern: columns — for: two or three parallel evidence groups; regions: col-1, col-2, col-3, takeaway; components: lead ×3 + takeaway; may vary: two or three columns; may not: vary starts, widths, rhythm, or reading order. -->
 <div class="slide">
-  <div class="el metric accent" style="left:-32px;top:80px;width:1500px;height:700px">−42</div>
-  <div class="el unit right" style="left:1584px;top:144px;width:240px;height:200px">%</div>
-  <div class="el meta" style="left:96px;top:920px;width:1500px;height:48px">Placeholder measure · current period</div></div>
-<!-- Showcase: choice — equal starts and widths replace panels; red marks the recommended view. -->
+<div class="el slide-title" style="left:80px; top:220px; width:520px; height:240px;">WHAT</div>
+<div class="el body-text" style="left:80px; top:480px; width:480px; height:150px;">State context.</div>
+<div class="el slide-title" style="left:700px; top:220px; width:520px; height:240px;">WHY</div>
+<div class="el body-text" style="left:700px; top:480px; width:480px; height:150px;">Explain cause.</div>
+<div class="el slide-title accent" style="left:1320px; top:220px; width:520px; height:240px;">NOW</div>
+<div class="el body-text" style="left:1320px; top:480px; width:480px; height:150px;">Name action.</div>
+<div class="el body-text heavy" style="left:80px; top:800px; width:1760px; height:120px;">Equal starts make columns.</div>
+</div>
+
+<!-- Pattern: process — for: three to five ordered stages with one current state; regions: step-1, step-2, step-3, body; components: step ×3 + selected + lead; may vary: active stage and count; may not: add numbers, connectors, boxes, or branch. -->
 <div class="slide">
-  <div class="el slide-title" style="left:80px;top:72px;width:1760px;height:200px">TWO VIEWS</div>
-  <div class="el heading" style="left:80px;top:360px;width:860px;height:140px">FIRST VIEW</div>
-  <div class="el body-text" style="left:80px;top:520px;width:800px;height:200px">Position.<br>Evidence.<br>Limit.</div>
-  <div class="el heading accent" style="left:1000px;top:360px;width:860px;height:140px">SECOND VIEW</div>
-  <div class="el body-text" style="left:1000px;top:520px;width:800px;height:200px">Counterpoint.<br>Evidence.<br>Why it wins.</div>
-  <div class="el body-text heavy" style="left:80px;top:820px;width:1760px;height:120px">The criterion selects it.</div></div>
-</body></html>
+<div class="el label dim" style="left:80px; top:48px; width:600px; height:28px;">Now</div>
+<!-- Component: step (.stack) — an ordered text stage; may vary: active word and three to five items; may not: add numbers, connectors, boxes, or exceed the stack budget. -->
+<div class="el stack" style="left:80px; top:88px; width:900px; height:280px;">START</div>
+<div class="el stack muted" style="left:80px; top:368px; width:900px; height:280px;">SHIFT</div>
+<div class="el stack muted" style="left:80px; top:648px; width:900px; height:280px;">SCALE</div>
+<div class="el body-text" style="left:1040px; top:160px; width:800px; height:190px;">Order connects. Black marks the current stage.</div>
+</div>
+
+<!-- Pattern: metric — for: one value that is itself the claim; regions: body, takeaway; components: metric + tag; may vary: value, unit, scope, and period; may not: add a second number, comparator, bar, or shape. -->
+<div class="slide">
+<!-- Component: metric (.metric) — one-value claim bleeding left; may vary: value, unit, and caption; may not: add another number, comparator, or shape. -->
+<div class="el metric accent" style="left:-32px; top:80px; width:1500px; height:700px;">−42</div>
+<div class="el unit right" style="left:1584px; top:144px; width:240px; height:200px;">%</div>
+<div class="el meta" style="left:96px; top:920px; width:1500px; height:48px;">One measure · one scope · one period</div>
+</div>
+
+<!-- Pattern: table — for: exact categorical values; regions: table, takeaway; components: table + selected + takeaway; may vary: three to five rows or columns; may not: add rules, fills, zebra, native styling, or a second red value. -->
+<!-- Native tables inherit the template font, so use aligned text to retain this face. Right-align tabular figures; weight marks the important column and red marks one claimed value. More than five rows becomes a chart or another slide. -->
+<div class="slide">
+<div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">THE NUMBERS</div>
+<div class="el label dim" style="left:80px; top:320px; width:600px; height:28px;">Item</div>
+<div class="el label dim right" style="left:760px; top:320px; width:320px; height:28px;">Prior</div>
+<div class="el label dim right" style="left:1160px; top:320px; width:320px; height:28px;">Current</div>
+<!-- Component: table (.table-text) — exact values aligned without a native grid; may vary: three to five rows or columns; may not: add rules, fills, zebra, or lose tabular alignment. -->
+<div class="el table-text" style="left:80px; top:400px; width:600px; height:70px;">Item A</div>
+<div class="el table-text right" style="left:760px; top:400px; width:320px; height:70px;">100</div>
+<div class="el table-text heavy right" style="left:1160px; top:400px; width:320px; height:70px;">124</div>
+<div class="el table-text" style="left:80px; top:540px; width:600px; height:70px;">Item B</div>
+<div class="el table-text right" style="left:760px; top:540px; width:320px; height:70px;">80</div>
+<div class="el slide-title accent right" style="left:1160px; top:470px; width:320px; height:240px;">91</div>
+<div class="el body-text heavy" style="left:80px; top:800px; width:1760px; height:120px;">The red value decides.</div>
+</div>
+
+<!-- Pattern: chart — for: a four-to-six point trend when position can carry magnitude; regions: chart, takeaway; components: chart + selected + tag; may vary: values and four to six periods; may not: add axes, bars, grids, avoidable legends, or unequal scales. -->
+<!-- Decks use native charts with direct labels when a drawn form is unavoidable. The style-native trend below uses numbers as marks: one common scale, position as axis, grey history, red current value, no empty gridlines. Beyond six points, accept a native chart or choose another style. -->
+<div class="slide">
+<div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">TREND RISES</div>
+<!-- Component: chart (.chart-value) — direct value positioned by magnitude; may vary: four to six values on one scale; may not: add axes, bars, grids, or indirect legends. -->
+<div class="el stack muted tabular chart-value" style="left:120px; top:600px; width:360px; height:250px;">24</div>
+<div class="el label dim" style="left:120px; top:860px; width:300px; height:28px;">Period 1</div>
+<div class="el stack muted tabular chart-value" style="left:540px; top:520px; width:360px; height:250px;">31</div>
+<div class="el label dim" style="left:540px; top:780px; width:300px; height:28px;">Period 2</div>
+<div class="el stack muted tabular chart-value" style="left:960px; top:440px; width:360px; height:250px;">37</div>
+<div class="el label dim" style="left:960px; top:700px; width:300px; height:28px;">Period 3</div>
+<div class="el display accent tabular chart-value" style="left:1380px; top:240px; width:500px; height:352px;">48</div>
+<div class="el label dim" style="left:1380px; top:600px; width:300px; height:28px;">Current</div>
+<div class="el meta" style="left:96px; top:960px; width:1500px; height:48px;">Position carries magnitude. Values label themselves.</div>
+</div>
+
+<!-- Pattern: before-after — for: one state change on identical scope; regions: left, right, takeaway; components: before-after ×2 + selected + tag; may vary: state words and scope; may not: add an arrow, split rule, equals sign, or change the comparator. -->
+<div class="slide">
+<!-- Component: before-after (.stack) — one of two offset state words; may vary: labels and diagonal; may not: change scope, add a divider, or select the before state. -->
+<div class="el stack muted" style="left:80px; top:200px; width:1000px; height:280px;">BEFORE</div>
+<div class="el stack accent" style="left:860px; top:560px; width:1000px; height:280px;">AFTER</div>
+<div class="el meta" style="left:96px; top:920px; width:1500px; height:48px;">Same scope · same comparator</div>
+</div>
+
+<!-- Pattern: text — for: a bounded argument requiring prose; regions: body, media; components: lead + tag; may vary: up to six lines and supplied source; may not: use bullets, exceed one paragraph, add another idea, or turn the source into evidence not supplied. -->
+<!-- This is the single six-line support exception. It drops the display to slide-title size. The paragraph moves claim, mechanism, evidence, counter-case, implication, then ask; the optional dim right block carries only a supplied source, method, sample, or period. -->
+<div class="slide">
+<div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">READ THIS</div>
+<div class="el body-text" style="left:80px; top:344px; width:1100px; height:420px;">State the claim. Explain cause. Bound evidence. Test the counter-case. Name the implication. Ask for one decision.</div>
+</div>
+
+<!-- Pattern: hierarchy — for: one outcome and two drivers; regions: body, col-1, col-2, takeaway; components: hierarchy + selected + lead; may vary: words and chosen lever; may not: add a tree, connector, box, or more than two children. -->
+<div class="slide">
+<!-- Component: hierarchy (.display) — one parent above two children, encoded by scale and vertical order; may vary: labels and selected lever; may not: add connectors, boxes, or another child. -->
+<div class="el display" style="left:-24px; top:96px; width:1944px; height:352px;">OUTCOME</div>
+<div class="el stack muted" style="left:80px; top:520px; width:860px; height:280px;">DRIVER</div>
+<div class="el stack accent" style="left:1000px; top:520px; width:860px; height:280px;">LEVER</div>
+<div class="el body-text" style="left:80px; top:860px; width:1760px; height:120px;">Scale sets hierarchy. Red marks the changeable lever.</div>
+</div>
+
+<!-- Pattern: focus-stack — for: choosing one of three dimensions or tracking three to five items; regions: step-1, step-2, step-3, body; components: list + selected + lead; may vary: chosen word and three to five items; may not: add bullets, numbers, boxes, or select twice. -->
+<div class="slide">
+<!-- Component: list (.stack) — three to five words compared by order and tone; may vary: labels and chosen item; may not: add bullets, numbers, boxes, or more than one selection. -->
+<div class="el stack" style="left:80px; top:88px; width:900px; height:280px;">COST</div>
+<div class="el stack muted" style="left:80px; top:368px; width:900px; height:280px;">TIME</div>
+<div class="el stack muted" style="left:80px; top:648px; width:900px; height:280px;">RISK</div>
+<div class="el body-text" style="left:1040px; top:160px; width:800px; height:190px;">Black leads. Grey recedes. Red selects only when a decision requires it.</div>
+</div>
+
+<!-- Part: Closing -->
+<!-- Frame: closing — repeat the cover composition with two final words, black first and red second, plus one ask line at anchor B; wording may vary, but bleed, line pitch, accent line, and absence of furniture may not. Nothing follows; appendix material belongs in a separate deck. -->
+<div class="slide">
+<div class="el cover-title" style="left:-24px; top:64px; width:1944px; height:352px;">NEXT</div>
+<div class="el cover-title accent" style="left:-24px; top:416px; width:1944px; height:352px;">MOVE</div>
+<div class="el meta" style="left:96px; top:888px; width:1500px; height:48px;">One owner · one date · one ask</div>
+</div>
+
+</body>
+</html>
