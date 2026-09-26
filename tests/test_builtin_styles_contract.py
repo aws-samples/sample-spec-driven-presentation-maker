@@ -5,7 +5,7 @@ A style is a rulebook + reference + gallery sample in one HTML file
 document other code depends on — ``apply_style`` reads ``--color-text``, the
 build-time font-size lint reads ``--fs-*``, the Web UI splits on
 ``<div class="slide`` and shows the first slide as the thumbnail — plus the
-skeleton and writing principles the style workflow promises to every reader.
+skeleton (Parts 1-8, wireframe layouts), a size budget and writing principles the style workflow promises to every reader.
 """
 
 from __future__ import annotations
@@ -34,7 +34,9 @@ EXPECTED_NAMES = {
 }
 
 REQUIRED_TOKENS = ("--color-text", "--color-bg", "--fs-cover-title", "--fs-slide-title", "--fs-body")
-PART_MARKERS = tuple(f"Part {n}" for n in range(1, 8))
+PART_MARKERS = tuple(f"Part {n}" for n in range(1, 9))
+# Every composer receives the whole file; the skeleton fits well under this.
+MAX_STYLE_CHARS = 50_000
 BRAND_WORDS = ("McKinsey", "BCG", "Bain", "Accenture", "Deloitte", "Apple", "TED", "Amazon", "AWS", "Google")
 EMOJI_RE = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F2FF]")
 ROOT_RE = re.compile(r":root\s*\{(.*?)\}", re.DOTALL | re.IGNORECASE)
@@ -70,12 +72,32 @@ class TestStyleContract:
 
     def test_skeleton(self, path: Path) -> None:
         html = path.read_text(encoding="utf-8")
-        assert len(SLIDE_RE.findall(html)) >= 14, f"{path.stem}: skeleton with 8+ patterns needs >= 14 slides"
+        assert len(SLIDE_RE.findall(html)) >= 12, f"{path.stem}: the skeleton needs >= 12 slides"
         for marker in PART_MARKERS:
             assert marker in html, f"{path.stem}: no '{marker}' marker"
         # first slide is the cover — the gallery shows it as the thumbnail
         first = SLIDE_RE.search(html)
         assert first and "Part 1" in html[: first.start()]
+        # Part 7 layouts are wireframes: frame-ghost + named regions (layout pass names)
+        layouts = html[html.index("Part 7") : html.index("Part 8")]
+        assert 'class="el frame-ghost' in layouts and 'class="el region' in layouts, f"{path.stem}: Part 7 needs wireframes"
+        assert 'class="region-name' in layouts, f"{path.stem}: regions must be named"
+
+    def test_style_toc_sees_every_slide(self, path: Path) -> None:
+        # apply_style returns style_toc and agents read the file by line range, so every
+        # slide must open on its own line (a minified file collapses the TOC).
+        html = path.read_text(encoding="utf-8")
+        toc = [e for e in api.style_toc(html) if e["kind"] == "slide"]
+        assert len(toc) == len(SLIDE_RE.findall(html)), f"{path.stem}: slides share a line"
+
+    def test_regions_are_named(self, path: Path) -> None:
+        html = path.read_text(encoding="utf-8")
+        for m in re.finditer(r'<div class="el region[^"]*"[^>]*>(.*?)</div>', html):
+            assert 'class="region-name' in m.group(1), f"{path.stem}: unnamed region {m.group(0)[:80]}"
+
+    def test_size_budget(self, path: Path) -> None:
+        size = len(path.read_text(encoding="utf-8"))
+        assert size <= MAX_STYLE_CHARS, f"{path.stem}: {size} chars > {MAX_STYLE_CHARS}; cut duplication, not rules"
 
     def test_html_mechanics(self, path: Path) -> None:
         html = path.read_text(encoding="utf-8")

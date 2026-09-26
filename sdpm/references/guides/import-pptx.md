@@ -384,9 +384,9 @@ your visual notes (Lens A):
 
 You are now writing a style — follow the **`style` workflow**
 you loaded in 5-1. The HTML skeleton, `:root` token conventions,
-text-class naming (`.t-cover-title` / `.t-body` / ...), the Part 0–7
-skeleton (cover, rules, message & outline, palette, typography, frame,
-patterns), absolute-positioning rules, the 1.5× type scale, font-size
+text-class naming (`.t-cover-title` / `.t-body` / ...), the Part 0–8
+skeleton (cover, rules, message & outline, palette & type, frame,
+components, layouts, showcase), absolute-positioning rules, the 1.5× type scale, font-size
 unit, and violation examples are all defined there. Do not re-invent any of
 those conventions in this guide.
 
@@ -407,8 +407,9 @@ to the lens that produced it in 5-2:
 
 After populating tokens, write the demonstration slides. **The
 demonstration slides are NOT a re-render of the source deck.** Read
-the style workflow's skeleton: each Part 7 slide demonstrates how this
-style builds one slide type with placeholder content like
+the style workflow's skeleton: Part 6 shows this style's components,
+Part 7 its layouts as wireframes, Part 8 a few finished slides — all with
+placeholder content like
 "Cover Title" / "Section header" / "Body sample paragraph" /
 "Component swatches". Do not paste source-deck headlines, bullet
 lists, charts, or specific data into the demonstration slides — that

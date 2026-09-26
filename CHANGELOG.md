@@ -240,6 +240,18 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **Bundled styles teach components and layouts, at 58% of their former size.** The style
+  skeleton is now Parts 0–8: Palette and Typography merge into one part, the frame is built
+  once in Part 5, and the old Part 7 of finished pattern slides becomes Part 6 **Components**
+  (this style's own parts, each commented: when to use, what may vary), Part 7 **Layouts**
+  (wireframes of named regions, the same names the layout pass writes) and Part 8
+  **Showcase** (two or three finished slides for the gallery). Invented sources, captions
+  that repeated the comments, div-drawn charts and per-slide frame copies are gone. The 15
+  files total 480k characters instead of 829k — every composer receives the whole file, so
+  this is paid once per composer. Tokens and `<title>` descriptions are unchanged, so decks
+  already built and user styles in the old skeleton keep working. The layout pass now takes
+  its regions from the style's Layouts.
+
 - **`start_presentation` / `start_style` return every style, `pinned` flagged.**
   The pin filter is a gallery concern; the role picking a style sees the whole
   catalogue with the user's favourites marked. `list_styles` keeps its

@@ -27,7 +27,9 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
 
 - `slide_spec` (returned with this document) is the slide format; `read_guides(["slide-json-spec"])`
   brings it back if it has left your context.
-- `specs/art-direction.html` is the style. Design = style expressed in the spec's JSON.
+- `specs/art-direction.html` is the style. Design = style expressed in the spec's JSON: its
+  Frame part is what repeats on every slide, its Components part the parts slides are built
+  from, its Layouts part the region sets this style divides a slide into.
 - `grid(purpose, spec)` computes exact coordinates for row × column layouts from a CSS-Grid
   style spec — use it for rectangular arrangements instead of hand-placing; compute
   non-rectangular positions (arcs, radial, curves) yourself.
@@ -61,8 +63,9 @@ slide's title and section taken from the outline — and the regions its content
 one body area, two columns, three steps, media beside text — as named `_comment` elements
 (`{"_comment": "region: body", "x": 96, "y": 210, "w": 1728, "h": 640}`) at the head of
 `elements`. The name is shown as a label in the Web UI: a short identifier (`body`, `step-1`,
-`media`), nothing else. Derive all coordinates from one grid (margins, gutters — the `grid`
-tool computes them), so the same kind of expression gets the same region set across the deck.
+`media`), nothing else. Start from the style's Layouts: pick the wireframe that fits each slide's `visual` and
+take its regions, adapting only what the content needs. Derive all coordinates from one grid
+(margins, gutters — the `grid` tool computes them), so the same kind of expression gets the same region set across the deck.
 The body — text, images, charts, tables — belongs to the content composers.
 Write every slide in one `run_python` call: a few layout functions and a plan list, looped —
 the JSON is emitted once, not per slide. Regions are invisible in previews; a preview shows
