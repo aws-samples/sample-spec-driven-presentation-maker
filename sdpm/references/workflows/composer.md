@@ -31,7 +31,13 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
   Design = style expressed in the spec's JSON: its `Frame:` comments say what repeats on every
   slide, its `Component:` comments the parts slides are built from (by role), its `Pattern:`
   slides how this style builds each slide type and which regions that divides into. Match its
-  density as well as its look: a slide the style would not show, do not build.
+  density and its look. Its patterns show how it draws, not the limit of what a slide may show.
+- Show before you tell: realise each slide's `visual` as a drawn form — the spec's **Visual
+  forms** (flow, cycle, hub, hierarchy, matrix, timeline, progress, icon + label…) built from
+  the style's components, icons from `search_assets`. Where the outline's `visual` is only text
+  but the `body` has a structure (steps, parts, a centre and satellites, a trade-off), draw the
+  structure and say so in your summary. A slide that is mostly sentences inside cards is a
+  defect unless its claim is itself a sentence.
 - `grid(purpose, spec)` computes exact coordinates for row × column layouts from a CSS-Grid
   style spec — use it for rectangular arrangements instead of hand-placing; compute
   non-rectangular positions (arcs, radial, curves) yourself.

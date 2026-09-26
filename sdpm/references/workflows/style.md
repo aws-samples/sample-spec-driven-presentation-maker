@@ -40,7 +40,7 @@ Parts, in this order, each opened by a marker comment (`<!-- Part: Rules -->`):
 | Cover | The style's cover. **Always the first `.slide`** — the gallery thumbnail. |
 | Rules | The design decision (who reads this, in what setting, under what constraint) and the DO / DON'T that **follow from it**. As many slides as the rules need at the style's own density. |
 | Message & Outline | What the orchestrator reads before writing the outline: title grammar, one claim per slide, per-slide density, lead-in and closing conventions, chapter shape (agenda tracker, section dividers, summary first…), favoured visual forms. **Deck length is not the style's decision**: it follows the brief and material. |
-| Patterns | One slide per recurring slide type, each built as that pattern and explaining it: the comparison slide compares, the process slide is a process of how to build one. Required: `comparison`, `columns`, `process`, `metric`, `table`, `chart`; add what the style is for (`relationship`, `before-after`, `text`, `media`, `timeline`, `matrix`, `dashboard`, `swimlane`, `code`, `architecture`). Open with a section divider. |
+| Patterns | One slide per recurring slide type, each built as that pattern and explaining it: the comparison slide compares, the process slide is a process of how to build one. Required: `comparison`, `columns`, `process`, `metric`, `table`, `chart`, `diagram` (a relationship drawn as a form — cycle, hub, hierarchy or matrix — with the style's icons, nodes and connectors; it shows how much this style illustrates); add what the style is for (`relationship`, `before-after`, `text`, `media`, `timeline`, `matrix`, `dashboard`, `swimlane`, `code`, `architecture`). Open with a section divider. |
 | Closing | The closing frame, ending on what makes the style this style. |
 
 **Frames** are the elements repeated on every slide — title band, section label, agenda
@@ -84,10 +84,11 @@ whitespace and rules -->` — so a composer never guesses.
 | Sequence | `step` + `connector`, `phase` (stage header), `milestone` | `step` + `connector` |
 | Relationship | `hub` (centre and satellites), `hierarchy`, `axis` (2×2 or spectrum), `brace` (items gathered into one conclusion) | — |
 | Labels | `tag` (status or category), `marker` (number or point marker), `legend` | `tag` |
-| Evidence | `table`, `chart` (native; the comment carries series colours, highlight, labels, baseline), `media` (image or screenshot treatment), `code`, `icon` | `table`, `chart` |
+| Evidence | `table`, `chart` (native; the comment carries series colours, highlight, labels, baseline), `media` (image or screenshot treatment), `code`, `icon` (size, colour, what it sits on, which family) | `table`, `chart`, `icon` |
 
-Define the optional roles the style is for and leave the rest out. Shape vocabulary is not a
-goal: a role is worth a non-rectangular shape only when the style's look calls for it.
+Define the optional roles the style is for and leave the rest out. Every style draws diagrams —
+the slide JSON spec's Visual forms are available to every deck — so what a style decides is how
+they look here: the node, the connector, the icon, the marker.
 
 **Shape classes.** When a component uses a shape other than a rectangle, give it a class named
 after the slide JSON `shape` value — `.shape-<name>`, with `_` written as `-` — so class → JSON
@@ -161,6 +162,13 @@ The demo slides are read as coordinates, so the format is constrained:
   `--fs-slide-title` (40pt → 192 px), and `--content-top` sits below it. One-line titles leave
   the second line empty; content never moves up to fill it.
 - No emoji anywhere — the PPTX renderer has no emoji fonts. Icons come from `search_assets`.
+- Icons are inline SVG, because the gallery renders the file on its own (relative asset paths do
+  not resolve there). One line directly after `<body>` holds the symbols the file uses —
+  `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/hub" viewBox="0 -960 960 960"><path d="…"/></symbol>…</svg>` —
+  with each `id` the `search_assets` name, `<source>/<name>`, and the path copied from that
+  asset, so the JSON `src` is `assets:` + the id. Draw one with
+  `<svg class="icon"><use href="#material/hub"/></svg>`; its colour is `fill` from a token (the
+  JSON `iconColor`). Multi-colour service icons (`aws/…`) keep their own colours.
 
 ## Writing the rules
 
@@ -172,7 +180,13 @@ The demo slides are read as coordinates, so the format is constrained:
   claim per slide; the title is the claim; colours beyond background and text kept to the
   minimum that distinguishes content; text contrast ≥ 4.5:1 (3:1 for ≥ 18pt); charts label
   values directly and drop gridlines that carry no information; margins ≥ 5% of the slide
-  edge; no emoji.
+  edge; no emoji; structure is drawn, not written — steps, loops, parts, a centre and its
+  satellites, trade-offs and quantities become forms, and text is kept for claims that are
+  sentences.
+- **Say how much the style illustrates.** One rule states where icons appear (card heads,
+  nodes, icon + label rows — or none, with shapes and numerals carrying the concepts, when the
+  design decision demands it), their size, colour and family, and which forms the style favours
+  and how dense a diagram may get. The `diagram` pattern is that rule's sample.
 - **Describe by design, not by brand.** Do not name companies, firms or presenters whose
   decks the style resembles, and do not describe the style as "what AI decks look like" or
   its opposite. Say what the style does and for whom.

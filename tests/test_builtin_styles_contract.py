@@ -38,14 +38,14 @@ EXPECTED_NAMES = {
 REQUIRED_TOKENS = ("--color-text", "--color-bg", "--fs-cover-title", "--fs-slide-title", "--fs-body")
 PARTS = ("Cover", "Rules", "Message & Outline", "Patterns", "Closing")
 REQUIRED_FRAMES = ("content", "divider", "closing")
-REQUIRED_PATTERNS = ("comparison", "columns", "process", "metric", "table", "chart")
-# Every composer receives the whole file; the skeleton fits well under this.
-MAX_STYLE_CHARS = 40_000
+REQUIRED_PATTERNS = ("comparison", "columns", "process", "metric", "table", "chart", "diagram")
+# Every composer receives the whole file; the skeleton plus its icon symbols fits under this.
+MAX_STYLE_CHARS = 44_000
 # Component vocabulary (workflows/style.md): roles every style must state, and all roles
-REQUIRED_ROLES = ("container", "selected", "takeaway", "numbered", "metric", "step", "connector", "tag", "table", "chart")
+REQUIRED_ROLES = ("container", "selected", "takeaway", "numbered", "metric", "step", "connector", "tag", "table", "chart", "icon")
 ALL_ROLES = REQUIRED_ROLES + (
     "list", "lead", "quote", "delta", "before-after", "progress", "phase", "milestone",
-    "hub", "hierarchy", "axis", "brace", "marker", "legend", "media", "code", "icon",
+    "hub", "hierarchy", "axis", "brace", "marker", "legend", "media", "code",
 )
 COMPONENT_RE = re.compile(r"<!--\s*Component:\s*([a-z-]+)")
 PATTERN_RE = re.compile(r"<!--\s*Pattern:\s*([a-z-]+)(.*?)-->", re.DOTALL)
@@ -57,6 +57,9 @@ EMOJI_RE = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0
 ROOT_RE = re.compile(r":root\s*\{(.*?)\}", re.DOTALL | re.IGNORECASE)
 SLIDE_RE = re.compile(r'<div class="slide[\s"]')
 EL_STYLE_RE = re.compile(r'class="[^"]*\bel\b[^"]*"[^>]*style="([^"]*)"')
+SYMBOL_RE = re.compile(r'<symbol id="([\w./-]+)"[^>]*>(.*?)</symbol>', re.DOTALL)
+USE_RE = re.compile(r'<use href="#([\w./-]+)"')
+ASSETS_DIR = Path(__file__).resolve().parents[1] / "sdpm" / "assets"
 
 
 def _root(html: str) -> str:
@@ -129,6 +132,26 @@ class TestStyleContract:
             text = _html.unescape(re.sub(r"<[^>]+>", " ", slide))
             words = len(re.findall(r"[\w%$€£¥+−-]+", text))
             assert words <= limit, f"{path.stem}: slide {i} shows {words} words > density {limit}"
+
+    def test_icons_are_self_contained_assets(self, path: Path) -> None:
+        # the gallery renders the file alone (iframe srcdoc): icons are inline <symbol>s whose
+        # id is the search_assets name, so the slide JSON src is "assets:" + id
+        html = path.read_text(encoding="utf-8")
+        symbols = dict(SYMBOL_RE.findall(html))
+        used = set(USE_RE.findall(html))
+        assert used <= set(symbols), f"{path.stem}: <use> without a symbol: {sorted(used - set(symbols))}"
+        assert not re.search(r'src="\.\./', html), f"{path.stem}: relative asset paths do not resolve in the gallery"
+        diagram = html.split("<!-- Pattern: diagram", 1)[1].split('<div class="slide', 2)[1]
+        declares_none = re.search(r"<!--\s*Component:\s*icon[^>]*—\s*none", html)
+        assert declares_none or USE_RE.search(diagram) or "<svg" in diagram, f"{path.stem}: diagram pattern draws no icon"
+        for sid, body in symbols.items():
+            source, _, name = sid.partition("/")
+            asset = ASSETS_DIR / source / f"{name}.svg"
+            if not asset.parent.is_dir():
+                continue  # catalog not downloaded (CI); names are still checked where it exists
+            assert asset.is_file(), f"{path.stem}: symbol {sid} is not a search_assets name"
+            first = re.search(r'd="([^"]{24})', body)
+            assert first and first.group(1) in asset.read_text(encoding="utf-8"), f"{path.stem}: {sid} path not copied from the asset"
 
     def test_size_budget(self, path: Path) -> None:
         size = len(path.read_text(encoding="utf-8"))

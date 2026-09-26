@@ -75,9 +75,16 @@ body { margin: 0; padding: 40px; background: #D8CDBA; font-family: var(--font-fa
 .chart { border-left: var(--border-thin) solid var(--color-border); border-bottom: var(--border-thin) solid var(--color-border); }
 .chart text { font-family: "Helvetica Neue", Arial, sans-serif; font-size: calc(var(--fs-caption) * 1.5); font-weight: 900; fill: var(--color-text); }
 .prose { border-left: var(--border-thin) solid var(--color-border); padding-left: 36px; }
+.icon { display: block; width: 96px; height: 96px; flex: none; fill: var(--color-text); }
+.icon-hub { width: 120px; height: 120px; }
+.icon-card { display: flex; flex-direction: column; gap: 22px; }
+.node-main { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; }
+.node-side { display: flex; align-items: center; gap: 36px; padding: 28px 34px; }
+.arrow-right { background: var(--color-border); clip-path: polygon(0 0, 100% 50%, 0 100%); }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/campaign" viewBox="0 -960 960 960"><path d="M730-450v-60h150v60H730Zm50 290-121-90 36-48 121 90-36 48Zm-82-503-36-48 118-89 36 48-118 89ZM210-200v-160h-70q-24.75 0-42.37-17.63Q80-395.25 80-420v-120q0-24.75 17.63-42.38Q115.25-600 140-600h180l200-120v480L320-360h-50v160h-60Zm250-146v-268l-124 74H140v120h196l124 74Zm100 0v-268q27 24 43.5 58.5T620-480q0 41-16.5 75.5T560-346ZM300-480Z"/></symbol><symbol id="material/account_tree" viewBox="0 -960 960 960"><path d="M604-120v-125H450v-410h-93v130H80v-315h277v125h247v-125h276v315H604v-130h-94v350h94v-130h276v315H604ZM140-780v195-195Zm524 405v195-195Zm0-405v195-195Zm0 195h156v-195H664v195Zm0 405h156v-195H664v195ZM140-585h157v-195H140v195Z"/></symbol><symbol id="material/analytics" viewBox="0 -960 960 960"><path d="M284-277h60v-205h-60v205Zm332 0h60v-420h-60v420Zm-166 0h60v-118h-60v118Zm0-205h60v-60h-60v60ZM180-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h600q24 0 42 18t18 42v600q0 24-18 42t-42 18H180Zm0-60h600v-600H180v600Zm0-600v600-600Z"/></symbol><symbol id="material/compare_arrows" viewBox="0 -960 960 960"><path d="m317-160-42-42 121-121H80v-60h316L275-504l42-42 193 193-193 193Zm326-254L450-607l193-193 42 42-121 121h316v60H564l121 121-42 42Z"/></symbol><symbol id="material/task_alt" viewBox="0 -960 960 960"><path d="M480-80q-85 0-158-30.5T195-195q-54-54-84.5-127T80-480q0-84 30.5-157T195-764q54-54 127-85t158-31q75 0 140 24t117 66l-43 43q-44-35-98-54t-116-19q-145 0-242.5 97.5T140-480q0 145 97.5 242.5T480-140q145 0 242.5-97.5T820-480q0-30-4.5-58.5T802-594l46-46q16 37 24 77t8 83q0 85-31 158t-85 127q-54 54-127 84.5T480-80Zm-59-218L256-464l45-45 120 120 414-414 46 45-460 460Z"/></symbol></svg>
 
 <!-- Part: Cover -->
 <!-- The cover spends three primary fills on the style declaration; no other decoration, rotation, overlap, or gradient is permitted. -->
@@ -104,6 +111,7 @@ body { margin: 0; padding: 40px; background: #D8CDBA; font-family: var(--font-fa
 </div>
 
 <!-- Every filled box uses one native outer shadow with blur 0, distance 12, direction 45, colour #111111, and opacity 1. Every filled box keeps a 6px black border and radius 0. Rotation is exactly 0 degrees. Repeat colours only by role. -->
+<!-- Illustration rule: use 96px black Material icons at card, step, and satellite heads, with 120px only in the one hub; favour hard-edged hubs, hierarchies, short flows, comparisons, and quantities; limit a diagram to one hub plus three satellites and four edge-to-edge connectors. -->
 <div class="slide">
 <div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Rules / geometry</div>
 <div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">Consistency creates the force</div>
@@ -116,7 +124,7 @@ body { margin: 0; padding: 40px; background: #D8CDBA; font-family: var(--font-fa
 <div class="el hd" style="left:1120px;top:350px;width:560px;height:100px">Square corners</div>
 <div class="el marker lb" style="left:980px;top:520px;width:90px;height:70px">04</div>
 <div class="el hd" style="left:1120px;top:520px;width:560px;height:100px">Zero rotation</div>
-<div class="el takeaway bt" style="left:120px;top:760px;width:1680px;height:140px">Labels stay uppercase and three words maximum. Icons are sourced, monochrome, and essential.</div>
+<div class="el takeaway bt" style="left:120px;top:760px;width:1680px;height:140px">Draw hubs, hierarchies, and short flows with 96px Material icons in card and node heads; cap diagrams at four nodes.</div>
 <div class="el frame-foot cp" style="left:120px;top:970px;width:1680px;height:50px">Margins exceed five percent</div>
 </div>
 
@@ -141,7 +149,7 @@ body { margin: 0; padding: 40px; background: #D8CDBA; font-family: var(--font-fa
 <div class="el box red hd" style="left:120px;top:350px;width:460px;height:310px">Open<br><span class="bt">Strongest claim</span></div>
 <div class="el box yellow hd" style="left:730px;top:350px;width:460px;height:310px">Build<br><span class="bt">Evidence order</span></div>
 <div class="el box green hd" style="left:1340px;top:350px;width:460px;height:310px">Close<br><span class="bt">Immediate implication</span></div>
-<div class="el takeaway bt" style="left:120px;top:770px;width:1680px;height:145px">Favor large numbers, direct comparisons, short processes, explicit relationships, compact tables, and native charts.</div>
+<div class="el takeaway bt" style="left:120px;top:770px;width:1680px;height:145px">Favor oversized metrics, icon-led columns, short flows, hard-edged hubs and hierarchies, exact tables, and native charts.</div>
 </div>
 
 <!-- Part: Patterns -->
@@ -162,28 +170,29 @@ body { margin: 0; padding: 40px; background: #D8CDBA; font-family: var(--font-fa
 <div class="el takeaway bt" style="left:120px;top:850px;width:1680px;height:110px">State the −22 delta directly; colour does not carry direction.</div>
 </div>
 
-<!-- Pattern: columns — for: three or four parallel categories, including a three-way comparison; regions: col-1, col-2, col-3, col-4; components: container ×4; may vary: three or four columns and reuse of three fills; may not: vary widths, evidence depth, shared baseline, evidence order, or exceed four blocks. -->
+<!-- Pattern: columns — for: three or four parallel categories, including a three-way comparison; regions: col-1, col-2, col-3, col-4; components: container ×4 + icon ×4; may vary: three or four columns, icon concept, and reuse of three fills; may not: vary widths, icon size, evidence depth, shared baseline, evidence order, or exceed four blocks. -->
 <div class="slide">
 <div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Pattern / columns</div>
 <div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">Equal columns hold parallel logic</div>
-<div class="el box red hd" style="left:120px;top:370px;width:360px;height:400px">Frame<br><span class="bt">Name the claim.</span></div>
-<div class="el box yellow hd" style="left:560px;top:370px;width:360px;height:400px">Measure<br><span class="bt">Use one scale.</span></div>
-<div class="el box green hd" style="left:1000px;top:370px;width:360px;height:400px">Compare<br><span class="bt">Match depth.</span></div>
-<div class="el box red hd" style="left:1440px;top:370px;width:360px;height:400px">Decide<br><span class="bt">End directly.</span></div>
+<!-- Component: icon (.icon) — name a concept at a card, step, or diagram-node head; 96px black Material family, with 120px only for the hub; may vary: sourced concept; may not: decorate, mix families, sit beside paragraphs, lose its short label, or change size among peers. -->
+<div class="el box red icon-card" style="left:120px;top:370px;width:360px;height:400px"><svg class="icon"><use href="#material/campaign"/></svg><div class="hd">Frame</div><div class="bt">Name the claim.</div></div>
+<div class="el box yellow icon-card" style="left:560px;top:370px;width:360px;height:400px"><svg class="icon"><use href="#material/analytics"/></svg><div class="hd">Measure</div><div class="bt">Use one scale.</div></div>
+<div class="el box green icon-card" style="left:1000px;top:370px;width:360px;height:400px"><svg class="icon"><use href="#material/compare_arrows"/></svg><div class="hd">Compare</div><div class="bt">Match depth.</div></div>
+<div class="el box red icon-card" style="left:1440px;top:370px;width:360px;height:400px"><svg class="icon"><use href="#material/task_alt"/></svg><div class="hd">Decide</div><div class="bt">End directly.</div></div>
 <div class="el takeaway bt" style="left:120px;top:850px;width:1680px;height:110px">Repeat colour only when its role repeats.</div>
 </div>
 
-<!-- Pattern: process — for: three to five ordered stages; regions: step-1, step-2, step-3, takeaway; components: step ×3 + connector ×2 + takeaway; may vary: stage count and repeated fills; may not: rotate, curve, detach connectors, add paragraphs, or use sequence without meaningful order. -->
+<!-- Pattern: process — for: three to five ordered stages; regions: step-1, step-2, step-3, takeaway; components: step ×3 + icon ×3 + connector ×2 + takeaway; may vary: stage count, icon concept, and repeated fills; may not: rotate, curve, detach connectors, change peer icon size, add paragraphs, or use sequence without meaningful order. -->
 <div class="slide">
 <div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Pattern / process</div>
 <div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">Three checks prevent rework</div>
-<!-- Component: step (.step) — hold one “Step N — verb phrase” stage in matched geometry; may vary: three to five stages and repeated fills; may not: rotate, change sibling size, or carry a paragraph. -->
-<div class="el step red hd" style="left:120px;top:390px;width:400px;height:280px">Step 1<br>Frame claim</div>
-<!-- Component: connector (.connector) — make one straight left-to-right handoff between adjacent steps; may vary: length with spacing; may not: curve, rotate, detach, or become decorative. -->
-<div class="el connector" style="left:540px;top:525px;width:120px;height:6px"></div>
-<div class="el step yellow hd" style="left:680px;top:390px;width:400px;height:280px">Step 2<br>Test evidence</div>
-<div class="el connector" style="left:1100px;top:525px;width:120px;height:6px"></div>
-<div class="el step green hd" style="left:1240px;top:390px;width:400px;height:280px">Step 3<br>Name owner</div>
+<!-- Component: step (.step) — hold one icon plus “Step N — verb phrase” in matched geometry; may vary: three to five stages and repeated fills; may not: rotate, change sibling size, change icon size, or carry a paragraph. -->
+<div class="el step red icon-card" style="left:120px;top:365px;width:400px;height:330px"><svg class="icon"><use href="#material/campaign"/></svg><div class="hd">Step 1<br>Frame claim</div></div>
+<!-- Component: connector (.connector) — make one straight edge-to-edge left-to-right handoff between adjacent steps; may vary: length with spacing; may not: curve, rotate, detach, or become decorative. -->
+<div class="el connector" style="left:520px;top:524px;width:160px;height:12px"></div>
+<div class="el step yellow icon-card" style="left:680px;top:365px;width:400px;height:330px"><svg class="icon"><use href="#material/analytics"/></svg><div class="hd">Step 2<br>Test evidence</div></div>
+<div class="el connector" style="left:1080px;top:524px;width:160px;height:12px"></div>
+<div class="el step green icon-card" style="left:1240px;top:365px;width:400px;height:330px"><svg class="icon"><use href="#material/task_alt"/></svg><div class="hd">Step 3<br>Name owner</div></div>
 <div class="el takeaway bt" style="left:120px;top:790px;width:1520px;height:130px">Move left to right. Split stages that need paragraphs.</div>
 </div>
 
@@ -243,6 +252,26 @@ body { margin: 0; padding: 40px; background: #D8CDBA; font-family: var(--font-fa
 <div class="el box green center hd" style="left:760px;top:694px;width:400px;height:170px">Sequence</div>
 <div class="el box blue center hd" style="left:1400px;top:694px;width:400px;height:170px">Evidence</div>
 <div class="el frame-foot cp" style="left:120px;top:950px;width:1680px;height:55px">Name the relationship in the claim</div>
+</div>
+
+<!-- Pattern: diagram — for: one claim driving three distinct outcomes; regions: hub, spine, node-1, node-2, node-3; components: hub + selected + container ×3 + icon ×4 + connector ×4; may vary: labels, outcome order, and which peer uses the quiet surface; may not: exceed four nodes, change peer icon size, hide or detach connectors, point at node centres, add crossings, or use more than three primary fills. -->
+<div class="slide">
+<div class="el lb" style="left:120px;top:65px;width:500px;height:32px">Pattern / diagram</div>
+<div class="el st frame-title" style="left:120px;top:112px;width:1680px;height:160px">One claim drives three outcomes</div>
+<!-- Component: hub (.node-main) — make the one governing claim the largest selected node with a 120px icon; may vary: claim concept and selected fill; may not: compete with a second hub, shrink to peer size, or carry a paragraph. -->
+<div class="el box red node-main" style="left:120px;top:390px;width:560px;height:420px"><svg class="icon icon-hub"><use href="#material/campaign"/></svg><div class="hd">One claim</div><div class="lb">Governs the slide</div></div>
+<!-- Component: connector (.connector + .arrow-right) — distribute one thick edge-to-edge relationship through a straight spine, with arrowheads only where the governing direction enters a peer node; may vary: branch spacing with node positions; may not: disappear behind shadows, enter labels, detach, cross, or terminate at a node centre. -->
+<div class="el connector" style="left:680px;top:594px;width:302px;height:12px"></div>
+<div class="el connector" style="left:970px;top:410px;width:12px;height:450px"></div>
+<div class="el connector" style="left:982px;top:404px;width:228px;height:12px"></div>
+<div class="el arrow-right" style="left:1210px;top:389px;width:30px;height:42px"></div>
+<div class="el connector" style="left:982px;top:629px;width:228px;height:12px"></div>
+<div class="el arrow-right" style="left:1210px;top:614px;width:30px;height:42px"></div>
+<div class="el connector" style="left:982px;top:854px;width:228px;height:12px"></div>
+<div class="el arrow-right" style="left:1210px;top:839px;width:30px;height:42px"></div>
+<div class="el box yellow node-side" style="left:1240px;top:330px;width:560px;height:160px"><svg class="icon"><use href="#material/account_tree"/></svg><div class="hd">Show structure</div></div>
+<div class="el box surface node-side" style="left:1240px;top:555px;width:560px;height:160px"><svg class="icon"><use href="#material/analytics"/></svg><div class="hd">Name evidence</div></div>
+<div class="el box green node-side" style="left:1240px;top:780px;width:560px;height:160px"><svg class="icon"><use href="#material/task_alt"/></svg><div class="hd">Drive action</div></div>
 </div>
 
 <!-- Pattern: text — for: a bounded prose-led argument; regions: left, finding-1, finding-2, finding-3; components: lead + numbered ×3; may vary: synopsis and three to five points; may not: exceed density, scatter cards, use an unnumbered scan path, or move qualification onto the slide. -->

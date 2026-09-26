@@ -76,9 +76,18 @@ body { margin: 0; padding: 40px; background: #DDDDE2; color: var(--color-text); 
 .chart .value { font-size: calc(var(--fs-table) * 1.5); font-weight: 700; fill: var(--color-text); }
 .chart .bar { fill: var(--color-bar); }
 .chart .bar-pick { fill: var(--accent); }
+.icon { width: 104px; height: 104px; flex: none; fill: var(--color-text); }
+.icon-md { width: 72px; height: 72px; }
+.icon-hub { width: 88px; height: 88px; }
+.dark .icon { fill: var(--color-on-dark); }
+.acc .icon { fill: var(--color-on-accent); }
+.connector { background: var(--color-muted); border-radius: 999px; box-shadow: var(--shadow); }
+.connector-selected { background: var(--accent); }
+.node-row { flex-direction: row; align-items: center; justify-content: center; gap: 24px; }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/visibility" viewBox="0 -960 960 960"><path d="M600.5-379.5Q650-429 650-500t-49.5-120.5Q551-670 480-670t-120.5 49.5Q310-571 310-500t49.5 120.5Q409-330 480-330t120.5-49.5Zm-200-41Q368-453 368-500t32.5-79.5Q433-612 480-612t79.5 32.5Q592-547 592-500t-32.5 79.5Q527-388 480-388t-79.5-32.5ZM216-283Q98-366 40-500q58-134 176-217t264-83q146 0 264 83t176 217q-58 134-176 217t-264 83q-146 0-264-83Zm264-217Zm222.5 174.5Q804-391 857-500q-53-109-154.5-174.5T480-740q-121 0-222.5 65.5T102-500q54 109 155.5 174.5T480-260q121 0 222.5-65.5Z"/></symbol><symbol id="material/grid_view" viewBox="0 -960 960 960"><path d="M120-510v-330h330v330H120Zm0 390v-330h330v330H120Zm390-390v-330h330v330H510Zm0 390v-330h330v330H510ZM180-570h210v-210H180v210Zm390 0h210v-210H570v210Zm0 390h210v-210H570v210Zm-390 0h210v-210H180v210Zm390-390Zm0 180Zm-180 0Zm0-180Z"/></symbol><symbol id="material/data_check" viewBox="0 -960 960 960"><path d="m612-550 141-142-28-28-113 113-57-57-28 29 85 85ZM120-160v-60h480v60H120Zm385.5-345.61q-55.5-55.6-55.5-134.5 0-78.89 55.61-134.39 55.6-55.5 134.5-55.5 78.89 0 134.39 55.61 55.5 55.6 55.5 134.5 0 78.89-55.61 134.39-55.6 55.5-134.5 55.5-78.89 0-134.39-55.61ZM120-500v-60h262q5.32 16.32 12.16 31.16T409-500H120Zm0 170v-60h419q13.8 6.36 29.4 10.68Q584-375 600-373v43H120Z"/></symbol><symbol id="material/task_alt" viewBox="0 -960 960 960"><path d="M480-80q-85 0-158-30.5T195-195q-54-54-84.5-127T80-480q0-84 30.5-157T195-764q54-54 127-85t158-31q75 0 140 24t117 66l-43 43q-44-35-98-54t-116-19q-145 0-242.5 97.5T140-480q0 145 97.5 242.5T480-140q145 0 242.5-97.5T820-480q0-30-4.5-58.5T802-594l46-46q16 37 24 77t8 83q0 85-31 158t-85 127q-54 54-127 84.5T480-80Zm-59-218L256-464l45-45 120 120 414-414 46 45-460 460Z"/></symbol><symbol id="material/hub" viewBox="0 -960 960 960"><path d="M153-73q-33-33-33-81t33.25-81q33.25-33 80.75-33 14 0 24.5 2.5T280-258l85-106q-19-23-29-52.5t-5-61.5l-121-41q-15 25-39.5 39T114-466q-47.5 0-80.75-33.25T0-580q0-47.5 33.25-80.75T114-694q47.5 0 80.75 33.25T228-580v4l122 42q18-32 43.5-49t56.5-24v-129q-39-11-61.5-43T366-846q0-47.5 33-80.75T480-960q48 0 81 33.25T594-846q0 35-23 67t-61 43v129q31 7 57 24t44 49l121-42v-4q0-47.5 33.25-80.75T846-694q47.5 0 80.75 33T960-580q0 48-33.25 81T846-466q-32 0-57-14t-39-39l-121 41q5 32-4.5 61.5T595-364l85 106q11-5 21.5-7.5t24.06-2.5Q774-268 807-235t33 81q0 48-33 81t-81 33q-48 0-81-33.25T612-154q0-20 5.5-36t15.5-31l-85-106q-32.13 17-68.56 17Q443-310 411-327l-84 107q10 15 15.5 30.5T348-154q0 47.5-33 80.75T234-40q-48 0-81-33Zm-38.96-453q22.96 0 38.46-15.54 15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5Q91-634 75.5-618.46 60-602.93 60-579.96 60-557 75.54-541.5q15.53 15.5 38.5 15.5ZM272.5-115.54q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54Zm246-692q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54ZM480.5-370q37.5 0 63.5-26.5t26-64q0-37.5-26.1-63.5T480-550q-37 0-63.5 26.1T390-460q0 37 26.5 63.5t64 26.5Zm284 254.46q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54Zm120-426q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54ZM480-846ZM114-580Zm366 120Zm366-120ZM234-154Zm492 0Z"/></symbol></svg>
 
 <!-- Part: Cover -->
 <!-- The cover is already a deck slide: four unequal tiles introduce the modular decision without a specimen row. -->
@@ -105,14 +114,14 @@ body { margin: 0; padding: 40px; background: #DDDDE2; color: var(--color-text); 
 <div class="el tile acc pad-sm between" style="left:1256px;top:788px;width:544px;height:220px;"><div class="label">If it fails</div><div class="tile-title">Merge or add a slide</div></div>
 </div>
 
-<!-- Universal rules remain explicit: one claim per slide; title equals claim; margins exceed five percent; text contrast is at least 4.5:1, or 3:1 only at 18pt and above; no emoji; one meaningful sourced icon only when words fail. -->
+<!-- Universal rules remain explicit: one claim per slide; title equals claim; margins exceed five percent; text contrast is at least 4.5:1, or 3:1 only at 18pt and above; no emoji; use sourced icons only to name concepts. Illustration rule: put Material icons only at card and node heads, 72–104px, in text colour or white on selected tiles; favour modular flows, hubs, comparisons, before-and-after, and quantities; cap a diagram at five nodes and four edge-to-edge connectors. -->
 <div class="slide">
 <div class="el label" style="left:120px;top:62px;width:700px;height:34px;">Rules / readability</div>
 <div class="el slide-title" style="left:120px;top:118px;width:1680px;height:160px;">Restraint keeps every tile readable</div>
 <div class="el tile dark between" style="left:120px;top:300px;width:828px;height:464px;"><div class="label">Claim</div><div class="tile-title">One assertion owns the slide</div><div class="caption">The title states it directly.</div></div>
 <div class="el tile between" style="left:972px;top:300px;width:828px;height:464px;"><div class="label">Contrast</div><div class="tile-title">Text remains readable on every fill</div><div class="caption">Use regular or bold; never italics or a third weight.</div></div>
 <div class="el tile between" style="left:120px;top:788px;width:1112px;height:220px;"><div class="label">Edges</div><div class="tile-title">Keep margins beyond five percent</div></div>
-<div class="el tile acc pad-sm between" style="left:1256px;top:788px;width:544px;height:220px;"><div class="label">Assets</div><div class="tile-title">Words first; one icon only when necessary</div></div>
+<div class="el tile acc pad-sm between" style="left:1256px;top:788px;width:544px;height:220px;"><div class="label">Illustration</div><div class="tile-title">Icons name concepts</div><div class="caption">Material · 72–104px · selected or text colour</div></div>
 </div>
 
 <!-- Content slides use 3–6 tiles, exactly one dark tile, and zero or one accent tile. A second accent becomes white. Accent-tile copy stays white with no muted grade, and colour never carries meaning alone. Every tile label is three words or fewer; every tile keeps one fact to 12 words or fewer plus one qualifier. -->
@@ -123,7 +132,7 @@ body { margin: 0; padding: 40px; background: #DDDDE2; color: var(--color-text); 
 <div class="el tile dark between" style="left:120px;top:300px;width:544px;height:464px;"><div class="label">Count</div><div class="metric">3–6</div><div class="caption">tiles per content slide</div></div>
 <div class="el tile between" style="left:688px;top:300px;width:544px;height:464px;"><div class="label">Gap</div><div class="metric">24px</div><div class="caption">horizontal and vertical, always</div></div>
 <div class="el tile between" style="left:1256px;top:300px;width:544px;height:464px;"><div class="label">Corner</div><div class="metric">20px</div><div class="caption">same radius on every tile</div></div>
-<div class="el tile acc pad-sm between" style="left:120px;top:788px;width:1680px;height:220px;"><div class="label">Never</div><div class="tile-title">Nest, overlap, tilt, vary the shadow, or decorate with connectors</div></div>
+<div class="el tile acc pad-sm between" style="left:120px;top:788px;width:1680px;height:220px;"><div class="label">Never</div><div class="tile-title">Nest, overlap, tilt, vary the shadow, or use decorative connectors</div></div>
 </div>
 
 <!-- Part: Message & Outline -->
@@ -145,7 +154,7 @@ body { margin: 0; padding: 40px; background: #DDDDE2; color: var(--color-text); 
 <div class="el slide-title" style="left:120px;top:118px;width:1680px;height:160px;">The claim chooses the visual form</div>
 <div class="el tile dark between" style="left:120px;top:300px;width:544px;height:464px;"><div class="label">Open</div><div class="tile-title">Lead with the strongest supported claim</div><div class="caption">Add navigation only when readers need it.</div></div>
 <div class="el tile between" style="left:688px;top:300px;width:544px;height:464px;"><div class="label">Build</div><div class="tile-title">Sequence claims in the material’s logic</div><div class="caption">The brief sets deck length.</div></div>
-<div class="el tile between" style="left:1256px;top:300px;width:544px;height:464px;"><div class="label">Prefer</div><div class="tile-title">Numbers and parallel categories</div><div class="caption">Use tables for lookup and charts for shape.</div></div>
+<div class="el tile between" style="left:1256px;top:300px;width:544px;height:464px;"><div class="label">Prefer</div><div class="tile-title">Draw flows, hubs, comparisons, and quantities</div><div class="caption">Icons name nodes; sentences remain sentences.</div></div>
 <div class="el tile acc pad-sm between" style="left:120px;top:788px;width:1680px;height:220px;"><div class="label">Close</div><div class="tile-title">Repeat the claim and name one owned action</div></div>
 </div>
 
@@ -177,18 +186,18 @@ body { margin: 0; padding: 40px; background: #DDDDE2; color: var(--color-text); 
 <div class="el tile dark pad-sm between" style="left:120px;top:788px;width:1680px;height:220px;"><div class="label">Rule</div><div class="tile-title">Split any column that needs another claim</div></div>
 </div>
 
-<!-- Pattern: process — for: a left-to-right sequence; regions: step-1, step-2, step-3, step-4, takeaway; components: step ×4 + numbered ×4 + selected + takeaway; may vary: three to five steps and selected step; may not: lose equal boxes, numeral order, verb phrases, or zero rotation. -->
-<!-- Component: connector — none; equal step boxes, whitespace, and numerals carry order because arrows would break tile independence. -->
+<!-- Pattern: process — for: a left-to-right sequence; regions: step-1, step-2, step-3, step-4, takeaway; components: step ×4 + numbered ×4 + icon ×4 + selected + takeaway; may vary: three to five steps and selected step; may not: lose equal boxes, numeral order, verb phrases, or zero rotation. -->
 <!-- Component: tag — none; the uppercase tile label carries status or category without adding another shape. -->
 <!-- Component: step (.tile) — one equal sequence stage; may vary: three to five verb-led stages; may not: change size within the row, rotate, or become a paragraph. -->
 <!-- Component: numbered (.step-index) — numeral attached to its step tile; may vary: sequence value; may not: detach, replace the verb phrase, or imply order outside a process. -->
 <div class="slide">
 <div class="el label" style="left:120px;top:62px;width:700px;height:34px;">Pattern / process</div>
 <div class="el slide-title" style="left:120px;top:118px;width:1680px;height:160px;">Numerals order steps without arrows</div>
-<div class="el tile between" style="left:120px;top:300px;width:402px;height:464px;"><div class="step-index">01</div><div class="tile-title">Frame the claim</div><div class="caption">one verb phrase</div></div>
-<div class="el tile between" style="left:546px;top:300px;width:402px;height:464px;"><div class="step-index">02</div><div class="tile-title">Build the evidence</div><div class="caption">one verb phrase</div></div>
-<div class="el tile acc between" style="left:972px;top:300px;width:402px;height:464px;"><div class="step-index">03</div><div class="tile-title">Test the reading</div><div class="caption">selected step</div></div>
-<div class="el tile between" style="left:1398px;top:300px;width:402px;height:464px;"><div class="step-index">04</div><div class="tile-title">State the action</div><div class="caption">one verb phrase</div></div>
+<!-- Component: icon (.icon) — at card and node heads beside a one-to-four-word label; size 72–104px; Material family; text colour or white on dark and selected tiles; may vary: concept and bounded size; may not: decorate, mix families, sit beside a paragraph, or lose its label. -->
+<div class="el tile between" style="left:120px;top:300px;width:402px;height:464px;"><div class="step-index">01</div><svg class="icon"><use href="#material/visibility"/></svg><div class="tile-title">Frame the claim</div></div>
+<div class="el tile between" style="left:546px;top:300px;width:402px;height:464px;"><div class="step-index">02</div><svg class="icon"><use href="#material/grid_view"/></svg><div class="tile-title">Build the evidence</div></div>
+<div class="el tile acc between" style="left:972px;top:300px;width:402px;height:464px;"><div class="step-index">03</div><svg class="icon"><use href="#material/data_check"/></svg><div class="tile-title">Test the reading</div></div>
+<div class="el tile between" style="left:1398px;top:300px;width:402px;height:464px;"><div class="step-index">04</div><svg class="icon"><use href="#material/task_alt"/></svg><div class="tile-title">State the action</div></div>
 <div class="el tile dark pad-sm between" style="left:120px;top:788px;width:1680px;height:220px;"><div class="label">Precondition</div><div class="tile-title">Name what must be true before step one</div></div>
 </div>
 
@@ -224,16 +233,21 @@ body { margin: 0; padding: 40px; background: #DDDDE2; color: var(--color-text); 
 <div class="el tile acc pad-sm between" style="left:1256px;top:788px;width:544px;height:220px;"><div class="label">Current</div><div class="metric">42</div></div>
 </div>
 
-<!-- Pattern: relationship — for: a named hub with independent satellites; regions: col-1, hub, col-3, takeaway; components: hub + container ×3 + takeaway; may vary: two to four satellites and relation verbs; may not: add arrows, nesting, overlap, or treat geometry as evidence. -->
+<!-- Pattern: diagram — for: a centre with four independent inputs and outcomes; regions: node-top, node-left, hub, node-right, node-bottom; components: hub + container ×3 + selected + icon ×5 + connector ×4; may vary: three to four satellites, labels, and selected outcome; may not: exceed five nodes, bend spokes, add arrowheads without direction, miss node edges, overlap labels, or nest tiles. -->
 <div class="slide">
-<div class="el label" style="left:120px;top:62px;width:700px;height:34px;">Pattern / relationship</div>
-<div class="el slide-title" style="left:120px;top:118px;width:1680px;height:160px;">Words name relationships that lines cannot</div>
-<div class="el tile between" style="left:120px;top:300px;width:402px;height:464px;"><div class="label">Feeds the centre</div><div class="tile-title">Observe</div><div class="caption">name what it sends</div></div>
-<!-- Component: hub (.tile.dark) — the single central idea with relation verbs stated in words; may vary: hub and satellites; may not: use connectors, nesting, or geometry as proof. -->
-<div class="el tile dark pad-lg between" style="left:688px;top:300px;width:544px;height:708px;"><div class="label">Centre</div><div class="tile-title">Decide</div><div class="body-text">State what each satellite contributes and receives.</div><div class="caption">The sentence is evidence; position is not.</div></div>
-<div class="el tile acc between" style="left:1398px;top:300px;width:402px;height:464px;"><div class="label">Depends on centre</div><div class="tile-title">Adjust</div><div class="caption">name what it receives</div></div>
-<div class="el tile pad-sm between" style="left:120px;top:788px;width:402px;height:220px;"><div class="label">Constrains centre</div><div class="tile-title">Bound</div></div>
-<div class="el tile pad-sm between" style="left:1398px;top:788px;width:402px;height:220px;"><div class="label">Measures centre</div><div class="tile-title">Review</div></div>
+<div class="el label" style="left:120px;top:62px;width:700px;height:34px;">Pattern / diagram</div>
+<div class="el slide-title" style="left:120px;top:118px;width:1680px;height:160px;">A tiled hub makes every dependency visible</div>
+<div class="el tile pad-sm node-row center" style="left:688px;top:300px;width:544px;height:172px;"><svg class="icon icon-md"><use href="#material/visibility"/></svg><div class="tile-title">Observe</div></div>
+<div class="el tile pad-sm node-row center" style="left:120px;top:568px;width:544px;height:172px;"><svg class="icon icon-md"><use href="#material/grid_view"/></svg><div class="tile-title">Frame</div></div>
+<!-- Component: hub (.tile.dark) — the large central node where four edge-overlapping spokes meet; may vary: concept and satellite labels; may not: lose the dark anchor, exceed four satellites, or carry a paragraph. -->
+<div class="el tile dark pad-sm mid center" style="left:688px;top:496px;width:544px;height:316px;"><div class="label">Centre</div><svg class="icon icon-hub"><use href="#material/hub"/></svg><div class="tile-title">Decide</div></div>
+<div class="el tile pad-sm node-row center" style="left:1256px;top:568px;width:544px;height:172px;"><svg class="icon icon-md"><use href="#material/data_check"/></svg><div class="tile-title">Test</div></div>
+<div class="el tile acc pad-sm node-row center" style="left:688px;top:836px;width:544px;height:172px;"><svg class="icon icon-md"><use href="#material/task_alt"/></svg><div class="tile-title">Act</div></div>
+<!-- Component: connector (.connector) — a 16-pixel pill spoke that crosses the gap and overlaps both node edges so the relationship survives at thumbnail size; may vary: length, orientation, and accent on the selected outcome; may not: float, enter labels, imply direction without an arrowhead, or connect independent content tiles. -->
+<div class="el connector" style="left:952px;top:456px;width:16px;height:56px;"></div>
+<div class="el connector" style="left:648px;top:646px;width:56px;height:16px;"></div>
+<div class="el connector" style="left:1216px;top:646px;width:56px;height:16px;"></div>
+<div class="el connector connector-selected" style="left:952px;top:796px;width:16px;height:56px;"></div>
 </div>
 
 <!-- Pattern: before-after — for: one matched state change; regions: left, delta, right; components: container + selected + takeaway + metric; may vary: states, measure, and which state is dark; may not: change geometry, scope, unit, row order, or use an arrow. -->

@@ -63,6 +63,12 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 .takeaway { border-top: var(--rule-thin) solid currentColor; padding-top: 24px; }
 .list-row { border-top: var(--rule-thin) solid currentColor; padding-top: 20px; }
 .selected { font-weight: 900; }
+.icon { display: block; width: 96px; height: 96px; fill: currentColor; flex: none; }
+.icon-list { width: 80px; height: 80px; }
+.icon-step { width: 104px; height: 104px; margin-bottom: 12px; }
+.icon-node { width: 120px; height: 120px; }
+.icon-hub { width: 144px; height: 144px; }
+.icon-row { display: flex; align-items: center; gap: 24px; }
 .step { border-top: var(--rule-thin) solid currentColor; padding-top: 18px; }
 .connector { background: var(--color-text); }
 .state { border-top: var(--rule-thin) solid currentColor; padding-top: 20px; }
@@ -82,6 +88,7 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/edit" viewBox="0 -960 960 960"><path d="M180-180h44l472-471-44-44-472 471v44Zm-60 60v-128l575-574q8-8 19-12.5t23-4.5q11 0 22 4.5t20 12.5l44 44q9 9 13 20t4 22q0 11-4.5 22.5T823-694L248-120H120Zm659-617-41-41 41 41Zm-105 64-22-22 44 44-22-22Z"/></symbol><symbol id="material/build" viewBox="0 -960 960 960"><path d="M705-128 447-388q-23 8-46 13t-47 5q-97.08 0-165.04-67.67Q121-505.33 121-602q0-31 8.16-60.39T152-718l145 145 92-86-149-149q25.91-15.16 54.96-23.58Q324-840 354-840q99.17 0 168.58 69.42Q592-701.17 592-602q0 24-5 47t-13 46l259 258q11 10.96 11 26.48T833-198l-76 70q-10.7 11-25.85 11Q716-117 705-128Zm28-57 40-40-273-273q16-21 24-49.5t8-54.5q0-75-55.5-127T350-782l102 104q9 9 8.5 21.5T451-635L318-510q-9.27 8-21.64 8-12.36 0-20.36-8l-98-97q3 77 54.67 127T354-430q25 0 53-8t49-24l277 277ZM476-484Z"/></symbol><symbol id="material/verified" viewBox="0 -960 960 960"><path d="m346-60-76-130-151-31 17-147-96-112 96-111-17-147 151-31 76-131 134 62 134-62 77 131 150 31-17 147 96 111-96 112 17 147-150 31-77 130-134-62-134 62Zm27-79 107-45 110 45 67-100 117-30-12-119 81-92-81-94 12-119-117-28-69-100-108 45-110-45-67 100-117 28 12 119-81 94 81 92-12 121 117 28 70 100Zm107-341Zm-43 133 227-225-45-41-182 180-95-99-46 45 141 140Z"/></symbol><symbol id="material/rocket_launch" viewBox="0 -960 960 960"><path d="m187-551 106 45q18-36 38.5-71t43.5-67l-79-16-109 109Zm154 81 133 133q57-26 107-59t81-64q81-81 119-166t41-192q-107 3-192 41T464-658q-31 31-64 81t-59 107Zm209-145.5q0-29.5 20-49.5t49.5-20q29.5 0 49.5 20t20 49.5q0 29.5-20 49.5t-49.5 20q-29.5 0-49.5-20t-20-49.5Zm5 432.5 109-109-16-79q-32 23-67 43.5T510-289l45 106Zm326-694q9 136-34 248T705-418l-2 2-2 2 22 110q3 15-1.5 29T706-250L535-78l-85-198-170-170-198-85 172-171q11-11 25-15.5t29-1.5l110 22q1-1 2-1.5t2-1.5q99-99 211-142.5T881-877ZM149-325q35-35 85.5-35.5T320-326q35 35 34.5 85.5T319-155q-26 26-80.5 43T75-80q15-109 31.5-164t42.5-81Zm42 43q-14 15-25 47t-19 82q50-8 82-19t47-25q19-17 19.5-42.5T278-284q-19-18-44.5-17.5T191-282Z"/></symbol><symbol id="material/hub" viewBox="0 -960 960 960"><path d="M153-73q-33-33-33-81t33.25-81q33.25-33 80.75-33 14 0 24.5 2.5T280-258l85-106q-19-23-29-52.5t-5-61.5l-121-41q-15 25-39.5 39T114-466q-47.5 0-80.75-33.25T0-580q0-47.5 33.25-80.75T114-694q47.5 0 80.75 33.25T228-580v4l122 42q18-32 43.5-49t56.5-24v-129q-39-11-61.5-43T366-846q0-47.5 33-80.75T480-960q48 0 81 33.25T594-846q0 35-23 67t-61 43v129q31 7 57 24t44 49l121-42v-4q0-47.5 33.25-80.75T846-694q47.5 0 80.75 33T960-580q0 48-33.25 81T846-466q-32 0-57-14t-39-39l-121 41q5 32-4.5 61.5T595-364l85 106q11-5 21.5-7.5t24.06-2.5Q774-268 807-235t33 81q0 48-33 81t-81 33q-48 0-81-33.25T612-154q0-20 5.5-36t15.5-31l-85-106q-32.13 17-68.56 17Q443-310 411-327l-84 107q10 15 15.5 30.5T348-154q0 47.5-33 80.75T234-40q-48 0-81-33Zm-38.96-453q22.96 0 38.46-15.54 15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5Q91-634 75.5-618.46 60-602.93 60-579.96 60-557 75.54-541.5q15.53 15.5 38.5 15.5ZM272.5-115.54q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54Zm246-692q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54ZM480.5-370q37.5 0 63.5-26.5t26-64q0-37.5-26.1-63.5T480-550q-37 0-63.5 26.1T390-460q0 37 26.5 63.5t64 26.5Zm284 254.46q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54Zm120-426q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54ZM480-846ZM114-580Zm366 120Zm366-120ZM234-154Zm492 0Z"/></symbol></svg>
 
 <!-- Part: Cover -->
 <!-- The cover makes the identity visible before explaining it: one equal split, two title halves at the same scale, orange as the voice on dark, and no ornamental object. -->
@@ -112,17 +119,16 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 <div class="el t-body on-accent" style="left:1056px;top:440px;width:768px;height:420px">Use one legal split.<br><br>Inset each field 96px.<br><br>Use one assertion title.<br><br>Keep proof opposite the claim.</div>
 </div>
 
-<!-- Orange is one field, never a stripe, badge, tint, decorative rule, or body-text background. Orange text appears only on dark; all type on orange is near-black. White may be a neutral chart mark on orange but never text there. Grey is dark-field metadata only, from label through body size, never body hierarchy. Use only the minimum colours that distinguish content. -->
+<!-- Orange is one field, never a stripe, badge, tint, decorative rule, or body-text background. Orange text appears only on dark; all type on orange is near-black. White may be a neutral chart mark on orange but never text there. Grey is dark-field metadata only, from label through body size, never body hierarchy. Use only the minimum colours that distinguish content. Structure is drawn only when it has a relationship, sequence, or small set; sentences remain text. -->
 <div class="slide">
 <div class="el field" style="left:0px;top:0px;width:640px;height:1080px"></div>
-<div class="el t-label on-accent" style="left:96px;top:88px;width:448px;height:34px">Rules / colour</div>
-<div class="el t-slide-title on-accent" style="left:96px;top:144px;width:448px;height:300px">Two fields stay two fields</div>
-<div class="el t-body on-accent" style="left:96px;top:520px;width:448px;height:330px">Near-black type only.</div>
-<div class="el t-label accent" style="left:736px;top:88px;width:1088px;height:34px">Do not / add another voice</div>
-<div class="el t-slide-title" style="left:736px;top:144px;width:1088px;height:240px">Restraint protects the edge</div>
-<div class="el t-body" style="left:736px;top:440px;width:500px;height:400px">No second edge or crossing.<br>No card, panel, badge, or third colour.<br>No shadow, radius, rotation, decorative icon, or emoji.</div>
-<div class="el t-body" style="left:1324px;top:440px;width:500px;height:400px">No white or grey text on orange.<br>No grey body copy.<br>No second claim, needless legend, or empty gridline.</div>
-<div class="el takeaway t-heading accent" style="left:736px;top:870px;width:1088px;height:100px">Use solid fills, heavy and regular weights, and no italics.</div>
+<div class="el t-label on-accent" style="left:96px;top:88px;width:448px;height:34px">Rules / illustration</div>
+<div class="el t-slide-title on-accent" style="left:96px;top:144px;width:448px;height:300px">Illustration stays sparse</div>
+<div class="el t-body on-accent" style="left:96px;top:500px;width:448px;height:390px">Use filled Material icons for major outline beats, stages, and nodes: 80px, 104px, and 120–144px. Near-black on orange; white on dark; orange marks one core. Favour short processes and one core with four satellites.</div>
+<div class="el t-label accent" style="left:736px;top:88px;width:1088px;height:34px">Do not / decorate</div>
+<div class="el t-slide-title" style="left:736px;top:144px;width:1088px;height:240px">Draw only real structure</div>
+<div class="el t-body" style="left:736px;top:440px;width:1088px;height:350px">No decorative icon.<br>No icon beside prose.<br>No mixed families.<br>No dense network.<br>No arrow without direction.<br>No emoji.</div>
+<div class="el takeaway t-heading accent" style="left:736px;top:850px;width:1088px;height:100px">Four satellites are enough.</div>
 </div>
 
 <!-- The four legal fields are exact: A is 50:50 at x 960; B is 33:67 at x 640; C is 67:33 at x 1280; D is horizontal at y 540. Orange may occupy either side, giving eight grounds. Full-height labels start at y 88, titles at y 144 inside a 240px reserve, content at y 440, and nothing passes y 984; when only one field holds the title, evidence on the other starts at the title's y. Horizontal labels start at y 72 or 590, one-line titles at y 130, and content at y 270–440 or 640–920. -->
@@ -163,16 +169,13 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 <div class="el t-label on-accent" style="left:96px;top:88px;width:1088px;height:34px">Outline / claim before form</div>
 <div class="el t-slide-title on-accent" style="left:96px;top:144px;width:1088px;height:240px">Move from claim to ask</div>
 <!-- Component: list (.list-row) — three or four peer facts with aligned starts; build each lead word and its copy as separate text boxes sharing a top, with the bold lead inside a 200px column; may vary: lead words and two or three copy lines; may not: use bullets, boxes, grey hierarchy, or mismatched rhythm. -->
-<div class="el list-row t-lead on-accent" style="left:96px;top:440px;width:200px;height:150px">Open</div>
-<div class="el list-row t-body on-accent" style="left:312px;top:440px;width:284px;height:150px">Strongest claim</div>
-<div class="el list-row t-lead on-accent" style="left:684px;top:440px;width:200px;height:150px">Build</div>
-<div class="el list-row t-body on-accent" style="left:900px;top:440px;width:284px;height:150px">Evidence sequence</div>
-<div class="el list-row t-lead on-accent" style="left:96px;top:700px;width:200px;height:150px">Decide</div>
-<div class="el list-row t-body on-accent" style="left:312px;top:700px;width:284px;height:150px">One recommendation</div>
-<div class="el list-row t-lead on-accent" style="left:684px;top:700px;width:200px;height:150px">Close</div>
-<div class="el list-row t-body on-accent" style="left:900px;top:700px;width:284px;height:150px">Owner, timing, measure</div>
-<div class="el t-label accent" style="left:1376px;top:88px;width:448px;height:34px">Favoured forms</div>
-<div class="el t-body" style="left:1376px;top:180px;width:448px;height:560px">Key figure<br><br>Matched comparison<br><br>Short process<br><br>Relationship<br><br>Native chart<br><br>Spare table</div>
+<!-- Component: icon (.icon) — filled Material concept paired with a one-to-four-word label at major outline beats, process stages, and diagram nodes; size 80px, 104px, or 120–144px by role; colour near-black on orange, white on dark, and orange for one core; may vary: concept and role size; may not: decorate, mix families, sit beside prose, lose its label, or add a second accent. -->
+<div class="el list-row icon-row on-accent" style="left:96px;top:440px;width:500px;height:150px"><svg class="icon icon-list"><use href="#material/edit"/></svg><div><span class="t-lead">Open</span><br><span class="t-body">Strongest claim</span></div></div>
+<div class="el list-row icon-row on-accent" style="left:684px;top:440px;width:500px;height:150px"><svg class="icon icon-list"><use href="#material/build"/></svg><div><span class="t-lead">Build</span><br><span class="t-body">Evidence sequence</span></div></div>
+<div class="el list-row icon-row on-accent" style="left:96px;top:700px;width:500px;height:150px"><svg class="icon icon-list"><use href="#material/verified"/></svg><div><span class="t-lead">Decide</span><br><span class="t-body">One recommendation</span></div></div>
+<div class="el list-row icon-row on-accent" style="left:684px;top:700px;width:500px;height:150px"><svg class="icon icon-list"><use href="#material/rocket_launch"/></svg><div><span class="t-lead">Close</span><br><span class="t-body">Owner and measure</span></div></div>
+<div class="el t-label accent" style="left:1376px;top:88px;width:448px;height:34px">Favoured drawn forms</div>
+<div class="el t-body" style="left:1376px;top:180px;width:448px;height:560px">Icon-led process<br><br>Sparse hub diagram<br><br>Key figure<br><br>Direct-labelled chart<br><br>Matched comparison<br><br>Spare table</div>
 <div class="el t-caption muted" style="left:1376px;top:840px;width:448px;height:100px">The brief and material set length.</div>
 </div>
 
@@ -214,22 +217,22 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 <div class="el list-row t-heading on-accent" style="left:1428px;top:660px;width:396px;height:240px">04 · Conclude<br><span class="t-body">State the set.</span></div>
 </div>
 
-<!-- Pattern: process — for: three to five ordered stages; regions: body, step-1, step-2, step-3, step-4; components: step ×4 + connector ×3; may vary: count, verbs, and orange field side; may not: vary widths, add boxes, chevrons, arrowheads, or rotation. -->
+<!-- Pattern: process — for: three to five ordered stages; regions: body, step-1, step-2, step-3, step-4; components: step ×4 + icon ×4 + connector ×3; may vary: count, verbs, concepts, and orange field side; may not: vary widths, add boxes, chevrons, arrowheads, paragraphs, or rotation. -->
 <div class="slide">
 <div class="el field" style="left:0px;top:0px;width:1920px;height:540px"></div>
 <div class="el t-label on-accent" style="left:96px;top:72px;width:1728px;height:34px">Pattern / process</div>
 <div class="el t-slide-title on-accent" style="left:96px;top:130px;width:1728px;height:120px">Equal stages make order visible</div>
 <div class="el t-body on-accent" style="left:96px;top:300px;width:1500px;height:110px">Use a sequence only when each handoff changes what can happen next.</div>
 <div class="el t-label accent" style="left:96px;top:590px;width:1728px;height:34px">Three to five ordered stages</div>
-<!-- Component: step (.step) — equal ordered stage with a numeral and verb; may vary: count and copy; may not: vary width, add a box, or carry paragraph text. -->
-<div class="el step t-heading accent" style="left:96px;top:680px;width:384px;height:220px"><span class="t-metric-sm">01</span><br>Define</div>
-<!-- Component: connector (.connector) — neutral 2px handoff between adjacent steps; may vary: length; may not: gain an arrowhead, colour, diagonal, branch, or unsupported causality. -->
-<div class="el connector" style="left:492px;top:744px;width:24px;height:2px"></div>
-<div class="el step t-heading accent" style="left:544px;top:680px;width:384px;height:220px"><span class="t-metric-sm">02</span><br>Build</div>
-<div class="el connector" style="left:940px;top:744px;width:24px;height:2px"></div>
-<div class="el step t-heading accent" style="left:992px;top:680px;width:384px;height:220px"><span class="t-metric-sm">03</span><br>Verify</div>
-<div class="el connector" style="left:1388px;top:744px;width:24px;height:2px"></div>
-<div class="el step t-heading accent" style="left:1440px;top:680px;width:384px;height:220px"><span class="t-metric-sm">04</span><br>Release</div>
+<!-- Component: step (.step) — equal ordered stage with an icon, numeral, and verb; may vary: count, concept, and copy; may not: vary width, add a box, or carry paragraph text. -->
+<div class="el step accent" style="left:96px;top:680px;width:384px;height:280px"><svg class="icon icon-step"><use href="#material/edit"/></svg><span class="t-label">01</span><br><span class="t-heading">Define</span></div>
+<!-- Component: connector (.connector) — neutral 2px handoff meeting adjacent icon edges; may vary: length; may not: gain an arrowhead, colour, diagonal, branch, or unsupported causality. -->
+<div class="el connector" style="left:200px;top:749px;width:344px;height:2px"></div>
+<div class="el step accent" style="left:544px;top:680px;width:384px;height:280px"><svg class="icon icon-step"><use href="#material/build"/></svg><span class="t-label">02</span><br><span class="t-heading">Build</span></div>
+<div class="el connector" style="left:648px;top:749px;width:344px;height:2px"></div>
+<div class="el step accent" style="left:992px;top:680px;width:384px;height:280px"><svg class="icon icon-step"><use href="#material/verified"/></svg><span class="t-label">03</span><br><span class="t-heading">Verify</span></div>
+<div class="el connector" style="left:1096px;top:749px;width:344px;height:2px"></div>
+<div class="el step accent" style="left:1440px;top:680px;width:384px;height:280px"><svg class="icon icon-step"><use href="#material/rocket_launch"/></svg><span class="t-label">04</span><br><span class="t-heading">Release</span></div>
 </div>
 
 <!-- Pattern: metric — for: one decisive measure with scope and comparator; regions: body, kpi-1, takeaway; components: metric + takeaway; may vary: value, unit, comparator, and orange side; may not: box the figure, exceed three hero glyphs, detach the unit, or add unrelated figures. -->
@@ -269,23 +272,29 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 <div class="el takeaway t-heading accent" style="left:1056px;top:850px;width:768px;height:120px">Label values; remove empty gridlines.</div>
 </div>
 
-<!-- Pattern: relationship — for: one core with three or four named satellites; regions: body, hub, col-1, col-2, col-3; components: hub + connector; may vary: labels and relation direction; may not: cross the split, use boxes, diagonals, rotation, crossings, or emphasise more than one core. -->
-<!-- Relations use orthogonal 2px hairlines and are named in words because they carry no arrowheads. Position and one size step create hierarchy without nodes. -->
+<!-- Pattern: diagram — for: one core with four independent inputs or outcomes; regions: body, node-top, node-left, hub, node-right, node-bottom; components: hub + icon ×5 + connector ×4 + selected; may vary: three to four satellites, labels, concepts, and relation direction; may not: cross the split, exceed five nodes, use boxes, diagonals, crossings, arrows without direction, or emphasise more than one core. -->
+<!-- The diagram fills the evidence field with unboxed icon-and-label nodes. Orthogonal 2px spokes meet icon edges exactly; the orange 144px hub is the only size and colour emphasis, while 120px white satellites remain peers. -->
 <div class="slide">
-<div class="el field" style="left:1280px;top:0px;width:640px;height:1080px"></div>
-<div class="el t-label accent" style="left:96px;top:88px;width:1088px;height:34px">Pattern / relationship</div>
-<div class="el t-slide-title" style="left:96px;top:144px;width:1088px;height:240px">Three inputs feed one core</div>
-<div class="el t-body" style="left:96px;top:500px;width:220px;height:70px">Frame</div>
-<div class="el connector" style="left:330px;top:535px;width:120px;height:2px"></div>
-<!-- Component: hub (.t-heading + .accent) — one larger orange core among unboxed satellites; may vary: label and three or four relations; may not: add a node box, diagonal, or second emphasis. -->
-<div class="el t-heading accent" style="left:480px;top:480px;width:320px;height:110px">Core claim</div>
-<div class="el connector" style="left:830px;top:535px;width:120px;height:2px"></div>
-<div class="el t-body" style="left:980px;top:500px;width:204px;height:70px">Outcome</div>
-<div class="el t-body" style="left:480px;top:760px;width:320px;height:70px">Constraint</div>
-<div class="el connector" style="left:638px;top:600px;width:2px;height:130px"></div>
-<div class="el t-label on-accent" style="left:1376px;top:88px;width:448px;height:34px">Relation / direction</div>
-<div class="el t-heading on-accent" style="left:1376px;top:240px;width:448px;height:180px">Name the relationship in words</div>
-<div class="el t-body on-accent" style="left:1376px;top:700px;width:448px;height:180px">Keep every line inside one field.</div>
+<div class="el field" style="left:0px;top:0px;width:640px;height:1080px"></div>
+<div class="el t-label on-accent" style="left:96px;top:88px;width:448px;height:34px">Pattern / diagram</div>
+<div class="el t-slide-title on-accent" style="left:96px;top:144px;width:448px;height:300px">Four signals meet one core</div>
+<div class="el t-body on-accent" style="left:96px;top:540px;width:448px;height:260px">Use a hub when each satellite changes the same centre. Name direction in words; omit arrows when the relationship is shared.</div>
+<div class="el t-label accent" style="left:736px;top:88px;width:1088px;height:34px">Sparse hub / four satellites</div>
+<div class="el connector" style="left:1281px;top:280px;width:2px;height:180px"></div>
+<div class="el connector" style="left:880px;top:539px;width:330px;height:2px"></div>
+<div class="el connector" style="left:1354px;top:539px;width:330px;height:2px"></div>
+<div class="el connector" style="left:1281px;top:604px;width:2px;height:196px"></div>
+<div class="el" style="left:1222px;top:160px;width:120px;height:120px"><svg class="icon icon-node"><use href="#material/edit"/></svg></div>
+<div class="el t-heading" style="left:1370px;top:184px;width:300px;height:80px">Frame</div>
+<div class="el" style="left:760px;top:480px;width:120px;height:120px"><svg class="icon icon-node"><use href="#material/build"/></svg></div>
+<div class="el t-heading" style="left:760px;top:630px;width:240px;height:80px">Build</div>
+<!-- Component: hub (.icon-hub + .accent) — one larger orange centre connected edge-to-edge to three or four white satellite icons; may vary: concept and labels; may not: add a box, diagonal, arrow without direction, or second emphasis. -->
+<div class="el accent" style="left:1210px;top:460px;width:144px;height:144px"><svg class="icon icon-hub"><use href="#material/hub"/></svg></div>
+<div class="el t-heading accent" style="left:1380px;top:420px;width:300px;height:90px">Core claim</div>
+<div class="el" style="left:1684px;top:480px;width:120px;height:120px"><svg class="icon icon-node"><use href="#material/verified"/></svg></div>
+<div class="el t-heading" style="left:1580px;top:630px;width:244px;height:80px">Verify</div>
+<div class="el" style="left:1222px;top:800px;width:120px;height:120px"><svg class="icon icon-node"><use href="#material/rocket_launch"/></svg></div>
+<div class="el t-heading" style="left:1370px;top:824px;width:300px;height:80px">Release</div>
 </div>
 
 <!-- Pattern: before-after — for: one matched state change; regions: left, right, takeaway; components: before-after ×2 + metric + selected; may vary: two to four matched conditions; may not: change row positions, measure, unit, or put before on orange, or add an arrow across the edge. -->

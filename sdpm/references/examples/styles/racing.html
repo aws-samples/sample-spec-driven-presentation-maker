@@ -38,6 +38,9 @@
 body { margin:0; padding:40px; background:#050506; font-family:var(--font-family); zoom: 0.7; }
 .slide { position:relative; width:1920px; height:1080px; margin:0 auto 40px; overflow:hidden; background:var(--color-bg); color:var(--color-text); }
 .el { position:absolute; }
+.icon { width:96px; height:96px; display:block; flex:0 0 96px; fill:var(--color-text); }
+.lane .icon,.sector .icon { margin-bottom:22px; }
+.selected .icon,.active .icon,.diagram-node.active .icon,.icon.hot { fill:var(--accent); }
 .tricolor { background:linear-gradient(90deg,var(--accent-2) 0 33.333%,var(--accent-3) 33.333% 66.666%,var(--accent) 66.666%); }
 .t-cover,.t-title,.t-heading { font-style:italic; font-weight:900; text-transform:uppercase; letter-spacing:-.6pt; }
 .t-cover { font-size:calc(var(--fs-cover-title) * 1.5); line-height:.96; }
@@ -78,13 +81,23 @@ body { margin:0; padding:40px; background:#050506; font-family:var(--font-family
 .chart-specimen { border-bottom:var(--border-thin) solid var(--color-border); }
 .node { display:flex; align-items:center; justify-content:center; border:var(--border-thin) solid var(--color-border); text-align:center; }
 .node.hot { border:var(--border-strong) solid var(--accent); }
-.connector { background:var(--color-border); }
+.connector,.cycle-connector { background:var(--color-border); }
+.illustration-row { display:flex; align-items:center; gap:32px; border-top:var(--border-strong) solid var(--color-border); padding:30px 0 0; }
+.diagram-node { display:flex; align-items:center; gap:30px; border:var(--border-strong) solid var(--color-border); padding:36px; background:var(--color-surface); }
+.diagram-node.active { border-color:var(--accent); }
+.cycle-caption { display:flex; align-items:center; justify-content:center; text-align:center; color:var(--color-muted); }
+.arrow-right,.arrow-left,.arrow-up,.arrow-down { background:var(--color-muted); }
+.arrow-right { clip-path:polygon(0 0,100% 50%,0 100%); }
+.arrow-left { clip-path:polygon(100% 0,0 50%,100% 100%); }
+.arrow-up { clip-path:polygon(0 100%,50% 0,100% 100%); }
+.arrow-down { clip-path:polygon(0 0,50% 100%,100% 0); }
 .state { border-top:var(--border-strong) solid var(--color-border); padding-top:24px; }
 .state.after { border-top-color:var(--accent); }
 .prose { border-top:var(--border-strong) solid var(--color-border); padding-top:26px; }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/search" viewBox="0 -960 960 960"><path d="M796-121 533-384q-30 26-70 40.5T378-329q-108 0-183-75t-75-181q0-106 75-181t182-75q106 0 180.5 75T632-585q0 43-14 83t-42 75l264 262-44 44ZM377-389q81 0 138-57.5T572-585q0-81-57-138.5T377-781q-82 0-139.5 57.5T180-585q0 81 57.5 138.5T377-389Z"/></symbol><symbol id="material/monitoring" viewBox="0 -960 960 960"><path d="M120-120v-76l60-60v136h-60Zm165 0v-236l60-60v296h-60Zm165 0v-296l60 61v235h-60Zm165 0v-235l60-60v295h-60Zm165 0v-396l60-60v456h-60ZM120-356v-85l280-278 160 160 280-281v85L560-474 400-634 120-356Z"/></symbol><symbol id="material/science" viewBox="0 -960 960 960"><path d="M172-120q-41.78 0-59.39-39T124-230l248-280v-270h-52q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h320q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5h-52v270l248 280q29 32 11.39 71T788-120H172Zm-12-60h640L528-488v-292h-96v292L160-180Zm318-300Z"/></symbol><symbol id="material/flag" viewBox="0 -960 960 960"><path d="M200-120v-680h343l19 86h238v370H544l-18.93-85H260v309h-60Zm300-452Zm95 168h145v-250H511l-19-86H260v251h316l19 85Z"/></symbol></svg>
 
 <!-- Part: Cover -->
 <!-- The cover spends its only red content signal inside the name; the stripe and three successively shorter horizontal speed lines establish identity without another decorative field. -->
@@ -131,6 +144,18 @@ body { margin:0; padding:40px; background:#050506; font-family:var(--font-family
 <div class="el t-caption" style="left:120px;top:820px;width:1500px;height:80px">Headline italics may be synthesised; body, tables, chart labels, and captions remain upright.</div>
 </div>
 
+<!-- Pace depends on instant recognition rather than decoration: use one Material icon per concept, always paired with a short label. -->
+<div class="slide">
+<div class="el tricolor" style="left:0px;top:0px;width:1920px;height:10px"></div>
+<div class="el frame-title" style="left:120px;top:70px;width:1680px;height:210px"><div class="t-label kicker">Rules / illustration</div><div class="t-title">Draw only useful signals</div></div>
+<div class="el t-body muted" style="left:120px;top:295px;width:1680px;height:120px">Place one 96px Material icon in each lane, process sector, or diagram node. Keep icons white; make only the active member red. Favor straight tracks and four-node cycles.</div>
+<!-- Component: icon (.icon) — identify concepts at lane heads, process sectors, and diagram nodes; size: 96px; colour: white, or red only on the active member; family: Material; may vary: glyph and short label; may not: decorate, sit beside paragraphs, mix families, or appear without a label. -->
+<div class="el illustration-row" style="left:120px;top:500px;width:480px;height:220px"><svg class="icon"><use href="#material/search"/></svg><div><div class="t-label muted">Open lane</div><div class="t-heading">Find the claim</div></div></div>
+<div class="el illustration-row" style="left:720px;top:500px;width:480px;height:220px"><svg class="icon"><use href="#material/monitoring"/></svg><div><div class="t-label muted">Process sector</div><div class="t-heading">Read the pace</div></div></div>
+<div class="el illustration-row" style="left:1320px;top:500px;width:480px;height:220px"><svg class="icon hot"><use href="#material/flag"/></svg><div><div class="t-label muted">Active node</div><div class="t-heading">Mark one gate</div></div></div>
+<div class="el takeaway t-heading" style="left:120px;top:845px;width:1680px;height:100px">Four nodes and one loop are enough.</div>
+</div>
+
 <!-- Part: Message & Outline -->
 <!-- Density: 60 -->
 <!-- The 60-word ceiling tightens the older two-block prose limit of 90 words. Add a slide before adding a sixth title word, a second claim, or smaller type. -->
@@ -148,7 +173,7 @@ body { margin:0; padding:40px; background:#050506; font-family:var(--font-family
 <div class="slide">
 <div class="el tricolor" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el frame-title" style="left:120px;top:70px;width:1680px;height:210px"><div class="t-label kicker">Outline / cadence</div><div class="t-title">Sequence claims to decisions</div></div>
-<div class="el track" style="left:120px;top:360px;width:1680px;height:310px"><div class="sector"><div class="t-label muted">01 / Launch</div><div class="t-heading">Strongest claim</div><div class="t-caption">Open without throat-clearing.</div></div><div class="sector"><div class="t-label muted">02 / Hold</div><div class="t-heading">Evidence forms</div><div class="t-caption">Alternate metric, comparison, process, native chart, and table.</div></div><div class="sector active"><div class="t-label muted">03 / Exit</div><div class="t-heading">Recommendation</div><div class="t-caption">Name the advancing action.</div></div><div class="sector"><div class="t-label muted">04 / Finish</div><div class="t-heading">Resolved ask</div><div class="t-caption">No recap grid.</div></div></div>
+<div class="el track" style="left:120px;top:360px;width:1680px;height:310px"><div class="sector"><div class="t-label muted">01 / Launch</div><div class="t-heading">Strongest claim</div><div class="t-caption">Open without throat-clearing.</div></div><div class="sector"><div class="t-label muted">02 / Hold</div><div class="t-heading">Evidence forms</div><div class="t-caption">Alternate icon-led process, four-node cycle, metric, comparison, native chart, and table.</div></div><div class="sector active"><div class="t-label muted">03 / Exit</div><div class="t-heading">Recommendation</div><div class="t-caption">Name the advancing action.</div></div><div class="sector"><div class="t-label muted">04 / Finish</div><div class="t-heading">Resolved ask</div><div class="t-caption">No recap grid.</div></div></div>
 <div class="el takeaway t-heading" style="left:120px;top:790px;width:1680px;height:110px">Let cadence serve the argument.</div>
 </div>
 
@@ -176,9 +201,9 @@ body { margin:0; padding:40px; background:#050506; font-family:var(--font-family
 <div class="slide">
 <div class="el tricolor" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el frame-title" style="left:120px;top:70px;width:1680px;height:210px"><div class="t-label kicker">Pattern / columns</div><div class="t-title">Scan equal race factors</div></div>
-<div class="el lane" style="left:120px;top:360px;width:528px;height:430px"><div class="t-label muted">01 / Context</div><div class="t-heading">Frame the change</div><div class="t-metric-sm">24</div><div class="t-caption">One direct sentence.</div></div>
-<div class="el lane" style="left:696px;top:360px;width:528px;height:430px"><div class="t-label muted">02 / Evidence</div><div class="t-heading">Hold the measure</div><div class="t-metric-sm">38</div><div class="t-caption">One direct sentence.</div></div>
-<div class="el lane selected" style="left:1272px;top:360px;width:528px;height:430px"><div class="t-label muted">03 / Decision</div><div class="t-heading">Mark the factor</div><div class="t-metric-sm">51</div><div class="t-caption">One direct sentence.</div></div>
+<div class="el lane" style="left:120px;top:360px;width:528px;height:430px"><svg class="icon"><use href="#material/search"/></svg><div class="t-label muted">01 / Context</div><div class="t-heading">Frame the change</div><div class="t-metric-sm">24</div><div class="t-caption">One direct sentence.</div></div>
+<div class="el lane" style="left:696px;top:360px;width:528px;height:430px"><svg class="icon"><use href="#material/monitoring"/></svg><div class="t-label muted">02 / Evidence</div><div class="t-heading">Hold the measure</div><div class="t-metric-sm">38</div><div class="t-caption">One direct sentence.</div></div>
+<div class="el lane selected" style="left:1272px;top:360px;width:528px;height:430px"><svg class="icon"><use href="#material/flag"/></svg><div class="t-label muted">03 / Decision</div><div class="t-heading">Mark the factor</div><div class="t-metric-sm">51</div><div class="t-caption">One direct sentence.</div></div>
 <div class="el takeaway t-heading" style="left:120px;top:860px;width:1680px;height:100px">Equal lanes keep scanning honest.</div>
 </div>
 
@@ -189,8 +214,8 @@ body { margin:0; padding:40px; background:#050506; font-family:var(--font-family
 <!-- Component: tag (.tag) — identify a compact status or category without becoming the red signal; may vary: wording; may not: replace the assertion or compete with selection. -->
 <div class="el tag t-label" style="left:120px;top:310px;width:330px;height:48px">Four-sector lap</div>
 <!-- Component: step (.sector) — hold one verb-led stage and one completion condition; may vary: three to five stages; may not: curve, rotate, change peer size, or activate two. -->
-<!-- Component: connector (.track) — act as the shared straight sequence track; may vary: with three to five sectors; may not: use arrows, curves, or detached links. -->
-<div class="el track" style="left:120px;top:420px;width:1680px;height:320px"><div class="sector"><div class="t-label muted">01</div><div class="t-heading">Define</div><div class="t-caption">Scope fixed</div></div><div class="sector"><div class="t-label muted">02</div><div class="t-heading">Measure</div><div class="t-caption">Baseline labelled</div></div><div class="sector"><div class="t-label muted">03</div><div class="t-heading">Test</div><div class="t-caption">Result bounded</div></div><div class="sector active"><div class="t-label muted">04</div><div class="t-heading">Release</div><div class="t-caption">Gate passed</div></div></div>
+<!-- Component: connector (.track, .cycle-connector) — join stages with attached neutral tracks; may vary: one shared sequence rail or four orthogonal cycle edges; may not: hide endpoints, curve links, rotate, or add arrows where direction is irrelevant. -->
+<div class="el track" style="left:120px;top:420px;width:1680px;height:320px"><div class="sector"><svg class="icon"><use href="#material/search"/></svg><div class="t-label muted">01</div><div class="t-heading">Define</div><div class="t-caption">Scope fixed</div></div><div class="sector"><svg class="icon"><use href="#material/monitoring"/></svg><div class="t-label muted">02</div><div class="t-heading">Measure</div><div class="t-caption">Baseline labelled</div></div><div class="sector"><svg class="icon"><use href="#material/science"/></svg><div class="t-label muted">03</div><div class="t-heading">Test</div><div class="t-caption">Result bounded</div></div><div class="sector active"><svg class="icon"><use href="#material/flag"/></svg><div class="t-label muted">04</div><div class="t-heading">Release</div><div class="t-caption">Gate passed</div></div></div>
 <div class="el takeaway t-heading" style="left:120px;top:840px;width:1680px;height:110px">Each sector hands off one completed output.</div>
 </div>
 
@@ -226,21 +251,23 @@ body { margin:0; padding:40px; background:#050506; font-family:var(--font-family
 <div class="el takeaway t-heading" style="left:240px;top:885px;width:1440px;height:90px">Direct labels keep the trend moving.</div>
 </div>
 
-<!-- Pattern: relationship — for: one feedback circuit without a first step; regions: hub, col-1, col-2, col-3, takeaway; components: hub + connector + selected + takeaway; may vary: two to four square upright nodes; may not: add another loop, curves, arrows, or unequal nodes. -->
+<!-- Pattern: diagram — for: a four-stage feedback cycle whose direction matters; regions: step-1, step-2, step-3, step-4, takeaway; components: container ×4 + icon ×4 + connector ×4 + selected + takeaway; may vary: labels and one active node; may not: exceed four nodes, hide connector endpoints, add a second loop, curve links, or mark another node red. -->
 <div class="slide">
 <div class="el tricolor" style="left:0px;top:0px;width:1920px;height:10px"></div>
-<div class="el frame-title" style="left:120px;top:70px;width:1680px;height:210px"><div class="t-label kicker">Pattern / relationship</div><div class="t-title">Close the feedback loop</div></div>
-<!-- Component: hub (.node) — form one feedback circuit from two to four square upright nodes; may vary: labels and selected outcome; may not: use another loop, curved links, arrows, or unequal nodes. -->
-<div class="el node" style="left:160px;top:400px;width:360px;height:150px"><span class="t-heading">Input</span></div>
-<div class="el connector" style="left:520px;top:474px;width:240px;height:2px"></div>
-<div class="el node" style="left:760px;top:400px;width:360px;height:150px"><span class="t-heading">Action</span></div>
-<div class="el connector" style="left:1120px;top:474px;width:240px;height:2px"></div>
-<div class="el node hot" style="left:1360px;top:400px;width:360px;height:150px"><span class="t-heading">Result</span></div>
-<div class="el connector" style="left:939px;top:550px;width:2px;height:170px"></div>
-<div class="el node" style="left:760px;top:720px;width:360px;height:150px"><span class="t-heading">Review</span></div>
-<div class="el connector" style="left:339px;top:794px;width:421px;height:2px"></div>
-<div class="el connector" style="left:339px;top:550px;width:2px;height:246px"></div>
-<div class="el t-label next" style="left:120px;top:965px;width:1680px;height:55px"><b>Next lap</b> — return the result as evidence</div>
+<div class="el frame-title" style="left:120px;top:70px;width:1680px;height:210px"><div class="t-label kicker">Pattern / diagram</div><div class="t-title">Run one control loop</div></div>
+<div class="el cycle-connector" style="left:620px;top:438px;width:680px;height:3px"></div>
+<div class="el arrow-right" style="left:1268px;top:426px;width:32px;height:28px"></div>
+<div class="el cycle-connector" style="left:1518px;top:530px;width:3px;height:190px"></div>
+<div class="el arrow-down" style="left:1506px;top:688px;width:28px;height:32px"></div>
+<div class="el cycle-connector" style="left:620px;top:808px;width:680px;height:3px"></div>
+<div class="el arrow-left" style="left:620px;top:796px;width:32px;height:28px"></div>
+<div class="el cycle-connector" style="left:398px;top:530px;width:3px;height:190px"></div>
+<div class="el arrow-up" style="left:386px;top:530px;width:28px;height:32px"></div>
+<div class="el diagram-node" style="left:180px;top:350px;width:440px;height:180px"><svg class="icon"><use href="#material/search"/></svg><div><div class="t-label muted">01 / Observe</div><div class="t-heading">Find the signal</div></div></div>
+<div class="el diagram-node" style="left:1300px;top:350px;width:440px;height:180px"><svg class="icon"><use href="#material/monitoring"/></svg><div><div class="t-label muted">02 / Measure</div><div class="t-heading">Read the pace</div></div></div>
+<div class="el diagram-node" style="left:1300px;top:720px;width:440px;height:180px"><svg class="icon"><use href="#material/science"/></svg><div><div class="t-label muted">03 / Test</div><div class="t-heading">Prove the move</div></div></div>
+<div class="el diagram-node active" style="left:180px;top:720px;width:440px;height:180px"><svg class="icon"><use href="#material/flag"/></svg><div><div class="t-label muted">04 / Release</div><div class="t-heading">Pass one gate</div></div></div>
+<div class="el cycle-caption t-heading" style="left:720px;top:570px;width:480px;height:110px">Output returns<br>as input</div>
 </div>
 
 <!-- Pattern: before-after — for: one matched state change; regions: left, right, takeaway; components: before-after ×2 + selected + metric + takeaway; may vary: labels and evidence; may not: change units, period, scale, order, or alignment, or place red on the before state. -->

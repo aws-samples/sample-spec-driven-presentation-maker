@@ -67,21 +67,33 @@ body { margin: 0; padding: 40px; background: var(--gallery-bg); font-family: var
 .accent-fill { display: flex; align-items: center; justify-content: center; background: var(--accent); color: var(--color-on-accent); }
 .accent-outline { border: var(--border-group) solid var(--accent); border-radius: var(--radius); }
 .columns { display: flex; gap: 48px; }
-.column { flex: 1; padding: 28px 30px; background: var(--color-surface); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); }
-.step { display: flex; align-items: center; justify-content: center; text-align: center; background: var(--color-surface); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); }
-.step.accent-fill { background: var(--accent); color: var(--color-on-accent); border-color: var(--accent); }
+.column { flex: 1; padding: 28px 30px; border-top: var(--border-group) solid var(--color-border); }
+.icon-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; }
+.step { display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; text-align: center; background: var(--color-surface); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); }
+.step.accent-outline { border-color: var(--accent); }
 .connector { background: var(--color-muted); }
 .group { border: var(--border-group) solid; border-radius: var(--radius); }
 .cat-integration { background: var(--cat-integration-tint); border-color: var(--cat-integration); }
 .cat-storage { background: var(--cat-storage-tint); border-color: var(--cat-storage); }
 .cat-compute { background: var(--cat-compute-tint); border-color: var(--cat-compute); }
 .cat-security { background: var(--cat-security-tint); border-color: var(--cat-security); }
+.cat-database { background: var(--cat-database-tint); border-color: var(--cat-database); }
 .c-analytics { color: var(--cat-analytics); }
 .c-integration { color: var(--cat-integration); }
 .c-storage { color: var(--cat-storage); }
 .c-compute { color: var(--cat-compute); }
 .c-security { color: var(--cat-security); }
-.icon { display: flex; align-items: center; justify-content: center; text-align: center; background: var(--color-bg); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius); padding: 10px; }
+.c-database { color: var(--cat-database); }
+.icon { display: block; width: 100%; height: 100%; }
+.icon-tile .icon { width: 112px; height: 112px; }
+.step .icon { width: 78px; height: 78px; }
+.diagram-node { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; border: var(--border-group) solid; border-radius: var(--radius); }
+.diagram-node .icon { width: 110px; height: 110px; }
+.diagram-hub .icon { width: 144px; height: 144px; }
+.route-tl { border-top: 3px solid var(--color-muted); border-right: 3px solid var(--color-muted); }
+.route-tr { border-top: 3px solid var(--color-muted); border-left: 3px solid var(--color-muted); }
+.route-bl { border-bottom: 3px solid var(--color-muted); border-right: 3px solid var(--color-muted); }
+.route-br { border-bottom: 3px solid var(--color-muted); border-left: 3px solid var(--color-muted); }
 .metric-row { display: flex; border-block: var(--border-thin) solid var(--color-border); }
 .metric-cell { flex: 1; padding: 28px 20px; text-align: center; border-right: var(--border-thin) solid var(--color-border); }
 .metric-cell:last-child { border-right: 0; }
@@ -98,6 +110,7 @@ body { margin: 0; padding: 40px; background: var(--gallery-bg); font-family: var
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="aws/Res_Amazon-EventBridge_Default-Event-Bus_48" viewBox="0 0 48 48"><path d="M11.001,39.001 L37.001,39.001 L37.001,37.001 L11.001,37.001 L11.001,39.001 Z M35.88,12.009 L34.153,10.998 L30.544,17.16 L32.271,18.17 L35.88,12.009 Z M42.567,18.594 L36.323,22.147 L37.312,23.885 L43.556,20.332 L42.567,18.594 Z M39.002,28.995 L39,30.995 L46,31.001 L46.002,29.001 L39.002,28.995 Z M2,31.001 L9,31.007 L9.002,29.007 L2.002,29.001 L2,31.001 Z M5.454,18.562 L4.462,20.298 L10.701,23.863 L11.693,22.126 L5.454,18.562 Z M17.48,17.148 L13.882,10.981 L12.153,11.989 L15.751,18.156 L17.48,17.148 Z M25.001,9.002 L23.001,9 L22.994,16 L24.994,16.002 L25.001,9.002 Z M13.095,27.196 L18.114,18.501 C18.293,18.192 18.623,18.001 18.981,18.001 L29.021,18.001 C29.378,18.001 29.708,18.192 29.887,18.501 L34.907,27.196 C35.086,27.505 35.086,27.886 34.907,28.196 L31.071,34.838 L29.339,33.838 L32.887,27.696 L28.443,20.001 L19.558,20.001 L15.115,27.696 L18.662,33.838 L16.93,34.838 L13.095,28.196 C12.916,27.886 12.916,27.505 13.095,27.196 L13.095,27.196 Z" id="Amazon-EventBridge_Default-Event-Bus_Resource-Icon_dark-bg" fill="#E7157B"></path></symbol><symbol id="aws/Res_AWS-Lambda_Lambda-Function_48" viewBox="0 0 48 48"><path d="M24,44 C12.972,44 4,35.028 4,24 C4,12.972 12.972,4 24,4 C35.028,4 44,12.972 44,24 C44,35.028 35.028,44 24,44 L24,44 Z M24,2 C11.869,2 2,11.869 2,24 C2,36.131 11.869,46 24,46 C36.131,46 46,36.131 46,24 C46,11.869 36.131,2 24,2 L24,2 Z M17.231,35.25 L11.876,35.25 L18.221,21.959 L20.902,27.492 L17.231,35.25 Z M19.114,19.215 C18.946,18.87 18.597,18.651 18.214,18.651 L18.211,18.651 C17.826,18.652 17.477,18.874 17.312,19.221 L9.389,35.819 C9.24,36.129 9.262,36.493 9.445,36.783 C9.628,37.074 9.947,37.25 10.291,37.25 L17.864,37.25 C18.251,37.25 18.603,37.027 18.769,36.678 L22.915,27.915 C23.044,27.642 23.043,27.323 22.911,27.051 L19.114,19.215 Z M36.125,35.25 L30.673,35.25 L20.761,13.953 C20.597,13.601 20.243,13.375 19.854,13.375 L16.251,13.375 L16.255,9.25 L23.475,9.25 L33.339,30.545 C33.503,30.898 33.856,31.125 34.246,31.125 L36.125,31.125 L36.125,35.25 Z M37.125,29.125 L34.885,29.125 L25.021,7.83 C24.856,7.477 24.503,7.25 24.113,7.25 L15.256,7.25 C14.704,7.25 14.257,7.697 14.256,8.249 L14.25,14.374 C14.25,14.64 14.355,14.894 14.543,15.082 C14.73,15.27 14.984,15.375 15.25,15.375 L19.217,15.375 L29.129,36.672 C29.293,37.024 29.646,37.25 30.035,37.25 L37.125,37.25 C37.678,37.25 38.125,36.803 38.125,36.25 L38.125,30.125 C38.125,29.572 37.678,29.125 37.125,29.125 L37.125,29.125 Z" id="Amazon-Lambda-Lambda-Function_Resource-Icon_light-bg" fill="#ED7100"></path></symbol><symbol id="aws/Res_Amazon-CloudWatch_Rule_48" viewBox="0 0 48 48"><path d="M2.042,2 L2.042,14.473 L13.06,14.497 L15.725,17.13 L45.967,17.079 L45.951,4.607 L16.537,4.607 L13.888,2 L2.042,2 Z M13.882,12.499 L4.043,12.477 L4.043,4 L13.07,4 L15.719,6.607 L43.953,6.607 L43.965,15.082 L16.546,15.127 L13.882,12.499 Z M37.94,9.454 L36.048,7.556 L34.631,8.968 L36.526,10.868 L34.624,12.77 L36.038,14.184 L37.938,12.285 L39.838,14.192 L41.254,12.78 L39.352,10.871 L41.253,8.969 L39.839,7.555 L37.94,9.454 Z M2,15.968 L2,28.468 L13.061,28.468 L15.71,31.09 L45.96,31.076 L45.945,18.617 L16.528,18.607 L13.948,15.968 L2,15.968 Z M4,17.968 L13.106,17.968 L15.687,20.607 L43.947,20.617 L43.959,29.076 L16.533,29.09 L13.883,26.468 L4,26.468 L4,17.968 Z M35.419,25.276 L34.299,24.158 L32.885,25.572 L35.297,27.985 L41.229,23.023 L39.946,21.49 L35.419,25.276 Z M2,29.95 L2,42.451 L13.084,42.438 L15.741,45.022 L45.951,45.074 L45.96,32.586 L16.532,32.587 L13.819,29.95 L2,29.95 Z M4,31.95 L13.007,31.95 L15.719,34.588 L43.959,34.585 L43.953,43.07 L16.555,43.024 L13.895,40.438 L4,40.449 L4,31.95 Z M35.179,39.211 L34.06,38.093 L32.646,39.507 L35.058,41.92 L40.99,36.958 L39.706,35.424 L35.179,39.211 Z" id="Amazon-Cloudwatch_rule_Resource-Icon_light-bg" fill="#E7157B"></path></symbol><symbol id="aws/Res_Amazon-DynamoDB_Table_48" viewBox="0 0 48 48"><path d="M13.355,11.862 L45.928,11.862 L45.928,2 L13.355,2 L13.355,11.862 Z M15.355,9.862 L43.927,9.862 L43.927,4.001 L15.355,4.001 L15.355,9.862 Z M2,11.862 L11.861,11.862 L11.861,2 L2,2 L2,11.862 Z M4,9.862 L9.862,9.862 L9.862,4.001 L4,4.001 L4,9.862 Z M13.355,23.217 L45.928,23.217 L45.928,13.356 L13.355,13.356 L13.355,23.217 Z M15.355,21.217 L43.927,21.217 L43.927,15.356 L15.355,15.356 L15.355,21.217 Z M2,23.217 L11.861,23.217 L11.861,13.356 L2,13.356 L2,23.217 Z M4,21.217 L9.862,21.217 L9.862,15.356 L4,15.356 L4,21.217 Z M13.355,34.572 L45.928,34.572 L45.928,24.711 L13.355,24.711 L13.355,34.572 Z M15.355,32.572 L43.927,32.572 L43.927,26.71 L15.355,26.71 L15.355,32.572 Z M2,34.572 L11.861,34.572 L11.861,24.711 L2,24.711 L2,34.572 Z M4,32.572 L9.862,32.572 L9.862,26.71 L4,26.71 L4,32.572 Z M13.355,45.927 L45.928,45.927 L45.928,36.066 L13.355,36.066 L13.355,45.927 Z M15.355,43.928 L43.927,43.928 L43.927,38.066 L15.355,38.066 L15.355,43.928 Z M2,45.927 L11.861,45.927 L11.861,36.066 L2,36.066 L2,45.927 Z M4,43.928 L9.862,43.928 L9.862,38.066 L4,38.066 L4,43.928 Z" id="Amazon-DATABASE_Amazon-DynamoDB_Table_Resource-Icon_light-bg" fill="#C925D1"></path></symbol><symbol id="aws/Arch_Amazon-Simple-Storage-Service_48" viewBox="0 0 64 64"><g id="Icon-Architecture/48/Arch_Amazon-Simple-Storage-Service_48" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"><g id="Icon-Architecture-BG/48/Storage" fill="#7AA116"><rect id="Rectangle" x="0" y="0" width="64" height="64"></rect></g><g id="Icon-Service/48/Amazon-Simple-Storage-Service_48" transform="translate(10.999800, 10.000200)" fill="#FFFFFF"><path d="M36.759,23.948 L36.993,22.131 C39.166,23.385 39.842,24.121 40.037,24.424 C39.713,24.485 38.832,24.509 36.759,23.948 L36.759,23.948 Z M19.5,11 C9.125,11 2.382,8.488 2,6.696 L2,6.511 C2.349,5.392 8.14,2 19.5,2 C30.84,2 36.632,5.381 37,6.505 L37,6.616 C36.724,8.446 29.961,11 19.5,11 L19.5,11 Z M34.818,23.362 C30.053,21.797 23.912,18.979 21.594,17.888 C21.535,16.786 20.628,15.906 19.512,15.906 C18.358,15.906 17.418,16.845 17.418,18 C17.418,19.154 18.358,20.094 19.512,20.094 C19.969,20.094 20.389,19.942 20.733,19.693 C23.132,20.822 29.619,23.798 34.558,25.38 L32.837,38.724 C32.583,40.352 27.919,42 19.497,42 C11.072,42 6.405,40.352 6.155,38.751 L2.435,9.814 C5.945,11.915 12.749,13 19.5,13 C26.25,13 33.054,11.915 36.565,9.815 L34.818,23.362 Z M39,6.5 C39,3.431 30.661,0 19.5,0 C8.339,0 -3.55271368e-15,3.431 -3.55271368e-15,6.5 L-3.55271368e-15,7.043 L4.174,39.033 C4.875,43.516 15.123,44 19.497,44 C23.869,44 34.113,43.516 34.818,39.007 L36.501,25.947 C37.778,26.279 38.812,26.456 39.616,26.455 C40.606,26.455 41.273,26.203 41.697,25.697 C42.047,25.281 42.185,24.756 42.085,24.221 C41.857,23 40.403,21.712 37.37,20.044 L37.27,19.989 L39,7.044 L39,6.5 Z" id="Amazon-Simple-Storage-Service-Icon_48_Squid"></path></g></g></symbol></svg>
 
 <!-- Part: Cover -->
 <div class="slide">
@@ -137,7 +150,7 @@ body { margin: 0; padding: 40px; background: var(--gallery-bg); font-family: var
 <div class="el takeaway t-heading" style="left:112px;top:770px;width:1696px;height:120px">Two orange spots read as two alerts.</div>
 </div>
 
-<!-- Icons use official assets from search_assets with source aws; generic concepts use general assets. Align each icon and short label on a grid, on ground or category tint, never a card. Orthogonal connectors avoid nodes and carry short route labels. Contrast is at least 4.5:1, or 3:1 for large text. Margins stay at least 5%. Native tables inherit the template font. Slide JSON has no letter-spacing, line-height, or intermediate weight; use regular or bold with explicit box heights. -->
+<!-- Illustrate at medium density: place 78px official AWS icons in process steps, 112px icons in column heads, and 110–144px icons in diagram nodes; preserve their category colours on ground or tint. Favour icon-led flows, four-spoke hubs, and grouped architecture; cap a relationship diagram at one hub, four satellites, and two bends per route. Generic concepts use one general family instead. Orthogonal connectors meet node edges and carry labels only when the relationship needs naming. Contrast is at least 4.5:1, or 3:1 for large text. Margins stay at least 5%. Native tables inherit the template font. Slide JSON has no letter-spacing, line-height, or intermediate weight; use regular or bold with explicit box heights. -->
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:700px;height:30px">Rules / production</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Technical evidence stays literal, aligned, and direct</div>
@@ -170,7 +183,7 @@ body { margin: 0; padding: 40px; background: var(--gallery-bg); font-family: var
 <div class="el takeaway t-heading" style="left:760px;top:840px;width:1048px;height:110px">Choose the claim before the components.</div>
 </div>
 
-<!-- Open on the strongest decision unless navigation is necessary. Dividers only mark subject changes and state the decision question and intended conclusion. Develop constraint, design, cost, and operations; resolve each chapter before carrying one unresolved decision forward. No agenda tracker competes with diagrams. Favour figures, comparisons, numbered processes, grouped architecture, direct-labelled charts, spare tables, and short proof points; prose is only for a necessary qualification or source. -->
+<!-- Open on the strongest decision unless navigation is necessary. Dividers only mark subject changes and state the decision question and intended conclusion. Develop constraint, design, cost, and operations; resolve each chapter before carrying one unresolved decision forward. No agenda tracker competes with diagrams. Favour figures, comparisons, service-icon columns, icon-led processes, four-spoke hubs, grouped architecture, direct-labelled charts, spare tables, and short proof points; prose is only for a necessary qualification or source. -->
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:800px;height:30px">Outline / argument rhythm</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Move from decision to evidence to architecture to action</div>
@@ -213,7 +226,8 @@ body { margin: 0; padding: 40px; background: var(--gallery-bg); font-family: var
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / columns</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Equal columns make a service catalogue scannable</div>
 <div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
-<div class="el columns" style="left:112px;top:350px;width:1696px;height:490px"><div class="column"><div class="t-label c-compute">Compute</div><div class="t-heading">Runtime choices</div><div class="t-caption muted">Service A<br>Service B</div></div><div class="column"><div class="t-label c-analytics">Analytics</div><div class="t-heading">Evidence services</div><div class="t-caption muted">Service C<br>Service D</div></div><div class="column"><div class="t-label" style="color:var(--cat-database)">Database</div><div class="t-heading">State services</div><div class="t-caption muted">Service E<br>Service F</div></div></div>
+<!-- Component: icon (.icon) — official AWS resource symbol beside a 1–4 word label; 78px in steps, 112px in column heads, 110–144px in nodes; preserve asset colour and use one family; may vary: service and role size; may not: use generic art for a service, add a card behind it, use emoji, or mix families. -->
+<div class="el columns" style="left:112px;top:350px;width:1696px;height:490px"><div class="column icon-tile"><div class="t-label c-compute">Compute</div><svg class="icon"><use href="#aws/Res_AWS-Lambda_Lambda-Function_48"/></svg><div class="t-heading">Functions</div><div class="t-caption muted">Run on demand</div></div><div class="column icon-tile"><div class="t-label c-integration">Integration</div><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg><div class="t-heading">Event bus</div><div class="t-caption muted">Route by rule</div></div><div class="column icon-tile"><div class="t-label c-database">Database</div><svg class="icon"><use href="#aws/Res_Amazon-DynamoDB_Table_48"/></svg><div class="t-heading">Tables</div><div class="t-caption muted">Persist state</div></div></div>
 <div class="el takeaway t-heading" style="left:112px;top:890px;width:1696px;height:90px">Category headers establish identity once.</div>
 </div>
 
@@ -223,18 +237,18 @@ body { margin: 0; padding: 40px; background: var(--gallery-bg); font-family: var
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One orange step locates the current handoff</div>
 <div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: step (.step) — equal verb-led stage with its service label below; may vary: 3–6 stages; may not: vary peer size or use category colour for sequence status. -->
-<div class="el step t-heading" style="left:112px;top:400px;width:360px;height:170px">1 · Receive</div>
+<div class="el step" style="left:112px;top:350px;width:360px;height:240px"><div class="t-label muted">01</div><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg><div class="t-heading">Receive</div></div>
 <!-- Component: connector (.connector) — neutral orthogonal handoff between adjacent nodes; may vary: route and short label; may not: use category colour, run diagonally, cross a node, or imply unsupported causality. -->
-<div class="el connector" style="left:472px;top:484px;width:64px;height:2px"></div>
-<div class="el step t-heading" style="left:536px;top:400px;width:360px;height:170px">2 · Validate</div>
-<div class="el connector" style="left:896px;top:484px;width:64px;height:2px"></div>
-<div class="el step accent-fill t-heading" style="left:960px;top:400px;width:360px;height:170px">3 · Route</div>
-<div class="el connector" style="left:1320px;top:484px;width:64px;height:2px"></div>
-<div class="el step t-heading" style="left:1384px;top:400px;width:424px;height:170px">4 · Observe</div>
-<div class="el t-label c-integration center" style="left:112px;top:630px;width:360px;height:34px">Integration service</div>
-<div class="el t-label c-security center" style="left:536px;top:630px;width:360px;height:34px">Security service</div>
-<div class="el t-label c-integration center" style="left:960px;top:630px;width:360px;height:34px">Routing service</div>
-<div class="el t-label c-analytics center" style="left:1384px;top:630px;width:424px;height:34px">Analytics service</div>
+<div class="el connector" style="left:472px;top:469px;width:64px;height:3px"></div>
+<div class="el step" style="left:536px;top:350px;width:360px;height:240px"><div class="t-label muted">02</div><svg class="icon"><use href="#aws/Res_Amazon-DynamoDB_Table_48"/></svg><div class="t-heading">Validate</div></div>
+<div class="el connector" style="left:896px;top:469px;width:64px;height:3px"></div>
+<div class="el step accent-outline" style="left:960px;top:350px;width:360px;height:240px"><div class="t-label muted">03</div><svg class="icon"><use href="#aws/Res_AWS-Lambda_Lambda-Function_48"/></svg><div class="t-heading">Route</div></div>
+<div class="el connector" style="left:1320px;top:469px;width:64px;height:3px"></div>
+<div class="el step" style="left:1384px;top:350px;width:424px;height:240px"><div class="t-label muted">04</div><svg class="icon"><use href="#aws/Res_Amazon-CloudWatch_Rule_48"/></svg><div class="t-heading">Observe</div></div>
+<div class="el t-label c-integration center" style="left:112px;top:630px;width:360px;height:34px">Integration</div>
+<div class="el t-label c-database center" style="left:536px;top:630px;width:360px;height:34px">Database</div>
+<div class="el t-label c-compute center" style="left:960px;top:630px;width:360px;height:34px">Compute</div>
+<div class="el t-label muted center" style="left:1384px;top:630px;width:424px;height:34px">Operations</div>
 <div class="el takeaway t-heading" style="left:112px;top:830px;width:1696px;height:110px">Write stages as verbs and outcomes as evidence.</div>
 </div>
 
@@ -267,29 +281,22 @@ body { margin: 0; padding: 40px; background: var(--gallery-bg); font-family: var
 <div class="el takeaway t-heading" style="left:1400px;top:470px;width:408px;height:230px">Label values directly. Remove empty gridlines.</div>
 </div>
 
-<!-- Pattern: architecture — for: service relationships across category boundaries; regions: group-1, group-2, group-3, takeaway; components: container ×3 + icon ×5 + selected + connector; may vary: group widths, icon count, and orthogonal routes; may not: change category mapping, misalign nodes, route diagonally, cross nodes, or use more than one orange highlight. -->
-<!-- arch_diagram may position rectangular groups and routed connections; the composer adds official icons, short labels, exact category border/tint pairs, and route labels. -->
+<!-- Pattern: diagram — for: one routed service coordinating independent capabilities; regions: hub, satellite-1, satellite-2, satellite-3, satellite-4, takeaway; components: hub + icon ×5 + connector ×4 + selected + takeaway; may vary: hub service, 3–6 satellites, labels, and category tint; may not: hide spokes in gaps, route through nodes, exceed two bends, add arrows without direction, or highlight more than one node. -->
 <div class="slide">
-<div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / architecture</div>
-<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Category boundaries make one event route legible</div>
+<div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / diagram</div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One event bus coordinates four independently scaled services</div>
 <div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
-<div class="el group cat-integration" style="left:112px;top:330px;width:500px;height:510px"></div>
-<div class="el t-label c-integration" style="left:145px;top:360px;width:430px;height:32px">Integration</div>
-<!-- Component: icon (.icon) — official AWS service asset with short name; may vary: asset and label; may not: use generic art for a service, use emoji, or add an individual card. -->
-<div class="el icon t-caption" style="left:180px;top:480px;width:170px;height:125px">Official icon<br>Service A</div>
-<div class="el icon t-caption" style="left:400px;top:480px;width:170px;height:125px">Official icon<br>Service B</div>
-<div class="el connector" style="left:612px;top:542px;width:98px;height:2px"></div>
-<div class="el t-label muted center" style="left:612px;top:575px;width:98px;height:32px">Events</div>
-<div class="el group cat-compute" style="left:710px;top:330px;width:500px;height:510px"></div>
-<div class="el t-label c-compute" style="left:743px;top:360px;width:430px;height:32px">Compute</div>
-<div class="el icon accent-outline t-caption" style="left:875px;top:480px;width:170px;height:125px">Selected<br>Service C</div>
-<div class="el connector" style="left:1210px;top:542px;width:98px;height:2px"></div>
-<div class="el t-label muted center" style="left:1210px;top:575px;width:98px;height:32px">Writes</div>
-<div class="el group cat-storage" style="left:1308px;top:330px;width:500px;height:510px"></div>
-<div class="el t-label c-storage" style="left:1341px;top:360px;width:430px;height:32px">Storage</div>
-<div class="el icon t-caption" style="left:1380px;top:480px;width:170px;height:125px">Official icon<br>Service D</div>
-<div class="el icon t-caption" style="left:1595px;top:480px;width:170px;height:125px">Official icon<br>Service E</div>
-<div class="el takeaway t-heading" style="left:112px;top:900px;width:1696px;height:80px">Route labels explain each relationship.</div>
+<div class="el route-tl" style="left:542px;top:450px;width:188px;height:50px"></div>
+<div class="el route-tr" style="left:1190px;top:450px;width:188px;height:50px"></div>
+<div class="el route-bl" style="left:542px;top:700px;width:188px;height:60px"></div>
+<div class="el route-br" style="left:1190px;top:700px;width:188px;height:60px"></div>
+<div class="el diagram-node cat-compute" style="left:112px;top:340px;width:430px;height:220px"><svg class="icon"><use href="#aws/Res_AWS-Lambda_Lambda-Function_48"/></svg><div class="t-heading">Transform</div></div>
+<div class="el diagram-node cat-integration" style="left:1378px;top:340px;width:430px;height:220px"><svg class="icon"><use href="#aws/Res_Amazon-CloudWatch_Rule_48"/></svg><div class="t-heading">Rules</div></div>
+<div class="el diagram-node cat-database" style="left:112px;top:650px;width:430px;height:220px"><svg class="icon"><use href="#aws/Res_Amazon-DynamoDB_Table_48"/></svg><div class="t-heading">Tables</div></div>
+<div class="el diagram-node cat-storage" style="left:1378px;top:650px;width:430px;height:220px"><svg class="icon"><use href="#aws/Arch_Amazon-Simple-Storage-Service_48"/></svg><div class="t-heading">Objects</div></div>
+<!-- Component: hub (.diagram-hub) — one selected coordinating service with 3–6 equal satellites; 144px official icon and edge-to-edge neutral spokes; may vary: service, labels, and satellite count; may not: shrink into a card cluster, hide spokes, or imply direction without arrows. -->
+<div class="el diagram-node diagram-hub cat-integration accent-outline" style="left:730px;top:430px;width:460px;height:350px"><div class="t-label c-integration">Routing centre</div><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg><div class="t-heading">Event bus</div></div>
+<div class="el takeaway t-heading" style="left:112px;top:920px;width:1696px;height:80px">Spokes meet node edges so independence is visible before labels are read.</div>
 </div>
 
 <!-- Pattern: hierarchy — for: shared responsibility or layered ownership; regions: labels, left, right, takeaway; components: hierarchy rows + takeaway; may vary: layers, boundary, and 2–4 owner actions; may not: encode ownership with category colour, add depth, alter row order, or leave a layer unowned. -->

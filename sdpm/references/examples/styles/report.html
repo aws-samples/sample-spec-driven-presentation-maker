@@ -64,9 +64,22 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 .columns { display: flex; gap: 70px; }
 .columns > div { flex: 1; border-top: 2px solid var(--color-text); padding-top: 22px; }
 .columns p { margin: 14px 0 0; }
-.step { border-top: 3px solid var(--color-text); padding: 20px 18px 0 0; }
-.step.current { border-top-color: var(--accent); }
-.connector { background: var(--color-border); }
+.columns.icon-columns { gap: 50px; }
+.columns.icon-columns > .evidence-node { padding-top: 0; border-top: 3px solid var(--color-text); }
+.columns.icon-columns > .evidence-node.current { border-top: 5px solid var(--accent); }
+.connector { background: var(--color-muted); }
+.connector.flow::after { content: ""; position: absolute; right: -12px; top: -6px; border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-left: 12px solid var(--color-muted); }
+.icon { display: block; width: 104px; height: 104px; flex: none; fill: var(--color-text); }
+.icon.icon-accent { fill: var(--accent); }
+.evidence-node, .hierarchy-node { display: flex; align-items: stretch; border-top: 3px solid var(--color-text); border-bottom: 1px solid var(--color-border); background: var(--color-bg); }
+.evidence-node.current, .hierarchy-node.selected { border-top: 5px solid var(--accent); background: var(--color-surface); }
+.evidence-node .node-icon, .hierarchy-node .node-icon { display: flex; align-items: center; justify-content: center; width: 148px; flex: none; background: var(--color-surface); border-right: 1px solid var(--color-border); }
+.evidence-node.current .node-icon, .hierarchy-node.selected .node-icon { background: var(--accent); border-right-color: var(--accent); }
+.evidence-node.current .icon, .hierarchy-node.selected .icon { fill: var(--color-bg); }
+.evidence-node .node-copy, .hierarchy-node .node-copy { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 28px 30px; }
+.evidence-node .section-title, .hierarchy-node .section-title { margin-top: 8px; }
+.evidence-node .caption { margin-top: 16px; }
+.hierarchy-connector { background: var(--color-muted); }
 .metric-strip { display: flex; border-block: 1px solid var(--color-border); border-top-color: var(--color-text); }
 .metric-cell { flex: 1; padding: 24px 22px 18px 0; border-right: 1px solid var(--color-border); }
 .metric-cell + .metric-cell { padding-left: 22px; }
@@ -99,6 +112,7 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/analytics" viewBox="0 -960 960 960"><path d="M284-277h60v-205h-60v205Zm332 0h60v-420h-60v420Zm-166 0h60v-118h-60v118Zm0-205h60v-60h-60v60ZM180-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h600q24 0 42 18t18 42v600q0 24-18 42t-42 18H180Zm0-60h600v-600H180v600Zm0-600v600-600Z"/></symbol><symbol id="material/trending_up" viewBox="0 -960 960 960"><path d="m123-240-43-43 292-291 167 167 241-241H653v-60h227v227h-59v-123L538-321 371-488 123-240Z"/></symbol><symbol id="material/flag" viewBox="0 -960 960 960"><path d="M200-120v-680h343l19 86h238v370H544l-18.93-85H260v309h-60Zm300-452Zm95 168h145v-250H511l-19-86H260v251h316l19 85Z"/></symbol><symbol id="material/task_alt" viewBox="0 -960 960 960"><path d="M480-80q-85 0-158-30.5T195-195q-54-54-84.5-127T80-480q0-84 30.5-157T195-764q54-54 127-85t158-31q75 0 140 24t117 66l-43 43q-44-35-98-54t-116-19q-145 0-242.5 97.5T140-480q0 145 97.5 242.5T480-140q145 0 242.5-97.5T820-480q0-30-4.5-58.5T802-594l46-46q16 37 24 77t8 83q0 85-31 158t-85 127q-54 54-127 84.5T480-80Zm-59-218L256-464l45-45 120 120 414-414 46 45-460 460Z"/></symbol></svg>
 
 <!-- Part: Cover -->
 <div class="slide">
@@ -123,10 +137,10 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 <div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Margins ≥ five percent</div>
 </div>
 
-<!-- Core evidence keeps contrast at least 4.5:1, or 3:1 for text at least 18pt. Use one accent for current period, selected series, or final total; signs and words carry direction. Use solid fills only, and keep sourced icons outside tables. -->
+<!-- Core evidence keeps contrast at least 4.5:1, or 3:1 for text at least 18pt. Use one accent for current period, selected series, or final total; signs and words carry direction. Use solid fills only, and keep sourced icons outside tables. Illustrate selectively: every major stage, column head, and diagram node uses one 104px filled Material icon in a ruled 148px evidence rail, near-black by default and reversed on accent only for the selected member. Favour sparse hierarchy or matrix forms with no more than four nodes. -->
 <div class="slide">
 <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Rules / evidence discipline</div><div class="claim">Every mark must improve comparison or audit</div><div class="period">Screen and print</div></div>
-<div class="el columns" style="left:120px; top:340px; width:1680px; height:430px;"><div><div class="label accent">Always</div><p class="section-title">Label direct values</p><p class="caption">Keep one useful baseline.</p><p class="section-title">Contextualise figures</p><p class="caption">Pair with prior, plan, benchmark, or trend.</p></div><div><div class="label">Never</div><p class="section-title">Judge with colour</p><p class="caption">Accent identifies current or selected evidence.</p></div></div>
+<div class="el columns" style="left:120px; top:340px; width:1680px; height:430px;"><div><div class="label accent">Always</div><p class="section-title">Label direct values</p><p class="caption">Keep one useful baseline.</p><p class="section-title">Contextualise figures</p><p class="caption">Pair with prior, plan, benchmark, or trend.</p></div><div><div class="label">Illustrate</div><p class="section-title">Stage heads and nodes</p><p class="caption">Sparse hierarchy or matrix only.</p></div></div>
 <!-- Component: takeaway (.takeaway) — state one decision implication the exhibit cannot carry; may vary: one sentence; may not: repeat the title or introduce a second claim. -->
 <div class="el takeaway" style="left:120px; top:820px; width:1680px; height:110px;">Alignment carries the style when template fonts vary.</div>
 <div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Use regular or bold weight</div>
@@ -144,11 +158,12 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 <div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Plain language across periods</div>
 </div>
 
-<!-- The core flow is cover, three to five findings, four to six contextualised KPIs, two or three evidence chapters, owned actions, then an alphabetical appendix with governed definitions and supplied source/scope notes. Relationships use sparse lines or a matrix only for explicit causality; avoid dense networks and unauditable diagrams. -->
+<!-- The core flow is cover, three to five findings, four to six contextualised KPIs, two or three evidence chapters, owned actions, then an alphabetical appendix with governed definitions and supplied source/scope notes. Favoured drawn forms are direct-labelled charts, compact tables, sparse hierarchy, and 2×2 matrices for explicit causality; avoid dense networks and unauditable diagrams. -->
 <div class="slide">
 <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Outline / summary first</div><div class="claim">Move from result to cause to action</div><div class="period">Brief sets length</div></div>
-<div class="el columns" style="left:120px; top:350px; width:1680px; height:440px;"><div><div class="label accent">Lead</div><div class="section-title">Answer before explaining</div><p class="caption">Start with findings and shared-period metrics.</p></div><div><div class="label accent">Build</div><div class="section-title">Question, evidence, implication</div><p class="caption">Reserve dividers for major chapters.</p></div><div><div class="label accent">Close</div><div class="section-title">Assign measurable work</div><p class="caption">Name owner, timing, expected movement.</p></div></div>
-<div class="el takeaway" style="left:120px; top:830px; width:1680px; height:105px;">Prefer metrics, tables, charts, comparisons, and findings.</div>
+<!-- Component: icon (.icon) — mark a major stage head, column head, or diagram node beside a one-to-four-word label; size: 104px inside a 148px evidence rail for every role; colour: near-black, reversed on accent only when selected; family: filled Material; may vary: concept; may not: enter tables, sit beside paragraphs, mix families, shrink by pattern, or decorate. -->
+<div class="el columns icon-columns" style="left:120px; top:350px; width:1680px; height:460px;"><div class="evidence-node current"><div class="node-icon"><svg class="icon"><use href="#material/analytics"/></svg></div><div class="node-copy"><div class="label accent">Lead</div><div class="section-title">Answer before explaining</div><div class="caption">Findings and shared-period metrics.</div></div></div><div class="evidence-node"><div class="node-icon"><svg class="icon"><use href="#material/trending_up"/></svg></div><div class="node-copy"><div class="label accent">Build</div><div class="section-title">Question, evidence, implication</div><div class="caption">Dividers only for major chapters.</div></div></div><div class="evidence-node"><div class="node-icon"><svg class="icon"><use href="#material/task_alt"/></svg></div><div class="node-copy"><div class="label accent">Close</div><div class="section-title">Assign measurable work</div><div class="caption">Owner, timing, expected movement.</div></div></div></div>
+<div class="el takeaway" style="left:120px; top:840px; width:1680px; height:95px;">Prefer charts, tables, sparse hierarchy, and 2×2 matrices.</div>
 <div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Keep backup outside the argument</div>
 </div>
 
@@ -175,8 +190,8 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 <!-- Pattern: columns — for: parallel explanations with equal weight; regions: col-1, col-2, col-3; components: container ×3; may vary: two or three columns; may not: mix unrelated questions or unequal reading order. -->
 <div class="slide">
 <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / columns</div><div class="claim">Parallel columns separate causes without fragmenting the claim</div><div class="period">Three equal causes</div></div>
-<div class="el columns" style="left:120px; top:370px; width:1680px; height:450px;"><div><div class="label accent">01 / Frame</div><div class="section-title">Name one shared question</div><p class="caption">Parallel headings.</p></div><div><div class="label accent">02 / Evidence</div><div class="section-title">Give each cause one proof</div><p class="caption">Same unit and window.</p></div><div><div class="label accent">03 / Read</div><div class="section-title">Order by contribution</div><p class="caption">Descending contribution.</p></div></div>
-<div class="el takeaway" style="left:120px; top:850px; width:1680px; height:95px;">Split any column needing another claim.</div>
+<div class="el columns icon-columns" style="left:120px; top:350px; width:1680px; height:460px;"><div class="evidence-node"><div class="node-icon"><svg class="icon"><use href="#material/analytics"/></svg></div><div class="node-copy"><div class="label accent">01 / Frame</div><div class="section-title">Name one shared question</div><div class="caption">Parallel headings.</div></div></div><div class="evidence-node"><div class="node-icon"><svg class="icon"><use href="#material/trending_up"/></svg></div><div class="node-copy"><div class="label accent">02 / Evidence</div><div class="section-title">Give each cause one proof</div><div class="caption">Same unit and window.</div></div></div><div class="evidence-node"><div class="node-icon"><svg class="icon"><use href="#material/task_alt"/></svg></div><div class="node-copy"><div class="label accent">03 / Read</div><div class="section-title">Order by contribution</div><div class="caption">Descending contribution.</div></div></div></div>
+<div class="el takeaway" style="left:120px; top:840px; width:1680px; height:95px;">Split any column needing another claim.</div>
 <div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Whitespace and rules group the evidence</div>
 </div>
 
@@ -184,16 +199,32 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 <div class="slide">
 <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / process</div><div class="claim">Sequence earns space only when it explains movement</div><div class="period">Three stages</div></div>
 <!-- Component: tag (.tag) — identify category or status in compact uppercase text; may vary: wording; may not: replace a finding title or rely on colour alone. -->
-<div class="el tag" style="left:120px; top:330px; width:210px; height:42px;">Build sequence</div>
+<div class="el tag" style="left:120px; top:325px; width:210px; height:42px;">Build sequence</div>
 <!-- Component: step (.step) — hold one verb-led stage and its measurable output; may vary: count and copy; may not: become a paragraph or decorative milestone. -->
-<div class="el step current" style="left:120px; top:430px; width:430px; height:280px;"><div class="label accent">01 / Define</div><div class="section-title">Fix metric and scope</div><div class="caption">Name the stage output.</div></div>
+<div class="el step evidence-node current" style="left:120px; top:405px; width:460px; height:430px;"><div class="node-icon"><svg class="icon"><use href="#material/analytics"/></svg></div><div class="node-copy"><div class="label accent">01 / Define</div><div class="section-title">Fix metric and scope</div><div class="caption">Name the stage output.</div></div></div>
 <!-- Component: connector (.connector) — show one directional handoff between adjacent stages; may vary: length; may not: branch, loop, or imply unsupported causality. -->
-<div class="el connector" style="left:570px; top:500px; width:140px; height:2px;"></div>
-<div class="el step" style="left:730px; top:430px; width:430px; height:280px;"><div class="label">02 / Measure</div><div class="section-title">Label each transition</div><div class="caption">Use one reporting window.</div></div>
-<div class="el connector" style="left:1180px; top:500px; width:140px; height:2px;"></div>
-<div class="el step" style="left:1340px; top:430px; width:460px; height:280px;"><div class="label">03 / Decide</div><div class="section-title">End on owned action</div><div class="caption">Tie it to expected movement.</div></div>
-<div class="el takeaway" style="left:120px; top:800px; width:1680px; height:105px;">Use a native bridge for signed drivers.</div>
+<div class="el connector flow" style="left:580px; top:618px; width:138px; height:4px;"></div>
+<div class="el step evidence-node" style="left:730px; top:405px; width:460px; height:430px;"><div class="node-icon"><svg class="icon"><use href="#material/trending_up"/></svg></div><div class="node-copy"><div class="label">02 / Measure</div><div class="section-title">Label each transition</div><div class="caption">Use one reporting window.</div></div></div>
+<div class="el connector flow" style="left:1190px; top:618px; width:138px; height:4px;"></div>
+<div class="el step evidence-node" style="left:1340px; top:405px; width:460px; height:430px;"><div class="node-icon"><svg class="icon"><use href="#material/task_alt"/></svg></div><div class="node-copy"><div class="label">03 / Decide</div><div class="section-title">End on owned action</div><div class="caption">Tie it to expected movement.</div></div></div>
+<div class="el takeaway" style="left:120px; top:860px; width:1680px; height:75px;">Use a native bridge for signed drivers.</div>
 <div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Avoid decorative timelines</div>
+</div>
+
+<!-- Pattern: diagram — for: one reported result decomposed into two evidence views and one owned response; regions: result, driver-1, driver-2, action; components: hierarchy + selected + icon ×4 + connector ×5; may vary: labels and evidence concepts; may not: exceed four nodes, cross connectors, point at node centres, or imply unsupported causality. -->
+<div class="slide">
+<div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / diagram</div><div class="claim">One result branches into evidence and owned response</div><div class="period">Sparse hierarchy<br>Four nodes</div></div>
+<!-- Component: hierarchy (.hierarchy-node) — decompose one selected result into up to three equal ruled evidence panels with a dedicated icon rail; may vary: one-to-three children and concepts; may not: cross lines, mix node sizes, shrink icons, or detach labels from icons. -->
+<div class="el hierarchy-node selected" style="left:610px; top:325px; width:700px; height:230px;"><div class="node-icon"><svg class="icon"><use href="#material/analytics"/></svg></div><div class="node-copy"><div class="label accent">Reported result</div><div class="section-title">Current finding</div></div></div>
+<div class="el hierarchy-connector" style="left:958px; top:555px; width:4px; height:70px;"></div>
+<div class="el hierarchy-connector" style="left:380px; top:622px; width:1160px; height:4px;"></div>
+<div class="el hierarchy-connector" style="left:378px; top:625px; width:4px; height:65px;"></div>
+<div class="el hierarchy-connector" style="left:958px; top:625px; width:4px; height:65px;"></div>
+<div class="el hierarchy-connector" style="left:1538px; top:625px; width:4px; height:65px;"></div>
+<div class="el hierarchy-node" style="left:120px; top:690px; width:520px; height:240px;"><div class="node-icon"><svg class="icon"><use href="#material/trending_up"/></svg></div><div class="node-copy"><div class="label">Trend</div><div class="section-title">Direction</div></div></div>
+<div class="el hierarchy-node" style="left:700px; top:690px; width:520px; height:240px;"><div class="node-icon"><svg class="icon"><use href="#material/flag"/></svg></div><div class="node-copy"><div class="label">Target</div><div class="section-title">Gap</div></div></div>
+<div class="el hierarchy-node" style="left:1280px; top:690px; width:520px; height:240px;"><div class="node-icon"><svg class="icon"><use href="#material/task_alt"/></svg></div><div class="node-copy"><div class="label">Action</div><div class="section-title">Owner + timing</div></div></div>
+<div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Connectors meet node edges; labels stay clear</div>
 </div>
 
 <!-- Pattern: metric — for: overall performance at a glance; regions: kpi-1, kpi-2, kpi-3, kpi-4, takeaway; components: metric ×4 + selected + takeaway; may vary: four to six measures and units; may not: omit comparators, mix windows, or use cards. -->

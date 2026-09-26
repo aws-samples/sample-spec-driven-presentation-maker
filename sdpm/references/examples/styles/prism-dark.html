@@ -68,7 +68,12 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 .takeaway { border-top:var(--border-thin) solid var(--color-border); padding-top:24px; }
 .node,.node-g { display:flex; align-items:center; justify-content:center; text-align:center; font-size:calc(var(--fs-body) * 1.5); line-height:1.35; }
 .node { border-radius:var(--radius); background:var(--color-surface); border:var(--border-thin) solid var(--color-border); }
-.connector { background:var(--color-border); }
+.connector { background:var(--color-flat-bar); }
+.icon { display:block; width:96px; height:96px; flex:none; fill:var(--color-muted); }
+.icon.icon-accent,.node-g .icon { fill:var(--accent); }
+.icon-hub { width:112px; height:112px; }
+.icon-wrap { display:flex; align-items:center; justify-content:center; }
+.node-icon { flex-direction:column; gap:16px; }
 .table-row { display:flex; align-items:center; border-bottom:var(--border-thin) solid var(--color-border); }
 .table-row > span:last-child { text-align:right; }
 .chart-specimen { border-left:2px solid var(--color-border); border-bottom:2px solid var(--color-border); }
@@ -77,6 +82,7 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/visibility" viewBox="0 -960 960 960"><path d="M600.5-379.5Q650-429 650-500t-49.5-120.5Q551-670 480-670t-120.5 49.5Q310-571 310-500t49.5 120.5Q409-330 480-330t120.5-49.5Zm-200-41Q368-453 368-500t32.5-79.5Q433-612 480-612t79.5 32.5Q592-547 592-500t-32.5 79.5Q527-388 480-388t-79.5-32.5ZM216-283Q98-366 40-500q58-134 176-217t264-83q146 0 264 83t176 217q-58 134-176 217t-264 83q-146 0-264-83Zm264-217Zm222.5 174.5Q804-391 857-500q-53-109-154.5-174.5T480-740q-121 0-222.5 65.5T102-500q54 109 155.5 174.5T480-260q121 0 222.5-65.5Z"/></symbol><symbol id="material/edit" viewBox="0 -960 960 960"><path d="M180-180h44l472-471-44-44-472 471v44Zm-60 60v-128l575-574q8-8 19-12.5t23-4.5q11 0 22 4.5t20 12.5l44 44q9 9 13 20t4 22q0 11-4.5 22.5T823-694L248-120H120Zm659-617-41-41 41 41Zm-105 64-22-22 44 44-22-22Z"/></symbol><symbol id="material/search_insights" viewBox="0 -960 960 960"><path d="M400.06-300Q508-300 584.5-376.13 661-452.25 661-561q0-107.92-76.5-183.46T400.06-820q-107.94 0-183.5 75.54T141-561q0 108.75 75.56 184.87Q292.12-300 400.06-300ZM371-448v-267h60v267h-60Zm-145 0v-184h60v184h-60Zm290 0v-143h60v143h-60ZM838-80 605-314q-42 35-94.24 54.5Q458.51-240 400-240q-133 0-226-93.5T81-560.7q0-133.71 92.8-226.5Q266.59-880 400.3-880q133.7 0 227.2 93T721-561q0 58.51-19.5 110.76Q682-398 647-356l233 233-42 43Z"/></symbol><symbol id="material/task_alt" viewBox="0 -960 960 960"><path d="M480-80q-85 0-158-30.5T195-195q-54-54-84.5-127T80-480q0-84 30.5-157T195-764q54-54 127-85t158-31q75 0 140 24t117 66l-43 43q-44-35-98-54t-116-19q-145 0-242.5 97.5T140-480q0 145 97.5 242.5T480-140q145 0 242.5-97.5T820-480q0-30-4.5-58.5T802-594l46-46q16 37 24 77t8 83q0 85-31 158t-85 127q-54 54-127 84.5T480-80Zm-59-218L256-464l45-45 120 120 414-414 46 45-460 460Z"/></symbol><symbol id="material/hub" viewBox="0 -960 960 960"><path d="M153-73q-33-33-33-81t33.25-81q33.25-33 80.75-33 14 0 24.5 2.5T280-258l85-106q-19-23-29-52.5t-5-61.5l-121-41q-15 25-39.5 39T114-466q-47.5 0-80.75-33.25T0-580q0-47.5 33.25-80.75T114-694q47.5 0 80.75 33.25T228-580v4l122 42q18-32 43.5-49t56.5-24v-129q-39-11-61.5-43T366-846q0-47.5 33-80.75T480-960q48 0 81 33.25T594-846q0 35-23 67t-61 43v129q31 7 57 24t44 49l121-42v-4q0-47.5 33.25-80.75T846-694q47.5 0 80.75 33T960-580q0 48-33.25 81T846-466q-32 0-57-14t-39-39l-121 41q5 32-4.5 61.5T595-364l85 106q11-5 21.5-7.5t24.06-2.5Q774-268 807-235t33 81q0 48-33 81t-81 33q-48 0-81-33.25T612-154q0-20 5.5-36t15.5-31l-85-106q-32.13 17-68.56 17Q443-310 411-327l-84 107q10 15 15.5 30.5T348-154q0 47.5-33 80.75T234-40q-48 0-81-33Zm-38.96-453q22.96 0 38.46-15.54 15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5Q91-634 75.5-618.46 60-602.93 60-579.96 60-557 75.54-541.5q15.53 15.5 38.5 15.5ZM272.5-115.54q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54Zm246-692q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54ZM480.5-370q37.5 0 63.5-26.5t26-64q0-37.5-26.1-63.5T480-550q-37 0-63.5 26.1T390-460q0 37 26.5 63.5t64 26.5Zm284 254.46q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54Zm120-426q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54ZM480-846ZM114-580Zm366 120Zm366-120ZM234-154Zm492 0Z"/></symbol><symbol id="material/target" viewBox="0 -960 960 960"><path d="M324-111.5Q251-143 197-197t-85.5-127Q80-397 80-480t31.5-156Q143-709 197-763t127-85.5Q397-880 480-880t156 31.5Q709-817 763-763t85.5 127Q880-563 880-480t-31.5 156Q817-251 763-197t-127 85.5Q563-80 480-80t-156-31.5ZM721-239q99-99 99-241t-99-241q-99-99-241-99t-241 99q-99 99-99 241t99 241q99 99 241 99t241-99Zm-411-71q-70-70-70-170t70-170q70-70 170-70t170 70q70 70 70 170t-70 170q-70 70-170 70t-170-70Zm297.5-42.5Q660-405 660-480t-52.5-127.5Q555-660 480-660t-127.5 52.5Q300-555 300-480t52.5 127.5Q405-300 480-300t127.5-52.5Zm-184-71Q400-447 400-480t23.5-56.5Q447-560 480-560t56.5 23.5Q560-513 560-480t-23.5 56.5Q513-400 480-400t-56.5-23.5Z"/></symbol></svg>
 
 <!-- Part: Cover -->
 <!-- The cover has no claim, so the edge is its only gradient; metadata remains flat and no panel, pill, or rule competes with the name. -->
@@ -122,6 +128,18 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 <div class="el t-caption c-muted" style="left:144px;top:864px;width:1500px;height:72px">No emoji or decorative effects.</div>
 </div>
 
+<div class="slide">
+<div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Sparse diagrams turn structure into evidence</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Use icons only where a form carries meaning.</div>
+<!-- Component: icon (.icon) — at card and node heads beside a one-to-four-word label; size: 96px, or 112px for a diagram hub; colour: muted grey by default and violet only on the named target; family: Material; may vary: concept and hub size; may not: decorate, mix families, sit beside a paragraph, or lose its label. -->
+<div class="el node node-icon" style="left:144px;top:364px;width:528px;height:300px"><svg class="icon"><use href="#material/visibility"/></svg><span class="t-heading">Card heads</span></div>
+<div class="el node node-icon" style="left:720px;top:364px;width:528px;height:300px"><svg class="icon"><use href="#material/task_alt"/></svg><span class="t-heading">Process nodes</span></div>
+<div class="el node-g node-icon" style="left:1296px;top:364px;width:528px;height:300px"><svg class="icon"><use href="#material/hub"/></svg><span class="t-heading">Diagram nodes</span></div>
+<div class="el t-caption c-muted" style="left:144px;top:724px;width:1680px;height:64px">96 px · Material · grey by default · violet at the target</div>
+<div class="el takeaway t-heading" style="left:144px;top:824px;width:1680px;height:112px">Favor processes, hubs, and equal comparisons; stop at five nodes.</div>
+</div>
+
 <!-- Part: Message & Outline -->
 <!-- Density: 45 -->
 <!-- The default and this gallery stay at 45 visible words; a production slide meant to be read alone may carry up to 90. Title rows reserve both lines even when one is empty. Slide count follows the brief and source material. -->
@@ -155,7 +173,7 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 <div class="el rule" style="left:248px;top:744px;width:1200px;height:1px"></div>
 <div class="el marker" style="left:144px;top:804px;width:72px;height:48px">04</div>
 <div class="el t-heading" style="left:248px;top:792px;width:520px;height:72px">Closing ask</div>
-<div class="el t-caption c-muted" style="left:1020px;top:792px;width:700px;height:100px">Prefer figures, equal comparisons, processes, native charts, spare tables, and unboxed prose.</div>
+<div class="el t-caption c-muted" style="left:1020px;top:792px;width:700px;height:100px">Draw quantities as figures, choices as equal comparisons, sequence as process, and relationships as sparse hubs.</div>
 </div>
 
 <!-- Part: Patterns -->
@@ -203,16 +221,19 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 <div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">Parallel evidence belongs in equal columns</div>
 <div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Keep one rhythm across the row.</div>
 <div class="el card" style="left:144px;top:356px;width:528px;height:448px"></div>
-<div class="el t-label c-muted" style="left:192px;top:404px;width:432px;height:32px">Context</div>
-<div class="el t-heading" style="left:192px;top:468px;width:432px;height:72px">What changed</div>
+<div class="el icon-wrap" style="left:192px;top:396px;width:96px;height:96px"><svg class="icon"><use href="#material/visibility"/></svg></div>
+<div class="el t-label c-muted" style="left:320px;top:404px;width:304px;height:32px">Context</div>
+<div class="el t-heading" style="left:320px;top:468px;width:304px;height:72px">What changed</div>
 <div class="el t-caption c-muted" style="left:192px;top:580px;width:400px;height:120px">One fact set, aligned to peers.</div>
 <div class="el card-g" style="left:720px;top:356px;width:528px;height:448px"></div>
-<div class="el pill-g" style="left:768px;top:404px;width:210px;height:48px">Target</div>
-<div class="el t-heading" style="left:768px;top:468px;width:432px;height:72px">What matters</div>
+<div class="el icon-wrap" style="left:768px;top:396px;width:96px;height:96px"><svg class="icon icon-accent"><use href="#material/target"/></svg></div>
+<div class="el pill-g" style="left:896px;top:404px;width:210px;height:48px">Target</div>
+<div class="el t-heading" style="left:896px;top:468px;width:304px;height:72px">What matters</div>
 <div class="el t-caption" style="left:768px;top:580px;width:400px;height:120px">Only this column is outlined.</div>
 <div class="el card" style="left:1296px;top:356px;width:528px;height:448px"></div>
-<div class="el t-label c-muted" style="left:1344px;top:404px;width:432px;height:32px">Consequence</div>
-<div class="el t-heading" style="left:1344px;top:468px;width:432px;height:72px">What follows</div>
+<div class="el icon-wrap" style="left:1344px;top:396px;width:96px;height:96px"><svg class="icon"><use href="#material/task_alt"/></svg></div>
+<div class="el t-label c-muted" style="left:1472px;top:404px;width:304px;height:32px">Consequence</div>
+<div class="el t-heading" style="left:1472px;top:468px;width:304px;height:72px">What follows</div>
 <div class="el t-caption c-muted" style="left:1344px;top:580px;width:400px;height:120px">Matched depth keeps comparison honest.</div>
 <div class="el takeaway t-heading" style="left:144px;top:864px;width:1680px;height:100px">Use columns for parallel logic, never decorative splitting.</div>
 </div>
@@ -223,16 +244,16 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 <div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">One gate controls the process</div>
 <div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Equal steps show sequence; the outlined step shows risk.</div>
 <!-- Component: step (.node) — equal sequence stage; may vary: short verb phrase; may not: vary size within a set or carry decorative colour. -->
-<div class="el node" style="left:144px;top:432px;width:384px;height:220px">Frame</div>
+<div class="el node node-icon" style="left:144px;top:432px;width:384px;height:220px"><svg class="icon"><use href="#material/visibility"/></svg><span>Frame</span></div>
 <!-- Component: connector (.connector) — neutral link between steps or nodes; may vary: length and orientation; may not: use gradient or imply meaning absent from the title. -->
 <div class="el connector" style="left:528px;top:541px;width:48px;height:2px"></div>
-<div class="el node" style="left:576px;top:432px;width:384px;height:220px">Build</div>
+<div class="el node node-icon" style="left:576px;top:432px;width:384px;height:220px"><svg class="icon"><use href="#material/edit"/></svg><span>Build</span></div>
 <div class="el connector" style="left:960px;top:541px;width:48px;height:2px"></div>
-<div class="el node-g" style="left:1008px;top:432px;width:384px;height:220px">Measure</div>
+<div class="el node-g node-icon" style="left:1008px;top:432px;width:384px;height:220px"><svg class="icon"><use href="#material/search_insights"/></svg><span>Measure</span></div>
 <!-- Component: milestone (.pill-g) — sequence gate label; may vary: stage and status; may not: appear on a cycle or without an outlined step. -->
 <div class="el pill-g" style="left:1056px;top:384px;width:240px;height:48px">Step 3 · gate</div>
 <div class="el connector" style="left:1392px;top:541px;width:48px;height:2px"></div>
-<div class="el node" style="left:1440px;top:432px;width:384px;height:220px">Release</div>
+<div class="el node node-icon" style="left:1440px;top:432px;width:384px;height:220px"><svg class="icon"><use href="#material/task_alt"/></svg><span>Release</span></div>
 <div class="el takeaway t-heading" style="left:144px;top:816px;width:1680px;height:120px">Neutral connectors preserve order without stealing the pointer.</div>
 </div>
 
@@ -291,20 +312,22 @@ body { margin:0; padding:40px; background:#000; font-family:var(--font-family); 
 <div class="el takeaway t-heading gtext" style="left:144px;top:840px;width:1680px;height:120px">End prose with one bounded action.</div>
 </div>
 
-<!-- Pattern: relationship — for: a cycle or hub without a first step; regions: hub, col-1, col-2, col-3, takeaway; components: hub + step ×3 + connector + takeaway; may vary: 3–5 equal nodes and marked pivot; may not: add arrowheads, a milestone pill, unequal nodes, or a gradient connector. -->
+<!-- Pattern: diagram — for: one decision pivot with four independent inputs and outcomes; regions: node-top, node-left, hub, node-right, node-bottom; components: hub + step ×4 + connector ×4 + icon ×5; may vary: three to four satellites, labels, and pivot; may not: exceed five nodes, add arrowheads without direction, miss node edges, cross links, overlap, or shrink into the centre. -->
 <div class="slide">
 <div class="el edge" style="left:0px;top:0px;width:40px;height:1080px"></div>
-<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">A relationship has a pivot, not a start</div>
-<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Equal nodes and neutral links keep direction open.</div>
-<!-- Component: hub (.node-g) — named pivot among equal relationship nodes; may vary: target and 3–5 satellites; may not: carry a pill, imply sequence, or change node geometry. -->
-<div class="el node-g" style="left:772px;top:372px;width:376px;height:150px">Review</div>
-<div class="el connector" style="left:959px;top:522px;width:2px;height:90px"></div>
-<div class="el node" style="left:144px;top:664px;width:376px;height:150px">Observe</div>
-<div class="el connector" style="left:520px;top:738px;width:252px;height:2px"></div>
-<div class="el node" style="left:772px;top:664px;width:376px;height:150px">Decide</div>
-<div class="el connector" style="left:1148px;top:738px;width:252px;height:2px"></div>
-<div class="el node" style="left:1400px;top:664px;width:376px;height:150px">Adjust</div>
-<div class="el takeaway t-heading" style="left:144px;top:880px;width:1680px;height:88px">Outline the named pivot without adding a sequence pill.</div>
+<div class="el t-slide-title" style="left:144px;top:72px;width:1440px;height:160px">A sparse hub turns decision logic into a map</div>
+<div class="el t-heading" style="left:144px;top:248px;width:1560px;height:60px">Four neutral spokes meet node edges; the gradient marks the pivot.</div>
+<!-- Component: connector (.connector) — a four-pixel muted-grey link that meets node edges; may vary: length and orientation; may not: use gradient, float in gaps, enter labels, or imply direction without an arrowhead. -->
+<div class="el connector" style="left:958px;top:506px;width:4px;height:20px"></div>
+<div class="el connector" style="left:564px;top:638px;width:186px;height:4px"></div>
+<div class="el connector" style="left:1170px;top:638px;width:186px;height:4px"></div>
+<div class="el connector" style="left:958px;top:754px;width:4px;height:20px"></div>
+<div class="el node node-icon" style="left:750px;top:336px;width:420px;height:170px"><svg class="icon"><use href="#material/visibility"/></svg><span>Observe</span></div>
+<div class="el node node-icon" style="left:144px;top:555px;width:420px;height:170px"><svg class="icon"><use href="#material/edit"/></svg><span>Frame</span></div>
+<!-- Component: hub (.node-g) — the one outlined pivot where three to four edge-to-edge spokes meet; may vary: concept and satellite labels; may not: carry a milestone pill, imply sequence, change satellite geometry, or lose its 112px icon. -->
+<div class="el node-g node-icon" style="left:750px;top:526px;width:420px;height:228px"><svg class="icon icon-hub"><use href="#material/hub"/></svg><span class="t-heading">Decide</span></div>
+<div class="el node node-icon" style="left:1356px;top:555px;width:420px;height:170px"><svg class="icon"><use href="#material/search_insights"/></svg><span>Test</span></div>
+<div class="el node node-icon" style="left:750px;top:774px;width:420px;height:170px"><svg class="icon"><use href="#material/task_alt"/></svg><span>Act</span></div>
 </div>
 
 <!-- Part: Closing -->
