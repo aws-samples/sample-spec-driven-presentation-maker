@@ -229,10 +229,10 @@ def kiro_home() -> Path:
 def kiro_leftovers(root: Optional[Path] = None) -> list[Path]:
     """Files the old installer wrote that now break sub-agent dispatch.
 
-    ``agents/sdpm-composer.json`` points its prompt at ``skills/sdpm-composer/SKILL.md``,
-    which no longer exists, and its MCP entry at a checkout that may be gone — yet its name
-    makes an orchestrator pick it over a working general-purpose sub-agent. Only entries
-    that are recognisably ours are reported.
+    The generated ``agents/sdpm-composer.json`` pointed its prompt at
+    ``skills/sdpm-composer/SKILL.md``, which no longer exists, so the agent cannot start —
+    yet its name makes an orchestrator pick it. Only that exact fingerprint is reported: a
+    user's own agent of the same name (own prompt, own model) is theirs and is left alone.
     """
     root = root or kiro_home()
     found: list[Path] = []
@@ -242,7 +242,7 @@ def kiro_leftovers(root: Optional[Path] = None) -> list[Path]:
             text = agent.read_text(encoding="utf-8", errors="replace")
         except OSError:
             text = ""
-        if "sdpm" in text:
+        if "skills/sdpm-composer/SKILL.md" in text:
             found.append(agent)
     for name in _LEGACY_SKILLS:
         entry = root / "skills" / name
@@ -265,8 +265,8 @@ def remove_leftovers(paths: list[Path], *, dry_run: bool = False) -> None:
 def leftover_notice(paths: list[Path]) -> str:
     lines = ["Found files from the previous Kiro installer (make install-kiro):"]
     lines += [f"  {p}" for p in paths]
-    lines.append("They point at files that no longer exist and make an orchestrator pick a broken")
-    lines.append("sub-agent named sdpm-composer. Nothing in SDPM needs them any more.")
+    lines.append("They point at files that no longer exist, so an orchestrator that picks the")
+    lines.append("sdpm-composer agent fails. Nothing in SDPM needs them any more.")
     return "\n".join(lines)
 
 

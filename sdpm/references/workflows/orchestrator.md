@@ -45,9 +45,7 @@ the project's shared vocabulary for structure and look.
 
 Spawn composers with your environment's sub-agent mechanism, one per dispatch. Any
 sub-agent that has the sdpm tools will do — a general-purpose one, or yourself if the
-mechanism spawns a copy of you. Do not look for a dedicated sdpm agent: one named
-`sdpm-composer` is a leftover of an older installer and no longer works. Always use this
-prompt (replace only the placeholders):
+mechanism spawns a copy of you. Always use this prompt (replace only the placeholders):
 
 ```
 You are an sdpm composer. First call start_composing(deck_id, assigned_slugs) with the
