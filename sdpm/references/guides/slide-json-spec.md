@@ -714,6 +714,7 @@ look intentional. Icons in a row share one size and one baseline.
 | matrix | two criteria, 2×2 | Two `line` axes crossing at the region centre, `arrowEnd`; axis names at the ends; quadrant names in the corners; items as markers at `(rx + tx·rw, ry + (1 − ty)·rh)`. |
 | spectrum | one criterion, positions on it | One `line` with `arrowStart` + `arrowEnd`, pole labels at both ends, items as markers at `x = x0 + t·len`. |
 | timeline | dated events | Baseline `line`; `oval` markers on it; date on one side, label on the other; alternate sides when labels are long. |
+| stack | layers built on each other (architecture, maturity) | Full-width bands in one column from `grid`, bottom layer first in meaning; one icon + name at each band's left, what it adds on the right; the band the slide is about in the selected treatment. |
 | funnel / pyramid | narrowing stages, layers | Stack `trapezoid`s. Pyramid: default orientation (narrow top), widths grow top → bottom, label in `text`. Funnel: widths shrink top → bottom and `flipV`; because `flipV` also flips shape text, omit `text` and add an upright centred `textbox` inset slightly from each shape box. |
 | brace | several items → one conclusion | `right_brace` spanning the items' height; the conclusion beside it, centred on the brace. |
 | progress | a share or completion | Ring: `donut` track `adjustments: [t]` + `block_arc` `[270, "N%", t]` on the same box, figure centred. Bar: track `rectangle` + filled rectangle of width `w·p`. |

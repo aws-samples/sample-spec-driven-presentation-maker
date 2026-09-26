@@ -36,7 +36,8 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
   forms** (flow, cycle, hub, hierarchy, matrix, timeline, progress, icon + label…) built from
   the style's components, icons from `search_assets`. Where the outline's `visual` is only text
   but the `body` has a structure (steps, parts, a centre and satellites, a trade-off), draw the
-  structure and say so in your summary. A slide that is mostly sentences inside cards is a
+  structure and say so in your summary. A card or node that names a concept carries an icon,
+  as the style's icon rule places it. A slide that is mostly sentences inside cards is a
   defect unless its claim is itself a sentence.
 - `grid(purpose, spec)` computes exact coordinates for row × column layouts from a CSS-Grid
   style spec — use it for rectangular arrangements instead of hand-placing; compute
