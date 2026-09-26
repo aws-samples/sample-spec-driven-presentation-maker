@@ -73,6 +73,42 @@ function Show-Confirm {
     return (-not $reply -or $reply -match '^[Yy]')
 }
 
+# Two-row checklist matching the client picker: MCP server always on, Web UI toggles.
+# Returns $true when the Web UI is selected. Falls back to Show-Confirm without a console.
+function Show-SurfacePicker {
+    if ($script:NonInteractive) { return $true }
+    if ([Console]::IsOutputRedirected -or [Console]::IsInputRedirected) {
+        return (Show-Confirm "Also install the browser Web UI?")
+    }
+    $webui = $true
+    $top = [Console]::CursorTop
+    $render = {
+        [Console]::SetCursorPosition(0, $top)
+        Write-Host "  What to install   " -NoNewline; Write-Host "space toggle - enter confirm" -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "        [x] MCP server        for your AI agent - always installed" -ForegroundColor DarkGray
+        Write-Host "  " -NoNewline; Write-Host ">" -ForegroundColor Cyan -NoNewline
+        if ($webui) { Write-Host " [x]" -ForegroundColor Green -NoNewline } else { Write-Host " [ ]" -NoNewline }
+        Write-Host " Browser Web UI    " -NoNewline; Write-Host "needs Node.js 20+; a few minutes of build   " -ForegroundColor DarkGray
+    }
+    [Console]::CursorVisible = $false
+    try {
+        & $render
+        while ($true) {
+            $key = [Console]::ReadKey($true)
+            if ($key.Key -eq "Spacebar") { $webui = -not $webui }
+            elseif ($key.Key -eq "Enter") { break }
+            & $render
+        }
+    } finally { [Console]::CursorVisible = $true }
+    [Console]::SetCursorPosition(0, $top)
+    for ($i = 0; $i -lt 4; $i++) { Write-Host (" " * ([Console]::WindowWidth - 1)) }
+    [Console]::SetCursorPosition(0, $top)
+    if ($webui) { Write-Host "  What to install: MCP server, Browser Web UI" } else { Write-Host "  What to install: MCP server" }
+    Write-Host ""
+    return $webui
+}
+
 function Has-Command { param([string]$Name); return [bool](Get-Command $Name -ErrorAction SilentlyContinue) }
 
 function Refresh-Path {
@@ -573,10 +609,7 @@ function Choose-Profile {
     if ($script:Profile) { return }
     if ($script:NonInteractive) { $script:Profile = "full"; return }
     Write-Host ""
-    Write-Host "  SDPM has two surfaces on one installation:"
-    Write-Host "    - your own AI agent (Kiro CLI, Claude Code, Cursor, ...) through the MCP server"
-    Write-Host "    - a browser Web UI (needs Node.js 20+; adds a few minutes of build time)"
-    $script:Profile = if (Show-Confirm "Also install the browser Web UI?") { "full" } else { "mcp" }
+    $script:Profile = if (Show-SurfacePicker) { "full" } else { "mcp" }
 }
 
 function Invoke-Launcher {

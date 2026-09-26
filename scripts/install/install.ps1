@@ -219,10 +219,7 @@ function Choose-Profile {
     if ($script:Profile) { return }
     if ($script:NonInteractive) { $script:Profile = "full"; return }
     Write-Host ""
-    Write-Host "  SDPM has two surfaces on one installation:"
-    Write-Host "    - your own AI agent (Kiro CLI, Claude Code, Cursor, ...) through the MCP server"
-    Write-Host "    - a browser Web UI (needs Node.js 20+; adds a few minutes of build time)"
-    $script:Profile = if (Show-Confirm "Also install the browser Web UI?") { "full" } else { "mcp" }
+    $script:Profile = if (Show-SurfacePicker) { "full" } else { "mcp" }
 }
 
 function Invoke-Launcher {
