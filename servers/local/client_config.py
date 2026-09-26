@@ -562,12 +562,12 @@ def unregister(clients: list[Client], *, dry_run: bool = False, run: Callable[[l
     return failures
 
 
-def registered(clients: list[Client]) -> dict[str, Optional[bool]]:
+def registered(clients: list[Client], agent_name: str = DEFAULT_KIRO_AGENT) -> dict[str, Optional[bool]]:
     """Best effort: True/False when the client CLI can tell us, None otherwise."""
     result: dict[str, Optional[bool]] = {}
     for client in clients:
         if client.id == "kiro-cli":
-            result[client.id] = kiro_agent_registered()
+            result[client.id] = kiro_agent_registered(agent_name)
             continue
         if client.list_cmd is None:
             result[client.id] = None
@@ -599,27 +599,38 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="sdpm mcp-config", description=__doc__.split("\n\n")[0])
     parser.add_argument("--uv", help="absolute path of uv (default: SDPM_UV, then PATH)")
     parser.add_argument("--checkout", help="checkout root (default: this file's repository)")
-    parser.add_argument("--agent-name", default=DEFAULT_KIRO_AGENT, help="name of the Kiro CLI agent (default: sdpm)")
+    parser.add_argument("--agent-name", default=None,
+                        help="name of the Kiro CLI agent (default: SDPM_AGENT_NAME or sdpm)")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    def agent_name_option(sp: argparse.ArgumentParser) -> None:
+        # Accepted after the subcommand too (`sdpm register kiro-cli --agent-name x`);
+        # SUPPRESS keeps a value given before the subcommand from being reset.
+        sp.add_argument("--agent-name", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
 
     p = sub.add_parser("print", help="show configuration for detected (or named) clients")
     p.add_argument("clients", nargs="*", choices=[*CLIENT_IDS, []])
     p.add_argument("--json", action="store_true")
     p.add_argument("--all", action="store_true", help="every supported client, detected or not")
+    agent_name_option(p)
 
     p = sub.add_parser("register", help="register with detected (or named) clients")
     p.add_argument("clients", nargs="*", choices=[*CLIENT_IDS, []])
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--yes", "-y", action="store_true", help="do not ask per client")
+    agent_name_option(p)
 
     p = sub.add_parser("unregister", help="remove the server from detected (or named) clients")
     p.add_argument("clients", nargs="*", choices=[*CLIENT_IDS, []])
     p.add_argument("--dry-run", action="store_true")
+    agent_name_option(p)
 
     p = sub.add_parser("status", help="which detected clients have the server registered")
     p.add_argument("--json", action="store_true")
 
     args = parser.parse_args(argv)
+    if not getattr(args, "agent_name", None):
+        args.agent_name = os.environ.get("SDPM_AGENT_NAME") or DEFAULT_KIRO_AGENT
     target = _default_target(args)
 
     if args.command == "print":
@@ -649,7 +660,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.command == "status":
         clients = detect()
         rows = [{"id": c.id, "label": c.label, "registered": r}
-                for c, r in zip(clients, registered(clients).values())]
+                for c, r in zip(clients, registered(clients, args.agent_name).values())]
         if args.json:
             print(json.dumps({"checkout": target.checkout, "uv": target.uv, "clients": rows}, indent=2))
         elif not rows:
@@ -659,7 +670,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             print("  MCP clients:")
             for row in rows:
                 mark = {
-                    True: "registered" + ("   → kiro-cli chat --agent sdpm" if row["id"] == "kiro-cli" else ""),
+                    True: "registered" + (f"   → kiro-cli chat --agent {args.agent_name}" if row["id"] == "kiro-cli" else ""),
                     False: f"not registered   → sdpm register {row['id']}",
                     None: f"see: sdpm mcp-config {row['id']}",
                 }[row["registered"]]

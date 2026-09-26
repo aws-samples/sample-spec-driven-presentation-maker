@@ -18,6 +18,10 @@ $SdpmHome = if ($env:SDPM_HOME) { $env:SDPM_HOME } else { Join-Path $env:USERPRO
 $Checkout = Join-Path $SdpmHome "checkout"
 $ProfileFile = Join-Path $SdpmHome ".profile"
 $UvPathFile = Join-Path $SdpmHome ".uv-path"
+# Kiro agent name chosen at install time (-AgentName); SDPM_AGENT_NAME overrides per call.
+$agentNameFile = Join-Path $SdpmHome ".agent-name"
+if (-not $env:SDPM_AGENT_NAME -and (Test-Path $agentNameFile)) { $env:SDPM_AGENT_NAME = (Get-Content $agentNameFile -Raw).Trim() }
+if (-not $env:SDPM_AGENT_NAME) { $env:SDPM_AGENT_NAME = "sdpm" }
 $RepoUrl = "https://github.com/aws-samples/sample-spec-driven-presentation-maker.git"
 $WebUiPort = if ($env:SDPM_WEBUI_PORT) { [int]$env:SDPM_WEBUI_PORT } else { 3000 }
 $ServerDir = Join-Path $Checkout "servers\local"

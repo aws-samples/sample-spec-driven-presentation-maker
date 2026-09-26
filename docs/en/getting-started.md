@@ -42,6 +42,7 @@ Re-running the installer repairs an existing installation; it never creates a se
 |---|---|
 | `--full` / `--mcp-only` | Skip the profile question |
 | `--register` / `--no-register` | Register with every detected client / only print the configuration |
+| `--agent-name NAME` | Name of the Kiro CLI agent (default `sdpm`; remembered for `sdpm register` / status) |
 | `--non-interactive` | Accept all prompts (profile defaults to full) |
 | `--skip-libreoffice`, `--skip-shortcut` | Leave those out |
 | `--deps-only` | Install `git`, `uv`, LibreOffice and poppler only (for a developer checkout) |

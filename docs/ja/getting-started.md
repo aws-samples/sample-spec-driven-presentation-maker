@@ -40,6 +40,7 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 |---|---|
 | `--full` / `--mcp-only` | プロファイルの質問を省く |
 | `--register` / `--no-register` | 検出した全クライアントに登録 / 設定を表示するだけ |
+| `--agent-name NAME` | Kiro CLI エージェントの名前（既定 `sdpm`。`sdpm register` / 状態表示でも使われる） |
 | `--non-interactive` | すべて yes（プロファイルは full） |
 | `--skip-libreoffice`, `--skip-shortcut` | それらを省く |
 | `--deps-only` | `git`・`uv`・LibreOffice・poppler だけ入れる（開発者の checkout 向け） |

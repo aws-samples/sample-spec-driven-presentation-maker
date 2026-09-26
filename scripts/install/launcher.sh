@@ -15,6 +15,11 @@ SDPM_HOME="${SDPM_HOME:-$HOME/.sdpm}"
 CHECKOUT="$SDPM_HOME/checkout"
 PROFILE_FILE="$SDPM_HOME/.profile"
 UV_PATH_FILE="$SDPM_HOME/.uv-path"
+# Kiro agent name chosen at install time (--agent-name); SDPM_AGENT_NAME overrides per call.
+if [[ -z "${SDPM_AGENT_NAME:-}" && -f "$SDPM_HOME/.agent-name" ]]; then
+  SDPM_AGENT_NAME=$(cat "$SDPM_HOME/.agent-name" 2>/dev/null || true)
+fi
+export SDPM_AGENT_NAME="${SDPM_AGENT_NAME:-sdpm}"
 REPO_URL="https://github.com/aws-samples/sample-spec-driven-presentation-maker.git"
 WEBUI_PORT="${SDPM_WEBUI_PORT:-3000}"
 

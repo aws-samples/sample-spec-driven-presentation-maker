@@ -7,6 +7,7 @@ param(
     [switch]$Full,
     [switch]$McpOnly,
     [switch]$Register,
+    [string]$AgentName = "",
     [switch]$NoRegister,
     [switch]$DepsOnly,
     [switch]$NonInteractive,
@@ -22,6 +23,7 @@ if ($env:SDPM_SKIP_LIBREOFFICE -eq "1") { $SkipLibreOffice = $true }
 if ($env:SDPM_SKIP_SHORTCUT -eq "1") { $SkipShortcut = $true }
 # Profile: full | mcp. Asked interactively when neither switch nor SDPM_PROFILE is given.
 $script:Profile = if ($Full) { "full" } elseif ($McpOnly) { "mcp" } elseif ($env:SDPM_PROFILE) { $env:SDPM_PROFILE } else { "" }
+if ($AgentName) { $env:SDPM_AGENT_NAME = $AgentName } elseif (-not $env:SDPM_AGENT_NAME) { $env:SDPM_AGENT_NAME = "sdpm" }
 # Registration: ask | yes | no
 $script:RegisterMode = if ($Register) { "yes" } elseif ($NoRegister) { "no" } elseif ($env:SDPM_REGISTER) { $env:SDPM_REGISTER } else { "ask" }
 $InstallerVersion = "0.1.0"
@@ -157,6 +159,7 @@ function Setup-Packages {
     if (-not $result.Success) { Fail-Step "uv sync failed" $result.Output "$RepoHelp/blob/main/docs/en/getting-started.md"; exit 1 }
     Complete-Step "MCP server ready ($($result.Elapsed))"
     $script:Profile | Set-Content -Path (Join-Path $SdpmHome ".profile") -Encoding ASCII
+    $env:SDPM_AGENT_NAME | Set-Content -Path (Join-Path $SdpmHome ".agent-name") -Encoding ASCII
     (Get-Command uv).Source | Set-Content -Path (Join-Path $SdpmHome ".uv-path") -Encoding ASCII
     if ($script:Profile -ne "full") { return }
 
@@ -246,7 +249,7 @@ function Register-Clients {
 function Show-Completion {
     Write-Host "`n  SDPM is installed.`n" -ForegroundColor Green
     Write-Host "    Your agent:   ask it `"Make slides about ...`" - it finds SDPM through MCP."
-    Write-Host "                  Kiro CLI: kiro-cli chat --agent sdpm"
+    Write-Host "                  Kiro CLI: kiro-cli chat --agent $env:SDPM_AGENT_NAME"
     if ($script:Profile -eq "full") {
         Write-Host "    Browser:      sdpm webui"
         & kiro-cli whoami *> $null

@@ -15,6 +15,7 @@ LAUNCHER_DIR="${SDPM_LAUNCHER_DIR:-$HOME/.local/bin}"
 DEPS_ONLY=0
 PROFILE="${SDPM_PROFILE:-}"          # full | mcp ; asked interactively when empty
 REGISTER="${SDPM_REGISTER:-ask}"     # ask | yes | no
+export SDPM_AGENT_NAME="${SDPM_AGENT_NAME:-sdpm}"   # name of the Kiro CLI agent
 NON_INTERACTIVE="${SDPM_NON_INTERACTIVE:-0}"
 SKIP_LIBREOFFICE="${SDPM_SKIP_LIBREOFFICE:-0}"
 SKIP_SHORTCUT="${SDPM_SKIP_SHORTCUT:-0}"
@@ -28,6 +29,7 @@ Options:
   --full               Install the MCP server and the browser Web UI (needs Node.js)
   --mcp-only           Install the MCP server only (no Node.js, no Web UI)
   --register           Register the MCP server with every detected client without asking
+  --agent-name NAME    Name of the Kiro CLI agent (default: sdpm)
   --no-register        Skip client registration (print the configuration instead)
   --deps-only          Install git, uv, LibreOffice, and poppler only
   --non-interactive    Accept dependency installation prompts; default profile: full
@@ -41,6 +43,7 @@ Environment:
   SDPM_PROFILE=full|mcp     Same as --full / --mcp-only
   SDPM_REPO_URL             Clone source (default: the GitHub repository; CI/testing)
   SDPM_REGISTER=yes|no      Same as --register / --no-register
+  SDPM_AGENT_NAME           Same as --agent-name
   SDPM_NON_INTERACTIVE=1    Same as --non-interactive
   SDPM_SKIP_LIBREOFFICE=1   Same as --skip-libreoffice
   SDPM_SKIP_SHORTCUT=1      Same as --skip-shortcut
@@ -52,6 +55,7 @@ while [[ $# -gt 0 ]]; do
     --full) PROFILE=full ;;
     --mcp-only) PROFILE=mcp ;;
     --register) REGISTER=yes ;;
+    --agent-name) shift; SDPM_AGENT_NAME="${1:?--agent-name needs a value}" ;;
     --no-register) REGISTER=no ;;
     --deps-only) DEPS_ONLY=1 ;;
     --non-interactive) NON_INTERACTIVE=1 ;;
@@ -249,6 +253,7 @@ setup_packages() {
   if run_with_spinner "uv sync --directory '$CHECKOUT/servers/local'"; then complete_step "MCP server ready ($LAST_ELAPSED)"
   else fail_step "uv sync failed" "$LAST_LOG" "$REPO_HELP/blob/main/docs/en/getting-started.md"; exit 1; fi
   echo "$PROFILE" > "$SDPM_HOME/.profile"
+  echo "$SDPM_AGENT_NAME" > "$SDPM_HOME/.agent-name"
   local uv_path; uv_path="$(command -v uv)"   # absolute; symlinks kept (brew's bin/uv is the stable path)
   echo "$uv_path" > "$SDPM_HOME/.uv-path"
   [[ "$PROFILE" == "full" ]] || return 0
@@ -335,7 +340,7 @@ register_clients() {
 show_completion() {
   echo ""; printf "  ${C_GREEN}SDPM is installed.${C_RESET}\n\n"
   echo "    Your agent:   ask it \"Make slides about ...\" — it finds SDPM through MCP."
-  echo "                  Kiro CLI: kiro-cli chat --agent sdpm"
+  echo "                  Kiro CLI: kiro-cli chat --agent $SDPM_AGENT_NAME"
   if [[ "$PROFILE" == "full" ]]; then
     echo "    Browser:      sdpm webui"
     kiro-cli whoami >/dev/null 2>&1 || echo "                  (the Web UI uses Kiro CLI: run 'kiro-cli login' once first)"
