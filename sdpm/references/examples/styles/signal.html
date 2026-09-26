@@ -75,12 +75,14 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 .data-table tr:last-child td{border-bottom:0}
 .data-table th:last-child,.data-table td:last-child{border-right:0}
 .chart{border-left:2px solid var(--color-border);border-bottom:2px solid var(--color-border)}
+.chart svg{overflow:visible}
 .chart text{font-family:var(--font-family)}
 .chart .bar{fill:var(--color-border)}
 .chart .bar-on{fill:var(--accent)}
 .chart .value{fill:var(--color-text);font-size:calc(var(--fs-heading)*1.5);font-weight:900}
 .chart .label{fill:var(--color-muted);font-family:var(--font-mono);font-size:calc(var(--fs-label)*1.5);font-weight:700}
 .state{padding:var(--panel-pad);border:var(--border-thin) solid var(--color-border);background:var(--color-surface)}
+.state>.tag{margin-bottom:20px}
 .state.on{border-color:var(--accent);border-top:18px solid var(--accent)}
 </style>
 </head>

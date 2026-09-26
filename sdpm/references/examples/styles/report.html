@@ -81,8 +81,9 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 .data-table .total td { border-top: 2px solid var(--color-text); background: var(--color-bg); font-weight: 700; }
 .data-table .current-col { color: var(--accent); font-weight: 700; }
 .chart { border-bottom: 1px solid var(--color-border); }
+.chart svg { overflow: visible; }
 .chart text { font-family: var(--font-family); }
-.chart .svg-label { font-size: calc(var(--fs-caption) * 1.5); fill: var(--color-muted); }
+.chart .svg-label { font-size: calc(var(--fs-caption) * 1.5); fill: var(--color-muted); transform: translateY(50px); }
 .chart .svg-value { font-size: calc(var(--fs-caption) * 1.5); font-weight: 700; fill: var(--color-text); }
 .chart .svg-current { fill: var(--accent); }
 .chart .svg-history { fill: var(--color-bar); }

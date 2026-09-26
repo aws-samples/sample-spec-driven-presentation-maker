@@ -65,6 +65,7 @@ body { margin:0; padding:40px; background:#050506; font-family:var(--font-family
 .takeaway { border-top:var(--border-thin) solid var(--color-border); padding-top:18px; }
 .metric-block { border-left:var(--border-strong) solid var(--color-border); padding-left:28px; }
 .metric-block.hot { border-left-color:var(--accent); }
+.metric-block.lead .t-metric { margin:18px 0 28px; }
 .track { display:flex; }
 .track .sector { flex:1; border-top:var(--border-strong) solid var(--color-border); padding:24px 22px 0 0; }
 .track .sector.active { border-top-color:var(--accent); }
@@ -186,7 +187,7 @@ body { margin:0; padding:40px; background:#050506; font-family:var(--font-family
 <div class="el tricolor" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el frame-title" style="left:120px;top:70px;width:1680px;height:210px"><div class="t-label kicker">Pattern / process</div><div class="t-title">Complete the next sector</div></div>
 <!-- Component: tag (.tag) — identify a compact status or category without becoming the red signal; may vary: wording; may not: replace the assertion or compete with selection. -->
-<div class="el tag t-label" style="left:120px;top:310px;width:250px;height:48px">Four-sector lap</div>
+<div class="el tag t-label" style="left:120px;top:310px;width:330px;height:48px">Four-sector lap</div>
 <!-- Component: step (.sector) — hold one verb-led stage and one completion condition; may vary: three to five stages; may not: curve, rotate, change peer size, or activate two. -->
 <!-- Component: connector (.track) — act as the shared straight sequence track; may vary: with three to five sectors; may not: use arrows, curves, or detached links. -->
 <div class="el track" style="left:120px;top:420px;width:1680px;height:320px"><div class="sector"><div class="t-label muted">01</div><div class="t-heading">Define</div><div class="t-caption">Scope fixed</div></div><div class="sector"><div class="t-label muted">02</div><div class="t-heading">Measure</div><div class="t-caption">Baseline labelled</div></div><div class="sector"><div class="t-label muted">03</div><div class="t-heading">Test</div><div class="t-caption">Result bounded</div></div><div class="sector active"><div class="t-label muted">04</div><div class="t-heading">Release</div><div class="t-caption">Gate passed</div></div></div>
@@ -198,7 +199,7 @@ body { margin:0; padding:40px; background:#050506; font-family:var(--font-family
 <div class="el tricolor" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el frame-title" style="left:120px;top:70px;width:1680px;height:210px"><div class="t-label kicker">Pattern / metric</div><div class="t-title">Raise the lead metric</div></div>
 <!-- Component: metric (.metric-block) — pair a figure with its label, unit, and comparator; may vary: one lead plus two supports; may not: exceed three figures or leave a figure unqualified. -->
-<div class="el metric-block hot" style="left:120px;top:350px;width:900px;height:420px"><div class="t-label muted">Primary measure</div><div class="t-metric accent">42%</div><div class="t-body">Lead outcome, directly labelled.</div></div>
+<div class="el metric-block hot lead" style="left:120px;top:350px;width:900px;height:420px"><div class="t-label muted">Primary measure</div><div class="t-metric accent">42%</div><div class="t-body">Lead outcome, directly labelled.</div></div>
 <div class="el metric-block" style="left:1180px;top:380px;width:620px;height:170px"><div class="t-label muted">Support A</div><div class="t-metric-sm">18 days</div></div>
 <div class="el metric-block" style="left:1180px;top:630px;width:620px;height:170px"><div class="t-label muted">Support B</div><div class="t-metric-sm">7.4 pts</div></div>
 <div class="el speed-line" style="left:900px;top:870px;width:900px;height:2px"></div>

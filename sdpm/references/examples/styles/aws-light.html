@@ -92,6 +92,7 @@ body { margin: 0; padding: 40px; background: var(--gallery-bg); font-family: var
 .data-table .num { text-align: right; }
 .data-table .total { font-weight: 700; border-top: var(--border-group) solid var(--color-border); }
 .chart-specimen { border-left: var(--border-group) solid var(--color-border); border-bottom: var(--border-group) solid var(--color-border); }
+.chart-specimen .svg-value { fill: var(--color-text); }
 .state { border-top: var(--border-thin) solid var(--color-border); }
 .hierarchy-row { display: flex; align-items: center; justify-content: center; text-align: center; background: var(--color-surface); border-bottom: var(--border-thin) solid var(--color-border); }
 </style>
@@ -262,7 +263,7 @@ body { margin: 0; padding: 40px; background: var(--gallery-bg); font-family: var
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One highlighted value carries the trend claim</div>
 <div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: chart (.chart-specimen) — use a native chart in decks with direct values, one scale, a common baseline, neutral context, and one orange claimed value; service-category colour identifies a series only when services differ; HTML values are illustrative. -->
-<div class="el chart-specimen" style="left:180px;top:350px;width:1120px;height:500px"><svg viewBox="0 0 1120 500" width="1120" height="500" aria-label="Illustrative four-period bar chart"><rect x="100" y="260" width="140" height="238" fill="#8FADD0"/><rect x="360" y="210" width="140" height="288" fill="#8FADD0"/><rect x="620" y="150" width="140" height="348" fill="#8FADD0"/><rect x="880" y="70" width="140" height="428" fill="#FF9900"/><g fill="#FFFFFF" font-family="Arial" font-size="28"><text x="145" y="240">62</text><text x="405" y="190">78</text><text x="665" y="130">91</text><text x="925" y="50">112</text></g></svg></div>
+<div class="el chart-specimen" style="left:180px;top:350px;width:1120px;height:500px"><svg viewBox="0 0 1120 500" width="1120" height="500" aria-label="Illustrative four-period bar chart"><rect x="100" y="260" width="140" height="238" fill="#8FADD0"/><rect x="360" y="210" width="140" height="288" fill="#8FADD0"/><rect x="620" y="150" width="140" height="348" fill="#8FADD0"/><rect x="880" y="70" width="140" height="428" fill="#FF9900"/><g class="svg-value" font-family="Arial" font-size="28"><text x="145" y="240">62</text><text x="405" y="190">78</text><text x="665" y="130">91</text><text x="925" y="50">112</text></g></svg></div>
 <div class="el takeaway t-heading" style="left:1400px;top:470px;width:408px;height:230px">Label values directly. Remove empty gridlines.</div>
 </div>
 
