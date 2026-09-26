@@ -141,11 +141,18 @@ uv run python3 sdpm/scripts/download_material_icons.py
 make smoke        # ローカルサーバーに tools/list + start_presentation
 ```
 
-クライアントは同じ 1 行設定で clone の `servers/local` を指します — checkout に書かせるなら:
+インストール版と自分の clone は**両方持って**構いません。`~/.sdpm` はユーザーが動かすもの、clone は
+あなたが変更するもの。クライアントには clone を**インストール版の隣に**登録します:
 
 ```bash
-uv run --directory servers/local python client_config.py --checkout "$PWD" print --all
+make register-dev              # Kiro CLI: エージェント `sdpm-dev` → この checkout。他はクライアントごとに確認
+make register-dev AGENT=sdpm-x CLIENTS=kiro-cli   # worktree ごとに 1 エージェント、1 クライアントだけ
+make mcp-config-dev            # この checkout 用の設定を表示するだけ
 ```
+
+`kiro-cli chat --agent sdpm-dev` で作業ツリー、`--agent sdpm` でインストール版が動きます。Claude Code の
+`--scope user` はスコープ内でサーバー名が 1 つなので、clone はプロジェクトスコープの登録か
+`claude --mcp-config …` のアドホック設定にし、user スコープの `sdpm` は置き換えないでください。
 
 ### MCP を使わないエージェントスキル
 

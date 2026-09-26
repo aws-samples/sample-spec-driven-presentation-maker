@@ -146,12 +146,20 @@ uv run python3 sdpm/scripts/download_material_icons.py
 make smoke        # tools/list + start_presentation against the local server
 ```
 
-Point a client at the clone with the same one-line configuration, using the clone's
-`servers/local` path — or let the checkout do it:
+You do not have to choose between the installed release and your clone — keep both. The
+installed `~/.sdpm` is what users run; your clone is what you change. Point clients at the
+clone **next to** the installed one:
 
 ```bash
-uv run --directory servers/local python client_config.py --checkout "$PWD" print --all
+make register-dev              # Kiro CLI: agent `sdpm-dev` → this checkout; others: asks per client
+make register-dev AGENT=sdpm-x CLIENTS=kiro-cli   # one agent per worktree, one client
+make mcp-config-dev            # just print the configuration for this checkout
 ```
+
+`kiro-cli chat --agent sdpm-dev` then runs your working tree, `--agent sdpm` the installed
+release. For Claude Code, `--scope user` registration is one server name per scope, so use
+a project-scoped entry or `claude --mcp-config <(make -s mcp-config-dev …)` style ad-hoc
+configs for the clone rather than replacing the user-scope `sdpm`.
 
 ### Agent skill without MCP
 

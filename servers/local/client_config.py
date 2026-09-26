@@ -353,11 +353,11 @@ def manual_json(target: Target) -> str:
     return json.dumps({"mcpServers": {SERVER_NAME: server_config(target)}}, indent=2)
 
 
-def render_client(client: Client, target: Target) -> str:
+def render_client(client: Client, target: Target, agent_name: str = DEFAULT_KIRO_AGENT) -> str:
     lines = [f"## {client.label}"]
     if client.id == "kiro-cli":
-        lines.append(f"`sdpm register kiro-cli` writes this agent to {client.manual_target}:")
-        lines.extend("  " + ln for ln in json.dumps(kiro_agent_definition(target), indent=2).splitlines())
+        lines.append(f"`sdpm register kiro-cli` writes this agent to {kiro_agent_path(agent_name)}:")
+        lines.extend("  " + ln for ln in json.dumps(kiro_agent_definition(target, agent_name), indent=2).splitlines())
         lines.append(client.note)
         return "\n".join(lines)
     if client.register is not None:
@@ -383,7 +383,7 @@ def _shell_join(argv: list[str]) -> str:
     return shlex.join(argv)
 
 
-def config_document(clients: list[Client], target: Target) -> dict:
+def config_document(clients: list[Client], target: Target, agent_name: str = DEFAULT_KIRO_AGENT) -> dict:
     return {
         "server": {SERVER_NAME: server_config(target)},
         "clients": [
@@ -391,7 +391,7 @@ def config_document(clients: list[Client], target: Target) -> dict:
                 "id": c.id,
                 "label": c.label,
                 "register": c.register(target) if c.register else None,
-                "agent": kiro_agent_definition(target) if c.id == "kiro-cli" else None,
+                "agent": kiro_agent_definition(target, agent_name) if c.id == "kiro-cli" else None,
                 "unregister": c.unregister() if c.unregister else None,
                 "manual_target": c.manual_target,
                 "deeplink": c.deeplink(target) if c.deeplink else None,
@@ -625,13 +625,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.command == "print":
         clients = list(CLIENTS) if args.all else detect(args.clients or None)
         if args.json:
-            print(json.dumps(config_document(clients, target), indent=2))
+            print(json.dumps(config_document(clients, target, args.agent_name), indent=2))
         else:
             if not clients:
                 print("No supported MCP client detected. Generic configuration:")
                 print(manual_json(target))
             for c in clients:
-                print(render_client(c, target))
+                print(render_client(c, target, args.agent_name))
                 print()
         return 0
 
