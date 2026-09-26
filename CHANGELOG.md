@@ -247,7 +247,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   (wireframes of named regions, the same names the layout pass writes) and Part 8
   **Showcase** (two or three finished slides for the gallery). Invented sources, captions
   that repeated the comments, div-drawn charts and per-slide frame copies are gone. The 15
-  files total 480k characters instead of 829k — every composer receives the whole file, so
+  files total 487k characters instead of 829k — every composer receives the whole file, so
   this is paid once per composer. Tokens and `<title>` descriptions are unchanged, so decks
   already built and user styles in the old skeleton keep working. The layout pass now takes
   its regions from the style's Layouts.
