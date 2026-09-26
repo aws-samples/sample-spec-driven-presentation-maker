@@ -81,11 +81,11 @@
 <div class="el t-label c-muted" style="left:144px;top:350px;width:780px;height:32px">Design decision</div>
 <div class="el t-body" style="left:144px;top:404px;width:780px;height:200px">A room reaching agreement must see which element the decision is about in one glance. Spend the gradient on that target; flat supporting content makes the pointer legible.</div>
 <div class="el t-label c-muted" style="left:144px;top:640px;width:780px;height:32px">Do</div>
-<div class="el bullets" style="left:144px;top:692px;width:780px;height:300px"><ul class="bullets"><li>Name the target in an assertion title.</li><li>Keep siblings flat and equal.</li><li>Use crisp edges: no glow, blur or fade.</li><li>Keep text contrast at 4.5:1; 3:1 at 18pt or larger.</li></ul></div>
+<div class="el bullets" style="left:144px;top:692px;width:780px;height:300px"><ul class="bullets"><li>Name the target in an assertion title.</li><li>Keep siblings flat and equal.</li><li>Keep text and pills horizontal, bars vertical, and every edge crisp: no glow, blur or fade.</li><li>Keep text contrast at 4.5:1; 3:1 at 18pt or larger.</li></ul></div>
 <div class="el rule" style="left:984px;top:350px;width:1px;height:648px"></div>
 <div class="el t-label c-muted" style="left:1020px;top:350px;width:804px;height:32px">Do not</div>
-<div class="el bullets" style="left:1020px;top:404px;width:804px;height:450px"><ul class="bullets"><li>No gradient panels or full-bleed fields: they point everywhere.</li><li>No gradient behind body text: contrast suffers.</li><li>No second colour family or repeated gradient tags.</li><li>No emoji; use one meaningful asset.</li><li>No second claim; split the slide.</li></ul></div>
-<div class="el t-caption c-muted" style="left:1020px;top:920px;width:804px;height:72px">A figure and its native chart mark may both carry the gradient only when they express the same fact.</div>
+<div class="el bullets" style="left:1020px;top:404px;width:804px;height:450px"><ul class="bullets"><li>No gradient panels or full-bleed fields: they point everywhere.</li><li>No gradient behind body text: contrast suffers.</li><li>No second colour family, repeated gradient tags, or gradient quota to spend.</li><li>No emoji; use one meaningful asset.</li><li>No second claim; split the slide.</li></ul></div>
+<div class="el t-caption c-muted" style="left:1020px;top:920px;width:804px;height:72px">One subject may be marked twice only when figure and chart mark express the same fact. Preview may flatten gradient text and outlines to violet; do not compensate.</div>
 </div>
 
 <!-- Part 3: Message & Outline -->
@@ -100,7 +100,7 @@
 <div class="el t-caption c-muted" style="left:1296px;top:490px;width:480px;height:92px">maximum title; leave the reserved line empty</div>
 <div class="el rule" style="left:144px;top:630px;width:1680px;height:1px"></div>
 <div class="el t-body" style="left:144px;top:674px;width:804px;height:270px"><span class="bold">Title grammar.</span> Use a sentence with a concrete object: “Run cost falls by 42%” names a metric; “Shared ownership is the recommended model” names a choice. Never use a topic label such as “Costs.”</div>
-<div class="el t-body" style="left:1020px;top:674px;width:804px;height:270px"><span class="bold">Chapter shape.</span> Open on the strongest claim. Use an agenda only for a long review, flat section dividers between chapters, and a single closing ask. Prefer key figures, equal comparisons, processes, native charts and spare tables.</div>
+<div class="el t-body" style="left:1020px;top:674px;width:804px;height:270px"><span class="bold">Chapter shape.</span> Open on the strongest claim. A long-review agenda uses a noun-phrase title, hairline rows and a flat current pill—no pointer or highlighted entry. Use flat dividers and one closing ask. Prefer key figures, equal comparisons, processes, native charts and spare tables.</div>
 </div>
 
 <!-- Part 4: Palette & Type -->
@@ -193,7 +193,7 @@
 <div class="el t-label c-muted" style="left:1048px;top:202px;width:304px;height:32px">card</div>
 <div class="el t-heading" style="left:1048px;top:260px;width:304px;height:64px">Alternative</div>
 <div class="el t-caption c-muted" style="left:1048px;top:344px;width:304px;height:100px">Flat surface and one neutral hairline.</div>
-<!-- Component: card-g — Use for the one selected option; may vary: which sibling wins; may not: appear without flat siblings or lose its 4px outline. -->
+<!-- Component: card-g — one selected option among 2–4 equal cards; vary winner/copy; keep one 4px outline + pill, equal geometry/measure and muted flat siblings. -->
 <div class="el card-g" style="left:1440px;top:160px;width:384px;height:350px"></div>
 <div class="el pill-g" style="left:1480px;top:202px;width:210px;height:48px">Recommended</div>
 <div class="el t-heading" style="left:1480px;top:276px;width:304px;height:64px">Selected</div>
@@ -211,7 +211,7 @@
 <div class="el node" style="left:144px;top:180px;width:384px;height:220px">Configure</div>
 <!-- Component: connector — neutral node link; vary length/orientation, never add gradient. -->
 <div class="el connector" style="left:528px;top:289px;width:48px;height:2px"></div>
-<!-- Component: node-g — Mark the one step or pivot named by the title; may vary: target node; may not: mark two nodes. Add pill-g only for a sequence gate, never a cycle. -->
+<!-- Component: node-g — named gate or pivot; vary target among 3–5 equal nodes; keep neutral connectors, muted siblings and one outline. Add pill-g only to a left-to-right sequence gate, never a cycle. -->
 <div class="el node-g" style="left:576px;top:180px;width:384px;height:220px">Measure</div>
 <div class="el pill-g" style="left:624px;top:148px;width:240px;height:48px">Step 2 · gate</div>
 <!-- Component: prose-rule — organise unboxed prose; vary height, never add gradient. -->
@@ -227,12 +227,12 @@
 
 <div class="slide">
 <div class="el sheet-label" style="left:144px;top:72px;width:600px;height:32px">Table and native chart components</div>
-<!-- Component: table-treatment — Use for exact values; may vary: 3–6 rows and 3–5 columns; may not: use zebra fills, vertical rules or a gradient cell. Lift the claimed figure into metric-pointer. -->
+<!-- Component: table-treatment — exact values; vary 3–6 rows/3–5 columns; keep figures right-aligned, hairlines only, no zebra/vertical rules/gradient cell. Lift the claimed figure into metric-pointer. -->
 <div class="el table-row t-label c-muted" style="left:144px;top:160px;width:804px;height:56px"><span style="width:45%">Item</span><span style="width:30%">Type</span><span style="width:25%">Value</span></div>
 <div class="el table-row t-table" style="left:144px;top:216px;width:804px;height:76px"><span style="width:45%">Primary row</span><span class="c-muted" style="width:30%">recurring</span><span style="width:25%">96k</span></div>
 <div class="el table-row t-table" style="left:144px;top:292px;width:804px;height:76px"><span style="width:45%">Secondary row</span><span class="c-muted" style="width:30%">one-off</span><span style="width:25%">54k</span></div>
 <div class="el table-row t-table bold" style="left:144px;top:368px;width:804px;height:76px"><span style="width:75%">Total</span><span style="width:25%">150k</span></div>
-<!-- Component: native-chart — Use for a trend or comparison; may vary: 3–8 marks and chart type; may not: draw bars from divs, use a legend when direct labels fit, or add non-informative gridlines. Keep siblings grey and one claimed mark gradient-filled. -->
+<!-- Component: native-chart — trend, ranking or proportion; vary 3–8 native marks/type and optional reference; keep one common baseline/scale, direct labels, one gradient mark, grey siblings, one series, no empty grids/avoidable legend/donut/ring/div bars. -->
 <div class="el chart-specimen" style="left:1080px;top:160px;width:744px;height:360px">
   <svg viewBox="0 0 744 360" width="744" height="360">
     <defs><linearGradient id="prismBar" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#8B7CFF"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs>
@@ -249,11 +249,11 @@
 <!-- Layout: single-body — one explanatory claim or figure; vary body form, never split it decoratively. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:310px;width:1680px;height:570px"><span class="region-name">body</span><span class="region-fill">metric-pointer + qualifier or prose-rule</span></div>
+<div class="el region" style="left:120px;top:310px;width:1680px;height:570px"><span class="region-name">body</span><span class="region-fill">metric-pointer + metric-qualifier or prose-rule</span></div>
 <div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
 </div>
 
-<!-- Layout: comparison — selection or before/after; vary content, keep two equal columns. -->
+<!-- Layout: comparison — selection or before/after; vary content/marked side; keep equal geometry and matched row order, measure and unit, with no arrow. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
 <div class="el region" style="left:120px;top:310px;width:804px;height:570px"><span class="region-name">left</span><span class="region-fill">card or metric-pointer</span></div>
@@ -280,18 +280,27 @@
 <div class="el region" style="left:120px;top:820px;width:1680px;height:190px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
 </div>
 
-<!-- Layout: media-text — one visual beside explanation; vary its side, keep balance and separation. -->
-<div class="slide">
-<div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:310px;width:804px;height:570px"><span class="region-name">media</span><span class="region-fill">image, diagram or code specimen</span></div>
-<div class="el region" style="left:996px;top:310px;width:804px;height:570px"><span class="region-name">body</span><span class="region-fill">prose-rule + metric-pointer</span></div>
-<div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
-</div>
-
 <!-- Layout: chart-takeaway — quantitative pattern; vary native chart and marks, prefer direct labels. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
 <div class="el region" style="left:120px;top:310px;width:1680px;height:570px"><span class="region-name">chart</span><span class="region-fill">native-chart + optional metric-pointer</span></div>
+<div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
+</div>
+
+<!-- Layout: relationship — hub or cycle; vary 3–5 nodes and target, keep equal nodes, neutral connectors, one outlined node without pill, and no start-implying arrows. -->
+<div class="slide">
+<div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
+<div class="el region" style="left:696px;top:310px;width:528px;height:250px"><span class="region-name">hub</span><span class="region-fill">node-g + connector</span></div>
+<div class="el region" style="left:120px;top:650px;width:528px;height:250px"><span class="region-name">col-1</span><span class="region-fill">node</span></div>
+<div class="el region" style="left:696px;top:650px;width:528px;height:250px"><span class="region-name">col-2</span><span class="region-fill">node</span></div>
+<div class="el region" style="left:1272px;top:650px;width:528px;height:250px"><span class="region-name">col-3</span><span class="region-fill">node</span></div>
+</div>
+
+<!-- Layout: table-or-chart — exact values or proportional evidence; vary exhibit and lifted figure, keep direct labels, common scale and no emphasis inside a table. -->
+<div class="slide">
+<div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
+<div class="el region" style="left:120px;top:310px;width:1160px;height:570px"><span class="region-name">exhibit</span><span class="region-fill">table-treatment or native-chart</span></div>
+<div class="el region" style="left:1328px;top:310px;width:472px;height:570px"><span class="region-name">body</span><span class="region-fill">metric-pointer + metric-qualifier</span></div>
 <div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
 </div>
 

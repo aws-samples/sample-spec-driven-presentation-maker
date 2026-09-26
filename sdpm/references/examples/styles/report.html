@@ -54,12 +54,12 @@
 <div><div class="label accent">Chapter shape</div><ul class="rule-list">
 <li>Cover → 3–5 executive findings → 4–6 KPI scorecard.</li>
 <li>Use 2–3 evidence chapters: shared result, drivers, then segments.</li>
-<li>Close with owned actions and next-period measures; move detail to an appendix.</li>
+<li>Close with owned actions and next-period measures; move detail to an appendix whose glossary is alphabetical, with plain definitions and supplied source/scope notes.</li>
 <li>Let audience, time, and material determine deck length.</li>
 </ul></div>
 <div><div class="label accent">Page density and visual choice</div><ul class="rule-list">
 <li>One claim and 25–55 visible words on a typical analytical page.</li>
-<li>Prefer KPI rows, exact-value tables, native charts, ranking, bridges, and numbered findings.</li>
+<li>Prefer KPI rows, exact-value tables, native charts, shared-scale small multiples, rankings, bridges, and numbered findings; use stages only when sequence explains a metric, and sparse lines or a matrix only for explicit causality.</li>
 <li>Open chapters with a question; close with a takeaway or action, not a recap.</li>
 <li>Split independent clauses rather than shrinking type or adding panels.</li>
 </ul></div>
@@ -104,7 +104,6 @@
 <div class="el rule" style="left:120px; top:355px; width:1680px; height:1px;"></div>
 <div class="el section-title" style="left:120px; top:410px; width:1500px; height:100px;">Reserve the full title band on every page</div>
 <div class="el body-text muted" style="left:120px; top:535px; width:1450px; height:150px;">Align every exhibit to the 120px left edge. The white field replaces a card. Keep the right footer band clear for template pagination.</div>
-<div class="el note-box body-text" style="left:120px; top:720px; width:1680px; height:145px;"><span class="bold">Optional footer:</span> draw one supplied source or definition line; do not invent one.</div>
 <div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Source or definition line when supplied</div>
 </div>
 
@@ -128,7 +127,7 @@
 <!-- Part 6: Components -->
 <div class="slide">
 <div class="el label accent" style="left:120px; top:70px; width:1680px; height:42px;">Component sheet / score and finding</div>
-<!-- Component: .kpi-row — use for 4–6 headline measures; may vary: measure count, unit, comparator, trend availability; may not: cards, mixed comparator windows, or accent meaning favourable. -->
+<!-- Component: .kpi-row — use for 4–6 headline measures; may vary: count, unit, comparator, trend; may not: cards, mixed windows, or accent meaning favourable. With no history, omit delta/trend and state “first period”. -->
 <div class="el kpi-row" style="left:120px; top:170px; width:1680px; height:245px;"><div class="kpi"><div class="kpi-label">Measure 1</div><div class="kpi-value accent">124</div><div class="kpi-delta">+12% vs prior</div></div><div class="kpi"><div class="kpi-label">Measure 2</div><div class="kpi-value accent">42%</div><div class="kpi-delta">+1.8 pts vs prior</div></div><div class="kpi"><div class="kpi-label">Measure 3</div><div class="kpi-value accent">68</div><div class="kpi-delta">−1% vs prior</div></div><div class="kpi"><div class="kpi-label">Measure 4</div><div class="kpi-value accent">18d</div><div class="kpi-delta">+2 days vs target</div></div></div>
 <!-- Component: .findings — use for 3–5 executive findings; may vary: count and evidence reference; may not: topic labels or unsupported implications. -->
 <div class="el findings" style="left:120px; top:500px; width:1680px; height:380px;"><div class="finding"><div class="finding-num">01</div><div class="finding-text">Claim stated as one sentence about the headline result</div><div class="finding-proof">Evidence: metric + comparator.<br>Implication: decision or watch item.</div></div><div class="finding"><div class="finding-num">02</div><div class="finding-text">Claim stated as one sentence about the primary driver</div><div class="finding-proof">Evidence: driver and scale.<br>Implication: action and owner.</div></div></div>
@@ -140,7 +139,7 @@
 <div class="el label accent" style="left:120px; top:70px; width:1680px; height:42px;">Component sheet / exact values</div>
 <!-- Component: .data-table — use when exact values and period comparison matter; may vary: rows and comparator columns; may not: left-align figures, remove signs, or style every row. -->
 <div class="el" style="left:120px; top:165px; width:1680px; height:365px;"><table class="data-table"><thead><tr><th>Line item</th><th>Prior</th><th class="current-col">Current</th><th>Change</th><th>Change %</th></tr></thead><tbody><tr><td>Primary measure</td><td>72.0</td><td class="current-col">81.4</td><td>+9.4</td><td>+13.1%</td></tr><tr><td>Secondary measure</td><td>28.0</td><td class="current-col">30.6</td><td>+2.6</td><td>+9.3%</td></tr><tr class="total"><td>Total</td><td>100.0</td><td class="current-col">112.0</td><td>+12.0</td><td>+12.0%</td></tr></tbody></table></div>
-<!-- Component: .data-table.current-col — use for plan variance with arithmetic and meaning in one path; may vary: measures and favourable logic; may not: depend on colour for interpretation. -->
+<!-- Component: .current-col — use inside .data-table for the current/actual column; may vary: measures and favourable logic; may not: depend on colour for interpretation. -->
 <div class="el" style="left:120px; top:610px; width:1680px; height:300px;"><table class="data-table"><thead><tr><th>Measure</th><th>Unit</th><th>Plan</th><th class="current-col">Actual</th><th>Delta</th><th>Interpretation</th></tr></thead><tbody><tr><td>Measure A</td><td>percent</td><td>41.0%</td><td class="current-col">42.0%</td><td>+1.0 pt</td><td>Above plan</td></tr><tr><td>Measure B</td><td>days</td><td>16</td><td class="current-col">18</td><td>+2</td><td>Above plan; unfavourable</td></tr></tbody></table></div>
 </div>
 
@@ -150,9 +149,9 @@
 <div class="el before-after" style="left:120px; top:165px; width:1680px; height:255px;"><div><div class="label">Before / prior state</div><div class="metric-lg muted">24 days</div><div class="caption">Agreed baseline and scope</div></div><div class="after"><div class="label accent">After / current state</div><div class="metric-lg accent">18 days</div><div class="caption"><span class="bold">−6 days / −25%</span><br>Same baseline and scope</div></div></div>
 <!-- Component: .rank-list — use for ordered contribution or performance; may vary: 4–8 items and highlighted focus; may not: multiple colours or unordered values. Native bars, when needed, share zero and label values directly. -->
 <div class="el rank-list" style="left:120px; top:500px; width:760px; height:280px;"><div class="rank-row"><div class="section-title accent">01</div><div class="table-text bold">Leading segment</div><div class="table-text bold accent">42</div></div><div class="rank-row"><div class="section-title accent">02</div><div class="table-text bold">Second segment</div><div class="table-text bold">34</div></div><div class="rank-row"><div class="section-title accent">03</div><div class="table-text bold">Third segment</div><div class="table-text bold">27</div></div></div>
-<!-- Component: native chart conventions — use for trend, ranking, or bridge evidence; may vary: chart type and one target line; may not: use div-drawn charts, decorative grids, legends in place of labels, or accent historical series. -->
+<!-- Component: native chart — use for trend, ranking, bridge, or 4/6 identical small multiples; may vary: type and one labelled target; may not: use div bars, decorative grids, legends instead of labels, unequal small-multiple scales, or accent history. -->
 <div class="el two-col" style="left:960px; top:500px; width:840px; height:280px;"><div class="convention"><div class="label accent">Trend / ranking</div><div class="caption">Native chart. Grey history, accent current focus, common scale, direct values, one baseline.</div></div><div class="convention"><div class="label accent">Waterfall / bridge</div><div class="caption">Start and end totals, signed drivers, connectors, direct values; accent final total only.</div></div></div>
-<!-- Component: chart subtitle — use to state metric, unit, window, and scale once above a native chart; may vary: wording; may not: repeat the title or explain obvious marks. -->
+<!-- Component: .caption — use above a native chart for metric, unit, window, and scale; may vary: wording; may not: repeat the title or explain obvious marks. -->
 <div class="el caption" style="left:120px; top:875px; width:1680px; height:70px;">Metric (unit); comparison window; shared scale or variance definition</div>
 </div>
 
@@ -160,7 +159,7 @@
 <!-- Layout: KPI scorecard — for a claim about overall performance; may vary: four to six metrics and optional takeaway; may not: use cards or mixed periods. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px; top:58px; width:1680px; height:220px;"><span class="region-name">frame (Part 5)</span><span class="region-fill">section + finding title + period</span></div>
-<div class="el region" style="left:120px; top:330px; width:1680px; height:400px;"><span class="region-name">kpi-1 · kpi-2 · kpi-3 · kpi-4</span><span class="region-fill">.kpi-row with 4–6 metric blocks</span></div>
+<div class="el region" style="left:120px; top:330px; width:1680px; height:400px;"><span class="region-name">body</span><span class="region-fill">.kpi-row with 4–6 metric blocks</span></div>
 <div class="el region" style="left:120px; top:770px; width:1680px; height:170px;"><span class="region-name">takeaway</span><span class="region-fill">.note-box when one interpretation is required</span></div>
 </div>
 
@@ -176,23 +175,23 @@
 <div class="el frame-ghost" style="left:120px; top:58px; width:1680px; height:220px;"><span class="region-name">frame (Part 5)</span><span class="region-fill">section + finding title + shared measure</span></div>
 <div class="el region" style="left:120px; top:330px; width:800px; height:480px;"><span class="region-name">left</span><span class="region-fill">.before-after prior state · metric + scope</span></div>
 <div class="el region" style="left:1000px; top:330px; width:800px; height:480px;"><span class="region-name">right</span><span class="region-fill">.before-after current state · delta + same scope</span></div>
-<div class="el region" style="left:120px; top:850px; width:1680px; height:120px;"><span class="region-name">takeaway</span><span class="region-fill">one implication</span></div>
+<div class="el region" style="left:120px; top:850px; width:1680px; height:120px;"><span class="region-name">takeaway</span><span class="region-fill">.note-box · one implication</span></div>
 </div>
 
 <!-- Layout: native chart with takeaway — for a trend, ranking, or bridge claim; may vary: native chart type and one reference line; may not: use decorative grids or a separate legend. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px; top:58px; width:1680px; height:220px;"><span class="region-name">frame (Part 5)</span><span class="region-fill">section + finding title + metric / period</span></div>
-<div class="el region" style="left:120px; top:320px; width:1680px; height:90px;"><span class="region-name">body</span><span class="region-fill">chart subtitle · metric + unit + scale</span></div>
+<div class="el region" style="left:120px; top:320px; width:1680px; height:90px;"><span class="region-name">body</span><span class="region-fill">.caption · metric + unit + scale</span></div>
 <div class="el region" style="left:120px; top:440px; width:1250px; height:480px;"><span class="region-name">chart</span><span class="region-fill">native trend / ranking / waterfall · direct labels</span></div>
-<div class="el region" style="left:1420px; top:440px; width:380px; height:480px;"><span class="region-name">takeaway</span><span class="region-fill">one implication or target gap</span></div>
+<div class="el region" style="left:1420px; top:440px; width:380px; height:480px;"><span class="region-name">takeaway</span><span class="region-fill">.note-box · one implication or target gap</span></div>
 </div>
 
 <!-- Layout: numbered findings — for three to five summary claims with compact proof; may vary: finding count and evidence wording; may not: turn proof into a second narrative. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px; top:58px; width:1680px; height:220px;"><span class="region-name">frame (Part 5)</span><span class="region-fill">executive summary + synthesis title</span></div>
-<div class="el region" style="left:120px; top:330px; width:1680px; height:190px;"><span class="region-name">body / finding-1</span><span class="region-fill">.findings · number + sentence claim + proof / implication</span></div>
-<div class="el region" style="left:120px; top:550px; width:1680px; height:190px;"><span class="region-name">body / finding-2</span><span class="region-fill">.findings · number + sentence claim + proof / implication</span></div>
-<div class="el region" style="left:120px; top:770px; width:1680px; height:190px;"><span class="region-name">body / finding-3</span><span class="region-fill">.findings · number + sentence claim + proof / implication</span></div>
+<div class="el region" style="left:120px; top:330px; width:1680px; height:190px;"><span class="region-name">finding-1</span><span class="region-fill">.findings · number + sentence claim + proof / implication</span></div>
+<div class="el region" style="left:120px; top:550px; width:1680px; height:190px;"><span class="region-name">finding-2</span><span class="region-fill">.findings · number + sentence claim + proof / implication</span></div>
+<div class="el region" style="left:120px; top:770px; width:1680px; height:190px;"><span class="region-name">finding-3</span><span class="region-fill">.findings · number + sentence claim + proof / implication</span></div>
 </div>
 
 <!-- Part 8: Showcase -->
