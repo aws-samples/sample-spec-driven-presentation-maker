@@ -89,9 +89,9 @@ body{margin:0;padding:30pt;background:#000;font-family:var(--font-family);zoom:0
   <div class="el fld" style="left:1280px;top:0px;width:640px;height:1080px"></div>
   <div class="el lb ac" style="left:96px;top:64px;width:1088px;height:34px">Palette / token + job</div>
   <div class="el sw sw-bg" style="left:96px;top:120px;width:170px;height:90px"></div>
-  <div class="el cp" style="left:290px;top:120px;width:330px;height:90px">--color-bg / --color-surface<br>ground; unboxed evidence</div>
+  <div class="el cp" style="left:290px;top:120px;width:330px;height:90px">--color-bg / surface<br>unboxed ground</div>
   <div class="el sw sw-text" style="left:664px;top:120px;width:170px;height:90px"></div>
-  <div class="el cp" style="left:858px;top:120px;width:326px;height:90px">--color-text / --color-border<br>primary type; rules</div>
+  <div class="el cp" style="left:858px;top:120px;width:326px;height:90px">--color-text / border<br>type and rules</div>
   <div class="el sw sw-mu" style="left:96px;top:240px;width:170px;height:90px"></div>
   <div class="el cp mu" style="left:290px;top:240px;width:330px;height:90px">--color-muted<br>dark-field meta only</div>
   <div class="el sw sw-ac" style="left:664px;top:240px;width:170px;height:90px"></div>
@@ -133,42 +133,46 @@ body{margin:0;padding:30pt;background:#000;font-family:var(--font-family);zoom:0
   <div class="el hd" style="left:1056px;top:240px;width:768px;height:240px">One action stated as a sentence</div>
   <div class="el bd mu" style="left:1056px;top:840px;width:768px;height:100px">Owner · timing · review measure</div></div>
 <!-- Part 6: Components -->
+<!-- Component: container — none; group by whitespace and 2px rules -->
+<!-- Component: numbered — none; use list for peer findings or step only when order matters -->
+<!-- Component: tag — none; use plain label text with orange reserved for the single emphasis -->
 <div class="slide">
   <div class="el lb mu" style="left:96px;top:54px;width:1728px;height:34px">Components / figure, prose and sequence</div>
-<!-- Component: metric — use: decisive measure; vary: figure/unit; fixed: unboxed, ≤3 glyphs at 144pt. -->
+<!-- Component: metric (.mt + .ms) — when: decisive measure; may vary: figure and unit; may not: add a box or exceed 3 glyphs at 144pt. -->
   <div class="el mt" style="left:96px;top:125px;width:520px;height:250px">42</div>
   <div class="el ms ac" style="left:580px;top:243px;width:180px;height:130px">%</div>
-<!-- Component: metric-qualifier — use: context; vary: two lines; fixed: period/population/comparison, no claim. -->
+<!-- Component: metric (.cp) — when: the measure needs context; may vary: up to two lines; may not: omit period, population, or comparison, or state a second claim. -->
   <div class="el cp mu" style="left:96px;top:400px;width:664px;height:100px">metric + unit · period, population, comparator</div>
-<!-- Component: lead-item — use: 3–4 peers; vary: 200px lead/body; fixed: no boxes, aligned tops. -->
+<!-- Component: list (.ld + .bd) — when: 3–4 peer facts; may vary: 200px lead and body copy; may not: add boxes or misalign tops. -->
   <div class="el ld ac" style="left:900px;top:125px;width:200px;height:70px">Lead</div>
   <div class="el bd" style="left:1116px;top:125px;width:708px;height:140px">Supporting fact and qualifying condition.</div>
   <div class="el ld ac" style="left:900px;top:300px;width:200px;height:70px">Lead</div>
   <div class="el bd" style="left:1116px;top:300px;width:708px;height:140px">Supporting fact and shared scope.</div>
-<!-- Component: prose-block — use: 1–2 readings; vary: copy; fixed: body size, no grey hierarchy. -->
+<!-- Component: lead (.hd + .bd) — when: 1–2 readings carry the claim; may vary: copy; may not: change body size or create a grey hierarchy. -->
   <div class="el hd" style="left:96px;top:560px;width:650px;height:74px">Prose block</div>
   <div class="el bd" style="left:96px;top:640px;width:650px;height:150px">One fact, its population and a qualifying condition.</div>
-<!-- Component: takeaway-rule — use: consequence; vary: sentence; fixed: no title repeat. -->
+<!-- Component: takeaway (.rw + .hd) — when: evidence needs its consequence; may vary: sentence; may not: repeat the title. -->
   <div class="el rw" style="left:900px;top:560px;width:924px;height:2px"></div>
   <div class="el hd" style="left:900px;top:610px;width:924px;height:130px">Takeaway states what changes next.</div>
-<!-- Component: step — use: 3–5 steps; vary numeral/verb; keep equal widths, no boxes/arrows/rotation. -->
+<!-- Component: step (.step) — when: 3–5 ordered stages; may vary: numeral and verb; may not: vary widths or add boxes, arrows, or rotation. -->
   <div class="el step ac" style="left:96px;top:860px;width:528px;height:160px"><span class="ms">01</span> <span class="hd">Verb phrase</span></div>
-<!-- Component: connector — use: hand-off between steps; vary length; keep 2px, horizontal and neutral, with no arrowhead. -->
+<!-- Component: connector (.rw) — when: one step hands off to the next; may vary: length; may not: exceed 2px, depart from horizontal neutral treatment, or add an arrowhead. -->
   <div class="el rw" style="left:648px;top:930px;width:96px;height:2px"></div></div>
 <div class="slide">
   <div class="el lb mu" style="left:96px;top:54px;width:1728px;height:34px">Components / exact values, chart and relationship</div>
-<!-- Component: table — exact values; vary 3–5 columns/4–6 rows; keep units in headers, right-aligned figures, no vertical rules/zebra/fills, one orange exception; native tables inherit template type. -->
+<!-- Component: table (.tbl) — when: exact values matter; may vary: 3–5 columns and 4–6 rows; may not: omit header units or right alignment, add vertical rules, zebra stripes, or fills, or highlight more than one orange exception; native tables inherit template type. -->
   <div class="el" style="left:96px;top:120px;width:850px;height:350px"><table class="tbl"><thead><tr><th>Item</th><th class="num">Measure</th><th class="num">Limit</th><th>State</th></tr></thead><tbody><tr><td>Primary</td><td class="num">42</td><td class="num">50</td><td>Within</td></tr><tr><td class="acc">Exception</td><td class="num acc">68</td><td class="num acc">50</td><td class="acc">Above</td></tr></tbody></table></div>
-<!-- Component: native-chart — 3–5 marks; vary native type/field; keep proportional marks on one baseline, direct labels, no legend/empty grids, and one highlight: orange on dark or white on orange. -->
+<!-- Component: chart (.chart) — when: 3–5 proportional marks prove the claim; may vary: native chart type and field; may not: depart from one baseline, omit direct labels, add a needless legend or empty grid, or use more than one orange-on-dark or white-on-orange highlight. -->
   <div class="el chart" style="left:1070px;top:120px;width:754px;height:350px"><svg viewBox="0 0 754 350" width="754" height="350"><rect x="90" y="165" width="100" height="183" fill="#FFF"/><rect x="300" y="115" width="100" height="233" fill="#FFF"/><rect x="510" y="50" width="100" height="298" fill="#FF4F00"/><g fill="#AAAAAA" font-family="Arial" font-size="22"><text x="120" y="153">42</text><text x="330" y="103">54</text><text x="540" y="38" fill="#FF4F00">68</text></g></svg></div>
-<!-- Component: chart-qualifier — use: chart context; vary: wording; fixed: metric/unit/period/baseline, no title repeat. -->
+<!-- Component: chart (.cp) — when: the chart needs context; may vary: wording; may not: omit metric, unit, period, or baseline, or repeat the title. -->
   <div class="el cp mu" style="left:1070px;top:490px;width:754px;height:70px">Metric (unit) · period · direct labels · baseline</div>
-<!-- Component: before-after — state change; vary 2–4 conditions; keep matched rows/measure/unit, after on orange at title size, before at heading size, and no arrow across the edge. -->
+<!-- Component: before-after (.lb + .ms) — when: a state change is the claim; may vary: 2–4 conditions; may not: mismatch rows, measure, or unit, move after from orange at title size or before from heading size, or add an arrow across the edge. -->
+<!-- Component: selected (.ac) — when: one state, exception, or core needs emphasis; may vary: which member is orange; may not: emphasise more than one member. -->
   <div class="el lb ac" style="left:96px;top:610px;width:520px;height:34px">Before</div>
   <div class="el ms" style="left:96px;top:665px;width:520px;height:130px">3.4h</div>
   <div class="el lb" style="left:700px;top:610px;width:520px;height:34px">After / orange field</div>
   <div class="el ms ac" style="left:700px;top:665px;width:520px;height:130px">18m</div>
-<!-- Component: relationship — core + 3–4 satellites; vary labels/direction; keep named relations, orthogonal 2px rules, one larger orange core, no boxes/crossings/diagonals/rotation. -->
+<!-- Component: hub (.hd + .rw) — when: one core connects to 3–4 satellites; may vary: labels and direction; may not: leave relations unnamed, use non-orthogonal or non-2px rules, add boxes, crossings, diagonals, or rotation, or emphasise more than one larger orange core. -->
   <div class="el bd" style="left:96px;top:900px;width:220px;height:60px">Input</div>
   <div class="el rw" style="left:330px;top:930px;width:100px;height:2px"></div>
   <div class="el hd ac" style="left:470px;top:890px;width:300px;height:80px">Core claim</div>
@@ -178,8 +182,8 @@ body{margin:0;padding:30pt;background:#000;font-family:var(--font-family);zoom:0
 <!-- Layout: single-body — use: measure/prose claim; vary: orange side; fixed: one body. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:640px;height:1080px"><span class="region-name">frame / split B (Part 5)</span></div>
-  <div class="el region or" style="left:96px;top:120px;width:448px;height:840px"><span class="region-name">left</span><span class="region-fill">prose-block</span></div>
-  <div class="el region" style="left:736px;top:120px;width:1088px;height:840px"><span class="region-name">body</span><span class="region-fill">metric + metric-qualifier or prose-block</span></div></div>
+  <div class="el region or" style="left:96px;top:120px;width:448px;height:840px"><span class="region-name">left</span><span class="region-fill">lead</span></div>
+  <div class="el region" style="left:736px;top:120px;width:1088px;height:840px"><span class="region-name">body</span><span class="region-fill">metric or lead</span></div></div>
 <!-- Layout: comparison — use: matched options; vary: recommendation side; fixed: two options. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:960px;top:0px;width:960px;height:1080px"><span class="region-name">frame / split A (Part 5)</span></div>
@@ -188,14 +192,14 @@ body{margin:0;padding:30pt;background:#000;font-family:var(--font-family);zoom:0
 <!-- Layout: three-items — use: 3–4 peers; vary: lead/copy; fixed: aligned tops, claim on narrow field. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:640px;height:1080px"><span class="region-name">frame / split B (Part 5)</span></div>
-  <div class="el region or" style="left:96px;top:120px;width:448px;height:840px"><span class="region-name">left</span><span class="region-fill">prose-block</span></div>
-  <div class="el region" style="left:736px;top:120px;width:1088px;height:230px"><span class="region-name">col-1</span><span class="region-fill">lead-item</span></div>
-  <div class="el region" style="left:736px;top:420px;width:1088px;height:230px"><span class="region-name">col-2</span><span class="region-fill">lead-item</span></div>
-  <div class="el region" style="left:736px;top:720px;width:1088px;height:230px"><span class="region-name">col-3</span><span class="region-fill">lead-item</span></div></div>
+  <div class="el region or" style="left:96px;top:120px;width:448px;height:840px"><span class="region-name">left</span><span class="region-fill">lead</span></div>
+  <div class="el region" style="left:736px;top:120px;width:1088px;height:230px"><span class="region-name">col-1</span><span class="region-fill">list</span></div>
+  <div class="el region" style="left:736px;top:420px;width:1088px;height:230px"><span class="region-name">col-2</span><span class="region-fill">list</span></div>
+  <div class="el region" style="left:736px;top:720px;width:1088px;height:230px"><span class="region-name">col-3</span><span class="region-fill">list</span></div></div>
 <!-- Layout: process-four — use: 3–5 steps; vary: count/field; fixed: no boxes/arrows. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:1920px;height:540px"><span class="region-name">frame / split D (Part 5)</span></div>
-  <div class="el region or" style="left:96px;top:90px;width:1728px;height:360px"><span class="region-name">body</span><span class="region-fill">prose-block</span></div>
+  <div class="el region or" style="left:96px;top:90px;width:1728px;height:360px"><span class="region-name">body</span><span class="region-fill">lead</span></div>
   <div class="el region" style="left:96px;top:620px;width:396px;height:350px"><span class="region-name">step-1</span><span class="region-fill">step</span></div>
   <div class="el region" style="left:540px;top:620px;width:396px;height:350px"><span class="region-name">step-2</span><span class="region-fill">step + connector</span></div>
   <div class="el region" style="left:984px;top:620px;width:396px;height:350px"><span class="region-name">step-3</span><span class="region-fill">step + connector</span></div>
@@ -203,16 +207,16 @@ body{margin:0;padding:30pt;background:#000;font-family:var(--font-family);zoom:0
 <!-- Layout: four-columns — use: four terse peers; vary 3–4 items; keep equal 396px columns, one-line descriptions and 2px connectors on the full-width field. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:1920px;height:540px"><span class="region-name">frame / split D (Part 5)</span></div>
-  <div class="el region or" style="left:96px;top:90px;width:1728px;height:360px"><span class="region-name">body</span><span class="region-fill">prose-block</span></div>
-  <div class="el region" style="left:96px;top:620px;width:396px;height:350px"><span class="region-name">col-1</span><span class="region-fill">lead-item</span></div>
-  <div class="el region" style="left:540px;top:620px;width:396px;height:350px"><span class="region-name">col-2</span><span class="region-fill">lead-item</span></div>
-  <div class="el region" style="left:984px;top:620px;width:396px;height:350px"><span class="region-name">col-3</span><span class="region-fill">lead-item</span></div>
-  <div class="el region" style="left:1428px;top:620px;width:396px;height:350px"><span class="region-name">col-4</span><span class="region-fill">lead-item</span></div></div>
+  <div class="el region or" style="left:96px;top:90px;width:1728px;height:360px"><span class="region-name">body</span><span class="region-fill">lead</span></div>
+  <div class="el region" style="left:96px;top:620px;width:396px;height:350px"><span class="region-name">col-1</span><span class="region-fill">list</span></div>
+  <div class="el region" style="left:540px;top:620px;width:396px;height:350px"><span class="region-name">col-2</span><span class="region-fill">list</span></div>
+  <div class="el region" style="left:984px;top:620px;width:396px;height:350px"><span class="region-name">col-3</span><span class="region-fill">list</span></div>
+  <div class="el region" style="left:1428px;top:620px;width:396px;height:350px"><span class="region-name">col-4</span><span class="region-fill">list</span></div></div>
 <!-- Layout: table-or-chart — use: exact values/trend; vary: table/chart; fixed: full-width evidence, one highlight. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:1920px;height:540px"><span class="region-name">frame / split D (Part 5)</span></div>
-  <div class="el region or" style="left:96px;top:90px;width:1728px;height:360px"><span class="region-name">body</span><span class="region-fill">prose-block</span></div>
-  <div class="el region" style="left:96px;top:620px;width:1728px;height:350px"><span class="region-name">exhibit</span><span class="region-fill">table or native-chart + chart-qualifier</span></div></div>
+  <div class="el region or" style="left:96px;top:90px;width:1728px;height:360px"><span class="region-name">body</span><span class="region-fill">lead</span></div>
+  <div class="el region" style="left:96px;top:620px;width:1728px;height:350px"><span class="region-name">exhibit</span><span class="region-fill">table or chart</span></div></div>
 <!-- Part 8: Showcase -->
 <div class="slide">
   <div class="el fld" style="left:960px;top:0px;width:960px;height:1080px"></div>

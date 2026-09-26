@@ -100,8 +100,8 @@ body{margin:0;padding:40px;background:#DDDDE2;font-family:var(--font-family);zoo
   <div class="el type-row" style="left:120px;top:687px;width:1680px;height:64px"><span class="heading">Heading sentence</span><span class="type-meta">--fs-heading 22pt · --fs-tile-title 20pt</span></div>
   <div class="el type-row" style="left:120px;top:751px;width:1680px;height:58px"><span class="body-text">One short supporting fact.</span><span class="type-meta">--fs-body · 16pt / 1.45 · regular</span></div>
   <div class="el type-row" style="left:120px;top:809px;width:1680px;height:52px"><span class="caption">Unit, period, or qualification</span><span class="type-meta">--fs-caption 12pt · --fs-label 10pt · --fs-table 13pt</span></div>
-  <div class="el type-row" style="left:120px;top:861px;width:1680px;height:80px"><span class="metric">42%</span><span class="type-meta">--fs-metric · 44pt / 1 · bold</span></div>
-  <div class="el type-row" style="left:120px;top:941px;width:1680px;height:115px"><span class="metric-lg">124</span><span class="type-meta">--fs-metric-lg · 72pt / 1 · one hero</span></div></div>
+  <div class="el type-row" style="left:120px;top:861px;width:780px;height:150px"><span class="metric">42%</span><span class="type-meta">--fs-metric · 44pt / 1 · bold</span></div>
+  <div class="el type-row" style="left:960px;top:861px;width:840px;height:170px"><span class="metric-lg">124</span><span class="type-meta">--fs-metric-lg · 72pt / 1 · one hero</span></div></div>
 <!-- Part 5: Frame -->
 <!-- Frame: content — Vary: section, claim, tag, spans. Keep: title reserve and grid arithmetic. -->
 <div class="slide">
@@ -125,68 +125,71 @@ body{margin:0;padding:40px;background:#DDDDE2;font-family:var(--font-family);zoo
 <!-- Part 6: Components -->
 <div class="slide">
   <div class="el label" style="left:120px;top:62px;width:900px;height:34px">Components / tiles and metrics</div>
-<!-- Component: .tile — Independent fact. Vary: span, copy, padding. Keep: radius, shadow, one fact; no nesting/overlap. -->
+<!-- Component: container (.tile) — independent fact; may vary: span, copy and padding; may not: lose radius, shadow and one-fact scope, nest or overlap. -->
   <div class="el tile between" style="left:120px;top:150px;width:544px;height:330px"><div class="label">.tile</div><div class="tile-title">Independent supporting fact</div><div class="caption">White is the default.</div></div>
-<!-- Component: .tile.dark — Claim/synopsis/conclusion anchor. Vary: role. Keep: exactly one. -->
+<!-- Component: takeaway (.tile.dark) — claim, synopsis or conclusion anchor; may vary: role; may not: appear more than once. -->
   <div class="el tile dark between" style="left:688px;top:150px;width:544px;height:330px"><div class="label">.tile.dark</div><div class="tile-title">The slide's anchor</div><div class="caption">White type; muted-dark detail.</div></div>
-<!-- Component: .tile.acc — Changed/chosen/memorable fact. Vary: target. Keep: one, labelled. -->
+<!-- Component: selected (.tile.acc) — changed, chosen or memorable fact; may vary: target; may not: appear unlabelled or more than once. -->
   <div class="el tile acc between" style="left:1256px;top:150px;width:544px;height:330px"><div class="label">.tile.acc</div><div class="tile-title">The selected fact</div><div class="caption">White type only.</div></div>
-<!-- Component: .metric-lg — Hero figure. Vary: value/unit/qualifier. Keep: one metric with scope. -->
+<!-- Component: metric (.metric-lg) — hero figure; may vary: value, unit and qualifier; may not: omit scope or show more than one hero. -->
   <div class="el tile pad-lg between" style="left:120px;top:520px;width:1112px;height:440px"><div class="label">.metric-lg / measure / period</div><div class="metric-lg accent-text">42%</div><div class="body-text">One line saying what the figure means.</div><div class="caption">Baseline, scope, and unit stay here.</div></div>
-<!-- Component: .metric — Comparator. Vary: value/direction. Keep: meaning explicit, not colour-only. -->
+<!-- Component: delta (.metric) — comparator; may vary: value and direction; may not: make meaning colour-only or implicit. -->
   <div class="el tile dark pad-sm between" style="left:1256px;top:520px;width:544px;height:200px"><div class="label">Comparator</div><div class="metric">+12 pts</div></div>
-<!-- Component: .tile.acc — Consequence. Vary: sentence. Keep: ≤2 lines; do not restate title. -->
+<!-- Component: takeaway (.tile.acc) — consequence; may vary: sentence; may not: exceed two lines or restate the title. -->
   <div class="el tile acc pad-sm between" style="left:1256px;top:744px;width:544px;height:216px"><div class="label">Takeaway</div><div class="tile-title">One consequence stated directly</div></div></div>
 <div class="slide">
   <div class="el label" style="left:120px;top:40px;width:1000px;height:34px">Components / sequence, table, chart, and icon</div>
-<!-- Component: .tile + .step-index — Sequence. Vary: 3–5 numerals/verbs/selection. Keep: equal boxes; no connectors/rotation. -->
+<!-- Component: step (.tile) — sequence; may vary: 3–5 verbs and one selection; may not: lose equal boxes, add connectors or rotate. -->
+<!-- Component: numbered (.step-index) — step numeral; may vary: 3–5 numerals; may not: detach from its equal step box. -->
+<!-- Component: connector — none; use equal step boxes and whitespace instead -->
+<!-- Component: tag — none; use the tile label instead -->
   <div class="el tile pad-sm between" style="left:120px;top:105px;width:402px;height:250px"><div class="step-index">01</div><div class="tile-title">Step 1 — verb phrase</div></div>
   <div class="el tile acc pad-sm between" style="left:546px;top:105px;width:402px;height:250px"><div class="step-index">02</div><div class="tile-title">Step 2 — verb phrase</div></div>
   <div class="el tile dark pad-sm between" style="left:972px;top:105px;width:402px;height:250px"><div class="step-index">03</div><div class="tile-title">Step 3 — verb phrase</div></div>
   <div class="el tile pad-sm between" style="left:1398px;top:105px;width:402px;height:250px"><div class="step-index">04</div><div class="tile-title">Step 4 — verb phrase</div></div>
-<!-- Component: .data-table — Exact values. Vary: 3–6 rows/3–5 columns/one pick. Fixed: aligned numerals, hairlines, no zebra/vertical rules; template font. -->
+<!-- Component: table (.data-table) — exact values; may vary: 3–6 rows, 3–5 columns and one pick; may not: lose aligned numerals, hairlines and template font, or add zebra fills or vertical rules. -->
   <div class="el tile pad-sm" style="left:120px;top:380px;width:1680px;height:330px"><table class="data-table"><thead><tr><th>Category</th><th class="num">Measure A</th><th class="num">Measure B</th><th>Result</th></tr></thead><tbody><tr><td>Item A</td><td class="num">18</td><td class="num">4.2</td><td>Result phrase</td></tr><tr><td>Item B</td><td class="num pick">42</td><td class="num">2.4</td><td class="pick">Selected result</td></tr><tr><td>Item C</td><td class="num">31</td><td class="num">3.8</td><td>Result phrase</td></tr></tbody></table></div>
-<!-- Component: .tile (native chart) — Trend/comparison. Vary: 3–6 native marks/type/reference. Fixed: direct labels, zero, grey + one accent; no div bars/grids. -->
+<!-- Component: chart (.tile) — trend or comparison with native marks; may vary: 3–6 marks, type and reference; may not: lose direct labels, zero baseline, grey plus one accent, or add div bars or grids. -->
   <div class="el tile pad-sm between" style="left:120px;top:735px;width:686px;height:255px"><div class="label">Native chart</div><div class="tile-title">Direct labels · one baseline</div><div class="caption">Square marks; direction stated in words.</div></div>
-<!-- Component: .tile.dark (relationship) — Named relations. Vary: 2–4 satellites/verbs. Keep: no arrows; geometry is not evidence. -->
+<!-- Component: hub (.tile.dark) — named relationships; may vary: 2–4 satellites and verbs; may not: add arrows or treat geometry as evidence. -->
   <div class="el tile dark pad-sm between" style="left:830px;top:735px;width:544px;height:255px"><div class="label">Feeds the centre</div><div class="tile-title">Relation named in words</div></div>
-<!-- Component: .tile.acc (icon slot) — When words fail. Vary: sourced monochrome asset. Keep: one; no emoji/decoration. -->
+<!-- Component: icon (.tile.acc) — when words fail; may vary: sourced monochrome asset; may not: show more than one, use emoji or decorate. -->
   <div class="el tile acc pad-sm between" style="left:1398px;top:735px;width:402px;height:255px"><div class="label">Icon slot</div><div class="tile-title">One meaningful asset</div></div></div>
 <!-- Part 7: Layouts -->
 <!-- Layout: hero metric — Quantitative claim. Vary: side/support count. Keep: one hero. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:300px;width:1112px;height:708px"><span class="region-name">body</span><span class="region-fill">.tile + .metric-lg</span></div>
-  <div class="el region" style="left:1256px;top:300px;width:544px;height:220px"><span class="region-name">kpi-1</span><span class="region-fill">.tile.acc + .metric</span></div>
-  <div class="el region" style="left:1256px;top:544px;width:544px;height:220px"><span class="region-name">kpi-2</span><span class="region-fill">.tile</span></div>
-  <div class="el region" style="left:1256px;top:788px;width:544px;height:220px"><span class="region-name">takeaway</span><span class="region-fill">.tile.dark</span></div></div>
+  <div class="el region" style="left:120px;top:300px;width:1112px;height:708px"><span class="region-name">body</span><span class="region-fill">container + metric</span></div>
+  <div class="el region" style="left:1256px;top:300px;width:544px;height:220px"><span class="region-name">kpi-1</span><span class="region-fill">selected + delta</span></div>
+  <div class="el region" style="left:1256px;top:544px;width:544px;height:220px"><span class="region-name">kpi-2</span><span class="region-fill">container</span></div>
+  <div class="el region" style="left:1256px;top:788px;width:544px;height:220px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div></div>
 <!-- Layout: comparison — Selection. Vary: selected column. Keep: equal criteria/geometry. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:300px;width:544px;height:464px"><span class="region-name">col-1</span><span class="region-fill">.tile</span></div>
-  <div class="el region" style="left:688px;top:300px;width:544px;height:464px"><span class="region-name">col-2</span><span class="region-fill">.tile.acc</span></div>
-  <div class="el region" style="left:1256px;top:300px;width:544px;height:464px"><span class="region-name">col-3</span><span class="region-fill">.tile</span></div>
-  <div class="el region" style="left:120px;top:788px;width:1680px;height:220px"><span class="region-name">takeaway</span><span class="region-fill">.tile.dark</span></div></div>
+  <div class="el region" style="left:120px;top:300px;width:544px;height:464px"><span class="region-name">col-1</span><span class="region-fill">container</span></div>
+  <div class="el region" style="left:688px;top:300px;width:544px;height:464px"><span class="region-name">col-2</span><span class="region-fill">selected</span></div>
+  <div class="el region" style="left:1256px;top:300px;width:544px;height:464px"><span class="region-name">col-3</span><span class="region-fill">container</span></div>
+  <div class="el region" style="left:120px;top:788px;width:1680px;height:220px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div></div>
 <!-- Layout: process — Sequence. Vary: 3–5 steps. Keep: equal boxes, numerals, no connectors. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:300px;width:402px;height:464px"><span class="region-name">step-1</span><span class="region-fill">.tile + .step-index</span></div>
-  <div class="el region" style="left:546px;top:300px;width:402px;height:464px"><span class="region-name">step-2</span><span class="region-fill">.tile + .step-index</span></div>
-  <div class="el region" style="left:972px;top:300px;width:402px;height:464px"><span class="region-name">step-3</span><span class="region-fill">.tile.acc + .step-index</span></div>
-  <div class="el region" style="left:1398px;top:300px;width:402px;height:464px"><span class="region-name">step-4</span><span class="region-fill">.tile + .step-index</span></div>
-  <div class="el region" style="left:120px;top:788px;width:1680px;height:220px"><span class="region-name">takeaway</span><span class="region-fill">.tile.dark</span></div></div>
+  <div class="el region" style="left:120px;top:300px;width:402px;height:464px"><span class="region-name">step-1</span><span class="region-fill">step + numbered</span></div>
+  <div class="el region" style="left:546px;top:300px;width:402px;height:464px"><span class="region-name">step-2</span><span class="region-fill">step + numbered</span></div>
+  <div class="el region" style="left:972px;top:300px;width:402px;height:464px"><span class="region-name">step-3</span><span class="region-fill">selected + step + numbered</span></div>
+  <div class="el region" style="left:1398px;top:300px;width:402px;height:464px"><span class="region-name">step-4</span><span class="region-fill">step + numbered</span></div>
+  <div class="el region" style="left:120px;top:788px;width:1680px;height:220px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div></div>
 <!-- Layout: table — Exact values. Vary: rows/columns. Keep: one table, separate reading. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:300px;width:1680px;height:464px"><span class="region-name">table</span><span class="region-fill">.tile + .data-table</span></div>
-  <div class="el region" style="left:120px;top:788px;width:1112px;height:220px"><span class="region-name">takeaway</span><span class="region-fill">.tile.dark</span></div>
-  <div class="el region" style="left:1256px;top:788px;width:544px;height:220px"><span class="region-name">kpi-1</span><span class="region-fill">.tile.acc + .metric</span></div></div>
+  <div class="el region" style="left:120px;top:300px;width:1680px;height:464px"><span class="region-name">table</span><span class="region-fill">container + table</span></div>
+  <div class="el region" style="left:120px;top:788px;width:1112px;height:220px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
+  <div class="el region" style="left:1256px;top:788px;width:544px;height:220px"><span class="region-name">kpi-1</span><span class="region-fill">selected + delta</span></div></div>
 <!-- Layout: chart — Trend/ranking. Vary: native chart/3–6 marks. Keep: labels, baseline, one accent. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:300px;width:1112px;height:708px"><span class="region-name">chart</span><span class="region-fill">.tile (native chart)</span></div>
-  <div class="el region" style="left:1256px;top:300px;width:544px;height:464px"><span class="region-name">takeaway</span><span class="region-fill">.tile.dark</span></div>
-  <div class="el region" style="left:1256px;top:788px;width:544px;height:220px"><span class="region-name">kpi-1</span><span class="region-fill">.tile.acc + .metric</span></div></div>
+  <div class="el region" style="left:120px;top:300px;width:1112px;height:708px"><span class="region-name">chart</span><span class="region-fill">container + chart</span></div>
+  <div class="el region" style="left:1256px;top:300px;width:544px;height:464px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
+  <div class="el region" style="left:1256px;top:788px;width:544px;height:220px"><span class="region-name">kpi-1</span><span class="region-fill">selected + delta</span></div></div>
 <!-- Part 8: Showcase -->
 <!-- Showcase: hero metric — asymmetric bento grid. -->
 <div class="slide">

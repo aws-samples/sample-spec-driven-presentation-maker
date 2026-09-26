@@ -59,14 +59,15 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 .type-stack>div{border-bottom:var(--border-thin) solid var(--color-border)}
 .frame-ghost,.region{padding:14px;border:2px dashed var(--color-border)}
 .region{border-color:var(--accent)}
-.region-name{font:calc(var(--fs-label)*1.5) var(--font-family)}
+.region-name,.region-fill{display:block;font:calc(var(--fs-label)*1.5) var(--font-family)}
 .region-name{font-weight:900;text-transform:uppercase;color:var(--accent)}
+.region-fill{margin-top:8px;color:var(--color-muted)}
 </style>
 </head><body>
 <!-- Part 1: Cover -->
 <div class="slide">
   <div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
-  <div class="el badge" style="left:120px;top:240px;width:280px;height:48px">Bundled style / 01</div>
+  <div class="el badge" style="left:120px;top:240px;width:350px;height:48px">Bundled style / 01</div>
   <div class="el t-cover-title" style="left:120px;top:330px;width:1500px;height:220px">Signal</div>
   <div class="el t-heading c-accent" style="left:120px;top:570px;width:1300px;height:70px">Make the warning visible</div>
   <div class="el t-body c-muted" style="left:120px;top:690px;width:1120px;height:150px">Near-black ground. One safety-yellow signal. Upright heavy headlines. Huge numerals. No decorative motion.</div>
@@ -75,7 +76,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="slide">
   <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:30px">Rules / read first</div>
   <div class="el t-slide-title" style="left:120px;top:80px;width:1680px;height:125px">One signal controls the page</div>
-  <div class="el t-heading" style="left:120px;top:225px;width:1680px;height:70px">Readers scan at distance; one decisive signal must outrank every supporting detail.</div>
+  <div class="el t-heading" style="left:120px;top:225px;width:1680px;height:70px">One decisive signal outranks supporting detail.</div>
   <div class="el t-label c-accent" style="left:120px;top:330px;width:760px;height:30px">Do / preserve the warning hierarchy</div>
   <div class="el" style="left:120px;top:375px;width:760px;height:600px"><ul class="rule-list"><li>Keep one claim per slide; the title is that claim.</li><li>Use uppercase headlines in 1–5 words and at most 2 lines.</li><li>Allow one yellow filled panel; otherwise yellow is text, rules, or outlines.</li><li>Use one 10px stripe on the top edge only.</li><li>Let one 56–96pt numeral become largest.</li><li>Keep content inside margins of at least 5%.</li><li>Maintain contrast ≥4.5:1, or ≥3:1 at 18pt+.</li></ul></div>
   <div class="el rule" style="left:960px;top:330px;width:1px;height:645px"></div>
@@ -94,11 +95,11 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="slide">
   <div class="el t-label c-accent" style="left:120px;top:35px;width:700px;height:30px">Palette and actual-size type</div>
   <div class="el t-slide-title" style="left:120px;top:75px;width:1680px;height:115px">One colour means attention</div>
-  <div class="el palette" style="left:120px;top:220px;width:1680px;height:190px"><div class="chip"><div class="swatch bg-accent"></div><div class="t-caption">--accent · one signal; dark text</div></div><div class="chip"><div class="swatch"></div><div class="t-caption">--color-bg · ground; white text</div></div><div class="chip"><div class="swatch bg-surface"></div><div class="t-caption">--color-surface · quiet grouping</div></div><div class="chip"><div class="swatch sw-border"></div><div class="t-caption">--color-border · neutral rules</div></div><div class="chip"><div class="swatch sw-text"></div><div class="t-caption">--color-text · primary type</div></div><div class="chip"><div class="t-caption">--color-muted · metadata only<br>--color-on-accent · yellow fills<br><br>One yellow fill maximum.</div></div></div>
+  <div class="el palette" style="left:120px;top:220px;width:1680px;height:190px"><div class="chip"><div class="swatch bg-accent"></div><div class="t-caption">--accent · one signal; dark text</div></div><div class="chip"><div class="swatch"></div><div class="t-caption">--color-bg · ground; white text</div></div><div class="chip"><div class="swatch bg-surface"></div><div class="t-caption">--color-surface · quiet grouping</div></div><div class="chip"><div class="swatch sw-border"></div><div class="t-caption">--color-border · neutral rules</div></div><div class="chip"><div class="swatch sw-text"></div><div class="t-caption">--color-text · primary type</div></div><div class="chip"><div class="meta">--color-muted<br>metadata only<br>--color-on-accent<br>yellow fills<br>One fill maximum.</div></div></div>
   <div class="el rule" style="left:120px;top:450px;width:1680px;height:1px"></div>
-  <div class="el type-stack" style="left:120px;top:490px;width:1680px;height:470px"><div class="t-cover-title">Cover <span class="meta">64pt / .95</span></div><div class="t-slide-title">Slide title <span class="meta">38pt / 1.02 / max 2 lines</span></div><div class="t-heading">Heading <span class="meta">24pt / 1.12</span></div><div class="t-body">Body stays upright. <span class="meta">18pt / 1.38</span></div><div class="t-caption">Caption 14pt · label 11pt mono uppercase</div></div>
-  <div class="el t-metric-sm c-accent" style="left:120px;top:960px;width:350px;height:100px">56</div>
-  <div class="el t-metric c-accent" style="left:1000px;top:930px;width:600px;height:150px">96%</div></div>
+  <div class="el type-stack" style="left:120px;top:490px;width:1680px;height:370px"><div class="t-cover-title">Cover <span class="meta">64pt / .95</span></div><div class="t-slide-title">Slide title <span class="meta">38pt / 1.02 / max 2 lines</span></div><div class="t-heading">Heading <span class="meta">24pt / 1.12</span></div><div class="t-body">Body stays upright. <span class="meta">18pt / 1.38</span></div><div class="t-caption">Caption 14pt · label 11pt mono uppercase</div></div>
+  <div class="el t-metric-sm c-accent" style="left:120px;top:900px;width:350px;height:130px">56</div>
+  <div class="el t-metric c-accent" style="left:1000px;top:860px;width:600px;height:220px">96%</div></div>
 <!-- Part 5: Frame -->
 <!-- Frame: content — vary kicker/claim/meta; retain stripe, title reserve, content start/margins. -->
 <div class="slide">
@@ -109,7 +110,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <!-- Frame: divider — major beat only; vary name/preview; do not add evidence. -->
 <div class="slide">
   <div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
-  <div class="el t-metric-sm c-accent" style="left:120px;top:300px;width:600px;height:110px">03 / 05</div>
+  <div class="el t-metric-sm c-accent" style="left:120px;top:300px;width:600px;height:130px">03 / 05</div>
   <div class="el t-cover-title" style="left:120px;top:470px;width:1500px;height:180px">Section name</div>
   <div class="el rule" style="left:120px;top:720px;width:900px;height:2px"></div>
   <div class="el t-heading c-muted" style="left:120px;top:770px;width:1400px;height:120px">One-line preview of this section.</div></div>
@@ -117,87 +118,91 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="slide">
   <div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
   <div class="el t-label c-accent" style="left:120px;top:250px;width:500px;height:30px">The ask</div>
-  <div class="el t-cover-title" style="left:120px;top:340px;width:1550px;height:190px">Approve the next step</div>
+  <div class="el t-cover-title" style="left:120px;top:340px;width:1550px;height:190px">Approve next step</div>
   <div class="el rule-accent" style="left:120px;top:610px;width:1680px;height:4px"></div>
   <div class="el t-body" style="left:120px;top:680px;width:780px;height:180px"><b>Condition one.</b> Owner or boundary.</div>
   <div class="el t-body" style="left:1020px;top:680px;width:780px;height:180px"><b>Condition two.</b> Measure and review point.</div></div>
 <!-- Part 6: Components -->
 <div class="slide">
-<!-- Component: .number-box.on — one hero metric; vary value/comparator; retain one fill/96pt. -->
+<!-- Component: metric (.number-box.on) — when: one hero measure leads; may vary: value and comparator; may not: use more than one fill or leave 96pt. -->
   <div class="el number-box on" style="left:120px;top:130px;width:740px;height:390px"><div class="t-label">Primary metric</div><div class="t-metric">42%</div><div class="t-body">Comparator and scope.</div></div>
-<!-- Component: .number-box — support; vary value/unit; do not outrank hero/gain fill. -->
+<!-- Component: metric (.number-box) — when: support adds context; may vary: value and unit; may not: outrank the hero or gain fill. -->
+<!-- Component: numbered (.number-box) — when: 2–4 text-heavy sections need ordered labels; may vary: count and 25–60 words; may not: gain fill or replace step for a true sequence. -->
   <div class="el number-box" style="left:940px;top:130px;width:380px;height:230px"><div class="t-label c-accent">Metric B</div><div class="t-metric-sm c-accent">18</div></div>
-<!-- Component: .col-box + .col-box.on — 2–4 peers; vary selection; retain geometry/order/one fill. -->
+<!-- Component: container (.col-box) — when: grouping 2–4 peer fields; may vary: content; may not: change geometry or order. -->
+<!-- Component: selected (.col-box.on) — when: one peer field is decisive; may vary: selected member; may not: use more than one fill. -->
+<!-- Component: before-after (.col-box + .col-box.on) — when: one state changes against a matched prior state; may vary: labels and measures; may not: mismatch geometry, scale, or row order, or put yellow on before. -->
   <div class="el col-box" style="left:120px;top:650px;width:500px;height:260px"><div class="t-heading">Peer field</div><div class="t-caption">Neutral evidence.</div></div>
   <div class="el col-box on" style="left:690px;top:650px;width:500px;height:260px"><div class="t-heading">Selected field</div><div class="t-body">Signal state.</div></div>
-<!-- Component: .badge + .outline-badge — state; vary text; retain one filled badge per slide. -->
+<!-- Component: tag (.badge + .outline-badge) — when: a compact state label is needed; may vary: text; may not: use more than one filled badge per slide. -->
   <div class="el outline-badge" style="left:1400px;top:270px;width:260px;height:48px">Before</div>
-<!-- Component: .panel.bg-accent — conclusion band; takeaway; vary implication; retain to two lines. -->
+<!-- Component: takeaway (.panel.bg-accent) — when: evidence needs a conclusion band; may vary: implication; may not: exceed two lines. -->
   <div class="el panel bg-accent" style="left:1300px;top:650px;width:500px;height:260px"><div class="t-label">Conclusion</div><div class="t-heading">Decision implication</div></div></div>
 <div class="slide">
-<!-- Component: .step-box + connector — true 3–5 steps; vary active step; retain equal boxes/one fill. -->
+<!-- Component: step (.step-box) — when: a true sequence has 3–5 stages; may vary: active step; may not: vary box geometry or use more than one fill. -->
+<!-- Component: connector (.connector) — when: adjacent steps depend on one another; may vary: length with spacing; may not: change direction or detach from equal boxes. -->
   <div class="el step-box" style="left:120px;top:130px;width:330px;height:220px"><div><div class="t-metric-sm c-accent">01</div><div class="t-heading">Define</div></div></div>
   <div class="el connector" style="left:450px;top:238px;width:70px;height:4px"></div>
   <div class="el step-box on" style="left:520px;top:130px;width:330px;height:220px"><div><div class="t-metric-sm">02</div><div class="t-heading">Release</div></div></div>
-<!-- Component: .node + .node.on — core + 3–5 nodes; vary count; retain orthogonal links/one fill. -->
+<!-- Component: hub (.node + .node.on) — when: one core connects to 3–5 nodes; may vary: count; may not: use non-orthogonal links or more than one fill. -->
   <div class="el node" style="left:1030px;top:130px;width:300px;height:140px">Input</div>
   <div class="el connector" style="left:1330px;top:198px;width:100px;height:4px"></div>
   <div class="el node on" style="left:1430px;top:130px;width:370px;height:140px">Core</div>
-<!-- Component: .table-wrap — exact values; vary 3–5 columns/4–8 rows; retain units, yellow header/exception text. Native tables inherit template font. -->
+<!-- Component: table (.table-wrap) — when: exact values matter; may vary: 3–5 columns and 4–8 rows; may not: omit units or move yellow from header or exception text; native tables inherit template font. -->
   <div class="el table-wrap" style="left:120px;top:490px;width:900px;height:330px"><table class="table"><tr><th>Item</th><th>Measure</th><th>Limit</th></tr><tr><td>Primary</td><td>42 units</td><td>50</td></tr><tr><td>Exception</td><td class="c-accent"><b>68 units</b></td><td>50</td></tr></table></div>
-<!-- Component: .status + .status.on — 3–6 states; vary metadata; yellow marks one attention row. -->
+<!-- Component: list (.status + .status.on) — when: 3–6 states need scanning; may vary: metadata; may not: mark more than one attention row in yellow. -->
   <div class="el status" style="left:1100px;top:490px;width:700px;height:120px"><div><div class="status-code">State-01 / clear</div><div class="status-name">System A</div></div></div>
   <div class="el status on" style="left:1100px;top:635px;width:700px;height:145px"><div><div class="status-code">State-02 / attention</div><div class="status-name">System B</div></div></div>
-<!-- Component: native chart — trend/comparison; vary chart/periods; retain native marks, zero baseline, direct values, neutral context/one yellow mark; no div bars/needless legend/gridlines. -->
+<!-- Component: chart — when: trend or comparison; may vary: native type and periods; may not: use div bars, nonzero baseline, indirect values, needless legend or gridlines, or more than one yellow mark on neutral context. -->
 </div>
 <!-- Part 7: Layouts -->
 <!-- Layout: hero-metric — quantified claim; vary support/comparator; do not add a second hero. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:1920px;height:280px"><span class="region-name">frame · Part 5</span></div>
-  <div class="el region" style="left:120px;top:330px;width:800px;height:560px"><span class="region-name">body · number-box.on</span></div>
-  <div class="el region" style="left:1000px;top:330px;width:800px;height:560px"><span class="region-name">kpi-1 / kpi-2 · number-box ×2</span></div></div>
+  <div class="el region" style="left:120px;top:330px;width:800px;height:560px"><span class="region-name">body</span><span class="region-fill">metric + selected</span></div>
+  <div class="el region" style="left:1000px;top:330px;width:800px;height:560px"><span class="region-name">kpi-1 / kpi-2</span><span class="region-fill">metric ×2</span></div></div>
 <!-- Layout: comparison — matched or dominant/support fields; vary side and 40:60–50:50 ratio; retain row order and one fill. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:1920px;height:280px"><span class="region-name">frame · Part 5</span></div>
-  <div class="el region" style="left:120px;top:330px;width:800px;height:560px"><span class="region-name">left · col-box</span></div>
-  <div class="el region" style="left:1000px;top:330px;width:800px;height:560px"><span class="region-name">right · col-box.on</span></div></div>
+  <div class="el region" style="left:120px;top:330px;width:800px;height:560px"><span class="region-name">left</span><span class="region-fill">container</span></div>
+  <div class="el region" style="left:1000px;top:330px;width:800px;height:560px"><span class="region-name">right</span><span class="region-fill">container + selected</span></div></div>
 <!-- Layout: four-columns — 3–4 equal peers; vary selected field; retain order and one fill (centre for three, final allowed for four). -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:1920px;height:280px"><span class="region-name">frame · Part 5</span></div>
-  <div class="el region" style="left:120px;top:330px;width:380px;height:560px"><span class="region-name">col-1 · col-box</span></div>
-  <div class="el region" style="left:553px;top:330px;width:380px;height:560px"><span class="region-name">col-2 · col-box</span></div>
-  <div class="el region" style="left:987px;top:330px;width:380px;height:560px"><span class="region-name">col-3 · col-box</span></div>
-  <div class="el region" style="left:1420px;top:330px;width:380px;height:560px"><span class="region-name">col-4 · col-box.on</span></div></div>
+  <div class="el region" style="left:120px;top:330px;width:380px;height:560px"><span class="region-name">col-1</span><span class="region-fill">container</span></div>
+  <div class="el region" style="left:553px;top:330px;width:380px;height:560px"><span class="region-name">col-2</span><span class="region-fill">container</span></div>
+  <div class="el region" style="left:987px;top:330px;width:380px;height:560px"><span class="region-name">col-3</span><span class="region-fill">container</span></div>
+  <div class="el region" style="left:1420px;top:330px;width:380px;height:560px"><span class="region-name">col-4</span><span class="region-fill">container + selected</span></div></div>
 <!-- Layout: process-four — dependent sequence; vary 3–5 steps/active stage; retain equal boxes/connectors. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:1920px;height:280px"><span class="region-name">frame · Part 5</span></div>
-  <div class="el region" style="left:120px;top:350px;width:360px;height:430px"><span class="region-name">step-1 · step-box</span></div>
-  <div class="el region" style="left:560px;top:350px;width:360px;height:430px"><span class="region-name">step-2 · step-box</span></div>
-  <div class="el region" style="left:1000px;top:350px;width:360px;height:430px"><span class="region-name">step-3 · step-box</span></div>
-  <div class="el region" style="left:1440px;top:350px;width:360px;height:430px"><span class="region-name">step-4 · step-box.on</span></div></div>
+  <div class="el region" style="left:120px;top:350px;width:360px;height:430px"><span class="region-name">step-1</span><span class="region-fill">step + connector</span></div>
+  <div class="el region" style="left:560px;top:350px;width:360px;height:430px"><span class="region-name">step-2</span><span class="region-fill">step + connector</span></div>
+  <div class="el region" style="left:1000px;top:350px;width:360px;height:430px"><span class="region-name">step-3</span><span class="region-fill">step + connector</span></div>
+  <div class="el region" style="left:1440px;top:350px;width:360px;height:430px"><span class="region-name">step-4</span><span class="region-fill">step + connector + selected</span></div></div>
 <!-- Layout: evidence-board — exact values, chart,/status scan; vary native exhibit; retain direct labels/one yellow exception. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:1920px;height:280px"><span class="region-name">frame · Part 5</span></div>
-  <div class="el region" style="left:120px;top:330px;width:1680px;height:520px"><span class="region-name">table / chart / body · table-wrap, native chart, or status ×3–6</span></div>
-  <div class="el region" style="left:120px;top:890px;width:1680px;height:100px"><span class="region-name">takeaway · .panel.bg-accent</span></div></div>
+  <div class="el region" style="left:120px;top:330px;width:1680px;height:520px"><span class="region-name">table / chart / body</span><span class="region-fill">table or chart or list</span></div>
+  <div class="el region" style="left:120px;top:890px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div></div>
 <!-- Layout: relationship — one core with 3–5 nodes; vary count; keep one yellow core and orthogonal connectors, never rotated diamonds. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:1920px;height:280px"><span class="region-name">frame · Part 5</span></div>
-  <div class="el region" style="left:120px;top:330px;width:520px;height:500px"><span class="region-name">left · .node ×2</span></div>
-  <div class="el region" style="left:700px;top:400px;width:520px;height:360px"><span class="region-name">body · .node.on + .connector</span></div>
-  <div class="el region" style="left:1280px;top:330px;width:520px;height:500px"><span class="region-name">right · .node ×2</span></div></div>
+  <div class="el region" style="left:120px;top:330px;width:520px;height:500px"><span class="region-name">left</span><span class="region-fill">hub satellites ×2</span></div>
+  <div class="el region" style="left:700px;top:400px;width:520px;height:360px"><span class="region-name">body</span><span class="region-fill">hub core + connector</span></div>
+  <div class="el region" style="left:1280px;top:330px;width:520px;height:500px"><span class="region-name">right</span><span class="region-fill">hub satellites ×2</span></div></div>
 <!-- Layout: text-heavy — 2–4 numbered sections; vary count; keep 25–60 words and one yellow conclusion. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:1920px;height:280px"><span class="region-name">frame · Part 5</span></div>
-  <div class="el region" style="left:120px;top:330px;width:800px;height:430px"><span class="region-name">section-1 · .number-box</span></div>
-  <div class="el region" style="left:1000px;top:330px;width:800px;height:430px"><span class="region-name">section-2 · .number-box</span></div>
-  <div class="el region" style="left:120px;top:810px;width:1680px;height:150px"><span class="region-name">takeaway · .panel.bg-accent</span></div></div>
+  <div class="el region" style="left:120px;top:330px;width:800px;height:430px"><span class="region-name">section-1</span><span class="region-fill">numbered</span></div>
+  <div class="el region" style="left:1000px;top:330px;width:800px;height:430px"><span class="region-name">section-2</span><span class="region-fill">numbered</span></div>
+  <div class="el region" style="left:120px;top:810px;width:1680px;height:150px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div></div>
 <!-- Layout: before-after — one changed state; vary labels/measures; preserve paired geometry, scale, row order, and yellow only on after. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:0px;top:0px;width:1920px;height:280px"><span class="region-name">frame · Part 5</span></div>
-  <div class="el region" style="left:120px;top:330px;width:800px;height:520px"><span class="region-name">left · .col-box</span></div>
-  <div class="el region" style="left:1000px;top:330px;width:800px;height:520px"><span class="region-name">right · .col-box.on</span></div>
-  <div class="el region" style="left:120px;top:890px;width:1680px;height:100px"><span class="region-name">takeaway · .panel.bg-accent</span></div></div>
+  <div class="el region" style="left:120px;top:330px;width:800px;height:520px"><span class="region-name">left</span><span class="region-fill">before-after</span></div>
+  <div class="el region" style="left:1000px;top:330px;width:800px;height:520px"><span class="region-name">right</span><span class="region-fill">before-after + selected</span></div>
+  <div class="el region" style="left:120px;top:890px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div></div>
 <!-- Part 8: Showcase -->
 <!-- Showcase: metric — frame with one hero and two supporting values. -->
 <div class="slide">

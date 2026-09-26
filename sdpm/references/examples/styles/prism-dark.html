@@ -143,7 +143,7 @@
 <div class="el t-metric-sm gtext" style="left:144px;top:844px;width:520px;height:120px">2.1 days</div>
 <div class="el t-caption c-muted mono" style="left:720px;top:876px;width:400px;height:48px">--fs-metric-sm · 60pt</div>
 <div class="el t-caption c-muted mono" style="left:1200px;top:792px;width:624px;height:48px">--fs-metric · 124pt / 1</div>
-<div class="el t-metric gtext" style="left:1200px;top:830px;width:624px;height:250px">−42%</div>
+<div class="el t-metric gtext" style="left:1200px;top:800px;width:624px;height:250px">−42%</div>
 </div>
 
 <!-- Part 5: Frame -->
@@ -184,55 +184,58 @@
 <!-- Part 6: Components -->
 <div class="slide">
 <div class="el sheet-label" style="left:144px;top:72px;width:600px;height:32px">Pointer components</div>
-<!-- Component: metric-pointer — key figure; vary figure/unit, never split its gradient or box it. -->
+<!-- Component: metric (.t-metric.gtext) — key figure; may vary: figure and unit; may not: split its gradient or box it. -->
 <div class="el t-metric gtext" style="left:144px;top:160px;width:760px;height:230px">−42%</div>
-<!-- Component: metric-qualifier — flat context; vary one or two lines, never repeat the figure. -->
+<!-- Component: lead (.t-caption.c-muted) — flat metric context; may vary: one or two lines; may not: repeat the figure. -->
 <div class="el t-caption c-muted" style="left:144px;top:414px;width:760px;height:96px">metric-pointer + metric-qualifier</div>
-<!-- Component: card — Use for equal supporting options; may vary: label, heading and short copy; may not: change sibling geometry. -->
+<!-- Component: container (.card) — equal supporting option; may vary: label, heading and short copy; may not: change sibling geometry. -->
 <div class="el card" style="left:1008px;top:160px;width:384px;height:350px"></div>
 <div class="el t-label c-muted" style="left:1048px;top:202px;width:304px;height:32px">card</div>
 <div class="el t-heading" style="left:1048px;top:260px;width:304px;height:64px">Alternative</div>
 <div class="el t-caption c-muted" style="left:1048px;top:344px;width:304px;height:100px">Flat surface and one neutral hairline.</div>
-<!-- Component: card-g — one selected option among 2–4 equal cards; vary winner/copy; keep one 4px outline + pill, equal geometry/measure and muted flat siblings. -->
+<!-- Component: selected (.card-g) — one selected option among 2–4 equal cards; may vary: winner and copy; may not: lose its one 4px outline and pill, equal geometry and measure, or muted flat siblings. -->
 <div class="el card-g" style="left:1440px;top:160px;width:384px;height:350px"></div>
 <div class="el pill-g" style="left:1480px;top:202px;width:210px;height:48px">Recommended</div>
 <div class="el t-heading" style="left:1480px;top:276px;width:304px;height:64px">Selected</div>
 <div class="el t-caption c-muted" style="left:1480px;top:360px;width:304px;height:100px">card-g + pill-g</div>
-<!-- Component: pill-o — title metadata; vary index/period/unit, never use decoratively. -->
+<!-- Component: tag (.pill-o) — title metadata; may vary: index, period and unit; may not: be used decoratively. -->
 <div class="el pill-o" style="left:144px;top:650px;width:340px;height:48px">Index · base 100</div>
-<!-- Component: pill — inactive agenda state; vary label, never use as the claim pointer. -->
+<!-- Component: tag (.pill) — inactive agenda state; may vary: label; may not: be used as the claim pointer. -->
 <div class="el pill" style="left:532px;top:650px;width:280px;height:48px">02 Evidence</div>
 <div class="el t-body" style="left:144px;top:760px;width:1680px;height:120px">The four legal pointer roles are metric text, one selected card or step, one native chart mark, and the edge bar when no claim is made.</div>
 </div>
 
 <div class="slide">
 <div class="el sheet-label" style="left:144px;top:72px;width:600px;height:32px">Sequence and prose components</div>
-<!-- Component: node — Use for equal steps or relationship nodes; may vary: short verb phrase; may not: vary size within a set. -->
+<!-- Component: step (.node) — equal sequence step; may vary: short verb phrase; may not: vary size within a set. -->
+<!-- Component: numbered — none; use equal step nodes with short verb phrases instead -->
 <div class="el node" style="left:144px;top:180px;width:384px;height:220px">Configure</div>
-<!-- Component: connector — neutral node link; vary length/orientation, never add gradient. -->
+<!-- Component: connector (.connector) — neutral node link; may vary: length and orientation; may not: add gradient. -->
 <div class="el connector" style="left:528px;top:289px;width:48px;height:2px"></div>
-<!-- Component: node-g — named gate or pivot; vary target among 3–5 equal nodes; keep neutral connectors, muted siblings and one outline. Add pill-g only to a left-to-right sequence gate, never a cycle. -->
+<!-- Component: selected (.node-g) — named gate among 3–5 equal nodes; may vary: target; may not: lose neutral connectors, muted siblings and one outline. -->
+<!-- Component: hub (.node-g) — named pivot among equal relationship nodes; may vary: target; may not: imply a start with arrows or carry a pill. -->
+<!-- Component: milestone (.pill-g) — left-to-right sequence gate; may vary: gate label; may not: appear on a cycle. -->
 <div class="el node-g" style="left:576px;top:180px;width:384px;height:220px">Measure</div>
 <div class="el pill-g" style="left:624px;top:148px;width:240px;height:48px">Step 2 · gate</div>
-<!-- Component: prose-rule — organise unboxed prose; vary height, never add gradient. -->
+<!-- Component: lead (.connector) — organise unboxed prose beside a neutral rule; may vary: rule height; may not: add gradient. -->
 <div class="el connector" style="left:1056px;top:180px;width:2px;height:220px"></div>
 <div class="el t-body" style="left:1104px;top:180px;width:720px;height:220px">A short paragraph sits beside a neutral rule. Its conclusion belongs in a separate takeaway box rather than receiving an inline gradient.</div>
-<!-- Component: takeaway — consequence/action; vary one sentence, never restate title or exceed two lines. -->
+<!-- Component: takeaway (.t-heading.gtext) — consequence or action; may vary: one sentence; may not: restate the title or exceed two lines. -->
 <div class="el rule" style="left:144px;top:560px;width:1680px;height:1px"></div>
 <div class="el t-heading gtext" style="left:144px;top:608px;width:1680px;height:110px">Takeaway line names what the room should do next.</div>
-<!-- Component: icon-slot — one meaningful line asset; vary asset, never use emoji or decoration. -->
+<!-- Component: icon (.card) — one meaningful line asset on a flat surface; may vary: asset; may not: use emoji or decoration. -->
 <div class="el card" style="left:144px;top:820px;width:96px;height:96px"></div>
 <div class="el t-caption c-muted" style="left:272px;top:830px;width:760px;height:80px">icon-slot · one monochrome asset on a flat surface</div>
 </div>
 
 <div class="slide">
 <div class="el sheet-label" style="left:144px;top:72px;width:600px;height:32px">Table and native chart components</div>
-<!-- Component: table-treatment — exact values; vary 3–6 rows/3–5 columns; keep figures right-aligned, hairlines only, no zebra/vertical rules/gradient cell. Lift the claimed figure into metric-pointer. -->
+<!-- Component: table (.table-row) — exact values; may vary: 3–6 rows and 3–5 columns; may not: lose right-aligned figures and hairlines, add zebra or vertical rules or a gradient cell, or retain the claimed figure instead of lifting it into metric. -->
 <div class="el table-row t-label c-muted" style="left:144px;top:160px;width:804px;height:56px"><span style="width:45%">Item</span><span style="width:30%">Type</span><span style="width:25%">Value</span></div>
 <div class="el table-row t-table" style="left:144px;top:216px;width:804px;height:76px"><span style="width:45%">Primary row</span><span class="c-muted" style="width:30%">recurring</span><span style="width:25%">96k</span></div>
 <div class="el table-row t-table" style="left:144px;top:292px;width:804px;height:76px"><span style="width:45%">Secondary row</span><span class="c-muted" style="width:30%">one-off</span><span style="width:25%">54k</span></div>
 <div class="el table-row t-table bold" style="left:144px;top:368px;width:804px;height:76px"><span style="width:75%">Total</span><span style="width:25%">150k</span></div>
-<!-- Component: native-chart — trend, ranking or proportion; vary 3–8 native marks/type and optional reference; keep one common baseline/scale, direct labels, one gradient mark, grey siblings, one series, no empty grids/avoidable legend/donut/ring/div bars. -->
+<!-- Component: chart (.chart-specimen) — trend, ranking or proportion; may vary: 3–8 native marks, type and optional reference; may not: lose one common baseline and scale, direct labels, one gradient mark, grey siblings and one series, or add empty grids, avoidable legends, donuts, rings or div bars. -->
 <div class="el chart-specimen" style="left:1080px;top:160px;width:744px;height:360px">
   <svg viewBox="0 0 744 360" width="744" height="360">
     <defs><linearGradient id="prismBar" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#8B7CFF"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs>
@@ -249,58 +252,58 @@
 <!-- Layout: single-body — one explanatory claim or figure; vary body form, never split it decoratively. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:310px;width:1680px;height:570px"><span class="region-name">body</span><span class="region-fill">metric-pointer + metric-qualifier or prose-rule</span></div>
+<div class="el region" style="left:120px;top:310px;width:1680px;height:570px"><span class="region-name">body</span><span class="region-fill">metric or lead</span></div>
 <div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
 </div>
 
 <!-- Layout: comparison — selection or before/after; vary content/marked side; keep equal geometry and matched row order, measure and unit, with no arrow. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:310px;width:804px;height:570px"><span class="region-name">left</span><span class="region-fill">card or metric-pointer</span></div>
-<div class="el region" style="left:996px;top:310px;width:804px;height:570px"><span class="region-name">right</span><span class="region-fill">card-g or metric-pointer</span></div>
+<div class="el region" style="left:120px;top:310px;width:804px;height:570px"><span class="region-name">left</span><span class="region-fill">container or metric</span></div>
+<div class="el region" style="left:996px;top:310px;width:804px;height:570px"><span class="region-name">right</span><span class="region-fill">selected or metric</span></div>
 <div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
 </div>
 
 <!-- Layout: three-columns — compare three options; vary the card-g target, not geometry or measures. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:310px;width:528px;height:570px"><span class="region-name">col-1</span><span class="region-fill">card</span></div>
-<div class="el region" style="left:696px;top:310px;width:528px;height:570px"><span class="region-name">col-2</span><span class="region-fill">card-g</span></div>
-<div class="el region" style="left:1272px;top:310px;width:528px;height:570px"><span class="region-name">col-3</span><span class="region-fill">card</span></div>
+<div class="el region" style="left:120px;top:310px;width:528px;height:570px"><span class="region-name">col-1</span><span class="region-fill">container</span></div>
+<div class="el region" style="left:696px;top:310px;width:528px;height:570px"><span class="region-name">col-2</span><span class="region-fill">selected</span></div>
+<div class="el region" style="left:1272px;top:310px;width:528px;height:570px"><span class="region-name">col-3</span><span class="region-fill">container</span></div>
 <div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
 </div>
 
 <!-- Layout: process-four — sequence or gate; vary 3–5 equal steps, never colour connectors. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:350px;width:384px;height:420px"><span class="region-name">step-1</span><span class="region-fill">node</span></div>
-<div class="el region" style="left:552px;top:350px;width:384px;height:420px"><span class="region-name">step-2</span><span class="region-fill">node</span></div>
-<div class="el region" style="left:984px;top:350px;width:384px;height:420px"><span class="region-name">step-3</span><span class="region-fill">node-g + pill-g</span></div>
-<div class="el region" style="left:1416px;top:350px;width:384px;height:420px"><span class="region-name">step-4</span><span class="region-fill">node</span></div>
+<div class="el region" style="left:120px;top:350px;width:384px;height:420px"><span class="region-name">step-1</span><span class="region-fill">step</span></div>
+<div class="el region" style="left:552px;top:350px;width:384px;height:420px"><span class="region-name">step-2</span><span class="region-fill">step</span></div>
+<div class="el region" style="left:984px;top:350px;width:384px;height:420px"><span class="region-name">step-3</span><span class="region-fill">step + selected + milestone</span></div>
+<div class="el region" style="left:1416px;top:350px;width:384px;height:420px"><span class="region-name">step-4</span><span class="region-fill">step</span></div>
 <div class="el region" style="left:120px;top:820px;width:1680px;height:190px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
 </div>
 
 <!-- Layout: chart-takeaway — quantitative pattern; vary native chart and marks, prefer direct labels. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:310px;width:1680px;height:570px"><span class="region-name">chart</span><span class="region-fill">native-chart + optional metric-pointer</span></div>
+<div class="el region" style="left:120px;top:310px;width:1680px;height:570px"><span class="region-name">chart</span><span class="region-fill">chart + optional metric</span></div>
 <div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
 </div>
 
 <!-- Layout: relationship — hub or cycle; vary 3–5 nodes and target, keep equal nodes, neutral connectors, one outlined node without pill, and no start-implying arrows. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:696px;top:310px;width:528px;height:250px"><span class="region-name">hub</span><span class="region-fill">node-g + connector</span></div>
-<div class="el region" style="left:120px;top:650px;width:528px;height:250px"><span class="region-name">col-1</span><span class="region-fill">node</span></div>
-<div class="el region" style="left:696px;top:650px;width:528px;height:250px"><span class="region-name">col-2</span><span class="region-fill">node</span></div>
-<div class="el region" style="left:1272px;top:650px;width:528px;height:250px"><span class="region-name">col-3</span><span class="region-fill">node</span></div>
+<div class="el region" style="left:696px;top:310px;width:528px;height:250px"><span class="region-name">hub</span><span class="region-fill">hub + connector</span></div>
+<div class="el region" style="left:120px;top:650px;width:528px;height:250px"><span class="region-name">col-1</span><span class="region-fill">step</span></div>
+<div class="el region" style="left:696px;top:650px;width:528px;height:250px"><span class="region-name">col-2</span><span class="region-fill">step</span></div>
+<div class="el region" style="left:1272px;top:650px;width:528px;height:250px"><span class="region-name">col-3</span><span class="region-fill">step</span></div>
 </div>
 
 <!-- Layout: table-or-chart — exact values or proportional evidence; vary exhibit and lifted figure, keep direct labels, common scale and no emphasis inside a table. -->
 <div class="slide">
 <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-<div class="el region" style="left:120px;top:310px;width:1160px;height:570px"><span class="region-name">exhibit</span><span class="region-fill">table-treatment or native-chart</span></div>
-<div class="el region" style="left:1328px;top:310px;width:472px;height:570px"><span class="region-name">body</span><span class="region-fill">metric-pointer + metric-qualifier</span></div>
+<div class="el region" style="left:120px;top:310px;width:1160px;height:570px"><span class="region-name">exhibit</span><span class="region-fill">table or chart</span></div>
+<div class="el region" style="left:1328px;top:310px;width:472px;height:570px"><span class="region-name">body</span><span class="region-fill">metric + lead</span></div>
 <div class="el region" style="left:120px;top:910px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div>
 </div>
 

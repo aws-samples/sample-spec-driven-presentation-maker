@@ -72,7 +72,7 @@ body{margin:0;padding:40px;background:#DCD6C8;font-family:var(--font-family);zoo
 <div class="slide">
   <div class="el kicker" style="left:120px;top:50px;width:900px;height:28px">Rules / read first</div>
   <div class="el headline" style="left:120px;top:86px;width:1560px;height:136px">This page is set to be read,<br>not watched</div>
-  <div class="el deck-line" style="left:120px;top:232px;width:1560px;height:72px">The deck is circulated, printed and read alone. Print composition therefore outranks stage decoration.</div>
+  <div class="el deck-line" style="left:120px;top:232px;width:1560px;height:72px">The deck is circulated and read alone. Print composition outranks stage decoration.</div>
   <div class="el rule" style="left:120px;top:318px;width:1680px;height:3px"></div>
   <div class="el subhead" style="left:120px;top:338px;width:816px;height:36px">Always</div>
   <div class="el col-flush" style="left:120px;top:382px;width:816px;height:260px"><ul class="rule-list"><li>One claim per page; the headline is that claim.</li><li>Keep 120px side margins and 66px foot clearance.</li><li>Contrast ≥ 4.5:1; ≥ 3:1 only at 18pt+.</li><li>Label chart values directly; remove empty gridlines.</li><li>No emoji; sourced icons stay outside prose columns.</li></ul></div>
@@ -97,7 +97,7 @@ body{margin:0;padding:40px;background:#DCD6C8;font-family:var(--font-family);zoo
   <div class="el rule" style="left:960px;top:398px;width:1px;height:182px"></div>
   <div class="el kicker muted" style="left:1000px;top:398px;width:800px;height:26px">Avoid topic labels</div>
   <div class="el subhead muted" style="left:1000px;top:438px;width:790px;height:48px">Placeholder overview</div>
-  <div class="el col-flush" style="left:1000px;top:500px;width:790px;height:80px">The kicker names the page in ≤ 4 words and never repeats the headline. Numbers substantiate, never replace, the claim; a figure still takes a deck line.</div>
+  <div class="el col-flush" style="left:1000px;top:500px;width:790px;height:80px">Kicker: ≤ 4 words. Numbers support the claim; figures still need deck lines.</div>
   <div class="el rule" style="left:120px;top:610px;width:1680px;height:1px"></div>
   <div class="el kicker" style="left:120px;top:638px;width:528px;height:26px">Deck shape</div>
   <div class="el col" style="left:120px;top:680px;width:528px;height:270px">Let the brief and material set page count. Opening, sequence and close follow the material; this style imposes no chapter template.</div>
@@ -192,33 +192,37 @@ body{margin:0;padding:40px;background:#DCD6C8;font-family:var(--font-family);zoo
   <div class="el col" style="left:1000px;top:712px;width:800px;height:234px">Name the decision, owner and date. A reading deck is often answered in writing, so leave something specific to answer.</div>
   <div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div></div>
 <!-- Part 6: Components -->
+<!-- Component: connector — none; separate ordered steps with whitespace and rules, never arrows -->
+<!-- Component: tag — none; use a kicker for category or state labels -->
 <div class="slide">
   <div class="el kicker" style="left:120px;top:70px;width:900px;height:28px">Components / reading</div>
-<!-- Component: .col — use: justified prose; vary: 60–120 words, 2–3 columns; fixed: no fill/fourth column; body 14–16pt. -->
+<!-- Component: lead (.col) — when: justified prose carries the argument; may vary: 60–120 words across 2–3 columns; may not: add fill or a fourth column, or leave 14–16pt body type. -->
   <div class="el col" style="left:120px;top:150px;width:528px;height:300px">A reading column is the primary component. It is justified and unboxed, with argument carried by prose rather than decoration. Separate adjacent columns with the fixed 48px gap or one straight hairline.</div>
-<!-- Component: .dropcap + .col — use: first-column opening; vary: letter, ink/red; fixed: once, not sidebar, three boxes. -->
+<!-- Component: lead (.dropcap + .col) — when: opening the first reading column; may vary: letter and ink or red; may not: appear more than once, move to a sidebar, or exceed three boxes. -->
   <div class="el dropcap red" style="left:696px;top:150px;width:84px;height:130px">P</div>
   <div class="el col" style="left:788px;top:156px;width:436px;height:146px">laceholder prose opens beside the cap for exactly three lines.</div>
   <div class="el col" style="left:696px;top:306px;width:528px;height:144px">Then the column resumes at full measure.</div>
-<!-- Component: .kicker + .subhead — use: prose zone; vary: kicker/subhead; fixed: kicker ≤4 words, never repeat headline. -->
+<!-- Component: container (.kicker + .rule + .subhead) — when: grouping one prose zone without a box; may vary: kicker and subhead; may not: let the kicker exceed 4 words or repeat the headline. -->
   <div class="el kicker" style="left:1272px;top:150px;width:528px;height:26px">Column heading</div>
   <div class="el rule" style="left:1272px;top:186px;width:528px;height:1px"></div>
   <div class="el subhead" style="left:1272px;top:210px;width:528px;height:92px">Subhead introduces one argument</div>
   <div class="el caption" style="left:1272px;top:330px;width:528px;height:90px">Optional qualification in italic.</div>
   <div class="el rule" style="left:120px;top:520px;width:1680px;height:1px"></div>
-<!-- Component: .compare — use: equal evidence; vary: labels, prose, red figure side; fixed: depth, measure, period, scope. -->
+<!-- Component: before-after (.compare) — when: two states or options need equal evidence; may vary: labels and prose; may not: mismatch depth, measure, period, or scope. -->
+<!-- Component: selected (.compare .red) — when: one compared side needs emphasis; may vary: which side carries the red figure; may not: highlight both sides. -->
   <div class="el compare" style="left:120px;top:570px;width:816px;height:360px"><div class="kicker">Option one</div><div class="subhead">Placeholder option</div><div class="col-flush">Matched evidence at the same scope and depth.</div><div class="metric-sm">28 units</div></div>
   <div class="el compare" style="left:1000px;top:570px;width:800px;height:360px"><div class="kicker">Option two</div><div class="subhead">Placeholder option</div><div class="col-flush">Matched evidence at the same scope and depth.</div><div class="metric-sm red">42 units</div></div></div>
 <div class="slide">
   <div class="el kicker" style="left:120px;top:70px;width:900px;height:28px">Components / sequence</div>
-<!-- Component: .metric + .caption — use: key result; vary: number, unit, period, scope, support; fixed: comparator, one red. -->
+<!-- Component: metric (.metric + .caption) — when: one key result leads; may vary: number, unit, period, scope, and support; may not: omit the comparator or use more than one red figure. -->
   <div class="el metric red" style="left:120px;top:150px;width:700px;height:160px">42%</div>
   <div class="el caption" style="left:120px;top:330px;width:700px;height:100px">Unit, period, scope, comparator and exclusion.</div>
-<!-- Component: .step — use: sequence; vary: 3–5 steps/copy; fixed: verb names; no arrows, boxes or connectors. -->
+<!-- Component: step (.step) — when: a sequence needs 3–5 stages; may vary: count and copy; may not: use noun-only names or add arrows, boxes, or connectors. -->
+<!-- Component: numbered (.step-num + .subhead) — when: prose points have meaningful order; may vary: 3–5 numerals and verb phrases; may not: imply order for peer facts. -->
   <div class="el step" style="left:900px;top:150px;width:900px;height:145px"><div class="step-num">1</div><div class="subhead">Step one — verb phrase</div><div class="col-flush">State the hand-off.</div></div>
-  <div class="el step" style="left:900px;top:315px;width:900px;height:145px"><div class="step-num">2</div><div class="subhead">Step two — verb phrase</div><div class="col-flush">Match the depth.</div></div>
+  <div class="el step" style="left:900px;top:315px;width:900px;height:145px"><div class="step-num">2</div><div class="subhead">Step two — verb phrase</div><div class="col-flush">Match depth.</div></div>
   <div class="el rule" style="left:120px;top:510px;width:1680px;height:1px"></div>
-<!-- Component: .rule + .subhead (relationship tree) — use: one-to-many; vary: 2–4 children; fixed: straight rules, named relation, one red. -->
+<!-- Component: hierarchy (.rule + .subhead) — when: one statement branches to many; may vary: 2–4 children; may not: bend rules, leave the relation unnamed, or use more than one red emphasis. -->
   <div class="el rule-red" style="left:660px;top:570px;width:600px;height:3px"></div>
   <div class="el subhead" style="left:660px;top:600px;width:600px;height:80px">Central statement names the relation</div>
   <div class="el rule" style="left:960px;top:680px;width:1px;height:70px"></div>
@@ -231,51 +235,51 @@ body{margin:0;padding:40px;background:#DCD6C8;font-family:var(--font-family);zoo
   <div class="el kicker" style="left:1272px;top:830px;width:528px;height:26px">Item three</div></div>
 <div class="slide">
   <div class="el kicker" style="left:120px;top:70px;width:900px;height:28px">Components / exact values</div>
-<!-- Component: .np-table — use: exact values; vary: 3–7 rows, 3–6 columns, red figure; fixed: no vertical/zebra, figures right, 3px total. -->
+<!-- Component: table (.np-table) — when: exact values matter; may vary: 3–7 rows, 3–6 columns, and one red figure; may not: add vertical rules or zebra fill, left-align figures, or lose the 3px total rule. -->
   <div class="el table-text" style="left:120px;top:150px;width:900px;height:420px"><table class="np-table"><thead><tr><th>Line item</th><th>Prior</th><th>Current</th><th>Change</th></tr></thead><tbody><tr><td>Primary item</td><td>72.0</td><td>81.4</td><td>+9.4</td></tr><tr><td>Secondary item</td><td>28.0</td><td>30.6</td><td>+2.6</td></tr><tr class="total"><td>Total</td><td>100.0</td><td class="fig-red">112.0</td><td>+12.0</td></tr></tbody></table></div>
-<!-- Component: .chart-specimen — use: trend/comparison; vary: type, 3–8 marks, target; fixed: no div bars/empty grids/legend when labels fit; one red. -->
+<!-- Component: chart (.chart-specimen) — when: a trend or comparison proves the claim; may vary: native type, 3–8 marks, and target; may not: draw div bars, empty grids, or a legend when direct labels fit, or use more than one red mark. -->
   <div class="el chart-specimen" style="left:1100px;top:150px;width:700px;height:420px"><svg viewBox="0 0 700 420" width="700" height="420"><rect x="80" y="180" width="110" height="238" fill="#151515"/><rect x="295" y="130" width="110" height="288" fill="#151515"/><rect x="510" y="70" width="110" height="348" fill="#B3261E"/><g fill="#151515" font-family="Georgia" font-size="24"><text x="115" y="166">64</text><text x="330" y="116">78</text><text x="545" y="56">94</text><text x="105" y="400">One</text><text x="320" y="400">Two</text><text x="525" y="400">Current</text></g></svg></div>
-<!-- Component: .subhead (takeaway line) — use: consequence; vary: one sentence; fixed: ≤2 lines, do not repeat headline. -->
+<!-- Component: takeaway (.subhead) — when: evidence needs its consequence; may vary: one sentence; may not: exceed 2 lines or repeat the headline. -->
   <div class="el rule" style="left:120px;top:680px;width:1680px;height:1px"></div>
   <div class="el subhead" style="left:120px;top:720px;width:1680px;height:100px">Takeaway states the consequence that the evidence alone cannot carry.</div>
-<!-- Component: .rule-red (icon slot) — use: one sourced asset outside prose; vary: monochrome asset; fixed: no emoji/decoration/inside-column use. -->
+<!-- Component: icon (.rule-red) — when: one sourced asset is essential outside prose; may vary: monochrome asset; may not: use emoji, decoration, or place it inside a reading column. -->
   <div class="el rule" style="left:120px;top:880px;width:96px;height:3px"></div></div>
 <!-- Part 7: Layouts -->
 <!-- Layout: reading spread — use: prose; vary: 2–3 columns, cap colour; fixed: no fourth column/second cap -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:270px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:350px;width:528px;height:590px"><span class="region-name">col-1</span><span class="region-fill">.dropcap + .col</span></div>
-  <div class="el region" style="left:696px;top:350px;width:528px;height:590px"><span class="region-name">col-2</span><span class="region-fill">.col</span></div>
-  <div class="el region" style="left:1272px;top:350px;width:528px;height:590px"><span class="region-name">col-3</span><span class="region-fill">.col + optional caption</span></div></div>
+  <div class="el region" style="left:120px;top:350px;width:528px;height:590px"><span class="region-name">col-1</span><span class="region-fill">lead</span></div>
+  <div class="el region" style="left:696px;top:350px;width:528px;height:590px"><span class="region-name">col-2</span><span class="region-fill">lead</span></div>
+  <div class="el region" style="left:1272px;top:350px;width:528px;height:590px"><span class="region-name">col-3</span><span class="region-fill">lead</span></div></div>
 <!-- Layout: comparison — use: two matched states/options; vary: red side; fixed: equal columns, evidence depth/scope. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:270px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:350px;width:816px;height:500px"><span class="region-name">left</span><span class="region-fill">.compare · prose + figure</span></div>
-  <div class="el region" style="left:984px;top:350px;width:816px;height:500px"><span class="region-name">right</span><span class="region-fill">.compare · prose + one red figure</span></div>
-  <div class="el region" style="left:120px;top:880px;width:1680px;height:90px"><span class="region-name">takeaway</span><span class="region-fill">.subhead (takeaway line)</span></div></div>
+  <div class="el region" style="left:120px;top:350px;width:816px;height:500px"><span class="region-name">left</span><span class="region-fill">before-after</span></div>
+  <div class="el region" style="left:984px;top:350px;width:816px;height:500px"><span class="region-name">right</span><span class="region-fill">before-after + selected</span></div>
+  <div class="el region" style="left:120px;top:880px;width:1680px;height:90px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div></div>
 <!-- Layout: process-four — use: sequence; vary: 3–5 steps; fixed: numbered prose rows, no arrows/boxes. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:270px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:350px;width:1680px;height:130px"><span class="region-name">step-1</span><span class="region-fill">.step</span></div>
-  <div class="el region" style="left:120px;top:500px;width:1680px;height:130px"><span class="region-name">step-2</span><span class="region-fill">.step</span></div>
-  <div class="el region" style="left:120px;top:650px;width:1680px;height:130px"><span class="region-name">step-3</span><span class="region-fill">.step</span></div>
-  <div class="el region" style="left:120px;top:800px;width:1680px;height:130px"><span class="region-name">step-4</span><span class="region-fill">.step (red numeral optional)</span></div></div>
+  <div class="el region" style="left:120px;top:350px;width:1680px;height:130px"><span class="region-name">step-1</span><span class="region-fill">step + numbered</span></div>
+  <div class="el region" style="left:120px;top:500px;width:1680px;height:130px"><span class="region-name">step-2</span><span class="region-fill">step + numbered</span></div>
+  <div class="el region" style="left:120px;top:650px;width:1680px;height:130px"><span class="region-name">step-3</span><span class="region-fill">step + numbered</span></div>
+  <div class="el region" style="left:120px;top:800px;width:1680px;height:130px"><span class="region-name">step-4</span><span class="region-fill">step + numbered</span></div></div>
 <!-- Layout: lead-sidebar — use: argument + related facts; vary: 3–5 side items; fixed: 1104/528, no fills. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:270px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:350px;width:1104px;height:590px"><span class="region-name">body</span><span class="region-fill">.kicker + .subhead + .col</span></div>
-  <div class="el region" style="left:1272px;top:350px;width:528px;height:590px"><span class="region-name">right</span><span class="region-fill">.kicker + .subhead + .col ×3–5</span></div></div>
+  <div class="el region" style="left:120px;top:350px;width:1104px;height:590px"><span class="region-name">body</span><span class="region-fill">container + lead</span></div>
+  <div class="el region" style="left:1272px;top:350px;width:528px;height:590px"><span class="region-name">right</span><span class="region-fill">container + lead ×3–5</span></div></div>
 <!-- Layout: figure-chart — use: quantitative claim; vary: figure/chart/support; fixed: one red, direct labels, one baseline. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:270px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:350px;width:816px;height:500px"><span class="region-name">left</span><span class="region-fill">.metric + .caption</span></div>
-  <div class="el region" style="left:984px;top:350px;width:816px;height:500px"><span class="region-name">chart</span><span class="region-fill">.chart-specimen</span></div>
-  <div class="el region" style="left:120px;top:880px;width:1680px;height:90px"><span class="region-name">takeaway</span><span class="region-fill">.subhead (takeaway line)</span></div></div>
+  <div class="el region" style="left:120px;top:350px;width:816px;height:500px"><span class="region-name">left</span><span class="region-fill">metric</span></div>
+  <div class="el region" style="left:984px;top:350px;width:816px;height:500px"><span class="region-name">chart</span><span class="region-fill">chart</span></div>
+  <div class="el region" style="left:120px;top:880px;width:1680px;height:90px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div></div>
 <!-- Layout: table — use: exact values; vary: 3–7 rows, 3–6 columns; fixed: hairlines, one header band. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:58px;width:1680px;height:270px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:350px;width:1680px;height:500px"><span class="region-name">table</span><span class="region-fill">.np-table · one red figure + 3px total rule</span></div>
-  <div class="el region" style="left:120px;top:880px;width:1680px;height:90px"><span class="region-name">takeaway</span><span class="region-fill">.caption or .subhead (takeaway line)</span></div></div>
+  <div class="el region" style="left:120px;top:350px;width:1680px;height:500px"><span class="region-name">table</span><span class="region-fill">table</span></div>
+  <div class="el region" style="left:120px;top:880px;width:1680px;height:90px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div></div>
 <!-- Part 8: Showcase -->
 <div class="slide">
   <div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>

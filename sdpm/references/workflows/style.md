@@ -33,8 +33,8 @@ Every style has the same parts in the same order, so a composer knows where to l
 | 3 Message & Outline | What the orchestrator reads before writing the outline: title grammar (assertion sentence, noun phrase, single word…), one claim per slide, lead-in and closing conventions, density per slide, chapter shape (agenda tracker, section dividers, summary first…), which visual forms this style favours. The style states per-slide density and chapter shape, but **deck length is not the style's decision**: it follows the brief and material (audience, time, takeaway). |
 | 4 Palette & Type | One or two slides. Each colour as a small chip with its token name and its job (which colour means what, how many accents on one slide, text colour on each fill); the size ramp at real size, one row per `--fs-*` token with pt / line height and when to use it (max lines per title). Values live in `:root` — do not restate them in prose. |
 | 5 Frame | The elements repeated on every slide — title band, section label, section divider, agenda tracker, closing slide — built exactly as composers should build them. **Shown here once**; later parts do not repeat it. |
-| 6 Components | The parts *this* style builds slides from, each shown alone at real size on a few sheet slides: its card or panel (or what replaces cards when the style has none), callout / takeaway line, step and connector, metric block, label / tag, table treatment, chart conventions (series colours, highlight, direct labels, baseline), icon treatment — whatever the style uses, and only that. Each component is preceded by an HTML comment: its class name, when to use it, what may vary and what may not. |
-| 7 Layouts | 5–8 wireframes of how this style divides a slide: one `.el frame-ghost` box marking the area Part 5's frame occupies, then named `.el region` boxes — the same short names the layout pass writes (`body`, `left` / `right`, `step-1`…, `media`, `takeaway`) — each labelled with the components that fill it (`step ×4 + connector`). Cover the recurring slide types (single body, comparison, 3 / 4 columns, process, media beside text, table or chart with takeaway) and what the style is for (swimlane, dashboard, code). Each layout's comment says which kind of claim it serves and what may vary. |
+| 6 Components | The parts *this* style builds slides from, each shown alone at real size on a few sheet slides, named by **role** from the vocabulary below. Each component is preceded by `<!-- Component: <role> (.<class>) — when; may vary: …; may not: … -->`. A required role the style does without still gets its line — `<!-- Component: container — none; group by whitespace and rules -->` — so a composer never guesses. |
+| 7 Layouts | 5–8 wireframes of how this style divides a slide: one `.el frame-ghost` box marking the area Part 5's frame occupies, then named `.el region` boxes — the same short names the layout pass writes (`body`, `left` / `right`, `step-1`…, `media`, `takeaway`) — each labelled with the component roles that fill it (`step ×4 + connector`). Cover the recurring slide types (single body, comparison, 3 / 4 columns, process, media beside text, table or chart with takeaway) and what the style is for (swimlane, dashboard, code). Each layout's comment says which kind of claim it serves and what may vary. |
 | 8 Showcase | 2–3 finished slides combining components in layouts, frame included — the style's most characteristic slides. They are what a person sees in the gallery. |
 
 Fill every part. Components and Layouts are what keep a deck in this style's look instead of
@@ -46,6 +46,50 @@ rebuilding it. Everything in the file is either read as an instruction or copied
 geometry, so leave out what is neither: invented body text and sources, captions that repeat
 the comment, div-drawn charts (charts are native — state their conventions in Part 6), notes
 explaining the demo.
+
+## Component vocabulary
+
+Roles are shared by every style; how a role looks is each style's decision. Naming components
+by role lets a composer find "this style's comparison part" in any style, and lets Part 7 and
+the layout pass label regions the same way everywhere.
+
+| Group | Roles | Required |
+|---|---|---|
+| Grouping | `container` (card, panel, or what replaces it), `selected` (the one emphasised member) | both |
+| Text | `takeaway` (the one-line conclusion), `numbered` (numbered point or finding), `list`, `lead`, `quote` | `takeaway`, `numbered` |
+| Numbers | `metric` (figure + unit + comparator), `delta`, `before-after`, `progress` | `metric` |
+| Sequence | `step` + `connector`, `phase` (stage header), `milestone` | `step` + `connector` |
+| Relationship | `hub` (centre and satellites), `hierarchy`, `axis` (2×2 or spectrum), `brace` (items gathered into one conclusion) | — |
+| Labels | `tag` (status or category), `marker` (number or point marker), `legend` | `tag` |
+| Evidence | `table`, `chart` (native; the comment carries series colours, highlight, labels, baseline), `media` (image or screenshot treatment), `code`, `icon` | `table`, `chart` |
+
+Define the optional roles the style is for and leave the rest out. Shape vocabulary is not a
+goal: a role is worth a non-rectangular shape only when the style's look calls for it.
+
+**Shape classes.** When a component uses a shape other than a rectangle, give it a class named
+after the slide JSON `shape` value — `.shape-<name>`, with `_` written as `-` — so class → JSON
+is mechanical. Draw it with `clip-path` or borders on the `.el` box; the inline style still
+carries only the box. Copy just the ones the style uses:
+
+```css
+/* JSON "pentagon" is the arrow-tipped phase header (home plate), not a regular pentagon */
+.shape-pentagon { --notch: 40px; clip-path: polygon(0 0, calc(100% - var(--notch)) 0, 100% 50%, calc(100% - var(--notch)) 100%, 0 100%); }
+.shape-chevron  { --notch: 40px; clip-path: polygon(0 0, calc(100% - var(--notch)) 0, 100% 50%, calc(100% - var(--notch)) 100%, 0 100%, var(--notch) 50%); padding-left: var(--notch); }
+.shape-triangle { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.shape-diamond  { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.shape-hexagon  { clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
+.shape-oval     { border-radius: 50%; }
+.shape-donut    { border-radius: 50%; background: none; border: 24px solid var(--accent); }
+.shape-block-arc { --sweep: 73%; --ring: 24px; border-radius: 50%;
+  background: conic-gradient(var(--accent) var(--sweep), var(--color-surface) 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring))); }
+```
+
+Keep the notch in px: PowerPoint sizes the point from the shorter side — in the JSON it is
+`adjustments: [notch ÷ shorter side]` (default 0.5) — so a `%` notch that grows with the width
+misleads. Consecutive chevrons nest by overlapping the notch minus the gap you want
+(`x` of the next = `x + width − notch + gap`); state notch and gap in the component comment. Vary the notch with a
+modifier class (`.notch-sm { --notch: 24px; }`), never inline.
 
 ## Token contract
 

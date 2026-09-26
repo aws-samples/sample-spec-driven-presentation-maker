@@ -61,8 +61,8 @@ body{margin:0;padding:40px;background:var(--color-bg);font-family:var(--font-fam
 .muted{color:var(--color-muted)}
 .on-accent{color:var(--color-on-accent)}
 .heavy{font-weight:800}
-.shape,.circle,.track{background:var(--accent)}
-.circle{border-radius:50%}
+.shape,.shape-oval,.track{background:var(--accent)}
+.shape-oval{border-radius:50%}
 .band{background:var(--accent);transform:rotate(var(--band-angle))}
 .rule{background:var(--color-border)}
 .rule-list{margin:10px 0 0;padding-left:24px}
@@ -89,7 +89,7 @@ body{margin:0;padding:40px;background:var(--color-bg);font-family:var(--font-fam
 </head><body>
 <!-- Part 1: Cover -->
 <div class="slide">
-  <div class="el circle" style="left:1264px;top:-180px;width:560px;height:560px"></div>
+  <div class="el shape-oval" style="left:1264px;top:-180px;width:560px;height:560px"></div>
   <div class="el rule" style="left:1104px;top:0px;width:1px;height:1080px"></div>
   <div class="el label muted" style="left:96px;top:56px;width:552px;height:32px">Bundled style</div>
   <div class="el cover-title" style="left:96px;top:200px;width:1008px;height:272px">SWISS<br>POSTER</div>
@@ -113,7 +113,7 @@ body{margin:0;padding:40px;background:var(--color-bg);font-family:var(--font-fam
   <div class="el label" style="left:96px;top:984px;width:264px;height:32px">03 / NN</div></div>
 <!-- Part 3: Message & Outline -->
 <div class="slide">
-  <div class="el circle" style="left:1448px;top:380px;width:520px;height:520px"></div>
+  <div class="el shape-oval" style="left:1448px;top:380px;width:520px;height:520px"></div>
   <div class="el rule" style="left:96px;top:312px;width:1272px;height:1px"></div>
   <div class="el label muted" style="left:96px;top:56px;width:552px;height:32px">Message and outline</div>
   <div class="el slide-title" style="left:96px;top:120px;width:1128px;height:192px">SHORT PHRASE,<br>SINGLE CLAIM</div>
@@ -157,7 +157,7 @@ body{margin:0;padding:40px;background:var(--color-bg);font-family:var(--font-fam
 <!-- Part 5: Frame -->
 <!-- Frame: content poster — claims; vary shape/labels/rule; never title, content, or number anchors. -->
 <div class="slide">
-  <div class="el circle" style="left:1448px;top:520px;width:560px;height:560px"></div>
+  <div class="el shape-oval" style="left:1448px;top:520px;width:560px;height:560px"></div>
   <div class="el rule" style="left:96px;top:312px;width:1272px;height:1px"></div>
   <div class="el label muted" style="left:96px;top:56px;width:552px;height:32px">Section label</div>
   <div class="el slide-title" style="left:96px;top:120px;width:1128px;height:192px">CLAIM AS SHORT<br>NOUN PHRASE</div>
@@ -174,7 +174,7 @@ body{margin:0;padding:40px;background:var(--color-bg);font-family:var(--font-fam
   <div class="el label" style="left:96px;top:984px;width:264px;height:32px">NN / NN</div></div>
 <!-- Frame: closing poster — mirror cover; vary phrase/body; never another shape or colour. -->
 <div class="slide">
-  <div class="el circle" style="left:1264px;top:700px;width:560px;height:560px"></div>
+  <div class="el shape-oval" style="left:1264px;top:700px;width:560px;height:560px"></div>
   <div class="el rule" style="left:1104px;top:0px;width:1px;height:1080px"></div>
   <div class="el label muted" style="left:96px;top:56px;width:552px;height:32px">Closing</div>
   <div class="el cover-title" style="left:96px;top:240px;width:984px;height:272px">CLOSING<br>PHRASE</div>
@@ -183,17 +183,22 @@ body{margin:0;padding:40px;background:var(--color-bg);font-family:var(--font-fam
 <!-- Part 6: Components -->
 <div class="slide">
   <div class="el label muted" style="left:96px;top:56px;width:700px;height:32px">Components / anchors and figures</div>
-<!-- Component: .circle/.shape/.band — single anchor; vary legal silhouette/size/bleed/angle; never a second red form. -->
-  <div class="el circle" style="left:96px;top:180px;width:360px;height:360px"></div>
+<!-- Component: container — none; group by whitespace and hairline rules -->
+<!-- Component: selected (.shape-oval) — single anchor; may vary: legal silhouette, size, bleed, and angle; may not: add a second red form. -->
+<!-- Component: hub (.shape-oval) — relationship centre; may vary: centre label and 3–4 dependencies; may not: bleed, add arrows, or add nodes. -->
+<!-- Component: lead (.body-text) — one prose measure or supporting block; may vary: wording and line count within the grid; may not: compete with the single anchor. -->
+  <div class="el shape-oval" style="left:96px;top:180px;width:360px;height:360px"></div>
   <div class="el heading" style="left:528px;top:180px;width:552px;height:58px">Single red anchor</div>
   <div class="el body-text" style="left:528px;top:260px;width:696px;height:180px">Circle, square, horizontal or vertical bar, or diagonal band. A circle may stay inside only when it is a relationship centre; otherwise the shape may bleed one or two edges.</div>
-<!-- Component: .shape + .metric — metric-on-shape; hero figure; vary figure/comparator; never red type, second fill, or missing scope. -->
+<!-- Component: metric (.metric) — metric on the single shape; may vary: hero figure and comparator; may not: use red type, a second fill, or omit scope. -->
   <div class="el shape" style="left:-96px;top:650px;width:1224px;height:240px"></div>
   <div class="el metric on-accent" style="left:96px;top:674px;width:984px;height:192px">−42%</div>
   <div class="el body-text" style="left:1200px;top:650px;width:600px;height:180px">Pair the figure with scope, period, and one comparator. White-on-red is legal because the bar is the one shape.</div></div>
 <div class="slide">
   <div class="el label muted" style="left:96px;top:56px;width:700px;height:32px">Components / sequence and comparison</div>
-<!-- Component: .track + .number + .heading — process-track; 3–5 equal steps; vary count/bar thickness; never arrows, connectors, or unequal widths. -->
+<!-- Component: numbered (.number) — numbered process point; may vary: count from 3–5; may not: use unequal widths or restart numbering. -->
+<!-- Component: step (.heading) — equal process step; may vary: label and count from 3–5; may not: use unequal widths or arrows. -->
+<!-- Component: connector (.track) — one shared process track; may vary: bar thickness; may not: use arrows or separate connectors. -->
   <div class="el track" style="left:-80px;top:360px;width:2080px;height:96px"></div>
   <div class="el number" style="left:96px;top:190px;width:264px;height:96px">01</div>
   <div class="el heading" style="left:96px;top:500px;width:408px;height:58px">Verb phrase</div>
@@ -203,7 +208,7 @@ body{margin:0;padding:40px;background:var(--color-bg);font-family:var(--font-fam
   <div class="el heading" style="left:960px;top:500px;width:408px;height:58px">Verb phrase</div>
   <div class="el number" style="left:1392px;top:190px;width:264px;height:96px">04</div>
   <div class="el heading" style="left:1392px;top:500px;width:408px;height:58px">Verb phrase</div>
-<!-- Component: .rule + .heading + .body-text — split-comparison; two equal unboxed states; vary labels/copy; never cards, unequal columns, or before/after arrow. -->
+<!-- Component: before-after (.rule) — two equal unboxed states; may vary: labels and copy; may not: use cards, unequal columns, or a before/after arrow. -->
   <div class="el rule" style="left:948px;top:670px;width:1px;height:260px"></div>
   <div class="el heading muted" style="left:96px;top:690px;width:816px;height:58px">Prior or option A</div>
   <div class="el body-text muted" style="left:96px;top:770px;width:816px;height:135px">Up to three aligned attributes.<br>One common measure.</div>
@@ -212,51 +217,51 @@ body{margin:0;padding:40px;background:var(--color-bg);font-family:var(--font-fam
 <div class="slide">
   <div class="el shape" style="left:1680px;top:560px;width:400px;height:400px"></div>
   <div class="el label muted" style="left:96px;top:56px;width:700px;height:32px">Components / evidence</div>
-<!-- Component: .poster-table — exact values; vary 3–6 rows/4–5 columns; never fills, vertical rules, or left-aligned figures. -->
+<!-- Component: table (.poster-table) — exact values; may vary: 3–6 rows and 4–5 columns; may not: use fills, vertical rules, or left-aligned figures. -->
   <div class="el" style="left:96px;top:150px;width:1440px;height:360px"><table class="poster-table"><thead><tr><th>Item</th><th>Prior</th><th>Current</th><th>Change</th></tr></thead><tbody><tr><td>Primary item</td><td>100</td><td class="heavy">124</td><td>+24</td></tr><tr><td>Secondary item</td><td>80</td><td class="heavy">91</td><td>+11</td></tr><tr><td>Third item</td><td>60</td><td class="heavy">72</td><td>+12</td></tr></tbody></table></div>
-<!-- Component: native chart — vary type/3–6 marks; never div bars, legends, axes, or grids beyond baseline; one red mark is the shape. -->
-<!-- Component: .vert — vertical-label; right-margin context; vary 2–5 words/320–480px height; never twice or outside x1784/40px. -->
+<!-- Component: chart — quantitative evidence with a native chart; may vary: type and 3–6 marks; may not: use div bars, legends, axes, grids beyond baseline, or make a second red mark. -->
+<!-- Component: tag (.vert) — right-margin context label; may vary: 2–5 words and 320–480px height; may not: appear twice or outside x1784/40px. -->
   <div class="el vert muted" style="left:1784px;top:120px;width:40px;height:400px">Vertical context</div>
-<!-- Component: .body-text.heavy — chart/table takeaway; one interpretation; vary sentence; never restate title or add a claim. -->
+<!-- Component: takeaway (.body-text.heavy) — one chart or table interpretation; may vary: sentence; may not: restate the title or add a claim. -->
   <div class="el body-text heavy" style="left:1008px;top:690px;width:528px;height:180px">One sentence states what the evidence changes.</div></div>
 <!-- Part 7: Layouts -->
 <!-- Layout: single-body — explanation/hero; vary body/anchor; never decorative splits. -->
 <div class="slide">
-  <div class="el frame-ghost" style="left:96px;top:56px;width:1728px;height:256px"><span class="region-name">frame (Part 5)</span> <span class="region-fill">label + title + hairline + number + one red anchor</span></div>
-  <div class="el region" style="left:96px;top:376px;width:1272px;height:500px"><span class="region-name">body</span> <span class="region-fill">metric-on-shape or one prose measure</span></div>
-  <div class="el region" style="left:96px;top:900px;width:1272px;height:70px"><span class="region-name">takeaway</span> <span class="region-fill">one unboxed implication</span></div></div>
+  <div class="el frame-ghost" style="left:96px;top:56px;width:1728px;height:256px"><span class="region-name">frame (Part 5)</span> <span class="region-fill">tag + numbered + selected</span></div>
+  <div class="el region" style="left:96px;top:376px;width:1272px;height:500px"><span class="region-name">body</span> <span class="region-fill">metric or lead</span></div>
+  <div class="el region" style="left:96px;top:900px;width:1272px;height:70px"><span class="region-name">takeaway</span> <span class="region-fill">takeaway</span></div></div>
 <!-- Layout: comparison — recommendation/change; vary favored side; keep equal columns/one divider. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:96px;top:56px;width:1728px;height:256px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:96px;top:376px;width:816px;height:430px"><span class="region-name">left</span> <span class="region-fill">split-comparison · muted when before</span></div>
-  <div class="el region" style="left:1008px;top:376px;width:816px;height:430px"><span class="region-name">right</span> <span class="region-fill">split-comparison · anchor favors recommendation / after</span></div>
-  <div class="el region" style="left:96px;top:840px;width:1728px;height:120px"><span class="region-name">takeaway</span> <span class="region-fill">one synthesis sentence</span></div></div>
+  <div class="el region" style="left:96px;top:376px;width:816px;height:430px"><span class="region-name">left</span> <span class="region-fill">before-after · muted before</span></div>
+  <div class="el region" style="left:1008px;top:376px;width:816px;height:430px"><span class="region-name">right</span> <span class="region-fill">selected before-after · anchor favors recommendation / after</span></div>
+  <div class="el region" style="left:96px;top:840px;width:1728px;height:120px"><span class="region-name">takeaway</span> <span class="region-fill">takeaway</span></div></div>
 <!-- Layout: three-or-four-columns — densest peer set; vary 3–4 headings and 96–240px bottom bar; keep equal columns, two copy lines each, and one bar crossing right. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:96px;top:56px;width:1728px;height:256px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:96px;top:376px;width:408px;height:430px"><span class="region-name">col-1</span> <span class="region-fill">.number + .heading + .body-text</span></div>
-  <div class="el region" style="left:528px;top:376px;width:408px;height:430px"><span class="region-name">col-2</span> <span class="region-fill">.number + .heading + .body-text</span></div>
-  <div class="el region" style="left:960px;top:376px;width:408px;height:430px"><span class="region-name">col-3</span> <span class="region-fill">.number + .heading + .body-text</span></div>
-  <div class="el region" style="left:1392px;top:376px;width:408px;height:430px"><span class="region-name">col-4</span> <span class="region-fill">.number + .heading + .body-text</span></div>
-  <div class="el region" style="left:96px;top:850px;width:1728px;height:120px"><span class="region-name">anchor</span> <span class="region-fill">.shape bottom bar</span></div></div>
+  <div class="el region" style="left:96px;top:376px;width:408px;height:430px"><span class="region-name">col-1</span> <span class="region-fill">numbered + lead</span></div>
+  <div class="el region" style="left:528px;top:376px;width:408px;height:430px"><span class="region-name">col-2</span> <span class="region-fill">numbered + lead</span></div>
+  <div class="el region" style="left:960px;top:376px;width:408px;height:430px"><span class="region-name">col-3</span> <span class="region-fill">numbered + lead</span></div>
+  <div class="el region" style="left:1392px;top:376px;width:408px;height:430px"><span class="region-name">col-4</span> <span class="region-fill">numbered + lead</span></div>
+  <div class="el region" style="left:96px;top:850px;width:1728px;height:120px"><span class="region-name">anchor</span> <span class="region-fill">selected bottom bar</span></div></div>
 <!-- Layout: process-four — directional claim; vary 3–5 equal steps; one track, no arrows. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:96px;top:56px;width:1728px;height:256px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:96px;top:376px;width:408px;height:470px"><span class="region-name">step-1</span> <span class="region-fill">.number + .track + .heading</span></div>
-  <div class="el region" style="left:528px;top:376px;width:408px;height:470px"><span class="region-name">step-2</span> <span class="region-fill">.number + .track + .heading</span></div>
-  <div class="el region" style="left:960px;top:376px;width:408px;height:470px"><span class="region-name">step-3</span> <span class="region-fill">.number + .track + .heading</span></div>
-  <div class="el region" style="left:1392px;top:376px;width:408px;height:470px"><span class="region-name">step-4</span> <span class="region-fill">.number + .track + .heading</span></div></div>
+  <div class="el region" style="left:96px;top:376px;width:408px;height:470px"><span class="region-name">step-1</span> <span class="region-fill">numbered + step + connector</span></div>
+  <div class="el region" style="left:528px;top:376px;width:408px;height:470px"><span class="region-name">step-2</span> <span class="region-fill">numbered + step + connector</span></div>
+  <div class="el region" style="left:960px;top:376px;width:408px;height:470px"><span class="region-name">step-3</span> <span class="region-fill">numbered + step + connector</span></div>
+  <div class="el region" style="left:1392px;top:376px;width:408px;height:470px"><span class="region-name">step-4</span> <span class="region-fill">numbered + step + connector</span></div></div>
 <!-- Layout: relationship — centre + 3–4 dependencies; vary copy; circle inside, centre-aligned, no arrows/nodes. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:96px;top:56px;width:1728px;height:256px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:96px;top:376px;width:552px;height:500px"><span class="region-name">left</span> <span class="region-fill">.body-text ×2</span></div>
-  <div class="el region" style="left:720px;top:392px;width:480px;height:480px"><span class="region-name">body</span> <span class="region-fill">.circle + centre label</span></div>
-  <div class="el region" style="left:1272px;top:376px;width:552px;height:500px"><span class="region-name">right</span> <span class="region-fill">.body-text ×2</span></div></div>
+  <div class="el region" style="left:96px;top:376px;width:552px;height:500px"><span class="region-name">left</span> <span class="region-fill">lead ×2</span></div>
+  <div class="el region" style="left:720px;top:392px;width:480px;height:480px"><span class="region-name">body</span> <span class="region-fill">hub + centre label</span></div>
+  <div class="el region" style="left:1272px;top:376px;width:552px;height:500px"><span class="region-name">right</span> <span class="region-fill">lead ×2</span></div></div>
 <!-- Layout: table-or-chart — quantitative claim; vary chart/table; never both or a second red shape. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:96px;top:56px;width:1728px;height:256px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:96px;top:376px;width:1248px;height:500px"><span class="region-name">table / chart</span> <span class="region-fill">.poster-table or native chart · direct labels</span></div>
-  <div class="el region" style="left:1392px;top:376px;width:408px;height:500px"><span class="region-name">takeaway</span> <span class="region-fill">.body-text.heavy · .shape may bleed right</span></div></div>
+  <div class="el region" style="left:96px;top:376px;width:1248px;height:500px"><span class="region-name">table / chart</span> <span class="region-fill">table or chart · direct labels</span></div>
+  <div class="el region" style="left:1392px;top:376px;width:408px;height:500px"><span class="region-name">takeaway</span> <span class="region-fill">takeaway · selected may bleed right</span></div></div>
 <!-- Part 8: Showcase -->
 <!-- Showcase: hero metric — claimed figure on the red bar. -->
 <div class="slide">

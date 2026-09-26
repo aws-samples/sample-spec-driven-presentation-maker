@@ -69,13 +69,13 @@ body{margin:0;padding:40px;background:#D8CDBA;font-family:var(--font-family);zoo
 <div class="slide">
   <div class="el lb" style="left:120px;top:70px;width:700px;height:32px">Message and outline</div>
   <div class="el st ft" style="left:120px;top:115px;width:1680px;height:145px">Short claims hit harder</div>
-  <div class="el box red hd" style="left:120px;top:340px;width:500px;height:120px">Title grammar</div>
+  <div class="el box red hd" style="left:120px;top:340px;width:500px;height:120px">Title form</div>
   <div class="el bt" style="left:120px;top:500px;width:500px;height:360px">Use a punchy assertion of 6 words or fewer, maximum 2 lines. Draft “Claim of this slide stated as a sentence,” then compress without losing the claim.</div>
   <div class="el box yellow hd" style="left:710px;top:340px;width:500px;height:120px">Deck shape</div>
   <div class="el bt" style="left:710px;top:500px;width:500px;height:360px">Brief and content set length. Keep one claim per slide. Opening, sequence, and closing follow the material; this look imposes no chapter template.</div>
   <div class="el box green hd" style="left:1300px;top:340px;width:500px;height:120px">Density limit</div>
   <div class="el bt" style="left:1300px;top:500px;width:500px;height:360px">Use 15–45 visible words, excluding labels and tables, in 1–4 content blocks. Split when a second independent claim appears.</div>
-  <div class="el box surface bt" style="left:120px;top:900px;width:1680px;height:105px">Favor large numbers, direct comparisons, short processes, explicit relationships, and compact tables. Subject varies; visual grammar does not.</div></div>
+  <div class="el box surface bt" style="left:120px;top:885px;width:1680px;height:155px">Favor large numbers, direct comparisons, short processes, explicit relationships, and compact tables. Subject varies; visual grammar does not.</div></div>
 <!-- Part 4: Palette & Type -->
 <div class="slide">
   <div class="el lb" style="left:120px;top:45px;width:500px;height:32px">Palette + actual type</div>
@@ -103,7 +103,7 @@ body{margin:0;padding:40px;background:#D8CDBA;font-family:var(--font-family);zoo
 <!-- Frame: standard content — all evidence slides; vary label, claim, optional page tag and supplied source; never margins, title reserve, content top, or geometry. -->
 <div class="slide">
   <div class="el lb" style="left:120px;top:65px;width:620px;height:32px">Section label</div>
-  <div class="el st ft" style="left:120px;top:112px;width:1680px;height:160px">Claim stated in six words</div>
+  <div class="el st ft" style="left:120px;top:112px;width:1320px;height:160px">Claim stated in six words</div>
   <div class="el box yellow lb center" style="left:1480px;top:55px;width:300px;height:70px">01 / 12</div>
   <div class="el lb muted" style="left:120px;top:315px;width:900px;height:35px">Content begins at --content-top / 300px</div>
   <div class="el ff cp" style="left:120px;top:975px;width:1680px;height:48px">One supplied source only; leave template pagination clear.</div></div>
@@ -121,78 +121,82 @@ body{margin:0;padding:40px;background:#D8CDBA;font-family:var(--font-family);zoo
   <div class="el box green lb center" style="left:1370px;top:610px;width:310px;height:190px">End</div>
   <div class="el bt" style="left:120px;top:870px;width:1300px;height:100px">Close on the claim and its immediate implication.</div></div>
 <!-- Part 6: Components -->
+<!-- Component: tag — none; use a plain .lb label, with fill reserved for selected content -->
 <div class="slide">
   <div class="el lb" style="left:120px;top:60px;width:700px;height:32px">Components / impact</div>
-<!-- Component: .box — content block; vary fill and size; never lose 6px border, 12px shadow, square corner, or overlap. -->
+<!-- Component: container (.box) — when: grouping one content block; may vary: fill and size; may not: lose the 6px border, 12px shadow, square corner, or overlap. -->
+<!-- Component: selected (.box.red) — when: one block is the recommended or active member; may vary: which member carries the fill; may not: highlight every peer or change its geometry. -->
+<!-- Component: takeaway (.box) — when: evidence needs one immediate implication; may vary: phrase and one flat fill; may not: exceed one block or repeat the title. -->
   <div class="el box red hd" style="left:120px;top:140px;width:500px;height:240px">Claim block</div>
-<!-- Component: .box + .mx + .bt — metric stage; one figure with unit and comparator; vary figure/fill; never float without context or encode direction by color alone. -->
+<!-- Component: metric (.box + .mx + .bt) — when: one figure leads with unit and comparator; may vary: figure and fill; may not: float without context or encode direction by colour alone. -->
   <div class="el box surface" style="left:730px;top:140px;width:1070px;height:300px"></div>
   <div class="el mx txr" style="left:790px;top:190px;width:700px;height:150px">42%</div>
   <div class="el bt" style="left:790px;top:350px;width:850px;height:55px">Metric · unit · period · comparator</div>
-<!-- Component: .mt + .bt — indexed point; 3–5 prose points; vary count/text; never exceed density or use colored tags. -->
+<!-- Component: numbered (.mt + .bt) — when: 3–5 prose points have meaningful order; may vary: count and text; may not: exceed density or use coloured tags. -->
   <div class="el mt txr" style="left:120px;top:545px;width:120px;height:100px">01</div>
   <div class="el bt" style="left:280px;top:555px;width:520px;height:90px">Supporting point in one sentence.</div>
-<!-- Component: .box + .connector — process step; 3–5 steps; vary repeated fill and “Step N — verb phrase”; never vary geometry, rotate, or exceed three fills. -->
+<!-- Component: step (.box) — when: a process has 3–5 stages; may vary: repeated fill and “Step N — verb phrase”; may not: vary geometry, rotate, or exceed three fills. -->
+<!-- Component: connector (.connector) — when: adjacent process steps hand off left to right; may vary: length with spacing; may not: curve, rotate, or detach from equal step boxes. -->
   <div class="el box red hd" style="left:120px;top:740px;width:400px;height:230px">Step 1<br>Verb phrase</div>
   <div class="el connector" style="left:540px;top:850px;width:120px;height:6px"></div>
   <div class="el box yellow hd" style="left:680px;top:740px;width:400px;height:230px">Step 2<br>Verb phrase</div>
   <div class="el connector" style="left:1100px;top:850px;width:120px;height:6px"></div>
   <div class="el box green hd" style="left:1240px;top:740px;width:400px;height:230px">Step 3<br>Verb phrase</div>
-<!-- Component: .box.surface — icon slot; one essential sourced monochrome icon; vary asset; never emoji or decorative sets. -->
+<!-- Component: icon (.box.surface) — when: one sourced monochrome icon is essential; may vary: asset; may not: use emoji or decorative sets. -->
   <div class="el box surface center lb" style="left:980px;top:525px;width:150px;height:120px">Icon</div>
   <div class="el cp" style="left:1180px;top:555px;width:600px;height:60px">Black asset on one flat fill.</div></div>
 <div class="slide">
   <div class="el lb" style="left:120px;top:60px;width:800px;height:32px">Components / exact evidence</div>
-<!-- Component: .data-table — 3–6 rows, 2–5 columns; vary labels and one highlighted cell; never lose direct headers, alignment, 6px rules, or add decorative fills. -->
+<!-- Component: table (.data-table) — when: exact evidence needs 3–6 rows and 2–5 columns; may vary: labels and one highlighted cell; may not: lose direct headers, alignment, or 6px rules, or add decorative fills. -->
   <div class="el box surface tt" style="left:120px;top:140px;width:1000px;height:430px"><table class="data-table"><thead><tr><th>Category</th><th>Measure</th><th>Result</th></tr></thead><tbody><tr><td>Item A</td><td>42</td><td>Direct phrase</td></tr><tr><td>Item B</td><td>58</td><td>Direct phrase</td></tr><tr><td>Item C</td><td>73</td><td>Direct phrase</td></tr></tbody></table></div>
-<!-- Component: .box + .mt — before/after delta; identical scope/baseline; vary states and after fill; never mismatch geometry or omit arithmetic. -->
+<!-- Component: before-after (.box + .mt) — when: a delta compares identical scope and baseline; may vary: states and after fill; may not: mismatch geometry or omit arithmetic. -->
   <div class="el box surface hd" style="left:1260px;top:140px;width:540px;height:190px">Before <span class="mt">64</span></div>
   <div class="el box green hd" style="left:1260px;top:390px;width:540px;height:190px">After <span class="mt">42</span></div>
-  <div class="el box red center hd" style="left:1320px;top:650px;width:420px;height:130px">−22 points</div>
-<!-- Component: .box + .connector — relationship hub; one-to-many with 2–4 satellites; vary labels/fills; never overlap, curve, or leave relationship wording implicit. -->
+  <div class="el box red center hd" style="left:1400px;top:650px;width:400px;height:130px">−22 points</div>
+<!-- Component: hub (.box + .connector) — when: one core relates to 2–4 satellites; may vary: labels and fills; may not: overlap, curve, or leave relationship wording implicit. -->
   <div class="el box surface center hd" style="left:120px;top:700px;width:430px;height:150px">Central idea</div>
   <div class="el connector" style="left:570px;top:770px;width:120px;height:6px"></div>
   <div class="el box yellow center lb" style="left:710px;top:700px;width:300px;height:150px">Relation A</div>
   <div class="el box blue center lb" style="left:1060px;top:700px;width:300px;height:150px">Relation B</div>
-<!-- Component: native chart treatment — 3–6 directly labelled marks on one zero baseline; vary native chart type and repeated fills; never draw div bars, use needless grids, or use a legend when labels fit. -->
+<!-- Component: chart — when: 3–6 directly labelled marks share one zero baseline; may vary: native chart type and repeated fills; may not: draw div bars, use needless grids, or use a legend when labels fit. -->
 </div>
 <!-- Part 7: Layouts -->
 <!-- Layout: single-body — one figure or prose claim; vary body form, never split it decoratively. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:55px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:320px;width:1680px;height:540px"><span class="region-name">body</span><span class="region-fill">.box + .mx + .bt or .mt + .bt</span></div>
-  <div class="el region" style="left:120px;top:900px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">.box</span></div></div>
+  <div class="el region" style="left:120px;top:320px;width:1680px;height:540px"><span class="region-name">body</span><span class="region-fill">metric or numbered</span></div>
+  <div class="el region" style="left:120px;top:900px;width:1680px;height:100px"><span class="region-name">takeaway</span><span class="region-fill">takeaway</span></div></div>
 <!-- Layout: two-columns — two peer claims on matched criteria; vary side/fill; keep equal visual weight, aligned tops, one claim, 6px borders, and 12px shadows. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:55px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:320px;width:790px;height:560px"><span class="region-name">left</span><span class="region-fill">.box</span></div>
-  <div class="el region" style="left:1010px;top:320px;width:790px;height:560px"><span class="region-name">right</span><span class="region-fill">.box</span></div></div>
+  <div class="el region" style="left:120px;top:320px;width:790px;height:560px"><span class="region-name">left</span><span class="region-fill">container</span></div>
+  <div class="el region" style="left:1010px;top:320px;width:790px;height:560px"><span class="region-name">right</span><span class="region-fill">container</span></div></div>
 <!-- Layout: three-or-four-columns — compare 3–4 categories; vary up to three fills; keep equal widths, terse copy, aligned baselines, and four blocks maximum. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:55px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:320px;width:380px;height:560px"><span class="region-name">col-1</span><span class="region-fill">.box</span></div>
-  <div class="el region" style="left:553px;top:320px;width:380px;height:560px"><span class="region-name">col-2</span><span class="region-fill">.box</span></div>
-  <div class="el region" style="left:987px;top:320px;width:380px;height:560px"><span class="region-name">col-3</span><span class="region-fill">.box</span></div>
-  <div class="el region" style="left:1420px;top:320px;width:380px;height:560px"><span class="region-name">col-4</span><span class="region-fill">.box</span></div></div>
+  <div class="el region" style="left:120px;top:320px;width:380px;height:560px"><span class="region-name">col-1</span><span class="region-fill">container</span></div>
+  <div class="el region" style="left:553px;top:320px;width:380px;height:560px"><span class="region-name">col-2</span><span class="region-fill">container</span></div>
+  <div class="el region" style="left:987px;top:320px;width:380px;height:560px"><span class="region-name">col-3</span><span class="region-fill">container</span></div>
+  <div class="el region" style="left:1420px;top:320px;width:380px;height:560px"><span class="region-name">col-4</span><span class="region-fill">container</span></div></div>
 <!-- Layout: process — 3–5 left-to-right steps; vary count/repeated fills, never connector direction or grammar. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:55px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:360px;width:360px;height:390px"><span class="region-name">step-1</span><span class="region-fill">.box + .connector</span></div>
-  <div class="el region" style="left:560px;top:360px;width:360px;height:390px"><span class="region-name">step-2</span><span class="region-fill">.box + .connector</span></div>
-  <div class="el region" style="left:1000px;top:360px;width:360px;height:390px"><span class="region-name">step-3</span><span class="region-fill">.box + .connector</span></div>
-  <div class="el region" style="left:1440px;top:360px;width:360px;height:390px"><span class="region-name">step-4</span><span class="region-fill">.box + .connector</span></div></div>
+  <div class="el region" style="left:120px;top:360px;width:360px;height:390px"><span class="region-name">step-1</span><span class="region-fill">step + connector</span></div>
+  <div class="el region" style="left:560px;top:360px;width:360px;height:390px"><span class="region-name">step-2</span><span class="region-fill">step + connector</span></div>
+  <div class="el region" style="left:1000px;top:360px;width:360px;height:390px"><span class="region-name">step-3</span><span class="region-fill">step + connector</span></div>
+  <div class="el region" style="left:1440px;top:360px;width:360px;height:390px"><span class="region-name">step-4</span><span class="region-fill">step + connector</span></div></div>
 <!-- Layout: relationship — one hub and 2–4 satellites; vary labels/fills, never overlap or rely on geometry alone. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:55px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:710px;top:320px;width:500px;height:240px"><span class="region-name">body</span><span class="region-fill">.box + .connector</span></div>
-  <div class="el region" style="left:120px;top:690px;width:400px;height:220px"><span class="region-name">col-1</span><span class="region-fill">.box</span></div>
-  <div class="el region" style="left:760px;top:690px;width:400px;height:220px"><span class="region-name">col-2</span><span class="region-fill">.box</span></div>
-  <div class="el region" style="left:1400px;top:690px;width:400px;height:220px"><span class="region-name">col-3</span><span class="region-fill">.box</span></div></div>
+  <div class="el region" style="left:710px;top:320px;width:500px;height:240px"><span class="region-name">body</span><span class="region-fill">hub core + connector</span></div>
+  <div class="el region" style="left:120px;top:690px;width:400px;height:220px"><span class="region-name">col-1</span><span class="region-fill">hub satellite</span></div>
+  <div class="el region" style="left:760px;top:690px;width:400px;height:220px"><span class="region-name">col-2</span><span class="region-fill">hub satellite</span></div>
+  <div class="el region" style="left:1400px;top:690px;width:400px;height:220px"><span class="region-name">col-3</span><span class="region-fill">hub satellite</span></div></div>
 <!-- Layout: table or chart — exact or quantitative evidence; vary native exhibit, keep direct labels and one takeaway. -->
 <div class="slide">
   <div class="el frame-ghost" style="left:120px;top:55px;width:1680px;height:220px"><span class="region-name">frame (Part 5)</span></div>
-  <div class="el region" style="left:120px;top:320px;width:1250px;height:560px"><span class="region-name">table / chart</span><span class="region-fill">.data-table or native chart</span></div>
-  <div class="el region" style="left:1430px;top:320px;width:370px;height:560px"><span class="region-name">takeaway</span><span class="region-fill">.box + .mx + .bt or .box</span></div></div>
+  <div class="el region" style="left:120px;top:320px;width:1250px;height:560px"><span class="region-name">table / chart</span><span class="region-fill">table or chart</span></div>
+  <div class="el region" style="left:1430px;top:320px;width:370px;height:560px"><span class="region-name">takeaway</span><span class="region-fill">metric or takeaway</span></div></div>
 <!-- Part 8: Showcase -->
 <!-- Showcase: big number — finished standard frame plus dominant metric and comparator. -->
 <div class="slide">

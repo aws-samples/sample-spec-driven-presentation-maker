@@ -37,6 +37,13 @@ REQUIRED_TOKENS = ("--color-text", "--color-bg", "--fs-cover-title", "--fs-slide
 PART_MARKERS = tuple(f"Part {n}" for n in range(1, 9))
 # Every composer receives the whole file; the skeleton fits well under this.
 MAX_STYLE_CHARS = 50_000
+# Component vocabulary (workflows/style.md): roles every style must state, and all roles
+REQUIRED_ROLES = ("container", "selected", "takeaway", "numbered", "metric", "step", "connector", "tag", "table", "chart")
+ALL_ROLES = REQUIRED_ROLES + (
+    "list", "lead", "quote", "delta", "before-after", "progress", "phase", "milestone",
+    "hub", "hierarchy", "axis", "brace", "marker", "legend", "media", "code", "icon",
+)
+COMPONENT_RE = re.compile(r"<!--\s*Component:\s*([a-z-]+)")
 BRAND_WORDS = ("McKinsey", "BCG", "Bain", "Accenture", "Deloitte", "Apple", "TED", "Amazon", "AWS", "Google")
 EMOJI_RE = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F2FF]")
 ROOT_RE = re.compile(r":root\s*\{(.*?)\}", re.DOTALL | re.IGNORECASE)
@@ -94,6 +101,21 @@ class TestStyleContract:
         html = path.read_text(encoding="utf-8")
         for m in re.finditer(r'<div class="el region[^"]*"[^>]*>(.*?)</div>', html):
             assert 'class="region-name' in m.group(1), f"{path.stem}: unnamed region {m.group(0)[:80]}"
+
+    def test_components_are_named_by_role(self, path: Path) -> None:
+        html = path.read_text(encoding="utf-8")
+        part6 = html[html.index("Part 6") : html.index("Part 7")]
+        roles = COMPONENT_RE.findall(part6)
+        unknown = sorted(set(roles) - set(ALL_ROLES))
+        assert not unknown, f"{path.stem}: component roles not in the vocabulary: {unknown}"
+        missing = [r for r in REQUIRED_ROLES if r not in roles]
+        assert not missing, f"{path.stem}: required roles without a Component line: {missing}"
+
+    def test_region_fills_name_roles(self, path: Path) -> None:
+        html = path.read_text(encoding="utf-8")
+        for fill in re.findall(r'class="region-fill">(.*?)</span>', html):
+            words = set(re.findall(r"[a-z]+(?:-[a-z]+)?", fill.lower()))
+            assert words & set(ALL_ROLES), f"{path.stem}: region fill names no role: {fill!r}"
 
     def test_size_budget(self, path: Path) -> None:
         size = len(path.read_text(encoding="utf-8"))
