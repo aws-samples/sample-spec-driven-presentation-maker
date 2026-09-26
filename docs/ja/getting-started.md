@@ -151,7 +151,16 @@ make register-dev AGENT=sdpm-x CLIENTS=kiro-cli   # worktree ごとに 1 エー�
 make mcp-config-dev            # この checkout 用の設定を表示するだけ
 ```
 
-`kiro-cli chat --agent sdpm-dev` で作業ツリー、`--agent sdpm` でインストール版が動きます。Claude Code の
+`kiro-cli chat --agent sdpm-dev` で作業ツリー、`--agent sdpm` でインストール版が動きます。Web UI は登録不要です:
+`servers/local` を自分の `web-ui/` からの相対で解決するので、`cd web-ui && npm run dev:local` で clone の
+サーバーと ACP エージェントがホットリロード付きで動きます（`sdpm webui` が 3000 を使っていれば `PORT=3001`。
+逆にインストール版を動かすなら `SDPM_WEBUI_PORT`）。
+
+| | インストール版（ユーザーが使うもの） | 自分の clone |
+|---|---|---|
+| MCP（Kiro CLI） | `kiro-cli chat --agent sdpm` | `make register-dev` → `--agent sdpm-dev` |
+| Web UI | `sdpm webui` | `cd web-ui && npm run dev:local` |
+| 更新 | `sdpm update` | `git pull` — 編集は次のセッションから反映 |Claude Code の
 `--scope user` はスコープ内でサーバー名が 1 つなので、clone はプロジェクトスコープの登録か
 `claude --mcp-config …` のアドホック設定にし、user スコープの `sdpm` は置き換えないでください。
 

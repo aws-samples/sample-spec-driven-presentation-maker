@@ -158,7 +158,16 @@ make mcp-config-dev            # just print the configuration for this checkout
 ```
 
 `kiro-cli chat --agent sdpm-dev` then runs your working tree, `--agent sdpm` the installed
-release. For Claude Code, `--scope user` registration is one server name per scope, so use
+release. The Web UI needs no registration: it resolves `servers/local` relative to its own
+`web-ui/` directory, so `cd web-ui && npm run dev:local` runs your clone's server and ACP
+agents with hot reload (`PORT=3001` if `sdpm webui` is up on 3000; `SDPM_WEBUI_PORT` moves
+the installed one instead).
+
+| | Installed (what users run) | Your clone |
+|---|---|---|
+| MCP (Kiro CLI) | `kiro-cli chat --agent sdpm` | `make register-dev` → `--agent sdpm-dev` |
+| Web UI | `sdpm webui` | `cd web-ui && npm run dev:local` |
+| Update | `sdpm update` | `git pull` — edits apply on the next session | For Claude Code, `--scope user` registration is one server name per scope, so use
 a project-scoped entry or `claude --mcp-config <(make -s mcp-config-dev …)` style ad-hoc
 configs for the clone rather than replacing the user-scope `sdpm`.
 
