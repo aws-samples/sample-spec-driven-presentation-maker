@@ -53,12 +53,45 @@ def test_every_client_has_cli_registration_or_manual_instructions():
         assert client.label in rendered
 
 
-def test_kiro_cli_registers_globally_with_force():
-    argv = cc.by_id("kiro-cli").register(POSIX)
-    assert argv[:3] == ["kiro-cli", "mcp", "add"]
-    assert "--force" in argv and argv[argv.index("--scope") + 1] == "global"
-    assert argv[argv.index("--command") + 1] == POSIX.uv
-    assert json.loads(argv[argv.index("--args") + 1]) == cc.server_config(POSIX)["args"]
+def test_kiro_agent_is_wiring_only():
+    agent = cc.kiro_agent_definition(POSIX)
+    assert agent["name"] == "sdpm"
+    assert agent["mcpServers"]["sdpm"]["command"] == POSIX.uv
+    assert agent["mcpServers"]["sdpm"]["args"] == cc.server_config(POSIX)["args"]
+    assert "prompt" not in agent and "file://" not in json.dumps(agent)
+    assert "@sdpm" in agent["allowedTools"] and "use_subagent" in agent["tools"]
+    assert not {"write", "shell", "execute_bash"} & set(agent["tools"])
+    assert cc.KIRO_AGENT_MARKER in agent["description"]
+
+
+def test_write_kiro_agent_creates_refreshes_and_respects_foreign_file(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)  # no kiro-cli validate step
+    assert cc.write_kiro_agent(POSIX, root=tmp_path) == 0
+    path = tmp_path / "agents" / "sdpm.json"
+    assert json.loads(path.read_text())["mcpServers"]["sdpm"]["command"] == POSIX.uv
+    assert cc.kiro_agent_registered(root=tmp_path) is True
+    # refresh with a new target overwrites our own file
+    other = cc.Target(uv="/new/uv", checkout="/new/checkout", platform="linux")
+    assert cc.write_kiro_agent(other, root=tmp_path) == 0
+    assert json.loads(path.read_text())["mcpServers"]["sdpm"]["command"] == "/new/uv"
+    # a user's own agent of the same name is never touched
+    path.write_text('{"name": "sdpm", "prompt": "mine"}')
+    assert cc.write_kiro_agent(POSIX, root=tmp_path) == 0
+    assert json.loads(path.read_text()) == {"name": "sdpm", "prompt": "mine"}
+    assert "not managed by sdpm" in capsys.readouterr().out
+    assert cc.kiro_agent_registered(root=tmp_path) is False
+    cc.remove_kiro_agent(root=tmp_path)
+    assert path.exists()  # still theirs
+
+
+def test_write_kiro_agent_dry_run_and_remove(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    assert cc.write_kiro_agent(POSIX, dry_run=True, root=tmp_path) == 0
+    assert not (tmp_path / "agents" / "sdpm.json").exists()
+    assert "[dry-run] write" in capsys.readouterr().out
+    cc.write_kiro_agent(POSIX, root=tmp_path)
+    cc.remove_kiro_agent(root=tmp_path)
+    assert not (tmp_path / "agents" / "sdpm.json").exists()
 
 
 def test_claude_code_and_codex_use_double_dash_form():
@@ -87,11 +120,11 @@ def test_cursor_deeplink_encodes_the_same_server_config():
 
 def test_register_dry_run_runs_nothing_and_opens_nothing(capsys):
     ran, opened = [], []
-    clients = [cc.by_id("kiro-cli"), cc.by_id("cursor"), cc.by_id("claude-desktop")]
+    clients = [cc.by_id("claude-code"), cc.by_id("cursor"), cc.by_id("claude-desktop")]
     failures = cc.register(clients, POSIX, dry_run=True, run=ran.append, open_url=opened.append)
     assert failures == 0 and ran == [] and opened == []
     out = capsys.readouterr().out
-    assert "[dry-run] kiro-cli mcp add" in out
+    assert "[dry-run] claude mcp add" in out
     assert "[dry-run] open cursor://" in out
     assert "Claude Desktop" in out  # manual clients are printed, never executed
 
@@ -118,8 +151,8 @@ def test_register_declined_prompt_skips(monkeypatch):
 
 def test_unregister_uses_client_cli_or_explains(capsys):
     ran = []
-    cc.unregister([cc.by_id("kiro-cli"), cc.by_id("vscode")], run=lambda a: (ran.append(a), 0)[1])
-    assert ran == [["kiro-cli", "mcp", "remove", "--scope", "global", "--name", "sdpm"]]
+    cc.unregister([cc.by_id("claude-code"), cc.by_id("vscode")], run=lambda a: (ran.append(a), 0)[1])
+    assert ran == [["claude", "mcp", "remove", "--scope", "user", "sdpm"]]
     assert "Visual Studio Code" in capsys.readouterr().out
 
 
@@ -183,8 +216,10 @@ def test_register_kiro_offers_and_removes_leftovers(tmp_path, monkeypatch, capsy
     (tmp_path / "agents").mkdir()
     agent = tmp_path / "agents" / "sdpm-composer.json"
     agent.write_text('{"prompt": "file:///c/skills/sdpm-composer/SKILL.md"}')
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
     cc.register([cc.by_id("kiro-cli")], POSIX, assume_yes=True, run=lambda _a: 0)
     assert not agent.exists()
+    assert (tmp_path / "agents" / "sdpm.json").exists()
     assert "previous Kiro installer" in capsys.readouterr().out
 
 
@@ -193,8 +228,9 @@ def test_register_kiro_dry_run_keeps_leftovers(tmp_path, monkeypatch, capsys):
     (tmp_path / "agents").mkdir()
     agent = tmp_path / "agents" / "sdpm-composer.json"
     agent.write_text('{"prompt": "file:///c/skills/sdpm-composer/SKILL.md"}')
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
     cc.register([cc.by_id("kiro-cli")], POSIX, dry_run=True, run=lambda _a: 0)
-    assert agent.exists()
+    assert agent.exists() and not (tmp_path / "agents" / "sdpm.json").exists()
     assert "[dry-run] remove" in capsys.readouterr().out
 
 
@@ -204,3 +240,14 @@ def test_unregister_kiro_removes_leftovers(tmp_path, monkeypatch):
     (tmp_path / "skills" / "sdpm-create").symlink_to(tmp_path / "gone")
     cc.unregister([cc.by_id("kiro-cli")], run=lambda _a: 0)
     assert not (tmp_path / "skills" / "sdpm-create").is_symlink()
+
+
+def test_register_kiro_offers_to_remove_global_entry(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    (tmp_path / "settings").mkdir()
+    (tmp_path / "settings" / "mcp.json").write_text('{"mcpServers": {"sdpm": {"command": "uv"}}}')
+    ran = []
+    cc.register([cc.by_id("kiro-cli")], POSIX, assume_yes=True, run=lambda a: (ran.append(a), 0)[1])
+    assert ran == [["kiro-cli", "mcp", "remove", "--scope", "global", "--name", "sdpm"]]
+    assert "redundant" in capsys.readouterr().out

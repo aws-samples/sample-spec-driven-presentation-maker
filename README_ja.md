@@ -70,7 +70,8 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 
 | やりたいこと | 手順 |
 |---|---|
-| いつもの AI エージェントで使う（Kiro CLI / Claude Code / Cursor / VS Code / Codex / Kiro IDE） | インストーラーの登録提案に yes と答えていれば、エージェントに**「〜のスライドを作って」**と頼むだけ。それ以外、または別のクライアントを後から: `sdpm register` |
+| いつもの AI エージェントで使う（Claude Code / Cursor / VS Code / Codex） | インストーラーの登録提案に yes と答えていれば、エージェントに**「〜のスライドを作って」**と頼むだけ。それ以外、または別のクライアントを後から: `sdpm register` |
+| Kiro CLI で使う | インストーラーが専用の `sdpm` エージェントを作ります（ツールと信頼設定はそのエージェントに閉じ、他のセッションには何も足しません）: `kiro-cli chat --agent sdpm` |
 | ブラウザで使う | `sdpm webui` |
 | Claude Desktop で使う | [`sdpm.mcpb` をダウンロード](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb)してダブルクリック（インストーラー不要） |
 | チームで共有サーバー / Web UI を使う | [AWS にデプロイ](docs/en/deploy-cloudshell.md) |
@@ -80,6 +81,28 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 インストーラーが導入を提案し、無くても PPTX は生成され、足りないものをエージェントに伝えます。
 オプション、クライアントの手動設定、開発者向けセットアップは[はじめに](docs/ja/getting-started.md)へ。
 
+### AI エージェントにインストールさせる
+
+このリポジトリの URL をコーディングエージェントに渡して「入れて」と頼む人も多いはずです。
+その場合（あなたでもエージェントでも）、非対話の形はこれです:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --mcp-only --non-interactive --register
+```
+
+`--mcp-only` はブラウザ用 Web UI を省きます（含めるなら外すか `--full`。Node.js 20+ が必要）。
+`--register` は見つかった全 MCP クライアントに確認なしで接続します（`--no-register` なら設定を
+表示するだけ）。確認は `sdpm`（状態）と
+`python3 ~/.sdpm/checkout/scripts/install/mcp_smoke.py ~/.local/bin/sdpm mcp`。全オプション:
+[はじめに](docs/ja/getting-started.md#インストーラーのオプション)。
+
+> **旧環境を移行するエージェントへの破壊的変更の注記:** インストーラー以前の導入手段 —
+> Claude Code / Codex の plugin、Kiro Power、`make install-kiro`、`skills/` ディレクトリ、
+> `uvx … sdpm-mcp` のクライアント設定 — はすべて廃止されました。
+> [移行: 導入方法](docs/en/migration-onboarding.md)の表に従って削除してください。特に残りがちな
+> `~/.kiro/agents/sdpm-composer.json` とグローバル `~/.kiro/settings/mcp.json` の項目は
+> `sdpm register kiro-cli` が検出して削除を提案します。ツール名・prompt・デッキのファイルは変わりません。
+
 **モードを選ぶ。** 頼むだけで十分ですが、明示したいときはサーバーの prompt を使います:
 `sdpm-vibe`（素材から質問なしで作る）、`sdpm-spec`（対話で構成を固めてから作る）、
 `sdpm-style`（再利用できるスタイルガイド）、`sdpm-translate`（デッキの言語版）— Claude Desktop の
@@ -87,10 +110,9 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 `/sdpm-vibe`。各 prompt は役割の入口ツールを指すだけで、振る舞いは `sdpm/references/workflows/`
 の 1 か所にあります。
 
-> **旧バージョンからのアップグレード:** plugin・skill・`make install-kiro`・`uvx` 構成は
-> 廃止されました — インストーラーを 1 回実行し、[移行: 導入方法](docs/en/migration-onboarding.md)を
-> 参照してください。それ以前の変更: [v0.5](docs/en/migration-v0.5.md)、
-> [role workflows](docs/en/migration-role-workflows.md)。
+> **旧バージョンからのアップグレード:** 上の破壊的変更の注記と
+> [移行: 導入方法](docs/en/migration-onboarding.md)を参照してください。それ以前の変更:
+> [v0.5](docs/en/migration-v0.5.md)、[role workflows](docs/en/migration-role-workflows.md)。
 
 ---
 

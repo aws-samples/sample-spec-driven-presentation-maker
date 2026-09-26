@@ -685,6 +685,7 @@ register_clients() {
 show_completion() {
   echo ""; printf "  ${C_GREEN}SDPM is installed.${C_RESET}\n\n"
   echo "    Your agent:   ask it \"Make slides about ...\" — it finds SDPM through MCP."
+  echo "                  Kiro CLI: kiro-cli chat --agent sdpm"
   if [[ "$PROFILE" == "full" ]]; then
     echo "    Browser:      sdpm webui"
     kiro-cli whoami >/dev/null 2>&1 || echo "                  (the Web UI uses Kiro CLI: run 'kiro-cli login' once first)"

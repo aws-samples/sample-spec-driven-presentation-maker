@@ -67,16 +67,17 @@ checkout を直接指します（次節）。
 
 ## AI エージェントから使う（MCP）
 
-`sdpm register` は各クライアント自身の CLI で接続するので、設定ファイルを手で編集しません:
+`sdpm register` は各クライアント自身の CLI で（Kiro CLI は SDPM が所有するエージェントファイルを
+作って）接続するので、既存の設定ファイルを手で編集しません:
 
 | クライアント | `sdpm register` がすること |
 |---|---|
-| Kiro CLI（Kiro IDE も — `~/.kiro/settings/mcp.json` を共有） | `kiro-cli mcp add --scope global …` |
+| Kiro CLI | 専用エージェント `~/.kiro/agents/sdpm.json` を書く（MCP サーバー、ツール、並列 composer のための `@sdpm` と `use_subagent` の信頼設定。prompt テキストは無し）— `kiro-cli chat --agent sdpm` か `/agent sdpm` で開始。他のセッションには何も足さない。`--agent-name` で別名、自作のエージェントファイルには触れない |
 | Claude Code | `claude mcp add --scope user sdpm -- …` |
 | Visual Studio Code | `code --add-mcp …` |
 | Codex（CLI / IDE 拡張 / ChatGPT デスクトップアプリ） | `codex mcp add sdpm -- …` |
 | Cursor | 実パスで組み立てた `cursor://…/mcp/install` deep link を開く — 1 クリック |
-| Kiro CLI 無しの Kiro IDE、その他 | JSON と書き込み先ファイルを表示 |
+| Kiro IDE、その他 | JSON と書き込み先ファイルを表示（Kiro IDE は `~/.kiro/settings/mcp.json`） |
 | Claude Desktop | 代わりに [`sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) をダブルクリック |
 
 どの設定も同じ 1 行で、絶対パスです:
@@ -93,7 +94,9 @@ checkout を直接指します（次節）。
 ```
 
 絶対パスが重要です: Dock やスタートメニューから起動した GUI クライアントはシェルの `PATH` を
-引き継ぎません。`sdpm mcp-config` があなたのパスを埋めたこのブロックを表示するので、上の表に
+引き継ぎません。Kiro CLI では同じブロックがエージェントファイルの中にあります。旧構成でグローバル
+`~/.kiro/settings/mcp.json` に SDPM が入っている場合、`sdpm register kiro-cli` がその項目（全セッションに
+ツールが載る）と、旧インストーラーが生成した `sdpm-composer` エージェントの削除を提案します。`sdpm mcp-config` があなたのパスを埋めたこのブロックを表示するので、上の表に
 無いクライアントにはそのまま貼ります。
 
 あとはエージェントにスライドを頼むだけです。最初に呼ばれる `start_presentation` が、作業を導く

@@ -111,14 +111,80 @@ class Client:
     note: str = ""
 
 
-def _kiro_cli_register(t: Target) -> list[str]:
-    # --scope global: without it kiro-cli writes the *workspace* config of the cwd.
-    return [
-        "kiro-cli", "mcp", "add", "--force", "--scope", "global",
-        "--name", SERVER_NAME,
-        "--command", t.uv,
-        "--args", json.dumps(server_config(t)["args"]),
-    ]
+# Kiro's unit of configuration is the agent (tools, allowed tools, MCP servers), so SDPM is a
+# dedicated agent rather than an entry in the global mcp.json that would put 20 tools and an
+# approval prompt per run_python into every session. The agent is wiring only: no prompt, no
+# file:// pointer — the role documents come from the server (start_* tools).
+KIRO_AGENT_MARKER = "(managed by `sdpm register`)"
+DEFAULT_KIRO_AGENT = "sdpm"
+_KIRO_AGENT_TOOLS = ["@sdpm", "use_subagent", "read", "glob", "grep", "web_search", "web_fetch"]
+
+
+def kiro_agent_definition(t: Target, name: str = DEFAULT_KIRO_AGENT) -> dict:
+    cfg = server_config(t)
+    return {
+        "name": name,
+        "description": (
+            "Spec-Driven Presentation Maker — slides from material or dialogue. "
+            "Prompts: /sdpm-vibe /sdpm-spec /sdpm-style /sdpm-translate. " + KIRO_AGENT_MARKER
+        ),
+        "mcpServers": {SERVER_NAME: {**cfg, "timeout": 120000}},
+        # @sdpm is trusted: composing a deck is dozens of run_python calls, and run_python
+        # is a local sandbox confined to the deck directory. Nothing here writes files or
+        # runs shell commands outside that sandbox.
+        "tools": list(_KIRO_AGENT_TOOLS),
+        "allowedTools": list(_KIRO_AGENT_TOOLS),
+        # Composers are copies of this agent: spawning it needs no approval, and no other
+        # agent (say, a stale one from an old installer) can be picked by mistake.
+        "toolsSettings": {"subagent": {"availableAgents": [name], "trustedAgents": [name]}},
+        "resources": [],
+    }
+
+
+def kiro_agent_path(name: str = DEFAULT_KIRO_AGENT, root: Optional[Path] = None) -> Path:
+    return (root or kiro_home()) / "agents" / f"{name}.json"
+
+
+def _is_our_agent_file(path: Path) -> bool:
+    try:
+        return KIRO_AGENT_MARKER in path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+
+
+def write_kiro_agent(t: Target, *, name: str = DEFAULT_KIRO_AGENT, dry_run: bool = False,
+                     root: Optional[Path] = None) -> int:
+    """Create or refresh the agent file we own. A user's own agent of that name is left alone."""
+    path = kiro_agent_path(name, root)
+    if path.exists() and not _is_our_agent_file(path):
+        print(f"{path} exists and is not managed by sdpm — leaving it alone.")
+        print("  Use `sdpm register kiro-cli --agent-name <other>` or add the server to that agent yourself:")
+        print("  " + json.dumps(server_config(t)))
+        return 0
+    text = json.dumps(kiro_agent_definition(t, name), indent=2, ensure_ascii=False) + "\n"
+    print(("[dry-run] write " if dry_run else "wrote ") + str(path))
+    if dry_run:
+        return 0
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    if shutil.which("kiro-cli"):
+        rc = _run(["kiro-cli", "agent", "validate", "--path", str(path)])
+        if rc != 0:
+            print(f"  kiro-cli agent validate rejected {path}", file=sys.stderr)
+            return 1
+    return 0
+
+
+def remove_kiro_agent(*, name: str = DEFAULT_KIRO_AGENT, dry_run: bool = False, root: Optional[Path] = None) -> None:
+    path = kiro_agent_path(name, root)
+    if path.exists() and _is_our_agent_file(path):
+        print(("[dry-run] remove " if dry_run else "removed ") + str(path))
+        if not dry_run:
+            path.unlink()
+
+
+def kiro_agent_registered(name: str = DEFAULT_KIRO_AGENT, root: Optional[Path] = None) -> bool:
+    return _is_our_agent_file(kiro_agent_path(name, root))
 
 
 def _claude_code_register(t: Target) -> list[str]:
@@ -141,12 +207,10 @@ def _cursor_deeplink(t: Target) -> str:
 CLIENTS: tuple[Client, ...] = (
     Client(
         id="kiro-cli",
-        label="Kiro CLI (and Kiro IDE — they share ~/.kiro/settings/mcp.json)",
+        label="Kiro CLI",
         detect=lambda: _which("kiro-cli"),
-        register=_kiro_cli_register,
-        unregister=lambda: ["kiro-cli", "mcp", "remove", "--scope", "global", "--name", SERVER_NAME],
-        list_cmd=["kiro-cli", "mcp", "list"],
-        manual_target="~/.kiro/settings/mcp.json",
+        manual_target="~/.kiro/agents/sdpm.json",
+        note="Creates a dedicated agent: start it with `kiro-cli chat --agent sdpm` (or /agent sdpm).",
     ),
     Client(
         id="claude-code",
@@ -187,7 +251,6 @@ CLIENTS: tuple[Client, ...] = (
         label="Kiro IDE",
         detect=lambda: _dir_exists(".kiro")() and not _which("kiro-cli"),
         manual_target="~/.kiro/settings/mcp.json",
-        note="Installing Kiro CLI lets `sdpm register` do this for you.",
     ),
     Client(
         id="claude-desktop",
@@ -251,6 +314,15 @@ def kiro_leftovers(root: Optional[Path] = None) -> list[Path]:
     return found
 
 
+def kiro_global_entry(root: Optional[Path] = None) -> bool:
+    """True when the global mcp.json carries an `sdpm` server (old installer, or our #396 era)."""
+    path = (root or kiro_home()) / "settings" / "mcp.json"
+    try:
+        return SERVER_NAME in json.loads(path.read_text(encoding="utf-8")).get("mcpServers", {})
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
 def remove_leftovers(paths: list[Path], *, dry_run: bool = False) -> None:
     for path in paths:
         print(("[dry-run] remove " if dry_run else "removed ") + str(path))
@@ -281,6 +353,11 @@ def manual_json(target: Target) -> str:
 
 def render_client(client: Client, target: Target) -> str:
     lines = [f"## {client.label}"]
+    if client.id == "kiro-cli":
+        lines.append(f"`sdpm register kiro-cli` writes this agent to {client.manual_target}:")
+        lines.extend("  " + ln for ln in json.dumps(kiro_agent_definition(target), indent=2).splitlines())
+        lines.append(client.note)
+        return "\n".join(lines)
     if client.register is not None:
         lines.append("Run:")
         lines.append("  " + _shell_join(client.register(target)))
@@ -312,6 +389,7 @@ def config_document(clients: list[Client], target: Target) -> dict:
                 "id": c.id,
                 "label": c.label,
                 "register": c.register(target) if c.register else None,
+                "agent": kiro_agent_definition(target) if c.id == "kiro-cli" else None,
                 "unregister": c.unregister() if c.unregister else None,
                 "manual_target": c.manual_target,
                 "deeplink": c.deeplink(target) if c.deeplink else None,
@@ -357,10 +435,21 @@ def register(
     assume_yes: bool = False,
     run: Callable[[list[str]], int] = _run,
     open_url: Callable[[str], bool] = webbrowser.open,
+    agent_name: str = DEFAULT_KIRO_AGENT,
 ) -> int:
     """Register with each client; returns the number of failures."""
     failures = 0
+    done: list[Client] = []
     for client in clients:
+        if client.id == "kiro-cli":
+            if not assume_yes and not dry_run and not _confirm(f"Register SDPM with {client.label} (agent '{agent_name}')?"):
+                continue
+            if write_kiro_agent(target, name=agent_name, dry_run=dry_run) == 0:
+                done.append(client)
+            else:
+                failures += 1
+            _offer_leftover_cleanup(dry_run=dry_run, assume_yes=assume_yes, run=run)
+            continue
         if client.register is None and client.deeplink is None:
             print(render_client(client, target))
             print()
@@ -373,14 +462,29 @@ def register(
             if not dry_run and run(argv) != 0:
                 failures += 1
                 print(f"  failed — you can add it manually:\n{render_client(client, target)}", file=sys.stderr)
-            if client.id == "kiro-cli":
-                _offer_leftover_cleanup(dry_run=dry_run, assume_yes=assume_yes)
+            else:
+                done.append(client)
         elif client.deeplink is not None:
             url = client.deeplink(target)
             print(("[dry-run] open " if dry_run else "Opening ") + url)
             if not dry_run and not open_url(url):
                 print(render_client(client, target))
+            else:
+                done.append(client)
+    if done and not dry_run:
+        print()
+        print("Next:")
+        for client in done:
+            print(f"  {client.label + ':':<22} {next_step(client, agent_name)}")
     return failures
+
+
+def next_step(client: Client, agent_name: str = DEFAULT_KIRO_AGENT) -> str:
+    if client.id == "kiro-cli":
+        return f"kiro-cli chat --agent {agent_name}   then ask: make slides about …"
+    if client.id == "cursor":
+        return "confirm the Install dialog Cursor just opened, then ask: make slides about …"
+    return "restart it if it is running, then ask: make slides about …"
 
 
 def _print_leftover_warning() -> None:
@@ -391,22 +495,32 @@ def _print_leftover_warning() -> None:
         print("    Remove with: sdpm register kiro-cli   (or sdpm unregister kiro-cli)")
 
 
-def _offer_leftover_cleanup(*, dry_run: bool, assume_yes: bool) -> None:
+def _offer_leftover_cleanup(*, dry_run: bool, assume_yes: bool, run: Callable[[list[str]], int] = _run) -> None:
     leftovers = kiro_leftovers()
-    if not leftovers:
-        return
-    print(leftover_notice(leftovers))
-    if dry_run or assume_yes or _confirm("Remove them?"):
-        remove_leftovers(leftovers, dry_run=dry_run)
+    if leftovers:
+        print(leftover_notice(leftovers))
+        if dry_run or assume_yes or _confirm("Remove them?"):
+            remove_leftovers(leftovers, dry_run=dry_run)
+    if kiro_global_entry():
+        print(f"The global ~/.kiro/settings/mcp.json has an '{SERVER_NAME}' server. With the sdpm agent it is")
+        print("redundant and puts the tools into every session (an old installer wrote it).")
+        argv = ["kiro-cli", "mcp", "remove", "--scope", "global", "--name", SERVER_NAME]
+        if dry_run:
+            print("[dry-run] " + _shell_join(argv))
+        elif assume_yes or _confirm("Remove it?"):
+            run(argv)
 
 
-def unregister(clients: list[Client], *, dry_run: bool = False, run: Callable[[list[str]], int] = _run) -> int:
+def unregister(clients: list[Client], *, dry_run: bool = False, run: Callable[[list[str]], int] = _run,
+               agent_name: str = DEFAULT_KIRO_AGENT) -> int:
     failures = 0
     for client in clients:
         if client.id == "kiro-cli":
+            remove_kiro_agent(name=agent_name, dry_run=dry_run)
             leftovers = kiro_leftovers()
             if leftovers:
                 remove_leftovers(leftovers, dry_run=dry_run)
+            continue
         if client.unregister is None:
             print(f"{client.label}: remove '{SERVER_NAME}' from {client.manual_target}")
             continue
@@ -421,6 +535,9 @@ def registered(clients: list[Client]) -> dict[str, Optional[bool]]:
     """Best effort: True/False when the client CLI can tell us, None otherwise."""
     result: dict[str, Optional[bool]] = {}
     for client in clients:
+        if client.id == "kiro-cli":
+            result[client.id] = kiro_agent_registered()
+            continue
         if client.list_cmd is None:
             result[client.id] = None
             continue
@@ -451,6 +568,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="sdpm mcp-config", description=__doc__.split("\n\n")[0])
     parser.add_argument("--uv", help="absolute path of uv (default: SDPM_UV, then PATH)")
     parser.add_argument("--checkout", help="checkout root (default: this file's repository)")
+    parser.add_argument("--agent-name", default=DEFAULT_KIRO_AGENT, help="name of the Kiro CLI agent (default: sdpm)")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("print", help="show configuration for detected (or named) clients")
@@ -492,10 +610,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             print("No supported MCP client detected. Add this to your client's MCP configuration:")
             print(manual_json(target))
             return 0
-        return 1 if register(clients, target, dry_run=args.dry_run, assume_yes=args.yes) else 0
+        return 1 if register(clients, target, dry_run=args.dry_run, assume_yes=args.yes, agent_name=args.agent_name) else 0
 
     if args.command == "unregister":
-        return 1 if unregister(detect(args.clients or None), dry_run=args.dry_run) else 0
+        return 1 if unregister(detect(args.clients or None), dry_run=args.dry_run, agent_name=args.agent_name) else 0
 
     if args.command == "status":
         clients = detect()
@@ -510,7 +628,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             print("  MCP clients:")
             for row in rows:
                 mark = {
-                    True: "registered",
+                    True: "registered" + ("   → kiro-cli chat --agent sdpm" if row["id"] == "kiro-cli" else ""),
                     False: f"not registered   → sdpm register {row['id']}",
                     None: f"see: sdpm mcp-config {row['id']}",
                 }[row["registered"]]

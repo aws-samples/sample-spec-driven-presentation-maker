@@ -596,6 +596,7 @@ function Register-Clients {
 function Show-Completion {
     Write-Host "`n  SDPM is installed.`n" -ForegroundColor Green
     Write-Host "    Your agent:   ask it `"Make slides about ...`" - it finds SDPM through MCP."
+    Write-Host "                  Kiro CLI: kiro-cli chat --agent sdpm"
     if ($script:Profile -eq "full") {
         Write-Host "    Browser:      sdpm webui"
         & kiro-cli whoami *> $null

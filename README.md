@@ -67,7 +67,8 @@ which of your MCP clients to connect — and ends with what to do next. Then:
 
 | You want to | Do this |
 |---|---|
-| Use your own AI agent (Kiro CLI, Claude Code, Cursor, VS Code, Codex, Kiro IDE) | Said yes when the installer offered to register it? Ask the agent **“Make slides about …”**. Otherwise, or for another client later: `sdpm register` |
+| Use your own AI agent (Claude Code, Cursor, VS Code, Codex) | Said yes when the installer offered to register it? Ask the agent **“Make slides about …”**. Otherwise, or for another client later: `sdpm register` |
+| Use Kiro CLI | The installer creates a dedicated `sdpm` agent (its own tools and trust settings, nothing added to other sessions): `kiro-cli chat --agent sdpm` |
 | Use a browser | `sdpm webui` |
 | Use Claude Desktop | [Download `sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) and double-click it (no installer needed) |
 | Give a team a shared server or Web UI | [Deploy on AWS](docs/en/deploy-cloudshell.md) |
@@ -78,6 +79,29 @@ installer offers them, and a build without them still produces the PPTX and tell
 what is missing. See [Getting Started](docs/en/getting-started.md) for options, manual
 client configuration, and the developer setup.
 
+### Installing with an AI agent
+
+Many people hand this repository's URL to a coding agent and say "install this". If that
+is you (or the agent), the non-interactive form is:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --mcp-only --non-interactive --register
+```
+
+`--mcp-only` skips the browser Web UI (drop it, or use `--full`, to include it — needs
+Node.js 20+); `--register` connects every MCP client found on the machine without asking
+(`--no-register` prints the configuration instead). Then verify with `sdpm` (status) and
+`python3 ~/.sdpm/checkout/scripts/install/mcp_smoke.py ~/.local/bin/sdpm mcp`. Full option
+list: [Getting Started](docs/en/getting-started.md#installer-options).
+
+> **Breaking change for agents migrating an older setup (before the installer):** the
+> Claude Code / Codex plugins, the Kiro Power, `make install-kiro`, the `skills/`
+> directory and any `uvx … sdpm-mcp` client entry no longer exist. Remove them as listed in
+> [Migration: onboarding](docs/en/migration-onboarding.md) — in particular a leftover
+> `~/.kiro/agents/sdpm-composer.json` or a global `~/.kiro/settings/mcp.json` entry, both
+> of which `sdpm register kiro-cli` detects and offers to remove. Tool names, prompts and
+> deck files are unchanged.
+
 **Picking a mode.** Just asking for slides is enough — the agent calls `start_presentation`
 and follows it. To choose explicitly, use the server's prompts where your client shows them:
 `sdpm-vibe` (build from material, no questions), `sdpm-spec` (shape the deck in dialogue
@@ -86,9 +110,9 @@ Desktop's "+" menu, Claude Code `/mcp__sdpm__sdpm-vibe`, VS Code `/mcp.sdpm.sdpm
 `/sdpm-vibe`. Each prompt only names the role's entry tool; the behavior itself still lives in
 `sdpm/references/workflows/`, in one place.
 
-> **Upgrading from an older release?** Plugins, skills, `make install-kiro` and the `uvx`
-> setup are gone — run the installer once and see [Migration: onboarding](docs/en/migration-onboarding.md).
-> Older changes: [v0.5](docs/en/migration-v0.5.md), [role workflows](docs/en/migration-role-workflows.md).
+> **Upgrading from an older release?** See the breaking-change note above and
+> [Migration: onboarding](docs/en/migration-onboarding.md). Older changes:
+> [v0.5](docs/en/migration-v0.5.md), [role workflows](docs/en/migration-role-workflows.md).
 
 ---
 

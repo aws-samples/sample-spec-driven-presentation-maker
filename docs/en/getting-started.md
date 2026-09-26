@@ -70,17 +70,17 @@ clients receive points at `uv` and the checkout directly (next section).
 
 ## Your AI agent (MCP)
 
-`sdpm register` connects the server through each client's own CLI, so no configuration file
-is edited by hand:
+`sdpm register` connects the server through each client's own CLI (or, for Kiro CLI, by
+creating an agent file that SDPM owns), so no existing configuration file is edited by hand:
 
 | Client | What `sdpm register` does |
 |---|---|
-| Kiro CLI (and Kiro IDE — shared `~/.kiro/settings/mcp.json`) | `kiro-cli mcp add --scope global …` |
+| Kiro CLI | writes a dedicated agent `~/.kiro/agents/sdpm.json` (MCP server, tools, trusted `@sdpm` and `use_subagent` for parallel composers, no prompt text) — start it with `kiro-cli chat --agent sdpm` or `/agent sdpm`. Nothing is added to other sessions. `--agent-name` picks another name; an agent file you wrote yourself is never touched |
 | Claude Code | `claude mcp add --scope user sdpm -- …` |
 | Visual Studio Code | `code --add-mcp …` |
 | Codex (CLI, IDE extension, ChatGPT desktop app) | `codex mcp add sdpm -- …` |
 | Cursor | opens the `cursor://…/mcp/install` deep link built with your real paths — one click |
-| Kiro IDE without Kiro CLI, other clients | prints the JSON and the file it belongs in |
+| Kiro IDE, other clients | prints the JSON and the file it belongs in (`~/.kiro/settings/mcp.json` for Kiro IDE) |
 | Claude Desktop | use the [`sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) release instead (double-click) |
 
 Every configuration is the same one line, with absolute paths:
@@ -97,7 +97,10 @@ Every configuration is the same one line, with absolute paths:
 ```
 
 Absolute paths matter: GUI clients started from the Dock or Start Menu do not inherit your
-shell `PATH`. `sdpm mcp-config` prints this block with your paths filled in for any client,
+shell `PATH`. For Kiro CLI the same block sits inside the agent file; if you had SDPM in the
+global `~/.kiro/settings/mcp.json` from an older setup, `sdpm register kiro-cli` offers to
+remove that entry (it would load the tools into every session) along with any leftover
+`sdpm-composer` agent the old installer generated. `sdpm mcp-config` prints this block with your paths filled in for any client,
 so a client that is not listed above takes it verbatim.
 
 Then ask your agent for slides. The first tool it reaches for, `start_presentation`, returns

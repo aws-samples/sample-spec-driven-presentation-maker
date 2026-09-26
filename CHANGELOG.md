@@ -51,9 +51,14 @@ Entries before v0.5.0 were written retroactively as summaries.
   Web UI (`--full` / `--mcp-only`; MCP-only needs no Node.js) and which detected MCP
   clients to connect (`--register` / `--no-register`). `sdpm webui` starts the Web UI,
   `sdpm mcp` runs the server on stdio, `sdpm register` / `unregister` / `mcp-config`
-  connect clients through their own CLIs — Kiro CLI (covers Kiro IDE), Claude Code,
-  VS Code, Codex — or open Cursor's deep link built with the real paths; other clients
-  get the JSON and the file it belongs in. `sdpm` alone shows status; `sdpm update
+  connect clients through their own CLIs — Claude Code, VS Code, Codex — or open Cursor's
+  deep link built with the real paths; other clients get the JSON and the file it belongs
+  in. Kiro CLI gets a dedicated `sdpm` agent (`~/.kiro/agents/sdpm.json`: the MCP server,
+  trusted `@sdpm` / `use_subagent`, sub-agents restricted to itself, no prompt text) instead
+  of an entry in the global `mcp.json` — nothing is added to other sessions, and composers
+  need no approval per `run_python`. `sdpm register kiro-cli` also detects the old
+  installer's `sdpm-composer` agent, skill links and global `mcp.json` entry and offers to
+  remove them; a user-authored agent of the same name is left alone. `sdpm` alone shows status; `sdpm update
   [--with-webui]` upgrades both surfaces; `sdpm uninstall` removes everything. Client
   detection, configuration and registration live once in
   `servers/local/client_config.py`; both launchers delegate to it. Every client
