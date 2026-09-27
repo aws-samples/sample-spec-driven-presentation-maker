@@ -10,6 +10,8 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-28
+
 ### Added
 
 - **MCP prompts `sdpm-vibe`, `sdpm-spec`, `sdpm-style`, `sdpm-translate`** — user-invoked entry
@@ -273,6 +275,14 @@ Entries before v0.5.0 were written retroactively as summaries.
   limit of what a slide may show. Every bundled style defines its `icon` treatment, states how
   much it illustrates, and carries a `diagram` pattern; icons are inline SVG symbols named after
   their `search_assets` asset, so the gallery shows them too.
+
+- **Styles carry no stock decoration.** The decoration roles (orb, ring, glow, gradient
+  field, watermark, accent bar, hero graphic, icon frame) are gone from the style workflow,
+  the slide JSON spec and all 15 bundled styles; a named list of ornament became a menu every
+  style picked from. Decoration is now defined like any other component, and its comment says
+  what it does in that style's decision (Signal's hazard rail, Racing's cover speed lines).
+  The restored component catalog guide (`components.md`) is removed again: A/B decks with and
+  without it were equally rich, and the guide cost every composer ~40k characters.
 
 - **`start_presentation` / `start_style` return every style, `pinned` flagged.**
   The pin filter is a gallery concern; the role picking a style sees the whole
@@ -1111,7 +1121,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.8.0...v0.8.1
