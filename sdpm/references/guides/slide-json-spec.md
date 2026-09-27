@@ -710,7 +710,7 @@ image; an `orb` is an `oval` with a gradient fill and a large `softEdge`, behind
 (`sendToBack` when it must not cover the title); `ring`s are `oval`s with no fill and a thin
 `line`, concentric (same centre, radii stepping) or dashed (`dashStyle`); a `gradient-field` is a
 `gradient` fill on a band, panel or the text's shape; a `watermark` is a large icon or numeral
-at low `opacity`. `read_guides(["components"])` walks through these with samples.
+at low `opacity`.
 
 **Recipes** — N items in a region (`rx`, `ry`, `rw`, `rh`); rectangular node size
 `w × h`, circle diameter `s`, gap `g`.
