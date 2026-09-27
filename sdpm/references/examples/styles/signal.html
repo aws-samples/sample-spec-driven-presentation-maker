@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>signal — A high-visibility presentation look for audiences scanning decisive information at distance; it supports concise communication by reserving one safety-yellow signal, upright ultra-bold headlines, huge numerals, and monospaced metadata.</title>
+<title>signal — A high-visibility presentation look for audiences scanning decisive information at distance; it supports concise communication by reserving one safety-yellow signal, upright ultra-bold headlines, huge numerals, monospaced metadata, and a single industrial hazard stripe.</title>
 <style>
 :root {
 --color-text:#FFFFFF; /* primary claims and evidence on dark ground */
@@ -29,6 +29,7 @@
 --panel-pad:24pt; /* inset for filled and outlined evidence */
 --gap:18pt; /* standard separation between evidence blocks */
 --radius:0px; /* square industrial geometry throughout */
+--stripe-h:10px; /* the one hazard rail at the top edge */
 --border-thin:1px; /* neutral table and panel structure */
 --border-strong:3px; /* signal outline and title rule */
 --shadow:none; /* flat sign-plane geometry keeps the selected field decisive */
@@ -49,6 +50,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 .panel.on>.icon-frame,.step.on .icon-frame,.node.on>.icon-frame,.status.on>.icon-frame{background:var(--color-bg);border-color:var(--color-bg)}
 .panel.on>.icon-frame>.icon,.step.on .icon-frame>.icon,.node.on>.icon-frame>.icon,.status.on>.icon-frame>.icon{fill:var(--accent)}
 .el.icon-frame{position:absolute}
+.hazard{background:repeating-linear-gradient(135deg,var(--accent) 0 10px,var(--color-bg) 10px 20px)}
 .hero-frame{width:170px;height:170px;background:var(--accent);border-color:var(--accent)}
 .hero-frame>.icon{width:102px;height:102px;fill:var(--color-on-accent)}
 .t-cover-title,.t-slide-title,.t-heading,.status-name{font-weight:900;text-transform:uppercase}
@@ -102,7 +104,9 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/visibility" viewBox="0 -960 960 960"><path d="M600.5-379.5Q650-429 650-500t-49.5-120.5Q551-670 480-670t-120.5 49.5Q310-571 310-500t49.5 120.5Q409-330 480-330t120.5-49.5Zm-200-41Q368-453 368-500t32.5-79.5Q433-612 480-612t79.5 32.5Q592-547 592-500t-32.5 79.5Q527-388 480-388t-79.5-32.5ZM216-283Q98-366 40-500q58-134 176-217t264-83q146 0 264 83t176 217q-58 134-176 217t-264 83q-146 0-264-83Zm264-217Zm222.5 174.5Q804-391 857-500q-53-109-154.5-174.5T480-740q-121 0-222.5 65.5T102-500q54 109 155.5 174.5T480-260q121 0 222.5-65.5Z"/></symbol><symbol id="material/fact_check" viewBox="0 -960 960 960"><path d="M132-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h696q24 0 42 18t18 42v600q0 24-18 42t-42 18H132Zm0-60h696v-600H132v600Zm68-100h200v-80H200v80Zm382-80 198-198-57-57-141 142-57-57-56 57 113 113Zm-382-80h200v-80H200v80Zm0-160h200v-80H200v80Zm-68 420v-600 600Z"/></symbol><symbol id="material/campaign" viewBox="0 -960 960 960"><path d="M730-450v-60h150v60H730Zm50 290-121-90 36-48 121 90-36 48Zm-82-503-36-48 118-89 36 48-118 89ZM210-200v-160h-70q-24.75 0-42.37-17.63Q80-395.25 80-420v-120q0-24.75 17.63-42.38Q115.25-600 140-600h180l200-120v480L320-360h-50v160h-60Zm250-146v-268l-124 74H140v120h196l124 74Zm100 0v-268q27 24 43.5 58.5T620-480q0 41-16.5 75.5T560-346ZM300-480Z"/></symbol><symbol id="material/bolt" viewBox="0 -960 960 960"><path d="m393-165 279-335H492l36-286-253 366h154l-36 255Zm-73 85 40-280H160l360-520h80l-40 320h240L400-80h-80Zm154-396Z"/></symbol><symbol id="material/warning" viewBox="0 -960 960 960"><path d="m40-120 440-760 440 760H40Zm104-60h672L480-760 144-180Zm361.5-65.68q8.5-8.67 8.5-21.5 0-12.82-8.68-21.32-8.67-8.5-21.5-8.5-12.82 0-21.32 8.68-8.5 8.67-8.5 21.5 0 12.82 8.68 21.32 8.67 8.5 21.5 8.5 12.82 0 21.32-8.68ZM454-348h60v-224h-60v224Zm26-122Z"/></symbol></svg>
 
 <!-- Part: Cover -->
+<!-- The hazard rail marks the whole deck as signage: a fixed top edge of yellow and black, in PPTX a 10px strip of alternating parallelograms. It never moves, repeats on another edge, or sits beside content, so the one yellow signal in the body stays the only thing to look at. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <!-- Component: tag (.tag) — compact state or metadata label; may vary: wording; may not: become a second filled signal or replace the claim. -->
 <div class="el tag" style="left:120px;top:238px;width:340px;height:48px">Bundled style / 01</div>
 <div class="el t-cover-title" style="left:120px;top:330px;width:1500px;height:220px">Signal</div>
@@ -110,13 +114,14 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="el t-body c-muted" style="left:120px;top:690px;width:1120px;height:150px">Near-black ground. One safety-yellow signal. Upright heavy headlines. Huge numerals. Decisive focus.</div>
 <!-- Component: icon (.icon) — when a short concept replaces a numeric head; size: 68px in card frames, 48px in nodes and scan rows, 102px for one hero; colour: white on dark, yellow when its dark backing marks the selected member, black when its yellow backing is the single hero signal; family: Material; backing job: a square frame groups the glyph with its card, node, or row, and backing inversion identifies the selected member; may vary: glyph and 80–170px backing by role; may not: sit beside paragraphs, mix families, or change size within a role. -->
 <div class="el icon-frame hero-frame" style="left:1475px;top:415px;width:170px;height:170px"><svg class="icon"><use href="#material/warning"/></svg></div>
-<div class="el meta" style="left:120px;top:980px;width:1500px;height:48px">Style-signal / rev A / 16:9 / one attention field</div>
+<div class="el meta" style="left:120px;top:980px;width:1500px;height:48px">Style-signal / rev A / 16:9 / top stripe</div>
 </div>
 
 <!-- Part: Rules -->
-<!-- Frame: content — retain the x 120–1800 safe region, title at y 90 within a 192px two-line reserve, content at y 330 or below, and optional metadata inside the lower five percent; kicker, claim, content, and metadata may vary; geometry and absence of a page-number element may not. -->
+<!-- Frame: content — retain the 10px hazard rail at y 0 across the full width, the x 120–1800 safe region, title at y 90 within a 192px two-line reserve, content at y 330 or below, and optional metadata inside the lower five percent; kicker, claim, content, and metadata may vary; geometry and absence of a page-number element may not. -->
 <!-- Readers scan at distance, so one decisive signal must outrank support. Contrast stays at least 4.5:1, or 3:1 for type at least 18pt. Use no colours beyond black, white, neutrals, and safety yellow. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Rules / hierarchy</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">One signal controls</div>
 <!-- Component: container (.panel) — group one evidence block on the hard-edged sign plane; may vary: width and content; may not: rotate, round, or compete with the selected signal. -->
@@ -130,6 +135,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 
 <!-- Upright construction is literal: rotation is zero and italics are absent. Illustrate structure with 96px Material icons in framed card heads, process steps, and diagram nodes, or 72px framed icons beside scan rows; white on dark and yellow on the single dark frame inside a selected state. Favour process, hub, comparison, and status forms, with at most five diagram nodes. Never place icons beside paragraphs, mix families, or shrink type and boxes to fit. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Rules / restraint</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Keep force upright</div>
 <div class="el t-heading" style="left:120px;top:350px;width:700px;height:70px">Do</div>
@@ -145,6 +151,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <!-- Density: 60 -->
 <!-- Titles are uppercase imperative or noun phrases of one to five words and no more than two lines. Body remains upright and sentence case. A second claim gets another slide, never smaller type. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Message / grammar</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Titles strike first</div>
 <!-- Component: numbered (.numbered) — order a writing instruction or finding; may vary: index and short statement; may not: imply sequence where none exists or receive a second fill. -->
@@ -161,6 +168,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 
 <!-- Deck length follows the brief and material. Order claims by logic; use no purpose-specific chapter shape. Start with the strongest claim, insert a divider only for a necessary visual beat, and close on one owned ask. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Outline / rhythm</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Control the impact</div>
 <div class="el t-metric-sm c-accent" style="left:120px;top:350px;width:480px;height:150px">25–60</div>
@@ -177,8 +185,9 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 </div>
 
 <!-- Part: Patterns -->
-<!-- Frame: divider — place chapter progress near y 300, section name near y 470, a neutral rule near y 720, and one preview below; wording and progress may vary; evidence, page numbers, and a second signal may not enter. -->
+<!-- Frame: divider — retain the hazard rail; place chapter progress near y 300, section name near y 470, a neutral rule near y 720, and one preview below; wording and progress may vary; evidence, page numbers, and a second signal may not enter. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-metric-sm c-accent" style="left:120px;top:300px;width:600px;height:130px">04 / 05</div>
 <div class="el t-cover-title" style="left:120px;top:470px;width:1500px;height:180px">Patterns</div>
 <div class="el icon-frame hero-frame" style="left:1440px;top:380px;width:170px;height:170px"><svg class="icon"><use href="#material/bolt"/></svg></div>
@@ -188,6 +197,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 
 <!-- Pattern: comparison — for: two matched options or states; regions: left, right, takeaway; components: container ×2 + selected + takeaway; may vary: labels and matched evidence; may not: change geometry, scale, row order, or add a second fill. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / comparison</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Match before marking</div>
 <div class="el panel" style="left:120px;top:350px;width:800px;height:420px"><div class="t-label c-accent">Baseline</div><div class="t-heading">Neutral state</div><div class="t-body c-muted">Same measure<br>Same period<br>Same row order</div></div>
@@ -198,6 +208,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 
 <!-- Pattern: columns — for: two to four parallel fields; regions: col-1, col-2, col-3, takeaway; components: container ×3 + selected + takeaway; may vary: two columns at 40:60–50:50, three equal with centre selected, or four equal with final selection allowed; may not: change peer order, internal rhythm, or use two fills. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / columns</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Peers keep one rhythm</div>
 <div class="el panel" style="left:120px;top:350px;width:520px;height:430px"><div class="icon-frame"><svg class="icon"><use href="#material/visibility"/></svg></div><div class="t-heading">Context</div><div class="t-caption">Matched depth.</div></div>
@@ -209,6 +220,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 
 <!-- Pattern: process — for: a true dependent sequence; regions: step-1, step-2, step-3, step-4, takeaway; components: step ×4 + connector ×3 + selected + takeaway; may vary: three to five stages and active stage; may not: vary box geometry, rotate shapes, detach connectors, or number unordered ideas. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / process</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Dependence earns sequence</div>
 <!-- Component: step (.step) — equal stage in a true three-to-five-step sequence; may vary: active step and short verb; may not: change geometry or become a paragraph. -->
@@ -226,6 +238,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 
 <!-- Pattern: metric — for: one hero measure with direct context; regions: body, kpi-1, kpi-2, takeaway; components: metric ×3 + selected + takeaway; may vary: value, unit, comparator, and two supporting measures; may not: split the unit, omit scope, use another fill, or let support outrank the hero. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / metric</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">One number breaks through</div>
 <!-- Component: metric (.metric-block) — direct value with unit, scope, period, and comparator; may vary: hero or supporting size; may not: leave context implicit or exceed one 96pt hero. -->
@@ -238,6 +251,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 
 <!-- Pattern: table — for: exact threshold or categorical evidence; regions: table, takeaway; components: table + takeaway; may vary: three to five columns and four to eight rows; may not: omit units, break the continuous header, add vertical emphasis, or use yellow beyond header and exception text. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / table</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Expose the exception</div>
 <!-- Component: table (.data-table) — native exact-value matrix with units in headers and one continuous yellow header; may vary: three-to-five columns and four-to-eight rows; may not: hide units, remove rules, or colour normal rows. -->
@@ -248,6 +262,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 
 <!-- Pattern: chart — for: trend or categorical comparison; regions: chart, takeaway; components: chart + takeaway; may vary: native chart type, periods, and illustrative values; may not: use shape bars in decks, lose the zero baseline, hide direct values, add a needless legend or gridline, or highlight two marks. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / chart</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Mark the crossing</div>
 <div class="el t-caption" style="left:120px;top:300px;width:900px;height:42px">Decks use native charts; HTML values are illustrative.</div>
@@ -259,6 +274,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 
 <!-- Pattern: before-after — for: one changed state against a matched prior state; regions: left, right, takeaway; components: before-after ×2 + selected + takeaway; may vary: labels and measures; may not: change width, scale, unit, row order, or put yellow on the before state. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / before-after</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Hold the baseline</div>
 <!-- Component: before-after (.state) — one of two identically scoped states; may vary: labels and measures; may not: change geometry, scale, unit, or row order between states. -->
@@ -270,6 +286,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 
 <!-- Pattern: diagram — for: one warning coordinated from detection and verification into one decision and two owned outputs; regions: left, hub, right; components: hub + icon ×5 + connector ×7; may vary: three to five nodes and labels; may not: use diagonal links, arrows without direction, unequal peers, or more than one filled core. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / diagram</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">One signal aligns action</div>
 <div class="el connector" style="left:550px;top:453px;width:90px;height:4px"></div>
@@ -290,6 +307,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 
 <!-- Pattern: status — for: rapid scanning of three to six states; regions: body, takeaway; components: list + selected + takeaway; may vary: row labels and metadata; may not: highlight more than one row or use yellow for a clear state. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / status</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">One state needs attention</div>
 <!-- Component: list (.status) — stack three to six scan states with monospaced metadata; may vary: labels and row count; may not: mark more than one attention row. -->
@@ -302,6 +320,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 
 <!-- Pattern: text — for: two to four evidence blocks and one conclusion; regions: section-1, section-2, takeaway; components: numbered ×2 + takeaway; may vary: two to four blocks; may not: exceed 60 words, shrink body below 18pt, repeat the title, or introduce another claim. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / text</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Dense stays scannable</div>
 <div class="el numbered t-metric-sm" style="left:120px;top:350px;width:180px;height:180px">01</div>
@@ -315,8 +334,9 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 </div>
 
 <!-- Part: Closing -->
-<!-- Frame: closing — place one ask near y 340, one yellow rule near y 610, and at most two conditions below; ask, owner, measure, and review point may vary; another conclusion, appendix, or page number may not follow. -->
+<!-- Frame: closing — retain the hazard rail; place one ask near y 340, one yellow rule near y 610, and at most two conditions below; ask, owner, measure, and review point may vary; another conclusion, appendix, or page number may not follow. -->
 <div class="slide">
+<div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:250px;width:500px;height:48px">The ask</div>
 <div class="el t-cover-title" style="left:120px;top:340px;width:1550px;height:190px">Signal once</div>
 <div class="el icon-frame hero-frame" style="left:1480px;top:320px;width:170px;height:170px"><svg class="icon"><use href="#material/campaign"/></svg></div>
