@@ -13,8 +13,8 @@
   --color-canvas: #DDDDDA; /* gallery surround outside slides */
   --color-bar: #969691; /* historical chart series */
   --color-bar-soft: #A8A8A3; /* secondary historical series */
-  --accent: #1F6B4E; /* current period, selected series, and registration decoration */
-  --accent-soft: #DDEBE4; /* pale tint for non-data decoration and icon frames */
+  --accent: #1F6B4E; /* current period, selected series, and selected member */
+  --accent-soft: #DDEBE4; /* pale icon rail that groups concept with evidence */
   --font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif; /* figures, labels, and body */
   --font-heading: Georgia, "Yu Mincho", "Hiragino Mincho ProN", serif; /* cover and finding titles */
   --fs-cover-title: 50pt; /* cover and divider question, two lines */
@@ -25,7 +25,6 @@
   --fs-label: 10pt; /* uppercase section and status labels */
   --fs-metric: 31pt; /* standard headline figure */
   --fs-metric-lg: 43pt; /* single comparison figure */
-  --fs-watermark: 110pt; /* pale report index on covers and chapter turns */
   --fs-table: 13pt; /* exact values in native tables */
   --fs-small: 9pt; /* footer or dense table note only */
   --margin-x: 120px; /* safe edge beyond five percent */
@@ -54,9 +53,7 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 .bold { font-weight: 700; }
 .rule { background: var(--color-border); }
 .rule-dark { background: var(--color-text); }
-.rule-accent, .decor-accent-bar { background: var(--accent); }
-.decor-watermark { font-family: var(--font-heading); font-size: calc(var(--fs-watermark) * 1.5); line-height: 1; color: var(--color-surface); font-variant-numeric: tabular-nums; }
-.decor-key-ring { border: 4px solid var(--accent); border-radius: 50%; opacity: 0.32; }
+.rule-accent { background: var(--accent); }
 .frame-head { border-bottom: var(--border-thin) solid var(--color-border); }
 .frame-head .claim { width: 1280px; margin-top: 14px; }
 .frame-head .period { position: absolute; right: 0; top: 36px; width: 330px; text-align: right; font-size: calc(var(--fs-caption) * 1.5); line-height: 1.35; color: var(--color-muted); }
@@ -122,15 +119,9 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 
 <!-- Part: Cover -->
 <div class="slide">
-<!-- Component: accent-bar (.decor-accent-bar) — register the report frame or current-period edge; strength: one 5–8px rule; JSON: {"type":"shape","shape":"rectangle","fill":"#1F6B4E"}; may vary: length and orientation; may not: cross a data mark or become a full-field band. -->
-<div class="el decor-accent-bar" style="left:120px; top:180px; width:240px; height:6px;"></div>
-<!-- Component: watermark (.decor-watermark) — index a reporting period or chapter in the open margin; strength: one pale serif numeral; JSON: {"type":"textbox","text":"24","fontSize":110,"fontFamily":"Georgia","fill":"#F3F3F0"}; may vary: period or section numeral; may not: carry a measure or sit behind body copy. -->
-<div class="el decor-watermark" style="left:1490px; top:250px; width:280px; height:230px;">24</div>
-<!-- Component: ring (.decor-key-ring) — mark the indexed margin as a report registration device; strength: one thin accent outline; JSON: {"type":"shape","shape":"oval","fill":"none","line":"#1F6B4E","lineWidth":2,"opacity":0.32}; may vary: diameter; may not: encode favourable direction or enclose dense text. -->
-<div class="el decor-key-ring" style="left:1450px; top:210px; width:320px; height:320px;"></div>
 <div class="el label" style="left:120px; top:230px; width:900px; height:42px;">Periodic performance report</div>
-<div class="el cover-title" style="left:120px; top:300px; width:1320px; height:225px;">Results read clearly,<br>period after period</div>
-<div class="el body-text caption" style="left:120px; top:555px; width:950px; height:150px;">Stable comparisons turn recurring figures into decisions, on screen or paper.</div>
+<div class="el cover-title" style="left:120px; top:300px; width:1680px; height:225px;">Results read clearly,<br>period after period</div>
+<div class="el body-text caption" style="left:120px; top:555px; width:1200px; height:150px;">Stable comparisons turn recurring figures into decisions, on screen or paper.</div>
 <div class="el rule-dark" style="left:120px; top:780px; width:1680px; height:1px;"></div>
 <div class="el label accent" style="left:120px; top:820px; width:520px; height:36px;">Reporting period</div>
 <div class="el section-title" style="left:120px; top:860px; width:700px; height:60px;">Current period / fiscal year</div>
@@ -148,7 +139,7 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 <div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Margins ≥ five percent</div>
 </div>
 
-<!-- Core evidence keeps contrast at least 4.5:1, or 3:1 for text at least 18pt. Use one accent for current period, selected series, final total, or a registration mark; signs and words carry direction. Data marks use solid fills because greyscale printing must preserve their boundaries; watermark numerals stay outside data regions, while one ring may outline the title-selected value without encoding direction. Keep sourced icons outside tables. Illustrate selectively: every major stage, column head, and diagram node uses one 104px filled Material icon in a ruled 148px evidence rail, near-black by default and reversed on accent only for the selected member. Favour sparse hierarchy or matrix forms with no more than four nodes. -->
+<!-- Core evidence keeps contrast at least 4.5:1, or 3:1 for text at least 18pt. Use one accent for current period, selected series, or final total; signs and words carry direction. Data marks use solid fills because greyscale printing must preserve their boundaries. Keep sourced icons outside tables. Illustrate selectively: every major stage, column head, and diagram node uses one 104px filled Material icon in a ruled 148px evidence rail, near-black by default and reversed on accent only for the selected member. Favour sparse hierarchy or matrix forms with no more than four nodes. -->
 <div class="slide">
 <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Rules / evidence discipline</div><div class="claim">Every mark must improve comparison or audit</div><div class="period">Screen and print</div></div>
 <div class="el columns" style="left:120px; top:340px; width:1680px; height:430px;"><div><div class="label accent">Always</div><p class="section-title">Label direct values</p><p class="caption">Keep one useful baseline.</p><p class="section-title">Contextualise figures</p><p class="caption">Pair with prior, plan, benchmark, or trend.</p></div><div><div class="label">Illustrate</div><p class="section-title">Stage heads and nodes</p><p class="caption">Sparse hierarchy or matrix only.</p></div></div>
@@ -172,8 +163,7 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 <!-- The core flow is cover, three to five findings, four to six contextualised KPIs, two or three evidence chapters, owned actions, then an alphabetical appendix with governed definitions and supplied source/scope notes. Favoured drawn forms are direct-labelled charts, compact tables, sparse hierarchy, and 2×2 matrices for explicit causality; avoid dense networks and unauditable diagrams. -->
 <div class="slide">
 <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Outline / summary first</div><div class="claim">Move from result to cause to action</div><div class="period">Brief sets length</div></div>
-<!-- Component: icon (.icon) — mark a major stage head, column head, or diagram node beside a one-to-four-word label; size: 104px inside a 148px evidence rail for every role; colour: near-black, reversed on accent only when selected; family: filled Material; may vary: concept; may not: enter tables, sit beside paragraphs, mix families, shrink by pattern, or detach from its label. -->
-<!-- Component: icon-frame (.icon-frame) — bind an icon to its evidence panel with a pale square rail and accent registration edge; strength: quiet keyline plus 6px inset edge; JSON: background rectangle {"type":"shape","shape":"rectangle","fill":"#DDEBE4","line":"#C8C8C3","lineWidth":1} + labelled icon {"type":"icon","src":"assets:material/analytics","color":"#1C1C1A"}; may vary: icon concept and reversed selected state; may not: round, float, or lose the adjacent label. -->
+<!-- Component: icon (.icon + .icon-frame) — group a major stage head, column head, or diagram node with its label in a pale square evidence rail; the rail sets the report-frame tone, and accent fill plus a reversed icon points to the selected member; size: 104px inside a 148px rail; colour: near-black by default; family: filled Material; JSON: background rectangle {"type":"shape","shape":"rectangle","fill":"#DDEBE4","line":"#C8C8C3","lineWidth":1} + labelled icon {"type":"icon","src":"assets:material/analytics","color":"#1C1C1A"}; may vary: concept and reversed selected state; may not: enter tables, sit beside paragraphs, mix families, shrink by pattern, round, float, or detach from its label. -->
 <div class="el columns icon-columns" style="left:120px; top:350px; width:1680px; height:460px;"><div class="evidence-node current"><div class="node-icon icon-frame"><svg class="icon"><use href="#material/analytics"/></svg></div><div class="node-copy"><div class="label accent">Lead</div><div class="section-title">Answer before explaining</div><div class="caption">Findings and shared-period metrics.</div></div></div><div class="evidence-node"><div class="node-icon icon-frame"><svg class="icon"><use href="#material/trending_up"/></svg></div><div class="node-copy"><div class="label accent">Build</div><div class="section-title">Question, evidence, implication</div><div class="caption">Dividers only for major chapters.</div></div></div><div class="evidence-node"><div class="node-icon icon-frame"><svg class="icon"><use href="#material/task_alt"/></svg></div><div class="node-copy"><div class="label accent">Close</div><div class="section-title">Assign measurable work</div><div class="caption">Owner, timing, expected movement.</div></div></div></div>
 <div class="el takeaway" style="left:120px; top:840px; width:1680px; height:95px;">Prefer charts, tables, sparse hierarchy, and 2×2 matrices.</div>
 <div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Keep backup outside the argument</div>
@@ -182,9 +172,7 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 <!-- Part: Patterns -->
 <!-- Frame: divider — pause at a major chapter with one analytical question and period; number and wording may vary, evidence and charts may not enter this frame. -->
 <div class="slide">
-<div class="el decor-accent-bar" style="left:120px; top:170px; width:220px; height:5px;"></div>
 <div class="el label accent" style="left:120px; top:220px; width:420px; height:36px;">Patterns / recurring evidence</div>
-<div class="el decor-key-ring" style="left:74px; top:272px; width:270px; height:270px;"></div>
 <div class="el section-number" style="left:120px; top:320px; width:260px; height:100px;">01</div>
 <div class="el cover-title" style="left:420px; top:300px; width:1260px; height:230px;">How does this style<br>build an argument?</div>
 <div class="el body-text caption" style="left:420px; top:590px; width:980px; height:140px;">Each following slide demonstrates the pattern it explains.</div>
@@ -244,7 +232,6 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 <div class="slide">
 <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / metric</div><div class="claim">Aligned figures make the current period scannable</div><div class="period">One window<br>Mixed units</div></div>
 <!-- Component: metric (.metric-strip) — pair every headline figure with unit, comparator, and optional trend; may vary: four to six cells; may not: float a number without context or mix periods. -->
-<div class="el decor-accent-bar" style="left:112px; top:370px; width:8px; height:280px;"></div>
 <div class="el metric-strip" style="left:120px; top:370px; width:1680px; height:280px;"><div class="metric-cell"><div class="label">Measure 1</div><div class="metric-value accent">124</div><div class="metric-delta">+12% vs prior</div></div><div class="metric-cell"><div class="label">Measure 2</div><div class="metric-value accent">42%</div><div class="metric-delta">+1.8 pts vs prior</div></div><div class="metric-cell"><div class="label">Measure 3</div><div class="metric-value accent">68</div><div class="metric-delta">−1% vs prior</div></div><div class="metric-cell"><div class="label">Measure 4</div><div class="metric-value accent">18d</div><div class="metric-delta">+2 days vs target</div></div></div>
 <div class="el takeaway" style="left:120px; top:740px; width:1680px; height:135px;">Accent marks current, not favourable. With no history, state “first period.”</div>
 <div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Keep explicit comparators</div>
@@ -264,7 +251,6 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 <div class="el frame-head" style="left:120px; top:58px; width:1680px; height:220px;"><div class="label accent">Pattern / chart</div><div class="claim">Direct labels make the trend readable with less ink</div><div class="period">Completed units<br>Four periods</div></div>
 <div class="el caption" style="left:120px; top:310px; width:1100px; height:42px;">Native chart in the deck; HTML values are illustrative</div>
 <!-- Component: chart (.chart) — build as a native chart with grey history, accent current focus, direct values, common zero baseline, and at most one labelled reference; may vary: bar, line, ranking, bridge, or four/six small multiples; may not: draw production charts with shapes. -->
-<div class="el decor-key-ring" style="left:997px; top:365px; width:170px; height:110px;"></div>
 <div class="el chart" style="left:120px; top:380px; width:1180px; height:470px;"><svg viewBox="0 0 1180 470" width="1180" height="470" aria-label="Illustrative four-period bar chart"><rect class="svg-history" x="100" y="220" width="130" height="250"></rect><rect class="svg-history" x="360" y="170" width="130" height="300"></rect><rect class="svg-history" x="620" y="120" width="130" height="350"></rect><rect class="svg-current" x="880" y="60" width="130" height="410"></rect><text class="svg-value" x="140" y="195">80</text><text class="svg-value" x="400" y="145">86</text><text class="svg-value" x="660" y="95">91</text><text class="svg-value svg-current" x="920" y="35">99</text><text class="svg-label" x="100" y="455">Period 1</text><text class="svg-label" x="360" y="455">Period 2</text><text class="svg-label" x="620" y="455">Period 3</text><text class="svg-label svg-current" x="880" y="455">Current</text></svg></div>
 <div class="el takeaway" style="left:1400px; top:470px; width:400px; height:250px;">Keep one useful baseline. Label values directly; remove empty gridlines.</div>
 <div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Small multiples share scale and geometry</div>
@@ -292,9 +278,7 @@ body { margin: 0; padding: 40px; background: var(--color-canvas); color: var(--c
 <!-- Frame: closing — convert evidence into owned next-period work; action count and wording may vary, owner, timing, and expected measure may not be omitted. -->
 <div class="slide">
 <div class="el label accent" style="left:120px; top:110px; width:600px; height:36px;">Close / action and outlook</div>
-<div class="el cover-title" style="left:120px; top:190px; width:1240px; height:220px;">The next period tests<br>three owned actions</div>
-<div class="el decor-watermark" style="left:1490px; top:170px; width:280px; height:230px;">03</div>
-<div class="el decor-key-ring" style="left:1450px; top:130px; width:320px; height:320px;"></div>
+<div class="el cover-title" style="left:120px; top:190px; width:1680px; height:220px;">The next period tests<br>three owned actions</div>
 <div class="el" style="left:120px; top:500px; width:1680px; height:340px;"><table class="data-table"><thead><tr><th>Action</th><th>Owner</th><th>Due</th><th>Expected measure</th></tr></thead><tbody><tr><td>Resolve primary gap</td><td>Role</td><td>Period date</td><td class="current-col">Metric +4 pts</td></tr><tr><td>Remove delay</td><td>Role</td><td>Period date</td><td class="current-col">Metric −2 days</td></tr><tr><td>Extend leading practice</td><td>Role</td><td>Period date</td><td class="current-col">Metric +6%</td></tr></tbody></table></div>
 <div class="el frame-foot" style="left:120px; top:970px; width:1560px; height:46px;">Expected movement is directional, not a forecast</div>
 </div>

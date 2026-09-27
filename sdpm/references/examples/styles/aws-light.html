@@ -9,8 +9,6 @@
   --color-border:#D9D9D9; /* neutral rules */
   --color-text:#000000; /* claims and labels */
   --color-muted:#767676; /* notes and routes */
-  --color-atmosphere:#EAF2F8; /* technical depth only */
-  --color-orbit:#AAB7C4; /* decorative orbits */
   --accent:#FF9900; /* one emphasis */
   --color-on-accent:#16191F; /* copy on orange */
   --cat-analytics:#8C4FFF; /* analytics identity */
@@ -38,11 +36,9 @@
   --radius:4px; /* group corners */
   --border-thin:1px; /* separators */
   --border-group:2px; /* category/selection */
-  --shadow:0 14px 34px rgba(35, 47, 62, 0.14); /* focal icon lift */
   --margin-x:112px; /* safe inset */
   --content-w:1696px; /* content width */
   --content-top:300px; /* content start */
-  --bar-h:4px; /* title rule */
   --gallery-bg:#D9D9D9; /* gallery */}
 *{box-sizing:border-box}
 body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--font-family); zoom:0.7}
@@ -58,11 +54,6 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 .muted{color:var(--color-muted)}
 .center{text-align:center}
 .right{text-align:right}
-.accent-bar{background:var(--accent)}
-.focus-orb{border-radius:50%; background:radial-gradient(circle at 38% 35%, #FFFFFF 0%, var(--color-atmosphere) 42%, rgba(234, 242, 248, 0.2) 68%, rgba(255, 255, 255, 0) 72%)}
-.orbit-ring{border:2px solid var(--color-orbit); border-radius:50%}
-.orbit-ring.soft{border-color:var(--color-border)}
-.title-rule{background:var(--color-border)}
 .rule{background:var(--color-border)}
 .surface-text{padding:28px 32px; background:var(--color-surface); border:var(--border-thin) solid var(--color-border); border-radius:var(--radius)}
 .takeaway{padding-top:24px; border-top:var(--border-thin) solid var(--color-border)}
@@ -94,7 +85,7 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 .diagram-node .icon{width:110px; height:110px}
 .diagram-hub .icon{width:144px; height:144px}
 .shape-oval{border-radius:50%}
-.icon-frame{display:flex; align-items:center; justify-content:center; width:144px; height:144px; border:var(--border-group) solid; border-radius:50%; background:var(--color-bg); box-shadow:var(--shadow)}
+.icon-frame{display:flex; align-items:center; justify-content:center; width:144px; height:144px; border:var(--border-group) solid; border-radius:50%; background:var(--color-bg)}
 .icon-frame .icon{width:108px; height:108px}
 .icon-frame.sm{width:104px; height:104px}
 .icon-frame.sm .icon{width:72px; height:72px}
@@ -103,8 +94,7 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 .frame-integration{background:var(--cat-integration-tint); border-color:var(--cat-integration)}
 .frame-compute{background:var(--cat-compute-tint); border-color:var(--cat-compute)}
 .frame-database{background:var(--cat-database-tint); border-color:var(--cat-database)}
-.focus-step{background:linear-gradient(135deg, #FFFFFF 0%, #FFF1DB 100%); box-shadow:var(--shadow)}
-.metric-focus{display:flex; align-items:center; justify-content:center; width:180px; height:180px; margin:10px auto 8px; border-radius:50%; background:linear-gradient(135deg, #FFC46B 0%, var(--accent) 100%); box-shadow:var(--shadow)}
+.metric-focus{display:inline-block; padding:0 16px; background:var(--accent); color:var(--color-on-accent)}
 .route-tl{border-top:3px solid var(--color-muted); border-right:3px solid var(--color-muted)}
 .route-tr{border-top:3px solid var(--color-muted); border-left:3px solid var(--color-muted)}
 .route-bl{border-bottom:3px solid var(--color-muted); border-right:3px solid var(--color-muted)}
@@ -129,14 +119,8 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 
 <!-- Part: Cover -->
 <div class="slide">
-<!-- Component: orb (.focus-orb) — pale field behind one focus; strength: 560–760px; JSON: {"type":"shape","shape":"oval","gradient":{"angle":135,"stops":[{"position":0,"color":"#FFFFFF"},{"position":1,"color":"#EAF2F8"}]},"softEdge":24}; may vary: size/crop; may not: encode category or rival orange. -->
-<div class="el focus-orb" style="left:1120px;top:70px;width:780px;height:780px"></div>
-<!-- Component: ring (.orbit-ring) — diagram line around one focus; strength: two 2px rings; JSON: {"type":"shape","shape":"oval","fill":"none","line":"#AAB7C4","lineWidth":2}; may vary: diameter/crop; may not: imply data. -->
-<div class="el orbit-ring soft" style="left:1260px;top:190px;width:560px;height:560px"></div>
-<div class="el orbit-ring" style="left:1340px;top:270px;width:400px;height:400px"></div>
-<!-- Component: icon-frame (.icon-frame) — matching category-tint disc behind an official icon; strength: 144px, 180px hub; JSON: {"type":"shape","shape":"oval","fill":"#FCE3EF","line":"#E7157B","lineWidth":2,"shadow":"sm"}; may vary: matching category/size; may not: mismatch category or family. -->
+<!-- Component: icon (.icon) — official AWS symbol with a 1–4 word label; its category-tint disc identifies the service at 72px in steps, 108px in columns, and 138px in a hub; may vary: service, matching category, role size; may not: mismatch category or mix icon families. -->
 <div class="el icon-frame lg frame-integration" style="left:1450px;top:380px;width:180px;height:180px"><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg></div>
-<div class="el accent-bar" style="left:0px;top:0px;width:8px;height:1080px"></div>
 <!-- Component: tag (.t-label) — section, category, or route metadata; may vary: wording/matching colour; may not: encode status or ornament because category means identity. -->
 <div class="el t-label muted" style="left:112px;top:300px;width:900px;height:34px">Bundled presentation style</div>
 <div class="el t-cover" style="left:112px;top:360px;width:1050px;height:240px">AWS architecture,<br>made legible</div>
@@ -145,11 +129,10 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 </div>
 
 <!-- Part: Rules -->
-<!-- Frame: content — x 112–1808; title y 64–237; content y 300–930; optional source y 970; may vary: title/section; may not: move geometry or use orange title rule beside another orange mark. -->
+<!-- Frame: content — x 112–1808; title y 64–237; content y 300–930; optional source y 970; may vary: title/section; may not: move geometry or add a second orange mark. -->
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:700px;height:30px">Rules / identity</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Category colour identifies services; it never decorates</div>
-<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: container (.surface-text) — compact proof when whitespace is insufficient; may vary: width/content; may not: repeat as chrome or hold a service icon. -->
 <div class="el surface-text" style="left:112px;top:340px;width:760px;height:250px"><div class="t-heading c-analytics">Use full colour for identity</div><div class="t-caption">Border, header, legend, or category label.</div></div>
 <div class="el surface-text" style="left:1048px;top:340px;width:760px;height:250px"><div class="t-heading">Use tint for groups</div><div class="t-caption muted">Pair normal text and tint with its category border.</div></div>
@@ -161,13 +144,10 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:700px;height:30px">Rules / composition</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One claim and one orange mark create the route</div>
-<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
-<div class="el t-heading" style="left:112px;top:340px;width:480px;height:60px">Message</div>
-<div class="el t-body" style="left:112px;top:420px;width:480px;height:190px">Use one finding, at most two lines.</div>
-<div class="el t-heading" style="left:720px;top:340px;width:480px;height:60px">Emphasis</div>
-<div class="el t-body" style="left:720px;top:420px;width:480px;height:190px">Mark one number, node, current step, or title rule.</div>
-<div class="el t-heading" style="left:1328px;top:340px;width:480px;height:60px">Atmosphere</div>
-<div class="el t-body" style="left:1328px;top:420px;width:480px;height:190px">Rings frame focus; soft fields add depth.</div>
+<div class="el t-heading" style="left:112px;top:340px;width:760px;height:60px">Message</div>
+<div class="el t-body" style="left:112px;top:420px;width:760px;height:190px">Use one finding, at most two lines.</div>
+<div class="el t-heading" style="left:1048px;top:340px;width:760px;height:60px">Emphasis</div>
+<div class="el t-body" style="left:1048px;top:420px;width:760px;height:190px">Mark one number, node, or current step.</div>
 <!-- Component: takeaway (.takeaway) — one consequence; may vary: one sentence; may not: repeat the title, add a claim, or exceed two lines. -->
 <div class="el takeaway t-heading" style="left:112px;top:770px;width:1696px;height:120px">Two orange spots read as two alerts.</div>
 </div>
@@ -176,7 +156,6 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:700px;height:30px">Rules / production</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Technical evidence stays literal, aligned, and direct</div>
-<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: numbered (.marker) — ordered rule or finding; may vary: index/text; may not: replace a process stage or form orange badge sets. -->
 <div class="el marker t-label" style="left:112px;top:350px;width:70px;height:52px">01</div>
 <div class="el t-body" style="left:220px;top:342px;width:640px;height:80px">Use official service icons.</div>
@@ -196,8 +175,7 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:800px;height:30px">Message / title grammar</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Finding-led titles make technical choices unambiguous</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
-<!-- Component: metric (.t-metric) — labelled figure with period/comparator; may vary: unit/value; may not: float without context, mix periods, or share orange. -->
+<!-- Component: metric (.t-metric) — labelled figure with period/comparator; the one claim-carrying figure may use orange fill or a 180px field; may vary: unit, value, selected figure; may not: float without context, mix periods, or share orange. -->
 <div class="el t-metric accent-fill" style="left:112px;top:350px;width:360px;height:150px">45</div>
 <div class="el t-heading" style="left:112px;top:550px;width:520px;height:80px">visible words maximum</div>
 <div class="el t-body" style="left:760px;top:350px;width:900px;height:170px">Write a concrete subject, directional verb, and bounded implication.</div>
@@ -209,7 +187,6 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:800px;height:30px">Outline / argument rhythm</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Move from decision to evidence to architecture to action</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
 <div class="el surface-text" style="left:112px;top:350px;width:480px;height:290px"><div class="t-label muted">01 / Decide</div><div class="t-heading">Lead with the strongest claim</div></div>
 <div class="el surface-text" style="left:720px;top:350px;width:480px;height:290px"><div class="t-label muted">02 / Prove</div><div class="t-heading">Sequence constraint, design, and cost</div></div>
 <div class="el surface-text accent-outline" style="left:1328px;top:350px;width:480px;height:290px"><div class="t-label muted">03 / Act</div><div class="t-heading">Close on one owned decision</div></div>
@@ -217,22 +194,17 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 </div>
 
 <!-- Part: Patterns -->
-<!-- Frame: divider — 8px orange edge, section label, two-line question, optional preview; may vary: wording; may not: add evidence, tracker, or page number. -->
+<!-- Frame: divider — section label, two-line question, optional preview; may vary: wording; may not: add evidence, tracker, or page number. -->
 <div class="slide">
-<div class="el focus-orb" style="left:1270px;top:190px;width:620px;height:620px"></div>
-<div class="el orbit-ring soft" style="left:1370px;top:280px;width:440px;height:440px"></div>
-<div class="el orbit-ring" style="left:1450px;top:360px;width:280px;height:280px"></div>
-<div class="el accent-bar" style="left:0px;top:0px;width:8px;height:1080px"></div>
 <div class="el t-label muted" style="left:112px;top:300px;width:700px;height:34px">Patterns / technical evidence</div>
-<div class="el t-cover" style="left:112px;top:370px;width:1500px;height:220px">How does the claim<br>choose the layout?</div>
-<div class="el t-body muted" style="left:112px;top:680px;width:1380px;height:120px">Every following slide demonstrates the pattern it explains.</div>
+<div class="el t-cover" style="left:112px;top:370px;width:1696px;height:220px">How does the claim<br>choose the layout?</div>
+<div class="el t-body muted" style="left:112px;top:680px;width:1696px;height:120px">Every following slide demonstrates the pattern it explains.</div>
 </div>
 
 <!-- Pattern: comparison — for: matched states; regions: left, right, takeaway; components: before-after ×2 + selected + takeaway; may vary: 3–5 criteria/selection; may not: change widths, row order, scope, units, or add arrows. -->
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / comparison</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Matched states expose the operating change</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: before-after (.state) — matched state with aligned criteria; may vary: values/3–5 rows; may not: change geometry, units, or row order. -->
 <div class="el state" style="left:112px;top:350px;width:760px;height:430px"></div>
 <div class="el t-label muted" style="left:112px;top:390px;width:600px;height:32px">Before</div>
@@ -246,28 +218,25 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <div class="el takeaway t-heading" style="left:112px;top:870px;width:1696px;height:100px">Show changed responsibility, not unrelated features.</div>
 </div>
 
-<!-- Pattern: columns — for: service catalogue/parallel evidence; regions: col-1, col-2, col-3; components: container ×3 + icon-frame ×3 + icon ×3; may vary: 2–4 equal categories/items; may not: vary widths, mismatch frames, or use category outside its region. -->
+<!-- Pattern: columns — for: service catalogue/parallel evidence; regions: col-1, col-2, col-3; components: container ×3 + icon ×3; may vary: 2–4 equal categories/items; may not: vary widths, mismatch category identity, or use category outside its region. -->
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / columns</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Equal columns make a service catalogue scannable</div>
-<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
-<!-- Component: icon (.icon) — official AWS symbol with a 1–4 word label; 72px steps, 108px columns, 138px hub; may vary: service/role size; may not: use generic service art, rectangular cards, emoji, or mixed families. -->
 <div class="el columns" style="left:112px;top:350px;width:1696px;height:490px"><div class="column icon-tile"><div class="t-label c-compute">Compute</div><div class="icon-frame frame-compute"><svg class="icon"><use href="#aws/Res_AWS-Lambda_Lambda-Function_48"/></svg></div><div class="t-heading">Functions</div><div class="t-caption muted">Run on demand</div></div><div class="column icon-tile"><div class="t-label c-integration">Integration</div><div class="icon-frame frame-integration"><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg></div><div class="t-heading">Event bus</div><div class="t-caption muted">Route by rule</div></div><div class="column icon-tile"><div class="t-label c-database">Database</div><div class="icon-frame frame-database"><svg class="icon"><use href="#aws/Res_Amazon-DynamoDB_Table_48"/></svg></div><div class="t-heading">Tables</div><div class="t-caption muted">Persist state</div></div></div>
 <div class="el takeaway t-heading" style="left:112px;top:890px;width:1696px;height:90px">Category headers establish identity once.</div>
 </div>
 
-<!-- Pattern: process — for: event flow/roadmap; regions: step-1, step-2, step-3, step-4, takeaway; components: step ×4 + connector ×3 + selected + icon-frame + tag; may vary: 3–6 verb steps; may not: colour connectors, use category as status, or select twice. -->
+<!-- Pattern: process — for: event flow/roadmap; regions: step-1, step-2, step-3, step-4, takeaway; components: step ×4 + connector ×3 + selected + icon + tag; may vary: 3–6 verb steps; may not: colour connectors, use category as status, or select twice. -->
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / process</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One orange step locates the current handoff</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: step (.step) — equal verb-led stage with service; may vary: 3–6 stages; may not: vary peer size or use category as status. -->
 <div class="el step" style="left:112px;top:350px;width:360px;height:240px"><div class="t-label muted">01</div><div class="icon-frame sm frame-integration"><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg></div><div class="t-heading">Receive</div></div>
 <!-- Component: connector (.connector) — neutral orthogonal handoff; may vary: route/label; may not: use category colour, cross nodes, go diagonal, or invent causality. -->
 <div class="el connector" style="left:472px;top:469px;width:64px;height:3px"></div>
 <div class="el step" style="left:536px;top:350px;width:360px;height:240px"><div class="t-label muted">02</div><div class="icon-frame sm frame-database"><svg class="icon"><use href="#aws/Res_Amazon-DynamoDB_Table_48"/></svg></div><div class="t-heading">Validate</div></div>
 <div class="el connector" style="left:896px;top:469px;width:64px;height:3px"></div>
-<div class="el step accent-outline focus-step" style="left:960px;top:350px;width:360px;height:240px"><div class="t-label muted">03</div><div class="icon-frame sm frame-compute"><svg class="icon"><use href="#aws/Res_AWS-Lambda_Lambda-Function_48"/></svg></div><div class="t-heading">Route</div></div>
+<div class="el step accent-outline" style="left:960px;top:350px;width:360px;height:240px"><div class="t-label muted">03</div><div class="icon-frame sm frame-compute"><svg class="icon"><use href="#aws/Res_AWS-Lambda_Lambda-Function_48"/></svg></div><div class="t-heading">Route</div></div>
 <div class="el connector" style="left:1320px;top:469px;width:64px;height:3px"></div>
 <div class="el step" style="left:1384px;top:350px;width:424px;height:240px"><div class="t-label muted">04</div><div class="icon-frame sm frame-integration"><svg class="icon"><use href="#aws/Res_Amazon-CloudWatch_Rule_48"/></svg></div><div class="t-heading">Observe</div></div>
 <div class="el t-label c-integration center" style="left:112px;top:630px;width:360px;height:34px">Integration</div>
@@ -277,12 +246,10 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <div class="el takeaway t-heading" style="left:112px;top:830px;width:1696px;height:110px">Write stages as verbs and outcomes as evidence.</div>
 </div>
 
-<!-- Pattern: metric — for: 3–5 measures in one window; regions: kpi-1, kpi-2, kpi-3, kpi-4, takeaway; components: metric ×4 + selected + gradient-field + takeaway; may vary: count/values/units; may not: mix periods, omit comparators, repeat cards, or colour twice. -->
+<!-- Pattern: metric — for: 3–5 measures in one window; regions: kpi-1, kpi-2, kpi-3, kpi-4, takeaway; components: metric ×4 + selected + takeaway; may vary: count/values/units; may not: mix periods, omit comparators, repeat cards, or colour twice. -->
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / metric</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Aligned metrics compare without repeated cards</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
-<!-- Component: gradient-field (.metric-focus) — orange/gold field behind one figure; strength: one 180px field; JSON: {"type":"shape","shape":"oval","gradient":{"angle":135,"stops":[{"position":0,"color":"#FFC46B"},{"position":1,"color":"#FF9900"}]},"shadow":"sm"}; may vary: value/size; may not: repeat or encode category. -->
 <div class="el metric-row" style="left:112px;top:360px;width:1696px;height:330px"><div class="metric-cell"><div class="t-label muted">Availability</div><div class="metric-value metric-focus">99.9%</div><div class="t-caption muted">+0.2 points vs prior</div></div><div class="metric-cell"><div class="t-label muted">Monthly cost</div><div class="metric-value">−32%</div><div class="t-caption muted">same workload</div></div><div class="metric-cell"><div class="t-label muted">Deploy time</div><div class="metric-value">18 min</div><div class="t-caption muted">median / 30 days</div></div><div class="metric-cell"><div class="t-label muted">Operator hours</div><div class="metric-value">−24%</div><div class="t-caption muted">same team</div></div></div>
 <div class="el takeaway t-heading" style="left:112px;top:800px;width:1696px;height:120px">State period and comparator beneath every figure.</div>
 </div>
@@ -291,7 +258,6 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / table</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">A shortlist is defensible on shared criteria</div>
-<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: table (.data-table) — exact comparison with hairlines/aligned figures; may vary: rows/columns; may not: lose units, numeric alignment, or template font. -->
 <div class="el" style="left:112px;top:340px;width:1696px;height:430px"><table class="data-table"><thead><tr><th>Service</th><th>Best fit</th><th>Operating model</th><th class="num">Cost unit</th></tr></thead><tbody><tr><td>Compute service</td><td>Steady workload</td><td>Managed host</td><td class="num">Time</td></tr><tr><td>Integration service</td><td>Event routing</td><td>Serverless</td><td class="num">Requests</td></tr><tr><td>Storage service</td><td>Durable objects</td><td>Fully managed</td><td class="num">Capacity</td></tr></tbody></table></div>
 <div class="el takeaway t-heading" style="left:112px;top:840px;width:1696px;height:110px">Use charts for shape; use tables for lookup.</div>
@@ -301,23 +267,19 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / chart</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One highlighted value carries the trend claim</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: chart (.chart-specimen) — native chart with direct values, common baseline, neutral context, one orange value; may vary: series/marks; may not: add empty grids or indirect legends. -->
 <div class="el chart-specimen" style="left:180px;top:350px;width:1120px;height:500px"><svg viewBox="0 0 1120 500" width="1120" height="500" aria-label="Illustrative four-period bar chart"><rect x="100" y="260" width="140" height="238" fill="#8FADD0"/><rect x="360" y="210" width="140" height="288" fill="#8FADD0"/><rect x="620" y="150" width="140" height="348" fill="#8FADD0"/><rect x="880" y="70" width="140" height="428" fill="#FF9900"/><g class="svg-value" font-family="Arial" font-size="28"><text x="145" y="240">62</text><text x="405" y="190">78</text><text x="665" y="130">91</text><text x="925" y="50">112</text></g></svg></div>
 <div class="el takeaway t-heading" style="left:1400px;top:470px;width:408px;height:230px">Label values directly. Remove empty gridlines.</div>
 </div>
 
-<!-- Pattern: diagram — for: one coordinator and independent capabilities; regions: hub, satellite-1, satellite-2, satellite-3, satellite-4, takeaway; components: hub + icon ×5 + icon-frame + connector ×4 + ring ×2 + selected + takeaway; may vary: service, 3–6 peers, labels/tint; may not: hide spokes, cross nodes, exceed two bends, or select twice. -->
+<!-- Pattern: diagram — for: one coordinator and independent capabilities; regions: hub, satellite-1, satellite-2, satellite-3, satellite-4, takeaway; components: hub + icon ×5 + connector ×4 + selected + takeaway; may vary: service, 3–6 peers, labels/tint; may not: hide spokes, cross nodes, exceed two bends, or select twice. -->
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / diagram</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One event bus coordinates four independently scaled services</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
-<div class="el orbit-ring soft" style="left:690px;top:315px;width:540px;height:540px"></div>
-<div class="el orbit-ring" style="left:735px;top:360px;width:450px;height:450px"></div>
-<div class="el route-tl" style="left:542px;top:450px;width:223px;height:50px"></div>
-<div class="el route-tr" style="left:1155px;top:450px;width:223px;height:50px"></div>
-<div class="el route-bl" style="left:542px;top:700px;width:223px;height:60px"></div>
-<div class="el route-br" style="left:1155px;top:700px;width:223px;height:60px"></div>
+<div class="el route-tl" style="left:542px;top:450px;width:243px;height:50px"></div>
+<div class="el route-tr" style="left:1135px;top:450px;width:243px;height:50px"></div>
+<div class="el route-bl" style="left:542px;top:700px;width:261px;height:60px"></div>
+<div class="el route-br" style="left:1117px;top:700px;width:261px;height:60px"></div>
 <div class="el diagram-node cat-compute" style="left:112px;top:340px;width:430px;height:220px"><svg class="icon"><use href="#aws/Res_AWS-Lambda_Lambda-Function_48"/></svg><div class="t-heading">Transform</div></div>
 <div class="el diagram-node cat-integration" style="left:1378px;top:340px;width:430px;height:220px"><svg class="icon"><use href="#aws/Res_Amazon-CloudWatch_Rule_48"/></svg><div class="t-heading">Rules</div></div>
 <div class="el diagram-node cat-database" style="left:112px;top:650px;width:430px;height:220px"><svg class="icon"><use href="#aws/Res_Amazon-DynamoDB_Table_48"/></svg><div class="t-heading">Tables</div></div>
@@ -331,7 +293,6 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / shared responsibility</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Every technical layer needs one accountable side</div>
-<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: hierarchy (.hierarchy-row) — aligned layer/owner rows; may vary: layer count/split; may not: encode ownership with category colour or depth. -->
 <div class="el t-heading center" style="left:430px;top:320px;width:520px;height:60px">Customer</div>
 <div class="el t-heading center" style="left:1050px;top:320px;width:520px;height:60px">AWS</div>
@@ -350,13 +311,10 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <!-- Part: Closing -->
 <!-- Frame: closing — one decision plus one orange owner–verb–date action; may vary: decision/2–4 actions; may not: recap, multiply recommendations, add orange, or append material. -->
 <div class="slide">
-<div class="el focus-orb" style="left:1310px;top:250px;width:570px;height:570px"></div>
-<div class="el orbit-ring soft" style="left:1400px;top:330px;width:410px;height:410px"></div>
-<div class="el orbit-ring" style="left:1475px;top:405px;width:260px;height:260px"></div>
 <div class="el t-label muted" style="left:112px;top:250px;width:600px;height:34px">Decision</div>
-<div class="el t-cover" style="left:112px;top:315px;width:1120px;height:230px">Make the architecture<br>easy to decide</div>
-<div class="el accent-fill t-heading" style="left:112px;top:610px;width:1100px;height:120px">Next action — owner, verb, and date</div>
-<div class="el t-body muted" style="left:112px;top:810px;width:1100px;height:120px">Category identity, strict alignment, and one emphasis keep the path clear.</div>
+<div class="el t-cover" style="left:112px;top:315px;width:1696px;height:230px">Make the architecture<br>easy to decide</div>
+<div class="el accent-fill t-heading" style="left:112px;top:610px;width:1696px;height:120px">Next action — owner, verb, and date</div>
+<div class="el t-body muted" style="left:112px;top:810px;width:1696px;height:120px">Category identity, strict alignment, and one emphasis keep the path clear.</div>
 </div>
 
 </body>

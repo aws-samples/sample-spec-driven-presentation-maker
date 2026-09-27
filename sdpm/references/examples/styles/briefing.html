@@ -31,7 +31,6 @@
   --border-thin:1px; /* neutral structure */
   --border-accent:3px; /* one focused rule or edge */
   --shadow:none; /* evidence surfaces stay planar */
-  --shadow-sm:0 0 22px rgba(17,164,151,.26); /* selected signal glow only */
   --margin-x:120px; /* safe inset beyond five percent */
   --content-w:1680px; /* common content span */
   --content-top:350px; /* evidence begins after title and claim */
@@ -55,11 +54,6 @@ body { margin:0; padding:40px; background:#070A0E; font-family:var(--font-family
 .muted { color:var(--color-muted); }
 .bold { font-weight:700; }
 .rule { background:var(--color-border); }
-.edge { background:linear-gradient(180deg,#44D6C7 0%,var(--accent) 48%,rgba(17,164,151,.08) 100%); box-shadow:0 0 30px rgba(17,164,151,.65); }
-.signal-field { border-radius:50%; background:radial-gradient(circle at 50% 50%,rgba(17,164,151,.40) 0%,rgba(17,164,151,.16) 38%,rgba(17,164,151,0) 72%); filter:blur(8px); }
-.focus-ring { border:2px solid rgba(68,214,199,.34); border-radius:50%; box-shadow:0 0 26px rgba(17,164,151,.18),inset 0 0 22px rgba(17,164,151,.10); }
-.focus-ring.inner { border-color:rgba(68,214,199,.62); }
-.signal-line { background:linear-gradient(90deg,var(--accent),rgba(68,214,199,.78),rgba(17,164,151,0)); box-shadow:0 0 22px rgba(17,164,151,.55); }
 .topbar { display:flex; align-items:center; border-bottom:var(--border-thin) solid var(--color-border); background:linear-gradient(90deg,rgba(17,164,151,.10),rgba(17,164,151,0) 46%); }
 .topbar::before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--accent); }
 .tb-num { width:210px; padding-left:120px; color:var(--accent); font-size:calc(var(--fs-num) * 1.5); font-weight:700; }
@@ -73,7 +67,7 @@ body { margin:0; padding:40px; background:#070A0E; font-family:var(--font-family
 .open-field { border-top:var(--border-thin) solid var(--color-border); padding-top:24px; }
 .open-field.selected { border-top:var(--border-accent) solid var(--accent); background:var(--wash-accent); padding:22px 28px 0; }
 .takeaway { border-top:var(--border-thin) solid var(--color-border); padding-top:20px; font-size:calc(var(--fs-heading) * 1.5); font-weight:600; line-height:1.4; }
-.metric-band { display:flex; background:linear-gradient(110deg,rgba(17,164,151,.20),var(--wash-accent) 45%,rgba(68,214,199,.05)); border-top:var(--border-thin) solid var(--accent); box-shadow:0 -10px 34px rgba(17,164,151,.10); }
+.metric-band { display:flex; background:var(--wash-accent); border-top:var(--border-thin) solid var(--accent); }
 .metric-item { flex:1; padding:30px 28px; border-right:var(--border-thin) solid var(--color-border); }
 .metric-item:last-child { border-right:0; }
 .metric-value { font-size:calc(var(--fs-metric-lg) * 1.5); font-weight:700; line-height:1; color:var(--accent); }
@@ -107,7 +101,7 @@ body { margin:0; padding:40px; background:#070A0E; font-family:var(--font-family
 .prose { border-left:var(--border-accent) solid var(--color-border); padding-left:24px; font-size:calc(var(--fs-body) * 1.5); line-height:1.5; }
 .prose.current { border-left-color:var(--accent); }
 .icon { width:88px; height:88px; display:block; flex:0 0 88px; fill:var(--color-muted); }
-.icon-frame { width:112px; height:112px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,rgba(17,164,151,.18),rgba(22,27,34,.96)); border:1px solid rgba(68,214,199,.42); clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px)); }
+.icon-frame { width:112px; height:112px; display:flex; align-items:center; justify-content:center; background:var(--color-surface); border:1px solid var(--color-border); clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px)); }
 .icon-frame .icon { width:62px; height:62px; flex-basis:62px; }
 .icon-frame.selected { border-color:var(--accent); box-shadow:0 0 28px rgba(17,164,151,.48); background:linear-gradient(135deg,rgba(17,164,151,.38),rgba(22,27,34,.96)); }
 .icon-frame.compact { width:74px; height:74px; flex-basis:74px; clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px)); }
@@ -131,19 +125,11 @@ body { margin:0; padding:40px; background:#070A0E; font-family:var(--font-family
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/analytics-fill" viewBox="0 -960 960 960"><path d="M284-277h60v-205h-60v205Zm332 0h60v-420h-60v420Zm-166 0h60v-118h-60v118Zm0-205h60v-60h-60v60ZM180-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h600q24 0 42 18t18 42v600q0 24-18 42t-42 18H180Z"/></symbol><symbol id="material/filter_alt-fill" viewBox="0 -960 960 960"><path d="M440-160q-17 0-28.5-11.5T400-200v-240L161-745q-14-17-4-36t31-19h584q21 0 31 19t-4 36L560-440v240q0 17-11.5 28.5T520-160h-80Z"/></symbol><symbol id="material/person-fill" viewBox="0 -960 960 960"><path d="M372-523q-42-42-42-108t42-108q42-42 108-42t108 42q42 42 42 108t-42 108q-42 42-108 42t-108-42ZM160-160v-94q0-38 19-65t49-41q67-30 128.5-45T480-420q62 0 123 15.5T731-360q31 14 50 41t19 65v94H160Z"/></symbol><symbol id="material/flag-fill" viewBox="0 -960 960 960"><path d="M200-120v-680h343l19 86h238v370H544l-19-85H260v309h-60Z"/></symbol><symbol id="material/target-fill" viewBox="0 -960 960 960"><path d="M324-111.5Q251-143 197-197t-85.5-127Q80-397 80-480t31.5-156Q143-709 197-763t127-85.5Q397-880 480-880t156 31.5Q709-817 763-763t85.5 127Q880-563 880-480t-31.5 156Q817-251 763-197t-127 85.5Q563-80 480-80t-156-31.5ZM721-239q99-99 99-241t-99-241q-99-99-241-99t-241 99q-99 99-99 241t99 241q99 99 241 99t241-99Zm-411-71q-70-70-70-170t70-170q70-70 170-70t170 70q70 70 70 170t-70 170q-70 70-170 70t-170-70Zm297.5-42.5Q660-405 660-480t-52.5-127.5Q555-660 480-660t-127.5 52.5Q300-555 300-480t52.5 127.5Q405-300 480-300t127.5-52.5Zm-184-71Q400-447 400-480t23.5-56.5Q447-560 480-560t56.5 23.5Q560-513 560-480t-23.5 56.5Q513-400 480-400t-56.5-23.5Z"/></symbol><symbol id="material/task-fill" viewBox="0 -960 960 960"><path d="m434-255 229-229-39-39-190 190-103-103-39 39 142 142ZM220-80q-24 0-42-18t-18-42v-680q0-24 18-42t42-18h361l219 219v521q0 24-18 42t-42 18H220Zm331-554h189L551-820v186Z"/></symbol></svg>
 
 <!-- Part: Cover -->
-<!-- Component: gradient-field (.signal-field) — behind cover, divider, closing, or one selected analytical form; strength: 16–40% teal fading into the ground; JSON: {"type":"shape","shape":"oval","gradient":{"angle":0,"stops":[{"position":0,"color":"#11A497","opacity":0.4},{"position":1,"color":"#0D1117","opacity":0}]},"softEdge":36,"sendToBack":true}; may vary: scale and crop; may not: cross primary text or introduce another hue. -->
-<!-- Component: ring (.focus-ring) — concentric around a chapter signal or decision hub; strength: 1–2px teal at 34–62%; JSON: {"type":"shape","shape":"oval","fill":{"color":"#0D1117","transparency":100},"line":{"color":"#44D6C7","transparency":55},"lineWidth":1.5}; may vary: two or three radii; may not: imply quantity or obscure connectors. -->
-<!-- Component: glow (.signal-line) — on the active rail, selected icon-frame, or claimed node; strength: 22–30px at 48–65%; JSON: {"glow":{"radius":14,"color":"#11A497","opacity":0.55}}; may vary: radius with object size; may not: apply to neutral evidence or body text. -->
-<!-- Component: accent-bar (.edge) — the luminous teal entry rail on hero frames; strength: 3px with a 30px glow; JSON: {"type":"line","lineWidth":1.5,"lineGradient":{"angle":270,"stops":[{"position":0,"color":"#44D6C7"},{"position":0.5,"color":"#11A497"},{"position":1,"color":"#11A497","opacity":0.08}]},"glow":{"radius":15,"color":"#11A497","opacity":0.65}}; may vary: vertical hero rail or short horizontal proof rail; may not: mark two competing focal points. -->
 <div class="slide">
-<div class="el signal-field" style="left:1180px;top:90px;width:780px;height:780px"></div>
-<div class="el focus-ring" style="left:1390px;top:190px;width:470px;height:470px"></div>
-<div class="el focus-ring inner" style="left:1480px;top:280px;width:290px;height:290px"></div>
-<div class="el edge" style="left:0px;top:0px;width:3px;height:1080px"></div>
-<div class="el t-label accent" style="left:120px;top:360px;width:800px;height:36px">Bundled style</div>
-<div class="el t-cover" style="left:120px;top:420px;width:1400px;height:150px">Briefing</div>
-<div class="el lead muted" style="left:120px;top:610px;width:1400px;height:130px">A dark style for a room that scans the evidence while the presenter carries the detail.</div>
-<div class="el t-cap" style="left:120px;top:920px;width:1500px;height:50px">Open structure · one teal focus · formal title and stated claim</div>
+<div class="el t-label accent" style="left:120px;top:300px;width:1680px;height:36px">Bundled style</div>
+<div class="el t-cover" style="left:120px;top:390px;width:1680px;height:150px">Briefing</div>
+<div class="el lead muted" style="left:120px;top:590px;width:1680px;height:130px">A dark style for a room that scans the evidence while the presenter carries the detail.</div>
+<div class="el t-cap" style="left:120px;top:850px;width:1680px;height:50px">Open structure · one teal focus · formal title and stated claim</div>
 </div>
 
 <!-- Part: Rules -->
@@ -209,16 +195,12 @@ body { margin:0; padding:40px; background:#070A0E; font-family:var(--font-family
 </div>
 
 <!-- Part: Patterns -->
-<!-- Frame: divider — use the 3px edge, oversized number, noun-phrase chapter name, one-line claim preview, and a flat mini-map showing the current chapter; no topbar, evidence, card, or footer. -->
+<!-- Frame: divider — use an oversized number, noun-phrase chapter name, one-line claim preview, and a full-width baseline to create a deliberate chapter pause; no topbar, evidence, card, or footer. -->
 <div class="slide">
-<div class="el signal-field" style="left:1220px;top:120px;width:760px;height:760px"></div>
-<div class="el focus-ring" style="left:1360px;top:210px;width:520px;height:520px"></div>
-<div class="el focus-ring inner" style="left:1470px;top:320px;width:300px;height:300px"></div>
-<div class="el edge" style="left:0px;top:0px;width:3px;height:1080px"></div>
-<div class="el t-metric-lg accent" style="left:120px;top:300px;width:600px;height:130px">05</div>
-<div class="el t-cover" style="left:120px;top:470px;width:1000px;height:160px">Patterns</div>
-<div class="el t-head muted" style="left:120px;top:680px;width:1200px;height:100px">Each layout explains itself through a real briefing slide.</div>
-<div class="el rule" style="left:120px;top:850px;width:1680px;height:1px"></div>
+<div class="el t-metric-lg accent" style="left:120px;top:270px;width:1680px;height:130px">05</div>
+<div class="el t-cover" style="left:120px;top:440px;width:1680px;height:160px">Patterns</div>
+<div class="el t-head muted" style="left:120px;top:650px;width:1680px;height:100px">Each layout explains itself through a real briefing slide.</div>
+<div class="el rule" style="left:120px;top:830px;width:1680px;height:1px"></div>
 </div>
 
 <!-- Pattern: comparison — two matched states; regions: left, right, takeaway; components: container ×2, selected, takeaway; vary labels and 3–5 criteria; keep order, units, scope, and one selected side. -->
@@ -237,17 +219,16 @@ body { margin:0; padding:40px; background:#070A0E; font-family:var(--font-family
 <div class="el takeaway" style="left:120px;top:885px;width:1680px;height:90px">Use the same scope and unit on both sides.</div>
 </div>
 
-<!-- Pattern: columns — 3–5 parallel parts; regions: equal columns, takeaway; components: container ×3, icon-frame ×3, selected, takeaway; vary labels and count; keep widths, rhythm, scope, and one focus. -->
+<!-- Pattern: columns — 3–5 parallel parts; regions: equal columns, takeaway; components: container ×3, icon ×3, selected, takeaway; vary labels and count; keep widths, rhythm, scope, and one focus. -->
 <div class="slide">
 <div class="el topbar" style="left:0px;top:0px;width:1920px;height:240px"><div class="tb-num">07</div><div class="tb-rule"></div><div class="tb-copy"><div class="tb-sub">Pattern / columns</div><div class="tb-title">Parallel evidence groups</div></div></div>
 <div class="el lead" style="left:120px;top:262px;width:1680px;height:96px">Equal columns keep one rhythm and one focus.</div>
-<!-- Component: icon (.icon) — one monochrome Material glyph inside a signal frame at a column head, process step, or diagram node; may vary: concept and muted, text, or selected teal colour; may not: appear without a 1–4 word label or mix families. -->
-<!-- Component: icon-frame (.icon-frame) — chamfered dark signal chip behind conceptual icons; strength: 1px teal line, selected member gains a 28px glow; JSON: {"type":"shape","shape":"snip2_diag_rect","fill":"#161B22","line":"#44D6C7","lineWidth":1,"glow":{"radius":14,"color":"#11A497","opacity":0.48}}; may vary: 74px compact step, 88px node, or 112px column/hub size; may not: frame unlabeled glyphs or mix frame geometry in one role. -->
+<!-- Component: icon (.icon, .icon-frame) — one monochrome Material glyph on a chamfered dark backing at a column head, process step, or diagram node; the backing groups concept with label and gains a teal border and glow only to identify the selected member; JSON backing: {"type":"shape","shape":"snip2_diag_rect","fill":"#161B22","line":"#44D6C7","lineWidth":1}; may vary: concept, colour, and 74px step / 88px node / 112px column size; may not: appear without a 1–4 word label, mix families, or highlight a neutral member. -->
 <div class="el columns" style="left:120px;top:390px;width:1680px;height:410px"><div class="column"><div class="icon-frame"><svg class="icon"><use href="#material/analytics-fill"/></svg></div><div class="t-label muted">Context</div><div class="t-head">Visible evidence</div><div class="t-cap">One shared-scope fact.</div></div><div class="column current"><div class="icon-frame selected"><svg class="icon accent-icon"><use href="#material/target-fill"/></svg></div><div class="t-label accent">Focus</div><div class="t-head">Decision point</div><div class="t-cap">One highlighted contribution.</div></div><div class="column"><div class="icon-frame"><svg class="icon"><use href="#material/flag-fill"/></svg></div><div class="t-label muted">Consequence</div><div class="t-head">Bounded action</div><div class="t-cap">One stated implication.</div></div></div>
 <div class="el takeaway" style="left:120px;top:860px;width:1680px;height:110px">Use columns only for parallel logic.</div>
 </div>
 
-<!-- Pattern: process — 3–5 irreversible stages and a gate; regions: steps, connectors, takeaway; components: step ×4, connector ×3, icon-frame ×4, selected, takeaway; keep one band, equal widths, and the final gate selected. -->
+<!-- Pattern: process — 3–5 irreversible stages and a gate; regions: steps, connectors, takeaway; components: step ×4, connector ×3, icon ×4, selected, takeaway; keep one band, equal widths, and the final gate selected. -->
 <div class="slide">
 <div class="el topbar" style="left:0px;top:0px;width:1920px;height:240px"><div class="tb-num">08</div><div class="tb-rule"></div><div class="tb-copy"><div class="tb-sub">Pattern / process</div><div class="tb-title">Four-stage decision path</div></div></div>
 <div class="el lead" style="left:120px;top:262px;width:1680px;height:96px">An unbroken band shows order; teal marks the gate.</div>
@@ -261,13 +242,11 @@ body { margin:0; padding:40px; background:#070A0E; font-family:var(--font-family
 <div class="el takeaway" style="left:120px;top:830px;width:1680px;height:120px">Sequence must carry analytical meaning.</div>
 </div>
 
-<!-- Pattern: metric — 2–4 related outcomes; regions: metrics, takeaway; components: metric ×3, gradient-field, ring, selected, takeaway; vary values; keep one period and scope, attached units, and no card grid. -->
+<!-- Pattern: metric — 2–4 related outcomes; regions: metrics, takeaway; components: metric ×3, selected, takeaway; vary values; keep one period and scope, attached units, and no card grid. -->
 <div class="slide">
 <div class="el topbar" style="left:0px;top:0px;width:1920px;height:240px"><div class="tb-num">09</div><div class="tb-rule"></div><div class="tb-copy"><div class="tb-sub">Pattern / metric</div><div class="tb-title">Contextual outcome measures</div></div></div>
 <div class="el lead" style="left:120px;top:262px;width:1680px;height:96px">Large values scan first; labels retain context.</div>
 <!-- Component: metric (.metric-band) — 2–4 contextual figures; vary count and units; keep one window, attached units, and one shared field. -->
-<div class="el signal-field" style="left:1280px;top:300px;width:620px;height:620px"></div>
-<div class="el focus-ring" style="left:1470px;top:385px;width:330px;height:330px"></div>
 <div class="el metric-band" style="left:120px;top:390px;width:1680px;height:300px"><div class="metric-item"><div class="metric-value">−67%</div><div class="metric-label">Primary measure<br>versus baseline</div></div><div class="metric-item"><div class="metric-value">0</div><div class="metric-label">Related outcome<br>same period</div></div><div class="metric-item"><div class="metric-value">2.1d</div><div class="metric-label">Time measure<br>same scope</div></div></div>
 <div class="el takeaway" style="left:120px;top:800px;width:1680px;height:130px">Teal marks current evidence, not favourable direction.</div>
 </div>
@@ -308,13 +287,10 @@ body { margin:0; padding:40px; background:#070A0E; font-family:var(--font-family
 <div class="el takeaway" style="left:120px;top:895px;width:1680px;height:80px">Accent selects; comparison explains.</div>
 </div>
 
-<!-- Pattern: diagram — 3–5 proof conditions around one decision; regions: centre and peers; components: hub, icon-frame ×5, connector, ring, selected; keep equal peers, clear spokes, no arrows, and only the centre accented. -->
+<!-- Pattern: diagram — 3–5 proof conditions around one decision; regions: centre and peers; components: hub, icon ×5, connector, selected; keep equal peers, clear spokes, no arrows, and only the centre accented. -->
 <div class="slide">
 <div class="el topbar" style="left:0px;top:0px;width:1920px;height:240px"><div class="tb-num">13</div><div class="tb-rule"></div><div class="tb-copy"><div class="tb-sub">Pattern / diagram</div><div class="tb-title">Decision evidence map</div></div></div>
 <div class="el lead" style="left:120px;top:262px;width:1680px;height:96px">Four proof conditions converge on one bounded decision.</div>
-<div class="el signal-field" style="left:620px;top:330px;width:680px;height:680px"></div>
-<div class="el focus-ring" style="left:650px;top:350px;width:620px;height:620px"></div>
-<div class="el focus-ring inner" style="left:705px;top:405px;width:510px;height:510px"></div>
 <div class="el hub-link" style="left:500px;top:468px;width:170px;height:4px"></div>
 <div class="el hub-link" style="left:668px;top:468px;width:4px;height:124px"></div>
 <div class="el hub-link" style="left:670px;top:588px;width:80px;height:4px"></div>
@@ -362,12 +338,8 @@ body { margin:0; padding:40px; background:#070A0E; font-family:var(--font-family
 </div>
 
 <!-- Part: Closing -->
-<!-- Frame: closing — one implication and at most two action conditions stay in the open field; the signal motif closes the argument without competing copy. -->
+<!-- Frame: closing — one implication and at most two action conditions stay in the open field; the full-width rule groups the conditions and closes the argument without competing copy. -->
 <div class="slide">
-<div class="el signal-field" style="left:1210px;top:80px;width:780px;height:780px"></div>
-<div class="el focus-ring" style="left:1420px;top:170px;width:470px;height:470px"></div>
-<div class="el focus-ring inner" style="left:1510px;top:260px;width:290px;height:290px"></div>
-<div class="el edge" style="left:0px;top:0px;width:3px;height:1080px"></div>
 <div class="el t-label accent" style="left:120px;top:300px;width:700px;height:36px">The implication</div>
 <div class="el t-cover" style="left:120px;top:390px;width:1560px;height:300px">Structure the argument.<br>Let the presenter explain.</div>
 <div class="el rule" style="left:120px;top:690px;width:1680px;height:1px"></div>

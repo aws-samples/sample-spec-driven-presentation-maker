@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>duotone — A two-field presentation style for claims that must land from the back row or on a shared screen; one hard edge divides near-black and vivid orange, placing the claim on one field and its evidence on the other, while very large heavy type, strict colour roles, split concentric rings, and framed icons make contrast carry the entire hierarchy.</title>
+<title>duotone — A two-field presentation style for claims that must land from the back row or on a shared screen; one hard edge divides near-black and vivid orange, placing the claim on one field and its evidence on the other, while very large heavy type, strict colour roles, and framed structural icons make contrast carry the entire hierarchy.</title>
 <style>
 :root {
   --color-text: #FFFFFF; /* primary text and rules on the dark field */
@@ -40,16 +40,12 @@
   --border-thin: 2px; /* component border when a rule is needed */
   --radius: 0px; /* hard geometry throughout */
   --shadow: none; /* soft depth would blur the hard field edge */
-  --ring-thin: 4px; /* quiet echo of the split around structural content */
-  --ring-thick: 12px; /* signature outline on covers and dividers */
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-family); zoom: 0.7; }
 .slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 30pt; overflow: hidden; background: var(--color-bg); color: var(--color-text); }
 .el { position: absolute; }
 .field { background: var(--accent); }
-.deco-ring { border: var(--ring-thin) solid currentColor; border-radius: 50%; opacity: .28; }
-.deco-ring-strong { border-width: var(--ring-thick); opacity: 1; }
 .icon-frame { border: 8px solid currentColor; border-radius: 50%; padding: 18px; }
 .on-accent { color: var(--color-on-accent); }
 .accent { color: var(--accent); }
@@ -96,23 +92,18 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/edit" viewBox="0 -960 960 960"><path d="M180-180h44l472-471-44-44-472 471v44Zm-60 60v-128l575-574q8-8 19-12.5t23-4.5q11 0 22 4.5t20 12.5l44 44q9 9 13 20t4 22q0 11-4.5 22.5T823-694L248-120H120Zm659-617-41-41 41 41Zm-105 64-22-22 44 44-22-22Z"/></symbol><symbol id="material/build" viewBox="0 -960 960 960"><path d="M705-128 447-388q-23 8-46 13t-47 5q-97.08 0-165.04-67.67Q121-505.33 121-602q0-31 8.16-60.39T152-718l145 145 92-86-149-149q25.91-15.16 54.96-23.58Q324-840 354-840q99.17 0 168.58 69.42Q592-701.17 592-602q0 24-5 47t-13 46l259 258q11 10.96 11 26.48T833-198l-76 70q-10.7 11-25.85 11Q716-117 705-128Zm28-57 40-40-273-273q16-21 24-49.5t8-54.5q0-75-55.5-127T350-782l102 104q9 9 8.5 21.5T451-635L318-510q-9.27 8-21.64 8-12.36 0-20.36-8l-98-97q3 77 54.67 127T354-430q25 0 53-8t49-24l277 277ZM476-484Z"/></symbol><symbol id="material/verified" viewBox="0 -960 960 960"><path d="m346-60-76-130-151-31 17-147-96-112 96-111-17-147 151-31 76-131 134 62 134-62 77 131 150 31-17 147 96 111-96 112 17 147-150 31-77 130-134-62-134 62Zm27-79 107-45 110 45 67-100 117-30-12-119 81-92-81-94 12-119-117-28-69-100-108 45-110-45-67 100-117 28 12 119-81 94 81 92-12 121 117 28 70 100Zm107-341Zm-43 133 227-225-45-41-182 180-95-99-46 45 141 140Z"/></symbol><symbol id="material/rocket_launch" viewBox="0 -960 960 960"><path d="m187-551 106 45q18-36 38.5-71t43.5-67l-79-16-109 109Zm154 81 133 133q57-26 107-59t81-64q81-81 119-166t41-192q-107 3-192 41T464-658q-31 31-64 81t-59 107Zm209-145.5q0-29.5 20-49.5t49.5-20q29.5 0 49.5 20t20 49.5q0 29.5-20 49.5t-49.5 20q-29.5 0-49.5-20t-20-49.5Zm5 432.5 109-109-16-79q-32 23-67 43.5T510-289l45 106Zm326-694q9 136-34 248T705-418l-2 2-2 2 22 110q3 15-1.5 29T706-250L535-78l-85-198-170-170-198-85 172-171q11-11 25-15.5t29-1.5l110 22q1-1 2-1.5t2-1.5q99-99 211-142.5T881-877ZM149-325q35-35 85.5-35.5T320-326q35 35 34.5 85.5T319-155q-26 26-80.5 43T75-80q15-109 31.5-164t42.5-81Zm42 43q-14 15-25 47t-19 82q50-8 82-19t47-25q19-17 19.5-42.5T278-284q-19-18-44.5-17.5T191-282Z"/></symbol><symbol id="material/hub" viewBox="0 -960 960 960"><path d="M153-73q-33-33-33-81t33.25-81q33.25-33 80.75-33 14 0 24.5 2.5T280-258l85-106q-19-23-29-52.5t-5-61.5l-121-41q-15 25-39.5 39T114-466q-47.5 0-80.75-33.25T0-580q0-47.5 33.25-80.75T114-694q47.5 0 80.75 33.25T228-580v4l122 42q18-32 43.5-49t56.5-24v-129q-39-11-61.5-43T366-846q0-47.5 33-80.75T480-960q48 0 81 33.25T594-846q0 35-23 67t-61 43v129q31 7 57 24t44 49l121-42v-4q0-47.5 33.25-80.75T846-694q47.5 0 80.75 33T960-580q0 48-33.25 81T846-466q-32 0-57-14t-39-39l-121 41q5 32-4.5 61.5T595-364l85 106q11-5 21.5-7.5t24.06-2.5Q774-268 807-235t33 81q0 48-33 81t-81 33q-48 0-81-33.25T612-154q0-20 5.5-36t15.5-31l-85-106q-32.13 17-68.56 17Q443-310 411-327l-84 107q10 15 15.5 30.5T348-154q0 47.5-33 80.75T234-40q-48 0-81-33Zm-38.96-453q22.96 0 38.46-15.54 15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5Q91-634 75.5-618.46 60-602.93 60-579.96 60-557 75.54-541.5q15.53 15.5 38.5 15.5ZM272.5-115.54q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54Zm246-692q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54ZM480.5-370q37.5 0 63.5-26.5t26-64q0-37.5-26.1-63.5T480-550q-37 0-63.5 26.1T390-460q0 37 26.5 63.5t64 26.5Zm284 254.46q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54Zm120-426q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54ZM480-846ZM114-580Zm366 120Zm366-120ZM234-154Zm492 0Z"/></symbol></svg>
 
 <!-- Part: Cover -->
-<!-- The cover makes the identity visible before explaining it: one equal split, two title halves at the same scale, orange as the voice on dark, and field-matched rings that become visible only after crossing the edge. -->
-<!-- Component: ring (.deco-ring) — split-edge signature; strength: one or two 4–12px outlines at 28–100% opacity; JSON: coincident unfilled ovals, lines #1D1D1B and #FF4F00, lineWidth 2–6, opacity 0.28–1, so each arc disappears into its matching field; may vary: diameter, crop, one nested ring; may not: blur the edge, cover text, or add colour. -->
+<!-- The cover makes the identity visible before explaining it: one equal split, two title halves at the same scale, orange as the voice on dark, and the hard edge as the only focal geometry. -->
 <div class="slide">
 <div class="el field" style="left:0px;top:0px;width:960px;height:1080px"></div>
-<div class="el deco-ring deco-ring-strong on-accent" style="left:700px;top:650px;width:520px;height:520px"></div>
-<div class="el deco-ring deco-ring-strong accent" style="left:700px;top:650px;width:520px;height:520px"></div>
-<div class="el deco-ring on-accent" style="left:775px;top:725px;width:370px;height:370px"></div>
-<div class="el deco-ring accent" style="left:775px;top:725px;width:370px;height:370px"></div>
 <div class="el t-label on-accent" style="left:96px;top:96px;width:768px;height:34px">Bundled style / concept tier</div>
 <div class="el t-cover-title on-accent" style="left:96px;top:240px;width:768px;height:540px">Duotone</div>
 <div class="el t-label accent" style="left:1056px;top:96px;width:768px;height:34px">One visual decision</div>
 <div class="el t-cover-title accent" style="left:1056px;top:240px;width:768px;height:540px">One hard edge</div>
-<div class="el t-caption muted" style="left:1056px;top:860px;width:768px;height:90px">Split rings · framed icons · one hard edge</div>
+<div class="el t-caption muted" style="left:1056px;top:860px;width:768px;height:90px">Hard split · framed icons · heavy type</div>
 </div>
 
 <!-- Part: Rules -->
-<!-- Frame: content — every content slide uses one orange rectangle on the dark deck ground, with no title band, footer, page number, logo strip, or second field edge; vary split, orange side, and field-matched ring crop, but inset both fields 96px. -->
+<!-- Frame: content — every content slide uses one orange rectangle on the dark deck ground, with no title band, footer, page number, logo strip, or second field edge; vary split and orange side, but inset both fields 96px. -->
 <!-- Component: container — none; group by the two fields, whitespace, and 2px rules because cards and panels would create a third hierarchy. -->
 <!-- Component: numbered — none; use a list for peer findings and step only when order carries meaning. -->
 <!-- Component: tag — none; plain field labels provide metadata because badges would become decoration. -->
@@ -123,26 +114,22 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 <div class="el t-slide-title" style="left:96px;top:144px;width:768px;height:240px">Contrast carries hierarchy</div>
 <div class="el t-body" style="left:96px;top:440px;width:768px;height:250px">Large-room reading demands an immediate division: the claim stands on one field, its proof on the other.</div>
 <!-- Component: takeaway (.takeaway) — one consequence or action after the evidence; may vary: one sentence; may not: repeat the title, add a second claim, or become a card. -->
-<div class="el takeaway t-heading accent" style="left:96px;top:790px;width:768px;height:140px">Rings repeat the split without adding a third field.</div>
+<div class="el takeaway t-heading accent" style="left:96px;top:790px;width:768px;height:140px">Keep every hierarchy decision on the two fields.</div>
 <div class="el t-label on-accent" style="left:1056px;top:88px;width:768px;height:34px">Do / keep the cut hard</div>
 <div class="el t-heading on-accent" style="left:1056px;top:144px;width:768px;height:100px">One edge. Two jobs.</div>
 <div class="el t-body on-accent" style="left:1056px;top:440px;width:768px;height:420px">Use one legal split.<br><br>Inset each field 96px.<br><br>Use one assertion title.<br><br>Keep proof opposite the claim.</div>
 </div>
 
-<!-- Orange is field, dark-field emphasis, ring, and icon-frame; near-black performs the inverse jobs on orange. White is dark-field text and neutral evidence; grey is metadata only. Draw real relationships and sequences; keep sentences as text. Soft depth would blur the edge, so decoration stays crisp. -->
+<!-- Orange is field, dark-field emphasis, and structural icon outline; near-black performs the inverse jobs on orange. White is dark-field text and neutral evidence; grey is metadata only. Draw real relationships and sequences; keep sentences as text. Soft depth would blur the edge, so icon outlines stay crisp. -->
 <div class="slide">
 <div class="el field" style="left:0px;top:0px;width:640px;height:1080px"></div>
-<div class="el deco-ring deco-ring-strong on-accent" style="left:400px;top:620px;width:480px;height:480px"></div>
-<div class="el deco-ring deco-ring-strong accent" style="left:400px;top:620px;width:480px;height:480px"></div>
-<div class="el deco-ring on-accent" style="left:470px;top:690px;width:340px;height:340px"></div>
-<div class="el deco-ring accent" style="left:470px;top:690px;width:340px;height:340px"></div>
 <div class="el t-label on-accent" style="left:96px;top:88px;width:448px;height:34px">Rules / signature</div>
-<div class="el t-slide-title on-accent" style="left:96px;top:144px;width:448px;height:300px">Decoration follows the edge</div>
-<div class="el t-body on-accent" style="left:96px;top:500px;width:448px;height:300px">Use split rings at decisive frames and framed Material icons at structural nodes. Near-black answers orange across the cut.</div>
-<div class="el t-label accent" style="left:736px;top:88px;width:1088px;height:34px">Do / repeat the two jobs</div>
-<div class="el t-slide-title" style="left:736px;top:144px;width:1088px;height:240px">Ornament stays duotone</div>
-<div class="el t-body" style="left:960px;top:440px;width:864px;height:300px">Crop rings at an edge.<br><br>Frame only structural icons.<br><br>Keep one filled family.<br><br>Name every icon.</div>
-<div class="el takeaway t-heading accent" style="left:960px;top:850px;width:864px;height:100px">Every mark repeats the same contrast.</div>
+<div class="el t-slide-title on-accent" style="left:96px;top:144px;width:448px;height:300px">Frames serve structure</div>
+<div class="el t-body on-accent" style="left:96px;top:500px;width:448px;height:300px">Frame icons only at structural beats and nodes. Near-black answers orange across the cut.</div>
+<div class="el t-label accent" style="left:736px;top:88px;width:1088px;height:34px">Do / frame the structure</div>
+<div class="el t-slide-title" style="left:736px;top:144px;width:1088px;height:240px">Structure stays duotone</div>
+<div class="el t-body" style="left:960px;top:440px;width:864px;height:300px">Frame only structural icons.<br><br>Keep one filled family.<br><br>Match outlines to their field.<br><br>Name every icon.</div>
+<div class="el takeaway t-heading accent" style="left:960px;top:850px;width:864px;height:100px">Every framed icon names a structural role.</div>
 </div>
 
 <!-- Legal splits: 50:50 at x 960, 33:67 at x 640, 67:33 at x 1280, or horizontal at y 540; orange may take either field. Full-height labels begin y 88, titles y 144, evidence y 440, and content ends by y 984. Horizontal labels begin y 72/590 and titles y 130. -->
@@ -183,8 +170,7 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 <div class="el t-label on-accent" style="left:96px;top:88px;width:1088px;height:34px">Outline / claim before form</div>
 <div class="el t-slide-title on-accent" style="left:96px;top:144px;width:1088px;height:240px">Move from claim to ask</div>
 <!-- Component: list (.list-row) — three or four peer facts with aligned starts; build each lead word and its copy as separate text boxes sharing a top, with the bold lead inside a 200px column; may vary: lead words and two or three copy lines; may not: use bullets, boxes, grey hierarchy, or mismatched rhythm. -->
-<!-- Component: icon-frame (.icon-frame) — crisp outline at beats, stages, and nodes; strength: 8px with 18px inset; JSON: unfilled oval, opposite-field line, lineWidth 4, then centred icon inset 18px with matching iconColor; may vary: role diameter; may not: frame prose, soften, or add colour. -->
-<!-- Component: icon (.icon) — filled Material concept paired with a one-to-four-word label at major outline beats, process stages, and diagram nodes; size 80px, 104px, or 120–144px by role; colour near-black on orange, white on dark, and orange for one core; may vary: concept and role size; may not: mix families, sit beside prose, lose its label, or compete with the claim. -->
+<!-- Component: icon (.icon + .icon-frame) — filled Material concept in a crisp circular outline that marks major outline beats, process stages, and diagram nodes; the 8px opposite-field outline with 18px inset sets the hard-edged frame tone and orange identifies one core; size 80px, 104px, or 120–144px by role; may vary: concept, label, and role diameter; may not: mix families, frame prose, soften, lose its label, or compete with the claim. -->
 <div class="el list-row icon-row on-accent" style="left:96px;top:440px;width:500px;height:150px"><svg class="icon icon-list icon-frame"><use href="#material/edit"/></svg><div><span class="t-lead">Open</span><br><span class="t-body">Strongest claim</span></div></div>
 <div class="el list-row icon-row on-accent" style="left:684px;top:440px;width:500px;height:150px"><svg class="icon icon-list icon-frame"><use href="#material/build"/></svg><div><span class="t-lead">Build</span><br><span class="t-body">Evidence sequence</span></div></div>
 <div class="el list-row icon-row on-accent" style="left:96px;top:700px;width:500px;height:150px"><svg class="icon icon-list icon-frame"><use href="#material/verified"/></svg><div><span class="t-lead">Decide</span><br><span class="t-body">One recommendation</span></div></div>
@@ -195,13 +181,9 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 </div>
 
 <!-- Part: Patterns -->
-<!-- Frame: divider — use the split itself as a chapter title slide, with concentric rings centred on its edge; vary side, number, question, preview, and ring crop, but include no evidence, panel, badge, footer, or competing focal object. -->
+<!-- Frame: divider — use the split itself as the sole focal geometry for a chapter title; vary side, number, question, and preview, but include no evidence, panel, badge, footer, or competing focal object because this frame only sets the chapter claim. -->
 <div class="slide">
 <div class="el field" style="left:1280px;top:0px;width:640px;height:1080px"></div>
-<div class="el deco-ring deco-ring-strong accent" style="left:1080px;top:590px;width:440px;height:440px"></div>
-<div class="el deco-ring deco-ring-strong on-accent" style="left:1080px;top:590px;width:440px;height:440px"></div>
-<div class="el deco-ring accent" style="left:1140px;top:650px;width:320px;height:320px"></div>
-<div class="el deco-ring on-accent" style="left:1140px;top:650px;width:320px;height:320px"></div>
 <div class="el t-label accent" style="left:96px;top:88px;width:1088px;height:34px">Section 03 / recurring forms</div>
 <div class="el t-cover-title" style="left:96px;top:300px;width:1088px;height:300px">How does the edge<br>shape evidence?</div>
 <div class="el t-heading muted" style="left:96px;top:740px;width:1088px;height:120px">Each following slide demonstrates the pattern it explains.</div>
@@ -226,8 +208,6 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 <!-- Pattern: columns — for: three or four terse peers that complete one set; regions: body, col-1, col-2, col-3, col-4; components: list ×4; may vary: three or four headings and descriptions; may not: vary widths, rhythm, or use columns as decoration. -->
 <div class="slide">
 <div class="el field" style="left:0px;top:540px;width:1920px;height:540px"></div>
-<div class="el deco-ring deco-ring-strong accent" style="left:1640px;top:330px;width:420px;height:420px"></div>
-<div class="el deco-ring deco-ring-strong on-accent" style="left:1640px;top:330px;width:420px;height:420px"></div>
  <div class="el t-label accent" style="left:96px;top:72px;width:1728px;height:34px">Pattern / columns</div>
 <div class="el t-slide-title" style="left:96px;top:130px;width:1728px;height:120px">Equal columns complete one set</div>
 <div class="el t-body" style="left:96px;top:300px;width:1500px;height:110px">Use the full-width field when four peers need one shared reading order.</div>
@@ -241,8 +221,6 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 <!-- Pattern: process — for: three to five ordered stages; regions: body, step-1, step-2, step-3, step-4; components: step ×4 + icon ×4 + connector ×3; may vary: count, verbs, concepts, and orange field side; may not: vary widths, add boxes, chevrons, arrowheads, paragraphs, or rotation. -->
 <div class="slide">
 <div class="el field" style="left:0px;top:0px;width:1920px;height:540px"></div>
-<div class="el deco-ring deco-ring-strong on-accent" style="left:1640px;top:330px;width:420px;height:420px"></div>
-<div class="el deco-ring deco-ring-strong accent" style="left:1640px;top:330px;width:420px;height:420px"></div>
  <div class="el t-label on-accent" style="left:96px;top:72px;width:1728px;height:34px">Pattern / process</div>
 <div class="el t-slide-title on-accent" style="left:96px;top:130px;width:1728px;height:120px">Equal stages make order visible</div>
 <div class="el t-body on-accent" style="left:96px;top:300px;width:1500px;height:110px">Use a sequence only when each handoff changes what can happen next.</div>
@@ -261,8 +239,6 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 <!-- Pattern: metric — for: one decisive measure with scope and comparator; regions: body, kpi-1, takeaway; components: metric + takeaway; may vary: value, unit, comparator, and orange side; may not: box the figure, exceed three hero glyphs, detach the unit, or add unrelated figures. -->
 <div class="slide">
 <div class="el field" style="left:0px;top:0px;width:960px;height:1080px"></div>
-<div class="el deco-ring deco-ring-strong on-accent" style="left:620px;top:760px;width:480px;height:480px"></div>
-<div class="el deco-ring deco-ring-strong accent" style="left:620px;top:760px;width:480px;height:480px"></div>
  <div class="el t-label on-accent" style="left:96px;top:88px;width:768px;height:34px">Pattern / metric</div>
 <div class="el t-slide-title on-accent" style="left:96px;top:144px;width:768px;height:240px">One figure owns one field</div>
 <div class="el t-body on-accent" style="left:96px;top:500px;width:768px;height:220px">State period, population, and comparison on the opposite field.</div>
@@ -301,8 +277,6 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 <!-- Diagram: unboxed framed icons, orthogonal 2px spokes meeting edges, one orange 144px hub, and peer 120px white satellites. -->
 <div class="slide">
 <div class="el field" style="left:0px;top:0px;width:640px;height:1080px"></div>
-<div class="el deco-ring deco-ring-strong on-accent" style="left:400px;top:680px;width:480px;height:480px"></div>
-<div class="el deco-ring deco-ring-strong accent" style="left:400px;top:680px;width:480px;height:480px"></div>
 <div class="el t-label on-accent" style="left:96px;top:88px;width:448px;height:34px">Pattern / diagram</div>
 <div class="el t-slide-title on-accent" style="left:96px;top:144px;width:448px;height:300px">Four signals meet one core</div>
 <div class="el t-body on-accent" style="left:96px;top:540px;width:448px;height:260px">Use a hub when each satellite changes the same centre. Name direction in words; omit arrows when the relationship is shared.</div>
@@ -352,13 +326,9 @@ body { margin: 0; padding: 30pt; background: #000000; font-family: var(--font-fa
 </div>
 
 <!-- Part: Closing -->
-<!-- Frame: closing — repeat the equal cover split and split-ring signature with one ask, then name owner, timing, and review measure; vary wording, orange side, and ring crop, but allow no second action or appendix after this slide. -->
+<!-- Frame: closing — repeat the equal cover split with one ask, then name owner, timing, and review measure; vary wording and orange side, but allow no second action or appendix because the close has one owned outcome. -->
 <div class="slide">
 <div class="el field" style="left:0px;top:0px;width:960px;height:1080px"></div>
-<div class="el deco-ring deco-ring-strong on-accent" style="left:700px;top:650px;width:520px;height:520px"></div>
-<div class="el deco-ring deco-ring-strong accent" style="left:700px;top:650px;width:520px;height:520px"></div>
-<div class="el deco-ring on-accent" style="left:775px;top:725px;width:370px;height:370px"></div>
-<div class="el deco-ring accent" style="left:775px;top:725px;width:370px;height:370px"></div>
 <div class="el t-label on-accent" style="left:96px;top:96px;width:768px;height:34px">Close / one action</div>
 <div class="el t-cover-title on-accent" style="left:96px;top:240px;width:768px;height:540px">Next</div>
 <div class="el t-label accent" style="left:1056px;top:96px;width:768px;height:34px">The ask</div>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>aws-dark — For customers, partners, and internal teams explaining AWS services, architectures, and cost decisions; a dark technical grid, luminous category halos, and one Smile Orange glow make complex systems readable.</title>
+<title>aws-dark — For customers, partners, and internal teams explaining AWS services, architectures, and cost decisions; a dark technical grid, category-coded service frames, and one orange selection make complex systems readable.</title>
 <style>
 :root {
 --color-bg:#161D26;/* dark technical ground on every slide */
@@ -37,11 +37,9 @@
 --radius:4px;/* restrained grouping corners */
 --border-thin:1px;/* ordinary separators */
 --border-group:2px;/* category or selected boundary */
---shadow:none;/* ordinary surfaces stay flat;one selected element may glow */
 --margin-x:112px;/* safe inset beyond five percent */
 --content-w:1696px;/* shared content width */
 --content-top:300px;/* content below reserved title zone */
---bar-h:4px;/* title emphasis rule */
 --gallery-bg:#16191F;/* surround outside the slide */
 }
 *{box-sizing:border-box;}
@@ -58,15 +56,6 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 .muted{color:var(--color-muted);}
 .center{text-align:center;}
 .right{text-align:right;}
-.accent-bar{background:linear-gradient(180deg, #FFB84D 0%, var(--accent) 52%, #ED7100 100%);box-shadow:0 0 26px rgba(255,153,0,.30);}
-.gradient-field{background:linear-gradient(135deg, rgba(29,39,51,0) 0%, rgba(50,66,86,.86) 52%, rgba(29,39,51,0) 100%);}
-.orb{border-radius:50%;filter:blur(18px);}
-.orb-analytics{background:radial-gradient(circle, rgba(140,79,255,.56) 0%, rgba(140,79,255,.14) 48%, rgba(140,79,255,0) 74%);}
-.orb-integration{background:radial-gradient(circle, rgba(231,21,123,.50) 0%, rgba(231,21,123,.12) 48%, rgba(231,21,123,0) 74%);}
-.ring{border-radius:50%;border:2px solid rgba(143,173,208,.55);}
-.ring-analytics{border-color:var(--cat-analytics);box-shadow:0 0 30px rgba(140,79,255,.38);}
-.selected-glow{box-shadow:0 0 32px rgba(255,153,0,.42);}
-.title-rule{background:var(--color-border);}
 .rule{background:var(--color-border);}
 .surface-text{padding:28px 32px;background:var(--color-surface);border:var(--border-thin) solid var(--color-border);border-radius:var(--radius);}
 .takeaway{padding-top:24px;border-top:var(--border-thin) solid var(--color-border);}
@@ -92,12 +81,12 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 .icon{display:block;width:96px;height:96px;flex:0 0 96px;}
 .icon-frame{width:116px;height:116px;flex:0 0 116px;display:flex;align-items:center;justify-content:center;border:2px solid var(--color-border);border-radius:50%;background:var(--color-bg);}
 .icon-frame .icon{width:78px;height:78px;flex-basis:78px;}
-.frame-analytics{background:var(--cat-analytics-tint);border-color:var(--cat-analytics);box-shadow:0 0 26px rgba(140,79,255,.34);}
-.frame-integration{background:var(--cat-integration-tint);border-color:var(--cat-integration);box-shadow:0 0 26px rgba(231,21,123,.30);}
-.frame-storage{background:var(--cat-storage-tint);border-color:var(--cat-storage);box-shadow:0 0 26px rgba(122,161,22,.28);}
-.frame-compute{background:var(--cat-compute-tint);border-color:var(--cat-compute);box-shadow:0 0 26px rgba(237,113,0,.30);}
+.frame-analytics{background:var(--cat-analytics-tint);border-color:var(--cat-analytics);}
+.frame-integration{background:var(--cat-integration-tint);border-color:var(--cat-integration);}
+.frame-storage{background:var(--cat-storage-tint);border-color:var(--cat-storage);}
+.frame-compute{background:var(--cat-compute-tint);border-color:var(--cat-compute);}
 .hero-icon{display:flex;align-items:center;justify-content:center;}
-.hero-icon .icon{width:112px;height:112px;flex-basis:112px;}
+.hero-icon .icon{width:160px;height:160px;flex-basis:160px;}
 .icon-label{display:flex;align-items:center;gap:24px;}
 .icon-node{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:var(--color-surface);border:var(--border-group) solid var(--color-border);border-radius:var(--radius);}
 .icon-node.accent-outline{border-color:var(--accent);}
@@ -122,16 +111,8 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 
 <!-- Part: Cover -->
 <div class="slide">
-<!-- Component: accent-bar (.accent-bar) — route edge/rule; strength: 4–8px, 13px glow; JSON: gradient rectangle + glow {radius:13,color:#FF9900,opacity:.30}; may vary: length; may not: add a second orange focus. -->
-<div class="el accent-bar" style="left:0px;top:0px;width:8px;height:1080px"></div>
-<!-- Component: gradient-field (.gradient-field) — behind hero/closing frames; strength: quiet neutral sweep; JSON: rectangle, gradient 135° #1D2733/0 → #324256/.86 → #1D2733/0, sendToBack; may vary: angle; may not: cross text. -->
-<div class="el gradient-field" style="left:1180px;top:0px;width:740px;height:1080px"></div>
-<!-- Component: orb (.shape-oval.orb) — light behind a service hero; strength: 56% soft centre; JSON: oval, gradient #8C4FFF/.56 → #161D26/0, softEdge:18, sendToBack; may vary: category; may not: appear without its category. -->
-<div class="el shape-oval orb orb-analytics" style="left:1300px;top:190px;width:520px;height:520px"></div>
-<!-- Component: ring (.shape-oval.ring) — orbit around one focus; strength: 2px + glow; JSON: oval, fill:none, line:#8C4FFF, lineWidth:2, glow {radius:15,color:#8C4FFF,opacity:.38}; may vary: diameter; may not: encode data. -->
-<div class="el shape-oval ring ring-analytics" style="left:1380px;top:270px;width:360px;height:360px"></div>
-<!-- Component: icon-frame (.icon-frame) — official service halo; strength: tint disc, 2px ring, 13px glow; JSON: category-tint circle + matching line/glow behind unchanged assets:aws icon; may vary: category/size; may not: recolour, detach identity, or mix families. -->
-<div class="el icon-frame frame-analytics hero-icon" style="left:1484px;top:374px;width:152px;height:152px"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div>
+<!-- Component: icon (.icon-frame .icon) — official AWS asset on a category-tint circle with matching border so the backing encodes service family; may vary: asset/category/78–160px; may not: recolour, detach identity, mix families, or flank prose. -->
+<div class="el icon-frame frame-analytics hero-icon" style="left:1400px;top:360px;width:320px;height:320px"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div>
 <!-- Component: tag (.t-label) — metadata; may vary: wording/colour; may not: encode status or detach from its service. -->
 <div class="el t-label muted" style="left:112px;top:300px;width:900px;height:34px">Bundled presentation style</div>
 <div class="el t-cover" style="left:112px;top:360px;width:1080px;height:240px">AWS architecture,<br>made legible</div>
@@ -144,32 +125,29 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:700px;height:30px">Rules / identity</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Category colour frames the service it identifies</div>
-<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: container (.surface-text) — compact proof; may vary: size/content; may not: repeat as chrome or hold unframed service icons. -->
-<div class="el surface-text" style="left:112px;top:340px;width:760px;height:250px"><div class="t-heading c-analytics">Use colour on identity frames</div><div class="t-caption">Ring, header, legend, or category label.</div></div>
-<div class="el surface-text" style="left:1048px;top:340px;width:760px;height:250px"><div class="t-heading">Use tint inside the frame</div><div class="t-caption muted">Pair tint with the matching category ring.</div></div>
+<div class="el surface-text" style="left:112px;top:340px;width:760px;height:250px"><div class="t-heading c-analytics">Use colour on identity frames</div><div class="t-caption">Border, header, legend, or category label.</div></div>
+<div class="el surface-text" style="left:1048px;top:340px;width:760px;height:250px"><div class="t-heading">Use tint inside the frame</div><div class="t-caption muted">Pair tint with the matching category border.</div></div>
 <div class="el t-heading" style="left:112px;top:690px;width:760px;height:90px">Keep category colour attached to identity</div>
-<div class="el t-body muted" style="left:112px;top:810px;width:1480px;height:100px">A category halo stays with its label.</div>
+<div class="el t-body muted" style="left:112px;top:810px;width:1480px;height:100px">A category frame stays with its label.</div>
 </div>
 
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:700px;height:30px">Rules / composition</div>
-<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One claim and one orange mark create the route</div>
-<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
+<div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One claim and one orange selection create the route</div>
 <div class="el t-heading" style="left:112px;top:340px;width:480px;height:60px">Message</div>
 <div class="el t-body" style="left:112px;top:420px;width:480px;height:190px">Use one finding, at most two lines.</div>
 <div class="el t-heading" style="left:720px;top:340px;width:480px;height:60px">Emphasis</div>
-<div class="el t-body" style="left:720px;top:420px;width:480px;height:190px">Mark one number, node, current step, or title rule.</div>
+<div class="el t-body" style="left:720px;top:420px;width:480px;height:190px">Mark one number, node, or current step.</div>
 <div class="el t-heading" style="left:1328px;top:340px;width:480px;height:60px">Depth</div>
-<div class="el t-body" style="left:1328px;top:420px;width:480px;height:190px">Keep gradients behind content; glow one selected element.</div>
+<div class="el t-body" style="left:1328px;top:420px;width:480px;height:190px">Group by surface contrast; outline one selected element.</div>
 <!-- Component: takeaway (.takeaway) — consequence; may vary: one sentence; may not: repeat title/add a claim/exceed two lines. -->
-<div class="el takeaway t-heading" style="left:112px;top:770px;width:1696px;height:120px">Two orange spots read as two alerts.</div>
+<div class="el takeaway t-heading" style="left:112px;top:770px;width:1696px;height:120px">Two orange selections read as two priorities.</div>
 </div>
 
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:700px;height:30px">Rules / illustration</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Draw the service route before writing its explanation</div>
-<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: numbered (.marker) — ordered point; may vary: index/text; may not: replace stages or form orange sets. -->
 <div class="el marker t-label" style="left:112px;top:350px;width:70px;height:52px">01</div>
 <div class="el t-body" style="left:220px;top:342px;width:640px;height:80px">Illustrate nodes, steps, and column heads.</div>
@@ -188,7 +166,6 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:800px;height:30px">Message / title grammar</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Finding-led titles make technical choices unambiguous</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: metric (.t-metric) — figure + comparator; may vary: unit/value; may not: float, mix periods, or share orange. -->
 <div class="el t-metric accent-fill" style="left:112px;top:350px;width:360px;height:150px">45</div>
 <div class="el t-heading" style="left:112px;top:550px;width:520px;height:80px">visible words maximum</div>
@@ -200,7 +177,6 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:800px;height:30px">Outline / argument rhythm</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Move from decision to evidence to architecture to action</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
 <div class="el surface-text" style="left:112px;top:350px;width:480px;height:290px"><div class="t-label muted">01 / Decide</div><div class="t-heading">Lead with the strongest claim</div></div>
 <div class="el surface-text" style="left:720px;top:350px;width:480px;height:290px"><div class="t-label muted">02 / Prove</div><div class="t-heading">Sequence constraint, design, and cost</div></div>
 <div class="el surface-text accent-outline" style="left:1328px;top:350px;width:480px;height:290px"><div class="t-label muted">03 / Act</div><div class="t-heading">Close on one owned decision</div></div>
@@ -208,12 +184,9 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 </div>
 
 <!-- Part: Patterns -->
-<!-- Frame: divider — 8px edge, label y300, title, question, preview; may vary: wording; may not: add evidence/tracker/page. -->
+<!-- Frame: divider — label y300, title question, and category-framed service icon; may vary: wording/category; may not: add evidence, tracker, or page number. -->
 <div class="slide">
-<div class="el accent-bar" style="left:0px;top:0px;width:8px;height:1080px"></div>
-<div class="el gradient-field" style="left:1210px;top:0px;width:710px;height:1080px"></div>
-<div class="el shape-oval orb orb-integration" style="left:1370px;top:230px;width:430px;height:430px"></div>
-<div class="el icon-frame frame-integration hero-icon" style="left:1510px;top:370px;width:150px;height:150px"><svg class="icon"><use href="#aws/Arch_Amazon-EventBridge_48"/></svg></div>
+<div class="el icon-frame frame-integration hero-icon" style="left:1400px;top:360px;width:320px;height:320px"><svg class="icon"><use href="#aws/Arch_Amazon-EventBridge_48"/></svg></div>
 <div class="el t-label muted" style="left:112px;top:300px;width:700px;height:34px">Patterns / technical evidence</div>
 <div class="el t-cover" style="left:112px;top:370px;width:1080px;height:220px">How does the claim<br>choose the layout?</div>
 <div class="el t-body muted" style="left:112px;top:680px;width:1050px;height:120px">Every following slide demonstrates the pattern it explains.</div>
@@ -223,37 +196,33 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / comparison</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Matched states expose the operating change</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: before-after (.state) — matched criteria; may vary: values/rows; may not: change geometry/units/order. -->
 <div class="el state" style="left:112px;top:350px;width:760px;height:430px"></div>
 <div class="el t-label muted" style="left:112px;top:390px;width:600px;height:32px">Before</div>
 <div class="el t-heading" style="left:112px;top:470px;width:680px;height:70px">Operate hosts</div>
 <div class="el t-body muted" style="left:112px;top:590px;width:680px;height:120px">Plan capacity<br>Maintain backup tooling</div>
 <!-- Component: selected (.accent-outline) — claimed member; may vary: target; may not: duplicate orange or change peer geometry. -->
-<div class="el state accent-outline selected-glow" style="left:1048px;top:350px;width:760px;height:430px"></div>
+<div class="el state accent-outline" style="left:1048px;top:350px;width:760px;height:430px"></div>
 <div class="el t-label muted" style="left:1080px;top:390px;width:600px;height:32px">After / selected</div>
 <div class="el t-heading" style="left:1080px;top:470px;width:680px;height:70px">Use managed compute</div>
 <div class="el t-body muted" style="left:1080px;top:590px;width:680px;height:120px">Scale with demand<br>Set managed retention</div>
 <div class="el takeaway t-heading" style="left:112px;top:870px;width:1696px;height:100px">Show changed responsibility, not unrelated features.</div>
 </div>
 
-<!-- Pattern: columns — for: catalogue; regions: col-1,col-2,col-3,takeaway; components: container×3,icon-frame×3,icon×3,takeaway; may vary: 2–4 categories; may not: widths/detached colour. -->
+<!-- Pattern: columns — for: catalogue; regions: col-1,col-2,col-3,takeaway; components: container×3,icon×3,takeaway; may vary: 2–4 categories; may not: widths/detached colour. -->
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / columns</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Equal icon-led columns make service roles scannable</div>
-<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
-<!-- Component: icon (.icon) — official asset + short label in halo; may vary: asset/78–112px; may not: substitute/mix/recolour/flank prose. -->
 <div class="el columns" style="left:112px;top:350px;width:1696px;height:430px"><div class="column"><div class="icon-label"><div class="icon-frame frame-analytics"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div><div><div class="t-label c-analytics">Networking</div><div class="t-heading">API gateway</div></div></div><div class="t-caption muted">Receives governed requests</div></div><div class="column"><div class="icon-label"><div class="icon-frame frame-compute"><svg class="icon"><use href="#aws/Arch_AWS-Lambda_48"/></svg></div><div><div class="t-label c-compute">Compute</div><div class="t-heading">Function</div></div></div><div class="t-caption muted">Runs one bounded task</div></div><div class="column"><div class="icon-label"><div class="icon-frame frame-storage"><svg class="icon"><use href="#aws/Arch_Amazon-Simple-Storage-Service_48"/></svg></div><div><div class="t-label c-storage">Storage</div><div class="t-heading">Object store</div></div></div><div class="t-caption muted">Retains durable output</div></div></div>
 <div class="el takeaway t-heading" style="left:112px;top:870px;width:1696px;height:100px">One icon and one short label define each role.</div>
 </div>
 
-<!-- Pattern: process — for: flow; regions: step-1,step-2,step-3,step-4,takeaway; components: step×4,icon-frame×4,connector×3,selected,tag; may vary: 3–6 verbs; may not: coloured routes/category status/double selection. -->
+<!-- Pattern: process — for: flow; regions: step-1,step-2,step-3,step-4,takeaway; components: step×4,icon×4,connector×3,selected,tag; may vary: 3–6 verbs; may not: coloured routes/category status/double selection. -->
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / process</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One orange step locates the current handoff</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
-<!-- Component: step (.step) — halo, verb, category; may vary: 3–6 stages; may not: vary peer size or category-code status. -->
-<div class="el step accent-outline selected-glow" style="left:112px;top:335px;width:340px;height:455px"><div class="icon-frame frame-analytics"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div><div class="t-heading">1 · Receive</div><div class="t-label c-analytics">Networking</div></div>
+<!-- Component: step (.step) — category-framed icon, verb, and category; may vary: 3–6 stages; may not: vary peer size or category-code status. -->
+<div class="el step accent-outline" style="left:112px;top:335px;width:340px;height:455px"><div class="icon-frame frame-analytics"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div><div class="t-heading">1 · Receive</div><div class="t-label c-analytics">Networking</div></div>
 <!-- Component: connector (.connector) — neutral handoff; may vary: route; may not: use category colour/cross nodes. -->
 <div class="el connector" style="left:452px;top:560px;width:112px;height:4px"></div>
 <div class="el step" style="left:564px;top:335px;width:340px;height:455px"><div class="icon-frame frame-integration"><svg class="icon"><use href="#aws/Arch_Amazon-EventBridge_48"/></svg></div><div class="t-heading">2 · Route</div><div class="t-label c-integration">Integration</div></div>
@@ -268,8 +237,7 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / metric</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Aligned metrics compare without repeated cards</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
-<div class="el metric-row" style="left:112px;top:360px;width:1696px;height:300px"><div class="metric-cell"><div class="t-label muted">Availability</div><div class="metric-value accent-fill selected-glow">99.9%</div><div class="t-caption muted">+0.2 points vs prior</div></div><div class="metric-cell"><div class="t-label muted">Monthly cost</div><div class="metric-value">−32%</div><div class="t-caption muted">same workload</div></div><div class="metric-cell"><div class="t-label muted">Deploy time</div><div class="metric-value">18 min</div><div class="t-caption muted">median / 30 days</div></div><div class="metric-cell"><div class="t-label muted">Operator hours</div><div class="metric-value">−24%</div><div class="t-caption muted">same team</div></div></div>
+<div class="el metric-row" style="left:112px;top:360px;width:1696px;height:300px"><div class="metric-cell"><div class="t-label muted">Availability</div><div class="metric-value accent-fill">99.9%</div><div class="t-caption muted">+0.2 points vs prior</div></div><div class="metric-cell"><div class="t-label muted">Monthly cost</div><div class="metric-value">−32%</div><div class="t-caption muted">same workload</div></div><div class="metric-cell"><div class="t-label muted">Deploy time</div><div class="metric-value">18 min</div><div class="t-caption muted">median / 30 days</div></div><div class="metric-cell"><div class="t-label muted">Operator hours</div><div class="metric-value">−24%</div><div class="t-caption muted">same team</div></div></div>
 <div class="el takeaway t-heading" style="left:112px;top:800px;width:1696px;height:120px">State period and comparator beneath every figure.</div>
 </div>
 
@@ -277,7 +245,6 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / table</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">A shortlist is defensible on shared criteria</div>
-<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: table (.data-table) — exact lookup; may vary: rows/columns; may not: lose units/alignment/template font. -->
 <div class="el" style="left:112px;top:340px;width:1696px;height:430px"><table class="data-table"><thead><tr><th>Service</th><th>Best fit</th><th>Operating model</th><th class="num">Cost unit</th></tr></thead><tbody><tr><td>Compute service</td><td>Steady workload</td><td>Managed host</td><td class="num">Time</td></tr><tr><td>Integration service</td><td>Event routing</td><td>Serverless</td><td class="num">Requests</td></tr><tr><td>Storage service</td><td>Durable objects</td><td>Fully managed</td><td class="num">Capacity</td></tr></tbody></table></div>
 <div class="el takeaway t-heading" style="left:112px;top:840px;width:1696px;height:110px">Use charts for shape; use tables for lookup.</div>
@@ -287,22 +254,20 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / chart</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">One highlighted value carries the trend claim</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
 <!-- Component: chart (.chart-specimen) — native, direct labels, one scale/baseline/orange claim; category colour only distinguishes services. -->
 <div class="el chart-specimen" style="left:180px;top:350px;width:1120px;height:500px"><svg viewBox="0 0 1120 500" width="1120" height="500" aria-label="Illustrative four-period bar chart"><rect x="100" y="260" width="140" height="238" fill="#8FADD0"/><rect x="360" y="210" width="140" height="288" fill="#8FADD0"/><rect x="620" y="150" width="140" height="348" fill="#8FADD0"/><rect x="880" y="70" width="140" height="428" fill="#FF9900"/><g fill="#FFFFFF" font-family="Arial" font-size="28"><text x="145" y="240">62</text><text x="405" y="190">78</text><text x="665" y="130">91</text><text x="925" y="50">112</text></g></svg></div>
 <div class="el takeaway t-heading" style="left:1400px;top:470px;width:408px;height:230px">Label values directly. Remove empty gridlines.</div>
 </div>
 
-<!-- Pattern: diagram — for: hub; regions: satellite-1,satellite-2,hub,satellite-3,takeaway; components: hub,icon-frame×4,connector×3,selected,takeaway; may vary: 3–6 satellites/routes; may not: hidden spokes/crossed nodes/mixed icons/remapped category/double selection. -->
+<!-- Pattern: diagram — for: hub; regions: satellite-1,satellite-2,hub,satellite-3,takeaway; components: hub,icon×4,connector×3,selected,takeaway; may vary: 3–6 satellites/routes; may not: hidden spokes/crossed nodes/mixed icons/remapped category/double selection. -->
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / diagram / hub</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">A central event bus decouples intake, compute, and archive</div>
-<div class="el title-rule" style="left:112px;top:260px;width:140px;height:4px"></div>
 <div class="el" style="left:112px;top:320px;width:1696px;height:580px"><svg class="hub-lines" viewBox="0 0 1696 580" width="1696" height="580" aria-label="Three visible orthogonal routes into and out of an event bus"><defs><marker markerWidth="12" markerHeight="12" refX="10" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 z" fill="#8FADD0"/></marker></defs><path d="M340 120 H500 V250 H632" marker-end="url(#route-arrow)"/><path d="M632 330 H500 V480 H340" marker-end="url(#route-arrow)"/><path d="M1064 300 H1356" marker-end="url(#route-arrow)"/></svg></div>
 <div class="el icon-node group cat-analytics" style="left:112px;top:340px;width:340px;height:200px"><div class="icon-frame frame-analytics"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div><div><div class="t-heading">API gateway</div><div class="t-label c-analytics">Intake</div></div></div>
 <div class="el icon-node group cat-storage" style="left:112px;top:700px;width:340px;height:200px"><div class="icon-frame frame-storage"><svg class="icon"><use href="#aws/Arch_Amazon-Simple-Storage-Service_48"/></svg></div><div><div class="t-heading">Object store</div><div class="t-label c-storage">Archive</div></div></div>
-<!-- Component: hub (.icon-node) — haloed coordinator + visible spokes; may vary: satellites/labels; may not: hide routes/mix direction/lose orange. -->
-<div class="el icon-node accent-outline selected-glow" style="left:744px;top:505px;width:432px;height:230px"><div class="icon-frame frame-integration"><svg class="icon"><use href="#aws/Arch_Amazon-EventBridge_48"/></svg></div><div><div class="t-heading">Event bus</div><div class="t-label c-integration">Route once</div></div></div>
+<!-- Component: hub (.icon-node) — category-framed coordinator with visible spokes; may vary: satellites/labels; may not: hide routes, mix direction, or lose the selected outline. -->
+<div class="el icon-node accent-outline" style="left:744px;top:505px;width:432px;height:230px"><div class="icon-frame frame-integration"><svg class="icon"><use href="#aws/Arch_Amazon-EventBridge_48"/></svg></div><div><div class="t-heading">Event bus</div><div class="t-label c-integration">Route once</div></div></div>
 <div class="el icon-node group cat-compute" style="left:1468px;top:520px;width:340px;height:200px"><div class="icon-frame frame-compute"><svg class="icon"><use href="#aws/Arch_AWS-Lambda_48"/></svg></div><div><div class="t-heading">Function</div><div class="t-label c-compute">Process</div></div></div>
 <div class="el route-label t-label muted" style="left:475px;top:405px;width:150px;height:34px">Requests</div>
 <div class="el route-label t-label muted" style="left:475px;top:765px;width:150px;height:34px">Events</div>
@@ -313,8 +278,7 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 <div class="slide">
 <div class="el t-label muted" style="left:112px;top:24px;width:760px;height:30px">Pattern / shared responsibility</div>
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:173px">Every technical layer needs one accountable side</div>
-<div class="el accent-bar" style="left:112px;top:260px;width:140px;height:4px"></div>
-<!-- Component: hierarchy (.hierarchy-row) — ownership bands; may vary: layers/split; may not: category-code ownership or glow bands. -->
+<!-- Component: hierarchy (.hierarchy-row) — ownership bands; may vary: layers/split; may not: category-code ownership because category colour identifies services. -->
 <div class="el t-heading center" style="left:430px;top:320px;width:520px;height:60px">Customer</div>
 <div class="el t-heading center" style="left:1050px;top:320px;width:520px;height:60px">AWS</div>
 <div class="el t-label muted right" style="left:112px;top:440px;width:250px;height:34px">Application</div>
@@ -330,14 +294,11 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 </div>
 
 <!-- Part: Closing -->
-<!-- Frame: closing — path + orange owner–verb–date action; may vary: decision/criteria; may not: recap/add recommendation or orange/precede appendix. -->
+<!-- Frame: closing — decision plus orange owner–verb–date action; may vary: decision/criteria; may not: recap, add a second recommendation, or precede an appendix. -->
 <div class="slide">
-<div class="el gradient-field" style="left:1120px;top:0px;width:800px;height:1080px"></div>
-<div class="el shape-oval ring" style="left:1400px;top:190px;width:420px;height:420px"></div>
-<div class="el shape-oval ring" style="left:1490px;top:280px;width:240px;height:240px"></div>
 <div class="el t-label muted" style="left:112px;top:250px;width:600px;height:34px">Decision</div>
 <div class="el t-cover" style="left:112px;top:315px;width:1200px;height:230px">Make the architecture<br>easy to decide</div>
-<div class="el accent-fill selected-glow t-heading" style="left:112px;top:610px;width:1696px;height:120px">Next action — owner, verb, and date</div>
+<div class="el accent-fill t-heading" style="left:112px;top:610px;width:1696px;height:120px">Next action — owner, verb, and date</div>
 <div class="el t-body muted" style="left:112px;top:810px;width:1400px;height:120px">Category identity, strict alignment, and one emphasis keep the path clear.</div>
 </div>
 
