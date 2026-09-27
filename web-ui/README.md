@@ -52,8 +52,8 @@ Run the full Web UI on your machine with **[Kiro](https://kiro.dev/) CLI** over
 
 ### Install and start
 
-The installer adds Kiro CLI and the other dependencies, builds the Web UI (answer yes to
-"Also install the browser Web UI?"), and creates the `sdpm` launcher and a desktop shortcut:
+The installer adds Kiro CLI and the other dependencies, builds the Web UI (keep "Browser Web UI"
+ticked in the "What to install" step), and creates the `sdpm` launcher and a desktop shortcut:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash

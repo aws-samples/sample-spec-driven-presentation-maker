@@ -126,7 +126,7 @@ def test_register_dry_run_runs_nothing_and_opens_nothing(capsys):
     out = capsys.readouterr().out
     assert "[dry-run] claude mcp add" in out
     assert "[dry-run] open cursor://" in out
-    assert "Claude Desktop" in out  # manual clients are printed, never executed
+    assert "Claude Desktop" in out and "sdpm.mcpb" in out  # manual clients are listed, never executed
 
 
 def test_register_runs_cli_and_reports_failures(capsys):
@@ -139,14 +139,31 @@ def test_register_runs_cli_and_reports_failures(capsys):
     clients = [cc.by_id("claude-code"), cc.by_id("codex")]
     failures = cc.register(clients, POSIX, assume_yes=True, run=run, open_url=lambda _u: True)
     assert calls == ["claude", "codex"] and failures == 1
-    assert "failed" in capsys.readouterr().err
+    out = capsys.readouterr().out
+    assert "Codex" in out and "failed" in out and "sdpm mcp-config codex" in out
+    assert "Claude Code" in out and "registered" in out
 
 
-def test_register_declined_prompt_skips(monkeypatch):
-    monkeypatch.setattr(cc, "_confirm", lambda _q: False)
+def test_register_nothing_chosen_runs_nothing_and_says_skipped(capsys):
     ran = []
-    assert cc.register([cc.by_id("claude-code")], POSIX, run=ran.append) == 0
+    assert cc.register([cc.by_id("claude-code")], POSIX, run=ran.append, chosen=[]) == 0
     assert ran == []
+    out = capsys.readouterr().out
+    assert "skipped" in out and "sdpm register claude-code" in out
+
+
+def test_picker_fallback_line_input(monkeypatch, capsys):
+    import picker
+
+    monkeypatch.setattr(picker, "_tty_available", lambda: False)
+    monkeypatch.setattr("builtins.input", lambda _p: "2")
+    opts = [picker.Option("a", "A"), picker.Option("b", "B"), picker.Option("c", "C", enabled=False)]
+    assert picker.pick(opts, title="t") == ["b"]
+    monkeypatch.setattr("builtins.input", lambda _p: "")
+    assert picker.pick(opts, title="t") == ["a", "b"]  # Enter = defaults (all checked)
+    monkeypatch.setattr("builtins.input", lambda _p: "none")
+    assert picker.pick(opts, title="t") == []
+    assert "C" in capsys.readouterr().out  # disabled rows are shown
 
 
 def test_unregister_uses_client_cli_or_explains(capsys):
@@ -186,8 +203,8 @@ def test_missing_client_executable_is_a_failure_not_a_traceback(monkeypatch, cap
     monkeypatch.setattr(cc.subprocess, "run", raise_missing)
     failures = cc.register([cc.by_id("codex")], POSIX, assume_yes=True)  # default runner
     assert failures == 1
-    err = capsys.readouterr().err
-    assert "codex" in err and "manually" in err
+    captured = capsys.readouterr()
+    assert "codex" in captured.err and "by hand" in captured.out
 
 
 def test_kiro_leftovers_detects_only_our_files(tmp_path):

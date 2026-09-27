@@ -162,8 +162,8 @@ def write_kiro_agent(t: Target, *, name: str = DEFAULT_KIRO_AGENT, dry_run: bool
         print("  " + json.dumps(server_config(t)))
         return 0
     text = json.dumps(kiro_agent_definition(t, name), indent=2, ensure_ascii=False) + "\n"
-    print(("[dry-run] write " if dry_run else "wrote ") + str(path))
     if dry_run:
+        print("[dry-run] write " + str(path))
         return 0
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -429,6 +429,43 @@ def _run(argv: list[str]) -> int:
         return 127
 
 
+@dataclass
+class Outcome:
+    client: Client
+    status: str          # "registered" | "opened" | "skipped" | "failed" | "manual"
+    detail: str
+
+
+def _pick_hint(client: Client, agent_name: str) -> str:
+    return {
+        "kiro-cli": f"creates agent `{agent_name}`  →  kiro-cli chat --agent {agent_name}",
+        "claude-code": "claude mcp add (user scope)",
+        "vscode": "code --add-mcp",
+        "codex": "codex mcp add",
+        "cursor": "opens an Install link in Cursor",
+        "kiro-ide": "not here — paste `sdpm mcp-config kiro-ide` into ~/.kiro/settings/mcp.json",
+        "claude-desktop": "not here — double-click sdpm.mcpb from the release page",
+    }.get(client.id, "")
+
+
+def _selectable(client: Client) -> bool:
+    return client.id == "kiro-cli" or client.register is not None or client.deeplink is not None
+
+
+def choose_clients(clients: list[Client], *, agent_name: str, assume_yes: bool, dry_run: bool) -> list[Client]:
+    """Checkbox picker over the detected clients; all pre-checked. Non-interactive → all."""
+    from picker import Option, pick
+
+    if assume_yes or dry_run:
+        return [c for c in clients if _selectable(c)]
+    options = [Option(key=c.id, label=c.label, hint=_pick_hint(c, agent_name), checked=True, enabled=_selectable(c))
+               for c in clients]
+    chosen = pick(options, title="Connect SDPM to your MCP clients")
+    if chosen is None:
+        return []
+    return [c for c in clients if c.id in chosen]
+
+
 def register(
     clients: list[Client],
     target: Target,
@@ -438,60 +475,75 @@ def register(
     run: Callable[[list[str]], int] = _run,
     open_url: Callable[[str], bool] = webbrowser.open,
     agent_name: str = DEFAULT_KIRO_AGENT,
+    chosen: Optional[list[Client]] = None,
 ) -> int:
-    """Register with each client; returns the number of failures."""
-    failures = 0
-    done: list[Client] = []
+    """Pick clients, register with each, print one result table. Returns the number of failures."""
+    if chosen is None:
+        chosen = choose_clients(clients, agent_name=agent_name, assume_yes=assume_yes, dry_run=dry_run)
+    chosen_ids = {c.id for c in chosen}
+    outcomes: list[Outcome] = []
     for client in clients:
+        if not _selectable(client):
+            outcomes.append(Outcome(client, "manual", _pick_hint(client, agent_name).replace("not here — ", "")))
+            continue
+        if client.id not in chosen_ids:
+            outcomes.append(Outcome(client, "skipped", f"sdpm register {client.id}"))
+            continue
         if client.id == "kiro-cli":
-            if not assume_yes and not dry_run and not _confirm(f"Register SDPM with {client.label} (agent '{agent_name}')?"):
-                continue
             if write_kiro_agent(target, name=agent_name, dry_run=dry_run) == 0:
-                done.append(client)
+                outcomes.append(Outcome(client, "registered", f"agent `{agent_name}`  {next_step(client, agent_name)}"))
             else:
-                failures += 1
+                outcomes.append(Outcome(client, "failed", "sdpm mcp-config kiro-cli"))
             _offer_leftover_cleanup(dry_run=dry_run, assume_yes=assume_yes, run=run)
-            continue
-        if client.register is None and client.deeplink is None:
-            print(render_client(client, target))
-            print()
-            continue
-        if not assume_yes and not dry_run and not _confirm(f"Register SDPM with {client.label}?"):
             continue
         if client.register is not None:
             argv = client.register(target)
-            print(("[dry-run] " if dry_run else "") + _shell_join(argv))
-            if not dry_run and run(argv) != 0:
-                failures += 1
-                print(f"  failed — you can add it manually:\n{render_client(client, target)}", file=sys.stderr)
+            if dry_run:
+                print("[dry-run] " + _shell_join(argv))
+                outcomes.append(Outcome(client, "registered", next_step(client, agent_name)))
+                continue
+            if run(argv) != 0:
+                outcomes.append(Outcome(client, "failed", f"add it by hand: sdpm mcp-config {client.id}"))
             else:
-                done.append(client)
+                outcomes.append(Outcome(client, "registered", next_step(client, agent_name)))
             if client.id == "claude-code":
                 _offer_claude_plugin_cleanup(dry_run=dry_run, assume_yes=assume_yes, run=run)
         elif client.deeplink is not None:
             url = client.deeplink(target)
-            print(("[dry-run] open " if dry_run else "Opening ") + url)
-            if not dry_run and not open_url(url):
-                print(render_client(client, target))
+            if dry_run:
+                print("[dry-run] open " + url)
+                outcomes.append(Outcome(client, "opened", next_step(client, agent_name)))
+            elif open_url(url):
+                outcomes.append(Outcome(client, "opened", next_step(client, agent_name)))
             else:
-                done.append(client)
-    if done and not dry_run:
-        print()
-        print("Next:")
-        for client in done:
-            print(f"  {client.label + ':':<22} {next_step(client, agent_name)}")
-    return failures
+                outcomes.append(Outcome(client, "failed", f"open the link from: sdpm mcp-config {client.id}"))
+    print_outcomes(outcomes)
+    return sum(1 for o in outcomes if o.status == "failed")
+
+
+_MARK = {"registered": "\x1b[32m✓\x1b[0m", "opened": "\x1b[32m✓\x1b[0m", "skipped": "–",
+         "failed": "\x1b[31m✗\x1b[0m", "manual": " "}
+_WORD = {"registered": "registered", "opened": "link opened", "skipped": "skipped", "failed": "failed", "manual": ""}
+
+
+def print_outcomes(outcomes: list[Outcome]) -> None:
+    if not outcomes:
+        return
+    print()
+    width = max(len(o.client.label) for o in outcomes) + 2
+    for o in outcomes:
+        print(f"  {_MARK[o.status]} {o.client.label:<{width}}{_WORD[o.status]:<12} {o.detail}")
+    print()
 
 
 def next_step(client: Client, agent_name: str = DEFAULT_KIRO_AGENT) -> str:
     if client.id == "kiro-cli":
-        return f"kiro-cli chat --agent {agent_name}   then ask: make slides about …"
+        return f"→ kiro-cli chat --agent {agent_name}"
     if client.id == "cursor":
-        return "confirm the Install dialog Cursor just opened, then ask: make slides about …"
+        return "→ confirm the Install dialog in Cursor"
     if client.id == "claude-code":
-        return ("ask: make slides about …  (approve the sdpm tools once, or start with "
-                "`claude --allowedTools \"mcp__sdpm__*\"` to skip the prompts)")
-    return "restart it if it is running, then ask: make slides about …"
+        return "→ approve the sdpm tools once, or: claude --allowedTools \"mcp__sdpm__*\""
+    return "→ restart it if running, then ask for slides"
 
 
 def _print_leftover_warning() -> None:
@@ -652,7 +704,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             print("No supported MCP client detected. Add this to your client's MCP configuration:")
             print(manual_json(target))
             return 0
-        return 1 if register(clients, target, dry_run=args.dry_run, assume_yes=args.yes, agent_name=args.agent_name) else 0
+        # Named clients on the command line are the selection; no picker.
+        chosen = clients if args.clients else None
+        return 1 if register(clients, target, dry_run=args.dry_run, assume_yes=args.yes,
+                             agent_name=args.agent_name, chosen=chosen) else 0
 
     if args.command == "unregister":
         return 1 if unregister(detect(args.clients or None), dry_run=args.dry_run, agent_name=args.agent_name) else 0

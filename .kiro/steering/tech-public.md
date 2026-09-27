@@ -51,6 +51,7 @@ the lock back to npm-11 format (this exact mistake shipped once in #254).
 | Installer (source → generated `dist/`) | `scripts/install/install.{sh,ps1}`, `lib/tui.*`, `build.sh` |
 | `sdpm` launcher | `scripts/install/launcher.{sh,ps1}` |
 | Client detection / config / registration | `servers/local/client_config.py` (+ `tests/test_client_config.py`) |
+| Terminal checklist widget (no deps, 3 OS) | `servers/local/picker.py` — used by `sdpm register`; falls back to line input without a TTY |
 | MCP handshake smoke used by CI | `scripts/install/mcp_smoke.py` |
 | Installer CI (3 OS, real install, handshake) | `.github/workflows/installer.yml` |
 | Claude Desktop bundle | `scripts/mcpb/`, `scripts/build_mcpb.sh`, `release.yml` |

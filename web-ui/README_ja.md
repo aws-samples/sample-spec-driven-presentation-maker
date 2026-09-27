@@ -50,8 +50,8 @@ AWS へのデプロイは不要です。
 
 ### 導入と起動
 
-インストーラーは Kiro CLI などの依存関係を導入し、Web UI をビルドして（「ブラウザ用の Web UI も
-入れますか？」に yes）、`sdpm` ランチャーとデスクトップショートカットを作成します。
+インストーラーは Kiro CLI などの依存関係を導入し、Web UI をビルドして（「What to install」で
+「Browser Web UI」を on のまま）、`sdpm` ランチャーとデスクトップショートカットを作成します。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash

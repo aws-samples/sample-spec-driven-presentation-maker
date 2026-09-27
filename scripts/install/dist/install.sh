@@ -86,6 +86,45 @@ show_confirm() {
   case "${reply:-y}" in [Yy]*|"") return 0 ;; *) return 1 ;; esac
 }
 
+# Two-row checklist matching the client picker in servers/local/client_config.py: the MCP
+# server row is always on; the Web UI row toggles. Sets SURFACE_WEBUI=1|0. Falls back to
+# show_confirm without a terminal.
+show_surface_picker() {
+  SURFACE_WEBUI=1
+  if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then return 0; fi
+  if [[ ! -r /dev/tty || ! -t 1 ]]; then
+    if show_confirm "Also install the browser Web UI? [Y/n]"; then SURFACE_WEBUI=1; else SURFACE_WEBUI=0; fi
+    return 0
+  fi
+  _render_surfaces() {
+    printf "  What to install   ${C_DIM}space toggle · enter confirm${C_RESET}\n\n"
+    printf "        ${C_DIM}[x] MCP server        for your AI agent — always installed${C_RESET}\n"
+    if [[ "$SURFACE_WEBUI" == "1" ]]; then
+      printf "  ${C_CYAN}❯${C_RESET} ${C_GREEN}[x]${C_RESET} Browser Web UI    ${C_DIM}needs Node.js 20+; a few minutes of build${C_RESET}\n"
+    else
+      printf "  ${C_CYAN}❯${C_RESET} [ ] Browser Web UI    ${C_DIM}needs Node.js 20+; a few minutes of build${C_RESET}\n"
+    fi
+  }
+  local key
+  printf '\033[?25l'
+  _render_surfaces
+  while :; do
+    IFS= read -rsn1 key </dev/tty || break
+    case "$key" in
+      " ") SURFACE_WEBUI=$((1 - SURFACE_WEBUI)) ;;
+      "") break ;;
+      $'\033') IFS= read -rsn2 -t 1 key </dev/tty || true ;;   # arrows: nothing to move to
+      q) SURFACE_WEBUI=1; break ;;
+    esac
+    printf '\033[4A\033[J'
+    _render_surfaces
+  done
+  printf '\033[4A\033[J\033[?25h'
+  if [[ "$SURFACE_WEBUI" == "1" ]]; then echo "  What to install: MCP server, Browser Web UI"
+  else echo "  What to install: MCP server"; fi
+  echo ""
+}
+
 has_command() { command -v "$1" >/dev/null 2>&1; }
 
 run_with_spinner() {
@@ -671,40 +710,40 @@ choose_profile() {
   [[ -n "$PROFILE" ]] && return 0
   if [[ "$NON_INTERACTIVE" == "1" ]]; then PROFILE=full; return 0; fi
   echo ""
-  echo "  SDPM has two surfaces on one installation:"
-  echo "    - your own AI agent (Kiro CLI, Claude Code, Cursor, ...) through the MCP server"
-  echo "    - a browser Web UI (needs Node.js 20+; adds a few minutes of build time)"
-  if show_confirm "Also install the browser Web UI? [Y/n]"; then PROFILE=full; else PROFILE=mcp; fi
+  show_surface_picker
+  if [[ "$SURFACE_WEBUI" == "1" ]]; then PROFILE=full; else PROFILE=mcp; fi
 }
 
 REGISTER_FAILED=0
 
+# The register step prints its own result table (✓ registered / – skipped / ✗ failed),
+# which is the part of the completion screen that matters; nothing else repeats it.
 register_clients() {
-  [[ "$REGISTER" == "no" ]] && { "$LAUNCHER_DIR/sdpm" mcp-config || true; return 0; }
   echo ""
+  if [[ "$REGISTER" == "no" ]]; then
+    echo "  Skipping client registration (--no-register). Later: sdpm register"; return 0
+  fi
   if [[ "$REGISTER" == "yes" ]]; then
     "$LAUNCHER_DIR/sdpm" register --yes || REGISTER_FAILED=1
     return 0
   fi
-  if [[ "$NON_INTERACTIVE" == "1" ]]; then "$LAUNCHER_DIR/sdpm" mcp-config || true; return 0; fi
-  echo "  Connect your MCP clients now? Each one is asked separately; nothing is written"
-  echo "  without your yes, and 'sdpm register' does the same later."
-  "$LAUNCHER_DIR/sdpm" register || true
+  if [[ "$NON_INTERACTIVE" == "1" ]]; then
+    echo "  Non-interactive: clients were not registered. Later: sdpm register   (or re-run with --register)"
+    return 0
+  fi
+  "$LAUNCHER_DIR/sdpm" register || REGISTER_FAILED=1
 }
 
 show_completion() {
-  echo ""; printf "  ${C_GREEN}SDPM is installed.${C_RESET}\n\n"
-  echo "    Your agent:   ask it \"Make slides about ...\" — it finds SDPM through MCP."
-  echo "                  Kiro CLI: kiro-cli chat --agent $SDPM_AGENT_NAME"
+  printf "  ${C_GREEN}SDPM is installed${C_RESET} in $CHECKOUT\n\n"
   if [[ "$PROFILE" == "full" ]]; then
-    echo "    Browser:      sdpm webui"
-    kiro-cli whoami >/dev/null 2>&1 || echo "                  (the Web UI uses Kiro CLI: run 'kiro-cli login' once first)"
+    echo "    Browser:   sdpm webui"
+    kiro-cli whoami >/dev/null 2>&1 || echo "               (the Web UI uses Kiro CLI — run 'kiro-cli login' once first)"
   else
-    echo "    Browser:      not installed — add it any time with 'sdpm update --with-webui'"
+    echo "    Browser:   not installed — sdpm update --with-webui"
   fi
-  echo "    Later:        sdpm            status      sdpm register   connect more clients"
-  echo "                  sdpm update     upgrade     sdpm uninstall  remove"
-  echo ""; echo "    Checkout: $CHECKOUT"
+  echo "    Agents:    ask for slides in a registered client (table above)"
+  echo "    Later:     sdpm  ·  sdpm register  ·  sdpm update  ·  sdpm uninstall"
   if [[ ":$PATH:" != *":$LAUNCHER_DIR:"* ]]; then
     printf "    ${C_YELLOW}Add %s to PATH to run 'sdpm' directly.${C_RESET}\n" "$LAUNCHER_DIR"
   fi

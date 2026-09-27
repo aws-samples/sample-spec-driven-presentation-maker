@@ -104,7 +104,7 @@ See [Architecture](docs/en/architecture.md).
 - `docs/en/getting-started.md` — the user contract (installer options, launcher, per-client registration)
 - `docs/en/migration-onboarding.md` — what was removed and why
 - `scripts/install/README.md` — build (`build.sh`, CI rejects drift) and the isolated-home smoke test
-- `servers/local/client_config.py` + `tests/test_client_config.py` — the one implementation of client wiring and its guarded invariants (absolute paths, no launcher/PATH, CLI-based registration, marker-owned files)
+- `servers/local/client_config.py` (+ `picker.py`, the checklist widget) + `tests/test_client_config.py` — the one implementation of client wiring and its guarded invariants (absolute paths, no launcher/PATH, CLI-based registration, marker-owned files)
 - `.github/workflows/installer.yml` — real install + MCP handshake on ubuntu / macos / windows
 
 ## Further Documentation
