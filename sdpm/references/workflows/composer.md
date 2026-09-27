@@ -27,11 +27,26 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
 
 - `slide_spec` (returned with this document) is the slide format; `read_guides(["slide-json-spec"])`
   brings it back if it has left your context.
-- `specs/art-direction.html` is the style. Design = style expressed in the spec's JSON.
+- `specs/art-direction.html` is the style — a short deck built in the style, about the style.
+  Design = style expressed in the spec's JSON: its `Frame:` comments say what repeats on every
+  slide, its `Component:` comments the parts slides are built from (by role), its `Pattern:`
+  slides how this style builds each slide type and which regions that divides into. Match its
+  density and its look. Its patterns show how it draws, not the limit of what a slide may show.
+- Show before you tell: realise each slide's `visual` as a drawn form — the spec's **Visual
+  forms** (flow, cycle, hub, hierarchy, matrix, timeline, progress, icon + label…) built from
+  the style's components, icons from `search_assets`. Where the outline's `visual` is only text
+  but the `body` has a structure (steps, parts, a centre and satellites, a trade-off), draw the
+  structure and say so in your summary. A card or node that names a concept carries an icon,
+  as the style's icon rule places it. A slide that is mostly sentences inside cards is a
+  defect unless its claim is itself a sentence.
 - `grid(purpose, spec)` computes exact coordinates for row × column layouts from a CSS-Grid
   style spec — use it for rectangular arrangements instead of hand-placing; compute
   non-rectangular positions (arcs, radial, curves) yourself.
-- Guides exist for specific needs, load only when a slide calls for one:
+- `read_guides(["components"])` is the component catalog — containers, connectors, markers,
+  badges, progress, icon frames, dividers, banners, overlays and more, each with the thinking
+  behind it and a JSON sample. Read it before your first slide: the style decides how parts
+  look, the catalog how many kinds of part a slide can use.
+- Other guides exist for specific needs, load only when a slide calls for one:
   `grid`, `table`, `chart-bar` / `chart-line` / `chart-pie`, `freeform`,
   `arch-layout-engine` + `arch-elements` (architecture diagrams via `arch_diagram`),
   `design-rules`.
@@ -61,8 +76,9 @@ slide's title and section taken from the outline — and the regions its content
 one body area, two columns, three steps, media beside text — as named `_comment` elements
 (`{"_comment": "region: body", "x": 96, "y": 210, "w": 1728, "h": 640}`) at the head of
 `elements`. The name is shown as a label in the Web UI: a short identifier (`body`, `step-1`,
-`media`), nothing else. Derive all coordinates from one grid (margins, gutters — the `grid`
-tool computes them), so the same kind of expression gets the same region set across the deck.
+`media`), nothing else. Start from the style's patterns: pick the `Pattern:` slide that fits each slide's `visual`
+and take its regions, adapting only what the content needs. Derive all coordinates from one grid
+(margins, gutters — the `grid` tool computes them), so the same kind of expression gets the same region set across the deck.
 The body — text, images, charts, tables — belongs to the content composers.
 Write every slide in one `run_python` call: a few layout functions and a plan list, looped —
 the JSON is emitted once, not per slide. Regions are invisible in previews; a preview shows

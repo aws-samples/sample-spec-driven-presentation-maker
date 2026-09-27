@@ -22,22 +22,107 @@ catalogue (`styles`) and one bundled style's HTML (`base`) to imitate; `run_styl
 
 ## Skeleton
 
-Every style has the same parts in the same order, so a composer knows where to look for
-"how does this style do a comparison" and a style author has a template to fill.
+A style is **the first deck built in that style, about that style**. Every slide is a real
+slide of the style — its frame, its components, its density — and says something the composer
+needs: the rules, the message grammar, how a comparison or a table is built here. Nothing is a
+specimen sheet: the palette is seen on the slides and explained in `:root`, the type ramp is
+the slides' own titles and body, components are defined where a slide first uses them.
+
+This is also what makes the gallery honest: a person choosing a style sees slides that look
+exactly like the deck they will get. A style whose own slides break its own rules is a false
+sample — denser than its density, or wearing decoration its rules never define — and so is one
+whose slides are plainer than the decks it promises: composers copy what they see, so a look
+the style wants must appear on its own slides.
+
+Parts, in this order, each opened by a marker comment (`<!-- Part: Rules -->`):
 
 | Part | Content |
 |---|---|
-| 0 `<title>` + `:root` | `<title>` is `name — one paragraph`: audience, purpose, the design decision, the signature look. It becomes the description in `list_styles()`. `:root` holds the design tokens (contract below). |
-| 1 Cover | The style's own cover slide. **Always the first `.slide`** — the gallery shows it as the thumbnail. |
-| 2 Rules | Read first by agents. The design decision (who reads this, in what setting, under what constraint) and DO / DON'T lists that **follow from it**. |
-| 3 Message & Outline | What the orchestrator reads before writing the outline: title grammar (assertion sentence, noun phrase, single word…), one claim per slide, lead-in and closing conventions, density per slide, chapter shape (agenda tracker, section dividers, summary first…), which visual forms this style favours. The style states per-slide density and chapter shape, but **deck length is not the style's decision**: it follows the brief and material (audience, time, takeaway). |
-| 4 Palette | Swatches with usage rules: which colour means what, how many accents on one slide, text colour on each fill. |
-| 5 Typography | The size ramp at real size, each row labelled with token name / pt / line height, plus rules (max lines per title, when to use each size). |
-| 6 Frame | The elements repeated on every slide — title band, section label, section divider, agenda tracker, closing slide — built exactly as composers should build them. |
-| 7 Patterns | 8–12 finished slides showing how *this* style builds the recurring slide types: numbers, comparison, process / flow, relationship (cycle, hierarchy), 2 / 3 / 4 columns, text-heavy (bullets, paragraph), table, chart conventions, before / after, and whatever the style is specifically for (swimlane, journey map, code, dashboard). Each pattern slide carries an HTML comment saying **why** it is built this way. |
+| `<head>` | `<title>` is `name — one paragraph`: audience, purpose, the design decision, the signature look; it becomes the description in `list_styles()`. `:root` holds the tokens (contract below), each with a short comment saying its job (which colour means what, when a size is used, max lines). CSS follows. |
+| Cover | The style's cover. **Always the first `.slide`** — the gallery thumbnail. |
+| Rules | The design decision (who reads this, in what setting, under what constraint) and the DO / DON'T that **follow from it**. As many slides as the rules need at the style's own density. |
+| Message & Outline | What the orchestrator reads before writing the outline: title grammar, one claim per slide, per-slide density, lead-in and closing conventions, chapter shape (agenda tracker, section dividers, summary first…), favoured visual forms. **Deck length is not the style's decision**: it follows the brief and material. |
+| Patterns | One slide per recurring slide type, each built as that pattern and explaining it: the comparison slide compares, the process slide is a process of how to build one. Required: `comparison`, `columns`, `process`, `metric`, `table`, `chart`, `diagram` (a relationship drawn as a form — cycle, hub, hierarchy or matrix — with the style's icons, nodes and connectors; it shows how much this style illustrates); add what the style is for (`relationship`, `before-after`, `text`, `media`, `timeline`, `matrix`, `dashboard`, `swimlane`, `code`, `architecture`). Open with a section divider. |
+| Closing | The closing frame, ending on what makes the style this style. |
 
-Fill every part. A style with a good palette and no Part 7 gives the composer nothing to
-follow, and the deck ends up in the composer's default look.
+**Frames** are the elements repeated on every slide — title band, section label, agenda
+tracker — plus the section divider and the closing slide. They appear on every slide of the
+file; comment them once, at first use: `<!-- Frame: content — … -->`, `<!-- Frame: divider — … -->`,
+`<!-- Frame: closing — … -->`.
+
+**Patterns** carry one comment each, which is what the layout pass reads:
+`<!-- Pattern: comparison — for: …; regions: left, right, takeaway; components: container ×2 + selected + takeaway; may vary: …; may not: … -->`.
+Region names are the ones the layout pass writes (`body`, `left` / `right`, `col-1`…,
+`step-1`…, `media`, `chart`, `table`, `takeaway`, `kpi-1`…).
+
+**Density.** Every visible slide obeys the style's own density rule, which the Message & Outline
+part states in words and once as a marker the contract test reads: `<!-- Density: 45 -->`
+(maximum visible words on any slide of the file, labels included). When the rules or the grammar need more words than one slide allows, use more
+slides — never smaller type or tighter boxes. Detail a person does not need in order to judge
+the style — the reason behind each rule, exact coordinates, edge cases — goes in the HTML
+comment next to the slide. Say each thing once: the comment adds to the visible text, it does
+not repeat it.
+
+**One fact in one place.** Token values live in `:root`, a frame is commented where it first
+appears, a component where it is first used, a pattern on its own slide. Leave out what is
+neither an instruction nor a sample: invented sources, captions that repeat the comment,
+notes explaining the demo.
+
+## Component vocabulary
+
+Roles are shared by every style; how a role looks is each style's decision. Naming components
+by role lets a composer find "this style's selected card" in any style, and lets patterns and
+the layout pass name what fills a region the same way everywhere. Define each component with a
+comment directly before the slide element that first uses it:
+`<!-- Component: <role> (.<class>) — when; may vary: …; may not: … -->`. A required role the
+style does without still gets its line — `<!-- Component: container — none; group by
+whitespace and rules -->` — so a composer never guesses.
+
+| Group | Roles | Required |
+|---|---|---|
+| Grouping | `container` (card, panel, or what replaces it), `selected` (the one emphasised member) | both |
+| Text | `takeaway` (the one-line conclusion), `numbered` (numbered point or finding), `list`, `lead`, `quote` | `takeaway`, `numbered` |
+| Numbers | `metric` (figure + unit + comparator), `delta`, `before-after`, `progress` | `metric` |
+| Sequence | `step` + `connector`, `phase` (stage header), `milestone` | `step` + `connector` |
+| Relationship | `hub` (centre and satellites), `hierarchy`, `axis` (2×2 or spectrum), `brace` (items gathered into one conclusion) | — |
+| Labels | `tag` (status or category), `marker` (number or point marker), `legend` | `tag` |
+| Evidence | `table`, `chart` (native; the comment carries series colours, highlight, labels, baseline), `media` (image or screenshot treatment), `code`, `icon` (size, colour, what it sits on, which family) | `table`, `chart`, `icon` |
+| Decoration | `icon-frame` (disc, ring, chip or gradient behind an icon), `glow` (light around a shape, line or text), `orb` (soft blurred colour field), `ring` (concentric or orbit rings), `gradient-field` (gradient surface, band or text), `watermark` (large faint icon, numeral or word behind content), `accent-bar` (a coloured edge or rule that marks a unit), `hero-graphic` (a composed illustration that owns part of a slide) | at least one — or `none`, with the reason |
+
+Decoration is part of a style's look, not noise to minimise: it sets tone, lifts the member the
+slide is about, and makes a slide worth looking at. Each style chooses its decoration from its
+design decision and defines it like any component — a glowing dark style says where the glow
+sits and how strong it is; a print style may answer `<!-- Component: decoration — none; … -->`
+with the reason — and its own slides use it at the strength a deck should.
+
+Define the optional roles the style is for and leave the rest out. Every style draws diagrams —
+the slide JSON spec's Visual forms are available to every deck — so what a style decides is how
+they look here: the node, the connector, the icon, the marker.
+
+**Shape classes.** When a component uses a shape other than a rectangle, give it a class named
+after the slide JSON `shape` value — `.shape-<name>`, with `_` written as `-` — so class → JSON
+is mechanical. Draw it with `clip-path` or borders on the `.el` box; the inline style still
+carries only the box. Copy just the ones the style uses:
+
+```css
+/* JSON "pentagon" is the arrow-tipped phase header (home plate), not a regular pentagon */
+.shape-pentagon { --notch: 40px; clip-path: polygon(0 0, calc(100% - var(--notch)) 0, 100% 50%, calc(100% - var(--notch)) 100%, 0 100%); }
+.shape-chevron  { --notch: 40px; clip-path: polygon(0 0, calc(100% - var(--notch)) 0, 100% 50%, calc(100% - var(--notch)) 100%, 0 100%, var(--notch) 50%); padding-left: var(--notch); }
+.shape-triangle { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.shape-diamond  { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.shape-hexagon  { clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
+.shape-oval     { border-radius: 50%; }
+.shape-donut    { border-radius: 50%; background: none; border: 24px solid var(--accent); }
+.shape-block-arc { --sweep: 73%; --ring: 24px; border-radius: 50%;
+  background: conic-gradient(var(--accent) var(--sweep), var(--color-surface) 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring))); }
+```
+
+Keep the notch in px: PowerPoint sizes the point from the shorter side — in the JSON it is
+`adjustments: [notch ÷ shorter side]` (default 0.5) — so a `%` notch that grows with the width
+misleads. Consecutive chevrons nest by overlapping the notch minus the gap you want
+(`x` of the next = `x + width − notch + gap`); state notch and gap in the component comment. Vary the notch with a
+modifier class (`.notch-sm { --notch: 24px; }`), never inline.
 
 ## Token contract
 
@@ -86,18 +171,35 @@ The demo slides are read as coordinates, so the format is constrained:
   `--fs-slide-title` (40pt → 192 px), and `--content-top` sits below it. One-line titles leave
   the second line empty; content never moves up to fill it.
 - No emoji anywhere — the PPTX renderer has no emoji fonts. Icons come from `search_assets`.
+- Icons are inline SVG, because the gallery renders the file on its own (relative asset paths do
+  not resolve there). One line directly after `<body>` holds the symbols the file uses —
+  `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/hub" viewBox="0 -960 960 960"><path d="…"/></symbol>…</svg>` —
+  with each `id` the `search_assets` name, `<source>/<name>`, and the path copied from that
+  asset, so the JSON `src` is `assets:` + the id. Draw one with
+  `<svg class="icon"><use href="#material/hub"/></svg>`; its colour is `fill` from a token (the
+  JSON `iconColor`). Multi-colour service icons (`aws/…`) keep their own colours.
 
 ## Writing the rules
 
+- **Prohibit only what the decision rules out.** A DON'T needs a reason in this style's decision
+  ("print must survive greyscale, so no glow"), never a general taste for restraint. Blanket bans
+  on gradients, shadows, glow or colour that the decision does not require are not rules — leave
+  them out, and say what the style does instead.
 - **State the design decision, then derive the rules.** "This deck is read alone by someone
   deciding; the title row alone must carry the argument" leads to "titles are full-sentence
   assertions, ≤ 2 lines, the largest text on the slide" and "no topic-label titles". A DON'T
   without a reason is a rule the composer will bend.
 - **Rules that hold for every style, state them anyway** so the style is self-contained: one
-  claim per slide; the title is the claim; colours beyond background and text kept to the
-  minimum that distinguishes content; text contrast ≥ 4.5:1 (3:1 for ≥ 18pt); charts label
+  claim per slide; the title is the claim; every colour has a job the style names (category,
+  emphasis, tone, decoration); text contrast ≥ 4.5:1 (3:1 for ≥ 18pt); charts label
   values directly and drop gridlines that carry no information; margins ≥ 5% of the slide
-  edge; no emoji.
+  edge; no emoji; structure is drawn, not written — steps, loops, parts, a centre and its
+  satellites, trade-offs and quantities become forms, and text is kept for claims that are
+  sentences.
+- **Say how much the style illustrates.** One rule states where icons appear (card heads,
+  nodes, icon + label rows — or none, with shapes and numerals carrying the concepts, when the
+  design decision demands it), their size, colour and family, and which forms the style favours
+  and how dense a diagram may get. The `diagram` pattern is that rule's sample.
 - **Describe by design, not by brand.** Do not name companies, firms or presenters whose
   decks the style resembles, and do not describe the style as "what AI decks look like" or
   its opposite. Say what the style does and for whom.
@@ -107,10 +209,10 @@ The demo slides are read as coordinates, so the format is constrained:
   warn about it in every style. The only renderer facts worth stating are limits a composer
   cannot infer (native tables inherit the template font; slide JSON has no letter-spacing,
   line-height or intermediate font weights).
-- **Comment the patterns.** Each Part 7 slide has an HTML comment: what slide type it is,
-  why the elements are arranged this way in this style, what to vary and what not to.
-- Keep text on demo slides as placeholder content ("Claim of this slide stated as a sentence",
-  "Step 1 — verb phrase"), not real content from any deck.
+- **Comment frames, components and patterns** where they first appear: what it is for, why it is
+  built this way in this style, what to vary and what not to.
+- **The slides talk about the style**, never about a real deck's subject. A chart or table
+  pattern needs numbers: use a few plainly illustrative values.
 
 ## Working procedure
 
@@ -118,7 +220,7 @@ The demo slides are read as coordinates, so the format is constrained:
   derive a short kebab-case name.
 - Save with `write_style(name, html)` in `run_style_python`; it stores the file in the user's
   style store (locally `~/.config/sdpm/styles/`), where `list_styles()` and the gallery pick it
-  up. Each write is immediately visible, so write incrementally — skeleton and `:root` first,
+  up. Each write is immediately visible, so write incrementally — `:root` and the cover first,
   then parts in order — and refine.
 - `analyze_template(...)` reads a reference PPTX's theme; `read_guides(["import-pptx"])` when
   the reference deck should be inspected slide by slide.

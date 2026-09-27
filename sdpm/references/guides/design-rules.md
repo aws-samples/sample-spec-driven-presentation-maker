@@ -34,14 +34,7 @@ pt is an absolute unit. The same pt renders at the same size regardless of slide
 
 ## Icons
 
-Icon size is relative, not absolute. The right size depends on what's around it.
-
-- Next to text: match the text's line height × 1.5–2. The icon should feel like part of the line, not a separate element.
-- Inside a card: scale to the card's shorter dimension. A feature card's hero icon might be 25–35% of the shorter side. A small indicator icon might be 8–12%.
-- Standalone (hero/centerpiece): scale to the available space. Fill enough to feel intentional, not lost.
-
-Don't memorize pixel values. Look at the container and the neighboring elements, then size the icon so it feels balanced.
-An icon that's too small looks like an afterthought. An icon that's too large competes with the text.
+When, how and at what size to use icons: slide-json-spec, **Visual forms**.
 
 ## Effects
 

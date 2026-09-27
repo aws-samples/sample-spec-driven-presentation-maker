@@ -208,8 +208,10 @@ In the cloud Web UI, each user can add a private note to builtin and user templa
 
 A style is one HTML file that serves as rulebook, reference and gallery sample at once: its
 `:root` tokens (colours, `--fs-*` font sizes, geometry) are machine-read by `apply_style` and
-the build-time lint, and its slides show — and explain in comments — how *this* style builds a
-cover, a title frame, a comparison, a process, a table, a chart. Composers read the whole file
+the build-time lint, and its slides are a short deck built in the style, about the style: its rules, how titles and
+chapters are shaped, and one slide per recurring pattern (comparison, process, table, chart…),
+each commented with the regions and components it is built from. What the gallery shows is
+what a deck in that style looks like. Composers read the whole file
 as `specs/art-direction.html`, and the orchestrator reads its Message & Outline part before
 writing the outline, so a style shapes the deck's structure, not only its look. The skeleton
 and token contract are defined in the `style` workflow (returned by `start_style()`).
