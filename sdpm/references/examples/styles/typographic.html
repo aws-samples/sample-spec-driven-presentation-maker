@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>typographic — For a speaker whose point must land in one second from the back of a room: every slide is one enormous word, number, or two-line claim set at edge-to-edge scale on white; sparse concept icons clarify stages and nodes, heavy lines appear only when relationships depend on them, and one red concept carries the point.</title>
+<title>typographic — For a speaker whose point must land in one second from the back of a room: every slide is one enormous word, number, or two-line claim set edge to edge on white; pale oversized letterforms sit behind the argument, circular icon frames clarify structure, and one red word with its punctuation bar carries the point.</title>
 <style>
 :root {
   --color-text: #111111; /* claims, titles, and body */
@@ -11,7 +11,8 @@
   --color-border: #111111; /* structural connectors only */
   --color-muted: #BBBBBB; /* receding display words at large size */
   --color-dim: #666666; /* legible labels, meta, and sources */
-  --accent: #E63312; /* one decisive word or number */
+  --color-ghost: #E9E9E9; /* oversized watermark letterforms only */
+  --accent: #E63312; /* one decisive word, number, or punctuation bar */
   --color-on-accent: #FFFFFF; /* contract token; no accent surface */
   --font-family: "Helvetica Neue", Arial, "Segoe UI", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif; /* one installed sans family */
   --fs-cover-title: 192pt; /* bleed cover line, seven capitals maximum */
@@ -20,6 +21,7 @@
   --fs-slide-title: 100pt; /* quiet beat, twelve capitals maximum */
   --fs-heading: 56pt; /* paired view, twenty-two capitals maximum */
   --fs-metric: 380pt; /* one giant value */
+  --fs-watermark: 280pt; /* pale letterform behind foreground content */
   --fs-unit: 80pt; /* compact unit beside a metric */
   --fs-table: 24pt; /* aligned exact values */
   --fs-body: 18pt; /* black support, three lines normally */
@@ -32,11 +34,11 @@
   --support-w: 800px; /* about forty-four body characters */
   --caption-y: 920px; /* fixed one-line caption anchor */
   --bar-h: 0px; /* no title band */
-  --radius: 0px; /* no rounded geometry */
-  --border-thin: 0px; /* no decorative rules or outlines */
+  --radius: 999px; /* circular icon frames only */
+  --border-thin: 8px; /* icon rings and punctuation bars */
   --connector-w: 8px; /* diagram relationship stroke */
-  --icon-size: 120px; /* process and node concept mark */
-  --shadow: none; /* scale stays flat */
+  --icon-size: 72px; /* glyph inside a 120px icon frame */
+  --shadow: none; /* hard letter silhouettes stay legible at distance */
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(--font-family); zoom: 0.7; color: var(--color-text); }
@@ -60,7 +62,10 @@ body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(-
 .heavy { font-weight: 900; }
 .right { text-align: right; }
 .tabular { font-variant-numeric: tabular-nums; }
+.watermark { color: var(--color-ghost); font-size: calc(var(--fs-watermark) * 1.5); line-height: .8; font-weight: 900; letter-spacing: -14pt; white-space: nowrap; }
+.accent-bar { background: var(--accent); }
 .icon-wrap { display: flex; align-items: center; justify-content: center; }
+.icon-frame { border: var(--border-thin) solid currentColor; border-radius: var(--radius); }
 .icon { width: var(--icon-size); height: var(--icon-size); display: block; fill: var(--color-text); }
 .icon-wrap.muted .icon, .diagram-node.muted .icon { fill: var(--color-muted); }
 .icon-wrap.dim .icon, .diagram-node.dim .icon { fill: var(--color-dim); }
@@ -74,10 +79,14 @@ body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(-
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/play_arrow" viewBox="0 -960 960 960"><path d="M320-203v-560l440 280-440 280Zm60-280Zm0 171 269-171-269-171v342Z"/></symbol><symbol id="material/sync" viewBox="0 -960 960 960"><path d="M167-160v-60h130l-15-12q-64-51-93-111t-29-134q0-106 62.5-190.5T387-784v62q-75 29-121 96.5T220-477q0 63 23.5 109.5T307-287l30 21v-124h60v230H167Zm407-15v-63q76-29 121-96.5T740-483q0-48-23.5-97.5T655-668l-29-26v124h-60v-230h230v60H665l15 14q60 56 90 120t30 123q0 106-62 191T574-175Z"/></symbol><symbol id="material/trending_up" viewBox="0 -960 960 960"><path d="m123-240-43-43 292-291 167 167 241-241H653v-60h227v227h-59v-123L538-321 371-488 123-240Z"/></symbol><symbol id="material/flag" viewBox="0 -960 960 960"><path d="M200-120v-680h343l19 86h238v370H544l-18.93-85H260v309h-60Zm300-452Zm95 168h145v-250H511l-19-86H260v251h316l19 85Z"/></symbol><symbol id="material/shield" viewBox="0 -960 960 960"><path d="M480-81q-140-35-230-162.5T160-523v-238l320-120 320 120v238q0 152-90 279.5T480-81Zm0-62q115-38 187.5-143.5T740-523v-196l-260-98-260 98v196q0 131 72.5 236.5T480-143Zm0-337Z"/></symbol><symbol id="material/speed" viewBox="0 -960 960 960"><path d="M473.5-303.5Q517-305 537-336l216-339-335 219q-30 20-32 64t21 67q23 23 66.5 21.5ZM478-799q57 0 119 18.5T716-717l-52 37q-45-30-96.5-44.5T477.98-739q-140.47 0-239.23 100.22Q140-538.57 140-396.02 140-351 152.5-305q12.5 46 35.5 85h579q22-36 35-84t13-94q0-42-12.5-90.5T758-578l39-52q38 56 57 112.5T875-404q2 60-12 113t-41 98q-12 23-25.5 28t-33.5 5H192q-17 0-33.5-8.5T134-193q-26-48-40-97.5T80-396q0-83 31.5-156.5t85.5-128Q251-735 323.68-767T478-799Zm-9 331Z"/></symbol></svg>
 
 <!-- Part: Cover -->
-<!-- The cut left edge and two 384px-em lines define the cover. Keep left at −24px, pitch 352px, exactly one red word, and one black meta line; wording may vary within the display budget. -->
+<!-- The cut left edge and two 384px-em lines define the cover. Keep left at −24px, pitch 352px, one selected red word-and-bar lockup, one pale letter watermark, and one black meta line; wording may vary within the display budget. -->
+<!-- Component: watermark (.watermark) — a huge pale letter, numeral, or short word behind the claim; strength: visible as atmosphere but never needed for meaning; JSON: {"type":"textbox","text":"T","fontSize":280,"fontColor":"#E9E9E9","opacity":0.9,"sendToBack":true}; may vary: one letter, numeral, or word tied to the beat; may not: become the sole label, obscure foreground text, or repeat more than once. -->
+<!-- Component: accent-bar (.accent-bar) — one hard red punctuation stroke beside the selected word, value, or column; strength: 16–24px wide and 280–704px long; JSON: {"type":"shape","shape":"rectangle","fill":"#E63312","line":"none"}; may vary: vertical edge and length with the selected lockup; may not: appear without that lockup, underline prose, or multiply across a slide. -->
 <div class="slide">
+<div class="el watermark" style="left:1320px; top:32px; width:620px; height:880px;">T</div>
+<div class="el accent-bar" style="left:1788px; top:64px; width:20px; height:704px;"></div>
 <div class="el cover-title" style="left:-24px; top:64px; width:1944px; height:352px;">SCALE</div>
-<!-- Component: selected (.accent) — the one word, number, or node lockup carrying focus; may vary: chosen concept; may not: select twice, become a fill, or colour unrelated items. -->
+<!-- Component: selected (.accent) — the one word, number, or node lockup carrying focus, optionally paired with one accent bar; may vary: chosen concept and bar position; may not: select twice or colour unrelated items. -->
 <div class="el cover-title accent" style="left:-24px; top:416px; width:1944px; height:352px;">DECIDES</div>
 <!-- Component: tag (.meta) — one-line audience, scope, period, or supplied source at anchor B; may vary: wording; may not: carry another claim. -->
 <div class="el meta" style="left:96px; top:888px; width:1400px; height:48px;">Back row · spoken delivery</div>
@@ -101,21 +110,22 @@ body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(-
 
 <!-- Component: container — none; group by open space and shared alignment, never by cards, panels, fills, or enclosing shapes. -->
 <!-- Component: numbered — none; rank by position, size, and tone, never bullets, step numbers, or numbered badges. -->
-<!-- Component: connector (.connector) — an 8px black relationship stroke, red only on the selected branch; may vary: length and elbow routing; may not: decorate, cross labels, stop inside nodes, or add arrows where order already reads. -->
-<!-- Illustration rule: use 120px single-colour concept icons only in process steps, icon-label rows, and diagram nodes; black is primary, #666666 recedes, and red selects one concept. Favour process, hierarchy, metric, and sparse trend forms; diagrams fill the field and stop at four nodes. No cards, panels, decorative rules, gradients, shadows, or emoji. -->
+<!-- Component: connector (.connector) — an 8px black relationship stroke, red only on the selected branch; may vary: length and elbow routing; may not: cross labels, stop inside nodes, or add arrows where order already reads. -->
+<!-- Illustration rule: use one family of single-colour concept icons only in process steps, icon-label rows, and diagram nodes; each sits in the same 120px ring with a short label. Black is primary, #666666 recedes, and red selects one concept. Favour process, hierarchy, metric, and sparse trend forms; diagrams fill the field and stop at four nodes. Pale letterform watermarks, circular icon frames, and one red punctuation bar are the decoration vocabulary; effects that soften letter edges are excluded because the beat must retain a hard silhouette at distance. No emoji. -->
 <div class="slide">
 <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">SHOW LINKS</div>
-<!-- Component: icon (.icon) — process step, concept row, or diagram node; size: 120px; colour: black or dim grey, red only for the selected concept; family: general concept icons; may vary: glyph; may not: decorate, mix families, sit beside prose, or lose its 1–4 word label. -->
-<div class="el icon-wrap" style="left:80px; top:320px; width:120px; height:120px;"><svg class="icon"><use href="#material/play_arrow"/></svg></div>
+<!-- Component: icon-frame (.icon-frame) — a hard 8px circular ring that gives each structural icon the weight of a letterform; strength: 120px outer ring with a 72px glyph; JSON: an {"type":"shape","shape":"oval","fill":"#FFFFFF","line":"#111111","lineWidth":4} behind an icon using the same colour role; may vary: black, dim grey, or the single selected red; may not: vary size among peers, gain soft effects, or appear without an icon. -->
+<!-- Component: icon (.icon) — a 72px glyph inside a 120px frame at a process step, concept row, or diagram node; colour: black or dim grey, red only for the selected concept; family: general concept icons; may vary: glyph; may not: mix families, sit beside prose, lose its 1–4 word label, or become unlabelled ornament. -->
+<div class="el icon-wrap icon-frame" style="left:80px; top:320px; width:120px; height:120px;"><svg class="icon"><use href="#material/play_arrow"/></svg></div>
 <div class="el heading" style="left:260px; top:320px; width:900px; height:140px;">PROCESS</div>
-<div class="el icon-wrap dim" style="left:80px; top:520px; width:120px; height:120px;"><svg class="icon"><use href="#material/flag"/></svg></div>
+<div class="el icon-wrap icon-frame dim" style="left:80px; top:520px; width:120px; height:120px;"><svg class="icon"><use href="#material/flag"/></svg></div>
 <div class="el heading dim" style="left:260px; top:520px; width:900px; height:140px;">HIERARCHY</div>
-<div class="el icon-wrap accent" style="left:80px; top:720px; width:120px; height:120px;"><svg class="icon"><use href="#material/trending_up"/></svg></div>
+<div class="el icon-wrap icon-frame accent" style="left:80px; top:720px; width:120px; height:120px;"><svg class="icon"><use href="#material/trending_up"/></svg></div>
 <div class="el heading accent" style="left:260px; top:720px; width:900px; height:140px;">TREND</div>
 <div class="el meta" style="left:1040px; top:800px; width:800px; height:80px;">One family · one size · one selection</div>
 </div>
 
-<!-- Red identifies exactly one concept: a word, number, or selected node lockup with its connector branch. It is never a surface, chart bar, underline, decorative rule, or echo. -->
+<!-- Red identifies exactly one concept: a word, number, or selected node lockup may pair with one adjacent punctuation bar and its connector branch. The lockup counts as one red item; red is never a broad surface, chart fill, underline, or unrelated echo. -->
 <div class="slide">
 <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">ONE RED ITEM</div>
 <div class="el stack accent" style="left:80px; top:368px; width:900px; height:280px;">FOCUS</div>
@@ -190,21 +200,24 @@ body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(-
 <!-- Ask the outline for a single metric, focus stack, icon-led process, four-node hierarchy, before/after pair, equal word columns, magnitude-positioned trend, or aligned table. Avoid dense cycles, swimlanes, dashboards, and diagrams above four nodes. -->
 <div class="slide">
 <div class="el stack" style="left:240px; top:88px; width:1000px; height:280px;">PROCESS</div>
-<div class="el icon-wrap" style="left:80px; top:168px; width:120px; height:120px;"><svg class="icon"><use href="#material/play_arrow"/></svg></div>
+<div class="el icon-wrap icon-frame" style="left:80px; top:168px; width:120px; height:120px;"><svg class="icon"><use href="#material/play_arrow"/></svg></div>
 <div class="el stack dim" style="left:240px; top:368px; width:1000px; height:280px;">HIERARCHY</div>
-<div class="el icon-wrap dim" style="left:80px; top:448px; width:120px; height:120px;"><svg class="icon"><use href="#material/flag"/></svg></div>
+<div class="el icon-wrap icon-frame dim" style="left:80px; top:448px; width:120px; height:120px;"><svg class="icon"><use href="#material/flag"/></svg></div>
 <div class="el stack dim" style="left:240px; top:648px; width:1000px; height:280px;">METRIC</div>
 <div class="el body-text" style="left:1280px; top:800px; width:560px; height:120px;">Draw the structure. Keep the claim enormous.</div>
 </div>
 
 <!-- Part: Patterns -->
-<!-- Frame: divider — one red word alone at 384px is the pause; the chapter word may vary, but no subtitle, number, evidence, tracker, support, or decorative rule may enter the empty field. -->
+<!-- Frame: divider — one red word-and-bar lockup at 384px is the pause, with one pale initial behind it; the chapter word may vary, but no subtitle, evidence, tracker, or support may enter the empty field. -->
 <div class="slide">
+<div class="el watermark" style="left:1320px; top:40px; width:620px; height:880px;">P</div>
+<div class="el accent-bar" style="left:80px; top:240px; width:20px; height:600px;"></div>
 <div class="el display accent" style="left:-24px; top:348px; width:1944px; height:352px;">PATTERNS</div>
 </div>
 
-<!-- Pattern: comparison — for: choosing between two matched positions; regions: left, right, takeaway; components: lead ×2 + selected + takeaway; may vary: headings and evidence; may not: change widths, starts, criteria, or add boxes and dividers. -->
+<!-- Pattern: comparison — for: choosing between two matched positions; regions: left, right, takeaway; components: lead ×2 + selected + takeaway + watermark; may vary: headings and evidence; may not: change widths, starts, criteria, or add enclosing boxes. -->
 <div class="slide">
+<div class="el watermark" style="left:700px; top:176px; width:600px; height:620px;">VS</div>
 <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">TWO VIEWS</div>
 <div class="el slide-title" style="left:80px; top:320px; width:860px; height:240px;">FIRST</div>
 <div class="el body-text" style="left:80px; top:580px; width:800px; height:150px;">Equal scope.<br>Same criterion.</div>
@@ -213,8 +226,10 @@ body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(-
 <div class="el body-text heavy" style="left:80px; top:800px; width:1760px; height:120px;">Red selects; synthesis explains why.</div>
 </div>
 
-<!-- Pattern: columns — for: two or three parallel evidence groups; regions: col-1, col-2, col-3, takeaway; components: lead ×3 + takeaway; may vary: two or three columns; may not: vary starts, widths, rhythm, or reading order. -->
+<!-- Pattern: columns — for: two or three parallel evidence groups; regions: col-1, col-2, col-3, takeaway; components: lead ×3 + takeaway + selected + watermark + accent-bar; may vary: two or three columns and selected column; may not: vary starts, widths, rhythm, or reading order. -->
 <div class="slide">
+<div class="el watermark" style="left:520px; top:48px; width:1100px; height:720px;">III</div>
+<div class="el accent-bar" style="left:1284px; top:220px; width:20px; height:410px;"></div>
 <div class="el slide-title" style="left:80px; top:220px; width:520px; height:240px;">WHAT</div>
 <div class="el body-text" style="left:80px; top:480px; width:480px; height:150px;">State context.</div>
 <div class="el slide-title" style="left:700px; top:220px; width:520px; height:240px;">WHY</div>
@@ -224,30 +239,34 @@ body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(-
 <div class="el body-text heavy" style="left:80px; top:800px; width:1760px; height:120px;">Equal starts make columns.</div>
 </div>
 
-<!-- Pattern: process — for: three to five ordered stages with one current state; regions: step-1, step-2, step-3, body; components: step ×3 + icon ×3 + selected + lead; may vary: active stage, glyphs, and count; may not: add numbers, boxes, branches, or mixed icon sizes. -->
+<!-- Pattern: process — for: three to five ordered stages with one current state; regions: step-1, step-2, step-3, body; components: step ×3 + icon ×3 + icon-frame ×3 + selected + lead + watermark; may vary: active stage, glyphs, and count; may not: add semantic number badges, boxes, branches, or mixed icon sizes. -->
 <div class="slide">
+<div class="el watermark" style="left:980px; top:360px; width:940px; height:620px;">FLOW</div>
 <div class="el label dim" style="left:80px; top:48px; width:600px; height:28px;">Now</div>
-<!-- Component: step (.stack) — an icon-and-word ordered stage; may vary: active word, glyph, and three to five items; may not: add numbers, boxes, branches, or exceed the stack budget. -->
-<div class="el icon-wrap" style="left:80px; top:168px; width:120px; height:120px;"><svg class="icon"><use href="#material/play_arrow"/></svg></div>
+<!-- Component: step (.stack) — a framed-icon-and-word ordered stage; may vary: active word, glyph, and three to five items; may not: add semantic number badges, boxes, branches, or exceed the stack budget. -->
+<div class="el icon-wrap icon-frame" style="left:80px; top:168px; width:120px; height:120px;"><svg class="icon"><use href="#material/play_arrow"/></svg></div>
 <div class="el stack" style="left:240px; top:88px; width:740px; height:280px;">START</div>
-<div class="el icon-wrap dim" style="left:80px; top:448px; width:120px; height:120px;"><svg class="icon"><use href="#material/sync"/></svg></div>
+<div class="el icon-wrap icon-frame dim" style="left:80px; top:448px; width:120px; height:120px;"><svg class="icon"><use href="#material/sync"/></svg></div>
 <div class="el stack dim" style="left:240px; top:368px; width:740px; height:280px;">SHIFT</div>
-<div class="el icon-wrap dim" style="left:80px; top:728px; width:120px; height:120px;"><svg class="icon"><use href="#material/trending_up"/></svg></div>
+<div class="el icon-wrap icon-frame dim" style="left:80px; top:728px; width:120px; height:120px;"><svg class="icon"><use href="#material/trending_up"/></svg></div>
 <div class="el stack dim" style="left:240px; top:648px; width:740px; height:280px;">SCALE</div>
 <div class="el body-text" style="left:1040px; top:160px; width:800px; height:190px;">Order connects. Black marks the current stage.</div>
 </div>
 
-<!-- Pattern: metric — for: one value that is itself the claim; regions: body, takeaway; components: metric + tag; may vary: value, unit, scope, and period; may not: add a second number, comparator, bar, or shape. -->
+<!-- Pattern: metric — for: one value that is itself the claim; regions: body, takeaway; components: metric + tag + watermark + accent-bar; may vary: value, unit, scope, and period; may not: add a second measure, unrelated comparator, or dashboard furniture. -->
 <div class="slide">
-<!-- Component: metric (.metric) — one-value claim bleeding left; may vary: value, unit, and caption; may not: add another number, comparator, or shape. -->
+<div class="el watermark" style="left:760px; top:440px; width:1160px; height:500px;">DELTA</div>
+<div class="el accent-bar" style="left:1480px; top:120px; width:20px; height:620px;"></div>
+<!-- Component: metric (.metric) — one-value claim bleeding left; may vary: value, unit, and caption; may not: add another measure or unrelated comparator. -->
 <div class="el metric accent" style="left:-32px; top:80px; width:1500px; height:700px;">−42</div>
 <div class="el unit" style="left:1220px; top:220px; width:240px; height:200px;">%</div>
 <div class="el meta" style="left:96px; top:920px; width:1500px; height:48px;">One measure · one scope · one period</div>
 </div>
 
-<!-- Pattern: table — for: exact categorical values; regions: table, takeaway; components: table + selected + takeaway; may vary: three to five rows or columns; may not: add rules, fills, zebra, native styling, or a second red value. -->
+<!-- Pattern: table — for: exact categorical values; regions: table, takeaway; components: table + selected + takeaway + watermark; may vary: three to five rows or columns; may not: add data-cell fills, zebra, native styling, or a second red value. -->
 <!-- Native tables inherit the template font, so use aligned text to retain this face. Right-align tabular figures; weight marks the important column and red marks one claimed value. More than five rows becomes a chart or another slide. -->
 <div class="slide">
+<div class="el watermark" style="left:1180px; top:120px; width:720px; height:620px;">DATA</div>
 <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">THE NUMBERS</div>
 <div class="el label dim" style="left:80px; top:320px; width:600px; height:28px;">Item</div>
 <div class="el label dim right" style="left:760px; top:320px; width:320px; height:28px;">Prior</div>
@@ -262,9 +281,10 @@ body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(-
 <div class="el body-text heavy" style="left:80px; top:800px; width:1760px; height:120px;">The red value decides.</div>
 </div>
 
-<!-- Pattern: chart — for: a four-to-six point trend when position can carry magnitude; regions: chart, takeaway; components: chart + selected + tag; may vary: values and four to six periods; may not: add axes, bars, grids, avoidable legends, or unequal scales. -->
+<!-- Pattern: chart — for: a four-to-six point trend when position can carry magnitude; regions: chart, takeaway; components: chart + selected + tag + watermark; may vary: values and four to six periods; may not: add empty grids, avoidable legends, or unequal scales. -->
 <!-- Decks use native charts with direct labels when a drawn form is unavoidable. The style-native trend below uses numbers as marks: one common scale, position as axis, grey history, red current value, no empty gridlines. Beyond six points, accept a native chart or choose another style. -->
 <div class="slide">
+<div class="el watermark" style="left:80px; top:240px; width:760px; height:620px;">UP</div>
 <div class="el slide-title" style="left:80px; top:72px; width:1760px; height:200px;">TREND RISES</div>
 <!-- Component: chart (.chart-value) — direct value positioned by magnitude; may vary: four to six values on one scale; may not: add axes, bars, grids, or indirect legends. -->
 <div class="el stack muted tabular chart-value" style="left:120px; top:600px; width:360px; height:250px;">24</div>
@@ -293,18 +313,19 @@ body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(-
 <div class="el body-text" style="left:80px; top:344px; width:1100px; height:420px;">State the claim. Explain cause. Bound evidence. Test the counter-case. Name the implication. Ask for one decision.</div>
 </div>
 
-<!-- Pattern: diagram — for: one outcome explained by three drivers; regions: body, col-1, col-2, col-3, takeaway; components: hierarchy + connector ×4 + icon ×4 + selected + takeaway; may vary: labels, glyphs, and selected driver; may not: exceed four nodes, change node sizes, hide connector endpoints, add boxes, or select twice. -->
+<!-- Pattern: diagram — for: one outcome explained by three drivers; regions: body, col-1, col-2, col-3, takeaway; components: hierarchy + connector ×4 + icon ×4 + icon-frame ×4 + selected + takeaway + watermark; may vary: labels, glyphs, and selected driver; may not: exceed four nodes, change node sizes, hide connector endpoints, add enclosing boxes, or select twice. -->
 <div class="slide">
+<div class="el watermark" style="left:40px; top:240px; width:1200px; height:620px;">TREE</div>
 <!-- Component: hierarchy (.diagram-node) — equal 440×260 icon-and-word nodes joined edge to edge by an 8px elbow tree; may vary: concepts, glyphs, and selected branch; may not: exceed one parent plus three children, add boxes, mix sizes, or let connectors enter labels. -->
-<div class="el diagram-node" style="left:740px; top:64px; width:440px; height:260px;"><svg class="icon"><use href="#material/flag"/></svg><span class="heading">OUTCOME</span></div>
+<div class="el diagram-node" style="left:740px; top:64px; width:440px; height:260px;"><span class="icon-wrap icon-frame"><svg class="icon"><use href="#material/flag"/></svg></span><span class="heading">OUTCOME</span></div>
 <div class="el connector" style="left:956px; top:324px; width:8px; height:196px;"></div>
 <div class="el connector" style="left:320px; top:516px; width:1280px; height:8px;"></div>
 <div class="el connector" style="left:316px; top:516px; width:8px; height:174px;"></div>
 <div class="el connector" style="left:956px; top:516px; width:8px; height:174px;"></div>
 <div class="el connector accent" style="left:1596px; top:516px; width:8px; height:174px;"></div>
-<div class="el diagram-node dim" style="left:100px; top:690px; width:440px; height:260px;"><svg class="icon"><use href="#material/speed"/></svg><span class="heading">SPEED</span></div>
-<div class="el diagram-node dim" style="left:740px; top:690px; width:440px; height:260px;"><svg class="icon"><use href="#material/shield"/></svg><span class="heading">TRUST</span></div>
-<div class="el diagram-node accent" style="left:1380px; top:690px; width:440px; height:260px;"><svg class="icon"><use href="#material/trending_up"/></svg><span class="heading">REACH</span></div>
+<div class="el diagram-node dim" style="left:100px; top:690px; width:440px; height:260px;"><span class="icon-wrap icon-frame"><svg class="icon"><use href="#material/speed"/></svg></span><span class="heading">SPEED</span></div>
+<div class="el diagram-node dim" style="left:740px; top:690px; width:440px; height:260px;"><span class="icon-wrap icon-frame"><svg class="icon"><use href="#material/shield"/></svg></span><span class="heading">TRUST</span></div>
+<div class="el diagram-node accent" style="left:1380px; top:690px; width:440px; height:260px;"><span class="icon-wrap icon-frame"><svg class="icon"><use href="#material/trending_up"/></svg></span><span class="heading">REACH</span></div>
 <div class="el meta" style="left:80px; top:1000px; width:1760px; height:48px;">Type names. Lines explain. Red selects.</div>
 </div>
 
@@ -318,8 +339,10 @@ body { margin: 0; padding: 40px; background: var(--color-bg); font-family: var(-
 </div>
 
 <!-- Part: Closing -->
-<!-- Frame: closing — repeat the cover composition with two final words, black first and red second, plus one ask line at anchor B; wording may vary, but bleed, line pitch, accent line, and absence of furniture may not. Nothing follows; appendix material belongs in a separate deck. -->
+<!-- Frame: closing — repeat the cover composition with two final words, black first and red second, one pale letter watermark, one punctuation bar, and one ask line at anchor B; wording may vary, but bleed, line pitch, and selected lockup may not. Nothing follows; appendix material belongs in a separate deck. -->
 <div class="slide">
+<div class="el watermark" style="left:1320px; top:32px; width:620px; height:880px;">N</div>
+<div class="el accent-bar" style="left:1788px; top:64px; width:20px; height:704px;"></div>
 <div class="el cover-title" style="left:-24px; top:64px; width:1944px; height:352px;">NEXT</div>
 <div class="el cover-title accent" style="left:-24px; top:416px; width:1944px; height:352px;">MOVE</div>
 <div class="el meta" style="left:96px; top:888px; width:1500px; height:48px;">One owner · one date · one ask</div>

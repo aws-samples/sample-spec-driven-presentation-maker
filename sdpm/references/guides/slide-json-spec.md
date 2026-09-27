@@ -694,13 +694,23 @@ the content calls for may be drawn, at the style's density.
 
 **Icons.** `search_assets("keyword")` → `"src": "assets:<source>/<name>"`. An icon stands for a
 concept next to a short label (1–4 words): a list of concepts becomes icon + label rows, a card
-gets an icon at its head, a node carries one. Never an icon without a label, never beside a
-paragraph, never as decoration. One icon family per deck (a general pack for concepts; `aws`
-for AWS services — those are multi-colour: no `iconColor`, nothing drawn behind them). A
-single-colour icon takes `iconColor` from a token: the text colour normally, the accent only on
-the member the slide emphasises. Size is relative: beside a line of text, 1.5–2 × its line
-height; at the head of a card or node, 25–35 % of its shorter side; as a hero, large enough to
-look intentional. Icons in a row share one size and one baseline.
+gets an icon at its head, a node carries one; a single large icon may also be a slide's hero or
+a faint watermark. How it sits is the style's `icon` and `icon-frame`: bare glyph, or on a disc,
+ring, chip or gradient (a `circle`/`rounded_rectangle` behind it, the icon's `iconColor`
+contrasting with that fill), in the text colour or colour-coded by category. One icon family per
+deck (a general pack for concepts; `aws` for AWS services — those are multi-colour: no
+`iconColor`, nothing drawn behind them). Size is relative: beside a line of text, 1.5–2 × its
+line height; at the head of a card or node, 25–35 % of its shorter side; as a hero, large enough
+to own its area. Icons in a row share one size and one baseline.
+
+**Decoration** is the style's own (`Decoration` components: `icon-frame`, `glow`, `orb`, `ring`,
+`gradient-field`, `watermark`, `accent-bar`, `hero-graphic`); use what it defines, at the
+strength its slides show, and none it does not. Building blocks: `glow` on a shape, line or
+image; an `orb` is an `oval` with a gradient fill and a large `softEdge`, behind content
+(`sendToBack` when it must not cover the title); `ring`s are `oval`s with no fill and a thin
+`line`, concentric (same centre, radii stepping) or dashed (`dashStyle`); a `gradient-field` is a
+`gradient` fill on a band, panel or the text's shape; a `watermark` is a large icon or numeral
+at low `opacity`. `read_guides(["components"])` walks through these with samples.
 
 **Recipes** — N items in a region (`rx`, `ry`, `rw`, `rh`); rectangular node size
 `w × h`, circle diameter `s`, gap `g`.

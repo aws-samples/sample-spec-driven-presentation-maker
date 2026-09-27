@@ -29,8 +29,10 @@ specimen sheet: the palette is seen on the slides and explained in `:root`, the 
 the slides' own titles and body, components are defined where a slide first uses them.
 
 This is also what makes the gallery honest: a person choosing a style sees slides that look
-exactly like the deck they will get. A style whose own slides are denser, more decorated or
-more varied than its rules allow is a false sample — and composers copy what they see.
+exactly like the deck they will get. A style whose own slides break its own rules is a false
+sample — denser than its density, or wearing decoration its rules never define — and so is one
+whose slides are plainer than the decks it promises: composers copy what they see, so a look
+the style wants must appear on its own slides.
 
 Parts, in this order, each opened by a marker comment (`<!-- Part: Rules -->`):
 
@@ -85,6 +87,13 @@ whitespace and rules -->` — so a composer never guesses.
 | Relationship | `hub` (centre and satellites), `hierarchy`, `axis` (2×2 or spectrum), `brace` (items gathered into one conclusion) | — |
 | Labels | `tag` (status or category), `marker` (number or point marker), `legend` | `tag` |
 | Evidence | `table`, `chart` (native; the comment carries series colours, highlight, labels, baseline), `media` (image or screenshot treatment), `code`, `icon` (size, colour, what it sits on, which family) | `table`, `chart`, `icon` |
+| Decoration | `icon-frame` (disc, ring, chip or gradient behind an icon), `glow` (light around a shape, line or text), `orb` (soft blurred colour field), `ring` (concentric or orbit rings), `gradient-field` (gradient surface, band or text), `watermark` (large faint icon, numeral or word behind content), `accent-bar` (a coloured edge or rule that marks a unit), `hero-graphic` (a composed illustration that owns part of a slide) | at least one — or `none`, with the reason |
+
+Decoration is part of a style's look, not noise to minimise: it sets tone, lifts the member the
+slide is about, and makes a slide worth looking at. Each style chooses its decoration from its
+design decision and defines it like any component — a glowing dark style says where the glow
+sits and how strong it is; a print style may answer `<!-- Component: decoration — none; … -->`
+with the reason — and its own slides use it at the strength a deck should.
 
 Define the optional roles the style is for and leave the rest out. Every style draws diagrams —
 the slide JSON spec's Visual forms are available to every deck — so what a style decides is how
@@ -172,13 +181,17 @@ The demo slides are read as coordinates, so the format is constrained:
 
 ## Writing the rules
 
+- **Prohibit only what the decision rules out.** A DON'T needs a reason in this style's decision
+  ("print must survive greyscale, so no glow"), never a general taste for restraint. Blanket bans
+  on gradients, shadows, glow or colour that the decision does not require are not rules — leave
+  them out, and say what the style does instead.
 - **State the design decision, then derive the rules.** "This deck is read alone by someone
   deciding; the title row alone must carry the argument" leads to "titles are full-sentence
   assertions, ≤ 2 lines, the largest text on the slide" and "no topic-label titles". A DON'T
   without a reason is a rule the composer will bend.
 - **Rules that hold for every style, state them anyway** so the style is self-contained: one
-  claim per slide; the title is the claim; colours beyond background and text kept to the
-  minimum that distinguishes content; text contrast ≥ 4.5:1 (3:1 for ≥ 18pt); charts label
+  claim per slide; the title is the claim; every colour has a job the style names (category,
+  emphasis, tone, decoration); text contrast ≥ 4.5:1 (3:1 for ≥ 18pt); charts label
   values directly and drop gridlines that carry no information; margins ≥ 5% of the slide
   edge; no emoji; structure is drawn, not written — steps, loops, parts, a centre and its
   satellites, trade-offs and quantities become forms, and text is kept for claims that are

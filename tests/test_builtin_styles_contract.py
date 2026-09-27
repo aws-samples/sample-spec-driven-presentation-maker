@@ -46,7 +46,8 @@ REQUIRED_ROLES = ("container", "selected", "takeaway", "numbered", "metric", "st
 ALL_ROLES = REQUIRED_ROLES + (
     "list", "lead", "quote", "delta", "before-after", "progress", "phase", "milestone",
     "hub", "hierarchy", "axis", "brace", "marker", "legend", "media", "code",
-)
+) + ("icon-frame", "glow", "orb", "ring", "gradient-field", "watermark", "accent-bar", "hero-graphic", "decoration")
+DECORATION_ROLES = ("icon-frame", "glow", "orb", "ring", "gradient-field", "watermark", "accent-bar", "hero-graphic")
 COMPONENT_RE = re.compile(r"<!--\s*Component:\s*([a-z-]+)")
 PATTERN_RE = re.compile(r"<!--\s*Pattern:\s*([a-z-]+)(.*?)-->", re.DOTALL)
 FRAME_RE = re.compile(r"<!--\s*Frame:\s*([a-z-]+)")
@@ -118,6 +119,10 @@ class TestStyleContract:
         assert not unknown, f"{path.stem}: component roles not in the vocabulary: {unknown}"
         missing_roles = [r for r in REQUIRED_ROLES if r not in roles]
         assert not missing_roles, f"{path.stem}: required roles without a Component line: {missing_roles}"
+        # decoration is part of the look: at least one decoration role, or an explicit none
+        assert set(roles) & set(DECORATION_ROLES) or re.search(r"<!--\s*Component:\s*decoration\s*—\s*none", html), (
+            f"{path.stem}: no Decoration component (define one, or `Component: decoration — none; <reason>`)"
+        )
 
     def test_slides_obey_the_style_density(self, path: Path) -> None:
         # the file is the gallery sample and the composer's model: no slide may be denser

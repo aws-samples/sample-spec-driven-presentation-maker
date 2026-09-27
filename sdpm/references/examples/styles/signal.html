@@ -32,18 +32,31 @@
 --radius:0px; /* square industrial geometry throughout */
 --border-thin:1px; /* neutral table and panel structure */
 --border-strong:3px; /* signal outline and title rule */
---shadow:none; /* flat surfaces without decorative depth */
+--shadow:none; /* directional depth would weaken the single sign plane; glow is reserved for the signal */
 }
 *{box-sizing:border-box}
 body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoom:0.7}
 .slide{position:relative;width:1920px;height:1080px;margin:0 auto 40px;overflow:hidden;background:var(--color-bg);color:var(--color-text)}
 .el{position:absolute}
 .icon{display:block;width:96px;height:96px;fill:var(--color-text);flex:0 0 auto}
-.panel>.icon{margin-bottom:18px}
-.step .icon,.node .icon{margin-bottom:12px}
-.panel.on>.icon,.step.on .icon,.node.on>.icon,.status.on>.icon{fill:var(--color-on-accent)}
-.status>.icon{width:72px;height:72px;margin-right:24px}
+.icon-frame{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;width:118px;height:118px;border:var(--border-strong) solid var(--accent);background:var(--color-surface);flex:0 0 auto}
+.icon-frame>.icon{width:68px;height:68px}
+.panel>.icon-frame{margin-bottom:18px}
+.step .icon-frame{width:112px;height:112px;margin:0 auto 14px}
+.node .icon-frame{width:86px;height:86px;margin-bottom:10px}
+.node .icon-frame>.icon{width:48px;height:48px}
+.status>.icon-frame{width:80px;height:80px;margin-right:24px}
+.status>.icon-frame>.icon{width:44px;height:44px}
+.panel.on>.icon-frame,.step.on .icon-frame,.node.on>.icon-frame,.status.on>.icon-frame{background:var(--color-bg);border-color:var(--color-bg)}
+.panel.on>.icon-frame>.icon,.step.on .icon-frame>.icon,.node.on>.icon-frame>.icon,.status.on>.icon-frame>.icon{fill:var(--accent)}
+.hero-frame{width:170px;height:170px;background:var(--accent);border-color:var(--accent);box-shadow:0 0 34px rgba(255,212,0,.42)}
+.hero-frame>.icon{width:102px;height:102px;fill:var(--color-on-accent)}
 .hazard{background:repeating-linear-gradient(135deg,var(--accent) 0pt,var(--accent) 7.5pt,var(--color-bg) 7.5pt,var(--color-bg) 15pt)}
+.signal-rings{display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,212,0,.24);border-radius:50%;pointer-events:none}
+.signal-rings::before,.signal-rings::after{content:"";position:absolute;border:2px solid var(--accent);border-radius:50%}
+.signal-rings::before{inset:14%;opacity:.42}
+.signal-rings::after{inset:30%;opacity:.72}
+.signal-glow{box-shadow:0 0 32px rgba(255,212,0,.32)}
 .t-cover-title,.t-slide-title,.t-heading,.status-name{font-weight:900;text-transform:uppercase}
 .t-cover-title{font-size:calc(var(--fs-cover-title)*1.5);line-height:.95;letter-spacing:-1.5pt}
 .t-slide-title{font-size:calc(var(--fs-slide-title)*1.5);line-height:1.02;letter-spacing:-1pt}
@@ -95,14 +108,17 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/visibility" viewBox="0 -960 960 960"><path d="M600.5-379.5Q650-429 650-500t-49.5-120.5Q551-670 480-670t-120.5 49.5Q310-571 310-500t49.5 120.5Q409-330 480-330t120.5-49.5Zm-200-41Q368-453 368-500t32.5-79.5Q433-612 480-612t79.5 32.5Q592-547 592-500t-32.5 79.5Q527-388 480-388t-79.5-32.5ZM216-283Q98-366 40-500q58-134 176-217t264-83q146 0 264 83t176 217q-58 134-176 217t-264 83q-146 0-264-83Zm264-217Zm222.5 174.5Q804-391 857-500q-53-109-154.5-174.5T480-740q-121 0-222.5 65.5T102-500q54 109 155.5 174.5T480-260q121 0 222.5-65.5Z"/></symbol><symbol id="material/fact_check" viewBox="0 -960 960 960"><path d="M132-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h696q24 0 42 18t18 42v600q0 24-18 42t-42 18H132Zm0-60h696v-600H132v600Zm68-100h200v-80H200v80Zm382-80 198-198-57-57-141 142-57-57-56 57 113 113Zm-382-80h200v-80H200v80Zm0-160h200v-80H200v80Zm-68 420v-600 600Z"/></symbol><symbol id="material/campaign" viewBox="0 -960 960 960"><path d="M730-450v-60h150v60H730Zm50 290-121-90 36-48 121 90-36 48Zm-82-503-36-48 118-89 36 48-118 89ZM210-200v-160h-70q-24.75 0-42.37-17.63Q80-395.25 80-420v-120q0-24.75 17.63-42.38Q115.25-600 140-600h180l200-120v480L320-360h-50v160h-60Zm250-146v-268l-124 74H140v120h196l124 74Zm100 0v-268q27 24 43.5 58.5T620-480q0 41-16.5 75.5T560-346ZM300-480Z"/></symbol><symbol id="material/bolt" viewBox="0 -960 960 960"><path d="m393-165 279-335H492l36-286-253 366h154l-36 255Zm-73 85 40-280H160l360-520h80l-40 320h240L400-80h-80Zm154-396Z"/></symbol><symbol id="material/warning" viewBox="0 -960 960 960"><path d="m40-120 440-760 440 760H40Zm104-60h672L480-760 144-180Zm361.5-65.68q8.5-8.67 8.5-21.5 0-12.82-8.68-21.32-8.67-8.5-21.5-8.5-12.82 0-21.32 8.68-8.5 8.67-8.5 21.5 0 12.82 8.68 21.32 8.67 8.5 21.5 8.5 12.82 0 21.32-8.68ZM454-348h60v-224h-60v224Zm26-122Z"/></symbol></svg>
 
 <!-- Part: Cover -->
-<!-- Exactly one 10px top stripe uses a 135-degree repeating gradient: yellow from 0–7.5pt and black from 7.5–15pt. Never add a bottom stripe. -->
+<!-- Component: accent-bar (.hazard) — when: every slide needs its fixed top warning rail; strength: 10px with hard 7.5pt alternating stops; JSON: a 10px-high group of alternating yellow and black parallelogram shapes clipped across the full width at y 0; may vary: pitch to suit output scale; may not: move from the top or repeat on another edge, because one fixed rail preserves orientation. -->
 <div class="slide">
 <div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <!-- Component: tag (.tag) — compact state or metadata label; may vary: wording; may not: become a second filled signal or replace the claim. -->
 <div class="el tag" style="left:120px;top:238px;width:340px;height:48px">Bundled style / 01</div>
 <div class="el t-cover-title" style="left:120px;top:330px;width:1500px;height:220px">Signal</div>
 <div class="el t-heading c-accent" style="left:120px;top:570px;width:1300px;height:70px">Make the warning visible</div>
-<div class="el t-body c-muted" style="left:120px;top:690px;width:1120px;height:150px">Near-black ground. One safety-yellow signal. Upright heavy headlines. Huge numerals. No decorative motion.</div>
+<div class="el t-body c-muted" style="left:120px;top:690px;width:1120px;height:150px">Near-black ground. One safety-yellow signal. Upright heavy headlines. Huge numerals. Decisive focus.</div>
+<!-- Component: ring (.signal-rings) — when: one hero or selected element needs beacon focus; strength: three concentric 2px yellow rings at 24%, 42%, and 72% opacity; JSON: three unfilled oval shapes sharing a centre, line #FFD400 at 2px with opacity 0.24–0.72; may vary: diameter and elliptical proportion; may not: surround two competing elements. -->
+<!-- Component: icon-frame (.icon-frame) — when: a concept icon heads a card, node, scan row, or hero; strength: 3px yellow outline on dark, or one yellow hero core; JSON: rectangle behind icon, square corners, fill #181818 or #FFD400, line #FFD400 at 3px, iconColor #FFFFFF or #0A0A0A; may vary: 80–170px by role; may not: sit beside paragraph copy or mix icon families. -->
+<div class="el signal-rings" style="left:1310px;top:250px;width:500px;height:500px"><div class="icon-frame hero-frame"><svg class="icon"><use href="#material/warning"/></svg></div></div>
 <div class="el meta" style="left:120px;top:980px;width:1500px;height:48px">Style-signal / rev A / 16:9 / top stripe</div>
 </div>
 
@@ -113,16 +129,17 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Rules / hierarchy</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">One signal controls</div>
-<!-- Component: container (.panel) — group one evidence block with square geometry; may vary: width and content; may not: rotate, round, shadow, or become decorative. -->
+<!-- Component: container (.panel) — group one evidence block on the hard-edged sign plane; may vary: width and content; may not: rotate, round, or compete with the selected signal. -->
 <div class="el panel" style="left:120px;top:350px;width:780px;height:360px"><div class="t-label c-accent">Preserve</div><div class="t-heading">One claim</div><div class="t-body c-muted">The title states it. Supporting detail stays quieter.</div></div>
 <!-- Component: selected (.panel.on) — mark the single decisive peer or state; may vary: selected member; may not: appear twice or imply favourable direction. -->
-<div class="el panel on" style="left:1020px;top:350px;width:780px;height:360px"><div class="t-label">Signal</div><div class="t-heading">One yellow field</div><div class="t-body">Otherwise use yellow only for text, outlines, or rules.</div></div>
+<!-- Component: glow (.signal-glow) — when: the single yellow selected member must radiate at distance; strength: 32px yellow at 32% opacity; JSON: glow {radius: 32, color: "#FFD400", opacity: 0.32}; may vary: 18–36px with viewing distance; may not: appear on neutral support or more than one peer. -->
+<div class="el panel on signal-glow" style="left:1020px;top:350px;width:780px;height:360px"><div class="t-label">Signal</div><div class="t-heading">One yellow field</div><div class="t-body">Otherwise use yellow only for text, outlines, or rules.</div></div>
 <!-- Component: takeaway (.takeaway) — one short conclusion or action; may vary: sentence; may not: exceed two lines, repeat the title, or create a second yellow fill. -->
 <div class="el takeaway t-heading" style="left:120px;top:800px;width:1680px;height:120px">One signal makes distance readable.</div>
-<div class="el meta" style="left:120px;top:980px;width:1680px;height:48px">Margins ≥ 5% / yellow fills ≤ 1 / shadows = 0</div>
+<div class="el meta" style="left:120px;top:980px;width:1680px;height:48px">Margins ≥ 5% / yellow signal = 1 / selected glow = 1</div>
 </div>
 
-<!-- Upright construction is literal: rotation is zero, italics are absent, and gradients are forbidden except the hazard stripe. Illustrate structure, not empty space: use 96px Material icons in card heads, process steps, and diagram nodes, or 72px beside scan rows; white on dark and black on the single yellow state. Favour process, hub, comparison, and status forms, with at most five diagram nodes. Never place icons beside paragraphs, mix families, or shrink type and boxes to fit. -->
+<!-- Upright construction is literal: rotation is zero and italics are absent. Illustrate structure with 96px Material icons in framed card heads, process steps, and diagram nodes, or 72px framed icons beside scan rows; white on dark and yellow on the single dark frame inside a selected state. Favour process, hub, comparison, and status forms, with at most five diagram nodes. Never place icons beside paragraphs, mix families, or shrink type and boxes to fit. -->
 <div class="slide">
 <div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Rules / restraint</div>
@@ -131,9 +148,9 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="el t-body" style="left:120px;top:450px;width:700px;height:300px">Draw process, hubs, and status.<br>Use 96px icons in heads.<br>Cap diagrams at five nodes.</div>
 <div class="el rule" style="left:960px;top:350px;width:1px;height:500px"></div>
 <div class="el t-heading" style="left:1040px;top:350px;width:700px;height:70px">Do not</div>
-<div class="el t-body c-muted" style="left:1040px;top:450px;width:700px;height:300px">Iconize paragraphs.<br>Mix families or role sizes.<br>Signal two nodes.<br>Decorate empty space.</div>
+<div class="el t-body c-muted" style="left:1040px;top:450px;width:700px;height:300px">Iconize paragraphs.<br>Mix families or role sizes.<br>Signal two nodes.<br>Add a second attention field.</div>
 <div class="el takeaway t-heading" style="left:120px;top:820px;width:1680px;height:110px">Every mark must carry information.</div>
-<div class="el meta" style="left:120px;top:980px;width:1680px;height:48px">Rotation = 0 / italics = 0 / gradients = stripe only</div>
+<div class="el meta" style="left:120px;top:980px;width:1680px;height:48px">Rotation = 0 / italics = 0 / rings frame one focus</div>
 </div>
 
 <!-- Part: Message & Outline -->
@@ -179,6 +196,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-metric-sm c-accent" style="left:120px;top:300px;width:600px;height:130px">04 / 05</div>
 <div class="el t-cover-title" style="left:120px;top:470px;width:1500px;height:180px">Patterns</div>
+<div class="el signal-rings" style="left:1330px;top:270px;width:390px;height:390px"><div class="icon-frame hero-frame"><svg class="icon"><use href="#material/bolt"/></svg></div></div>
 <div class="el rule" style="left:120px;top:720px;width:900px;height:2px"></div>
 <div class="el t-heading c-muted" style="left:120px;top:770px;width:1400px;height:120px">One form carries one warning.</div>
 </div>
@@ -189,7 +207,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / comparison</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Match before marking</div>
 <div class="el panel" style="left:120px;top:350px;width:800px;height:420px"><div class="t-label c-accent">Baseline</div><div class="t-heading">Neutral state</div><div class="t-body c-muted">Same measure<br>Same period<br>Same row order</div></div>
-<div class="el panel on" style="left:1000px;top:350px;width:800px;height:420px"><div class="t-label">Selected</div><div class="t-heading">Signal state</div><div class="t-body">Same measure<br>Same period<br>Same row order</div></div>
+<div class="el panel on signal-glow" style="left:1000px;top:350px;width:800px;height:420px"><div class="t-label">Selected</div><div class="t-heading">Signal state</div><div class="t-body">Same measure<br>Same period<br>Same row order</div></div>
 <div class="el takeaway t-heading" style="left:120px;top:820px;width:1680px;height:110px">Equal geometry makes attention credible.</div>
 <div class="el meta" style="left:120px;top:980px;width:1680px;height:48px">Matched criteria / one selected state</div>
 </div>
@@ -199,10 +217,10 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / columns</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Peers keep one rhythm</div>
-<!-- Component: icon (.icon) — when a short concept replaces a numeric head; size: 96px in cards, steps, and nodes, 72px in scan rows; colour: white on dark, black on the one yellow selection; family: Material; may vary: glyph by meaning; may not: decorate, sit beside paragraphs, mix families, or change size within a role. -->
-<div class="el panel" style="left:120px;top:350px;width:520px;height:430px"><svg class="icon"><use href="#material/visibility"/></svg><div class="t-heading">Context</div><div class="t-caption">Matched depth.</div></div>
-<div class="el panel on" style="left:700px;top:350px;width:520px;height:430px"><svg class="icon"><use href="#material/campaign"/></svg><div class="t-heading">Priority</div><div class="t-body">One selected peer.</div></div>
-<div class="el panel" style="left:1280px;top:350px;width:520px;height:430px"><svg class="icon"><use href="#material/bolt"/></svg><div class="t-heading">Consequence</div><div class="t-caption">Matched depth.</div></div>
+<!-- Component: icon (.icon) — when a short concept replaces a numeric head; size: 68px in card frames, 48px in nodes and scan rows, 102px for one hero; colour: white on dark, yellow inside a selected dark frame, black in a yellow hero frame; family: Material; may vary: glyph by meaning; may not: sit beside paragraphs, mix families, or change size within a role. -->
+<div class="el panel" style="left:120px;top:350px;width:520px;height:430px"><div class="icon-frame"><svg class="icon"><use href="#material/visibility"/></svg></div><div class="t-heading">Context</div><div class="t-caption">Matched depth.</div></div>
+<div class="el panel on signal-glow" style="left:700px;top:350px;width:520px;height:430px"><div class="icon-frame"><svg class="icon"><use href="#material/campaign"/></svg></div><div class="t-heading">Priority</div><div class="t-body">One selected peer.</div></div>
+<div class="el panel" style="left:1280px;top:350px;width:520px;height:430px"><div class="icon-frame"><svg class="icon"><use href="#material/bolt"/></svg></div><div class="t-heading">Consequence</div><div class="t-caption">Matched depth.</div></div>
 <div class="el takeaway t-heading" style="left:120px;top:840px;width:1680px;height:100px">Parallel logic earns parallel space.</div>
 <div class="el meta" style="left:120px;top:980px;width:1680px;height:48px">Two to four fields / one fill</div>
 </div>
@@ -213,14 +231,14 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / process</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">Dependence earns sequence</div>
 <!-- Component: step (.step) — equal stage in a true three-to-five-step sequence; may vary: active step and short verb; may not: change geometry or become a paragraph. -->
-<div class="el step" style="left:120px;top:400px;width:360px;height:280px"><div><svg class="icon"><use href="#material/visibility"/></svg><div class="t-heading">Define</div></div></div>
+<div class="el step" style="left:120px;top:400px;width:360px;height:280px"><div><div class="icon-frame"><svg class="icon"><use href="#material/visibility"/></svg></div><div class="t-heading">Define</div></div></div>
 <!-- Component: connector (.connector) — direct handoff between adjacent equal stages; may vary: length; may not: branch, rotate, detach, or imply unsupported causality. -->
 <div class="el connector" style="left:480px;top:538px;width:80px;height:4px"></div>
-<div class="el step" style="left:560px;top:400px;width:360px;height:280px"><div><svg class="icon"><use href="#material/bolt"/></svg><div class="t-heading">Build</div></div></div>
+<div class="el step" style="left:560px;top:400px;width:360px;height:280px"><div><div class="icon-frame"><svg class="icon"><use href="#material/bolt"/></svg></div><div class="t-heading">Build</div></div></div>
 <div class="el connector" style="left:920px;top:538px;width:80px;height:4px"></div>
-<div class="el step" style="left:1000px;top:400px;width:360px;height:280px"><div><svg class="icon"><use href="#material/fact_check"/></svg><div class="t-heading">Check</div></div></div>
+<div class="el step" style="left:1000px;top:400px;width:360px;height:280px"><div><div class="icon-frame"><svg class="icon"><use href="#material/fact_check"/></svg></div><div class="t-heading">Check</div></div></div>
 <div class="el connector" style="left:1360px;top:538px;width:80px;height:4px"></div>
-<div class="el step on" style="left:1440px;top:400px;width:360px;height:280px"><div><svg class="icon"><use href="#material/campaign"/></svg><div class="t-heading">Release</div></div></div>
+<div class="el step on signal-glow" style="left:1440px;top:400px;width:360px;height:280px"><div><div class="icon-frame"><svg class="icon"><use href="#material/campaign"/></svg></div><div class="t-heading">Release</div></div></div>
 <div class="el takeaway t-heading" style="left:120px;top:790px;width:1680px;height:110px">Fill the current handoff once.</div>
 <div class="el meta" style="left:120px;top:980px;width:1680px;height:48px">Three to five steps / equal boxes</div>
 </div>
@@ -231,7 +249,8 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / metric</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">One number breaks through</div>
 <!-- Component: metric (.metric-block) — direct value with unit, scope, period, and comparator; may vary: hero or supporting size; may not: leave context implicit or exceed one 96pt hero. -->
-<div class="el metric-block on" style="left:120px;top:340px;width:800px;height:470px"><div class="t-label">Primary metric</div><div class="t-metric">−42%</div><div class="t-body">Versus prior period</div></div>
+<div class="el signal-rings" style="left:180px;top:350px;width:450px;height:450px"></div>
+<div class="el metric-block on signal-glow" style="left:120px;top:340px;width:800px;height:470px"><div class="t-label">Primary metric</div><div class="t-metric">−42%</div><div class="t-body">Versus prior period</div></div>
 <div class="el metric-block" style="left:1000px;top:340px;width:380px;height:250px"><div class="t-label c-accent">Current</div><div class="t-metric-sm c-accent">18</div><div class="t-caption">days</div></div>
 <div class="el metric-block" style="left:1420px;top:340px;width:380px;height:250px"><div class="t-label c-accent">Prior</div><div class="t-metric-sm c-accent">31</div><div class="t-caption">days</div></div>
 <div class="el t-body c-muted" style="left:1000px;top:680px;width:800px;height:150px">State the denominator, window, and comparison beside the measures.</div>
@@ -285,12 +304,13 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="el connector" style="left:1278px;top:453px;width:4px;height:304px"></div>
 <div class="el connector" style="left:1280px;top:453px;width:90px;height:4px"></div>
 <div class="el connector" style="left:1280px;top:753px;width:90px;height:4px"></div>
-<div class="el node" style="left:120px;top:350px;width:430px;height:210px"><svg class="icon"><use href="#material/visibility"/></svg><span>Detect</span></div>
-<div class="el node" style="left:120px;top:650px;width:430px;height:210px"><svg class="icon"><use href="#material/fact_check"/></svg><span>Verify</span></div>
+<div class="el signal-rings" style="left:675px;top:375px;width:570px;height:450px"></div>
+<div class="el node" style="left:120px;top:350px;width:430px;height:210px"><div class="icon-frame"><svg class="icon"><use href="#material/visibility"/></svg></div><span>Detect</span></div>
+<div class="el node" style="left:120px;top:650px;width:430px;height:210px"><div class="icon-frame"><svg class="icon"><use href="#material/fact_check"/></svg></div><span>Verify</span></div>
 <!-- Component: hub (.node.on) — single centre joining three to five peers; may vary: node count and labels; may not: move off centre, use diagonal links, or add another filled node. -->
-<div class="el node on" style="left:735px;top:440px;width:450px;height:320px"><svg class="icon"><use href="#material/warning"/></svg><span>Decide</span></div>
-<div class="el node" style="left:1370px;top:350px;width:430px;height:210px"><svg class="icon"><use href="#material/campaign"/></svg><span>Notify</span></div>
-<div class="el node" style="left:1370px;top:650px;width:430px;height:210px"><svg class="icon"><use href="#material/bolt"/></svg><span>Act</span></div>
+<div class="el node on signal-glow" style="left:735px;top:440px;width:450px;height:320px"><div class="icon-frame"><svg class="icon"><use href="#material/warning"/></svg></div><span>Decide</span></div>
+<div class="el node" style="left:1370px;top:350px;width:430px;height:210px"><div class="icon-frame"><svg class="icon"><use href="#material/campaign"/></svg></div><span>Notify</span></div>
+<div class="el node" style="left:1370px;top:650px;width:430px;height:210px"><div class="icon-frame"><svg class="icon"><use href="#material/bolt"/></svg></div><span>Act</span></div>
 <div class="el meta" style="left:120px;top:980px;width:1680px;height:48px">Five nodes / 96px icons / orthogonal links</div>
 </div>
 
@@ -300,10 +320,10 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="el t-label c-accent" style="left:120px;top:40px;width:600px;height:48px">Pattern / status</div>
 <div class="el t-slide-title frame-title" style="left:120px;top:90px;width:1680px;height:192px">One state needs attention</div>
 <!-- Component: list (.status) — stack three to six scan states with monospaced metadata; may vary: labels and row count; may not: mark more than one attention row. -->
-<div class="el status" style="left:120px;top:330px;width:1680px;height:120px"><svg class="icon"><use href="#material/fact_check"/></svg><div><div class="status-code">State-01 / clear</div><div class="status-name">System A</div></div></div>
-<div class="el status" style="left:120px;top:470px;width:1680px;height:120px"><svg class="icon"><use href="#material/fact_check"/></svg><div><div class="status-code">State-02 / clear</div><div class="status-name">System B</div></div></div>
-<div class="el status on" style="left:120px;top:610px;width:1680px;height:145px"><svg class="icon"><use href="#material/warning"/></svg><div><div class="status-code">State-03 / attention</div><div class="status-name">System C</div></div></div>
-<div class="el status" style="left:120px;top:775px;width:1680px;height:120px"><svg class="icon"><use href="#material/fact_check"/></svg><div><div class="status-code">State-04 / clear</div><div class="status-name">System D</div></div></div>
+<div class="el status" style="left:120px;top:330px;width:1680px;height:120px"><div class="icon-frame"><svg class="icon"><use href="#material/fact_check"/></svg></div><div><div class="status-code">State-01 / clear</div><div class="status-name">System A</div></div></div>
+<div class="el status" style="left:120px;top:470px;width:1680px;height:120px"><div class="icon-frame"><svg class="icon"><use href="#material/fact_check"/></svg></div><div><div class="status-code">State-02 / clear</div><div class="status-name">System B</div></div></div>
+<div class="el status on signal-glow" style="left:120px;top:610px;width:1680px;height:145px"><div class="icon-frame"><svg class="icon"><use href="#material/warning"/></svg></div><div><div class="status-code">State-03 / attention</div><div class="status-name">System C</div></div></div>
+<div class="el status" style="left:120px;top:775px;width:1680px;height:120px"><div class="icon-frame"><svg class="icon"><use href="#material/fact_check"/></svg></div><div><div class="status-code">State-04 / clear</div><div class="status-name">System D</div></div></div>
 <div class="el meta" style="left:120px;top:980px;width:1680px;height:48px">Three to six rows / one attention state</div>
 </div>
 
@@ -328,6 +348,7 @@ body{margin:0;padding:40px;background:#030303;font-family:var(--font-family);zoo
 <div class="el hazard" style="left:0px;top:0px;width:1920px;height:10px"></div>
 <div class="el t-label c-accent" style="left:120px;top:250px;width:500px;height:48px">The ask</div>
 <div class="el t-cover-title" style="left:120px;top:340px;width:1550px;height:190px">Signal once</div>
+<div class="el signal-rings" style="left:1370px;top:210px;width:390px;height:390px"><div class="icon-frame hero-frame"><svg class="icon"><use href="#material/campaign"/></svg></div></div>
 <div class="el rule-accent" style="left:120px;top:610px;width:1680px;height:4px"></div>
 <div class="el t-body" style="left:120px;top:680px;width:780px;height:180px"><b>Name the warning.</b><br>Make the title carry it.</div>
 <div class="el t-body" style="left:1020px;top:680px;width:780px;height:180px"><b>Mark the decision.</b><br>Let one yellow field own it.</div>
