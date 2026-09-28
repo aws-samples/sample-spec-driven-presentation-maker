@@ -37,9 +37,10 @@ model:
   # Both defaults.chat and defaults.create must appear in this list.
   allowedModelIds:
     - "global.anthropic.claude-opus-5-5"             # latest Opus, agentic coding / long-running tasks
-    - "global.anthropic.claude-sonnet-5"             # latest Sonnet (default chat/create)
+    - "global.anthropic.claude-sonnet-5-5"           # latest Sonnet, fast well-scoped work
+    - "global.anthropic.claude-sonnet-5"             # previous Sonnet
     - "global.anthropic.claude-opus-4-8"             # previous Opus, deep reasoning
-    - "global.anthropic.claude-sonnet-4-6"           # previous Sonnet
+    - "global.anthropic.claude-sonnet-4-6"           # default chat/create
     - "global.anthropic.claude-opus-4-7"
     - "global.anthropic.claude-opus-4-6-v1"
     - "global.anthropic.claude-haiku-4-5-20251001-v1:0"
@@ -54,7 +55,7 @@ model:
   # this list. Remove the key for a flat list.
   recommendedModelIds:
     - "global.anthropic.claude-sonnet-4-6"           # defaults.chat / create must be listed
-    - "global.anthropic.claude-sonnet-5"
+    - "global.anthropic.claude-sonnet-5-5"
     - "global.anthropic.claude-opus-5-5"
     - "global.openai.gpt-6-sol"
 

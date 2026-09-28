@@ -75,11 +75,15 @@ CLAUDE_STANDARD = ModelProfile(temperature=0.1, cache_strategy="auto")
 # Claude Haiku — same invocation params as standard, but not capable enough for compose.
 CLAUDE_HAIKU = ModelProfile(temperature=0.1, cache_strategy="auto", compose_capable=False)
 
-# Claude with extended thinking (e.g. Opus 4.7, 4.8, 5.5). Bedrock rejects
-# ``temperature`` because extended thinking forces temperature=1 internally;
-# passing it triggers ``ValidationException: temperature is deprecated``.
+# Claude with extended thinking (e.g. Opus 4.7, 4.8, 5.5, Sonnet 5.5). Bedrock
+# rejects ``temperature`` because extended thinking forces temperature=1
+# internally; passing it triggers ``ValidationException: temperature is
+# deprecated``.
 # Opus 5.5 verified in ap-northeast-1 on 2026-09-23: temperature=0.1 rejected
 # with that message, temperature omitted accepted, cachePoint accepted.
+# Sonnet 5.5 verified in ap-northeast-1 on 2026-09-29: same behaviour
+# (temperature=1.0 is also accepted, but omitting it is the safe form);
+# cachePoint wrote then read a 10,803-token system prefix.
 CLAUDE_EXTENDED_THINKING = ModelProfile(temperature=None, cache_strategy="auto")
 
 # Claude with adaptive thinking (e.g. Opus 4.6). Temperature=1 is required
@@ -131,6 +135,7 @@ _DEFAULT = CLAUDE_STANDARD
 MODEL_PROFILES: dict[str, ModelProfile] = {
     # Anthropic Claude
     "global.anthropic.claude-opus-5-5": CLAUDE_EXTENDED_THINKING,
+    "global.anthropic.claude-sonnet-5-5": CLAUDE_EXTENDED_THINKING,
     "global.anthropic.claude-sonnet-5": CLAUDE_ADAPTIVE_THINKING,
     "global.anthropic.claude-opus-4-8": CLAUDE_EXTENDED_THINKING,
     "global.anthropic.claude-opus-4-7": CLAUDE_EXTENDED_THINKING,

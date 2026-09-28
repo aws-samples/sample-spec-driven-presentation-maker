@@ -22,9 +22,13 @@ export const MODEL_METADATA: Record<string, ModelMetadata> = {
     displayName: "Claude Opus 5.5",
     description: "Most capable Opus, long-running agentic coding and knowledge work",
   },
+  "global.anthropic.claude-sonnet-5-5": {
+    displayName: "Claude Sonnet 5.5",
+    description: "Latest Sonnet, faster and lower cost per task for well-scoped work",
+  },
   "global.anthropic.claude-sonnet-5": {
     displayName: "Claude Sonnet 5",
-    description: "Latest Sonnet, near-Opus intelligence for coding and agents",
+    description: "Previous Sonnet, near-Opus intelligence for coding and agents",
   },
   "global.anthropic.claude-opus-4-8": {
     displayName: "Claude Opus 4.8",

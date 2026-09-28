@@ -10,6 +10,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Added
+
+- **Claude Sonnet 5.5** is a selectable model (`global.anthropic.claude-sonnet-5-5`) and
+  replaces Sonnet 5 in the example config's Recommended group. It uses the
+  extended-thinking profile (no `temperature`; Bedrock rejects 0.1 with "temperature is
+  deprecated"), with prompt caching enabled.
+
 ## [0.10.1] - 2026-09-28
 
 ### Fixed
