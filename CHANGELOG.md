@@ -10,6 +10,16 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Continuing a kiro-cli session no longer starts without the sdpm tools (Web UI
+  Local mode)** — after forking a session the Web UI switches the agent with
+  `session/set_mode`, which replies before the orchestrator's `sdpm` MCP server is up.
+  The continuation greeting could then run without `start_presentation` and fall back
+  to reading role documents from the checkout. The fork now waits for
+  `_kiro.dev/mcp/server_initialized` (`sdpm`) before the first prompt, up to the
+  server's 120 s timeout.
+
 ## [0.10.0] - 2026-09-28
 
 ### Added

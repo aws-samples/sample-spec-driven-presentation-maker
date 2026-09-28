@@ -13,10 +13,13 @@ import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
 import { getActiveAgent, type AgentConfig } from "./acp-adapter"
 import { syncToAgentsDir } from "./agents-sync"
 import type { ForkSessionPhase, ForkSessionPhaseDetail, SessionOrigin } from "./kiro-sessions.types"
+import { watchMcpServerReady } from "./mcp-ready"
 
 export { DECK_ROOT }
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
 const MAX_PROCESSES = 3
+/** Matches the sdpm server's `timeout` in the ACP agent definitions. */
+const MCP_READY_TIMEOUT_MS = 120_000
 
 type PendingResolve = (value: unknown) => void
 interface PendingRequest {
@@ -223,6 +226,9 @@ async function spawnProcess(
 
       opts.onPhase?.("loading", { replayed: 0 })
       ps.listeners.add(replayListener)
+      // Watch from before session/load: the source agent may already carry the
+      // sdpm server, and after set_mode its readiness can arrive before the reply.
+      const sdpmReady = opts.setMode ? watchMcpServerReady(ps.listeners, existingSessionId) : null
       let loaded: { modes?: { availableModes?: { id: string }[] } }
       try {
         loaded = await rpcRequestTo(ps, "session/load", {
@@ -230,6 +236,9 @@ async function spawnProcess(
           cwd: MCP_LOCAL_DIR,
           mcpServers: [],
         }) as { modes?: { availableModes?: { id: string }[] } }
+      } catch (error) {
+        sdpmReady?.dispose()
+        throw error
       } finally {
         ps.listeners.delete(replayListener)
       }
@@ -241,10 +250,21 @@ async function spawnProcess(
       if (opts.setMode) {
         const available = loaded.modes?.availableModes
         if (!available?.some((mode) => mode.id === agentName)) {
+          sdpmReady?.dispose()
           throw new Error(`mode ${agentName} unavailable`)
         }
         opts.onPhase?.("switching")
-        await rpcRequestTo(ps, "session/set_mode", { sessionId: existingSessionId, modeId: agentName })
+        try {
+          await rpcRequestTo(ps, "session/set_mode", { sessionId: existingSessionId, modeId: agentName })
+        } catch (error) {
+          sdpmReady?.dispose()
+          throw error
+        }
+        // set_mode replies before the new agent's MCP servers are up; the first
+        // prompt (the continuation greeting) needs start_presentation.
+        if (sdpmReady && !(await sdpmReady.wait(MCP_READY_TIMEOUT_MS, opts.signal))) {
+          console.warn("[acp] sdpm MCP server not initialized after %dms (session %s)", MCP_READY_TIMEOUT_MS, existingSessionId)
+        }
       }
     }
 
