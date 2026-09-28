@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "sdpm",
   "display_name": "Spec-Driven Presentation Maker",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Create editable PowerPoint presentations from structured specifications.",
   "long_description": "Design what to communicate first, then let AI compose an editable PowerPoint presentation. Claude Desktop manages Python and package dependencies through the UV runtime. LibreOffice and poppler are optional system dependencies used for PNG previews; PPTX generation still works when they are not installed.",
   "author": {
