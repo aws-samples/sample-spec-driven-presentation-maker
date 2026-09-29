@@ -10,6 +10,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Added
+
+- **GPT-6.1 Sol** is a selectable model (`global.openai.gpt-6.1-sol`) and replaces
+  GPT-6 Sol in the example config's Recommended group. It uses the same profile as the
+  other GPT models (no `temperature`, no Bedrock `cachePoint` — both are rejected on
+  Converse; model-native implicit prompt caching still applies).
+
 ## [0.10.2] - 2026-09-29
 
 ### Added
