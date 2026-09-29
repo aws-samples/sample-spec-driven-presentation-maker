@@ -56,9 +56,13 @@ export const MODEL_METADATA: Record<string, ModelMetadata> = {
     displayName: "GPT-6 Astra",
     description: "OpenAI's newest frontier model, deep reasoning (slower output)",
   },
+  "global.openai.gpt-6.1-sol": {
+    displayName: "GPT-6.1 Sol",
+    description: "Latest Sol, near-Astra agentic coding and professional work at about 1/5 the cost",
+  },
   "global.openai.gpt-6-sol": {
     displayName: "GPT-6 Sol",
-    description: "Daily model for complex tasks and coding, Astra-level reliability at lower cost",
+    description: "Previous Sol, daily model for complex tasks and coding",
   },
   "global.openai.gpt-6-luna": {
     displayName: "GPT-6 Luna",
