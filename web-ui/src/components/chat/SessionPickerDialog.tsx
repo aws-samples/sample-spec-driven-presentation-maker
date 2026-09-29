@@ -108,7 +108,7 @@ export function SessionPickerDialog({ open, onOpenChange, onSelect }: SessionPic
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-screen gap-0 overflow-hidden p-0 sm:max-w-xl motion-reduce:animate-none"
+        className="flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl motion-reduce:animate-none"
         aria-labelledby={`${listId}-title`}
         aria-describedby={`${listId}-description`}
       >
@@ -229,7 +229,7 @@ export function SessionPickerDialog({ open, onOpenChange, onSelect }: SessionPic
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium text-foreground">{session.title}</span>
                           <span className="mt-0.5 block text-xs text-foreground-muted">
-                            {relativeTime(session.updatedAt, locale)} · {t("messages", { count: session.messageCount })}
+                            {relativeTime(session.updatedAt, locale)}
                           </span>
                         </span>
                         {active && <Check className="h-4 w-4 flex-none text-brand-teal" aria-hidden="true" />}

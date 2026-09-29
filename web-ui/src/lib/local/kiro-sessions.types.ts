@@ -20,8 +20,6 @@ export interface KiroSessionSummary {
   project: string
   /** ISO 8601 */
   updatedAt: string
-  /** Number of user prompts in the `.jsonl` log. */
-  messageCount: number
   agentName: string | null
 }
 
