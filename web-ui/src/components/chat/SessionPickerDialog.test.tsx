@@ -25,7 +25,6 @@ const sessions: KiroSessionsResponse = {
           cwd: "/work/alpha",
           project: "alpha",
           updatedAt: "2026-09-22T10:00:00.000Z",
-          messageCount: 12,
           agentName: null,
         },
         {
@@ -34,7 +33,6 @@ const sessions: KiroSessionsResponse = {
           cwd: "/work/alpha",
           project: "alpha",
           updatedAt: "2026-09-22T09:00:00.000Z",
-          messageCount: 4,
           agentName: "kiro",
         },
       ],

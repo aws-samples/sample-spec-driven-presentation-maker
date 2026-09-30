@@ -22,9 +22,13 @@ export const MODEL_METADATA: Record<string, ModelMetadata> = {
     displayName: "Claude Opus 5.5",
     description: "Most capable Opus, long-running agentic coding and knowledge work",
   },
+  "global.anthropic.claude-sonnet-5-5": {
+    displayName: "Claude Sonnet 5.5",
+    description: "Latest Sonnet, faster and lower cost per task for well-scoped work",
+  },
   "global.anthropic.claude-sonnet-5": {
     displayName: "Claude Sonnet 5",
-    description: "Latest Sonnet, near-Opus intelligence for coding and agents",
+    description: "Previous Sonnet, near-Opus intelligence for coding and agents",
   },
   "global.anthropic.claude-opus-4-8": {
     displayName: "Claude Opus 4.8",
@@ -52,9 +56,13 @@ export const MODEL_METADATA: Record<string, ModelMetadata> = {
     displayName: "GPT-6 Astra",
     description: "OpenAI's newest frontier model, deep reasoning (slower output)",
   },
+  "global.openai.gpt-6.1-sol": {
+    displayName: "GPT-6.1 Sol",
+    description: "Latest Sol, near-Astra agentic coding and professional work at about 1/5 the cost",
+  },
   "global.openai.gpt-6-sol": {
     displayName: "GPT-6 Sol",
-    description: "Daily model for complex tasks and coding, Astra-level reliability at lower cost",
+    description: "Previous Sol, daily model for complex tasks and coding",
   },
   "global.openai.gpt-6-luna": {
     displayName: "GPT-6 Luna",

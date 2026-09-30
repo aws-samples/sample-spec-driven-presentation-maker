@@ -14,7 +14,6 @@ const session: KiroSessionSummary = {
   cwd: "/work/alpha",
   project: "alpha",
   updatedAt: "2026-09-22T10:00:00.000Z",
-  messageCount: 12,
   agentName: null,
 }
 
@@ -37,7 +36,7 @@ describe("ForkProgressCard", () => {
     )
 
     expect(screen.getByText("Investigate rendering latency")).toBeTruthy()
-    expect(screen.getByText("alpha · 12 messages")).toBeTruthy()
+    expect(screen.getByText("alpha")).toBeTruthy()
 
     for (const phase of Object.keys(expectedStates) as ForkSessionPhase[]) {
       rerender(<ForkProgressCard session={session} phase={phase} replayed={47} onCancel={() => {}} />)
