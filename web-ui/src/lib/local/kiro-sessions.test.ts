@@ -93,15 +93,38 @@ describe("listSessions", () => {
     expect(result.groups[0].sessions.map((session) => session.sessionId)).toEqual([IDS.recent, IDS.older])
     expect(result.groups[0].sessions[0]).toMatchObject({
       project: "alpha",
-      messageCount: 2,
       title: "A title recovered from the first prompt that is deliberately",
     })
-    expect(result.groups[1].sessions[0].messageCount).toBe(2)
+    expect(result.groups[0].sessions[0]).not.toHaveProperty("messageCount")
+    expect(result.groups[1].sessions[0].title).toBe("Missing parent key")
     expect(result.recent.map((session) => session.sessionId)).toEqual([IDS.recent, IDS.older, IDS.missingParent])
 
     const all = await listSessions({ includeAll: true, dir: tmp })
     expect(all.groups.flatMap((group) => group.sessions)).toHaveLength(6)
     expect(all.recent).toHaveLength(3)
+  })
+
+  it("does not read the log when the stored title is present", async () => {
+    const titled = "77777777-7777-4777-8777-777777777777"
+    writeSession(titled, { cwd: "/work/gamma", updated_at: new Date().toISOString(), title: "Stored" })
+    // A directory where the log should be: reading it would throw EISDIR.
+    fs.rmSync(path.join(tmp, `${titled}.jsonl`)) // nosemgrep: path-join-resolve-traversal — test fixture in tmpdir
+    fs.mkdirSync(path.join(tmp, `${titled}.jsonl`)) // nosemgrep: path-join-resolve-traversal — test fixture in tmpdir
+
+    const result = await listSessions({ includeAll: false, dir: tmp })
+    expect(result.recent.map((session) => session.title)).toEqual(["Stored"])
+  })
+
+  it("takes the title from the first prompt, skipping malformed and non-prompt lines", async () => {
+    writeSession(IDS.recent, { cwd: "/work/delta", updated_at: new Date().toISOString(), title: "  " }, [
+      "{malformed",
+      JSON.stringify({ kind: "AssistantMessage", data: {} }),
+      prompt("first"),
+      prompt("second"),
+    ])
+
+    const result = await listSessions({ includeAll: false, dir: tmp })
+    expect(result.recent[0].title).toBe("first")
   })
 })
 

@@ -17,6 +17,15 @@ Entries before v0.5.0 were written retroactively as summaries.
   other GPT models (no `temperature`, no Bedrock `cachePoint` — both are rejected on
   Converse; model-native implicit prompt caching still applies).
 
+### Fixed
+
+- **Local Web UI: "Continue from a kiro session" picker loads in well under a second.**
+  It used to read every session log under `~/.kiro/sessions/cli` in full on each open
+  (measured ~100 s on a 3.7 GB store); the list is now built from session metadata, and
+  a log is read only up to its first prompt when a session has no stored title. The
+  per-session message count is no longer shown. The "Show all" list also scrolls now
+  instead of being clipped.
+
 ## [0.10.2] - 2026-09-29
 
 ### Added

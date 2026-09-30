@@ -47,7 +47,7 @@ export function ForkProgressCard({ session, phase, replayed, onCancel }: ForkPro
               {session.title}
             </h2>
             <span className="mt-1 block truncate text-xs text-foreground-muted">
-              {t("sessionMeta", { project: session.project, count: session.messageCount })}
+              {session.project}
             </span>
           </span>
         </header>
