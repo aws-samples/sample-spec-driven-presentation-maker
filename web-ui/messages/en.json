@@ -268,7 +268,6 @@
     "showAll": "Show all",
     "empty": "No sessions found",
     "emptyHint": "Start a conversation with `kiro-cli chat` and it will appear here.",
-    "messages": "{count, plural, one {# message} other {# messages}}",
     "forking": "Branching from “{title}”…",
     "forkFailed": "Couldn’t branch from that session. Please try again.",
     "loading": "Loading sessions",
@@ -276,7 +275,6 @@
     "keyboardHint": "↑↓ to move · Enter to select · Esc to close"
   },
   "forkProgress": {
-    "sessionMeta": "{project} · {count, plural, one {# message} other {# messages}}",
     "stepsLabel": "Branching progress",
     "copying": "Copy session",
     "starting": "Start agent",

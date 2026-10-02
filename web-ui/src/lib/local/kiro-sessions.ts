@@ -82,21 +82,21 @@ function promptText(entry: unknown): string | null {
   return null
 }
 
-async function inspectLog(jsonlPath: string): Promise<{ messageCount: number; firstPrompt: string }> {
-  let messageCount = 0
-  let firstPrompt = ""
+/**
+ * First user prompt in a `.jsonl` log, used only as a title fallback.
+ *
+ * Stops at the first match: logs reach hundreds of MB, and listing must never
+ * scale with their size. Everything else the picker shows comes from `.json`.
+ */
+async function readFirstPrompt(jsonlPath: string): Promise<string> {
   let input: fs.ReadStream | null = null
   try {
     input = fs.createReadStream(jsonlPath, { encoding: "utf-8" })
     const lines = readline.createInterface({ input, crlfDelay: Infinity })
     for await (const line of lines) {
       try {
-        const entry = JSON.parse(line) as unknown
-        if (entry && typeof entry === "object" && (entry as Record<string, unknown>).kind === "Prompt") {
-          messageCount++
-          const text = promptText(entry)
-          if (!firstPrompt && text !== null) firstPrompt = text
-        }
+        const text = promptText(JSON.parse(line) as unknown)
+        if (text !== null) return text
       } catch {
         // An append interrupted mid-line must not hide otherwise valid sessions.
       }
@@ -106,7 +106,7 @@ async function inspectLog(jsonlPath: string): Promise<{ messageCount: number; fi
   } finally {
     input?.destroy()
   }
-  return { messageCount, firstPrompt }
+  return ""
 }
 
 function firstCharacters(value: string, count: number): string {
@@ -114,16 +114,17 @@ function firstCharacters(value: string, count: number): string {
 }
 
 async function summarize(sessionId: string, meta: SessionMeta, dir?: string): Promise<KiroSessionSummary> {
-  const log = await inspectLog(sessionPath(sessionId, ".jsonl", dir))
   const cwd = typeof meta.cwd === "string" ? meta.cwd : ""
   const storedTitle = typeof meta.title === "string" ? meta.title : ""
+  const title = storedTitle.trim()
+    ? storedTitle
+    : firstCharacters(await readFirstPrompt(sessionPath(sessionId, ".jsonl", dir)), 60)
   return {
     sessionId,
-    title: storedTitle.trim() ? storedTitle : firstCharacters(log.firstPrompt, 60),
+    title,
     cwd,
     project: path.basename(cwd),
     updatedAt: typeof meta.updated_at === "string" ? meta.updated_at : "",
-    messageCount: log.messageCount,
     agentName: agentName(meta),
   }
 }

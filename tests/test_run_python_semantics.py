@@ -8,8 +8,10 @@ The contract (decided 2026-08-01, see the run-python-unified-semantics SPEC):
    that gates persistence.
 2. The PPTX artifact rebuilds automatically whenever build-relevant files
    changed (deck.json / slides/ / includes/ / specs/outline.md).
-3. ``measure_slides`` is the only trigger for the expensive verification
-   pass (render + measure + preview).
+3. ``measure_slides`` is the only trigger for measurement (overflow, layout
+   bias, invalid layout). Compose (live-preview data) and preview images
+   follow the change: every slide it can alter is re-rendered, plus the
+   ``measure_slides`` slugs (``sdpm.engine.schema.affected_slugs``).
 4. The legacy ``save`` argument is removed from every public surface.
 5. Committed ``attachments/imports/`` bundles are readable but never writable or persisted.
 
@@ -554,6 +556,12 @@ def remote_rig(monkeypatch, tmp_path):
     monkeypatch.setattr(remote_server, "_check_deck_access", lambda *a, **k: None)
     monkeypatch.setattr(remote_server, "_get_user_id", lambda: "user1")
     monkeypatch.setattr(remote_server.sandbox_mod, "execute_in_sandbox", fake_execute)
+    # Background compose/preview tasks are captured, not run on a real thread,
+    # so assertions about them are deterministic.
+    fake_execute.background = []
+    monkeypatch.setattr(
+        remote_server, "_run_in_background", lambda target, *, name: fake_execute.background.append(target)
+    )
     return fake_execute, storage, calls
 
 
@@ -577,17 +585,27 @@ class TestRemoteRunPythonBranching:
         assert calls == {"prepare": 0, "build": 0, "measure": 0, "export_svg": 0}
         assert storage.uploads == {} and "measure" not in out
 
-    def test_change_without_measure_builds_artifact_only(self, remote_rig):
+    def test_change_without_measure_builds_artifact_and_rerenders(self, remote_rig):
         fake_execute, storage, calls = remote_rig
         fake_execute.changed_paths = ["slides/a.json"]
         out = self._run()
         assert calls["build"] == 1
-        # Cheap path only — no render, no measure, no measure-error noise
-        assert calls["measure"] == 0 and calls["export_svg"] == 0
+        # No measurement without measure_slides — no measure-error noise
+        assert calls["measure"] == 0
         assert "measure" not in out
         # Artifact refreshed
         assert any(k.startswith("pptx/d1/") for k in storage.uploads)
         assert storage.deck_updates and "pptxS3Key" in storage.deck_updates[0]
+        # The changed slide is re-rendered (compose + preview) in the background
+        assert len(fake_execute.background) == 1
+        assert "a" in out["previewHint"]
+
+    def test_non_slide_change_without_measure_renders_nothing(self, remote_rig):
+        fake_execute, storage, calls = remote_rig
+        fake_execute.changed_paths = ["specs/brief.md"]
+        out = self._run()
+        assert calls["build"] == 0
+        assert fake_execute.background == [] and "previewHint" not in out
 
     def test_measure_without_change_verifies_only(self, remote_rig):
         fake_execute, storage, calls = remote_rig

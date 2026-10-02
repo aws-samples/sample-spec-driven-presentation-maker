@@ -10,6 +10,48 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-10-02
+
+### Fixed
+
+- **Web UI previews no longer go stale when a slide is edited without being measured.**
+  `run_python` used to regenerate the live-preview data (`compose/`) and preview images only
+  for the `measure_slides` slugs, so a slide written in the same call but not listed — or a
+  slide the layout pass wrote but did not sample — kept its old (or no) preview. Rendering now
+  follows the change: every slide the written files can alter (the slide itself, slides
+  referencing a changed `includes/` file, `override` children, or every slide when `deck.json`
+  / `specs/outline.md` changed) is re-rendered, plus the `measure_slides` slugs. Measurement
+  (overflow, layout bias, invalid layouts) still covers only `measure_slides`. Applies to both
+  the local and the AWS server. A layout pass now renders every slide it writes, so that call
+  takes longer.
+
+## [0.10.3] - 2026-09-30
+
+### Added
+
+- **GPT-6.1 Sol** is a selectable model (`global.openai.gpt-6.1-sol`) and replaces
+  GPT-6 Sol in the example config's Recommended group. It uses the same profile as the
+  other GPT models (no `temperature`, no Bedrock `cachePoint` — both are rejected on
+  Converse; model-native implicit prompt caching still applies).
+
+### Fixed
+
+- **Local Web UI: "Continue from a kiro session" picker loads in well under a second.**
+  It used to read every session log under `~/.kiro/sessions/cli` in full on each open
+  (measured ~100 s on a 3.7 GB store); the list is now built from session metadata, and
+  a log is read only up to its first prompt when a session has no stored title. The
+  per-session message count is no longer shown. The "Show all" list also scrolls now
+  instead of being clipped.
+
+## [0.10.2] - 2026-09-29
+
+### Added
+
+- **Claude Sonnet 5.5** is a selectable model (`global.anthropic.claude-sonnet-5-5`) and
+  replaces Sonnet 5 in the example config's Recommended group. It uses the
+  extended-thinking profile (no `temperature`; Bedrock rejects 0.1 with "temperature is
+  deprecated"), with prompt caching enabled.
+
 ## [0.10.1] - 2026-09-28
 
 ### Fixed
@@ -1133,7 +1175,10 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.4...HEAD
+[0.10.4]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.3...v0.10.4
+[0.10.3]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.2...v0.10.3
+[0.10.2]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.8.2...v0.9.0
