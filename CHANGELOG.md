@@ -10,6 +10,21 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-10-02
+
+### Fixed
+
+- **Web UI previews no longer go stale when a slide is edited without being measured.**
+  `run_python` used to regenerate the live-preview data (`compose/`) and preview images only
+  for the `measure_slides` slugs, so a slide written in the same call but not listed — or a
+  slide the layout pass wrote but did not sample — kept its old (or no) preview. Rendering now
+  follows the change: every slide the written files can alter (the slide itself, slides
+  referencing a changed `includes/` file, `override` children, or every slide when `deck.json`
+  / `specs/outline.md` changed) is re-rendered, plus the `measure_slides` slugs. Measurement
+  (overflow, layout bias, invalid layouts) still covers only `measure_slides`. Applies to both
+  the local and the AWS server. A layout pass now renders every slide it writes, so that call
+  takes longer.
+
 ## [0.10.3] - 2026-09-30
 
 ### Added
@@ -1160,7 +1175,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.3...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.4...HEAD
+[0.10.4]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.0...v0.10.1
