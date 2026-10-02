@@ -135,10 +135,17 @@ The agent uses `get_preview` to retrieve preview images and visually review slid
 
 The compose pipeline (step 6–7) extracts optimized SVG components per slide and uploads them as JSON to S3. The Web UI uses these to render animated slide transitions without re-fetching full preview images.
 
+Compose data and preview images follow the change, not the measure list: after `run_python`,
+every slide the written files can alter is re-rendered — the edited `slides/<slug>.json`, slides
+that reference a changed `includes/` file, slides that inherit from an affected one via
+`override`, and every slide when `deck.json` or `specs/outline.md` changed
+(`sdpm.engine.schema.affected_slugs`) — plus the `measure_slides` slugs.
+
 ### Text Measurement
 
 The `run_python(measure_slides=[...])` parameter triggers LibreOffice SVG export to measure text bounding boxes,
-enabling overflow detection during the Build loop without visual review.
+enabling overflow detection during the Build loop without visual review. Measurement (overflow,
+layout bias, invalid layouts) covers only those slugs.
 
 ---
 
