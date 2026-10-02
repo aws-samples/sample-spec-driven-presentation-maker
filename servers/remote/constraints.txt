@@ -14,7 +14,7 @@ attrs==26.1.0
     # via
     #   jsonschema
     #   referencing
-aws-opentelemetry-distro==0.19.0
+aws-opentelemetry-distro==0.20.0
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
 boto3==1.43.100
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
@@ -61,7 +61,7 @@ httpx==0.28.1
     # via mcp
 httpx-sse==0.4.3
     # via mcp
-idna==3.19
+idna==3.20
     # via
     #   anyio
     #   httpx
@@ -435,7 +435,7 @@ pygments==2.21.0
     #   sdpm-skill
 pyjwt==2.14.0
     # via mcp
-pypdf==6.18.1
+pypdf==6.19.0
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
 pypdfium2==5.13.0
     # via pdfplumber
