@@ -51,18 +51,48 @@ def _build_snapshot(deck_dir: Path) -> dict[str, tuple[int, int]]:
     return snap
 
 
+def _render_slugs(
+    deck_dir: Path, changed_paths: list[str], measure_slides: list[str] | None, *, legacy: bool = False
+) -> tuple[list[str], list[str]]:
+    """Slugs that get fresh compose/preview, and the slugs the partial build needs.
+
+    Render set = affected by the change ∪ measure_slides, in deck (outline)
+    order. Build set = render set plus its override bases (the builder must
+    resolve inheritance). A legacy single-file presentation.json deck has no
+    per-slide files to diff, so it keeps the measure_slides-only behaviour.
+    """
+    from sdpm.api import parse_outline_slugs
+    from sdpm.engine.schema import affected_slugs, with_override_bases
+
+    if legacy:
+        return list(measure_slides or []), list(measure_slides or [])
+    slides: dict[str, dict] = {}
+    for slug in parse_outline_slugs(deck_dir / "specs" / "outline.md"):
+        p = deck_dir / "slides" / f"{slug}.json"
+        if not p.is_file():
+            continue
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        slides[slug] = data if isinstance(data, dict) else {}
+    wanted = set(measure_slides or []) | set(affected_slugs(changed_paths, slides))
+    render = [s for s in slides if s in wanted]
+    return render, with_override_bases(render, slides)
+
+
 def run_python(
     purpose: Annotated[str, Field(description='One line on what this code does (shown in the UI).')],
     code: Annotated[str, Field(description='Python code; no import statements.')],
     deck_id: Annotated[str, Field(description='Deck directory path.')],
-    measure_slides: Annotated[list[str] | None, Field(description='Slugs to render, measure and preview after the code ran — the ones you edited.')] = None,
+    measure_slides: Annotated[list[str] | None, Field(description='Slugs to measure for text overflow after the code ran — the ones you edited.')] = None,
 ) -> str:
     """Run Python inside the deck directory — the way to read and write deck files
     (deck.json, specs/, slides/, includes/). No import or open(); helpers:
     read_json(path), write_json(path, data), read_text(path), write_text(path, text),
-    list_files(subdir="."). Writes persist; output.pptx rebuilds when deck.json, slides/,
-    includes/ or specs/outline.md changed. measure_slides renders, measures text overflow
-    and previews those slugs.
+    list_files(subdir="."). Writes persist; output.pptx rebuilds and changed slides are
+    re-rendered and previewed when deck.json, slides/, includes/ or specs/outline.md
+    changed. measure_slides measures text overflow on those slugs and previews them.
     """
     result: dict[str, Any] = {}
     if not deck_id or not Path(deck_id).is_dir():
@@ -143,10 +173,14 @@ def run_python(
             errs = result.setdefault("errors", {})
             errs["lintDiagnostics"] = lint_diagnostics
 
-    # Post-processing: build PPTX + iso measure/compose/preview (lockless).
+    # Post-processing: build PPTX + iso compose/preview/measure (lockless).
     # output.pptx is a derived artifact — it follows deck changes automatically.
-    # measure_slides additionally triggers the expensive verification pass.
-    deck_changed = _build_snapshot(deck_dir) != pre_snap
+    # Live-preview data (compose/) and preview images follow too: every slide
+    # the change can alter is rendered, measured or not. measure_slides adds
+    # its slugs to the render set and is the only trigger for measurement.
+    post_snap = _build_snapshot(deck_dir)
+    changed_paths = sorted(k for k in pre_snap.keys() | post_snap.keys() if pre_snap.get(k) != post_snap.get(k))
+    deck_changed = bool(changed_paths)
     if deck_changed or measure_slides:
         import shutil
 
@@ -168,13 +202,21 @@ def run_python(
         except Exception as e:
             result["pptx_error"] = str(e)
 
-        # 2) iso.pptx path: compose + measure + preview for measure_slides only
-        if measure_slides:
+        # 2) iso.pptx path: compose + preview for every affected slug,
+        #    measure for measure_slides only
+        render_slugs, build_slugs = _render_slugs(
+            deck_dir, changed_paths, measure_slides, legacy=legacy_json.exists()
+        )
+        if measure_slides and not render_slugs:
+            result["measure"] = "No matching slides found for given slugs"
+        if render_slugs:
             outline_slugs = parse_outline_slugs(deck_dir / "specs" / "outline.md")
-            measure_set = set(measure_slides)
+            render_set = set(render_slugs)
+            build_set = set(build_slugs)
+            # Slides in iso.pptx, in page order (includes override bases)
             pptx_slugs = [
                 s for s in outline_slugs
-                if s in measure_set and (deck_dir / "slides" / f"{s}.json").exists()
+                if s in build_set and (deck_dir / "slides" / f"{s}.json").exists()
             ]
 
             work_root = get_work_dir(deck_dir)
@@ -185,7 +227,7 @@ def run_python(
                 generate(
                     json_path=deck_input,
                     output_path=str(iso_pptx),
-                    only_slugs=set(measure_slides),
+                    only_slugs=build_set,
                 )
 
                 # Export SVG from iso.pptx
@@ -241,7 +283,7 @@ def run_python(
                             encoding="utf-8",
                         )
 
-                        target_slugs = set(measure_slides)
+                        target_slugs = render_set
                         composed = 0
                         for sn in range(1, n):
                             idx = sn - 1
@@ -291,16 +333,16 @@ def run_python(
                                     pass
 
                         result["compose"] = f"{composed} slides composed"
-                        if n <= 2 and len(outline_slugs) > 1:
+                        if n - 1 < len(pptx_slugs) and len(pptx_slugs) > 1:
                             result["compose_error"] = (
-                                f"LibreOffice exported only {n - 1} slide(s) to SVG but outline has "
-                                f"{len(outline_slugs)} slides. Upgrade LibreOffice to 25.8.6+ (macOS multi-slide SVG fix)."
+                                f"LibreOffice exported only {n - 1} slide(s) to SVG but {len(pptx_slugs)} "
+                                f"were rendered. Upgrade LibreOffice to 25.8.6+ (macOS multi-slide SVG fix)."
                             )
                     except Exception as e:
                         result["compose_error"] = str(e)
 
-                # --- Measure ---
-                if svg_path and pptx_slugs:
+                # --- Measure (measure_slides only) ---
+                if measure_slides and svg_path and pptx_slugs:
                     try:
                         from sdpm.engine.preview.measure import measure_from_svg, format_measure_report
                         slug_to_page = {s: i + 1 for i, s in enumerate(pptx_slugs)}
@@ -318,7 +360,7 @@ def run_python(
                             )
                     except Exception as e:
                         result["measure"] = f"Measure error: {e}"
-                elif not svg_path:
+                elif measure_slides and not svg_path:
                     try:
                         from sdpm.api import measure as _sdpm_measure
                         result["measure"] = _sdpm_measure(json_path=deck_input, slides=list(measure_slides))
@@ -326,10 +368,13 @@ def run_python(
                         result["measure"] = f"Measure error: {e}"
 
                 # --- Preview: PDF → PNG (slug-named) ---
+                # A missing renderer is reported where previews were asked for
+                # (measure_slides), not on every automatic re-render.
                 from sdpm.engine.preview.environment import preview_unavailable
                 _no_preview = preview_unavailable()
                 if _no_preview is not None:
-                    result["preview"] = _no_preview
+                    if measure_slides:
+                        result["preview"] = _no_preview
                 elif iso_pptx.exists():
                     try:
                         from sdpm.engine.preview import export_pdf
@@ -352,6 +397,8 @@ def run_python(
                             filtered_previews = []
                             missing = []
                             for idx_p, slug in enumerate(pptx_slugs):
+                                if slug not in render_set:
+                                    continue  # override base built only for inheritance
                                 n_p = idx_p + 1
                                 src_png = None
                                 for width in (1, 2, 3, 4, 6):
@@ -376,8 +423,14 @@ def run_python(
                     except Exception as e:
                         result["preview_error"] = str(e)
 
-                # Filter warnings/lint to measured slugs
-                if _build_warnings or _build_lint:
+                # Filter warnings/lint to measured slugs (unfiltered when
+                # nothing was measured — same as the build-only path)
+                if not measure_slides:
+                    if _build_warnings:
+                        result["warnings"] = _build_warnings
+                    if _build_lint:
+                        result["lint_diagnostics"] = _build_lint
+                elif _build_warnings or _build_lint:
                     slug_to_page_full = {}
                     all_slugs = [s for s in outline_slugs if (deck_dir / "slides" / f"{s}.json").exists()]
                     for i, s in enumerate(all_slugs):
@@ -387,12 +440,16 @@ def run_python(
                     result["warnings"] = [w for w in _build_warnings if any(p in w for p in page_pats)]
                     result["lint_diagnostics"] = [d for d in _build_lint if any(p in str(d) for p in page_pats)]
 
+            except Exception as e:
+                # The automatic re-render must never fail the tool call: the
+                # writes are persisted and output.pptx is already rebuilt.
+                result["render_error"] = str(e)
             finally:
                 shutil.rmtree(iso_dir, ignore_errors=True)
 
         else:
-            # Deck changed without measure_slides: output.pptx only,
-            # skip compose/measure/preview
+            # Nothing renderable changed and nothing to measure: output.pptx
+            # only, skip compose/measure/preview
             if _build_warnings:
                 result["warnings"] = _build_warnings
             if _build_lint:
