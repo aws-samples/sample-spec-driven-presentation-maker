@@ -84,6 +84,11 @@ CLAUDE_HAIKU = ModelProfile(temperature=0.1, cache_strategy="auto", compose_capa
 # Sonnet 5.5 verified in ap-northeast-1 on 2026-09-29: same behaviour
 # (temperature=1.0 is also accepted, but omitting it is the safe form);
 # cachePoint wrote then read a 10,803-token system prefix.
+# Haiku 5.5 verified in ap-northeast-1 on 2026-10-08: same behaviour
+# (0.1 rejected, 1.0 and omitted accepted); cachePoint wrote then read an
+# 8,003-token system prefix. Unlike Haiku 4.5 it is compose_capable: a
+# feasibility check on the deployed stack (2026-10-08) judged its decks
+# usable, so it is also listed in the Recommended group.
 CLAUDE_EXTENDED_THINKING = ModelProfile(temperature=None, cache_strategy="auto")
 
 # Claude with adaptive thinking (e.g. Opus 4.6). Temperature=1 is required
@@ -145,6 +150,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     "global.anthropic.claude-opus-4-7": CLAUDE_EXTENDED_THINKING,
     "global.anthropic.claude-opus-4-6-v1": CLAUDE_ADAPTIVE_THINKING,
     "global.anthropic.claude-sonnet-4-6": CLAUDE_STANDARD,
+    "global.anthropic.claude-haiku-5-5": CLAUDE_EXTENDED_THINKING,
     "global.anthropic.claude-haiku-4-5-20251001-v1:0": CLAUDE_HAIKU,
     # OpenAI GPT (Converse API via global inference profile)
     "global.openai.gpt-6-astra": NO_TEMPERATURE_IMPLICIT_CACHE,
