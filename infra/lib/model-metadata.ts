@@ -46,6 +46,10 @@ export const MODEL_METADATA: Record<string, ModelMetadata> = {
     displayName: "Claude Sonnet 4.6",
     description: "Balanced quality and speed",
   },
+  "global.anthropic.claude-haiku-5-5": {
+    displayName: "Claude Haiku 5.5",
+    description: "Latest Haiku, fast and economical",
+  },
   "global.anthropic.claude-haiku-4-5-20251001-v1:0": {
     displayName: "Claude Haiku 4.5",
     description: "Fast and economical",
