@@ -331,7 +331,7 @@ def _deck_rules(template: TemplateHtml, layouts_used: list[str], default_backgro
         b64 = base64.b64encode(svg.read_bytes()).decode("ascii")
         rules.append(f"section[data-layout={css_string(name)}]"
                      f'{{background-image:url("data:image/svg+xml;base64,{b64}")}}')
-    rules.append("[data-sdpm-chrome]{position:absolute}")
+    rules.append("[data-sdpm-chrome],[data-region]{position:absolute}")
     rules.append(".reveal-viewport{background:var(--sdpm-ground)}")
     return "\n".join(rules)
 

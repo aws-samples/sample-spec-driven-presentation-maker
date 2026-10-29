@@ -120,6 +120,12 @@ def test_one_decoration_background_per_used_layout(built) -> None:
     assert result.html.count('section[data-layout="Title Only"]{background-image') == 1
 
 
+def test_regions_and_chrome_are_absolutely_positioned(built) -> None:
+    _, _, doc = built
+    deck_rules = doc.xpath('//style[@id="sdpm-deck"]')[0].text
+    assert "[data-sdpm-chrome],[data-region]{position:absolute}" in deck_rules
+
+
 def test_no_external_resource_reference(built) -> None:
     _, result, doc = built
     for el in doc.iter():

@@ -42,8 +42,8 @@ of the template:
 
 The section is the template's slide size in px (`template_html.slideSize.width` × `height`,
 1920 × 1080 for a 16:9 template). Children may be absolutely positioned in those px
-(`data-ph` elements are positioned by the template; give every other positioned element,
-`data-region` boxes included, `position:absolute` yourself); flex and grid are fine. The template ground and the decoration artwork are the
+(`data-ph` elements are positioned by the template and `data-region` boxes are absolute by
+default; give every other positioned element `position:absolute` yourself); flex and grid are fine. The template ground and the decoration artwork are the
 section background — draw on top of them, not over them.
 
 ## `template_html`
@@ -77,7 +77,7 @@ A placeholder is optional: leave it out and nothing is drawn there.
 ## Regions — `data-region`
 
 `data-region="<name>"` marks a content area the layout pass decided: an empty box with
-absolute px (`position:absolute` plus `left`, `top`, `width`, `height` in its `style`).
+absolute px (`left`, `top`, `width`, `height` in its `style`; the deck makes it `position:absolute`).
 Content composers fill it and
 keep its coordinates; the name is a short identifier (`body`, `step-1`, `media`).
 
