@@ -148,31 +148,96 @@ def _template_analysis(deck_json: dict) -> dict | None:
         return None
 
 
+_TEMPLATE_HTML_KEYS = ("slideSize", "ptScale", "fonts", "themeColors", "ground")
+
+
+def _template_html(deck_json: dict, deck_path: Path) -> dict | None:
+    """The HTML composer's view of the template: template.json, curated layouts only.
+
+    All layouts when the template curates none. ``decorations_status`` reports, in
+    the preview-unavailable shape, that the decoration artwork cannot be rendered
+    (LibreOffice / poppler missing and no bundled or cached SVGs); None otherwise.
+    An aid, never a blocker: any failure returns None.
+    """
+    if not deck_json.get("template"):
+        return None
+    from sdpm.api import _resolve_template, get_templates_dirs
+    from sdpm.engine.html.decorations import decoration_tools_status
+    from sdpm.engine.html.template import load_template_html
+
+    try:
+        path, _ = _resolve_template(deck_json, deck_path, get_templates_dirs())
+        converted = load_template_html(path, decorations=False)
+    except Exception:
+        return None
+    info = converted.info
+    layouts = list(info.get("layouts", []))
+    view: dict[str, Any] = {key: info.get(key) for key in _TEMPLATE_HTML_KEYS}
+    view["layouts"] = [layout for layout in layouts if layout.get("curated")] or layouts
+    rendered = len(converted.svg_paths) >= len(layouts)
+    view["decorations_status"] = None if rendered else decoration_tools_status()
+    return view
+
+
+_COMPOSER_MODES = ("pptx", "html")
+
+
+def _composer_static(mode: str) -> dict[str, str]:
+    if mode == "html":
+        return {"workflow": _workflow("composer-html"), "slide_spec": _read_reference(_GUIDES_DIR, "slide-html-spec")}
+    return {"workflow": _workflow("composer"), "slide_spec": _slide_spec()}
+
+
+def _existing_slides(slides_dir: Path, present: list[str], assigned: list[str], suffix: str) -> dict[str, dict]:
+    """Assigned slides' text keyed by slug, plus read-only override-group heads."""
+    assigned_set = set(assigned)
+    wanted = [s for s in present if s in assigned_set]
+    heads = _group_heads(present, assigned_set)
+    existing: dict[str, dict] = {}
+    for slug in wanted + sorted(heads):
+        entry: dict[str, Any] = {suffix: (slides_dir / f"{slug}.{suffix}").read_text(encoding="utf-8")}
+        if slug in heads:
+            entry["readonly"] = True
+        existing[slug] = entry
+    return existing
+
+
 def start_composing(
     deck_dir: str | Path | None = None,
     assigned_slugs: list[str] | None = None,
     *,
     deck_id: str | None = None,
     template_analysis: dict | None = None,
+    mode: str = "pptx",
 ) -> dict[str, Any]:
     """Composer entry.
 
-    Without ``deck_dir`` returns only ``static`` (role document + slide spec).
-    With a deck, validates the specs first; when they fail, returns
+    Without ``deck_dir`` returns only ``static`` (role document + slide spec for
+    ``mode``). With a deck, validates the specs first; when they fail, returns
     ``{"specs_ok": False, "errors": [...]}`` and nothing else — a composer must
     not start from broken specs. Otherwise returns ``static`` plus ``deck``:
     the specs, deck.json, template analysis, and the assigned slides' JSON
     (with read-only override-group heads the assigned slides inherit from).
 
+    ``mode`` is the composer mode the spawner chose: ``"pptx"`` (slide JSON) or
+    ``"html"`` (slide HTML). ``static`` depends only on the mode. A mode that does
+    not match deck.json ``outputFormat`` returns ``specs_ok`` false with the deck's
+    format as ``mode``. In html mode the deck part carries the slides' HTML, the
+    deck-root ``deck.css`` (``deck_css``, None when absent) and ``template_html``
+    instead of ``template_analysis``.
+
     ``deck_id`` labels the payload when ``deck_dir`` is a materialised copy of a deck
     that lives elsewhere; ``template_analysis`` likewise lets such a server supply the
     analysis of a template the local filesystem cannot see.
     """
-    static = {"workflow": _workflow("composer"), "slide_spec": _slide_spec()}
+    if mode not in _COMPOSER_MODES:
+        return {"specs_ok": False, "errors": ['mode must be "pptx" or "html"'], "warnings": []}
+    static = _composer_static(mode)
     if deck_dir is None or str(deck_dir) == "":
         return {"static": static}
 
     from sdpm.api import check_specs
+    from sdpm.engine.schema import deck_output_format
 
     assigned = list(assigned_slugs or [])
     deck_path = Path(deck_dir)
@@ -181,19 +246,42 @@ def start_composing(
         return {"specs_ok": False, "errors": verdict.get("errors", []), "warnings": verdict.get("warnings", [])}
 
     deck_json = json.loads((deck_path / "deck.json").read_text(encoding="utf-8"))
+    try:
+        fmt = deck_output_format(deck_json)
+    except ValueError as exc:
+        return {"specs_ok": False, "errors": [str(exc)], "warnings": verdict.get("warnings", [])}
+    if fmt != mode:
+        return {
+            "specs_ok": False,
+            "errors": [f'deck outputFormat is {fmt}; call start_composing(deck_id, assigned_slugs, mode="{fmt}")'],
+            "warnings": verdict.get("warnings", []),
+            "mode": fmt,
+        }
+
     specs = deck_path / "specs"
     slides_dir = deck_path / "slides"
-    present = sorted(p.stem for p in slides_dir.glob("*.json")) if slides_dir.is_dir() else []
+    suffix = "html" if mode == "html" else "json"
+    present = sorted(p.stem for p in slides_dir.glob(f"*.{suffix}")) if slides_dir.is_dir() else []
+    existing = _existing_slides(slides_dir, present, assigned, suffix)
 
-    assigned_set = set(assigned)
-    wanted = [s for s in present if s in assigned_set]
-    heads = _group_heads(present, assigned_set)
-    existing: dict[str, dict] = {}
-    for slug in wanted + sorted(heads):
-        entry: dict[str, Any] = {"json": (slides_dir / f"{slug}.json").read_text(encoding="utf-8")}
-        if slug in heads:
-            entry["readonly"] = True
-        existing[slug] = entry
+    if mode == "html":
+        return {
+            "static": static,
+            "deck": {
+                "deck_id": deck_id or str(deck_path),
+                "deck": deck_json,
+                "brief": _read_text(specs / "brief.md"),
+                "outline": _read_text(specs / "outline.md"),
+                "art_direction": _read_text(specs / "art-direction.html"),
+                "deck_css": _read_text(deck_path / "deck.css"),
+                "template_html": _template_html(deck_json, deck_path),
+                "assigned_slugs": assigned,
+                "slides_present": present,
+                "existing_slides": existing,
+                "specs_ok": True,
+                "warnings": verdict.get("warnings", []),
+            },
+        }
 
     return {
         "static": static,
@@ -256,6 +344,11 @@ def start_translation(deck_dir: str | Path, language: str) -> dict[str, Any]:
     deck_json_path = deck_path / "deck.json"
     if not deck_json_path.is_file():
         raise FileNotFoundError(f"Not an sdpm deck (deck.json missing): {deck_path}")
+    from sdpm.engine.schema import deck_output_format
+
+    deck_json = json.loads(deck_json_path.read_text(encoding="utf-8"))
+    if deck_output_format(deck_json) == "html":
+        raise ValueError("start_translation supports PPTX decks only; this deck has outputFormat html")
     slides_dir = deck_path / "slides"
     present = sorted(p.stem for p in slides_dir.glob("*.json")) if slides_dir.is_dir() else []
     sibling = deck_path.with_name(f"{deck_path.name}-{language}")
@@ -263,7 +356,7 @@ def start_translation(deck_dir: str | Path, language: str) -> dict[str, Any]:
         "static": {"workflow": _workflow("translate"), "slide_spec": _slide_spec()},
         "deck": {
             "deck_id": str(deck_path),
-            "deck": json.loads(deck_json_path.read_text(encoding="utf-8")),
+            "deck": deck_json,
             "slides_present": present,
             "language": language,
             "sibling": str(sibling),

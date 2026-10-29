@@ -217,6 +217,92 @@ class TestLocalLintRewriteGuard:
 
 
 # ---------------------------------------------------------------------------
+# Local: HTML decks (deck.json outputFormat html) rebuild output.html instead
+# ---------------------------------------------------------------------------
+
+
+_HTML_OUTLINE = """# Deck
+
+- [title] Hello
+  - body: Greeting
+  - visual: A title
+  - evidence: brief Sources 1
+"""
+
+_TITLE_HTML = '<section data-layout="Title Slide"><h1 data-ph="title">Hello</h1></section>\n'
+
+
+@pytest.fixture()
+def html_deck(tmp_path: Path) -> Path:
+    import sdpm.api
+
+    deck = Path(sdpm.api.init("html", output_dir=tmp_path / "html-deck", output_format="html")["output_dir"])
+    sdpm.api.apply_style(deck_dir=str(deck), style="typographic", template="blank-light")
+    (deck / "specs" / "outline.md").write_text(_HTML_OUTLINE, encoding="utf-8")
+    return deck
+
+
+class TestLocalRunPythonHtml:
+    _patch_generate = TestLocalRunPython._patch_generate
+
+    def _run(self, deck: Path, code: str, measure_slides=None) -> dict:
+        return json.loads(sandbox_tools.run_python(
+            purpose="html", code=code, deck_id=str(deck), measure_slides=measure_slides))
+
+    def test_slide_write_builds_output_html_not_pptx(self, html_deck: Path, monkeypatch):
+        calls = self._patch_generate(monkeypatch)
+        out = self._run(html_deck, f'write_text("slides/title.html", {_TITLE_HTML!r})')
+        assert calls == []
+        assert (html_deck / "output.html").is_file()
+        assert out["html"] == str(html_deck / "output.html")
+        assert "pptx" not in out and not (html_deck / "output.pptx").exists()
+        assert out["affected"] == ["title"]
+
+    def test_measure_returns_static_report_and_open_note(self, html_deck: Path, monkeypatch):
+        calls = self._patch_generate(monkeypatch)
+        self._run(html_deck, f'write_text("slides/title.html", {_TITLE_HTML!r})')
+        out = self._run(html_deck, 'print("noop")', measure_slides=["title"])
+        assert calls == []
+        assert "title: OK" in out["measure"]
+        assert out["preview"]["status"] == "unavailable"
+        assert out["preview"]["reason"] == "html-deck"
+
+    def test_readonly_run_does_not_rebuild(self, html_deck: Path, monkeypatch):
+        self._patch_generate(monkeypatch)
+        out = self._run(html_deck, 'print("noop")')
+        assert "html" not in out and not (html_deck / "output.html").exists()
+
+    def test_deck_css_write_rebuilds(self, html_deck: Path, monkeypatch):
+        self._patch_generate(monkeypatch)
+        self._run(html_deck, f'write_text("slides/title.html", {_TITLE_HTML!r})')
+        (html_deck / "output.html").unlink()
+        out = self._run(html_deck, 'write_text("deck.css", ".card { padding: 8px; }")')
+        assert (html_deck / "output.html").is_file()
+        assert out["affected"] == ["title"]  # deck.css is deck-wide
+
+    def test_snapshot_watches_html_files(self, html_deck: Path):
+        before = sandbox_tools._build_snapshot(html_deck)
+        (html_deck / "slides" / "title.html").write_text("<section></section>")
+        after = sandbox_tools._build_snapshot(html_deck)
+        assert after != before and "slides/title.html" in after
+        (html_deck / "deck.css").write_text(".x{}")
+        assert "deck.css" in sandbox_tools._build_snapshot(html_deck)
+        assert "specs/art-direction.html" in after
+
+    def test_pptx_snapshot_ignores_art_direction_and_deck_css(self, deck_dir: Path):
+        (deck_dir / "specs" / "art-direction.html").write_text("<html></html>")
+        (deck_dir / "deck.css").write_text(".x{}")
+        snap = sandbox_tools._build_snapshot(deck_dir)
+        assert "deck.css" not in snap and "specs/art-direction.html" not in snap
+
+    def test_invalid_output_format_is_reported_and_built_as_pptx(self, deck_dir: Path, monkeypatch):
+        calls = self._patch_generate(monkeypatch)
+        out = self._run(deck_dir, 'write_json("deck.json", {"template": "t.pptx", "outputFormat": "pdf"})')
+        assert "outputFormat" in out["errors"]
+        assert calls and calls[0]["output_path"] == str(deck_dir / "output.pptx")
+
+
+# ---------------------------------------------------------------------------
 # Remote: diff-based always-persist write-back
 # ---------------------------------------------------------------------------
 

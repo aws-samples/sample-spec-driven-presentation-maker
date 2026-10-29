@@ -29,23 +29,42 @@ def _rejection_message(violations: list[str]) -> str:
     return "\n".join(lines)
 
 
+def _deck_format(deck_dir: Path) -> str:
+    """deck.json outputFormat; raises ValueError for an invalid value, "pptx" when unreadable."""
+    from sdpm.engine.schema import deck_output_format
+
+    try:
+        deck_json = json.loads((deck_dir / "deck.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "pptx"
+    return deck_output_format(deck_json) if isinstance(deck_json, dict) else "pptx"
+
+
 def _build_snapshot(deck_dir: Path) -> dict[str, tuple[int, int]]:
     """Snapshot (mtime_ns, size) of files that affect the built PPTX.
 
     Used to detect whether a run_python execution changed the deck, so the
     output.pptx artifact can be rebuilt automatically. specs/outline.md is
-    included because slide order comes from the outline.
+    included because slide order comes from the outline. HTML decks also
+    watch slides/*.html, specs/art-direction.html and deck.css (output.html).
     """
     snap: dict[str, tuple[int, int]] = {}
-    for rel in ("deck.json", "presentation.json", "specs/outline.md"):
+    try:
+        html_deck = _deck_format(deck_dir) == "html"
+    except ValueError:
+        html_deck = False
+    rels = ["deck.json", "presentation.json", "specs/outline.md"]
+    if html_deck:
+        rels += ["specs/art-direction.html", "deck.css"]
+    for rel in rels:
         p = deck_dir / rel
         if p.is_file():
             st = p.stat()
             snap[rel] = (st.st_mtime_ns, st.st_size)
-    for sub in ("slides", "includes"):
+    for sub, pattern in (("slides", "*.json"), ("includes", "*.json"), ("slides", "*.html")):
         d = deck_dir / sub
         if d.is_dir():
-            for p in d.glob("*.json"):
+            for p in d.glob(pattern):
                 st = p.stat()
                 snap[f"{sub}/{p.name}"] = (st.st_mtime_ns, st.st_size)
     return snap
@@ -81,6 +100,36 @@ def _render_slugs(
     return render, with_override_bases(render, slides)
 
 
+def _refresh_html_deck(
+    deck_dir: Path,
+    pre_snap: dict[str, tuple[int, int]],
+    measure_slides: list[str] | None,
+    result: dict[str, Any],
+) -> None:
+    """HTML-deck post-processing: rebuild output.html (static checks, no previews).
+
+    Runs when a watched file changed or measure_slides was given, and merges the
+    sdpm.api.refresh_html result into ``result`` (warnings extend, other keys set).
+    """
+    post_snap = _build_snapshot(deck_dir)
+    changed_paths = sorted(k for k in pre_snap.keys() | post_snap.keys() if pre_snap.get(k) != post_snap.get(k))
+    if not changed_paths and not measure_slides:
+        return
+    from sdpm.api import refresh_html
+    from sdpm.knowledge.assets import invalidate_manifest_cache
+
+    invalidate_manifest_cache()
+    refreshed = refresh_html(deck_dir, changed_paths, list(measure_slides) if measure_slides else None)
+    warnings = refreshed.pop("warnings", [])
+    if warnings:
+        existing = result.get("warnings")
+        if isinstance(existing, dict):  # the outline lint's {"outline": …}
+            existing["html"] = warnings
+        else:
+            result.setdefault("warnings", []).extend(warnings)
+    result.update(refreshed)
+
+
 def run_python(
     purpose: Annotated[str, Field(description='One line on what this code does (shown in the UI).')],
     code: Annotated[str, Field(description='Python code; no import statements.')],
@@ -90,9 +139,10 @@ def run_python(
     """Run Python inside the deck directory — the way to read and write deck files
     (deck.json, specs/, slides/, includes/). No import or open(); helpers:
     read_json(path), write_json(path, data), read_text(path), write_text(path, text),
-    list_files(subdir="."). Writes persist; output.pptx rebuilds and changed slides are
-    re-rendered and previewed when deck.json, slides/, includes/ or specs/outline.md
-    changed. measure_slides measures text overflow on those slugs and previews them.
+    list_files(subdir="."). Writes persist; output.pptx (output.html for HTML decks)
+    rebuilds and changed slides are re-rendered and previewed when deck.json, slides/,
+    includes/ or specs/outline.md changed. measure_slides measures text overflow on those
+    slugs and previews them; HTML decks get static checks instead of previews.
     """
     result: dict[str, Any] = {}
     if not deck_id or not Path(deck_id).is_dir():
@@ -144,6 +194,15 @@ def run_python(
                 "outline.md format violation. "
                 "Read workflow `orchestrator` for the outline format."
             )
+
+    try:
+        deck_format = _deck_format(deck_dir)
+    except ValueError as e:
+        result.setdefault("errors", {})["outputFormat"] = str(e)
+        deck_format = "pptx"
+    if deck_format == "html":
+        _refresh_html_deck(deck_dir, pre_snap, measure_slides, result)
+        return json.dumps(result, ensure_ascii=False)
 
     # Lint and sanitize slide JSON
     from sdpm.engine.schema.lint import lint_and_sanitize

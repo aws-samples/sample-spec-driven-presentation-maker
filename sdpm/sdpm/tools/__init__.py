@@ -38,19 +38,20 @@ def start_presentation() -> dict[str, Any]:
 def start_composing(
     deck_id: Annotated[str, Field(description='Deck directory path, as given in your instruction.')] = "",
     assigned_slugs: Annotated[list[str] | None, Field(description='The slugs you own. Other slides belong to other composers running in parallel.')] = None,
+    mode: Annotated[Literal["pptx", "html"], Field(description='Composer mode from your instruction: pptx (slide JSON) or html (slide HTML).')] = "pptx",
 ) -> dict[str, Any]:
     """Composer entry. You are a composer when your instruction gives you a deck_id and
-    assigned_slugs — call this first with those values.
+    assigned_slugs — call this first with those values and the mode.
 
-    Validates the specs, then returns the composer role document, the slide JSON spec,
-    and everything the deck gives you: deck.json, brief, outline, art direction, template
-    analysis, which slides exist, and the JSON of your assigned slides (plus any
-    override-group head they inherit from, marked read-only). specs_ok=false with
-    errors means stop and report.
+    Validates the specs, then returns the composer role document, the slide spec for the
+    mode, and everything the deck gives you: deck.json, brief, outline, art direction,
+    template analysis (template_html in html mode), which slides exist, and your assigned
+    slides (plus any override-group head they inherit from, marked read-only).
+    specs_ok=false with errors means stop and report.
     """
     from sdpm.entry import start_composing as _start
 
-    return _start(deck_dir=deck_id or None, assigned_slugs=assigned_slugs)
+    return _start(deck_dir=deck_id or None, assigned_slugs=assigned_slugs, mode=mode)
 
 
 def start_style(
@@ -138,10 +139,27 @@ def analyze_template(
     return result
 
 
+def _is_html_deck(deck_id: str) -> bool:
+    """True when deck.json says outputFormat html; unreadable or invalid → False."""
+    from sdpm.engine.schema import deck_output_format
+    from sdpm.utils.io import read_json
+
+    try:
+        return deck_output_format(read_json(Path(deck_id) / "deck.json")) == "html"
+    except Exception:
+        return False
+
+
 def generate_pptx(deck_id: Annotated[str, Field(description='Deck directory path.')]) -> dict[str, Any]:
     """Build output.pptx from the deck workspace (deck.json + slides/*.json). run_python
-    already rebuilds after edits; use this for an explicit full build.
+    already rebuilds after edits; use this for an explicit full build. HTML decks build
+    nothing here.
     """
+    if _is_html_deck(deck_id):
+        return {
+            "output_format": "html",
+            "message": "This deck is an HTML deck: no PPTX is built. run_python rebuilds output.html after every change.",
+        }
     from sdpm.api import generate
     from sdpm.knowledge.assets import invalidate_manifest_cache
 
@@ -270,6 +288,8 @@ def code_to_slide(
     """Render source code as a syntax-highlighted block saved to deck/includes/<name>.json.
     Reference it from a slide as {"type": "include", "src": "includes/<name>.json"}.
     """
+    if _is_html_deck(deck_id):
+        return {"error": "code_to_slide emits PPTX elements; in HTML decks write <pre><code> instead."}
     from sdpm.api import code_block as _code_block
 
     elements = _code_block(code=code, language=language, theme=theme, x=x, y=y, width=width, height=height)

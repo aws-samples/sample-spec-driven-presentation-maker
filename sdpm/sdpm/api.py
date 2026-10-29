@@ -1424,6 +1424,16 @@ def load_slides_json_or_pptx(path) -> dict:
 
     path_obj = Path(path)
     if path_obj.is_dir():
+        from sdpm.engine.schema import deck_output_format
+
+        deck_json = path_obj / "deck.json"
+        try:
+            with open(deck_json) as f:
+                is_html = deck_output_format(json.load(f)) == "html"
+        except (OSError, ValueError):  # unreadable or invalid: the build below reports it
+            is_html = False
+        if is_html:
+            raise ValueError("diff_pptx / hand-edit sync support PPTX decks only; this deck has outputFormat html")
         # Deck-structure directory (deck.json + slides/*.json + specs/outline.md):
         # build via the canonical pipeline (outline.md ordering, includes,
         # overrides), then roundtrip the built PPTX so both sides of the diff

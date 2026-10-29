@@ -74,9 +74,27 @@ def _resolve_template(data, input_path):
     sys.exit(1)
 
 
+def _html_deck_dir(input_path):
+    """The deck directory when ``input_path`` is an HTML deck (deck.json outputFormat html)."""
+    from sdpm.engine.schema import deck_output_format
+
+    if not input_path or input_path == "-" or not Path(input_path).is_dir():
+        return None
+    try:
+        deck_json = read_json(Path(input_path) / "deck.json")
+        return Path(input_path) if deck_output_format(deck_json) == "html" else None
+    except (OSError, ValueError):
+        return None
+
+
 def cmd_generate(args):
     """Generate PPTX from JSON."""
     from sdpm.api import generate
+
+    if _html_deck_dir(args.input) is not None:
+        print("This deck is an HTML deck: no PPTX is built. "
+              f"Build output.html with: generate_html {args.input}", file=sys.stderr)
+        sys.exit(1)
 
     try:
         result = generate(
@@ -149,6 +167,15 @@ def cmd_preview(args):
     """Export slides as PNG images from JSON."""
     from sdpm.api import preview as api_preview
 
+    html_deck = _html_deck_dir(args.input)
+    if html_deck is not None:
+        from sdpm.engine.html.check import html_preview_unavailable
+
+        status = html_preview_unavailable(html_deck / "output.html")
+        print(status["note"])
+        print(f"Open: {status['open']}")
+        return
+
     pages_list = None
     if args.pages:
         pages_list = [int(p.strip()) for p in args.pages.split(",")]
@@ -181,6 +208,11 @@ def cmd_measure(args):
     if args.pages:
         slides_list = [int(p.strip()) for p in args.pages.split(",")]
 
+    html_deck = _html_deck_dir(args.input)
+    if html_deck is not None:
+        _measure_html(html_deck, slides_list)
+        return
+
     try:
         result = measure(
             json_path=args.input,
@@ -194,6 +226,41 @@ def cmd_measure(args):
         sys.exit(1)
 
     print(result)
+
+
+def _measure_html(deck_dir, pages):
+    """HTML deck: rebuild <deck>/output.html and print the static check report."""
+    from sdpm.api import generate_html
+    from sdpm.engine.html.check import format_check_report
+
+    try:
+        result = generate_html(deck_dir)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    built = [line.split(" - ", 1)[1] for line in result["slides"]]
+    slugs = [built[p - 1] for p in pages if 1 <= p <= len(built)] if pages else built
+    print(format_check_report(result["diagnostics"], slugs))
+
+
+def cmd_generate_html(args):
+    """Assemble an HTML deck into one offline output.html."""
+    from sdpm.api import generate_html
+
+    try:
+        result = generate_html(args.input, args.output)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Generated: {Path(result['output_path']).resolve()} ({result['bytes']} bytes)")
+    for line in result["slides"]:
+        print(line)
+    for w in result["warnings"]:
+        print(f"  {w}")
+    decorations = result.get("decorations")
+    if decorations:
+        print(f"  {decorations['note']}")
 
 
 def cmd_search_assets(args):
@@ -289,7 +356,7 @@ def cmd_start(args):
     if role == "presentation":
         payload = tools.start_presentation()
     elif role == "composing":
-        payload = tools.start_composing(args.deck or "", args.slugs or None)
+        payload = tools.start_composing(args.deck or "", args.slugs or None, mode=args.mode)
     elif role == "style":
         payload = tools.start_style(args.base or "")
     elif role == "translation":
@@ -589,6 +656,10 @@ def main():
     p_gen.add_argument("-o", "--output", required=True, help="Output PPTX path")
     p_gen.add_argument("--keep-empty-placeholders", action="store_true", help="Keep empty placeholders visible")
 
+    p_html = subparsers.add_parser("generate_html", help="Build output.html for an HTML deck (deck.json outputFormat html)")
+    p_html.add_argument("input", help="Deck directory")
+    p_html.add_argument("-o", "--output", help="Output HTML path (default: <deck>/output.html)")
+
     p_prev = subparsers.add_parser("preview", help="Export slides as PNG images")
     p_prev.add_argument("input", help="Input JSON file")
     p_prev.add_argument("-p", "--pages", help="Pages to export (e.g. 1,3,5)")
@@ -625,6 +696,8 @@ def main():
     p_start.add_argument("--slugs", nargs="*", help="Assigned slugs (composing)")
     p_start.add_argument("--base", help="Base style name (style)")
     p_start.add_argument("--language", help="Target language (translation)")
+    p_start.add_argument("--mode", choices=["pptx", "html"], default="pptx",
+                         help="Composer mode: pptx (slide JSON) or html (slide HTML) (composing)")
     p_start.add_argument("--workflow-only", action="store_true", help="Print only the role document")
 
     p_gd = subparsers.add_parser("read_guides", help="List or show guide documents")
@@ -680,6 +753,8 @@ def main():
 
     if args.command == "generate_pptx":
         cmd_generate(args)
+    elif args.command == "generate_html":
+        cmd_generate_html(args)
     elif args.command == "preview":
         cmd_preview(args)
     elif args.command == "measure":

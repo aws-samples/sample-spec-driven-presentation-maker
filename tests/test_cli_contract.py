@@ -27,7 +27,7 @@ def test_cli_subcommands_match_contract_vocabulary() -> None:
         "init_deck_workspace", "code_to_slide", "grid", "diff_pptx",
         "arch_diagram",
     }
-    unchanged_cli_only = {"preview", "measure", "image-size", "list-asset-sources"}
+    unchanged_cli_only = {"preview", "measure", "image-size", "list-asset-sources", "generate_html"}
     old_commands = {
         "generate", "examples", "workflows", "guides", "analyze-template",
         "search-assets", "list-templates", "init", "code-block", "diff",
