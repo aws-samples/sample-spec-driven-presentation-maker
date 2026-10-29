@@ -227,14 +227,40 @@ def _prepare_workspace(
         dest.write_bytes(storage.download_file_from_pptx_bucket(key))
 
     # Download asset manifests + referenced icons
+    slide_text = json.dumps(slides)
+    refs = set(re.findall(r'(?:assets:|icons:)([^"]+)', slide_text))
+    materialize_assets(refs, storage, tmpdir)
+
+    # Resolve template
+    template_path = materialize_template(deck_id, user_id, presentation, storage, tmpdir)
+
+    # Fonts
+    fonts = presentation.get("fonts") or deck.get("fonts")
+    if not fonts or not fonts.get("fullwidth"):
+        fonts = extract_fonts(template_path)
+
+    return tmpdir, slides, {
+        "template_path": template_path,
+        "custom_template": True,
+        "fonts": fonts,
+        "base_dir": tmpdir,
+        "default_text_color": presentation.get("defaultTextColor"),
+    }
+
+
+def materialize_assets(refs: set[str], storage: Storage, dest_dir: Path) -> None:
+    """Download the asset manifests and the assets ``refs`` name into ``dest_dir/assets``.
+
+    ``refs`` are asset references without the ``assets:`` / ``icons:`` prefix
+    (``source/name``). Points the engine's asset lookup at ``dest_dir/assets``.
+    """
+    tmpdir = dest_dir
     assets_dir = tmpdir / "assets"
     asset_keys = storage.list_files(prefix="assets/")
     for key in [k for k in asset_keys if k.endswith("manifest.json")]:
         dest = tmpdir / key
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(storage.download_file(key=key))
-    slide_text = json.dumps(slides)
-    refs = set(re.findall(r'(?:assets:|icons:)([^"]+)', slide_text))
     for source_dir in assets_dir.iterdir() if assets_dir.exists() else []:
         manifest_path = source_dir / "manifest.json"
         if not manifest_path.exists():
@@ -260,10 +286,23 @@ def _prepare_workspace(
     _assets_mod.ICON_LOCAL_DIR = assets_dir
     _assets_mod._manifest_cache = None
 
-    # Resolve template
+
+def materialize_template(
+    deck_id: str,
+    user_id: str,
+    deck_meta: dict,
+    storage: Storage,
+    dest_dir: Path,
+) -> Path:
+    """Download the template deck.json names into ``dest_dir/template.pptx``.
+
+    Resolution order: an imported bundle template, the historical deck-root
+    template.pptx, a user template, a builtin template, and blank-dark when the
+    deck names none. A named template that cannot be found raises ValueError.
+    """
     template_key = ""
-    template_path = tmpdir / "template.pptx"
-    tmpl_name = presentation.get("template", "")
+    template_path = dest_dir / "template.pptx"
+    tmpl_name = deck_meta.get("template", "")
     # New imports reference the immutable bundle template directly.
     if isinstance(tmpl_name, str) and tmpl_name.startswith("attachments/imports/"):
         if ".." in PurePosixPath(tmpl_name).parts or not tmpl_name.endswith("/deck/template.pptx"):
@@ -317,19 +356,7 @@ def _prepare_workspace(
         if not template_key:
             template_key = "templates/blank-dark.pptx"
         template_path.write_bytes(storage.download_file(key=template_key))
-
-    # Fonts
-    fonts = presentation.get("fonts") or deck.get("fonts")
-    if not fonts or not fonts.get("fullwidth"):
-        fonts = extract_fonts(template_path)
-
-    return tmpdir, slides, {
-        "template_path": template_path,
-        "custom_template": True,
-        "fonts": fonts,
-        "base_dir": tmpdir,
-        "default_text_color": presentation.get("defaultTextColor"),
-    }
+    return template_path
 
 
 def generate_pptx(

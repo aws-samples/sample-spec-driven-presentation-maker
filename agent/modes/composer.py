@@ -73,7 +73,15 @@ def _is_compose_stopped(parent_tool_use_id: str) -> bool:
         return False
 
 
-def _start_composing(mcp_client, deck_id: str, assigned_slugs: list[str]) -> dict:
+def _start_composing_args(deck_id: str, assigned_slugs: list[str], mode: str | None) -> dict:
+    """start_composing arguments; ``mode`` is sent only for HTML decks (PPTX calls stay as before)."""
+    arguments: dict = {"deck_id": deck_id, "assigned_slugs": assigned_slugs}
+    if mode == "html":
+        arguments["mode"] = "html"
+    return arguments
+
+
+def _start_composing(mcp_client, deck_id: str, assigned_slugs: list[str], mode: str | None = None) -> dict:
     """Call the composer's entry tool and return its ``deck`` part.
 
     The same call an interactive composer makes first; here it is made on the
@@ -84,7 +92,7 @@ def _start_composing(mcp_client, deck_id: str, assigned_slugs: list[str]) -> dic
         mcp_client,
         tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
         name="start_composing",
-        arguments={"deck_id": deck_id, "assigned_slugs": assigned_slugs},
+        arguments=_start_composing_args(deck_id, assigned_slugs, mode),
     )
     if result.get("status") == "error":
         raise RuntimeError(f"start_composing failed for deck {deck_id}: {result.get('content')}")
@@ -99,7 +107,9 @@ def _start_composing(mcp_client, deck_id: str, assigned_slugs: list[str]) -> dic
     raise RuntimeError(f"start_composing returned no payload for deck {deck_id}")
 
 
-def _replay_start_composing(deck_id: str, assigned_slugs: list[str], deck: dict) -> list[dict]:
+def _replay_start_composing(
+    deck_id: str, assigned_slugs: list[str], deck: dict, mode: str | None = None,
+) -> list[dict]:
     """assistant toolUse + user toolResult pair for a start_composing call already made."""
     tool_use_id = f"prefill-{uuid.uuid4().hex[:8]}"
     return [
@@ -110,7 +120,7 @@ def _replay_start_composing(deck_id: str, assigned_slugs: list[str], deck: dict)
                 {"toolUse": {
                     "toolUseId": tool_use_id,
                     "name": "start_composing",
-                    "input": {"deck_id": deck_id, "assigned_slugs": assigned_slugs},
+                    "input": _start_composing_args(deck_id, assigned_slugs, mode),
                 }},
             ],
         },
@@ -223,6 +233,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         # Validate the deck specification once before launching composers.
         spec_warnings: list[str] = []
         outline_slugs: list[str] = []
+        html_deck = False
         if mcp_client:
             assigned_slugs = [slug for group in slide_groups for slug in group["slugs"]]
             check_result = call_tool_with_retry(
@@ -249,6 +260,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
 
             spec_warnings = list(spec_result.get("warnings") or [])
             outline_slugs = list(spec_result.get("slugs") or [])
+            html_deck = (spec_result.get("outputFormat") or "pptx") == "html"
             if not spec_result.get("ok"):
                 yield json.dumps({
                     "status": "error",
@@ -270,7 +282,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         try:
             # Prefetch static composer parts (role prompt + refs) via composition
             yield {"status": "prefetching", "message": "Loading references..."}
-            composer_cfg = MODES["composer"]
+            composer_cfg = MODES["html_composer" if html_deck else "composer"]
+            compose_mode = "html" if html_deck else None
             composer_system, composer_history = resolve_parts(
                 composer_cfg.parts, mcp_client=mcp_client, context={}
             )
@@ -294,17 +307,18 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 # The composer's history opens like an interactive composer's session:
                 # the spawn instruction, then its own start_composing call with the
                 # deck payload as the result. The run continues from there.
-                deck_part = _start_composing(mcp_client, deck_id, group["slugs"]) if mcp_client else {}
+                deck_part = _start_composing(mcp_client, deck_id, group["slugs"], compose_mode) if mcp_client else {}
                 opening: list[dict] = [{
                     "role": "user",
                     "content": [{"text": (
                         f"deck_id: {deck_id}\n"
                         f"assigned_slugs: {', '.join(group['slugs'])}\n"
-                        f"task_instruction: {group['instruction']}"
+                        + ("mode: html\n" if compose_mode == "html" else "")
+                        + f"task_instruction: {group['instruction']}"
                     )}],
                 }]
                 if deck_part:
-                    opening.extend(_replay_start_composing(deck_id, group["slugs"], deck_part))
+                    opening.extend(_replay_start_composing(deck_id, group["slugs"], deck_part, compose_mode))
 
                 # Time budget: slug_count * seconds-per-slide. Periodic nudge (1st then every 3rd) to stop polishing.
                 deadline = time.time() + len(group["slugs"]) * _SECONDS_PER_SLIDE
@@ -537,7 +551,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                     })
 
         # Post-compose: build PPTX + assemble report
-        yield {"status": "building", "message": "Building final PPTX..."}
+        yield {"status": "building", "message": "Building the HTML deck..." if html_deck else "Building final PPTX..."}
         cancelled = _is_compose_stopped(parent_tool_use_id)
         partial = bool(errors) and bool(generated)
         report = {

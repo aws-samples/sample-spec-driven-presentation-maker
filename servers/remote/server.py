@@ -21,7 +21,7 @@ import sys
 import time
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 # Add sdpm/ (skill root) to sys.path so the engine is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "sdpm"))
@@ -322,12 +322,46 @@ def _check_deck_access(deck_id: str, action: str = "read") -> None:
 # checkout and has no cloud path (hand-edit sync is CLI-only for the same reason).
 
 
-_MATERIALIZE_FILES = {"deck.json", "specs/brief.md", "specs/outline.md", "specs/art-direction.html"}
-_MATERIALIZE_SLIDE = re.compile(r"^slides/[A-Za-z0-9_-]+\.json$")
+_MATERIALIZE_FILES = {"deck.json", "deck.css", "specs/brief.md", "specs/outline.md", "specs/art-direction.html"}
+_MATERIALIZE_SLIDE = re.compile(r"^slides/[A-Za-z0-9_-]+\.(?:json|html)$")
+
+
+def _deck_format(deck_id: str) -> str:
+    """deck.json outputFormat of an S3 deck; "pptx" when unreadable or invalid (built as PPTX)."""
+    from sdpm.engine.schema import deck_output_format
+
+    try:
+        return deck_output_format(_storage.get_deck_json(deck_id))
+    except Exception:
+        return "pptx"
+
+
+def _template_html(deck_id: str, deck_json: dict, root: Path) -> dict | None:
+    """``sdpm.entry.template_html_view`` of an S3 deck's template, via the S3 conversion cache.
+
+    None when deck.json names no template or anything fails (an aid, never a blocker).
+    """
+    if not deck_json.get("template"):
+        return None
+    from sdpm.entry import template_html_view
+    from tools import template_html_cache
+    from tools.generate import materialize_template
+
+    try:
+        dest = root / ".template"
+        dest.mkdir(exist_ok=True)
+        path = materialize_template(deck_id, _get_user_id(), deck_json, _storage, dest)
+        template_html_cache.restore(path, _storage)
+        view = template_html_view(path, cache_root=template_html_cache.resolve_root())
+        template_html_cache.persist(path, _storage)
+        return view
+    except Exception:
+        logger.warning("template_html failed for deck %s", deck_id, exc_info=True)
+        return None
 
 
 def _materialize_deck(deck_id: str, target: Path) -> None:
-    """Download deck.json, the three spec files and slides/*.json into ``target``.
+    """Download deck.json, deck.css, the three spec files and slides/*.json|html into ``target``.
 
     Strict allowlist on the relative key (no attachments, no path segments other
     than the ones named here), so a malformed key can never escape ``target``.
@@ -365,27 +399,38 @@ def start_composing(
         list[str] | None,
         Field(description="The slugs you own. Other slides belong to other composers running in parallel."),
     ] = None,
+    mode: Annotated[Literal["pptx", "html"], Field(description='Composer mode from your instruction: pptx (slide JSON) or html (slide HTML).')] = "pptx",
 ) -> str:
     """Composer entry. You are a composer when your instruction gives you a deck_id and
-    assigned_slugs — call this first with those values.
+    assigned_slugs — call this first with those values and the mode.
 
-    Validates the specs, then returns the composer role document, the slide JSON spec,
-    and everything the deck gives you: deck.json, brief, outline, art direction, template
-    analysis, which slides exist, and the JSON of your assigned slides (plus any
-    override-group head they inherit from, marked read-only). specs_ok=false with
-    errors means stop and report.
+    Validates the specs, then returns the composer role document, the slide spec for the
+    mode, and everything the deck gives you: deck.json, brief, outline, art direction, template
+    analysis (template_html in html mode), which slides exist, and your assigned
+    slides (plus any override-group head they inherit from, marked read-only).
+    specs_ok=false with errors means stop and report.
     """
     import tempfile
 
+    from sdpm.engine.schema import deck_output_format
     from sdpm.entry import start_composing as _start
 
     if not deck_id or not deck_id.strip():
-        return json.dumps(_start(), ensure_ascii=False)
+        return json.dumps(_start(mode=mode), ensure_ascii=False)
     _check_deck_access(deck_id, action="generate_pptx")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
         _materialize_deck(deck_id, root)
+        if mode == "html":
+            try:
+                deck_json = json.loads((root / "deck.json").read_text(encoding="utf-8"))
+                is_html = deck_output_format(deck_json) == "html"
+            except Exception:  # the core reports an unreadable / invalid deck.json
+                deck_json, is_html = {}, False
+            template_html = _template_html(deck_id, deck_json, root) if is_html else None
+            payload = _start(root, assigned_slugs, deck_id=deck_id, template_html=template_html, mode="html")
+            return json.dumps(payload, ensure_ascii=False)
         analysis: dict | None = None
         try:
             template = json.loads((root / "deck.json").read_text(encoding="utf-8")).get("template") or ""
@@ -429,6 +474,7 @@ def start_style(
 @offloaded_tool
 def init_deck_workspace(
     name: Annotated[str, Field(description='Presentation name, e.g. "lambda-overview".')],
+    output_format: Annotated[Literal["pptx", "html"], Field(description="html only when the user asks for an HTML / browser deck; pptx otherwise.")] = "pptx",
 ) -> str:
     """Create an empty deck workspace (deck.json, specs/). A step inside the orchestrator
     workflow — after the brief is agreed, before apply_style — not where a request
@@ -439,6 +485,7 @@ def init_deck_workspace(
             name=name.strip(),
             user_id=_get_user_id(),
             storage=_storage,
+            output_format=output_format,
         ),
         ensure_ascii=False,
     )
@@ -578,12 +625,21 @@ def import_attachment(
 def generate_pptx(deck_id: Annotated[str, Field(description='Deck ID.')]) -> str:
     """Finalize the deck: full PPTX build, the WebP preview set, knowledge-base sync, and a
     whole-deck warnings report. run_python already rebuilds the PPTX after edits; this is
-    the explicit hand-off step.
+    the explicit hand-off step. HTML decks are finalized as HTML (output.html and slide
+    thumbnails, no PPTX).
     """
     _check_deck_access(deck_id, action="generate_pptx")
     import traceback
 
     try:
+        if _deck_format(deck_id) == "html":
+            from tools.html_deck import finalize_html_deck
+
+            result = finalize_html_deck(
+                deck_id=deck_id, user_id=_get_user_id(), storage=_storage, kb_sync=_get_kb_sync(),
+            )
+            logger.info("generate_pptx (html) completed: deck=%s slides=%s", deck_id, result.get("slideCount"))
+            return json.dumps(result, ensure_ascii=False)
         result = generate.generate_pptx(
             deck_id=deck_id, user_id=_get_user_id(), storage=_storage,
             kb_sync=_get_kb_sync(),
@@ -607,6 +663,10 @@ def get_preview(
     _check_deck_access(deck_id, action="preview")
     if not slugs:
         return [{"type": "text", "text": "Error: slugs must not be empty"}]
+    if _deck_format(deck_id) == "html":
+        from tools.html_deck import REMOTE_PREVIEW_NOTE
+
+        return [{"type": "text", "text": REMOTE_PREVIEW_NOTE}]
     _wait_for_pending_previews(deck_id)
     if quality not in ("low", "high"):
         quality = "high"
@@ -902,9 +962,9 @@ def run_python(
     (deck.json, specs/, slides/, includes/, attachments/). Helpers: read_json(path),
     write_json(path, data), read_text(path), write_text(path, text), list_files(subdir=".");
     plain open() also works. Writes persist (read-only decks: discarded, and the result
-    says so); output.pptx rebuilds and changed slides are re-rendered and previewed when
-    deck.json, slides/, includes/ or specs/outline.md changed. measure_slides measures
-    text overflow and lints those slugs, and previews them.
+    says so); output.pptx (output.html for HTML decks) rebuilds and changed slides are
+    re-rendered and previewed when deck.json, slides/, includes/ or specs/outline.md
+    changed. measure_slides measures text overflow and lints those slugs, and previews them.
     """
     if not deck_id:
         return json.dumps({
@@ -942,6 +1002,28 @@ def run_python(
     if lint_diagnostics:
         errs = result.setdefault("errors", {})
         errs["lintDiagnostics"] = lint_diagnostics
+
+    # HTML decks: rebuild output.html (+ thumbnails) on S3 instead of the PPTX
+    # post-processing below. Read-only runs persist nothing, so they rebuild nothing.
+    if (changed_paths or measure_slides) and _deck_format(deck_id) == "html":
+        from sdpm.engine.schema import is_html_build_input
+
+        if persist_writes and (any(is_html_build_input(p) for p in changed_paths) or measure_slides):
+            from tools.html_deck import refresh_html_deck
+
+            refreshed = refresh_html_deck(
+                deck_id, _get_user_id(), _storage, list(changed_paths),
+                list(measure_slides) if measure_slides else None,
+            )
+            warnings = refreshed.pop("warnings", [])
+            if warnings:
+                existing = result.get("warnings")
+                if isinstance(existing, dict):  # the outline lint's {"outline": …}
+                    existing["html"] = warnings
+                else:
+                    result.setdefault("warnings", []).extend(warnings)
+            result.update(refreshed)
+        return json.dumps(result, ensure_ascii=False)
 
     # Post-processing: rebuild the PPTX artifact whenever build-relevant files
     # changed (the artifact follows the deck automatically); measure_slides

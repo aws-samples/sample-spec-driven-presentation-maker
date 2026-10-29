@@ -6,5 +6,6 @@ Used by api/, servers/remote/, and servers/local/ to avoid duplication.
 - schema: DynamoDB key conventions
 - authz: deck access authorization
 - preview: slide preview key resolution
+- html_artifacts: S3 key layout of HTML deck artifacts
 - ingest: upload file conversion pipeline (PDF/DOCX/XLSX/PPTX → Markdown/JSON)
 """

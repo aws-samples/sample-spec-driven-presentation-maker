@@ -32,3 +32,8 @@ You cannot see the composers' own tool results (their `preview_files` stay
 inside each composer). After the content call returns, call
 `get_preview(deck_id, slugs=[...all slugs...])` yourself to see the
 rendering — this is how you look before deciding whether any slide needs another composer.
+
+For an HTML deck (`check_specs` returns `outputFormat: "html"`), `get_preview` returns no
+images: the Web UI shows the deck and its thumbnails to the user. Review through the
+composers' `summaries` and the warnings in `build`, and never tell the user to open a local
+`output.html` path.
