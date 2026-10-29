@@ -1,18 +1,18 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * SlashPickerPopup — Portal-based template/style autocomplete presentation.
+ * SlashPickerPopup — Portal-based template/style/format autocomplete presentation.
  */
 
 "use client"
 
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Star } from "lucide-react"
+import { CodeXml, Star } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { buildCoverDoc } from "@/components/StyleSlidePreview"
 import { useIsMobile } from "@/hooks/UseMobile"
-import type { PickerItem, PickerKind } from "@/lib/slashToken"
+import { sectionTitleKey, type PickerItem, type PickerKind } from "@/lib/slashToken"
 
 /**
  * DOM id of the option at `index`. Index-based (not name-based) because quoted
@@ -77,6 +77,45 @@ function StyleIdentifier({ pinned }: { pinned: boolean }) {
     <span className="grid h-5 w-11 shrink-0 place-items-center" aria-hidden="true">
       {pinned && <Star className="h-3.5 w-3.5 fill-current text-foreground-secondary" />}
     </span>
+  )
+}
+
+function FormatIdentifier() {
+  return (
+    <span className="grid h-5 w-11 shrink-0 place-items-center text-foreground-secondary" aria-hidden="true">
+      <CodeXml className="h-3.5 w-3.5" />
+    </span>
+  )
+}
+
+/** Localized label and description of a format candidate (its `name` is the token value). */
+function useFormatText(item: PickerItem): { label: string; description: string } {
+  const t = useTranslations("slashPicker")
+  return { label: t("formatHtml"), description: item.description || t("formatHtmlDescription") }
+}
+
+function FormatPreview({ item }: { item: PickerItem }) {
+  const { label, description } = useFormatText(item)
+  return (
+    <>
+      <div className="grid aspect-video w-60 place-items-center bg-foreground/[0.02] text-foreground-secondary" aria-hidden="true">
+        <CodeXml className="h-8 w-8" />
+      </div>
+      <div className="border-t border-border px-3 py-2">
+        <p className="truncate text-sm font-medium text-foreground">{label}</p>
+        <p className="text-xs text-foreground-muted">{description}</p>
+      </div>
+    </>
+  )
+}
+
+function FormatRowText({ item }: { item: PickerItem }) {
+  const { label, description } = useFormatText(item)
+  return (
+    <>
+      <span className="min-w-0 shrink-0 truncate text-sm font-medium text-foreground">{label}</span>
+      <span className="min-w-0 flex-1 truncate text-xs text-foreground-muted">{description}</span>
+    </>
   )
 }
 
@@ -175,6 +214,8 @@ function PreviewPanel({ item }: { item: PickerItem | undefined }) {
         <DebouncedStylePreview key={`${item.name}-${item.html}`} item={item} />
       ) : item.kind === "template" ? (
         <TemplatePreview item={item} />
+      ) : item.kind === "format" ? (
+        <FormatPreview item={item} />
       ) : (
         <>
           <div className="aspect-video w-60 bg-foreground/[0.02]" />
@@ -209,7 +250,7 @@ function Section({
   return (
     <section>
       <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wider text-foreground-muted">
-        {t(kind === "template" ? "sectionTemplate" : "sectionStyle")}
+        {t(sectionTitleKey(kind))}
       </div>
       {items.map((item) => {
         const index = allItems.indexOf(item)
@@ -229,13 +270,25 @@ function Section({
             }`}
           >
             {active && <span className="absolute inset-y-0 left-0 w-0.75 bg-foreground" aria-hidden="true" />}
-            {item.kind === "template" ? <TemplateSwatch item={item} /> : <StyleIdentifier pinned={item.pinned} />}
-            <span className="min-w-0 shrink-0 truncate text-sm font-medium text-foreground">{item.name}</span>
-            {item.source === "user" && (
-              <span className="shrink-0 text-[11px] font-medium text-foreground-muted">{custom("custom")}</span>
+            {item.kind === "template" ? (
+              <TemplateSwatch item={item} />
+            ) : item.kind === "format" ? (
+              <FormatIdentifier />
+            ) : (
+              <StyleIdentifier pinned={item.pinned} />
             )}
-            {item.description && (
-              <span className="min-w-0 flex-1 truncate text-xs text-foreground-muted">{item.description}</span>
+            {item.kind === "format" ? (
+              <FormatRowText item={item} />
+            ) : (
+              <>
+                <span className="min-w-0 shrink-0 truncate text-sm font-medium text-foreground">{item.name}</span>
+                {item.source === "user" && (
+                  <span className="shrink-0 text-[11px] font-medium text-foreground-muted">{custom("custom")}</span>
+                )}
+                {item.description && (
+                  <span className="min-w-0 flex-1 truncate text-xs text-foreground-muted">{item.description}</span>
+                )}
+              </>
             )}
           </button>
         )
@@ -290,6 +343,7 @@ export function SlashPickerPopup({
     : { position: "fixed" as const, bottom: 16, left: 16 }
   const templateItems = filtered.filter((item) => item.kind === "template")
   const styleItems = filtered.filter((item) => item.kind === "style")
+  const formatItems = filtered.filter((item) => item.kind === "format")
   const noMatches = !loading && (items.length === 0 || filtered.length === 0)
 
   const handleMouseMove = (index: number) => {
@@ -330,6 +384,15 @@ export function SlashPickerPopup({
               <Section
                 kind="style"
                 items={styleItems}
+                allItems={filtered}
+                listboxId={listboxId}
+                activeIndex={activeIndex}
+                onMouseMove={handleMouseMove}
+                onSelect={onSelect}
+              />
+              <Section
+                kind="format"
+                items={formatItems}
                 allItems={filtered}
                 listboxId={listboxId}
                 activeIndex={activeIndex}

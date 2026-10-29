@@ -121,7 +121,23 @@
     "openPptx": "Open PPTX",
     "downloadPptx": "Download PPTX",
     "slideAlt": "Slide {number}",
-    "slideAltFull": "Slide {number} of {total}"
+    "slideAltFull": "Slide {number} of {total}",
+    "formatHtml": "HTML",
+    "formatBadgeTitle": "Format: HTML (presented in a browser)",
+    "present": "Present",
+    "presentAria": "Present in a new tab",
+    "pdf": "PDF",
+    "pdfAria": "Open the print view in a new tab to save as PDF",
+    "downloadHtml": "Download HTML",
+    "open": "Open",
+    "openHtml": "Open the HTML deck in your browser",
+    "playerTitle": "HTML deck",
+    "playerTitleNamed": "HTML deck: {name}",
+    "htmlPreviewsPlaceholder": "Slide previews will appear here once the HTML deck is built.",
+    "errorPresent": "Couldn't open the presentation",
+    "errorPdf": "Couldn't open the PDF view",
+    "errorDownloadHtml": "Couldn't download the HTML",
+    "errorOpenHtml": "Couldn't open the HTML"
   },
   "outline": {
     "body": "Body",
@@ -195,10 +211,13 @@
   "slashPicker": {
     "sectionTemplate": "Template",
     "sectionStyle": "Style",
+    "sectionFormat": "Format",
+    "formatHtml": "HTML",
+    "formatHtmlDescription": "Present in a browser. Can't be edited in PowerPoint.",
     "noMatch": "No matches",
     "loading": "Loading…",
     "keyHint": "↑↓ move  ↵ insert  Esc close",
-    "listLabel": "Template and style suggestions",
+    "listLabel": "Template, style and format suggestions",
     "previewAlt": "Preview of {name}",
     "unknownName": "This template or style is unavailable",
     "removeToken": "Remove {kind} {name}",
@@ -307,6 +326,10 @@
     "specPath": "Review path",
     "vibeSummary": "Start rough. See a first draft sooner.",
     "specSummary": "Decide the story before the slides."
+  },
+  "htmlFormatPill": {
+    "buildAsHtml": "Build as HTML",
+    "hint": "Creates an HTML deck to present in a browser. It can't be edited in PowerPoint."
   },
   "tools": {
     "running": "Running",

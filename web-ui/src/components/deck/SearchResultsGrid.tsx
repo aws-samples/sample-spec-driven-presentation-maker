@@ -18,6 +18,8 @@ import { SlideSearchResult } from "@/services/deckService"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Search, Layers } from "lucide-react"
 import { useTranslations } from "next-intl"
+import { isHtmlPreview } from "@/lib/preview"
+import { HtmlSlideFrame } from "@/components/deck/HtmlSlideFrame"
 
 interface SearchResultsGridProps {
   results: SlideSearchResult[]
@@ -54,7 +56,14 @@ export function SearchResultsGrid({ results, searching, onSlideClick }: SearchRe
               style={{ "--delay": `${i * 60}ms` } as React.CSSProperties}
             >
               <div className="aspect-[16/9] bg-background-raised relative overflow-hidden">
-                {r.previewUrl ? (
+                {r.previewUrl && isHtmlPreview(r.previewUrl) ? (
+                  <HtmlSlideFrame
+                    src={r.previewUrl}
+                    title={t("resultAlt", { deck: r.deckName, page: r.pageNumber })}
+                    fit="cover"
+                    className="group-hover:scale-[1.03] transition-transform duration-500 ease-out"
+                  />
+                ) : r.previewUrl ? (
                   <img
                     src={r.previewUrl}
                     alt={t("resultAlt", { deck: r.deckName, page: r.pageNumber })}

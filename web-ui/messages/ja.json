@@ -121,7 +121,23 @@
     "openPptx": "PPTX を開く",
     "downloadPptx": "PPTX をダウンロード",
     "slideAlt": "スライド {number}",
-    "slideAltFull": "スライド {number} / {total}"
+    "slideAltFull": "スライド {number} / {total}",
+    "formatHtml": "HTML",
+    "formatBadgeTitle": "形式: HTML（ブラウザで発表）",
+    "present": "発表",
+    "presentAria": "新しいタブで発表",
+    "pdf": "PDF",
+    "pdfAria": "新しいタブで印刷画面を開いて PDF に保存",
+    "downloadHtml": "HTML をダウンロード",
+    "open": "開く",
+    "openHtml": "HTML デッキをブラウザで開く",
+    "playerTitle": "HTML デッキ",
+    "playerTitleNamed": "HTML デッキ: {name}",
+    "htmlPreviewsPlaceholder": "HTML デッキをビルドするとスライドプレビューがここに表示されます。",
+    "errorPresent": "発表を開けませんでした",
+    "errorPdf": "PDF 用の画面を開けませんでした",
+    "errorDownloadHtml": "HTML をダウンロードできませんでした",
+    "errorOpenHtml": "HTML を開けませんでした"
   },
   "outline": {
     "body": "本文",
@@ -195,10 +211,13 @@
   "slashPicker": {
     "sectionTemplate": "テンプレート",
     "sectionStyle": "スタイル",
+    "sectionFormat": "形式",
+    "formatHtml": "HTML",
+    "formatHtmlDescription": "ブラウザで発表します。PowerPoint では編集できません",
     "noMatch": "該当なし",
     "loading": "読み込み中…",
     "keyHint": "↑↓ 移動  ↵ 挿入  Esc 閉じる",
-    "listLabel": "テンプレート / スタイルの候補",
+    "listLabel": "テンプレート / スタイル / 形式の候補",
     "previewAlt": "{name} のプレビュー",
     "unknownName": "このテンプレートまたはスタイルは利用できません",
     "removeToken": "{kind}「{name}」を削除",
@@ -307,6 +326,10 @@
     "specPath": "確認しながら作成",
     "vibeSummary": "ラフな素材から、まず初稿をすばやく形にします。",
     "specSummary": "スライドを作る前に、伝えるストーリーを固めます。"
+  },
+  "htmlFormatPill": {
+    "buildAsHtml": "HTML で作成",
+    "hint": "ブラウザで発表する HTML を作ります。PowerPoint では編集できません"
   },
   "tools": {
     "running": "実行中",

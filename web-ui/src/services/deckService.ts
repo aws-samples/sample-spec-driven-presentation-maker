@@ -54,7 +54,16 @@ export interface DeckDetail {
   ownerAlias?: string
   collaborators?: string[]
   collaboratorAliases?: Record<string, string>
+  /** deck.json `outputFormat`; PPTX responses omit it, so a missing value means "pptx". */
+  outputFormat?: "pptx" | "html"
+  /** HTML decks: in-app view URL of output.html (cloud: 15-minute presigned URL), null until built. */
+  htmlUrl?: string | null
+  /** HTML decks: canvas size in CSS px (default 1920x1080). */
+  slideSize?: { width: number; height: number }
 }
+
+/** Why an HTML deck URL is requested: Present / PDF (inline, 4 hours) or Download (attachment). */
+export type HtmlUrlPurpose = "present" | "download"
 
 const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === 'local'
 
@@ -127,6 +136,26 @@ export async function getDeck(deckId: string, idToken: string): Promise<DeckDeta
   }
 
   return response.json()
+}
+
+/**
+ * Fetch a presigned output.html URL for an HTML deck (cloud only; local opens the file instead).
+ *
+ * @param deckId - Deck identifier
+ * @param purpose - "present" (inline) or "download" (attachment)
+ * @param idToken - Cognito ID token for API Gateway authorization
+ * @returns The presigned URL and its lifetime in seconds
+ * @throws Error when the deck is not readable or not built yet
+ */
+export async function fetchHtmlUrl(deckId: string, purpose: HtmlUrlPurpose, idToken: string): Promise<{ url: string; expiresIn: number }> {
+  const base = await getApiBaseUrl()
+  const response = await fetch(`${base}decks/${encodeURIComponent(deckId)}/html?purpose=${purpose}`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  if (!response.ok) throw new Error(`Failed to get HTML URL: ${response.status}`)
+  const data = (await response.json()) as { url?: string; expiresIn?: number }
+  if (!data.url) throw new Error("No HTML URL returned")
+  return { url: data.url, expiresIn: data.expiresIn ?? 0 }
 }
 
 /**
