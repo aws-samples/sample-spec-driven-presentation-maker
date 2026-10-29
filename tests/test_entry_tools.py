@@ -46,6 +46,24 @@ def deck(tmp_path: Path) -> Path:
     return deck_dir
 
 
+_SLIDE_HTML = '<section data-layout="Title Only"><h1 data-ph="title">{slug}</h1></section>\n'
+
+
+@pytest.fixture
+def html_deck(tmp_path: Path) -> Path:
+    r = tools.init_deck_workspace(str(tmp_path / "html-deck"), output_format="html")
+    deck_dir = Path(r["output_dir"])
+    tools.apply_style(str(deck_dir), style="typographic", template="blank-dark")
+    specs = deck_dir / "specs"
+    (specs / "brief.md").write_text("# Brief\n\nAudience: engineers.\n\n## Sources\n1. pasted notes\n", encoding="utf-8")
+    (specs / "outline.md").write_text(_OUTLINE, encoding="utf-8")
+    slides = deck_dir / "slides"
+    slides.mkdir(exist_ok=True)
+    for slug in ("intro", "demo-1", "demo-2"):
+        (slides / f"{slug}.html").write_text(_SLIDE_HTML.format(slug=slug), encoding="utf-8")
+    return deck_dir
+
+
 class TestStartPresentation:
     def test_returns_workflow_and_environment(self):
         r = tools.start_presentation()
@@ -68,8 +86,57 @@ class TestStartComposing:
         assert "# Composer" in r["static"]["workflow"]
         assert "deck.json" in r["static"]["slide_spec"]
 
-    def test_static_is_identical_across_calls(self, deck: Path):
-        assert tools.start_composing()["static"] == tools.start_composing(str(deck), ["intro"])["static"]
+    @pytest.mark.parametrize("mode", ["pptx", "html"])
+    def test_static_depends_only_on_mode(self, mode: str, request: pytest.FixtureRequest):
+        deck_dir = request.getfixturevalue("deck" if mode == "pptx" else "html_deck")
+        with_deck = tools.start_composing(str(deck_dir), ["intro"], mode=mode)
+        assert with_deck["deck"]["specs_ok"] is True
+        assert tools.start_composing(mode=mode)["static"] == with_deck["static"]
+
+    def test_static_differs_between_modes(self):
+        pptx = tools.start_composing()["static"]
+        html = tools.start_composing(mode="html")["static"]
+        assert pptx == tools.start_composing(mode="pptx")["static"]
+        assert pptx != html
+        assert "# Composer" in html["workflow"] and "html" in html["workflow"].lower()
+        assert "slide-html" in html["slide_spec"] or "data-layout" in html["slide_spec"]
+
+    def test_invalid_mode_is_rejected(self, deck: Path):
+        for args in ((), (str(deck), ["intro"])):
+            r = tools.start_composing(*args, mode="svg")
+            assert r["specs_ok"] is False and r["errors"]
+            assert "static" not in r
+
+    def test_mode_mismatch_names_the_deck_format(self, deck: Path, html_deck: Path):
+        r = tools.start_composing(str(deck), ["intro"], mode="html")
+        assert r["specs_ok"] is False and r["mode"] == "pptx"
+        assert 'mode="pptx"' in r["errors"][0]
+        assert "static" not in r and "deck" not in r
+        r = tools.start_composing(str(html_deck), ["intro"])
+        assert r["specs_ok"] is False and r["mode"] == "html"
+        assert 'mode="html"' in r["errors"][0]
+
+    def test_html_deck_payload(self, html_deck: Path):
+        d = tools.start_composing(str(html_deck), ["demo-2", "closing"], mode="html")["deck"]
+        assert d["specs_ok"] is True
+        assert "template_analysis" not in d
+        assert d["slides_present"] == ["demo-1", "demo-2", "intro"]
+        assert set(d["existing_slides"]) == {"demo-1", "demo-2"}
+        assert "<section" in d["existing_slides"]["demo-2"]["html"]
+        assert d["existing_slides"]["demo-1"]["readonly"] is True
+        assert "readonly" not in d["existing_slides"]["demo-2"]
+        assert "Audience: engineers" in d["brief"] and "[demo-2]" in d["outline"]
+        th = d["template_html"]
+        assert th["slideSize"]["width"] and th["ptScale"] and th["themeColors"]
+        assert th["layouts"] and all(layout["curated"] for layout in th["layouts"])
+        assert any(layout["placeholders"] for layout in th["layouts"])
+        assert "decorations_status" in th
+
+    def test_html_deck_css(self, html_deck: Path):
+        assert tools.start_composing(str(html_deck), ["intro"], mode="html")["deck"]["deck_css"] is None
+        (html_deck / "deck.css").write_text(".card { padding: 8px; }\n", encoding="utf-8")
+        d = tools.start_composing(str(html_deck), ["intro"], mode="html")["deck"]
+        assert d["deck_css"] == ".card { padding: 8px; }\n"
 
     def test_deck_payload_for_assigned_slugs(self, deck: Path):
         r = tools.start_composing(str(deck), ["intro", "closing"])
@@ -144,6 +211,28 @@ class TestStartTranslation:
     def test_not_a_deck(self, tmp_path: Path):
         with pytest.raises(FileNotFoundError):
             tools.start_translation(str(tmp_path), "en")
+
+    def test_html_deck_is_refused(self, html_deck: Path):
+        with pytest.raises(ValueError, match="PPTX decks only"):
+            tools.start_translation(str(html_deck), "en")
+
+
+class TestHtmlDeckGuards:
+    def test_generate_pptx_builds_nothing(self, html_deck: Path):
+        r = tools.generate_pptx(str(html_deck))
+        assert r["output_format"] == "html" and "output.html" in r["message"]
+        assert not (html_deck / "output.pptx").exists()
+
+    def test_code_to_slide_is_refused(self, html_deck: Path):
+        r = tools.code_to_slide(str(html_deck), "print(1)", "snippet")
+        assert "<pre><code>" in r["error"]
+        assert not (html_deck / "includes").exists()
+
+    def test_diff_refuses_html_decks(self, html_deck: Path):
+        from sdpm.api import diff_report
+
+        with pytest.raises(ValueError, match="PPTX decks only"):
+            diff_report(html_deck, html_deck)
 
 
 def test_local_server_binds_entry_tools_and_not_workflow_readers():

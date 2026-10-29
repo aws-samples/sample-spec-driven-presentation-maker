@@ -27,6 +27,7 @@ Dependencies always flow top-down.
 The core presentation engine. No network, no AWS, no MCP — just Python.
 
 - **sdpm/sdpm/engine/** — json↔pptx conversion: builder, converter, layout engine, schema lint, preview, checks, diff, analyzer
+- **sdpm/sdpm/engine/html/** — HTML output mode: converts a .pptx template to `theme.css` / `template.json` / decoration SVGs, assembles slide HTML files into a single offline `output.html` (vendored reveal.js under `sdpm/vendor/revealjs/`), and runs the static slide checks
 - **sdpm/sdpm/knowledge/** — knowledge retrieval: references (guides/workflows/examples) and asset search
 - **sdpm/sdpm/tools/** — the MCP tool contract: every tool's name, schema, docstring, and logic defined once; both servers register these functions directly
 - **sdpm/references/** — workflows (role documents: orchestrator/composer/style/translate),
@@ -231,8 +232,8 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Category | Tool | Description |
 |----------|------|-------------|
 | Prompts | `sdpm-vibe`, `sdpm-spec`, `sdpm-style`, `sdpm-translate` | User-invoked (slash-command) entry points; `vibe` / `spec` set the interaction mode |
-| Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate) |
-| Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template` | Create deck workspace, validate specs, apply style, analyze template |
+| Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate). `start_composing(mode="pptx"\|"html")` picks the composer document for the deck's output format |
+| Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template` | Create deck workspace (`output_format="pptx"\|"html"`), validate specs, apply style, analyze template |
 | Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview |
 | Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
 | References | `list_styles` | Bundled and user styles |
@@ -271,6 +272,10 @@ Deliberate asymmetries between surfaces — these are design decisions, not gaps
   MCP schema tokens and are the only operability for agents without MCP
   support, so overlap with MCP tools is acceptable — they are two adapters
   over the same engine.
+- **HTML output mode adds no MCP tool.** `run_python` rebuilds `output.html`
+  through `sdpm.api.refresh_html` after every change to an HTML deck, the CLI
+  has `generate_html` for the no-MCP path, and the remote server is unchanged
+  in phase 1 (HTML decks are local only).
 - **`search_slides` redesign is deferred.** The KB-backed search tool is kept
   as-is on Layer 3; rethinking it (scope, index lifecycle) is a separate
   theme, tracked outside the attachment/tool-cleanup work.
