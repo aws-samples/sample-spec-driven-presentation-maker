@@ -903,6 +903,193 @@ def generate(
     return result
 
 
+# ── HTML decks ───────────────────────────────────────────────────────────
+
+
+def _chrome_placeholder_keys(template_path: Path, info: dict) -> set[str]:
+    """idx keys of the template's date / footer / slide-number placeholders.
+
+    Keys that some layout uses for a content placeholder are left out, so a
+    content ``data-ph`` is never mistaken for chrome.
+    """
+    from pptx import Presentation
+
+    from sdpm.engine.html.textstyle import placeholder_type
+
+    prs = Presentation(str(template_path))
+    keys = {
+        str(ph.placeholder_format.idx)
+        for layout in prs.slide_masters[0].slide_layouts
+        for ph in layout.placeholders
+        if placeholder_type(ph._element) in ("dt", "ftr", "sldNum")
+    }
+    content = {ph["key"] for layout in info.get("layouts", []) for ph in layout.get("placeholders", [])}
+    return keys - content
+
+
+def _outline_title(outline_path: Path) -> str | None:
+    if not outline_path.is_file():
+        return None
+    for line in outline_path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("# "):
+            return line[2:].strip() or None
+    return None
+
+
+def _generate_html(deck_dir: Path, output_path: Path) -> tuple[dict[str, Any], list[tuple[str | None, str]]]:
+    """generate_html body; also returns ``(slug or None, warning)`` pairs for filtering."""
+    from sdpm.engine.html.assemble import assemble_deck
+    from sdpm.engine.html.check import (
+        DECK_CSS_SLUG,
+        check_deck_css,
+        check_html_font_sizes,
+        check_slide_html,
+    )
+    from sdpm.engine.html.template import load_template_html
+    from sdpm.engine.schema import deck_output_format
+    from sdpm.utils.io import read_json
+
+    deck_json = deck_dir / "deck.json"
+    if not deck_json.is_file():
+        raise FileNotFoundError(f"deck.json not found in {deck_dir}")
+    deck_meta = read_json(deck_json)
+    if deck_output_format(deck_meta) != "html":
+        raise ValueError(
+            f"{deck_dir} is a PPTX deck (deck.json has no \"outputFormat\": \"html\"); "
+            "build it with generate_pptx")
+
+    template_path, _ = _resolve_template(deck_meta, deck_dir, get_templates_dirs())
+    template = load_template_html(template_path)
+    layouts = {layout["name"] for layout in template.info.get("layouts", [])}
+    chrome_keys = _chrome_placeholder_keys(template_path, template.info)
+
+    outline_path = deck_dir / "specs" / "outline.md"
+    slugs = parse_outline_slugs(outline_path)
+    tagged: list[tuple[str | None, str]] = []
+    texts: dict[str, str] = {}
+    for slug in slugs:
+        path = deck_dir / "slides" / f"{slug}.html"
+        if not path.is_file():
+            tagged.append((slug, f"slides/{slug}.html missing — skipped"))
+            continue
+        texts[slug] = path.read_text(encoding="utf-8")
+
+    art_path = deck_dir / "specs" / "art-direction.html"
+    art_html = art_path.read_text(encoding="utf-8") if art_path.is_file() else ""
+    deck_css_path = deck_dir / "deck.css"
+    deck_css = deck_css_path.read_text(encoding="utf-8") if deck_css_path.is_file() else None
+
+    diagnostics: list[dict] = []
+    for slug, text in texts.items():
+        diagnostics.extend(check_slide_html(slug, text, layouts=layouts, chrome_keys=chrome_keys))
+    diagnostics.extend(check_html_font_sizes(texts, art_path))
+    if deck_css is not None:
+        diagnostics.extend(check_deck_css(deck_css, art_path))
+    order = {slug: i for i, slug in enumerate(slugs)}
+    diagnostics.sort(key=lambda d: order.get(d["slug"], -1))  # deck.css first, then deck order
+
+    assembled = assemble_deck(
+        slides=list(texts.items()),
+        template=template,
+        art_direction_html=art_html,
+        default_background=deck_meta.get("defaultBackground") or None,
+        default_text_color=deck_meta.get("defaultTextColor") or None,
+        title=_outline_title(outline_path) or deck_dir.name,
+        deck_dir=deck_dir,
+        deck_css=deck_css,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(assembled.html, encoding="utf-8", newline="\n")
+
+    for d in diagnostics:
+        label = "deck.css" if d["slug"] == DECK_CSS_SLUG else d["slug"]
+        tagged.append((None if d["slug"] == DECK_CSS_SLUG else d["slug"], f"{label}: {d['message']}"))
+    for warning in assembled.warnings:
+        head = warning.split(":", 1)[0]
+        tagged.append((head if head in texts else None, warning))
+
+    built = assembled.slugs
+    result: dict[str, Any] = {
+        "output_path": str(output_path),
+        "bytes": assembled.bytes,
+        "slide_count": len(built),
+        "slides": [f"page{i:02d} - {slug}" for i, slug in enumerate(built, 1)],
+        "layouts_used": assembled.layouts_used,
+        "warnings": [text for _, text in tagged],
+        "diagnostics": diagnostics,
+    }
+    if template.decorations_status is not None:
+        result["decorations"] = template.decorations_status
+    return result, tagged
+
+
+def generate_html(deck_dir: str | Path, output_path: str | Path | None = None) -> dict[str, Any]:
+    """Assemble an HTML deck (deck.json ``"outputFormat": "html"``) into one offline file.
+
+    Reads slides/<slug>.html in outline order, runs the static checks, and writes
+    ``output_path`` (default ``<deck>/output.html``).
+
+    Returns:
+        Dict with output_path, bytes, slide_count, slides (``pageNN - slug``),
+        layouts_used, warnings (``"<slug>: …"`` / ``"deck.css: …"``), diagnostics
+        (``{slug, rule, message}``) and, when template decorations are missing,
+        decorations (``preview_unavailable``-shaped status).
+
+    Raises:
+        ValueError: the deck is not an HTML deck.
+        FileNotFoundError: deck.json or the template is missing.
+    """
+    deck_path = Path(deck_dir)
+    out = Path(output_path) if output_path else deck_path / "output.html"
+    result, _ = _generate_html(deck_path, out)
+    return result
+
+
+def refresh_html(
+    deck_dir: str | Path,
+    changed_paths: list[str] | None = None,
+    measure_slides: list[str] | None = None,
+) -> dict[str, Any]:
+    """Rebuild ``<deck>/output.html`` after an edit (the run_python post-processing for HTML decks).
+
+    Never raises: a failure comes back as ``{"html_error": "…"}``.
+
+    Returns:
+        Dict with html (path), html_bytes, warnings (only the measure_slides' and
+        deck-wide ones when measure_slides is given), affected (slugs the changed
+        paths can alter) and, with measure_slides, measure (static check report),
+        preview (open-in-browser note) and decorations (when template decorations
+        are missing).
+    """
+    from sdpm.engine.html.check import format_check_report, html_preview_unavailable
+    from sdpm.engine.schema import affected_slugs
+
+    deck_path = Path(deck_dir)
+    output = deck_path / "output.html"
+    try:
+        built, tagged = _generate_html(deck_path, output)
+    except Exception as exc:  # reported to the agent, never raised
+        return {"html_error": f"{type(exc).__name__}: {exc}"}
+
+    slugs = parse_outline_slugs(deck_path / "specs" / "outline.md")
+    present = {s: {} for s in slugs if (deck_path / "slides" / f"{s}.html").is_file()}
+    result: dict[str, Any] = {
+        "html": built["output_path"],
+        "html_bytes": built["bytes"],
+        "warnings": built["warnings"],
+        "affected": affected_slugs(changed_paths or [], present, html=True),
+    }
+    if measure_slides:
+        wanted = set(measure_slides)
+        result["warnings"] = [text for slug, text in tagged if slug is None or slug in wanted]
+        diags = [d for d in built["diagnostics"] if d["slug"] in wanted or d["slug"] not in present]
+        result["measure"] = format_check_report(diags, measure_slides)
+        result["preview"] = html_preview_unavailable(output)
+        if built.get("decorations") is not None:
+            result["decorations"] = built["decorations"]
+    return result
+
+
 def measure(
     json_path: str | Path,
     slides: list[int] | list[str] | None = None,

@@ -1,5 +1,13 @@
-This project does not include any third-party code or assets that require attribution
-beyond the dependencies listed in pyproject.toml / package.json.
+This project includes the following third-party code, copied verbatim:
+
+reveal.js 6.0.2
+  https://github.com/hakimel/reveal.js
+  License: MIT
+  Copyright (C) 2011-2026 Hakim El Hattab, http://hakim.se, and reveal.js contributors
+  Location: sdpm/vendor/revealjs/ (full license text in sdpm/vendor/revealjs/LICENSE)
+
+Beyond that, the project relies only on the dependencies listed in
+pyproject.toml / package.json.
 
 All third-party dependencies are installed at build time and are subject to their
 respective licenses.
