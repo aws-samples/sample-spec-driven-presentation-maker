@@ -152,8 +152,7 @@ def _is_html_deck(deck_id: str) -> bool:
 
 def generate_pptx(deck_id: Annotated[str, Field(description='Deck directory path.')]) -> dict[str, Any]:
     """Build output.pptx from the deck workspace (deck.json + slides/*.json). run_python
-    already rebuilds after edits; use this for an explicit full build. HTML decks build
-    nothing here.
+    already rebuilds after edits; use this for an explicit full build.
     """
     if _is_html_deck(deck_id):
         return {

@@ -234,7 +234,7 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Prompts | `sdpm-vibe`, `sdpm-spec`, `sdpm-style`, `sdpm-translate` | User-invoked (slash-command) entry points; `vibe` / `spec` set the interaction mode |
 | Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate). `start_composing(mode="pptx"\|"html")` picks the composer document for the deck's output format |
 | Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template` | Create deck workspace (`output_format="pptx"\|"html"`), validate specs, apply style, analyze template |
-| Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview. For HTML decks `generate_pptx` builds nothing and returns a message pointing at `run_python` |
+| Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview |
 | Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
 | References | `list_styles` | Bundled and user styles |
 | References | `read_guides` | Design rules, guides, and the slide JSON spec (`slide-json-spec`) |

@@ -6,8 +6,6 @@ category: workflow
 
 # Phase 4: Sync After Hand-Editing
 
-PPTX decks only — HTML decks (deck.json `outputFormat` `html`) are not supported.
-
 Run this when the user has hand-edited the PPTX in PowerPoint and then asks the agent for further changes.
 The agent always edits the deck's source JSON, so hand-edits must be synced there first — otherwise they are lost on regeneration.
 
