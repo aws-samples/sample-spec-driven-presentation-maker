@@ -21,7 +21,8 @@ Entries before v0.5.0 were written retroactively as summaries.
   `slides/`; `run_python` assembles them into a single offline `<deck>/output.html` on
   reveal.js 6 (vendored under `sdpm/vendor/revealjs/`, MIT) with speaker notes, and reports
   static checks (structure, unknown layouts, scripts, external URLs, self-drawn slide numbers,
-  font sizes outside the style's tokens, `deck.css` rules). Templates and styles are shared
+  font sizes outside the style's tokens, `deck.css` rules). Every image is embedded in that
+  one file; an embedded file over 5 MB and an `output.html` over 25 MB are warned. Templates and styles are shared
   with PPTX; template decorations are converted to SVG when LibreOffice and poppler are
   installed. The CLI gains `generate_html <deck>`. Translation, PPTX import, hand-edit sync,
   `code_to_slide` and `generate_pptx` refuse HTML decks with a message. There is no PNG

@@ -71,9 +71,12 @@ Keep content clear of `band` and `obstacle` boxes, and never redraw them.
 
 `data-ph="<key>"` puts an element where the layout's placeholder is and styles it like the
 template (font, size, colour, alignment, bullets per list level). `title` and `subtitle`
-work as aliases. Override any of it with an inline `style`, a slide `<style>` rule or a
-`deck.css` class: the template rules weigh as one attribute selector (`[data-ph]`), so any
-of them wins.
+work as aliases. The placeholder element's own properties (position, size, padding, font,
+colour, alignment) can be overridden with an inline `style`, a slide `<style>` rule or a
+`deck.css` class. For its paragraphs and list items (margins, bullets, per-level sizes and
+colours), use a slide `<style>` rule that names the placeholder, e.g.
+`[data-ph="body"] li { … }`: the template's own rules for them are more specific than a
+single class.
 A placeholder is optional: leave it out and nothing is drawn there.
 
 ## Regions — `data-region`
@@ -139,10 +142,15 @@ speaker view.
   `alt` becomes the accessible label.
 - Images: paths relative to the deck root (`images/photo.png`, not relative to `slides/`) or
   `attachments/…`; they are embedded as data URIs wherever they load something: `src`,
-  `srcset`, `poster`, `<object data>`, `<link href>`, SVG `<image href>`, and CSS `url(…)` /
-  `image-set("…")`.
-- No external URLs in any of those positions or in `@import`. Links (`<a href="https://…">`)
-  are allowed.
+  `srcset`, `poster`, SVG `<image href>`, and CSS `url(…)` / `image-set("…")`. A deck SVG
+  file (`images/chart.svg`) stays an image: it is embedded as a data URI, never inlined, so
+  scripts or links inside it do nothing. To style or animate an SVG, write the `<svg>` in the
+  slide.
+- `<link rel=stylesheet>` and `@import` are not embedded (`external-url`): shared rules go in
+  `deck.css`, one-slide rules in the slide's `<style>`.
+- No external URLs in any of those positions. Links (`<a href="https://…">`) are allowed.
+- Everything ends up in one file: an embedded file over 5 MB and an `output.html` over 25 MB
+  are warned. Compress or shrink large images.
 
 ## Chrome — page numbers and footers
 
@@ -153,8 +161,9 @@ yourself: no `<footer>`, no `data-ph` for date / footer / slide-number placehold
 
 ## Not allowed
 
-`<script>`, `on*` event handlers, `javascript:` URLs, external URLs, `data-background-*`
-(the ground comes from the template and `defaultBackground`).
+`<script>`, `on*` event handlers, `javascript:` URLs, `<iframe>` / `<object>` / `<embed>`,
+external URLs, `data-background-*` (the ground comes from the template and
+`defaultBackground`). Inline `<svg>` follows the same rules, `<foreignObject>` content included.
 
 ## Static checks
 
@@ -165,8 +174,8 @@ yourself: no `<footer>`, no `data-ph` for date / footer / slide-number placehold
 | `structure` | not exactly one `<section>`, nested sections, or unparsable HTML — the slide is skipped |
 | `layout-missing` | the section has no `data-layout` |
 | `layout-unknown` | `data-layout` is not a layout of the template |
-| `script` | `<script>`, an `on*` handler, `javascript:` or `expression()` |
-| `external-url` | a non-local URL in `src` / `srcset` / `poster` / `data` / `href` (not `<a>`) / `url()` / `image-set()` / `@import` |
+| `script` | `<script>`, an `on*` handler, `javascript:`, `expression()`, or `<iframe>` / `<object>` / `<embed>` |
+| `external-url` | a non-local URL in `src` / `srcset` / `poster` / `data` / `href` (not `<a>`) / `url()` (also in SVG attributes such as `fill`) / `image-set()` / `@import`; a deck file behind `@import` or `<link rel=stylesheet>` (not embedded) |
 | `data-background` | a `data-background-*` attribute |
 | `self-chrome` | a hand-drawn page number or footer |
 | `root-in-slide-style` | a `:root` block in a slide `<style>` |

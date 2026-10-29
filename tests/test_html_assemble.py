@@ -274,18 +274,16 @@ def test_non_nestable_at_rules_are_hoisted_and_keyframes_renamed(tmp_path: Path)
     assert doc.xpath('//div[@class="dot"]')[0].get("style") == "animation:sdpm-anim-pulse 2s"
 
 
-def test_srcset_object_link_and_svg_image_refs_are_embedded(tmp_path: Path) -> None:
+def test_srcset_object_and_svg_image_refs_are_embedded(tmp_path: Path) -> None:
     deck = _make_deck(tmp_path)
     (deck / "images").mkdir()
     png = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
     (deck / "images" / "dot.png").write_bytes(png)
-    (deck / "images" / "extra.css").write_text(".extra{color:red}", encoding="utf-8")
     slides = {"refs": (
         '<section data-layout="Blank">'
         '<img src="data:image/png;base64,AAAA" srcset="images/dot.png 1x, data:image/png;base64,AA,BB 2x">'
         '<object data="images/dot.png"></object>'
-        '<link rel="stylesheet" href="images/extra.css">'
         '<svg><image href="images/dot.png"/><image xlink:href="images/dot.png"/></svg>'
         '<div style="background-image:image-set(&quot;images/dot.png&quot; 1x, '
         'url(images/dot.png) 2x)"></div></section>')}
@@ -296,11 +294,61 @@ def test_srcset_object_link_and_svg_image_refs_are_embedded(tmp_path: Path) -> N
     uri = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
     assert section.xpath(".//img")[0].get("srcset") == f"{uri} 1x, data:image/png;base64,AA,BB 2x"
     assert section.xpath(".//object")[0].get("data") == uri
-    assert section.xpath(".//link")[0].get("href").startswith("data:text/css;base64,")
     images = section.xpath(".//image")
     assert images[0].get("href") == uri and images[1].get("xlink:href") == uri
     assert section.xpath(".//div")[0].get("style").count(uri) == 2
     assert "images/" not in lxml_html.tostring(section, encoding="unicode")
+
+
+def test_linked_stylesheet_is_not_embedded(tmp_path: Path) -> None:
+    deck = _make_deck(tmp_path)
+    (deck / "images").mkdir()
+    (deck / "images" / "extra.css").write_text(".extra{color:red}", encoding="utf-8")
+    slides = {"css": '<section data-layout="Blank"><link rel="stylesheet" href="images/extra.css"></section>'}
+    result = _assemble(deck, slides=slides)
+    doc = lxml_html.document_fromstring(result.html)
+    assert doc.xpath('//section[@data-slug="css"]//link')[0].get("href") == "images/extra.css"
+    assert ".extra{color:red}" not in result.html and "data:text/css" not in result.html
+
+
+def test_deck_svg_is_embedded_as_an_inert_image(tmp_path: Path) -> None:
+    deck = _make_deck(tmp_path)
+    (deck / "images").mkdir()
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg" onload="evil()"><script>evil()</script>'
+           '<image href="https://evil.example/x.png"/><rect id="r" width="10" height="10"/></svg>')
+    (deck / "images" / "chart.svg").write_text(svg, encoding="utf-8")
+    slides = {"svg": (
+        '<section data-layout="Blank"><img src="images/chart.svg" alt="chart">'
+        '<div style="background:url(images/chart.svg)"></div>'
+        '<img srcset="images/chart.svg 1x"></section>')}
+    result = _assemble(deck, slides=slides)
+    assert not result.warnings
+    doc = lxml_html.document_fromstring(result.html)
+    section = doc.xpath('//section[@data-slug="svg"]')[0]
+    uri = "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    imgs = section.xpath(".//img")
+    assert imgs[0].get("src") == uri and imgs[0].get("alt") == "chart"
+    assert imgs[1].get("srcset") == f"{uri} 1x"
+    assert uri in section.xpath(".//div")[0].get("style")
+    text = lxml_html.tostring(section, encoding="unicode")
+    assert not section.xpath(".//svg | .//script") and "onload" not in text
+    assert "evil" not in result.html
+
+
+def test_size_warnings(tmp_path: Path, monkeypatch) -> None:
+    from sdpm.engine.html import assemble
+
+    deck = _make_deck(tmp_path)
+    (deck / "images").mkdir()
+    (deck / "images" / "big.png").write_bytes(b"\x89PNG" + b"0" * 2000)
+    slides = {"big": '<section data-layout="Blank"><img src="images/big.png"><img src="images/big.png"></section>'}
+    assert not _assemble(deck, slides=slides).warnings
+    monkeypatch.setattr(assemble, "MAX_EMBEDDED_FILE_BYTES", 1000)
+    monkeypatch.setattr(assemble, "MAX_OUTPUT_HTML_BYTES", 1000)
+    result = _assemble(deck, slides=slides)
+    assert [w.split(":", 1)[0] for w in result.warnings] == ["big", "output.html"]
+    assert "images/big.png is 0.0 MB" in result.warnings[0]
+    assert result.warnings[1].startswith(f"output.html: {result.bytes / 1048576:.1f} MB")
 
 
 def test_inline_js_escapes_script_end_and_comment_open() -> None:

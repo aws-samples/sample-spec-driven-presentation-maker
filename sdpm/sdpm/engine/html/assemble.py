@@ -4,8 +4,10 @@
 
 Everything is inlined: reveal.js (``sdpm.config.VENDOR_DIR``), the style ``:root``,
 theme.css, the decoration SVG of each used layout (once, as a CSS background), the
-deck-root ``deck.css``, each slide's scoped ``<style>``, icons (inline SVG) and
-images (data URIs). The result loads nothing from the network.
+deck-root ``deck.css``, each slide's scoped ``<style>``, ``assets:`` icons (inline
+SVG) and every other file (data URIs — deck SVGs too, so their scripts never run).
+``<link rel=stylesheet>`` is not embedded (shared rules belong in deck.css). The
+result loads nothing from the network.
 
 Head order: reset.css + reveal.css → style :root (``#sdpm-style-root``) → theme.css
 (``#sdpm-theme``) → deck rules (``#sdpm-deck``) → deck.css (``#sdpm-deck-css``) →
@@ -39,12 +41,20 @@ _IMG_ONLY_ATTRS = frozenset({"src", "alt", "srcset", "sizes", "loading", "decodi
                              "crossorigin", "referrerpolicy", "fetchpriority"})
 _INLINE_TAG = "sdpm-inline-svg"
 # Resource-loading attributes embedded as data URIs, per tag (others: src, poster).
+# <link> is left alone: a linked stylesheet is not embedded (check.py warns).
 _EMBED_ATTRS = {
     "object": ("data",),
-    "link": ("href",),
+    "link": (),
     "image": ("href", "xlink:href"),
     "feimage": ("href", "xlink:href"),
 }
+# Size warnings (everything is base64-embedded into one file).
+MAX_EMBEDDED_FILE_BYTES = 5 * 1024 * 1024
+MAX_OUTPUT_HTML_BYTES = 25 * 1024 * 1024
+
+
+def _mb(size: int) -> str:
+    return f"{size / (1024 * 1024):.1f} MB"
 
 
 @dataclass
@@ -149,8 +159,19 @@ class _Resolver:
         self.deck_dir = deck_dir.resolve()
         self.theme = theme
         self.warn = warn
+        self._sized: set[Path] = set()
 
     def path(self, ref: str, where: str) -> Path | None:
+        target = self._path(ref, where)
+        if target is not None and target not in self._sized:
+            self._sized.add(target)
+            size = target.stat().st_size
+            if size > MAX_EMBEDDED_FILE_BYTES:
+                self.warn(f"{where}: {ref} is {_mb(size)} (over {_mb(MAX_EMBEDDED_FILE_BYTES)}) and is "
+                          "embedded in output.html; compress or shrink it")
+        return target
+
+    def _path(self, ref: str, where: str) -> Path | None:
         kind = url_kind(ref)
         if kind == "assets":
             from sdpm.knowledge.assets import resolve_asset_path
@@ -335,7 +356,9 @@ def _process_media(section, slide_index: int, resolver: _Resolver, where: str,
             path = resolver.path(ref, where)
             if path is None:
                 continue
-            if tag == "img" and attr == "src" and path.suffix.lower() == ".svg":
+            # Only catalog icons are inlined; a deck SVG stays an image (inert, offline).
+            if (tag == "img" and attr == "src" and url_kind(ref) == "assets"
+                    and path.suffix.lower() == ".svg"):
                 n += 1
                 svg = _inline_svg_text(path, el, f"s{slide_index}i{n}-")
                 if svg is not None:
@@ -465,7 +488,9 @@ def assemble_deck(
 
     Returns:
         AssembleResult(html, bytes, layouts_used, warnings, slugs) — warnings are
-        ``"<slug>: …"`` / ``"deck.css: …"`` strings; slugs are the included slides.
+        ``"<slug>: …"`` / ``"deck.css: …"`` / ``"output.html: …"`` strings (the last one
+        when the file passes ``MAX_OUTPUT_HTML_BYTES``; an embedded file over
+        ``MAX_EMBEDDED_FILE_BYTES`` is warned under its slide); slugs are the included slides.
     """
     warnings: list[str] = []
     ground = default_background or template.info.get("ground")
@@ -539,8 +564,13 @@ def assemble_deck(
         "</html>",
     ]
     text = "\n".join(head + body) + "\n"
-    return AssembleResult(html=text, bytes=len(text.encode("utf-8")), layouts_used=layouts_used,
+    total = len(text.encode("utf-8"))
+    if total > MAX_OUTPUT_HTML_BYTES:
+        warnings.append(f"output.html: {_mb(total)} (over {_mb(MAX_OUTPUT_HTML_BYTES)}) — it opens "
+                        "slowly; compress or shrink the embedded images")
+    return AssembleResult(html=text, bytes=total, layouts_used=layouts_used,
                           warnings=warnings, slugs=included)
 
 
-__all__ = ["AssembleResult", "ParsedSlide", "assemble_deck", "inline_js", "parse_slide", "style_root_css"]
+__all__ = ["AssembleResult", "MAX_EMBEDDED_FILE_BYTES", "MAX_OUTPUT_HTML_BYTES", "ParsedSlide",
+           "assemble_deck", "inline_js", "parse_slide", "style_root_css"]

@@ -9,11 +9,17 @@ Rules:
     structure               not exactly one top-level ``<section>``, or a nested one
     layout-missing          the section has no ``data-layout``
     layout-unknown          ``data-layout`` names no layout of the template
-    script                  ``<script>``, ``on*`` attributes, ``javascript:`` URLs
+    script                  ``<script>``, ``on*`` attributes, ``javascript:`` URLs,
+                            ``<iframe>`` / ``<object>`` / ``<embed>`` (an embedded document
+                            the checks cannot see); inline ``<svg>`` and its
+                            ``<foreignObject>`` are checked like any other markup
                             (deck.css: ``javascript:``, ``expression()``, ``</style``)
     external-url            a resource-loading reference that is not ``data:``,
-                            ``assets:<source>/<name>`` or a deck-relative path
-                            (``<a href>`` is allowed: it loads nothing)
+                            ``assets:<source>/<name>`` or a deck-relative path, in an
+                            attribute, an attribute ``url()`` (SVG ``fill`` / ``filter`` …)
+                            or CSS (``<a href>`` is allowed: it loads nothing); also
+                            ``@import`` and ``<link rel=stylesheet>`` of a deck file,
+                            which are not embedded
     data-background         reveal.js ``data-background*`` attributes
     self-chrome             slide numbers / footers drawn by the slide (the assembler draws them)
     root-in-slide-style     ``:root`` in a slide ``<style>`` (tokens come from the style)
@@ -52,6 +58,11 @@ _CHROME_TOKEN_RE = re.compile(r"(?:page|slide)[-_]?(?:number|num|no)|pagenum|foo
 _CHROME_PH_NAMES = frozenset({"dt", "ftr", "sldnum", "date", "footer", "slide-number", "slidenumber"})
 # Attributes that make the browser load something.
 _RESOURCE_ATTRS = ("src", "poster", "data", "xlink:href")
+# Attributes whose javascript: value runs script (SVG animation sets href via to/from/values).
+_JS_URL_ATTRS = frozenset({"href", "xlink:href", "src", "action", "formaction", "data", "poster",
+                           "to", "from", "values"})
+# Elements that embed a whole document the static checks never see.
+_EMBEDDING_TAGS = frozenset({"iframe", "frame", "object", "embed"})
 
 
 def _diag(slug: str, rule: str, message: str) -> dict:
@@ -224,6 +235,10 @@ def check_html_font_sizes(slides: dict[str, str], art_direction_path: Path) -> l
 def _external_attr_diags(slug: str, el) -> list[dict]:
     out = []
     tag = el.tag
+    if tag in _EMBEDDING_TAGS:
+        out.append(_diag(slug, "script", f"<{tag}> embeds a document the checks cannot see; "
+                         "use <img> for images and put the content in the slide"))
+    stylesheet = tag == "link" and "stylesheet" in (el.get("rel") or "").lower().split()
     for name, value in el.attrib.items():
         lname = name.lower()
         if lname.startswith("on"):
@@ -234,10 +249,17 @@ def _external_attr_diags(slug: str, el) -> list[dict]:
                              f"<{tag} {name}> — reveal.js backgrounds are not used; the template "
                              "and style paint the ground"))
             continue
-        if url_kind(value) == "javascript" and lname in ("href", "xlink:href", "src", "action",
-                                                          "formaction", "data", "poster"):
+        if url_kind(value) == "javascript" and lname in _JS_URL_ATTRS:
             out.append(_diag(slug, "script", f"<{tag} {name}> uses a javascript: URL"))
             continue
+        if stylesheet and lname == "href":
+            if url_kind(value) != "data":
+                out.append(_diag(slug, "external-url",
+                                 f"<link rel=stylesheet href={value[:80]!r}> is not embedded; "
+                                 "put shared rules in deck.css"))
+            continue
+        if lname != "style" and "url(" in value.lower():
+            out.extend(_css_url_diags(slug, value, f"<{tag} {name}>"))
         urls: list[str] = []
         if lname in _RESOURCE_ATTRS:
             urls = [value]

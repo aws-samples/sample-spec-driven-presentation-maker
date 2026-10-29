@@ -77,6 +77,15 @@ def test_layout_missing_and_unknown() -> None:
     '<svg><rect onload="go()"/></svg>',
     '<a href="javascript:go()">x</a>',
     '<div style="background:url(javascript:go())"></div>',
+    '<svg><foreignObject><div onclick="go()">x</div></foreignObject></svg>',
+    "<svg><foreignObject><script>go()</script></foreignObject></svg>",
+    '<svg><a xlink:href="javascript:go()"><text>x</text></a></svg>',
+    '<svg><set attributeName="href" to="javascript:go()"/></svg>',
+    '<form action="javascript:go()"></form>',
+    '<button formaction="javascript:go()">x</button>',
+    '<iframe src="images/page.html"></iframe>',
+    '<object data="images/chart.png"></object>',
+    '<embed src="images/chart.svg">',
 ])
 def test_script(inner: str) -> None:
     assert "script" in _rules(_section(inner))
@@ -96,13 +105,28 @@ def test_script(inner: str) -> None:
     "<style>@import 'local.css';</style>",
     "<style>.x{background:image-set('https://example.com/a.png' 1x)}</style>",
     '<div style="background:-webkit-image-set(&quot;//cdn.example.com/a.png&quot; 1x)"></div>',
+    '<svg><rect fill="url(https://example.com/p.svg#g)"/></svg>',
+    '<svg><g filter="url(&quot;//cdn.example.com/f.svg#f&quot;)"></g></svg>',
+    '<svg><image href="https://example.com/a.png"/></svg>',
+    '<svg><foreignObject><img src="https://example.com/a.png"></foreignObject></svg>',
+    "<svg><style>.x{fill:url(https://example.com/p.svg#g)}</style></svg>",
+    '<link rel="stylesheet" href="images/extra.css">',
 ])
 def test_external_url(inner: str) -> None:
     assert "external-url" in _rules(_section(inner))
 
 
+def test_linked_stylesheet_says_use_deck_css() -> None:
+    diags = check_slide_html("s", _section('<link rel="stylesheet" href="https://example.com/a.css">'),
+                             layouts=LAYOUTS)
+    assert [d["rule"] for d in diags] == ["external-url"]
+    assert "put shared rules in deck.css" in diags[0]["message"]
+
+
 def test_anchor_href_and_fragment_refs_are_allowed() -> None:
     inner = ('<a href="https://example.com">link</a><svg><use href="#icon"/></svg>'
+             '<svg><defs><linearGradient id="g"/></defs><rect fill="url(#g)"/>'
+             '<animate attributeName="opacity" values="0;1"/></svg>'
              '<img src="data:image/png;base64,AAAA">'
              '<img srcset="data:image/png;base64,AA,BB 2x, images/a.png 1x">'
              '<div style="background:image-set(&quot;images/a.png&quot; type(&quot;image/png&quot;))"></div>')
