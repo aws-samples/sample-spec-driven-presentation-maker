@@ -119,6 +119,20 @@ result carries `preview: {"status": "unavailable", "install": "…"}` with the o
 for your OS, and the agent relays it. Icon catalogs missing for any reason are fetched in
 the background on the server's first start.
 
+### HTML decks
+
+Ask for an HTML, browser or reveal.js deck (or put `@format:html` in the message) and the
+agent builds a browser presentation instead of a PPTX. It uses the same templates and styles.
+The result is `<deck>/output.html`, a single file that works offline. In the browser,
+press `S` for the speaker view with notes, `F` for full screen and `Esc` for the slide
+overview. To get a PDF, open `output.html?print-pdf` and print from the browser.
+
+- Bundled templates ship pre-converted. For your own templates, LibreOffice and poppler are
+  needed to carry over decorations (logos, bands, background art); without them the layouts
+  and placeholders still convert.
+- There is no PNG preview for HTML decks yet: open `output.html` to see the slides.
+- PPTX-only features (translation, PPTX import, hand-edit sync) refuse HTML decks.
+
 ## Your browser (Web UI)
 
 `sdpm webui` starts the Web UI in Local mode — Next.js on `http://localhost:3000` talking to

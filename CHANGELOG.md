@@ -12,6 +12,21 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **HTML output mode (phase 1, local).** A deck can be a browser presentation instead of a
+  PPTX: ask for an HTML / browser deck or write `@format:html`, and the deck is created with
+  `deck.json` `outputFormat: "html"` (`init_deck_workspace(name, output_format="html")`).
+  Composers are dispatched with `start_composing(deck_id, assigned_slugs, mode="html")`,
+  which returns the HTML composer document, the template's converted layouts and the deck's
+  shared `deck.css` (written by the layout pass). Each slide is an HTML fragment under
+  `slides/`; `run_python` assembles them into a single offline `<deck>/output.html` on
+  reveal.js 6 (vendored under `sdpm/vendor/revealjs/`, MIT) with speaker notes, and reports
+  static checks (structure, unknown layouts, scripts, external URLs, self-drawn slide numbers,
+  font sizes outside the style's tokens, `deck.css` rules). Templates and styles are shared
+  with PPTX; template decorations are converted to SVG when LibreOffice and poppler are
+  installed. The CLI gains `generate_html <deck>`. Translation, PPTX import, hand-edit sync,
+  `code_to_slide` and `generate_pptx` refuse HTML decks with a message. There is no PNG
+  preview for HTML decks yet, and the AWS (remote) server does not support them. PPTX
+  behaviour is unchanged and the MCP tool count stays at 20.
 - **Claude Haiku 5.5** is a selectable model (`global.anthropic.claude-haiku-5-5`) for
   both Chat and Create. It uses the extended-thinking profile (no `temperature`; Bedrock
   rejects 0.1 with "temperature is deprecated"), with prompt caching enabled, and is
