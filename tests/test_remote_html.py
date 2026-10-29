@@ -498,3 +498,20 @@ def test_remote_tool_count_unchanged():
     params = {t.name: set(t.inputSchema.get("properties", {})) for t in tools}
     assert "output_format" in params["init_deck_workspace"]
     assert "mode" in params["start_composing"]
+
+
+# --- container image -----------------------------------------------------------------
+
+
+def test_runtime_image_copies_bundled_html_data():
+    """The remote image ships every bundled-data dir the HTML engine reads (SDPM_SKILL_ROOT).
+
+    reveal.js under sdpm/vendor/ is inlined into every HTML deck; without it in the
+    image, generate_pptx fails for every HTML deck on the deployed server.
+    """
+    dockerfile = (_ROOT / "servers" / "remote" / "Dockerfile").read_text(encoding="utf-8")
+    copies = set(re.findall(r"^COPY\s+(\S+)", dockerfile, flags=re.MULTILINE))
+    for data_dir in ("sdpm/references/", "sdpm/templates/", "sdpm/vendor/"):
+        assert data_dir in copies, data_dir
+    ignored = (_ROOT / ".dockerignore").read_text(encoding="utf-8").split()
+    assert not any(entry.rstrip("/") in ("sdpm/vendor", "sdpm") for entry in ignored)

@@ -29,8 +29,10 @@ RUN python3.13 -m pip install --no-cache-dir -c servers/remote/constraints.txt .
 
 # Bundled knowledge data (references / templates) — served by the shared tool
 # contract via SDPM_SKILL_ROOT. Assets stay on S3 (user-extensible, 36MB).
+# vendor/ holds reveal.js, inlined into every HTML deck (sdpm.engine.html).
 COPY sdpm/references/ sdpm/references/
 COPY sdpm/templates/ sdpm/templates/
+COPY sdpm/vendor/ sdpm/vendor/
 ENV SDPM_SKILL_ROOT=/app/sdpm
 
 # Install remote server
