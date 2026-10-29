@@ -242,5 +242,66 @@ def test_parse_slide_reports_structure() -> None:
     assert parse_slide("").section is None
 
 
+def test_nested_section_slide_is_skipped(tmp_path: Path) -> None:
+    deck = _make_deck(tmp_path)
+    slides = {"ok": SLIDES["cover"],
+              "stack": '<section data-layout="Blank"><section>inner</section></section>'}
+    result = _assemble(deck, slides=slides)
+    assert result.slugs == ["ok"]
+    assert any(w.startswith("stack: slide skipped") and "nested <section>" in w for w in result.warnings)
+
+
+def test_non_nestable_at_rules_are_hoisted_and_keyframes_renamed(tmp_path: Path) -> None:
+    deck = _make_deck(tmp_path)
+    slides = {"anim": (
+        '<section data-layout="Blank"><style>'
+        "/* pulse */ @keyframes pulse { from { opacity: .3 } to { opacity: 1 } }\n"
+        ".dot { animation: pulse 1s infinite; }\n"
+        "@font-face { font-family: Demo; src: local(Demo); }\n"
+        "@media (prefers-reduced-motion) { .dot { animation-name: none } }"
+        "</style><style>.ring { animation-name: pulse, fade; }</style>"
+        '<div class="dot" style="animation:pulse 2s">x</div></section>')}
+    result = _assemble(deck, slides=slides)
+    doc = lxml_html.document_fromstring(result.html)
+    css = doc.xpath('//style[@id="sdpm-slides"]')[0].text
+    wrapper = css.index('section[data-slug="anim"]{')
+    assert css.index("@keyframes sdpm-anim-pulse {") < wrapper
+    assert css.index("@font-face { font-family: Demo;") < wrapper
+    assert "@keyframes pulse" not in css
+    assert ".dot { animation: sdpm-anim-pulse 1s infinite; }" in css[wrapper:]
+    assert "@media (prefers-reduced-motion) { .dot { animation-name: none } }" in css[wrapper:]
+    assert ".ring { animation-name: sdpm-anim-pulse, fade; }" in css
+    assert doc.xpath('//div[@class="dot"]')[0].get("style") == "animation:sdpm-anim-pulse 2s"
+
+
+def test_srcset_object_link_and_svg_image_refs_are_embedded(tmp_path: Path) -> None:
+    deck = _make_deck(tmp_path)
+    (deck / "images").mkdir()
+    png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+    (deck / "images" / "dot.png").write_bytes(png)
+    (deck / "images" / "extra.css").write_text(".extra{color:red}", encoding="utf-8")
+    slides = {"refs": (
+        '<section data-layout="Blank">'
+        '<img src="data:image/png;base64,AAAA" srcset="images/dot.png 1x, data:image/png;base64,AA,BB 2x">'
+        '<object data="images/dot.png"></object>'
+        '<link rel="stylesheet" href="images/extra.css">'
+        '<svg><image href="images/dot.png"/><image xlink:href="images/dot.png"/></svg>'
+        '<div style="background-image:image-set(&quot;images/dot.png&quot; 1x, '
+        'url(images/dot.png) 2x)"></div></section>')}
+    result = _assemble(deck, slides=slides)
+    assert not result.warnings
+    doc = lxml_html.document_fromstring(result.html)
+    section = doc.xpath('//section[@data-slug="refs"]')[0]
+    uri = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+    assert section.xpath(".//img")[0].get("srcset") == f"{uri} 1x, data:image/png;base64,AA,BB 2x"
+    assert section.xpath(".//object")[0].get("data") == uri
+    assert section.xpath(".//link")[0].get("href").startswith("data:text/css;base64,")
+    images = section.xpath(".//image")
+    assert images[0].get("href") == uri and images[1].get("xlink:href") == uri
+    assert section.xpath(".//div")[0].get("style").count(uri) == 2
+    assert "images/" not in lxml_html.tostring(section, encoding="unicode")
+
+
 def test_inline_js_escapes_script_end_and_comment_open() -> None:
     assert inline_js('a="</SCRIPT>";b="<!--"') == 'a="<\\/SCRIPT>";b="<\\!--"'

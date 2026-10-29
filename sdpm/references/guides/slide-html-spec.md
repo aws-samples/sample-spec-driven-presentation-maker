@@ -71,7 +71,9 @@ Keep content clear of `band` and `obstacle` boxes, and never redraw them.
 
 `data-ph="<key>"` puts an element where the layout's placeholder is and styles it like the
 template (font, size, colour, alignment, bullets per list level). `title` and `subtitle`
-work as aliases. Override any of it with an inline `style` or a slide `<style>` rule.
+work as aliases. Override any of it with an inline `style`, a slide `<style>` rule or a
+`deck.css` class: the template rules weigh as one attribute selector (`[data-ph]`), so any
+of them wins.
 A placeholder is optional: leave it out and nothing is drawn there.
 
 ## Regions — `data-region`
@@ -84,7 +86,11 @@ keep its coordinates; the name is a short identifier (`body`, `step-1`, `media`)
 ## Styles
 
 - **Slide `<style>`** — any number inside the section. Rules are nested under that slide
-  automatically (`section[data-slug="<slug>"] { … }`), so plain selectors are local to it.
+  automatically (`section[data-slug="<slug>"] { … }`), so plain selectors are local to it;
+  `&` is the section itself (`&{…}`, `&.dark{…}` — a plain `section{…}` matches nothing).
+  `@keyframes`, `@font-face` and `@property` are moved out of the nesting and stay global;
+  keyframes are renamed per slide (`sdpm-<slug>-<name>`) together with the `animation` /
+  `animation-name` values of that slide, so two slides may both use `pulse`.
   No `:root` block (`root-in-slide-style`): tokens come from the style.
 - **Inline `style`** — fine for positions and one-off tweaks.
 - **Font sizes** — only `font-size: calc(var(--fs-x) * var(--sdpm-pt-scale))` (also in the
@@ -132,8 +138,10 @@ speaker view.
 - Icons: `search_assets` → `<img src="assets:<source>/<name>">`. SVG icons are inlined;
   `alt` becomes the accessible label.
 - Images: paths relative to the deck root (`images/photo.png`, not relative to `slides/`) or
-  `attachments/…`; they are embedded as data URIs. The same refs work in CSS `url(…)`.
-- No external URLs in `src`, `poster`, `url()` or `@import`. Links (`<a href="https://…">`)
+  `attachments/…`; they are embedded as data URIs wherever they load something: `src`,
+  `srcset`, `poster`, `<object data>`, `<link href>`, SVG `<image href>`, and CSS `url(…)` /
+  `image-set("…")`.
+- No external URLs in any of those positions or in `@import`. Links (`<a href="https://…">`)
   are allowed.
 
 ## Chrome — page numbers and footers
@@ -158,7 +166,7 @@ yourself: no `<footer>`, no `data-ph` for date / footer / slide-number placehold
 | `layout-missing` | the section has no `data-layout` |
 | `layout-unknown` | `data-layout` is not a layout of the template |
 | `script` | `<script>`, an `on*` handler, `javascript:` or `expression()` |
-| `external-url` | a non-local URL in `src` / `poster` / `url()` / `@import` |
+| `external-url` | a non-local URL in `src` / `srcset` / `poster` / `data` / `href` (not `<a>`) / `url()` / `image-set()` / `@import` |
 | `data-background` | a `data-background-*` attribute |
 | `self-chrome` | a hand-drawn page number or footer |
 | `root-in-slide-style` | a `:root` block in a slide `<style>` |

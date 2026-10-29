@@ -54,14 +54,16 @@ def _build_snapshot(deck_dir: Path) -> dict[str, tuple[int, int]]:
     except ValueError:
         html_deck = False
     rels = ["deck.json", "presentation.json", "specs/outline.md"]
+    globs = [("slides", "*.json"), ("includes", "*.json")]
     if html_deck:
         rels += ["specs/art-direction.html", "deck.css"]
+        globs.append(("slides", "*.html"))
     for rel in rels:
         p = deck_dir / rel
         if p.is_file():
             st = p.stat()
             snap[rel] = (st.st_mtime_ns, st.st_size)
-    for sub, pattern in (("slides", "*.json"), ("includes", "*.json"), ("slides", "*.html")):
+    for sub, pattern in globs:
         d = deck_dir / sub
         if d.is_dir():
             for p in d.glob(pattern):

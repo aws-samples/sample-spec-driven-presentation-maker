@@ -4,7 +4,7 @@
 
 ``theme.css``      canvas size, pt scale, ground, fonts, theme colours, and per
                    layout the placeholder boxes and text styles
-                   (``section[data-layout="…"] :is([data-ph="0"],[data-ph="title"])``)
+                   (``:where(section[data-layout="…"]) :is([data-ph="0"],[data-ph="title"])``)
 ``template.json``  layouts, placeholders (data-ph keys, boxes, resolved styles),
                    chrome (slide number / footer), decorations, grounds
 ``layouts/*.svg``  decoration-only renders (LibreOffice + poppler; optional)
@@ -30,7 +30,7 @@ from sdpm.engine import slide_size_px
 from sdpm.engine.html import decorations as _decorations
 from sdpm.engine.html.textstyle import load_theme, placeholder_type, resolve_placeholder_style
 
-CONVERTER_VERSION = "1"
+CONVERTER_VERSION = "2"
 TEMPLATE_JSON_VERSION = 1
 
 _CHROME_TYPES = ("dt", "ftr", "sldNum")
@@ -351,7 +351,10 @@ def build_theme_css(info: dict) -> str:
             lines.append(f"{section}{{--sdpm-template-bg:{ground['color']}}}")
         for ph in layout["placeholders"]:
             keys = [ph["key"], *ph.get("aliases", [])]
-            selector = f"{section} :is({','.join(f'[data-ph={css_string(k)}]' for k in keys)})"
+            # :where() keeps the layout part out of the specificity: placeholder rules
+            # weigh (0,1,0), above reveal's reset.css, tied with a deck.css class (which
+            # comes later and wins) and below any slide <style> rule.
+            selector = f":where({section}) :is({','.join(f'[data-ph={css_string(k)}]' for k in keys)})"
             lines.extend(_placeholder_rules(selector, ph))
     return "\n".join(lines) + "\n"
 

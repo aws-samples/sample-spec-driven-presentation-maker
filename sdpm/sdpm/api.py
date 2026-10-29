@@ -1428,8 +1428,7 @@ def load_slides_json_or_pptx(path) -> dict:
 
         deck_json = path_obj / "deck.json"
         try:
-            with open(deck_json) as f:
-                is_html = deck_output_format(json.load(f)) == "html"
+            is_html = deck_output_format(json.loads(deck_json.read_text(encoding="utf-8"))) == "html"
         except (OSError, ValueError):  # unreadable or invalid: the build below reports it
             is_html = False
         if is_html:

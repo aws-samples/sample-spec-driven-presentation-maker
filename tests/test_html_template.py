@@ -190,11 +190,11 @@ def test_theme_css_shape() -> None:
     assert '--sdpm-font-major:"Calibri"' in css
     assert "--sdpm-theme-accent1:" in css
     assert 'section[data-layout="Title Only"]{--sdpm-template-bg:#FFFFFF}' in css
-    selector = 'section[data-layout="Title and Content"] :is([data-ph="0"],[data-ph="title"])'
+    selector = ':where(section[data-layout="Title and Content"]) :is([data-ph="0"],[data-ph="title"])'
     assert f"{selector}{{position:absolute;" in css
     assert "font-size:calc(44pt * var(--sdpm-pt-scale))" in css
     assert "font-family:var(--font-family, var(--sdpm-font-major)), var(--sdpm-font-major)" in css
-    assert 'section[data-layout="Title and Content"] :is([data-ph="1"]) li li{' in css
+    assert ':where(section[data-layout="Title and Content"]) :is([data-ph="1"]) li li{' in css
     assert 'list-style-type:"• "' in css
 
 

@@ -292,8 +292,10 @@ class TestLocalRunPythonHtml:
     def test_pptx_snapshot_ignores_art_direction_and_deck_css(self, deck_dir: Path):
         (deck_dir / "specs" / "art-direction.html").write_text("<html></html>")
         (deck_dir / "deck.css").write_text(".x{}")
+        (deck_dir / "slides" / "stray.html").write_text("<section></section>")
         snap = sandbox_tools._build_snapshot(deck_dir)
         assert "deck.css" not in snap and "specs/art-direction.html" not in snap
+        assert "slides/stray.html" not in snap
 
     def test_invalid_output_format_is_reported_and_built_as_pptx(self, deck_dir: Path, monkeypatch):
         calls = self._patch_generate(monkeypatch)

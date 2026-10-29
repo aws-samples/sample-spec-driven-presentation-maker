@@ -1,5 +1,5 @@
 {
-  "converterVersion": "1",
+  "converterVersion": "2",
   "fonts": {
     "fullwidth": "",
     "halfwidth": "Calibri",
@@ -2476,7 +2476,7 @@
     "ptPerPx": 0.5,
     "width": 1920
   },
-  "sourceHash": "b0f6d86a6f0fe5e9",
+  "sourceHash": "27b68c726de69dbe",
   "template": "blank-dark",
   "themeColors": {
     "accent1": "#4F81BD",

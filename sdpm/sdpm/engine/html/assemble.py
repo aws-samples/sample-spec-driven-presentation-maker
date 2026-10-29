@@ -9,7 +9,9 @@ images (data URIs). The result loads nothing from the network.
 
 Head order: reset.css + reveal.css → style :root (``#sdpm-style-root``) → theme.css
 (``#sdpm-theme``) → deck rules (``#sdpm-deck``) → deck.css (``#sdpm-deck-css``) →
-slide styles nested under ``section[data-slug="…"]`` (``#sdpm-slides``).
+slide styles nested under ``section[data-slug="…"]`` (``#sdpm-slides``). At-rules that
+cannot be nested (``@keyframes``, ``@font-face``, ``@property``…) are emitted unscoped
+just before their slide's rules, keyframes renamed ``sdpm-<slug>-<name>``.
 """
 
 from __future__ import annotations
@@ -25,7 +27,7 @@ from typing import Any, Callable
 from lxml import etree
 from lxml import html as lxml_html
 
-from sdpm.engine.html.check import url_kind
+from sdpm.engine.html.check import image_set_strings, parse_srcset, url_kind
 from sdpm.engine.html.template import TemplateHtml, css_string
 
 _ROOT_RE = re.compile(r":root\s*\{(?P<body>.*?)\}", re.DOTALL | re.IGNORECASE)
@@ -36,6 +38,13 @@ _JUSTIFY = {"top": "flex-start", "middle": "center", "bottom": "flex-end"}
 _IMG_ONLY_ATTRS = frozenset({"src", "alt", "srcset", "sizes", "loading", "decoding",
                              "crossorigin", "referrerpolicy", "fetchpriority"})
 _INLINE_TAG = "sdpm-inline-svg"
+# Resource-loading attributes embedded as data URIs, per tag (others: src, poster).
+_EMBED_ATTRS = {
+    "object": ("data",),
+    "link": ("href",),
+    "image": ("href", "xlink:href"),
+    "feimage": ("href", "xlink:href"),
+}
 
 
 @dataclass
@@ -91,6 +100,8 @@ def parse_slide(text: str) -> ParsedSlide:
         errors.insert(0, f"expected exactly one top-level <section>, found {len(sections)}")
         return ParsedSlide(sections[0] if len(sections) > 1 else None, errors=errors)
     section = sections[0]
+    if any(el.tag == "section" for el in section.iterdescendants() if isinstance(el.tag, str)):
+        errors.append("nested <section> (vertical slides) is not supported")
     styles = [el.text or "" for el in section.iter("style")]
     has_notes = any("notes" in (el.get("class") or "").split() for el in section.iter("aside"))
     return ParsedSlide(section, section.get("data-layout"), has_notes, styles, errors)
@@ -168,7 +179,89 @@ class _Resolver:
                 return m.group(0)
             return f'url("{_data_uri(path)}")'
 
+        for start, end, url in reversed(image_set_strings(css)):
+            path = self.path(url, where)
+            if path is not None:
+                css = f'{css[:start]}"{_data_uri(path)}"{css[end:]}'
         return _CSS_URL_RE.sub(repl, css)
+
+
+# ── slide CSS: at-rules that cannot be nested ────────────────────────────
+
+# CSS nesting admits only conditional group rules inside a style rule; these are
+# emitted unscoped instead of inside ``section[data-slug="…"]{…}``.
+_HOISTED_AT_RULES = frozenset({"keyframes", "-webkit-keyframes", "font-face", "property",
+                               "counter-style", "font-feature-values", "font-palette-values"})
+_AT_KEYWORD_RE = re.compile(r"\s*(?:/\*.*?\*/\s*)*@([\w-]+)", re.DOTALL)
+_IDENT_RE = re.compile(r"\s+(-?[_a-zA-Z][\w-]*)")
+_ANIMATION_DECL_RE = re.compile(r"(?<![\w-])((?:-webkit-)?animation(?:-name)?\s*:\s*)([^;{}]+)",
+                                re.IGNORECASE)
+_NON_IDENT_RE = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def _top_level_chunks(css: str) -> list[str]:
+    """Split CSS into top-level statements (rules and at-rules), skipping strings and comments."""
+    chunks: list[str] = []
+    depth, start, i, n = 0, 0, 0, len(css)
+    while i < n:
+        c = css[i]
+        if css.startswith("/*", i):
+            end = css.find("*/", i + 2)
+            i = n if end < 0 else end + 2
+            continue
+        if c in "\"'":
+            j = i + 1
+            while j < n and css[j] not in (c, "\n"):
+                j += 2 if css[j] == "\\" else 1
+            i = j + 1
+            continue
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth = max(depth - 1, 0)
+        if (c == "}" and depth == 0) or (c == ";" and depth == 0):
+            chunks.append(css[start:i + 1])
+            start = i + 1
+        i += 1
+    if css[start:].strip():
+        chunks.append(css[start:])
+    return chunks
+
+
+def _split_slide_css(css: str, slug: str) -> tuple[list[str], str, dict[str, str]]:
+    """``(hoisted at-rules, CSS to nest, keyframes renames)`` for one slide ``<style>``.
+
+    Keyframes are renamed ``sdpm-<slug>-<name>`` so slides written in parallel
+    cannot collide; ``_rename_animations`` updates the references.
+    """
+    hoisted: list[str] = []
+    kept: list[str] = []
+    names: dict[str, str] = {}
+    prefix = f"sdpm-{_NON_IDENT_RE.sub('_', slug)}-"
+    for chunk in _top_level_chunks(css):
+        m = _AT_KEYWORD_RE.match(chunk)
+        keyword = m.group(1).lower() if m else ""
+        if keyword not in _HOISTED_AT_RULES:
+            kept.append(chunk)
+            continue
+        if keyword.endswith("keyframes"):
+            name = _IDENT_RE.match(chunk, m.end())
+            if name:
+                names[name.group(1)] = prefix + name.group(1)
+                chunk = chunk[:name.start(1)] + names[name.group(1)] + chunk[name.end(1):]
+        hoisted.append(chunk.strip())
+    if not hoisted:
+        return [], css, {}
+    return hoisted, "".join(kept), names
+
+
+def _rename_animations(css: str, names: dict[str, str]) -> str:
+    """Point ``animation`` / ``animation-name`` values at the renamed keyframes."""
+    if not names or "animation" not in css.lower():
+        return css
+    word = re.compile(r"(?<![\w-])(" + "|".join(map(re.escape, names)) + r")(?![\w-])")
+    return _ANIMATION_DECL_RE.sub(
+        lambda m: m.group(1) + word.sub(lambda w: names[w.group(1)], m.group(2)), css)
 
 
 # ── inline SVG ───────────────────────────────────────────────────────────
@@ -225,7 +318,17 @@ def _process_media(section, slide_index: int, resolver: _Resolver, where: str,
         if not isinstance(el.tag, str):
             continue
         tag = el.tag
-        for attr in ("src", "poster"):
+        style = el.get("style")
+        if style and ("url(" in style or "image-set(" in style):
+            el.set("style", resolver.css(style, where))
+        srcset = el.get("srcset")
+        if srcset:
+            candidates = []
+            for url, descriptors in parse_srcset(srcset):
+                path = resolver.path(url, where) if url_kind(url) in ("assets", "relative") else None
+                candidates.append(f"{_data_uri(path) if path else url} {descriptors}".strip())
+            el.set("srcset", ", ".join(candidates))
+        for attr in _EMBED_ATTRS.get(tag, ("src", "poster")):
             ref = el.get(attr)
             if ref is None or url_kind(ref) not in ("assets", "relative"):
                 continue
@@ -244,9 +347,6 @@ def _process_media(section, slide_index: int, resolver: _Resolver, where: str,
                     break
                 resolver.warn(f"{where}: {ref} is not a valid SVG — embedded as an image")
             el.set(attr, _data_uri(path))
-        style = el.get("style")
-        if style and "url(" in style:
-            el.set("style", resolver.css(style, where))
 
 
 def _chrome_html(chrome: dict, kind: str, text: str) -> str:
@@ -383,11 +483,20 @@ def assemble_deck(
             continue
         section = parsed.section
         number = len(sections) + 1
+        parts = []
         for style_el in list(section.iter("style")):
-            css = resolver.css(style_el.text or "", slug)
-            if css.strip():
-                slide_css.append(f"section[data-slug={css_string(slug)}]{{\n{css}\n}}")
+            parts.append(_split_slide_css(resolver.css(style_el.text or "", slug), slug))
             style_el.drop_tree()
+        renames = {old: new for _, _, found in parts for old, new in found.items()}
+        for hoisted, nested, _ in parts:
+            slide_css.extend(hoisted)
+            nested = _rename_animations(nested, renames)
+            if nested.strip():
+                slide_css.append(f"section[data-slug={css_string(slug)}]{{\n{nested}\n}}")
+        if renames:
+            for el in section.iter():
+                if isinstance(el.tag, str) and el.get("style"):
+                    el.set("style", _rename_animations(el.get("style"), renames))
         inline: dict[str, str] = {}
         _process_media(section, number, resolver, slug, inline)
         layout = parsed.layout

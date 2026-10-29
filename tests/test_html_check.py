@@ -94,6 +94,8 @@ def test_script(inner: str) -> None:
     "<style>.x{background:url('https://example.com/a.png')}</style>",
     "<style>@import url(https://fonts.example.com/f.css);</style>",
     "<style>@import 'local.css';</style>",
+    "<style>.x{background:image-set('https://example.com/a.png' 1x)}</style>",
+    '<div style="background:-webkit-image-set(&quot;//cdn.example.com/a.png&quot; 1x)"></div>',
 ])
 def test_external_url(inner: str) -> None:
     assert "external-url" in _rules(_section(inner))
@@ -101,7 +103,9 @@ def test_external_url(inner: str) -> None:
 
 def test_anchor_href_and_fragment_refs_are_allowed() -> None:
     inner = ('<a href="https://example.com">link</a><svg><use href="#icon"/></svg>'
-             '<img src="data:image/png;base64,AAAA">')
+             '<img src="data:image/png;base64,AAAA">'
+             '<img srcset="data:image/png;base64,AA,BB 2x, images/a.png 1x">'
+             '<div style="background:image-set(&quot;images/a.png&quot; type(&quot;image/png&quot;))"></div>')
     assert _rules(_section(inner)) == []
 
 

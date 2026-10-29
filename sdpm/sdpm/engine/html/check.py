@@ -41,6 +41,7 @@ _CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 _CSS_URL_RE = re.compile(r"url\(\s*(?P<q>['\"]?)(?P<url>.*?)(?P=q)\s*\)", re.IGNORECASE | re.DOTALL)
 _CSS_IMPORT_RE = re.compile(
     r"@import\s+(?:url\(\s*)?(?P<q>['\"]?)(?P<url>[^'\")\s;]*)", re.IGNORECASE)
+_IMAGE_SET_RE = re.compile(r"(?<![\w-])(?:-webkit-)?image-set\(", re.IGNORECASE)
 _ROOT_SEL_RE = re.compile(r":root\b", re.IGNORECASE)
 _SCHEME_RE = re.compile(r"^(?P<scheme>[a-zA-Z][a-zA-Z0-9+.-]*):")
 _CTRL_RE = re.compile(r"[\x00-\x20]+")
@@ -79,16 +80,72 @@ def url_kind(url: str) -> str:
     return "external"
 
 
+def parse_srcset(value: str) -> list[tuple[str, str]]:
+    """``(url, descriptors)`` candidates of a ``srcset`` (HTML candidate parsing:
+    URLs run to whitespace, so the commas of a ``data:`` URL do not split it)."""
+    out: list[tuple[str, str]] = []
+    i, n = 0, len(value or "")
+    while i < n:
+        while i < n and (value[i].isspace() or value[i] == ","):
+            i += 1
+        start = i
+        while i < n and not value[i].isspace():
+            i += 1
+        url, descriptors = value[start:i], ""
+        if url.endswith(","):
+            url = url.rstrip(",")
+        else:
+            start = i
+            while i < n and value[i] != ",":
+                i += 1
+            descriptors = value[start:i].strip()
+        if url:
+            out.append((url, descriptors))
+    return out
+
+
+def image_set_strings(css: str) -> list[tuple[int, int, str]]:
+    """``(start, end, url)`` of the string image arguments of every ``image-set()``.
+
+    ``start:end`` covers the quoted string; ``url()`` and ``type("…")`` arguments
+    (one level deeper) are not included.
+    """
+    out: list[tuple[int, int, str]] = []
+    n = len(css)
+    for m in _IMAGE_SET_RE.finditer(css):
+        i, depth = m.end(), 0
+        while i < n:
+            c = css[i]
+            if c in "\"'":
+                j = i + 1
+                while j < n and css[j] != c:
+                    j += 2 if css[j] == "\\" else 1
+                if depth == 0:
+                    out.append((i, min(j + 1, n), css[i + 1:j]))
+                i = j + 1
+                continue
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                if depth == 0:
+                    break
+                depth -= 1
+            i += 1
+    return out
+
+
 def _css_url_diags(slug: str, css: str, where: str) -> list[dict]:
     out = []
     css = _CSS_COMMENT_RE.sub("", css)
-    for m in _CSS_URL_RE.finditer(css):
-        kind = url_kind(m.group("url"))
+    urls = [m.group("url") for m in _CSS_URL_RE.finditer(css)]
+    urls += [url for _, _, url in image_set_strings(css)]
+    for url in urls:
+        kind = url_kind(url)
         if kind == "javascript":
             out.append(_diag(slug, "script", f"javascript: URL in {where}"))
         elif kind == "external":
             out.append(_diag(slug, "external-url",
-                             f"{where} loads {m.group('url')[:80]!r}; embed it (data:, assets:, or a deck file)"))
+                             f"{where} loads {url[:80]!r}; embed it (data:, assets:, or a deck file)"))
     for m in _CSS_IMPORT_RE.finditer(css):
         if url_kind(m.group("url")) != "data":
             out.append(_diag(slug, "external-url",
@@ -187,7 +244,7 @@ def _external_attr_diags(slug: str, el) -> list[dict]:
         elif lname == "href" and tag != "a":
             urls = [value]
         elif lname == "srcset":
-            urls = [part.strip().split()[0] for part in value.split(",") if part.strip()]
+            urls = [url for url, _ in parse_srcset(value)]
         for url in urls:
             if url_kind(url) == "external":
                 out.append(_diag(slug, "external-url",
@@ -247,8 +304,6 @@ def check_slide_html(
     for el in section.iter():
         if not isinstance(el.tag, str):
             continue
-        if el is not section and el.tag == "section":
-            out.append(_diag(slug, "structure", "nested <section> (vertical slides) is not supported"))
         if el.tag == "script":
             out.append(_diag(slug, "script", "<script> is not allowed in slides"))
         out.extend(_external_attr_diags(slug, el))
@@ -333,5 +388,7 @@ __all__ = [
     "check_slide_html",
     "format_check_report",
     "html_preview_unavailable",
+    "image_set_strings",
+    "parse_srcset",
     "url_kind",
 ]
