@@ -29,6 +29,8 @@ import { CloudOnly, IS_LOCAL } from "@/lib/mode"
 import { formatDate, meshGradient } from "@/lib/utils"
 import { useTranslations } from "next-intl"
 import { useLocale } from "@/i18n/LocaleProvider"
+import { isHtmlPreview } from "@/lib/preview"
+import { HtmlSlideFrame } from "@/components/deck/HtmlSlideFrame"
 
 
 interface DeckCardProps {
@@ -204,7 +206,14 @@ export function DeckCard({
 
       {/* Thumbnail */}
       <div className={`aspect-[16/9.5] relative overflow-hidden transition-transform duration-300 ${selected ? "scale-[0.97] rounded-lg" : ""}`}>
-        {deck.thumbnailUrl ? (
+        {deck.thumbnailUrl && isHtmlPreview(deck.thumbnailUrl) ? (
+          <HtmlSlideFrame
+            src={deck.thumbnailUrl}
+            title={t("previewAlt", { name: deck.name })}
+            fit="cover"
+            className="group-hover:scale-[1.03] transition-transform duration-700 ease-out"
+          />
+        ) : deck.thumbnailUrl ? (
           <img
             src={deck.thumbnailUrl}
             alt={t("previewAlt", { name: deck.name })}

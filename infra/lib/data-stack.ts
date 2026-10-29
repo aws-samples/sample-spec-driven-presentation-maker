@@ -100,6 +100,13 @@ export class DataStack extends cdk.Stack {
           noncurrentVersionExpiration: cdk.Duration.days(7),
         },
         {
+          // Rebuildable template → HTML conversion cache (theme.css,
+          // template.json, layout SVGs) for HTML decks; rebuilt on a miss.
+          prefix: "template-html-cache/",
+          expiration: cdk.Duration.days(30),
+          noncurrentVersionExpiration: cdk.Duration.days(7),
+        },
+        {
           // Clean up old PPTX versions after 90 days
           prefix: "pptx/",
           expiration: cdk.Duration.days(90),

@@ -131,8 +131,29 @@ overview. To get a PDF, open `output.html?print-pdf` and print from the browser.
   (logos, bands, background art) needs LibreOffice and poppler; without them the layouts and
   placeholders still convert. Templates without decorations, such as the bundled ones, need
   neither.
-- There is no PNG preview for HTML decks yet: open `output.html` to see the slides.
+- There is no PNG preview for HTML decks: the local server writes a static per-slide
+  thumbnail (`<deck>/preview/<slug>.html`) next to `output.html`.
 - PPTX-only features (translation, PPTX import, hand-edit sync) refuse HTML decks.
+
+#### HTML decks in the Web UI
+
+On the first chat screen, turn on **Build as HTML** (under Vibe / Spec) before sending, or
+type `/` and pick **HTML** under **Format**. Both put `@format:html` in the message, shown as
+an "HTML" chip you can remove. Without it the deck is a PPTX.
+
+The deck page of an HTML deck shows an "HTML" badge and plays the deck in the page. The
+slide grid shows a static thumbnail of each slide. On the AWS stack the header has three
+buttons:
+
+- **Present** opens the deck in a new tab. Press `S` there for the speaker view with notes;
+  it works only in that tab, not in the in-app player. The link is valid for 4 hours and
+  the speaker view reloads it when it opens, so press `S` early in a talk.
+- **PDF** opens the print view in a new tab; print it from the browser to save a PDF.
+- **HTML** (download icon) saves the single `output.html`, which works offline.
+
+Sharing and public decks work as for PPTX decks: anyone who can view the deck can present
+and download it. In the local Web UI the header has one **Open** button, which opens
+`output.html` in your default browser.
 
 ## Your browser (Web UI)
 

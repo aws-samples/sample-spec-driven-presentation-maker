@@ -14,6 +14,11 @@ Head order: reset.css + reveal.css → style :root (``#sdpm-style-root``) → th
 slide styles nested under ``section[data-slug="…"]`` (``#sdpm-slides``). At-rules that
 cannot be nested (``@keyframes``, ``@font-face``, ``@property``…) are emitted unscoped
 just before their slide's rules, keyframes renamed ``sdpm-<slug>-<name>``.
+
+``<meta http-equiv="Content-Security-Policy">`` (``sdpm.engine.html.csp``) follows
+``<meta charset>``: only the hashed engine scripts and the speaker view run, every
+resource is ``data:``. ``AssembleResult.previews`` holds one static document per slide
+(no script, every fragment shown) for thumbnails.
 """
 
 from __future__ import annotations
@@ -24,12 +29,20 @@ import mimetypes
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 from lxml import etree
 from lxml import html as lxml_html
 
 from sdpm.engine.html.check import image_set_strings, parse_srcset, url_kind
+from sdpm.engine.html.csp import (
+    PREVIEW_CSP,
+    REFERRER_META,
+    csp_meta,
+    deck_csp,
+    script_hash,
+    speaker_view_script,
+)
 from sdpm.engine.html.template import TemplateHtml, css_string
 
 _ROOT_RE = re.compile(r":root\s*\{(?P<body>.*?)\}", re.DOTALL | re.IGNORECASE)
@@ -77,6 +90,7 @@ class AssembleResult:
     layouts_used: list[str]
     warnings: list[str]
     slugs: list[str] = field(default_factory=list)  # slides actually included, in order
+    previews: dict[str, str] = field(default_factory=dict)  # slug -> static preview document
 
 
 def style_root_css(art_direction_html: str) -> str:
@@ -391,6 +405,56 @@ def _process_media(section, slide_index: int, resolver: _Resolver, where: str,
             el.set(attr, _data_uri(path))
 
 
+def _css_refs(css: str) -> list[str]:
+    """Every ``url()`` and string ``image-set()`` reference in ``css`` (as ``_Resolver.css`` sees them)."""
+    return [url for _, _, url in image_set_strings(css)] + [m.group("url") for m in _CSS_URL_RE.finditer(css)]
+
+
+def collect_refs(slides: Iterable[str], deck_css: str | None) -> dict[str, set[str]]:
+    """Files the assembler would embed: ``{"relative": deck paths, "assets": assets: refs}``.
+
+    Same scan as the assembly (attributes per ``_EMBED_ATTRS``, ``srcset``, ``style``
+    attributes, slide ``<style>`` blocks and deck.css ``url()`` / ``image-set()``);
+    relative paths lose their ``#`` / ``?`` parts. Lets a caller fetch only those
+    files before building (paths are not validated here).
+    """
+    relative: set[str] = set()
+    assets: set[str] = set()
+
+    def add(ref: str) -> None:
+        kind = url_kind(ref)
+        if kind == "assets":
+            assets.add(ref.strip())
+        elif kind == "relative":
+            path = ref.strip().split("#", 1)[0].split("?", 1)[0]
+            if path:
+                relative.add(path)
+
+    for text in slides:
+        section = parse_slide(text).section
+        if section is None:
+            continue
+        for el in section.iter():
+            if not isinstance(el.tag, str):
+                continue
+            if el.tag == "style":
+                for ref in _css_refs(el.text or ""):
+                    add(ref)
+            style = el.get("style")
+            if style:
+                for ref in _css_refs(style):
+                    add(ref)
+            if el.get("srcset"):
+                for url, _ in parse_srcset(el.get("srcset")):
+                    add(url)
+            for attr in _EMBED_ATTRS.get(el.tag, ("src", "poster")):
+                if el.get(attr) is not None:
+                    add(el.get(attr))
+    for ref in _css_refs(deck_css or ""):
+        add(ref)
+    return {"relative": relative, "assets": assets}
+
+
 def _chrome_html(chrome: dict, kind: str, text: str) -> str:
     bbox = chrome["bbox"]
     style = chrome.get("text", {})
@@ -421,23 +485,35 @@ def _chrome_html(chrome: dict, kind: str, text: str) -> str:
 
 
 def _serialize_section(section, slug: str, number: int, layout_info: dict | None,
-                       inline: dict[str, str]) -> str:
+                       inline: dict[str, str]) -> tuple[str, str]:
+    """``(deck text, preview text)`` of the section; the preview copy has class ``present``."""
     section.set("data-slug", slug)
     chrome = (layout_info or {}).get("chrome") or {}
     if chrome.get("slideNumber"):
         section.append(lxml_html.Element("i", {"data-sdpm-placeholder": "slide-number"}))
     if chrome.get("footer", {}).get("value"):
         section.append(lxml_html.Element("i", {"data-sdpm-placeholder": "footer"}))
-    text = lxml_html.tostring(section, encoding="unicode", method="html", with_tail=False)
-    if chrome.get("slideNumber"):
-        text = text.replace('<i data-sdpm-placeholder="slide-number"></i>',
-                            _chrome_html(chrome["slideNumber"], "slide-number", str(number)), 1)
-    if chrome.get("footer", {}).get("value"):
-        text = text.replace('<i data-sdpm-placeholder="footer"></i>',
-                            _chrome_html(chrome["footer"], "footer", chrome["footer"]["value"]), 1)
-    for key, svg in inline.items():
-        text = text.replace(f'<{_INLINE_TAG} data-k="{key}"></{_INLINE_TAG}>', svg, 1)
-    return text
+
+    def finish(text: str) -> str:
+        if chrome.get("slideNumber"):
+            text = text.replace('<i data-sdpm-placeholder="slide-number"></i>',
+                                _chrome_html(chrome["slideNumber"], "slide-number", str(number)), 1)
+        if chrome.get("footer", {}).get("value"):
+            text = text.replace('<i data-sdpm-placeholder="footer"></i>',
+                                _chrome_html(chrome["footer"], "footer", chrome["footer"]["value"]), 1)
+        for key, svg in inline.items():
+            text = text.replace(f'<{_INLINE_TAG} data-k="{key}"></{_INLINE_TAG}>', svg, 1)
+        return text
+
+    deck_text = lxml_html.tostring(section, encoding="unicode", method="html", with_tail=False)
+    original_class = section.get("class")
+    section.set("class", " ".join([*(original_class or "").split(), "present"]))
+    preview_text = lxml_html.tostring(section, encoding="unicode", method="html", with_tail=False)
+    if original_class is None:
+        del section.attrib["class"]
+    else:
+        section.set("class", original_class)
+    return finish(deck_text), finish(preview_text)
 
 
 # ── deck ─────────────────────────────────────────────────────────────────
@@ -491,6 +567,55 @@ def _deck_rules(template: TemplateHtml, layouts_used: list[str], default_backgro
     return "\n".join(rules)
 
 
+# Speaker-view parameters a receiver accepts from its URL fragment (the keys the
+# notes plugin appends); a crafted fragment can only set these.
+_RECEIVER_KEYS = ("receiver|progress|history|transition|autoSlide|backgroundTransition|"
+                  "scrollActivationWidth|postMessageEvents|controls")
+
+
+def _config_script(width: int, height: int) -> str:
+    """The ``Reveal.initialize`` script.
+
+    Present links are S3 presigned URLs, which reject any extra query parameter, so
+    everything reveal.js would put in the query goes in the fragment instead: the
+    speaker view's receivers load ``url`` (ending in ``#sdpm-receiver``) plus their
+    parameters, read back here through an allowlist (no hash sync, ``S`` disabled);
+    ``#print-pdf`` selects the print view (``?print-pdf`` still works natively).
+    """
+    return (
+        "(function(){"
+        f"var o={{width:{width},height:{height},margin:0.04,center:false,hash:true,plugins:[RevealNotes]}};"
+        "o.url=location.href.split('#')[0]+'#sdpm-receiver';"
+        "var h=location.hash,m=/^#sdpm-receiver[?&]([^#]*)/.exec(h);"
+        "if(m){o.hash=false;o.keyboard={83:null};"
+        "m[1].split('&').forEach(function(p){var i=p.indexOf('='),k=i<0?p:p.slice(0,i),v=i<0?'':p.slice(i+1);"
+        f"if(!/^({_RECEIVER_KEYS})$/.test(k))return;"
+        "o[k]=v===''||v==='true'?true:v==='false'?false:/^-?\\d+(\\.\\d+)?$/.test(v)?parseFloat(v):decodeURIComponent(v);});}"
+        "else if(/(^#|&)print-pdf(&|$)/.test(h)){o.view='print';o.hash=false;}"
+        "Reveal.initialize(o);})();"
+    )
+
+
+# Fragment effects whose transform would move or scale the element in a still image.
+_FRAGMENT_TRANSFORMS = ("grow", "shrink", "zoom-in", "fade-up", "fade-down", "fade-right", "fade-left")
+
+
+def _preview_css(width: int, height: int) -> str:
+    """Show one section statically at canvas size, every fragment visible (no reveal.js)."""
+    size = f"width:{width}px;height:{height}px"
+    transformed = ",".join(f".reveal .fragment.{name}" for name in _FRAGMENT_TRANSFORMS)
+    return "\n".join([
+        f"html,body{{margin:0;padding:0;overflow:hidden;{size};background:var(--sdpm-ground)}}",
+        f".reveal,.reveal .slides{{position:absolute;inset:auto;left:0;top:0;margin:0;{size};"
+        "overflow:hidden;transform:none;perspective:none}",
+        ".reveal .slides>section,.reveal .slides>section.present{display:block!important;position:absolute;"
+        "left:0;top:0;opacity:1;visibility:visible;transform:none;transition:none}",
+        ".reveal .fragment,.reveal .fragment:not(.custom),.reveal .fragment.visible{opacity:1!important;"
+        "visibility:inherit!important;transition:none!important}",
+        f"{transformed}{{transform:none!important}}",
+    ])
+
+
 def assemble_deck(
     *,
     slides: list[tuple[str, str]],
@@ -519,10 +644,11 @@ def assemble_deck(
         lang: ``<html lang>`` (omitted when None).
 
     Returns:
-        AssembleResult(html, bytes, layouts_used, warnings, slugs) — warnings are
+        AssembleResult(html, bytes, layouts_used, warnings, slugs, previews) — warnings are
         ``"<slug>: …"`` / ``"deck.css: …"`` / ``"output.html: …"`` strings (the last one
         when the file passes ``MAX_OUTPUT_HTML_BYTES``; an embedded file over
-        ``MAX_EMBEDDED_FILE_BYTES`` is warned under its slide); slugs are the included slides.
+        ``MAX_EMBEDDED_FILE_BYTES`` is warned under its slide); slugs are the included slides;
+        previews maps each included slug to its static preview document.
     """
     warnings: list[str] = []
     ground = default_background or template.info.get("ground")
@@ -530,6 +656,7 @@ def assemble_deck(
     layouts_by_name = {layout["name"]: layout for layout in template.info.get("layouts", [])}
 
     sections: list[str] = []
+    preview_sections: dict[str, tuple[str, str | None, list[str]]] = {}
     included: list[str] = []
     slide_css: list[str] = []
     layouts_used: list[str] = []
@@ -545,11 +672,13 @@ def assemble_deck(
             parts.append(_split_slide_css(resolver.css(style_el.text or "", slug), slug))
             style_el.drop_tree()
         renames = {old: new for _, _, found in parts for old, new in found.items()}
+        own_css: list[str] = []
         for hoisted, nested, _ in parts:
-            slide_css.extend(hoisted)
+            own_css.extend(hoisted)
             nested = _rename_animations(nested, renames)
             if nested.strip():
-                slide_css.append(f"section[data-slug={css_string(slug)}]{{\n{nested}\n}}")
+                own_css.append(f"section[data-slug={css_string(slug)}]{{\n{nested}\n}}")
+        slide_css.extend(own_css)
         if renames:
             for el in section.iter():
                 if isinstance(el.tag, str) and el.get("style"):
@@ -559,40 +688,54 @@ def assemble_deck(
         layout = parsed.layout
         if layout and layout in layouts_by_name and layout not in layouts_used:
             layouts_used.append(layout)
-        sections.append(_serialize_section(section, slug, number, layouts_by_name.get(layout), inline))
+        deck_text, preview_text = _serialize_section(section, slug, number, layouts_by_name.get(layout), inline)
+        sections.append(deck_text)
+        preview_sections[slug] = (preview_text, layout if layout in layouts_by_name else None, own_css)
         included.append(slug)
 
     size = template.info.get("slideSize", {})
     width, height = int(size.get("width", 1920)), int(size.get("height", 1080))
     deck_css_text = resolver.css(deck_css, "deck.css") if deck_css else ""
 
+    def styles(layouts: list[str], css: list[str]) -> list[str]:
+        out = [
+            f"<style>{_reveal_notice()}\n{_escape_css_text(_vendor_text('reset.css'))}\n"
+            f"{_escape_css_text(_vendor_text('reveal.css'))}</style>",
+            f'<style id="sdpm-style-root">{_escape_css_text(style_root_css(art_direction_html))}</style>',
+            f'<style id="sdpm-theme">{_escape_css_text(template.theme_css)}</style>',
+            f'<style id="sdpm-deck">{_escape_css_text(_deck_rules(template, layouts, default_background, default_text_color))}</style>',
+        ]
+        if deck_css_text:
+            out.append(f'<style id="sdpm-deck-css">{_escape_css_text(deck_css_text)}</style>')
+        out.append(f'<style id="sdpm-slides">{_escape_css_text(chr(10).join(css))}</style>')
+        return out
+
+    html_open = f'<html lang="{_html.escape(lang, quote=True)}">' if lang else "<html>"
+    notes_js = _vendor_text("plugin/notes.js")
+    scripts = [
+        inline_js(_vendor_text("reveal.js")),
+        f"{_reveal_notice()}\n{_MARKED_NOTICE}\n{inline_js(notes_js)}",
+        _config_script(width, height),
+    ]
+    policy = deck_csp([script_hash(s) for s in scripts] + [script_hash(speaker_view_script(notes_js))])
     head = [
         "<!doctype html>",
-        f'<html lang="{_html.escape(lang, quote=True)}">' if lang else "<html>",
+        html_open,
         "<head>",
         '<meta charset="utf-8">',
+        csp_meta(policy),
+        REFERRER_META,
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         f"<title>{_html.escape(title)}</title>",
-        f"<style>{_reveal_notice()}\n{_escape_css_text(_vendor_text('reset.css'))}\n"
-        f"{_escape_css_text(_vendor_text('reveal.css'))}</style>",
-        f'<style id="sdpm-style-root">{_escape_css_text(style_root_css(art_direction_html))}</style>',
-        f'<style id="sdpm-theme">{_escape_css_text(template.theme_css)}</style>',
-        f'<style id="sdpm-deck">{_escape_css_text(_deck_rules(template, layouts_used, default_background, default_text_color))}</style>',
+        *styles(layouts_used, slide_css),
+        "</head>",
     ]
-    if deck_css_text:
-        head.append(f'<style id="sdpm-deck-css">{_escape_css_text(deck_css_text)}</style>')
-    head.append(f'<style id="sdpm-slides">{_escape_css_text(chr(10).join(slide_css))}</style>')
-    head.append("</head>")
-    config = (f"Reveal.initialize({{width:{width},height:{height},margin:0.04,center:false,"
-              "hash:true,plugins:[RevealNotes]});")
     body = [
         "<body>",
         '<div class="reveal"><div class="slides">',
         *sections,
         "</div></div>",
-        f"<script>{inline_js(_vendor_text('reveal.js'))}</script>",
-        f"<script>{_reveal_notice()}\n{_MARKED_NOTICE}\n{inline_js(_vendor_text('plugin/notes.js'))}</script>",
-        f"<script>{config}</script>",
+        *(f"<script>{s}</script>" for s in scripts),
         "</body>",
         "</html>",
     ]
@@ -601,9 +744,30 @@ def assemble_deck(
     if total > MAX_OUTPUT_HTML_BYTES:
         warnings.append(f"output.html: {_mb(total)} (over {_mb(MAX_OUTPUT_HTML_BYTES)}) — it opens "
                         "slowly; compress or shrink the embedded images")
+
+    previews: dict[str, str] = {}
+    for slug, (section_text, layout, own_css) in preview_sections.items():
+        previews[slug] = "\n".join([
+            "<!doctype html>",
+            html_open,
+            "<head>",
+            '<meta charset="utf-8">',
+            csp_meta(PREVIEW_CSP),
+            REFERRER_META,
+            f"<title>{_html.escape(title)} — {_html.escape(slug)}</title>",
+            *styles([layout] if layout else [], own_css),
+            f'<style id="sdpm-preview">{_preview_css(width, height)}</style>',
+            "</head>",
+            "<body>",
+            '<div class="reveal"><div class="slides">',
+            section_text,
+            "</div></div>",
+            "</body>",
+            "</html>",
+        ]) + "\n"
     return AssembleResult(html=text, bytes=total, layouts_used=layouts_used,
-                          warnings=warnings, slugs=included)
+                          warnings=warnings, slugs=included, previews=previews)
 
 
 __all__ = ["AssembleResult", "MAX_EMBEDDED_FILE_BYTES", "MAX_OUTPUT_HTML_BYTES", "ParsedSlide",
-           "assemble_deck", "inline_js", "parse_slide", "style_root_css"]
+           "assemble_deck", "collect_refs", "inline_js", "parse_slide", "style_root_css"]

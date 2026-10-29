@@ -112,6 +112,23 @@ _COMPOSER = ModeConfig(
     allowed_tools=_DECK_TOOLS,
 )
 
+# HTML composer: the html mode of the same entry tool (composer-html workflow +
+# slide HTML spec). compose_slides picks it for decks with outputFormat html.
+_HTML_COMPOSER = ModeConfig(
+    parts=[
+        Part(
+            Source.mcp("start_composing", {"mode": "html"}, pick="static.workflow"),
+            target="system", label="workflow:composer-html",
+        ),
+        Part(
+            Source.mcp("start_composing", {"mode": "html"}, pick="static.slide_spec"),
+            target="system", label="slide-html-spec",
+        ),
+    ],
+    use_composer=False,
+    allowed_tools=_DECK_TOOLS,
+)
+
 _STYLE_CREATOR = ModeConfig(
     parts=[
         _COMMON_LANGUAGE,
@@ -131,5 +148,6 @@ MODES: dict[str, ModeConfig] = {
     "vibe": _ORCHESTRATOR_FAST,
     "spec": _ORCHESTRATOR_DIALOGUE,
     "composer": _COMPOSER,
+    "html_composer": _HTML_COMPOSER,
     "style_creator": _STYLE_CREATOR,
 }

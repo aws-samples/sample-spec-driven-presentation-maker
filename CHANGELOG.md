@@ -12,6 +12,36 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **HTML output mode (phase 2, cloud).** HTML decks now work on the AWS stack and in the
+  Web UI. On the first chat screen a **Build as HTML** pill (「HTML で作成」) under
+  Vibe / Spec adds `@format:html` to the message; the `/` picker has a matching **Format**
+  section, and the token shows as a removable "HTML" chip. Nothing is added for PPTX, which
+  stays the default. An HTML deck's page shows the deck in an in-app player (a sandboxed
+  iframe, `sandbox="allow-scripts allow-popups"`, no same-origin) with an "HTML" badge and
+  three buttons: **Present** opens the deck in a new tab, where `S` opens the speaker view
+  (the link is valid for 4 hours); **PDF** opens the print view (`#print-pdf`) in a new tab;
+  **HTML** (download icon) saves the single `output.html`. Sharing and public decks work as for
+  PPTX. Slide thumbnails in the deck page, the deck list and search are static per-slide
+  HTML files (`preview/<slug>.html`, no scripts, fragments shown) rendered in `sandbox=""`
+  iframes. The local Web UI shows the same player and thumbnails, with one **Open** button
+  that opens `output.html` in the default browser. `output.html` now carries a
+  Content-Security-Policy that allows only the engine's own scripts (by sha256 hash) and
+  `data:` images, fonts and media, plus `<meta name="referrer" content="no-referrer">`;
+  the thumbnails carry a CSP without scripts. New static checks flag `javascript:` in any item of an SVG animation `values` list,
+  `<use href>` pointing anywhere but a `#fragment`, and `data:` stylesheets (`<link>` and
+  `@import`), which the CSP blocks, and `<meta http-equiv>` in a slide (a `refresh` would
+  navigate the deck to another page, which no CSP directive stops). Remote MCP tools:
+  `init_deck_workspace(output_format)` and `start_composing(mode)` take the same arguments
+  as locally, `run_python` rebuilds the HTML deck and its thumbnails, `generate_pptx`
+  finalizes an HTML deck as HTML (full build, thumbnails, knowledge-base sync so
+  `search_slides` finds HTML slides), and `get_preview` returns a note instead of images for
+  HTML decks. The template's HTML conversion is cached on S3 (`template-html-cache/`,
+  expires after 30 days). HTML files live under `html/` in the deck bucket, which no
+  CloudFront path serves; the API hands out S3 presigned URLs only
+  (`GET /decks/{id}/html?purpose=present|download`). The local `generate_pptx` still
+  refuses HTML decks. The MCP tool count stays at 20 and PPTX behaviour is unchanged.
+  Deploy: SdpmData, SdpmRuntime, SdpmAgent, SdpmWebUi and the Web UI. The local Web UI dev
+  servers (`npm run dev`, `npm run dev:local`) now listen on 127.0.0.1 only.
 - **HTML output mode (phase 1, local).** A deck can be a browser presentation instead of a
   PPTX: ask for an HTML / browser deck or write `@format:html`, and the deck is created with
   `deck.json` `outputFormat: "html"` (`init_deck_workspace(name, output_format="html")`).
@@ -26,7 +56,8 @@ Entries before v0.5.0 were written retroactively as summaries.
   with PPTX; template decorations are converted to SVG when LibreOffice and poppler are
   installed. The CLI gains `generate_html <deck>`. Translation, PPTX import, hand-edit sync,
   `code_to_slide` and `generate_pptx` refuse HTML decks with a message. There is no PNG
-  preview for HTML decks yet, and the AWS (remote) server does not support them. PPTX
+  preview for HTML decks; phase 1 was local only, and phase 2 (above) adds the AWS (remote)
+  server and the Web UI. PPTX
   behaviour is unchanged and the MCP tool count stays at 20.
 - **Claude Haiku 5.5** is a selectable model (`global.anthropic.claude-haiku-5-5`) for
   both Chat and Create. It uses the extended-thinking profile (no `temperature`; Bedrock

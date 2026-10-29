@@ -66,7 +66,7 @@ describe("ChatInput slash picker", () => {
     const { onSend, textarea } = renderInput()
 
     changeValue(textarea, "/")
-    expect(screen.getByRole("listbox", { name: "Template and style suggestions" })).toBeTruthy()
+    expect(screen.getByRole("listbox", { name: "Template, style and format suggestions" })).toBeTruthy()
     expect(textarea.getAttribute("aria-expanded")).toBe("true")
 
     fireEvent.keyDown(textarea, { key: "ArrowDown" })
@@ -127,5 +127,36 @@ describe("ChatInput slash picker", () => {
 
     expect(screen.getByRole("listbox")).toBeTruthy()
     expect(textarea.getAttribute("aria-expanded")).toBe("true")
+  })
+})
+
+describe("ChatInput replaceText", () => {
+  it("replaces the whole input, notifies onInputChange and keeps focus with the caret at the end", () => {
+    const onInputChange = vi.fn()
+    const { handle, textarea } = renderInput({ onInputChange })
+    changeValue(textarea, "a launch deck")
+    onInputChange.mockClear()
+
+    const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => { cb(0); return 0 })
+    act(() => handle.current?.replaceText("@format:html a launch deck"))
+    raf.mockRestore()
+
+    expect(textarea.value).toBe("@format:html a launch deck")
+    expect(onInputChange).toHaveBeenCalledWith("@format:html a launch deck")
+    expect(document.activeElement).toBe(textarea)
+    expect(textarea.selectionStart).toBe("@format:html a launch deck".length)
+  })
+
+  it("mirrors picker inserts and the send reset through onInputChange", () => {
+    const onInputChange = vi.fn()
+    const { onSend, textarea } = renderInput({ onInputChange })
+    changeValue(textarea, "/")
+    fireEvent.keyDown(textarea, { key: "ArrowDown" })
+    fireEvent.keyDown(textarea, { key: "Enter" })
+    expect(onInputChange).toHaveBeenLastCalledWith("@style:lumina ")
+
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true })
+    expect(onSend).toHaveBeenCalled()
+    expect(onInputChange).toHaveBeenLastCalledWith("")
   })
 })

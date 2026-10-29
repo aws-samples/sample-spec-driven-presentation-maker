@@ -33,6 +33,15 @@ from chat_history import (
     truncate_tool_inputs,
 )
 from common import get_user_id, now_iso, presigned_url
+from html_presign import (
+    PURPOSES as HTML_PURPOSES,
+    html_presign_client,
+    html_slide_slugs,
+    is_html_deck,
+    presigned_html_url,
+    slide_size,
+)
+from shared.html_artifacts import build_html_preview_key_map, preview_prefix as html_preview_prefix
 from shared.schema import (
     deck_pk, deck_sk, shared_pk, fav_sk,
     DECK_SK_PREFIX, FAV_SK_PREFIX,
@@ -99,6 +108,13 @@ metrics = Metrics()
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
 s3_client = boto3.client("s3", config=BotoConfig(signature_version="s3v4"))
+# HTML decks run scripts, so they are served only from the S3 regional
+# endpoint (a different origin from the Web UI): the Web UI CloudFront
+# distribution serves previews/*, decks/*/* and pptx/* on the app origin.
+# HTML keys are signed with this client only — never preview_url() /
+# _cf_signed_url().
+REGION = os.environ.get("AWS_REGION") or boto3.session.Session().region_name or "us-east-1"
+html_s3_client = html_presign_client(REGION)
 app = APIGatewayHttpResolver(cors=cors_config)
 
 # --- KB (optional) ---
@@ -155,6 +171,23 @@ def _list_preview_keys(deck_id: str) -> set:
     return {obj["Key"] for obj in resp.get("Contents", [])}
 
 
+def _html_presigned(key: str, purpose: str = "view", deck_name: str = "") -> Optional[str]:
+    """Presigned S3 URL for an HTML artifact (regional S3 origin, never CloudFront).
+
+    Returns None when the key is not an ``html/**.html`` key.
+    """
+    try:
+        return presigned_html_url(html_s3_client, BUCKET_NAME, key, purpose, deck_name)[0]
+    except ValueError:
+        return None
+
+
+def _list_html_preview_map(deck_id: str) -> Dict[str, str]:
+    """slug → latest HTML preview key under html/{deck_id}/preview/ (one S3 call)."""
+    resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=html_preview_prefix(deck_id))
+    return build_html_preview_key_map(obj["Key"] for obj in resp.get("Contents", []))
+
+
 def _resolve_preview_url(deck_id: str, slug: str, preview_keys: set) -> Optional[str]:
     """Resolve the best preview URL for a slide from cached keys.
 
@@ -193,6 +226,9 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
     for deck in deck_items:
         deck_id = extract_deck_id(deck["SK"])
         key = deck.get("thumbnailS3Key")
+        if key and key.endswith(".html"):
+            extras[deck_id] = {"thumbnailUrl": _html_presigned(key)}
+            continue
         extras[deck_id] = {"thumbnailUrl": preview_url(key) if key else None}
     return extras
 
@@ -882,6 +918,141 @@ def list_public() -> Dict[str, Any]:
     return {"decks": decks}
 
 
+def _read_deck_json(deck_id: str) -> Dict[str, Any]:
+    """deck.json as a dict ({} when missing, unreadable or not an object)."""
+    try:
+        dj_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/deck.json")
+        data = json.loads(dj_resp["Body"].read())
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _read_outline_slugs(deck_id: str) -> List[str]:
+    """Slugs from specs/outline.md in order ([] when missing).
+
+    Canonical implementation: sdpm.api.parse_outline_slugs (not importable in Lambda).
+    """
+    slugs: List[str] = []
+    try:
+        outline_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/specs/outline.md")
+        outline_text = outline_resp["Body"].read().decode("utf-8")
+        slug_re = re.compile(r"^-\s*\[([a-z0-9-]+)\]\s*")
+        for line in outline_text.splitlines():
+            m = slug_re.match(line)
+            if m:
+                slugs.append(m.group(1))
+    except Exception:
+        pass
+    return slugs
+
+
+def _read_specs(deck_id: str) -> Dict[str, Any]:
+    """Read spec files from S3 (brief.md, outline.md, art-direction.html/.md)."""
+    specs: Dict[str, Any] = {}
+
+    # brief and outline — always .md
+    for spec_name in ("brief", "outline"):
+        spec_key = f"decks/{deck_id}/specs/{spec_name}.md"
+        try:
+            spec_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=spec_key)
+            content = spec_resp["Body"].read().decode("utf-8")
+            specs[spec_name] = content if content.strip() else None
+        except Exception:
+            specs[spec_name] = None
+
+    # art-direction — try .html first, fall back to .md
+    art_direction_content = None
+    for ext in (".html", ".md"):
+        art_key = f"decks/{deck_id}/specs/art-direction{ext}"
+        try:
+            art_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=art_key)
+            content = art_resp["Body"].read().decode("utf-8")
+            if content.strip():
+                art_direction_content = content
+                break
+        except Exception:
+            pass
+    specs["artDirection"] = art_direction_content
+    return specs
+
+
+def _get_html_deck(deck_id: str, decision: Any, deck_json: Dict[str, Any]) -> Dict[str, Any]:
+    """get_deck response for an HTML deck (outputFormat "html").
+
+    Slides are the outline slugs whose slides/{slug}.html exists; previews are
+    the static per-slide HTML thumbnails. Every HTML URL is an S3 presign.
+    """
+    deck = decision.deck
+    resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/slides/")
+    slide_keys = [obj["Key"] for obj in resp.get("Contents", [])]
+    slugs = html_slide_slugs(_read_outline_slugs(deck_id), slide_keys, deck_id)
+
+    preview_map = _list_html_preview_map(deck_id)
+    slides = []
+    for slug in slugs:
+        key = preview_map.get(slug)
+        slides.append({"slug": slug, "previewUrl": _html_presigned(key) if key else None})
+
+    html_key = deck.get("htmlS3Key")
+    return {
+        "deckId": deck_id,
+        "name": deck.get("name", "Untitled"),
+        "slideCount": len(slides),
+        "slides": slides,
+        "specs": _read_specs(deck_id),
+        "template": deck_json.get("template") or None,
+        "defsUrl": None,
+        "pptxUrl": None,
+        "outputFormat": "html",
+        "htmlUrl": _html_presigned(html_key) if html_key else None,
+        "slideSize": slide_size(deck_json),
+        "updatedAt": deck.get("updatedAt", ""),
+        "chatSessionId": deck.get("chatSessionId"),
+        "isOwner": decision.role == "owner",
+        "role": decision.role,
+        "visibility": deck.get("visibility", "private"),
+    }
+
+
+@app.get("/decks/<deck_id>/html")
+def get_deck_html(deck_id: str) -> Any:
+    """Presigned S3 URL of the built HTML deck.
+
+    Query params:
+        purpose: "present" (inline, 4 h) or "download" (attachment, 15 min).
+
+    Same read permission as get_deck (owner, collaborator, viewer of a public
+    deck). The URL is on the S3 regional endpoint, never CloudFront.
+
+    Returns:
+        Dict with url and expiresIn (seconds).
+    """
+    user_id = get_user_id(app.current_event)
+
+    decision = authorize(user_id, deck_id, "read", table)
+    if not decision.allowed:
+        return {"error": decision.reason}, 403
+
+    purpose = app.current_event.get_query_string_value("purpose") or ""
+    if purpose not in HTML_PURPOSES:
+        return {"error": "purpose must be 'present' or 'download'"}, 400
+
+    deck = decision.deck
+    html_key = deck.get("htmlS3Key")
+    if not html_key:
+        return {"error": "HTML not built yet"}, 404
+
+    try:
+        url, expires = presigned_html_url(
+            html_s3_client, BUCKET_NAME, html_key, purpose, deck.get("name", ""),
+        )
+    except ValueError:
+        logger.warning(f"Deck {deck_id} has a non-HTML htmlS3Key")
+        return {"error": "HTML not built yet"}, 404
+    return {"url": url, "expiresIn": expires}
+
+
 
 @app.get("/decks/<deck_id>")
 def get_deck(deck_id: str) -> Dict[str, Any]:
@@ -893,6 +1064,10 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         return {"error": decision.reason}, 403
 
     deck = decision.deck
+    deck_json = _read_deck_json(deck_id)
+    if is_html_deck(deck_json):
+        return _get_html_deck(deck_id, decision, deck_json)
+
     pptx_key = deck.get("pptxS3Key")
 
     # Read slides from S3 (deck.json + slides/*.json format)
@@ -924,18 +1099,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
     has_defs = defs_key is not None
 
     # outline.md for slug order, then slides/*.json
-    # Canonical implementation: sdpm.api.parse_outline_slugs (not importable in Lambda)
-    slugs = []
-    try:
-        outline_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/specs/outline.md")
-        outline_text = outline_resp["Body"].read().decode("utf-8")
-        slug_re = _re.compile(r"^-\s*\[([a-z0-9-]+)\]\s*")
-        for line in outline_text.splitlines():
-            m = slug_re.match(line)
-            if m:
-                slugs.append(m.group(1))
-    except Exception:
-        pass
+    slugs = _read_outline_slugs(deck_id)
 
     # If no outline slugs, list slides/ directory
     if not slugs:
@@ -979,40 +1143,10 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
             slide_entry["slideJson"] = json.dumps(slide_data)
         slides.append(slide_entry)
 
-    # Read spec files from S3 (brief.md, outline.md, art-direction.html/.md)
-    specs: Dict[str, Any] = {}
-
-    # brief and outline — always .md
-    for spec_name in ("brief", "outline"):
-        spec_key = f"decks/{deck_id}/specs/{spec_name}.md"
-        try:
-            spec_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=spec_key)
-            content = spec_resp["Body"].read().decode("utf-8")
-            specs[spec_name] = content if content.strip() else None
-        except Exception:
-            specs[spec_name] = None
-
-    # art-direction — try .html first, fall back to .md
-    art_direction_content = None
-    for ext in (".html", ".md"):
-        art_key = f"decks/{deck_id}/specs/art-direction{ext}"
-        try:
-            art_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=art_key)
-            content = art_resp["Body"].read().decode("utf-8")
-            if content.strip():
-                art_direction_content = content
-                break
-        except Exception:
-            pass
-    specs["artDirection"] = art_direction_content
+    specs = _read_specs(deck_id)
 
     # Confirmed template name from deck.json (written by the agent at Art Direction)
-    template = None
-    try:
-        dj_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/deck.json")
-        template = json.loads(dj_resp["Body"].read()).get("template") or None
-    except Exception:
-        pass
+    template = deck_json.get("template") or None
 
     return {
         "deckId": deck_id,
@@ -1236,6 +1370,7 @@ def search_slides_api() -> Dict[str, Any]:
     results: List[Dict] = []
     seen: set = set()
     seen_decks: Dict[str, set] = {}
+    seen_html_decks: Dict[str, Dict[str, str]] = {}
     for r in response.get("retrievalResults", []):
         meta = r.get("metadata", {})
         deck_id = meta.get("deckId", "")
@@ -1252,6 +1387,15 @@ def search_slides_api() -> Dict[str, Any]:
             if deck_id not in seen_decks:
                 seen_decks[deck_id] = _list_preview_keys(deck_id)
             slide_preview_url = _resolve_preview_url(deck_id, slide_id, seen_decks[deck_id])
+            if not slide_preview_url:
+                # HTML decks keep static per-slide previews under html/{deck}/preview/
+                if deck_id not in seen_html_decks:
+                    try:
+                        seen_html_decks[deck_id] = _list_html_preview_map(deck_id)
+                    except Exception:
+                        seen_html_decks[deck_id] = {}
+                html_key = seen_html_decks[deck_id].get(slide_id)
+                slide_preview_url = _html_presigned(html_key) if html_key else None
             slide_preview_url = slide_preview_url or ""
 
         results.append({

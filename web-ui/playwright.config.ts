@@ -22,12 +22,13 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    baseURL: `http://127.0.0.1:${PORT}`,
     trace: "retain-on-failure",
   },
   webServer: {
-    command: `npx next dev --turbopack --port ${PORT}`,
-    port: PORT,
+    // Loopback only: the local API routes (file access, /api/open) have no auth.
+    command: `npx next dev --turbopack --hostname 127.0.0.1 --port ${PORT}`,
+    url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: false,
     timeout: 120_000,
     env: {

@@ -138,6 +138,34 @@ class TestStartComposing:
         d = tools.start_composing(str(html_deck), ["intro"], mode="html")["deck"]
         assert d["deck_css"] == ".card { padding: 8px; }\n"
 
+    def test_template_html_view_matches_the_payload(self, html_deck: Path, tmp_path: Path):
+        from sdpm.config import TEMPLATES_DIR
+        from sdpm.engine.html.template import cache_key
+        from sdpm.entry import template_html_view
+
+        template = TEMPLATES_DIR / "blank-dark.pptx"
+        cache = tmp_path / "view-cache"
+        view = template_html_view(template, cache_root=cache)
+        assert (cache / cache_key(template) / "template.json").is_file()
+        payload = tools.start_composing(str(html_deck), ["intro"], mode="html")["deck"]["template_html"]
+        assert view == payload
+        assert template_html_view(tmp_path / "missing.pptx") is None
+
+    def test_supplied_template_html_is_used(self, html_deck: Path, monkeypatch: pytest.MonkeyPatch):
+        from sdpm import entry
+
+        monkeypatch.setattr(entry, "_template_html", lambda *a, **k: pytest.fail("computed locally"))
+        supplied = {"slideSize": {"width": 1, "height": 1}, "layouts": []}
+        d = entry.start_composing(str(html_deck), ["intro"], mode="html", template_html=supplied)["deck"]
+        assert d["template_html"] is supplied
+
+    def test_template_html_does_not_touch_pptx_payload(self, deck: Path):
+        from sdpm import entry
+
+        plain = entry.start_composing(str(deck), ["intro"])
+        with_html = entry.start_composing(str(deck), ["intro"], template_html={"x": 1})
+        assert with_html == plain and "template_html" not in plain["deck"]
+
     def test_deck_payload_for_assigned_slugs(self, deck: Path):
         r = tools.start_composing(str(deck), ["intro", "closing"])
         d = r["deck"]

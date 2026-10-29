@@ -16,6 +16,38 @@ function safeRead(p: string): string | null {
   try { return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : null } catch { return null }
 }
 
+/** Slug grammar of HTML slide files (`slides/<slug>.html`), as in the core engine. */
+const HTML_SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/
+
+/** `?v=<mtime>` cache-buster so the UI sees a rebuilt file as a new URL; null when absent. */
+function versionedUrl(filePath: string, url: string): string | null {
+  try { return `${url}?v=${Math.floor(fs.statSync(filePath).mtimeMs)}` } catch { return null }
+}
+
+/** deck.json slideSize as {width, height} CSS px (1920x1080 when missing or invalid). */
+function htmlSlideSize(deckJson: Record<string, unknown>): { width: number; height: number } {
+  const size = deckJson.slideSize as { width?: unknown; height?: unknown } | undefined
+  const ok = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v > 0
+  return size && ok(size.width) && ok(size.height) ? { width: size.width, height: size.height } : { width: 1920, height: 1080 }
+}
+
+/** HTML deck slides: `slides/<slug>.html` in outline order, previews from `preview/<slug>.html`. */
+function htmlSlides(dp: string, deckId: string, outlineSlugs: string[]): Record<string, unknown>[] {
+  // `dp` comes from resolveDeckDir (allow-list + realpath check); every slug passes HTML_SLUG_RE before it is joined.
+  const slidesDir = path.join(dp, "slides") // nosemgrep: path-join-resolve-traversal — dp validated by resolveDeckDir
+  if (!fs.existsSync(slidesDir)) return []
+  const slugList = outlineSlugs.length > 0 ? outlineSlugs
+    : fs.readdirSync(slidesDir).filter(f => f.endsWith(".html")).map(f => f.slice(0, -".html".length)).sort()
+  return slugList
+    .filter(slug => HTML_SLUG_RE.test(slug) && fs.existsSync(path.join(slidesDir, `${slug}.html`))) // nosemgrep: path-join-resolve-traversal — slug checked by HTML_SLUG_RE first
+    .map(slug => ({
+      slug,
+      previewUrl: versionedUrl(path.join(dp, "preview", `${slug}.html`), `/api/preview/${deckId}/preview/${slug}.html`), // nosemgrep: path-join-resolve-traversal — slug passed HTML_SLUG_RE above
+      composeUrl: null,
+      updatedAt: new Date().toISOString(),
+    }))
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: deckId } = await params
   const dp = resolveDeckDir(deckId)
@@ -66,12 +98,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   // Build slides array
+  const isHtml = deckJson.outputFormat === "html"
   const slidesDir = path.join(dp, "slides")
-  const slides: Record<string, unknown>[] = []
+  const slides: Record<string, unknown>[] = isHtml ? htmlSlides(dp, deckId, outlineSlugs) : []
   let slugList = outlineSlugs.length > 0 ? outlineSlugs
     : (fs.existsSync(slidesDir) ? fs.readdirSync(slidesDir).filter(f => f.endsWith(".json")).map(f => f.replace(".json", "")) : [])
   let pageNum = 0
-  if (fs.existsSync(slidesDir)) {
+  if (!isHtml && fs.existsSync(slidesDir)) {
     for (const slug of slugList) {
       if (!fs.existsSync(path.join(slidesDir, `${slug}.json`))) continue
       pageNum++
@@ -112,6 +145,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     isOwner: true,
     collaborators: [],
     collaboratorAliases: {},
+    ...(isHtml ? {
+      outputFormat: "html",
+      htmlUrl: versionedUrl(path.join(dp, "output.html"), `/api/preview/${deckId}/output.html`),
+      slideSize: htmlSlideSize(deckJson),
+    } : {}),
   })
 }
 

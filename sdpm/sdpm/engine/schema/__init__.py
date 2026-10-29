@@ -6,6 +6,8 @@ from sdpm.engine.schema.deck_spec import (
     OUTPUT_FORMATS,
     complete_deck_skeleton,
     deck_output_format,
+    is_html_build_input,
+    new_deck_json,
     validate_specs,
 )
 from sdpm.engine.schema.regions import extract_regions, is_comment_element
@@ -19,6 +21,8 @@ __all__ = [
     "deck_output_format",
     "extract_regions",
     "is_comment_element",
+    "is_html_build_input",
+    "new_deck_json",
     "validate_specs",
     "with_override_bases",
 ]

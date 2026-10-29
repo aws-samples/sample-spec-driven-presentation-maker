@@ -98,7 +98,7 @@ def test_deck_css_embedded_once_and_checked(tmp_path) -> None:
 def test_refresh_html_without_measure(tmp_path) -> None:
     deck = _deck(tmp_path)
     result = api.refresh_html(deck, ["slides/body.html", "slides/body.json"])
-    assert set(result) == {"html", "html_bytes", "warnings", "affected"}
+    assert set(result) == {"html", "html_bytes", "warnings", "affected", "previews"}
     assert result["html"] == str(deck / "output.html")
     assert result["affected"] == ["body"]
     assert api.refresh_html(deck, ["deck.css"])["affected"] == ["cover", "body"]
@@ -109,7 +109,7 @@ def test_refresh_html_with_measure_filters_warnings(tmp_path) -> None:
     deck = _deck(tmp_path)
     (deck / "deck.css").write_text(":root { --x: 1; }", encoding="utf-8")
     result = api.refresh_html(deck, ["slides/cover.html"], measure_slides=["cover"])
-    assert set(result) == {"html", "html_bytes", "warnings", "affected", "measure", "preview"}
+    assert set(result) == {"html", "html_bytes", "warnings", "affected", "measure", "preview", "previews"}
     assert result["warnings"] == [w for w in result["warnings"] if w.startswith("deck.css: ")]
     assert len(result["warnings"]) == 1  # deck.css always reported; body / gone filtered out
     assert "cover: OK" in result["measure"] and "(deck.css): 1 issue(s)" in result["measure"]
@@ -145,3 +145,63 @@ def test_decorated_template_gets_its_decoration_background(tmp_path, monkeypatch
              for m in re.findall(r"rgb\(([\d.]+)%, ([\d.]+)%, ([\d.]+)%\)", svg)]
     assert any(all(abs(c - t) <= 1 for c, t in zip(fill, DECORATED_BAND_RGB)) for fill in fills)
     assert "<image" in svg  # master logo
+
+
+def test_generate_html_writes_static_previews_and_removes_stale_ones(tmp_path) -> None:
+    deck = _deck(tmp_path)
+    preview = deck / "preview"
+    preview.mkdir()
+    (preview / "old.html").write_text("<p>stale</p>", encoding="utf-8")
+    (preview / "old.png").write_bytes(b"\x89PNG")
+    result = api.generate_html(deck)
+    assert result["previews"] == {"cover": "preview/cover.html", "body": "preview/body.html"}
+    assert sorted(p.name for p in preview.iterdir()) == ["body.html", "cover.html", "old.png"]
+    text = (preview / "body.html").read_text(encoding="utf-8")
+    assert "<script" not in text and "script-src 'none'" in text
+    assert 'data-slug="body"' in text and 'data-slug="cover"' not in text
+
+    (deck / "slides" / "body.html").unlink()
+    refreshed = api.refresh_html(deck, ["slides/body.html"])
+    assert refreshed["previews"] == {"cover": "preview/cover.html"}
+    assert not (preview / "body.html").exists() and (preview / "old.png").exists()
+
+
+def test_template_cache_is_passed_to_the_template_conversion(tmp_path) -> None:
+    from sdpm.engine.html.template import cache_key
+
+    deck = _deck(tmp_path)
+    cache = tmp_path / "tcache"
+    api.generate_html(deck, template_cache=cache)
+    template = sdpm.config.TEMPLATES_DIR / "blank-light.pptx"
+    assert (cache / cache_key(template) / "template.json").is_file()
+    other = tmp_path / "tcache2"
+    assert "html_error" not in api.refresh_html(deck, ["deck.css"], template_cache=other)
+    assert (other / cache_key(template) / "template.json").is_file()
+
+
+def test_html_slide_texts_in_outline_order(tmp_path) -> None:
+    slides = {
+        "intro": ('<section data-layout="Title Slide"><h1 data-ph="title">Hello  <b>world</b></h1>'
+                  '<p>Body text</p><aside class="notes">Say hi</aside></section>'),
+        "gone": None,
+        "plain": '<section data-layout="Blank"><style>.x{color:red}</style><h2>Second</h2><p>more</p></section>',
+    }
+    deck = _deck(tmp_path, slides=slides)
+    assert api.html_slide_texts(deck) == [
+        {"slug": "intro", "layout": "Title Slide", "title": "Hello world", "notes": "Say hi",
+         "text": "Hello world Body text"},
+        {"slug": "plain", "layout": "Blank", "title": "Second", "notes": "", "text": "Second more"},
+    ]
+
+
+def test_html_deck_refs(tmp_path) -> None:
+    slides = {
+        "pic": '<section data-layout="Blank"><img src="images/a.png"><img src="assets:aws/Arch_AWS-Lambda_48"></section>',
+        "unlisted": None,
+    }
+    deck = _deck(tmp_path, slides=slides)
+    (deck / "slides" / "orphan.html").write_text(
+        '<section data-layout="Blank"><img src="images/orphan.png"></section>', encoding="utf-8")
+    (deck / "deck.css").write_text(".x{background:url('images/bg.png')}", encoding="utf-8")
+    assert api.html_deck_refs(deck) == {"relative": {"images/a.png", "images/bg.png"},
+                                        "assets": {"assets:aws/Arch_AWS-Lambda_48"}}

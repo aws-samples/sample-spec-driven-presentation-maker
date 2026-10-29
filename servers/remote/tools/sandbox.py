@@ -30,7 +30,7 @@ from storage import Storage
 logger = logging.getLogger(__name__)
 
 # Files managed by the deck workspace — only these are synced back to S3.
-_WORKSPACE_PREFIXES = ("deck.json", "slides/", "specs/", "includes/", "attachments/")
+_WORKSPACE_PREFIXES = ("deck.json", "deck.css", "slides/", "specs/", "includes/", "attachments/")
 _IMMUTABLE_IMPORT_PREFIX = "attachments/imports/"
 
 

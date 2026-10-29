@@ -174,8 +174,9 @@ external URLs, `data-background-*` (the ground comes from the template and
 | `structure` | not exactly one `<section>`, nested sections, or unparsable HTML — the slide is skipped |
 | `layout-missing` | the section has no `data-layout` |
 | `layout-unknown` | `data-layout` is not a layout of the template |
-| `script` | `<script>`, an `on*` handler, `javascript:`, `expression()`, or `<iframe>` / `<object>` / `<embed>` |
-| `external-url` | a non-local URL in `src` / `srcset` / `poster` / `data` / `href` (not `<a>`) / `url()` (also in SVG attributes such as `fill`) / `image-set()` / `@import`; a deck file behind `@import` or `<link rel=stylesheet>` (not embedded) |
+| `script` | `<script>`, an `on*` handler, `javascript:` (also in an SVG animation `values` list), `expression()`, `<iframe>` / `<object>` / `<embed>`, or `<meta http-equiv>` (a `refresh` navigates the deck away) |
+| `external-url` | a non-local URL in `src` / `srcset` / `poster` / `data` / `href` (not `<a>`) / `url()` (also in SVG attributes such as `fill`) / `image-set()` / `@import`; any `@import` or `<link rel=stylesheet>` (not embedded, and the deck blocks linked stylesheets, `data:` ones too) |
+| `external-use` | `<use href>` that is not a `#id` in the same slide (another file's sprite does not load): inline the SVG |
 | `data-background` | a `data-background-*` attribute |
 | `self-chrome` | a hand-drawn page number or footer |
 | `root-in-slide-style` | a `:root` block in a slide `<style>` |

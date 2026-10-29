@@ -47,3 +47,20 @@ describe("DeckCard selection", () => {
     expect(screen.getByRole("checkbox").getAttribute("aria-checked")).toBe("true")
   })
 })
+
+describe("DeckCard thumbnail", () => {
+  it("renders an HTML deck thumbnail in a sandbox=\"\" iframe", () => {
+    const html = { ...deck, thumbnailUrl: "https://b.s3.ap-northeast-1.amazonaws.com/html/d1/preview/intro_1.html?X-Amz-Signature=x" }
+    const { container } = renderWithIntl(<DeckCard deck={html} index={0} onOpen={() => {}} />)
+    expect(container.querySelector("img")).toBeNull()
+    expect(container.querySelector("iframe")?.getAttribute("sandbox")).toBe("")
+    expect(screen.getByRole("img", { name: "Preview of Quarterly review" })).toBeTruthy()
+  })
+
+  it("keeps <img> for image thumbnails", () => {
+    const png = { ...deck, thumbnailUrl: "/api/preview/d1/preview/intro.png" }
+    const { container } = renderWithIntl(<DeckCard deck={png} index={0} onOpen={() => {}} />)
+    expect(container.querySelector("iframe")).toBeNull()
+    expect(container.querySelector("img")?.getAttribute("src")).toBe("/api/preview/d1/preview/intro.png")
+  })
+})

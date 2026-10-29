@@ -74,6 +74,20 @@ Additional tools over Layer 2:
 - `run_python` — Execute Python in Amazon Bedrock AgentCore Code Interpreter sandbox (edit deck workspace, analyze data)
 - `search_slides` — Semantic slide search via Amazon Bedrock Knowledge Base (optional)
 
+HTML decks (`deck.json` `outputFormat: "html"`) use the same tools with these differences:
+
+| Tool | HTML deck behaviour |
+|------|---------------------|
+| `init_deck_workspace` | `output_format="html"` creates an HTML deck (default `pptx`) |
+| `start_composing` | `mode="html"` returns the HTML composer document, the template converted for HTML and the deck's `deck.css` |
+| `run_python` | After a change to an HTML build input, rebuilds `output.html` and the changed slides' thumbnails and uploads them under `html/` |
+| `generate_pptx` | Finalizes the deck as HTML: full build, every thumbnail, deck record update, knowledge-base sync (`search_slides` indexes HTML slides) |
+| `get_preview` | Returns a note instead of images: HTML decks have no PNG previews; the Web UI shows the deck and its thumbnails |
+
+The remote build reads and updates the deck record under the caller's user id, as the PPTX
+build does. Only the deck owner's `run_python` / `generate_pptx` therefore rebuild an HTML
+deck on S3; a collaborator's run reports `html_error` (`generate_pptx` returns an error)
+and the published HTML stays as the owner last built it.
 ### Storage
 
 ```
@@ -88,6 +102,10 @@ S3 (pptx bucket):
   decks/{deckId}/includes/          — code block JSON
   decks/{deckId}/compose/           — per-slide SVG compose JSON (for Web UI animation)
   previews/{deckId}/{slideId}.png   — slide previews
+  html/{deckId}/{uuid}.html         — HTML deck output.html (DynamoDB htmlS3Key)
+  html/{deckId}/preview/{slug}_{epoch}.html — HTML slide thumbnails (latest epoch wins)
+  template-html-cache/{cacheKey}/   — template HTML conversion (theme.css, template.json,
+                                      layouts/*.svg); expires after 30 days
 
 S3 (resource bucket):
   references/                       — examples, workflows, guides
@@ -101,8 +119,10 @@ Using `run_python(deck_id=...)` loads the entire deck workspace into the sandbox
 The agent can read and write files using standard Python file I/O (`open`, `json.load`, etc.); modified files are written back to S3 automatically after every execution.
 
 ```
-deck.json           — deck metadata (template, fonts, defaultTextColor)
+deck.json           — deck metadata (template, fonts, defaultTextColor, outputFormat)
 slides/{slug}.json  — per-slide data (one file per slide, slug from outline)
+slides/{slug}.html  — per-slide HTML fragment (HTML decks)
+deck.css            — shared slide CSS (HTML decks)
 specs/brief.md          — briefing (audience, purpose, key messages)
 specs/outline.md        — one line per slide: - [slug] message
 specs/art-direction.html — visual design direction (HTML style guide)
@@ -141,6 +161,27 @@ every slide the written files can alter is re-rendered — the edited `slides/<s
 that reference a changed `includes/` file, slides that inherit from an affected one via
 `override`, and every slide when `deck.json` or `specs/outline.md` changed
 (`sdpm.engine.schema.affected_slugs`) — plus the `measure_slides` slugs.
+
+### HTML Deck Security
+
+An HTML deck runs scripts, so it is never served from the Web UI's origin:
+
+- `output.html` carries a Content-Security-Policy `<meta>` that allows only the engine's own
+  scripts (reveal.js, the notes plugin, the config and the speaker view, by sha256 hash) and
+  `data:` images, fonts and media; `connect-src` and `form-action` are `'none'`. It also sets
+  `<meta name="referrer" content="no-referrer">` so slide links do not leak the signed URL.
+  Thumbnails carry a CSP without scripts.
+- HTML objects live under `html/` in the deck bucket. No CloudFront behaviour serves
+  `html/*` and the CloudFront OAC bucket-policy grant does not include it.
+- The API returns S3 presigned URLs on the bucket's regional host (a different origin from
+  the Web UI), with `text/html; charset=utf-8`: the in-app view and thumbnails for 900 s in
+  `GET /decks/{id}`, and `GET /decks/{id}/html?purpose=present` (14400 s, inline) or
+  `purpose=download` (900 s, attachment). Both go through the deck's `read` authorization.
+- The Web UI plays the deck in an iframe with `sandbox="allow-scripts allow-popups"` (no
+  `allow-same-origin`, so it gets an opaque origin) and renders thumbnails in `sandbox=""`
+  iframes. Present opens a new tab with `opener` cleared.
+- The local Web UI serves `output.html` with `Content-Security-Policy: sandbox allow-scripts
+  allow-popups` and thumbnails with `Content-Security-Policy: sandbox`, both `nosniff`.
 
 ### Text Measurement
 
@@ -234,7 +275,7 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Prompts | `sdpm-vibe`, `sdpm-spec`, `sdpm-style`, `sdpm-translate` | User-invoked (slash-command) entry points; `vibe` / `spec` set the interaction mode |
 | Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate). `start_composing(mode="pptx"\|"html")` picks the composer document for the deck's output format |
 | Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template` | Create deck workspace (`output_format="pptx"\|"html"`), validate specs, apply style, analyze template |
-| Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview |
+| Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview (local `generate_pptx` refuses HTML decks; `run_python` builds them) |
 | Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
 | References | `list_styles` | Bundled and user styles |
 | References | `read_guides` | Design rules, guides, and the slide JSON spec (`slide-json-spec`) |
@@ -274,8 +315,8 @@ Deliberate asymmetries between surfaces — these are design decisions, not gaps
   over the same engine.
 - **HTML output mode adds no MCP tool.** `run_python` rebuilds `output.html`
   through `sdpm.api.refresh_html` after every change to an HTML deck, the CLI
-  has `generate_html` for the no-MCP path, and the remote server is unchanged
-  in phase 1 (HTML decks are local only).
+  has `generate_html` for the no-MCP path, and on the remote server
+  `generate_pptx` finalizes an HTML deck as HTML (see Layer 3).
 - **`search_slides` redesign is deferred.** The KB-backed search tool is kept
   as-is on Layer 3; rethinking it (scope, index lifecycle) is a separate
   theme, tracked outside the attachment/tool-cleanup work.

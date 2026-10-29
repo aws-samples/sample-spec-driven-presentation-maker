@@ -22,7 +22,7 @@ import { useState, useEffect } from "react"
 import Markdown from "react-markdown"
 import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { ChevronRight, Sparkles, FileText as FileTextIcon, Image as ImageIcon } from "lucide-react"
+import { ChevronRight, CodeXml, Sparkles, FileText as FileTextIcon, Image as ImageIcon } from "lucide-react"
 import { ToolCard, ToolCardCompact } from "./ToolCard"
 import { HearingCard } from "./HearingCard"
 import { SnippetBlock } from "./SnippetBlock"
@@ -40,6 +40,7 @@ function extractQuestions(input: Record<string, unknown>): HearingQuestion[] {
 }
 
 const MENTION_RE = new RegExp(`(@Page\\s\\d+|@\\[[^\\]]+\\]|${SLASH_TOKEN_SOURCE})`)
+const FORMAT_HTML_TOKEN_RE = /^@format:(?:html|"html")$/
 const SLIDE_PREVIEW_RE = /\[slide-preview:([a-f0-9]+):([a-z0-9][a-z0-9_-]*)\]/g
 const COLOR_CODE_RE = /(#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3}))\b/g
 
@@ -60,6 +61,17 @@ function renderInlinePreviews(text: string, urls: Record<string, string>): strin
   })
 }
 
+/** Sent-message chip for the `@format:html` token (label shared with the input chip). */
+function FormatHtmlChip() {
+  const t = useTranslations("slashPicker")
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-border bg-foreground/[0.03] px-1.5 py-0.5 align-middle text-xs font-medium text-foreground">
+      <CodeXml className="h-3 w-3" aria-hidden="true" />
+      {t("formatHtml")}
+    </span>
+  )
+}
+
 /**
  * Highlight @Page N and @[DeckName] mentions within a text string,
  * and render inline color swatches next to hex color codes (#RGB / #RRGGBB).
@@ -72,6 +84,9 @@ function highlightMentions(text: string): (string | React.JSX.Element)[] {
   const COMBINED_RE = new RegExp(`(@Page\\s\\d+|@\\[[^\\]]+\\]|${SLASH_TOKEN_SOURCE}|#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\\b)`, "g")
   const parts = text.split(COMBINED_RE)
   return parts.map((part, i) => {
+    if (FORMAT_HTML_TOKEN_RE.test(part)) {
+      return <FormatHtmlChip key={i} />
+    }
     if (MENTION_RE.test(part)) {
       return <span key={i} className="text-blue-400 font-medium">{part}</span>
     }

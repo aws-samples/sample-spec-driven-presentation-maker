@@ -176,6 +176,9 @@ export default function DecksPage() {
                     deckId={ws.isNew ? ws.createdDeckId || undefined : ws.activeDeckId!}
                     deckName={ws.deck?.name}
                     pptxUrl={ws.deck?.pptxUrl}
+                    outputFormat={ws.deck?.outputFormat}
+                    htmlUrl={ws.deck?.htmlUrl}
+                    slideSize={ws.deck?.slideSize}
                     isLoading={ws.waitingForPng || false}
                     scrollToSlide={ws.scrollToSlide}
                     onScrollComplete={() => ws.setScrollToSlide("")}

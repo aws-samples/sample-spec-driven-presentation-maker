@@ -45,6 +45,34 @@ def complete_deck_skeleton(deck: dict) -> dict:
     return completed
 
 
+def new_deck_json(output_format: str = "pptx") -> dict[str, Any]:
+    """deck.json of a new deck: the skeleton, plus ``"outputFormat": "html"`` for HTML decks.
+
+    Raises ValueError for any output_format other than "pptx" or "html".
+    """
+    if output_format not in OUTPUT_FORMATS:
+        raise ValueError(f'output_format must be "pptx" or "html", got {output_format!r}')
+    deck = complete_deck_skeleton(DECK_JSON_SKELETON)
+    if output_format == "html":
+        deck["outputFormat"] = "html"
+    return deck
+
+
+_HTML_BUILD_FILES = frozenset({"deck.json", "specs/outline.md", "specs/art-direction.html", "deck.css"})
+_HTML_SLIDE_RE = re.compile(r"^slides/[^/]+\.html$")
+
+
+def is_html_build_input(rel: str) -> bool:
+    """True when a deck-relative path is an input of the HTML build (a rebuild is due).
+
+    deck.json, specs/outline.md, specs/art-direction.html, deck.css and slides/*.html.
+    """
+    rel = (rel or "").replace("\\", "/")
+    if rel.startswith("./"):
+        rel = rel[2:]
+    return rel in _HTML_BUILD_FILES or bool(_HTML_SLIDE_RE.match(rel))
+
+
 def deck_output_format(deck_json: dict) -> Literal["pptx", "html"]:
     """Return the deck's output format: "pptx" when outputFormat is absent or None.
 

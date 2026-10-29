@@ -86,6 +86,8 @@ def test_layout_missing_and_unknown() -> None:
     '<iframe src="images/page.html"></iframe>',
     '<object data="images/chart.png"></object>',
     '<embed src="images/chart.svg">',
+    '<meta http-equiv="refresh" content="0;url=https://example.com/">',
+    '<svg><meta http-equiv="Refresh" content="5"/></svg>',
 ])
 def test_script(inner: str) -> None:
     assert "script" in _rules(_section(inner))
@@ -217,3 +219,36 @@ def test_format_check_report() -> None:
     assert "(deck.css): 1 issue(s)" in report and "a: 1 issue(s)" in report and "b: OK" in report
     assert "[script] no" in report
     assert "no issues" in format_check_report([])
+
+
+@pytest.mark.parametrize("inner", [
+    '<svg><a><animate attributeName="href" values="0;javascript:alert(1)"/></a></svg>',
+    '<svg><a><animate attributeName="href" values="#a; JavaScript:alert(1) ;#b"/></a></svg>',
+    '<svg><a><set attributeName="href" values="javascript:go()"/></a></svg>',
+    '<svg><animateMotion values="0;javascript:go()"/></svg>',
+    '<svg><animateTransform values="0;javascript:go()"/></svg>',
+])
+def test_javascript_in_svg_animation_values(inner: str) -> None:
+    assert "script" in _rules(_section(inner))
+
+
+def test_svg_animation_values_without_javascript_are_allowed() -> None:
+    assert _rules(_section('<svg><animate attributeName="opacity" values="0;1;0.5"/></svg>')) == []
+
+
+@pytest.mark.parametrize("inner, also_external", [
+    ('<svg><use href="images/s.svg#a"/></svg>', False),
+    ('<svg><use xlink:href="images/s.svg#a"/></svg>', False),
+    ('<svg><use href="https://example.com/s.svg#a"/></svg>', True),
+])
+def test_non_fragment_use_href_is_external_use(inner: str, also_external: bool) -> None:
+    diags = check_slide_html("s", _section(inner), layouts=LAYOUTS)
+    rules = [d["rule"] for d in diags]
+    assert "external-use" in rules
+    assert ("external-url" in rules) is also_external
+    message = next(d["message"] for d in diags if d["rule"] == "external-use")
+    assert "another document's sprite" in message and "inline the SVG" in message
+
+
+def test_fragment_use_href_is_allowed() -> None:
+    assert _rules(_section('<svg><defs><g id="a"/></defs><use href="#a"/><use xlink:href="#a"/></svg>')) == []

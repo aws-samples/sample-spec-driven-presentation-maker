@@ -163,6 +163,23 @@ def test_composer_static_is_workflow_plus_slide_spec_and_cacheable():
     assert messages == []
 
 
+def test_html_composer_static_is_the_html_mode_of_start_composing():
+    parts = MODES["html_composer"].parts
+    assert [p.source.value for p in parts] == ["start_composing", "start_composing"]
+    assert [p.source.pick for p in parts] == ["static.workflow", "static.slide_spec"]
+    assert all(p.source.args == {"mode": "html"} for p in parts)
+    assert all(p.target == "system" for p in parts)
+    assert MODES["html_composer"].use_composer is False
+    assert MODES["html_composer"].allowed_tools == MODES["composer"].allowed_tools
+    client = ContractFakeMCPClient()
+    system_prompt, messages = resolve_parts(parts, mcp_client=client, context={}, enable_cache=False)
+    static = contract.start_composing(mode="html")["static"]
+    assert "# Composer (HTML)" in system_prompt
+    assert static["workflow"] in system_prompt and static["slide_spec"] in system_prompt
+    assert client.calls == [("start_composing", {"mode": "html"})]
+    assert messages == []
+
+
 def test_orchestrator_carries_compose_report_wiring():
     values = [
         part.source.value
