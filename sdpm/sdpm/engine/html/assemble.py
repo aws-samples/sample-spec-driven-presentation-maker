@@ -213,11 +213,30 @@ class _Resolver:
 # emitted unscoped instead of inside ``section[data-slug="…"]{…}``.
 _HOISTED_AT_RULES = frozenset({"keyframes", "-webkit-keyframes", "font-face", "property",
                                "counter-style", "font-feature-values", "font-palette-values"})
-_AT_KEYWORD_RE = re.compile(r"\s*(?:/\*.*?\*/\s*)*@([\w-]+)", re.DOTALL)
+_AT_NAME_RE = re.compile(r"@([\w-]+)")
 _IDENT_RE = re.compile(r"\s+(-?[_a-zA-Z][\w-]*)")
 _ANIMATION_DECL_RE = re.compile(r"(?<![\w-])((?:-webkit-)?animation(?:-name)?\s*:\s*)([^;{}]+)",
                                 re.IGNORECASE)
 _NON_IDENT_RE = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def _leading_at_keyword(chunk: str) -> re.Match[str] | None:
+    """Match the at-keyword (``@name``) a CSS statement starts with, after whitespace and comments.
+
+    A linear scan rather than one regex: ``(?:/\\*.*?\\*/\\s*)*@`` backtracks exponentially
+    on input such as ``/*`` followed by many ``*//*`` with no ``@``.
+    """
+    i, n = 0, len(chunk)
+    while True:
+        while i < n and chunk[i].isspace():
+            i += 1
+        if not chunk.startswith("/*", i):
+            break
+        end = chunk.find("*/", i + 2)
+        if end < 0:
+            return None
+        i = end + 2
+    return _AT_NAME_RE.match(chunk, i)
 
 
 def _top_level_chunks(css: str) -> list[str]:
@@ -260,7 +279,7 @@ def _split_slide_css(css: str, slug: str) -> tuple[list[str], str, dict[str, str
     names: dict[str, str] = {}
     prefix = f"sdpm-{_NON_IDENT_RE.sub('_', slug)}-"
     for chunk in _top_level_chunks(css):
-        m = _AT_KEYWORD_RE.match(chunk)
+        m = _leading_at_keyword(chunk)
         keyword = m.group(1).lower() if m else ""
         if keyword not in _HOISTED_AT_RULES:
             kept.append(chunk)

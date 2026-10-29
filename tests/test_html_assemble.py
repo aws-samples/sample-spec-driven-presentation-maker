@@ -274,6 +274,17 @@ def test_non_nestable_at_rules_are_hoisted_and_keyframes_renamed(tmp_path: Path)
     assert doc.xpath('//div[@class="dot"]')[0].get("style") == "animation:sdpm-anim-pulse 2s"
 
 
+def test_leading_at_keyword_skips_comments_without_backtracking() -> None:
+    from sdpm.engine.html.assemble import _leading_at_keyword
+
+    m = _leading_at_keyword(" /* a */\n/* b */ @keyframes pulse {}")
+    assert m is not None and m.group(1) == "keyframes"
+    assert _leading_at_keyword(".dot { color: red }") is None
+    assert _leading_at_keyword("/* unterminated @keyframes x {}") is None
+    # CodeQL py/redos input for the former regex: "/*" plus many "*//*" and no "@".
+    assert _leading_at_keyword("/*" + "*//*" * 50_000) is None
+
+
 def test_srcset_object_and_svg_image_refs_are_embedded(tmp_path: Path) -> None:
     deck = _make_deck(tmp_path)
     (deck / "images").mkdir()
