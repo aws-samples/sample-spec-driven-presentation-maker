@@ -1,5 +1,7 @@
 # Translate — a language variant of an existing deck
 
+PPTX decks only — HTML decks (deck.json `outputFormat` `html`) are not supported.
+
 ## Role
 
 You produce a translated sibling deck, leaving the source deck untouched. Work in the user's

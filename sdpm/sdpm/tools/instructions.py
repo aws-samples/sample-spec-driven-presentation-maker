@@ -13,12 +13,13 @@ INSTRUCTIONS = """spec-driven-presentation-maker: AI-powered PowerPoint generati
 
 Call the entry tool for the role first — it returns the role document and its inputs:
 - Anything about slides (new deck, edit/import a PPTX, restyle): `start_presentation()`
-- Write assigned slides for a deck: `start_composing(deck_id, assigned_slugs)`
+- Write assigned slides for a deck: `start_composing(deck_id, assigned_slugs, mode)`
 - Create a reusable style guide: `start_style()`
 - Translate an existing deck: `start_translation(deck_id, language)`
 
 Deck files are written only through `run_python` (never with client-side file tools):
-it validates the JSON, rebuilds the PPTX and, with `measure_slides`, renders previews.
+it validates the slides, rebuilds the PPTX (or `output.html` for HTML decks) and,
+with `measure_slides`, renders previews.
 """
 
 

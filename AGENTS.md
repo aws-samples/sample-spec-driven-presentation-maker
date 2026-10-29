@@ -64,8 +64,9 @@ docs/        Documentation
 are peers. `sdpm.tools` defines every MCP tool once — names, schemas,
 docstrings, logic — and both servers register those functions directly. Role and
 procedure text is content, not client config: `sdpm/references/workflows/<role>.md`
-(orchestrator, composer, style, translate) is the single definition for each role,
-delivered to any MCP client by the `start_*` entry tools (`start_presentation`,
+(orchestrator, composer, style, translate) is the single definition for each role — one
+document per mode for the composer (`composer.md` for pptx, `composer-html.md` for html),
+the mode chosen by the spawner through `start_composing(..., mode=…)` — delivered to any MCP client by the `start_*` entry tools (`start_presentation`,
 `start_composing`, `start_style`, `start_translation`), each of which also returns what
 that role reads first. Nothing lives on the client side: `sdpm register`
 (`servers/local/client_config.py`) writes the one line that starts the server into each
@@ -75,8 +76,10 @@ See [Architecture](docs/en/architecture.md).
 ## Conventions
 
 - Engine source of truth: `sdpm/sdpm/` — servers must stay thin binds of `sdpm.tools`
-- Role + procedure text lives only in `sdpm/references/workflows/<role>.md`; `SKILL.md`,
-  the ACP agent definitions and server instructions are dispatch/environment only
+- Role + procedure text lives only in `sdpm/references/workflows/<role>.md`, one document
+  per mode (composer: `composer.md` / `composer-html.md`, chosen by the spawner via
+  `start_composing`'s `mode` argument); `SKILL.md`, the ACP agent definitions and server
+  instructions are dispatch/environment only
 - Client configuration is generated, never hand-written: one template in
   `servers/local/client_config.py` (absolute `uv` + absolute checkout, no launcher, no
   `PATH`), rendered per client; `tests/test_client_config.py` guards it. Both launchers

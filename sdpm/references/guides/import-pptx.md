@@ -6,6 +6,8 @@ category: guide
 
 # Import PPTX (Edit Existing Presentation)
 
+PPTX decks only — HTML decks (deck.json `outputFormat` `html`) are not supported.
+
 Invoke this guide when **both** are true:
 
 1. `read_attachment` response contains `guideInstruction` pointing to
