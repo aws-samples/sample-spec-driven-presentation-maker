@@ -2,7 +2,7 @@ name: Installer
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'dev/**']
     paths:
       - "scripts/install/**"
       - "servers/local/client_config.py"
@@ -10,7 +10,7 @@ on:
       - ".gitignore"
       - ".github/workflows/installer.yml"
   pull_request:
-    branches: [main]
+    branches: [main, 'dev/**']
     paths:
       - "scripts/install/**"
       - "servers/local/client_config.py"
